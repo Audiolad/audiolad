@@ -129,14 +129,28 @@ export function createAnalyticsAuthSyncController() {
       ? "signup"
       : "link";
 
-    while (isFlowCompleted(pair, flow) || pair.inflight) {
+    while (true) {
       if (isFlowCompleted(pair, flow)) {
         logDedupe("completed", event);
         return { ran: false, reason: "completed", flow: null };
       }
 
+      if (!pair.inflight) {
+        break;
+      }
+
       logDedupe("inflight", event);
-      await pair.inflight;
+      const waited = await pair.inflight;
+      if (isFlowCompleted(pair, flow)) {
+        logDedupe("completed", event);
+        return { ran: false, reason: "completed", flow: null };
+      }
+
+      // Same-flow waiters must not tight-retry after a failed attempt.
+      // A later lifecycle event (new sync after inflight is gone) can try once.
+      if (waited?.flow === flow) {
+        return { ran: false, reason: "failed", flow: null };
+      }
     }
 
     const work = (async (): Promise<AnalyticsAuthSyncResult> => {

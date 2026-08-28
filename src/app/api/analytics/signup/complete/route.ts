@@ -97,10 +97,9 @@ export async function POST(request: Request) {
     if (result.error) {
       guard.release("error");
       console.error("analytics_signup_complete_error", result.error.message);
-      return NextResponse.json(
-        { recorded: false, reason: "degraded" },
-        { status: 200 },
-      );
+      // Fail-soft after the RPC returns. Analytics must never 500 login/signup
+      // or amplify 55P03 / PGRST003 retries.
+      return new NextResponse(null, { status: 204 });
     }
 
     guard.release("ok");
@@ -119,9 +118,6 @@ export async function POST(request: Request) {
       "analytics_signup_complete_error",
       error instanceof Error ? error.message : "unknown",
     );
-    return NextResponse.json(
-      { recorded: false, reason: "degraded" },
-      { status: 200 },
-    );
+    return new NextResponse(null, { status: 204 });
   }
 }

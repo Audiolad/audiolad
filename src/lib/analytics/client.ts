@@ -170,13 +170,23 @@ export function resolveAnalyticsSessionId(): string | null {
 function isSuccessfulLinkAttempt(
   result: PostJsonResult<{ linked?: boolean; reason?: string }>,
 ): boolean {
-  return result.ok && result.data?.reason !== "degraded" && Boolean(result.data?.linked);
+  return (
+    result.status === 200 &&
+    result.ok &&
+    result.data?.reason !== "degraded" &&
+    Boolean(result.data?.linked)
+  );
 }
 
 function isSuccessfulSignupAttempt(
   result: PostJsonResult<{ recorded?: boolean; reason?: string }>,
 ): boolean {
-  return result.ok && result.data?.reason !== "degraded" && Boolean(result.data?.recorded);
+  return (
+    result.status === 200 &&
+    result.ok &&
+    result.data?.reason !== "degraded" &&
+    Boolean(result.data?.recorded)
+  );
 }
 
 export async function ensureAnalyticsSession(
@@ -258,7 +268,7 @@ export async function linkAnalyticsSessionUser(): Promise<boolean> {
 
   if (!isSuccessfulLinkAttempt(result)) {
     console.info("analytics_session_link_client", {
-      event: "degraded",
+      event: result.status === 204 || result.data?.reason === "degraded" ? "degraded" : "failed",
       status: result.status,
       error: result.error,
     });
@@ -301,9 +311,15 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
     return signupCompleteFlight.hasSettled(key);
   }
 
-  if (!result.ok || result.data?.reason === "degraded") {
+  if (!isSuccessfulSignupAttempt(result)) {
     console.info("analytics_signup_complete_client", {
-      event: "degraded",
+      event:
+        result.status === 204 ||
+        result.status === 429 ||
+        result.status === 503 ||
+        result.data?.reason === "degraded"
+          ? "degraded"
+          : "failed",
       status: result.status,
       error: result.error,
     });

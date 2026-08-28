@@ -48,13 +48,6 @@ export default function AnalyticsAuthLinker() {
       flushPending();
     };
 
-    void supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user?.id;
-      if (userId) {
-        remember("INITIAL_SESSION", userId);
-      }
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -75,7 +68,10 @@ export default function AnalyticsAuthLinker() {
 
       if (event === "INITIAL_SESSION") {
         remember("INITIAL_SESSION", session.user.id);
+        return;
       }
+
+      // TOKEN_REFRESHED and other non-transition events must not link or signup.
     });
 
     const unsubscribeSession = subscribeSessionState(() => {

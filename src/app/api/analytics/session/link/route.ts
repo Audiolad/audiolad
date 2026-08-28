@@ -84,7 +84,9 @@ export async function POST(request: Request) {
     if (result.error) {
       guard.release("error");
       console.error("analytics_session_link_error", result.error.message);
-      return NextResponse.json({ linked: false, reason: "degraded" }, { status: 200 });
+      // Fail-soft after the RPC returns. Do not 500 — clients must not retry
+      // 55P03 / PGRST003 in this page lifecycle.
+      return new NextResponse(null, { status: 204 });
     }
 
     guard.release("ok");
@@ -95,6 +97,6 @@ export async function POST(request: Request) {
       "analytics_session_link_error",
       error instanceof Error ? error.message : "unknown",
     );
-    return NextResponse.json({ linked: false, reason: "degraded" }, { status: 200 });
+    return new NextResponse(null, { status: 204 });
   }
 }
