@@ -31,6 +31,12 @@ import {
   isAnalyticsRetryItemReady,
   shouldRetryAnalyticsFailure,
 } from "../src/lib/analytics/retry-queue.ts";
+import {
+  STORM_EDGE_IP_EXAMPLE,
+  getTrustedClientIp,
+  isCloudflareIp,
+  isTrustedProxyIp,
+} from "../src/lib/http/trusted-client-ip.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,11 +45,26 @@ function read(rel) {
 }
 
 function makeRequest(ip, bearer) {
-  const headers = { "x-forwarded-for": ip };
+  const headers = {
+    "x-real-ip": ip,
+    "x-forwarded-for": ip,
+  };
   if (bearer) {
     headers.authorization = `Bearer ${bearer}`;
   }
   return new Request("https://audiolad.ru/api/analytics/session/link", { headers });
+}
+
+function makeCloudflareRequest(clientIp, edgeIp = STORM_EDGE_IP_EXAMPLE, extra = {}) {
+  return new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "x-real-ip": edgeIp,
+      "x-forwarded-for": `${clientIp}, ${edgeIp}`,
+      "cf-connecting-ip": clientIp,
+      "cf-ray": "8a1b2c3d4e5f6a7b-DME",
+      ...extra,
+    },
+  });
 }
 
 function encodeJwt(sub) {
@@ -416,6 +437,19 @@ function testSourceContracts() {
   assert.match(protection, /PGRST003/);
   assert.match(protection, /55P03/);
   assert.equal(protection.includes("Promise.race"), false);
+  assert.match(protection, /getTrustedClientIp/);
+  assert.match(protection, /Never used for authorization/);
+  assert.match(read("src/lib/http/trusted-client-ip.ts"), /cf-connecting-ip/);
+  assert.match(read("src/app/api/analytics/signup/complete/route.ts"), /createClientFromRequest/);
+  assert.match(read("src/app/api/analytics/signup/complete/route.ts"), /getUser/);
+  assert.equal(
+    read("src/app/api/analytics/signup/complete/route.ts").includes("peekJwtSubject"),
+    false,
+  );
+  assert.equal(
+    read("src/app/api/analytics/session/link/route.ts").includes("peekJwtSubject"),
+    false,
+  );
 
   const jwt = encodeJwt("user-z");
   assert.equal(peekJwtSubject(jwt), "user-z");
@@ -436,6 +470,113 @@ function testSourceContracts() {
       }),
     true,
   );
+}
+
+function testTrustedClientIpExtraction() {
+  assert.equal(isCloudflareIp(STORM_EDGE_IP_EXAMPLE), true, "104.30.175.37 is Cloudflare-owned");
+  assert.equal(isTrustedProxyIp(STORM_EDGE_IP_EXAMPLE), true);
+  assert.equal(isTrustedProxyIp("127.0.0.1"), true);
+  assert.equal(isTrustedProxyIp("203.0.113.10"), false);
+
+  const viaCf = makeCloudflareRequest("203.0.113.50");
+  assert.equal(getTrustedClientIp(viaCf), "203.0.113.50");
+
+  const nginxWithoutCfHeaders = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "x-real-ip": STORM_EDGE_IP_EXAMPLE,
+      "x-forwarded-for": `203.0.113.50, ${STORM_EDGE_IP_EXAMPLE}`,
+    },
+  });
+  assert.equal(
+    getTrustedClientIp(nginxWithoutCfHeaders),
+    "203.0.113.50",
+    "nginx X-Real-IP=edge + XFF walk must yield the real client",
+  );
+
+  const spoofed = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "x-real-ip": "203.0.113.10",
+      "x-forwarded-for": "8.8.8.8, 203.0.113.10",
+    },
+  });
+  assert.equal(
+    getTrustedClientIp(spoofed),
+    "203.0.113.10",
+    "untrusted XFF leftmost hop must be ignored",
+  );
+
+  const spoofedXffOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "x-forwarded-for": `8.8.8.8, ${STORM_EDGE_IP_EXAMPLE}`,
+    },
+  });
+  assert.equal(
+    getTrustedClientIp(spoofedXffOnly),
+    "unknown",
+    "direct client must not become trusted by appending a Cloudflare hop",
+  );
+
+  const cfHeadersWithoutRealIp = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "cf-connecting-ip": "203.0.113.77",
+      "cf-ray": "8a1b2c3d4e5f6a7b-DME",
+    },
+  });
+  assert.equal(getTrustedClientIp(cfHeadersWithoutRealIp), "203.0.113.77");
+
+  const edgeOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {
+      "x-real-ip": STORM_EDGE_IP_EXAMPLE,
+      "x-forwarded-for": STORM_EDGE_IP_EXAMPLE,
+    },
+  });
+  assert.equal(
+    getTrustedClientIp(edgeOnly),
+    "unknown",
+    "Cloudflare/proxy peer must not become the client cap",
+  );
+
+  assert.equal(isCloudflareIp(`::ffff:${STORM_EDGE_IP_EXAMPLE}`), true);
+}
+
+async function testDifferentRealClientsDoNotShareCap() {
+  resetAnalyticsRpcProtectionForTests();
+  const first = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request: makeCloudflareRequest("203.0.113.21"),
+    sessionId: "44444444-4444-4444-8444-444444444444",
+    userId: "user-d",
+  });
+  assert.equal(first.action, "rpc");
+  first.release("ok");
+
+  const second = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request: makeCloudflareRequest("203.0.113.22"),
+    sessionId: "55555555-5555-4555-8555-555555555555",
+    userId: "user-e",
+  });
+  assert.equal(second.action, "rpc", "different real client IPs must not share the edge cap");
+  second.release("ok");
+}
+
+async function testManyUsersBehindOneEdgeDoNotBlockEachOther() {
+  resetAnalyticsRpcProtectionForTests();
+  let rpc = 0;
+  for (let i = 0; i < 25; i += 1) {
+    const clientIp = `198.51.100.${i + 1}`;
+    const decision = guardAnalyticsHeavyRpc({
+      route: "signup_complete",
+      request: makeCloudflareRequest(clientIp),
+      sessionId: `66666666-6666-4666-8666-${String(i).padStart(12, "0")}`,
+      userId: `edge-user-${i}`,
+    });
+    if (decision.action === "rpc") {
+      rpc += 1;
+      decision.release("ok");
+    }
+  }
+  assert.equal(rpc, 25, "25 users behind one Cloudflare edge must not share a 20/min cap");
 }
 
 function testExistingRateLimiterStillUsed() {
@@ -460,6 +601,9 @@ async function main() {
   testRetryBackoffNoAmplify();
   testSqlIdempotentAndLockPlacement();
   testSourceContracts();
+  testTrustedClientIpExtraction();
+  await testDifferentRealClientsDoNotShareCap();
+  await testManyUsersBehindOneEdgeDoNotBlockEachOther();
   testExistingRateLimiterStillUsed();
   console.log("analytics-rpc-protection-unit: ok");
 }

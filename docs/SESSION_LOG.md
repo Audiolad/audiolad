@@ -10,6 +10,7 @@
 
 - Frontend: `AnalyticsAuthLinker` больше не линкует на `TOKEN_REFRESHED`. `SIGNED_IN` канонически вызывает только `signup/complete`. Dedupe на пару session+user.
 - Server: rate limit + in-flight/success cache + circuit breaker до RPC на `/api/analytics/session/link` и `/api/analytics/signup/complete`. AbortController timeout. Fail-open.
+- Rebase PR #155 onto `origin/main` (`e03b5aa9`). Client IP cap: `getTrustedClientIp` — Cloudflare edge (`104.30.175.37`) не visitor; untrusted XFF игнорируется.
 - SQL: `20260901120000_analytics_heavy_rpc_idempotent.sql` — cheap return для уже связанной сессии; advisory lock только на мутацию first-touch.
 - Track retry: backoff + jitter; PGRST003/55P03 не усиливаются.
 

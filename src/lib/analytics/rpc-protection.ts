@@ -1,5 +1,6 @@
 import { ANALYTICS_RPC_TIMEOUT_MS } from "@/lib/analytics/constants";
 import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
+import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 
 export { ANALYTICS_RPC_TIMEOUT_MS };
 export const ANALYTICS_HEAVY_RPC_PAIR_LIMIT = 3;
@@ -35,11 +36,15 @@ function nowMs(): number {
 }
 
 function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || request.headers.get("x-real-ip") || "unknown";
+  return getTrustedClientIp(request);
 }
 
-/** Decode JWT `sub` for a rate-limit key only. Does not verify the token. */
+/**
+ * Decode JWT `sub` for a non-critical rate-limit discriminator only.
+ * Never used for authorization, ownership, data access, or to bypass
+ * the session/IP guard. Signup/link auth stays on createClientFromRequest
+ * / getUser / cookies.
+ */
 export function peekJwtSubject(token: string | null | undefined): string | null {
   if (typeof token !== "string") {
     return null;

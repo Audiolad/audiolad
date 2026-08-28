@@ -14,6 +14,7 @@
 
 - Frontend: link/signup только на реальный anonymous → authenticated переход. `TOKEN_REFRESHED` не вызывает RPC. `SIGNED_IN` канонически идёт только в signup/complete. In-flight + completed dedupe на пару session+user.
 - Server: process-local rate limit (`checkAnalyticsRateLimit`), in-flight/success cache и circuit breaker **до** RPC. AbortController timeout, без `Promise.race`.
+- IP cap: только trusted-proxy extraction (`getTrustedClientIp`). `104.30.175.37` — Cloudflare edge, не visitor. Не использовать raw socket / edge IP как общий cap. JWT `sub` — только non-critical discriminator, не authz.
 - SQL: уже принадлежащая пользователю сессия возвращается сразу; advisory lock только если first-touch ещё нет.
 - Track retry: ограниченный backoff + jitter; PGRST003/55P03/503/504 не ретраятся в tight loop.
 
