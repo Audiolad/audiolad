@@ -154,9 +154,15 @@ function runIsolatedSql() {
   );
 }
 
-if (dockerAvailable() || localPostgresAvailable()) {
+const skipIsolatedSql = process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1";
+
+if (!skipIsolatedSql && (dockerAvailable() || localPostgresAvailable())) {
   runIsolatedSql();
   console.log("playlist-catalog-foundation-sql-unit: parse + isolated sql ok");
 } else {
-  console.log("playlist-catalog-foundation-sql-unit: parse-only ok (no local postgres)");
+  console.log(
+    skipIsolatedSql
+      ? "playlist-catalog-foundation-sql-unit: parse-only ok (isolated SQL disabled)"
+      : "playlist-catalog-foundation-sql-unit: parse-only ok (no local postgres)",
+  );
 }

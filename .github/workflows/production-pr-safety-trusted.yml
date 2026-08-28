@@ -28,12 +28,24 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout trusted main history
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
+      - name: Create trusted main object store
+        run: |
+          set -euo pipefail
+          OBJECT_STORE="$(mktemp -d)"
+          TRUSTED_DIR="$(mktemp -d)"
+          git -C "${OBJECT_STORE}" init --quiet
+          git -C "${OBJECT_STORE}" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${OBJECT_STORE}" fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          TRUSTED_MAIN_SHA="$(git -C "${OBJECT_STORE}" rev-parse refs/remotes/origin/main)"
+          git -C "${OBJECT_STORE}" show \
+            "${TRUSTED_MAIN_SHA}:scripts/production-pr-safety-guard.mjs" \
+            > "${TRUSTED_DIR}/production-pr-safety-guard.mjs"
+          git -C "${OBJECT_STORE}" show \
+            "${TRUSTED_MAIN_SHA}:scripts/production-pr-safety-status.mjs" \
+            > "${TRUSTED_DIR}/production-pr-safety-status.mjs"
+          printf 'OBJECT_STORE=%s\n' "${OBJECT_STORE}" >> "${GITHUB_ENV}"
+          printf 'TRUSTED_DIR=%s\n' "${TRUSTED_DIR}" >> "${GITHUB_ENV}"
+          printf 'TRUSTED_MAIN_SHA=%s\n' "${TRUSTED_MAIN_SHA}" >> "${GITHUB_ENV}"
 
       - name: Resolve and validate current main and PR head
         id: refs
@@ -68,8 +80,8 @@ jobs:
             echo "BLOCK: GitHub API returned an invalid PR head clone URL" >&2
             exit 1
           fi
-          git fetch --no-tags origin "$main_sha"
-          git fetch --no-tags "$pr_clone_url" "$pr_sha"
+          git -C "${OBJECT_STORE}" fetch --no-tags origin "$main_sha"
+          git -C "${OBJECT_STORE}" fetch --no-tags "$pr_clone_url" "$pr_sha"
           printf 'main_sha=%s\n' "$main_sha" >> "$GITHUB_OUTPUT"
           printf 'pr_sha=%s\n' "$pr_sha" >> "$GITHUB_OUTPUT"
           printf 'pr_state=%s\n' "$pr_state" >> "$GITHUB_OUTPUT"
@@ -113,7 +125,9 @@ jobs:
           PR_SAFETY_PR_BASE_REF: ${{ steps.refs.outputs.pr_base_ref }}
           PR_SAFETY_WORKFLOW_SHA: ${{ github.sha }}
           AUDIOLAD_PRODUCTION_HEALTH_URL: https://audiolad.ru/api/health/build
-        run: node scripts/production-pr-safety-guard.mjs
+        run: |
+          cd "${OBJECT_STORE}"
+          node "${TRUSTED_DIR}/production-pr-safety-guard.mjs"
 
       - name: Resolve final trusted status
         id: final-status
@@ -121,7 +135,7 @@ jobs:
         env:
           GUARD_STATE: ${{ steps.guard.outputs.status_state }}
           GUARD_OUTCOME: ${{ steps.guard.outcome }}
-        run: node scripts/production-pr-safety-status.mjs
+        run: node "${TRUSTED_DIR}/production-pr-safety-status.mjs"
 
       - name: Set final trusted status on PR head
         if: always() && github.event_name == 'pull_request_target' && steps.refs.outcome == 'success'
@@ -138,3 +152,7 @@ jobs:
             -f context='Production / PR Safety' \
             -f description="$STATUS_DESCRIPTION" \
             -f target_url="$RUN_URL"
+
+      - name: Remove trusted temporary stores
+        if: always()
+        run: rm -rf "${OBJECT_STORE}" "${TRUSTED_DIR}"
