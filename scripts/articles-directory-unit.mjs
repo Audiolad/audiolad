@@ -102,6 +102,7 @@ import { TARO_BYVSHAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-b
 import { TARO_RABOTA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-rabota-blizhayshee-budushchee.ts";
 import { TARO_NA_RABOTU_NA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-na-rabotu-na-blizhayshee-budushchee.ts";
 import { VOPROSY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-na-rabotu.ts";
+import { TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE } from "../src/lib/seo/listens/content/taro-kakaya-rabota-mne-podhodit.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2312,6 +2313,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyFifthListenHref}`,
     ),
     "directory JSON-LD includes seventy-fifth listen href",
+  );
+
+  const seventySixthListenHref = "/listens/taro-kakaya-rabota-mne-podhodit";
+  const seventySixthListenCard = data.articles.find((card) => card.href === seventySixthListenHref);
+  assert(seventySixthListenCard, "seventy-sixth indexable listen page is listed");
+  assert(
+    seventySixthListenCard.title === "Таро – какая работа мне подходит и какую сферу выбрать | АудиоЛад",
+    "seventy-sixth listen directory title",
+  );
+  assert(
+    seventySixthListenCard.description === TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE.description,
+    "seventy-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-kakaya-rabota-mne-podhodit",
+    ),
+    "no /articles duplicate for seventy-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventySixthListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-sixth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
