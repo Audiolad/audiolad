@@ -21,7 +21,9 @@ import {
   COURSE_BUILDER_PDF_TOO_LARGE,
   COURSE_BUILDER_PDF_WRONG_TYPE,
   COURSE_BUILDER_SECTION_TITLE,
+  COURSE_PUBLISH_EMPTY_LESSON_CODE,
   COURSE_PUBLISH_MISSING_CONTENT_CODE,
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
   defaultCourseLessonTitle,
   evaluateCoursePublishContentGate,
   getCourseBuilderAudioUploadError,
@@ -245,13 +247,15 @@ assert.equal(
   false,
 );
 
-assert.deepEqual(
-  countCoursePublishContentFromLessons([
-    { blocks: [{}, {}] },
-    { blocks: [{}] },
-  ]),
-  { lessonCount: 2, blockCount: 3 },
-);
+const countedLessons = [
+  { blocks: [{}, {}] },
+  { blocks: [{}] },
+];
+assert.deepEqual(countCoursePublishContentFromLessons(countedLessons), {
+  lessonCount: 2,
+  blockCount: 3,
+  lessons: countedLessons,
+});
 
 assert.equal(
   evaluateCoursePublishContentGate({
@@ -268,10 +272,22 @@ assert.equal(
     publicationClass: "course",
     productKind: "practice",
     publishedAt: null,
+    lessonCount: 0,
+    blockCount: 0,
+    lessons: [],
+  }).code,
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+);
+assert.equal(
+  evaluateCoursePublishContentGate({
+    publicationClass: "course",
+    productKind: "practice",
+    publishedAt: null,
     lessonCount: 1,
     blockCount: 0,
+    lessons: [{ id: "lesson-1", title: "Урок 1", blocks: [] }],
   }).code,
-  COURSE_PUBLISH_MISSING_CONTENT_CODE,
+  COURSE_PUBLISH_EMPTY_LESSON_CODE,
 );
 assert.equal(
   evaluateCoursePublishContentGate({
@@ -280,8 +296,33 @@ assert.equal(
     publishedAt: null,
     lessonCount: 1,
     blockCount: 1,
+    lessons: [
+      {
+        id: "lesson-1",
+        title: "Урок 1",
+        blocks: [{ type: "text", payload: { text: "Текст урока" } }],
+      },
+    ],
   }).ok,
   true,
+);
+assert.equal(
+  evaluateCoursePublishContentGate({
+    publicationClass: "course",
+    productKind: "practice",
+    publishedAt: null,
+    lessonCount: 1,
+    blockCount: 1,
+    lessons: [
+      {
+        id: "lesson-1",
+        title: "Урок 1",
+        blocks: [{ type: "text", payload: { text: "" } }],
+      },
+    ],
+  }).ok,
+  false,
+  "empty text is not valid course content",
 );
 assert.equal(
   evaluateCoursePublishContentGate({
@@ -290,8 +331,10 @@ assert.equal(
     publishedAt: "2026-01-01T00:00:00.000Z",
     lessonCount: 0,
     blockCount: 0,
+    lessons: [],
   }).ok,
-  true,
+  false,
+  "publishedAt does not skip empty course lessons",
 );
 assert.equal(
   evaluateCoursePublishContentGate({
@@ -317,7 +360,8 @@ assert.equal(
     productKind: "practice",
     blockCount: 0,
   }),
-  false,
+  true,
+  "courses never require leftover flat audio_items",
 );
 
 assert.equal(shouldCreateDefaultAudioItem("course"), false);
@@ -481,7 +525,17 @@ assert.equal(
 
 const unpublishedWithContent = evaluatePublishReadiness(coursePractice(), [], {
   activeTopicCount: 1,
-  courseContent: { lessonCount: 1, blockCount: 1 },
+  courseContent: {
+    lessonCount: 1,
+    blockCount: 1,
+    lessons: [
+      {
+        id: "lesson-1",
+        title: "Урок 1",
+        blocks: [{ type: "text", payload: { text: "Текст урока" } }],
+      },
+    ],
+  },
 });
 assert.equal(unpublishedWithContent.ok, true);
 assert.equal(
@@ -497,10 +551,18 @@ const legacyPublished = evaluatePublishReadiness(
   [audioItem()],
   {
     activeTopicCount: 1,
-    courseContent: { lessonCount: 0, blockCount: 0 },
+    courseContent: { lessonCount: 0, blockCount: 0, lessons: [] },
   },
 );
-assert.equal(legacyPublished.ok, true);
+assert.equal(
+  legacyPublished.ok,
+  false,
+  "publishedAt does not exempt a lesson-less course from the per-lesson rule",
+);
+assert.equal(
+  legacyPublished.firstFailure?.code,
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+);
 
 const practiceDraft = evaluatePublishReadiness(
   coursePractice({

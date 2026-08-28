@@ -299,6 +299,7 @@ function buildCorePublishRequirements(
     publishedAt: practice.published_at,
     lessonCount: courseContent?.lessonCount ?? 0,
     blockCount,
+    lessons: courseContent?.lessons,
   });
   const courseContentFailure = courseContentCheck.ok
     ? null
@@ -465,7 +466,7 @@ export async function publishPracticeProduct(
   });
 
   if (error) {
-    const publishMapped = mapPublishRpcError(error.message);
+    const publishMapped = mapPublishRpcError(error);
     if (publishMapped) {
       throw publishMapped;
     }
@@ -489,7 +490,7 @@ export async function unpublishPracticeProduct(
   });
 
   if (error) {
-    const mapped = mapPublishRpcError(error.message);
+    const mapped = mapPublishRpcError(error);
     if (mapped) {
       throw mapped;
     }

@@ -266,6 +266,7 @@ export async function getAdminProductDiagnostics(
     audioItems,
     accessStatus,
     activeTopicCount: topicTitles.length,
+    courseContent,
   });
   const submitEligibility = evaluateAuthorSubmitEligibility({
     status: practice.status,

@@ -4,11 +4,16 @@ import { mapModerationRpcError } from "@/lib/author-products/moderation";
 import type { PracticeRow } from "@/lib/author-products/types";
 import { coercePracticeRow } from "@/lib/author-products/types";
 
-function mapLifecycleRpcError(message: string): {
+function mapLifecycleRpcError(error: {
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+}): {
   status: number;
   code: string;
   message: string;
 } {
+  const message = typeof error.message === "string" ? error.message : "";
   const normalized = message.toLowerCase();
 
   if (normalized.includes("lifecycle_state_changed")) {
@@ -38,7 +43,7 @@ function mapLifecycleRpcError(message: string): {
     };
   }
 
-  return mapModerationRpcError(message);
+  return mapModerationRpcError(error);
 }
 
 function coerceRpcPractice(data: unknown, fallbackMessage: string): PracticeRow {
@@ -62,7 +67,7 @@ export async function unpublishApprovedPractice(
   });
 
   if (error) {
-    throw mapLifecycleRpcError(error.message);
+    throw mapLifecycleRpcError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось снять продукт с публикации.");
@@ -77,7 +82,7 @@ export async function startPracticeEditing(
   });
 
   if (error) {
-    throw mapLifecycleRpcError(error.message);
+    throw mapLifecycleRpcError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось перейти к редактированию.");
@@ -94,7 +99,7 @@ export async function softDeletePractice(
   });
 
   if (error) {
-    throw mapLifecycleRpcError(error.message);
+    throw mapLifecycleRpcError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось удалить продукт.");
