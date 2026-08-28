@@ -28,6 +28,7 @@ type StartRow = {
   user_id: string | null;
   started_at: string;
   expires_at: string;
+  sale_price_snapshot: number;
 };
 
 export function mapPricePromotionRow(row: PromotionRow): PricePromotionRecord | null {
@@ -69,6 +70,7 @@ export function mapPersonalPromotionStart(
     userId: row.user_id,
     startedAt: row.started_at,
     expiresAt: row.expires_at,
+    salePriceSnapshot: row.sale_price_snapshot,
   };
 }
 
@@ -76,4 +78,4 @@ export const PRICE_PROMOTION_SELECT =
   "id, practice_id, name, promotion_type, sale_price, starts_at, ends_at, duration_seconds, above_timer_text, below_button_text, is_active, start_token, created_at, updated_at";
 
 export const PRICE_PROMOTION_START_SELECT =
-  "id, promotion_id, visitor_id, user_id, started_at, expires_at";
+  "id, promotion_id, visitor_id, user_id, started_at, expires_at, sale_price_snapshot";

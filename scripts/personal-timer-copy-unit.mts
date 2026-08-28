@@ -53,6 +53,7 @@ function start(overrides: Record<string, unknown> = {}) {
     userId: null,
     startedAt: "2026-08-23T10:00:00.000Z",
     expiresAt: "2026-08-23T10:20:00.000Z",
+    salePriceSnapshot: 499,
     ...overrides,
   };
 }

@@ -54,6 +54,7 @@ export function buildSyntheticAuthorPromoStart(input: {
   promotionId: string;
   durationSeconds: number;
   now: Date;
+  salePriceSnapshot: number;
 }): PersonalPromotionStart {
   const startedAt = input.now.toISOString();
   const expiresAt = new Date(
@@ -67,6 +68,7 @@ export function buildSyntheticAuthorPromoStart(input: {
     userId: null,
     startedAt,
     expiresAt,
+    salePriceSnapshot: input.salePriceSnapshot,
   };
 }
 
@@ -108,6 +110,7 @@ export function resolveAuthorPromoPreviewPrice(input: {
     promotionId: previewPromotion.id,
     durationSeconds,
     now,
+    salePriceSnapshot: previewPromotion.salePrice,
   });
 
   const resolved = resolvePracticePrice({
