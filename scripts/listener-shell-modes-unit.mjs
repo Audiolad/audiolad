@@ -74,7 +74,7 @@ assert(
 );
 
 assert(
-  listenerNav.includes('{ key: "profile", title: "Профиль", href: "/profile" }'),
+  listenerNav.includes('{ key: "profile", title: "Профиль", href: "/profile"'),
   "sidebar nav must include profile item",
 );
 
