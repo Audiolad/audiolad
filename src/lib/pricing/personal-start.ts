@@ -1,4 +1,29 @@
-import type { PersonalPromotionStart } from "@/lib/pricing/types";
+import { PRICE_PROMOTION_TYPES, type PersonalPromotionStart, type PricePromotionRecord } from "@/lib/pricing/types";
+
+export const PERSONAL_COUNTDOWN_VIEWER_STATES = {
+  INACTIVE: "inactive",
+  NEVER_STARTED: "never_started",
+  ACTIVE: "active",
+  EXPIRED: "expired",
+} as const;
+
+export type PersonalCountdownViewerState =
+  (typeof PERSONAL_COUNTDOWN_VIEWER_STATES)[keyof typeof PERSONAL_COUNTDOWN_VIEWER_STATES];
+
+export function isPersonalCountdownDefinitionActive(
+  promotion: Pick<
+    PricePromotionRecord,
+    "promotionType" | "isActive" | "durationSeconds"
+  >,
+): boolean {
+  return (
+    promotion.promotionType === PRICE_PROMOTION_TYPES.PERSONAL_COUNTDOWN &&
+    promotion.isActive &&
+    typeof promotion.durationSeconds === "number" &&
+    Number.isInteger(promotion.durationSeconds) &&
+    promotion.durationSeconds > 0
+  );
+}
 
 export type PersonalStartRow = PersonalPromotionStart;
 
@@ -96,6 +121,33 @@ export function isPersonalStartActive(
     nowMs >= startedAt &&
     nowMs < expiresAt
   );
+}
+
+/**
+ * Viewer-state for one personal_countdown definition.
+ * NEVER_STARTED (no start row) is not EXPIRED (start exists, window consumed).
+ */
+export function classifyPersonalCountdownViewerState(
+  promotion: Pick<
+    PricePromotionRecord,
+    "id" | "promotionType" | "isActive" | "durationSeconds"
+  >,
+  starts: PersonalStartRow[],
+  nowMs: number,
+): PersonalCountdownViewerState {
+  if (!isPersonalCountdownDefinitionActive(promotion)) {
+    return PERSONAL_COUNTDOWN_VIEWER_STATES.INACTIVE;
+  }
+
+  const canonical = chooseCanonicalPersonalStart(starts, promotion.id);
+
+  if (!canonical) {
+    return PERSONAL_COUNTDOWN_VIEWER_STATES.NEVER_STARTED;
+  }
+
+  return isPersonalStartActive(canonical, nowMs)
+    ? PERSONAL_COUNTDOWN_VIEWER_STATES.ACTIVE
+    : PERSONAL_COUNTDOWN_VIEWER_STATES.EXPIRED;
 }
 
 /**

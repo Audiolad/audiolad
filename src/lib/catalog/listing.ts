@@ -15,6 +15,7 @@ import {
 } from "@/lib/library/saves";
 import {
   getPublishedCatalogProducts,
+  type CatalogProductViewer,
   type CatalogProduct,
 } from "@/lib/products/catalog";
 import {
@@ -77,6 +78,7 @@ export function mapLegacyCatalogProductToSource(
     productKind: product.productKind,
     publicationClass: product.publicationClass,
     price: product.price,
+    compareAtPrice: product.compareAtPrice,
     isFree: product.isFree,
     coverUrl: product.coverUrl,
     coverImage: product.coverImage,
@@ -321,12 +323,18 @@ export async function listPublishedCatalog(
   query: CatalogListingQuery,
   options: {
     userId?: string | null;
+    visitorId?: string | null;
     savesStore?: LibrarySavesAsyncStore;
   } = {},
 ): Promise<CatalogListingResult> {
   const productKindHint = listingProductKindHint(query.class);
   const userId = await resolveCatalogViewerUserId(supabase, options.userId);
-  const viewer = await loadOrdinaryCatalogViewer(supabase, userId);
+  const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);
+  const viewer: CatalogProductViewer = {
+    ...ordinaryViewer,
+    visitorId: options.visitorId ?? null,
+    userId,
+  };
 
   const products = query.q
     ? await searchPublishedCatalogProducts(supabase, {
@@ -353,7 +361,6 @@ export async function listPublishedCatalog(
   );
   const sorted = sortCatalogListingItems(candidates, query.sort);
   const page = paginateCatalogListingItems(sorted, query);
-
   const grantedIds = new Set(viewer.entitledPracticeIds);
 
   if (!userId) {

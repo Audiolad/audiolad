@@ -1,7 +1,10 @@
 import { rublesToMinor } from "@/lib/pricing/money";
 import {
   chooseCanonicalPersonalStart,
+  classifyPersonalCountdownViewerState,
+  isPersonalCountdownDefinitionActive,
   isPersonalStartActive,
+  PERSONAL_COUNTDOWN_VIEWER_STATES,
 } from "@/lib/pricing/personal-start";
 import {
   PRICE_PROMOTION_TYPES,
@@ -21,6 +24,11 @@ export type ResolvePracticePriceInput = {
   starts: PersonalPromotionStart[];
   now?: Date;
   surface: PriceSurface;
+  /**
+   * Catalog listing only. Teases never-started / in-window personal
+   * countdown without starting a row. Product/checkout ignore this flag.
+   */
+  catalogPersonalTeaser?: boolean;
 };
 
 function toTime(value: string | null | undefined): number | null {
@@ -51,13 +59,7 @@ function isCalendarActive(promotion: PricePromotionRecord, nowMs: number): boole
 }
 
 function isPersonalDefinitionActive(promotion: PricePromotionRecord): boolean {
-  return (
-    promotion.promotionType === PRICE_PROMOTION_TYPES.PERSONAL_COUNTDOWN &&
-    promotion.isActive &&
-    typeof promotion.durationSeconds === "number" &&
-    Number.isInteger(promotion.durationSeconds) &&
-    promotion.durationSeconds > 0
-  );
+  return isPersonalCountdownDefinitionActive(promotion);
 }
 
 function findActivePersonalStart(
@@ -110,10 +112,52 @@ function toResolvedPromotion(
   };
 }
 
+function personalCatalogTeaserOffer(
+  promotion: PricePromotionRecord,
+  starts: PersonalPromotionStart[],
+  nowMs: number,
+  basePrice: number,
+): { salePrice: number; expiresAt: string | null } | null {
+  const viewerState = classifyPersonalCountdownViewerState(
+    promotion,
+    starts,
+    nowMs,
+  );
+
+  if (viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.NEVER_STARTED) {
+    if (!isValidSaleAgainstBase(promotion.salePrice, basePrice)) {
+      return null;
+    }
+
+    return { salePrice: promotion.salePrice, expiresAt: null };
+  }
+
+  if (viewerState !== PERSONAL_COUNTDOWN_VIEWER_STATES.ACTIVE) {
+    return null;
+  }
+
+  const start = findActivePersonalStart(promotion, starts, nowMs);
+
+  if (!start) {
+    return null;
+  }
+
+  const salePrice = personalStartSalePrice(start, basePrice);
+
+  if (salePrice === null) {
+    return null;
+  }
+
+  return { salePrice, expiresAt: start.expiresAt };
+}
+
 /**
  * Picks at most one applicable promotion.
  * Calendar promotions apply on every surface using live sale_price.
- * Personal countdown applies on product/checkout only, and only after a start.
+ * Personal countdown applies on product/checkout only after a start, unless
+ * `catalogPersonalTeaser` is set: then catalog may tease NEVER_STARTED or
+ * ACTIVE personal (not EXPIRED).
+ * NEVER_STARTED catalog teaser uses live promotion.sale_price.
  * An active personal start uses start.salePriceSnapshot, not live sale_price,
  * and only when snapshot > 0 AND snapshot < the current practice base price.
  * Otherwise the effective price is the current base. The start row is not rewritten.
@@ -131,6 +175,9 @@ export function resolvePracticePrice(
       : 0;
   const nowMs = (input.now ?? new Date()).getTime();
   const allowPersonal = input.surface !== PRICE_SURFACES.CATALOG;
+  const allowPersonalCatalogTeaser =
+    input.surface === PRICE_SURFACES.CATALOG &&
+    input.catalogPersonalTeaser === true;
 
   if (isFree || basePrice <= 0) {
     return {
@@ -164,6 +211,25 @@ export function resolvePracticePrice(
           salePrice: promotion.salePrice,
         };
       }
+      continue;
+    }
+
+    if (allowPersonalCatalogTeaser && isPersonalDefinitionActive(promotion)) {
+      const teaser = personalCatalogTeaserOffer(
+        promotion,
+        input.starts,
+        nowMs,
+        basePrice,
+      );
+
+      if (teaser && (!winner || teaser.salePrice < winner.salePrice)) {
+        winner = {
+          promotion,
+          expiresAt: teaser.expiresAt,
+          salePrice: teaser.salePrice,
+        };
+      }
+
       continue;
     }
 

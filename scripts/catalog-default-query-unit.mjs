@@ -17,12 +17,12 @@ assert.match(
 );
 assert.match(
   page,
-  /Promise\.all\(\[\s*listTopicsWithCatalogCounts\(supabase\),\s*canLoadDefaultListingInParallel\s*\?[\s\S]*listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: null \}\)/,
+  /Promise\.all\(\[\s*listTopicsWithCatalogCounts\(supabase\),\s*canLoadDefaultListingInParallel\s*\?[\s\S]*listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: null \}/,
   "default path overlaps topics with unfiltered listing",
 );
 assert.match(
   page,
-  /defaultListing \?\?[\s\S]*listPublishedCatalog\(supabase, resolvedListingQuery\)/,
+  /defaultListing \?\?[\s\S]*listPublishedCatalog\(supabase, resolvedListingQuery/,
   "topic-filtered path still loads listing after validated key",
 );
 assert.match(page, /export const dynamic = "force-dynamic"/, "catalog stays dynamic");

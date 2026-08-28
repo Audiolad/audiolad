@@ -7,6 +7,7 @@ import {
 import {
   getPublishedPracticeIdsForTopicKey,
   mapPracticeRowsToCatalogProducts,
+  type CatalogProductViewer,
   type CatalogProduct,
 } from "@/lib/products/catalog";
 import {
@@ -225,7 +226,7 @@ export type CatalogProductSearchOptions = {
   query: string;
   topicKey?: string | null;
   limit?: number;
-  viewer?: OrdinaryCatalogViewer;
+  viewer?: CatalogProductViewer;
 };
 
 /**
@@ -294,7 +295,9 @@ export async function searchPublishedCatalogProducts(
     return [];
   }
 
-  const products = await mapPracticeRowsToCatalogProducts(supabase, mergedRows);
+  const products = await mapPracticeRowsToCatalogProducts(supabase, mergedRows, {
+    viewer: options.viewer,
+  });
 
   return products.slice(0, resultLimit);
 }

@@ -20,6 +20,7 @@ import {
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { buildCatalogMetadata } from "@/lib/seo/public-page-metadata";
 import { listTopicsWithCatalogCounts } from "@/lib/topics/queries";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -66,10 +67,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   });
   const canLoadDefaultListingInParallel = !isSearchActive && !topicSearchParam;
 
+  const visitorId = await readPriceVisitorId();
   const [topicsWithCounts, defaultListing, authUser] = await Promise.all([
     listTopicsWithCatalogCounts(supabase),
     canLoadDefaultListingInParallel
-      ? listPublishedCatalog(supabase, { ...listingQuery, topic: null })
+      ? listPublishedCatalog(supabase, { ...listingQuery, topic: null }, {
+          visitorId,
+        })
       : Promise.resolve(null),
     supabase.auth.getUser().then(({ data }) => data.user),
   ]);
@@ -96,7 +100,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   };
 
   const listing =
-    defaultListing ?? (await listPublishedCatalog(supabase, resolvedListingQuery));
+    defaultListing ??
+    (await listPublishedCatalog(supabase, resolvedListingQuery, { visitorId }));
 
   const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;

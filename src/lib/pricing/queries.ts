@@ -94,32 +94,50 @@ export async function loadPricePromotionByIdForPractice(
   return mapPricePromotionRow(data as Parameters<typeof mapPricePromotionRow>[0]);
 }
 
-export async function loadPersonalPromotionStarts(input: {
+export async function loadPersonalPromotionStartsForPractices(input: {
   supabase: SupabaseClient;
-  practiceId: string;
+  practiceIds: string[];
   visitorId: string | null;
   userId: string | null;
-}): Promise<PersonalPromotionStart[]> {
-  if (!input.visitorId && !input.userId) {
-    return [];
+}): Promise<Map<string, PersonalPromotionStart[]>> {
+  const result = new Map<string, PersonalPromotionStart[]>();
+
+  if (
+    input.practiceIds.length === 0 ||
+    (!input.visitorId && !input.userId)
+  ) {
+    return result;
   }
 
   const { data: promotions, error: promotionsError } = await input.supabase
     .from("practice_price_promotions")
-    .select("id")
-    .eq("practice_id", input.practiceId)
+    .select("id, practice_id")
+    .in("practice_id", input.practiceIds)
     .eq("promotion_type", "personal_countdown")
     .eq("is_active", true);
 
   if (promotionsError) {
     console.error("price_promotion_ids_load_error", promotionsError.message);
-    return [];
+    return result;
   }
 
-  const promotionIds = (promotions ?? []).map((row) => row.id as string);
+  const promotionIds: string[] = [];
+  const practiceByPromotion = new Map<string, string>();
+
+  for (const row of promotions ?? []) {
+    const promotionId = row.id as string;
+    const practiceId = row.practice_id as string;
+
+    if (!promotionId || !practiceId) {
+      continue;
+    }
+
+    promotionIds.push(promotionId);
+    practiceByPromotion.set(promotionId, practiceId);
+  }
 
   if (promotionIds.length === 0) {
-    return [];
+    return result;
   }
 
   let query = input.supabase
@@ -139,12 +157,41 @@ export async function loadPersonalPromotionStarts(input: {
 
   if (error) {
     console.error("price_promotion_starts_load_error", error.message);
-    return [];
+    return result;
   }
 
-  return (data ?? []).map((row) =>
-    mapPersonalPromotionStart(row as Parameters<typeof mapPersonalPromotionStart>[0]),
-  );
+  for (const row of data ?? []) {
+    const mapped = mapPersonalPromotionStart(
+      row as Parameters<typeof mapPersonalPromotionStart>[0],
+    );
+    const practiceId = practiceByPromotion.get(mapped.promotionId);
+
+    if (!practiceId) {
+      continue;
+    }
+
+    const list = result.get(practiceId) ?? [];
+    list.push(mapped);
+    result.set(practiceId, list);
+  }
+
+  return result;
+}
+
+export async function loadPersonalPromotionStarts(input: {
+  supabase: SupabaseClient;
+  practiceId: string;
+  visitorId: string | null;
+  userId: string | null;
+}): Promise<PersonalPromotionStart[]> {
+  const map = await loadPersonalPromotionStartsForPractices({
+    supabase: input.supabase,
+    practiceIds: [input.practiceId],
+    visitorId: input.visitorId,
+    userId: input.userId,
+  });
+
+  return map.get(input.practiceId) ?? [];
 }
 
 export async function resolvePracticePriceForSurface(input: {

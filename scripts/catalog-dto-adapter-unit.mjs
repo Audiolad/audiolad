@@ -52,6 +52,14 @@ assertStorefrontDisplayLabel(practice, "Аудиопрактика");
 assert.equal(practice?.default_offer?.access, "paid");
 assert.equal(practice?.default_offer?.price?.amount_minor, 49000);
 assert.equal(practice?.default_offer?.price?.currency, "RUB");
+assert.equal(practice?.default_offer?.compare_at_price ?? null, null);
+
+const teaser = adaptLegacyCatalogSourceToCard(
+  source({ price: 499, compareAtPrice: 4999 }),
+);
+assert.equal(teaser?.default_offer?.access, "paid");
+assert.equal(teaser?.default_offer?.price?.amount_minor, 49900);
+assert.equal(teaser?.default_offer?.compare_at_price?.amount_minor, 499900);
 assert.equal(practice?.gallery.length, 0);
 assert.equal(practice?.progress, null);
 assert.deepEqual(practice?.summary, {});
@@ -273,6 +281,13 @@ for (const file of frontendFiles) {
   assert.doesNotMatch(sourceText, /\bis_free\b/, `${file} has no is_free`);
   assert.doesNotMatch(sourceText, /audio_items/, `${file} has no audio_items`);
 }
+
+const dtoSource = read("src/lib/catalog/dto.ts");
+assert.doesNotMatch(
+  dtoSource,
+  /start_token|startToken/,
+  "public catalog DTO does not expose start_token",
+);
 
 const adapterSource = read("src/lib/catalog/legacy-adapter.ts");
 assert.match(adapterSource, /productKind/, "adapter may read legacy kind");

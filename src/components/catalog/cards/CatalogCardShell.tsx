@@ -7,7 +7,10 @@ import {
   type CatalogCard,
   type PublicationClass,
 } from "@/lib/catalog/dto";
-import { readPaidCatalogOfferPriceLabel } from "@/lib/catalog/offer";
+import {
+  readPaidCatalogOfferCompareAtLabel,
+  readPaidCatalogOfferPriceLabel,
+} from "@/lib/catalog/offer";
 import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 import Link from "next/link";
 
@@ -44,6 +47,10 @@ export default function CatalogCardShell({
   const actionTarget = catalogCardToActionTarget(card);
   const paidOfferLabel =
     card.class === "post" ? null : readPaidCatalogOfferPriceLabel(card.default_offer);
+  const compareAtLabel =
+    card.class === "post"
+      ? null
+      : readPaidCatalogOfferCompareAtLabel(card.default_offer);
   const actionLabel = resolveActionLabel(card);
 
   return (
@@ -86,6 +93,14 @@ export default function CatalogCardShell({
 
         {paidOfferLabel ? (
           <p data-catalog-card-meta className="mt-1 text-xs leading-4">
+            {compareAtLabel ? (
+              <span
+                data-catalog-card-compare-at
+                className="mr-1.5 whitespace-nowrap font-medium text-[#9a8bb8] line-through"
+              >
+                {compareAtLabel}
+              </span>
+            ) : null}
             <span
               data-catalog-card-price
               className="whitespace-nowrap font-semibold text-[#7042c5]"
