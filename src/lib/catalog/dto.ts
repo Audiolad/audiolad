@@ -42,6 +42,7 @@ export type CatalogFreeOffer = {
 export type CatalogPaidOffer = {
   access: "paid";
   price: CatalogMoney;
+  compare_at_price?: CatalogMoney | null;
 };
 
 export type CatalogDefaultOffer = CatalogFreeOffer | CatalogPaidOffer | null;

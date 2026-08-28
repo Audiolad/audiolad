@@ -74,8 +74,8 @@ function testCatalogLinksToPracticePath() {
   const carousel = readRoot("src/components/products/CatalogProductCarousel.tsx");
 
   assert(
-    catalog.includes("buildPracticePublicPath"),
-    "catalog products build canonical practice href",
+    catalog.includes("buildCatalogListingPriceView"),
+    "catalog products build practice href through the listing price view",
   );
   assert(card.includes("product.href"), "catalog card links to product href");
   assert(
@@ -156,8 +156,8 @@ function testPracticeSlugPathShape() {
     "practice public path uses author and product slugs",
   );
   assert(
-    catalog.includes("href: buildPracticePublicPath(author.slug, practice.slug)"),
-    "catalog href uses author and product slugs",
+    catalog.includes("href: listingPrice.href"),
+    "catalog href uses the listing price view",
   );
 }
 

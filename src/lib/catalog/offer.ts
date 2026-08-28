@@ -48,6 +48,16 @@ export function readPaidCatalogOfferPriceLabel(
   return formatCatalogMoney(offer.price);
 }
 
+export function readPaidCatalogOfferCompareAtLabel(
+  offer: CatalogDefaultOffer,
+): string | null {
+  if (offer?.access !== "paid") {
+    return null;
+  }
+
+  return formatCatalogMoney(offer.compare_at_price);
+}
+
 export function listingOfferAmountMinor(
   offer: CatalogDefaultOffer,
 ): number {

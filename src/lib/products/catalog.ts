@@ -18,12 +18,12 @@ import {
 } from "@/lib/author-products/publication-class";
 import type { CatalogSlide } from "@/lib/catalog/dto";
 import { loadPublicationGalleriesByIds } from "@/lib/catalog/publication-gallery";
-import { getProductPriceLabel } from "@/lib/products/price-format";
-import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
-import { resolvePracticePrice } from "@/lib/pricing/resolve";
-import { PRICE_SURFACES } from "@/lib/pricing/types";
-import { formatRubles } from "@/lib/products/price-format";
-import { buildPracticePublicPath } from "@/lib/products/paths";
+import { buildCatalogListingPriceView } from "@/lib/pricing/catalog-listing";
+import {
+  loadPersonalPromotionStartsForPractices,
+  loadPricePromotionsForPractices,
+} from "@/lib/pricing/queries";
+import type { PersonalPromotionStart } from "@/lib/pricing/types";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { parseCatalogTopicKeyList } from "@/lib/catalog/topic-filter";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
@@ -68,6 +68,7 @@ export type CatalogProduct = ProductCoverFields & {
   /** NULL on legacy rows. Adapter prefers this over productKind. */
   publicationClass?: PublicationClass | null;
   price: number | null;
+  compareAtPrice?: number | null;
   isFree: boolean;
   authorName: string | null;
   authorSlug: string | null;
@@ -90,10 +91,22 @@ export type CatalogSections = {
   paidProducts: CatalogProduct[];
 };
 
+export type CatalogPriceViewer = {
+  visitorId?: string | null;
+  userId?: string | null;
+  now?: Date;
+};
+
 export type CatalogQueryOptions = {
   topicKey?: string | null;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
   productKind?: ProductKind | null;
+  /**
+   * When set, catalog listing may tease never-started / active personal
+   * countdown. Omitted for sitemap/home/SEO so those stay calendar-only
+   * with canonical PDP hrefs.
+   */
+  viewer?: CatalogPriceViewer | null;
 };
 
 export async function getPublishedPracticeIdsForTopicKey(
@@ -298,12 +311,17 @@ export async function getPublishedCatalogProducts(
     (practices ?? []) as CatalogPracticeRow[],
   );
 
-  return mapPracticeRowsToCatalogProducts(supabase, practiceRows);
+  return mapPracticeRowsToCatalogProducts(supabase, practiceRows, {
+    viewer: options?.viewer,
+  });
 }
 
 export async function mapPracticeRowsToCatalogProducts(
   supabase: SupabaseClient,
   practiceRows: CatalogPracticeRow[],
+  options?: {
+    viewer?: CatalogPriceViewer | null;
+  },
 ): Promise<CatalogProduct[]> {
   if (practiceRows.length === 0) {
     return [];
@@ -324,10 +342,21 @@ export async function mapPracticeRowsToCatalogProducts(
     audioSummaryMap = new Map();
   }
 
+  const practiceIds = practiceRows.map((practice) => practice.id);
   const promotionsByPractice = await loadPricePromotionsForPractices(
     supabase,
-    practiceRows.map((practice) => practice.id),
+    practiceIds,
   );
+  const viewer = options?.viewer ?? null;
+  const personalTeaser = viewer !== null;
+  const startsByPractice = personalTeaser
+    ? await loadPersonalPromotionStartsForPractices({
+        supabase,
+        practiceIds,
+        visitorId: viewer.visitorId ?? null,
+        userId: viewer.userId ?? null,
+      })
+    : new Map<string, PersonalPromotionStart[]>();
 
   let galleriesByPublication = new Map<string, CatalogSlide[]>();
 
@@ -349,18 +378,19 @@ export async function mapPracticeRowsToCatalogProducts(
 
     const audioSummary = audioSummaryMap.get(practice.id);
     const audioCount = audioSummary?.audioCount ?? 0;
-    const resolved = resolvePracticePrice({
+    const listingPrice = buildCatalogListingPriceView({
       isFree: practice.is_free,
       basePrice: practice.price,
       promotions: promotionsByPractice.get(practice.id) ?? [],
-      starts: [],
-      surface: PRICE_SURFACES.CATALOG,
+      starts: startsByPractice.get(practice.id) ?? [],
+      authorSlug: author.slug,
+      productSlug: practice.slug,
+      now: viewer?.now,
+      personalTeaser,
     });
-    const catalogPrice = resolved.isFree ? practice.price : resolved.finalPrice;
-    const compareAtPriceLabel =
-      !resolved.isFree && resolved.promotion
-        ? formatRubles(resolved.basePrice)
-        : null;
+    const catalogPrice = listingPrice.isFree
+      ? practice.price
+      : listingPrice.price;
 
     return [
       {
@@ -374,11 +404,12 @@ export async function mapPracticeRowsToCatalogProducts(
         productKind: normalizeProductKind(practice.product_kind),
         publicationClass: parsePublicationClass(practice.publication_class),
         price: catalogPrice,
-        isFree: resolved.isFree,
+        compareAtPrice: listingPrice.compareAtPrice,
+        isFree: listingPrice.isFree,
         ...mapProductCoverFields(practice),
         authorName: author.name,
         authorSlug: author.slug,
-        href: buildPracticePublicPath(author.slug, practice.slug),
+        href: listingPrice.href,
         meta: formatProductMeta({
           format: isMusicProductKind(practice.product_kind)
             ? getProductKindLabel(practice.product_kind)
@@ -400,11 +431,9 @@ export async function mapPracticeRowsToCatalogProducts(
           ? getProductKindLabel(practice.product_kind)
           : (getDisplayFormat(practice.format) ??
             getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
-        priceLabel: resolved.isFree
-          ? getProductPriceLabel(practice.price, practice.is_free)
-          : formatRubles(resolved.finalPrice),
-        compareAtPriceLabel,
-        promotionEndsAt: resolved.promotion?.endsAt ?? null,
+        priceLabel: listingPrice.priceLabel,
+        compareAtPriceLabel: listingPrice.compareAtPriceLabel,
+        promotionEndsAt: listingPrice.promotionEndsAt,
         sortTimestamp: getSortTimestamp(
           practice.published_at,
           practice.created_at,
