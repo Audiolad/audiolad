@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Node --require harness for unit tests (intentional CJS).
     "scripts/cjs-stub-server-only.cjs",
+    "scripts/author-practice-access-cjs-stub.cjs",
   ]),
 ]);
 
