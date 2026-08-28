@@ -11,7 +11,7 @@
 - Frontend: `AnalyticsAuthLinker` больше не линкует на `TOKEN_REFRESHED`. `SIGNED_IN` канонически вызывает только `signup/complete`. Dedupe на пару session+user.
 - Server: rate limit + in-flight/success cache + circuit breaker до RPC на `/api/analytics/session/link` и `/api/analytics/signup/complete`. AbortController timeout. Fail-open.
 - Rebase PR #155 onto `origin/main`. Client IP: `getTrustedClientIp` = X-Real-IP иначе правый XFF. Cap by single connecting client / egress. Leftmost XFF не используется.
-- SQL: `20260901120000_analytics_heavy_rpc_idempotent.sql` — cheap return для уже связанной сессии; advisory lock только на мутацию first-touch.
+- SQL: `20260902120100_analytics_heavy_rpc_idempotent.sql` — cheap return для уже связанной сессии; advisory lock только на мутацию first-touch.
 - Track retry: backoff + jitter; PGRST003/55P03 не усиливаются.
 
 **Следующий шаг:** применить миграцию отдельным подтверждённым deploy; первые 10–15 мин смотреть PGRST003/55P03, rate_limited/deduped/circuit_open и SAVE 504.

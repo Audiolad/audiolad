@@ -723,7 +723,7 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 ## Analytics heavy RPC (2026-08-28)
 
-Миграция: `supabase/migrations/20260901120000_analytics_heavy_rpc_idempotent.sql`.
+Миграция: `supabase/migrations/20260902120100_analytics_heavy_rpc_idempotent.sql`.
 
 `link_analytics_session_user`: если `analytics_sessions.user_id` уже равен `auth.uid()`, функция сразу возвращает `true` — без `pg_advisory_xact_lock`, без массового `UPDATE analytics_events`, без повторного `link_analytics_identity`. Первый link по-прежнему пишет session/events (`user_id IS NULL`) и identity/first-touch.
 
