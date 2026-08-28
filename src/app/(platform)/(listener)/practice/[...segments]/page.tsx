@@ -69,7 +69,7 @@ import {
   loadPublicAudioItems,
   shouldLoadPublicAudioItemsOnProductPage,
 } from "@/lib/products/public-audio-items";
-import { resolveListeningNotice } from "@/lib/products/listening-notice";
+import { resolvePublicListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
 import { createSupabaseLibrarySavesStore } from "@/lib/library/saves";
@@ -548,7 +548,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     supabase,
     practice.id,
   );
-  const listeningNotice = resolveListeningNotice(practice);
+  const listeningNotice = resolvePublicListeningNotice(practice);
 
   const mobileCoverDisplayUrl = getProductCoverDisplayUrl(
     practice.cover_url,
