@@ -5,7 +5,10 @@ import {
   DEFAULT_LISTENING_NOTICE_TEXT,
   DEFAULT_LISTENING_NOTICE_TITLE,
   resolveListeningNotice,
+  resolvePublicListeningNotice,
+  shouldShowListeningNoticeForPublication,
 } from "../src/lib/products/listening-notice.ts";
+import { shouldShowPracticeListeningNotice } from "../src/lib/author-products/course-builder-shared.ts";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -13,6 +16,10 @@ function assert(condition, message) {
 
 function read(path) {
   return readFileSync(path, "utf8");
+}
+
+function wouldRenderListeningNoticeCard(notice) {
+  return notice != null;
 }
 
 function testDefaultLegacyProduct() {
@@ -65,6 +72,221 @@ function testEmptyTitleUsesDefault() {
   );
 }
 
+function testCourseEnabledDoesNotRender() {
+  assert(
+    shouldShowListeningNoticeForPublication("course", "practice") === false,
+    "course publication hides notice",
+  );
+  const notice = resolvePublicListeningNotice({
+    publication_class: "course",
+    product_kind: "practice",
+    listening_notice_enabled: true,
+  });
+  assert(notice === null, "course + enabled=true => notice NOT resolved");
+  assert(
+    wouldRenderListeningNoticeCard(notice) === false,
+    "course + enabled=true => notice NOT rendered",
+  );
+}
+
+function testCourseCustomNoticeDoesNotRender() {
+  const notice = resolvePublicListeningNotice({
+    publication_class: "course",
+    product_kind: "practice",
+    listening_notice_enabled: true,
+    listening_notice_title: "Перед курсом",
+    listening_notice_text: "Кастомный текст для курса",
+  });
+  assert(notice === null, "course + custom notice still NOT resolved");
+  assert(
+    wouldRenderListeningNoticeCard(notice) === false,
+    "course + custom notice still NOT rendered",
+  );
+}
+
+function testPracticeEnabledRenders() {
+  assert(
+    shouldShowListeningNoticeForPublication("practice", "practice") === true,
+    "practice publication allows notice",
+  );
+  const notice = resolvePublicListeningNotice({
+    publication_class: "practice",
+    product_kind: "practice",
+    listening_notice_enabled: true,
+    listening_notice_title: "Перед практикой",
+    listening_notice_text: "Кастомный текст практики",
+  });
+  assert(notice !== null, "practice + enabled=true => notice resolved");
+  assert(notice.title === "Перед практикой", "practice keeps custom title");
+  assert(notice.text === "Кастомный текст практики", "practice keeps custom text");
+  assert(
+    wouldRenderListeningNoticeCard(notice) === true,
+    "practice + enabled=true => notice rendered",
+  );
+}
+
+function testPracticeDisabledDoesNotRender() {
+  const notice = resolvePublicListeningNotice({
+    publication_class: "practice",
+    product_kind: "practice",
+    listening_notice_enabled: false,
+    listening_notice_title: "Перед практикой",
+    listening_notice_text: "Кастомный текст практики",
+  });
+  assert(notice === null, "practice + enabled=false => notice NOT resolved");
+  assert(
+    wouldRenderListeningNoticeCard(notice) === false,
+    "practice + enabled=false => notice NOT rendered",
+  );
+}
+
+function testAudiobookUnchanged() {
+  assert(
+    shouldShowListeningNoticeForPublication("audiobook", "practice") === true,
+    "audiobook publication still allows notice",
+  );
+  const notice = resolvePublicListeningNotice({
+    publication_class: "audiobook",
+    product_kind: "practice",
+    listening_notice_enabled: true,
+  });
+  assert(notice !== null, "audiobook + enabled=true still resolves notice");
+  assert(
+    resolvePublicListeningNotice({
+      publication_class: "audiobook",
+      product_kind: "practice",
+      listening_notice_enabled: false,
+    }) === null,
+    "audiobook + enabled=false still hides notice",
+  );
+}
+
+function testMusicAndAudioPostUnchanged() {
+  const music = resolvePublicListeningNotice({
+    publication_class: "release",
+    product_kind: "music",
+    listening_notice_enabled: true,
+  });
+  assert(music !== null, "music + enabled=true still resolves notice");
+  assert(
+    resolvePublicListeningNotice({
+      publication_class: "release",
+      product_kind: "music",
+      listening_notice_enabled: false,
+    }) === null,
+    "music + enabled=false still hides notice",
+  );
+
+  const post = resolvePublicListeningNotice({
+    publication_class: "post",
+    product_kind: "audio_post",
+    listening_notice_enabled: true,
+  });
+  assert(post !== null, "audio post + enabled=true still resolves notice");
+}
+
+function testEditorReusesSharedPredicate() {
+  assert(
+    shouldShowPracticeListeningNotice("course", "practice") === false,
+    "editor hides listening notice for course",
+  );
+  assert(
+    shouldShowPracticeListeningNotice("practice", "practice") === true,
+    "editor still shows listening notice for practice",
+  );
+  assert(
+    shouldShowPracticeListeningNotice("audiobook", "practice") === true,
+    "editor still shows listening notice for audiobook",
+  );
+
+  const shared = read("src/lib/author-products/course-builder-shared.ts");
+  assert(
+    shared.includes("shouldShowListeningNoticeForPublication"),
+    "editor predicate reuses the shared publication-class gate",
+  );
+  assert(
+    !/normalizeProductKind\(productKind\) === PRODUCT_KIND\.PRACTICE &&\s*!isCoursePublication\(/.test(
+      shared,
+    ),
+    "editor must not duplicate the course publication condition",
+  );
+}
+
+function testDesktopMobileCoursePdpAbsent() {
+  const courseNotice = resolvePublicListeningNotice({
+    publication_class: "course",
+    product_kind: "practice",
+    listening_notice_enabled: true,
+    listening_notice_title: "Перед курсом",
+    listening_notice_text: "Не должно появиться",
+  });
+  assert(
+    wouldRenderListeningNoticeCard(courseNotice) === false,
+    "course view-model notice is null for both desktop and mobile PDP",
+  );
+
+  const desktop = read(
+    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  );
+  const mobile = read(
+    "src/components/products/practice-page/PracticePageMobile.tsx",
+  );
+
+  assert(
+    desktop.includes("ListeningNoticeCard"),
+    "desktop PDP still uses shared card",
+  );
+  assert(
+    mobile.includes("ListeningNoticeCard"),
+    "mobile PDP still uses shared card",
+  );
+  assert(
+    /\{listeningNotice \? \(/.test(desktop),
+    "desktop renders card only when view-model notice is set",
+  );
+  assert(
+    /\{listeningNotice \? \(/.test(mobile),
+    "mobile renders card only when view-model notice is set",
+  );
+  assert(
+    !desktop.includes("resolveListeningNotice") &&
+      !desktop.includes("shouldShowListeningNoticeForPublication"),
+    "desktop does not copy the publication-class rule",
+  );
+  assert(
+    !mobile.includes("resolveListeningNotice") &&
+      !mobile.includes("shouldShowListeningNoticeForPublication"),
+    "mobile does not copy the publication-class rule",
+  );
+}
+
+function testListenRouteUsesSharedGate() {
+  const listenShared = read("src/lib/listen/page-shared.tsx");
+  const listenMobile = read("src/components/audio/ListenPlayerMobile.tsx");
+  const listenDesktop = read("src/components/audio/ListenPlayerDesktop.tsx");
+
+  assert(
+    listenShared.includes("resolvePublicListeningNotice"),
+    "listen route uses the public publication-class gate",
+  );
+  assert(
+    listenShared.includes("import { resolvePublicListeningNotice }"),
+    "listen route imports the gated public resolver",
+  );
+  assert(
+    !listenShared.includes("import { resolveListeningNotice }"),
+    "listen route must not import the ungated data resolver",
+  );
+  assert(
+    /\{listeningNotice \? \(/.test(listenMobile),
+    "listen mobile renders card only when notice is set",
+  );
+  assert(
+    /\{listeningNotice \? \(/.test(listenDesktop),
+    "listen desktop renders notice only when notice is set",
+  );
+}
+
 function testWiring() {
   const migration = read(
     "supabase/migrations/20260718220000_practice_listening_notice.sql",
@@ -98,7 +320,9 @@ function testWiring() {
     "reset to default control present",
   );
 
-  const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+  const practicePage = read(
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+  );
   const practiceMobilePage = read(
     "src/components/products/practice-page/PracticePageMobile.tsx",
   );
@@ -107,18 +331,32 @@ function testWiring() {
     "practice page uses shared card",
   );
   assert(
+    practicePage.includes("resolvePublicListeningNotice"),
+    "practice PDP uses the public publication-class gate",
+  );
+  assert(
+    practicePage.includes("import { resolvePublicListeningNotice }"),
+    "practice PDP imports the gated public resolver",
+  );
+  assert(
+    !practicePage.includes("import { resolveListeningNotice }"),
+    "practice PDP must not import the ungated data resolver",
+  );
+  assert(
     !practicePage.includes("Выберите спokойное"),
     "practice page no hardcoded notice text",
   );
 
-  const audioPlayer = read("src/components/audio/AudioPlayer.tsx");
-  assert(
-    audioPlayer.includes("listeningNotice"),
-    "audio player accepts notice prop",
+  const listenPlayerShared = read(
+    "src/components/audio/listen-player-shared.tsx",
   );
   assert(
-    !audioPlayer.includes("Выберите спокойное и безопасное место."),
-    "audio player no hardcoded notice text",
+    listenPlayerShared.includes("listeningNotice"),
+    "listen player accepts notice prop",
+  );
+  assert(
+    !listenPlayerShared.includes("Выберите спокойное и безопасное место."),
+    "listen player no hardcoded notice text",
   );
 }
 
@@ -127,6 +365,15 @@ testCustomText();
 testDisabled();
 testEmptyTextDoesNotRender();
 testEmptyTitleUsesDefault();
+testCourseEnabledDoesNotRender();
+testCourseCustomNoticeDoesNotRender();
+testPracticeEnabledRenders();
+testPracticeDisabledDoesNotRender();
+testAudiobookUnchanged();
+testMusicAndAudioPostUnchanged();
+testEditorReusesSharedPredicate();
+testDesktopMobileCoursePdpAbsent();
+testListenRouteUsesSharedGate();
 testWiring();
 
 console.log("listening-notice-unit: ok");

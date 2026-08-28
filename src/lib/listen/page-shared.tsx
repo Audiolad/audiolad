@@ -39,7 +39,7 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { resolveListeningNotice } from "@/lib/products/listening-notice";
+import { resolvePublicListeningNotice } from "@/lib/products/listening-notice";
 import { resolveLibraryAction } from "@/lib/products/practice-access-ui";
 import { createClient } from "@/lib/supabase/server";
 
@@ -550,7 +550,7 @@ export async function renderListenPage(
     canListen: productAccess.canListen,
     accessReason: productAccess.reason,
   });
-  const listeningNotice = resolveListeningNotice(practiceRow);
+  const listeningNotice = resolvePublicListeningNotice(practiceRow);
   const [shellData, cookieStore] = await Promise.all([
     getListenerShellData(),
     cookies(),
