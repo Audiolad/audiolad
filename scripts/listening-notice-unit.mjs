@@ -347,14 +347,16 @@ function testWiring() {
     "practice page no hardcoded notice text",
   );
 
-  const audioPlayer = read("src/components/audio/AudioPlayer.tsx");
-  assert(
-    audioPlayer.includes("listeningNotice"),
-    "audio player accepts notice prop",
+  const listenPlayerShared = read(
+    "src/components/audio/listen-player-shared.tsx",
   );
   assert(
-    !audioPlayer.includes("Выберите спокойное и безопасное место."),
-    "audio player no hardcoded notice text",
+    listenPlayerShared.includes("listeningNotice"),
+    "listen player accepts notice prop",
+  );
+  assert(
+    !listenPlayerShared.includes("Выберите спокойное и безопасное место."),
+    "listen player no hardcoded notice text",
   );
 }
 
