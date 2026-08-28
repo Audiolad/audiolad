@@ -11,11 +11,11 @@ import { fileURLToPath } from "node:url";
 import {
   classifyLinkAnalyticsSessionUser,
   classifyRecordPlatformSignupCompleted,
-} from "../src/lib/analytics/link-signup-idempotency.ts";
+} from "../src/lib/analytics/link-signup-idempotency";
 import {
   createKeyedSingleFlight,
   shouldSettleAnalyticsHttpAttempt,
-} from "../src/lib/analytics/single-flight.ts";
+} from "../src/lib/analytics/single-flight";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATION =
