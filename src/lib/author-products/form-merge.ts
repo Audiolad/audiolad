@@ -19,6 +19,10 @@ import type {
   AuthorProductDetail,
   AudioItemRow,
 } from "@/lib/author-products/types";
+import {
+  parseCatalogVisibility,
+  type CatalogVisibility,
+} from "@/lib/products/catalog-visibility";
 
 export type ProductFormSnapshot = {
   authorId: string;
@@ -34,6 +38,7 @@ export type ProductFormSnapshot = {
   isFree: boolean;
   price: number;
   isCatalogListed: boolean;
+  catalogVisibility: CatalogVisibility;
   promoEnabled: boolean;
   promoTitle: string;
   promoText: string;
@@ -87,6 +92,10 @@ export function productDetailToFormSnapshot(
           ? 99
           : practice.price,
     isCatalogListed: practice.is_catalog_listed !== false,
+    catalogVisibility: parseCatalogVisibility(
+      practice.catalog_visibility,
+      practice.is_catalog_listed,
+    ),
     promoEnabled: practice.promo_enabled === true,
     promoTitle: practice.promo_title ?? "",
     promoText: practice.promo_text ?? "",
@@ -135,6 +144,7 @@ export function mergeServerProductIntoForm(
     isFree: current.productKind === "audio_post" ? true : current.isFree,
     price: current.productKind === "audio_post" ? 0 : current.price,
     isCatalogListed: current.isCatalogListed,
+    catalogVisibility: current.catalogVisibility,
     promoEnabled: current.promoEnabled,
     promoTitle: current.promoTitle,
     promoText: current.promoText,

@@ -177,32 +177,21 @@ BEGIN
     RAISE EXCEPTION 'archived practice must not be readable by anon';
   END IF;
 
-  -- playlist_items row for RLS-hidden practice still exists for anon
-  -- (app maps missing embed to unavailable placeholder; must not 500)
+  -- Public playlist discovery is listed-only: an RLS-hidden practice must
+  -- not disclose an item slot or practice_id to anon.
   SELECT count(*) INTO cnt
   FROM public.playlist_items
   WHERE playlist_id = public_pl AND practice_id = archived_id;
-  IF cnt <> 1 THEN
-    RAISE EXCEPTION 'RLS-hidden practice item row must remain visible via playlist_items';
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'RLS-hidden practice item row must not remain publicly visible';
   END IF;
 
-  -- embed join: archived practice null for anon, free still embeds
-  SELECT count(*) INTO cnt
-  FROM public.playlist_items AS pi
-  LEFT JOIN public.practices AS pr ON pr.id = pi.practice_id
-  WHERE pi.playlist_id = public_pl
-    AND pi.practice_id = archived_id
-    AND pr.id IS NULL;
-  IF cnt <> 1 THEN
-    RAISE EXCEPTION 'archived practice embed must be null under anon RLS';
-  END IF;
-
-  -- items ordered by position
+  -- Items exposed to anon remain ordered by their public positions.
   IF (
     SELECT array_agg(practice_id ORDER BY position)
     FROM public.playlist_items
     WHERE playlist_id = public_pl
-  ) IS DISTINCT FROM ARRAY[free_id, paid_id, unlisted_id, archived_id] THEN
+  ) IS DISTINCT FROM ARRAY[free_id, paid_id] THEN
     RAISE EXCEPTION 'item order by position broken';
   END IF;
 

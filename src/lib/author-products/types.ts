@@ -21,6 +21,10 @@ import {
 } from "@/lib/author-products/moderation";
 
 import { RECOMMENDED_PAID_PRICES_RUB } from "@/lib/pricing/money";
+import {
+  parseCatalogVisibility,
+  type CatalogVisibility,
+} from "@/lib/products/catalog-visibility";
 
 /** Recommended chips only. Authors may enter any integer ruble amount in range. */
 export const PAID_PRICE_OPTIONS = RECOMMENDED_PAID_PRICES_RUB;
@@ -82,6 +86,7 @@ export type PracticeRow = {
   price: number;
   is_free: boolean;
   is_catalog_listed: boolean;
+  catalog_visibility: CatalogVisibility;
   cover_url: string | null;
   cover_image?: unknown;
   use_shared_cover: boolean;
@@ -135,6 +140,7 @@ export function coercePracticeRow(
     | "publication_class"
     | "music_usage_permission"
     | "is_catalog_listed"
+    | "catalog_visibility"
     | "moderation_status"
     | "moderation_attempt"
     | "moderation_submitted_at"
@@ -160,6 +166,7 @@ export function coercePracticeRow(
     deleted_by?: string | null;
     deletion_reason?: string | null;
     is_catalog_listed?: boolean | null;
+    catalog_visibility?: string | null;
     promo_enabled?: boolean | null;
     promo_title?: string | null;
     promo_text?: string | null;
@@ -185,6 +192,10 @@ export function coercePracticeRow(
     deleted_by: row.deleted_by ?? null,
     deletion_reason: row.deletion_reason ?? null,
     is_catalog_listed: row.is_catalog_listed !== false,
+    catalog_visibility: parseCatalogVisibility(
+      row.catalog_visibility,
+      row.is_catalog_listed,
+    ),
     promo_enabled: row.promo_enabled === true,
     promo_title: row.promo_title ?? null,
     promo_text: row.promo_text ?? null,

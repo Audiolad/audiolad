@@ -154,6 +154,7 @@ const pageSource = read("src/app/(platform)/(listener)/practice/[...segments]/pa
 assert.match(pageSource, /AudioPostPage/);
 assert.match(pageSource, /isAudioPostProductKind/);
 assert.match(pageSource, /shouldIndexPracticePage\(\s*practice\.status,\s*practice\.is_catalog_listed/);
+assert.match(pageSource, /practice\.catalog_visibility/);
 
 const audioPostPage = read("src/components/products/audio-post/AudioPostPage.tsx");
 assert.match(audioPostPage, /featured-card/);

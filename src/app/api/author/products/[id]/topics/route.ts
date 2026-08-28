@@ -13,6 +13,7 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { setPracticeTopics } from "@/lib/topics/sync";
 
 type RouteContext = {
@@ -88,7 +89,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       id,
     );
 
-    if (practice.status === "published" && practice.slug) {
+    if (
+      practice.status === "published" &&
+      practice.slug &&
+      shouldNotifyIndexNowByVisibility(
+        (practice as { catalog_visibility?: string | null }).catalog_visibility,
+        (practice as { is_catalog_listed?: boolean | null }).is_catalog_listed,
+      )
+    ) {
       const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
 
       if (authorSlug) {

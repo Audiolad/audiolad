@@ -14,6 +14,7 @@ type PracticeAccessRow = {
   is_free: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
   publication_class?: string | null;

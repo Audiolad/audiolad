@@ -46,6 +46,7 @@ type PracticeEmbed = {
   updated_at: string | null;
   status: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   authors: AuthorEmbed | AuthorEmbed[] | null;
 };
 
@@ -209,6 +210,7 @@ export const loadPublicPlaylistBySlug = cache(
         updated_at,
         status,
         is_catalog_listed,
+        catalog_visibility,
         authors!practices_author_id_fkey (
           name,
           slug
@@ -267,27 +269,10 @@ export const loadPublicPlaylistBySlug = cache(
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
 
-      if (!practice) {
-        hasUnavailable = true;
-        items.push({
-          practiceId: row.practice_id,
-          audioItemId: row.audio_item_id ?? null,
-          position: row.position,
-          title: "Практика временно недоступна",
-          authorName: null,
-          authorSlug: null,
-          formatLabel: null,
-          metaLabel: null,
-          durationLabel: null,
-          durationSeconds: null,
-          productSlug: null,
-          productHref: null,
-          coverUrl: null,
-          coverImage: null,
-          updatedAt: null,
-          available: false,
-          href: null,
-        });
+      // Public playlist_items RLS permits only listed products. A missing
+      // embed means its product is not public to this viewer, so omit it
+      // completely: neither a placeholder nor practice_id may leak a slot.
+      if (!practice || practice.catalog_visibility === "selected_users") {
         continue;
       }
 

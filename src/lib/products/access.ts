@@ -2,6 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
 import { isCoursePublication } from "@/lib/course-content/validators";
+import {
+  isListedCatalogVisibility,
+  isSelectedUsersCatalogVisibility,
+  parseCatalogVisibility,
+  type CatalogVisibility,
+} from "@/lib/products/catalog-visibility";
 
 export type ProductAccessReason =
   | "free"
@@ -20,6 +26,7 @@ export type ProductAccessInput = {
   is_free: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
   publication_class?: string | null;
@@ -43,6 +50,8 @@ export type ProductAccessResult = {
   isAuthorMember: boolean;
   accessSource: string | null;
   hasEntitlement: boolean;
+  canSeeSelectedUsers?: boolean;
+  catalogVisibility?: CatalogVisibility;
 };
 
 export function isPracticePublished(status: string | null | undefined): boolean {
@@ -60,9 +69,14 @@ export function isPracticeArchived(status: string | null | undefined): boolean {
 export function isPracticeCatalogListed(practice: {
   status: string | null | undefined;
   is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
 }): boolean {
   return (
-    isPracticePublished(practice.status) && practice.is_catalog_listed !== false
+    isPracticePublished(practice.status) &&
+    isListedCatalogVisibility(
+      practice.catalog_visibility,
+      practice.is_catalog_listed,
+    )
   );
 }
 
@@ -77,13 +91,21 @@ export function canEntitledUserAccessPracticeStatus(
   );
 }
 
-export function canAcquirePractice(practice: ProductAccessInput): boolean {
+export function canAcquirePractice(
+  practice: ProductAccessInput,
+  options?: { canSeeSelectedUsers?: boolean },
+): boolean {
   if (!isPracticePublished(practice.status)) {
     return false;
   }
 
-  if (practice.is_catalog_listed === false) {
-    return false;
+  const visibility = parseCatalogVisibility(
+    practice.catalog_visibility,
+    practice.is_catalog_listed,
+  );
+
+  if (visibility === "selected_users") {
+    return options?.canSeeSelectedUsers === true;
   }
 
   return true;
@@ -123,14 +145,46 @@ function mapAccessSourceToReason(
   }
 }
 
+async function lookupSelectedUsersVisibility(
+  supabase: SupabaseClient,
+  practiceId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("practice_visibility_users")
+    .select("user_id")
+    .eq("practice_id", practiceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("visibility_allowlist_lookup_failed");
+  }
+
+  if (data?.user_id) {
+    return true;
+  }
+
+  const { isPlatformAdmin } = await import("@/lib/auth/platform-admin");
+  return isPlatformAdmin(supabase, userId);
+}
+
 export async function resolveProductAccess(
   supabase: SupabaseClient,
   practice: ProductAccessInput,
   userId: string | null,
 ): Promise<ProductAccessResult> {
+  const catalogVisibility = parseCatalogVisibility(
+    practice.catalog_visibility,
+    practice.is_catalog_listed,
+  );
   const isPubliclyListed = isPracticeCatalogListed(practice);
-  const canAcquire = canAcquirePractice(practice);
+  const selectedUsers = isSelectedUsersCatalogVisibility(
+    practice.catalog_visibility,
+    practice.is_catalog_listed,
+  );
   let isAuthorMember = false;
+  let canSeeSelectedUsers = false;
 
   if (userId) {
     const { data: membership, error: membershipError } = await supabase
@@ -145,16 +199,19 @@ export async function resolveProductAccess(
     }
 
     isAuthorMember = Boolean(membership?.id);
+    canSeeSelectedUsers = isAuthorMember;
 
     if (isAuthorMember) {
       return {
         canListen: true,
-        canAcquire,
+        canAcquire: canAcquirePractice(practice, { canSeeSelectedUsers: true }),
         isPubliclyListed,
         reason: "author_owner",
         isAuthorMember: true,
         accessSource: null,
         hasEntitlement: false,
+        canSeeSelectedUsers: true,
+        catalogVisibility,
       };
     }
 
@@ -186,16 +243,30 @@ export async function resolveProductAccess(
         isAuthorMember: false,
         accessSource,
         hasEntitlement: true,
+        canSeeSelectedUsers: true,
+        catalogVisibility,
       };
+    }
+
+    if (selectedUsers) {
+      canSeeSelectedUsers = await lookupSelectedUsersVisibility(
+        supabase,
+        practice.id,
+        userId,
+      );
     }
   }
 
+  const canAcquire = canAcquirePractice(practice, { canSeeSelectedUsers });
+  const canSeeProduct = !selectedUsers || canSeeSelectedUsers;
+
   // Free audio posts stay listenable by direct link even when unlisted.
-  // Catalog claim / acquire remains gated by is_catalog_listed separately.
+  // selected_users free audio posts stay hidden from strangers.
   const freeAudioPostListen =
     isAudioPostProductKind(practice.product_kind) &&
     practice.is_free === true &&
-    isPracticePublished(practice.status);
+    isPracticePublished(practice.status) &&
+    canSeeProduct;
 
   if (
     (practice.is_free === true &&
@@ -211,12 +282,15 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      canSeeSelectedUsers,
+      catalogVisibility,
     };
   }
 
   if (
     practice.guest_access_enabled === true &&
-    isPracticePublished(practice.status)
+    isPracticePublished(practice.status) &&
+    canSeeProduct
   ) {
     return {
       canListen: true,
@@ -226,6 +300,8 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      canSeeSelectedUsers,
+      catalogVisibility,
     };
   }
 
@@ -238,6 +314,8 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      canSeeSelectedUsers,
+      catalogVisibility,
     };
   }
 
@@ -249,6 +327,8 @@ export async function resolveProductAccess(
     isAuthorMember: false,
     accessSource: null,
     hasEntitlement: false,
+    canSeeSelectedUsers,
+    catalogVisibility,
   };
 }
 

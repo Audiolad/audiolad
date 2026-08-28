@@ -270,6 +270,8 @@ function testSeoAndAnalyticsGuards() {
   assert.equal(shouldIndexPracticePage("published"), true);
   assert.equal(shouldIndexPracticePage("published", true), true);
   assert.equal(shouldIndexPracticePage("published", false), false);
+  assert.equal(shouldIndexPracticePage("published", false, "unlisted"), false);
+  assert.equal(shouldIndexPracticePage("published", false, "selected_users"), false);
   assert.equal(shouldIndexPracticePage("draft"), false);
   assert.equal(shouldIndexPracticePage("unpublished"), false);
   assert.equal(shouldIndexPracticePage("archived"), false);

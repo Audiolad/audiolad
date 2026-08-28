@@ -16,6 +16,7 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -76,7 +77,14 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const product = await getAuthorProductDetail(supabase, id);
 
-    if (authorSlug && previousSlug) {
+    if (
+      authorSlug &&
+      previousSlug &&
+      shouldNotifyIndexNowByVisibility(
+        (practice as { catalog_visibility?: string | null }).catalog_visibility,
+        (practice as { is_catalog_listed?: boolean | null }).is_catalog_listed,
+      )
+    ) {
       scheduleIndexNowNotification(
         [buildPracticeCanonicalUrl(authorSlug, previousSlug)],
         INDEXNOW_REASONS.practice_unpublished,

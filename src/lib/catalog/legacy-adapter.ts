@@ -47,6 +47,7 @@ export type LegacyCatalogSource = {
   gallery?: ReadonlyArray<Partial<CatalogSlide> | null | undefined> | null;
   topics?: CatalogCard["topics"];
   isSaved?: boolean;
+  hasGrant?: boolean;
 };
 
 function resolveAuthor(
@@ -140,13 +141,14 @@ function resolveViewer(
   publicationClass: PublicationClass,
   offer: CatalogDefaultOffer,
   isSaved: boolean,
+  hasGrant: boolean,
 ): CatalogViewer {
   const canListen =
-    publicationClass === "post" || offer?.access === "free";
+    publicationClass === "post" || offer?.access === "free" || hasGrant;
 
   return {
     can_listen: canListen,
-    has_grant: false,
+    has_grant: hasGrant,
     is_saved: isSaved,
   };
 }
@@ -192,6 +194,7 @@ export function adaptLegacyCatalogSourceToCard(
       publicationClass,
       defaultOffer,
       source.isSaved === true,
+      source.hasGrant === true,
     ),
     badges: [],
     progress: null,
