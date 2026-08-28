@@ -384,7 +384,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
               type="search"
               name="q"
               defaultValue={data.query}
-              placeholder="Имя или email"
+              placeholder="Имя, email, UUID или адрес продукта"
               className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm"
             />
           </label>
@@ -501,7 +501,12 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                         )}
                       </td>
                       <td className="px-4 py-4 font-medium text-[#25135c]">
-                        {user.displayName}
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="hover:text-[#7042c5]"
+                        >
+                          {user.displayName}
+                        </Link>
                       </td>
                       <td className="px-4 py-4 text-[#796ba0]">
                         {user.email ?? "—"}
@@ -574,7 +579,12 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <h2 className="text-base font-semibold text-[#25135c]">
-                        {user.displayName}
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="hover:text-[#7042c5]"
+                        >
+                          {user.displayName}
+                        </Link>
                       </h2>
                       <UserRowMenu
                         displayName={user.displayName}

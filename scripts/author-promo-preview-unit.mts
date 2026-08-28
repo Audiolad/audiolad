@@ -71,6 +71,7 @@ function start(overrides: Record<string, unknown> = {}) {
     userId: null,
     startedAt: "2026-08-23T10:00:00.000Z",
     expiresAt: "2026-08-23T10:20:00.000Z",
+    salePriceSnapshot: 499,
     ...overrides,
   };
 }
@@ -146,6 +147,29 @@ function testAuthorPreviewResolvesSaleCopyAndSyntheticTime() {
   });
   assert.equal(copy.above, "Предложение действует ещё: 20:00 мин.");
   assert.equal(copy.below.includes(formatRubles(4999)), true);
+}
+
+function testPreviewUsesCurrentPromotionSalePrice() {
+  const now = new Date("2026-08-27T12:00:00.000Z");
+  const preview = resolveAuthorPromoPreviewPrice({
+    isFree: false,
+    basePrice: 4999,
+    promotion: promotion({ salePrice: 699 }),
+    now,
+  });
+  assert.equal(preview?.finalPrice, 699, "preview follows current sale_price");
+  assert.equal(preview?.salePrice, 699);
+
+  const buyerStart = start({ salePriceSnapshot: 499 });
+  const buyer = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promotion({ salePrice: 699 })],
+    starts: [buyerStart],
+    surface: PRICE_SURFACES.PRODUCT,
+    now: new Date("2026-08-23T10:10:00.000Z"),
+  });
+  assert.equal(buyer.finalPrice, 499, "real start keeps snapshot while preview moves");
 }
 
 function testPreviewDoesNotNeedAStartRow() {
@@ -349,6 +373,7 @@ function testBuyerPromoStillCreatesAndReusesOneShot() {
     userId: null,
     now,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
   });
   assert.equal(first.created, true);
   assert.equal(first.store.length, 1);
@@ -360,6 +385,7 @@ function testBuyerPromoStillCreatesAndReusesOneShot() {
     userId: null,
     now: later,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
   });
   assert.equal(reuse.created, false);
   assert.equal(reuse.start.startedAt, first.start.startedAt);
@@ -384,6 +410,7 @@ function testBuyerPromoStillCreatesAndReusesOneShot() {
     userId: null,
     now: afterExpiry,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
   });
   assert.equal(afterExpiryStart.created, false, "expired start is never restarted");
   assert.equal(afterExpiryStart.start.expiresAt, first.start.expiresAt);
@@ -408,6 +435,7 @@ function testSyntheticStartIsNotABuyerBinding() {
     promotionId: "promo-preview-1",
     durationSeconds: 1200,
     now: new Date("2026-08-27T12:00:00.000Z"),
+    salePriceSnapshot: 499,
   });
   assert.equal(startRow.visitorId, AUTHOR_PROMO_PREVIEW_VISITOR_ID);
   assert.equal(startRow.userId, null);
@@ -728,6 +756,8 @@ function testSourceContracts() {
 
   assert.match(form, /Предпросмотр акции/);
   assert.match(form, /data-author-promo-preview/);
+  assert.match(form, /Редактировать/);
+  assert.match(form, /data-author-promo-edit/);
   assert.match(form, /buildPracticePromoPreviewPath/);
   assert.match(form, /Выключить/);
   assert.match(form, /Удалить/);
@@ -742,6 +772,7 @@ function testSourceContracts() {
 
 async function main() {
   testAuthorPreviewResolvesSaleCopyAndSyntheticTime();
+  testPreviewUsesCurrentPromotionSalePrice();
   testPreviewDoesNotNeedAStartRow();
   testReopenRestartsFullDuration();
   testInactiveAndDraftStillPreview();

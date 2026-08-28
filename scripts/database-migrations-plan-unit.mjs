@@ -301,6 +301,13 @@ function testRepoOneFileOneVersion() {
         "20260830120000_personal_timer_promotion_copy.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260831120000_personal_start_sale_price_snapshot.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -354,8 +361,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260830120200",
     "20260830120300",
     "20260830120400",
+    "20260831120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 21);
+  assert.equal(plan.database_migrations_pending, 22);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -388,8 +396,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260830120200",
     "20260830120300",
     "20260830120400",
+    "20260831120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 15);
+  assert.equal(plan.database_migrations_pending, 16);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -429,8 +438,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260830120200",
     "20260830120300",
     "20260830120400",
+    "20260831120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 6);
+  assert.equal(plan.database_migrations_pending, 7);
 }
 
 function main() {

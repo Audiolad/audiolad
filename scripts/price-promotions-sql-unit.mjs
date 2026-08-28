@@ -23,6 +23,10 @@ const M190 = join(
   "supabase/migrations/20260823190000_start_practice_price_promotion_qualify_identifiers.sql",
 );
 const M191 = join(ROOT, "supabase/migrations/20260823191000_quick_offers.sql");
+const M_SNAPSHOT = join(
+  ROOT,
+  "supabase/migrations/20260831120000_personal_start_sale_price_snapshot.sql",
+);
 const M140_GONE = join(ROOT, "supabase/migrations/20260823140000_quick_offers.sql");
 
 const CLEAN_DB = "audiolad_price_promo_clean";
@@ -158,6 +162,8 @@ function applyPricingMigrations(database, { through } = {}) {
   psqlFile(database, M190);
   if (through === "190") return;
   psqlFile(database, M191);
+  if (through === "191") return;
+  psqlFile(database, M_SNAPSHOT);
 }
 
 function seedActorsAndProducts(database) {
@@ -348,6 +354,40 @@ INSERT INTO public.practice_price_promotion_starts (
     "upgrade base price unchanged after Quick Offers",
   );
 
+  psqlFile(UPGRADE_DB, M_SNAPSHOT);
+  assertEqual(
+    scalar(
+      UPGRADE_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR}'`,
+    ),
+    "499",
+    "upgrade backfills snapshot from current promotion.sale_price",
+  );
+  assertEqual(
+    scalar(
+      UPGRADE_DB,
+      `SELECT count(*)::text
+       FROM public.practice_price_promotion_starts
+       WHERE sale_price_snapshot IS NULL`,
+    ),
+    "0",
+    "upgrade snapshot backfill leaves no NULL",
+  );
+  assertEqual(
+    scalar(
+      UPGRADE_DB,
+      `SELECT is_nullable
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'practice_price_promotion_starts'
+         AND column_name = 'sale_price_snapshot'`,
+    ),
+    "NO",
+    "upgrade snapshot is NOT NULL",
+  );
+
   seedActorsAndProducts(CLEAN_DB);
   assertQuickOffersInstalled(CLEAN_DB, "clean install after 191");
   testQuickOffersRpcs(CLEAN_DB, "clean");
@@ -362,7 +402,7 @@ function testBindTwoRowConflict() {
     CLEAN_DB,
     `
 INSERT INTO public.practice_price_promotion_starts (
-  id, promotion_id, visitor_id, user_id, started_at, expires_at
+  id, promotion_id, visitor_id, user_id, started_at, expires_at, sale_price_snapshot
 ) VALUES
   (
     '11111111-bbbb-4bbb-8bbb-111111111111',
@@ -370,7 +410,8 @@ INSERT INTO public.practice_price_promotion_starts (
     '${VISITOR}',
     NULL,
     '2026-08-23T10:00:00Z',
-    '2026-08-23T10:20:00Z'
+    '2026-08-23T10:20:00Z',
+    499
   ),
   (
     '22222222-bbbb-4bbb-8bbb-222222222222',
@@ -378,7 +419,8 @@ INSERT INTO public.practice_price_promotion_starts (
     '${VISITOR_B}',
     '${USER_ID}',
     '2026-08-23T10:05:00Z',
-    '2026-08-23T10:25:00Z'
+    '2026-08-23T10:25:00Z',
+    499
   );
 
 SELECT public.bind_practice_price_promotion_starts('${VISITOR}', '${USER_ID}');
@@ -810,7 +852,7 @@ function testStartRpcSemantics() {
     CLEAN_DB,
     `
 INSERT INTO public.practice_price_promotion_starts (
-  id, promotion_id, visitor_id, user_id, started_at, expires_at
+  id, promotion_id, visitor_id, user_id, started_at, expires_at, sale_price_snapshot
 ) VALUES
   (
     '11111111-cccc-4ccc-8ccc-111111111111',
@@ -818,7 +860,8 @@ INSERT INTO public.practice_price_promotion_starts (
     '${VISITOR_D}',
     NULL,
     '2026-08-23T11:00:00Z',
-    '2026-08-23T11:20:00Z'
+    '2026-08-23T11:20:00Z',
+    499
   ),
   (
     '22222222-cccc-4ccc-8ccc-222222222222',
@@ -826,7 +869,8 @@ INSERT INTO public.practice_price_promotion_starts (
     '${VISITOR_E}',
     '${USER_CONFLICT}',
     '2026-08-23T11:05:00Z',
-    '2026-08-23T11:25:00Z'
+    '2026-08-23T11:25:00Z',
+    499
   );
 `,
   );
@@ -1126,6 +1170,484 @@ SELECT public.apply_quick_offer_amount(
   );
 }
 
+function resolvePrice(database, visitor, userId, surface, at) {
+  return lastTuple(
+    database,
+    `SELECT format(
+       '%s|%s|%s',
+       final_price::text,
+       coalesce(sale_price::text, ''),
+       coalesce(promotion_name, '')
+     )
+     FROM public.resolve_practice_effective_price(
+       '${PRACTICE_ID}'::uuid,
+       '${surface}',
+       ${visitor == null ? "NULL" : `'${visitor}'`},
+       ${sqlUuidOrNull(userId)},
+       timestamptz '${at}'
+     )`,
+  );
+}
+
+function testSalePriceSnapshotSemantics() {
+  prepareStartDb(CLEAN_DB);
+
+  const first = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(first.reused, "f", "A: first start inserts");
+  assertEqual(first.salePrice, "499", "A: first start returns 499");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR}'`,
+    ),
+    "499",
+    "A: first INSERT stores snapshot 499",
+  );
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotion_starts AS starts
+     SET
+       started_at = timestamptz '2026-08-23T10:00:00Z',
+       expires_at = timestamptz '2026-08-23T10:20:00Z'
+     WHERE starts.visitor_id = '${VISITOR}';
+     UPDATE public.practice_price_promotions
+     SET
+       sale_price = 699,
+       duration_seconds = 600,
+       name = 'Funnel 699'
+     WHERE id = '${PROMO_ID}'`,
+  );
+
+  const reuse = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(reuse.reused, "t", "A: reuse after price change");
+  assertEqual(reuse.salePrice, "499", "A: reuse returns snapshot 499, not live 699");
+  assertEqual(reuse.startedAt, "2026-08-23T10:00:00Z", "B: reuse keeps started_at");
+  assertEqual(reuse.expiresAt, "2026-08-23T10:20:00Z", "B: duration change does not move expires_at");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR}'`,
+    ),
+    "499",
+    "A: stored snapshot is not rewritten",
+  );
+
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "A: existing viewer PDP stays 499",
+  );
+  const existingCheckout = resolvePrice(
+    CLEAN_DB,
+    VISITOR,
+    null,
+    "checkout",
+    "2026-08-23T10:10:00Z",
+  ).split("|");
+  assertEqual(existingCheckout[0], "499", "A: existing viewer checkout stays 499");
+  assertEqual(existingCheckout[2], "Funnel 699", "C: live name is visible to existing viewer");
+
+  const newer = startRow(CLEAN_DB, VISITOR_B, null);
+  assertEqual(newer.reused, "f", "A: new visitor inserts");
+  assertEqual(newer.salePrice, "699", "A: new visitor snapshots 699");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR_B}'`,
+    ),
+    "699",
+    "A: new visitor row stores 699",
+  );
+  const newStarted = new Date(newer.startedAt).getTime();
+  const newExpires = new Date(newer.expiresAt).getTime();
+  assertEqual(newExpires - newStarted, 600 * 1000, "B: new start uses new duration");
+  const newerDuring = new Date(newStarted + 1000).toISOString();
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR_B, null, "product", newerDuring).split("|")[0],
+    "699",
+    "A: new visitor PDP is 699",
+  );
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotion_starts AS starts
+     SET
+       started_at = timestamptz '2026-08-23T10:00:00Z',
+       expires_at = timestamptz '2026-08-23T10:20:00Z'
+     WHERE starts.visitor_id = '${VISITOR}'`,
+  );
+  const expiredRepeat = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(expiredRepeat.reused, "t", "D: repeat ?promo= after expiry reuses");
+  assertEqual(expiredRepeat.startedAt, "2026-08-23T10:00:00Z", "D: expired started_at kept");
+  assertEqual(expiredRepeat.expiresAt, "2026-08-23T10:20:00Z", "D: expired expires_at kept");
+  assertEqual(expiredRepeat.salePrice, "499", "D: expired reuse still returns original snapshot");
+  assertEqual(countStarts(CLEAN_DB, VISITOR), "1", "D: repeat does not insert");
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:25:00Z").split("|")[0],
+    "4999",
+    "D: expired start is base price",
+  );
+
+  const guest = startRow(CLEAN_DB, VISITOR_C, null);
+  assertEqual(guest.salePrice, "699", "E: guest after live 699 snapshots 699");
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET sale_price = 899
+     WHERE id = '${PROMO_ID}'`,
+  );
+  const afterLogin = startRow(CLEAN_DB, VISITOR_C, USER_LOGIN);
+  assertEqual(afterLogin.reused, "t", "E: guest→login reuses");
+  assertEqual(afterLogin.salePrice, "699", "E: bind keeps guest snapshot, not live 899");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR_C}'`,
+    ),
+    "699",
+    "E: stored snapshot not copied from current promo",
+  );
+  const loginDuring = new Date(new Date(afterLogin.startedAt).getTime() + 1000).toISOString();
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR_C, USER_LOGIN, "checkout", loginDuring).split("|")[0],
+    "699",
+    "E: login checkout uses guest snapshot",
+  );
+
+  psql(
+    CLEAN_DB,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+UPDATE public.practice_price_promotion_starts
+SET
+  started_at = now() - interval '2 minutes',
+  expires_at = now() + interval '10 minutes'
+WHERE visitor_id = '${VISITOR}';
+`,
+  );
+  const checkout499 = lastTuple(
+    CLEAN_DB,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+SELECT public.bind_practice_price_promotion_starts('${VISITOR}', '${USER_ID}');
+SELECT amount_minor::text
+FROM public.create_practice_order(
+  'paid-practice',
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  NULL, NULL, NULL, NULL,
+  49900,
+  '${VISITOR}'
+);
+`,
+  );
+  assertEqual(checkout499, "49900", "A: checkout charges the 499 snapshot after live 899");
+
+  let liveExpectedFailed = false;
+  try {
+    psql(
+      CLEAN_DB,
+      `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+SELECT * FROM public.create_practice_order(
+  'paid-practice',
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  NULL, NULL, NULL, NULL,
+  89900,
+  '${VISITOR}'
+);
+`,
+    );
+  } catch (error) {
+    liveExpectedFailed = startErrorBlob(error).includes("price_changed");
+  }
+  assert(liveExpectedFailed, "A: checkout expected live 899 raises price_changed");
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotion_starts AS starts
+     SET
+       started_at = timestamptz '2026-08-23T10:00:00Z',
+       expires_at = timestamptz '2026-08-23T10:20:00Z'
+     WHERE starts.visitor_id = '${VISITOR}'`,
+  );
+
+  psql(
+    CLEAN_DB,
+    `
+INSERT INTO public.practice_price_promotions (
+  id, practice_id, name, promotion_type, sale_price, starts_at, ends_at, is_active, start_token
+) VALUES (
+  '${CALENDAR_ID}',
+  '${PRACTICE_ID}',
+  'Weekend',
+  'calendar',
+  888,
+  '2026-08-23T09:00:00Z',
+  '2026-08-23T18:00:00Z',
+  true,
+  'fedcba9876543210fedcba9876543210'
+);
+`,
+  );
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT final_price::text FROM public.resolve_practice_effective_price(
+        '${PRACTICE_ID}'::uuid,
+        'catalog',
+        NULL,
+        NULL,
+        timestamptz '2026-08-23T12:00:00Z'
+      )`,
+    ),
+    "888",
+    "F: calendar still applies on catalog",
+  );
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, USER_ID, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "F: in-window snapshot still beats higher calendar",
+  );
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, USER_ID, "product", "2026-08-23T10:25:00Z").split("|")[0],
+    "888",
+    "F: calendar applies after personal expiry",
+  );
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET is_active = false
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, USER_ID, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "888",
+    "disable stops personal snapshot; calendar remains",
+  );
+}
+
+function assertStartRowUntouched(database, visitor, expectedSnapshot, label) {
+  assertEqual(
+    scalar(
+      database,
+      `SELECT format(
+         '%s|%s|%s',
+         sale_price_snapshot::text,
+         to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+         to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+       )
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${visitor}'`,
+    ),
+    `${expectedSnapshot}|2026-08-23T10:00:00Z|2026-08-23T10:20:00Z`,
+    `${label}: start row snapshot/window not rewritten`,
+  );
+}
+
+function pinVisitorWindow(database, visitor) {
+  psql(
+    database,
+    `UPDATE public.practice_price_promotion_starts AS starts
+     SET
+       started_at = timestamptz '2026-08-23T10:00:00Z',
+       expires_at = timestamptz '2026-08-23T10:20:00Z'
+     WHERE starts.visitor_id = '${visitor}'`,
+  );
+}
+
+function testSnapshotOnlyAppliesBelowCurrentBase() {
+  prepareStartDb(CLEAN_DB);
+  const first = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(first.salePrice, "499", "2: start snapshots 499 against base 4999");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  psql(CLEAN_DB, `UPDATE public.practices SET price = 5999 WHERE id = '${PRACTICE_ID}'`);
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "2: PDP stays 499 after base rises to 5999",
+  );
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "checkout", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "2: checkout stays 499 after base rises to 5999",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "2");
+
+  prepareStartDb(CLEAN_DB);
+  const lowered = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(lowered.salePrice, "499", "1: start snapshots 499 against base 4999");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  psql(CLEAN_DB, `UPDATE public.practices SET price = 399 WHERE id = '${PRACTICE_ID}'`);
+  const loweredProduct = resolvePrice(
+    CLEAN_DB,
+    VISITOR,
+    null,
+    "product",
+    "2026-08-23T10:10:00Z",
+  ).split("|");
+  assertEqual(loweredProduct[0], "399", "1: PDP uses current base 399 when snapshot 499 is above it");
+  assertEqual(loweredProduct[1], "", "1: no sale_price when snapshot is not below base");
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "checkout", "2026-08-23T10:10:00Z").split("|")[0],
+    "399",
+    "1: checkout uses current base 399",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "1");
+
+  const checkout399 = lastTuple(
+    CLEAN_DB,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+UPDATE public.practice_price_promotion_starts
+SET
+  started_at = now() - interval '2 minutes',
+  expires_at = now() + interval '10 minutes'
+WHERE visitor_id = '${VISITOR}';
+SELECT public.bind_practice_price_promotion_starts('${VISITOR}', '${USER_ID}');
+SELECT amount_minor::text
+FROM public.create_practice_order(
+  'paid-practice',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  NULL, NULL, NULL, NULL,
+  39900,
+  '${VISITOR}'
+);
+`,
+  );
+  assertEqual(checkout399, "39900", "1: checkout charges current base 39900");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR}'`,
+    ),
+    "499",
+    "1: checkout does not rewrite sale_price_snapshot",
+  );
+}
+
+function testAuthorPromotionEditDoesNotRewriteStarts() {
+  prepareStartDb(CLEAN_DB);
+
+  const first = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(first.reused, "f", "author-edit: buyer start inserts");
+  assertEqual(first.salePrice, "499", "author-edit: first start snapshots 499");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  const before = lastTuple(
+    CLEAN_DB,
+    `SELECT format(
+       '%s|%s|%s|%s',
+       id::text,
+       start_token,
+       is_active::text,
+       count(*) OVER ()
+     )
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    before,
+    `${PROMO_ID}|${TOKEN}|t|1`,
+    "author-edit: one enabled promotion before save",
+  );
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET
+       name = 'Funnel 699',
+       sale_price = 699,
+       duration_seconds = 2700,
+       is_active = true
+     WHERE id = '${PROMO_ID}'`,
+  );
+
+  const after = lastTuple(
+    CLEAN_DB,
+    `SELECT format(
+       '%s|%s|%s|%s|%s|%s',
+       id::text,
+       start_token,
+       is_active::text,
+       sale_price::text,
+       duration_seconds::text,
+       (SELECT count(*) FROM public.practice_price_promotions)
+     )
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    after,
+    `${PROMO_ID}|${TOKEN}|t|699|2700|1`,
+    "author-edit: same id/token/enabled; no second row",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "author-edit");
+
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "author-edit: existing buyer PDP=499",
+  );
+  const existingCheckout = resolvePrice(
+    CLEAN_DB,
+    VISITOR,
+    null,
+    "checkout",
+    "2026-08-23T10:10:00Z",
+  ).split("|");
+  assertEqual(existingCheckout[0], "499", "author-edit: existing buyer checkout=499");
+  assertEqual(existingCheckout[2], "Funnel 699", "author-edit: name edit is live");
+
+  const reuse = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(reuse.reused, "t", "author-edit: existing start is reused");
+  assertEqual(reuse.salePrice, "499", "author-edit: reuse keeps snapshot 499");
+  assertEqual(reuse.expiresAt, "2026-08-23T10:20:00Z", "author-edit: expires_at unchanged");
+
+  const newer = startRow(CLEAN_DB, VISITOR_B, null);
+  assertEqual(newer.reused, "f", "author-edit: new buyer start inserts");
+  assertEqual(newer.salePrice, "699", "author-edit: new start snapshots 699");
+  const newStarted = new Date(newer.startedAt).getTime();
+  const newExpires = new Date(newer.expiresAt).getTime();
+  assertEqual(newExpires - newStarted, 2700 * 1000, "author-edit: new start uses 45 min");
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET is_active = false
+     WHERE id = '${PROMO_ID}'`,
+  );
+  const disabled = lastTuple(
+    CLEAN_DB,
+    `SELECT format('%s|%s|%s', id::text, start_token, is_active::text)
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    disabled,
+    `${PROMO_ID}|${TOKEN}|f`,
+    "author-edit: disable keeps id and start_token",
+  );
+  assertEqual(
+    scalar(CLEAN_DB, "SELECT count(*) FROM public.practice_price_promotions"),
+    "1",
+    "author-edit: disable does not insert a second promotion",
+  );
+}
+
 function testMigrationContract() {
   const oneshot = readFileSync(M183, "utf8");
   assert(oneshot.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "conflict");
@@ -1133,7 +1655,15 @@ function testMigrationContract() {
   assert(oneshot.includes("bind_practice_price_promotion_starts"), "bind");
   assert(oneshot.includes("WHEN unique_violation THEN"), "bind catches unique conflict");
   assert(oneshot.includes("row_number() OVER"), "upgrade dedupe");
-  assert(existsSync(M180) && existsSync(M181) && existsSync(M183) && existsSync(M190) && existsSync(M191), "five migrations present");
+  assert(
+    existsSync(M180) &&
+      existsSync(M181) &&
+      existsSync(M183) &&
+      existsSync(M190) &&
+      existsSync(M191) &&
+      existsSync(M_SNAPSHOT),
+    "six migrations present",
+  );
   assert(!existsSync(M140_GONE), "140000 must not remain in active migrations");
 
   const qualify = readFileSync(M190, "utf8");
@@ -1145,6 +1675,19 @@ function testMigrationContract() {
   assert(qualify.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "hotfix keeps visitor upsert");
   assert(qualify.includes("EXECUTE"), "ON CONFLICT runs as SQL so OUT promotion_id is not substituted");
   assert(!qualify.includes("started_at = v_now"), "hotfix does not restart");
+
+  const snapshot = readFileSync(M_SNAPSHOT, "utf8");
+  assert(snapshot.includes("ADD COLUMN IF NOT EXISTS sale_price_snapshot integer"), "additive snapshot column");
+  assert(snapshot.includes("SET sale_price_snapshot = promo.sale_price"), "best-effort backfill");
+  assert(snapshot.includes("ALTER COLUMN sale_price_snapshot SET NOT NULL"), "NOT NULL after backfill");
+  assert(snapshot.includes("sale_price := v_existing.sale_price_snapshot"), "reuse returns snapshot");
+  assert(snapshot.includes("canonical.sale_price_snapshot"), "resolve uses start snapshot");
+  assert(
+    snapshot.includes("canonical.sale_price_snapshot > 0") &&
+      snapshot.includes("canonical.sale_price_snapshot < v_practice.price"),
+    "snapshot applies only below current base",
+  );
+  assert(snapshot.includes("CREATE OR REPLACE FUNCTION public.create_practice_order") === false, "order fn still uses resolver");
 }
 
 function main() {
@@ -1162,6 +1705,9 @@ function main() {
   testCreateOrderPriceChanged();
   testOneshotAmbiguousThenQualifyHotfix();
   testStartRpcSemantics();
+  testSalePriceSnapshotSemantics();
+  testSnapshotOnlyAppliesBelowCurrentBase();
+  testAuthorPromotionEditDoesNotRewriteStarts();
   console.log(`price-promotions-sql-unit: ok (${backend})`);
 }
 
