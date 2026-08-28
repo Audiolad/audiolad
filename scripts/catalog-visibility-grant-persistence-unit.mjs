@@ -71,6 +71,28 @@ assert.match(transactionSql, /\\echo after_allowlist_removal/);
 assert.match(postcheckSql, /\\echo after_rollback/);
 assert.match(postcheckSql, /catalog_visibility = 'listed'/);
 assert.match(postcheckSql, /is_catalog_listed IS TRUE/);
+assert.doesNotMatch(
+  transactionSql,
+  /(?:p\.)?author_id\s*=\s*'3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid/,
+  "author user UUID must never be compared to practices.author_id",
+);
+assert.doesNotMatch(
+  transactionSql,
+  /author_members(?:\s+AS\s+\w+)?\s*(?:AS\s+\w+)?[\s\S]{0,200}author_id\s*=\s*'3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid/,
+  "author user UUID must never be treated as author_members.author_id",
+);
+assert.match(
+  transactionSql,
+  /FROM public\.practices AS p\s+JOIN public\.author_members AS am ON am\.author_id = p\.author_id/,
+);
+assert.match(
+  transactionSql,
+  /am\.user_id = '3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid/,
+);
+assert.match(
+  transactionSql,
+  /am\.author_id = \(\s+SELECT p\.author_id FROM public\.practices AS p/,
+);
 
 const runner = readFileSync("scripts/catalog-visibility-grant-persistence.mjs", "utf8");
 assert.match(runner, /AUDIOLAD_VISIBILITY_GRANT_PERSISTENCE_DATABASE_URL/);

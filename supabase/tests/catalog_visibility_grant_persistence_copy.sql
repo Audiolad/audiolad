@@ -27,11 +27,14 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM public.practices
-    WHERE id = '5fb00fbb-d66b-4c95-b993-04d4344b8d0b'::uuid
-      AND author_id = '3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid
-      AND catalog_visibility = 'listed'
-      AND is_catalog_listed IS TRUE
+    SELECT 1
+    FROM public.practices AS p
+    JOIN public.author_members AS am ON am.author_id = p.author_id
+    WHERE p.id = '5fb00fbb-d66b-4c95-b993-04d4344b8d0b'::uuid
+      AND p.catalog_visibility = 'listed'
+      AND p.is_catalog_listed IS TRUE
+      AND am.user_id = '3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid
+      AND am.role IN ('owner', 'editor')
   ) THEN
     RAISE EXCEPTION 'product is missing, owned by another author, or not listed';
   END IF;
@@ -200,9 +203,12 @@ BEGIN
   ) THEN RAISE EXCEPTION 'after removal: allowlist row remains'; END IF;
 
   IF EXISTS (
-    SELECT 1 FROM public.author_members
-    WHERE author_id = '3f840bf3-e5e4-4d42-a4ad-db7010861e1d'::uuid
-      AND user_id = '0a7c0b20-2057-4503-a685-b7ed9ed1bd3b'::uuid
+    SELECT 1 FROM public.author_members AS am
+    WHERE am.author_id = (
+      SELECT p.author_id FROM public.practices AS p
+      WHERE p.id = '5fb00fbb-d66b-4c95-b993-04d4344b8d0b'::uuid
+    )
+      AND am.user_id = '0a7c0b20-2057-4503-a685-b7ed9ed1bd3b'::uuid
   ) THEN RAISE EXCEPTION 'after removal: test user is an author member'; END IF;
 
   IF NOT EXISTS (
