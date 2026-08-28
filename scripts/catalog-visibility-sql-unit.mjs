@@ -105,6 +105,32 @@ assert.match(
   /public\.is_practice_author_member\(\s*practice_id,\s*auth\.uid\(\)\s*\)/,
 );
 
+const searchMigration = readFileSync(
+  join(
+    repoRoot,
+    "supabase/migrations/20260903120000_search_practice_visibility_users.sql",
+  ),
+  "utf8",
+);
+assert.match(searchMigration, /search_practice_visibility_users/);
+assert.match(searchMigration, /actor_can_manage_practice_as_author/);
+assert.match(searchMigration, /is_practice_author_member/);
+assert.match(searchMigration, /search_practice_visibility_users_with_support_proof/);
+assert.match(searchMigration, /char_length\(v_query\) < 2/);
+assert.match(searchMigration, /practice_visibility_search_attempts/);
+assert.match(searchMigration, /window_started_at/);
+assert.match(searchMigration, /user_id uuid PRIMARY KEY/);
+assert.match(searchMigration, /mask_practice_visibility_email/);
+assert.match(searchMigration, /lower\(btrim\(pr\.email\)\) = v_query/);
+assert.doesNotMatch(searchMigration, /strpos\(lower\(btrim\(pr\.email\)\)/);
+assert.doesNotMatch(searchMigration, /INSERT INTO public\.user_practices/);
+assert.doesNotMatch(
+  searchMigration,
+  /ALTER TABLE public\.practice_visibility_users/,
+);
+assert.doesNotMatch(searchMigration, /ALTER TABLE public\.practices/);
+assert.doesNotMatch(searchMigration, /SET\s+catalog_visibility/);
+
 const smoke = readFileSync(
   join(repoRoot, "supabase/tests/catalog_visibility_rls_smoke.sql"),
   "utf8",

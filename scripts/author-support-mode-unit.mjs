@@ -632,6 +632,10 @@ assert.match(sql, /Product is not published\./);
 assert.match(sql, /Editing mode requires published\/unpublished approved/);
 assert.match(sql, /pg_advisory_xact_lock/);
 assert.match(sql, /lookup_practice_visibility_user/);
+assert.match(
+  read("src/lib/author-support/proof.ts"),
+  /search_practice_visibility_users:\s*\n\s*"search_practice_visibility_users_with_support_proof"/,
+);
 assert.doesNotMatch(sql, /CREATE OR REPLACE FUNCTION public\.sync_practice_catalog_visibility/);
 
 const audit = read("src/lib/author-support/audit.ts");
