@@ -222,5 +222,36 @@ assert.match(docs, /does not write the trusted status context/);
 assert.match(docs, /commit status.*Production \/ PR Safety/is);
 assert.match(docs, /isolated Git object store/);
 assert.match(docs, /git archive/);
+assert.match(docs, /test:database-migrations:ci/);
+assert.match(docs, /full\s+self-hosted\/local suite/);
+
+const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+const ciMigrationSuite = packageJson.scripts["test:database-migrations:ci"];
+assert.ok(ciMigrationSuite, "CI-safe migration suite must exist");
+assert.match(ciMigrationSuite, /AUDIOLAD_SKIP_ISOLATED_SQL=1 node scripts\/catalog-foundation-sql-unit\.mjs/);
+assert.match(ciMigrationSuite, /AUDIOLAD_SKIP_ISOLATED_SQL=1 node scripts\/playlist-catalog-foundation-sql-unit\.mjs/);
+assert.equal(
+  validationWorkflow.includes("npm run test:database-migrations:ci"),
+  true,
+  "GitHub-hosted validation must not invoke the full self-hosted suite",
+);
+assert.equal(
+  validationWorkflow.includes("npm run test:database-migrations\n"),
+  false,
+  "GitHub-hosted validation must not require supabase-db",
+);
+
+const catalogFoundationSql = readFileSync(
+  "scripts/catalog-foundation-sql-unit.mjs",
+  "utf8",
+);
+const playlistFoundationSql = readFileSync(
+  "scripts/playlist-catalog-foundation-sql-unit.mjs",
+  "utf8",
+);
+for (const sqlUnit of [catalogFoundationSql, playlistFoundationSql]) {
+  assert.match(sqlUnit, /AUDIOLAD_SKIP_ISOLATED_SQL === "1"/);
+  assert.match(sqlUnit, /!skipIsolatedSql && \(dockerAvailable\(\) \|\| localPostgresAvailable\(\)\)/);
+}
 
 console.log("production-pr-safety-guard-unit: ok");

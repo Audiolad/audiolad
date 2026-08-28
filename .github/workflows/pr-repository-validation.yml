@@ -47,7 +47,7 @@ jobs:
       - name: Validate PR repository
         working-directory: ${{ env.PR_WORKSPACE }}
         run: |
-          npm run test:database-migrations
+          npm run test:database-migrations:ci
           npm run build
           npm run typecheck
           npm run lint
