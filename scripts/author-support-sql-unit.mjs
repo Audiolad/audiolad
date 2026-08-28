@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const support = readFileSync(
-  join(root, "supabase/migrations/20260901130000_author_support_mode.sql"),
+  join(root, "supabase/migrations/20260902120200_author_support_mode.sql"),
   "utf8",
 );
 const visibility = readFileSync(

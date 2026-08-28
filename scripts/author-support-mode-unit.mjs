@@ -368,7 +368,7 @@ assert.match(moderationActor, /author_products\.moderate/);
 assert.match(moderationActor, /peekAuthorExecutionContext/);
 assert.doesNotMatch(read("src/lib/author-products/moderation.ts"), /author-support\/context/);
 
-const sql = read("supabase/migrations/20260901130000_author_support_mode.sql");
+const sql = read("supabase/migrations/20260902120200_author_support_mode.sql");
 assert.match(sql, /CREATE TABLE IF NOT EXISTS public.author_support_sessions/);
 assert.match(sql, /CREATE TABLE IF NOT EXISTS public.author_support_audit_events/);
 assert.match(sql, /actor_user_id/);

@@ -22,6 +22,7 @@ Chronological order versus neighboring files is preserved.
 | `20260830120200_create_practice_order_visibility.sql` | `20260901120200_create_practice_order_visibility.sql` | RENAME |
 | `20260830120300_public_playlist_selected_visibility.sql` | `20260901120300_public_playlist_selected_visibility.sql` | RENAME |
 | `20260830120400_fix_visibility_allowlist_author_policy.sql` | `20260901120400_fix_visibility_allowlist_author_policy.sql` | RENAME |
+| `20260901130000_author_support_mode.sql` | `20260902120200_author_support_mode.sql` | RENAME |
 
 ## Why these new timestamps
 
@@ -40,6 +41,8 @@ History-hole reissue (SQL unchanged; only versions moved after production max
 - `20260830120200` → `20260901120200`
 - `20260830120300` → `20260901120300`
 - `20260830120400` → `20260901120400`
+
+History-hole reissue (SQL unchanged): `20260901130000_author_support_mode.sql` → `20260902120200_author_support_mode.sql`. Production max is now `20260902120000`; local max was `20260902120100` (later `20260903120000_search_practice_visibility_users.sql` is already on main). New stamp sits after analytics `20260902120100` so search can still replace the 3-column list wrapper. SQL unchanged.
 
 Do not invent a parallel history table. After a one-time baseline, ordinary
 deploy applies pending files by these unique versions.
