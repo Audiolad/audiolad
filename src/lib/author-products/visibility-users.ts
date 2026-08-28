@@ -99,17 +99,40 @@ export function validateVisibilitySearchQuery(value: string): string | null {
   return "Введите имя, фамилию, email или UUID";
 }
 
+export function isVisibilityEmailQuery(value: string): boolean {
+  return isVisibilityLookupEmail(value);
+}
+
 export function maskVisibilityEmail(
   email: string | null | undefined,
 ): string | null {
   const value = (email ?? "").trim();
   const at = value.indexOf("@");
 
-  if (at <= 0 || at === value.length - 1) {
+  if (at <= 0 || at >= value.length - 1) {
     return null;
   }
 
-  return `${value[0]}***${value.slice(at)}`;
+  const local = value.slice(0, at);
+  const domain = value.slice(at + 1);
+
+  if (!local || !domain || domain.includes("@")) {
+    return null;
+  }
+
+  if (local.length <= 1) {
+    return `***@${domain}`;
+  }
+
+  if (local.length === 2) {
+    return `${local[0]}***@${domain}`;
+  }
+
+  if (local.length <= 4) {
+    return `${local[0]}***${local[local.length - 1]}@${domain}`;
+  }
+
+  return `${local.slice(0, 2)}***${local.slice(-2)}@${domain}`;
 }
 
 export function splitVisibilityDisplayName(fullName: string | null | undefined): {
@@ -189,10 +212,10 @@ export function profileMatchesVisibilitySearchQuery(
   }
 
   const lowered = query.toLowerCase();
-  const email = (profile.email ?? "").trim().toLowerCase();
 
-  if (email && (email === lowered || email.includes(lowered))) {
-    return true;
+  if (isVisibilityEmailQuery(query)) {
+    const email = (profile.email ?? "").trim().toLowerCase();
+    return email.length > 0 && email === lowered;
   }
 
   const name = (profile.fullName ?? "").trim().toLowerCase();
@@ -341,4 +364,43 @@ export function visibilitySearchHitHasPrivateFields(
   value: Record<string, unknown>,
 ): boolean {
   return PRIVATE_VISIBILITY_SEARCH_KEYS.some((key) => key in value);
+}
+
+export function visibilityJsonHasRawEmail(payload: unknown): boolean {
+  const serialized = JSON.stringify(payload ?? null);
+
+  if (/"email"\s*:/.test(serialized)) {
+    return true;
+  }
+
+  const candidates =
+    serialized.match(/[A-Za-z0-9._%+*-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? [];
+
+  return candidates.some((value) => !value.includes("***"));
+}
+
+export function toVisibilityListUser(row: {
+  user_id?: string;
+  display_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  masked_email?: string | null;
+  created_at?: string;
+}): PracticeVisibilityUser {
+  const hit = sanitizeVisibilitySearchHit({
+    user_id: row.user_id,
+    display_name: row.display_name,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    masked_email: row.masked_email,
+  });
+
+  return {
+    userId: hit?.userId ?? row.user_id ?? "",
+    displayName: hit?.displayName ?? row.display_name ?? "Пользователь",
+    firstName: hit?.firstName ?? row.first_name ?? null,
+    lastName: hit?.lastName ?? row.last_name ?? null,
+    maskedEmail: hit?.maskedEmail ?? null,
+    createdAt: row.created_at,
+  };
 }

@@ -5,7 +5,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { maskVisibilityEmail } from "@/lib/author-products/visibility-users";
+import { toVisibilityListUser } from "@/lib/author-products/visibility-users";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -24,23 +24,16 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    const users = (data ?? []).map((row: {
-      user_id?: string;
-      display_name?: string;
-      first_name?: string | null;
-      last_name?: string | null;
-      masked_email?: string | null;
-      created_at?: string;
-    }) => ({
-      userId: row.user_id,
-      displayName: row.display_name,
-      firstName: row.first_name ?? null,
-      lastName: row.last_name ?? null,
-      maskedEmail: row.masked_email?.includes("***")
-        ? row.masked_email
-        : maskVisibilityEmail(row.masked_email),
-      createdAt: row.created_at,
-    }));
+    const users = (data ?? []).map(
+      (row: {
+        user_id?: string;
+        display_name?: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        masked_email?: string | null;
+        created_at?: string;
+      }) => toVisibilityListUser(row),
+    );
 
     return NextResponse.json({ users });
   } catch (error) {

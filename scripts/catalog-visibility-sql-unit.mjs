@@ -116,6 +116,11 @@ assert.match(searchMigration, /search_practice_visibility_users/);
 assert.match(searchMigration, /is_practice_author_member/);
 assert.match(searchMigration, /char_length\(v_query\) < 2/);
 assert.match(searchMigration, /practice_visibility_search_attempts/);
+assert.match(searchMigration, /window_started_at/);
+assert.match(searchMigration, /user_id uuid PRIMARY KEY/);
+assert.match(searchMigration, /mask_practice_visibility_email/);
+assert.match(searchMigration, /lower\(btrim\(pr\.email\)\) = v_query/);
+assert.doesNotMatch(searchMigration, /strpos\(lower\(btrim\(pr\.email\)\)/);
 assert.doesNotMatch(searchMigration, /INSERT INTO public\.user_practices/);
 assert.doesNotMatch(
   searchMigration,

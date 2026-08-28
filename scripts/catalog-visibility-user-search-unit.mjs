@@ -22,8 +22,15 @@ import {
   shouldSearchVisibilityUsers,
   validateVisibilityLookupQuery,
   validateVisibilitySearchQuery,
+  visibilityJsonHasRawEmail,
   visibilitySearchHitHasPrivateFields,
 } from "../src/lib/author-products/visibility-users.ts";
+import {
+  DEFAULT_ALLOWED_DATABASE,
+  hasIsolatedOrTestToken,
+  parseAllowedDatabaseName,
+  parseAllowedDatabaseUrl,
+} from "./catalog-visibility-user-search-isolated.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -109,7 +116,22 @@ function testExactEmailSearch() {
   const hits = searchVisibilityProfiles(profiles, "german@example.com");
   assert.equal(hits.length, 1, "5 exact email uniquely resolves");
   assert.equal(hits[0]?.userId, GERMAN_ID);
-  assert.equal(hits[0]?.maskedEmail, "g***@example.com");
+  assert.equal(hits[0]?.maskedEmail, "ge***an@example.com");
+}
+
+function testPartialEmailDoesNotMatch() {
+  for (const query of ["gmail.com", "@example.com", "german@", "man@example"]) {
+    assert.deepEqual(
+      searchVisibilityProfiles(profiles, query),
+      [],
+      `partial email must not match: ${query}`,
+    );
+    assert.equal(
+      profileMatchesVisibilitySearchQuery(profiles[0], query),
+      false,
+      `partial email must not match profile: ${query}`,
+    );
+  }
 }
 
 function testUuidSearch() {
@@ -177,17 +199,36 @@ function testAuthAndPrivacySourceGuards() {
   assert.match(searchFn, /char_length\(v_query\) < 2/);
   assert.match(searchFn, /RETURN;/);
   assert.match(searchFn, /practice_visibility_search_attempts/);
-  assert.match(searchFn, /v_recent >= 60/);
+  assert.match(searchFn, /window_started_at/);
+  assert.match(searchFn, /attempt_count/);
+  assert.match(searchFn, /v_count >= 60/);
   assert.match(searchFn, /LIMIT 10/);
+  assert.match(searchFn, /v_is_email/);
+  assert.match(searchFn, /lower\(btrim\(pr\.email\)\) = v_query/);
+  assert.doesNotMatch(searchFn, /strpos\(lower\(btrim\(pr\.email\)\)/);
   assert.doesNotMatch(searchFn, /INSERT INTO public\.user_practices/);
   assert.doesNotMatch(searchFn, /INSERT INTO public\.practice_visibility_users/);
   assert.doesNotMatch(searchFn, /phone/);
   assert.doesNotMatch(searchFn, /raw_user_meta_data/);
   assert.match(searchFn, /masked_email/);
+  assert.match(searchFn, /mask_practice_visibility_email/);
   assert.match(
-    searchFn,
-    /left\(btrim\(pr\.email\), 1\) \|\| '\*\*\*'/,
-    "search masks emails in SQL",
+    migration,
+    /user_id uuid PRIMARY KEY/,
+    "rate limit storage is one row per actor",
+  );
+  assert.doesNotMatch(
+    migration,
+    /id bigint GENERATED ALWAYS AS IDENTITY/,
+    "rate limit table is not append-only",
+  );
+  assert.match(lookupRoute, /checkAnalyticsRateLimit/);
+  assert.doesNotMatch(lookupRoute, /email:\s*\n/);
+  assert.doesNotMatch(lookupRoute, /email:\s+isVisibilityLookupEmail/);
+  assert.doesNotMatch(
+    lookupRoute,
+    /user:\s*\{[\s\S]*email:/,
+    "lookup JSON must not include an email field",
   );
 
   const beforeScan = searchFn.slice(0, searchFn.indexOf("FROM public.profiles"));
@@ -293,7 +334,7 @@ function testSelectedListUsesMaskedIdentity() {
   });
   assert.ok(german);
   assert.equal(formatVisibilityUserPrimaryLabel(german), "Герман Иванов");
-  assert.equal(german.maskedEmail, "g***@example.com");
+  assert.equal(german.maskedEmail, "ge***an@example.com");
   assert.deepEqual(
     Object.keys(german).sort(),
     [...VISIBILITY_SEARCH_PUBLIC_KEYS].sort(),
@@ -309,8 +350,9 @@ function testSelectedListUsesMaskedIdentity() {
   assert.equal(twoAnnas.length, 2);
   assert.deepEqual(
     new Set(twoAnnas.map((hit) => hit.maskedEmail)),
-    new Set(["a***@example.com", "a***@example.com"]),
+    new Set(["an***va@example.com", "an***er@example.com"]),
   );
+  assert.notEqual(twoAnnas[0]?.maskedEmail, twoAnnas[1]?.maskedEmail);
   assert.notEqual(twoAnnas[0]?.userId, twoAnnas[1]?.userId);
 
   assert.equal(
@@ -321,7 +363,64 @@ function testSelectedListUsesMaskedIdentity() {
     GERMAN_ID,
     "UUID only if the profile has no name",
   );
-  assert.equal(maskVisibilityEmail("anna.other@example.com"), "a***@example.com");
+  assert.equal(maskVisibilityEmail("anna.ivanova@example.com"), "an***va@example.com");
+  assert.equal(maskVisibilityEmail("anna.other@example.com"), "an***er@example.com");
+  assert.equal(maskVisibilityEmail("german@example.com"), "ge***an@example.com");
+  assert.equal(maskVisibilityEmail("a@example.com"), "***@example.com");
+  assert.equal(maskVisibilityEmail("ab@example.com"), "a***@example.com");
+  assert.equal(maskVisibilityEmail("abcd@example.com"), "a***d@example.com");
+  assert.notEqual(
+    maskVisibilityEmail("anna.ivanova@example.com"),
+    maskVisibilityEmail("anna.other@example.com"),
+  );
+}
+
+function testLookupJsonNeverIncludesRawEmail() {
+  const lookupFixture = {
+    user: {
+      userId: GERMAN_ID,
+      displayName: "Герман Иванов",
+      firstName: "Герман",
+      lastName: "Иванов",
+      maskedEmail: maskVisibilityEmail("german@example.com"),
+    },
+    users: [
+      {
+        userId: GERMAN_ID,
+        displayName: "Герман Иванов",
+        firstName: "Герман",
+        lastName: "Иванов",
+        maskedEmail: maskVisibilityEmail("german@example.com"),
+      },
+    ],
+  };
+  assert.equal(visibilityJsonHasRawEmail(lookupFixture), false);
+  assert.equal(
+    visibilityJsonHasRawEmail({
+      user: { userId: GERMAN_ID, email: "german@example.com" },
+    }),
+    true,
+  );
+  assert.equal(
+    visibilityJsonHasRawEmail({
+      users: [{ userId: GERMAN_ID, maskedEmail: "german@example.com" }],
+    }),
+    true,
+  );
+
+  const listFixture = {
+    users: [
+      {
+        userId: GERMAN_ID,
+        displayName: "Герман Иванов",
+        firstName: "Герман",
+        lastName: "Иванов",
+        maskedEmail: "ge***an@example.com",
+        createdAt: "2026-08-28T00:00:00.000Z",
+      },
+    ],
+  };
+  assert.equal(visibilityJsonHasRawEmail(listFixture), false);
 }
 
 function testExactLookupStaysExact() {
@@ -331,17 +430,73 @@ function testExactLookupStaysExact() {
   assert.equal(shouldSearchVisibilityUsers("Герман"), true);
 }
 
+function testIsolatedHarnessGuards() {
+  const safeUrl = `postgresql://reader:secret@localhost:5432/${DEFAULT_ALLOWED_DATABASE}`;
+  assert.equal(hasIsolatedOrTestToken(DEFAULT_ALLOWED_DATABASE), true);
+  assert.equal(hasIsolatedOrTestToken("audiolad"), false);
+  assert.equal(hasIsolatedOrTestToken("audiolad_production"), false);
+  assert.equal(parseAllowedDatabaseUrl(undefined).ok, false);
+  assert.equal(parseAllowedDatabaseUrl(safeUrl).ok, true);
+  assert.match(
+    parseAllowedDatabaseUrl("postgresql://host/postgres").reason,
+    /unsafe database name: postgres/,
+  );
+  assert.match(
+    parseAllowedDatabaseUrl("postgresql://host/supabase").reason,
+    /unsafe database name: supabase/,
+  );
+  assert.match(
+    parseAllowedDatabaseUrl("postgresql://host/audiolad").reason,
+    /isolated or test token/,
+  );
+  assert.match(
+    parseAllowedDatabaseUrl("postgresql://host/audiolad_production").reason,
+    /production-looking/,
+  );
+  assert.equal(
+    parseAllowedDatabaseName("audiolad_other_isolated").ok,
+    false,
+    "non-default isolated names still require explicit allow",
+  );
+  assert.equal(
+    parseAllowedDatabaseName(
+      "audiolad_other_isolated",
+      "audiolad_other_isolated",
+    ).ok,
+    true,
+  );
+
+  const runner = read("scripts/catalog-visibility-user-search-isolated.mjs");
+  const fixture = read("supabase/tests/catalog_visibility_user_search_isolated.sql");
+  assert.match(runner, /AUDIOLAD_VISIBILITY_USER_SEARCH_DATABASE_URL/);
+  assert.match(runner, /AUDIOLAD_VISIBILITY_USER_SEARCH_TRANSPORT/);
+  assert.match(runner, /20260903120000_search_practice_visibility_users\.sql/);
+  assert.match(runner, /catalog_visibility_user_search_isolated\.sql/);
+  assert.match(fixture, /^BEGIN;$/m);
+  assert.match(fixture, /^ROLLBACK;$/m);
+  assert.match(fixture, /SET LOCAL ROLE authenticated/);
+  assert.match(fixture, /SET LOCAL ROLE anon/);
+  assert.match(fixture, /not_authorized/);
+  assert.match(fixture, /gmail\.com/);
+  assert.match(fixture, /user_practices/);
+  assert.match(fixture, /list_practice_visibility_users/);
+  assert.doesNotMatch(runner, /\|\|\s*true/);
+}
+
 testNameSearch();
 testLastNameSearch();
 testFirstAndLastSearch();
 testCaseInsensitiveSearch();
 testExactEmailSearch();
+testPartialEmailDoesNotMatch();
 testUuidSearch();
 testShortQueryDoesNotSearch();
 testResultCap();
 testAuthAndPrivacySourceGuards();
 testDuplicateSelectedUser();
 testSelectedListUsesMaskedIdentity();
+testLookupJsonNeverIncludesRawEmail();
 testExactLookupStaysExact();
+testIsolatedHarnessGuards();
 
 console.log("catalog-visibility-user-search-unit: ok");

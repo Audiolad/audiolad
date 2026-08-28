@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
 import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import {
-  isVisibilityLookupEmail,
   sanitizeVisibilitySearchHit,
   shouldSearchVisibilityUsers,
   validateVisibilityLookupQuery,
@@ -31,7 +31,7 @@ function mapExactLookupUser(row: {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, user } = await requirePracticeMutationAccess(id);
 
     let body: unknown;
 
@@ -96,16 +96,18 @@ export async function POST(request: Request, context: RouteContext) {
       const hit = mapExactLookupUser(row);
 
       return NextResponse.json({
-        user: {
-          userId: row.user_id,
-          displayName: row.display_name ?? "Пользователь",
-          email:
-            isVisibilityLookupEmail(trimmed) && typeof row.email === "string"
-              ? row.email
-              : null,
-        },
+        user: hit,
         users: hit ? [hit] : [],
       });
+    }
+
+    if (
+      !checkAnalyticsRateLimit(`visibility-user-search:${user.id}`, 60, 60_000)
+    ) {
+      return NextResponse.json(
+        { error: "rate_limited", users: [] },
+        { status: 429 },
+      );
     }
 
     const { data, error } = await supabase.rpc(

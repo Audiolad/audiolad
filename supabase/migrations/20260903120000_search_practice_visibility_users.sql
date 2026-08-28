@@ -1,19 +1,85 @@
 -- Allowlist identity search for selected_users authors.
 -- Fail-closed: only practice authors/editors. Search resolves user_id only.
--- Does not write user_practices. Does not change catalog_visibility or grants.
+-- Email match is exact-only. Does not write user_practices.
+-- Does not change catalog_visibility or grants.
 
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.mask_practice_visibility_email(p_email text)
+RETURNS text
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_email text;
+  v_at integer;
+  v_local text;
+  v_domain text;
+BEGIN
+  v_email := btrim(COALESCE(p_email, ''));
+  v_at := position('@' IN v_email);
+
+  IF v_at <= 1 OR v_at >= char_length(v_email) THEN
+    RETURN NULL;
+  END IF;
+
+  v_local := substr(v_email, 1, v_at - 1);
+  v_domain := substr(v_email, v_at + 1);
+
+  IF v_local = '' OR v_domain = '' OR position('@' IN v_domain) > 0 THEN
+    RETURN NULL;
+  END IF;
+
+  IF char_length(v_local) <= 1 THEN
+    RETURN '***@' || v_domain;
+  END IF;
+
+  IF char_length(v_local) = 2 THEN
+    RETURN left(v_local, 1) || '***@' || v_domain;
+  END IF;
+
+  IF char_length(v_local) <= 4 THEN
+    RETURN left(v_local, 1) || '***' || right(v_local, 1) || '@' || v_domain;
+  END IF;
+
+  RETURN left(v_local, 2) || '***' || right(v_local, 2) || '@' || v_domain;
+END;
+$$;
+
+COMMENT ON FUNCTION public.mask_practice_visibility_email(text) IS
+  'audiolad:visibility-mask:v1; privacy-safe email mask; never returns the full local-part';
+
+REVOKE ALL ON FUNCTION public.mask_practice_visibility_email(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.mask_practice_visibility_email(text) FROM anon;
+REVOKE ALL ON FUNCTION public.mask_practice_visibility_email(text) FROM authenticated;
+
+-- Draft-only reshape: replace the unmerged append-only attempts table
+-- with one row per searching author (bounded by actor count, not keystrokes).
+DO $$
+BEGIN
+  IF to_regclass('public.practice_visibility_search_attempts') IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'practice_visibility_search_attempts'
+         AND column_name = 'attempted_at'
+     )
+  THEN
+    DROP TABLE public.practice_visibility_search_attempts;
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS public.practice_visibility_search_attempts (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id uuid NOT NULL
+  user_id uuid PRIMARY KEY
     REFERENCES auth.users (id)
     ON DELETE CASCADE,
-  attempted_at timestamptz NOT NULL DEFAULT now()
+  window_started_at timestamptz NOT NULL DEFAULT now(),
+  attempt_count integer NOT NULL DEFAULT 0
+    CHECK (attempt_count >= 0)
 );
-
-CREATE INDEX IF NOT EXISTS practice_visibility_search_attempts_user_idx
-  ON public.practice_visibility_search_attempts (user_id, attempted_at DESC);
 
 ALTER TABLE public.practice_visibility_search_attempts ENABLE ROW LEVEL SECURITY;
 
@@ -41,7 +107,9 @@ DECLARE
   v_actor uuid;
   v_query text;
   v_uuid uuid;
-  v_recent integer;
+  v_is_email boolean;
+  v_window timestamptz;
+  v_count integer;
   v_tokens text[];
 BEGIN
   v_actor := auth.uid();
@@ -72,19 +140,33 @@ BEGIN
     hashtext(v_actor::text)
   );
 
-  SELECT count(*)
-  INTO v_recent
+  SELECT a.window_started_at, a.attempt_count
+  INTO v_window, v_count
   FROM public.practice_visibility_search_attempts AS a
   WHERE a.user_id = v_actor
-    AND a.attempted_at > now() - interval '1 minute';
+  FOR UPDATE;
 
-  IF v_recent >= 60 THEN
+  IF NOT FOUND THEN
+    INSERT INTO public.practice_visibility_search_attempts (
+      user_id,
+      window_started_at,
+      attempt_count
+    )
+    VALUES (v_actor, now(), 1);
+  ELSIF v_window <= now() - interval '1 minute' THEN
+    UPDATE public.practice_visibility_search_attempts
+    SET
+      window_started_at = now(),
+      attempt_count = 1
+    WHERE user_id = v_actor;
+  ELSIF v_count >= 60 THEN
     RAISE EXCEPTION 'rate_limited'
       USING ERRCODE = 'P0001';
+  ELSE
+    UPDATE public.practice_visibility_search_attempts
+    SET attempt_count = attempt_count + 1
+    WHERE user_id = v_actor;
   END IF;
-
-  INSERT INTO public.practice_visibility_search_attempts (user_id)
-  VALUES (v_actor);
 
   BEGIN
     v_uuid := v_query::uuid;
@@ -93,6 +175,7 @@ BEGIN
       v_uuid := NULL;
   END;
 
+  v_is_email := position('@' IN v_query) > 0 AND v_query NOT LIKE '% %';
   v_tokens := regexp_split_to_array(v_query, '\s+');
 
   RETURN QUERY
@@ -109,10 +192,7 @@ BEGIN
     SELECT
       pr.id AS user_id,
       COALESCE(NULLIF(btrim(pr.full_name), ''), 'Пользователь') AS display_name,
-      CASE
-        WHEN pr.email IS NULL OR position('@' IN pr.email) <= 1 THEN NULL
-        ELSE left(btrim(pr.email), 1) || '***' || substring(btrim(pr.email) FROM position('@' IN btrim(pr.email)))
-      END AS masked_email
+      public.mask_practice_visibility_email(pr.email) AS masked_email
     FROM public.profiles AS pr
     WHERE
       (
@@ -121,29 +201,25 @@ BEGIN
       )
       OR (
         v_uuid IS NULL
-        AND (
-          (
-            pr.email IS NOT NULL
-            AND strpos(lower(btrim(pr.email)), v_query) > 0
-          )
-          OR (
-            pr.full_name IS NOT NULL
-            AND NOT EXISTS (
-              SELECT 1
-              FROM unnest(v_tokens) AS token(value)
-              WHERE token.value <> ''
-                AND strpos(lower(pr.full_name), token.value) = 0
-            )
-          )
+        AND v_is_email
+        AND pr.email IS NOT NULL
+        AND lower(btrim(pr.email)) = v_query
+      )
+      OR (
+        v_uuid IS NULL
+        AND NOT v_is_email
+        AND pr.full_name IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(v_tokens) AS token(value)
+          WHERE token.value <> ''
+            AND strpos(lower(pr.full_name), token.value) = 0
         )
       )
     LIMIT 10
   ) AS matched;
 
-  IF v_uuid IS NULL
-     AND position('@' IN v_query) > 1
-     AND NOT v_query LIKE '% %'
-  THEN
+  IF v_uuid IS NULL AND v_is_email THEN
     RETURN QUERY
     SELECT
       au.id AS user_id,
@@ -159,10 +235,7 @@ BEGIN
         ),
         COALESCE(NULLIF(btrim(pr.full_name), ''), 'Пользователь')
       ),
-      CASE
-        WHEN au.email IS NULL OR position('@' IN au.email) <= 1 THEN NULL
-        ELSE left(btrim(au.email), 1) || '***' || substring(btrim(au.email) FROM position('@' IN btrim(au.email)))
-      END
+      public.mask_practice_visibility_email(COALESCE(pr.email, au.email))
     FROM auth.users AS au
     LEFT JOIN public.profiles AS pr
       ON pr.id = au.id
@@ -171,10 +244,8 @@ BEGIN
         SELECT 1
         FROM public.profiles AS existing
         WHERE existing.id = au.id
-          AND (
-            existing.email IS NOT NULL
-            AND strpos(lower(btrim(existing.email)), v_query) > 0
-          )
+          AND existing.email IS NOT NULL
+          AND lower(btrim(existing.email)) = v_query
       )
     LIMIT 1;
   END IF;
@@ -182,7 +253,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.search_practice_visibility_users(uuid, text) IS
-  'audiolad:visibility-search:v1; author-only name/email/uuid allowlist lookup; returns masked email; never writes user_practices';
+  'audiolad:visibility-search:v2; author-only name/exact-email/uuid allowlist lookup; masked email; never writes user_practices';
 
 REVOKE ALL ON FUNCTION public.search_practice_visibility_users(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.search_practice_visibility_users(uuid, text) FROM anon;
@@ -239,10 +310,7 @@ BEGIN
       ),
       COALESCE(NULLIF(btrim(pr.full_name), ''), 'Пользователь')
     ) AS last_name,
-    CASE
-      WHEN pr.email IS NULL OR position('@' IN pr.email) <= 1 THEN NULL
-      ELSE left(btrim(pr.email), 1) || '***' || substring(btrim(pr.email) FROM position('@' IN btrim(pr.email)))
-    END AS masked_email,
+    public.mask_practice_visibility_email(pr.email) AS masked_email,
     v.created_at
   FROM public.practice_visibility_users AS v
   LEFT JOIN public.profiles AS pr
