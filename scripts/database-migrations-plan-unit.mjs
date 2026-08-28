@@ -310,6 +310,13 @@ function testRepoOneFileOneVersion() {
   );
   assert.ok(
     listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260901120000_analytics_link_signup_idempotent.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
       (row) => row.filename === "20260901130000_author_support_mode.sql",
     ),
   );
@@ -367,9 +374,10 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901120000",
     "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 23);
+  assert.equal(plan.database_migrations_pending, 24);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -403,9 +411,10 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901120000",
     "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 17);
+  assert.equal(plan.database_migrations_pending, 18);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -446,9 +455,10 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901120000",
     "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 8);
+  assert.equal(plan.database_migrations_pending, 9);
 }
 
 function main() {

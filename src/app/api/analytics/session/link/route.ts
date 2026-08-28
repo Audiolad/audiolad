@@ -38,7 +38,10 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("analytics_session_link_error", error.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    // Fail-soft after the RPC returns. Do not 500 — clients must not retry
+    // 55P03 / PGRST003 in this page lifecycle. The SQL/client stampede
+    // guards are what keep the PostgREST pool from being held.
+    return new NextResponse(null, { status: 204 });
   }
 
   return NextResponse.json({ linked: Boolean(data) }, { status: 200 });

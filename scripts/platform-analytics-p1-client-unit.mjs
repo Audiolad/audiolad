@@ -36,6 +36,8 @@ function testContracts() {
   assert(client.includes("client_event_id"), "client event id");
   assert(client.includes("flushAnalyticsRetryQueue"), "retry flush");
   assert(client.includes("client_version"), "client version");
+  assert(client.includes("linkSessionFlight"), "link single-flight");
+  assert(client.includes("signupCompleteFlight"), "signup single-flight");
   assert(retry.includes("48") || retry.includes("172800") || retry.includes("48 *"), "ttl ~48h");
   assert(controls.includes("Не учитывать служебный и тестовый трафик"), "toggle label");
   assert(mig.includes("analytics_identity_links"), "identity links");
