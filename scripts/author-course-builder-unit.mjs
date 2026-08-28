@@ -84,6 +84,11 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(form, /convert.*audio_items|Автоматически перенести/);
 assert.match(form, /shouldShowPracticeListeningNotice/);
+assert.match(
+  read("src/lib/author-products/course-builder-shared.ts"),
+  /shouldShowListeningNoticeForPublication/,
+  "editor listening-notice gate reuses the shared publication-class predicate",
+);
 assert.match(form, /shouldShowSharedTrackCoverToggle/);
 assert.match(form, /shouldCreateDefaultAudioItem/);
 assert.doesNotMatch(

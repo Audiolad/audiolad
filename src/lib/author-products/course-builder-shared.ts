@@ -8,6 +8,7 @@ import {
   normalizeProductKind,
 } from "@/lib/author-products/product-kind";
 import { isCoursePublication } from "@/lib/author-products/publication-class";
+import { shouldShowListeningNoticeForPublication } from "@/lib/products/listening-notice";
 import {
   PUBLICATION_FILE_MAX_PDF_BYTES,
   PUBLICATION_FILE_PDF_MIME,
@@ -448,7 +449,7 @@ export function shouldShowPracticeListeningNotice(
 ): boolean {
   return (
     normalizeProductKind(productKind) === PRODUCT_KIND.PRACTICE &&
-    !isCoursePublication(publicationClass, productKind)
+    shouldShowListeningNoticeForPublication(publicationClass, productKind)
   );
 }
 
