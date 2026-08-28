@@ -28,7 +28,6 @@ import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 
 import {
   getCachedAnalyticsSessionId,
-  linkAnalyticsSessionUser,
   recordPlatformSignupCompleted,
   trackPlatformEvent,
 } from "@/lib/analytics/client";
@@ -221,7 +220,6 @@ function SignUpForm() {
       const sessionId = getCachedAnalyticsSessionId();
 
       if (sessionId) {
-        await linkAnalyticsSessionUser();
         await recordPlatformSignupCompleted();
       }
 
