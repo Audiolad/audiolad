@@ -424,13 +424,14 @@ assert.doesNotMatch(banner, /Вернуться в админку/);
 assert.doesNotMatch(banner, /Режим сопровождения/);
 
 const exitForm = read("src/components/author-support/AuthorSupportExitForm.tsx");
+assert.match(exitForm, /<form action=\{stopAuthorSupportMode\}>/);
 assert.match(exitForm, /stopAuthorSupportMode/);
 assert.match(exitForm, /Выйти из режима поддержки/);
-assert.match(exitForm, /useTransition/);
-assert.match(exitForm, /startTransition/);
-assert.match(exitForm, /type="button"/);
-assert.match(exitForm, /Выходим…/);
-assert.doesNotMatch(exitForm, /<form/);
+assert.match(exitForm, /type="submit"/);
+assert.doesNotMatch(exitForm, /useTransition/);
+assert.doesNotMatch(exitForm, /startTransition/);
+assert.doesNotMatch(exitForm, /void stopAuthorSupportMode/);
+assert.doesNotMatch(exitForm, /type="button"/);
 assert.doesNotMatch(exitForm, /fetch\(/);
 
 const bannerGate = read("src/components/author-support/AuthorSupportBannerGate.tsx");
@@ -743,24 +744,64 @@ for (const sensitivePath of [
   );
 }
 
-// Canonical exit: revoke/end session, clear cookie, then own POST is not blocked.
+// Canonical exit: peek → audit/revoke if active → else revoke-for-actor → clear cookie → redirect.
 const exitActions = read("src/lib/author-support/actions.ts");
 assert.match(exitActions, /export async function stopAuthorSupportMode/);
+assert.match(exitActions, /peekAuthorExecutionContext/);
+assert.match(
+  exitActions,
+  /if \(execution\?\.isSupportMode && execution\.sessionId && execution\.actingAuthorId\)/,
+);
 assert.match(exitActions, /support_session_ended/);
 assert.match(exitActions, /revokeAuthorSupportSession/);
 assert.match(exitActions, /revokeAuthorSupportSessionsForActor/);
 assert.match(exitActions, /clearAuthorSupportCookie/);
 assert.match(exitActions, /resolveAuthorSupportReturnPath/);
+assert.match(
+  exitActions,
+  /const returnUserId = execution\?\.isSupportMode \? execution\.actingUserId : null/,
+);
+assert.match(
+  exitActions,
+  /redirect\(returnUserId \? resolveAuthorSupportReturnPath\(returnUserId\) : "\/admin\/users"\)/,
+);
 assert.doesNotMatch(exitActions, /cookies\(\)\.delete/);
 
-let leftoverSupportCookie = activeSupportCookie;
-const exitSession = { revokedAt: null, ended: false };
-exitSession.revokedAt = new Date().toISOString();
-exitSession.ended = true;
-leftoverSupportCookie = "";
-assert.ok(exitSession.revokedAt);
-assert.equal(exitSession.ended, true);
-assert.equal(leftoverSupportCookie, "");
+function simulateCanonicalStop({ isSupportMode, cookiePresent }) {
+  return {
+    audited: isSupportMode,
+    revokedSession: isSupportMode,
+    revokedForActor: !isSupportMode,
+    cookieCleared: cookiePresent,
+    redirectTo: isSupportMode
+      ? resolveAuthorSupportReturnPath(targetUserId)
+      : "/admin/users",
+  };
+}
+
+const activeCanonical = simulateCanonicalStop({
+  isSupportMode: true,
+  cookiePresent: true,
+});
+assert.equal(activeCanonical.audited, true);
+assert.equal(activeCanonical.revokedSession, true);
+assert.equal(activeCanonical.revokedForActor, false);
+assert.equal(activeCanonical.cookieCleared, true);
+assert.equal(activeCanonical.redirectTo, `/admin/users/${targetUserId}`);
+
+const leftoverCanonical = simulateCanonicalStop({
+  isSupportMode: false,
+  cookiePresent: true,
+});
+assert.equal(leftoverCanonical.audited, false);
+assert.equal(leftoverCanonical.revokedSession, false);
+assert.equal(leftoverCanonical.revokedForActor, true);
+assert.equal(leftoverCanonical.cookieCleared, true);
+assert.equal(leftoverCanonical.redirectTo, "/admin/users");
+
+let leftoverSupportCookie = leftoverCanonical.cookieCleared
+  ? ""
+  : activeSupportCookie;
 
 // C. After canonical exit, same own POST audio is NOT blocked by this guard.
 assert.equal(
@@ -861,7 +902,8 @@ assert.match(
 const supportErrorAlert = read(
   "src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx",
 );
-assert.match(supportErrorAlert, /AuthorSupportExitForm/);
+assert.match(supportErrorAlert, /\{message\}/);
+assert.doesNotMatch(supportErrorAlert, /AuthorSupportExitForm/);
 assert.doesNotMatch(supportErrorAlert, /<form/);
 
 const createDiagnostics = read(
@@ -872,7 +914,7 @@ assert.match(createDiagnostics, /PersonalMaterialClientErrorAlert/);
 assert.match(createDiagnostics, /onSubmit/);
 assert.doesNotMatch(createDiagnostics, /<form[\s\S]*<form/);
 assert.doesNotMatch(
-  `${createDiagnostics}\n${supportErrorAlert}\n${exitForm}`,
+  `${createDiagnostics}\n${supportErrorAlert}`,
   /<form[\s\S]*<form/,
 );
 

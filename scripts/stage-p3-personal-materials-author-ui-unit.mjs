@@ -89,16 +89,29 @@ function testCreateComponent() {
   assert(!create.includes("<form action="), "create form is not a support-exit form");
 
   const alert = read("src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx");
+  const errors = read("src/lib/personal-materials/client/errors.ts");
   const exitControl = read("src/components/author-support/AuthorSupportExitForm.tsx");
-  assert(alert.includes("AuthorSupportExitForm"), "alert uses shared support exit");
+  assert(
+    errors.includes(
+      "Сейчас включён режим поддержки другого автора. Выйдите из режима поддержки и повторите действие.",
+    ),
+    "support_mutation_blocked copy",
+  );
+  assert(alert.includes("{message}"), "alert renders the blocked message");
+  assert(!alert.includes("AuthorSupportExitForm"), "alert has no support exit CTA");
   assert(!alert.includes("<form"), "alert does not emit a form");
-  assert(exitControl.includes('type="button"'), "support exit is a button");
-  assert(exitControl.includes("startTransition"), "support exit calls server action via transition");
+  assert(
+    exitControl.includes("<form action={stopAuthorSupportMode}>"),
+    "support exit is a native form action",
+  );
+  assert(exitControl.includes('type="submit"'), "support exit submits the form");
   assert(exitControl.includes("stopAuthorSupportMode"), "support exit calls canonical stop");
-  assert(!exitControl.includes("<form"), "support exit is not a form");
+  assert(!exitControl.includes("useTransition"), "support exit does not useTransition");
+  assert(!exitControl.includes("startTransition"), "support exit does not startTransition");
+  assert(!exitControl.includes("void stopAuthorSupportMode"), "support exit is not imperative");
   assert(!exitControl.includes("fetch("), "support exit does not fetch");
   assert(
-    !/<form[\s\S]*<form/.test(`${create}\n${alert}\n${exitControl}`),
+    !/<form[\s\S]*<form/.test(`${create}\n${alert}`),
     "create diagnostics does not emit a nested support-exit form",
   );
 }
