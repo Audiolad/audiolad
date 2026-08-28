@@ -12,12 +12,6 @@ export default function AnalyticsAuthLinker() {
   useEffect(() => {
     const supabase = createClient();
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        void linkAnalyticsSessionUser();
-      }
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -25,7 +19,12 @@ export default function AnalyticsAuthLinker() {
         return;
       }
 
-      void linkAnalyticsSessionUser();
+      // INITIAL_SESSION covers the logged-in page load. SIGNED_IN covers
+      // login / signup / auth callback. TOKEN_REFRESHED and other ticks
+      // must not enter the link/signup RPCs — they were the cutover stampede.
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+        void linkAnalyticsSessionUser();
+      }
 
       if (event === "SIGNED_IN") {
         void recordPlatformSignupCompleted();

@@ -46,7 +46,9 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("analytics_signup_complete_error", error.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    // Fail-soft after the RPC returns. Analytics must never 500 login/signup
+    // or amplify 55P03 / PGRST003 retries.
+    return new NextResponse(null, { status: 204 });
   }
 
   const result = (data ?? {}) as { recorded?: boolean; reason?: string };
