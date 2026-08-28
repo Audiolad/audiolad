@@ -377,9 +377,16 @@ function testRepoOneFileOneVersion() {
         "20260901120400_fix_visibility_allowlist_author_policy.sql",
     ),
   );
-  assert.ok(
+  assert.equal(
     listed.files.some(
       (row) => row.filename === "20260901130000_author_support_mode.sql",
+    ),
+    false,
+    "unapplied author_support_mode 130000 stamp must leave the active migrations directory",
+  );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260902120200_author_support_mode.sql",
     ),
   );
   assert.ok(
@@ -456,9 +463,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
-    "20260901130000",
     "20260902120000",
     "20260902120100",
+    "20260902120200",
     "20260903120000",
   ]);
   assert.equal(plan.database_migrations_pending, 27);
@@ -496,9 +503,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
-    "20260901130000",
     "20260902120000",
     "20260902120100",
+    "20260902120200",
     "20260903120000",
   ]);
   assert.equal(plan.database_migrations_pending, 21);
@@ -543,9 +550,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
-    "20260901130000",
     "20260902120000",
     "20260902120100",
+    "20260902120200",
     "20260903120000",
   ]);
   assert.equal(plan.database_migrations_pending, 12);
@@ -595,7 +602,8 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
       `reissued visibility version must exist locally: ${version}`,
     );
   }
-  assert.ok(listed.versions.includes("20260901130000"));
+  assert.equal(listed.versions.includes("20260901130000"), false);
+  assert.ok(listed.versions.includes("20260902120200"));
   assert.ok(listed.versions.includes("20260902120000"));
   const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
   assert.equal(remoteVersions.includes("20260830120100"), false);
@@ -618,7 +626,7 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
     assert.equal(livePlan.pending.includes(hole), false);
   }
   const lastVisibility = "20260901120400";
-  const supportStamp = "20260901130000";
+  const supportStamp = "20260902120200";
   const courseStamp = "20260902120000";
   const searchStamp = "20260903120000";
   assert.ok(livePlan.pending.includes(supportStamp));
@@ -630,8 +638,12 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
     "support-mode stamp must follow restamped visibility migrations",
   );
   assert.ok(
-    livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(supportStamp),
-    "course readiness stamp must follow the support-mode migration",
+    livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(lastVisibility),
+    "course readiness stamp must follow last visibility",
+  );
+  assert.ok(
+    livePlan.pending.indexOf(supportStamp) > livePlan.pending.indexOf("20260902120100"),
+    "support-mode stamp must follow analytics RPC protection",
   );
   assert.ok(listed.versions.includes("20260902120100"));
   assert.ok(livePlan.pending.includes("20260902120100"));
@@ -643,6 +655,17 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
     livePlan.pending.indexOf(searchStamp) > livePlan.pending.indexOf("20260902120100"),
     "visibility user search stamp must follow analytics RPC protection",
   );
+  const productionMax = "20260902120000";
+  const productionRemote = listed.versions.filter((version) => version <= productionMax);
+  const productionPlan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions: productionRemote,
+  });
+  assert.equal(productionPlan.pending.includes("20260901130000"), false);
+  assert.ok(productionPlan.pending.includes(supportStamp));
+  assert.ok(productionPlan.pending.every((version) => version > productionMax));
+  assert.equal(productionPlan.action, "apply");
+  assert.notEqual(productionPlan.code, "database_migration_history_drift");
 }
 
 function main() {

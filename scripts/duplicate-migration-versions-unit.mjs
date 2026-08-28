@@ -18,6 +18,7 @@ const EXPECTED_RENAMES = [
   ["20260830120200_create_practice_order_visibility.sql", "20260901120200_create_practice_order_visibility.sql"],
   ["20260830120300_public_playlist_selected_visibility.sql", "20260901120300_public_playlist_selected_visibility.sql"],
   ["20260830120400_fix_visibility_allowlist_author_policy.sql", "20260901120400_fix_visibility_allowlist_author_policy.sql"],
+  ["20260901130000_author_support_mode.sql", "20260902120200_author_support_mode.sql"],
 ];
 
 const EXPECTED_KEEP = [
