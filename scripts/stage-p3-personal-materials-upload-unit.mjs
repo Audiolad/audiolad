@@ -124,6 +124,10 @@ assert.equal(
 );
 
 assert.equal(
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+  "Сейчас включён режим поддержки другого автора. Выйдите из режима поддержки и повторите действие.",
+);
+assert.equal(
   getPersonalMaterialUploadErrorMessage("support_mutation_blocked"),
   PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
 );

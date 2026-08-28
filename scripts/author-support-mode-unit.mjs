@@ -426,6 +426,12 @@ assert.doesNotMatch(banner, /Режим сопровождения/);
 const exitForm = read("src/components/author-support/AuthorSupportExitForm.tsx");
 assert.match(exitForm, /stopAuthorSupportMode/);
 assert.match(exitForm, /Выйти из режима поддержки/);
+assert.match(exitForm, /useTransition/);
+assert.match(exitForm, /startTransition/);
+assert.match(exitForm, /type="button"/);
+assert.match(exitForm, /Выходим…/);
+assert.doesNotMatch(exitForm, /<form/);
+assert.doesNotMatch(exitForm, /fetch\(/);
 
 const bannerGate = read("src/components/author-support/AuthorSupportBannerGate.tsx");
 assert.match(bannerGate, /readAuthorSupportCookie/);
@@ -841,14 +847,28 @@ assert.doesNotMatch(
 
 const personalErrors = read("src/lib/personal-materials/client/errors.ts");
 assert.match(personalErrors, /support_mutation_blocked/);
-assert.match(personalErrors, /Выйдите из режима поддержки и повторите загрузку/);
+assert.match(personalErrors, /Выйдите из режима поддержки и повторите действие/);
+assert.doesNotMatch(personalErrors, /повторите загрузку/);
 assert.match(
   read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload.tsx"),
   /PersonalMaterialClientErrorAlert/,
 );
-assert.match(
-  read("src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx"),
-  /AuthorSupportExitForm/,
+const supportErrorAlert = read(
+  "src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx",
+);
+assert.match(supportErrorAlert, /AuthorSupportExitForm/);
+assert.doesNotMatch(supportErrorAlert, /<form/);
+
+const createDiagnostics = read(
+  "src/components/author-dashboard/personal-materials/AuthorDiagnosticsCreateClient.tsx",
+);
+assert.match(createDiagnostics, /<form/);
+assert.match(createDiagnostics, /PersonalMaterialClientErrorAlert/);
+assert.match(createDiagnostics, /onSubmit/);
+assert.doesNotMatch(createDiagnostics, /<form[\s\S]*<form/);
+assert.doesNotMatch(
+  `${createDiagnostics}\n${supportErrorAlert}\n${exitForm}`,
+  /<form[\s\S]*<form/,
 );
 
 assert.doesNotMatch(read("src/lib/author-support/actions.ts"), /console\.error\("author_support_audit_insert_failed"\)/);
