@@ -4,7 +4,7 @@
 --     npm run test:catalog-visibility:rls
 --
 -- Requires migrations through:
---   20260830120400_fix_visibility_allowlist_author_policy.sql
+--   20260901120400_fix_visibility_allowlist_author_policy.sql
 \set ON_ERROR_STOP on
 
 DO $$

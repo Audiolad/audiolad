@@ -10,24 +10,24 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = readFileSync(
-  join(repoRoot, "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql"),
+  join(repoRoot, "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql"),
   "utf8",
 );
 const orderMigration = readFileSync(
-  join(repoRoot, "supabase/migrations/20260830120200_create_practice_order_visibility.sql"),
+  join(repoRoot, "supabase/migrations/20260901120200_create_practice_order_visibility.sql"),
   "utf8",
 );
 const playlistMigration = readFileSync(
   join(
     repoRoot,
-    "supabase/migrations/20260830120300_public_playlist_selected_visibility.sql",
+    "supabase/migrations/20260901120300_public_playlist_selected_visibility.sql",
   ),
   "utf8",
 );
 const recursionFixMigration = readFileSync(
   join(
     repoRoot,
-    "supabase/migrations/20260830120400_fix_visibility_allowlist_author_policy.sql",
+    "supabase/migrations/20260901120400_fix_visibility_allowlist_author_policy.sql",
   ),
   "utf8",
 );
