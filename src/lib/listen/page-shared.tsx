@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/listen/track-cover";
 import type { ListenTrack } from "@/lib/listen/types";
 import { getListenerShellData } from "@/lib/listener/shell-data";
+import { readListenerSidebarPinnedState } from "@/lib/navigation/listener-sidebar";
 import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import {
@@ -204,7 +206,11 @@ async function ListenMessageState({
   backHref: string;
   backLabel: string;
 }) {
-  const shellData = await getListenerShellData();
+  const [shellData, cookieStore] = await Promise.all([
+    getListenerShellData(),
+    cookies(),
+  ]);
+  const initialSidebarPinned = readListenerSidebarPinnedState(cookieStore);
 
   return (
     <>
@@ -224,7 +230,11 @@ async function ListenMessageState({
       </div>
 
       <div className="hidden xl:block xl:h-dvh">
-        <ListenerAppShell shellData={shellData} mode="listen">
+        <ListenerAppShell
+          shellData={shellData}
+          mode="listen"
+          initialSidebarPinned={initialSidebarPinned}
+        >
           <ListenDesktopFrame backHref={backHref} backLabel={backLabel}>
             <section className="rounded-[28px] border border-[#eadff8] bg-white px-8 py-10 text-center shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
               <h1 className="text-[28px] font-semibold leading-tight text-[#25135c]">
@@ -540,7 +550,11 @@ export async function renderListenPage(
     accessReason: productAccess.reason,
   });
   const listeningNotice = resolveListeningNotice(practiceRow);
-  const shellData = await getListenerShellData();
+  const [shellData, cookieStore] = await Promise.all([
+    getListenerShellData(),
+    cookies(),
+  ]);
+  const initialSidebarPinned = readListenerSidebarPinnedState(cookieStore);
   const isAuthorPreview = access.mode === "author_preview";
   const libraryAction = resolveLibraryAction({
     access: productAccess,
@@ -637,7 +651,11 @@ export async function renderListenPage(
         </div>
 
         <div className="hidden xl:block xl:h-dvh">
-          <ListenerAppShell shellData={shellData} mode="listen">
+          <ListenerAppShell
+            shellData={shellData}
+            mode="listen"
+            initialSidebarPinned={initialSidebarPinned}
+          >
             <ListenDesktopFrame
               backHref={practiceHref}
               backLabel="← К практике"

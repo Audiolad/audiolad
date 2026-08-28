@@ -104,7 +104,7 @@ export default function ProductPriceOffer({
   return (
     <div data-product-price-offer="promo">
       <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-sm text-[#7d70a2] line-through">
+        <span className="text-[21px] text-[#7d70a2] line-through">
           {formatRubles(basePrice)}
         </span>
         <span className="text-[22px] font-semibold leading-tight text-[#25135c]">

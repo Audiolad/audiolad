@@ -76,15 +76,35 @@ function findActivePersonalStart(
   return canonical;
 }
 
+function isValidSaleAgainstBase(salePrice: number, basePrice: number): boolean {
+  return (
+    Number.isInteger(salePrice) && salePrice > 0 && salePrice < basePrice
+  );
+}
+
+function personalStartSalePrice(
+  start: PersonalPromotionStart,
+  basePrice: number,
+): number | null {
+  // Apply the frozen snapshot only while it is still below the current base.
+  // Do not mutate the start row when the snapshot is no longer valid.
+  if (!isValidSaleAgainstBase(start.salePriceSnapshot, basePrice)) {
+    return null;
+  }
+
+  return start.salePriceSnapshot;
+}
+
 function toResolvedPromotion(
   promotion: PricePromotionRecord,
   expiresAt: string | null,
+  salePrice: number,
 ): ResolvedPromotion {
   return {
     id: promotion.id,
     name: promotion.name,
     promotionType: promotion.promotionType,
-    salePrice: promotion.salePrice,
+    salePrice,
     endsAt: promotion.endsAt,
     expiresAt,
     aboveTimerText: promotion.aboveTimerText ?? null,
@@ -92,13 +112,58 @@ function toResolvedPromotion(
   };
 }
 
+function personalCatalogTeaserOffer(
+  promotion: PricePromotionRecord,
+  starts: PersonalPromotionStart[],
+  nowMs: number,
+  basePrice: number,
+): { salePrice: number; expiresAt: string | null } | null {
+  const viewerState = classifyPersonalCountdownViewerState(
+    promotion,
+    starts,
+    nowMs,
+  );
+
+  if (viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.NEVER_STARTED) {
+    if (!isValidSaleAgainstBase(promotion.salePrice, basePrice)) {
+      return null;
+    }
+
+    return { salePrice: promotion.salePrice, expiresAt: null };
+  }
+
+  if (viewerState !== PERSONAL_COUNTDOWN_VIEWER_STATES.ACTIVE) {
+    return null;
+  }
+
+  const start = findActivePersonalStart(promotion, starts, nowMs);
+
+  if (!start) {
+    return null;
+  }
+
+  const salePrice = personalStartSalePrice(start, basePrice);
+
+  if (salePrice === null) {
+    return null;
+  }
+
+  return { salePrice, expiresAt: start.expiresAt };
+}
+
 /**
  * Picks at most one applicable promotion.
- * Calendar promotions apply on every surface.
+ * Calendar promotions apply on every surface using live sale_price.
  * Personal countdown applies on product/checkout only after a start, unless
  * `catalogPersonalTeaser` is set: then catalog may tease NEVER_STARTED or
- * ACTIVE personal (not EXPIRED). If several apply, the lowest valid sale
- * price wins (no stacking).
+ * ACTIVE personal (not EXPIRED).
+ * NEVER_STARTED catalog teaser uses live promotion.sale_price.
+ * An active personal start uses start.salePriceSnapshot, not live sale_price,
+ * and only when snapshot > 0 AND snapshot < the current practice base price.
+ * Otherwise the effective price is the current base. The start row is not rewritten.
+ * Name / above_timer_text / below_button_text stay on the live promotion row.
+ * Disable (is_active=false) still stops the offer.
+ * If several apply, the lowest valid effective sale price wins (no stacking).
  */
 export function resolvePracticePrice(
   input: ResolvePracticePriceInput,
@@ -130,43 +195,39 @@ export function resolvePracticePrice(
   let winner: {
     promotion: PricePromotionRecord;
     expiresAt: string | null;
+    salePrice: number;
   } | null = null;
 
   for (const promotion of input.promotions) {
-    if (
-      !Number.isInteger(promotion.salePrice) ||
-      promotion.salePrice <= 0 ||
-      promotion.salePrice >= basePrice
-    ) {
-      continue;
-    }
-
     if (isCalendarActive(promotion, nowMs)) {
-      if (!winner || promotion.salePrice < winner.promotion.salePrice) {
-        winner = { promotion, expiresAt: promotion.endsAt };
+      if (!isValidSaleAgainstBase(promotion.salePrice, basePrice)) {
+        continue;
+      }
+
+      if (!winner || promotion.salePrice < winner.salePrice) {
+        winner = {
+          promotion,
+          expiresAt: promotion.endsAt,
+          salePrice: promotion.salePrice,
+        };
       }
       continue;
     }
 
     if (allowPersonalCatalogTeaser && isPersonalDefinitionActive(promotion)) {
-      const viewerState = classifyPersonalCountdownViewerState(
+      const teaser = personalCatalogTeaserOffer(
         promotion,
         input.starts,
         nowMs,
+        basePrice,
       );
 
-      if (
-        viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.NEVER_STARTED ||
-        viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.ACTIVE
-      ) {
-        const start = findActivePersonalStart(promotion, input.starts, nowMs);
-
-        if (!winner || promotion.salePrice < winner.promotion.salePrice) {
-          winner = {
-            promotion,
-            expiresAt: start?.expiresAt ?? null,
-          };
-        }
+      if (teaser && (!winner || teaser.salePrice < winner.salePrice)) {
+        winner = {
+          promotion,
+          expiresAt: teaser.expiresAt,
+          salePrice: teaser.salePrice,
+        };
       }
 
       continue;
@@ -182,12 +243,18 @@ export function resolvePracticePrice(
       continue;
     }
 
-    if (!winner || promotion.salePrice < winner.promotion.salePrice) {
-      winner = { promotion, expiresAt: start.expiresAt };
+    const salePrice = personalStartSalePrice(start, basePrice);
+
+    if (salePrice === null) {
+      continue;
+    }
+
+    if (!winner || salePrice < winner.salePrice) {
+      winner = { promotion, expiresAt: start.expiresAt, salePrice };
     }
   }
 
-  const salePrice = winner?.promotion.salePrice ?? null;
+  const salePrice = winner?.salePrice ?? null;
   const finalPrice = salePrice ?? basePrice;
 
   return {
@@ -195,7 +262,9 @@ export function resolvePracticePrice(
     basePrice,
     salePrice,
     finalPrice,
-    promotion: winner ? toResolvedPromotion(winner.promotion, winner.expiresAt) : null,
+    promotion: winner
+      ? toResolvedPromotion(winner.promotion, winner.expiresAt, winner.salePrice)
+      : null,
     basePriceMinor: rublesToMinor(basePrice),
     salePriceMinor: salePrice === null ? null : rublesToMinor(salePrice),
     finalPriceMinor: rublesToMinor(finalPrice),
