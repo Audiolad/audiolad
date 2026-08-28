@@ -99,6 +99,7 @@ import { KARTY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/karty-
 import { TARO_NOVAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-novaya-rabota.ts";
 import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-novuyu-rabotu.ts";
 import { TARO_BYVSHAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-byvshaya-rabota.ts";
+import { TARO_RABOTA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-rabota-blizhayshee-budushchee.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2236,6 +2237,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventySecondListenHref}`,
     ),
     "directory JSON-LD includes seventy-second listen href",
+  );
+
+  const seventyThirdListenHref = "/listens/taro-rabota-blizhayshee-budushchee";
+  const seventyThirdListenCard = data.articles.find((card) => card.href === seventyThirdListenHref);
+  assert(seventyThirdListenCard, "seventy-third indexable listen page is listed");
+  assert(
+    seventyThirdListenCard.title === "Таро работа – ближайшее будущее и рабочая ситуация | АудиоЛад",
+    "seventy-third listen directory title",
+  );
+  assert(
+    seventyThirdListenCard.description === TARO_RABOTA_BLIZHAYSHEE_BUDUSHCHEE_PAGE.description,
+    "seventy-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-rabota-blizhayshee-budushchee",
+    ),
+    "no /articles duplicate for seventy-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-third listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
