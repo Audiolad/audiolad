@@ -331,8 +331,10 @@ assert.equal(
     publishedAt: "2026-01-01T00:00:00.000Z",
     lessonCount: 0,
     blockCount: 0,
+    lessons: [],
   }).ok,
-  true,
+  false,
+  "publishedAt does not skip empty course lessons",
 );
 assert.equal(
   evaluateCoursePublishContentGate({
@@ -549,10 +551,18 @@ const legacyPublished = evaluatePublishReadiness(
   [audioItem()],
   {
     activeTopicCount: 1,
-    courseContent: { lessonCount: 0, blockCount: 0 },
+    courseContent: { lessonCount: 0, blockCount: 0, lessons: [] },
   },
 );
-assert.equal(legacyPublished.ok, true);
+assert.equal(
+  legacyPublished.ok,
+  false,
+  "publishedAt does not exempt a lesson-less course from the per-lesson rule",
+);
+assert.equal(
+  legacyPublished.firstFailure?.code,
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+);
 
 const practiceDraft = evaluatePublishReadiness(
   coursePractice({

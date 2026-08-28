@@ -389,24 +389,26 @@ export function evaluateCourseLessonsReadiness(
 /**
  * Author-form / TS publish gate for course content.
  *
- * publishedAt skip: already-published courses can republish / start-editing
- * without re-blocking the client on empty snapshot counts (legacy published
- * courses may predate course_lessons). SQL assert_practice_moderation_ready
- * still validates lessons on every submit/publish RPC.
+ * publishedAt is not a content exemption. start_practice_editing keeps
+ * published_at, so a skip would mark start-editing + deleted lessons READY
+ * in the UI while SQL assert_practice_moderation_ready returns
+ * product_not_ready. Seeds/migrations never create publication_class=course,
+ * and createDraftProduct starts a draft with zero lessons — first publish
+ * and republish both use the same per-lesson rule as SQL.
  */
 export function evaluateCoursePublishContentGate(input: {
   publicationClass: string | null | undefined;
   productKind: string | null | undefined;
-  publishedAt: string | null | undefined;
+  publishedAt?: string | null | undefined;
   lessonCount?: number;
   blockCount?: number;
   lessons?: ReadonlyArray<CoursePublishLessonInput> | null;
 }): { ok: true } | { ok: false; code: string; message: string } {
-  if (!isCoursePublication(input.publicationClass, input.productKind)) {
-    return { ok: true };
-  }
+  void input.publishedAt;
+  void input.lessonCount;
+  void input.blockCount;
 
-  if (input.publishedAt) {
+  if (!isCoursePublication(input.publicationClass, input.productKind)) {
     return { ok: true };
   }
 

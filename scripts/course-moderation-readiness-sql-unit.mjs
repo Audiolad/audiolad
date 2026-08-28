@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(root, "supabase/migrations");
-const filename = "20260901120000_course_moderation_readiness.sql";
+const filename = "20260902120000_course_moderation_readiness.sql";
 const previous = "20260805193000_audio_post_optional_description.sql";
 const sql = readFileSync(join(migrationsDir, filename), "utf8");
 const previousSql = readFileSync(join(migrationsDir, previous), "utf8");
@@ -19,7 +19,12 @@ const names = readdirSync(migrationsDir).filter((name) =>
 );
 const versions = names.map((name) => name.match(/^(\d{8,})_/)?.[1]);
 assert.equal(new Set(versions).size, versions.length, "no duplicate timestamps");
-assert.ok(versions.includes("20260901120000"));
+assert.ok(versions.includes("20260902120000"));
+assert.equal(
+  existsSync(join(migrationsDir, "20260901120000_course_moderation_readiness.sql")),
+  false,
+  "old colliding 20260901120000 filename must be gone",
+);
 assert.ok(
   versions.includes("20260805193000"),
   "previous readiness REPLACE stays intact",

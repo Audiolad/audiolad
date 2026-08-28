@@ -380,7 +380,7 @@ function testRepoOneFileOneVersion() {
   assert.ok(
     listed.files.some(
       (row) =>
-        row.filename === "20260901120000_course_moderation_readiness.sql",
+        row.filename === "20260902120000_course_moderation_readiness.sql",
     ),
   );
 }
@@ -438,8 +438,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 23);
+  assert.equal(plan.database_migrations_pending, 24);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -474,8 +475,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 17);
+  assert.equal(plan.database_migrations_pending, 18);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -517,8 +519,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 8);
+  assert.equal(plan.database_migrations_pending, 9);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
@@ -565,6 +568,7 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
       `reissued visibility version must exist locally: ${version}`,
     );
   }
+  assert.ok(listed.versions.includes("20260902120000"));
   const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
   assert.equal(remoteVersions.includes("20260830120100"), false);
   assert.equal(remoteVersions.includes("20260830120200"), false);
@@ -585,6 +589,13 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
   for (const hole of oldHoles) {
     assert.equal(livePlan.pending.includes(hole), false);
   }
+  const lastVisibility = "20260901120400";
+  const courseStamp = "20260902120000";
+  assert.ok(livePlan.pending.includes(courseStamp));
+  assert.ok(
+    livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(lastVisibility),
+    "course readiness stamp must follow restamped visibility migrations",
+  );
 }
 
 function main() {

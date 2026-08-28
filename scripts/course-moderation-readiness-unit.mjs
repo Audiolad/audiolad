@@ -5,7 +5,7 @@
  * evaluateCoursePublishContentGate, and evaluateDatabaseModerationReady.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -541,36 +541,56 @@ assert.equal(
 );
 assert.equal(
   divergences.some((item) => item.includes("publishedAt")),
-  true,
-  "published-course client skip stays documented",
+  false,
+  "publishedAt is not a documented course-content exemption",
 );
 
-// Published course client skip vs SQL still validating lessons
+// published_at is not a content exemption: start-editing keeps it, so a
+// lesson-less published/unpublished course must be NOT READY in UI and SQL.
 {
   const published = coursePractice({
     published_at: "2026-01-01T00:00:00.000Z",
+    status: "published",
   });
-  const gate = evaluateCoursePublishContentGate({
-    publicationClass: "course",
-    productKind: "practice",
-    publishedAt: published.published_at,
-    lessons: [],
+  const afterStartEditing = coursePractice({
+    published_at: "2026-01-01T00:00:00.000Z",
+    status: "unpublished",
+    moderation_status: "not_submitted",
   });
-  const ts = evaluatePublishReadiness(published, [], {
-    accessStatus: "free",
-    activeTopicCount: 1,
-    courseContent: snapshotFromLessons([]),
-  });
-  const db = evaluateDatabaseModerationReady({
-    practice: published,
-    audioItems: [],
-    accessStatus: "free",
-    activeTopicCount: 1,
-    courseContent: snapshotFromLessons([]),
-  });
-  assert.equal(gate.ok, true, "publishedAt skip keeps republish client gate open");
-  assert.equal(ts.ok, true, "TS publish readiness skips empty course content when published");
-  assert.equal(db.ok, false, "SQL mirror still requires lessons on a published course");
+
+  for (const [label, practice] of [
+    ["published lesson-less course", published],
+    ["start-editing keeps published_at", afterStartEditing],
+  ]) {
+    const gate = evaluateCoursePublishContentGate({
+      publicationClass: "course",
+      productKind: "practice",
+      publishedAt: practice.published_at,
+      lessons: [],
+    });
+    const ts = evaluatePublishReadiness(practice, [], {
+      accessStatus: "free",
+      activeTopicCount: 1,
+      courseContent: snapshotFromLessons([]),
+    });
+    const db = evaluateDatabaseModerationReady({
+      practice: practice,
+      audioItems: [],
+      accessStatus: "free",
+      activeTopicCount: 1,
+      courseContent: snapshotFromLessons([]),
+    });
+    assert.equal(gate.ok, false, `${label}: client gate must not skip empty lessons`);
+    assert.equal(gate.code, COURSE_PUBLISH_MISSING_LESSONS_CODE, `${label}: gate code`);
+    assert.equal(ts.ok, false, `${label}: evaluatePublishReadiness`);
+    assert.equal(ts.firstFailure?.code, COURSE_PUBLISH_MISSING_LESSONS_CODE, `${label}: TS code`);
+    assert.equal(db.ok, false, `${label}: SQL mirror`);
+    assert.equal(
+      db.firstFailure?.code,
+      COURSE_PUBLISH_MISSING_LESSONS_CODE,
+      `${label}: SQL code`,
+    );
+  }
 }
 
 // Error mapping
@@ -700,11 +720,67 @@ const sqlMirror = readFileSync(
   join(root, "src/lib/author-products/database-moderation-ready.ts"),
   "utf8",
 );
-assert.match(sqlMirror, /20260901120000_course_moderation_readiness/);
+assert.match(sqlMirror, /20260902120000_course_moderation_readiness/);
 assert.match(sqlMirror, /evaluateCourseLessonsReadiness/);
 assert.doesNotMatch(
   sqlMirror,
   /SQL всегда требует хотя бы один audio_items/,
 );
+
+// Code/seeds/migrations lock: no published lesson-less course is created,
+// and republish after start-editing cannot skip the per-lesson SQL rule.
+{
+  const productsSrc = readFileSync(
+    join(root, "src/lib/author-products/products.ts"),
+    "utf8",
+  );
+  assert.match(productsSrc, /export async function createDraftProduct/);
+  assert.match(productsSrc, /status: "draft"/);
+  assert.match(productsSrc, /shouldCreateDefaultAudioItem\(publicationClass\)/);
+
+  const startEditing = readFileSync(
+    join(
+      root,
+      "supabase/migrations/20260731181000_practice_moderation_mvp_gates_and_rpcs.sql",
+    ),
+    "utf8",
+  );
+  const startFn = startEditing.slice(
+    startEditing.indexOf("CREATE OR REPLACE FUNCTION public.start_practice_editing"),
+    startEditing.indexOf("GRANT EXECUTE ON FUNCTION public.start_practice_editing"),
+  );
+  assert.match(startFn, /status = 'unpublished'/);
+  assert.doesNotMatch(
+    startFn,
+    /published_at\s*=/,
+    "start_practice_editing must keep published_at",
+  );
+
+  const migrationsDir = join(root, "supabase/migrations");
+  const sqlFiles = readdirSync(migrationsDir).filter((name) =>
+    name.endsWith(".sql"),
+  );
+  for (const name of sqlFiles) {
+    const sql = readFileSync(join(migrationsDir, name), "utf8");
+    assert.doesNotMatch(
+      sql,
+      /INSERT\s+INTO\s+public\.practices[\s\S]{0,800}publication_class\s*=\s*'course'/i,
+      `${name} must not insert a course product`,
+    );
+    assert.doesNotMatch(
+      sql,
+      /UPDATE\s+public\.practices[\s\S]{0,400}publication_class\s*=\s*'course'/i,
+      `${name} must not backfill publication_class=course`,
+    );
+  }
+
+  assert.match(
+    readFileSync(
+      join(root, "src/lib/author-products/course-builder-shared.ts"),
+      "utf8",
+    ),
+    /publishedAt is not a content exemption/,
+  );
+}
 
 console.log("course-moderation-readiness-unit: ok");

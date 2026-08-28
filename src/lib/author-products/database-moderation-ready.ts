@@ -1,6 +1,6 @@
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
- * (latest: supabase/migrations/20260901120000_course_moderation_readiness.sql).
+ * (latest: supabase/migrations/20260902120000_course_moderation_readiness.sql).
  *
  * Used by admin support diagnostics so a product is never reported READY
  * when the live submit RPC would fail existing DB validation.
@@ -85,7 +85,6 @@ export function listKnownTsSqlReadinessDivergences(): readonly string[] {
     "SQL требует slug вида ^[a-z0-9]+(?:-[a-z0-9]+)*$; TS проверяет только непустое значение.",
     "SQL требует currency = RUB; TS не проверяет валюту.",
     "SQL не проверяет диапазон цены 49–100 000 ₽ и позиции треков.",
-    "TS пропускает содержание курса, если publishedAt уже задан (повторная публикация / клиентский gate). SQL всегда проверяет уроки и блоки курса.",
   ];
 }
 
