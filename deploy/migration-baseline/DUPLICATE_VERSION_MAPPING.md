@@ -18,6 +18,10 @@ Chronological order versus neighboring files is preserved.
 | `20260716190000_claim_promo_practice_by_id.sql` | `20260716191000_claim_promo_practice_by_id.sql` | RENAME |
 | `20260728120000_author_payout_profiles.sql` | `20260728120000_author_payout_profiles.sql` | KEEP |
 | `20260728120000_practice_content_sale_lock.sql` | `20260728121000_practice_content_sale_lock.sql` | RENAME |
+| `20260830120100_practice_catalog_visibility_modes.sql` | `20260901120100_practice_catalog_visibility_modes.sql` | RENAME |
+| `20260830120200_create_practice_order_visibility.sql` | `20260901120200_create_practice_order_visibility.sql` | RENAME |
+| `20260830120300_public_playlist_selected_visibility.sql` | `20260901120300_public_playlist_selected_visibility.sql` | RENAME |
+| `20260830120400_fix_visibility_allowlist_author_policy.sql` | `20260901120400_fix_visibility_allowlist_author_policy.sql` | RENAME |
 
 ## Why these new timestamps
 
@@ -28,6 +32,14 @@ remain after the kept file and before the next unrelated neighbor.
 - `20260716180000` (kept) → `20260716181000` → `20260716182000` → then `20260716190000`
 - `20260716190000` (kept) → `20260716191000` → then `20260716200000`
 - `20260728120000` (kept) → `20260728121000` → then `20260728140000`
+
+History-hole reissue (SQL unchanged; only versions moved after production max
+`20260831120000` and local max `20260901120000`):
+
+- `20260830120100` → `20260901120100`
+- `20260830120200` → `20260901120200`
+- `20260830120300` → `20260901120300`
+- `20260830120400` → `20260901120400`
 
 Do not invent a parallel history table. After a one-time baseline, ordinary
 deploy applies pending files by these unique versions.

@@ -114,7 +114,6 @@ import {
 import type { AssignedTopic, TopicOption } from "@/lib/topics/types";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 import {
-  COURSE_PUBLISH_MISSING_CONTENT_MESSAGE,
   evaluateCoursePublishContentGate,
   shouldCreateDefaultAudioItem,
   shouldShowPracticeListeningNotice,
@@ -1310,10 +1309,11 @@ export default function AuthorProductForm({
       publishedAt: form.publishedAt,
       lessonCount: courseContentSnapshot.lessonCount,
       blockCount: courseContentSnapshot.blockCount,
+      lessons: courseContentSnapshot.lessons,
     });
 
     if (!courseContentCheck.ok) {
-      setError(COURSE_PUBLISH_MISSING_CONTENT_MESSAGE);
+      setError(courseContentCheck.message);
       publishInFlightRef.current = false;
       setPublishing(false);
       setBusy(false);
@@ -1530,10 +1530,11 @@ export default function AuthorProductForm({
       publishedAt: form.publishedAt,
       lessonCount: courseContentSnapshot.lessonCount,
       blockCount: courseContentSnapshot.blockCount,
+      lessons: courseContentSnapshot.lessons,
     });
 
     if (!courseContentCheck.ok) {
-      setError(COURSE_PUBLISH_MISSING_CONTENT_MESSAGE);
+      setError(courseContentCheck.message);
       requestScrollToFirstSubmitIssue();
       setBusy(false);
       return;

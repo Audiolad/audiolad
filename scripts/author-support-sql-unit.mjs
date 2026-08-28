@@ -14,7 +14,7 @@ const support = readFileSync(
   "utf8",
 );
 const visibility = readFileSync(
-  join(root, "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql"),
+  join(root, "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql"),
   "utf8",
 );
 const actorBypass = readFileSync(

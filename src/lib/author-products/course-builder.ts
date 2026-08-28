@@ -10,6 +10,7 @@ import {
 import {
   assertBlockBelongsToLesson,
   assertLessonBelongsToCourse,
+  countCoursePublishContentFromLessons,
   defaultCourseLessonTitle,
   nextCoursePosition,
   validateCourseCompletionCtaInput,
@@ -202,34 +203,8 @@ export async function countCoursePublishContent(
   supabase: SupabaseClient,
   publicationId: string,
 ): Promise<CoursePublishContentSnapshot> {
-  const { data: lessons, error: lessonError } = await supabase
-    .from("course_lessons")
-    .select("id")
-    .eq("publication_id", publicationId);
-
-  if (lessonError) {
-    throw new CourseBuilderError("internal_error", 500);
-  }
-
-  const lessonIds = (lessons ?? []).map((row) => row.id as string);
-
-  if (lessonIds.length === 0) {
-    return { lessonCount: 0, blockCount: 0 };
-  }
-
-  const { count, error: blockError } = await supabase
-    .from("course_lesson_blocks")
-    .select("id", { count: "exact", head: true })
-    .in("lesson_id", lessonIds);
-
-  if (blockError) {
-    throw new CourseBuilderError("internal_error", 500);
-  }
-
-  return {
-    lessonCount: lessonIds.length,
-    blockCount: count ?? 0,
-  };
+  const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
+  return countCoursePublishContentFromLessons(snapshot.lessons);
 }
 
 export async function loadCourseBuilderSnapshot(

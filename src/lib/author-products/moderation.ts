@@ -1,5 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  COURSE_PUBLISH_EMPTY_LESSON_CODE,
+  COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE,
+  COURSE_PUBLISH_MISSING_FILE_CODE,
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+  COURSE_PUBLISH_MISSING_LESSONS_MESSAGE,
+  COURSE_PUBLISH_NOT_READY_FALLBACK,
+  formatEmptyCourseLessonMessage,
+  formatIncompleteCourseAudioMessage,
+  formatMissingCourseFileMessage,
+} from "@/lib/author-products/course-builder-shared";
+import type { PracticeRow } from "@/lib/author-products/types";
+import { hasPermission } from "@/lib/auth/platform-access";
+
 export const MODERATION_STATUS = {
   NOT_SUBMITTED: "not_submitted",
   SUBMITTED: "submitted",
@@ -275,12 +289,238 @@ export function isPracticeUnderModerationError(
   return error instanceof PracticeUnderModerationError;
 }
 
-export function mapPublishRpcError(message: string): {
+export type PublishRpcErrorSource =
+  | string
+  | {
+      message?: string | null;
+      details?: string | null;
+      hint?: string | null;
+    };
+
+export type MapPublishRpcErrorOptions = {
+  publicationClass?: string | null;
+};
+
+export const AUDIO_FIRST_PUBLISH_NOT_READY_FALLBACK =
+  "Продукт ещё не готов к публикации или отправке на модерацию. Проверьте обязательные поля, тему и аудио.";
+
+const PRODUCT_NOT_READY_DETAIL_CODES = [
+  "missing_title",
+  "missing_description",
+  "slug_required",
+  "invalid_slug",
+  "missing_cover",
+  "invalid_currency",
+  "invalid_product_kind",
+  "invalid_format",
+  "music_permission_required",
+  "music_permission_not_allowed",
+  "audio_post_must_be_free",
+  "invalid_price",
+  "commercial_eligibility_required",
+  "topic_min_required",
+  "missing_audio",
+  "audio_post_requires_single_audio",
+  "incomplete_audio",
+  "promo_title_required",
+  "promo_text_required",
+  "promo_button_text_required",
+  "promo_url_required",
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+  COURSE_PUBLISH_EMPTY_LESSON_CODE,
+  COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE,
+  COURSE_PUBLISH_MISSING_FILE_CODE,
+] as const;
+
+const COURSE_PRODUCT_NOT_READY_CODES = new Set<string>([
+  COURSE_PUBLISH_MISSING_LESSONS_CODE,
+  COURSE_PUBLISH_EMPTY_LESSON_CODE,
+  COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE,
+  COURSE_PUBLISH_MISSING_FILE_CODE,
+]);
+
+export function readPublishRpcErrorParts(source: PublishRpcErrorSource): {
+  message: string;
+  details: string;
+  hint: string;
+} {
+  if (typeof source === "string") {
+    return { message: source, details: "", hint: "" };
+  }
+
+  return {
+    message: typeof source.message === "string" ? source.message : "",
+    details: typeof source.details === "string" ? source.details : "",
+    hint: typeof source.hint === "string" ? source.hint : "",
+  };
+}
+
+function isSafeLessonHint(hint: string): string | null {
+  const trimmed = hint.trim();
+  if (!trimmed || trimmed.length > 200) {
+    return null;
+  }
+
+  const upper = trimmed.toUpperCase();
+  if (
+    upper.includes("SELECT ") ||
+    upper.includes("RAISE ") ||
+    upper.includes("ERROR") ||
+    upper.includes("DETAIL") ||
+    trimmed.includes("\n")
+  ) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+export function resolveProductNotReadyDetail(
+  source: PublishRpcErrorSource,
+): string | null {
+  const parts = readPublishRpcErrorParts(source);
+  const haystack = `${parts.details} ${parts.message}`;
+
+  for (const code of PRODUCT_NOT_READY_DETAIL_CODES) {
+    if (parts.details.trim() === code) {
+      return code;
+    }
+  }
+
+  for (const code of PRODUCT_NOT_READY_DETAIL_CODES) {
+    if (haystack.includes(code)) {
+      return code;
+    }
+  }
+
+  return null;
+}
+
+export function mapProductNotReadyUserMessage(
+  source: PublishRpcErrorSource,
+  options?: MapPublishRpcErrorOptions,
+): { code: string; message: string } {
+  const parts = readPublishRpcErrorParts(source);
+  const detail = resolveProductNotReadyDetail(source);
+  const lessonTitle = isSafeLessonHint(parts.hint);
+
+  switch (detail) {
+    case "missing_title":
+      return { code: detail, message: "Укажите название аудиопродукта." };
+    case "missing_description":
+      return { code: detail, message: "Добавьте описание аудиопродукта." };
+    case "slug_required":
+      return { code: detail, message: "Укажите адрес аудиопродукта." };
+    case "invalid_slug":
+      return {
+        code: detail,
+        message:
+          "Адрес должен состоять из строчных латинских букв, цифр и дефисов.",
+      };
+    case "missing_cover":
+      return { code: detail, message: "Загрузите обложку аудиопродукта." };
+    case "invalid_currency":
+      return { code: detail, message: "Валюта продукта должна быть RUB." };
+    case "invalid_product_kind":
+      return { code: detail, message: "Недопустимый тип продукта." };
+    case "invalid_format":
+      return { code: detail, message: "Формат не проходит проверку базы данных." };
+    case "music_permission_required":
+      return {
+        code: detail,
+        message: "Для музыки нужно выбрать условие использования.",
+      };
+    case "music_permission_not_allowed":
+      return {
+        code: detail,
+        message:
+          "Условия использования музыки нельзя задавать для этого типа продукта.",
+      };
+    case "audio_post_must_be_free":
+      return { code: detail, message: "Аудиопост может быть только бесплатным." };
+    case "invalid_price":
+      return {
+        code: detail,
+        message: "Цена не согласована с признаком бесплатности.",
+      };
+    case "commercial_eligibility_required":
+      return {
+        code: detail,
+        message:
+          "Платный продукт нельзя отправить: авторский доступ не разрешает продажи.",
+      };
+    case "topic_min_required":
+      return {
+        code: detail,
+        message: "Выберите хотя бы одну тему перед отправкой на модерацию.",
+      };
+    case "missing_audio":
+      return { code: detail, message: "Добавьте хотя бы одно аудио." };
+    case "audio_post_requires_single_audio":
+      return {
+        code: detail,
+        message: "Для аудиопоста требуется ровно одна аудиозапись.",
+      };
+    case "incomplete_audio":
+      return {
+        code: detail,
+        message:
+          "У одной или нескольких аудиозаписей нет названия, файла или длительности.",
+      };
+    case "promo_title_required":
+      return { code: detail, message: "Укажите заголовок рекомендации." };
+    case "promo_text_required":
+      return { code: detail, message: "Укажите текст рекомендации." };
+    case "promo_button_text_required":
+      return { code: detail, message: "Укажите текст кнопки рекомендации." };
+    case "promo_url_required":
+      return { code: detail, message: "Укажите ссылку рекомендации." };
+    case COURSE_PUBLISH_MISSING_LESSONS_CODE:
+      return {
+        code: detail,
+        message: COURSE_PUBLISH_MISSING_LESSONS_MESSAGE,
+      };
+    case COURSE_PUBLISH_EMPTY_LESSON_CODE:
+      return {
+        code: detail,
+        message: formatEmptyCourseLessonMessage(lessonTitle),
+      };
+    case COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE:
+      return {
+        code: detail,
+        message: formatIncompleteCourseAudioMessage(lessonTitle),
+      };
+    case COURSE_PUBLISH_MISSING_FILE_CODE:
+      return {
+        code: detail,
+        message: formatMissingCourseFileMessage(lessonTitle),
+      };
+    default:
+      break;
+  }
+
+  const useCourseFallback =
+    options?.publicationClass === "course" ||
+    (detail != null && COURSE_PRODUCT_NOT_READY_CODES.has(detail));
+
+  return {
+    code: detail ?? "product_not_ready",
+    message: useCourseFallback
+      ? COURSE_PUBLISH_NOT_READY_FALLBACK
+      : AUDIO_FIRST_PUBLISH_NOT_READY_FALLBACK,
+  };
+}
+
+export function mapPublishRpcError(
+  source: PublishRpcErrorSource,
+  options?: MapPublishRpcErrorOptions,
+): {
   status: number;
   code: string;
   message: string;
 } | null {
-  const normalized = message.toLowerCase();
+  const parts = readPublishRpcErrorParts(source);
+  const normalized = `${parts.message} ${parts.details}`.toLowerCase();
 
   if (normalized.includes("moderation_required")) {
     return {
@@ -300,11 +540,11 @@ export function mapPublishRpcError(message: string): {
   }
 
   if (normalized.includes("product_not_ready")) {
+    const mapped = mapProductNotReadyUserMessage(source, options);
     return {
       status: 400,
-      code: "product_not_ready",
-      message:
-        "Продукт ещё не готов к публикации или отправке на модерацию. Проверьте обязательные поля, тему и аудио.",
+      code: mapped.code,
+      message: mapped.message,
     };
   }
 
@@ -411,17 +651,20 @@ export function mapPublishRpcError(message: string): {
   return null;
 }
 
-export function mapModerationRpcError(message: string): {
+export function mapModerationRpcError(
+  source: PublishRpcErrorSource,
+  options?: MapPublishRpcErrorOptions,
+): {
   status: number;
   code: string;
   message: string;
 } {
-  const publishMapped = mapPublishRpcError(message);
+  const publishMapped = mapPublishRpcError(source, options);
   if (publishMapped) {
     return publishMapped;
   }
 
-  const normalized = message.toLowerCase();
+  const normalized = readPublishRpcErrorParts(source).message.toLowerCase();
 
   if (normalized.includes("not_authenticated")) {
     return {

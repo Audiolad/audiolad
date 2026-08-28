@@ -41,7 +41,7 @@ RLS включён. Политика SELECT: `Public can read published practice
 
 #### practice_visibility_users (2026-08-27)
 
-Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`, `20260830120300_public_playlist_selected_visibility.sql`, `20260830120400_fix_visibility_allowlist_author_policy.sql`.
+Миграции: `20260901120100_practice_catalog_visibility_modes.sql`, `20260901120200_create_practice_order_visibility.sql`, `20260901120300_public_playlist_selected_visibility.sql`, `20260901120400_fix_visibility_allowlist_author_policy.sql` (restamp of unapplied `20260830120100`–`20260830120400`; never present in production history).
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
@@ -129,6 +129,8 @@ Eligibility только в приложении через `isProductGalleryEli
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 
 Для `audio_post`: всегда бесплатный (`is_free=true`, `price=0`), публичный формат «Аудиопост», ровно один `audio_item` на уровне publish readiness / UX (не CHECK на число треков). Поле `description` для `audio_post` необязательно (`assert_practice_moderation_ready` / TS publish readiness); для `practice` и `music` описание по-прежнему обязательно. Миграция: `20260805193000_audio_post_optional_description.sql`.
+
+Для `publication_class='course'` `assert_practice_moderation_ready` не требует плоских `audio_items`. Готовность курса — семантическая: ≥1 `course_lessons` и у каждого урока ≥1 валидный блок (`text` с непустым `payload.text`, `audio` с загруженным `audio_items`, либо `file` с `publication_files`). Остаточные плоские треки курс не валят. `published_at` не освобождает от этой проверки: TS-gate и SQL совпадают на первом publish и на republish / start-editing. Остальные классы сохраняют прежние правила `audio_items`. Миграция: `20260902120000_course_moderation_readiness.sql`.
 
 #### promo_* — универсальная внутренняя рекомендация (2026-08-05)
 

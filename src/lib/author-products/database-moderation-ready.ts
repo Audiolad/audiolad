@@ -1,6 +1,6 @@
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
- * (latest: supabase/migrations/20260805193000_audio_post_optional_description.sql).
+ * (latest: supabase/migrations/20260902120000_course_moderation_readiness.sql).
  *
  * Used by admin support diagnostics so a product is never reported READY
  * when the live submit RPC would fail existing DB validation.
@@ -12,6 +12,10 @@ import {
   authorAccessAllowsPaidProducts,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
+import {
+  evaluateCourseLessonsReadiness,
+  type CoursePublishContentSnapshot,
+} from "@/lib/author-products/course-builder-shared";
 import {
   AUDIO_POST_KIND_LABEL,
   MUSIC_KIND_LABEL,
@@ -41,6 +45,7 @@ export type EvaluateDatabaseModerationReadyInput = {
   audioItems: AudioItemRow[];
   accessStatus: AuthorAccessStatus | string | null | undefined;
   activeTopicCount: number;
+  courseContent?: CoursePublishContentSnapshot;
 };
 
 function check(
@@ -79,8 +84,6 @@ export function listKnownTsSqlReadinessDivergences(): readonly string[] {
   return [
     "SQL требует slug вида ^[a-z0-9]+(?:-[a-z0-9]+)*$; TS проверяет только непустое значение.",
     "SQL требует currency = RUB; TS не проверяет валюту.",
-    "SQL всегда требует хотя бы один audio_items ряд (missing_audio). TS пропускает плоское аудио для курса с блоками (shouldSkipFlatAudioPublishRequirement).",
-    "SQL не проверяет содержание курса (уроки/блоки). TS требует course_content для unpublished course.",
     "SQL не проверяет диапазон цены 49–100 000 ₽ и позиции треков.",
   ];
 }
@@ -90,8 +93,12 @@ export function evaluateDatabaseModerationReady(
 ): DatabaseModerationReadyResult {
   const practice = input.practice;
   const productKind = normalizeProductKind(practice.product_kind);
+  const isCourse = practice.publication_class === "course";
   const audioCount = input.audioItems.length;
   const format = practice.format?.trim() ?? "";
+  const courseContentCheck = isCourse
+    ? evaluateCourseLessonsReadiness(input.courseContent?.lessons)
+    : ({ ok: true } as const);
 
   const checks: DatabaseModerationReadyCheck[] = [
     check(
@@ -213,29 +220,42 @@ export function evaluateDatabaseModerationReady(
     check(
       "missing_audio",
       "Аудиозаписи (SQL)",
-      audioCount === 0 ? "База требует хотя бы одну аудиозапись." : null,
+      !isCourse && audioCount === 0
+        ? "База требует хотя бы одну аудиозапись."
+        : null,
     ),
     check(
       "audio_post_requires_single_audio",
       "Одна аудиозапись для аудиопоста",
-      productKind === PRODUCT_KIND.AUDIO_POST && audioCount !== 1
+      !isCourse && productKind === PRODUCT_KIND.AUDIO_POST && audioCount !== 1
         ? "Для аудиопоста требуется ровно одна аудиозапись."
         : null,
     ),
     check(
       "incomplete_audio",
       "Полнота аудиозаписей",
-      input.audioItems.some(
-        (item) =>
-          !item.title?.trim() ||
-          !item.audio_path?.trim() ||
-          !item.duration_seconds ||
-          item.duration_seconds <= 0,
-      )
+      !isCourse &&
+        input.audioItems.some(
+          (item) =>
+            !item.title?.trim() ||
+            !item.audio_path?.trim() ||
+            !item.duration_seconds ||
+            item.duration_seconds <= 0,
+        )
         ? "У одной или нескольких аудиозаписей нет названия, файла или длительности."
         : null,
     ),
   ];
+
+  if (isCourse) {
+    checks.push(
+      check(
+        courseContentCheck.ok ? "course_content" : courseContentCheck.code,
+        "Содержание курса (SQL)",
+        courseContentCheck.ok ? null : courseContentCheck.message,
+      ),
+    );
+  }
 
   if (productKind === PRODUCT_KIND.AUDIO_POST && practice.promo_enabled) {
     checks.push(

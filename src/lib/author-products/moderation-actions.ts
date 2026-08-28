@@ -32,7 +32,7 @@ export async function submitPracticeForModeration(
   );
 
   if (error) {
-    throw mapModerationRpcError(error.message);
+    throw mapModerationRpcError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось отправить продукт на модерацию.");
@@ -50,7 +50,7 @@ export async function withdrawPracticeFromModeration(
   );
 
   if (error) {
-    throw mapModerationRpcError(error.message);
+    throw mapModerationRpcError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось отозвать продукт с модерации.");
