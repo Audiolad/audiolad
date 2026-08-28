@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   VISIBILITY_SEARCH_DEBOUNCE_MS,
@@ -48,7 +48,10 @@ export default function PracticeVisibilityUsersEditor({
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+  const listboxId = useId();
   const visibleUsers = practiceId ? users : [];
+  const canSearch = Boolean(practiceId) && !disabled && shouldSearchVisibilityUsers(query);
+  const showDropdown = dropdownOpen && canSearch;
 
   useEffect(() => {
     if (!practiceId) {
@@ -82,17 +85,13 @@ export default function PracticeVisibilityUsersEditor({
     abortRef.current?.abort();
     abortRef.current = null;
 
-    if (!practiceId || disabled || !shouldSearchVisibilityUsers(query)) {
-      setHits([]);
-      setSearching(false);
-      setDropdownOpen(false);
+    if (!practiceId || !canSearch) {
       return;
     }
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    setSearching(true);
-    setDropdownOpen(true);
+    const trimmedQuery = query.trim();
 
     debounceRef.current = window.setTimeout(() => {
       const controller = new AbortController();
@@ -105,7 +104,7 @@ export default function PracticeVisibilityUsersEditor({
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query: query.trim() }),
+              body: JSON.stringify({ query: trimmedQuery }),
               signal: controller.signal,
             },
           );
@@ -140,7 +139,7 @@ export default function PracticeVisibilityUsersEditor({
         window.clearTimeout(debounceRef.current);
       }
     };
-  }, [disabled, practiceId, query]);
+  }, [canSearch, practiceId, query]);
 
   function clearSearch() {
     setQuery("");
@@ -308,15 +307,28 @@ export default function PracticeVisibilityUsersEditor({
             placeholder="Имя, фамилия, email или UUID"
             autoComplete="off"
             role="combobox"
-            aria-expanded={dropdownOpen}
+            aria-expanded={showDropdown}
+            aria-controls={listboxId}
             aria-autocomplete="list"
             className="min-w-0 flex-1 rounded-[16px] border border-[#e4d7f4] px-4 py-2.5 text-sm"
             onChange={(event) => {
-              setQuery(event.target.value);
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
               setMessage(null);
+
+              if (!practiceId || disabled || !shouldSearchVisibilityUsers(nextQuery)) {
+                abortRef.current?.abort();
+                setHits([]);
+                setSearching(false);
+                setDropdownOpen(false);
+                return;
+              }
+
+              setSearching(true);
+              setDropdownOpen(true);
             }}
             onFocus={() => {
-              if (hits.length > 0 || searching) {
+              if (canSearch && (hits.length > 0 || searching)) {
                 setDropdownOpen(true);
               }
             }}
@@ -337,8 +349,9 @@ export default function PracticeVisibilityUsersEditor({
             Добавить
           </button>
         </div>
-        {dropdownOpen ? (
+        {showDropdown ? (
           <ul
+            id={listboxId}
             role="listbox"
             className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-[16px] border border-[#e4d7f4] bg-white p-1 shadow-lg sm:max-w-[calc(100%-7.5rem)]"
           >
@@ -354,6 +367,7 @@ export default function PracticeVisibilityUsersEditor({
                   <button
                     type="button"
                     role="option"
+                    aria-selected={false}
                     className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 text-left hover:bg-[#f8f4ff]"
                     onMouseDown={(event) => {
                       event.preventDefault();
