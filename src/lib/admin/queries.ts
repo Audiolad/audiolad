@@ -19,6 +19,9 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getOperationalEmailDeliveryForApplication } from "@/lib/email/operational-deliveries";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 import {
+  createOperationalTimeRange,
+} from "@/lib/admin/operational-overview";
+import {
   buildAdminUsersProfileSearchOr,
   isAdminExactUuid,
   isAdminProductSlugQuery,
@@ -26,7 +29,7 @@ import {
 
 export type AdminStatCard =
   | { kind: "value"; key: string; label: string; value: number }
-  | { kind: "currency"; key: string; label: string; valueRub: number }
+  | { kind: "currency"; key: string; label: string; valueMinor: number }
   | { kind: "unavailable"; key: string; label: string; reason: string };
 
 export type AdminOverviewStats = {
@@ -73,188 +76,123 @@ export type AdminUsersPageData = {
 
 const USERS_PAGE_SIZE = 20;
 
-function daysAgoIso(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
+function getOverviewStat(
+  raw: Record<string, unknown>,
+  key: string,
+): number {
+  const value = raw[key];
 
-async function countPublishedPrograms(
-  service: ReturnType<typeof createServiceRoleClient>,
-): Promise<number> {
-  const { data: practices, error } = await service
-    .from("practices")
-    .select("id")
-    .eq("status", "published");
-
-  if (error || !practices?.length) {
-    return 0;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
   }
 
-  const practiceIds = practices.map((row) => row.id);
-
-  const { data: audioItems, error: audioError } = await service
-    .from("audio_items")
-    .select("practice_id")
-    .in("practice_id", practiceIds)
-    .eq("status", "published");
-
-  if (audioError) {
-    return 0;
-  }
-
-  const counts = new Map<string, number>();
-
-  for (const item of audioItems ?? []) {
-    counts.set(item.practice_id, (counts.get(item.practice_id) ?? 0) + 1);
-  }
-
-  return [...counts.values()].filter((count) => count >= 2).length;
+  throw new Error(`admin_overview_stat_invalid:${key}`);
 }
 
 export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   const service = createServiceRoleClient();
-  const nowIso = new Date().toISOString();
-  const sevenDaysAgo = daysAgoIso(7);
-  const thirtyDaysAgo = daysAgoIso(30);
+  const timeRange = createOperationalTimeRange();
 
-  const [
-    usersTotal,
-    users7d,
-    users30d,
-    authorsTotal,
-    applicationsTotal,
-    applicationsNew,
-    publishedPractices,
-    publishedPrograms,
-    completedListens,
-    paidOrders,
-    revenueResult,
-  ] = await Promise.all([
-    service.from("profiles").select("*", { count: "exact", head: true }),
-    service
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", sevenDaysAgo),
-    service
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", thirtyDaysAgo),
-    service
-      .from("author_members")
-      .select("user_id", { count: "exact", head: true }),
-    service.from("author_applications").select("*", { count: "exact", head: true }),
-    service
-      .from("author_applications")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "submitted"),
-    service
-      .from("practices")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "published"),
-    countPublishedPrograms(service),
-    service
-      .from("practice_audio_progress")
-      .select("*", { count: "exact", head: true })
-      .eq("completed", true),
-    service
-      .from("orders")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "paid")
-      .eq("is_test", false),
-    // P3.0: gross from succeeded non-test payments (not orders.paid).
-    service
-      .from("payments")
-      .select("amount_minor")
-      .eq("status", "succeeded")
-      .eq("is_test", false),
-  ]);
+  const { data, error } = await service.rpc("admin_operational_overview_snapshot", {
+    p_snapshot_now: timeRange.snapshotNowIso,
+  });
 
-  const revenueMinor = (revenueResult.data ?? []).reduce(
-    (sum, row) => sum + (typeof row.amount_minor === "number" ? row.amount_minor : 0),
-    0,
-  );
+  if (error || !data || typeof data !== "object") {
+    throw new Error("admin_overview_stats_load_failed");
+  }
 
-  const authorMemberCount = authorsTotal.count ?? 0;
+  const stats = data as Record<string, unknown>;
 
   const cards: AdminStatCard[] = [
     {
       kind: "value",
       key: "users_total",
       label: "Всего пользователей",
-      value: usersTotal.count ?? 0,
+      value: getOverviewStat(stats, "users_total"),
     },
     {
       kind: "value",
       key: "users_7d",
-      label: "Новых за 7 дней",
-      value: users7d.count ?? 0,
+      label: "Новых пользователей за 7 дней",
+      value: getOverviewStat(stats, "users_7d"),
     },
     {
       kind: "value",
       key: "users_30d",
-      label: "Новых за 30 дней",
-      value: users30d.count ?? 0,
+      label: "Новых пользователей за 30 дней",
+      value: getOverviewStat(stats, "users_30d"),
     },
     {
       kind: "value",
       key: "authors_total",
       label: "Всего авторов",
-      value: authorMemberCount,
+      value: getOverviewStat(stats, "authors_total"),
     },
     {
       kind: "value",
-      key: "applications_new",
-      label: "Новых заявок на авторство",
-      value: applicationsNew.count ?? 0,
+      key: "author_workspaces_total",
+      label: "Авторских пространств",
+      value: getOverviewStat(stats, "author_workspaces_total"),
+    },
+    {
+      kind: "value",
+      key: "applications_submitted_7d",
+      label: "Заявок подано за 7 дней",
+      value: getOverviewStat(stats, "applications_submitted_7d"),
+    },
+    {
+      kind: "value",
+      key: "applications_awaiting_review",
+      label: "Ожидают рассмотрения",
+      value: getOverviewStat(stats, "applications_awaiting_review"),
     },
     {
       kind: "value",
       key: "applications_total",
       label: "Всего заявок на авторство",
-      value: applicationsTotal.count ?? 0,
+      value: getOverviewStat(stats, "applications_total"),
     },
     {
       kind: "value",
       key: "practices_published",
       label: "Опубликованных аудиопрактик",
-      value: publishedPractices.count ?? 0,
+      value: getOverviewStat(stats, "practices_published"),
     },
     {
       kind: "value",
       key: "programs_published",
       label: "Опубликованных программ (≥2 трека)",
-      value: publishedPrograms,
+      value: getOverviewStat(stats, "programs_published"),
     },
     {
-      kind: "unavailable",
+      kind: "value",
       key: "playback_starts",
-      label: "Общих запусков прослушивания",
-      reason: "Данные пока не собираются",
+      label: "Запусков прослушивания",
+      value: getOverviewStat(stats, "playback_starts"),
     },
     {
       kind: "value",
       key: "completions",
-      label: "Дослушиваний (progress DB)",
-      value: completedListens.count ?? 0,
+      label: "Дослушиваний",
+      value: getOverviewStat(stats, "completions"),
     },
     {
       kind: "value",
       key: "paid_orders",
       label: "Успешных заказов",
-      value: paidOrders.count ?? 0,
+      value: getOverviewStat(stats, "paid_orders"),
     },
     {
       kind: "currency",
       key: "revenue",
-      label: "Подтверждённая выручка (без test)",
-      valueRub: revenueMinor / 100,
+      label: "Выручка после возвратов",
+      valueMinor: getOverviewStat(stats, "revenue_minor"),
     },
   ];
 
   return {
     cards,
-    generatedAt: nowIso,
+    generatedAt: timeRange.snapshotNowIso,
   };
 }
 

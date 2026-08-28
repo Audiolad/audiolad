@@ -122,7 +122,7 @@ export default async function AdminOverviewPage({
             Операционный обзор
           </h2>
           <p className="mt-1 text-sm text-[#796ba0]">
-            Показатели из базы данных (без привязки к выбранному периоду аналитики).
+            Операционные показатели платформы. Периоды 7 и 30 дней рассчитываются независимо от выбранного периода аналитики.
           </p>
         </div>
         <AdminStatGrid cards={overviewStats.cards} />
