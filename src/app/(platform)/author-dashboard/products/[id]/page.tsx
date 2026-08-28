@@ -33,23 +33,12 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     redirect("/author-dashboard");
   }
 
+  let product;
+  let topicFormData;
   try {
-    const { product, topicFormData } = await loadAuthorDashboardProductEditData(id);
-
-    return (
-      <AuthorShell
-        title="Редактировать аудиопродукт"
-        subtitle={product.practice.title}
-        internalBackHref="/author-dashboard"
-      >
-        <AuthorProductForm
-          authors={authors}
-          initialProduct={product}
-          topicFormData={topicFormData}
-          mode="edit"
-        />
-      </AuthorShell>
-    );
+    const loaded = await loadAuthorDashboardProductEditData(id);
+    product = loaded.product;
+    topicFormData = loaded.topicFormData;
   } catch (error) {
     const mapped = mapAuthorDashboardProductEditError(error);
     if (mapped === "unauthorized") {
@@ -60,4 +49,19 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     }
     throw error;
   }
+
+  return (
+    <AuthorShell
+      title="Редактировать аудиопродукт"
+      subtitle={product.practice.title}
+      internalBackHref="/author-dashboard"
+    >
+      <AuthorProductForm
+        authors={authors}
+        initialProduct={product}
+        topicFormData={topicFormData}
+        mode="edit"
+      />
+    </AuthorShell>
+  );
 }

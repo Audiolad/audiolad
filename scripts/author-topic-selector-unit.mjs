@@ -65,6 +65,10 @@ const editPage = readFileSync(
   "src/app/(platform)/author-dashboard/products/[id]/page.tsx",
   "utf8",
 );
+const editPageLoader = readFileSync(
+  "src/lib/author-products/dashboard-edit-page.ts",
+  "utf8",
+);
 const publishRoute = readFileSync(
   "src/app/api/author/products/[id]/publish/route.ts",
   "utf8",
@@ -94,7 +98,10 @@ assert(topicSelector.includes("min-h-11"), "touch target sizing");
 assert(authorForm.includes("TopicSelector"), "AuthorProductForm wires TopicSelector");
 assert(authorForm.includes("topicFormData"), "form receives server topic data via props");
 assert(newPage.includes("loadAuthorProductTopicFormData"), "create page loads topics on server");
-assert(editPage.includes("loadAuthorProductTopicFormData"), "edit page loads assigned topics");
+assert(
+  editPageLoader.includes("loadAuthorProductTopicFormData"),
+  "edit page loads assigned topics",
+);
 assert(newPage.includes("topicFormData={topicFormData}"), "create passes topic props");
 assert(editPage.includes("topicFormData={topicFormData}"), "edit passes topic props");
 assert(!authorForm.includes("useEffect") || !authorForm.includes("listActiveTopics"), "no client useEffect topic fetch");

@@ -58,13 +58,24 @@ assert.match(auth, /loadActingAuthorMembership/);
 assert.doesNotMatch(auth, /SET request\.jwt\.claim\.sub/);
 assert.doesNotMatch(auth, /auth\.uid\(\)\s*=\s*acting_user_id/);
 
+type MembershipLookup = { authorId: string; userId: string };
+type RealMembership = { authorId: string; userId: string; role: string };
+
+function membershipLookups() {
+  return state.membershipLookups as MembershipLookup[];
+}
+
+function realMemberships() {
+  return state.realMemberships as RealMembership[];
+}
+
 const { AuthorAccessError, requirePracticeAccess } = await import(
-  "../src/lib/author-products/auth.ts"
+  "../src/lib/author-products/auth"
 );
 const {
   loadAuthorDashboardProductEditData,
   mapAuthorDashboardProductEditError,
-} = await import("../src/lib/author-products/dashboard-edit-page.ts");
+} = await import("../src/lib/author-products/dashboard-edit-page");
 
 async function expectAccess(
   practiceId: string,
@@ -116,7 +127,7 @@ assert.equal(supportDraft?.user.id, OWNER_ID, "auth.uid() stays the real admin")
 assert.equal(supportDraft?.practice.author_id, ACTING_AUTHOR_ID);
 assert.equal(supportDraft?.role, "owner");
 assert.equal(
-  state.membershipLookups.filter((lookup) => lookup.userId === OWNER_ID).length,
+  membershipLookups().filter((lookup) => lookup.userId === OWNER_ID).length,
   0,
   "support path must not check author_members for the real admin",
 );
@@ -124,7 +135,7 @@ assert.equal(
 // page-access regression: support context + real admin not a member +
 // product belongs to actingAuthorId → authorization succeeds
 assert.equal(
-  state.realMemberships.some((row) => row.userId === OWNER_ID),
+  realMemberships().some((row) => row.userId === OWNER_ID),
   false,
 );
 assert.equal(supportDraft?.practice.id, PRACTICE_ID);
@@ -179,7 +190,7 @@ resetState({
 });
 await expectAccess(PRACTICE_ID, { code: "forbidden", status: 403 });
 assert.ok(
-  state.membershipLookups.some(
+  membershipLookups().some(
     (lookup) =>
       lookup.userId === OWNER_ID && lookup.authorId === ACTING_AUTHOR_ID,
   ),
