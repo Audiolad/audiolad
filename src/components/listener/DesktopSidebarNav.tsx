@@ -102,16 +102,14 @@ function SidebarNavLink({
       className={`flex min-h-11 items-center rounded-xl transition-colors ${NAV_LINK_FOCUS} ${navLinkTone(active)} ${
         iconOnly
           ? "justify-center px-2 py-2"
-          : "gap-2 px-3 py-2.5 text-[15px] leading-snug"
+          : "gap-2.5 px-3 py-2.5 text-[15px] leading-snug"
       }`}
     >
-      {iconOnly || item.icon === "help" || item.icon === "lock" ? (
-        <SidebarItemIcon
-          item={item}
-          active={active}
-          className={iconOnly ? "!h-6 !w-6" : "!h-4 !w-4 shrink-0"}
-        />
-      ) : null}
+      <SidebarItemIcon
+        item={item}
+        active={active}
+        className="!h-6 !w-6 shrink-0"
+      />
       {iconOnly ? (
         <span className="sr-only">{item.title}</span>
       ) : (

@@ -251,6 +251,33 @@ assert.equal(
   false,
   "DesktopSidebarNav does not copy catalog SVG markup",
 );
+assert.match(
+  sidebarNav,
+  /<SidebarItemIcon/,
+  "labels and icons variants both render SidebarItemIcon",
+);
+assert.equal(
+  /iconOnly \|\| item\.icon === "help" \|\| item\.icon === "lock"/.test(
+    sidebarNav,
+  ),
+  false,
+  "labels variant is not gated on iconOnly/help/lock",
+);
+assert.equal(
+  sidebarNav.includes('className={iconOnly ? "!h-6 !w-6" : "!h-4 !w-4 shrink-0"}'),
+  false,
+  "Catalog/Library/Playlists/Profile icons are not collapsed-only / smaller in labels",
+);
+assert.match(
+  sidebarNav,
+  /className="!h-6 !w-6 shrink-0"/,
+  "expanded and collapsed rows share the same 24px icon slot",
+);
+assert.match(
+  chrome,
+  /<DesktopSidebarNav \{\.\.\.navFlags\} variant="labels" decorative/,
+  "flyout variant=labels uses the same icon+label DesktopSidebarNav",
+);
 
 // 7. BottomNav still 5 items from LISTENER_PRIMARY_NAV_ITEMS
 assert.equal(LISTENER_PRIMARY_NAV_ITEMS.length, 5);
