@@ -155,12 +155,16 @@ BEGIN
     RAISE EXCEPTION 'owner cannot search first name';
   END IF;
 
-  SELECT * INTO v_hit
-  FROM public.search_practice_visibility_users(v_practice_id, 'Герман')
-  LIMIT 1;
-  IF v_hit.user_id IS DISTINCT FROM v_german_id THEN
-    RAISE EXCEPTION 'Герман did not resolve the expected profile';
+  SELECT count(*) INTO v_count
+  FROM public.search_practice_visibility_users(v_practice_id, 'Герман') AS s
+  WHERE s.user_id = v_german_id;
+  IF v_count < 1 THEN
+    RAISE EXCEPTION 'first name search must include the fixture user';
   END IF;
+
+  SELECT s.* INTO v_hit
+  FROM public.search_practice_visibility_users(v_practice_id, 'Герман') AS s
+  WHERE s.user_id = v_german_id;
   IF v_hit.masked_email IS DISTINCT FROM 'ge***an@example.com' THEN
     RAISE EXCEPTION 'masked email mismatch: %', v_hit.masked_email;
   END IF;
@@ -172,6 +176,13 @@ BEGIN
   FROM public.search_practice_visibility_users(v_practice_id, 'Иванов');
   IF v_hits < 1 THEN
     RAISE EXCEPTION 'last name search failed';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.search_practice_visibility_users(v_practice_id, 'Иванов') AS s
+  WHERE s.user_id = v_german_id;
+  IF v_count < 1 THEN
+    RAISE EXCEPTION 'last name search must include the fixture user';
   END IF;
 
   SELECT count(*) INTO v_hits

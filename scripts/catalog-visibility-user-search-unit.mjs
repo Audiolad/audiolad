@@ -542,6 +542,16 @@ function testIsolatedHarnessGuards() {
   assert.match(fixture, /gmail\.com/);
   assert.match(fixture, /user_practices/);
   assert.match(fixture, /list_practice_visibility_users/);
+  assert.match(
+    fixture,
+    /WHERE s\.user_id = v_german_id/,
+    "name-search fixture asserts membership of the fixture user, not LIMIT 1",
+  );
+  assert.doesNotMatch(
+    fixture,
+    /did not resolve the expected profile/,
+    "clone DBs may have other first-name matches ahead of the fixture",
+  );
   assert.doesNotMatch(runner, /\|\|\s*true/);
 }
 
