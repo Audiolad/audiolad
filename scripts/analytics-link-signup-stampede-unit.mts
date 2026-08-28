@@ -148,6 +148,8 @@ type StampedeInput = {
   singleFlightPerTab: boolean;
   sqlEarlyReturn: boolean;
   retryOnTransient: boolean;
+  alreadyLinked?: boolean;
+  repeatStartMs?: number;
 };
 
 type StampedeResult = {
@@ -201,14 +203,15 @@ function simulateStampede(input: StampedeInput): StampedeResult {
   const lockWaiters = new Map<number, LockWaiter>();
   let nextWaiterId = 1;
   let lockHeld = false;
-  let linked = false;
+  let linked = Boolean(input.alreadyLinked);
   let nextAttempt = input.tabs * input.attemptsPerTab;
   const events: SimEvent[] = [];
 
   for (let tab = 0; tab < input.tabs; tab += 1) {
     const count = input.singleFlightPerTab ? 1 : input.attemptsPerTab;
+    const startT = tab === 0 ? 0 : (input.repeatStartMs ?? 0);
     for (let attempt = 0; attempt < count; attempt += 1) {
-      events.push({ t: 0, kind: "rpc_start", tab, attempt });
+      events.push({ t: startT, kind: "rpc_start", tab, attempt });
     }
   }
   events.push({ t: input.catalogStartMs, kind: "catalog_start" });
@@ -472,6 +475,9 @@ function testFixedStampedeIsCheapAndLetsCatalogThrough() {
     singleFlightPerTab: true,
     sqlEarlyReturn: true,
     retryOnTransient: false,
+    // Repeats start after the first commit. Concurrent first-time waiters
+    // can still 55P03 at 250ms; #156 is the already-linked / repeat path.
+    repeatStartMs: STORM.heavyWorkMs + 1,
   });
 
   assert.equal(fixed.heavy, 1, `fixed heavy must be 1 per logical session, got ${fixed.heavy}`);
@@ -480,6 +486,18 @@ function testFixedStampedeIsCheapAndLetsCatalogThrough() {
     STORM.tabs - 1,
     `remaining tab RPCs are fast no-ops, got ${fixed.cheap}`,
   );
+
+  const alreadyLinkedRepeats = simulateStampede({
+    ...STORM,
+    lockTimeoutMs: FUNCTION_LOCK_TIMEOUT_MS,
+    singleFlightPerTab: true,
+    sqlEarlyReturn: true,
+    retryOnTransient: false,
+    alreadyLinked: true,
+  });
+  assert.equal(alreadyLinkedRepeats.heavy, 0, "already-linked concurrent repeats take no heavy path");
+  assert.equal(alreadyLinkedRepeats.cheap, STORM.tabs, "already-linked repeats are all fast no-ops");
+  assert.equal(alreadyLinkedRepeats.lockTimeout, 0, "already-linked repeats do not wait 250ms");
   assert.equal(fixed.lockTimeout, 0, "no 55P03 avalanche");
   assert.equal(fixed.poolTimeout, 0, "no PGRST003");
   assert.equal(fixed.retries, 0, "no retry amplification");
