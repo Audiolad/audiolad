@@ -25,6 +25,10 @@ import { isPracticeSaleLockError } from "@/lib/author-products/sale-lock";
 
 import { hasPermission } from "@/lib/auth/platform-access";
 
+import {
+  evaluatePracticeAuthorAssignment,
+  type AuthorMemberWriteRole,
+} from "./author-assignment";
 import type { AuthorMemberRole, AuthorWorkspace } from "./types";
 
 export class AuthorAccessError extends Error {
@@ -298,6 +302,85 @@ export async function requireAuthorMutationMembership(
   return context;
 }
 
+function asWriteRole(role: string | null | undefined): AuthorMemberWriteRole | null {
+  return role === "owner" || role === "editor" ? role : null;
+}
+
+/**
+ * Draft saves send author_id while the slug is unlocked. Support mode must not
+ * treat that as "is the real admin in author_members?".
+ */
+export async function authorizePracticeAuthorAssignment(input: {
+  currentAuthorId: string;
+  nextAuthorId: string;
+  realUserId: string;
+  supabase: SupabaseClient;
+}): Promise<{ assign: boolean }> {
+  const {
+    peekAuthorExecutionContext,
+    requestedAuthorMatchesSupport,
+  } = await import("@/lib/author-support/context");
+  const { loadActingAuthorMembership } = await import(
+    "@/lib/author-support/store"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const isSupportMode = execution?.isSupportMode === true;
+  const authorChanged =
+    input.nextAuthorId.trim() !== input.currentAuthorId.trim();
+
+  let realUserRoleOnNextAuthor: AuthorMemberWriteRole | null = null;
+  let actingUserRoleOnNextAuthor: AuthorMemberWriteRole | null = null;
+
+  if (authorChanged && isSupportMode) {
+    if (
+      execution &&
+      requestedAuthorMatchesSupport(execution, input.nextAuthorId) &&
+      execution.actingAuthorId
+    ) {
+      const membership = await loadActingAuthorMembership({
+        actingUserId: execution.actingUserId,
+        actingAuthorId: execution.actingAuthorId,
+      });
+      actingUserRoleOnNextAuthor = asWriteRole(membership?.role);
+    }
+  } else if (authorChanged) {
+    const { data, error } = await input.supabase
+      .from("author_members")
+      .select("role")
+      .eq("author_id", input.nextAuthorId)
+      .eq("user_id", input.realUserId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("author_product_author_assignment_lookup_error", error.message);
+      throw new AuthorAccessError("internal_error", 500);
+    }
+
+    realUserRoleOnNextAuthor = asWriteRole(data?.role);
+  }
+
+  const decision = evaluatePracticeAuthorAssignment({
+    currentAuthorId: input.currentAuthorId,
+    nextAuthorId: input.nextAuthorId,
+    isSupportMode,
+    actingAuthorId: execution?.actingAuthorId ?? null,
+    realUserRoleOnNextAuthor,
+    actingUserRoleOnNextAuthor,
+  });
+
+  if (!decision.ok) {
+    console.error("author_product_author_assignment_denied", {
+      code: decision.code,
+      currentAuthorId: input.currentAuthorId,
+      nextAuthorId: input.nextAuthorId,
+      isSupportMode,
+    });
+    throw new AuthorAccessError(decision.code, 403);
+  }
+
+  return { assign: decision.assign };
+}
+
 export async function requirePracticeMutationAccess(practiceId: string) {
   const context = await requirePracticeAccess(practiceId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
@@ -440,9 +523,7 @@ export function handleAuthorRouteError(error: unknown) {
   }
 
   if (error instanceof AuthorAccessError) {
-    if (error.status >= 500) {
-      console.error("author_route_error", error.code);
-    }
+    console.error("author_route_error", error.code, error.status);
 
     return jsonError(error.code, error.status);
   }
@@ -492,7 +573,8 @@ export function handleAuthorRouteError(error: unknown) {
   }
 
   if (error instanceof Error && error.message === "author_support_proof_missing") {
-    return jsonError("forbidden", 403);
+    console.error("author_route_error", "author_support_proof_missing", 403);
+    return jsonError("author_support_proof_missing", 403);
   }
 
   console.error("author_route_unhandled_error", error);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   assertAuthorCommercialWriteAllowed,
+  authorizePracticeAuthorAssignment,
   handleAuthorRouteError,
   requirePracticeAccess,
   requirePracticeMutationAccess,
@@ -634,21 +635,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     ) {
       if (practice.status !== "published" && !practice.published_at) {
         const nextAuthorId = body.author_id.trim();
-        const { data: membership } = await supabase
-          .from("author_members")
-          .select("role")
-          .eq("author_id", nextAuthorId)
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const assignment = await authorizePracticeAuthorAssignment({
+          currentAuthorId: practice.author_id,
+          nextAuthorId,
+          realUserId: user.id,
+          supabase,
+        });
 
-        if (
-          !membership ||
-          (membership.role !== "owner" && membership.role !== "editor")
-        ) {
-          return NextResponse.json({ error: "forbidden" }, { status: 403 });
+        if (assignment.assign) {
+          updates.author_id = nextAuthorId;
         }
-
-        updates.author_id = nextAuthorId;
       }
     }
 
@@ -661,11 +657,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       .maybeSingle();
 
     if (updateError) {
-      console.error("author_product_update_error", updateError.message);
+      console.error("author_product_update_error", {
+        practiceId: id,
+        code: updateError.code ?? "internal_error",
+        message: updateError.message,
+      });
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
     if (!updatedPractice?.id) {
+      console.error("author_product_update_error", {
+        practiceId: id,
+        code: "update_failed",
+      });
       return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
