@@ -68,6 +68,7 @@ import { TARO_NA_RABOTU_PAGE } from "./content/taro-na-rabotu";
 import { RASKLAD_TARO_NA_RABOTU_PAGE } from "./content/rasklad-taro-na-rabotu";
 import { KARTY_TARO_NA_RABOTU_PAGE } from "./content/karty-taro-na-rabotu";
 import { TARO_NOVAYA_RABOTA_PAGE } from "./content/taro-novaya-rabota";
+import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "./content/rasklad-taro-na-novuyu-rabotu";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -145,6 +146,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RASKLAD_TARO_NA_RABOTU_PAGE,
   KARTY_TARO_NA_RABOTU_PAGE,
   TARO_NOVAYA_RABOTA_PAGE,
+  RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

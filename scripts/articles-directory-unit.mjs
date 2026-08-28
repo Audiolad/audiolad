@@ -97,6 +97,7 @@ import { TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-na-rabo
 import { RASKLAD_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-rabotu.ts";
 import { KARTY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/karty-taro-na-rabotu.ts";
 import { TARO_NOVAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-novaya-rabota.ts";
+import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-novuyu-rabotu.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2186,6 +2187,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventiethListenHref}`,
     ),
     "directory JSON-LD includes seventieth listen href",
+  );
+
+  const seventyFirstListenHref = "/listens/rasklad-taro-na-novuyu-rabotu";
+  const seventyFirstListenCard = data.articles.find((card) => card.href === seventyFirstListenHref);
+  assert(seventyFirstListenCard, "seventy-first indexable listen page is listed");
+  assert(
+    seventyFirstListenCard.title === "Расклад Таро на новую работу – схема на новое место | АудиоЛад",
+    "seventy-first listen directory title",
+  );
+  assert(
+    seventyFirstListenCard.description === RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE.description,
+    "seventy-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/rasklad-taro-na-novuyu-rabotu",
+    ),
+    "no /articles duplicate for seventy-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-first listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
