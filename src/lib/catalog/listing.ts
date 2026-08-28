@@ -15,9 +15,13 @@ import {
 } from "@/lib/library/saves";
 import {
   getPublishedCatalogProducts,
-  type CatalogPriceViewer,
+  type CatalogProductViewer,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import {
+  loadOrdinaryCatalogViewer,
+  resolveCatalogViewerUserId,
+} from "@/lib/catalog/visibility-query";
 
 import {
   decodeCatalogCursor,
@@ -270,20 +274,17 @@ export function applyCatalogListingSavedState(
   }));
 }
 
-async function resolveCatalogListingUserId(
-  supabase: SupabaseClient,
-  explicitUserId?: string | null,
-): Promise<string | null> {
-  if (explicitUserId !== undefined) {
-    return explicitUserId;
-  }
-
-  try {
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? null;
-  } catch {
-    return null;
-  }
+export function applyCatalogListingGrantState(
+  items: CatalogCard[],
+  grantedIds: ReadonlySet<string> | null,
+): CatalogCard[] {
+  return items.map((item) => ({
+    ...item,
+    viewer: {
+      ...item.viewer,
+      has_grant: grantedIds !== null && grantedIds.has(item.publication_id),
+    },
+  }));
 }
 
 function listingProductKindHint(
@@ -327,8 +328,10 @@ export async function listPublishedCatalog(
   } = {},
 ): Promise<CatalogListingResult> {
   const productKindHint = listingProductKindHint(query.class);
-  const userId = await resolveCatalogListingUserId(supabase, options.userId);
-  const viewer: CatalogPriceViewer = {
+  const userId = await resolveCatalogViewerUserId(supabase, options.userId);
+  const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);
+  const viewer: CatalogProductViewer = {
+    ...ordinaryViewer,
     visitorId: options.visitorId ?? null,
     userId,
   };
@@ -358,11 +361,15 @@ export async function listPublishedCatalog(
   );
   const sorted = sortCatalogListingItems(candidates, query.sort);
   const page = paginateCatalogListingItems(sorted, query);
+  const grantedIds = new Set(viewer.entitledPracticeIds);
 
   if (!userId) {
     return {
       ...page,
-      items: applyCatalogListingSavedState(page.items, null),
+      items: applyCatalogListingGrantState(
+        applyCatalogListingSavedState(page.items, null),
+        null,
+      ),
     };
   }
 
@@ -376,7 +383,10 @@ export async function listPublishedCatalog(
 
     return {
       ...page,
-      items: applyCatalogListingSavedState(page.items, new Set(savedIds)),
+      items: applyCatalogListingGrantState(
+        applyCatalogListingSavedState(page.items, new Set(savedIds)),
+        grantedIds,
+      ),
     };
   } catch (error) {
     console.error(
@@ -386,7 +396,10 @@ export async function listPublishedCatalog(
 
     return {
       ...page,
-      items: applyCatalogListingSavedState(page.items, new Set()),
+      items: applyCatalogListingGrantState(
+        applyCatalogListingSavedState(page.items, new Set()),
+        grantedIds,
+      ),
     };
   }
 }

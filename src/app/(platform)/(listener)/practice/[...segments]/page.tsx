@@ -60,6 +60,8 @@ import {
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
   canRevealPublicProductPage,
+  PRACTICE_UNAVAILABLE_METADATA,
+  resolvePracticePageRobots,
   shouldIndexPracticePage,
   shouldTrackPracticeListenerAnalytics,
 } from "@/lib/products/publish-preview";
@@ -198,10 +200,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (segments.length !== 2) {
-    return {
-      title: "Аудиопродукт – АудиоЛад",
-      robots: { index: false, follow: false },
-    };
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
   }
 
   const [authorSlug, productSlug] = segments;
@@ -213,13 +212,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   );
 
   if (error || !practice) {
-    return {
-      title: "Аудиопродукт – АудиоЛад",
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let access;
+
+  try {
+    access = await resolveProductAccess(supabase, practice, user?.id ?? null);
+  } catch {
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
+  }
+
+  if (
+    !canRevealPublicProductPage({
+      practiceStatus: practice.status,
+      access,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
+    })
+  ) {
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
   }
 
   const trimmedDescription =
@@ -230,6 +246,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const indexable = shouldIndexPracticePage(
     practice.status,
     practice.is_catalog_listed,
+    practice.catalog_visibility,
+  );
+  const robots = resolvePracticePageRobots(
+    practice.status,
+    practice.is_catalog_listed,
+    practice.catalog_visibility,
   );
   const isMusic = isMusicProductKind(practice.product_kind);
   const isAudioPost = isAudioPostProductKind(practice.product_kind);
@@ -266,12 +288,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     openGraph: social.openGraph,
     twitter: social.twitter,
-    robots: indexable
-      ? undefined
-      : {
-          index: false,
-          follow: false,
-        },
+    robots: indexable ? undefined : robots,
   };
 }
 
@@ -327,6 +344,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     !canRevealPublicProductPage({
       practiceStatus: practice.status,
       access,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
     })
   ) {
     notFound();
@@ -662,6 +681,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     status: practice.status,
     isFixtureMarked: isFixtureMarkedPractice(practice),
     isCatalogListed: practice.is_catalog_listed,
+    catalogVisibility: practice.catalog_visibility,
   })
     ? buildPracticeJsonLd({
         title: practice.title,

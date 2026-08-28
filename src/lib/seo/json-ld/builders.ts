@@ -678,8 +678,13 @@ export function shouldEmitPracticeJsonLd(input: {
   status: string | null | undefined;
   isFixtureMarked: boolean;
   isCatalogListed?: boolean | null;
+  catalogVisibility?: string | null;
 }): boolean {
   if (input.status !== "published" || input.isFixtureMarked) {
+    return false;
+  }
+
+  if (input.catalogVisibility === "unlisted" || input.catalogVisibility === "selected_users") {
     return false;
   }
 

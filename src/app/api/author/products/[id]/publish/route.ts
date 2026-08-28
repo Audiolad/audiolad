@@ -175,6 +175,8 @@ export async function POST(_request: Request, context: RouteContext) {
           practiceSlug: product.practice.slug,
           isFirstPublishOfPractice,
           publishedCountBefore,
+          catalogVisibility: product.practice.catalog_visibility,
+          isCatalogListed: product.practice.is_catalog_listed,
         })) {
           scheduleIndexNowNotification(event.urls, event.reason);
         }

@@ -55,6 +55,7 @@ export async function findSimilarAuthors(
     `,
     )
     .eq("status", "published")
+    .eq("is_catalog_listed", true)
     .neq("author_id", authorId);
 
   if (error || !publishedPractices?.length) {
