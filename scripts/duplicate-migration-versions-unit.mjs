@@ -14,6 +14,10 @@ const EXPECTED_RENAMES = [
   ["20260716180000_promotion_campaigns.sql", "20260716182000_promotion_campaigns.sql"],
   ["20260716190000_claim_promo_practice_by_id.sql", "20260716191000_claim_promo_practice_by_id.sql"],
   ["20260728120000_practice_content_sale_lock.sql", "20260728121000_practice_content_sale_lock.sql"],
+  ["20260830120100_practice_catalog_visibility_modes.sql", "20260901120100_practice_catalog_visibility_modes.sql"],
+  ["20260830120200_create_practice_order_visibility.sql", "20260901120200_create_practice_order_visibility.sql"],
+  ["20260830120300_public_playlist_selected_visibility.sql", "20260901120300_public_playlist_selected_visibility.sql"],
+  ["20260830120400_fix_visibility_allowlist_author_policy.sql", "20260901120400_fix_visibility_allowlist_author_policy.sql"],
 ];
 
 const EXPECTED_KEEP = [

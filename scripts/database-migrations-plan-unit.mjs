@@ -315,6 +315,68 @@ function testRepoOneFileOneVersion() {
         "20260901120000_analytics_link_signup_idempotent.sql",
     ),
   );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120100_practice_catalog_visibility_modes.sql",
+    ),
+    false,
+    "unapplied visibility modes 120100 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260830120200_create_practice_order_visibility.sql",
+    ),
+    false,
+    "unapplied order visibility 120200 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120300_public_playlist_selected_visibility.sql",
+    ),
+    false,
+    "unapplied playlist selected visibility 120300 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120400_fix_visibility_allowlist_author_policy.sql",
+    ),
+    false,
+    "unapplied allowlist author policy 120400 stamp must leave the active migrations directory",
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260901120100_practice_catalog_visibility_modes.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260901120200_create_practice_order_visibility.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260901120300_public_playlist_selected_visibility.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260901120400_fix_visibility_allowlist_author_policy.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -364,12 +426,12 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260829120000",
     "20260829130000",
     "20260830120000",
-    "20260830120100",
-    "20260830120200",
-    "20260830120300",
-    "20260830120400",
     "20260831120000",
     "20260901120000",
+    "20260901120100",
+    "20260901120200",
+    "20260901120300",
+    "20260901120400",
   ]);
   assert.equal(plan.database_migrations_pending, 23);
 }
@@ -400,12 +462,12 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260829120000",
     "20260829130000",
     "20260830120000",
-    "20260830120100",
-    "20260830120200",
-    "20260830120300",
-    "20260830120400",
     "20260831120000",
     "20260901120000",
+    "20260901120100",
+    "20260901120200",
+    "20260901120300",
+    "20260901120400",
   ]);
   assert.equal(plan.database_migrations_pending, 17);
 }
@@ -443,14 +505,80 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
   assert.deepEqual(plan.pending, [
     "20260829130000",
     "20260830120000",
+    "20260831120000",
+    "20260901120000",
+    "20260901120100",
+    "20260901120200",
+    "20260901120300",
+    "20260901120400",
+  ]);
+  assert.equal(plan.database_migrations_pending, 8);
+}
+
+function testReissuedVisibilityAfterProductionMaxHasNoHole() {
+  const maxRemote = "20260831120000";
+  const newVisibility = [
+    "20260901120100",
+    "20260901120200",
+    "20260901120300",
+    "20260901120400",
+  ];
+  const oldHoles = [
     "20260830120100",
     "20260830120200",
     "20260830120300",
     "20260830120400",
-    "20260831120000",
-    "20260901120000",
-  ]);
-  assert.equal(plan.database_migrations_pending, 8);
+  ];
+  const fixturePlan = planDatabaseMigrations({
+    localVersions: [maxRemote, ...newVisibility],
+    remoteVersions: [maxRemote],
+  });
+  assert.equal(fixturePlan.action, "apply");
+  assert.deepEqual(fixturePlan.pending, newVisibility);
+  assert.notEqual(fixturePlan.code, "database_migration_history_drift");
+  assert.equal(fixturePlan.code, "apply");
+  assert.equal(fixturePlan.pending.some((version) => version < maxRemote), false);
+  assert.equal(
+    oldHoles.some((version) => fixturePlan.pending.includes(version)),
+    false,
+  );
+
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  for (const hole of oldHoles) {
+    assert.equal(
+      listed.versions.includes(hole),
+      false,
+      `old hole version must leave the local set: ${hole}`,
+    );
+  }
+  for (const version of newVisibility) {
+    assert.ok(
+      listed.versions.includes(version),
+      `reissued visibility version must exist locally: ${version}`,
+    );
+  }
+  const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
+  assert.equal(remoteVersions.includes("20260830120100"), false);
+  assert.equal(remoteVersions.includes("20260830120200"), false);
+  assert.equal(remoteVersions.includes("20260830120300"), false);
+  assert.equal(remoteVersions.includes("20260830120400"), false);
+  const livePlan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions,
+  });
+  assert.equal(livePlan.action, "apply");
+  assert.notEqual(livePlan.code, "database_migration_history_drift");
+  assert.equal(livePlan.code, "apply");
+  assert.equal(livePlan.pending.some((version) => version < maxRemote), false);
+  assert.ok(livePlan.pending.every((version) => version > maxRemote));
+  for (const version of newVisibility) {
+    assert.ok(livePlan.pending.includes(version));
+  }
+  for (const hole of oldHoles) {
+    assert.equal(livePlan.pending.includes(hole), false);
+  }
 }
 
 function main() {
@@ -469,6 +597,7 @@ function main() {
   testProductionLikePendingAfterQuickOffersRestamp();
   testProductionLikePendingAfterPlaylistRestamp();
   testOrdinaryDeployAfterLatestMainHasNoHole();
+  testReissuedVisibilityAfterProductionMaxHasNoHole();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 
