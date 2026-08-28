@@ -5,9 +5,10 @@ performs a read-only safety check for pull requests to `main`. Its green
 verdict is **SAFE TO CONTINUE REVIEW**, never “safe to deploy”.
 
 The trusted job runs only on `pull_request_target`: GitHub takes that workflow
-from the protected base `main`, checks out `main`, and never checks out or
-executes PR code. It fetches the PR only as Git objects for `merge-base`,
-`rev-list`, `diff`, and `ls-tree`. Its permissions are `contents: read`,
+from the protected base `main`, creates an isolated Git object store, and never
+checks out or executes PR code. It fetches the trusted main ref, extracts the
+guard scripts with `git show <MAIN_SHA>:…`, and fetches the PR only as Git
+objects for `merge-base`, `rev-list`, `diff`, and `ls-tree`. Its permissions are `contents: read`,
 `pull-requests: read`, and `statuses: write`; it uses neither SSH nor
 production credentials.
 
@@ -25,9 +26,24 @@ production credentials.
 - duplicate migration version prefixes from the fetched PR Git tree.
 
 The separate `.github/workflows/pr-repository-validation.yml` performs
-`npm run test:database-migrations`, build, typecheck, and lint on PR code.
+`npm run test:database-migrations:ci`, build, typecheck, and lint on PR code.
 Its green result is a separate ordinary CI result, not a trusted lineage
 decision.
+
+`test:database-migrations:ci` runs the autonomous migration/repository checks:
+duplicate migration versions, migration planner, fake-Docker migration and
+baseline units, migration audit, external-identities and link-identity SQL
+units, static portions of catalog/playlist foundation SQL units, publication
+gallery SQL, topics SQL, and course-content SQL. It explicitly disables only
+the two isolated SQL executions that require an already bootstrapped
+`supabase-db` container.
+
+The unchanged `npm run test:database-migrations` remains the full
+self-hosted/local suite, including isolated catalog and playlist foundation
+SQL checks. Product-specific live checks such as
+`npm run test:catalog-visibility:rls` likewise require an isolated or staging
+database; GitHub-hosted PR Repository Validation does not claim to run their
+full SQL semantics.
 
 The production endpoint reads `process.cwd()/.deploy-commit`, which the release
 pipeline writes with the full target Git SHA. Missing or malformed metadata
@@ -96,12 +112,16 @@ does not checkout the PR. It writes one commit status directly to the validated
 GitHub API PR head SHA: **Production / PR Safety**. This context—not the
 base-SHA `pull_request_target` check-run—is the future required context.
 
-The separate **PR Repository Validation** workflow runs
-build/typecheck/lint/migration tests from the PR under ordinary `pull_request`
-semantics. It has only `contents: read`, no `statuses: write`, and cannot
-write the trusted status context. Its result does not imply trusted production
-lineage, and trusted lineage green does not imply its build/typecheck/lint
-checks passed.
+The separate **PR Repository Validation** workflow materializes the validated
+PR Git tree using `git archive` into a temporary workspace, then runs
+CI-safe migration validation, build, typecheck, and lint under ordinary
+`pull_request` semantics. It does not provision a Supabase service container:
+the full suite expects Supabase-specific auth/storage schemas, roles,
+extensions, and bootstrap state, so a plain PostgreSQL service would not be
+compatible without building a separate integration environment.
+It has only `contents: read`, no `statuses: write`, and cannot write the trusted
+status context. Its result does not imply trusted production lineage, and
+trusted lineage green does not imply its build/typecheck/lint checks passed.
 
 The bootstrap PR itself is an exception: until it is merged, current main
 cannot supply this workflow. `workflow_dispatch` is diagnostic and must be

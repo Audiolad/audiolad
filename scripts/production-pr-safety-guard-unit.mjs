@@ -153,8 +153,6 @@ assert.match(trustedWorkflow, /pull_request_target:/);
 assert.doesNotMatch(trustedWorkflow, /^\s+pull_request:/m);
 assert.match(trustedWorkflow, /workflow_dispatch:/);
 assert.match(trustedWorkflow, /pr_number:/);
-assert.match(trustedWorkflow, /fetch-depth: 0/);
-assert.match(trustedWorkflow, /persist-credentials: false/);
 assert.match(trustedWorkflow, /statuses: write/);
 assert.match(trustedWorkflow, /context='Production \/ PR Safety'/);
 assert.match(trustedWorkflow, /statuses\/\$\{PR_SHA\}/);
@@ -172,6 +170,27 @@ assert.match(trustedWorkflow, /malformed main or PR SHA/);
 assert.match(trustedWorkflow, /production-pr-safety-\$\{\{ github\.event_name \}\}-\$\{\{/);
 assert.doesNotMatch(trustedWorkflow, /\bssh\b/i);
 assert.doesNotMatch(trustedWorkflow, /DATABASE_URL|SUPABASE.*KEY|production.*secret/i);
+assert.doesNotMatch(trustedWorkflow, /actions\/checkout/);
+assert.doesNotMatch(trustedWorkflow, /\bgit submodule\b/);
+assert.doesNotMatch(trustedWorkflow, /\bgit checkout\b/);
+assert.match(trustedWorkflow, /git -C "\$\{OBJECT_STORE\}" init --quiet/);
+assert.match(
+  trustedWorkflow,
+  /fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/,
+);
+assert.match(trustedWorkflow, /TRUSTED_MAIN_SHA=.*rev-parse refs\/remotes\/origin\/main/);
+assert.match(
+  trustedWorkflow,
+  /\$\{TRUSTED_MAIN_SHA\}:scripts\/production-pr-safety-guard\.mjs/,
+);
+assert.match(
+  trustedWorkflow,
+  /\$\{TRUSTED_MAIN_SHA\}:scripts\/production-pr-safety-status\.mjs/,
+);
+assert.match(
+  trustedWorkflow,
+  /cd "\$\{OBJECT_STORE\}"\s+node "\$\{TRUSTED_DIR\}\/production-pr-safety-guard\.mjs"/,
+);
 const trustedJob = trustedWorkflow.slice(
   trustedWorkflow.indexOf("  production-pr-safety-runner:"),
 );
@@ -184,16 +203,55 @@ assert.match(
 );
 assert.doesNotMatch(validationWorkflow, /pull_request_target:/);
 assert.doesNotMatch(validationWorkflow, /statuses: write/);
-assert.match(validationWorkflow, /persist-credentials: false/);
+assert.doesNotMatch(validationWorkflow, /actions\/checkout/);
+assert.doesNotMatch(validationWorkflow, /\bgit submodule\b/);
+assert.doesNotMatch(validationWorkflow, /\bgit checkout\b/);
 assert.match(
   validationWorkflow,
   /github\.event\.pull_request\.head\.sha/,
-  "ordinary validation is the only workflow that checks out PR code",
+  "ordinary validation reads the PR SHA only from event metadata",
 );
+assert.match(validationWorkflow, /git -C "\$\{OBJECT_STORE\}" archive "\$\{PR_SHA\}" \| tar -x -C "\$\{PR_WORKSPACE\}"/);
+assert.match(validationWorkflow, /working-directory: \$\{\{ env\.PR_WORKSPACE \}\}/);
+assert.match(validationWorkflow, /\^\[0-9a-fA-F\]\{40\}\$/);
+assert.match(validationWorkflow, /\^https:\/\/github\\\.com\//);
 
 const docs = readFileSync("docs/ci-production-pr-safety.md", "utf8");
 assert.match(docs, /separate .*PR Repository Validation.*workflow/is);
 assert.match(docs, /does not write the trusted status context/);
 assert.match(docs, /commit status.*Production \/ PR Safety/is);
+assert.match(docs, /isolated Git object store/);
+assert.match(docs, /git archive/);
+assert.match(docs, /test:database-migrations:ci/);
+assert.match(docs, /full\s+self-hosted\/local suite/);
+
+const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+const ciMigrationSuite = packageJson.scripts["test:database-migrations:ci"];
+assert.ok(ciMigrationSuite, "CI-safe migration suite must exist");
+assert.match(ciMigrationSuite, /AUDIOLAD_SKIP_ISOLATED_SQL=1 node scripts\/catalog-foundation-sql-unit\.mjs/);
+assert.match(ciMigrationSuite, /AUDIOLAD_SKIP_ISOLATED_SQL=1 node scripts\/playlist-catalog-foundation-sql-unit\.mjs/);
+assert.equal(
+  validationWorkflow.includes("npm run test:database-migrations:ci"),
+  true,
+  "GitHub-hosted validation must not invoke the full self-hosted suite",
+);
+assert.equal(
+  validationWorkflow.includes("npm run test:database-migrations\n"),
+  false,
+  "GitHub-hosted validation must not require supabase-db",
+);
+
+const catalogFoundationSql = readFileSync(
+  "scripts/catalog-foundation-sql-unit.mjs",
+  "utf8",
+);
+const playlistFoundationSql = readFileSync(
+  "scripts/playlist-catalog-foundation-sql-unit.mjs",
+  "utf8",
+);
+for (const sqlUnit of [catalogFoundationSql, playlistFoundationSql]) {
+  assert.match(sqlUnit, /AUDIOLAD_SKIP_ISOLATED_SQL === "1"/);
+  assert.match(sqlUnit, /!skipIsolatedSql && \(dockerAvailable\(\) \|\| localPostgresAvailable\(\)\)/);
+}
 
 console.log("production-pr-safety-guard-unit: ok");
