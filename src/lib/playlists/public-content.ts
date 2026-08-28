@@ -7,6 +7,7 @@ export type PlaylistPublishPractice = {
   is_free: boolean | null;
   price: number | null;
   is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
   cover_image?: unknown;
 };
 
@@ -27,7 +28,11 @@ export function isPracticeEligibleForPublicPlaylist(
   }
 
   // Same as claim_free_practice: is_catalog_listed IS NOT TRUE → reject
-  if (practice.is_catalog_listed !== true) {
+  if (
+    practice.catalog_visibility === "selected_users" ||
+    practice.catalog_visibility === "unlisted" ||
+    practice.is_catalog_listed !== true
+  ) {
     return false;
   }
 

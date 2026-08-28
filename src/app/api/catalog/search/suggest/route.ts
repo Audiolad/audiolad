@@ -12,6 +12,10 @@ import {
   mapCatalogProductsToSuggestions,
 } from "@/lib/catalog/search-suggestions";
 import { normalizeCatalogTopicParam } from "@/lib/catalog/topic-filter";
+import {
+  loadOrdinaryCatalogViewer,
+  resolveCatalogViewerUserId,
+} from "@/lib/catalog/visibility-query";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,9 +43,8 @@ export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const visitorId = await readPriceVisitorId();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const userId = await resolveCatalogViewerUserId(supabase);
+    const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);
 
     const [authorResults, productResults] = await Promise.all([
       searchPublishedCatalogAuthors(supabase, {
@@ -54,8 +57,9 @@ export async function GET(request: Request) {
         topicKey,
         limit: CATALOG_PRODUCT_SUGGEST_LIMIT,
         viewer: {
+          ...ordinaryViewer,
           visitorId,
-          userId: user?.id ?? null,
+          userId,
         },
       }),
     ]);

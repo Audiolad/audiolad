@@ -61,6 +61,7 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { hasPracticePublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
+import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
@@ -476,6 +477,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (
+      "catalog_visibility" in body &&
+      (body.catalog_visibility === "listed" ||
+        body.catalog_visibility === "unlisted" ||
+        body.catalog_visibility === "selected_users")
+    ) {
+      updates.catalog_visibility = body.catalog_visibility;
+      updates.is_catalog_listed = body.catalog_visibility === "listed";
+    } else if (
       "is_catalog_listed" in body &&
       typeof body.is_catalog_listed === "boolean"
     ) {
@@ -669,7 +678,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       practice.status === "published" &&
-      hasPracticePublicIndexNowChanges(updates)
+      hasPracticePublicIndexNowChanges(updates) &&
+      shouldNotifyIndexNowByVisibility(
+        product.practice.catalog_visibility,
+        product.practice.is_catalog_listed,
+      )
     ) {
       const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
       const nextSlug = product.practice.slug;

@@ -1,5 +1,13 @@
 import type { ProductAccessResult } from "@/lib/products/access";
 import { isPracticePublished } from "@/lib/products/access";
+import {
+  isSelectedUsersCatalogVisibility,
+  parseCatalogVisibility,
+  resolvePracticeRobots,
+  shouldFollowByCatalogVisibility,
+  shouldIndexByCatalogVisibility,
+  type CatalogVisibility,
+} from "@/lib/products/catalog-visibility";
 
 export const PRACTICE_PUBLISH_PREVIEW_QUERY_VALUE = "publish";
 export const PRACTICE_PUBLISH_LISTENER_VIEW_QUERY_VALUE = "listener";
@@ -40,14 +48,37 @@ export function canActivatePublishPreviewMode(input: {
  * even with ?preview=publish. Author members (and entitled buyers of
  * unpublished/archived products) can still open the existing PDP.
  */
+export const PRACTICE_UNAVAILABLE_METADATA = {
+  title: "Аудиопродукт – АудиоЛад",
+  robots: {
+    index: false,
+    follow: false,
+  },
+} as const;
+
 export function canRevealPublicProductPage(input: {
   practiceStatus: string | null | undefined;
   access: Pick<
     ProductAccessResult,
-    "isAuthorMember" | "hasEntitlement"
+    "isAuthorMember" | "hasEntitlement" | "canSeeSelectedUsers"
   >;
+  catalogVisibility?: CatalogVisibility | string | null;
+  isCatalogListed?: boolean | null;
 }): boolean {
   if (isPracticePublished(input.practiceStatus)) {
+    if (
+      isSelectedUsersCatalogVisibility(
+        input.catalogVisibility,
+        input.isCatalogListed,
+      )
+    ) {
+      return (
+        input.access.isAuthorMember ||
+        input.access.hasEntitlement ||
+        input.access.canSeeSelectedUsers === true
+      );
+    }
+
     return true;
   }
 
@@ -109,18 +140,40 @@ export function canPublishFromPublishPreview(
 export function shouldIndexPracticePage(
   practiceStatus: string | null | undefined,
   isCatalogListed?: boolean | null,
+  catalogVisibility?: CatalogVisibility | string | null,
 ): boolean {
   if (!isPracticePublished(practiceStatus)) {
     return false;
   }
 
-  // Unlisted published products stay reachable by URL but must not be indexed.
-  if (isCatalogListed === false) {
-    return false;
-  }
-
-  return true;
+  return shouldIndexByCatalogVisibility(catalogVisibility, isCatalogListed);
 }
+
+export function shouldFollowPracticePage(
+  practiceStatus: string | null | undefined,
+  isCatalogListed?: boolean | null,
+  catalogVisibility?: CatalogVisibility | string | null,
+): boolean {
+  return shouldFollowByCatalogVisibility(
+    isPracticePublished(practiceStatus),
+    catalogVisibility,
+    isCatalogListed,
+  );
+}
+
+export function resolvePracticePageRobots(
+  practiceStatus: string | null | undefined,
+  isCatalogListed?: boolean | null,
+  catalogVisibility?: CatalogVisibility | string | null,
+) {
+  return resolvePracticeRobots({
+    published: isPracticePublished(practiceStatus),
+    catalogVisibility,
+    isCatalogListed,
+  });
+}
+
+export { parseCatalogVisibility };
 
 export function shouldTrackPracticeListenerAnalytics(input: {
   practiceStatus: string | null | undefined;
