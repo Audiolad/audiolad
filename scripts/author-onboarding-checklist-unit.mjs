@@ -575,6 +575,8 @@ function testSourceGuards() {
   const onboardingApi = read("src/app/api/author/onboarding/route.ts");
   assert.match(onboardingApi, /requireAuthorMembership/);
   assert.match(onboardingApi, /loadAuthorOnboardingChecklistState/);
+  assert.match(onboardingApi, /syncAuthorOnboardingUiState/);
+  assert.doesNotMatch(onboardingApi, /force_expanded/);
 
   const checklistUi = read(
     "src/components/author-dashboard/AuthorOnboardingChecklist.tsx",
@@ -584,14 +586,19 @@ function testSourceGuards() {
   assert.match(checklistUi, /Начните зарабатывать на своих аудиопродуктах/);
   assert.match(checklistUi, /Пока недоступно/);
   assert.match(checklistUi, /Скоро будет доступно/);
-  assert.match(checklistUi, /Поздравляем/);
-  assert.match(checklistUi, /Ваша страница автора полностью готова/);
-  assert.match(checklistUi, /Показать стартовый чек-лист/);
-  assert.match(checklistUi, /useAuthorOnboardingUiPreference/);
-  assert.match(checklistUi, /journeyComplete/);
+  assert.match(checklistUi, /Скрыть сейчас/);
+  assert.match(checklistUi, /Показать/);
+  assert.match(checklistUi, /Коммерческий старт завершён/);
+  assert.doesNotMatch(checklistUi, /Поздравляем/);
+  assert.doesNotMatch(checklistUi, /Ваша страница автора полностью готова/);
+  assert.doesNotMatch(checklistUi, /Показать стартовый чек-лист/);
+  assert.doesNotMatch(checklistUi, /useAuthorOnboardingUiPreference/);
+  assert.doesNotMatch(checklistUi, /journeyComplete/);
+  assert.match(checklistUi, /localShow/);
+  assert.match(checklistUi, /shouldBridgeLegacyOnboardingDismiss/);
   assert.match(
     read("src/lib/author-dashboard/onboarding-preference-store.ts"),
-    /buildAuthorOnboardingStorageKey/,
+    /readLegacyOnboardingDismissed/,
   );
   assert.match(
     read("src/lib/author-dashboard/onboarding-checklist.ts"),

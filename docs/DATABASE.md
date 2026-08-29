@@ -203,6 +203,30 @@ Max 6 контактов на автора (`sort_order < 6`).
 
 RLS: публичный SELECT только `is_visible = true`. Members (`owner`/`editor`) — полный CRUD своих контактов. `anon`/`authenticated` SELECT; `authenticated`/`service_role` ALL.
 
+#### author_onboarding_ui_state (2026-09-05)
+
+Миграция: `20260905120000_author_onboarding_ui_state.sql`.
+
+Приватное UI-состояние чек-листов кабинета автора. Не колонки `authors` и не `author_settings` jsonb. Presentation (`expanded` / `compact`) не хранится: только epoch-метки.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `author_id` | uuid PK | FK → `authors.id` ON DELETE CASCADE |
+| `free_completed_at` | timestamptz NULL | первый `now()` эпохи, когда free = 100%. Не перезаписывается, пока complete |
+| `free_hidden_at` | timestamptz NULL | `now()` по «Скрыть сейчас». Только если free complete |
+| `commercial_completed_at` | timestamptz NULL | то же для commercial (6 required steps; `payout_details` не входит в 100%) |
+| `commercial_hidden_at` | timestamptz NULL | то же для commercial |
+| `updated_at` | timestamptz | trigger `set_author_onboarding_ui_state_updated_at` |
+
+Incomplete → `completed_at` и `hidden_at` этой стороны очищаются (новая эпоха). Следующий rising edge ставит новый `completed_at`.
+
+RPC (service_role only, после `requireAuthorMembership` в Next.js):
+
+- `sync_author_onboarding_ui_completion(author_id, free_complete, commercial_complete)` — GET stamp/clear
+- `hide_author_onboarding_checklist(author_id, 'free' \| 'commercial')` — PATCH hide
+
+RLS: ENABLE, нет anon SELECT. Members (`owner`/`editor`) SELECT/INSERT/UPDATE своей строки. `service_role` ALL. DELETE-политики нет.
+
 #### RLS
 
 RLS **включён**.

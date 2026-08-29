@@ -408,6 +408,12 @@ function testRepoOneFileOneVersion() {
         "20260903120000_search_practice_visibility_users.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260905120000_author_onboarding_ui_state.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -468,8 +474,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260902120200",
     "20260903120000",
     "20260904120000",
+    "20260905120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 28);
+  assert.equal(plan.database_migrations_pending, 29);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -509,8 +516,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260902120200",
     "20260903120000",
     "20260904120000",
+    "20260905120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 22);
+  assert.equal(plan.database_migrations_pending, 23);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -557,8 +565,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260902120200",
     "20260903120000",
     "20260904120000",
+    "20260905120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 13);
+  assert.equal(plan.database_migrations_pending, 14);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
