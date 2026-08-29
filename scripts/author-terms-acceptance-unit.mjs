@@ -192,7 +192,8 @@ assert.deepEqual(stepIds.slice(0, 3), [
   "terms_acceptance",
   "paid_product",
 ]);
-assert.equal(stepIds.at(-1), "payout_details");
+assert.equal(stepIds.at(-1), "publish_paid_product");
+assert.equal(stepIds.includes("payout_details"), false);
 assert.equal(pendingTerms.steps[1].state, "active");
 assert.equal(pendingTerms.steps[2].state, "locked");
 assert.equal(pendingTerms.steps.at(-1)?.state, "locked");
@@ -218,10 +219,13 @@ const acceptedTerms = evaluateCommercialOnboardingChecklist({
 assert.equal(acceptedTerms.steps[1].state, "completed");
 assert.equal(acceptedTerms.steps[2].id, "paid_product");
 assert.equal(acceptedTerms.steps[2].state, "active");
-assert.equal(acceptedTerms.steps.at(-1)?.id, "payout_details");
-assert.equal(acceptedTerms.steps.at(-1)?.statusLabel, "Необязательно");
+assert.equal(acceptedTerms.steps.at(-1)?.id, "publish_paid_product");
+assert.equal(
+  acceptedTerms.steps.some((step) => step.id === "payout_details"),
+  false,
+);
 assert.equal(acceptedTerms.complete, false);
-assert.equal(acceptedTerms.totalCount, 6);
+assert.equal(acceptedTerms.totalCount, 5);
 
 // error code contract
 assert.equal(AUTHOR_TERMS_ACCEPTANCE_REQUIRED, "AUTHOR_TERMS_ACCEPTANCE_REQUIRED");

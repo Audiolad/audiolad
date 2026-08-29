@@ -74,6 +74,31 @@ export function resolveChecklistPresentation(input: {
  * Mirrors SQL epoch stamp/clear. `nowIso` is only used in tests; production
  * stamps with Postgres `now()` so the 3-day clock is the database clock.
  */
+/**
+ * One-time legacy-complete decision for authors who already satisfy the
+ * current commercial 5-step rule but were never stamped complete (old-world
+ * 5/6: promotion and/or payout still missing).
+ *
+ * Must not treat «first stamp ever» as legacy: a new author who finishes
+ * step 5 after this ships goes through GET `completed_at = now()` with
+ * `hidden_at` null and the normal 3-day grace.
+ */
+export function planLegacyCommercialCompleteBackfill(input: {
+  commercialComplete: boolean;
+  existingCompletedAt: string | null;
+  existingHiddenAt: string | null;
+  nowIso: string;
+}): OnboardingChecklistUiFields | null {
+  if (!input.commercialComplete || input.existingCompletedAt) {
+    return null;
+  }
+
+  return {
+    completedAt: input.nowIso,
+    hiddenAt: input.existingHiddenAt ?? input.nowIso,
+  };
+}
+
 export function planOnboardingUiEpochSync(input: {
   complete: boolean;
   completedAt: string | null;

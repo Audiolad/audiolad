@@ -144,7 +144,10 @@ function testOnboardingCommercialApplicationFlow() {
   assert.equal(submittedApp.actionLabel, "Смотреть заявку");
   assert.equal(stepById(submitted, "terms_acceptance").state, "locked");
   assert.equal(stepById(submitted, "paid_product").state, "locked");
-  assert.equal(stepById(submitted, "payout_details").state, "locked");
+  assert.equal(
+    submitted.steps.some((step) => step.id === "payout_details"),
+    false,
+  );
   assert.equal(authorAccessAllowsPaidProducts("commercial_pending"), false);
 
   // 7. In review
@@ -200,7 +203,6 @@ function testOnboardingCommercialApplicationFlow() {
   const approvedApp = stepById(approved, "commercial_application");
   const approvedTerms = stepById(approved, "terms_acceptance");
   const approvedPaid = stepById(approved, "paid_product");
-  const approvedPayout = stepById(approved, "payout_details");
   assert.equal(approvedApp.state, "completed");
   assert.equal(approvedTerms.state, "active");
   assert.equal(approvedTerms.actionLabel, "Открыть условия");
@@ -214,10 +216,9 @@ function testOnboardingCommercialApplicationFlow() {
     approvedPaid.hint ?? "",
     /Сначала нужна одобренная коммерческая заявка/,
   );
-  assert.equal(approvedPayout.state, "locked");
-  assert.match(
-    approvedPayout.hint ?? "",
-    /Сначала примите Авторские условия сотрудничества/,
+  assert.equal(
+    approved.steps.some((step) => step.id === "payout_details"),
+    false,
   );
 
   // Terms accepted while still commercial_onboarding: payout may open,
@@ -239,10 +240,9 @@ function testOnboardingCommercialApplicationFlow() {
     "completed",
   );
   assert.equal(stepById(termsDoneOnboarding, "paid_product").state, "locked");
-  assert.equal(stepById(termsDoneOnboarding, "payout_details").state, "active");
   assert.equal(
-    stepById(termsDoneOnboarding, "payout_details").actionLabel,
-    "Заполнить данные",
+    termsDoneOnboarding.steps.some((step) => step.id === "payout_details"),
+    false,
   );
   assert.equal(authorAccessAllowsPaidProducts("commercial_onboarding"), false);
 
@@ -269,7 +269,10 @@ function testOnboardingCommercialApplicationFlow() {
     stepById(commercialActive, "paid_product").actionLabel,
     "Создать платный продукт",
   );
-  assert.equal(stepById(commercialActive, "payout_details").state, "active");
+  assert.equal(
+    commercialActive.steps.some((step) => step.id === "payout_details"),
+    false,
+  );
 
   // 12. Rejected — no reapply CTA
   const rejected = evaluateCommercial({

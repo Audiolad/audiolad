@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import type { CommercialOnboardingStepState } from "@/lib/author-dashboard/commercial-onboarding";
+import {
+  isCommercialOnboardingChecklistStepId,
+  type CommercialOnboardingStepState,
+} from "@/lib/author-dashboard/commercial-onboarding";
 import {
   type AuthorOnboardingChecklistState,
   type AuthorOnboardingStepState,
@@ -672,9 +675,11 @@ export default function AuthorOnboardingChecklist({
         />
       ) : null}
       <ol className="mt-5 space-y-3">
-        {checklist.commercial.steps.map((step) => (
-          <CommercialStepCard key={step.id} step={step} />
-        ))}
+        {checklist.commercial.steps
+          .filter((step) => isCommercialOnboardingChecklistStepId(step.id))
+          .map((step) => (
+            <CommercialStepCard key={step.id} step={step} />
+          ))}
       </ol>
     </section>
   );
