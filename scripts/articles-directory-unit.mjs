@@ -108,6 +108,7 @@ import { TARO_POISK_RABOTY_PAGE } from "../src/lib/seo/listens/content/taro-pois
 import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/naydu-li-ya-rabotu-taro.ts";
 import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/vozmut-li-menya-na-rabotu-taro.ts";
 import { TARO_MENYAT_LI_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-menyat-li-rabotu.ts";
+import { TARO_RABOTA_I_KARERA_PAGE } from "../src/lib/seo/listens/content/taro-rabota-i-karera.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2466,6 +2467,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightyFirstListenHref}`,
     ),
     "directory JSON-LD includes eighty-first listen href",
+  );
+
+  const eightySecondListenHref = "/listens/taro-rabota-i-karera";
+  const eightySecondListenCard = data.articles.find((card) => card.href === eightySecondListenHref);
+  assert(eightySecondListenCard, "eighty-second indexable listen page is listed");
+  assert(
+    eightySecondListenCard.title === "Таро работа и карьера – расклад на профессиональный путь | АудиоЛад",
+    "eighty-second listen directory title",
+  );
+  assert(
+    eightySecondListenCard.description === TARO_RABOTA_I_KARERA_PAGE.description,
+    "eighty-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-rabota-i-karera",
+    ),
+    "no /articles duplicate for eighty-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightySecondListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-second listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
