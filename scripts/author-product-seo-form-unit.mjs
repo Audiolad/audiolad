@@ -23,8 +23,10 @@ import {
 import { normalizeClearableTextField } from "../src/lib/author-products/text-fields.ts";
 import {
   hasPracticeSeoContentChanges,
+  getPracticeSeoUsageHeading,
   parsePracticeSeoContent,
 } from "../src/lib/products/practice-seo-content.ts";
+import { validateSeoSecondaryQueries } from "../src/lib/author-products/limits.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -262,6 +264,11 @@ assert.deepEqual(canonicalSeoContent, {
   relatedListenSlugs: ["meditatsiya-na-dengi-slushat-onlayn-besplatno"],
 });
 assert.equal(hasPracticeSeoContentChanges(canonicalSeoContent, canonicalSeoContent), false);
+assert.equal(getPracticeSeoUsageHeading("practice"), "Как использовать практику");
+assert.equal(getPracticeSeoUsageHeading("music"), "Как слушать музыку");
+assert.equal(getPracticeSeoUsageHeading("audio_post"), "Как использовать");
+assert.equal(validateSeoSecondaryQueries(["сон", "СОН"]), "seo_secondary_queries_invalid");
+assert.equal(validateSeoSecondaryQueries(["сон", "отдых"]), null);
 assert.equal(
   parsePracticeSeoContent({
     usage_items: [],
@@ -292,6 +299,10 @@ assert.ok(
 );
 assert.match(seoSection, /disabled:cursor-not-allowed disabled:opacity-60/);
 assert.match(seoSection, /api\/author\/seo\/listen-options/);
+assert.match(seoSection, /api\/author\/seo\/related-product-options/);
+assert.match(seoSection, /relatedProductSourceId/);
+assert.match(seoSection, /Поиск связанных продуктов/);
+assert.match(seoSection, /Удалить фразу/);
 assert.doesNotMatch(seoSection, /listListenPageDefinitions/);
 assert.match(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
@@ -309,6 +320,10 @@ assert.match(patch, /validateRelatedPracticeTargets/);
 assert.match(patch, /hasPracticeSeoContentChanges/);
 assert.match(patch, /seoContentChanged/);
 assert.match(patch, /scalarUpdates/);
+assert.match(patch, /const currentProduct = await getAuthorProductDetail/);
+assert.match(patch, /const currentPractice = currentProduct\.practice/);
+assert.match(patch, /if \(hasChanges\) \{\s+await syncPracticeAudioCompatibility/s);
+assert.match(patch, /if \(hasChanges\) \{\s+await recordAuthorSupportAudit/s);
 
 const seoContentSource = read("src/lib/products/practice-seo-content.ts");
 assert.match(seoContentSource, /\.rpc\("replace_practice_seo_content"/);
@@ -317,5 +332,22 @@ const migration = read("supabase/migrations/20260908120000_product_seo_v2.sql");
 assert.match(migration, /CREATE OR REPLACE FUNCTION public\.replace_practice_seo_content/);
 assert.match(migration, /REVOKE INSERT, UPDATE, DELETE ON TABLE public\.practice_seo_usage_items FROM authenticated/);
 assert.match(migration, /is_catalog_listed IS TRUE/);
+const hardeningMigration = read(
+  "supabase/migrations/20260909090000_harden_product_seo_v2.sql",
+);
+assert.match(hardeningMigration, /SECURITY DEFINER/);
+assert.match(hardeningMigration, /SET search_path = pg_catalog, pg_temp/);
+assert.match(hardeningMigration, /practice_seo_not_authenticated/);
+assert.match(hardeningMigration, /NOT public\.can_manage_practice_seo/);
+assert.match(hardeningMigration, /REVOKE INSERT, UPDATE, DELETE ON TABLE/);
+assert.match(hardeningMigration, /count\(DISTINCT lower\(btrim\(value\)\)\)/);
+const relatedOptionsRoute = read(
+  "src/app/api/author/seo/related-product-options/route.ts",
+);
+assert.match(relatedOptionsRoute, /requirePracticeAccess\(sourcePracticeId\)/);
+assert.match(relatedOptionsRoute, /admin_panel\.access/);
+assert.match(relatedOptionsRoute, /\.limit\(MAX_RESULTS\)/);
+assert.match(relatedOptionsRoute, /— \$\{authorName\}/);
+assert.doesNotMatch(relatedOptionsRoute, /author_id.*searchParams/);
 
 console.log("author-product-seo-form-unit: ok");

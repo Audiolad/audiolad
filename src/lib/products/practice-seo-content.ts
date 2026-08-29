@@ -19,6 +19,13 @@ export type PublicPracticeSeoContent = {
   relatedListens: Array<{ title: string; href: string }>;
 };
 
+/** Keep editor and public-page wording aligned for the ordered usage section. */
+export function getPracticeSeoUsageHeading(productKind?: string | null): string {
+  if (productKind === "music") return "Как слушать музыку";
+  if (productKind === "practice") return "Как использовать практику";
+  return "Как использовать";
+}
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

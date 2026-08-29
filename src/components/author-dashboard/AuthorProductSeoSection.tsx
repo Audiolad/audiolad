@@ -9,7 +9,10 @@ import {
   buildProductSeoPreview,
   evaluateProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
-import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
+import {
+  getPracticeSeoUsageHeading,
+  type PracticeSeoContentInput,
+} from "@/lib/products/practice-seo-content";
 
 type SelectOption = { value: string; label: string };
 
@@ -41,6 +44,7 @@ export type AuthorProductSeoSectionProps = {
   seoAbout: string;
   seoContent: PracticeSeoContentInput;
   relatedProductOptions: SelectOption[];
+  relatedProductSourceId?: string;
   publicPath: string;
   fieldErrors: {
     seoPrimaryQuery?: string;
@@ -74,6 +78,7 @@ export default function AuthorProductSeoSection({
   seoAbout,
   seoContent,
   relatedProductOptions,
+  relatedProductSourceId,
   publicPath,
   fieldErrors,
   onChange,
@@ -81,12 +86,41 @@ export default function AuthorProductSeoSection({
 }: AuthorProductSeoSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [listenOptions, setListenOptions] = useState<SelectOption[]>([]);
+  const [relatedProductQuery, setRelatedProductQuery] = useState("");
+  const [searchedRelatedProducts, setSearchedRelatedProducts] =
+    useState<SelectOption[]>(relatedProductOptions);
   useEffect(() => {
     void fetch("/api/author/seo/listen-options")
       .then((response) => response.ok ? response.json() : { options: [] })
       .then((payload: { options?: SelectOption[] }) => setListenOptions(payload.options ?? []))
       .catch(() => setListenOptions([]));
   }, []);
+  useEffect(() => {
+    if (!relatedProductSourceId) {
+      setSearchedRelatedProducts(relatedProductOptions);
+      return;
+    }
+
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      source: relatedProductSourceId,
+      q: relatedProductQuery,
+    });
+    void fetch(`/api/author/seo/related-product-options?${query}`, {
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : { options: [] })
+      .then((payload: { options?: SelectOption[] }) =>
+        setSearchedRelatedProducts(payload.options ?? []),
+      )
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setSearchedRelatedProducts([]);
+        }
+      });
+
+    return () => controller.abort();
+  }, [relatedProductSourceId, relatedProductOptions, relatedProductQuery]);
   const seoInput = {
     title,
     subtitle,
@@ -174,7 +208,7 @@ export default function AuthorProductSeoSection({
       </label>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
-        <p className="text-sm font-medium">Как использовать</p>
+        <p className="text-sm font-medium">{getPracticeSeoUsageHeading(productKind)}</p>
         {seoContent.usageItems.map((item, index) => (
           <div className="mt-2 flex gap-2" key={`usage-${index}`}>
             <input
@@ -207,11 +241,19 @@ export default function AuthorProductSeoSection({
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">Связанные продукты</p>
+        <input
+          aria-label="Поиск связанных продуктов"
+          value={relatedProductQuery}
+          disabled={disabled || !relatedProductSourceId}
+          onChange={(event) => setRelatedProductQuery(event.target.value)}
+          className="mt-2 w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2"
+          placeholder={relatedProductSourceId ? "Поиск по названию" : "Сначала сохраните продукт"}
+        />
         {seoContent.relatedPracticeIds.map((id, index) => (
           <div className="mt-2 flex gap-2" key={`product-${index}`}>
             <select value={id} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
               <option value="">Выберите опубликованный продукт</option>
-              {relatedProductOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {searchedRelatedProducts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, -1) } })}>↑</button>
             <button type="button" disabled={disabled || index === seoContent.relatedPracticeIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, 1) } })}>↓</button>
@@ -237,30 +279,44 @@ export default function AuthorProductSeoSection({
         {seoContent.relatedListenSlugs.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: [...seoContent.relatedListenSlugs, ""] } })}>+ Добавить страницу</button> : null}
       </div>
 
-      <label className="mt-4 block">
+      <div className="mt-4">
         <span className="mb-2 block text-sm font-medium">Дополнительные поисковые фразы</span>
-        <textarea
-          value={seoSecondaryQueries.join("\n")}
-          maxLength={(PRODUCT_CONTENT_LIMITS.seoSecondaryQuery + 1) * PRODUCT_CONTENT_LIMITS.seoSecondaryQueries}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange({
-              seoSecondaryQueries: event.target.value
-                .split("\n")
-                .map((item) => item.trim())
-                .filter(Boolean)
-                .slice(0, PRODUCT_CONTENT_LIMITS.seoSecondaryQueries),
-            })
-          }
-          rows={3}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-          placeholder="Одна фраза в строке"
-        />
+        <div className="flex flex-wrap gap-2">
+          {seoSecondaryQueries.map((query, index) => (
+            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
+              {query}
+              <button
+                type="button"
+                aria-label={`Удалить фразу ${query}`}
+                disabled={disabled}
+                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        {seoSecondaryQueries.length < PRODUCT_CONTENT_LIMITS.seoSecondaryQueries ? (
+          <input
+            aria-label="Новая дополнительная поисковая фраза"
+            disabled={disabled}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              const value = event.currentTarget.value.trim();
+              if (!value || seoSecondaryQueries.some((item) => item.localeCompare(value, "ru", { sensitivity: "accent" }) === 0)) return;
+              onChange({ seoSecondaryQueries: [...seoSecondaryQueries, value] });
+              event.currentTarget.value = "";
+            }}
+            className="mt-2 w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder="Введите фразу и нажмите Enter"
+          />
+        ) : null}
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Необязательно. До 10 фраз для внутренней SEO-подсказки; публично они не выводятся.
         </p>
         {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
-      </label>
+      </div>
 
       <label
         className="mt-4 block"

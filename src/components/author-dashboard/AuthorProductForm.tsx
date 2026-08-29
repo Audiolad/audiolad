@@ -2623,6 +2623,7 @@ export default function AuthorProductForm({
           seoAbout={form.seoAbout}
           seoContent={form.seoContent}
           relatedProductOptions={relatedProductOptions}
+          relatedProductSourceId={practiceId || undefined}
           publicPath={publicPath}
           fieldErrors={{
             seoPrimaryQuery: fieldErrors.seoPrimaryQuery,

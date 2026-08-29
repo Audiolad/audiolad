@@ -79,7 +79,6 @@ import { hasPermission } from "@/lib/auth/platform-access";
 import {
   parsePracticeSeoContent,
   hasPracticeSeoContentChanges,
-  loadAuthorPracticeSeoContent,
   replacePracticeSeoContent,
   validateRelatedPracticeTargets,
 } from "@/lib/products/practice-seo-content";
@@ -759,16 +758,22 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const previousSlug = practice.slug;
+    // requirePracticeMutationAccess intentionally selects only authorization
+    // fields. Reload the complete mutable row immediately before diffing so a
+    // full editor save never mistakes omitted fields for changes.
+    const currentProduct = await getAuthorProductDetail(supabase, id);
+    if (!currentProduct) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    const currentPractice = currentProduct.practice;
+    const previousSlug = currentPractice.slug;
     const scalarUpdates = Object.fromEntries(
       Object.entries(updates).filter(([key, value]) => !samePublicValue(
-        (practice as Record<string, unknown>)[key],
+        (currentPractice as Record<string, unknown>)[key],
         value,
       )),
     );
-    const previousSeoContent = seoContent
-      ? await loadAuthorPracticeSeoContent(supabase, id)
-      : null;
+    const previousSeoContent = seoContent ? currentProduct.seo_content : null;
     const seoContentChanged = Boolean(
       seoContent &&
         previousSeoContent &&
@@ -809,7 +814,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       await replacePracticeSeoContent(supabase, id, seoContent);
     }
 
-    await syncPracticeAudioCompatibility(supabase, id);
+    const hasChanges =
+      Object.keys(scalarUpdates).length > 0 || seoContentChanged;
+    if (hasChanges) {
+      await syncPracticeAudioCompatibility(supabase, id);
+    }
 
     const changedFields = [
       ...Object.keys(scalarUpdates),
@@ -822,17 +831,19 @@ export async function PATCH(request: Request, context: RouteContext) {
           ]
         : []),
     ];
-    await recordAuthorSupportAudit({
-      action: "product_updated",
-      resourceType: "practice",
-      resourceId: id,
-      metadata: {
-        changed_fields: changedFields,
-        ...(Object.prototype.hasOwnProperty.call(updates, "format")
-          ? { format: updates.format }
-          : {}),
-      },
-    });
+    if (hasChanges) {
+      await recordAuthorSupportAudit({
+        action: "product_updated",
+        resourceType: "practice",
+        resourceId: id,
+        metadata: {
+          changed_fields: changedFields,
+          ...(Object.prototype.hasOwnProperty.call(updates, "format")
+            ? { format: updates.format }
+            : {}),
+        },
+      });
+    }
 
     const product = await getAuthorProductDetail(supabase, id);
 

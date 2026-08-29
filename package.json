@@ -120,6 +120,7 @@
     "test:indexnow": "npx tsx scripts/indexnow-unit.mjs",
     "test:indexnow-hooks": "npx tsx scripts/indexnow-hooks-unit.mjs",
     "test:product-seo": "npx tsx scripts/product-seo-metadata-unit.mjs && npx tsx scripts/author-product-seo-form-unit.mjs",
+    "test:product-seo:isolated": "node scripts/product-seo-v2-isolated.mjs",
     "test:yandex-webmaster": "npx tsx scripts/yandex-webmaster-unit.mjs && npx tsx scripts/yandex-webmaster-hooks-unit.mjs",
     "test:studio-guest-security": "npx tsx scripts/studio-guest-security-unit.mts",
     "test:studio-guest-limits": "npx tsx scripts/studio-guest-limits-unit.mts",

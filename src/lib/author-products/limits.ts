@@ -198,6 +198,12 @@ export function validateSeoTitleLength(
 export function validateSeoSecondaryQueries(
   values: unknown,
 ): ProductFieldErrorCode | null {
+  const normalized = Array.isArray(values)
+    ? values.map((value) =>
+        typeof value === "string" ? value.trim().toLocaleLowerCase() : value,
+      )
+    : [];
+
   if (
     !Array.isArray(values) ||
     values.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQueries ||
@@ -207,6 +213,7 @@ export function validateSeoSecondaryQueries(
         !value.trim() ||
         value.trim().length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery,
     )
+    || new Set(normalized).size !== normalized.length
   ) {
     return "seo_secondary_queries_invalid";
   }

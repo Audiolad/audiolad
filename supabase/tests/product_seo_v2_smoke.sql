@@ -132,6 +132,41 @@ BEGIN
   ) IS NOT TRUE THEN
     RAISE EXCEPTION 'authenticated cannot execute atomic product SEO replacement RPC';
   END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'public.replace_practice_seo_content(uuid,jsonb,jsonb,jsonb,jsonb)',
+    'EXECUTE'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'anon must not execute atomic product SEO replacement RPC';
+  END IF;
+
+  IF (
+    SELECT prosecdef
+    FROM pg_proc
+    WHERE oid = 'public.replace_practice_seo_content(uuid,jsonb,jsonb,jsonb,jsonb)'::regprocedure
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'atomic product SEO replacement RPC must be SECURITY DEFINER';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM aclexplode(
+      coalesce(
+        (
+          SELECT relacl
+          FROM pg_class
+          WHERE oid = 'public.practice_seo_usage_items'::regclass
+        ),
+        acldefault('r', (SELECT relowner FROM pg_class WHERE oid = 'public.practice_seo_usage_items'::regclass))
+      )
+    ) AS privilege
+    JOIN pg_roles AS role ON role.oid = privilege.grantee
+    WHERE role.rolname IN ('anon', 'authenticated')
+      AND privilege.privilege_type IN ('INSERT', 'UPDATE', 'DELETE')
+  ) THEN
+    RAISE EXCEPTION 'direct child DML must be revoked from anon and authenticated';
+  END IF;
 END;
 $$;
 
