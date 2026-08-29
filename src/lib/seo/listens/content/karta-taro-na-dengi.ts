@@ -185,6 +185,14 @@ export const KARTA_TARO_NA_DENGI_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Или:" },
         { kind: "paragraph", text: "«Помнить о своей финансовой цели»." },
         { kind: "paragraph", text: "Так карта остаётся визуальным символом, а не превращается в обещание денежного результата." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если карту ставят на экран телефона, есть материал " },
+            { href: "/listens/taro-na-dengi-na-zastavku-telefona", label: "Таро на деньги на заставку телефона" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

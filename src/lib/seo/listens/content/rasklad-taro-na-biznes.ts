@@ -344,6 +344,22 @@ export const RASKLAD_TARO_NA_BIZNES_PAGE = assertListenPageDefinition({
           "финансовый резерв.",
         ]},
         { kind: "paragraph", text: "Но если главный вопрос касается именно денег бизнеса, выручки, расходов или финансового потока, это уже более узкий тип анализа." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для такой узкой финансовой схемы есть отдельный " },
+            { href: "/listens/rasklad-taro-na-biznes-i-dengi", label: "расклад Таро на бизнес и деньги" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Шире денежную сторону своего дела можно посмотреть в материале " },
+            { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+            { text: "." },
+          ],
+        },
         { kind: "paragraph", text: "В текущей схеме финансовая тема остаётся частью общей бизнес-ситуации." },
         {
           kind: "rich_paragraph",
@@ -419,6 +435,14 @@ export const RASKLAD_TARO_NA_BIZNES_PAGE = assertListenPageDefinition({
           "менять цены.",
         ]},
         { kind: "paragraph", text: "Карты не заменяют бизнес-аналитику, финансовый расчёт, договоры, бухгалтера, юриста, исследование рынка и реальные тесты." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если запрос привычно называют гаданием, можно посмотреть " },
+            { href: "/listens/gadanie-taro-na-biznes", label: "гадание Таро на бизнес" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

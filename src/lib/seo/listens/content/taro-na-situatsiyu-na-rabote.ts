@@ -390,6 +390,14 @@ export const TARO_NA_SITUATSIYU_NA_RABOTE_PAGE = assertListenPageDefinition({
           "Какую свою позицию мне стоит объяснить яснее?",
         ]},
         { kind: "paragraph", text: "Так фокус остаётся на конкретной ситуации, а не на поиске врагов." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если сложная ситуация связана с коллегами или начальством, есть материал " },
+            { href: "/listens/taro-otnosheniya-na-rabote", label: "Таро отношения на работе" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

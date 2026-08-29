@@ -325,6 +325,14 @@ export const TARO_RABOTA_I_FINANSY_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Поэтому перед картами полезно спросить:" },
         { kind: "paragraph", text: "«Что именно меня беспокоит – работа сама по себе или её финансовая сторона?»" },
         { kind: "paragraph", text: "Этот вопрос помогает не смешивать разные темы." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если человек сравнивает зарплату найма и доход своего дела, есть материал " },
+            { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -405,6 +413,14 @@ export const TARO_RABOTA_I_FINANSY_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Если решение существенно влияет на доход или профессиональную ситуацию, важно оценить реальные условия и риски." },
         { kind: "paragraph", text: "Таро может помочь поставить вопрос." },
         { kind: "paragraph", text: "Решение всё равно принимает человек на основании реальной информации." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос касается выручки, расходов и прибыли бизнеса, отдельно разобрана тема " },
+            { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

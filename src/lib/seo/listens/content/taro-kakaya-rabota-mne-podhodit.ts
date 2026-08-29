@@ -237,6 +237,14 @@ export const TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "или:" },
         { kind: "paragraph", text: "«Вам обязательно нужно идти в продажи»." },
         { kind: "paragraph", text: "Они могут стать поводом подумать, какой тип задач и рабочей среды вызывает больший интерес." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос уже не о сфере, а о выборе между наймом и своим делом, есть материал " },
+            { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
