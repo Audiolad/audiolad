@@ -79,7 +79,7 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             </p>
           </section>
         ) : null}
-        <PracticeSeoContentSections content={seoContent} />
+        <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

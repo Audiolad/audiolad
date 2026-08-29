@@ -78,6 +78,8 @@ import { slugifyTitle } from "@/lib/author-products/utils";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
   parsePracticeSeoContent,
+  hasPracticeSeoContentChanges,
+  loadAuthorPracticeSeoContent,
   replacePracticeSeoContent,
   validateRelatedPracticeTargets,
 } from "@/lib/products/practice-seo-content";
@@ -85,6 +87,10 @@ import {
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+function samePublicValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
@@ -224,9 +230,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const updates: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
+    const updates: Record<string, unknown> = {};
 
     if ("title" in body && typeof body.title === "string") {
       const title = body.title.trim();
@@ -756,12 +760,33 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const previousSlug = practice.slug;
-    const { data: updatedPractice, error: updateError } = await supabase
-      .from("practices")
-      .update(updates)
-      .eq("id", id)
-      .select("id, title, subtitle, description, format, updated_at")
-      .maybeSingle();
+    const scalarUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => !samePublicValue(
+        (practice as Record<string, unknown>)[key],
+        value,
+      )),
+    );
+    const previousSeoContent = seoContent
+      ? await loadAuthorPracticeSeoContent(supabase, id)
+      : null;
+    const seoContentChanged = Boolean(
+      seoContent &&
+        previousSeoContent &&
+        hasPracticeSeoContentChanges(previousSeoContent, seoContent),
+    );
+
+    let updatedPractice: { id: string } | null = { id };
+    let updateError: { code?: string; message: string } | null = null;
+    if (Object.keys(scalarUpdates).length) {
+      const result = await supabase
+        .from("practices")
+        .update({ ...scalarUpdates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+      updatedPractice = result.data;
+      updateError = result.error;
+    }
 
     if (updateError) {
       console.error("author_product_update_error", {
@@ -780,15 +805,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
-    if (seoContent) {
+    if (seoContentChanged && seoContent) {
       await replacePracticeSeoContent(supabase, id, seoContent);
     }
 
     await syncPracticeAudioCompatibility(supabase, id);
 
     const changedFields = [
-      ...Object.keys(updates).filter((key) => key !== "updated_at"),
-      ...(seoContent
+      ...Object.keys(scalarUpdates),
+      ...(seoContentChanged
         ? [
             "seo_usage_items",
             "seo_faq_items",
@@ -818,7 +843,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (
       practice.status === "published" &&
       hasPracticePublicIndexNowChanges(
-        seoContent ? { ...updates, seo_content: seoContent } : updates,
+        seoContentChanged
+          ? { ...scalarUpdates, seo_content: seoContent }
+          : scalarUpdates,
       ) &&
       shouldNotifyIndexNowByVisibility(
         product.practice.catalog_visibility,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   PRODUCT_CONTENT_LIMITS,
@@ -10,7 +10,8 @@ import {
   evaluateProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
-import { listListenPageDefinitions } from "@/lib/seo/listens/registry";
+
+type SelectOption = { value: string; label: string };
 
 function CharCounter({ value, max }: { value: string; max: number }) {
   return (
@@ -39,11 +40,14 @@ export type AuthorProductSeoSectionProps = {
   seoDescription: string;
   seoAbout: string;
   seoContent: PracticeSeoContentInput;
+  relatedProductOptions: SelectOption[];
   publicPath: string;
   fieldErrors: {
     seoPrimaryQuery?: string;
+    seoSecondaryQueries?: string;
     seoTitle?: string;
     seoDescription?: string;
+    seoAbout?: string;
   };
   onChange: (
     patch: Partial<{
@@ -69,12 +73,20 @@ export default function AuthorProductSeoSection({
   seoDescription,
   seoAbout,
   seoContent,
+  relatedProductOptions,
   publicPath,
   fieldErrors,
   onChange,
   disabled = false,
 }: AuthorProductSeoSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [listenOptions, setListenOptions] = useState<SelectOption[]>([]);
+  useEffect(() => {
+    void fetch("/api/author/seo/listen-options")
+      .then((response) => response.ok ? response.json() : { options: [] })
+      .then((payload: { options?: SelectOption[] }) => setListenOptions(payload.options ?? []))
+      .catch(() => setListenOptions([]));
+  }, []);
   const seoInput = {
     title,
     subtitle,
@@ -85,6 +97,9 @@ export default function AuthorProductSeoSection({
     seoTitle,
     seoDescription,
     seoAbout,
+    seoUsageItems: seoContent.usageItems.map((item) => item.content),
+    seoFaqCount: seoContent.faqItems.filter((item) => item.question.trim() && item.answer.trim()).length,
+    seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length + seoContent.relatedListenSlugs.filter(Boolean).length,
     publicPath,
   };
   const preview = buildProductSeoPreview(seoInput);
@@ -194,13 +209,16 @@ export default function AuthorProductSeoSection({
         <p className="text-sm font-medium">Связанные продукты</p>
         {seoContent.relatedPracticeIds.map((id, index) => (
           <div className="mt-2 flex gap-2" key={`product-${index}`}>
-            <input value={id} disabled={disabled} placeholder="ID опубликованного продукта" onChange={(event) => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2" />
+            <select value={id} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
+              <option value="">Выберите опубликованный продукт</option>
+              {relatedProductOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
             <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, -1) } })}>↑</button>
             <button type="button" disabled={disabled || index === seoContent.relatedPracticeIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, 1) } })}>↓</button>
             <button type="button" disabled={disabled} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.filter((_, itemIndex) => itemIndex !== index) } })}>Удалить</button>
           </div>
         ))}
-        <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: [...seoContent.relatedPracticeIds, ""] } })}>+ Добавить продукт</button>
+        {seoContent.relatedPracticeIds.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: [...seoContent.relatedPracticeIds, ""] } })}>+ Добавить продукт</button> : null}
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
@@ -209,14 +227,14 @@ export default function AuthorProductSeoSection({
           <div className="mt-2 flex gap-2" key={`listen-${index}`}>
             <select value={slug} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedListenSlugs: seoContent.relatedListenSlugs.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
               <option value="">Выберите страницу</option>
-              {listListenPageDefinitions().map((page) => <option key={page.slug} value={page.slug}>{page.title}</option>)}
+              {listenOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: moveItem(seoContent.relatedListenSlugs, index, -1) } })}>↑</button>
             <button type="button" disabled={disabled || index === seoContent.relatedListenSlugs.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: moveItem(seoContent.relatedListenSlugs, index, 1) } })}>↓</button>
             <button type="button" disabled={disabled} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: seoContent.relatedListenSlugs.filter((_, itemIndex) => itemIndex !== index) } })}>Удалить</button>
           </div>
         ))}
-        <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: [...seoContent.relatedListenSlugs, ""] } })}>+ Добавить страницу</button>
+        {seoContent.relatedListenSlugs.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: [...seoContent.relatedListenSlugs, ""] } })}>+ Добавить страницу</button> : null}
       </div>
 
       <label className="mt-4 block">
@@ -241,6 +259,7 @@ export default function AuthorProductSeoSection({
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Необязательно. До 10 фраз для внутренней SEO-подсказки; публично они не выводятся.
         </p>
+        {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
       </label>
 
       <label
@@ -267,7 +286,7 @@ export default function AuthorProductSeoSection({
         ) : null}
       </label>
 
-      <label className="mt-4 block">
+      <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
         <span className="mb-2 block text-sm font-medium">О продукте</span>
         <textarea
           value={seoAbout}
@@ -280,6 +299,7 @@ export default function AuthorProductSeoSection({
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Необязательный дополнительный публичный текст. Он не заменяет основное описание.
         </p>
+        {fieldErrors.seoAbout ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoAbout}</p> : null}
       </label>
 
       <label

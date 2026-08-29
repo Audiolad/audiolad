@@ -120,6 +120,18 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'related product reverse lookup index missing';
   END IF;
+
+  IF to_regprocedure('public.replace_practice_seo_content(uuid,jsonb,jsonb,jsonb,jsonb)') IS NULL THEN
+    RAISE EXCEPTION 'atomic product SEO replacement RPC missing';
+  END IF;
+
+  IF has_function_privilege(
+    'authenticated',
+    'public.replace_practice_seo_content(uuid,jsonb,jsonb,jsonb,jsonb)',
+    'EXECUTE'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'authenticated cannot execute atomic product SEO replacement RPC';
+  END IF;
 END;
 $$;
 

@@ -70,7 +70,7 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
             </p>
           </section>
         ) : null}
-        <PracticeSeoContentSections content={seoContent} />
+        <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

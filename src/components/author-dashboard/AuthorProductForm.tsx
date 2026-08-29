@@ -150,6 +150,7 @@ function CharCounter({ value, max }: { value: string; max: number }) {
 
 type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
+  relatedProductOptions?: Array<{ value: string; label: string }>;
   initialAuthorSlug?: string;
   initialProduct?: AuthorProductDetail;
   initialPublicationClass?: PublicationClass | null;
@@ -469,6 +470,7 @@ function buildProductSavePayload(
 
 export default function AuthorProductForm({
   authors,
+  relatedProductOptions = [],
   initialAuthorSlug,
   initialProduct,
   initialPublicationClass,
@@ -565,8 +567,10 @@ export default function AuthorProductForm({
     listeningNoticeTitle?: string;
     listeningNoticeText?: string;
     seoPrimaryQuery?: string;
+    seoSecondaryQueries?: string;
     seoTitle?: string;
     seoDescription?: string;
+    seoAbout?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -1179,8 +1183,10 @@ export default function AuthorProductForm({
             fieldKey === "listeningNoticeTitle" ||
             fieldKey === "listeningNoticeText" ||
             fieldKey === "seoPrimaryQuery" ||
+            fieldKey === "seoSecondaryQueries" ||
             fieldKey === "seoTitle" ||
-            fieldKey === "seoDescription"
+            fieldKey === "seoDescription" ||
+            fieldKey === "seoAbout"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
@@ -2616,11 +2622,14 @@ export default function AuthorProductForm({
           seoDescription={form.seoDescription}
           seoAbout={form.seoAbout}
           seoContent={form.seoContent}
+          relatedProductOptions={relatedProductOptions}
           publicPath={publicPath}
           fieldErrors={{
             seoPrimaryQuery: fieldErrors.seoPrimaryQuery,
+            seoSecondaryQueries: fieldErrors.seoSecondaryQueries,
             seoTitle: fieldErrors.seoTitle,
             seoDescription: fieldErrors.seoDescription,
+            seoAbout: fieldErrors.seoAbout,
           }}
           disabled={!canEditPublicFields || busy}
           onChange={(patch) => {
@@ -2629,10 +2638,14 @@ export default function AuthorProductForm({
               ...(patch.seoPrimaryQuery !== undefined
                 ? { seoPrimaryQuery: undefined }
                 : {}),
+              ...(patch.seoSecondaryQueries !== undefined
+                ? { seoSecondaryQueries: undefined }
+                : {}),
               ...(patch.seoTitle !== undefined ? { seoTitle: undefined } : {}),
               ...(patch.seoDescription !== undefined
                 ? { seoDescription: undefined }
                 : {}),
+              ...(patch.seoAbout !== undefined ? { seoAbout: undefined } : {}),
             }));
             setForm((current) => ({ ...current, ...patch }));
           }}

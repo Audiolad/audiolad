@@ -41,6 +41,7 @@ export type PracticePageViewModel = {
   resolvedAuthorSlug: string;
   authorName: string | null;
   productTypeLabel: string | null;
+  productKind: string | null;
   subtitle: string | null;
   description: string | null;
   seoAbout: string | null;

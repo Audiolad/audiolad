@@ -39,24 +39,25 @@ function parseTextItems(
       : PRODUCT_CONTENT_LIMITS.seoFaqItems)
   ) return null;
 
-  const items = value.map((item) => {
-    if (!isRecord(item) || typeof item[key] !== "string") return null;
+  const items = value.flatMap((item) => {
+    if (!isRecord(item) || typeof item[key] !== "string") return [];
     const primary = item[key].trim();
-    if (!primary) return null;
+    // Draft placeholder rows are never persisted as public SEO content.
+    if (!primary) return [];
     if (key === "content") {
       return primary.length <= PRODUCT_CONTENT_LIMITS.seoUsageItem
-        ? { content: primary }
-        : null;
+        ? [{ content: primary }]
+        : [];
     }
-    if (!secondaryKey || typeof item[secondaryKey] !== "string") return null;
+    if (!secondaryKey || typeof item[secondaryKey] !== "string") return [];
     const answer = item[secondaryKey].trim();
-    return answer &&
-      primary.length <= PRODUCT_CONTENT_LIMITS.seoFaqQuestion &&
+    if (!answer) return [];
+    return primary.length <= PRODUCT_CONTENT_LIMITS.seoFaqQuestion &&
       answer.length <= PRODUCT_CONTENT_LIMITS.seoFaqAnswer
-      ? { question: primary, answer }
-      : null;
+      ? [{ question: primary, answer }]
+      : [];
   });
-  return items.every(Boolean) ? (items as PracticeSeoUsageItem[] | PracticeSeoFaqItem[]) : null;
+  return items as PracticeSeoUsageItem[] | PracticeSeoFaqItem[];
 }
 
 export function parsePracticeSeoContent(
@@ -69,12 +70,16 @@ export function parsePracticeSeoContent(
     return null;
   }
 
-  const relatedPracticeIds = value.related_practice_ids.map((id) =>
-    typeof id === "string" ? id.trim() : "",
-  );
-  const relatedListenSlugs = value.related_listen_slugs.map((slug) =>
-    typeof slug === "string" ? slug.trim().toLowerCase() : "",
-  );
+  if (
+    value.related_practice_ids.length > PRODUCT_CONTENT_LIMITS.seoUsageItems ||
+    value.related_listen_slugs.length > PRODUCT_CONTENT_LIMITS.seoUsageItems
+  ) return null;
+  const relatedPracticeIds = value.related_practice_ids
+    .map((id) => (typeof id === "string" ? id.trim() : ""))
+    .filter(Boolean);
+  const relatedListenSlugs = value.related_listen_slugs
+    .map((slug) => (typeof slug === "string" ? slug.trim().toLowerCase() : ""))
+    .filter(Boolean);
   if (
     relatedPracticeIds.some((id) => !UUID_PATTERN.test(id)) ||
     relatedListenSlugs.some((slug) => !getListenPageBySlug(slug)) ||
@@ -108,11 +113,12 @@ export async function validateRelatedPracticeTargets(input: {
 
   const { data, error } = await input.supabase
     .from("practices")
-    .select("id, author_id, status, deleted_at, catalog_visibility")
+    .select("id, author_id, status, deleted_at, catalog_visibility, is_catalog_listed")
     .in("id", input.relatedPracticeIds)
     .eq("status", "published")
     .is("deleted_at", null)
-    .eq("catalog_visibility", "listed");
+    .eq("catalog_visibility", "listed")
+    .eq("is_catalog_listed", true);
   if (error || (data?.length ?? 0) !== input.relatedPracticeIds.length) {
     return "invalid_related_product";
   }
@@ -127,43 +133,23 @@ export async function replacePracticeSeoContent(
   practiceId: string,
   content: PracticeSeoContentInput,
 ): Promise<void> {
-  const tables = [
-    "practice_seo_usage_items",
-    "practice_seo_faq_items",
-    "practice_related_products",
-    "practice_related_listens",
-  ];
-  for (const table of tables) {
-    const { error } = await supabase.from(table).delete().eq("practice_id", practiceId);
-    if (error) throw new Error("practice_seo_content_save_failed");
-  }
-
-  const writes = [
-    content.usageItems.length
-      ? supabase.from("practice_seo_usage_items").insert(
-          content.usageItems.map((item, position) => ({ practice_id: practiceId, ...item, position })),
-        )
-      : null,
-    content.faqItems.length
-      ? supabase.from("practice_seo_faq_items").insert(
-          content.faqItems.map((item, position) => ({ practice_id: practiceId, ...item, position })),
-        )
-      : null,
-    content.relatedPracticeIds.length
-      ? supabase.from("practice_related_products").insert(
-          content.relatedPracticeIds.map((related_practice_id, position) => ({ practice_id: practiceId, related_practice_id, position })),
-        )
-      : null,
-    content.relatedListenSlugs.length
-      ? supabase.from("practice_related_listens").insert(
-          content.relatedListenSlugs.map((listen_slug, position) => ({ practice_id: practiceId, listen_slug, position })),
-        )
-      : null,
-  ].filter(Boolean);
-  const results = await Promise.all(writes);
-  if (results.some((result) => result?.error)) {
+  const { error } = await supabase.rpc("replace_practice_seo_content", {
+    p_practice_id: practiceId,
+    p_usage_items: content.usageItems,
+    p_faq_items: content.faqItems,
+    p_related_practice_ids: content.relatedPracticeIds,
+    p_related_listen_slugs: content.relatedListenSlugs,
+  });
+  if (error) {
     throw new Error("practice_seo_content_save_failed");
   }
+}
+
+export function hasPracticeSeoContentChanges(
+  previous: PracticeSeoContentInput,
+  next: PracticeSeoContentInput,
+): boolean {
+  return JSON.stringify(previous) !== JSON.stringify(next);
 }
 
 export async function loadAuthorPracticeSeoContent(
@@ -199,7 +185,7 @@ export async function loadPublicPracticeSeoContent(
   ]);
   const ids = (relatedProducts.data ?? []).map((row) => row.related_practice_id as string);
   const { data: targets } = ids.length
-    ? await supabase.from("practices").select("id, title, slug, authors!practices_author_id_fkey(slug)").in("id", ids).eq("status", "published").is("deleted_at", null).eq("catalog_visibility", "listed")
+    ? await supabase.from("practices").select("id, title, slug, authors!practices_author_id_fkey(slug)").in("id", ids).eq("status", "published").is("deleted_at", null).eq("catalog_visibility", "listed").eq("is_catalog_listed", true)
     : { data: [] as Array<Record<string, unknown>> };
   const targetById = new Map((targets ?? []).map((target) => [target.id as string, target]));
 

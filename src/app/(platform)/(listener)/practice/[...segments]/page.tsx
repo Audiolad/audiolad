@@ -479,6 +479,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const meta = buildPracticeHeroLightMeta({
     gallerySlides,
     productTypeLabel: typeLabel,
+    productKind,
     formatMeta,
     authorName,
   });
