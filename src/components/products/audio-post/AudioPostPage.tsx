@@ -2,6 +2,7 @@ import LegalFooter from "@/components/LegalFooter";
 import AuthorLink from "@/components/authors/AuthorLink";
 import NextStepRecommendation from "@/components/products/NextStepRecommendation";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
+import ProductCopySections from "@/components/products/ProductCopySections";
 import AudioPostBackLink from "@/components/products/audio-post/AudioPostBackLink";
 import AudioPostListenAnalytics from "@/components/products/audio-post/AudioPostListenAnalytics";
 import AudioPostPlayer from "@/components/products/audio-post/AudioPostPlayer";
@@ -147,14 +148,10 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           </div>
         </article>
 
-        {description ? (
-          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
-        ) : null}
-        {viewModel.seoAbout ? <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"><h2 className="text-lg font-semibold text-[#2b2140]">О продукте</h2><p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#65577f]">{viewModel.seoAbout}</p></section> : null}
+        <ProductCopySections
+          description={description}
+          seoAbout={viewModel.seoAbout}
+        />
         <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
 
         <AudioPostRecommendation viewModel={viewModel} />
@@ -212,14 +209,10 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           <AudioPostPlayer {...playerProps} variant="panel" />
         </div>
 
-        {description ? (
-          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
-        ) : null}
-        {viewModel.seoAbout ? <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"><h2 className="text-lg font-semibold text-[#2b2140]">О продукте</h2><p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#65577f]">{viewModel.seoAbout}</p></section> : null}
+        <ProductCopySections
+          description={description}
+          seoAbout={viewModel.seoAbout}
+        />
         <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
 
         <AudioPostRecommendation viewModel={viewModel} />

@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import RelatedProductLinkCard from "@/components/products/RelatedProductLinkCard";
 import {
   getPracticeSeoUsageHeading,
   type PublicPracticeSeoContent,
@@ -15,8 +14,7 @@ export default function PracticeSeoContentSections({
   if (
     !content.usageItems.length &&
     !content.faqItems.length &&
-    !content.relatedProducts.length &&
-    !content.relatedListens.length
+    !content.relatedProducts.length
   ) {
     return null;
   }
@@ -44,20 +42,16 @@ export default function PracticeSeoContentSections({
           </dl>
         </section>
       ) : null}
-      {content.relatedProducts.length || content.relatedListens.length ? (
-        <section className="rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)] sm:p-6">
-          {content.relatedProducts.length ? <><h2 className="text-lg font-semibold text-[#2b2140]">Связанные продукты</h2>
-          <ul className="mt-3 space-y-2">
+      {content.relatedProducts.length ? (
+        <section className="overflow-hidden rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)] sm:p-6">
+          <h2 className="text-lg font-semibold text-[#2b2140]">Связанные продукты</h2>
+          <ul className="mt-3 grid w-full max-w-full grid-cols-1 gap-2">
             {content.relatedProducts.map((item) => (
-              <li key={item.href}><Link className="text-[#7042c5] underline-offset-2 hover:underline" href={item.href}>{item.title}</Link></li>
+              <li key={item.practiceId} className="min-w-0">
+                <RelatedProductLinkCard product={item} />
+              </li>
             ))}
-          </ul></> : null}
-          {content.relatedListens.length ? <><h2 className={content.relatedProducts.length ? "mt-5 text-lg font-semibold text-[#2b2140]" : "text-lg font-semibold text-[#2b2140]"}>Связанные страницы «Слушать»</h2>
-          <ul className="mt-3 space-y-2">
-            {content.relatedListens.map((item) => (
-              <li key={item.href}><Link className="text-[#7042c5] underline-offset-2 hover:underline" href={item.href}>{item.title}</Link></li>
-            ))}
-          </ul></> : null}
+          </ul>
         </section>
       ) : null}
     </div>

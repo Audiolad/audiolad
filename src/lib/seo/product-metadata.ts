@@ -1,4 +1,8 @@
 import { AUDIO_POST_KIND_LABEL } from "@/lib/author-products/product-kind";
+import {
+  AUTHOR_DESCRIPTION_LABEL,
+  SEO_ABOUT_LABEL,
+} from "@/lib/products/product-copy";
 
 export const PRODUCT_SEO_BRAND = "АудиоЛад";
 export const PRODUCT_SEO_TITLE_SEPARATOR = " – ";
@@ -43,7 +47,7 @@ export type ProductSeoReadinessCheck = {
 
 export type ProductSeoReadiness = {
   doneCount: number;
-  total: 8;
+  total: number;
   checks: ProductSeoReadinessCheck[];
 };
 
@@ -239,7 +243,7 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "substantial_description",
-      label: "Описание достаточно подробное",
+      label: `${AUTHOR_DESCRIPTION_LABEL} достаточно подробное`,
       done: description.length >= PRODUCT_SEO_SUBSTANTIAL_DESCRIPTION_LENGTH,
     },
     {
@@ -249,7 +253,7 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "about",
-      label: "Заполнен блок «О продукте»",
+      label: `Заполнен блок «${SEO_ABOUT_LABEL}»`,
       done: Boolean(about),
     },
     {
@@ -264,14 +268,14 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "related",
-      label: "Добавлены связанные материалы",
+      label: "Добавлены связанные продукты",
       done: (input.seoRelatedCount ?? 0) > 0,
     },
   ];
 
   return {
     doneCount: checks.filter((check) => check.done).length,
-    total: 8,
+    total: checks.length,
     checks,
   };
 }

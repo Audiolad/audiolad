@@ -25,6 +25,7 @@ import {
   hasPracticeSeoContentChanges,
   getPracticeSeoUsageHeading,
   parsePracticeSeoContent,
+  withPreservedRelatedListenSlugs,
 } from "../src/lib/products/practice-seo-content.ts";
 import { validateSeoSecondaryQueries } from "../src/lib/author-products/limits.ts";
 
@@ -278,8 +279,40 @@ assert.equal(
   }),
   null,
 );
+assert.deepEqual(
+  parsePracticeSeoContent({
+    usage_items: [],
+    faq_items: [],
+    related_practice_ids: ["33333333-3333-4333-8333-333333333333"],
+  }),
+  {
+    usageItems: [],
+    faqItems: [],
+    relatedPracticeIds: ["33333333-3333-4333-8333-333333333333"],
+    relatedListenSlugs: [],
+  },
+);
+assert.deepEqual(
+  withPreservedRelatedListenSlugs(
+    {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: ["33333333-3333-4333-8333-333333333333"],
+      relatedListenSlugs: [],
+    },
+    {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: ["33333333-3333-4333-8333-333333333333"],
+      relatedListenSlugs: ["meditatsiya-na-dengi-slushat-onlayn-besplatno"],
+    },
+  ).relatedListenSlugs,
+  ["meditatsiya-na-dengi-slushat-onlayn-besplatno"],
+);
 
 const formSource = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(formSource, /AUTHOR_DESCRIPTION_LABEL/);
+assert.match(formSource, /AUTHOR_DESCRIPTION_HELPER/);
 assert.match(formSource, /AuthorProductSeoSection/);
 assert.match(formSource, /seo_primary_query: form\.seoPrimaryQuery\.trim\(\) \|\| null/);
 assert.match(formSource, /seo_title: form\.seoTitle\.trim\(\) \|\| null/);
@@ -377,11 +410,12 @@ assert.ok(
   "search title comes before search description",
 );
 assert.ok(
-  openMarkup.indexOf("Описание для поиска") < openMarkup.indexOf("О продукте"),
+  openMarkup.indexOf("Описание для поиска") <
+    openMarkup.indexOf("{SEO_ABOUT_LABEL}"),
   "search description comes before about",
 );
 assert.ok(
-  openMarkup.indexOf("О продукте") <
+  openMarkup.indexOf("{SEO_ABOUT_LABEL}") <
     openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}"),
   "about comes before usage",
 );
@@ -397,13 +431,13 @@ assert.ok(
 );
 assert.ok(
   openMarkup.indexOf("Связанные продукты") <
-    openMarkup.indexOf("Связанные страницы «Слушать»"),
-  "related products come before related listens",
-);
-assert.ok(
-  openMarkup.indexOf("Связанные страницы «Слушать»") <
     openMarkup.indexOf("{preview.displayUrl}"),
-  "related listens come before search preview",
+  "related products come before search preview",
+);
+assert.equal(
+  openMarkup.includes("Связанные страницы «Слушать»"),
+  false,
+  "related Listen selector is not shown",
 );
 assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
@@ -438,7 +472,13 @@ assert.match(wordstatPicker, /запросов за последние[\s\S]*30 
 assert.match(wordstatPicker, /общая оценка темы, а не частота самой фразы/);
 assert.doesNotMatch(wordstatPicker, /конкуренция низкая|TOP-3|TOP-5|results\[|associations\[|totalCount/);
 assert.match(seoSection, /canAddSecondaryQuery/);
-assert.match(seoSection, /event\.key !== "Enter"/);
+assert.match(seoSection, /parseSeoSecondaryQueryList/);
+assert.match(seoSection, /Добавить фразы/);
+assert.match(
+  seoSection,
+  /Введите одну или несколько фраз через запятую или с новой строки/,
+);
+assert.doesNotMatch(seoSection, /event\.key !== "Enter"/);
 assert.match(seoSection, /clipSeoQuery/);
 assert.match(seoSection, /WORDSTAT_ERROR_MESSAGES/);
 assert.match(seoSection, /Подбор запросов временно недоступен|UPSTREAM_ERROR|NO_RESULTS/);
@@ -457,7 +497,11 @@ assert.match(seoSection, /Ориентир: 120–180 символов/);
 assert.match(seoSection, /Ориентир: 500–1500 символов/);
 assert.match(seoSection, /Когда лучше слушать/);
 assert.match(seoSection, /Выберите 2–4 продукта/);
-assert.match(seoSection, /близкие по теме статьи АудиоЛада/);
+assert.match(seoSection, /Найти продукт/);
+assert.match(seoSection, /Введите название или слово из названия/);
+assert.doesNotMatch(seoSection, /близкие по теме статьи АудиоЛада/);
+assert.doesNotMatch(seoSection, /Связанные страницы «Слушать»/);
+assert.doesNotMatch(seoSection, /Связанные статьи|Связанные Listen/);
 assert.doesNotMatch(seoSection, /SEO score|keyword-density|100%/i);
 assert.doesNotMatch(seoSection, /FAQPage|QAPage/);
 assert.match(seoSection, /disabled\?: boolean/);
@@ -466,21 +510,26 @@ assert.ok(
   "all SEO inputs must honor the moderation lock",
 );
 assert.match(seoSection, /disabled:cursor-not-allowed disabled:opacity-60/);
-assert.match(seoSection, /api\/author\/seo\/listen-options/);
+assert.doesNotMatch(seoSection, /api\/author\/seo\/listen-options/);
 assert.match(seoSection, /api\/author\/seo\/related-product-options/);
+assert.match(seoSection, /RELATED_PRODUCT_SEARCH_DEBOUNCE_MS/);
+assert.match(seoSection, /shouldSearchRelatedProducts/);
+assert.match(seoSection, /canAddRelatedProductId/);
 assert.match(seoSection, /api\/author\/seo\/wordstat\/suggestions/);
 assert.doesNotMatch(seoSection, /YANDEX_SEARCH_API_KEY|YANDEX_SEARCH_FOLDER_ID/);
 assert.match(seoSection, /relatedProductSourceId/);
-assert.match(seoSection, /Поиск связанных продуктов/);
+assert.match(seoSection, /Найти продукт/);
 assert.match(seoSection, /Удалить фразу/);
 assert.doesNotMatch(seoSection, /listListenPageDefinitions/);
-assert.match(seoSection, /relatedListenSlugs/);
+assert.doesNotMatch(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
 assert.doesNotMatch(seoSection, /relatedListenUrl|listen_url/i);
+assert.match(formSource, /related_listen_slugs: form\.seoContent\.relatedListenSlugs/);
 assert.match(formSource, /disabled=\{!canEditPublicFields \|\| busy\}/);
 assert.doesNotMatch(formSource, /wordstat|Wordstat/);
 
 const patch = read("src/app/api/author/products/[id]/route.ts");
+assert.match(patch, /withPreservedRelatedListenSlugs/);
 assert.match(patch, /seo_primary_query/);
 assert.match(patch, /validateSeoPrimaryQueryLength/);
 assert.match(patch, /validateSeoTitleLength/);
@@ -518,6 +567,11 @@ const relatedOptionsRoute = read(
 assert.match(relatedOptionsRoute, /requirePracticeAccess\(sourcePracticeId\)/);
 assert.match(relatedOptionsRoute, /admin_panel\.access/);
 assert.match(relatedOptionsRoute, /\.limit\(MAX_RESULTS\)/);
+assert.match(relatedOptionsRoute, /RELATED_PRODUCT_SEARCH_LIMIT/);
+assert.match(relatedOptionsRoute, /shouldSearchRelatedProducts/);
+assert.match(relatedOptionsRoute, /toRelatedProductOrFilter/);
+assert.match(relatedOptionsRoute, /parseRelatedProductIdsParam/);
+assert.match(relatedOptionsRoute, /options: \[\]/);
 assert.match(relatedOptionsRoute, /— \$\{authorName\}/);
 assert.doesNotMatch(relatedOptionsRoute, /author_id.*searchParams/);
 

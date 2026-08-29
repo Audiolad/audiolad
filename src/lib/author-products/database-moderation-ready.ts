@@ -17,6 +17,10 @@ import {
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
 import {
+  AUTHOR_DESCRIPTION_LABEL,
+  AUTHOR_DESCRIPTION_MISSING_MESSAGE,
+} from "@/lib/products/product-copy";
+import {
   AUDIO_POST_KIND_LABEL,
   MUSIC_KIND_LABEL,
   normalizeProductKind,
@@ -122,9 +126,9 @@ export function evaluateDatabaseModerationReady(
     ),
     check(
       "missing_description",
-      "Описание",
+      AUTHOR_DESCRIPTION_LABEL,
       productKind !== PRODUCT_KIND.AUDIO_POST && !practice.description?.trim()
-        ? "Добавьте описание аудиопродукта."
+        ? AUTHOR_DESCRIPTION_MISSING_MESSAGE
         : null,
     ),
     check(

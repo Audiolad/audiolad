@@ -175,7 +175,7 @@ function testBeforePurchaseRowKeepsBuy() {
   );
 
   const mobileCta = mobile.indexOf("<PracticeProductHero");
-  const mobileDescription = mobile.indexOf("description ?");
+  const mobileDescription = mobile.indexOf("<ProductCopySections");
   const mobileContents = mobile.indexOf("<ProductContentsSection");
   assert.match(hero, /PracticePrimaryActionSection/, "hero mounts the primary CTA");
   assert.ok(mobileCta >= 0, "mobile mounts the product hero");
@@ -193,7 +193,7 @@ function testBeforePurchaseRowKeepsBuy() {
   );
 
   const desktopCta = desktop.indexOf("<PracticeProductHero");
-  const desktopDescription = desktop.indexOf("description ?");
+  const desktopDescription = desktop.indexOf("<ProductCopySections");
   const desktopContents = desktop.indexOf("<ProductContentsSection");
   assert.doesNotMatch(
     desktop,
@@ -214,28 +214,26 @@ function testBeforePurchaseRowKeepsBuy() {
     "desktop contents appear before the description block",
   );
 
-  const desktopDescriptionBody = desktop.slice(desktopDescription);
+  const copySections = read("src/components/products/ProductCopySections.tsx");
   assert.match(
-    desktopDescriptionBody,
-    /className="[^"]*\bw-full\b[^"]*"/,
-    "desktop description body is w-full",
+    desktop.slice(desktopDescription),
+    /variant="desktop"/,
+    "desktop copy sections use the desktop variant",
   );
   assert.match(
-    desktopDescriptionBody,
-    /className="[^"]*\bmax-w-none\b[^"]*"/,
-    "desktop description body uses max-w-none instead of prose width",
+    copySections,
+    /w-full max-w-none/,
+    "desktop description body is w-full and max-w-none",
   );
   assert.doesNotMatch(
-    desktopDescriptionBody,
+    copySections,
     /max-w-prose/,
     "desktop description body is not constrained by max-w-prose",
   );
-
-  const mobileDescriptionBody = mobile.slice(mobileDescription);
   assert.doesNotMatch(
-    mobileDescriptionBody,
-    /max-w-prose|max-w-none/,
-    "mobile description layout stays unchanged",
+    mobile.slice(mobileDescription),
+    /variant="desktop"|max-w-prose|max-w-none/,
+    "mobile description layout stays compact",
   );
 
   assert.doesNotMatch(

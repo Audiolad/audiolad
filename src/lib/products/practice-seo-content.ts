@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getDisplayFormat } from "@/lib/author-products/format";
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
+import { formatProductDuration } from "@/lib/products/duration";
 import { getListenPageBySlug } from "@/lib/seo/listens/registry";
 
 export type PracticeSeoUsageItem = { content: string };
@@ -12,10 +14,22 @@ export type PracticeSeoContentInput = {
   relatedListenSlugs: string[];
 };
 
+export type PublicRelatedProduct = {
+  practiceId: string;
+  title: string;
+  href: string;
+  authorName: string | null;
+  formatLabel: string | null;
+  durationLabel: string | null;
+  coverUrl: string | null;
+  coverImage?: unknown;
+  updatedAt?: string | null;
+};
+
 export type PublicPracticeSeoContent = {
   usageItems: PracticeSeoUsageItem[];
   faqItems: PracticeSeoFaqItem[];
-  relatedProducts: Array<{ title: string; href: string }>;
+  relatedProducts: PublicRelatedProduct[];
   relatedListens: Array<{ title: string; href: string }>;
 };
 
@@ -77,18 +91,26 @@ export function parsePracticeSeoContent(
   if (!isRecord(value)) return null;
   const usageItems = parseTextItems(value.usage_items, "content");
   const faqItems = parseTextItems(value.faq_items, "question", "answer");
-  if (!usageItems || !faqItems || !Array.isArray(value.related_practice_ids) || !Array.isArray(value.related_listen_slugs)) {
+  if (
+    !usageItems ||
+    !faqItems ||
+    !Array.isArray(value.related_practice_ids) ||
+    (value.related_listen_slugs !== undefined && !Array.isArray(value.related_listen_slugs))
+  ) {
     return null;
   }
 
+  const relatedListenSlugsRaw = Array.isArray(value.related_listen_slugs)
+    ? value.related_listen_slugs
+    : [];
   if (
     value.related_practice_ids.length > PRODUCT_CONTENT_LIMITS.seoUsageItems ||
-    value.related_listen_slugs.length > PRODUCT_CONTENT_LIMITS.seoUsageItems
+    relatedListenSlugsRaw.length > PRODUCT_CONTENT_LIMITS.seoUsageItems
   ) return null;
   const relatedPracticeIds = value.related_practice_ids
     .map((id) => (typeof id === "string" ? id.trim() : ""))
     .filter(Boolean);
-  const relatedListenSlugs = value.related_listen_slugs
+  const relatedListenSlugs = relatedListenSlugsRaw
     .map((slug) => (typeof slug === "string" ? slug.trim().toLowerCase() : ""))
     .filter(Boolean);
   if (
@@ -139,6 +161,17 @@ export async function validateRelatedPracticeTargets(input: {
   return null;
 }
 
+/** Product SEO no longer edits related Listen; keep stored slugs on ordinary save. */
+export function withPreservedRelatedListenSlugs(
+  incoming: PracticeSeoContentInput,
+  previous: PracticeSeoContentInput,
+): PracticeSeoContentInput {
+  return {
+    ...incoming,
+    relatedListenSlugs: previous.relatedListenSlugs,
+  };
+}
+
 export async function replacePracticeSeoContent(
   supabase: SupabaseClient,
   practiceId: string,
@@ -184,19 +217,78 @@ export async function loadAuthorPracticeSeoContent(
   };
 }
 
+function readRelatedAuthor(value: unknown): { slug: string; name: string | null } | null {
+  const author = Array.isArray(value) ? value[0] : value;
+  if (!author || typeof author !== "object" || !("slug" in author) || typeof author.slug !== "string") {
+    return null;
+  }
+  const slug = author.slug.trim();
+  if (!slug) {
+    return null;
+  }
+  const name =
+    "name" in author && typeof author.name === "string" && author.name.trim()
+      ? author.name.trim()
+      : null;
+  return { slug, name };
+}
+
+export function mapPublicRelatedProduct(target: {
+  id?: unknown;
+  title?: unknown;
+  slug?: unknown;
+  format?: unknown;
+  duration_minutes?: unknown;
+  cover_url?: unknown;
+  cover_image?: unknown;
+  updated_at?: unknown;
+  authors?: unknown;
+}): PublicRelatedProduct | null {
+  const author = readRelatedAuthor(target.authors);
+  const practiceId = typeof target.id === "string" ? target.id : "";
+  const title = typeof target.title === "string" ? target.title.trim() : "";
+  const slug = typeof target.slug === "string" ? target.slug.trim() : "";
+  if (!practiceId || !title || !slug || !author) {
+    return null;
+  }
+
+  return {
+    practiceId,
+    title,
+    href: `/practice/${author.slug}/${slug}`,
+    authorName: author.name,
+    formatLabel: getDisplayFormat(typeof target.format === "string" ? target.format : null),
+    durationLabel: formatProductDuration(
+      null,
+      typeof target.duration_minutes === "number" ? target.duration_minutes : null,
+    ),
+    coverUrl: typeof target.cover_url === "string" && target.cover_url.trim()
+      ? target.cover_url.trim()
+      : null,
+    coverImage: target.cover_image ?? null,
+    updatedAt: typeof target.updated_at === "string" ? target.updated_at : null,
+  };
+}
+
 export async function loadPublicPracticeSeoContent(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PublicPracticeSeoContent> {
-  const [usage, faq, relatedProducts, relatedListens] = await Promise.all([
+  const [usage, faq, relatedProducts] = await Promise.all([
     supabase.from("practice_seo_usage_items").select("content").eq("practice_id", practiceId).order("position"),
     supabase.from("practice_seo_faq_items").select("question, answer").eq("practice_id", practiceId).order("position"),
     supabase.from("practice_related_products").select("related_practice_id").eq("practice_id", practiceId).order("position"),
-    supabase.from("practice_related_listens").select("listen_slug").eq("practice_id", practiceId).order("position"),
   ]);
   const ids = (relatedProducts.data ?? []).map((row) => row.related_practice_id as string);
   const { data: targets } = ids.length
-    ? await supabase.from("practices").select("id, title, slug, authors!practices_author_id_fkey(slug)").in("id", ids).eq("status", "published").is("deleted_at", null).eq("catalog_visibility", "listed").eq("is_catalog_listed", true)
+    ? await supabase
+        .from("practices")
+        .select("id, title, slug, format, duration_minutes, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(slug, name)")
+        .in("id", ids)
+        .eq("status", "published")
+        .is("deleted_at", null)
+        .eq("catalog_visibility", "listed")
+        .eq("is_catalog_listed", true)
     : { data: [] as Array<Record<string, unknown>> };
   const targetById = new Map((targets ?? []).map((target) => [target.id as string, target]));
 
@@ -204,15 +296,9 @@ export async function loadPublicPracticeSeoContent(
     usageItems: usage.error ? [] : (usage.data ?? []).map((row) => ({ content: String(row.content) })),
     faqItems: faq.error ? [] : (faq.data ?? []).map((row) => ({ question: String(row.question), answer: String(row.answer) })),
     relatedProducts: relatedProducts.error ? [] : ids.flatMap((id) => {
-      const target = targetById.get(id);
-      const author = Array.isArray(target?.authors) ? target.authors[0] : target?.authors;
-      return target?.title && target?.slug && author && typeof author === "object" && "slug" in author && typeof author.slug === "string"
-        ? [{ title: String(target.title), href: `/practice/${author.slug}/${target.slug}` }]
-        : [];
+      const mapped = mapPublicRelatedProduct(targetById.get(id) ?? {});
+      return mapped ? [mapped] : [];
     }),
-    relatedListens: relatedListens.error ? [] : (relatedListens.data ?? []).flatMap((row) => {
-      const listen = getListenPageBySlug(String(row.listen_slug));
-      return listen ? [{ title: listen.title, href: `/listens/${listen.slug}` }] : [];
-    }),
+    relatedListens: [],
   };
 }

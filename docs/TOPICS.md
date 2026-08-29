@@ -7,6 +7,7 @@
 - `supabase/migrations/20260717140000_topics_foundation.sql` — таблица и MVP-справочник
 - `supabase/migrations/20260825120000_topics_career_business_learning.sql` — Карьера / Бизнес / Обучение
 - `supabase/migrations/20260826120000_topics_spirituality.sql` — Духовность
+- `supabase/migrations/20260910120000_topics_sleep.sql` — Сон
 
 Тема — отдельная грань каталога. Она не является классом публикации (`practice` | `course` | `audiobook` | `release` | `post`) и не добавляет `product_kind`. «Обучение» (`learning`) не равно `class=course`.
 
@@ -37,6 +38,7 @@
 | `money` | Деньги | 10 |
 | `relationships` | Отношения | 20 |
 | `calm` | Спокойствие | 30 |
+| `sleep` | Сон | 35 |
 | `self-worth` | Уверенность и самоценность | 40 |
 | `body-wellbeing` | Тело и самочувствие | 50 |
 | `energy` | Энергия и ресурс | 60 |

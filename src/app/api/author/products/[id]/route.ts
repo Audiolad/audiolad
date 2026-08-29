@@ -81,6 +81,7 @@ import {
   hasPracticeSeoContentChanges,
   replacePracticeSeoContent,
   validateRelatedPracticeTargets,
+  withPreservedRelatedListenSlugs,
 } from "@/lib/products/practice-seo-content";
 
 type RouteContext = {
@@ -208,20 +209,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const seoContent =
+    const parsedSeoContent =
       "seo_content" in body
         ? parsePracticeSeoContent((body as Record<string, unknown>).seo_content)
         : null;
-    if ("seo_content" in body && !seoContent) {
+    if ("seo_content" in body && !parsedSeoContent) {
       return NextResponse.json({ error: "invalid_seo_content" }, { status: 400 });
     }
-    if (seoContent) {
+    if (parsedSeoContent) {
       const isAdmin = await hasPermission(supabase, user.id, "admin_panel.access");
       const relationError = await validateRelatedPracticeTargets({
         supabase,
         sourcePracticeId: id,
         sourceAuthorId: practice.author_id,
-        relatedPracticeIds: seoContent.relatedPracticeIds,
+        relatedPracticeIds: parsedSeoContent.relatedPracticeIds,
         isAdmin,
       });
       if (relationError) {
@@ -773,7 +774,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         value,
       )),
     );
-    const previousSeoContent = seoContent ? currentProduct.seo_content : null;
+    const previousSeoContent = parsedSeoContent ? currentProduct.seo_content : null;
+    const seoContent = parsedSeoContent && previousSeoContent
+      ? withPreservedRelatedListenSlugs(parsedSeoContent, previousSeoContent)
+      : parsedSeoContent;
     const seoContentChanged = Boolean(
       seoContent &&
         previousSeoContent &&

@@ -5,6 +5,7 @@ import { requireAdminPermission } from "@/lib/admin/guard";
 import { getAdminProductDiagnostics } from "@/lib/admin/product-diagnostics";
 import { isAdminExactUuid } from "@/lib/admin/users-search";
 import { listKnownTsSqlReadinessDivergences } from "@/lib/author-products/database-moderation-ready";
+import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -132,7 +133,7 @@ export default async function AdminProductDiagnosticsPage({
           <DetailRow label="Авторский slug" value={author.slug || "—"} />
           <DetailRow label="Название" value={practice.title || "—"} />
           <DetailRow label="Slug" value={practice.slug || "—"} />
-          <DetailRow label="Описание" value={practice.description || "—"} />
+          <DetailRow label={AUTHOR_DESCRIPTION_LABEL} value={practice.description || "—"} />
           <DetailRow label="Класс" value={diagnostics.publicationClassLabel ?? "—"} />
           <DetailRow label="Тип / формат" value={`${diagnostics.productKindLabel} · ${practice.format || "—"}`} />
           <DetailRow label="Статус" value={practice.status} />

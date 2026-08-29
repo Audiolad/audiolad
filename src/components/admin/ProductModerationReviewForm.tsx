@@ -20,6 +20,7 @@ import {
   getVisibleAuthorProductStatusLabel,
 } from "@/lib/author-products/moderation";
 import { getProductKindLabel } from "@/lib/author-products/product-kind";
+import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 
@@ -290,7 +291,7 @@ export default function ProductModerationReviewForm({
 
         {product.description ? (
           <div className="mt-4">
-            <h4 className="text-sm font-semibold text-[#25135c]">Описание</h4>
+            <h4 className="text-sm font-semibold text-[#25135c]">{AUTHOR_DESCRIPTION_LABEL}</h4>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#5f5484]">
               {product.description}
             </p>

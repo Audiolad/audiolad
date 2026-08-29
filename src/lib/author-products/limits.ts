@@ -1,3 +1,8 @@
+import {
+  AUTHOR_DESCRIPTION_LABEL,
+  SEO_ABOUT_LABEL,
+} from "@/lib/products/product-copy";
+
 export const MAX_COVER_BYTES = 3 * 1024 * 1024;
 export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 
@@ -246,7 +251,7 @@ export function getProductFieldErrorMessage(code: string): string | null {
     case "subtitle_too_long":
       return "Подзаголовок не должен превышать 120 символов.";
     case "description_too_long":
-      return "Описание не должно превышать 1000 символов.";
+      return `${AUTHOR_DESCRIPTION_LABEL} не должно превышать 1000 символов.`;
     case "audio_title_too_long":
       return "Название аудио не должно превышать 100 символов.";
     case "audio_description_too_long":
@@ -268,7 +273,7 @@ export function getProductFieldErrorMessage(code: string): string | null {
     case "seo_description_too_long":
       return "Описание для поиска не должно превышать 300 символов.";
     case "seo_about_too_long":
-      return "Текст «О продукте» не должен превышать 3000 символов.";
+      return `Текст «${SEO_ABOUT_LABEL}» не должен превышать 3000 символов.`;
     default:
       return null;
   }

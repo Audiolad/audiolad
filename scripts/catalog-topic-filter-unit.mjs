@@ -24,7 +24,7 @@ function assert(condition, message) {
   }
 }
 
-const allowedKeys = ["money", "relationships", "calm", "career", "business", "learning", "spirituality"];
+const allowedKeys = ["money", "relationships", "calm", "sleep", "career", "business", "learning", "spirituality"];
 
 assert(parseCatalogTopicFilter(undefined, allowedKeys) === null, "missing param -> all");
 assert(parseCatalogTopicFilter("", allowedKeys) === null, "empty param -> all");
@@ -33,6 +33,8 @@ assert(parseCatalogTopicFilter("MONEY", allowedKeys) === "money", "case insensit
 assert(parseCatalogTopicFilter("unknown", allowedKeys) === null, "unknown key -> all");
 assert(parseCatalogTopicFilter("bad key", allowedKeys) === null, "invalid format -> all");
 assert(parseCatalogTopicFilter("self-worth", ["self-worth"]) === "self-worth", "hyphenated key");
+assert(parseCatalogTopicFilter("sleep", allowedKeys) === "sleep", "sleep catalog key");
+assert(buildCatalogTopicHref("sleep") === "/catalog?topic=sleep", "sleep catalog href");
 
 assert(buildCatalogTopicHref(null) === "/catalog", "all href");
 assert(buildCatalogTopicHref("money") === "/catalog?topic=money", "topic href");

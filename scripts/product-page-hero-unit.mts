@@ -397,8 +397,10 @@ function testStandardPdpNotBroken() {
   assert.match(page, /publishPreview/);
   assert.match(mobile, /ProductContentsSection/);
   assert.match(desktop, /ProductContentsSection/);
-  assert.match(mobile, /description \?/);
-  assert.match(desktop, /description \?/);
+  assert.match(mobile, /ProductCopySections/);
+  assert.match(desktop, /ProductCopySections/);
+  assert.match(mobile, /description=\{description\}/);
+  assert.match(desktop, /description=\{description\}/);
 }
 
 function testDesktopHeroHeightFollowsSquareCover() {

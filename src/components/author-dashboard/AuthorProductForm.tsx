@@ -49,6 +49,10 @@ import {
 } from "@/lib/author-products/format";
 import { PRODUCT_LANGUAGE_GUIDELINES } from "@/lib/author-products/language-guidelines";
 import {
+  AUTHOR_DESCRIPTION_HELPER,
+  AUTHOR_DESCRIPTION_LABEL,
+} from "@/lib/products/product-copy";
+import {
   MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
   MUSIC_USAGE_PERMISSION_INTRO,
@@ -2578,8 +2582,8 @@ export default function AuthorProductForm({
         >
           <span className="mb-2 block text-sm font-medium">
             {form.productKind === PRODUCT_KIND.AUDIO_POST
-              ? "Описание (необязательно)"
-              : "Описание"}
+              ? `${AUTHOR_DESCRIPTION_LABEL} (необязательно)`
+              : AUTHOR_DESCRIPTION_LABEL}
           </span>
           <textarea
             value={form.description}
@@ -2598,6 +2602,9 @@ export default function AuthorProductForm({
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           />
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {AUTHOR_DESCRIPTION_HELPER}
+          </p>
+          <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
             {PRODUCT_LANGUAGE_GUIDELINES.fieldHints.description}
           </p>
           <CharCounter

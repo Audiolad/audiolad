@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import {
   PRODUCT_CONTENT_LIMITS,
 } from "@/lib/author-products/limits";
@@ -12,9 +14,18 @@ import {
   evaluateProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
 import {
+  SEO_ABOUT_AUTOFILL_HINT,
+  SEO_ABOUT_HELPER,
+  SEO_ABOUT_LABEL,
+} from "@/lib/products/product-copy";
+import {
   getPracticeSeoUsageHeading,
   type PracticeSeoContentInput,
 } from "@/lib/products/practice-seo-content";
+import {
+  formatSeoSecondaryQueryBulkMessage,
+  parseSeoSecondaryQueryList,
+} from "@/lib/seo/secondary-query-list";
 import {
   canAddSecondaryQuery,
   clipSeoQuery,
@@ -53,6 +64,12 @@ import {
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
 import type { ProductSeoSecondaryQueryStatus } from "@/lib/seo/product-autofill/types";
+import {
+  RELATED_PRODUCT_SEARCH_DEBOUNCE_MS,
+  canAddRelatedProductId,
+  shouldSearchRelatedProducts,
+  type RelatedProductSearchOption,
+} from "@/lib/seo/related-product-search";
 
 type SelectOption = { value: string; label: string };
 
@@ -125,10 +142,14 @@ export default function AuthorProductSeoSection({
   disabled = false,
 }: AuthorProductSeoSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [listenOptions, setListenOptions] = useState<SelectOption[]>([]);
   const [relatedProductQuery, setRelatedProductQuery] = useState("");
   const [searchedRelatedProducts, setSearchedRelatedProducts] =
-    useState<SelectOption[]>([]);
+    useState<RelatedProductSearchOption[]>([]);
+  const [selectedRelatedProducts, setSelectedRelatedProducts] = useState<
+    Record<string, SelectOption>
+  >({});
+  const [completedRelatedProductQuery, setCompletedRelatedProductQuery] =
+    useState("");
   const [wordstatOpen, setWordstatOpen] = useState(false);
   const [wordstatSeed, setWordstatSeed] = useState("");
   const [wordstatLoading, setWordstatLoading] = useState(false);
@@ -146,39 +167,95 @@ export default function AuthorProductSeoSection({
   );
   const [secondaryQueryStatus, setSecondaryQueryStatus] =
     useState<ProductSeoSecondaryQueryStatus | null>(null);
-  const displayedRelatedProducts = relatedProductSourceId
+  const [secondaryDraft, setSecondaryDraft] = useState("");
+  const [secondaryBulkMessage, setSecondaryBulkMessage] = useState<string | null>(
+    null,
+  );
+  const selectedRelatedIds = useMemo(
+    () => seoContent.relatedPracticeIds.filter(Boolean),
+    [seoContent.relatedPracticeIds],
+  );
+  const selectedRelatedLabels = useMemo(() => {
+    const next: Record<string, SelectOption> = { ...selectedRelatedProducts };
+    for (const option of relatedProductOptions) {
+      if (!next[option.value]) {
+        next[option.value] = option;
+      }
+    }
+    return next;
+  }, [relatedProductOptions, selectedRelatedProducts]);
+  const relatedProductSearching = Boolean(
+    relatedProductSourceId && shouldSearchRelatedProducts(relatedProductQuery),
+  );
+  const relatedProductSearchSettled =
+    relatedProductSearching &&
+    completedRelatedProductQuery === relatedProductQuery;
+  const visibleRelatedProductResults = relatedProductSearching
     ? searchedRelatedProducts
-    : relatedProductOptions;
+    : [];
   useEffect(() => {
-    void fetch("/api/author/seo/listen-options")
-      .then((response) => response.ok ? response.json() : { options: [] })
-      .then((payload: { options?: SelectOption[] }) => setListenOptions(payload.options ?? []))
-      .catch(() => setListenOptions([]));
-  }, []);
-  useEffect(() => {
-    if (!relatedProductSourceId) {
+    if (!relatedProductSourceId || !selectedRelatedIds.length) {
       return;
     }
 
     const controller = new AbortController();
     const query = new URLSearchParams({
       source: relatedProductSourceId,
-      q: relatedProductQuery,
+      ids: selectedRelatedIds.join(","),
     });
     void fetch(`/api/author/seo/related-product-options?${query}`, {
       signal: controller.signal,
     })
-      .then((response) => response.ok ? response.json() : { options: [] })
-      .then((payload: { options?: SelectOption[] }) =>
-        setSearchedRelatedProducts(payload.options ?? []),
-      )
+      .then((response) => (response.ok ? response.json() : { options: [] }))
+      .then((payload: { options?: SelectOption[] }) => {
+        setSelectedRelatedProducts((current) => {
+          const next = { ...current };
+          for (const option of payload.options ?? []) {
+            next[option.value] = option;
+          }
+          return next;
+        });
+      })
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setSearchedRelatedProducts([]);
+          return;
         }
       });
 
     return () => controller.abort();
+  }, [relatedProductSourceId, selectedRelatedIds]);
+  useEffect(() => {
+    if (!relatedProductSourceId || !shouldSearchRelatedProducts(relatedProductQuery)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const query = new URLSearchParams({
+        source: relatedProductSourceId,
+        q: relatedProductQuery,
+      });
+      void fetch(`/api/author/seo/related-product-options?${query}`, {
+        signal: controller.signal,
+      })
+        .then((response) => (response.ok ? response.json() : { options: [] }))
+        .then((payload: { options?: RelatedProductSearchOption[] }) =>
+          setSearchedRelatedProducts(payload.options ?? []),
+        )
+        .catch((error: unknown) => {
+          if (!(error instanceof DOMException && error.name === "AbortError")) {
+            setSearchedRelatedProducts([]);
+          }
+        })
+        .finally(() => {
+          setCompletedRelatedProductQuery(relatedProductQuery);
+        });
+    }, RELATED_PRODUCT_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [relatedProductSourceId, relatedProductQuery]);
   const seoInput = {
     title,
@@ -192,7 +269,7 @@ export default function AuthorProductSeoSection({
     seoAbout,
     seoUsageItems: seoContent.usageItems.map((item) => item.content),
     seoFaqCount: seoContent.faqItems.filter((item) => item.question.trim() && item.answer.trim()).length,
-    seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length + seoContent.relatedListenSlugs.filter(Boolean).length,
+    seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length,
     publicPath,
   };
   const preview = buildProductSeoPreview(seoInput);
@@ -231,6 +308,18 @@ export default function AuthorProductSeoSection({
     }
 
     onChange({ seoSecondaryQueries: result.next });
+  }
+
+  function addSecondaryPhrasesFromDraft() {
+    const result = parseSeoSecondaryQueryList(secondaryDraft, {
+      existing: seoSecondaryQueries,
+      primaryQuery: seoPrimaryQuery,
+    });
+    if (result.added.length > 0) {
+      onChange({ seoSecondaryQueries: result.next });
+      setSecondaryDraft("");
+    }
+    setSecondaryBulkMessage(formatSeoSecondaryQueryBulkMessage(result));
   }
 
   function applyGeneratedDraft(draft: {
@@ -635,22 +724,34 @@ export default function AuthorProductSeoSection({
           ))}
         </div>
         {secondariesFull ? null : (
-          <input
-            aria-label="Новая дополнительная поисковая фраза"
-            disabled={disabled}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              const value = event.currentTarget.value.trim();
-              const result = canAddSecondaryQuery(value, seoSecondaryQueries);
-              if (!result.ok) return;
-              onChange({ seoSecondaryQueries: result.next });
-              event.currentTarget.value = "";
-            }}
-            className="mt-2 w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder="Введите фразу и нажмите Enter"
-          />
+          <div className="mt-2">
+            <textarea
+              aria-label="Дополнительные поисковые фразы"
+              disabled={disabled}
+              value={secondaryDraft}
+              onChange={(event) => {
+                setSecondaryDraft(event.target.value);
+                setSecondaryBulkMessage(null);
+              }}
+              rows={3}
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+              placeholder="Введите одну или несколько фраз через запятую или с новой строки"
+            />
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={addSecondaryPhrasesFromDraft}
+              className="mt-2 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Добавить фразы
+            </button>
+          </div>
         )}
+        {secondaryBulkMessage ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {secondaryBulkMessage}
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={disabled}
@@ -744,7 +845,7 @@ export default function AuthorProductSeoSection({
       </label>
 
       <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
-        <span className="mb-2 block text-sm font-medium">О продукте</span>
+        <span className="mb-2 block text-sm font-medium">{SEO_ABOUT_LABEL}</span>
         <textarea
           value={seoAbout}
           maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
@@ -754,13 +855,10 @@ export default function AuthorProductSeoSection({
           className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Дополнительный публичный текст для страницы продукта. Расскажите в 2–4
-          небольших абзацах: что это за продукт, для какой ситуации он создан,
-          что происходит во время прослушивания и чем он полезен.
+          {SEO_ABOUT_HELPER}
         </p>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-          Не копируйте дословно основное описание. Используйте поисковые фразы
-          только там, где они звучат естественно.
+          {SEO_ABOUT_AUTOFILL_HINT}
         </p>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
           Ориентир: 500–1500 символов.
@@ -821,46 +919,98 @@ export default function AuthorProductSeoSection({
           Выберите 2–4 продукта, которые действительно связаны с этой темой и
           могут быть полезны слушателю дальше.
         </p>
-        <input
-          aria-label="Поиск связанных продуктов"
-          value={relatedProductQuery}
-          disabled={disabled || !relatedProductSourceId}
-          onChange={(event) => setRelatedProductQuery(event.target.value)}
-          className="mt-2 w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2"
-          placeholder={relatedProductSourceId ? "Поиск по названию" : "Сначала сохраните продукт"}
-        />
-        {seoContent.relatedPracticeIds.map((id, index) => (
-          <div className="mt-2 flex gap-2" key={`product-${index}`}>
-            <select value={id} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
-              <option value="">Выберите опубликованный продукт</option>
-              {displayedRelatedProducts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, -1) } })}>↑</button>
-            <button type="button" disabled={disabled || index === seoContent.relatedPracticeIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, 1) } })}>↓</button>
-            <button type="button" disabled={disabled} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.filter((_, itemIndex) => itemIndex !== index) } })}>Удалить</button>
+        <label className="mt-3 block" htmlFor="related-product-search">
+          <span className="text-sm font-medium">Найти продукт</span>
+          <input
+            id="related-product-search"
+            aria-label="Найти продукт"
+            aria-controls="related-product-search-results"
+            aria-busy={relatedProductSearching && !relatedProductSearchSettled}
+            value={relatedProductQuery}
+            disabled={disabled || !relatedProductSourceId}
+            onChange={(event) => setRelatedProductQuery(event.target.value)}
+            className="mt-2 w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2"
+            placeholder={relatedProductSourceId ? "Введите название или слово из названия" : "Сначала сохраните продукт"}
+          />
+        </label>
+        <div id="related-product-search-results" role="status">
+        {!relatedProductSourceId ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Сначала сохраните продукт</p>
+        ) : relatedProductQuery.trim() && !shouldSearchRelatedProducts(relatedProductQuery) ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Начните вводить название</p>
+        ) : relatedProductSearching && !relatedProductSearchSettled ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ищем…</p>
+        ) : null}
+        {visibleRelatedProductResults.length ? (
+          <ul className="mt-2 space-y-1">
+            {visibleRelatedProductResults
+              .filter((option) => !selectedRelatedIds.includes(option.value))
+              .map((option) => (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-label={`Добавить «${option.label}»`}
+                    className="flex w-full min-w-0 items-center gap-3 rounded-[14px] border border-[#eadff8] bg-white px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    onClick={() => {
+                      const result = canAddRelatedProductId(
+                        option.value,
+                        seoContent.relatedPracticeIds,
+                        PRODUCT_CONTENT_LIMITS.seoUsageItems,
+                      );
+                      if (!result.ok) {
+                        return;
+                      }
+                      setSelectedRelatedProducts((current) => ({
+                        ...current,
+                        [option.value]: option,
+                      }));
+                      onChange({
+                        seoContent: {
+                          ...seoContent,
+                          relatedPracticeIds: result.next,
+                        },
+                      });
+                    }}
+                  >
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px]" aria-hidden="true">
+                      <ProductCoverThumbnail
+                        slug={option.value}
+                        title={option.label}
+                        coverUrl={option.coverUrl}
+                        authorName={option.authorName}
+                        format={option.formatLabel}
+                        displayWidth={48}
+                        className="h-full w-full rounded-[10px]"
+                      />
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      {option.formatLabel ? (
+                        <span className={`block ${PRODUCT_FORMAT_LINE_CLASS}`}>{option.formatLabel}</span>
+                      ) : null}
+                      <span className="block text-sm font-medium text-[#2b2140]">{option.label}</span>
+                      {option.authorName ? (
+                        <span className="mt-0.5 block truncate text-xs text-[#5c4f82]">{option.authorName}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+        ) : relatedProductSearchSettled && !visibleRelatedProductResults.length ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ничего не найдено</p>
+        ) : null}
+        </div>
+        {selectedRelatedIds.map((id, index) => (
+          <div className="mt-2 flex min-w-0 items-center gap-2" key={`product-${id}`}>
+            <p className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-[#fbf8ff] px-3 py-2 text-sm text-[#2b2140]">
+              {selectedRelatedLabels[id]?.label ?? "Выбранный продукт"}
+            </p>
+            <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(selectedRelatedIds, index, -1) } })}>↑</button>
+            <button type="button" disabled={disabled || index === selectedRelatedIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(selectedRelatedIds, index, 1) } })}>↓</button>
+            <button type="button" disabled={disabled} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: selectedRelatedIds.filter((current) => current !== id) } })}>Удалить</button>
           </div>
         ))}
-        {seoContent.relatedPracticeIds.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: [...seoContent.relatedPracticeIds, ""] } })}>+ Добавить продукт</button> : null}
-      </div>
-
-      <div className="mt-5 border-t border-[#e4d7f4] pt-5">
-        <p className="text-sm font-medium">Связанные страницы «Слушать»</p>
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Добавьте близкие по теме статьи АудиоЛада. Выбирайте только материалы,
-          которые действительно раскрывают ту же тему.
-        </p>
-        {seoContent.relatedListenSlugs.map((slug, index) => (
-          <div className="mt-2 flex gap-2" key={`listen-${index}`}>
-            <select value={slug} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedListenSlugs: seoContent.relatedListenSlugs.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
-              <option value="">Выберите страницу</option>
-              {listenOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: moveItem(seoContent.relatedListenSlugs, index, -1) } })}>↑</button>
-            <button type="button" disabled={disabled || index === seoContent.relatedListenSlugs.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: moveItem(seoContent.relatedListenSlugs, index, 1) } })}>↓</button>
-            <button type="button" disabled={disabled} onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: seoContent.relatedListenSlugs.filter((_, itemIndex) => itemIndex !== index) } })}>Удалить</button>
-          </div>
-        ))}
-        {seoContent.relatedListenSlugs.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: [...seoContent.relatedListenSlugs, ""] } })}>+ Добавить страницу</button> : null}
       </div>
 
       <div className="mt-5 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
