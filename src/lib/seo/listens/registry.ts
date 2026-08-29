@@ -80,6 +80,7 @@ import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "./content/naydu-li-ya-rabotu-taro"
 import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "./content/vozmut-li-menya-na-rabotu-taro";
 import { TARO_MENYAT_LI_RABOTU_PAGE } from "./content/taro-menyat-li-rabotu";
 import { TARO_RABOTA_I_KARERA_PAGE } from "./content/taro-rabota-i-karera";
+import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "./content/taro-perspektivy-na-rabote";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -169,6 +170,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE,
   TARO_MENYAT_LI_RABOTU_PAGE,
   TARO_RABOTA_I_KARERA_PAGE,
+  TARO_PERSPEKTIVY_NA_RABOTE_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
