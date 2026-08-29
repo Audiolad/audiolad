@@ -299,61 +299,63 @@ assert.match(seoSection, /Яндексе и Google/);
 assert.match(seoSection, /SEO-готовность/);
 assert.match(seoSection, /Это ориентир, а не условие публикации/);
 assert.match(seoSection, /Как заполнить SEO/);
+const openMarkup = seoSection.slice(seoSection.indexOf("{isOpen ? <>"));
 assert.ok(
   seoSection.indexOf("Как заполнить SEO") >
     seoSection.indexOf("{isOpen ? <>"),
   "method card is rendered only after the accordion opens",
 );
 assert.ok(
-  seoSection.indexOf("Как заполнить SEO") < seoSection.indexOf("SEO-готовность"),
+  openMarkup.indexOf("Как заполнить SEO") < openMarkup.indexOf("SEO-готовность"),
   "method card comes before readiness",
 );
 assert.ok(
-  seoSection.indexOf("SEO-готовность") <
-    seoSection.indexOf("Основной поисковый запрос"),
+  openMarkup.indexOf("SEO-готовность") <
+    openMarkup.indexOf("Основной поисковый запрос"),
   "readiness comes before primary query",
 );
 assert.ok(
-  seoSection.indexOf("Основной поисковый запрос") <
-    seoSection.indexOf("Дополнительные поисковые фразы"),
+  openMarkup.indexOf("Основной поисковый запрос") <
+    openMarkup.indexOf("Дополнительные поисковые фразы"),
   "primary query comes before secondary phrases",
 );
 assert.ok(
-  seoSection.indexOf("Дополнительные поисковые фразы") <
-    seoSection.indexOf("Заголовок для поиска"),
+  openMarkup.indexOf("Дополнительные поисковые фразы") <
+    openMarkup.indexOf("Заголовок для поиска"),
   "secondary phrases come before search title",
 );
 assert.ok(
-  seoSection.indexOf("Заголовок для поиска") <
-    seoSection.indexOf("Описание для поиска"),
+  openMarkup.indexOf("Заголовок для поиска") <
+    openMarkup.indexOf("Описание для поиска"),
   "search title comes before search description",
 );
 assert.ok(
-  seoSection.indexOf("Описание для поиска") < seoSection.indexOf("О продукте"),
+  openMarkup.indexOf("Описание для поиска") < openMarkup.indexOf("О продукте"),
   "search description comes before about",
 );
 assert.ok(
-  seoSection.indexOf("О продукте") < seoSection.indexOf("getPracticeSeoUsageHeading"),
+  openMarkup.indexOf("О продукте") <
+    openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}"),
   "about comes before usage",
 );
 assert.ok(
-  seoSection.indexOf("getPracticeSeoUsageHeading") <
-    seoSection.indexOf("Вопросы и ответы"),
+  openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}") <
+    openMarkup.indexOf("Вопросы и ответы"),
   "usage comes before FAQ",
 );
 assert.ok(
-  seoSection.indexOf("Вопросы и ответы") <
-    seoSection.indexOf("Связанные продукты"),
+  openMarkup.indexOf("Вопросы и ответы") <
+    openMarkup.indexOf("Связанные продукты"),
   "FAQ comes before related products",
 );
 assert.ok(
-  seoSection.indexOf("Связанные продукты") <
-    seoSection.indexOf("Связанные страницы «Слушать»"),
+  openMarkup.indexOf("Связанные продукты") <
+    openMarkup.indexOf("Связанные страницы «Слушать»"),
   "related products come before related listens",
 );
 assert.ok(
-  seoSection.indexOf("Связанные страницы «Слушать»") <
-    seoSection.indexOf("preview.title"),
+  openMarkup.indexOf("Связанные страницы «Слушать»") <
+    openMarkup.indexOf("{preview.displayUrl}"),
   "related listens come before search preview",
 );
 assert.match(
@@ -362,7 +364,8 @@ assert.match(
 );
 assert.match(seoSection, /Пишите прежде всего для человека/);
 assert.match(seoSection, /Например: медитация для сна/);
-assert.match(seoSection, /Помочь подобрать запрос/);
+assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);
+assert.match(read("src/lib/seo/wordstat/ui.ts"), /Подобрать похожие/);
 assert.match(seoSection, /getWordstatPrimaryCtaLabel\(seoPrimaryQuery\)/);
 assert.match(seoSection, /onChange=\{\(event\) =>\s+onChange\(\{ seoPrimaryQuery: event\.target\.value \}\)/s);
 assert.match(seoSection, /disabled=\{disabled\}/);
@@ -375,7 +378,7 @@ assert.match(wordstatPicker, /Россия · все устройства/);
 assert.match(wordstatPicker, /50–1000 запросов за 30 дней/);
 assert.match(wordstatPicker, /подходит для старта/);
 assert.match(wordstatPicker, /стоит оценить внимательнее/);
-assert.match(wordstatPicker, /лучше поискать другой вариант/);
+assert.match(wordstatPicker, /лучше поискать[\s\S]*другой вариант/);
 assert.match(wordstatPicker, /Частотность показывает поисковый спрос, а не гарантирует позицию/);
 assert.match(wordstatPicker, /Запросы по теме/);
 assert.match(wordstatPicker, /Похожие запросы/);
@@ -385,7 +388,8 @@ assert.match(wordstatPicker, /Основной/);
 assert.match(wordstatPicker, /Добавлено/);
 assert.match(wordstatPicker, /aria-label=\{ariaLabel\}/);
 assert.match(wordstatPicker, /wordstatColorClasses/);
-assert.match(wordstatPicker, /запросов за последние 30 дней/);
+assert.match(read("src/lib/seo/wordstat/ui.ts"), /запросов за последние 30 дней/);
+assert.match(wordstatPicker, /запросов за последние[\s\S]*30 дней/);
 assert.match(wordstatPicker, /общая оценка темы, а не частота самой фразы/);
 assert.doesNotMatch(wordstatPicker, /конкуренция низкая|TOP-3|TOP-5|results\[|associations\[|totalCount/);
 assert.match(seoSection, /canAddSecondaryQuery/);

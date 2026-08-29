@@ -176,7 +176,7 @@ export function classifyWordstatHttpError(
 }
 
 /**
- * Official GetTop only. Never scrapes wordstat.yandex.ru.
+ * Official Cloud Search API GetTop only. Never scrapes the public Wordstat site.
  * Client-facing callers must not pass folderId, API key, region, or URL.
  */
 export async function fetchWordstatSuggestions(

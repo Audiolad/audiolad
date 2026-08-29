@@ -455,14 +455,19 @@ assert.doesNotMatch(route, /YANDEX_WEBMASTER_/);
 assert.doesNotMatch(route, /wordstat\.yandex\.ru/);
 
 const client = read("src/lib/seo/wordstat/client.ts");
-assert.match(client, /searchapi\.api\.cloud\.yandex\.net\/v2\/wordstat\/topRequests/);
+assert.match(client, /WORDSTAT_GET_TOP_URL/);
 assert.match(client, /Api-Key/);
-assert.match(client, /DEVICE_ALL/);
 assert.match(client, /numPhrases/);
 assert.match(client, /sleepImpl\(400\)/);
 assert.match(client, /import "server-only"/);
 assert.doesNotMatch(client, /wordstat\.yandex\.ru/);
 assert.doesNotMatch(client, /YANDEX_WEBMASTER_/);
+
+const types = read("src/lib/seo/wordstat/types.ts");
+assert.match(types, /searchapi\.api\.cloud\.yandex\.net/);
+assert.match(types, /\/v2\/wordstat\/topRequests/);
+assert.match(types, /DEVICE_ALL/);
+assert.match(types, /WORDSTAT_NUM_PHRASES = 20/);
 
 const config = read("src/lib/seo/wordstat/config.ts");
 assert.match(config, /YANDEX_WORDSTAT_ENABLED/);
