@@ -109,6 +109,7 @@ import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/nay
 import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/vozmut-li-menya-na-rabotu-taro.ts";
 import { TARO_MENYAT_LI_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-menyat-li-rabotu.ts";
 import { TARO_RABOTA_I_KARERA_PAGE } from "../src/lib/seo/listens/content/taro-rabota-i-karera.ts";
+import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-perspektivy-na-rabote.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2491,6 +2492,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightySecondListenHref}`,
     ),
     "directory JSON-LD includes eighty-second listen href",
+  );
+
+  const eightyThirdListenHref = "/listens/taro-perspektivy-na-rabote";
+  const eightyThirdListenCard = data.articles.find((card) => card.href === eightyThirdListenHref);
+  assert(eightyThirdListenCard, "eighty-third indexable listen page is listed");
+  assert(
+    eightyThirdListenCard.title === "Таро перспективы на работе – успех, рост и повышение | АудиоЛад",
+    "eighty-third listen directory title",
+  );
+  assert(
+    eightyThirdListenCard.description === TARO_PERSPEKTIVY_NA_RABOTE_PAGE.description,
+    "eighty-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-perspektivy-na-rabote",
+    ),
+    "no /articles duplicate for eighty-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-third listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
