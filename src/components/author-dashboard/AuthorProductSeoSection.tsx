@@ -22,6 +22,30 @@ import {
 } from "@/lib/seo/wordstat/ui";
 import { WORDSTAT_ERROR_MESSAGES } from "@/lib/seo/wordstat/errors";
 import type { WordstatSuggestionsPayload } from "@/lib/seo/wordstat/types";
+import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "@/lib/seo/product-autofill/errors";
+import {
+  hasFilledGeneratedSeoFields,
+  PRODUCT_SEO_ACCORDION_BADGE_COPY,
+  PRODUCT_SEO_ACCORDION_TITLE,
+  PRODUCT_SEO_ADD_OWN_FAQ,
+  PRODUCT_SEO_AFTER_PRIMARY_COPY,
+  PRODUCT_SEO_CLOSED_TEASER,
+  PRODUCT_SEO_GENERATE_CTA,
+  PRODUCT_SEO_GENERATE_LOADING,
+  PRODUCT_SEO_GENERATE_STAGE_QUERIES,
+  PRODUCT_SEO_GENERATE_STAGE_TEXT,
+  PRODUCT_SEO_OVERWRITE_CANCEL,
+  PRODUCT_SEO_OVERWRITE_CONFIRM,
+  PRODUCT_SEO_OVERWRITE_REPLACE,
+  PRODUCT_SEO_PICK_PRIMARY_CTA,
+  PRODUCT_SEO_READINESS_HINT,
+  PRODUCT_SEO_SELLING_COPY,
+  PRODUCT_SEO_START_HEADING,
+  PRODUCT_SEO_START_TEXT,
+  productSeoPrimarySelectedLabel,
+  resolveProductSeoAccordionBadge,
+  suggestPrimaryQuerySeeds,
+} from "@/lib/seo/product-autofill/ui";
 
 type SelectOption = { value: string; label: string };
 
@@ -104,6 +128,12 @@ export default function AuthorProductSeoSection({
   const [wordstatError, setWordstatError] = useState<string | null>(null);
   const [wordstatResult, setWordstatResult] =
     useState<WordstatSuggestionsPayload | null>(null);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [generateStage, setGenerateStage] = useState<
+    "queries" | "text" | null
+  >(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [overwriteOpen, setOverwriteOpen] = useState(false);
   const displayedRelatedProducts = relatedProductSourceId
     ? searchedRelatedProducts
     : relatedProductOptions;
@@ -155,6 +185,21 @@ export default function AuthorProductSeoSection({
   };
   const preview = buildProductSeoPreview(seoInput);
   const readiness = evaluateProductSeoReadiness(seoInput);
+  const accordionBadge = resolveProductSeoAccordionBadge(readiness, {
+    seoPrimaryQuery,
+    seoTitle,
+    seoDescription,
+    seoAbout,
+  });
+  const primarySelected = Boolean(seoPrimaryQuery.trim());
+  const primarySeeds = primarySelected
+    ? []
+    : suggestPrimaryQuerySeeds({
+        title,
+        subtitle,
+        description,
+        productKind,
+      });
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
 
@@ -174,6 +219,122 @@ export default function AuthorProductSeoSection({
     }
 
     onChange({ seoSecondaryQueries: result.next });
+  }
+
+  function applyGeneratedDraft(draft: {
+    seoSecondaryQueries: string[];
+    seoTitle: string;
+    seoDescription: string;
+    seoAbout: string;
+    usageItems: Array<{ content: string }>;
+    faqItems: Array<{ question: string; answer: string }>;
+  }) {
+    onChange({
+      seoSecondaryQueries: draft.seoSecondaryQueries,
+      seoTitle: draft.seoTitle,
+      seoDescription: draft.seoDescription,
+      seoAbout: draft.seoAbout,
+      seoContent: {
+        ...seoContent,
+        usageItems: draft.usageItems,
+        faqItems: draft.faqItems,
+      },
+    });
+  }
+
+  async function generateProductSeo() {
+    if (generateLoading || disabled || !primarySelected) {
+      return;
+    }
+
+    setGenerateLoading(true);
+    setGenerateStage("queries");
+    setGenerateError(null);
+    setOverwriteOpen(false);
+    const stageTimer = window.setTimeout(() => {
+      setGenerateStage("text");
+    }, 1200);
+
+    try {
+      const response = await fetch("/api/author/seo/product-autofill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          subtitle,
+          description,
+          productKind,
+          seoPrimaryQuery,
+          usageItems: seoContent.usageItems.map((item) => item.content),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            seoSecondaryQueries?: string[];
+            seoTitle?: string;
+            seoDescription?: string;
+            seoAbout?: string;
+            usageItems?: Array<{ content: string }>;
+            faqItems?: Array<{ question: string; answer: string }>;
+            error?: string;
+            code?: string;
+          }
+        | null;
+
+      if (
+        !response.ok ||
+        !payload ||
+        typeof payload.seoTitle !== "string" ||
+        typeof payload.seoDescription !== "string" ||
+        typeof payload.seoAbout !== "string" ||
+        !Array.isArray(payload.seoSecondaryQueries) ||
+        !Array.isArray(payload.usageItems) ||
+        !Array.isArray(payload.faqItems)
+      ) {
+        setGenerateError(
+          (payload && typeof payload.error === "string" && payload.error) ||
+            PRODUCT_SEO_AI_ERROR_MESSAGE,
+        );
+        return;
+      }
+
+      applyGeneratedDraft({
+        seoSecondaryQueries: payload.seoSecondaryQueries,
+        seoTitle: payload.seoTitle,
+        seoDescription: payload.seoDescription,
+        seoAbout: payload.seoAbout,
+        usageItems: payload.usageItems,
+        faqItems: payload.faqItems,
+      });
+    } catch {
+      setGenerateError(PRODUCT_SEO_AI_ERROR_MESSAGE);
+    } finally {
+      window.clearTimeout(stageTimer);
+      setGenerateLoading(false);
+      setGenerateStage(null);
+    }
+  }
+
+  function requestGenerateProductSeo() {
+    if (generateLoading || disabled || !primarySelected) {
+      return;
+    }
+
+    if (
+      hasFilledGeneratedSeoFields({
+        seoSecondaryQueries,
+        seoTitle,
+        seoDescription,
+        seoAbout,
+        seoContent,
+      })
+    ) {
+      setOverwriteOpen(true);
+      setGenerateError(null);
+      return;
+    }
+
+    void generateProductSeo();
   }
 
   async function submitWordstat() {
@@ -229,35 +390,118 @@ export default function AuthorProductSeoSection({
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
-        <span>{isOpen ? "−" : "＋"} SEO и продвижение · необязательно</span>
+        <span>{isOpen ? "−" : "＋"} {PRODUCT_SEO_ACCORDION_TITLE}</span>
       </button>
       {!isOpen ? (
-        <p className="mt-2 text-sm text-[#7d70a2]">
-          {seoPrimaryQuery || seoSecondaryQueries.length || seoTitle || seoDescription || seoAbout
-            ? "SEO заполнено частично"
-            : "SEO не заполнено"}
-        </p>
+        <div className="mt-2 space-y-1">
+          <p className="text-sm text-[#7d70a2]">
+            {PRODUCT_SEO_ACCORDION_BADGE_COPY[accordionBadge]}
+          </p>
+          {accordionBadge === "recommend" ? (
+            <p className="text-sm leading-5 text-[#5c5278]">
+              {PRODUCT_SEO_CLOSED_TEASER}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {isOpen ? <><p className="mt-2 text-sm leading-6 text-[#5c5278]">
-        Помогите людям находить ваш продукт в Яндексе и Google.
+        {PRODUCT_SEO_SELLING_COPY}
       </p>
 
-      <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
-        <p className="text-sm font-medium text-[#2b2140]">Как заполнить SEO</p>
-        <p className="mt-2 text-sm leading-6 text-[#5c5278]">
-          1. Выберите один основной запрос, по которому люди могут искать такой продукт.
-          2. Добавьте несколько близких поисковых фраз.
-          3. Используйте основной запрос естественно в заголовке для поиска и тексте продукта.
-          4. Пишите прежде всего для человека – не повторяйте ключевые слова искусственно.
-        </p>
-      </div>
+      {!primarySelected ? (
+        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+          <p className="text-sm leading-6 text-[#5c5278]">{PRODUCT_SEO_CLOSED_TEASER}</p>
+          <p className="mt-3 text-sm font-medium text-[#2b2140]">
+            {PRODUCT_SEO_START_HEADING}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#5c5278]">
+            {PRODUCT_SEO_START_TEXT}
+          </p>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => openWordstatPicker()}
+            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {PRODUCT_SEO_PICK_PRIMARY_CTA}
+          </button>
+          {primarySeeds.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {primarySeeds.map((seed) => (
+                <button
+                  key={seed}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => openWordstatPicker(seed)}
+                  className="rounded-full border border-[#d4c4ee] bg-white px-3 py-1.5 text-sm text-[#4d336f] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {seed}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+          <p className="text-sm leading-6 text-[#5c5278]">
+            {PRODUCT_SEO_AFTER_PRIMARY_COPY}
+          </p>
+          <p className="mt-2 text-sm font-medium text-[#2b2140]">
+            {productSeoPrimarySelectedLabel(seoPrimaryQuery)}
+          </p>
+          <button
+            type="button"
+            disabled={disabled || generateLoading}
+            onClick={requestGenerateProductSeo}
+            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generateLoading
+              ? generateStage === "queries"
+                ? PRODUCT_SEO_GENERATE_STAGE_QUERIES
+                : generateStage === "text"
+                  ? PRODUCT_SEO_GENERATE_STAGE_TEXT
+                  : PRODUCT_SEO_GENERATE_LOADING
+              : PRODUCT_SEO_GENERATE_CTA}
+          </button>
+          {overwriteOpen ? (
+            <div className="mt-3 rounded-[14px] border border-[#ead48a] bg-[#fff8e6] px-3 py-3">
+              <p className="text-sm leading-5 text-[#5c5278]">
+                {PRODUCT_SEO_OVERWRITE_CONFIRM}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={disabled || generateLoading}
+                  onClick={() => {
+                    void generateProductSeo();
+                  }}
+                  className="rounded-full bg-[#7042c5] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {PRODUCT_SEO_OVERWRITE_REPLACE}
+                </button>
+                <button
+                  type="button"
+                  disabled={generateLoading}
+                  onClick={() => setOverwriteOpen(false)}
+                  className="rounded-full border border-[#d4c4ee] bg-white px-3 py-1.5 text-sm text-[#4d336f]"
+                >
+                  {PRODUCT_SEO_OVERWRITE_CANCEL}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {generateError ? (
+            <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
+          ) : null}
+        </div>
+      )}
 
       <p className="mt-4 text-sm font-medium text-[#2b2140]">
         SEO-готовность: {readiness.doneCount} из {readiness.total}
       </p>
       <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-        Это ориентир, а не условие публикации.
+        {PRODUCT_SEO_READINESS_HINT}
       </p>
       <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[#5c5278]">
         {readiness.checks.map((check) => (
@@ -528,7 +772,7 @@ export default function AuthorProductSeoSection({
             <button type="button" disabled={disabled} className="justify-self-start text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, faqItems: seoContent.faqItems.filter((_, itemIndex) => itemIndex !== index) } })}>Удалить</button>
           </div>
         ))}
-        {seoContent.faqItems.length < PRODUCT_CONTENT_LIMITS.seoFaqItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, faqItems: [...seoContent.faqItems, { question: "", answer: "" }] } })}>+ Добавить вопрос</button> : null}
+        {seoContent.faqItems.length < PRODUCT_CONTENT_LIMITS.seoFaqItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, faqItems: [...seoContent.faqItems, { question: "", answer: "" }] } })}>{PRODUCT_SEO_ADD_OWN_FAQ}</button> : null}
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
