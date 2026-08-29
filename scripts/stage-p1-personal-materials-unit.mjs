@@ -192,6 +192,59 @@ function testMigrationFile() {
   assert(!sql.includes("Claimed owners can read own personal materials"), "owner direct select removed");
   assert(sql.includes("20 MiB"), "pdf limit comment");
   assert(!sql.includes("author_display_name"), "no duplicated author display name");
+  assert(
+    sql.includes("ARRAY['audio/mpeg', 'application/pdf']"),
+    "foundation bucket MIME allowlist is mpeg+pdf",
+  );
+  assert(sql.includes("52428800"), "foundation file_size_limit stays 50 MiB");
+}
+
+function testM4aMimeMigration() {
+  const sql = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260905120000_personal_materials_allow_m4a_mime.sql",
+    ),
+    "utf8",
+  );
+
+  assert(
+    /id\s*=\s*'personal-materials'/.test(sql),
+    "hotfix must target id='personal-materials' only",
+  );
+  assert(
+    /array_append\(\s*allowed_mime_types\s*,\s*'audio\/mp4'\s*\)/.test(sql),
+    "hotfix must append audio/mp4 without replacing the allowlist",
+  );
+  assert(
+    /allowed_mime_types\s+IS\s+NOT\s+NULL/.test(sql),
+    "hotfix must refuse to write a list when allowed_mime_types is NULL",
+  );
+  assert(
+    /NOT\s+\(\s*'audio\/mp4'\s*=\s*ANY\(\s*allowed_mime_types\s*\)\s*\)/.test(sql),
+    "hotfix must no-op when audio/mp4 is already present",
+  );
+  assert(
+    !/\bSET\b[\s\S]*allowed_mime_types\s*=\s*NULL/i.test(sql),
+    "hotfix must not set allowed_mime_types NULL",
+  );
+  assert(
+    !/allowed_mime_types\s*=\s*ARRAY\s*\[/.test(sql),
+    "hotfix must not overwrite the allowlist with a hardcoded ARRAY",
+  );
+  assert(!/\bfile_size_limit\b/.test(sql), "hotfix must not change file_size_limit");
+  assert(!/\bpublic\s*=/.test(sql), "hotfix must not change public");
+  assert(
+    !/\b(studio-draft-assets|practice-audio|publication-files|user-avatars)\b/.test(
+      sql,
+    ),
+    "hotfix must not touch other buckets",
+  );
+  assert(!/\bCREATE\s+POLICY\b/i.test(sql), "hotfix must not change RLS policies");
+  assert(
+    !/\b(audio\/mpeg|application\/pdf)\b/.test(sql.replace(/audio\/mp4/g, "")),
+    "preservation of mpeg/pdf is via append, not a rewritten list",
+  );
 }
 
 function main() {
@@ -202,6 +255,7 @@ function main() {
   testStoragePaths();
   testClaimContext();
   testMigrationFile();
+  testM4aMimeMigration();
   console.log("stage-p1-personal-materials-unit: PASS");
 }
 
