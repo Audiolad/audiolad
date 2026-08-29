@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
+import {
+  isPersonalMaterialAudioExtension,
+  type PersonalMaterialAudioExtension,
+} from "@/lib/personal-materials/audio-format";
+
 export const PERSONAL_MATERIALS_BUCKET = "personal-materials" as const;
 
 const UUID_PATTERN =
@@ -28,11 +33,16 @@ export function sanitizeStorageFilename(originalName: string): string {
 export function buildPersonalMaterialAudioPath(
   authorId: string,
   materialId: string,
+  extension: PersonalMaterialAudioExtension,
 ): string {
   assertUuid(authorId, "author_id");
   assertUuid(materialId, "material_id");
 
-  return `${authorId}/${materialId}/audio/${randomUUID()}.mp3`;
+  if (!isPersonalMaterialAudioExtension(extension)) {
+    throw new Error("invalid_audio_extension");
+  }
+
+  return `${authorId}/${materialId}/audio/${randomUUID()}.${extension}`;
 }
 
 export function buildPersonalMaterialDocumentPath(
@@ -48,6 +58,23 @@ export function buildPersonalMaterialDocumentPath(
   return `${authorId}/${materialId}/documents/${safeFilename}`;
 }
 
+export function resolveReplacedPersonalMaterialStoragePath(
+  previousPath: string | null | undefined,
+  nextPath: string,
+): string | null {
+  const previous = previousPath?.trim() || null;
+
+  if (!previous || previous === nextPath) {
+    return null;
+  }
+
+  if (!isPathInsidePersonalMaterialRoot(previous)) {
+    return null;
+  }
+
+  return previous;
+}
+
 export function isPathInsidePersonalMaterialRoot(storagePath: string): boolean {
   const normalized = storagePath.replace(/\\/g, "/").trim();
 
@@ -61,11 +88,20 @@ export function isPathInsidePersonalMaterialRoot(storagePath: string): boolean {
     return false;
   }
 
-  const [authorId, materialId, kind] = segments;
+  const [authorId, materialId, kind, filename] = segments;
 
   if (!UUID_PATTERN.test(authorId) || !UUID_PATTERN.test(materialId)) {
     return false;
   }
 
-  return kind === "audio" || kind === "documents";
+  if (!filename || filename === "." || filename === "..") {
+    return false;
+  }
+
+  if (kind === "audio") {
+    const lowerFilename = filename.toLowerCase();
+    return lowerFilename.endsWith(".mp3") || lowerFilename.endsWith(".m4a");
+  }
+
+  return kind === "documents";
 }

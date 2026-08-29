@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
+import { getPersonalMaterialAudioDownloadFallbackFilename } from "@/lib/personal-materials/audio-format";
 import { sanitizePersonalMaterialDownloadFilename } from "@/lib/personal-materials/download-filename";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -17,15 +18,13 @@ import { PersonalMaterialApiError } from "./errors";
 export type PersonalMaterialAttachmentKind = "audio" | "pdf";
 
 export function resolvePersonalMaterialDownloadFilename(
-  material: Pick<
-    PersonalMaterialRow,
-    "audio_original_filename" | "pdf_original_filename"
-  >,
+  material: Pick<PersonalMaterialRow, "audio_original_filename" | "pdf_original_filename"> &
+    Partial<Pick<PersonalMaterialRow, "audio_path">>,
   kind: PersonalMaterialAttachmentKind,
 ): string {
   if (kind === "audio") {
     const name = material.audio_original_filename?.trim();
-    return name || "audio.mp3";
+    return name || getPersonalMaterialAudioDownloadFallbackFilename(material.audio_path);
   }
 
   const name = material.pdf_original_filename?.trim();
@@ -62,7 +61,9 @@ export async function createAuthorAttachmentDownloadSignedUrl(
 
   const filename = sanitizePersonalMaterialDownloadFilename(
     resolvePersonalMaterialDownloadFilename(material, kind),
-    kind === "audio" ? "audio.mp3" : "document.pdf",
+    kind === "audio"
+      ? getPersonalMaterialAudioDownloadFallbackFilename(material.audio_path)
+      : "document.pdf",
   );
   const service = createServiceRoleClient();
   const expiresIn = PERSONAL_MATERIAL_LIMITS.signedUrlTtlSeconds;
