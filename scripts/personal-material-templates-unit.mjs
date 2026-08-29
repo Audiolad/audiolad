@@ -6,7 +6,19 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  PERSONAL_MATERIAL_TEMPLATE_DISPLAY_ORDER,
+  sortPersonalMaterialTemplatesForDisplay,
+} from "../src/lib/personal-materials/template-display-order.ts";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+const REQUIRED_TEMPLATE_DISPLAY_ORDER = [
+  "Диагностика МАКС",
+  "Диагностика Телеграм",
+  "Диагностика ПДФ МАКС",
+  "Диагностика ПДФ Телеграм",
+];
 
 function assert(condition, message) {
   if (!condition) {
@@ -58,6 +70,10 @@ function testTemplateApi() {
   assert(!inst.includes("access_token"), "instantiate no token");
   assert(server.includes("parseTemplateBody"), "parse body");
   assert(server.includes("toSafePersonalMaterialTemplateDto"), "safe dto");
+  assert(
+    server.includes("sortPersonalMaterialTemplatesForDisplay"),
+    "list applies stable display order",
+  );
 }
 
 function testAuthorPlayer() {
@@ -111,6 +127,12 @@ function testUiWiring() {
   assert(create.includes("Создать с нуля"), "create blank");
   assert(create.includes("Создать из шаблона"), "create from template");
   assert(create.includes("instantiateAuthorPersonalMaterialTemplate"), "create instantiate");
+  assert(create.includes("value={template.id}"), "dropdown option keeps template id");
+  assert(create.includes("{template.internalName}"), "dropdown label keeps existing title");
+  assert(
+    create.includes("instantiateAuthorPersonalMaterialTemplate(selectedTemplateId)"),
+    "instantiate still uses selected id",
+  );
   assert(panel.includes("Создать из шаблона"), "panel primary action");
   assert(panel.includes("Дублировать"), "panel duplicate");
   assert(panel.includes("Удалить"), "panel delete");
@@ -122,11 +144,70 @@ function testUiWiring() {
   assert(editPage.includes("getPersonalMaterialTemplateById"), "edit loads template");
 }
 
+function testTemplateDisplayOrder() {
+  const actualOrder = [...PERSONAL_MATERIAL_TEMPLATE_DISPLAY_ORDER];
+  assert(
+    actualOrder.length === REQUIRED_TEMPLATE_DISPLAY_ORDER.length &&
+      actualOrder.every((title, index) => title === REQUIRED_TEMPLATE_DISPLAY_ORDER[index]),
+    "display-order constant matches required titles",
+  );
+
+  const shuffled = [
+    { id: "d", internalName: "Диагностика ПДФ Телеграм" },
+    { id: "b", internal_name: "Диагностика Телеграм" },
+    { id: "c", internalName: "Диагностика ПДФ МАКС" },
+    { id: "a", internal_name: "Диагностика МАКС" },
+  ];
+  const sortedKnown = sortPersonalMaterialTemplatesForDisplay(shuffled);
+
+  assert(
+    sortedKnown.map((item) => item.internalName ?? item.internal_name).join("|") ===
+      REQUIRED_TEMPLATE_DISPLAY_ORDER.join("|"),
+    "known titles sort to required order regardless of updated_at/id",
+  );
+  assert(
+    sortedKnown.map((item) => item.id).join("|") === "a|b|c|d",
+    "known-title sort keeps original template ids",
+  );
+
+  const mixed = [
+    { id: "z", internalName: "Якорь" },
+    { id: "m2", internalName: "Другой шаблон" },
+    { id: "tg", internalName: "Диагностика Телеграм" },
+    { id: "m1", internalName: "Другой шаблон" },
+    { id: "max", internalName: "Диагностика МАКС" },
+    { id: "pdf-tg", internalName: "Диагностика ПДФ Телеграм" },
+    { id: "pdf-max", internalName: "Диагностика ПДФ МАКС" },
+    { id: "a-extra", internalName: "Альфа" },
+  ];
+  const sortedMixed = sortPersonalMaterialTemplatesForDisplay(mixed);
+
+  assert(
+    sortedMixed.map((item) => item.id).join("|") ===
+      "max|tg|pdf-max|pdf-tg|a-extra|m1|m2|z",
+    "known titles first; remaining titles localeCompare then id",
+  );
+
+  const reversed = sortPersonalMaterialTemplatesForDisplay([...mixed].reverse());
+  assert(
+    reversed.map((item) => item.id).join("|") ===
+      sortedMixed.map((item) => item.id).join("|"),
+    "display order is stable for the same set",
+  );
+
+  const helper = read("src/lib/personal-materials/template-display-order.ts");
+  assert(
+    !helper.includes("created_at") && !helper.includes("updated_at"),
+    "display order is not created_at/updated_at",
+  );
+}
+
 function main() {
   testMigration();
   testTemplateApi();
   testAuthorPlayer();
   testUiWiring();
+  testTemplateDisplayOrder();
   console.log("personal-material-templates-unit: PASS");
 }
 

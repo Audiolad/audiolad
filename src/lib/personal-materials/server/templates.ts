@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 import {
   validateReturnButtonLabel,
   validateReturnUrl,
 } from "@/lib/personal-materials/return-url";
+import { sortPersonalMaterialTemplatesForDisplay } from "@/lib/personal-materials/template-display-order";
+import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 
 import { PersonalMaterialApiError } from "./errors";
 
@@ -141,7 +142,9 @@ export async function listPersonalMaterialTemplates(
     throw new PersonalMaterialApiError("internal_error", 500);
   }
 
-  return (data ?? []) as PersonalMaterialTemplateRow[];
+  return sortPersonalMaterialTemplatesForDisplay(
+    (data ?? []) as PersonalMaterialTemplateRow[],
+  );
 }
 
 export async function getPersonalMaterialTemplateById(
