@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import {
   PRODUCT_CONTENT_LIMITS,
 } from "@/lib/author-products/limits";
@@ -13,6 +14,14 @@ import {
   getPracticeSeoUsageHeading,
   type PracticeSeoContentInput,
 } from "@/lib/products/practice-seo-content";
+import {
+  canAddSecondaryQuery,
+  clipSeoQuery,
+  getWordstatPrimaryCtaLabel,
+  resolveWordstatSeed,
+} from "@/lib/seo/wordstat/ui";
+import { WORDSTAT_ERROR_MESSAGES } from "@/lib/seo/wordstat/errors";
+import type { WordstatSuggestionsPayload } from "@/lib/seo/wordstat/types";
 
 type SelectOption = { value: string; label: string };
 
@@ -89,6 +98,12 @@ export default function AuthorProductSeoSection({
   const [relatedProductQuery, setRelatedProductQuery] = useState("");
   const [searchedRelatedProducts, setSearchedRelatedProducts] =
     useState<SelectOption[]>([]);
+  const [wordstatOpen, setWordstatOpen] = useState(false);
+  const [wordstatSeed, setWordstatSeed] = useState("");
+  const [wordstatLoading, setWordstatLoading] = useState(false);
+  const [wordstatError, setWordstatError] = useState<string | null>(null);
+  const [wordstatResult, setWordstatResult] =
+    useState<WordstatSuggestionsPayload | null>(null);
   const displayedRelatedProducts = relatedProductSourceId
     ? searchedRelatedProducts
     : relatedProductOptions;
@@ -140,6 +155,71 @@ export default function AuthorProductSeoSection({
   };
   const preview = buildProductSeoPreview(seoInput);
   const readiness = evaluateProductSeoReadiness(seoInput);
+  const secondariesFull =
+    seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
+
+  function openWordstatPicker(seedOverride?: string) {
+    setWordstatOpen(true);
+    setWordstatError(null);
+    setWordstatSeed(
+      seedOverride?.trim() ||
+        resolveWordstatSeed({ seoPrimaryQuery, title }),
+    );
+  }
+
+  function addSecondaryPhrase(phrase: string) {
+    const result = canAddSecondaryQuery(phrase, seoSecondaryQueries);
+    if (!result.ok) {
+      return;
+    }
+
+    onChange({ seoSecondaryQueries: result.next });
+  }
+
+  async function submitWordstat() {
+    if (wordstatLoading) {
+      return;
+    }
+
+    setWordstatLoading(true);
+    setWordstatError(null);
+
+    try {
+      const response = await fetch("/api/author/seo/wordstat/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phrase: wordstatSeed }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | WordstatSuggestionsPayload
+        | { error?: string; code?: string }
+        | null;
+
+      if (!response.ok || !payload || !("suggestions" in payload)) {
+        const code = payload && "code" in payload ? payload.code : null;
+        setWordstatResult(null);
+        setWordstatError(
+          (payload && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : null) ||
+            (code === "RATE_LIMITED"
+              ? WORDSTAT_ERROR_MESSAGES.RATE_LIMITED
+              : WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR),
+        );
+        return;
+      }
+
+      setWordstatResult(payload);
+      if (payload.suggestions.length === 0) {
+        setWordstatError(WORDSTAT_ERROR_MESSAGES.NO_RESULTS);
+      }
+    } catch {
+      setWordstatResult(null);
+      setWordstatError(WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
+    } finally {
+      setWordstatLoading(false);
+    }
+  }
 
   return (
     <section className="rounded-[22px] border border-[#e4d7f4] bg-[#fcf8ff] px-4 py-5 sm:px-5">
@@ -163,8 +243,21 @@ export default function AuthorProductSeoSection({
         Помогите людям находить ваш продукт в Яндексе и Google.
       </p>
 
+      <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+        <p className="text-sm font-medium text-[#2b2140]">Как заполнить SEO</p>
+        <p className="mt-2 text-sm leading-6 text-[#5c5278]">
+          1. Выберите один основной запрос, по которому люди могут искать такой продукт.
+          2. Добавьте несколько близких поисковых фраз.
+          3. Используйте основной запрос естественно в заголовке для поиска и тексте продукта.
+          4. Пишите прежде всего для человека – не повторяйте ключевые слова искусственно.
+        </p>
+      </div>
+
       <p className="mt-4 text-sm font-medium text-[#2b2140]">
         SEO-готовность: {readiness.doneCount} из {readiness.total}
+      </p>
+      <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+        Это ориентир, а не условие публикации.
       </p>
       <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[#5c5278]">
         {readiness.checks.map((check) => (
@@ -173,9 +266,6 @@ export default function AuthorProductSeoSection({
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
-        Используйте фразы естественно — не повторяйте их искусственно.
-      </p>
 
       <label
         className="mt-5 block"
@@ -195,9 +285,18 @@ export default function AuthorProductSeoSection({
           placeholder="Например: медитация для сна"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Напишите фразу, которую человек может ввести в Яндексе, чтобы найти
-          такой аудиопродукт.
+          Одна главная фраза, по которой человек может искать именно такой
+          продукт. Можно написать её самостоятельно или подобрать по данным
+          Яндекса.
         </p>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => openWordstatPicker()}
+          className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {getWordstatPrimaryCtaLabel(seoPrimaryQuery)}
+        </button>
         <CharCounter
           value={seoPrimaryQuery}
           max={PRODUCT_CONTENT_LIMITS.seoPrimaryQuery}
@@ -209,8 +308,191 @@ export default function AuthorProductSeoSection({
         ) : null}
       </label>
 
+      {wordstatOpen ? (
+        <AuthorProductSeoWordstatPicker
+          seed={wordstatSeed}
+          onSeedChange={setWordstatSeed}
+          loading={wordstatLoading}
+          error={wordstatError}
+          result={wordstatResult}
+          seoPrimaryQuery={seoPrimaryQuery}
+          seoSecondaryQueries={seoSecondaryQueries}
+          disabled={disabled}
+          onSubmit={() => {
+            void submitWordstat();
+          }}
+          onSelectPrimary={(phrase) =>
+            onChange({
+              seoPrimaryQuery: clipSeoQuery(
+                phrase,
+                PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
+              ),
+            })
+          }
+          onAddSecondary={addSecondaryPhrase}
+        />
+      ) : null}
+
+      <div className="mt-4">
+        <span className="mb-2 block text-sm font-medium">Дополнительные поисковые фразы</span>
+        <div className="flex flex-wrap gap-2">
+          {seoSecondaryQueries.map((query, index) => (
+            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
+              {query}
+              <button
+                type="button"
+                aria-label={`Удалить фразу ${query}`}
+                disabled={disabled}
+                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        {secondariesFull ? null : (
+          <input
+            aria-label="Новая дополнительная поисковая фраза"
+            disabled={disabled}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              const value = event.currentTarget.value.trim();
+              const result = canAddSecondaryQuery(value, seoSecondaryQueries);
+              if (!result.ok) return;
+              onChange({ seoSecondaryQueries: result.next });
+              event.currentTarget.value = "";
+            }}
+            className="mt-2 w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder="Введите фразу и нажмите Enter"
+          />
+        )}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() =>
+            openWordstatPicker(seoPrimaryQuery.trim() || undefined)
+          }
+          className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Подобрать похожие
+        </button>
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Добавьте несколько близких вариантов основного запроса. Они должны
+          описывать тот же продукт и ту же потребность человека.
+        </p>
+        {secondariesFull ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            Можно добавить не больше 10 фраз. Удалите одну, чтобы добавить другую.
+          </p>
+        ) : null}
+        {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
+      </div>
+
+      <label
+        className="mt-4 block"
+        data-submit-issue={fieldErrors.seoTitle ? "" : undefined}
+      >
+        <span className="mb-2 block text-sm font-medium">
+          Заголовок для поиска
+        </span>
+        <input
+          value={seoTitle}
+          maxLength={PRODUCT_CONTENT_LIMITS.seoTitle}
+          disabled={disabled}
+          onChange={(event) => onChange({ seoTitle: event.target.value })}
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder={preview.title}
+        />
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Напишите понятный заголовок результата поиска. Основной запрос
+          желательно использовать один раз и ближе к началу. Не перечисляйте
+          ключевые фразы через | или запятые.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Например: Медитация для сна – расслабление перед сном
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Ориентир: около 50–70 символов. Это рекомендация, а не обязательный лимит.
+        </p>
+        <CharCounter value={seoTitle} max={PRODUCT_CONTENT_LIMITS.seoTitle} />
+        {fieldErrors.seoTitle ? (
+          <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoTitle}</p>
+        ) : null}
+      </label>
+
+      <label
+        className="mt-4 block"
+        data-submit-issue={fieldErrors.seoDescription ? "" : undefined}
+      >
+        <span className="mb-2 block text-sm font-medium">
+          Описание для поиска
+        </span>
+        <textarea
+          value={seoDescription}
+          maxLength={PRODUCT_CONTENT_LIMITS.seoDescription}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ seoDescription: event.target.value })
+          }
+          rows={4}
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Коротко ответьте: что это за продукт, для кого он и что получит
+          слушатель. Основной запрос можно естественно использовать один раз.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Ориентир: 120–180 символов.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Яндекс может изменить заголовок и описание в результатах поиска.
+        </p>
+        <CharCounter
+          value={seoDescription}
+          max={PRODUCT_CONTENT_LIMITS.seoDescription}
+        />
+        {fieldErrors.seoDescription ? (
+          <p className="mt-2 text-sm text-[#9b3d3d]">
+            {fieldErrors.seoDescription}
+          </p>
+        ) : null}
+      </label>
+
+      <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
+        <span className="mb-2 block text-sm font-medium">О продукте</span>
+        <textarea
+          value={seoAbout}
+          maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
+          disabled={disabled}
+          onChange={(event) => onChange({ seoAbout: event.target.value })}
+          rows={6}
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Дополнительный публичный текст для страницы продукта. Расскажите в 2–4
+          небольших абзацах: что это за продукт, для какой ситуации он создан,
+          что происходит во время прослушивания и чем он полезен.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Не копируйте дословно основное описание. Используйте поисковые фразы
+          только там, где они звучат естественно.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Ориентир: 500–1500 символов.
+        </p>
+        {fieldErrors.seoAbout ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoAbout}</p> : null}
+      </label>
+
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">{getPracticeSeoUsageHeading(productKind)}</p>
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Добавьте 3–5 конкретных ситуаций, когда человеку может пригодиться
+          этот продукт.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Например: Перед сном, после напряжённого дня, во время вечернего отдыха.
+        </p>
         {seoContent.usageItems.map((item, index) => (
           <div className="mt-2 flex gap-2" key={`usage-${index}`}>
             <input
@@ -230,6 +512,14 @@ export default function AuthorProductSeoSection({
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">Вопросы и ответы</p>
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Добавьте реальные вопросы, которые человек может задать перед
+          прослушиванием или покупкой. Обычно достаточно 3–5.
+        </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Например: «Когда лучше слушать?» «Нужен ли опыт?» «Можно ли слушать в
+          наушниках?»
+        </p>
         {seoContent.faqItems.map((item, index) => (
           <div className="mt-2 grid gap-2" key={`faq-${index}`}>
             <input value={item.question} disabled={disabled} placeholder="Вопрос" maxLength={PRODUCT_CONTENT_LIMITS.seoFaqQuestion} onChange={(event) => onChange({ seoContent: { ...seoContent, faqItems: seoContent.faqItems.map((current, itemIndex) => itemIndex === index ? { ...current, question: event.target.value } : current) } })} className="rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2" />
@@ -243,6 +533,10 @@ export default function AuthorProductSeoSection({
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">Связанные продукты</p>
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Выберите 2–4 продукта, которые действительно связаны с этой темой и
+          могут быть полезны слушателю дальше.
+        </p>
         <input
           aria-label="Поиск связанных продуктов"
           value={relatedProductQuery}
@@ -267,6 +561,10 @@ export default function AuthorProductSeoSection({
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">Связанные страницы «Слушать»</p>
+        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+          Добавьте близкие по теме статьи АудиоЛада. Выбирайте только материалы,
+          которые действительно раскрывают ту же тему.
+        </p>
         {seoContent.relatedListenSlugs.map((slug, index) => (
           <div className="mt-2 flex gap-2" key={`listen-${index}`}>
             <select value={slug} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedListenSlugs: seoContent.relatedListenSlugs.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
@@ -280,117 +578,6 @@ export default function AuthorProductSeoSection({
         ))}
         {seoContent.relatedListenSlugs.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, relatedListenSlugs: [...seoContent.relatedListenSlugs, ""] } })}>+ Добавить страницу</button> : null}
       </div>
-
-      <div className="mt-4">
-        <span className="mb-2 block text-sm font-medium">Дополнительные поисковые фразы</span>
-        <div className="flex flex-wrap gap-2">
-          {seoSecondaryQueries.map((query, index) => (
-            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
-              {query}
-              <button
-                type="button"
-                aria-label={`Удалить фразу ${query}`}
-                disabled={disabled}
-                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-        {seoSecondaryQueries.length < PRODUCT_CONTENT_LIMITS.seoSecondaryQueries ? (
-          <input
-            aria-label="Новая дополнительная поисковая фраза"
-            disabled={disabled}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              const value = event.currentTarget.value.trim();
-              if (!value || seoSecondaryQueries.some((item) => item.localeCompare(value, "ru", { sensitivity: "accent" }) === 0)) return;
-              onChange({ seoSecondaryQueries: [...seoSecondaryQueries, value] });
-              event.currentTarget.value = "";
-            }}
-            className="mt-2 w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder="Введите фразу и нажмите Enter"
-          />
-        ) : null}
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Необязательно. До 10 фраз для внутренней SEO-подсказки; публично они не выводятся.
-        </p>
-        {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
-      </div>
-
-      <label
-        className="mt-4 block"
-        data-submit-issue={fieldErrors.seoTitle ? "" : undefined}
-      >
-        <span className="mb-2 block text-sm font-medium">
-          Заголовок для поиска
-        </span>
-        <input
-          value={seoTitle}
-          maxLength={PRODUCT_CONTENT_LIMITS.seoTitle}
-          disabled={disabled}
-          onChange={(event) => onChange({ seoTitle: event.target.value })}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-          placeholder={preview.title}
-        />
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Необязательно. Если оставить пустым, сохранится обычный заголовок продукта.
-        </p>
-        <CharCounter value={seoTitle} max={PRODUCT_CONTENT_LIMITS.seoTitle} />
-        {fieldErrors.seoTitle ? (
-          <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoTitle}</p>
-        ) : null}
-      </label>
-
-      <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
-        <span className="mb-2 block text-sm font-medium">О продукте</span>
-        <textarea
-          value={seoAbout}
-          maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
-          disabled={disabled}
-          onChange={(event) => onChange({ seoAbout: event.target.value })}
-          rows={6}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-        />
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Необязательный дополнительный публичный текст. Он не заменяет основное описание.
-        </p>
-        {fieldErrors.seoAbout ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoAbout}</p> : null}
-      </label>
-
-      <label
-        className="mt-4 block"
-        data-submit-issue={fieldErrors.seoDescription ? "" : undefined}
-      >
-        <span className="mb-2 block text-sm font-medium">
-          Описание для поиска
-        </span>
-        <textarea
-          value={seoDescription}
-          maxLength={PRODUCT_CONTENT_LIMITS.seoDescription}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange({ seoDescription: event.target.value })
-          }
-          rows={4}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-        />
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Коротко объясните, что получит слушатель. Если оставить пустым,
-          АудиоЛад возьмёт начало обычного описания продукта.
-        </p>
-        <CharCounter
-          value={seoDescription}
-          max={PRODUCT_CONTENT_LIMITS.seoDescription}
-        />
-        {fieldErrors.seoDescription ? (
-          <p className="mt-2 text-sm text-[#9b3d3d]">
-            {fieldErrors.seoDescription}
-          </p>
-        ) : null}
-      </label>
 
       <div className="mt-5 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
         <p className="text-sm font-medium leading-6 text-[#1a0dab]">

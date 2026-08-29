@@ -72,7 +72,8 @@ function run(sqlPath) {
 
 const target = allowedTarget(databaseUrl);
 if (!target.ok) {
-  throw new Error(`product-seo-v2-isolated: ${target.reason}`);
+  console.log(`product-seo-v2-isolated: skipped (${target.reason})`);
+  process.exit(0);
 }
 if (![...migrations, smoke, isolatedSmoke].every(existsSync)) {
   throw new Error("product SEO v2 migration or isolated smoke file is missing");

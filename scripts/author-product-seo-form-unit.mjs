@@ -289,9 +289,128 @@ assert.match(formSource, /seo_content:/);
 const seoSection = read(
   "src/components/author-dashboard/AuthorProductSeoSection.tsx",
 );
+const wordstatPicker = read(
+  "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
+);
+assert.match(seoSection, /useState\(false\)/);
+assert.match(seoSection, /aria-expanded=\{isOpen\}/);
+assert.match(seoSection, /SEO и продвижение · необязательно/);
 assert.match(seoSection, /Яндексе и Google/);
 assert.match(seoSection, /SEO-готовность/);
+assert.match(seoSection, /Это ориентир, а не условие публикации/);
+assert.match(seoSection, /Как заполнить SEO/);
+assert.ok(
+  seoSection.indexOf("Как заполнить SEO") >
+    seoSection.indexOf("{isOpen ? <>"),
+  "method card is rendered only after the accordion opens",
+);
+assert.ok(
+  seoSection.indexOf("Как заполнить SEO") < seoSection.indexOf("SEO-готовность"),
+  "method card comes before readiness",
+);
+assert.ok(
+  seoSection.indexOf("SEO-готовность") <
+    seoSection.indexOf("Основной поисковый запрос"),
+  "readiness comes before primary query",
+);
+assert.ok(
+  seoSection.indexOf("Основной поисковый запрос") <
+    seoSection.indexOf("Дополнительные поисковые фразы"),
+  "primary query comes before secondary phrases",
+);
+assert.ok(
+  seoSection.indexOf("Дополнительные поисковые фразы") <
+    seoSection.indexOf("Заголовок для поиска"),
+  "secondary phrases come before search title",
+);
+assert.ok(
+  seoSection.indexOf("Заголовок для поиска") <
+    seoSection.indexOf("Описание для поиска"),
+  "search title comes before search description",
+);
+assert.ok(
+  seoSection.indexOf("Описание для поиска") < seoSection.indexOf("О продукте"),
+  "search description comes before about",
+);
+assert.ok(
+  seoSection.indexOf("О продукте") < seoSection.indexOf("getPracticeSeoUsageHeading"),
+  "about comes before usage",
+);
+assert.ok(
+  seoSection.indexOf("getPracticeSeoUsageHeading") <
+    seoSection.indexOf("Вопросы и ответы"),
+  "usage comes before FAQ",
+);
+assert.ok(
+  seoSection.indexOf("Вопросы и ответы") <
+    seoSection.indexOf("Связанные продукты"),
+  "FAQ comes before related products",
+);
+assert.ok(
+  seoSection.indexOf("Связанные продукты") <
+    seoSection.indexOf("Связанные страницы «Слушать»"),
+  "related products come before related listens",
+);
+assert.ok(
+  seoSection.indexOf("Связанные страницы «Слушать»") <
+    seoSection.indexOf("preview.title"),
+  "related listens come before search preview",
+);
+assert.match(
+  seoSection,
+  /1\. Выберите один основной запрос, по которому люди могут искать такой продукт/,
+);
+assert.match(seoSection, /Пишите прежде всего для человека/);
+assert.match(seoSection, /Например: медитация для сна/);
+assert.match(seoSection, /Помочь подобрать запрос/);
+assert.match(seoSection, /getWordstatPrimaryCtaLabel\(seoPrimaryQuery\)/);
+assert.match(seoSection, /onChange=\{\(event\) =>\s+onChange\(\{ seoPrimaryQuery: event\.target\.value \}\)/s);
+assert.match(seoSection, /disabled=\{disabled\}/);
+assert.match(seoSection, /wordstatLoading/);
+assert.match(wordstatPicker, /Ищем запросы в Яндексе/);
+assert.match(wordstatPicker, /Подбор поискового запроса/);
+assert.match(wordstatPicker, /Что ищем/);
+assert.match(wordstatPicker, /Подобрать в Яндексе/);
+assert.match(wordstatPicker, /Россия · все устройства/);
+assert.match(wordstatPicker, /50–1000 запросов за 30 дней/);
+assert.match(wordstatPicker, /подходит для старта/);
+assert.match(wordstatPicker, /стоит оценить внимательнее/);
+assert.match(wordstatPicker, /лучше поискать другой вариант/);
+assert.match(wordstatPicker, /Частотность показывает поисковый спрос, а не гарантирует позицию/);
+assert.match(wordstatPicker, /Запросы по теме/);
+assert.match(wordstatPicker, /Похожие запросы/);
+assert.match(wordstatPicker, /Выбрать основным/);
+assert.match(wordstatPicker, /\+ В дополнительные/);
+assert.match(wordstatPicker, /Основной/);
+assert.match(wordstatPicker, /Добавлено/);
+assert.match(wordstatPicker, /aria-label=\{ariaLabel\}/);
+assert.match(wordstatPicker, /wordstatColorClasses/);
+assert.match(wordstatPicker, /запросов за последние 30 дней/);
+assert.match(wordstatPicker, /общая оценка темы, а не частота самой фразы/);
+assert.doesNotMatch(wordstatPicker, /конкуренция низкая|TOP-3|TOP-5|results\[|associations\[|totalCount/);
+assert.match(seoSection, /canAddSecondaryQuery/);
+assert.match(seoSection, /event\.key !== "Enter"/);
+assert.match(seoSection, /clipSeoQuery/);
+assert.match(seoSection, /WORDSTAT_ERROR_MESSAGES/);
+assert.match(seoSection, /Подбор запросов временно недоступен|UPSTREAM_ERROR|NO_RESULTS/);
+assert.doesNotMatch(seoSection, /нельзя опубликовать|обязательно для публикации|publication gate/i);
+assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoTitle\}/);
+assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoDescription\}/);
+assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoAbout\}/);
+assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoPrimaryQuery\}/);
+assert.match(seoSection, /evaluateProductSeoReadiness/);
+assert.match(seoSection, /buildProductSeoPreview/);
+assert.match(seoSection, /preview\.title/);
+assert.match(seoSection, /preview\.displayUrl/);
+assert.match(seoSection, /preview\.description/);
+assert.match(seoSection, /Ориентир: около 50–70 символов/);
+assert.match(seoSection, /Ориентир: 120–180 символов/);
+assert.match(seoSection, /Ориентир: 500–1500 символов/);
+assert.match(seoSection, /Когда лучше слушать/);
+assert.match(seoSection, /Выберите 2–4 продукта/);
+assert.match(seoSection, /близкие по теме статьи АудиоЛада/);
 assert.doesNotMatch(seoSection, /SEO score|keyword-density|100%/i);
+assert.doesNotMatch(seoSection, /FAQPage|QAPage/);
 assert.match(seoSection, /disabled\?: boolean/);
 assert.ok(
   [...seoSection.matchAll(/disabled=\{disabled\}/g)].length >= 3,
@@ -300,6 +419,8 @@ assert.ok(
 assert.match(seoSection, /disabled:cursor-not-allowed disabled:opacity-60/);
 assert.match(seoSection, /api\/author\/seo\/listen-options/);
 assert.match(seoSection, /api\/author\/seo\/related-product-options/);
+assert.match(seoSection, /api\/author\/seo\/wordstat\/suggestions/);
+assert.doesNotMatch(seoSection, /YANDEX_SEARCH_API_KEY|YANDEX_SEARCH_FOLDER_ID/);
 assert.match(seoSection, /relatedProductSourceId/);
 assert.match(seoSection, /Поиск связанных продуктов/);
 assert.match(seoSection, /Удалить фразу/);
@@ -308,6 +429,7 @@ assert.match(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
 assert.doesNotMatch(seoSection, /relatedListenUrl|listen_url/i);
 assert.match(formSource, /disabled=\{!canEditPublicFields \|\| busy\}/);
+assert.doesNotMatch(formSource, /wordstat|Wordstat/);
 
 const patch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patch, /seo_primary_query/);
