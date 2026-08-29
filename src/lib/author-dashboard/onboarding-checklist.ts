@@ -91,7 +91,7 @@ export type AuthorOnboardingFreeChecklistState = {
 
 export type AuthorOnboardingChecklistState = AuthorOnboardingFreeChecklistState & {
   commercial: CommercialOnboardingSectionState;
-  /** Free + commercial sections fully complete. */
+  /** Free + commercial sections fully complete. Does not gate checklist visibility. */
   journeyComplete: boolean;
 };
 

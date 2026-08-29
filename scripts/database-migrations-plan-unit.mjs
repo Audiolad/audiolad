@@ -408,6 +408,12 @@ function testRepoOneFileOneVersion() {
         "20260903120000_search_practice_visibility_users.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260905120000_author_onboarding_ui_state.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
