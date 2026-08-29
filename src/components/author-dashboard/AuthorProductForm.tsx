@@ -11,6 +11,7 @@ import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
+import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import PracticeVisibilityUsersEditor from "@/components/author-dashboard/PracticeVisibilityUsersEditor";
 import {
   CATALOG_VISIBILITY,
@@ -149,6 +150,7 @@ function CharCounter({ value, max }: { value: string; max: number }) {
 
 type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
+  relatedProductOptions?: Array<{ value: string; label: string }>;
   initialAuthorSlug?: string;
   initialProduct?: AuthorProductDetail;
   initialPublicationClass?: PublicationClass | null;
@@ -185,8 +187,11 @@ type FormState = {
   listeningNoticeTitle: string;
   listeningNoticeText: string;
   seoPrimaryQuery: string;
+  seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
+  seoAbout: string;
+  seoContent: PracticeSeoContentInput;
   status: string;
   moderationStatus: string;
   moderationSubmittedAt: string | null;
@@ -327,8 +332,16 @@ function buildInitialForm(
     listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
     listeningNoticeText: listeningDefaults.listeningNoticeText,
     seoPrimaryQuery: "",
+    seoSecondaryQueries: [],
     seoTitle: "",
     seoDescription: "",
+    seoAbout: "",
+    seoContent: {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: [],
+      relatedListenSlugs: [],
+    },
     status: "draft",
     moderationStatus: "not_submitted",
     moderationSubmittedAt: null,
@@ -442,13 +455,22 @@ function buildProductSavePayload(
     listening_notice_title: form.listeningNoticeTitle,
     listening_notice_text: form.listeningNoticeText,
     seo_primary_query: form.seoPrimaryQuery.trim() || null,
+    seo_secondary_queries: form.seoSecondaryQueries.map((item) => item.trim()).filter(Boolean),
     seo_title: form.seoTitle.trim() || null,
     seo_description: form.seoDescription.trim() || null,
+    seo_about: form.seoAbout.trim() || null,
+    seo_content: {
+      usage_items: form.seoContent.usageItems,
+      faq_items: form.seoContent.faqItems,
+      related_practice_ids: form.seoContent.relatedPracticeIds,
+      related_listen_slugs: form.seoContent.relatedListenSlugs,
+    },
   };
 }
 
 export default function AuthorProductForm({
   authors,
+  relatedProductOptions = [],
   initialAuthorSlug,
   initialProduct,
   initialPublicationClass,
@@ -545,8 +567,10 @@ export default function AuthorProductForm({
     listeningNoticeTitle?: string;
     listeningNoticeText?: string;
     seoPrimaryQuery?: string;
+    seoSecondaryQueries?: string;
     seoTitle?: string;
     seoDescription?: string;
+    seoAbout?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -1159,8 +1183,10 @@ export default function AuthorProductForm({
             fieldKey === "listeningNoticeTitle" ||
             fieldKey === "listeningNoticeText" ||
             fieldKey === "seoPrimaryQuery" ||
+            fieldKey === "seoSecondaryQueries" ||
             fieldKey === "seoTitle" ||
-            fieldKey === "seoDescription"
+            fieldKey === "seoDescription" ||
+            fieldKey === "seoAbout"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
@@ -2591,13 +2617,20 @@ export default function AuthorProductForm({
           description={form.description}
           productKind={form.productKind}
           seoPrimaryQuery={form.seoPrimaryQuery}
+          seoSecondaryQueries={form.seoSecondaryQueries}
           seoTitle={form.seoTitle}
           seoDescription={form.seoDescription}
+          seoAbout={form.seoAbout}
+          seoContent={form.seoContent}
+          relatedProductOptions={relatedProductOptions}
+          relatedProductSourceId={practiceId || undefined}
           publicPath={publicPath}
           fieldErrors={{
             seoPrimaryQuery: fieldErrors.seoPrimaryQuery,
+            seoSecondaryQueries: fieldErrors.seoSecondaryQueries,
             seoTitle: fieldErrors.seoTitle,
             seoDescription: fieldErrors.seoDescription,
+            seoAbout: fieldErrors.seoAbout,
           }}
           disabled={!canEditPublicFields || busy}
           onChange={(patch) => {
@@ -2606,10 +2639,14 @@ export default function AuthorProductForm({
               ...(patch.seoPrimaryQuery !== undefined
                 ? { seoPrimaryQuery: undefined }
                 : {}),
+              ...(patch.seoSecondaryQueries !== undefined
+                ? { seoSecondaryQueries: undefined }
+                : {}),
               ...(patch.seoTitle !== undefined ? { seoTitle: undefined } : {}),
               ...(patch.seoDescription !== undefined
                 ? { seoDescription: undefined }
                 : {}),
+              ...(patch.seoAbout !== undefined ? { seoAbout: undefined } : {}),
             }));
             setForm((current) => ({ ...current, ...patch }));
           }}

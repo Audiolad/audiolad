@@ -57,6 +57,16 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     initialAuthor.id,
   );
   const cabinetBranch = publicationClassToCabinetBranch(publicationClass);
+  const { data: relatedProducts } = await supabase
+    .from("practices")
+    .select("id, title")
+    .eq("author_id", initialAuthor.id)
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .eq("catalog_visibility", "listed")
+    .eq("is_catalog_listed", true)
+    .order("title")
+    .limit(8);
 
   return (
     <AuthorShell
@@ -66,6 +76,10 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     >
       <AuthorProductForm
         authors={authors}
+        relatedProductOptions={(relatedProducts ?? []).map((item) => ({
+          value: item.id,
+          label: item.title,
+        }))}
         initialAuthorSlug={params.author}
         initialPublicationClass={publicationClass}
         topicFormData={topicFormData}

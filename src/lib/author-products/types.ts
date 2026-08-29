@@ -25,6 +25,7 @@ import {
   parseCatalogVisibility,
   type CatalogVisibility,
 } from "@/lib/products/catalog-visibility";
+import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 
 /** Recommended chips only. Authors may enter any integer ruble amount in range. */
 export const PAID_PRICE_OPTIONS = RECOMMENDED_PAID_PRICES_RUB;
@@ -111,8 +112,10 @@ export type PracticeRow = {
   promo_url: string | null;
   promo_open_in_new_tab: boolean;
   seo_primary_query: string | null;
+  seo_secondary_queries: string[] | null;
   seo_title: string | null;
   seo_description: string | null;
+  seo_about: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -158,8 +161,10 @@ export function coercePracticeRow(
     | "promo_url"
     | "promo_open_in_new_tab"
     | "seo_primary_query"
+    | "seo_secondary_queries"
     | "seo_title"
     | "seo_description"
+    | "seo_about"
   > & {
     product_kind?: string | null;
     publication_class?: string | null;
@@ -180,8 +185,10 @@ export function coercePracticeRow(
     promo_url?: string | null;
     promo_open_in_new_tab?: boolean | null;
     seo_primary_query?: string | null;
+    seo_secondary_queries?: string[] | null;
     seo_title?: string | null;
     seo_description?: string | null;
+    seo_about?: string | null;
   },
 ): PracticeRow {
   return {
@@ -212,8 +219,10 @@ export function coercePracticeRow(
     promo_url: row.promo_url ?? null,
     promo_open_in_new_tab: row.promo_open_in_new_tab === true,
     seo_primary_query: row.seo_primary_query ?? null,
+    seo_secondary_queries: row.seo_secondary_queries ?? null,
     seo_title: row.seo_title ?? null,
     seo_description: row.seo_description ?? null,
+    seo_about: row.seo_about ?? null,
   };
 }
 
@@ -221,6 +230,7 @@ export type AuthorProductDetail = {
   practice: PracticeRow;
   audio_items: AudioItemRow[];
   gallery_slides: AuthorGallerySlide[];
+  seo_content: PracticeSeoContentInput;
   /** True when entitlements or paid orders lock destructive content edits. */
   contentLockedAfterSale: boolean;
   /** True when a paid order blocks soft delete (narrower than content lock). */

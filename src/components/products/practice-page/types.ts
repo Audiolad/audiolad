@@ -4,6 +4,7 @@ import type { PracticeAccessPresentation } from "@/lib/products/practice-access-
 import type { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
 import type { PublicAudioItem } from "@/lib/products/public-audio-items";
+import type { PublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
 export type PracticePageCoverData = {
   displayUrl: string | null;
@@ -40,8 +41,11 @@ export type PracticePageViewModel = {
   resolvedAuthorSlug: string;
   authorName: string | null;
   productTypeLabel: string | null;
+  productKind: string | null;
   subtitle: string | null;
   description: string | null;
+  seoAbout: string | null;
+  seoContent: PublicPracticeSeoContent;
   meta: string | null;
   gallerySlides: CatalogSlide[];
   presentation: PracticeAccessPresentation;

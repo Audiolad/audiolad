@@ -25,8 +25,14 @@ export const PRACTICE_YANDEX_RECRAWL_FIELDS = [
   "subtitle",
   "description",
   "seo_primary_query",
+  "seo_secondary_queries",
   "seo_title",
   "seo_description",
+  "seo_about",
+  "seo_usage_items",
+  "seo_faq_items",
+  "related_products",
+  "related_listens",
   "slug",
 ] as const;
 
@@ -37,8 +43,14 @@ const PRACTICE_YANDEX_FIELD_SET = new Set<string>(PRACTICE_YANDEX_RECRAWL_FIELDS
 
 const PRACTICE_YANDEX_SEO_FIELDS = new Set([
   "seo_primary_query",
+  "seo_secondary_queries",
   "seo_title",
   "seo_description",
+  "seo_about",
+  "seo_usage_items",
+  "seo_faq_items",
+  "related_products",
+  "related_listens",
 ]);
 
 export function hasPracticeYandexRecrawlChanges(

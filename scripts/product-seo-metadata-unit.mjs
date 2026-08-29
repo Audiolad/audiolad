@@ -28,7 +28,7 @@ assert.equal(normalizeSeoPhrase("  Медитация   для сна  "), "ме
 assert.equal(containsSeoPhrase("Медитация для сна «Лавандовый сон»", "медитация для сна"), true);
 assert.equal(containsSeoPhrase("Лавандовый сон", "медитация для сна"), false);
 
-// A. title + query, seo_title null
+// A. Primary query is internal and does not change a blank SEO title.
 assert.equal(
   resolveProductSeoTitle({
     title: "Лавандовый сон",
@@ -36,10 +36,10 @@ assert.equal(
     seoTitle: null,
     productKind: "practice",
   }),
-  "Лавандовый сон – медитация для сна – АудиоЛад",
+  "Лавандовый сон – АудиоЛад",
 );
 
-// B. query already in title — do not duplicate
+// B. Legacy title remains unchanged when it already contains the query.
 assert.equal(
   resolveProductSeoTitle({
     title: "Медитация для сна «Лавандовый сон»",
@@ -100,7 +100,7 @@ assert.equal(
   "Коротко: мягкая медитация для засыпания.",
 );
 
-// F. description / subtitle / type fallback
+// F. subtitle / description / type fallback
 assert.equal(
   resolveProductMetaDescription({
     title: "Лавандовый сон",
@@ -108,7 +108,7 @@ assert.equal(
     subtitle: "Подзаголовок",
     seoDescription: null,
   }),
-  "Обычное описание продукта.",
+  "Подзаголовок",
 );
 assert.equal(
   resolveProductMetaDescription({
@@ -164,7 +164,7 @@ const preview = buildProductSeoPreview({
   publicPath: "/practice/sergey/lavandovyy-son",
   description: "Описание для сниппета.",
 });
-assert.equal(preview.title, "Лавандовый сон – медитация для сна – АудиоЛад");
+assert.equal(preview.title, "Лавандовый сон – АудиоЛад");
 assert.equal(preview.displayUrl, "audiolad.ru/practice/sergey/lavandovyy-son");
 assert.equal(
   buildProductSeoPreview({ title: "Черновик" }).displayUrl,
@@ -177,8 +177,8 @@ const readiness = evaluateProductSeoReadiness({
   seoDescription: "Мягкая медитация для сна перед отдыхом.",
   description: "а".repeat(180),
 });
-assert.equal(readiness.total, 5);
-assert.equal(readiness.doneCount, 5);
+assert.equal(readiness.total, 8);
+assert.equal(readiness.doneCount, 4);
 
 const page = read(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
@@ -189,6 +189,17 @@ assert.match(page, /productTitle: practice\.title/);
 assert.match(page, /title: practice\.title/);
 assert.doesNotMatch(page, /seo_title as the product name/);
 assert.doesNotMatch(page, /meta keywords|metaKeywords|name:\s*"keywords"/i);
+assert.match(page, /loadPublicPracticeSeoContent/);
+assert.doesNotMatch(page, /FAQPage|QAPage/);
+
+const seoContent = read("src/components/products/PracticeSeoContentSections.tsx");
+assert.match(seoContent, /getPracticeSeoUsageHeading/);
+assert.match(seoContent, /Вопросы и ответы/);
+assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
+assert.match(
+  read("src/lib/products/practice-seo-content.ts"),
+  /Как использовать практику/,
+);
 
 const jsonLd = read("src/lib/seo/json-ld/builders.ts");
 assert.match(jsonLd, /name: input\.title/);
