@@ -9,7 +9,7 @@ import {
 } from "../src/lib/personal-materials/client/status-labels.ts";
 import {
   formatFileSize,
-  isAllowedClientMp3File,
+  isAllowedClientAudioFile,
   validatePersonalMaterialForm,
 } from "../src/lib/personal-materials/client/validation.ts";
 import { mapPersonalMaterialClientError } from "../src/lib/personal-materials/client/errors.ts";
@@ -91,13 +91,18 @@ const invalid = validatePersonalMaterialForm({
 });
 assert.ok(invalid.clientFirstName);
 
-assert.equal(isAllowedClientMp3File({ name: "test.mp3", type: "audio/mpeg", size: 1000 }), true);
-assert.equal(isAllowedClientMp3File({ name: "Райля.mp3", type: "", size: 1000 }), true);
+assert.equal(isAllowedClientAudioFile({ name: "test.mp3", type: "audio/mpeg", size: 1000 }), true);
+assert.equal(isAllowedClientAudioFile({ name: "Райля.mp3", type: "", size: 1000 }), true);
 assert.equal(
-  isAllowedClientMp3File({ name: "Райля.mp3", type: "application/octet-stream", size: 1000 }),
+  isAllowedClientAudioFile({ name: "Райля.mp3", type: "application/octet-stream", size: 1000 }),
   true,
 );
-assert.equal(isAllowedClientMp3File({ name: "test.pdf", type: "application/pdf", size: 1000 }), false);
+assert.equal(isAllowedClientAudioFile({ name: "foo.m4a", type: "audio/mp4", size: 1000 }), true);
+assert.equal(isAllowedClientAudioFile({ name: "foo.m4a", type: "audio/x-m4a", size: 1000 }), true);
+assert.equal(isAllowedClientAudioFile({ name: "foo.M4A", type: "audio/mp4", size: 1000 }), true);
+assert.equal(isAllowedClientAudioFile({ name: "test.pdf", type: "application/pdf", size: 1000 }), false);
+assert.equal(isAllowedClientAudioFile({ name: "foo.m4a", type: "image/jpeg", size: 1000 }), false);
+assert.equal(isAllowedClientAudioFile({ name: "foo.mp3", type: "audio/mp4", size: 1000 }), false);
 
 assert.equal(formatFileSize(1024 * 1024 * 2.5), "2.5 МБ");
 

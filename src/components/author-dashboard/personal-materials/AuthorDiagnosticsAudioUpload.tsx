@@ -5,9 +5,10 @@ import { useRef, useState } from "react";
 import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import { getPersonalMaterialDownloadErrorMessage } from "@/lib/personal-materials/client/errors";
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
+import { PERSONAL_MATERIAL_AUDIO_INPUT_ACCEPT } from "@/lib/personal-materials/audio-format";
 import {
   formatFileSize,
-  isAllowedClientMp3File,
+  isAllowedClientAudioFile,
 } from "@/lib/personal-materials/client/validation";
 
 type AuthorDiagnosticsAudioUploadProps = {
@@ -45,15 +46,15 @@ export default function AuthorDiagnosticsAudioUpload({
       return;
     }
 
-    if (!isAllowedClientMp3File(file)) {
-      setLocalError("Выберите аудиофайл в формате MP3.");
+    if (!isAllowedClientAudioFile(file)) {
+      setLocalError("Выберите аудиофайл в формате MP3 или M4A.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
     }
 
     if (file.size <= 0) {
-      setLocalError("Файл пустой. Выберите другой MP3-файл.");
+      setLocalError("Файл пустой. Выберите другой аудиофайл.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
@@ -113,7 +114,7 @@ export default function AuthorDiagnosticsAudioUpload({
 
   const limitLabel = formatFileSize(PERSONAL_MATERIAL_LIMITS.maxAudioBytes);
   const displayName = hasAudio
-    ? (audioOriginalFilename ?? selectedName ?? "audio.mp3")
+    ? (audioOriginalFilename ?? selectedName ?? "Аудиофайл")
     : selectedName;
   const displaySize = hasAudio ? audioSizeBytes : selectedSize;
   const displayedError = localError ?? error ?? null;
@@ -125,10 +126,11 @@ export default function AuthorDiagnosticsAudioUpload({
     >
       <h3 className="text-[18px] font-semibold">Аудиофайл</h3>
       <p className="mt-2 text-sm text-[#7d70a2]">
-        Загрузите персональный аудиоматериал в формате MP3. Максимальный размер —{" "}
-        {limitLabel || "50 МБ"}.
+        Загрузите персональный аудиоматериал в формате MP3 или M4A.
+        <br />
+        Максимальный размер — {limitLabel || "50 МБ"}.
       </p>
-      <p className="mt-1 text-xs text-[#7d70a2]">Поддерживаемый формат: MP3</p>
+      <p className="mt-1 text-xs text-[#7d70a2]">Поддерживаемые форматы: MP3, M4A</p>
 
       <div
         className="mt-4 rounded-[20px] border border-dashed border-[#d8c7ef] bg-[#faf6ff] px-4 py-6 text-center"
@@ -148,7 +150,7 @@ export default function AuthorDiagnosticsAudioUpload({
         ) : (
           <>
             <p className="text-sm font-medium text-[#5f5484]">
-              {hasAudio ? "Аудиофайл загружен" : "Выберите MP3-файл"}
+              {hasAudio ? "Аудиофайл загружен" : "Выберите MP3- или M4A-файл"}
             </p>
             <p className="mt-1 text-xs text-[#7d70a2]">
               Перетащите файл сюда или выберите на устройстве
@@ -172,7 +174,7 @@ export default function AuthorDiagnosticsAudioUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,audio/mpeg,audio/mp3,application/octet-stream"
+          accept={PERSONAL_MATERIAL_AUDIO_INPUT_ACCEPT}
           className="sr-only"
           disabled={disabled || uploading}
           onChange={(event) => {

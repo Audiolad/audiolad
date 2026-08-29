@@ -108,27 +108,10 @@ export function requireClientFirstName(
   return null;
 }
 
-export function isAllowedClientMp3File(file: File): boolean {
-  const name = file.name.toLowerCase();
-  const type = file.type.toLowerCase();
-
-  if (!name.endsWith(".mp3")) {
-    return false;
-  }
-
-  if (
-    type &&
-    type !== "audio/mpeg" &&
-    type !== "audio/mp3" &&
-    type !== "audio/x-mpeg" &&
-    type !== "audio/x-mp3" &&
-    type !== "application/octet-stream"
-  ) {
-    return false;
-  }
-
-  return true;
-}
+export {
+  isAllowedPersonalMaterialAudioFile as isAllowedClientAudioFile,
+  resolvePersonalMaterialAudioFormat,
+} from "@/lib/personal-materials/audio-format";
 
 export function isAllowedClientPdfFile(file: File): boolean {
   const type = file.type.toLowerCase();

@@ -1,21 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  getMp3DurationSeconds,
-  isAllowedMp3File,
-} from "@/lib/author-products/media";
+  getPersonalMaterialAudioFileIssue,
+  resolvePersonalMaterialAudioFormat,
+} from "@/lib/personal-materials/audio-format";
+import { probePersonalMaterialAudioDuration } from "@/lib/personal-materials/server/audio-probe";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   buildPersonalMaterialAudioPath,
   buildPersonalMaterialDocumentPath,
   isPathInsidePersonalMaterialRoot,
   PERSONAL_MATERIALS_BUCKET,
+  resolveReplacedPersonalMaterialStoragePath,
 } from "@/lib/personal-materials/storage";
 import { validatePdfUpload } from "@/lib/personal-materials/server/pdf-validation";
-import {
-  PERSONAL_MATERIAL_LIMITS,
-  type PersonalMaterialRow,
-} from "@/lib/personal-materials/types";
+import type { PersonalMaterialRow } from "@/lib/personal-materials/types";
 
 import { PersonalMaterialApiError } from "./errors";
 import { clearPersonalMaterialDraftAudio, clearPersonalMaterialDraftPdf } from "./repository";
@@ -47,26 +46,36 @@ export async function uploadPersonalMaterialAudio(
     throw new PersonalMaterialApiError("material_not_editable", 409);
   }
 
-  if (!isAllowedMp3File(file)) {
+  const format = resolvePersonalMaterialAudioFormat(file);
+  const fileIssue = getPersonalMaterialAudioFileIssue(file);
+
+  if (!format || fileIssue === "invalid_file_type") {
     throw new PersonalMaterialApiError("invalid_file_type", 400);
   }
 
-  if (file.size <= 0) {
+  if (fileIssue === "empty_file") {
     throw new PersonalMaterialApiError("empty_file", 400);
   }
 
-  if (file.size > PERSONAL_MATERIAL_LIMITS.maxAudioBytes) {
+  if (fileIssue === "file_too_large") {
     throw new PersonalMaterialApiError("file_too_large", 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const durationSeconds = await getMp3DurationSeconds(buffer);
+  const durationSeconds = await probePersonalMaterialAudioDuration(
+    buffer,
+    format.extension,
+  );
 
   if (!durationSeconds) {
     throw new PersonalMaterialApiError("invalid_audio_duration", 400);
   }
 
-  const storagePath = buildPersonalMaterialAudioPath(material.author_id, material.id);
+  const storagePath = buildPersonalMaterialAudioPath(
+    material.author_id,
+    material.id,
+    format.extension,
+  );
 
   if (!isPathInsidePersonalMaterialRoot(storagePath)) {
     throw new PersonalMaterialApiError("invalid_request", 400);
@@ -78,7 +87,7 @@ export async function uploadPersonalMaterialAudio(
   const { error: uploadError } = await service.storage
     .from(PERSONAL_MATERIALS_BUCKET)
     .upload(storagePath, buffer, {
-      contentType: "audio/mpeg",
+      contentType: format.mimeType,
       upsert: true,
     });
 
@@ -97,7 +106,7 @@ export async function uploadPersonalMaterialAudio(
     .update({
       audio_path: storagePath,
       audio_original_filename: file.name,
-      audio_mime_type: "audio/mpeg",
+      audio_mime_type: format.mimeType,
       audio_size_bytes: file.size,
       duration_seconds: durationSeconds,
       updated_at: new Date().toISOString(),
@@ -111,14 +120,19 @@ export async function uploadPersonalMaterialAudio(
     throw new PersonalMaterialApiError("internal_error", 500);
   }
 
-  if (previousPath && previousPath !== storagePath) {
-    await removeStorageObjects(service, [previousPath]);
+  const replacedPath = resolveReplacedPersonalMaterialStoragePath(
+    previousPath,
+    storagePath,
+  );
+
+  if (replacedPath) {
+    await removeStorageObjects(service, [replacedPath]);
   }
 
   return {
     durationSeconds,
     originalFilename: file.name,
-    mimeType: "audio/mpeg",
+    mimeType: format.mimeType,
     sizeBytes: file.size,
     storagePath,
   };

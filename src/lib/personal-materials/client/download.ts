@@ -1,3 +1,4 @@
+import { getPersonalMaterialAudioDownloadFallbackFilename } from "@/lib/personal-materials/audio-format";
 import { sanitizePersonalMaterialDownloadFilename } from "@/lib/personal-materials/download-filename";
 import {
   mapPersonalMaterialClientError,
@@ -43,7 +44,9 @@ async function fetchAuthorPersonalMaterialDownloadUrl(
     throw new PersonalMaterialClientError("internal_error", 500);
   }
 
-  const fallbackFilename = path.includes("/pdf/download") ? "document.pdf" : "audio.mp3";
+  const fallbackFilename = path.includes("/pdf/download")
+    ? "document.pdf"
+    : getPersonalMaterialAudioDownloadFallbackFilename(payload.downloadUrl);
 
   return {
     downloadUrl: payload.downloadUrl.trim(),

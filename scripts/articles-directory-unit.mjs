@@ -107,6 +107,7 @@ import { TARO_NA_SITUATSIYU_NA_RABOTE_PAGE } from "../src/lib/seo/listens/conten
 import { TARO_POISK_RABOTY_PAGE } from "../src/lib/seo/listens/content/taro-poisk-raboty.ts";
 import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/naydu-li-ya-rabotu-taro.ts";
 import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/vozmut-li-menya-na-rabotu-taro.ts";
+import { TARO_MENYAT_LI_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-menyat-li-rabotu.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2440,6 +2441,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightiethListenHref}`,
     ),
     "directory JSON-LD includes eightieth listen href",
+  );
+
+
+  const eightyFirstListenHref = "/listens/taro-menyat-li-rabotu";
+  const eightyFirstListenCard = data.articles.find((card) => card.href === eightyFirstListenHref);
+  assert(eightyFirstListenCard, "eighty-first indexable listen page is listed");
+  assert(
+    eightyFirstListenCard.title === "Таро – менять ли работу, уходить или остаться | АудиоЛад",
+    "eighty-first listen directory title",
+  );
+  assert(
+    eightyFirstListenCard.description === TARO_MENYAT_LI_RABOTU_PAGE.description,
+    "eighty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-menyat-li-rabotu",
+    ),
+    "no /articles duplicate for eighty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-first listen href",
   );
 
 const articleCards = listArticleDirectoryCards();

@@ -281,7 +281,7 @@ export default function AuthorDiagnosticsCreateClient({
           аудиофайл.
         </p>
         <p className="mt-3 text-sm text-[#5f5484]">
-          Поддерживаемый формат: <span className="font-semibold">MP3</span>
+          Поддерживаемые форматы: <span className="font-semibold">MP3, M4A</span>
         </p>
         <button
           type="button"
