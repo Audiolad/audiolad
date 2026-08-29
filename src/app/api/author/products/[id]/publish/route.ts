@@ -17,9 +17,8 @@ import { registerPracticeLegacySlug } from "@/lib/products/lookup";
 import {
   countAuthorPublishedPractices,
   loadAuthorSlug,
-  planPracticePublishIndexNow,
-  scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
+import { schedulePracticePublishedSearchNotifications } from "@/lib/seo/practice-publish-notifications";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
 
 type RouteContext = {
@@ -170,16 +169,16 @@ export async function POST(_request: Request, context: RouteContext) {
       const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
 
       if (authorSlug) {
-        for (const event of planPracticePublishIndexNow({
+        schedulePracticePublishedSearchNotifications({
           authorSlug,
           practiceSlug: product.practice.slug,
-          isFirstPublishOfPractice,
-          publishedCountBefore,
+          previousStatus: practice.status,
+          nextStatus: product.practice.status,
           catalogVisibility: product.practice.catalog_visibility,
           isCatalogListed: product.practice.is_catalog_listed,
-        })) {
-          scheduleIndexNowNotification(event.urls, event.reason);
-        }
+          isFirstPublishOfPractice,
+          publishedCountBefore,
+        });
       }
     }
 

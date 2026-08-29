@@ -117,6 +117,11 @@ const actions = read("src/app/(platform)/admin/product-moderation/actions.ts");
 assert.match(actions, /approveAndPublishPractice/);
 assert.match(actions, /requestPracticeChanges/);
 assert.match(actions, /comment\.length < 10/);
+assert.match(actions, /schedulePracticePublishedSearchNotifications/);
+assert.match(
+  actions,
+  /approveAndPublishPractice[\s\S]*schedulePracticePublishedSearchNotifications/,
+);
 
 const form = read("src/components/admin/ProductModerationReviewForm.tsx");
 assert.match(form, /Одобрить и опубликовать/);

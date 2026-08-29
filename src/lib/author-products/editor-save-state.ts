@@ -43,6 +43,9 @@ export function serializeProductEditorBaseline(
     promoButtonText: string;
     promoUrl: string;
     promoOpenInNewTab: boolean;
+    seoPrimaryQuery: string;
+    seoTitle: string;
+    seoDescription: string;
   },
   audioItems: Array<{
     id: string;
@@ -74,6 +77,9 @@ export function serializeProductEditorBaseline(
     promoButtonText: form.promoButtonText,
     promoUrl: form.promoUrl,
     promoOpenInNewTab: form.promoOpenInNewTab,
+    seoPrimaryQuery: form.seoPrimaryQuery,
+    seoTitle: form.seoTitle,
+    seoDescription: form.seoDescription,
     audioItems: audioItems.map((item) => ({
       id: item.id,
       title: item.title,

@@ -110,6 +110,9 @@ export type PracticeRow = {
   promo_button_text: string | null;
   promo_url: string | null;
   promo_open_in_new_tab: boolean;
+  seo_primary_query: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -154,6 +157,9 @@ export function coercePracticeRow(
     | "promo_button_text"
     | "promo_url"
     | "promo_open_in_new_tab"
+    | "seo_primary_query"
+    | "seo_title"
+    | "seo_description"
   > & {
     product_kind?: string | null;
     publication_class?: string | null;
@@ -173,6 +179,9 @@ export function coercePracticeRow(
     promo_button_text?: string | null;
     promo_url?: string | null;
     promo_open_in_new_tab?: boolean | null;
+    seo_primary_query?: string | null;
+    seo_title?: string | null;
+    seo_description?: string | null;
   },
 ): PracticeRow {
   return {
@@ -202,6 +211,9 @@ export function coercePracticeRow(
     promo_button_text: row.promo_button_text ?? null,
     promo_url: row.promo_url ?? null,
     promo_open_in_new_tab: row.promo_open_in_new_tab === true,
+    seo_primary_query: row.seo_primary_query ?? null,
+    seo_title: row.seo_title ?? null,
+    seo_description: row.seo_description ?? null,
   };
 }
 

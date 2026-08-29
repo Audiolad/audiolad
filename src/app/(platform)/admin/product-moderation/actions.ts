@@ -10,6 +10,11 @@ import {
   requestPracticeChanges,
 } from "@/lib/author-products/admin-moderation-actions";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import {
+  countAuthorPublishedPractices,
+  loadAuthorSlug,
+} from "@/lib/seo/indexnow/hooks";
+import { schedulePracticePublishedSearchNotifications } from "@/lib/seo/practice-publish-notifications";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateProductModerationPaths(practiceId: string) {
@@ -34,8 +39,26 @@ export async function approveAndPublishProductAction(
 
   const supabase = await createClient();
 
+  const { data: beforePractice } = await supabase
+    .from("practices")
+    .select("status, published_at, author_id, slug, catalog_visibility, is_catalog_listed")
+    .eq("id", practiceId)
+    .maybeSingle();
+
+  const previousStatus =
+    typeof beforePractice?.status === "string" ? beforePractice.status : null;
+  const isFirstPublishOfPractice = !beforePractice?.published_at;
+  const authorId =
+    typeof beforePractice?.author_id === "string" ? beforePractice.author_id : null;
+  const publishedCountBefore =
+    isFirstPublishOfPractice && authorId
+      ? await countAuthorPublishedPractices(supabase, authorId)
+      : 0;
+
+  let publishedPractice;
+
   try {
-    await approveAndPublishPractice(supabase, practiceId);
+    publishedPractice = await approveAndPublishPractice(supabase, practiceId);
   } catch (error) {
     if (
       error &&
@@ -61,6 +84,24 @@ export async function approveAndPublishProductAction(
     detail?.authorSlug && detail.slug
       ? buildPracticePublicPath(detail.authorSlug, detail.slug)
       : undefined;
+
+  const authorSlug =
+    detail?.authorSlug ||
+    (authorId ? await loadAuthorSlug(supabase, authorId) : null);
+  const practiceSlug = publishedPractice.slug || detail?.slug || "";
+
+  if (authorSlug && practiceSlug) {
+    schedulePracticePublishedSearchNotifications({
+      authorSlug,
+      practiceSlug,
+      previousStatus,
+      nextStatus: publishedPractice.status,
+      catalogVisibility: publishedPractice.catalog_visibility,
+      isCatalogListed: publishedPractice.is_catalog_listed,
+      isFirstPublishOfPractice,
+      publishedCountBefore,
+    });
+  }
 
   console.info("admin_product_moderation_approved", {
     practiceId,

@@ -72,6 +72,10 @@ import {
 import { resolvePublicListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
+import {
+  resolveProductMetaDescription,
+  resolveProductSeoTitle,
+} from "@/lib/seo/product-metadata";
 import { createSupabaseLibrarySavesStore } from "@/lib/library/saves";
 import { createClient } from "@/lib/supabase/server";
 import PricePromotionStartHandler from "@/components/pricing/PricePromotionStartHandler";
@@ -108,9 +112,6 @@ type PageProps = {
   }>;
 };
 
-const METADATA_DESCRIPTION_FALLBACK =
-  "Аудиопрактика на платформе АудиоЛад.";
-
 const MOBILE_COVER_DISPLAY_WIDTH = 640;
 const DESKTOP_COVER_DISPLAY_WIDTH = 480;
 
@@ -131,16 +132,6 @@ function getAuthorName(practice: PublicPracticeRow): string | null {
   const name = author?.name?.trim();
 
   return name ? name : null;
-}
-
-function truncateDescription(text: string, maxLength = 160): string {
-  const characters = [...text];
-
-  if (characters.length <= maxLength) {
-    return text;
-  }
-
-  return `${characters.slice(0, maxLength).join("").trimEnd()}…`;
 }
 
 async function resolvePracticeRoute(segments: string[]) {
@@ -238,10 +229,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { ...PRACTICE_UNAVAILABLE_METADATA };
   }
 
-  const trimmedDescription =
-    typeof practice.description === "string"
-      ? practice.description.trim()
-      : "";
   const canonical = buildPracticeCanonicalUrl(authorSlug, productSlug);
   const indexable = shouldIndexPracticePage(
     practice.status,
@@ -253,20 +240,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     practice.is_catalog_listed,
     practice.catalog_visibility,
   );
-  const isMusic = isMusicProductKind(practice.product_kind);
-  const isAudioPost = isAudioPostProductKind(practice.product_kind);
-  const descriptionFallback = isMusic
-    ? "Музыкальный продукт на платформе АудиоЛад."
-    : isAudioPost
-      ? "Аудиопост на платформе АудиоЛад."
-      : METADATA_DESCRIPTION_FALLBACK;
-  const subtitle =
-    typeof practice.subtitle === "string" ? practice.subtitle.trim() : "";
-  const metaDescription = trimmedDescription
-    ? truncateDescription(trimmedDescription)
-    : subtitle
-      ? truncateDescription(subtitle)
-      : descriptionFallback;
+  const seoInput = {
+    title: practice.title,
+    subtitle: practice.subtitle,
+    description: practice.description,
+    productKind: practice.product_kind,
+    seoPrimaryQuery: practice.seo_primary_query,
+    seoTitle: practice.seo_title,
+    seoDescription: practice.seo_description,
+  };
+  const metaDescription = resolveProductMetaDescription(seoInput);
   const social = buildPracticePdpSocialTags({
     productTitle: practice.title,
     description: metaDescription,
@@ -279,9 +262,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 
   return {
-    title: isAudioPost
-      ? `${practice.title} – ${AUDIO_POST_KIND_LABEL} – АудиоЛад`
-      : `${practice.title} – АудиоЛад`,
+    title: resolveProductSeoTitle(seoInput),
     description: metaDescription,
     alternates: {
       canonical,

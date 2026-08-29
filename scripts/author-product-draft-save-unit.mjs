@@ -261,6 +261,9 @@ const form = {
   promoButtonText: "",
   promoUrl: "",
   promoOpenInNewTab: false,
+  seoPrimaryQuery: "",
+  seoTitle: "",
+  seoDescription: "",
 };
 const audio = [
   {
@@ -275,6 +278,16 @@ assert.equal(isProductEditorDirty(baseline, baseline), false);
 assert.equal(
   isProductEditorDirty(
     serializeProductEditorBaseline({ ...form, title: "Новое название" }, audio),
+    baseline,
+  ),
+  true,
+);
+assert.equal(
+  isProductEditorDirty(
+    serializeProductEditorBaseline(
+      { ...form, seoPrimaryQuery: "медитация для сна" },
+      audio,
+    ),
     baseline,
   ),
   true,
