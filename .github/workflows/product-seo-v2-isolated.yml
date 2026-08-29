@@ -1,0 +1,54 @@
+name: Product SEO v2 Isolated SQL Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/product-seo-v2-isolated.yml"
+      - "scripts/product-seo-v2-isolated.mjs"
+      - "supabase/migrations/20260908120000_product_seo_v2.sql"
+      - "supabase/migrations/20260909090000_harden_product_seo_v2.sql"
+      - "supabase/tests/product_seo_v2_bootstrap.sql"
+      - "supabase/tests/product_seo_v2_smoke.sql"
+      - "supabase/tests/product_seo_v2_isolated.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  product-seo-v2-isolated:
+    name: Product SEO v2 Isolated SQL Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_product_seo_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_product_seo_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.84.2
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          supabase --version
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_product_seo_isolated
+      - name: Run isolated Product SEO v2 SQL smoke
+        env:
+          AUDIOLAD_PRODUCT_SEO_ISOLATED: "1"
+          AUDIOLAD_PRODUCT_SEO_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_product_seo_isolated
+        run: |
+          set -euo pipefail
+          npm run test:product-seo:isolated

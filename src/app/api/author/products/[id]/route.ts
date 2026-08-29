@@ -13,7 +13,9 @@ import {
   validateListeningNoticeTitleLength,
   validateStoredFormatLength,
   validateSeoDescriptionLength,
+  validateSeoAboutLength,
   validateSeoPrimaryQueryLength,
+  validateSeoSecondaryQueries,
   validateSeoTitleLength,
   validateSubtitleLength,
   validateTitleLength,
@@ -73,10 +75,21 @@ import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { slugifyTitle } from "@/lib/author-products/utils";
+import { hasPermission } from "@/lib/auth/platform-access";
+import {
+  parsePracticeSeoContent,
+  hasPracticeSeoContentChanges,
+  replacePracticeSeoContent,
+  validateRelatedPracticeTargets,
+} from "@/lib/products/practice-seo-content";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+function samePublicValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
@@ -101,6 +114,7 @@ function applyClearableTextField(
     | "description"
     | "format"
     | "seo_primary_query"
+    | "seo_about"
     | "seo_title"
     | "seo_description",
   updates: Record<string, unknown>,
@@ -194,9 +208,28 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const updates: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
+    const seoContent =
+      "seo_content" in body
+        ? parsePracticeSeoContent((body as Record<string, unknown>).seo_content)
+        : null;
+    if ("seo_content" in body && !seoContent) {
+      return NextResponse.json({ error: "invalid_seo_content" }, { status: 400 });
+    }
+    if (seoContent) {
+      const isAdmin = await hasPermission(supabase, user.id, "admin_panel.access");
+      const relationError = await validateRelatedPracticeTargets({
+        supabase,
+        sourcePracticeId: id,
+        sourceAuthorId: practice.author_id,
+        relatedPracticeIds: seoContent.relatedPracticeIds,
+        isAdmin,
+      });
+      if (relationError) {
+        return NextResponse.json({ error: relationError }, { status: 400 });
+      }
+    }
+
+    const updates: Record<string, unknown> = {};
 
     if ("title" in body && typeof body.title === "string") {
       const title = body.title.trim();
@@ -264,6 +297,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (seoTitleError) {
         return NextResponse.json({ error: seoTitleError }, { status: 400 });
       }
+    }
+
+    if ("seo_about" in body) {
+      const seoAboutError = applyClearableTextField(
+        body,
+        "seo_about",
+        updates,
+        validateSeoAboutLength,
+      );
+
+      if (seoAboutError) {
+        return NextResponse.json({ error: seoAboutError }, { status: 400 });
+      }
+    }
+
+    if ("seo_secondary_queries" in body) {
+      const secondaryError = validateSeoSecondaryQueries(
+        (body as Record<string, unknown>).seo_secondary_queries,
+      );
+
+      if (secondaryError) {
+        return NextResponse.json({ error: secondaryError }, { status: 400 });
+      }
+
+      updates.seo_secondary_queries = (
+        (body as Record<string, string[]>).seo_secondary_queries
+      ).map((item) => item.trim());
     }
 
     if ("seo_description" in body) {
@@ -698,13 +758,40 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const previousSlug = practice.slug;
-    const { data: updatedPractice, error: updateError } = await supabase
-      .from("practices")
-      .update(updates)
-      .eq("id", id)
-      .select("id, title, subtitle, description, format, updated_at")
-      .maybeSingle();
+    // requirePracticeMutationAccess intentionally selects only authorization
+    // fields. Reload the complete mutable row immediately before diffing so a
+    // full editor save never mistakes omitted fields for changes.
+    const currentProduct = await getAuthorProductDetail(supabase, id);
+    if (!currentProduct) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    const currentPractice = currentProduct.practice;
+    const previousSlug = currentPractice.slug;
+    const scalarUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => !samePublicValue(
+        (currentPractice as Record<string, unknown>)[key],
+        value,
+      )),
+    );
+    const previousSeoContent = seoContent ? currentProduct.seo_content : null;
+    const seoContentChanged = Boolean(
+      seoContent &&
+        previousSeoContent &&
+        hasPracticeSeoContentChanges(previousSeoContent, seoContent),
+    );
+
+    let updatedPractice: { id: string } | null = { id };
+    let updateError: { code?: string; message: string } | null = null;
+    if (Object.keys(scalarUpdates).length) {
+      const result = await supabase
+        .from("practices")
+        .update({ ...scalarUpdates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+      updatedPractice = result.data;
+      updateError = result.error;
+    }
 
     if (updateError) {
       console.error("author_product_update_error", {
@@ -723,20 +810,40 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
-    await syncPracticeAudioCompatibility(supabase, id);
+    if (seoContentChanged && seoContent) {
+      await replacePracticeSeoContent(supabase, id, seoContent);
+    }
 
-    const changedFields = Object.keys(updates).filter((key) => key !== "updated_at");
-    await recordAuthorSupportAudit({
-      action: "product_updated",
-      resourceType: "practice",
-      resourceId: id,
-      metadata: {
-        changed_fields: changedFields,
-        ...(Object.prototype.hasOwnProperty.call(updates, "format")
-          ? { format: updates.format }
-          : {}),
-      },
-    });
+    const hasChanges =
+      Object.keys(scalarUpdates).length > 0 || seoContentChanged;
+    if (hasChanges) {
+      await syncPracticeAudioCompatibility(supabase, id);
+    }
+
+    const changedFields = [
+      ...Object.keys(scalarUpdates),
+      ...(seoContentChanged
+        ? [
+            "seo_usage_items",
+            "seo_faq_items",
+            "related_products",
+            "related_listens",
+          ]
+        : []),
+    ];
+    if (hasChanges) {
+      await recordAuthorSupportAudit({
+        action: "product_updated",
+        resourceType: "practice",
+        resourceId: id,
+        metadata: {
+          changed_fields: changedFields,
+          ...(Object.prototype.hasOwnProperty.call(updates, "format")
+            ? { format: updates.format }
+            : {}),
+        },
+      });
+    }
 
     const product = await getAuthorProductDetail(supabase, id);
 
@@ -746,7 +853,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       practice.status === "published" &&
-      hasPracticePublicIndexNowChanges(updates) &&
+      hasPracticePublicIndexNowChanges(
+        seoContentChanged
+          ? { ...scalarUpdates, seo_content: seoContent }
+          : scalarUpdates,
+      ) &&
       shouldNotifyIndexNowByVisibility(
         product.practice.catalog_visibility,
         product.practice.is_catalog_listed,
@@ -776,7 +887,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           nextStatus: product.practice.status,
           catalogVisibility: product.practice.catalog_visibility,
           isCatalogListed: product.practice.is_catalog_listed,
-          changedFields: Object.keys(updates),
+          changedFields,
           authorSlug,
           practiceSlug: nextSlug,
         });

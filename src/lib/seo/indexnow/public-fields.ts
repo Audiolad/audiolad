@@ -19,8 +19,15 @@ export const PRACTICE_PUBLIC_INDEXNOW_FIELDS = [
   "is_catalog_listed",
   "catalog_visibility",
   "seo_primary_query",
+  "seo_secondary_queries",
   "seo_title",
   "seo_description",
+  "seo_about",
+  "seo_usage_items",
+  "seo_faq_items",
+  "related_products",
+  "related_listens",
+  "seo_content",
 ] as const;
 
 export type PracticePublicIndexNowField =

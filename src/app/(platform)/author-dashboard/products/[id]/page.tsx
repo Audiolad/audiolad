@@ -49,6 +49,17 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     }
     throw error;
   }
+  const { data: relatedProducts } = await supabase
+    .from("practices")
+    .select("id, title")
+    .eq("author_id", product.practice.author_id)
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .eq("catalog_visibility", "listed")
+    .eq("is_catalog_listed", true)
+    .neq("id", product.practice.id)
+    .order("title")
+    .limit(8);
 
   return (
     <AuthorShell
@@ -58,6 +69,10 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     >
       <AuthorProductForm
         authors={authors}
+        relatedProductOptions={(relatedProducts ?? []).map((item) => ({
+          value: item.id,
+          label: item.title,
+        }))}
         initialProduct={product}
         topicFormData={topicFormData}
         mode="edit"

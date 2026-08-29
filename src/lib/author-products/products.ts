@@ -4,6 +4,7 @@ import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-build
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadAuthorPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
 import {
   AUDIO_POST_KIND_LABEL,
@@ -69,8 +70,10 @@ const PRACTICE_DETAIL_SELECT = `
   promo_url,
   promo_open_in_new_tab,
   seo_primary_query,
+  seo_secondary_queries,
   seo_title,
   seo_description,
+  seo_about,
   created_at,
   updated_at
 `;
@@ -209,7 +212,7 @@ export async function getAuthorProductDetail(
   }
 
   const practiceRow = coercePracticeRow(practice as PracticeRow);
-  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase, gallerySlides] =
+  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase, gallerySlides, seoContent] =
     await Promise.all([
       resolveContentLockedAfterSale(practiceId),
       resolveDeleteLockedAfterPaidPurchase(practiceId),
@@ -219,12 +222,14 @@ export async function getAuthorProductDetail(
       )
         ? listAuthorGallerySlides(supabase, practiceId).catch(() => [])
         : Promise.resolve([]),
+      loadAuthorPracticeSeoContent(supabase, practiceId),
     ]);
 
   return {
     practice: practiceRow,
     audio_items: (audioItems ?? []) as AudioItemRow[],
     gallery_slides: gallerySlides,
+    seo_content: seoContent,
     contentLockedAfterSale,
     deleteLockedAfterPaidPurchase,
   };
@@ -343,6 +348,12 @@ export async function createDraftProduct(
       practice: coercePracticeRow(practice as PracticeRow),
       audio_items: [],
       gallery_slides: [],
+      seo_content: {
+        usageItems: [],
+        faqItems: [],
+        relatedPracticeIds: [],
+        relatedListenSlugs: [],
+      },
       contentLockedAfterSale: false,
       deleteLockedAfterPaidPurchase: false,
     };
@@ -367,6 +378,12 @@ export async function createDraftProduct(
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: [audioItem as AudioItemRow],
     gallery_slides: [],
+    seo_content: {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: [],
+      relatedListenSlugs: [],
+    },
     contentLockedAfterSale: false,
     deleteLockedAfterPaidPurchase: false,
   };
