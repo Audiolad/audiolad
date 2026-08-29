@@ -195,12 +195,16 @@ function checklist(overrides = {}) {
     payoutProfileStatus: null,
   });
   assert.equal(section.totalCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
+  assert.equal(COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT, 5);
   assert.equal(section.complete, true);
-  assert.equal(section.steps.at(-1)?.id, "payout_details");
-  assert.equal(section.steps.at(-1)?.statusLabel, "Не заполнено");
-  assert.match(
-    section.steps.at(-1)?.hint ?? "",
-    /Можно заполнить позже/,
+  assert.equal(section.steps.at(-1)?.id, "publish_paid_product");
+  assert.equal(
+    section.steps.some((step) => step.id === "payout_details"),
+    false,
+  );
+  assert.equal(
+    section.steps.some((step) => step.id === "paid_promotion"),
+    false,
   );
 }
 
