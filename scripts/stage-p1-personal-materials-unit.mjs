@@ -203,7 +203,7 @@ function testM4aMimeMigration() {
   const sql = readFileSync(
     path.join(
       ROOT,
-      "supabase/migrations/20260905120000_personal_materials_allow_m4a_mime.sql",
+      "supabase/migrations/20260905120100_personal_materials_allow_m4a_mime.sql",
     ),
     "utf8",
   );

@@ -194,7 +194,7 @@ const THIRTEEN = [
   "20260801120000_aurafon_bypass_product_moderation.sql",
   "20260810160000_studio_recording_webm_assets.sql",
   "20260816120000_playlist_description_max_300.sql",
-  "20260905120000_personal_materials_allow_m4a_mime.sql",
+  "20260905120100_personal_materials_allow_m4a_mime.sql",
 ];
 
 function readMigration(name) {
@@ -235,7 +235,7 @@ function testDataLineageAppliedAndNotApplied() {
     "20260719140000_clear_legacy_author_seed_description.sql": "data:authors.legacy_seed_description_cleared",
     "20260801120000_aurafon_bypass_product_moderation.sql": "data:authors.aurafon_bypass_product_moderation",
     "20260810160000_studio_recording_webm_assets.sql": "data:storage.studio_draft_assets_allows_webm",
-    "20260905120000_personal_materials_allow_m4a_mime.sql": "data:storage.personal_materials_allows_m4a",
+    "20260905120100_personal_materials_allow_m4a_mime.sql": "data:storage.personal_materials_allows_m4a",
   };
   for (const [name, probeId] of Object.entries(cases)) {
     const sql = readMigration(name);
