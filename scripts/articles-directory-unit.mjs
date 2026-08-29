@@ -117,6 +117,7 @@ import { ZNACHENIE_TARO_V_BIZNESE_PAGE } from "../src/lib/seo/listens/content/zn
 import { RASKLAD_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes.ts";
 import { GADANIE_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/gadanie-taro-na-biznes.ts";
 import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-pro-biznes.ts";
+import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota-i-biznes-taro.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2693,6 +2694,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${ninetiethListenHref}`,
     ),
     "directory JSON-LD includes ninetieth listen href",
+  );
+
+  const ninetyFirstListenHref = "/listens/rabota-i-biznes-taro";
+  const ninetyFirstListenCard = data.articles.find((card) => card.href === ninetyFirstListenHref);
+  assert(ninetyFirstListenCard, "ninety-first indexable listen page is listed");
+  assert(
+    ninetyFirstListenCard.title === "Работа и бизнес Таро – наём или своё дело | АудиоЛад",
+    "ninety-first listen directory title",
+  );
+  assert(
+    ninetyFirstListenCard.description === RABOTA_I_BIZNES_TARO_PAGE.description,
+    "ninety-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/rabota-i-biznes-taro",
+    ),
+    "no /articles duplicate for ninety-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${ninetyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes ninety-first listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
