@@ -106,6 +106,7 @@ import { TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE } from "../src/lib/seo/listens/con
 import { TARO_NA_SITUATSIYU_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-na-situatsiyu-na-rabote.ts";
 import { TARO_POISK_RABOTY_PAGE } from "../src/lib/seo/listens/content/taro-poisk-raboty.ts";
 import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/naydu-li-ya-rabotu-taro.ts";
+import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/vozmut-li-menya-na-rabotu-taro.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2415,6 +2416,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyNinthListenHref}`,
     ),
     "directory JSON-LD includes seventy-ninth listen href",
+  );
+
+  const eightiethListenHref = "/listens/vozmut-li-menya-na-rabotu-taro";
+  const eightiethListenCard = data.articles.find((card) => card.href === eightiethListenHref);
+  assert(eightiethListenCard, "eightieth indexable listen page is listed");
+  assert(
+    eightiethListenCard.title === "Возьмут ли меня на работу – Таро после собеседования | АудиоЛад",
+    "eightieth listen directory title",
+  );
+  assert(
+    eightiethListenCard.description === VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE.description,
+    "eightieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/vozmut-li-menya-na-rabotu-taro",
+    ),
+    "no /articles duplicate for eightieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightiethListenHref}`,
+    ),
+    "directory JSON-LD includes eightieth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
