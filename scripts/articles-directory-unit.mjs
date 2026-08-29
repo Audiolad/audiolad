@@ -112,6 +112,7 @@ import { TARO_RABOTA_I_KARERA_PAGE } from "../src/lib/seo/listens/content/taro-r
 import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-perspektivy-na-rabote.ts";
 import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-otnosheniya-na-rabote.ts";
 import { TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/taro-biznes.ts";
+import { KARTY_TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/karty-taro-biznes.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2567,6 +2568,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightyFifthListenHref}`,
     ),
     "directory JSON-LD includes eighty-fifth listen href",
+  );
+
+  const eightySixthListenHref = "/listens/karty-taro-biznes";
+  const eightySixthListenCard = data.articles.find((card) => card.href === eightySixthListenHref);
+  assert(eightySixthListenCard, "eighty-sixth indexable listen page is listed");
+  assert(
+    eightySixthListenCard.title === "Карты Таро бизнес – карты для вопросов о своём деле | АудиоЛад",
+    "eighty-sixth listen directory title",
+  );
+  assert(
+    eightySixthListenCard.description === KARTY_TARO_BIZNES_PAGE.description,
+    "eighty-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/karty-taro-biznes",
+    ),
+    "no /articles duplicate for eighty-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightySixthListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-sixth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
