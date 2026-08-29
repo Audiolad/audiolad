@@ -268,7 +268,7 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "related",
-      label: "Добавлены связанные материалы",
+      label: "Добавлены связанные продукты",
       done: (input.seoRelatedCount ?? 0) > 0,
     },
   ];

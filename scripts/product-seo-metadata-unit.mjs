@@ -203,7 +203,14 @@ assert.doesNotMatch(page, /FAQPage|QAPage/);
 const seoContent = read("src/components/products/PracticeSeoContentSections.tsx");
 assert.match(seoContent, /getPracticeSeoUsageHeading/);
 assert.match(seoContent, /Вопросы и ответы/);
+assert.match(seoContent, /RelatedProductLinkCard/);
+assert.match(seoContent, /Связанные продукты/);
+assert.doesNotMatch(seoContent, /relatedListens|Связанные страницы/);
 assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
+assert.equal(
+  readiness.checks.find((check) => check.id === "related")?.label,
+  "Добавлены связанные продукты",
+);
 assert.match(
   read("src/lib/products/practice-seo-content.ts"),
   /Как использовать практику/,

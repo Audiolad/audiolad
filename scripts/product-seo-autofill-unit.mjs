@@ -1093,6 +1093,8 @@ assert.match(
 assert.match(copyPrompt, /Не пересказывай и не перефразируй его/);
 assert.match(copyPrompt, /должен продолжать короткое описание/);
 assert.match(copyPrompt, /Новая полезная информация важнее длины/);
+assert.match(copyPrompt, /Не генерируй связанные продукты и URL/);
+assert.doesNotMatch(copyPrompt, /relatedListen|related_listen|статьи АудиоЛада/);
 assert.match(
   copyPrompt,
   /напиши более короткий блок «Подробнее о продукте»/,
