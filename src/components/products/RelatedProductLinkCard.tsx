@@ -31,7 +31,7 @@ export default function RelatedProductLinkCard({
       href={product.href}
       className="flex w-full max-w-full min-w-0 items-center gap-3 rounded-[16px] border border-[#eadff8] bg-white px-3 py-2 no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
     >
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[12px]">
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[12px]" aria-hidden="true">
         <ProductCoverThumbnail
           slug={product.practiceId}
           title={product.title}
@@ -39,6 +39,7 @@ export default function RelatedProductLinkCard({
           coverImage={product.coverImage}
           updatedAt={product.updatedAt}
           authorName={product.authorName}
+          coverAlt="Обложка"
           displayWidth={56}
           className="h-full w-full rounded-[12px]"
         />

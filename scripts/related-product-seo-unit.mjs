@@ -111,6 +111,12 @@ assert.doesNotMatch(seoSection, /listen-options/);
 assert.doesNotMatch(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /RELATED_PRODUCT_SEARCH_DEBOUNCE_MS/);
 assert.match(seoSection, /shouldSearchRelatedProducts\(relatedProductQuery\)/);
+assert.match(seoSection, /ProductCoverThumbnail/);
+assert.match(seoSection, /option\.formatLabel/);
+assert.match(seoSection, /option\.authorName/);
+assert.match(seoSection, /aria-busy/);
+assert.match(seoSection, /Начните вводить название/);
+assert.doesNotMatch(seoSection, /Найти статью/);
 
 const publicSections = read("src/components/products/PracticeSeoContentSections.tsx");
 assert.match(publicSections, /RelatedProductLinkCard/);
@@ -124,6 +130,8 @@ assert.match(card, /ProductCoverThumbnail/);
 assert.match(card, /formatLabel/);
 assert.match(card, /product\.title/);
 assert.match(card, /authorName/);
+assert.match(card, /aria-hidden="true"/);
+assert.match(card, /coverAlt="Обложка"/);
 assert.doesNotMatch(card, /Слушать|PlayIcon|aria-label=\{`Слушать/);
 
 const loader = read("src/lib/products/practice-seo-content.ts");
@@ -143,6 +151,9 @@ const searchRoute = read("src/app/api/author/seo/related-product-options/route.t
 assert.match(searchRoute, /shouldSearchRelatedProducts/);
 assert.match(searchRoute, /RELATED_PRODUCT_SEARCH_LIMIT/);
 assert.match(searchRoute, /toRelatedProductOrFilter/);
+assert.match(searchRoute, /title\.ilike|toRelatedProductOrFilter/);
+assert.match(searchRoute, /subtitle/);
+assert.match(searchRoute, /status", "published"/);
 assert.doesNotMatch(searchRoute, /author_id.*searchParams/);
 
 assert.equal(

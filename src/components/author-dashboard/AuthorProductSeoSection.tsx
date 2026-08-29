@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import {
   PRODUCT_CONTENT_LIMITS,
 } from "@/lib/author-products/limits";
@@ -917,10 +919,13 @@ export default function AuthorProductSeoSection({
           Выберите 2–4 продукта, которые действительно связаны с этой темой и
           могут быть полезны слушателю дальше.
         </p>
-        <label className="mt-3 block">
+        <label className="mt-3 block" htmlFor="related-product-search">
           <span className="text-sm font-medium">Найти продукт</span>
           <input
+            id="related-product-search"
             aria-label="Найти продукт"
+            aria-controls="related-product-search-results"
+            aria-busy={relatedProductSearching && !relatedProductSearchSettled}
             value={relatedProductQuery}
             disabled={disabled || !relatedProductSourceId}
             onChange={(event) => setRelatedProductQuery(event.target.value)}
@@ -928,6 +933,7 @@ export default function AuthorProductSeoSection({
             placeholder={relatedProductSourceId ? "Введите название или слово из названия" : "Сначала сохраните продукт"}
           />
         </label>
+        <div id="related-product-search-results" role="status">
         {!relatedProductSourceId ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Сначала сохраните продукт</p>
         ) : relatedProductQuery.trim() && !shouldSearchRelatedProducts(relatedProductQuery) ? (
@@ -944,7 +950,8 @@ export default function AuthorProductSeoSection({
                   <button
                     type="button"
                     disabled={disabled}
-                    className="w-full rounded-[14px] border border-[#eadff8] bg-white px-3 py-2 text-left text-sm text-[#2b2140]"
+                    aria-label={`Добавить «${option.label}»`}
+                    className="flex w-full min-w-0 items-center gap-3 rounded-[14px] border border-[#eadff8] bg-white px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                     onClick={() => {
                       const result = canAddRelatedProductId(
                         option.value,
@@ -966,7 +973,26 @@ export default function AuthorProductSeoSection({
                       });
                     }}
                   >
-                    {option.label}
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px]" aria-hidden="true">
+                      <ProductCoverThumbnail
+                        slug={option.value}
+                        title={option.label}
+                        coverUrl={option.coverUrl}
+                        authorName={option.authorName}
+                        format={option.formatLabel}
+                        displayWidth={48}
+                        className="h-full w-full rounded-[10px]"
+                      />
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      {option.formatLabel ? (
+                        <span className={`block ${PRODUCT_FORMAT_LINE_CLASS}`}>{option.formatLabel}</span>
+                      ) : null}
+                      <span className="block text-sm font-medium text-[#2b2140]">{option.label}</span>
+                      {option.authorName ? (
+                        <span className="mt-0.5 block truncate text-xs text-[#5c4f82]">{option.authorName}</span>
+                      ) : null}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -974,6 +1000,7 @@ export default function AuthorProductSeoSection({
         ) : relatedProductSearchSettled && !visibleRelatedProductResults.length ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ничего не найдено</p>
         ) : null}
+        </div>
         {selectedRelatedIds.map((id, index) => (
           <div className="mt-2 flex min-w-0 items-center gap-2" key={`product-${id}`}>
             <p className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-[#fbf8ff] px-3 py-2 text-sm text-[#2b2140]">
