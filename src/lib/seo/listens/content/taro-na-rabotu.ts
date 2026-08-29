@@ -39,6 +39,14 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "«На что я могу опереться?»" },
         { kind: "paragraph", text: "«Какой вопрос мне нужно уточнить прежде, чем принимать решение?»" },
         { kind: "paragraph", text: "В этом и состоит практический смысл Таро на работу – карта становится поводом для конкретного размышления, а не готовым ответом о будущем." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос звучит как «найду ли я работу», отдельно разобрана тема " },
+            { href: "/listens/naydu-li-ya-rabotu-taro", label: "Найду ли я работу – Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -123,6 +131,14 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Но здесь важно не превращать работу с картами в полноценную схему расклада." },
         { kind: "paragraph", text: "Количество карт не делает ответ достовернее." },
         { kind: "paragraph", text: "Если вопрос остаётся запутанным, иногда полезнее переформулировать его, чем вытягивать новые карты." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если нужна схема позиций, есть отдельный " },
+            { href: "/listens/rasklad-taro-na-rabotu", label: "расклад Таро на работу" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -150,6 +166,14 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Это не фиксированные предсказания." },
         { kind: "paragraph", text: "Восьмёрка Пентаклей не означает, что работы обязательно станет больше, Император не говорит, какое решение примет руководитель, а Двойка Жезлов не гарантирует перемен." },
         { kind: "paragraph", text: "Значение зависит от конкретного вопроса и обстоятельств." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Значения карт в рабочем вопросе отдельно разобраны в материале " },
+            { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -177,6 +201,14 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
           "фактические решения работодателя.",
         ]},
         { kind: "paragraph", text: "Таро может помочь заметить собственные ожидания, но не узнать скрытый факт." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "После собеседования или отклика полезнее страница " },
+            { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -220,6 +252,14 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
           ],
         },
         { kind: "paragraph", text: "Текущая страница сосредоточена именно на том, как обратиться к картам со своим профессиональным вопросом." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для ближайшего рабочего периода есть материал " },
+            { href: "/listens/taro-na-rabotu-na-blizhayshee-budushchee", label: "Таро на работу на ближайшее будущее" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -287,6 +327,22 @@ export const TARO_NA_RABOTU_PAGE = assertListenPageDefinition({
           "альтернативы.",
         ]},
         { kind: "paragraph", text: "Таро здесь остаётся способом посмотреть на собственное восприятие выбора." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если выбор касается конкретного нового места, можно посмотреть " },
+            { href: "/listens/taro-novaya-rabota", label: "Таро новая работа" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если человек ещё в процессе поиска, есть материал " },
+            { href: "/listens/taro-poisk-raboty", label: "Таро поиск работы" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

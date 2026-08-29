@@ -51,6 +51,22 @@ export const RASKLAD_TARO_NA_DENGI_PAGE = assertListenPageDefinition({
             { text: ", она разобрана отдельно. Здесь главный акцент именно на структуре расклада и последовательности вопросов." },
           ],
         },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос звучит как ожидание конкретного поступления, можно посмотреть " },
+            { href: "/listens/budut-li-dengi-taro", label: "Будут ли деньги – Таро" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для ближайшего периода есть материал " },
+            { href: "/listens/taro-na-dengi-v-blizhayshee-vremya", label: "Таро на деньги в ближайшее время" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -339,6 +355,14 @@ export const RASKLAD_TARO_NA_DENGI_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Он заканчивается более полезным вопросом:" },
         { kind: "paragraph", text: "«Что я могу сделать после того, что заметил?»" },
         { kind: "paragraph", text: "При серьёзных финансовых решениях карты не должны становиться основанием для инвестирования, кредита, крупной покупки или другого значимого действия. Такие решения требуют реальных данных, расчётов и оценки рисков." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если расклад касается уже не личных денег, а финансов своего дела, есть " },
+            { href: "/listens/rasklad-taro-na-biznes-i-dengi", label: "расклад Таро на бизнес и деньги" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

@@ -238,6 +238,14 @@ export const TARO_DOHODY_PAGE = assertListenPageDefinition({
           "затраты времени;",
           "реальные результаты.",
         ]},
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если дополнительный доход связан со своим делом, отдельно разобрана тема " },
+            { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

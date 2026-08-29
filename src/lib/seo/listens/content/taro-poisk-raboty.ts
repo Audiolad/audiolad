@@ -441,6 +441,14 @@ export const TARO_POISK_RABOTY_PAGE = assertListenPageDefinition({
               { text: "." },
           ],
         },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "После отклика или собеседования по конкретной вакансии полезнее страница " },
+            { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

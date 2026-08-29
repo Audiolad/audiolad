@@ -75,6 +75,14 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
         ]},
         { kind: "paragraph", text: "Такие формулировки помогают не перекладывать решение на карты." },
         { kind: "paragraph", text: "Вопрос «сработает ли бизнес?» слишком широкий. Гораздо полезнее разобрать его на части: что известно о спросе, какую ценность получает клиент, сколько стоит привлечение покупателя, каких ресурсов не хватает и какой небольшой тест даст новую информацию." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Больше формулировок собрано в материале " },
+            { href: "/listens/voprosy-taro-pro-biznes", label: "вопросы Таро про бизнес" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -154,6 +162,14 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
         { kind: "heading", level: 3, title: "Карта 3 – что стоит проверить или сделать следующим" },
         { kind: "paragraph", text: "Какое действие поможет получить новые реальные данные?" },
         { kind: "paragraph", text: "Главная особенность этой схемы – последняя карта не отвечает за готовый результат. Она переводит символический разбор в проверяемое действие." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для подробной схемы позиций есть отдельный " },
+            { href: "/listens/rasklad-taro-na-biznes", label: "расклад Таро на бизнес" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -190,6 +206,14 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
               { text: "." },
           ],
         },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос касается уже не личных денег, а выручки, расходов и прибыли своего дела, отдельно разобрана тема " },
+            { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -209,6 +233,14 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
         ]},
         { kind: "paragraph", text: "Полезнее использовать позитивную карту как повод спросить: какие реальные возможности я вижу и как их проверить?" },
         { kind: "paragraph", text: "Например, если расклад вызывает мысль о новом канале продаж, следующим шагом может стать небольшой тест, а не немедленное вложение большого бюджета." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если запрос привычно называют гаданием, можно посмотреть " },
+            { href: "/listens/gadanie-taro-na-biznes", label: "гадание Таро на бизнес" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -254,6 +286,22 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
         { kind: "heading", level: 3, title: "Колесо Фортуны" },
         { kind: "paragraph", text: "Может напоминать об изменениях внешней среды и необходимости адаптироваться." },
         { kind: "paragraph", text: "Ни одна из этих карт не гарантирует прибыль, успешный бизнес или рост продаж. Символика помогает сформулировать вопрос, но ответ о состоянии бизнеса дают реальные показатели." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Отдельные арканы в предпринимательском контексте разобраны в материале " },
+            { href: "/listens/karty-taro-biznes", label: "Карты Таро бизнес" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Принципы чтения карт в бизнесе – в материале " },
+            { href: "/listens/znachenie-taro-v-biznese", label: "значение Таро в бизнесе" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -272,6 +320,14 @@ export const TARO_BIZNES_PAGE = assertListenPageDefinition({
           ],
         },
         { kind: "paragraph", text: "Так можно отделить вопрос о конкретном бизнесе от более широкого вопроса о собственной профессиональной траектории." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если нужно сравнить наём и своё дело, есть материал " },
+            { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
