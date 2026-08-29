@@ -118,6 +118,7 @@ import { RASKLAD_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/rask
 import { GADANIE_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/gadanie-taro-na-biznes.ts";
 import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-pro-biznes.ts";
 import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota-i-biznes-taro.ts";
+import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-biznes-i-dengi.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2718,6 +2719,26 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${ninetyFirstListenHref}`,
     ),
     "directory JSON-LD includes ninety-first listen href",
+  );
+
+  const ninetySecondListenHref = "/listens/taro-biznes-i-dengi";
+  const ninetySecondListenCard = data.articles.find((card) => card.href === ninetySecondListenHref);
+  assert(ninetySecondListenCard, "ninety-second indexable listen page is listed");
+  assert(
+    ninetySecondListenCard.title === "Таро бизнес и деньги – финансы своего дела через карты | АудиоЛад",
+    "ninety-second listen directory title",
+  );
+  assert(
+    ninetySecondListenCard.description === TARO_BIZNES_I_DENGI_PAGE.description,
+    "ninety-second listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/taro-biznes-i-dengi"),
+    "no /articles duplicate for ninety-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetySecondListenHref}`),
+    "directory JSON-LD includes ninety-second listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
