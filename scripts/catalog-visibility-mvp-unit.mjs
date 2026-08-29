@@ -391,8 +391,10 @@ function testSourceGuards() {
   assert.match(order, /viewer_can_commercially_access_practice/);
 
   const hooks = read("src/lib/seo/indexnow/hooks.ts");
-  assert.match(hooks, /shouldNotifyIndexNowByVisibility/);
-  assert.match(hooks, /catalogVisibility/);
+  const planner = read("src/lib/seo/indexnow/planner.ts");
+  assert.match(hooks, /from "@\/lib\/seo\/indexnow\/planner"/);
+  assert.match(planner, /shouldNotifyIndexNowByVisibility/);
+  assert.match(planner, /catalogVisibility/);
 }
 
 testParseAndSync();
