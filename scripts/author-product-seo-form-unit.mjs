@@ -21,7 +21,10 @@ import {
   validateSeoTitleLength,
 } from "../src/lib/author-products/limits.ts";
 import { normalizeClearableTextField } from "../src/lib/author-products/text-fields.ts";
-import { parsePracticeSeoContent } from "../src/lib/products/practice-seo-content.ts";
+import {
+  hasPracticeSeoContentChanges,
+  parsePracticeSeoContent,
+} from "../src/lib/products/practice-seo-content.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -243,6 +246,22 @@ assert.equal(
   }),
   null,
 );
+const canonicalSeoContent = parsePracticeSeoContent({
+  usage_items: [{ content: "  Слушайте в спокойном месте  " }, { content: "" }],
+  faq_items: [
+    { question: "Нужны ли наушники?", answer: "По желанию." },
+    { question: "", answer: "" },
+  ],
+  related_practice_ids: ["33333333-3333-4333-8333-333333333333", ""],
+  related_listen_slugs: ["meditatsiya-na-dengi-slushat-onlayn-besplatno", ""],
+});
+assert.deepEqual(canonicalSeoContent, {
+  usageItems: [{ content: "Слушайте в спокойном месте" }],
+  faqItems: [{ question: "Нужны ли наушники?", answer: "По желанию." }],
+  relatedPracticeIds: ["33333333-3333-4333-8333-333333333333"],
+  relatedListenSlugs: ["meditatsiya-na-dengi-slushat-onlayn-besplatno"],
+});
+assert.equal(hasPracticeSeoContentChanges(canonicalSeoContent, canonicalSeoContent), false);
 assert.equal(
   parsePracticeSeoContent({
     usage_items: [],
@@ -272,7 +291,8 @@ assert.ok(
   "all SEO inputs must honor the moderation lock",
 );
 assert.match(seoSection, /disabled:cursor-not-allowed disabled:opacity-60/);
-assert.match(seoSection, /listListenPageDefinitions/);
+assert.match(seoSection, /api\/author\/seo\/listen-options/);
+assert.doesNotMatch(seoSection, /listListenPageDefinitions/);
 assert.match(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
 assert.doesNotMatch(seoSection, /relatedListenUrl|listen_url/i);
@@ -286,5 +306,16 @@ assert.match(patch, /validateSeoDescriptionLength/);
 assert.doesNotMatch(patch, /api\/author\/products\/\[id\]\/seo/);
 assert.match(patch, /replacePracticeSeoContent/);
 assert.match(patch, /validateRelatedPracticeTargets/);
+assert.match(patch, /hasPracticeSeoContentChanges/);
+assert.match(patch, /seoContentChanged/);
+assert.match(patch, /scalarUpdates/);
+
+const seoContentSource = read("src/lib/products/practice-seo-content.ts");
+assert.match(seoContentSource, /\.rpc\("replace_practice_seo_content"/);
+assert.doesNotMatch(seoContentSource, /for \(const table of tables\)/);
+const migration = read("supabase/migrations/20260908120000_product_seo_v2.sql");
+assert.match(migration, /CREATE OR REPLACE FUNCTION public\.replace_practice_seo_content/);
+assert.match(migration, /REVOKE INSERT, UPDATE, DELETE ON TABLE public\.practice_seo_usage_items FROM authenticated/);
+assert.match(migration, /is_catalog_listed IS TRUE/);
 
 console.log("author-product-seo-form-unit: ok");
