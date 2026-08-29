@@ -193,9 +193,13 @@ assert.match(page, /loadPublicPracticeSeoContent/);
 assert.doesNotMatch(page, /FAQPage|QAPage/);
 
 const seoContent = read("src/components/products/PracticeSeoContentSections.tsx");
-assert.match(seoContent, /Как использовать/);
+assert.match(seoContent, /getPracticeSeoUsageHeading/);
 assert.match(seoContent, /Вопросы и ответы/);
 assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
+assert.match(
+  read("src/lib/products/practice-seo-content.ts"),
+  /Как использовать практику/,
+);
 
 const jsonLd = read("src/lib/seo/json-ld/builders.ts");
 assert.match(jsonLd, /name: input\.title/);
