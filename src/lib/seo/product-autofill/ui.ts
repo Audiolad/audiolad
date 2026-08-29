@@ -10,7 +10,10 @@ import {
 } from "@/lib/seo/product-metadata";
 import { clipSeoQuery } from "@/lib/seo/wordstat/ui";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
-import type { ProductSeoAccordionBadgeKind } from "@/lib/seo/product-autofill/types";
+import type {
+  ProductSeoAccordionBadgeKind,
+  ProductSeoSecondaryQueryStatus,
+} from "@/lib/seo/product-autofill/types";
 
 export const PRODUCT_SEO_ACCORDION_TITLE = "SEO и продвижение";
 
@@ -48,6 +51,41 @@ export const PRODUCT_SEO_OVERWRITE_REPLACE = "Заменить";
 export const PRODUCT_SEO_OVERWRITE_CANCEL = "Отмена";
 
 export const PRODUCT_SEO_ADD_OWN_FAQ = "+ Добавить свой вопрос";
+
+export const PRODUCT_SEO_STYLE_LABEL = "Стиль текста";
+
+export const PRODUCT_SEO_STYLE_ADVANCED_CTA = "Настроить стиль";
+
+export const PRODUCT_SEO_STYLE_VARIETY_LABEL = "Разнообразие текстов";
+
+export const PRODUCT_SEO_SECONDARY_LIMITED_COPY =
+  "Яндекс нашёл мало подходящих дополнительных фраз. Вы можете добавить другие вручную.";
+
+export const PRODUCT_SEO_SECONDARY_NONE_COPY =
+  "Дополнительные поисковые фразы не удалось подобрать. Вы можете добавить их вручную.";
+
+export const PRODUCT_SEO_STYLE_SLIDER_LABELS = {
+  warmth: {
+    name: "Теплота",
+    low: "Сдержанно",
+    high: "Тепло и по-человечески",
+  },
+  expertise: {
+    name: "Экспертность",
+    low: "Просто",
+    high: "Подробно и экспертно",
+  },
+  conversational: {
+    name: "Разговорность",
+    low: "Деловой текст",
+    high: "Живая речь",
+  },
+  expressiveness: {
+    name: "Выразительность",
+    low: "Нейтрально",
+    high: "Образно и эмоционально",
+  },
+} as const;
 
 export const PRODUCT_SEO_ACCORDION_BADGE_COPY: Record<
   ProductSeoAccordionBadgeKind,
@@ -219,4 +257,18 @@ export function suggestPrimaryQuerySeeds(input: {
 
 export function productSeoPrimarySelectedLabel(primaryQuery: string): string {
   return `Основной запрос: «${primaryQuery.trim()}»`;
+}
+
+export function productSeoSecondaryStatusCopy(
+  status: ProductSeoSecondaryQueryStatus | null,
+): string | null {
+  if (status === "limited") {
+    return PRODUCT_SEO_SECONDARY_LIMITED_COPY;
+  }
+
+  if (status === "none") {
+    return PRODUCT_SEO_SECONDARY_NONE_COPY;
+  }
+
+  return null;
 }

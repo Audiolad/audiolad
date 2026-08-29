@@ -16,11 +16,17 @@ Do **not** paste `OPENAI_API_KEY` into GitHub issues, PRs, or chat.
    card and then checked in Wordstat.
 3. Wordstat returns real demand candidates (GetTop results + associations).
 4. Autofill **selects secondaries only from those candidates**.
+   If Wordstat has 3+ eligible phrases, the draft includes 3–5. If it
+   has 1–2, generation still succeeds with those phrases. If it has none,
+   secondaries stay empty and the other SEO fields are still prepared.
 5. Autofill writes a local SEO draft: title, description, about, usage,
-   and exactly 3 FAQ pairs.
+   and exactly 3 FAQ pairs. An optional style profile changes tone, not
+   facts or Wordstat phrases. The search title stays SEO-first.
 6. Author reviews and edits everything.
 7. The usual product save writes the form. There is no auto-save, no
    PATCH during generation, no IndexNow, and no Webmaster recrawl.
+   Style selection is local to the current form. Author-default style
+   persistence needs a follow-up (no existing settings JSON is safe).
 
 Wordstat = real demand and frequency. AI = semantic selection + writing.
 AI does not invent frequency. The author decides. Generated chips and
@@ -37,6 +43,10 @@ PRODUCT_SEO_AI_ENABLED=true
 OPENAI_API_KEY=<secret, enter only on the server>
 PRODUCT_SEO_AI_MODEL=<server-configurable model name>
 ```
+
+Default model is `gpt-5.4-mini` when `PRODUCT_SEO_AI_MODEL` is omitted.
+Responses requests use Structured Outputs, `store=false`,
+`max_output_tokens=3000`, and no tools.
 
 Autofill is available only when all of these are true:
 

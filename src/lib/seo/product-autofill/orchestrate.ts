@@ -17,8 +17,14 @@ import {
   type ProductSeoAiRateLimitStore,
 } from "@/lib/seo/product-autofill/rate-limit";
 import { eligibleSecondaryCandidates } from "@/lib/seo/product-autofill/select-secondaries";
+import {
+  createDefaultProductSeoStyleProfile,
+  requestHasForbiddenStyleKeys,
+  sanitizeProductSeoStyleProfile,
+} from "@/lib/seo/product-autofill/style-profile";
 import { validateProductSeoAiDraft } from "@/lib/seo/product-autofill/validate";
 import {
+  type ProductSeoAiErrorCode,
   type ProductSeoAiResult,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
@@ -45,12 +51,20 @@ export type GenerateProductSeoDraftOptions = {
   wordstatSuggestions?: WordstatSuggestion[];
 };
 
-function readAutofillRequest(body: unknown): ProductSeoAutofillRequest | null {
+export type ParseProductSeoAutofillRequestResult =
+  | { ok: true; request: ProductSeoAutofillRequest }
+  | { ok: false; code: Extract<ProductSeoAiErrorCode, "INVALID_PRIMARY" | "INVALID_STYLE_PROFILE"> };
+
+function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResult {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return null;
+    return { ok: false, code: "INVALID_PRIMARY" };
   }
 
   const record = body as Record<string, unknown>;
+  if (requestHasForbiddenStyleKeys(record)) {
+    return { ok: false, code: "INVALID_STYLE_PROFILE" };
+  }
+
   if (
     typeof record.title !== "string" ||
     typeof record.subtitle !== "string" ||
@@ -58,7 +72,12 @@ function readAutofillRequest(body: unknown): ProductSeoAutofillRequest | null {
     typeof record.productKind !== "string" ||
     typeof record.seoPrimaryQuery !== "string"
   ) {
-    return null;
+    return { ok: false, code: "INVALID_PRIMARY" };
+  }
+
+  const style = sanitizeProductSeoStyleProfile(record.styleProfile);
+  if (!style.ok) {
+    return { ok: false, code: "INVALID_STYLE_PROFILE" };
   }
 
   const usageItems = Array.isArray(record.usageItems)
@@ -66,30 +85,34 @@ function readAutofillRequest(body: unknown): ProductSeoAutofillRequest | null {
     : [];
 
   return {
-    title: record.title,
-    subtitle: record.subtitle,
-    description: record.description,
-    productKind: record.productKind,
-    seoPrimaryQuery: record.seoPrimaryQuery,
-    usageItems,
-    mode: record.mode === "field" ? "field" : "full",
-    fields: Array.isArray(record.fields)
-      ? record.fields.filter(
-          (item): item is NonNullable<ProductSeoAutofillRequest["fields"]>[number] =>
-            item === "title" ||
-            item === "description" ||
-            item === "about" ||
-            item === "faq" ||
-            item === "usage" ||
-            item === "secondaries",
-        )
-      : undefined,
+    ok: true,
+    request: {
+      title: record.title,
+      subtitle: record.subtitle,
+      description: record.description,
+      productKind: record.productKind,
+      seoPrimaryQuery: record.seoPrimaryQuery,
+      usageItems,
+      styleProfile: style.profile,
+      mode: record.mode === "field" ? "field" : "full",
+      fields: Array.isArray(record.fields)
+        ? record.fields.filter(
+            (item): item is NonNullable<ProductSeoAutofillRequest["fields"]>[number] =>
+              item === "title" ||
+              item === "description" ||
+              item === "about" ||
+              item === "faq" ||
+              item === "usage" ||
+              item === "secondaries",
+          )
+        : undefined,
+    },
   };
 }
 
 export function parseProductSeoAutofillRequest(
   body: unknown,
-): ProductSeoAutofillRequest | null {
+): ParseProductSeoAutofillRequestResult {
   return readAutofillRequest(body);
 }
 
@@ -147,10 +170,13 @@ export async function generateProductSeoDraft(
 
   const suggestions = await loadWordstatCandidates(primary, options);
   const candidates = eligibleSecondaryCandidates(suggestions, primary);
+  const styleProfile =
+    request.styleProfile ?? createDefaultProductSeoStyleProfile();
   const promptInput: ProductSeoAiPromptInput = {
     request: {
       ...request,
       seoPrimaryQuery: primary,
+      styleProfile,
     },
     candidates,
   };

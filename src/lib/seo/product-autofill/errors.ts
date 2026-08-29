@@ -18,6 +18,7 @@ export const PRODUCT_SEO_AI_ERROR_MESSAGES: Record<
   INVALID_OUTPUT: PRODUCT_SEO_AI_ERROR_MESSAGE,
   INVALID_PRIMARY: "Сначала выберите основной поисковый запрос.",
   MISSING_PRIMARY: "Сначала выберите основной поисковый запрос.",
+  INVALID_STYLE_PROFILE: "Некорректные настройки стиля текста.",
 };
 
 export function productSeoAiError(
@@ -38,6 +39,7 @@ export function productSeoAiHttpStatus(code: ProductSeoAiErrorCode): number {
   switch (code) {
     case "INVALID_PRIMARY":
     case "MISSING_PRIMARY":
+    case "INVALID_STYLE_PROFILE":
     case "INVALID_OUTPUT":
       return 400;
     case "RATE_LIMITED":

@@ -50,8 +50,8 @@ export async function POST(request: Request) {
     }
 
     const parsed = parseProductSeoAutofillRequest(body);
-    if (!parsed) {
-      const fallback = productSeoAiError("INVALID_PRIMARY");
+    if (!parsed.ok) {
+      const fallback = productSeoAiError(parsed.code);
       return NextResponse.json(
         {
           error: fallback.error.message,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await generateProductSeoDraft(parsed, { userId: user.id });
+    const result = await generateProductSeoDraft(parsed.request, { userId: user.id });
     if (!result.ok) {
       return NextResponse.json(
         {
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
         question: item.question,
         answer: item.answer,
       })),
+      secondaryQueryStatus: result.data.secondaryQueryStatus,
     });
   } catch (error) {
     if (error instanceof AuthorAccessError) {

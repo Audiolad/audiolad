@@ -1,8 +1,12 @@
-export const PRODUCT_SEO_AI_DEFAULT_MODEL = "gpt-4o-mini";
+import type { ProductSeoStyleProfile } from "@/lib/seo/product-autofill/style-profile";
+
+export const PRODUCT_SEO_AI_DEFAULT_MODEL = "gpt-5.4-mini";
 export const PRODUCT_SEO_AI_TIMEOUT_MS = 12_000;
 export const PRODUCT_SEO_AI_ORIGIN = "https://api.openai.com";
 export const PRODUCT_SEO_AI_RESPONSES_PATH = "/v1/responses";
 export const PRODUCT_SEO_AI_RESPONSES_URL = `${PRODUCT_SEO_AI_ORIGIN}${PRODUCT_SEO_AI_RESPONSES_PATH}`;
+export const PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS = 3000;
+export const PRODUCT_SEO_AI_STORE = false;
 
 export const PRODUCT_SEO_SECONDARY_MIN = 3;
 export const PRODUCT_SEO_SECONDARY_MAX = 5;
@@ -36,6 +40,8 @@ export type ProductSeoUsageDraft = {
   content: string;
 };
 
+export type ProductSeoSecondaryQueryStatus = "complete" | "limited" | "none";
+
 export type ProductSeoAutofillDraft = {
   seoSecondaryQueries: string[];
   seoTitle: string;
@@ -43,6 +49,7 @@ export type ProductSeoAutofillDraft = {
   seoAbout: string;
   usageItems: ProductSeoUsageDraft[];
   faqItems: ProductSeoFaqDraft[];
+  secondaryQueryStatus: ProductSeoSecondaryQueryStatus;
 };
 
 export type ProductSeoAutofillRequest = {
@@ -52,6 +59,7 @@ export type ProductSeoAutofillRequest = {
   productKind: string;
   seoPrimaryQuery: string;
   usageItems?: string[];
+  styleProfile?: ProductSeoStyleProfile;
   mode?: ProductSeoGenerateMode;
   fields?: ProductSeoGenerateField[];
 };
@@ -75,7 +83,8 @@ export type ProductSeoAiErrorCode =
   | "PROVIDER_ERROR"
   | "INVALID_OUTPUT"
   | "INVALID_PRIMARY"
-  | "MISSING_PRIMARY";
+  | "MISSING_PRIMARY"
+  | "INVALID_STYLE_PROFILE";
 
 export type ProductSeoAiErrorResult = {
   ok: false;

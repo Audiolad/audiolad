@@ -20,7 +20,9 @@ import {
   type ProductSeoAiRateLimitStore,
 } from "@/lib/seo/product-autofill/rate-limit";
 import {
+  PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_RESPONSES_URL,
+  PRODUCT_SEO_AI_STORE,
   PRODUCT_SEO_AI_TIMEOUT_MS,
   type ProductSeoAiErrorCode,
   type ProductSeoAiErrorResult,
@@ -201,9 +203,10 @@ export function createProductSeoAiProvider(
   const rateLimit = options.rateLimit ?? getProcessProductSeoAiRateLimit();
 
   async function callModel(
-    userPrompt: string,
+    prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
   ): Promise<ProductSeoAiProviderResult> {
+    const { systemPrompt, userPrompt } = prompts;
     const apiKey = readProductSeoAiApiKey(env);
     if (!apiKey) {
       return productSeoAiError("NOT_CONFIGURED");
@@ -215,8 +218,10 @@ export function createProductSeoAiProvider(
 
     const requestBody = JSON.stringify({
       model: config.model,
+      store: PRODUCT_SEO_AI_STORE,
+      max_output_tokens: PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
       input: [
-        { role: "system", content: buildProductSeoSystemPrompt() },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       text: {
@@ -271,11 +276,20 @@ export function createProductSeoAiProvider(
 
   return {
     generate(input) {
-      return callModel(buildProductSeoUserPrompt(input), "generate");
+      return callModel(
+        {
+          systemPrompt: buildProductSeoSystemPrompt(input),
+          userPrompt: buildProductSeoUserPrompt(input),
+        },
+        "generate",
+      );
     },
     repair(input, previous, issues) {
       return callModel(
-        buildProductSeoRepairPrompt(input, previous, issues),
+        {
+          systemPrompt: buildProductSeoSystemPrompt(input),
+          userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
+        },
         "repair",
       );
     },

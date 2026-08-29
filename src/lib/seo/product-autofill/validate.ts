@@ -11,10 +11,12 @@ import {
   PRODUCT_SEO_ABOUT_SOFT_MAX,
   PRODUCT_SEO_FAQ_GENERATED_COUNT,
   PRODUCT_SEO_SECONDARY_MAX,
+  PRODUCT_SEO_SECONDARY_MIN,
   PRODUCT_SEO_USAGE_MAX,
   PRODUCT_SEO_USAGE_MIN,
   type ProductSeoAiRawDraft,
   type ProductSeoAutofillDraft,
+  type ProductSeoSecondaryQueryStatus,
 } from "@/lib/seo/product-autofill/types";
 
 export const BANNED_SEO_CLAIM_PATTERNS: RegExp[] = [
@@ -49,6 +51,38 @@ export type ProductSeoValidationInput = {
 export type ProductSeoValidationResult =
   | { ok: true; draft: ProductSeoAutofillDraft }
   | { ok: false; issues: string[] };
+
+export function expectedSecondaryRange(candidateCount: number): {
+  min: number;
+  max: number;
+} {
+  if (candidateCount <= 0) {
+    return { min: 0, max: 0 };
+  }
+
+  if (candidateCount < PRODUCT_SEO_SECONDARY_MIN) {
+    return { min: 1, max: candidateCount };
+  }
+
+  return {
+    min: PRODUCT_SEO_SECONDARY_MIN,
+    max: Math.min(PRODUCT_SEO_SECONDARY_MAX, candidateCount),
+  };
+}
+
+export function resolveSecondaryQueryStatus(
+  selectedCount: number,
+): ProductSeoSecondaryQueryStatus {
+  if (selectedCount <= 0) {
+    return "none";
+  }
+
+  if (selectedCount < PRODUCT_SEO_SECONDARY_MIN) {
+    return "limited";
+  }
+
+  return "complete";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -243,6 +277,14 @@ export function validateProductSeoAiDraft(
     issues.push("secondary_limit");
   }
 
+  const expectedSecondaries = expectedSecondaryRange(input.candidates.length);
+  if (
+    secondaries.length < expectedSecondaries.min ||
+    secondaries.length > expectedSecondaries.max
+  ) {
+    issues.push("secondary_count");
+  }
+
   const seoTitle = parsed.seoTitle.trim();
   const seoDescription = parsed.seoDescription.trim();
   const seoAbout = parsed.seoAbout.trim();
@@ -385,6 +427,7 @@ export function validateProductSeoAiDraft(
       seoAbout,
       usageItems,
       faqItems,
+      secondaryQueryStatus: resolveSecondaryQueryStatus(secondaries.length),
     },
   };
 }

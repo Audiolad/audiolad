@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
+import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
 import {
   PRODUCT_CONTENT_LIMITS,
 } from "@/lib/author-products/limits";
@@ -43,9 +44,15 @@ import {
   PRODUCT_SEO_START_HEADING,
   PRODUCT_SEO_START_TEXT,
   productSeoPrimarySelectedLabel,
+  productSeoSecondaryStatusCopy,
   resolveProductSeoAccordionBadge,
   suggestPrimaryQuerySeeds,
 } from "@/lib/seo/product-autofill/ui";
+import {
+  createDefaultProductSeoStyleProfile,
+  sanitizeProductSeoStyleProfile,
+} from "@/lib/seo/product-autofill/style-profile";
+import type { ProductSeoSecondaryQueryStatus } from "@/lib/seo/product-autofill/types";
 
 type SelectOption = { value: string; label: string };
 
@@ -134,6 +141,11 @@ export default function AuthorProductSeoSection({
   >(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [overwriteOpen, setOverwriteOpen] = useState(false);
+  const [styleProfile, setStyleProfile] = useState(
+    createDefaultProductSeoStyleProfile,
+  );
+  const [secondaryQueryStatus, setSecondaryQueryStatus] =
+    useState<ProductSeoSecondaryQueryStatus | null>(null);
   const displayedRelatedProducts = relatedProductSourceId
     ? searchedRelatedProducts
     : relatedProductOptions;
@@ -266,6 +278,12 @@ export default function AuthorProductSeoSection({
           productKind,
           seoPrimaryQuery,
           usageItems: seoContent.usageItems.map((item) => item.content),
+          styleProfile: (() => {
+            const sanitized = sanitizeProductSeoStyleProfile(styleProfile);
+            return sanitized.ok
+              ? sanitized.profile
+              : createDefaultProductSeoStyleProfile();
+          })(),
         }),
       });
       const payload = (await response.json().catch(() => null)) as
@@ -276,6 +294,7 @@ export default function AuthorProductSeoSection({
             seoAbout?: string;
             usageItems?: Array<{ content: string }>;
             faqItems?: Array<{ question: string; answer: string }>;
+            secondaryQueryStatus?: ProductSeoSecondaryQueryStatus;
             error?: string;
             code?: string;
           }
@@ -306,6 +325,17 @@ export default function AuthorProductSeoSection({
         usageItems: payload.usageItems,
         faqItems: payload.faqItems,
       });
+      setSecondaryQueryStatus(
+        payload.secondaryQueryStatus === "limited" ||
+          payload.secondaryQueryStatus === "none" ||
+          payload.secondaryQueryStatus === "complete"
+          ? payload.secondaryQueryStatus
+          : payload.seoSecondaryQueries.length >= 3
+            ? "complete"
+            : payload.seoSecondaryQueries.length > 0
+              ? "limited"
+              : "none",
+      );
     } catch {
       setGenerateError(PRODUCT_SEO_AI_ERROR_MESSAGE);
     } finally {
@@ -450,6 +480,11 @@ export default function AuthorProductSeoSection({
           <p className="mt-2 text-sm font-medium text-[#2b2140]">
             {productSeoPrimarySelectedLabel(seoPrimaryQuery)}
           </p>
+          <AuthorProductSeoStyleControls
+            profile={styleProfile}
+            onChange={setStyleProfile}
+            disabled={disabled}
+          />
           <button
             type="button"
             disabled={disabled || generateLoading}
@@ -579,6 +614,11 @@ export default function AuthorProductSeoSection({
 
       <div className="mt-4">
         <span className="mb-2 block text-sm font-medium">Дополнительные поисковые фразы</span>
+        {productSeoSecondaryStatusCopy(secondaryQueryStatus) ? (
+          <p className="mb-2 text-sm leading-5 text-[#7d70a2]">
+            {productSeoSecondaryStatusCopy(secondaryQueryStatus)}
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           {seoSecondaryQueries.map((query, index) => (
             <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">

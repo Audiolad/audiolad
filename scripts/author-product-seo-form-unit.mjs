@@ -317,6 +317,27 @@ assert.match(seoSection, /PRODUCT_SEO_READINESS_HINT/);
 assert.match(seoSection, /PRODUCT_SEO_SELLING_COPY/);
 assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
 assert.match(seoSection, /PRODUCT_SEO_GENERATE_CTA/);
+assert.match(seoSection, /AuthorProductSeoStyleControls/);
+assert.match(seoSection, /styleProfile/);
+assert.match(seoSection, /sanitizeProductSeoStyleProfile/);
+const afterPrimaryBlock = seoSection.slice(
+  seoSection.indexOf("PRODUCT_SEO_AFTER_PRIMARY_COPY"),
+);
+assert.ok(
+  afterPrimaryBlock.indexOf("<AuthorProductSeoStyleControls") <
+    afterPrimaryBlock.lastIndexOf("PRODUCT_SEO_GENERATE_CTA"),
+  "style selector sits before generate CTA",
+);
+assert.match(seoAutofillUi, /Стиль текста/);
+assert.match(seoAutofillUi, /Настроить стиль/);
+assert.match(seoAutofillUi, /Разнообразие текстов/);
+assert.match(seoAutofillUi, /мало подходящих дополнительных фраз/);
+assert.match(seoAutofillUi, /Дополнительные поисковые фразы не удалось подобрать/);
+assert.match(
+  read("src/components/author-dashboard/AuthorProductSeoStyleControls.tsx"),
+  /useState\(false\)/,
+);
+assert.doesNotMatch(seoSection, /localStorage|Пример моего стиля/);
 assert.match(seoSection, /requestGenerateProductSeo/);
 assert.match(seoSection, /api\/author\/seo\/product-autofill/);
 assert.match(seoSection, /hasFilledGeneratedSeoFields/);
