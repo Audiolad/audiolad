@@ -111,6 +111,7 @@ import { TARO_MENYAT_LI_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-
 import { TARO_RABOTA_I_KARERA_PAGE } from "../src/lib/seo/listens/content/taro-rabota-i-karera.ts";
 import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-perspektivy-na-rabote.ts";
 import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-otnosheniya-na-rabote.ts";
+import { TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/taro-biznes.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2541,6 +2542,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightyFourthListenHref}`,
     ),
     "directory JSON-LD includes eighty-fourth listen href",
+  );
+
+
+  const eightyFifthListenHref = "/listens/taro-biznes";
+  const eightyFifthListenCard = data.articles.find((card) => card.href === eightyFifthListenHref);
+  assert(eightyFifthListenCard, "eighty-fifth indexable listen page is listed");
+  assert(
+    eightyFifthListenCard.title === "Таро бизнес – вопросы о своём деле и развитии | АудиоЛад",
+    "eighty-fifth listen directory title",
+  );
+  assert(
+    eightyFifthListenCard.description === TARO_BIZNES_PAGE.description,
+    "eighty-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-biznes",
+    ),
+    "no /articles duplicate for eighty-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightyFifthListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-fifth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
