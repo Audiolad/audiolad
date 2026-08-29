@@ -337,6 +337,24 @@ export const AUDIT_LINEAGE = {
     ],
   },
 
+  "20260905120100": {
+    extraProbes: [
+      dataProbe(
+        "data:storage.personal_materials_allows_m4a",
+        `SELECT EXISTS (
+  SELECT 1
+  FROM storage.buckets
+  WHERE id = 'personal-materials'
+    AND allowed_mime_types IS NOT NULL
+    AND 'audio/mpeg' = ANY (allowed_mime_types)
+    AND 'application/pdf' = ANY (allowed_mime_types)
+    AND 'audio/mp4' = ANY (allowed_mime_types)
+)`,
+        "personal-materials allowed_mime_types includes audio/mp4 and keeps mpeg/pdf",
+      ),
+    ],
+  },
+
   "20260816120000": {
     extraProbes: [
       schemaProbe(
