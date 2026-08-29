@@ -88,7 +88,10 @@ export default function AuthorProductSeoSection({
   const [listenOptions, setListenOptions] = useState<SelectOption[]>([]);
   const [relatedProductQuery, setRelatedProductQuery] = useState("");
   const [searchedRelatedProducts, setSearchedRelatedProducts] =
-    useState<SelectOption[]>(relatedProductOptions);
+    useState<SelectOption[]>([]);
+  const displayedRelatedProducts = relatedProductSourceId
+    ? searchedRelatedProducts
+    : relatedProductOptions;
   useEffect(() => {
     void fetch("/api/author/seo/listen-options")
       .then((response) => response.ok ? response.json() : { options: [] })
@@ -97,7 +100,6 @@ export default function AuthorProductSeoSection({
   }, []);
   useEffect(() => {
     if (!relatedProductSourceId) {
-      setSearchedRelatedProducts(relatedProductOptions);
       return;
     }
 
@@ -120,7 +122,7 @@ export default function AuthorProductSeoSection({
       });
 
     return () => controller.abort();
-  }, [relatedProductSourceId, relatedProductOptions, relatedProductQuery]);
+  }, [relatedProductSourceId, relatedProductQuery]);
   const seoInput = {
     title,
     subtitle,
@@ -253,7 +255,7 @@ export default function AuthorProductSeoSection({
           <div className="mt-2 flex gap-2" key={`product-${index}`}>
             <select value={id} disabled={disabled} onChange={(event) => onChange({ seoContent: { ...seoContent, relatedPracticeIds: seoContent.relatedPracticeIds.map((current, itemIndex) => itemIndex === index ? event.target.value : current) } })} className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2">
               <option value="">Выберите опубликованный продукт</option>
-              {searchedRelatedProducts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {displayedRelatedProducts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, -1) } })}>↑</button>
             <button type="button" disabled={disabled || index === seoContent.relatedPracticeIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(seoContent.relatedPracticeIds, index, 1) } })}>↓</button>
