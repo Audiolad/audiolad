@@ -110,6 +110,7 @@ import { VOZMUT_LI_MENYA_NA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/cont
 import { TARO_MENYAT_LI_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-menyat-li-rabotu.ts";
 import { TARO_RABOTA_I_KARERA_PAGE } from "../src/lib/seo/listens/content/taro-rabota-i-karera.ts";
 import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-perspektivy-na-rabote.ts";
+import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-otnosheniya-na-rabote.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2516,6 +2517,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightyThirdListenHref}`,
     ),
     "directory JSON-LD includes eighty-third listen href",
+  );
+
+  const eightyFourthListenHref = "/listens/taro-otnosheniya-na-rabote";
+  const eightyFourthListenCard = data.articles.find((card) => card.href === eightyFourthListenHref);
+  assert(eightyFourthListenCard, "eighty-fourth indexable listen page is listed");
+  assert(
+    eightyFourthListenCard.title === "Таро отношения на работе – коллеги и начальство | АудиоЛад",
+    "eighty-fourth listen directory title",
+  );
+  assert(
+    eightyFourthListenCard.description === TARO_OTNOSHENIYA_NA_RABOTE_PAGE.description,
+    "eighty-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-otnosheniya-na-rabote",
+    ),
+    "no /articles duplicate for eighty-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightyFourthListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-fourth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
