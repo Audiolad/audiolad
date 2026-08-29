@@ -166,6 +166,15 @@ function testPlayerContracts() {
   assert.match(myMaterials, /PersonalMaterialAudioPlayer/);
   assert.match(guest, /PersonalMaterialAudioPlayer/);
 
+  assert.equal(player.includes('type="audio/mpeg"'), false, "player is format-agnostic");
+  assert.equal(player.includes("type=\"audio/mp4\""), false, "no m4a-specific type attribute");
+  assert.match(player, /audio\.src = signed\.url/);
+  assert.match(helpers, /export type SignedAudioPayload = \{/);
+  assert.match(helpers, /url: string;/);
+  assert.match(helpers, /expiresAt: string;/);
+  assert.equal(helpers.includes("mimeType"), false, "signed payload has no mime field");
+  assert.equal(helpers.includes("contentType"), false, "signed payload has no contentType");
+
   // No full-token logging helpers that stringify signed url wholesale in debug fields.
   assert.equal(player.includes("fields: {\n            url:"), false);
   assert.equal(player.includes("signed.url"), true); // used for assign/compare only

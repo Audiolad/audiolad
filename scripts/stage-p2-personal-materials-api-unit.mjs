@@ -165,7 +165,9 @@ function testServerLayer() {
 
   assert(uploads.includes("createServiceRoleClient"), "upload uses service role");
   assert(uploads.includes("PERSONAL_MATERIALS_BUCKET"), "private bucket");
-  assert(uploads.includes("isAllowedMp3File"), "mp3 validation");
+  assert(uploads.includes("resolvePersonalMaterialAudioFormat"), "personal audio format resolver");
+  assert(uploads.includes("probePersonalMaterialAudioDuration"), "ffprobe uses validated extension");
+  assert(!uploads.includes("isAllowedMp3File"), "does not reuse author-product mp3 helper");
   assert(uploads.includes("clearPersonalMaterialDraftAudio"), "clear audio rpc");
   assert(uploads.includes("uploadPersonalMaterialPdf"), "pdf upload");
   assert(uploads.includes("clearPersonalMaterialDraftPdf"), "clear pdf rpc");

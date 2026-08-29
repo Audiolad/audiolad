@@ -141,8 +141,15 @@ function testEditorComponent() {
   assert(editor.includes("material.authorId !== selectedAuthor.id"), "author workspace guard");
   assert(editor.includes("returnUrl"), "editor saves return url");
 
-  assert(upload.includes("isAllowedClientMp3File"), "client mp3 validation");
-  assert(upload.includes("accept=\".mp3,audio/mpeg,audio/mp3,application/octet-stream\""), "mp3 accept");
+  assert(upload.includes("isAllowedClientAudioFile"), "client audio validation");
+  assert(upload.includes("PERSONAL_MATERIAL_AUDIO_INPUT_ACCEPT"), "shared audio accept");
+  assert(upload.includes("MP3 или M4A"), "upload copy mentions both formats");
+  assert(upload.includes("Поддерживаемые форматы: MP3, M4A"), "format caption");
+  assert(upload.includes("Выберите MP3- или M4A-файл"), "empty picker copy");
+  assert(upload.includes("Выберите другой аудиофайл."), "empty file copy is format-neutral");
+  assert(upload.includes("Аудиофайл"), "neutral display fallback");
+  assert(!upload.includes("isAllowedClientMp3File"), "mp3-only helper removed from ui");
+  assert(!upload.includes("audio.mp3"), "no mp3-only display fallback");
   assert(upload.includes("break-all"), "filename wrap");
   assert(upload.includes("Загрузить аудиофайл"), "upload CTA");
   assert(upload.includes("Аудиофайл загружен"), "upload success label");
@@ -276,11 +283,26 @@ function testReturnUrlLayer() {
 
 async function runModuleTests() {
   const { execSync } = await import("node:child_process");
+  const stubPath = path.join(ROOT, "scripts/cjs-stub-server-only.cjs");
+  const previousNodeOptions = process.env.NODE_OPTIONS ?? "";
+  const nodeOptions = [previousNodeOptions, `--require ${stubPath}`]
+    .filter(Boolean)
+    .join(" ");
+
   for (const script of [
     "scripts/stage-p3-personal-materials-author-ui-module-unit.mjs",
     "scripts/stage-p3-personal-materials-return-url-module-unit.mjs",
+    "scripts/stage-p3-personal-materials-upload-unit.mjs",
+    "scripts/personal-materials-audio-probe-unit.mjs",
   ]) {
-    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, { encoding: "utf8" });
+    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+      },
+    });
     process.stdout.write(output);
   }
 }

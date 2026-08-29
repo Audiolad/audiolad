@@ -194,6 +194,11 @@ async function runModuleTests() {
     { encoding: "utf8" },
   );
   process.stdout.write(output);
+  const playerOutput = execSync(
+    `npx --yes tsx ${path.join(ROOT, "scripts/personal-material-audio-player-unit.mjs")}`,
+    { encoding: "utf8" },
+  );
+  process.stdout.write(playerOutput);
 }
 
 async function main() {
