@@ -146,8 +146,8 @@ export default function AuthorProductSeoSection({
   const [selectedRelatedProducts, setSelectedRelatedProducts] = useState<
     Record<string, SelectOption>
   >({});
-  const [relatedProductSearchLoading, setRelatedProductSearchLoading] =
-    useState(false);
+  const [completedRelatedProductQuery, setCompletedRelatedProductQuery] =
+    useState("");
   const [wordstatOpen, setWordstatOpen] = useState(false);
   const [wordstatSeed, setWordstatSeed] = useState("");
   const [wordstatLoading, setWordstatLoading] = useState(false);
@@ -173,18 +173,24 @@ export default function AuthorProductSeoSection({
     () => seoContent.relatedPracticeIds.filter(Boolean),
     [seoContent.relatedPracticeIds],
   );
-  useEffect(() => {
-    if (!relatedProductOptions.length) {
-      return;
-    }
-    setSelectedRelatedProducts((current) => {
-      const next = { ...current };
-      for (const option of relatedProductOptions) {
+  const selectedRelatedLabels = useMemo(() => {
+    const next: Record<string, SelectOption> = { ...selectedRelatedProducts };
+    for (const option of relatedProductOptions) {
+      if (!next[option.value]) {
         next[option.value] = option;
       }
-      return next;
-    });
-  }, [relatedProductOptions]);
+    }
+    return next;
+  }, [relatedProductOptions, selectedRelatedProducts]);
+  const relatedProductSearching = Boolean(
+    relatedProductSourceId && shouldSearchRelatedProducts(relatedProductQuery),
+  );
+  const relatedProductSearchSettled =
+    relatedProductSearching &&
+    completedRelatedProductQuery === relatedProductQuery;
+  const visibleRelatedProductResults = relatedProductSearching
+    ? searchedRelatedProducts
+    : [];
   useEffect(() => {
     if (!relatedProductSourceId || !selectedRelatedIds.length) {
       return;
@@ -218,12 +224,9 @@ export default function AuthorProductSeoSection({
   }, [relatedProductSourceId, selectedRelatedIds]);
   useEffect(() => {
     if (!relatedProductSourceId || !shouldSearchRelatedProducts(relatedProductQuery)) {
-      setSearchedRelatedProducts([]);
-      setRelatedProductSearchLoading(false);
       return;
     }
 
-    setRelatedProductSearchLoading(true);
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       const query = new URLSearchParams({
@@ -242,7 +245,9 @@ export default function AuthorProductSeoSection({
             setSearchedRelatedProducts([]);
           }
         })
-        .finally(() => setRelatedProductSearchLoading(false));
+        .finally(() => {
+          setCompletedRelatedProductQuery(relatedProductQuery);
+        });
     }, RELATED_PRODUCT_SEARCH_DEBOUNCE_MS);
 
     return () => {
@@ -927,12 +932,12 @@ export default function AuthorProductSeoSection({
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Сначала сохраните продукт</p>
         ) : relatedProductQuery.trim() && !shouldSearchRelatedProducts(relatedProductQuery) ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Начните вводить название</p>
-        ) : relatedProductSearchLoading ? (
+        ) : relatedProductSearching && !relatedProductSearchSettled ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ищем…</p>
         ) : null}
-        {searchedRelatedProducts.length ? (
+        {visibleRelatedProductResults.length ? (
           <ul className="mt-2 space-y-1">
-            {searchedRelatedProducts
+            {visibleRelatedProductResults
               .filter((option) => !selectedRelatedIds.includes(option.value))
               .map((option) => (
                 <li key={option.value}>
@@ -966,15 +971,13 @@ export default function AuthorProductSeoSection({
                 </li>
               ))}
           </ul>
-        ) : shouldSearchRelatedProducts(relatedProductQuery) &&
-          !relatedProductSearchLoading &&
-          relatedProductSourceId ? (
+        ) : relatedProductSearchSettled && !visibleRelatedProductResults.length ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ничего не найдено</p>
         ) : null}
         {selectedRelatedIds.map((id, index) => (
           <div className="mt-2 flex min-w-0 items-center gap-2" key={`product-${id}`}>
             <p className="min-w-0 flex-1 rounded-[14px] border border-[#e4d7f4] bg-[#fbf8ff] px-3 py-2 text-sm text-[#2b2140]">
-              {selectedRelatedProducts[id]?.label ?? "Выбранный продукт"}
+              {selectedRelatedLabels[id]?.label ?? "Выбранный продукт"}
             </p>
             <button type="button" disabled={disabled || index === 0} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(selectedRelatedIds, index, -1) } })}>↑</button>
             <button type="button" disabled={disabled || index === selectedRelatedIds.length - 1} onClick={() => onChange({ seoContent: { ...seoContent, relatedPracticeIds: moveItem(selectedRelatedIds, index, 1) } })}>↓</button>
