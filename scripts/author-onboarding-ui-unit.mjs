@@ -9,6 +9,7 @@ import {
   evaluatePublishReadiness,
 } from "../src/lib/author-products/publish.ts";
 import {
+  COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT,
   DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
   evaluateCommercialOnboardingChecklist,
 } from "../src/lib/author-dashboard/commercial-onboarding.ts";
@@ -19,6 +20,7 @@ import {
   ONBOARDING_COMPACT_GRACE_MS,
   buildAuthorOnboardingUiState,
   parseOnboardingUiHideBody,
+  planLegacyCommercialCompleteBackfill,
   planOnboardingUiEpochSync,
   resolveChecklistPresentation,
   resolveOnboardingHideDecision,
@@ -305,11 +307,20 @@ function testOptionalPayoutDoesNotAffectCommercialComplete() {
   });
 
   assert.equal(paidPromo.complete, true);
-  assert.equal(paidPromo.completedCount, 6);
+  assert.equal(paidPromo.completedCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
+  assert.equal(paidPromo.totalCount, 5);
   assert.equal(
-    paidPromo.steps.find((step) => step.id === "payout_details")?.statusLabel,
-    "Не заполнено",
+    paidPromo.steps.some((step) => step.id === "payout_details"),
+    false,
   );
+  assert.equal(
+    paidPromo.steps.some((step) => step.id === "paid_promotion"),
+    false,
+  );
+
+  const withoutPromo = evaluateCommercialFive();
+  assert.equal(withoutPromo.complete, true);
+  assert.equal(withoutPromo.completedCount, 5);
 
   const now = "2026-09-05T12:00:00.000Z";
   const ui = buildAuthorOnboardingUiState({
@@ -418,7 +429,154 @@ function testLegacyBridge() {
   );
 }
 
-function testFreeFiveOfFiveAndCommercialIncomplete() {
+function publishedPaidProduct() {
+  return product(
+    {
+      id: "paid-1",
+      is_free: false,
+      status: "published",
+      slug: "paid-praktika",
+    },
+    readyPaidReadiness(),
+  );
+}
+
+function evaluateCommercialFive(overrides = {}) {
+  return evaluateCommercialOnboardingChecklist({
+    authorSlug: "demo-author",
+    accessStatus: "commercial",
+    freeGateReady: true,
+    products: [publishedPaidProduct()],
+    campaigns: [],
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      termsAcceptanceAvailable: true,
+    },
+    termsAccepted: true,
+    payoutDetailsComplete: false,
+    payoutProfileStatus: null,
+    ...overrides,
+  });
+}
+
+function testOldWorldFiveOfSixBecomesLegacyComplete() {
+  const oldWorld = evaluateCommercialFive();
+  assert.equal(oldWorld.complete, true);
+  assert.equal(oldWorld.completedCount, 5);
+  assert.equal(oldWorld.totalCount, 5);
+  assert.equal(
+    oldWorld.steps.some((step) => step.id === "paid_promotion"),
+    false,
+  );
+  assert.equal(
+    oldWorld.steps.some((step) => step.id === "payout_details"),
+    false,
+  );
+
+  const now = "2026-09-07T12:00:00.000Z";
+  const backfill = planLegacyCommercialCompleteBackfill({
+    commercialComplete: oldWorld.complete,
+    existingCompletedAt: null,
+    existingHiddenAt: null,
+    nowIso: now,
+  });
+  assert.deepEqual(backfill, { completedAt: now, hiddenAt: now });
+
+  const ui = buildAuthorOnboardingUiState({
+    freeComplete: true,
+    commercialComplete: true,
+    row: {
+      free_completed_at: hoursFrom(now, -96),
+      free_hidden_at: null,
+      commercial_completed_at: backfill.completedAt,
+      commercial_hidden_at: backfill.hiddenAt,
+    },
+    now,
+  });
+  assert.equal(ui.free.presentation, "compact");
+  assert.equal(ui.commercial.presentation, "compact");
+}
+
+function testNewCommercialCompletionKeepsGrace() {
+  const now = "2026-09-07T12:00:00.000Z";
+  const firstStamp = planOnboardingUiEpochSync({
+    complete: true,
+    completedAt: null,
+    hiddenAt: null,
+    nowIso: now,
+  });
+  assert.deepEqual(firstStamp, { completedAt: now, hiddenAt: null });
+
+  assert.equal(
+    planLegacyCommercialCompleteBackfill({
+      commercialComplete: true,
+      existingCompletedAt: firstStamp.completedAt,
+      existingHiddenAt: null,
+      nowIso: now,
+    }),
+    null,
+    "already-stamped new completion must not be treated as legacy",
+  );
+
+  const ui = buildAuthorOnboardingUiState({
+    freeComplete: true,
+    commercialComplete: true,
+    row: {
+      free_completed_at: hoursFrom(now, -96),
+      free_hidden_at: null,
+      commercial_completed_at: firstStamp.completedAt,
+      commercial_hidden_at: null,
+    },
+    now,
+  });
+  assert.equal(ui.commercial.presentation, "expanded");
+  assert.equal(
+    resolveChecklistPresentation({
+      complete: true,
+      completedAt: now,
+      hiddenAt: null,
+      now: hoursFrom(now, 72),
+    }),
+    "compact",
+  );
+}
+
+function testCommercialThreeOfFiveStaysExpanded() {
+  const commercialThree = evaluateCommercialFive({
+    products: [],
+    termsAccepted: true,
+  });
+  assert.equal(commercialThree.complete, false);
+  assert.equal(commercialThree.completedCount, 2);
+  assert.equal(commercialThree.totalCount, 5);
+
+  const now = "2026-09-07T12:00:00.000Z";
+  assert.equal(
+    planLegacyCommercialCompleteBackfill({
+      commercialComplete: commercialThree.complete,
+      existingCompletedAt: null,
+      existingHiddenAt: null,
+      nowIso: now,
+    }),
+    null,
+  );
+
+  const ui = buildAuthorOnboardingUiState({
+    freeComplete: true,
+    commercialComplete: commercialThree.complete,
+    row: {
+      free_completed_at: hoursFrom(now, -96),
+      free_hidden_at: null,
+      commercial_completed_at: null,
+      commercial_hidden_at: null,
+    },
+    now,
+  });
+  assert.equal(ui.free.presentation, "compact");
+  assert.equal(ui.commercial.presentation, "expanded");
+}
+
+function testFreeCompleteAndCommercialFiveWithoutPromo() {
   const freeComplete = evaluateAuthorOnboardingChecklist({
     authorId: "author-1",
     authorSlug: "demo-author",
@@ -441,46 +599,9 @@ function testFreeFiveOfFiveAndCommercialIncomplete() {
   assert.equal(freeComplete.complete, true);
   assert.equal(freeComplete.completedCount, 5);
 
-  const commercialIncomplete = evaluateCommercialOnboardingChecklist({
-    authorSlug: "demo-author",
-    accessStatus: "commercial",
-    freeGateReady: true,
-    products: [
-      product(
-        {
-          id: "paid-1",
-          is_free: false,
-          status: "published",
-          slug: "paid-praktika",
-        },
-        readyPaidReadiness(),
-      ),
-    ],
-    campaigns: [],
-    capabilities: {
-      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
-      termsAcceptanceAvailable: true,
-    },
-    termsAccepted: true,
-  });
-  assert.equal(commercialIncomplete.complete, false);
-  assert.equal(commercialIncomplete.completedCount, 5);
-  assert.equal(commercialIncomplete.totalCount, 6);
-
-  const now = "2026-09-05T12:00:00.000Z";
-  const ui = buildAuthorOnboardingUiState({
-    freeComplete: freeComplete.complete,
-    commercialComplete: commercialIncomplete.complete,
-    row: {
-      free_completed_at: hoursFrom(now, -96),
-      free_hidden_at: null,
-      commercial_completed_at: null,
-      commercial_hidden_at: null,
-    },
-    now,
-  });
-  assert.equal(ui.free.presentation, "compact");
-  assert.equal(ui.commercial.presentation, "expanded");
+  const commercial = evaluateCommercialFive();
+  assert.equal(commercial.complete, true);
+  assert.equal(commercial.completedCount, 5);
 }
 
 function testSourceGuards() {
@@ -590,6 +711,23 @@ function testSourceGuards() {
   const commercial = read("src/lib/author-dashboard/commercial-onboarding.ts");
   assert.doesNotMatch(evaluators, /free_completed_at/);
   assert.doesNotMatch(commercial, /commercial_completed_at/);
+  assert.match(commercial, /COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 5/);
+  assert.match(checklistUi, /isCommercialOnboardingChecklistStepId/);
+  assert.doesNotMatch(checklistUi, /Создайте ссылку для продвижения/);
+  assert.doesNotMatch(checklistUi, /Реквизиты для выплат/);
+
+  const legacyMigration = read(
+    "supabase/migrations/20260907120000_commercial_onboarding_legacy_complete.sql",
+  );
+  assert.match(legacyMigration, /author_onboarding_ui_state/);
+  assert.match(legacyMigration, /commercial_completed_at IS NULL/);
+  assert.match(legacyMigration, /author_has_published_free_product_for_commercial_gate/);
+  assert.match(legacyMigration, /author_terms_acceptances/);
+  assert.match(legacyMigration, /author_commercial_applications/);
+  assert.match(legacyMigration, /is_free IS FALSE/);
+  assert.doesNotMatch(legacyMigration, /ALTER TABLE public\.authors/);
+  assert.doesNotMatch(legacyMigration, /force_expanded/);
+  assert.doesNotMatch(legacyMigration, /first stamp ever/);
 }
 
 function main() {
@@ -599,7 +737,10 @@ function main() {
   testOptionalPayoutDoesNotAffectCommercialComplete();
   testHideApiContract();
   testLegacyBridge();
-  testFreeFiveOfFiveAndCommercialIncomplete();
+  testOldWorldFiveOfSixBecomesLegacyComplete();
+  testNewCommercialCompletionKeepsGrace();
+  testCommercialThreeOfFiveStaysExpanded();
+  testFreeCompleteAndCommercialFiveWithoutPromo();
   testSourceGuards();
   console.log("author-onboarding-ui-unit: ok");
 }

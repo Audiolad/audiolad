@@ -114,16 +114,16 @@ function testOnboardingStates() {
   assert.equal(approved.steps[1].state, "active");
   assert.equal(approved.steps[2].id, "paid_product");
   assert.equal(approved.steps[2].state, "locked");
-  assert.equal(approved.steps.at(-1)?.id, "payout_details");
+  assert.equal(approved.steps.at(-1)?.id, "publish_paid_product");
   assert.equal(approved.steps.at(-1)?.state, "locked");
+  assert.equal(
+    approved.steps.some((step) => step.id === "payout_details"),
+    false,
+  );
   assert.match(approved.steps[1].href ?? "", /\/terms/);
   assert.equal(approved.steps[1].actionLabel, "Открыть условия");
   assert.match(
     approved.steps[2].hint ?? "",
-    /Сначала примите Авторские условия сотрудничества/,
-  );
-  assert.match(
-    approved.steps.at(-1)?.hint ?? "",
     /Сначала примите Авторские условия сотрудничества/,
   );
 
@@ -142,15 +142,14 @@ function testOnboardingStates() {
   assert.equal(afterTerms.steps[1].state, "completed");
   assert.equal(afterTerms.steps[2].id, "paid_product");
   assert.equal(afterTerms.steps[2].state, "active");
-  assert.equal(afterTerms.steps.at(-1)?.id, "payout_details");
-  assert.equal(afterTerms.steps.at(-1)?.state, "active");
-  assert.equal(afterTerms.steps.at(-1)?.statusLabel, "Не заполнено");
-  assert.match(
-    afterTerms.steps.at(-1)?.hint ?? "",
-    /Можно заполнить позже/,
+  assert.equal(afterTerms.steps.at(-1)?.id, "publish_paid_product");
+  assert.equal(afterTerms.steps.at(-1)?.state, "locked");
+  assert.equal(
+    afterTerms.steps.some((step) => step.id === "payout_details"),
+    false,
   );
   assert.equal(afterTerms.complete, false);
-  assert.equal(afterTerms.totalCount, 6);
+  assert.equal(afterTerms.totalCount, 5);
 
   const rejected = evaluate({
     accessStatus: "free",

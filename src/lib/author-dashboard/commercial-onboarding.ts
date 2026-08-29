@@ -1,8 +1,6 @@
 import type { AuthorCommercialApplicationStatus } from "@/lib/author-commercial-applications/types";
-import { mapPayoutProfileStatusToOnboardingVisual } from "@/lib/author-payout-profiles/status";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import {
-  isActivePromotionForPublishedProduct,
   isNonArchivedProduct,
   isPublishedProduct,
   selectFocusProduct,
@@ -20,20 +18,38 @@ import {
   buildPracticePublishPreviewPath,
 } from "@/lib/products/paths";
 
-/** Required commercial connection steps exclude optional payout details. */
-export const COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 6;
+/**
+ * Required commercial start steps. Promotion links and payout requisites stay
+ * available outside this checklist and do not count toward 100%.
+ */
+export const COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 5;
 /** @deprecated Use COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT; kept for older imports. */
 export const COMMERCIAL_ONBOARDING_STEP_COUNT =
   COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT;
 
+export const COMMERCIAL_ONBOARDING_CHECKLIST_STEP_IDS = [
+  "commercial_application",
+  "terms_acceptance",
+  "paid_product",
+  "prepare_paid_product",
+  "publish_paid_product",
+] as const;
+
+export type CommercialOnboardingChecklistStepId =
+  (typeof COMMERCIAL_ONBOARDING_CHECKLIST_STEP_IDS)[number];
+
 export type CommercialOnboardingStepId =
-  | "commercial_application"
+  | CommercialOnboardingChecklistStepId
   | "payout_details"
-  | "terms_acceptance"
-  | "paid_product"
-  | "prepare_paid_product"
-  | "publish_paid_product"
   | "paid_promotion";
+
+export function isCommercialOnboardingChecklistStepId(
+  id: string,
+): id is CommercialOnboardingChecklistStepId {
+  return (COMMERCIAL_ONBOARDING_CHECKLIST_STEP_IDS as readonly string[]).includes(
+    id,
+  );
+}
 
 export type OnboardingStepVisualState =
   | "completed"
@@ -309,23 +325,22 @@ export function evaluateCommercialOnboardingChecklist(input: {
     accessStatus,
     freeGateReady,
     products,
-    campaigns,
     applicationStatus = null,
     applicationReviewComment = null,
     legacyPendingWithoutApplication = false,
-    payoutDetailsHref = null,
     termsHref = null,
-    payoutProfileStatus = null,
-    payoutProfileReviewComment = null,
-    legacyCommercialActive = false,
-    payoutProfileHasStoredRequisites = false,
   } = input;
 
   const capabilities =
     input.capabilities ?? DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES;
-  // Kept for callers; optional-step visuals use payoutProfileStatus only.
+  // Callers still pass these; promotion / payout stay outside this checklist.
+  void input.campaigns;
   void input.payoutDetailsComplete;
-  void legacyCommercialActive;
+  void input.payoutDetailsHref;
+  void input.payoutProfileStatus;
+  void input.payoutProfileReviewComment;
+  void input.payoutProfileHasStoredRequisites;
+  void input.legacyCommercialActive;
   const termsAccepted = input.termsAccepted === true;
   const resolvedApplicationHref =
     input.applicationHref ??
@@ -358,17 +373,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
   );
   const publishPaidComplete = publishedPaidProducts.length > 0;
 
-  const paidPublishedIds = new Set(
-    publishedPaidProducts.map((product) => product.id),
-  );
-  const paidPromotionComplete = campaigns.some(
-    (campaign) =>
-      isActivePromotionForPublishedProduct(campaign) &&
-      paidPublishedIds.has(campaign.practice_id),
-  );
-
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`;
-  const promotionHref = `/author-dashboard/promotion?author=${encodeURIComponent(authorSlug)}`;
   const focusEditHref = focusPaidProduct
     ? `/author-dashboard/products/${focusPaidProduct.id}`
     : newProductHref;
@@ -394,8 +399,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
       lockedStep("paid_product"),
       lockedStep("prepare_paid_product"),
       lockedStep("publish_paid_product"),
-      lockedStep("paid_promotion"),
-      lockedStep("payout_details"),
     ];
 
     return {
@@ -523,59 +526,10 @@ export function evaluateCommercialOnboardingChecklist(input: {
     };
   }
 
-  // --- Optional payout details (never blocks commercial completion) ---
-  let payoutStep: CommercialOnboardingStepState;
-
-  const payoutDetailsUnlocked =
-    (!capabilities.termsAcceptanceAvailable || termsAccepted) &&
-    applicationApproved;
-
-  const payoutVisual = mapPayoutProfileStatusToOnboardingVisual({
-    status: payoutProfileStatus,
-    available: capabilities.payoutDetailsAvailable && payoutDetailsUnlocked,
-    applicationApproved,
-    hasStoredRequisites: payoutProfileHasStoredRequisites,
-  });
-  const payoutReviewComment = payoutProfileReviewComment?.trim() || null;
-  const optionalPayoutHint =
-    payoutVisual.hint ??
-    "Реквизиты можно заполнить позднее, перед первой выплатой.";
-
-  if (!payoutDetailsUnlocked) {
-    payoutStep = lockedStep("payout_details", {
-      hint: applicationApproved
-        ? "Сначала примите Авторские условия сотрудничества."
-        : "Шаг откроется после одобрения коммерческой заявки.",
-    });
-  } else if (payoutVisual.state === "coming_soon") {
-    payoutStep = comingSoonStep("payout_details");
-  } else if (payoutVisual.state === "completed") {
-    payoutStep = {
-      id: "payout_details",
-      ...STEP_META.payout_details,
-      state: "completed",
-      statusLabel: payoutVisual.statusLabel ?? "Заполнено",
-      hint: null,
-      readiness: null,
-    };
-  } else {
-    payoutStep = {
-      id: "payout_details",
-      ...STEP_META.payout_details,
-      state: "active",
-      statusLabel: payoutVisual.statusLabel ?? "Не заполнено",
-      actionLabel: payoutVisual.actionLabel ?? "Заполнить реквизиты",
-      href: payoutDetailsHref ?? undefined,
-      hint: payoutReviewComment ?? optionalPayoutHint,
-      readiness: null,
-    };
-  }
-
-  // --- Steps 4–7: paid product path ---
+  // --- Steps 3–5: paid product path ---
   let paidProductStep: CommercialOnboardingStepState;
   let preparePaidStep: CommercialOnboardingStepState;
   let publishPaidStep: CommercialOnboardingStepState;
-  let paidPromotionStep: CommercialOnboardingStepState;
 
   if (paidProductComplete) {
     paidProductStep = {
@@ -657,40 +611,14 @@ export function evaluateCommercialOnboardingChecklist(input: {
     };
   }
 
-  if (paidPromotionComplete) {
-    paidPromotionStep = {
-      id: "paid_promotion",
-      ...STEP_META.paid_promotion,
-      state: "completed",
-      hint: null,
-      readiness: null,
-    };
-  } else if (!publishPaidComplete) {
-    paidPromotionStep = lockedStep("paid_promotion", {
-      hint: "Шаг откроется после публикации платного продукта.",
-    });
-  } else {
-    paidPromotionStep = {
-      id: "paid_promotion",
-      ...STEP_META.paid_promotion,
-      state: "active",
-      actionLabel: "Создать ссылку",
-      href: promotionHref,
-      hint: null,
-      readiness: null,
-    };
-  }
-
-  // Required path: application → terms → paid products.
-  // Payout is shown as an optional side step and excluded from completion.
+  // Required path: application → terms → first paid product publish.
+  // Promotion links and payout requisites stay outside this checklist.
   const steps = [
     applicationStep,
     termsStep,
     paidProductStep,
     preparePaidStep,
     publishPaidStep,
-    paidPromotionStep,
-    payoutStep,
   ];
 
   const completionFlags = [
@@ -699,7 +627,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
     paidProductComplete,
     preparePaidComplete,
     publishPaidComplete,
-    paidPromotionComplete,
   ];
   const completedCount = completionFlags.filter(Boolean).length;
 
