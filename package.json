@@ -121,7 +121,7 @@
     "test:indexnow-hooks": "npx tsx scripts/indexnow-hooks-unit.mjs",
     "test:wordstat": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/wordstat-unit.mjs",
     "test:product-seo-autofill": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/product-seo-autofill-unit.mjs",
-    "test:product-seo": "npx tsx scripts/product-copy-architecture-unit.mjs && npx tsx scripts/product-seo-metadata-unit.mjs && npx tsx scripts/author-product-seo-form-unit.mjs && npx tsx scripts/related-product-seo-unit.mjs && npm run test:wordstat && npm run test:product-seo-autofill",
+    "test:product-seo": "npx tsx scripts/product-copy-architecture-unit.mjs && npx tsx scripts/product-seo-metadata-unit.mjs && npx tsx scripts/author-product-seo-form-unit.mjs && npx tsx scripts/related-product-seo-unit.mjs && npx tsx scripts/topics-sleep-architecture-unit.mjs && npm run test:wordstat && npm run test:product-seo-autofill",
     "test:product-seo:isolated": "node scripts/product-seo-v2-isolated.mjs",
     "test:yandex-webmaster": "npx tsx scripts/yandex-webmaster-unit.mjs && npx tsx scripts/yandex-webmaster-hooks-unit.mjs",
     "test:studio-guest-security": "npx tsx scripts/studio-guest-security-unit.mts",
