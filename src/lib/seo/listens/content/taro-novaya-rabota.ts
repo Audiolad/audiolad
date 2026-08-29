@@ -193,6 +193,14 @@ export const TARO_NOVAYA_RABOTA_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "или:" },
         { kind: "paragraph", text: "«Отказывайтесь»." },
         { kind: "paragraph", text: "Решение о новой работе требует реальной информации." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если решение работодателя ещё не известно, можно посмотреть " },
+            { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

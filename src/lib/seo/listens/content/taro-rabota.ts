@@ -80,6 +80,22 @@ export const TARO_RABOTA_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "«На что я реагирую особенно остро?»" },
         { kind: "paragraph", text: "«Что я принимаю за факт, хотя это пока только предположение?»" },
         { kind: "paragraph", text: "Так Таро становится способом рефлексии, а не источником скрытой информации." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для более широкого профессионального пути можно посмотреть " },
+            { href: "/listens/taro-rabota-i-karera", label: "Таро работа и карьера" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если тема касается коллег и начальства, есть материал " },
+            { href: "/listens/taro-otnosheniya-na-rabote", label: "Таро отношения на работе" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -133,6 +149,14 @@ export const TARO_RABOTA_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "Или карта ассоциируется с выбором:" },
         { kind: "paragraph", text: "«Какие варианты я уже реально рассматриваю?»" },
         { kind: "paragraph", text: "Так интерпретация связывается с существующей ситуацией, а не заменяет её." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если нужно разобрать уже существующую рабочую проблему, есть материал " },
+            { href: "/listens/taro-na-situatsiyu-na-rabote", label: "Таро на ситуацию на работе" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -167,6 +191,22 @@ export const TARO_RABOTA_PAGE = assertListenPageDefinition({
           "будет ли профессиональный успех гарантирован.",
         ]},
         { kind: "paragraph", text: "Рабочий прогноз через Таро лучше воспринимать как способ рассмотреть возможные сценарии, а затем вернуться к фактам." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос про развитие на текущем месте, можно посмотреть " },
+            { href: "/listens/taro-perspektivy-na-rabote", label: "Таро перспективы на работе" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Для ближайшего рабочего периода есть материал " },
+            { href: "/listens/taro-rabota-blizhayshee-budushchee", label: "Таро работа – ближайшее будущее" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
@@ -274,6 +314,30 @@ export const TARO_RABOTA_PAGE = assertListenPageDefinition({
         { kind: "paragraph", text: "или:" },
         { kind: "paragraph", text: "«Какую часть ситуации я считаю проблемой?»" },
         { kind: "paragraph", text: "Так широкая рабочая тема остаётся в рамках текущей ситуации и не превращается в отдельный подробный разбор смены места." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если вопрос уже звучит как «уходить или остаться», отдельно разобрана тема " },
+            { href: "/listens/taro-menyat-li-rabotu", label: "Таро – менять ли работу" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если переход связан не со сменой работодателя, а с выбором между наймом и своим делом, отдельно разобрана тема " },
+            { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если место уже осталось в прошлом, можно посмотреть " },
+            { href: "/listens/taro-byvshaya-rabota", label: "Таро бывшая работа" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {

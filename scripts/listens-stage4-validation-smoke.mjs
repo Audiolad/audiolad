@@ -14058,6 +14058,17 @@ const FIFTY_THIRD_EXPECTED_SECTION_TITLES = [
   "Как использовать Таро про деньги без ожидания готового ответа",
   "Итог",
 ];
+const FIFTY_THIRD_EXPECTED_LINKS = [
+  { href: "/listens/karta-taro-na-dengi", label: "карту Таро на деньги" },
+  { href: "/listens/budut-li-dengi-taro", label: "будут ли деньги" },
+  { href: "/listens/rasklad-taro-na-dengi", label: "расклад Таро на деньги" },
+  { href: "/listens/taro-privlechenie-deneg", label: "Таро привлечение денег" },
+  { href: "/listens/taro-na-dengi-i-udachu", label: "Таро на деньги и удачу" },
+  { href: "/listens/taro-na-dengi-v-blizhayshee-vremya", label: "Таро на деньги в ближайшее время" },
+  { href: "/listens/taro-dohody", label: "Таро доходы" },
+  { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
+  { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+];
 const FIFTY_THIRD_EXPECTED_FAQ = [
   {
     question: "Что может показать Таро про деньги?",
@@ -14177,7 +14188,6 @@ function testFiftyThirdPage() {
   assert(!allTextChunks.toLowerCase().includes("таро больших денег"), "fifty-third has no big-money tarot leak");
   assert(!allTextChunks.toLowerCase().includes("заставк"), "fifty-third has no wallpaper leak");
   assert(!allTextChunks.toLowerCase().includes("обои"), "fifty-third has no wallpaper-oboi leak");
-  assert(!allTextChunks.includes("ближайшее время"), "fifty-third has no nearest-time forecast claim");
   assert(!allTextChunks.includes("обеспечат доход"), "fifty-third has no guaranteed-income wording");
   assert(!allTextChunks.includes("гарантируют богатство"), "fifty-third has no guaranteed-wealth wording");
 
@@ -14185,13 +14195,21 @@ function testFiftyThirdPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "fifty-third page has no hrefs");
+  assert(allLinks.length === 9, "fifty-third page has exactly nine hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 9, "fifty-third page has exactly nine unique dests");
+  for (const [index, expected] of FIFTY_THIRD_EXPECTED_LINKS.entries()) {
+    assert(allLinks[index].href === expected.href, `fifty-third href[${index}] is ${expected.href}`);
+    assert(allLinks[index].label === expected.label, `fifty-third label[${index}] is ${expected.label}`);
+  }
 
   const contentSource = read("src/lib/seo/listens/content/taro-dengi.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "fifty-third content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "fifty-third content file has no https://");
-  assert(!contentSource.includes("href"), "fifty-third content file has no href");
-  assert(!contentSource.includes("/listens/"), "fifty-third content file has no /listens/");
+  for (const expected of FIFTY_THIRD_EXPECTED_LINKS) {
+    assert(contentSource.includes(`href: "${expected.href}"`), `fifty-third content file has ${expected.href}`);
+    assert(contentSource.includes(`label: "${expected.label}"`), `fifty-third content file has ${expected.label} label`);
+  }
   assert(!contentSource.includes("ListenSignupCta"), "fifty-third content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "fifty-third content file has no primaryPractice");
   assert(!contentSource.includes("practice-player"), "fifty-third content file has no practice-player");
@@ -14842,7 +14860,6 @@ function testFiftySixthPage() {
   assert(!allTextChunks.includes("[PUBLIC PLAYLIST]"), "fifty-sixth definition has no playlist marker");
   assert(!allTextChunks.includes("[ДАЛЕЕ]"), "fifty-sixth definition has no next marker");
   assert(!allTextChunks.includes("SEO-самопроверка"), "fifty-sixth definition has no SEO-самопроверка");
-  assert(!allTextChunks.toLowerCase().includes("заставк"), "fifty-sixth has no wallpaper leak");
   assert(!allTextChunks.toLowerCase().includes("обои"), "fifty-sixth has no wallpaper-oboi leak");
   assert(!allTextChunks.includes("ближайшее время"), "fifty-sixth has no nearest-time forecast claim");
   assert(!allTextChunks.includes("обеспечат доход"), "fifty-sixth has no guaranteed-income wording");
@@ -14851,11 +14868,15 @@ function testFiftySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "fifty-sixth page has exactly two hrefs");
+  assert(allLinks.length === 3, "fifty-sixth page has exactly three hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 3, "fifty-sixth page has exactly three unique dests");
   assert(allLinks[0].href === "/listens/taro-dengi", "fifty-sixth first href is /listens/taro-dengi");
   assert(allLinks[0].label === "Таро и деньги", "fifty-sixth first href label is Таро и деньги");
   assert(allLinks[1].href === "/listens/taro-bogatstva-i-dengi", "fifty-sixth second href is /listens/taro-bogatstva-i-dengi");
   assert(allLinks[1].label === "Таро богатства и деньги", "fifty-sixth second href label is Таро богатства и деньги");
+  assert(allLinks[2].href === "/listens/taro-na-dengi-na-zastavku-telefona", "fifty-sixth third href is wallpaper listen");
+  assert(allLinks[2].label === "Таро на деньги на заставку телефона", "fifty-sixth third href label is wallpaper title");
   assert(
     !allLinks.some((link) => link.href === "/listens/taro-bolshih-deneg"),
     "fifty-sixth has no taro-bolshih-deneg href",
@@ -14867,6 +14888,8 @@ function testFiftySixthPage() {
   assert(contentSource.includes('href: "/listens/taro-dengi"'), "fifty-sixth content file has taro-dengi href");
   assert(contentSource.includes('label: "Таро и деньги"'), "fifty-sixth content file has Таро и деньги label");
   assert(contentSource.includes('href: "/listens/taro-bogatstva-i-dengi"'), "fifty-sixth content file has taro-bogatstva-i-dengi href");
+  assert(contentSource.includes('href: "/listens/taro-na-dengi-na-zastavku-telefona"'), "fifty-sixth content file has wallpaper href");
+  assert(contentSource.includes('label: "Таро на деньги на заставку телефона"'), "fifty-sixth content file has wallpaper label");
   assert(contentSource.includes('label: "Таро богатства и деньги"'), "fifty-sixth content file has Таро богатства и деньги label");
   assert(!contentSource.includes("/listens/taro-bolshih-deneg"), "fifty-sixth content file has no taro-bolshih-deneg href");
   assert(!contentSource.includes("taro-bolshih-deneg"), "fifty-sixth content file has no taro-bolshih-deneg");
@@ -15077,11 +15100,15 @@ function testFiftySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "fifty-seventh page has exactly two hrefs");
+  assert(allLinks.length === 3, "fifty-seventh page has exactly three hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 3, "fifty-seventh page has exactly three unique dests");
   assert(allLinks[0].href === "/listens/taro-dengi", "fifty-seventh first href is /listens/taro-dengi");
   assert(allLinks[0].label === "Таро и деньги", "fifty-seventh first href label is Таро и деньги");
   assert(allLinks[1].href === "/listens/karta-taro-na-dengi", "fifty-seventh second href is /listens/karta-taro-na-dengi");
   assert(allLinks[1].label === "карта Таро на деньги", "fifty-seventh second href label is карта Таро на деньги");
+  assert(allLinks[2].href === "/listens/taro-na-dengi-i-udachu", "fifty-seventh third href is luck listen");
+  assert(allLinks[2].label === "Таро на деньги и удачу", "fifty-seventh third href label is luck title");
   assert(
     !allLinks.some((link) => link.href === "/listens/taro-bolshih-deneg"),
     "fifty-seventh has no taro-bolshih-deneg href",
@@ -15098,6 +15125,8 @@ function testFiftySeventhPage() {
   assert(contentSource.includes('label: "Таро и деньги"'), "fifty-seventh content file has Таро и деньги label");
   assert(contentSource.includes('href: "/listens/karta-taro-na-dengi"'), "fifty-seventh content file has karta-taro-na-dengi href");
   assert(contentSource.includes('label: "карта Таро на деньги"'), "fifty-seventh content file has карта Таро на деньги label");
+  assert(contentSource.includes('href: "/listens/taro-na-dengi-i-udachu"'), "fifty-seventh content file has luck href");
+  assert(contentSource.includes('label: "Таро на деньги и удачу"'), "fifty-seventh content file has luck label");
   assert(!contentSource.includes("/listens/taro-bolshih-deneg"), "fifty-seventh content file has no taro-bolshih-deneg href");
   assert(!contentSource.includes("taro-bolshih-deneg"), "fifty-seventh content file has no taro-bolshih-deneg");
   assert(!contentSource.includes("/listens/taro-bogatstva-i-dengi"), "fifty-seventh content file has no taro-bogatstva-i-dengi href");
@@ -15906,11 +15935,19 @@ function testSixtiethPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "sixtieth page has exactly two hrefs");
+  assert(allLinks.length === 5, "sixtieth page has exactly five hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 5, "sixtieth page has exactly five unique dests");
   assert(allLinks[0].href === "/listens/taro-dengi", "sixtieth first href is /listens/taro-dengi");
   assert(allLinks[0].label === "Таро и деньги", "sixtieth first href label is Таро и деньги");
-  assert(allLinks[1].href === "/listens/karta-taro-na-dengi", "sixtieth second href is /listens/karta-taro-na-dengi");
-  assert(allLinks[1].label === "значении карт Таро в денежных вопросах", "sixtieth second href label is значении карт Таро в денежных вопросах");
+  assert(allLinks[1].href === "/listens/budut-li-dengi-taro", "sixtieth second href is budut-li-dengi-taro");
+  assert(allLinks[1].label === "Будут ли деньги – Таро", "sixtieth second href label is Будут ли деньги – Таро");
+  assert(allLinks[2].href === "/listens/taro-na-dengi-v-blizhayshee-vremya", "sixtieth third href is near-term money");
+  assert(allLinks[2].label === "Таро на деньги в ближайшее время", "sixtieth third href label is near-term money");
+  assert(allLinks[3].href === "/listens/karta-taro-na-dengi", "sixtieth fourth href is /listens/karta-taro-na-dengi");
+  assert(allLinks[3].label === "значении карт Таро в денежных вопросах", "sixtieth fourth href label is значении карт Таро в денежных вопросах");
+  assert(allLinks[4].href === "/listens/rasklad-taro-na-biznes-i-dengi", "sixtieth fifth href is business-money spread");
+  assert(allLinks[4].label === "расклад Таро на бизнес и деньги", "sixtieth fifth href label is business-money spread");
   for (const href of SIXTIETH_FORBIDDEN_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `sixtieth has no ${href} href`);
   }
@@ -15922,6 +15959,12 @@ function testSixtiethPage() {
   assert(contentSource.includes('label: "Таро и деньги"'), "sixtieth content file has Таро и деньги label");
   assert(contentSource.includes('href: "/listens/karta-taro-na-dengi"'), "sixtieth content file has karta-taro-na-dengi href");
   assert(contentSource.includes('label: "значении карт Таро в денежных вопросах"'), "sixtieth content file has значении карт Таро в денежных вопросах label");
+  assert(contentSource.includes('href: "/listens/budut-li-dengi-taro"'), "sixtieth content file has budut-li-dengi-taro href");
+  assert(contentSource.includes('label: "Будут ли деньги – Таро"'), "sixtieth content file has Будут ли деньги – Таро label");
+  assert(contentSource.includes('href: "/listens/taro-na-dengi-v-blizhayshee-vremya"'), "sixtieth content file has near-term money href");
+  assert(contentSource.includes('label: "Таро на деньги в ближайшее время"'), "sixtieth content file has near-term money label");
+  assert(contentSource.includes('href: "/listens/rasklad-taro-na-biznes-i-dengi"'), "sixtieth content file has business-money spread href");
+  assert(contentSource.includes('label: "расклад Таро на бизнес и деньги"'), "sixtieth content file has business-money spread label");
   for (const href of SIXTIETH_FORBIDDEN_HREFS) {
     assert(!contentSource.includes(href), `sixtieth content file has no ${href}`);
   }
@@ -16991,6 +17034,7 @@ const SIXTY_FOURTH_EXPECTED_LINKS = [
   { href: "/listens/taro-dengi", label: "Таро и деньги" },
   { href: "/listens/karta-taro-na-dengi", label: "карта Таро на деньги" },
   { href: "/listens/rasklad-taro-na-dengi", label: "расклад Таро на деньги" },
+  { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
 ];
 const SIXTY_FOURTH_FORBIDDEN_HREFS = [
   "/listens/budut-li-dengi-taro",
@@ -17139,7 +17183,9 @@ function testSixtyFourthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "sixty-fourth page has exactly three hrefs");
+  assert(allLinks.length === 4, "sixty-fourth page has exactly four hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 4, "sixty-fourth page has exactly four unique dests");
   for (const [index, expected] of SIXTY_FOURTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `sixty-fourth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `sixty-fourth label[${index}] is ${expected.label}`);
@@ -17328,6 +17374,8 @@ const SIXTY_FIFTH_EXPECTED_LINKS = [
   { href: "/listens/taro-dengi", label: "Таро и деньги" },
   { href: "/listens/taro-dohody", label: "Таро доходы" },
   { href: "/listens/rasklad-taro-na-dengi", label: "расклад Таро на деньги" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+  { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
 ];
 const SIXTY_FIFTH_FORBIDDEN_HREFS = [
   "/listens/karta-taro-na-dengi",
@@ -17489,7 +17537,9 @@ function testSixtyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "sixty-fifth page has exactly three hrefs");
+  assert(allLinks.length === 5, "sixty-fifth page has exactly five hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 5, "sixty-fifth page has exactly five unique dests");
   for (const [index, expected] of SIXTY_FIFTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `sixty-fifth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `sixty-fifth label[${index}] is ${expected.label}`);
@@ -17666,6 +17716,14 @@ const SIXTY_SIXTH_EXPECTED_FAQ = [
   },
 ];
 const SIXTY_SIXTH_EXPECTED_LINKS = [
+  { href: "/listens/taro-rabota-i-karera", label: "Таро работа и карьера" },
+  { href: "/listens/taro-otnosheniya-na-rabote", label: "Таро отношения на работе" },
+  { href: "/listens/taro-na-situatsiyu-na-rabote", label: "Таро на ситуацию на работе" },
+  { href: "/listens/taro-perspektivy-na-rabote", label: "Таро перспективы на работе" },
+  { href: "/listens/taro-rabota-blizhayshee-budushchee", label: "Таро работа – ближайшее будущее" },
+  { href: "/listens/taro-menyat-li-rabotu", label: "Таро – менять ли работу" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
+  { href: "/listens/taro-byvshaya-rabota", label: "Таро бывшая работа" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
   { href: "/listens/taro-dohody", label: "Таро доходы" },
 ];
@@ -17830,7 +17888,9 @@ function testSixtySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "sixty-sixth page has exactly two hrefs");
+  assert(allLinks.length === 10, "sixty-sixth page has exactly ten hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 10, "sixty-sixth page has exactly ten unique dests");
   for (const [index, expected] of SIXTY_SIXTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `sixty-sixth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `sixty-sixth label[${index}] is ${expected.label}`);
@@ -18020,15 +18080,21 @@ const SIXTY_SEVENTH_EXPECTED_FAQ = [
   },
 ];
 const SIXTY_SEVENTH_EXPECTED_LINKS = [
+  { href: "/listens/naydu-li-ya-rabotu-taro", label: "Найду ли я работу – Таро" },
+  { href: "/listens/rasklad-taro-na-rabotu", label: "расклад Таро на работу" },
+  { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
+  { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
   { href: "/listens/taro-rabota", label: "Таро про работу" },
+  { href: "/listens/taro-na-rabotu-na-blizhayshee-budushchee", label: "Таро на работу на ближайшее будущее" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
   { href: "/listens/taro-dohody", label: "Таро доходы" },
+  { href: "/listens/taro-novaya-rabota", label: "Таро новая работа" },
+  { href: "/listens/taro-poisk-raboty", label: "Таро поиск работы" },
 ];
 const SIXTY_SEVENTH_FORBIDDEN_HREFS = [
   "/listens/taro-dengi",
   "/listens/rasklad-taro-na-dengi",
   "/listens/karta-taro-na-dengi",
-  "/listens/rasklad-taro-na-rabotu",
   "/listens/novaya-rabota",
   "/listens/taro-na-rabotu-v-blizhayshee-vremya",
   "/listens/voprosy-taro-na-rabotu",
@@ -18150,8 +18216,9 @@ function testSixtySeventhPage() {
   const diffLinks = (diffSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(diffLinks.length === 1, "sixty-seventh first href lives in the difference H2");
+  assert(diffLinks.length === 2, "sixty-seventh difference H2 has hub and near-term hrefs");
   assert(diffLinks[0].href === "/listens/taro-rabota" && diffLinks[0].label === "Таро про работу", "sixty-seventh work-hub link");
+  assert(diffLinks[1].href === "/listens/taro-na-rabotu-na-blizhayshee-budushchee" && diffLinks[1].label === "Таро на работу на ближайшее будущее", "sixty-seventh near-term work link");
 
   const moneySection = parsed.definition.sections.find(
     (section) => section.title === "Когда рабочий вопрос на самом деле про деньги",
@@ -18208,7 +18275,9 @@ function testSixtySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "sixty-seventh page has exactly three hrefs");
+  assert(allLinks.length === 10, "sixty-seventh page has exactly ten hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 10, "sixty-seventh page has exactly ten unique dests");
   for (const [index, expected] of SIXTY_SEVENTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `sixty-seventh href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `sixty-seventh label[${index}] is ${expected.label}`);
@@ -19328,6 +19397,7 @@ const SEVENTIETH_EXPECTED_FAQ = [
 const SEVENTIETH_EXPECTED_LINKS = [
   { href: "/listens/taro-na-rabotu", label: "Таро на работу" },
   { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
+  { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
   { href: "/listens/rasklad-taro-na-rabotu", label: "расклад Таро на работу" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
 ];
@@ -19337,7 +19407,6 @@ const SEVENTIETH_FORBIDDEN_HREFS = [
   "/listens/taro-dengi",
   "/listens/rasklad-taro-na-novuyu-rabotu",
   "/listens/poisk-raboty",
-  "/listens/vozmut-li",
   "/listens/menyat-li-rabotu",
   "/listens/taro-na-rabotu-v-blizhayshee-vremya",
   "/listens/novaya-rabota",
@@ -19532,7 +19601,9 @@ function testSeventiethPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 4, "seventieth page has exactly four hrefs");
+  assert(allLinks.length === 5, "seventieth page has exactly five hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 5, "seventieth page has exactly five unique dests");
   for (const [index, expected] of SEVENTIETH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `seventieth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `seventieth label[${index}] is ${expected.label}`);
@@ -21956,6 +22027,7 @@ const SEVENTY_SIXTH_EXPECTED_FAQ = [
 ];
 const SEVENTY_SIXTH_EXPECTED_LINKS = [
   { href: "/listens/taro-na-rabotu", label: "Таро на работу" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
   { href: "/listens/voprosy-taro-na-rabotu", label: "вопросы Таро на работу" },
   { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
   { href: "/listens/rasklad-taro-na-rabotu", label: "расклад Таро на работу" },
@@ -22166,9 +22238,9 @@ function testSeventySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 6, "seventy-sixth page has exactly 6 hrefs");
+  assert(allLinks.length === 7, "seventy-sixth page has exactly 7 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 6, "seventy-sixth page has exactly six unique dests");
+  assert(uniqueDests.size === 7, "seventy-sixth page has exactly seven unique dests");
   for (const [index, expected] of SEVENTY_SIXTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `seventy-sixth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `seventy-sixth label[${index}] is ${expected.label}`);
@@ -22405,6 +22477,7 @@ const SEVENTY_SEVENTH_EXPECTED_LINKS = [
   { href: "/listens/voprosy-taro-na-rabotu", label: "вопросы Таро на работу" },
   { href: "/listens/rasklad-taro-na-rabotu", label: "расклад Таро на работу" },
   { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
+  { href: "/listens/taro-otnosheniya-na-rabote", label: "Таро отношения на работе" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
   { href: "/listens/taro-rabota", label: "Таро про работу" },
   { href: "/listens/taro-na-rabotu", label: "Таро на работу" },
@@ -22633,9 +22706,9 @@ function testSeventySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 7, "seventy-seventh page has exactly 7 hrefs");
+  assert(allLinks.length === 8, "seventy-seventh page has exactly 8 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 6, "seventy-seventh page has exactly six unique dests");
+  assert(uniqueDests.size === 7, "seventy-seventh page has exactly seven unique dests");
   for (const [index, expected] of SEVENTY_SEVENTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `seventy-seventh href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `seventy-seventh label[${index}] is ${expected.label}`);
@@ -22854,6 +22927,7 @@ const SEVENTY_EIGHTH_EXPECTED_LINKS = [
   { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
   { href: "/listens/taro-kakaya-rabota-mne-podhodit", label: "Таро – какая работа мне подходит" },
   { href: "/listens/taro-novaya-rabota", label: "Таро новая работа" },
+  { href: "/listens/vozmut-li-menya-na-rabotu-taro", label: "Возьмут ли меня на работу – Таро" },
   { href: "/listens/rasklad-taro-na-novuyu-rabotu", label: "расклад Таро на новую работу" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
 ];
@@ -23024,8 +23098,9 @@ function testSeventyEighthPage() {
   assert(directionLinks[0].href === "/listens/taro-kakaya-rabota-mne-podhodit" && directionLinks[0].label === "Таро – какая работа мне подходит", "seventy-eighth fifth link");
 
   const newPlaceLinks = sectionLinks(newPlaceSection);
-  assert(newPlaceLinks.length === 1, "seventy-eighth sixth href lives in H2 #13");
+  assert(newPlaceLinks.length === 2, "seventy-eighth sixth and seventh hrefs live in H2 #13");
   assert(newPlaceLinks[0].href === "/listens/taro-novaya-rabota" && newPlaceLinks[0].label === "Таро новая работа", "seventy-eighth sixth link");
+  assert(newPlaceLinks[1].href === "/listens/vozmut-li-menya-na-rabotu-taro" && newPlaceLinks[1].label === "Возьмут ли меня на работу – Таро", "seventy-eighth hire-me link");
 
   const offerLinks = sectionLinks(offerSection);
   assert(offerLinks.length === 1, "seventy-eighth seventh href lives in H2 #14");
@@ -23073,9 +23148,9 @@ function testSeventyEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 8, "seventy-eighth page has exactly 8 hrefs");
+  assert(allLinks.length === 9, "seventy-eighth page has exactly 9 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 7, "seventy-eighth page has exactly seven unique dests");
+  assert(uniqueDests.size === 8, "seventy-eighth page has exactly eight unique dests");
   for (const [index, expected] of SEVENTY_EIGHTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `seventy-eighth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `seventy-eighth label[${index}] is ${expected.label}`);
@@ -24195,6 +24270,7 @@ const EIGHTY_FIRST_EXPECTED_LINKS = [
   { href: "/listens/taro-poisk-raboty", label: "Таро поиск работы" },
   { href: "/listens/naydu-li-ya-rabotu-taro", label: "Найду ли я работу – Таро" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
 ];
 const EIGHTY_FIRST_FORBIDDEN_HREFS = [
   "/listens/menyat-li-rabotu",
@@ -24410,9 +24486,9 @@ function testEightyFirstPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 7, "eighty-first page has exactly 7 hrefs");
+  assert(allLinks.length === 8, "eighty-first page has exactly 8 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 6, "eighty-first page has exactly six unique dests");
+  assert(uniqueDests.size === 7, "eighty-first page has exactly seven unique dests");
   for (const [index, expected] of EIGHTY_FIRST_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `eighty-first href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `eighty-first label[${index}] is ${expected.label}`);
@@ -24595,8 +24671,10 @@ const EIGHTY_SECOND_EXPECTED_FAQ = [
 const EIGHTY_SECOND_EXPECTED_LINKS = [
   { href: "/listens/voprosy-taro-na-rabotu", label: "вопросы Таро на работу" },
   { href: "/listens/karty-taro-na-rabotu", label: "карты Таро на работу" },
+  { href: "/listens/taro-perspektivy-na-rabote", label: "Таро перспективы на работе" },
   { href: "/listens/taro-menyat-li-rabotu", label: "Таро – менять ли работу" },
   { href: "/listens/taro-kakaya-rabota-mne-podhodit", label: "какая работа мне подходит" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
   { href: "/listens/taro-poisk-raboty", label: "Таро поиск работы" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
 ];
@@ -24604,7 +24682,6 @@ const EIGHTY_SECOND_FORBIDDEN_HREFS = [
   "/listens/taro-rabota-i-karera",
   "/listens/taro-rabota",
   "/listens/taro-na-rabotu",
-  "/listens/taro-perspektivy",
   "/listens/taro-otnosheniya-na-rabote",
   "/articles/taro-rabota-i-karera",
 ];
@@ -24743,8 +24820,9 @@ function testEightySecondPage() {
   assert(changeJobLinks[0].href === "/listens/taro-menyat-li-rabotu" && changeJobLinks[0].label === "Таро – менять ли работу", "eighty-second third link");
 
   const directionLinks = sectionLinks(directionSection);
-  assert(directionLinks.length === 1, "eighty-second fourth href lives in H2 #10");
+  assert(directionLinks.length === 2, "eighty-second direction H2 has fit and work-vs-business hrefs");
   assert(directionLinks[0].href === "/listens/taro-kakaya-rabota-mne-podhodit" && directionLinks[0].label === "какая работа мне подходит", "eighty-second fourth link");
+  assert(directionLinks[1].href === "/listens/rabota-i-biznes-taro" && directionLinks[1].label === "Работа и бизнес Таро", "eighty-second work-vs-business link");
 
   const searchLinks = sectionLinks(searchSection);
   assert(searchLinks.length === 1, "eighty-second fifth href lives in H2 #11");
@@ -24793,9 +24871,9 @@ function testEightySecondPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 6, "eighty-second page has exactly 6 hrefs");
+  assert(allLinks.length === 8, "eighty-second page has exactly 8 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 6, "eighty-second page has exactly six unique dests");
+  assert(uniqueDests.size === 8, "eighty-second page has exactly eight unique dests");
   for (const [index, expected] of EIGHTY_SECOND_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `eighty-second href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `eighty-second label[${index}] is ${expected.label}`);
@@ -25760,20 +25838,21 @@ const EIGHTY_FIFTH_EXPECTED_FAQ = [
   },
 ];
 const EIGHTY_FIFTH_EXPECTED_LINKS = [
+  { href: "/listens/voprosy-taro-pro-biznes", label: "вопросы Таро про бизнес" },
+  { href: "/listens/rasklad-taro-na-biznes", label: "расклад Таро на бизнес" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
   { href: "/listens/taro-dengi", label: "Таро деньги" },
+  { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
+  { href: "/listens/gadanie-taro-na-biznes", label: "гадание Таро на бизнес" },
+  { href: "/listens/karty-taro-biznes", label: "Карты Таро бизнес" },
+  { href: "/listens/znachenie-taro-v-biznese", label: "значение Таро в бизнесе" },
   { href: "/listens/taro-rabota-i-karera", label: "Таро работа и карьера" },
+  { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
   { href: "/listens/taro-menyat-li-rabotu", label: "Таро – менять ли работу" },
   { href: "/listens/taro-kakaya-rabota-mne-podhodit", label: "какая работа мне подходит" },
 ];
 const EIGHTY_FIFTH_FORBIDDEN_HREFS = [
   "/listens/taro-biznes",
-  "/listens/karty-taro-biznes",
-  "/listens/znachenie-taro-v-biznese",
-  "/listens/rasklad-taro-na-biznes",
-  "/listens/gadanie-taro-na-biznes",
-  "/listens/voprosy-taro-pro-biznes",
-  "/listens/taro-biznes-i-dengi",
   "/listens/perspektivy-biznesa-taro",
   "/listens/zastoy-v-biznese-taro",
   "/listens/razvitie-biznesa-taro",
@@ -25906,13 +25985,15 @@ function testEightyFifthPage() {
       .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
 
   const moneyLinks = sectionLinks(moneySection);
-  assert(moneyLinks.length === 2, "eighty-fifth first two hrefs live in H2 #7");
+  assert(moneyLinks.length === 3, "eighty-fifth money H2 has work-finance, money, and business-money hrefs");
   assert(moneyLinks[0].href === "/listens/taro-rabota-i-finansy" && moneyLinks[0].label === "Таро работа и финансы", "eighty-fifth first link");
   assert(moneyLinks[1].href === "/listens/taro-dengi" && moneyLinks[1].label === "Таро деньги", "eighty-fifth second link");
+  assert(moneyLinks[2].href === "/listens/taro-biznes-i-dengi" && moneyLinks[2].label === "Таро бизнес и деньги", "eighty-fifth business-money link");
 
   const roleLinks = sectionLinks(roleSection);
-  assert(roleLinks.length === 1, "eighty-fifth third href lives in H2 #11");
+  assert(roleLinks.length === 2, "eighty-fifth role H2 has career and work-vs-business hrefs");
   assert(roleLinks[0].href === "/listens/taro-rabota-i-karera" && roleLinks[0].label === "Таро работа и карьера", "eighty-fifth third link");
+  assert(roleLinks[1].href === "/listens/rabota-i-biznes-taro" && roleLinks[1].label === "Работа и бизнес Таро", "eighty-fifth work-vs-business link");
 
   const careerChangeLinks = sectionLinks(careerChangeSection);
   assert(careerChangeLinks.length === 2, "eighty-fifth fourth and fifth hrefs live in H2 #14");
@@ -25958,9 +26039,9 @@ function testEightyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 5, "eighty-fifth page has exactly 5 hrefs");
+  assert(allLinks.length === 12, "eighty-fifth page has exactly 12 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 5, "eighty-fifth page has exactly five unique dests");
+  assert(uniqueDests.size === 12, "eighty-fifth page has exactly twelve unique dests");
   for (const [index, expected] of EIGHTY_FIFTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `eighty-fifth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `eighty-fifth label[${index}] is ${expected.label}`);
@@ -25982,10 +26063,14 @@ function testEightyFifthPage() {
   assert(contentSource.includes('label: "Таро работа и карьера"'), "eighty-fifth content file has Таро работа и карьера label");
   assert(contentSource.includes('label: "Таро – менять ли работу"'), "eighty-fifth content file has Таро – менять ли работу label");
   assert(contentSource.includes('label: "какая работа мне подходит"'), "eighty-fifth content file has какая работа мне подходит label");
+  for (const expected of EIGHTY_FIFTH_EXPECTED_LINKS) {
+    assert(contentSource.includes(`href: "${expected.href}"`), `eighty-fifth content file has ${expected.href}`);
+    assert(contentSource.includes(`label: "${expected.label}"`), `eighty-fifth content file has ${expected.label} label`);
+  }
   for (const href of EIGHTY_FIFTH_FORBIDDEN_HREFS) {
     assert(!contentSource.includes(`href: "${href}"`), `eighty-fifth content file has no ${href}`);
   }
-  assert(!contentSource.includes("/listens/taro-biznes"), "eighty-fifth content file never emits self-href");
+  assert(!contentSource.includes('href: "/listens/taro-biznes"'), "eighty-fifth content file never emits self-href");
   assert(!contentSource.includes("ListenSignupCta"), "eighty-fifth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "eighty-fifth content file has no primaryPractice");
   assert(!contentSource.includes("practice-player"), "eighty-fifth content file has no practice-player");
@@ -26930,14 +27015,14 @@ const EIGHTY_EIGHTH_EXPECTED_LINKS = [
   { href: "/listens/taro-biznes", label: "Таро бизнес" },
   { href: "/listens/znachenie-taro-v-biznese", label: "значение Таро в бизнесе" },
   { href: "/listens/karty-taro-biznes", label: "Карты Таро бизнес" },
+  { href: "/listens/rasklad-taro-na-biznes-i-dengi", label: "расклад Таро на бизнес и деньги" },
+  { href: "/listens/taro-biznes-i-dengi", label: "Таро бизнес и деньги" },
   { href: "/listens/taro-dengi", label: "Таро деньги" },
+  { href: "/listens/gadanie-taro-na-biznes", label: "гадание Таро на бизнес" },
 ];
 const EIGHTY_EIGHTH_FORBIDDEN_HREFS = [
   "/listens/rasklad-taro-na-biznes",
-  "/listens/gadanie-taro-na-biznes",
   "/listens/voprosy-taro-pro-biznes",
-  "/listens/taro-biznes-i-dengi",
-  "/listens/rasklad-taro-na-biznes-i-dengi",
   "/listens/perspektivy-biznesa-taro",
   "/listens/zastoy-v-biznese-taro",
   "/listens/razvitie-biznesa-taro",
@@ -27085,8 +27170,10 @@ function testEightyEighthPage() {
   assert(emperorLinks[1].href === "/listens/karty-taro-biznes" && emperorLinks[1].label === "Карты Таро бизнес", "eighty-eighth third link");
 
   const moneyLinks = sectionLinks(moneySection);
-  assert(moneyLinks.length === 1, "eighty-eighth fourth href lives in H2 #10");
-  assert(moneyLinks[0].href === "/listens/taro-dengi" && moneyLinks[0].label === "Таро деньги", "eighty-eighth fourth link");
+  assert(moneyLinks.length === 3, "eighty-eighth money H2 has business-money spread, hub, and money hrefs");
+  assert(moneyLinks[0].href === "/listens/rasklad-taro-na-biznes-i-dengi" && moneyLinks[0].label === "расклад Таро на бизнес и деньги", "eighty-eighth business-money spread link");
+  assert(moneyLinks[1].href === "/listens/taro-biznes-i-dengi" && moneyLinks[1].label === "Таро бизнес и деньги", "eighty-eighth business-money hub link");
+  assert(moneyLinks[2].href === "/listens/taro-dengi" && moneyLinks[2].label === "Таро деньги", "eighty-eighth fourth link");
 
   const allTextChunks = [
     parsed.definition.h1,
@@ -27125,9 +27212,9 @@ function testEightyEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 4, "eighty-eighth page has exactly 4 hrefs");
+  assert(allLinks.length === 7, "eighty-eighth page has exactly 7 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 4, "eighty-eighth page has exactly four unique dests");
+  assert(uniqueDests.size === 7, "eighty-eighth page has exactly seven unique dests");
   for (const [index, expected] of EIGHTY_EIGHTH_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `eighty-eighth href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `eighty-eighth label[${index}] is ${expected.label}`);
@@ -27147,10 +27234,14 @@ function testEightyEighthPage() {
   assert(contentSource.includes("label: \"значение Таро в бизнесе\""), "eighty-eighth content file has lowercase значение Таро в бизнесе label");
   assert(contentSource.includes("label: \"Карты Таро бизнес\""), "eighty-eighth content file has Карты Таро бизнес label");
   assert(contentSource.includes("label: \"Таро деньги\""), "eighty-eighth content file has Таро деньги label");
+  for (const expected of EIGHTY_EIGHTH_EXPECTED_LINKS) {
+    assert(contentSource.includes(`href: "${expected.href}"`), `eighty-eighth content file has ${expected.href}`);
+    assert(contentSource.includes(`label: "${expected.label}"`), `eighty-eighth content file has ${expected.label} label`);
+  }
   for (const href of EIGHTY_EIGHTH_FORBIDDEN_HREFS) {
     assert(!contentSource.includes(`href: "${href}"`), `eighty-eighth content file has no ${href}`);
   }
-  assert(!contentSource.includes("/listens/rasklad-taro-na-biznes"), "eighty-eighth content file never emits self-href");
+  assert(!contentSource.includes('href: "/listens/rasklad-taro-na-biznes"'), "eighty-eighth content file never emits self-href");
   assert(!contentSource.includes("ListenSignupCta"), "eighty-eighth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "eighty-eighth content file has no primaryPractice");
   assert(!contentSource.includes("practice-player"), "eighty-eighth content file has no practice-player");
@@ -28385,11 +28476,11 @@ const NINETY_SECOND_EXPECTED_LINKS = [
   { href: "/listens/karty-taro-biznes", label: "Карты Таро бизнес" },
   { href: "/listens/rabota-i-biznes-taro", label: "Работа и бизнес Таро" },
   { href: "/listens/taro-rabota-i-finansy", label: "Таро работа и финансы" },
+  { href: "/listens/rasklad-taro-na-biznes-i-dengi", label: "расклад Таро на бизнес и деньги" },
   { href: "/listens/taro-dengi", label: "Таро деньги" },
 ];
 const NINETY_SECOND_FORBIDDEN_HREFS = [
   "/listens/taro-biznes-i-dengi",
-  "/listens/rasklad-taro-na-biznes-i-dengi",
   "/listens/perspektivy-biznesa-taro",
   "/listens/zastoy-v-biznese-taro",
   "/listens/razvitie-biznesa-taro",
@@ -28571,9 +28662,9 @@ function testNinetySecondPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 6, "ninety-second page has exactly 6 hrefs");
+  assert(allLinks.length === 7, "ninety-second page has exactly 7 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 6, "ninety-second page has exactly six unique dests");
+  assert(uniqueDests.size === 7, "ninety-second page has exactly seven unique dests");
   for (const [index, expected] of NINETY_SECOND_EXPECTED_LINKS.entries()) {
     assert(allLinks[index].href === expected.href, `ninety-second href[${index}] is ${expected.href}`);
     assert(allLinks[index].label === expected.label, `ninety-second label[${index}] is ${expected.label}`);
@@ -28597,6 +28688,10 @@ function testNinetySecondPage() {
   assert(contentSource.includes("label: \"Работа и бизнес Таро\""), "ninety-second content file has Работа и бизнес Таро label");
   assert(contentSource.includes("label: \"Таро работа и финансы\""), "ninety-second content file has Таро работа и финансы label");
   assert(contentSource.includes("label: \"Таро деньги\""), "ninety-second content file has Таро деньги label");
+  for (const expected of NINETY_SECOND_EXPECTED_LINKS) {
+    assert(contentSource.includes(`href: "${expected.href}"`), `ninety-second content file has ${expected.href}`);
+    assert(contentSource.includes(`label: "${expected.label}"`), `ninety-second content file has ${expected.label} label`);
+  }
   for (const href of NINETY_SECOND_FORBIDDEN_HREFS) {
     assert(!contentSource.includes(`href: "${href}"`), `ninety-second content file has no ${href}`);
   }

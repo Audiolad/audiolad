@@ -211,6 +211,14 @@ export const TARO_PRIVLECHENIE_DENEG_PAGE = assertListenPageDefinition({
           "Какой информации мне не хватает?",
         ]},
         { kind: "paragraph", text: "Так Таро остаётся поводом посмотреть на ситуацию под другим углом, а не превращается в способ предсказать финансовый исход." },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если тема ближе к возможности и случайности, можно посмотреть " },
+            { href: "/listens/taro-na-dengi-i-udachu", label: "Таро на деньги и удачу" },
+            { text: "." },
+          ],
+        },
       ],
     },
     {
