@@ -52,6 +52,9 @@ export type ProductFormSnapshot = {
   listeningNoticeEnabled: boolean;
   listeningNoticeTitle: string;
   listeningNoticeText: string;
+  seoPrimaryQuery: string;
+  seoTitle: string;
+  seoDescription: string;
   status: string;
   moderationStatus: string;
   moderationSubmittedAt: string | null;
@@ -111,6 +114,9 @@ export function productDetailToFormSnapshot(
       practice.listening_notice_title ?? listeningDefaults.listeningNoticeTitle,
     listeningNoticeText:
       practice.listening_notice_text ?? listeningDefaults.listeningNoticeText,
+    seoPrimaryQuery: practice.seo_primary_query ?? "",
+    seoTitle: practice.seo_title ?? "",
+    seoDescription: practice.seo_description ?? "",
     status: practice.status,
     moderationStatus: practice.moderation_status ?? "not_submitted",
     moderationSubmittedAt: practice.moderation_submitted_at ?? null,
@@ -155,6 +161,9 @@ export function mergeServerProductIntoForm(
     listeningNoticeEnabled: current.listeningNoticeEnabled,
     listeningNoticeTitle: current.listeningNoticeTitle,
     listeningNoticeText: current.listeningNoticeText,
+    seoPrimaryQuery: current.seoPrimaryQuery,
+    seoTitle: current.seoTitle,
+    seoDescription: current.seoDescription,
     coverUrl: server.coverUrl ?? current.coverUrl,
     coverVersion: server.coverUrl ? server.coverVersion : current.coverVersion,
   };

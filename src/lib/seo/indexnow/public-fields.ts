@@ -18,6 +18,9 @@ export const PRACTICE_PUBLIC_INDEXNOW_FIELDS = [
   "listening_notice_text",
   "is_catalog_listed",
   "catalog_visibility",
+  "seo_primary_query",
+  "seo_title",
+  "seo_description",
 ] as const;
 
 export type PracticePublicIndexNowField =

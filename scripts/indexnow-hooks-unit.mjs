@@ -10,8 +10,8 @@ import {
   planPracticePublishIndexNow,
   planPracticeSlugChangeIndexNow,
   buildAuthorCanonicalUrl,
-  notifyIndexNowForTests,
-} from "../src/lib/seo/indexnow/hooks.ts";
+} from "../src/lib/seo/indexnow/planner.ts";
+import { notifyIndexNowUrls as notifyIndexNowForTests } from "../src/lib/seo/indexnow/notify.ts";
 import {
   hasAuthorPublicIndexNowChanges,
   hasPracticePublicIndexNowChanges,
@@ -99,6 +99,18 @@ function testPracticePublicFields() {
   assert(
     hasPracticePublicIndexNowChanges({ is_catalog_listed: false }),
     "listing flag change is public-significant",
+  );
+  assert(
+    hasPracticePublicIndexNowChanges({ seo_primary_query: "медитация для сна" }),
+    "seo_primary_query is public",
+  );
+  assert(
+    hasPracticePublicIndexNowChanges({ seo_title: "Сон" }),
+    "seo_title is public",
+  );
+  assert(
+    hasPracticePublicIndexNowChanges({ seo_description: "Описание" }),
+    "seo_description is public",
   );
 }
 
@@ -259,7 +271,8 @@ function testRouteWiringSource() {
   for (const file of files) {
     const source = read(file);
     assert(
-      source.includes("scheduleIndexNowNotification"),
+      source.includes("scheduleIndexNowNotification") ||
+        source.includes("schedulePracticePublishedSearchNotifications"),
       `${file} schedules IndexNow`,
     );
     assert(!/INDEXNOW_KEY\s*=\s*["'][A-Za-z0-9-]{16,}/.test(source), `${file} no key literal`);

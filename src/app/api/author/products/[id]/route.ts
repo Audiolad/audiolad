@@ -12,6 +12,9 @@ import {
   validateListeningNoticeTextLength,
   validateListeningNoticeTitleLength,
   validateStoredFormatLength,
+  validateSeoDescriptionLength,
+  validateSeoPrimaryQueryLength,
+  validateSeoTitleLength,
   validateSubtitleLength,
   validateTitleLength,
 } from "@/lib/author-products/limits";
@@ -64,6 +67,8 @@ import {
 import { hasPracticePublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
 import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { planPracticeYandexRecrawl } from "@/lib/seo/yandex-webmaster/planner";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
@@ -91,7 +96,13 @@ export async function GET(_request: Request, context: RouteContext) {
 
 function applyClearableTextField(
   body: object,
-  key: "subtitle" | "description" | "format",
+  key:
+    | "subtitle"
+    | "description"
+    | "format"
+    | "seo_primary_query"
+    | "seo_title"
+    | "seo_description",
   updates: Record<string, unknown>,
   validate?: (value: string) => string | null,
 ) {
@@ -226,6 +237,45 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       if (descriptionError) {
         return NextResponse.json({ error: descriptionError }, { status: 400 });
+      }
+    }
+
+    if ("seo_primary_query" in body) {
+      const seoPrimaryQueryError = applyClearableTextField(
+        body,
+        "seo_primary_query",
+        updates,
+        validateSeoPrimaryQueryLength,
+      );
+
+      if (seoPrimaryQueryError) {
+        return NextResponse.json({ error: seoPrimaryQueryError }, { status: 400 });
+      }
+    }
+
+    if ("seo_title" in body) {
+      const seoTitleError = applyClearableTextField(
+        body,
+        "seo_title",
+        updates,
+        validateSeoTitleLength,
+      );
+
+      if (seoTitleError) {
+        return NextResponse.json({ error: seoTitleError }, { status: 400 });
+      }
+    }
+
+    if ("seo_description" in body) {
+      const seoDescriptionError = applyClearableTextField(
+        body,
+        "seo_description",
+        updates,
+        validateSeoDescriptionLength,
+      );
+
+      if (seoDescriptionError) {
+        return NextResponse.json({ error: seoDescriptionError }, { status: 400 });
       }
     }
 
@@ -719,6 +769,20 @@ export async function PATCH(request: Request, context: RouteContext) {
             [buildPracticeCanonicalUrl(authorSlug, nextSlug)],
             INDEXNOW_REASONS.practice_updated,
           );
+        }
+
+        const yandexPlan = planPracticeYandexRecrawl({
+          previousStatus: practice.status,
+          nextStatus: product.practice.status,
+          catalogVisibility: product.practice.catalog_visibility,
+          isCatalogListed: product.practice.is_catalog_listed,
+          changedFields: Object.keys(updates),
+          authorSlug,
+          practiceSlug: nextSlug,
+        });
+
+        if (yandexPlan) {
+          scheduleYandexRecrawlNotification(yandexPlan.url, yandexPlan.reason);
         }
       }
     }
