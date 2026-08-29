@@ -688,6 +688,152 @@ assert.equal(
   }).profile.warmth,
   PRODUCT_SEO_STYLE_PRESET_VALUES.balanced.warmth,
 );
+const customNumericValid = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: 50,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customNumericValid.ok, true);
+assert.deepEqual(customNumericValid.profile, {
+  preset: "custom",
+  variety: "balanced",
+  warmth: 50,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+
+const customBelowZero = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: -20,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customBelowZero.ok, true);
+assert.equal(customBelowZero.profile.warmth, 0);
+
+const customAbove100 = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: 50,
+  expertise: 130,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customAbove100.ok, true);
+assert.equal(customAbove100.profile.expertise, 100);
+
+const customNumericString = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: "50",
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customNumericString.ok, false);
+assert.equal(customNumericString.reason, "malformed");
+
+const customMissingSlider = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: 50,
+  expertise: 50,
+  conversational: 50,
+});
+assert.equal(customMissingSlider.ok, false);
+assert.equal(customMissingSlider.reason, "malformed");
+
+const customNullSlider = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: null,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customNullSlider.ok, false);
+assert.equal(customNullSlider.reason, "malformed");
+
+const customNaNSlider = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: Number.NaN,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customNaNSlider.ok, false);
+assert.equal(customNaNSlider.reason, "malformed");
+
+const customInfinitySlider = sanitizeProductSeoStyleProfile({
+  preset: "custom",
+  variety: "balanced",
+  warmth: Number.POSITIVE_INFINITY,
+  expertise: 50,
+  conversational: 50,
+  expressiveness: 40,
+});
+assert.equal(customInfinitySlider.ok, false);
+assert.equal(customInfinitySlider.reason, "malformed");
+
+const namedPresetUnchanged = sanitizeProductSeoStyleProfile({
+  preset: "balanced",
+  variety: "balanced",
+  warmth: 1,
+  expertise: 1,
+  conversational: 1,
+  expressiveness: 1,
+});
+assert.equal(namedPresetUnchanged.ok, true);
+assert.deepEqual(namedPresetUnchanged.profile, {
+  preset: "balanced",
+  variety: "balanced",
+  ...PRODUCT_SEO_STYLE_PRESET_VALUES.balanced,
+});
+
+assert.equal(
+  parseProductSeoAutofillRequest({
+    title: "A",
+    subtitle: "",
+    description: "",
+    productKind: "practice",
+    seoPrimaryQuery: "медитация для сна",
+    styleProfile: {
+      preset: "custom",
+      variety: "balanced",
+      warmth: "50",
+      expertise: 50,
+      conversational: 50,
+      expressiveness: 40,
+    },
+  }).ok,
+  false,
+);
+assert.equal(
+  parseProductSeoAutofillRequest({
+    title: "A",
+    subtitle: "",
+    description: "",
+    productKind: "practice",
+    seoPrimaryQuery: "медитация для сна",
+    styleProfile: {
+      preset: "custom",
+      variety: "balanced",
+      warmth: "50",
+      expertise: 50,
+      conversational: 50,
+      expressiveness: 40,
+    },
+  }).code,
+  "INVALID_STYLE_PROFILE",
+);
+
 assert.equal(
   sanitizeProductSeoStyleProfile({
     preset: "custom",

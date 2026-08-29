@@ -257,21 +257,38 @@ export function sanitizeProductSeoStyleProfile(
     };
   }
 
-  const sliders = {
-    warmth: clampStyleSlider(Number(value.warmth)),
-    expertise: clampStyleSlider(Number(value.expertise)),
-    conversational: clampStyleSlider(Number(value.conversational)),
-    expressiveness: clampStyleSlider(Number(value.expressiveness)),
-  };
+  const warmth = readRequiredCustomSlider(value.warmth);
+  const expertise = readRequiredCustomSlider(value.expertise);
+  const conversational = readRequiredCustomSlider(value.conversational);
+  const expressiveness = readRequiredCustomSlider(value.expressiveness);
+  if (
+    warmth === null ||
+    expertise === null ||
+    conversational === null ||
+    expressiveness === null
+  ) {
+    return { ok: false, reason: "malformed" };
+  }
 
   return {
     ok: true,
     profile: {
       preset: "custom",
       variety,
-      ...sliders,
+      warmth,
+      expertise,
+      conversational,
+      expressiveness,
     },
   };
+}
+
+function readRequiredCustomSlider(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return clampStyleSlider(value);
 }
 
 export function productSeoStylePromptLines(
