@@ -116,6 +116,7 @@ import { KARTY_TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/karty-tar
 import { ZNACHENIE_TARO_V_BIZNESE_PAGE } from "../src/lib/seo/listens/content/znachenie-taro-v-biznese.ts";
 import { RASKLAD_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes.ts";
 import { GADANIE_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/gadanie-taro-na-biznes.ts";
+import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-pro-biznes.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2667,6 +2668,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightyNinthListenHref}`,
     ),
     "directory JSON-LD includes eighty-ninth listen href",
+  );
+
+
+  const ninetiethListenHref = "/listens/voprosy-taro-pro-biznes";
+  const ninetiethListenCard = data.articles.find((card) => card.href === ninetiethListenHref);
+  assert(ninetiethListenCard, "ninetieth indexable listen page is listed");
+  assert(
+    ninetiethListenCard.title === "Вопросы Таро про бизнес – что спрашивать о своём деле | АудиоЛад",
+    "ninetieth listen directory title",
+  );
+  assert(
+    ninetiethListenCard.description === VOPROSY_TARO_PRO_BIZNES_PAGE.description,
+    "ninetieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/voprosy-taro-pro-biznes",
+    ),
+    "no /articles duplicate for ninetieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${ninetiethListenHref}`,
+    ),
+    "directory JSON-LD includes ninetieth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
