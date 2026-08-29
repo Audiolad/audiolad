@@ -113,6 +113,7 @@ import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/
 import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-otnosheniya-na-rabote.ts";
 import { TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/taro-biznes.ts";
 import { KARTY_TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/karty-taro-biznes.ts";
+import { ZNACHENIE_TARO_V_BIZNESE_PAGE } from "../src/lib/seo/listens/content/znachenie-taro-v-biznese.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2592,6 +2593,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightySixthListenHref}`,
     ),
     "directory JSON-LD includes eighty-sixth listen href",
+  );
+
+  const eightySeventhListenHref = "/listens/znachenie-taro-v-biznese";
+  const eightySeventhListenCard = data.articles.find((card) => card.href === eightySeventhListenHref);
+  assert(eightySeventhListenCard, "eighty-seventh indexable listen page is listed");
+  assert(
+    eightySeventhListenCard.title === "Значение Таро в бизнесе – как трактовать карты | АудиоЛад",
+    "eighty-seventh listen directory title",
+  );
+  assert(
+    eightySeventhListenCard.description === ZNACHENIE_TARO_V_BIZNESE_PAGE.description,
+    "eighty-seventh listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/znachenie-taro-v-biznese",
+    ),
+    "no /articles duplicate for eighty-seventh listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightySeventhListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-seventh listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
