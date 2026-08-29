@@ -87,6 +87,7 @@ import { KARTY_TARO_BIZNES_PAGE } from "./content/karty-taro-biznes";
 import { ZNACHENIE_TARO_V_BIZNESE_PAGE } from "./content/znachenie-taro-v-biznese";
 import { RASKLAD_TARO_NA_BIZNES_PAGE } from "./content/rasklad-taro-na-biznes";
 import { GADANIE_TARO_NA_BIZNES_PAGE } from "./content/gadanie-taro-na-biznes";
+import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "./content/voprosy-taro-pro-biznes";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -183,6 +184,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   ZNACHENIE_TARO_V_BIZNESE_PAGE,
   RASKLAD_TARO_NA_BIZNES_PAGE,
   GADANIE_TARO_NA_BIZNES_PAGE,
+  VOPROSY_TARO_PRO_BIZNES_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
