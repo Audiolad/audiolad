@@ -114,6 +114,7 @@ import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/
 import { TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/taro-biznes.ts";
 import { KARTY_TARO_BIZNES_PAGE } from "../src/lib/seo/listens/content/karty-taro-biznes.ts";
 import { ZNACHENIE_TARO_V_BIZNESE_PAGE } from "../src/lib/seo/listens/content/znachenie-taro-v-biznese.ts";
+import { RASKLAD_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2617,6 +2618,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eightySeventhListenHref}`,
     ),
     "directory JSON-LD includes eighty-seventh listen href",
+  );
+
+  const eightyEighthListenHref = "/listens/rasklad-taro-na-biznes";
+  const eightyEighthListenCard = data.articles.find((card) => card.href === eightyEighthListenHref);
+  assert(eightyEighthListenCard, "eighty-eighth indexable listen page is listed");
+  assert(
+    eightyEighthListenCard.title === "Расклад Таро на бизнес – схема и позиции расклада | АудиоЛад",
+    "eighty-eighth listen directory title",
+  );
+  assert(
+    eightyEighthListenCard.description === RASKLAD_TARO_NA_BIZNES_PAGE.description,
+    "eighty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/rasklad-taro-na-biznes",
+    ),
+    "no /articles duplicate for eighty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eightyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes eighty-eighth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
