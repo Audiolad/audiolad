@@ -83,6 +83,7 @@ import { TARO_RABOTA_I_KARERA_PAGE } from "./content/taro-rabota-i-karera";
 import { TARO_PERSPEKTIVY_NA_RABOTE_PAGE } from "./content/taro-perspektivy-na-rabote";
 import { TARO_OTNOSHENIYA_NA_RABOTE_PAGE } from "./content/taro-otnosheniya-na-rabote";
 import { TARO_BIZNES_PAGE } from "./content/taro-biznes";
+import { KARTY_TARO_BIZNES_PAGE } from "./content/karty-taro-biznes";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -175,6 +176,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   TARO_PERSPEKTIVY_NA_RABOTE_PAGE,
   TARO_OTNOSHENIYA_NA_RABOTE_PAGE,
   TARO_BIZNES_PAGE,
+  KARTY_TARO_BIZNES_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
