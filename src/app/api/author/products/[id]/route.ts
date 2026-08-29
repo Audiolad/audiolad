@@ -13,7 +13,9 @@ import {
   validateListeningNoticeTitleLength,
   validateStoredFormatLength,
   validateSeoDescriptionLength,
+  validateSeoAboutLength,
   validateSeoPrimaryQueryLength,
+  validateSeoSecondaryQueries,
   validateSeoTitleLength,
   validateSubtitleLength,
   validateTitleLength,
@@ -73,6 +75,12 @@ import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { slugifyTitle } from "@/lib/author-products/utils";
+import { hasPermission } from "@/lib/auth/platform-access";
+import {
+  parsePracticeSeoContent,
+  replacePracticeSeoContent,
+  validateRelatedPracticeTargets,
+} from "@/lib/products/practice-seo-content";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -101,6 +109,7 @@ function applyClearableTextField(
     | "description"
     | "format"
     | "seo_primary_query"
+    | "seo_about"
     | "seo_title"
     | "seo_description",
   updates: Record<string, unknown>,
@@ -194,6 +203,27 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
+    const seoContent =
+      "seo_content" in body
+        ? parsePracticeSeoContent((body as Record<string, unknown>).seo_content)
+        : null;
+    if ("seo_content" in body && !seoContent) {
+      return NextResponse.json({ error: "invalid_seo_content" }, { status: 400 });
+    }
+    if (seoContent) {
+      const isAdmin = await hasPermission(supabase, user.id, "admin_panel.access");
+      const relationError = await validateRelatedPracticeTargets({
+        supabase,
+        sourcePracticeId: id,
+        sourceAuthorId: practice.author_id,
+        relatedPracticeIds: seoContent.relatedPracticeIds,
+        isAdmin,
+      });
+      if (relationError) {
+        return NextResponse.json({ error: relationError }, { status: 400 });
+      }
+    }
+
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
@@ -264,6 +294,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (seoTitleError) {
         return NextResponse.json({ error: seoTitleError }, { status: 400 });
       }
+    }
+
+    if ("seo_about" in body) {
+      const seoAboutError = applyClearableTextField(
+        body,
+        "seo_about",
+        updates,
+        validateSeoAboutLength,
+      );
+
+      if (seoAboutError) {
+        return NextResponse.json({ error: seoAboutError }, { status: 400 });
+      }
+    }
+
+    if ("seo_secondary_queries" in body) {
+      const secondaryError = validateSeoSecondaryQueries(
+        (body as Record<string, unknown>).seo_secondary_queries,
+      );
+
+      if (secondaryError) {
+        return NextResponse.json({ error: secondaryError }, { status: 400 });
+      }
+
+      updates.seo_secondary_queries = (
+        (body as Record<string, string[]>).seo_secondary_queries
+      ).map((item) => item.trim());
     }
 
     if ("seo_description" in body) {
@@ -723,9 +780,23 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
+    if (seoContent) {
+      await replacePracticeSeoContent(supabase, id, seoContent);
+    }
+
     await syncPracticeAudioCompatibility(supabase, id);
 
-    const changedFields = Object.keys(updates).filter((key) => key !== "updated_at");
+    const changedFields = [
+      ...Object.keys(updates).filter((key) => key !== "updated_at"),
+      ...(seoContent
+        ? [
+            "seo_usage_items",
+            "seo_faq_items",
+            "related_products",
+            "related_listens",
+          ]
+        : []),
+    ];
     await recordAuthorSupportAudit({
       action: "product_updated",
       resourceType: "practice",
@@ -746,7 +817,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       practice.status === "published" &&
-      hasPracticePublicIndexNowChanges(updates) &&
+      hasPracticePublicIndexNowChanges(
+        seoContent ? { ...updates, seo_content: seoContent } : updates,
+      ) &&
       shouldNotifyIndexNowByVisibility(
         product.practice.catalog_visibility,
         product.practice.is_catalog_listed,
@@ -776,7 +849,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           nextStatus: product.practice.status,
           catalogVisibility: product.practice.catalog_visibility,
           isCatalogListed: product.practice.is_catalog_listed,
-          changedFields: Object.keys(updates),
+          changedFields,
           authorSlug,
           practiceSlug: nextSlug,
         });

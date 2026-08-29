@@ -44,8 +44,16 @@ export function serializeProductEditorBaseline(
     promoUrl: string;
     promoOpenInNewTab: boolean;
     seoPrimaryQuery: string;
+    seoSecondaryQueries?: string[];
     seoTitle: string;
     seoDescription: string;
+    seoAbout?: string;
+    seoContent?: {
+      usageItems: Array<{ content: string }>;
+      faqItems: Array<{ question: string; answer: string }>;
+      relatedPracticeIds: string[];
+      relatedListenSlugs: string[];
+    };
   },
   audioItems: Array<{
     id: string;
@@ -78,8 +86,16 @@ export function serializeProductEditorBaseline(
     promoUrl: form.promoUrl,
     promoOpenInNewTab: form.promoOpenInNewTab,
     seoPrimaryQuery: form.seoPrimaryQuery,
+    seoSecondaryQueries: form.seoSecondaryQueries ?? [],
     seoTitle: form.seoTitle,
     seoDescription: form.seoDescription,
+    seoAbout: form.seoAbout ?? "",
+    seoContent: form.seoContent ?? {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: [],
+      relatedListenSlugs: [],
+    },
     audioItems: audioItems.map((item) => ({
       id: item.id,
       title: item.title,

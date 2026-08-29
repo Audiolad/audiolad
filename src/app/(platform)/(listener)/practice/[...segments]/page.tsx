@@ -70,6 +70,7 @@ import {
   shouldLoadPublicAudioItemsOnProductPage,
 } from "@/lib/products/public-audio-items";
 import { resolvePublicListeningNotice } from "@/lib/products/listening-notice";
+import { loadPublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
 import {
@@ -530,6 +531,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.id,
   );
   const listeningNotice = resolvePublicListeningNotice(practice);
+  const seoContent = await loadPublicPracticeSeoContent(supabase, practice.id);
 
   const mobileCoverDisplayUrl = getProductCoverDisplayUrl(
     practice.cover_url,
@@ -592,6 +594,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     productTypeLabel: typeLabel,
     subtitle,
     description,
+    seoAbout: practice.seo_about?.trim() || null,
+    seoContent,
     meta,
     gallerySlides,
     presentation,

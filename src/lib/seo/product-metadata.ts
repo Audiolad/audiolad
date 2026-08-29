@@ -19,6 +19,11 @@ export type ProductSeoFields = {
   seoPrimaryQuery?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  seoAbout?: string | null;
+  seoSecondaryQueries?: string[] | null;
+  seoUsageItems?: string[] | null;
+  seoFaqCount?: number;
+  seoRelatedCount?: number;
 };
 
 export type ProductSeoReadinessCheck = {
@@ -27,14 +32,18 @@ export type ProductSeoReadinessCheck = {
     | "query_in_title"
     | "query_in_description"
     | "substantial_description"
-    | "usable_search_description";
+    | "usable_search_description"
+    | "about"
+    | "usage"
+    | "faq"
+    | "related";
   label: string;
   done: boolean;
 };
 
 export type ProductSeoReadiness = {
   doneCount: number;
-  total: 5;
+  total: 8;
   checks: ProductSeoReadinessCheck[];
 };
 
@@ -92,10 +101,9 @@ function trimOrEmpty(value: string | null | undefined): string {
 }
 
 export function hasExplicitProductSeoTitleFields(input: {
-  seoPrimaryQuery?: string | null;
   seoTitle?: string | null;
 }): boolean {
-  return Boolean(trimOrEmpty(input.seoTitle) || trimOrEmpty(input.seoPrimaryQuery));
+  return Boolean(trimOrEmpty(input.seoTitle));
 }
 
 export function resolveLegacyProductSeoTitle(input: {
@@ -128,14 +136,9 @@ function appendBrandOnce(titleBase: string): string {
 export function resolveProductSeoTitleBase(input: ProductSeoFields): string {
   const title = trimOrEmpty(input.title);
   const seoTitle = trimOrEmpty(input.seoTitle);
-  const primaryQuery = trimOrEmpty(input.seoPrimaryQuery);
 
   if (seoTitle) {
     return seoTitle;
-  }
-
-  if (primaryQuery && !containsSeoPhrase(title, primaryQuery)) {
-    return `${title}${PRODUCT_SEO_TITLE_SEPARATOR}${primaryQuery}`;
   }
 
   return title;
@@ -170,16 +173,16 @@ export function resolveProductMetaDescription(input: ProductSeoFields): string {
     return seoDescription;
   }
 
-  const description = trimOrEmpty(input.description);
-
-  if (description) {
-    return truncateSeoSnippet(description);
-  }
-
   const subtitle = trimOrEmpty(input.subtitle);
 
   if (subtitle) {
     return truncateSeoSnippet(subtitle);
+  }
+
+  const description = trimOrEmpty(input.description);
+
+  if (description) {
+    return truncateSeoSnippet(description);
   }
 
   return resolveProductTypeDescriptionFallback(input.productKind);
@@ -206,8 +209,11 @@ export function evaluateProductSeoReadiness(
   const seoDescription = trimOrEmpty(input.seoDescription);
   const description = trimOrEmpty(input.description);
   const subtitle = trimOrEmpty(input.subtitle);
+  const about = trimOrEmpty(input.seoAbout);
+  const usageItems = input.seoUsageItems?.filter((item) => trimOrEmpty(item)) ?? [];
   const finalTitle = resolveProductSeoTitle(input);
-  const descriptionWindow = [...description]
+  const content = [description, about, ...usageItems].filter(Boolean).join("\n");
+  const descriptionWindow = [...content]
     .slice(0, PRODUCT_SEO_DESCRIPTION_QUERY_WINDOW)
     .join("");
 
@@ -224,7 +230,7 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "query_in_description",
-      label: "Добавьте основной запрос в начало описания",
+      label: "Основной запрос естественно есть в содержательном тексте",
       done: Boolean(
         primaryQuery &&
           (containsSeoPhrase(seoDescription, primaryQuery) ||
@@ -241,11 +247,31 @@ export function evaluateProductSeoReadiness(
       label: "Поисковое описание готово",
       done: Boolean(seoDescription || description || subtitle),
     },
+    {
+      id: "about",
+      label: "Заполнен блок «О продукте»",
+      done: Boolean(about),
+    },
+    {
+      id: "usage",
+      label: "Указаны варианты использования",
+      done: usageItems.length > 0,
+    },
+    {
+      id: "faq",
+      label: "Добавлен FAQ",
+      done: (input.seoFaqCount ?? 0) > 0,
+    },
+    {
+      id: "related",
+      label: "Добавлены связанные материалы",
+      done: (input.seoRelatedCount ?? 0) > 0,
+    },
   ];
 
   return {
     doneCount: checks.filter((check) => check.done).length,
-    total: 5,
+    total: 8,
     checks,
   };
 }

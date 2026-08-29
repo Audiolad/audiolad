@@ -1,6 +1,7 @@
 import LegalFooter from "@/components/LegalFooter";
 import AuthorLink from "@/components/authors/AuthorLink";
 import NextStepRecommendation from "@/components/products/NextStepRecommendation";
+import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
 import AudioPostBackLink from "@/components/products/audio-post/AudioPostBackLink";
 import AudioPostListenAnalytics from "@/components/products/audio-post/AudioPostListenAnalytics";
 import AudioPostPlayer from "@/components/products/audio-post/AudioPostPlayer";
@@ -153,6 +154,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             </p>
           </section>
         ) : null}
+        <PracticeSeoContentSections content={viewModel.seoContent} />
 
         <AudioPostRecommendation viewModel={viewModel} />
 
@@ -216,6 +218,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             </p>
           </section>
         ) : null}
+        <PracticeSeoContentSections content={viewModel.seoContent} />
 
         <AudioPostRecommendation viewModel={viewModel} />
 

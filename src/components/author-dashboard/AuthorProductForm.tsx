@@ -11,6 +11,7 @@ import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
+import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import PracticeVisibilityUsersEditor from "@/components/author-dashboard/PracticeVisibilityUsersEditor";
 import {
   CATALOG_VISIBILITY,
@@ -185,8 +186,11 @@ type FormState = {
   listeningNoticeTitle: string;
   listeningNoticeText: string;
   seoPrimaryQuery: string;
+  seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
+  seoAbout: string;
+  seoContent: PracticeSeoContentInput;
   status: string;
   moderationStatus: string;
   moderationSubmittedAt: string | null;
@@ -327,8 +331,16 @@ function buildInitialForm(
     listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
     listeningNoticeText: listeningDefaults.listeningNoticeText,
     seoPrimaryQuery: "",
+    seoSecondaryQueries: [],
     seoTitle: "",
     seoDescription: "",
+    seoAbout: "",
+    seoContent: {
+      usageItems: [],
+      faqItems: [],
+      relatedPracticeIds: [],
+      relatedListenSlugs: [],
+    },
     status: "draft",
     moderationStatus: "not_submitted",
     moderationSubmittedAt: null,
@@ -442,8 +454,16 @@ function buildProductSavePayload(
     listening_notice_title: form.listeningNoticeTitle,
     listening_notice_text: form.listeningNoticeText,
     seo_primary_query: form.seoPrimaryQuery.trim() || null,
+    seo_secondary_queries: form.seoSecondaryQueries.map((item) => item.trim()).filter(Boolean),
     seo_title: form.seoTitle.trim() || null,
     seo_description: form.seoDescription.trim() || null,
+    seo_about: form.seoAbout.trim() || null,
+    seo_content: {
+      usage_items: form.seoContent.usageItems,
+      faq_items: form.seoContent.faqItems,
+      related_practice_ids: form.seoContent.relatedPracticeIds,
+      related_listen_slugs: form.seoContent.relatedListenSlugs,
+    },
   };
 }
 
@@ -2591,8 +2611,11 @@ export default function AuthorProductForm({
           description={form.description}
           productKind={form.productKind}
           seoPrimaryQuery={form.seoPrimaryQuery}
+          seoSecondaryQueries={form.seoSecondaryQueries}
           seoTitle={form.seoTitle}
           seoDescription={form.seoDescription}
+          seoAbout={form.seoAbout}
+          seoContent={form.seoContent}
           publicPath={publicPath}
           fieldErrors={{
             seoPrimaryQuery: fieldErrors.seoPrimaryQuery,

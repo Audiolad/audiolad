@@ -69,8 +69,16 @@ export const PRODUCT_CONTENT_LIMITS = {
   listeningNoticeTitle: 120,
   listeningNoticeText: 1000,
   seoPrimaryQuery: 120,
+  seoSecondaryQueries: 10,
+  seoSecondaryQuery: 120,
   seoTitle: 140,
   seoDescription: 300,
+  seoAbout: 3_000,
+  seoUsageItems: 8,
+  seoUsageItem: 240,
+  seoFaqItems: 8,
+  seoFaqQuestion: 240,
+  seoFaqAnswer: 1_500,
 } as const;
 
 export type ProductFieldErrorCode =
@@ -84,8 +92,10 @@ export type ProductFieldErrorCode =
   | "listening_notice_title_too_long"
   | "listening_notice_text_too_long"
   | "seo_primary_query_too_long"
+  | "seo_secondary_queries_invalid"
   | "seo_title_too_long"
-  | "seo_description_too_long";
+  | "seo_description_too_long"
+  | "seo_about_too_long";
 
 export function validateTitleLength(value: string): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.title) {
@@ -185,6 +195,25 @@ export function validateSeoTitleLength(
   return null;
 }
 
+export function validateSeoSecondaryQueries(
+  values: unknown,
+): ProductFieldErrorCode | null {
+  if (
+    !Array.isArray(values) ||
+    values.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQueries ||
+    values.some(
+      (value) =>
+        typeof value !== "string" ||
+        !value.trim() ||
+        value.trim().length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery,
+    )
+  ) {
+    return "seo_secondary_queries_invalid";
+  }
+
+  return null;
+}
+
 export function validateSeoDescriptionLength(
   value: string,
 ): ProductFieldErrorCode | null {
@@ -193,6 +222,14 @@ export function validateSeoDescriptionLength(
   }
 
   return null;
+}
+
+export function validateSeoAboutLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  return value.trim().length > PRODUCT_CONTENT_LIMITS.seoAbout
+    ? "seo_about_too_long"
+    : null;
 }
 
 export function getProductFieldErrorMessage(code: string): string | null {
@@ -219,8 +256,12 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Основной поисковый запрос не должен превышать 120 символов.";
     case "seo_title_too_long":
       return "Заголовок для поиска не должен превышать 140 символов.";
+    case "seo_secondary_queries_invalid":
+      return "Добавьте до 10 непустых поисковых фраз, каждая не длиннее 120 символов.";
     case "seo_description_too_long":
       return "Описание для поиска не должно превышать 300 символов.";
+    case "seo_about_too_long":
+      return "Текст «О продукте» не должен превышать 3000 символов.";
     default:
       return null;
   }
@@ -239,8 +280,10 @@ export function getProductFieldKeyForError(
   | "listeningNoticeTitle"
   | "listeningNoticeText"
   | "seoPrimaryQuery"
+  | "seoSecondaryQueries"
   | "seoTitle"
-  | "seoDescription" {
+  | "seoDescription"
+  | "seoAbout" {
   switch (code) {
     case "title_too_long":
       return "title";
@@ -261,9 +304,13 @@ export function getProductFieldKeyForError(
       return "listeningNoticeText";
     case "seo_primary_query_too_long":
       return "seoPrimaryQuery";
+    case "seo_secondary_queries_invalid":
+      return "seoSecondaryQueries";
     case "seo_title_too_long":
       return "seoTitle";
     case "seo_description_too_long":
       return "seoDescription";
+    case "seo_about_too_long":
+      return "seoAbout";
   }
 }

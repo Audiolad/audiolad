@@ -19,6 +19,7 @@ import type {
   AuthorProductDetail,
   AudioItemRow,
 } from "@/lib/author-products/types";
+import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import {
   parseCatalogVisibility,
   type CatalogVisibility,
@@ -53,8 +54,11 @@ export type ProductFormSnapshot = {
   listeningNoticeTitle: string;
   listeningNoticeText: string;
   seoPrimaryQuery: string;
+  seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
+  seoAbout: string;
+  seoContent: PracticeSeoContentInput;
   status: string;
   moderationStatus: string;
   moderationSubmittedAt: string | null;
@@ -115,8 +119,11 @@ export function productDetailToFormSnapshot(
     listeningNoticeText:
       practice.listening_notice_text ?? listeningDefaults.listeningNoticeText,
     seoPrimaryQuery: practice.seo_primary_query ?? "",
+    seoSecondaryQueries: practice.seo_secondary_queries ?? [],
     seoTitle: practice.seo_title ?? "",
     seoDescription: practice.seo_description ?? "",
+    seoAbout: practice.seo_about ?? "",
+    seoContent: product.seo_content,
     status: practice.status,
     moderationStatus: practice.moderation_status ?? "not_submitted",
     moderationSubmittedAt: practice.moderation_submitted_at ?? null,
@@ -162,8 +169,11 @@ export function mergeServerProductIntoForm(
     listeningNoticeTitle: current.listeningNoticeTitle,
     listeningNoticeText: current.listeningNoticeText,
     seoPrimaryQuery: current.seoPrimaryQuery,
+    seoSecondaryQueries: current.seoSecondaryQueries,
     seoTitle: current.seoTitle,
     seoDescription: current.seoDescription,
+    seoAbout: current.seoAbout,
+    seoContent: current.seoContent,
     coverUrl: server.coverUrl ?? current.coverUrl,
     coverVersion: server.coverUrl ? server.coverVersion : current.coverVersion,
   };

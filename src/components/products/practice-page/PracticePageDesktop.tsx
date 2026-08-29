@@ -1,6 +1,7 @@
 import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
 
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 
@@ -19,6 +20,8 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
   const {
     practice,
     description,
+    seoAbout,
+    seoContent,
     publicAudioItems,
     listeningNotice,
     presentation,
@@ -67,6 +70,16 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             </p>
           </section>
         ) : null}
+
+        {seoAbout ? (
+          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+            <h2 className="text-lg font-semibold text-[#2b2140]">О продукте</h2>
+            <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
+              {seoAbout}
+            </p>
+          </section>
+        ) : null}
+        <PracticeSeoContentSections content={seoContent} />
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

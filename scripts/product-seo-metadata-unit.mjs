@@ -189,6 +189,13 @@ assert.match(page, /productTitle: practice\.title/);
 assert.match(page, /title: practice\.title/);
 assert.doesNotMatch(page, /seo_title as the product name/);
 assert.doesNotMatch(page, /meta keywords|metaKeywords|name:\s*"keywords"/i);
+assert.match(page, /loadPublicPracticeSeoContent/);
+assert.doesNotMatch(page, /FAQPage|QAPage/);
+
+const seoContent = read("src/components/products/PracticeSeoContentSections.tsx");
+assert.match(seoContent, /Как использовать/);
+assert.match(seoContent, /Вопросы и ответы/);
+assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
 
 const jsonLd = read("src/lib/seo/json-ld/builders.ts");
 assert.match(jsonLd, /name: input\.title/);
