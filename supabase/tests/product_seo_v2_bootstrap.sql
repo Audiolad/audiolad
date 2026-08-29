@@ -105,6 +105,7 @@ $$;
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA auth FROM PUBLIC;
+GRANT SELECT ON TABLE public.practices TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_practice_author_member(uuid, uuid)
   TO authenticated, service_role;
