@@ -20,6 +20,7 @@ import {
 } from "../src/lib/seo/product-autofill/rate-limit.ts";
 import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/select-secondaries.ts";
 import {
+  collectSeoAboutDuplicationIssues,
   expectedSecondaryRange,
   parseProductSeoAiRawDraft,
   resolveSecondaryQueryStatus,
@@ -33,7 +34,10 @@ import {
   sanitizeProductSeoStyleProfile,
   withCustomStyleSliders,
 } from "../src/lib/seo/product-autofill/style-profile.ts";
-import { buildProductSeoSystemPrompt } from "../src/lib/seo/product-autofill/prompt.ts";
+import {
+  buildProductSeoRepairPrompt,
+  buildProductSeoSystemPrompt,
+} from "../src/lib/seo/product-autofill/prompt.ts";
 import {
   hasFilledGeneratedSeoFields,
   productSeoSecondaryStatusCopy,
@@ -1077,6 +1081,80 @@ assert.doesNotMatch(form, /product-autofill|OpenAI/);
 assert.doesNotMatch(section, /TOP-5|SERP|domain authority|SEO score/i);
 assert.match(read("src/lib/seo/wordstat/client.ts"), /fetchWordstatSuggestions/);
 assert.doesNotMatch(orchestrate, /WORDSTAT_GET_TOP_URL/);
+
+const copyPrompt = buildProductSeoSystemPrompt({
+  request: requestInput(),
+  candidates: eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна"),
+});
+assert.match(
+  copyPrompt,
+  /Короткое описание продукта уже будет показано выше на публичной странице/,
+);
+assert.match(copyPrompt, /Не пересказывай и не перефразируй его/);
+assert.match(copyPrompt, /должен продолжать короткое описание/);
+assert.match(copyPrompt, /Новая полезная информация важнее длины/);
+assert.match(
+  copyPrompt,
+  /напиши более короткий блок «Подробнее о продукте»/,
+);
+
+const repairPrompt = buildProductSeoRepairPrompt(
+  {
+    request: requestInput(),
+    candidates: eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна"),
+  },
+  validDraft(),
+  ["about_duplicates_description"],
+);
+assert.match(
+  repairPrompt,
+  /Не пересказывай короткое описание. Используй его только как источник фактов и добавь новую информацию./,
+);
+
+assert.deepEqual(
+  collectSeoAboutDuplicationIssues(
+    "Мягкая медитация для сна.",
+    "Мягкая медитация для сна.",
+  ),
+  ["about_duplicates_description"],
+);
+assert.deepEqual(
+  collectSeoAboutDuplicationIssues(
+    "Мягкая медитация для сна. А вечером можно замедлиться ещё сильнее и заметить дыхание.",
+    "Мягкая медитация для сна.",
+  ),
+  ["about_starts_with_description"],
+);
+assert.deepEqual(
+  collectSeoAboutDuplicationIssues(
+    "Мягкая медитация для сна.\n\nПозже можно добавить вечерний ритуал и заметить дыхание.",
+    "Мягкая медитация для сна.\nДля тех, кто хочет спокойно завершить день.",
+  ),
+  ["about_opening_copies_description"],
+);
+assert.deepEqual(
+  collectSeoAboutDuplicationIssues(
+    "Вечерняя практика помогает замедлиться. Медитация для сна здесь звучит естественно.",
+    "Мягкая медитация для сна.",
+  ),
+  [],
+);
+
+const shortAbout = validateProductSeoAiDraft(
+  validDraft({
+    seoAbout:
+      "Вечером практика продолжает короткое описание: вы ложитесь удобно и следуете спокойному голосу, не повторяя те же фразы.",
+  }),
+  validationInput(),
+);
+assert.equal(shortAbout.ok, true, "short useful seoAbout must pass when context is thin");
+
+const exactDuplicateAbout = validateProductSeoAiDraft(
+  validDraft({ seoAbout: "Мягкая медитация для сна." }),
+  validationInput(),
+);
+assert.equal(exactDuplicateAbout.ok, false);
+assert.ok(exactDuplicateAbout.issues.includes("about_duplicates_description"));
 
 const packageJson = read("package.json");
 assert.match(packageJson, /test:product-seo-autofill/);

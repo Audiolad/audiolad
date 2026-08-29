@@ -280,6 +280,8 @@ assert.equal(
 );
 
 const formSource = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(formSource, /AUTHOR_DESCRIPTION_LABEL/);
+assert.match(formSource, /AUTHOR_DESCRIPTION_HELPER/);
 assert.match(formSource, /AuthorProductSeoSection/);
 assert.match(formSource, /seo_primary_query: form\.seoPrimaryQuery\.trim\(\) \|\| null/);
 assert.match(formSource, /seo_title: form\.seoTitle\.trim\(\) \|\| null/);
@@ -377,11 +379,12 @@ assert.ok(
   "search title comes before search description",
 );
 assert.ok(
-  openMarkup.indexOf("Описание для поиска") < openMarkup.indexOf("О продукте"),
+  openMarkup.indexOf("Описание для поиска") <
+    openMarkup.indexOf("{SEO_ABOUT_LABEL}"),
   "search description comes before about",
 );
 assert.ok(
-  openMarkup.indexOf("О продукте") <
+  openMarkup.indexOf("{SEO_ABOUT_LABEL}") <
     openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}"),
   "about comes before usage",
 );
@@ -438,7 +441,13 @@ assert.match(wordstatPicker, /запросов за последние[\s\S]*30 
 assert.match(wordstatPicker, /общая оценка темы, а не частота самой фразы/);
 assert.doesNotMatch(wordstatPicker, /конкуренция низкая|TOP-3|TOP-5|results\[|associations\[|totalCount/);
 assert.match(seoSection, /canAddSecondaryQuery/);
-assert.match(seoSection, /event\.key !== "Enter"/);
+assert.match(seoSection, /parseSeoSecondaryQueryList/);
+assert.match(seoSection, /Добавить фразы/);
+assert.match(
+  seoSection,
+  /Введите одну или несколько фраз через запятую или с новой строки/,
+);
+assert.doesNotMatch(seoSection, /event\.key !== "Enter"/);
 assert.match(seoSection, /clipSeoQuery/);
 assert.match(seoSection, /WORDSTAT_ERROR_MESSAGES/);
 assert.match(seoSection, /Подбор запросов временно недоступен|UPSTREAM_ERROR|NO_RESULTS/);

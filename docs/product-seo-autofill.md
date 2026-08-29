@@ -20,7 +20,11 @@ Do **not** paste `OPENAI_API_KEY` into GitHub issues, PRs, or chat.
    has 1–2, generation still succeeds with those phrases. If it has none,
    secondaries stay empty and the other SEO fields are still prepared.
 5. Autofill writes a local SEO draft: title, description, about, usage,
-   and exactly 3 FAQ pairs. An optional style profile changes tone, not
+   and exactly 3 FAQ pairs. Ordinary `description` stays the public short
+   product copy. `seoAbout` is «Подробнее о продукте»: a continuation, not
+   a rewrite. The model may use the short description only as a fact
+   source. If context is thin, a shorter about text is better than
+   repeating or padding. An optional style profile changes tone, not
    facts or Wordstat phrases. The search title stays SEO-first.
 6. Author reviews and edits everything.
 7. The usual product save writes the form. There is no auto-save, no

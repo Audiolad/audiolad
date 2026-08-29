@@ -210,6 +210,74 @@ function containsPrimaryInFaqQuestion(
   });
 }
 
+export function normalizeProductCopyText(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[.!?…]+$/g, "")
+    .trim();
+}
+
+function firstSubstantialParagraph(value: string): string {
+  for (const paragraph of value.split(/\n+/)) {
+    const normalized = normalizeProductCopyText(paragraph);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
+function hasWordBoundaryAfterPrefix(text: string, prefix: string): boolean {
+  if (!text.startsWith(prefix)) {
+    return false;
+  }
+
+  const rest = text.slice(prefix.length);
+  return rest === "" || /^[\s.,;:!?…"—–-]/.test(rest);
+}
+
+export function collectSeoAboutDuplicationIssues(
+  seoAbout: string,
+  description: string,
+): string[] {
+  const about = normalizeProductCopyText(seoAbout);
+  const source = normalizeProductCopyText(description);
+  if (!about || !source) {
+    return [];
+  }
+
+  const issues: string[] = [];
+  if (about === source) {
+    issues.push("about_duplicates_description");
+  }
+
+  if (
+    about !== source &&
+    hasWordBoundaryAfterPrefix(about, source)
+  ) {
+    issues.push("about_starts_with_description");
+  }
+
+  const aboutOpening = firstSubstantialParagraph(seoAbout);
+  const descriptionOpening = firstSubstantialParagraph(description);
+  if (
+    aboutOpening &&
+    (aboutOpening === source || aboutOpening === descriptionOpening)
+  ) {
+    if (
+      !issues.includes("about_duplicates_description") &&
+      !issues.includes("about_starts_with_description")
+    ) {
+      issues.push("about_opening_copies_description");
+    }
+  }
+
+  return issues;
+}
+
 function uniqueAnchors(faqItems: ProductSeoAiRawDraft["faqItems"]): boolean {
   const anchors = faqItems
     .map((item) => item.anchor.trim().toLocaleLowerCase())
@@ -320,6 +388,10 @@ export function validateProductSeoAiDraft(
   if (seoAbout.length > PRODUCT_SEO_ABOUT_SOFT_MAX + 400) {
     issues.push("about_far_over_soft_max");
   }
+
+  issues.push(
+    ...collectSeoAboutDuplicationIssues(seoAbout, input.description),
+  );
 
   const substantialStart = seoAbout.slice(0, 250);
   if (

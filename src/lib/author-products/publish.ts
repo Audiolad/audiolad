@@ -25,6 +25,10 @@ import {
 } from "./product-kind";
 import { minutesFromSeconds } from "./utils";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
+import {
+  AUTHOR_DESCRIPTION_LABEL,
+  AUTHOR_DESCRIPTION_MISSING_MESSAGE,
+} from "@/lib/products/product-copy";
 import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 
@@ -252,7 +256,7 @@ function buildCorePublishRequirements(
     !isAudioPost && !practice.description?.trim()
       ? {
           code: "missing_description",
-          message: "Добавьте описание аудиопродукта.",
+          message: AUTHOR_DESCRIPTION_MISSING_MESSAGE,
         }
       : null;
 
@@ -365,7 +369,7 @@ function buildCorePublishRequirements(
     requirement("author", "Авторское пространство", authorFailure),
     requirement("title", "Название", titleFailure),
     requirement("slug", "Адрес", slugFailure),
-    requirement("description", "Описание", descriptionFailure),
+    requirement("description", AUTHOR_DESCRIPTION_LABEL, descriptionFailure),
     requirement("format", "Формат", formatFailure),
     requirement("cover", "Обложка", coverFailure),
     requirement("audio", "Аудиозапись", audioFailure),

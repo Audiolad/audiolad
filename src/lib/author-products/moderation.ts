@@ -12,6 +12,7 @@ import {
   formatMissingCourseFileMessage,
 } from "@/lib/author-products/course-builder-shared";
 import type { PracticeRow } from "@/lib/author-products/types";
+import { AUTHOR_DESCRIPTION_MISSING_MESSAGE } from "@/lib/products/product-copy";
 import { hasPermission } from "@/lib/auth/platform-access";
 
 export const MODERATION_STATUS = {
@@ -408,7 +409,7 @@ export function mapProductNotReadyUserMessage(
     case "missing_title":
       return { code: detail, message: "Укажите название аудиопродукта." };
     case "missing_description":
-      return { code: detail, message: "Добавьте описание аудиопродукта." };
+      return { code: detail, message: AUTHOR_DESCRIPTION_MISSING_MESSAGE };
     case "slug_required":
       return { code: detail, message: "Укажите адрес аудиопродукта." };
     case "invalid_slug":

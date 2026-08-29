@@ -179,6 +179,14 @@ const readiness = evaluateProductSeoReadiness({
 });
 assert.equal(readiness.total, 8);
 assert.equal(readiness.doneCount, 4);
+assert.equal(
+  readiness.checks.find((check) => check.id === "substantial_description")?.label,
+  "Короткое описание продукта достаточно подробное",
+);
+assert.equal(
+  readiness.checks.find((check) => check.id === "about")?.label,
+  "Заполнен блок «Подробнее о продукте»",
+);
 
 const page = read(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",

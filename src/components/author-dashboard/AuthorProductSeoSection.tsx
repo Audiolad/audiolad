@@ -12,9 +12,18 @@ import {
   evaluateProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
 import {
+  SEO_ABOUT_AUTOFILL_HINT,
+  SEO_ABOUT_HELPER,
+  SEO_ABOUT_LABEL,
+} from "@/lib/products/product-copy";
+import {
   getPracticeSeoUsageHeading,
   type PracticeSeoContentInput,
 } from "@/lib/products/practice-seo-content";
+import {
+  formatSeoSecondaryQueryBulkMessage,
+  parseSeoSecondaryQueryList,
+} from "@/lib/seo/secondary-query-list";
 import {
   canAddSecondaryQuery,
   clipSeoQuery,
@@ -146,6 +155,10 @@ export default function AuthorProductSeoSection({
   );
   const [secondaryQueryStatus, setSecondaryQueryStatus] =
     useState<ProductSeoSecondaryQueryStatus | null>(null);
+  const [secondaryDraft, setSecondaryDraft] = useState("");
+  const [secondaryBulkMessage, setSecondaryBulkMessage] = useState<string | null>(
+    null,
+  );
   const displayedRelatedProducts = relatedProductSourceId
     ? searchedRelatedProducts
     : relatedProductOptions;
@@ -231,6 +244,18 @@ export default function AuthorProductSeoSection({
     }
 
     onChange({ seoSecondaryQueries: result.next });
+  }
+
+  function addSecondaryPhrasesFromDraft() {
+    const result = parseSeoSecondaryQueryList(secondaryDraft, {
+      existing: seoSecondaryQueries,
+      primaryQuery: seoPrimaryQuery,
+    });
+    if (result.added.length > 0) {
+      onChange({ seoSecondaryQueries: result.next });
+      setSecondaryDraft("");
+    }
+    setSecondaryBulkMessage(formatSeoSecondaryQueryBulkMessage(result));
   }
 
   function applyGeneratedDraft(draft: {
@@ -635,22 +660,34 @@ export default function AuthorProductSeoSection({
           ))}
         </div>
         {secondariesFull ? null : (
-          <input
-            aria-label="Новая дополнительная поисковая фраза"
-            disabled={disabled}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              const value = event.currentTarget.value.trim();
-              const result = canAddSecondaryQuery(value, seoSecondaryQueries);
-              if (!result.ok) return;
-              onChange({ seoSecondaryQueries: result.next });
-              event.currentTarget.value = "";
-            }}
-            className="mt-2 w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder="Введите фразу и нажмите Enter"
-          />
+          <div className="mt-2">
+            <textarea
+              aria-label="Дополнительные поисковые фразы"
+              disabled={disabled}
+              value={secondaryDraft}
+              onChange={(event) => {
+                setSecondaryDraft(event.target.value);
+                setSecondaryBulkMessage(null);
+              }}
+              rows={3}
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+              placeholder="Введите одну или несколько фраз через запятую или с новой строки"
+            />
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={addSecondaryPhrasesFromDraft}
+              className="mt-2 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Добавить фразы
+            </button>
+          </div>
         )}
+        {secondaryBulkMessage ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {secondaryBulkMessage}
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={disabled}
@@ -744,7 +781,7 @@ export default function AuthorProductSeoSection({
       </label>
 
       <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
-        <span className="mb-2 block text-sm font-medium">О продукте</span>
+        <span className="mb-2 block text-sm font-medium">{SEO_ABOUT_LABEL}</span>
         <textarea
           value={seoAbout}
           maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
@@ -754,13 +791,10 @@ export default function AuthorProductSeoSection({
           className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Дополнительный публичный текст для страницы продукта. Расскажите в 2–4
-          небольших абзацах: что это за продукт, для какой ситуации он создан,
-          что происходит во время прослушивания и чем он полезен.
+          {SEO_ABOUT_HELPER}
         </p>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-          Не копируйте дословно основное описание. Используйте поисковые фразы
-          только там, где они звучат естественно.
+          {SEO_ABOUT_AUTOFILL_HINT}
         </p>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
           Ориентир: 500–1500 символов.
