@@ -8,40 +8,28 @@ DO $$
 DECLARE
   v_owner_id uuid := 'be910001-0000-4000-8000-000000000001';
   v_other_id uuid := 'be910002-0000-4000-8000-000000000002';
-  v_author_id uuid;
-  v_practice_id uuid;
-  v_target_id uuid;
+  v_author_id uuid := 'be910010-0000-4000-8000-000000000010';
+  v_practice_id uuid := 'be910011-0000-4000-8000-000000000011';
+  v_target_id uuid := 'be910012-0000-4000-8000-000000000012';
   v_count integer;
 BEGIN
-  INSERT INTO auth.users (
-    id, instance_id, aud, role, email, encrypted_password,
-    email_confirmed_at, created_at, updated_at,
-    confirmation_token, recovery_token, email_change_token_new, email_change
-  )
+  INSERT INTO auth.users (id, email)
   VALUES
-    (v_owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-      'product.seo.owner@example.com', crypt('test-password', gen_salt('bf')),
-      now(), now(), now(), '', '', '', ''),
-    (v_other_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-      'product.seo.other@example.com', crypt('test-password', gen_salt('bf')),
-      now(), now(), now(), '', '', '', '')
-  ON CONFLICT (id) DO NOTHING;
+    (v_owner_id, 'product.seo.owner@example.test'),
+    (v_other_id, 'product.seo.other@example.test');
 
-  INSERT INTO public.authors (name, slug, author_type, access_status)
-  VALUES ('Product SEO isolated', 'product-seo-isolated-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12), 'person', 'free')
-  RETURNING id INTO v_author_id;
+  INSERT INTO public.authors (id, name, slug, author_type, access_status)
+  VALUES (v_author_id, 'Product SEO isolated', 'product-seo-isolated', 'person', 'free');
 
   INSERT INTO public.practices (
-    author_id, title, slug, status, is_free, price, is_catalog_listed, catalog_visibility
+    id, author_id, title, slug, status, is_free, price, is_catalog_listed, catalog_visibility
   )
-  VALUES (v_author_id, 'Product SEO source', 'product-seo-source-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12), 'published', true, 0, true, 'listed')
-  RETURNING id INTO v_practice_id;
+  VALUES (v_practice_id, v_author_id, 'Product SEO source', 'product-seo-source', 'published', true, 0, true, 'listed');
 
   INSERT INTO public.practices (
-    author_id, title, slug, status, is_free, price, is_catalog_listed, catalog_visibility
+    id, author_id, title, slug, status, is_free, price, is_catalog_listed, catalog_visibility
   )
-  VALUES (v_author_id, 'Product SEO target', 'product-seo-target-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12), 'published', true, 0, true, 'listed')
-  RETURNING id INTO v_target_id;
+  VALUES (v_target_id, v_author_id, 'Product SEO target', 'product-seo-target', 'published', true, 0, true, 'listed');
 
   INSERT INTO public.author_members (author_id, user_id, role)
   VALUES (v_author_id, v_owner_id, 'owner');
@@ -53,7 +41,7 @@ BEGIN
     v_practice_id,
     '[{"content":"Original saved item"}]'::jsonb,
     '[]'::jsonb,
-    '[]'::jsonb,
+    jsonb_build_array(v_target_id::text),
     '[]'::jsonb
   );
   RESET ROLE;
@@ -64,6 +52,28 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'authenticated owner RPC did not save child content';
   END IF;
+
+  EXECUTE 'SET LOCAL ROLE anon';
+  SELECT count(*) INTO v_count
+  FROM public.practice_related_products
+  WHERE practice_id = v_practice_id AND related_practice_id = v_target_id;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'public relation visibility did not expose two listed practices';
+  END IF;
+  RESET ROLE;
+
+  UPDATE public.practices SET is_catalog_listed = false
+  WHERE id = v_target_id;
+  EXECUTE 'SET LOCAL ROLE anon';
+  SELECT count(*) INTO v_count
+  FROM public.practice_related_products
+  WHERE practice_id = v_practice_id AND related_practice_id = v_target_id;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'public relation visibility exposed a non-listed related practice';
+  END IF;
+  RESET ROLE;
+  UPDATE public.practices SET is_catalog_listed = true
+  WHERE id = v_target_id;
 
   PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner_id, 'role', 'authenticated')::text, true);
