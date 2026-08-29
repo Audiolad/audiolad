@@ -4,6 +4,21 @@ BEGIN;
 -- reorder individual entries without rewriting a JSON document. No backfill:
 -- NULL/empty related rows retain current public-page behaviour.
 
+CREATE OR REPLACE FUNCTION public.valid_practice_seo_secondary_queries(p_values text[])
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT cardinality(p_values) <= 10
+    AND NOT EXISTS (
+      SELECT 1
+      FROM unnest(p_values) AS value
+      WHERE NULLIF(btrim(value), '') IS NULL
+         OR char_length(btrim(value)) > 120
+    );
+$$;
+
 ALTER TABLE public.practices
   ADD COLUMN IF NOT EXISTS seo_about text,
   ADD COLUMN IF NOT EXISTS seo_secondary_queries text[];
@@ -15,7 +30,7 @@ ALTER TABLE public.practices
   ADD CONSTRAINT practices_seo_secondary_queries_count_check
   CHECK (
     seo_secondary_queries IS NULL
-    OR cardinality(seo_secondary_queries) <= 10
+    OR public.valid_practice_seo_secondary_queries(seo_secondary_queries)
   );
 
 ALTER TABLE public.practices
@@ -23,6 +38,16 @@ ALTER TABLE public.practices
 ALTER TABLE public.practices
   ADD CONSTRAINT practices_seo_about_length_check
   CHECK (seo_about IS NULL OR char_length(btrim(seo_about)) <= 3000);
+
+ALTER TABLE public.practices
+  DROP CONSTRAINT IF EXISTS practices_seo_scalar_length_check;
+ALTER TABLE public.practices
+  ADD CONSTRAINT practices_seo_scalar_length_check
+  CHECK (
+    (seo_primary_query IS NULL OR char_length(btrim(seo_primary_query)) <= 120)
+    AND (seo_title IS NULL OR char_length(btrim(seo_title)) <= 140)
+    AND (seo_description IS NULL OR char_length(btrim(seo_description)) <= 300)
+  );
 
 COMMENT ON COLUMN public.practices.seo_about IS
   'Optional extended SEO about text for a public product page. NULL preserves existing rendering.';
@@ -463,6 +488,7 @@ REVOKE INSERT, UPDATE, DELETE ON TABLE public.practice_related_products FROM aut
 REVOKE INSERT, UPDATE, DELETE ON TABLE public.practice_related_listens FROM authenticated;
 
 REVOKE ALL ON FUNCTION public.set_practice_seo_item_updated_at() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.valid_practice_seo_secondary_queries(text[]) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.enforce_practice_seo_usage_item_limit() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.enforce_practice_seo_faq_item_limit() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.validate_practice_related_product() FROM PUBLIC;
@@ -471,6 +497,7 @@ REVOKE ALL ON FUNCTION public.is_public_listed_practice(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.replace_practice_seo_content(uuid, jsonb, jsonb, jsonb, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.can_manage_practice_seo(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_public_listed_practice(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.valid_practice_seo_secondary_queries(text[]) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.replace_practice_seo_content(uuid, jsonb, jsonb, jsonb, jsonb) TO authenticated, service_role;
 
 COMMIT;

@@ -74,7 +74,7 @@ BEGIN
   END LOOP;
 
   IF position(
-    'cardinality(seo_secondary_queries) <= 10'
+    'valid_practice_seo_secondary_queries'
     IN pg_get_constraintdef(
       (
         SELECT oid FROM pg_constraint
@@ -83,7 +83,7 @@ BEGIN
       )
     )
   ) = 0 THEN
-    RAISE EXCEPTION 'secondary-query database cap is not 10';
+    RAISE EXCEPTION 'secondary-query database validation is missing';
   END IF;
 
   FOREACH v_policy IN ARRAY ARRAY[
