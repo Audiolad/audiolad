@@ -53,6 +53,15 @@ BEGIN
     RAISE EXCEPTION 'authenticated owner RPC did not save child content';
   END IF;
 
+  BEGIN
+    UPDATE public.practices
+    SET seo_secondary_queries = ARRAY['Breathing', ' breathing ']
+    WHERE id = v_practice_id;
+    RAISE EXCEPTION 'duplicate secondary SEO queries unexpectedly succeeded';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
   EXECUTE 'SET LOCAL ROLE anon';
   SELECT count(*) INTO v_count
   FROM public.practice_related_products
@@ -82,6 +91,16 @@ BEGIN
     INSERT INTO public.practice_seo_usage_items (practice_id, content, position)
     VALUES (v_practice_id, 'Direct DML must fail', 1);
     RAISE EXCEPTION 'authenticated direct child DML unexpectedly succeeded';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  RESET ROLE;
+
+  EXECUTE 'SET LOCAL ROLE anon';
+  BEGIN
+    INSERT INTO public.practice_seo_usage_items (practice_id, content, position)
+    VALUES (v_practice_id, 'Anonymous direct DML must fail', 1);
+    RAISE EXCEPTION 'anon direct child DML unexpectedly succeeded';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
