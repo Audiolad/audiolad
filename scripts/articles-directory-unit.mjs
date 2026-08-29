@@ -119,6 +119,7 @@ import { GADANIE_TARO_NA_BIZNES_PAGE } from "../src/lib/seo/listens/content/gada
 import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-pro-biznes.ts";
 import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota-i-biznes-taro.ts";
 import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-biznes-i-dengi.ts";
+import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes-i-dengi.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2739,6 +2740,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetySecondListenHref}`),
     "directory JSON-LD includes ninety-second listen href",
+  );
+
+  const ninetyThirdListenHref = "/listens/rasklad-taro-na-biznes-i-dengi";
+  const ninetyThirdListenCard = data.articles.find((card) => card.href === ninetyThirdListenHref);
+  assert(ninetyThirdListenCard, "ninety-third indexable listen page is listed");
+  assert(
+    ninetyThirdListenCard.title === "Расклад Таро на бизнес и деньги – схема на 7 карт | АудиоЛад",
+    "ninety-third listen directory title",
+  );
+  assert(
+    ninetyThirdListenCard.description === RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE.description,
+    "ninety-third listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/rasklad-taro-na-biznes-i-dengi"),
+    "no /articles duplicate for ninety-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyThirdListenHref}`),
+    "directory JSON-LD includes ninety-third listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
