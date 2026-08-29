@@ -1,4 +1,5 @@
 import {
+  YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS,
   YANDEX_WEBMASTER_TIMEOUT_MS,
   buildYandexRecrawlQueueUrl,
   buildYandexRecrawlQuotaUrl,
@@ -10,6 +11,9 @@ import {
 
 export type YandexRecrawlErrorCode =
   | "auth_failed"
+  | "invalid_user_id"
+  | "host_not_verified"
+  | "already_queued"
   | "timeout"
   | "network"
   | "http_error"
@@ -30,6 +34,7 @@ export type YandexRecrawlHttpResult = {
   accepted: boolean;
   retried: boolean;
   errorCode?: YandexRecrawlErrorCode;
+  apiErrorCode?: string | null;
   taskId?: string | null;
   quotaRemainder?: number | null;
   dailyQuota?: number | null;
@@ -101,28 +106,84 @@ async function parseJsonBody(response: Response): Promise<Record<string, unknown
   }
 }
 
-function classifyHttpError(status: number | null): YandexRecrawlErrorCode {
+export function readYandexApiErrorCode(
+  body: Record<string, unknown> | null,
+): string | null {
+  return readStringField(body, ["error_code", "errorCode"]);
+}
+
+/**
+ * Classify an official Webmaster HTTP response. Never logs or returns the token.
+ */
+export function classifyYandexWebmasterError(
+  status: number | null,
+  body: Record<string, unknown> | null,
+  requestError?: YandexRecrawlErrorCode,
+): YandexRecrawlErrorCode {
+  if (requestError === "timeout" || requestError === "network") {
+    return requestError;
+  }
+
+  const apiErrorCode = readYandexApiErrorCode(body);
+
   if (status === 401) {
     return "auth_failed";
+  }
+
+  if (status === 403 && apiErrorCode === "INVALID_USER_ID") {
+    return "invalid_user_id";
+  }
+
+  if (status === 403) {
+    return "auth_failed";
+  }
+
+  if (status === 404 && apiErrorCode === "HOST_NOT_VERIFIED") {
+    return "host_not_verified";
+  }
+
+  if (status === 409 && apiErrorCode === "URL_ALREADY_ADDED") {
+    return "already_queued";
+  }
+
+  if (status === 429 && (apiErrorCode === "QUOTA_EXCEEDED" || !apiErrorCode)) {
+    return "quota_exhausted";
+  }
+
+  if (status === 400 && (apiErrorCode === "INVALID_URL" || !apiErrorCode)) {
+    return "invalid_url";
   }
 
   return "http_error";
 }
 
-function shouldRetry(result: YandexRecrawlHttpResult): boolean {
-  if (result.errorCode === "timeout" || result.errorCode === "network") {
+function isTransientWebmasterFailure(
+  errorCode: YandexRecrawlErrorCode | undefined,
+  status: number | null,
+): boolean {
+  if (errorCode === "timeout" || errorCode === "network") {
     return true;
   }
 
-  if (result.status === 429) {
-    return true;
+  return typeof status === "number" && status >= 500;
+}
+
+function classifyPostResponse(
+  status: number | null,
+  body: Record<string, unknown> | null,
+  requestError?: YandexRecrawlErrorCode,
+): Pick<YandexRecrawlHttpResult, "ok" | "accepted" | "errorCode"> {
+  if (typeof status === "number" && isYandexRecrawlAcceptedStatus(status)) {
+    return { ok: true, accepted: true };
   }
 
-  if (typeof result.status === "number" && result.status >= 500) {
-    return true;
+  const errorCode = classifyYandexWebmasterError(status, body, requestError);
+
+  if (errorCode === "already_queued") {
+    return { ok: true, accepted: false, errorCode };
   }
 
-  return false;
+  return { ok: false, accepted: false, errorCode };
 }
 
 async function requestOnce(
@@ -156,13 +217,17 @@ async function requestOnce(
       signal: controller.signal,
     });
 
+    const body = await parseJsonBody(response);
+
     return {
       status: response.status,
-      body: await parseJsonBody(response),
+      body,
       errorCode:
-        response.ok || isYandexRecrawlAcceptedStatus(response.status)
+        response.status === 200 ||
+        (init.method === "POST" &&
+          response.status === YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS)
           ? undefined
-          : classifyHttpError(response.status),
+          : classifyYandexWebmasterError(response.status, body),
     };
   } catch (error) {
     const name =
@@ -192,8 +257,38 @@ export function parseYandexRecrawlQuota(body: unknown): YandexRecrawlQuota {
   };
 }
 
+function toQuotaResult(
+  response: {
+    status: number | null;
+    errorCode?: YandexRecrawlErrorCode;
+    body: Record<string, unknown> | null;
+  },
+  retried: boolean,
+): YandexRecrawlHttpResult {
+  const quota = parseYandexRecrawlQuota(response.body);
+  const ok = response.status === 200;
+
+  return {
+    ok,
+    status: response.status,
+    accepted: ok,
+    retried,
+    errorCode: ok
+      ? undefined
+      : classifyYandexWebmasterError(
+          response.status,
+          response.body,
+          response.errorCode,
+        ),
+    apiErrorCode: readYandexApiErrorCode(response.body),
+    dailyQuota: quota.dailyQuota,
+    quotaRemainder: quota.quotaRemainder,
+  };
+}
+
 /**
  * GET /recrawl/quota. Never throws. Does not return the token.
+ * Auth/config errors stay distinct. Only transient 5xx / network / timeout retry once.
  */
 export async function checkYandexRecrawlQuota(
   options: YandexWebmasterClientOptions = {},
@@ -225,21 +320,10 @@ export async function checkYandexRecrawlQuota(
     fetchImpl,
     timeoutMs,
   });
+  const firstResult = toQuotaResult(first, false);
 
-  const firstResult: YandexRecrawlHttpResult = {
-    ok: first.status === 200,
-    status: first.status,
-    accepted: first.status === 200,
-    retried: false,
-    errorCode: first.status === 200 ? undefined : first.errorCode ?? "quota_check_failed",
-    dailyQuota: parseYandexRecrawlQuota(first.body).dailyQuota,
-    quotaRemainder: parseYandexRecrawlQuota(first.body).quotaRemainder,
-  };
-
-  if (firstResult.ok || !shouldRetry(firstResult)) {
-    return firstResult.ok
-      ? firstResult
-      : { ...firstResult, errorCode: "quota_check_failed" };
+  if (firstResult.ok || !isTransientWebmasterFailure(firstResult.errorCode, firstResult.status)) {
+    return firstResult;
   }
 
   await sleepImpl(400);
@@ -250,23 +334,29 @@ export async function checkYandexRecrawlQuota(
     fetchImpl,
     timeoutMs,
   });
-  const quota = parseYandexRecrawlQuota(second.body);
+  const secondResult = toQuotaResult(second, true);
+
+  if (secondResult.ok) {
+    return secondResult;
+  }
+
+  if (
+    secondResult.errorCode === "auth_failed" ||
+    secondResult.errorCode === "invalid_user_id" ||
+    secondResult.errorCode === "host_not_verified"
+  ) {
+    return secondResult;
+  }
 
   return {
-    ok: second.status === 200,
-    status: second.status,
-    accepted: second.status === 200,
-    retried: true,
-    errorCode:
-      second.status === 200 ? undefined : "quota_check_failed",
-    dailyQuota: quota.dailyQuota,
-    quotaRemainder: quota.quotaRemainder,
+    ...secondResult,
+    errorCode: "quota_check_failed",
   };
 }
 
 /**
  * POST /recrawl/queue after a successful quota check.
- * Retries once on 429 / 5xx / timeout / network. Never throws.
+ * Retries at most once on 5xx / timeout / network. Never throws.
  * Token never appears in the returned result.
  */
 export async function submitYandexRecrawl(
@@ -305,7 +395,8 @@ export async function submitYandexRecrawl(
       status: quota.status,
       accepted: false,
       retried: quota.retried,
-      errorCode: "quota_check_failed",
+      errorCode: quota.errorCode ?? "quota_check_failed",
+      apiErrorCode: quota.apiErrorCode ?? null,
       dailyQuota: quota.dailyQuota,
       quotaRemainder: quota.quotaRemainder,
     };
@@ -338,18 +429,18 @@ export async function submitYandexRecrawl(
     fetchImpl,
     timeoutMs,
   });
-
-  const firstAccepted =
-    typeof first.status === "number" &&
-    isYandexRecrawlAcceptedStatus(first.status);
+  const firstClassified = classifyPostResponse(
+    first.status,
+    first.body,
+    first.errorCode,
+  );
   const firstResult: YandexRecrawlHttpResult = {
-    ok: firstAccepted,
+    ok: firstClassified.ok,
     status: first.status,
-    accepted: firstAccepted,
+    accepted: firstClassified.accepted,
     retried: false,
-    errorCode: firstAccepted
-      ? undefined
-      : first.errorCode ?? classifyHttpError(first.status),
+    errorCode: firstClassified.errorCode,
+    apiErrorCode: readYandexApiErrorCode(first.body),
     taskId: readStringField(first.body, ["task_id", "taskId"]),
     quotaRemainder:
       readNumberField(first.body, ["quota_remainder", "quotaRemainder"]) ??
@@ -357,7 +448,11 @@ export async function submitYandexRecrawl(
     dailyQuota: quota.dailyQuota,
   };
 
-  if (firstResult.ok || !shouldRetry(firstResult)) {
+  if (
+    firstResult.ok ||
+    firstResult.errorCode === "already_queued" ||
+    !isTransientWebmasterFailure(firstResult.errorCode, firstResult.status)
+  ) {
     return firstResult;
   }
 
@@ -370,18 +465,19 @@ export async function submitYandexRecrawl(
     fetchImpl,
     timeoutMs,
   });
-  const secondAccepted =
-    typeof second.status === "number" &&
-    isYandexRecrawlAcceptedStatus(second.status);
+  const secondClassified = classifyPostResponse(
+    second.status,
+    second.body,
+    second.errorCode,
+  );
 
   return {
-    ok: secondAccepted,
+    ok: secondClassified.ok,
     status: second.status,
-    accepted: secondAccepted,
+    accepted: secondClassified.accepted,
     retried: true,
-    errorCode: secondAccepted
-      ? undefined
-      : second.errorCode ?? classifyHttpError(second.status),
+    errorCode: secondClassified.errorCode,
+    apiErrorCode: readYandexApiErrorCode(second.body),
     taskId: readStringField(second.body, ["task_id", "taskId"]),
     quotaRemainder:
       readNumberField(second.body, ["quota_remainder", "quotaRemainder"]) ??

@@ -2599,6 +2599,7 @@ export default function AuthorProductForm({
             seoTitle: fieldErrors.seoTitle,
             seoDescription: fieldErrors.seoDescription,
           }}
+          disabled={!canEditPublicFields || busy}
           onChange={(patch) => {
             setFieldErrors((current) => ({
               ...current,

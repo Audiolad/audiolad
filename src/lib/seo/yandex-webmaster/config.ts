@@ -11,12 +11,13 @@ export const YANDEX_WEBMASTER_API_ORIGIN = "https://api.webmaster.yandex.net";
 export const YANDEX_WEBMASTER_TIMEOUT_MS = 5_000;
 
 /**
- * Official documented success for POST /recrawl/queue is 202 ACCEPTED.
- * 200/201 are accepted as extra HTTP success if the API ever returns them.
+ * Official documented success for POST /recrawl/queue is 202 ACCEPTED only.
+ * Unexpected 200/201 must not be treated as a documented accepted response.
+ * GET /recrawl/quota still expects 200 OK.
  * Source: https://yandex.com/dev/webmaster/doc/en/reference/host-recrawl-post
  */
 export const YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS = 202;
-export const YANDEX_RECRAWL_ACCEPTED_STATUSES = [200, 201, 202] as const;
+export const YANDEX_RECRAWL_ACCEPTED_STATUSES = [202] as const;
 
 export type YandexWebmasterConfig = {
   enabledFlag: boolean;
@@ -105,10 +106,9 @@ export function getYandexWebmasterConfig(
   };
 }
 
+/** True only for the documented POST /recrawl/queue success status (202). */
 export function isYandexRecrawlAcceptedStatus(status: number): boolean {
-  return (YANDEX_RECRAWL_ACCEPTED_STATUSES as readonly number[]).includes(
-    status,
-  );
+  return status === YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS;
 }
 
 export function buildYandexRecrawlQuotaUrl(input: {

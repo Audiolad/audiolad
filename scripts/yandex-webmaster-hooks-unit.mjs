@@ -65,6 +65,15 @@ assert.equal(
 const publishRoute = read("src/app/api/author/products/[id]/publish/route.ts");
 assert.match(publishRoute, /schedulePracticePublishedSearchNotifications/);
 assert.match(publishRoute, /publishPracticeProduct/);
+assert.match(
+  publishRoute,
+  /publishPracticeProduct[\s\S]*schedulePracticePublishedSearchNotifications[\s\S]*NextResponse\.json/,
+);
+assert.doesNotMatch(
+  publishRoute,
+  /scheduleIndexNowNotification/,
+  "publish must not call IndexNow directly in addition to the shared helper",
+);
 
 const adminActions = read(
   "src/app/(platform)/admin/product-moderation/actions.ts",
@@ -75,6 +84,16 @@ assert.match(
   adminActions,
   /approveAndPublishPractice[\s\S]*schedulePracticePublishedSearchNotifications/,
 );
+assert.doesNotMatch(
+  adminActions,
+  /scheduleIndexNowNotification/,
+  "admin approve must not call IndexNow directly in addition to the shared helper",
+);
+
+const helper = read("src/lib/seo/practice-publish-notifications.ts");
+assert.match(helper, /scheduleIndexNowNotification/);
+assert.match(helper, /scheduleYandexRecrawlNotification/);
+assert.match(helper, /Fail-open/);
 
 const patchRoute = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patchRoute, /planPracticeYandexRecrawl/);

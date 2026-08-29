@@ -37,6 +37,7 @@ export type AuthorProductSeoSectionProps = {
       seoDescription: string;
     }>,
   ) => void;
+  disabled?: boolean;
 };
 
 export default function AuthorProductSeoSection({
@@ -50,6 +51,7 @@ export default function AuthorProductSeoSection({
   publicPath,
   fieldErrors,
   onChange,
+  disabled = false,
 }: AuthorProductSeoSectionProps) {
   const seoInput = {
     title,
@@ -97,10 +99,11 @@ export default function AuthorProductSeoSection({
         <input
           value={seoPrimaryQuery}
           maxLength={PRODUCT_CONTENT_LIMITS.seoPrimaryQuery}
+          disabled={disabled}
           onChange={(event) =>
             onChange({ seoPrimaryQuery: event.target.value })
           }
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
           placeholder="Например: медитация для сна"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
@@ -128,8 +131,9 @@ export default function AuthorProductSeoSection({
         <input
           value={seoTitle}
           maxLength={PRODUCT_CONTENT_LIMITS.seoTitle}
+          disabled={disabled}
           onChange={(event) => onChange({ seoTitle: event.target.value })}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
           placeholder={preview.title}
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
@@ -152,11 +156,12 @@ export default function AuthorProductSeoSection({
         <textarea
           value={seoDescription}
           maxLength={PRODUCT_CONTENT_LIMITS.seoDescription}
+          disabled={disabled}
           onChange={(event) =>
             onChange({ seoDescription: event.target.value })
           }
           rows={4}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Коротко объясните, что получит слушатель. Если оставить пустым,

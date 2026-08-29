@@ -90,8 +90,8 @@ function configOptions() {
 
 assert.equal(YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS, 202);
 assert.equal(isYandexRecrawlAcceptedStatus(202), true);
-assert.equal(isYandexRecrawlAcceptedStatus(200), true);
-assert.equal(isYandexRecrawlAcceptedStatus(201), true);
+assert.equal(isYandexRecrawlAcceptedStatus(200), false);
+assert.equal(isYandexRecrawlAcceptedStatus(201), false);
 assert.equal(isYandexRecrawlAcceptedStatus(401), false);
 
 withEnv(productionGateEnv({ YANDEX_WEBMASTER_RECRAWL_ENABLED: "false" }), () => {
@@ -298,29 +298,163 @@ await withEnvAsync(productionGateEnv(), async () => {
   assert.doesNotMatch(fetchImpl.calls[0].url, /recrawl\/queue$/);
 });
 
-for (const status of [200, 201, 202]) {
-  await withEnvAsync(productionGateEnv(), async () => {
-    const fetchImpl = mockFetch([
-      () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
-      () => jsonResponse(status, { task_id: `task-${status}` }),
-    ]);
-    const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
-    assert.equal(result.ok, true, `${status} should be accepted`);
-    assert.equal(result.status, status);
-  });
-}
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(200, { task_id: "task-200" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false, "POST 200 is not a documented accepted response");
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "http_error");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+});
 
 await withEnvAsync(productionGateEnv(), async () => {
   const fetchImpl = mockFetch([
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
-    () => jsonResponse(401, { error_code: "INVALID_USER_ID" }),
+    () => jsonResponse(201, { task_id: "task-201" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false, "POST 201 is not a documented accepted response");
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "http_error");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const logs = [];
+  const original = console.info;
+  console.info = (...args) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const fetchImpl = mockFetch([
+      () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+      () =>
+        jsonResponse(409, {
+          error_code: "URL_ALREADY_ADDED",
+          error_message: "URL is already in the recrawl queue",
+        }),
+    ]);
+    const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      fetchImpl,
+      sleepImpl: async () => {},
+    });
+    assert.equal(result.status, "already_queued");
+    assert.equal(result.http?.errorCode, "already_queued");
+    assert.equal(result.http?.retried, false);
+    assert.equal(result.http?.accepted, false);
+    assert.notEqual(result.status, "failed");
+    assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+    assert.match(logs.join("\n"), /\[yandex-webmaster\] already_queued/);
+    assert.doesNotMatch(logs.join("\n"), /\[yandex-webmaster\] failed/);
+    assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
+  } finally {
+    console.info = original;
+  }
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 1 }),
+    () => jsonResponse(429, { error_code: "QUOTA_EXCEEDED" }),
+    () => jsonResponse(202, { task_id: "must-not-retry" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "quota_exhausted");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(401, { error_code: "INVALID_OAUTH_TOKEN" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "auth_failed");
+  assert.notEqual(result.errorCode, "quota_check_failed");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.doesNotMatch(fetchImpl.calls[0].url, /recrawl\/queue$/);
+  assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(403, { error_code: "INVALID_USER_ID" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "invalid_user_id");
+  assert.notEqual(result.errorCode, "quota_check_failed");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(404, { error_code: "HOST_NOT_VERIFIED" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "host_not_verified");
+  assert.notEqual(result.errorCode, "quota_check_failed");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(401, { error_code: "INVALID_OAUTH_TOKEN" }),
   ]);
   const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "auth_failed");
   assert.equal(result.retried, false);
-  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
   assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(403, { error_code: "INVALID_USER_ID" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "invalid_user_id");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(404, { error_code: "HOST_NOT_VERIFIED" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "host_not_verified");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(400, { error_code: "INVALID_URL" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "invalid_url");
+  assert.equal(result.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
 });
 
 await withEnvAsync(productionGateEnv(), async () => {
@@ -329,10 +463,13 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(429, { error_code: "QUOTA_EXCEEDED" }),
     () => jsonResponse(202, { task_id: "after-429" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
-  assert.equal(result.ok, true);
-  assert.equal(result.retried, true);
-  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
+  const notifyResult = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+    fetchImpl,
+    sleepImpl: async () => {},
+  });
+  assert.equal(notifyResult.status, "quota_exhausted");
+  assert.equal(notifyResult.http?.retried, false);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
 });
 
 await withEnvAsync(productionGateEnv(), async () => {
@@ -343,7 +480,23 @@ await withEnvAsync(productionGateEnv(), async () => {
   ]);
   const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
   assert.equal(result.ok, true);
+  assert.equal(result.accepted, true);
+  assert.equal(result.status, 202);
   assert.equal(result.retried, true);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => jsonResponse(500, { error_code: "INTERNAL" }),
+    () => jsonResponse(500, { error_code: "INTERNAL" }),
+    () => jsonResponse(202, { task_id: "must-not-third" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.retried, true);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
 });
 
 await withEnvAsync(productionGateEnv(), async () => {
@@ -359,6 +512,39 @@ await withEnvAsync(productionGateEnv(), async () => {
   const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
   assert.equal(result.ok, true);
   assert.equal(result.retried, true);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => {
+      throw new Error("socket hang up");
+    },
+    () => jsonResponse(202, { task_id: "after-network" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, true);
+  assert.equal(result.retried, true);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
+    () => {
+      throw new Error("socket hang up");
+    },
+    () => {
+      throw new Error("socket hang up");
+    },
+    () => jsonResponse(202, { task_id: "must-not-third" }),
+  ]);
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "network");
+  assert.equal(result.retried, true);
+  assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
 });
 
 await withEnvAsync(productionGateEnv(), async () => {
@@ -379,6 +565,44 @@ await withEnvAsync(productionGateEnv(), async () => {
     assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
     assert.equal(logs.join("\n").includes(TEST_TOKEN), false);
     assert.match(logs.join("\n"), /\[yandex-webmaster\] submitted/);
+  } finally {
+    console.info = original;
+  }
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => {
+      throw new Error("yandex down");
+    },
+    () => {
+      throw new Error("yandex down");
+    },
+  ]);
+  const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+    fetchImpl,
+    sleepImpl: async () => {},
+  });
+  assert.equal(result.status, "quota_check_failed");
+  assert.equal(result.http?.errorCode, "quota_check_failed");
+  assert.equal(result.http?.retried, true);
+  assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
+});
+
+await withEnvAsync(productionGateEnv(), async () => {
+  const logs = [];
+  const original = console.info;
+  console.info = (...args) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      fetchImpl: mockFetch([() => jsonResponse(401, {})]),
+      sleepImpl: async () => {},
+    });
+    assert.equal(result.status, "auth_failed");
+    assert.match(logs.join("\n"), /\[yandex-webmaster\] auth_failed/);
+    assert.equal(logs.join("\n").includes(TEST_TOKEN), false);
   } finally {
     console.info = original;
   }

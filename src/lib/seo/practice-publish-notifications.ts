@@ -25,18 +25,26 @@ export function schedulePracticePublishedSearchNotifications(
 ): PracticePublishedSearchPlan {
   const plan = planPracticePublishedSearchNotifications(input);
 
-  for (const event of plan.indexNow) {
-    scheduleIndexNowNotification(event.urls, event.reason, options);
+  try {
+    for (const event of plan.indexNow) {
+      scheduleIndexNowNotification(event.urls, event.reason, options);
+    }
+  } catch {
+    // Fail-open: IndexNow must not change the publish HTTP response.
   }
 
-  if (plan.yandex) {
-    scheduleYandexRecrawlNotification(plan.yandex.url, plan.yandex.reason, {
-      syncForTests: options.syncForTests,
-      fetchImpl: options.fetchImpl,
-      sleepImpl: options.sleepImpl,
-      env: options.env,
-      dryRun: options.dryRun,
-    });
+  try {
+    if (plan.yandex) {
+      scheduleYandexRecrawlNotification(plan.yandex.url, plan.yandex.reason, {
+        syncForTests: options.syncForTests,
+        fetchImpl: options.fetchImpl,
+        sleepImpl: options.sleepImpl,
+        env: options.env,
+        dryRun: options.dryRun,
+      });
+    }
+  } catch {
+    // Fail-open: a Yandex error must not cancel publish or roll back the write.
   }
 
   return plan;

@@ -224,6 +224,14 @@ const seoSection = read(
 assert.match(seoSection, /Поиск в Яндексе/);
 assert.match(seoSection, /SEO-готовность/);
 assert.doesNotMatch(seoSection, /SEO score|keyword-density|100%/i);
+assert.match(seoSection, /disabled\?: boolean/);
+assert.equal(
+  [...seoSection.matchAll(/disabled=\{disabled\}/g)].length,
+  3,
+  "all three SEO inputs must honor the moderation lock",
+);
+assert.match(seoSection, /disabled:cursor-not-allowed disabled:opacity-60/);
+assert.match(formSource, /disabled=\{!canEditPublicFields \|\| busy\}/);
 
 const patch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patch, /seo_primary_query/);

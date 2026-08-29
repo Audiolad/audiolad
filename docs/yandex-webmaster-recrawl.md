@@ -63,10 +63,24 @@ After a public listed product is published or republished, or after a
 search-significant content/SEO/slug change, the app:
 
 1. checks GET `/recrawl/quota`;
-2. skips POST if `quota_remainder <= 0` or the quota check fails;
+2. skips POST if `quota_remainder <= 0`;
 3. otherwise POSTs `{ "url": "https://audiolad.ru/practice/..." }` to
    `/recrawl/queue`.
 
-Official documented success for the POST is **202 ACCEPTED**.
+Official documented success for the POST is **202 ACCEPTED** only.
+Unexpected 200/201 are not treated as accepted.
+
+Idempotent and terminal API outcomes (no retry):
+
+- `409 URL_ALREADY_ADDED` → `already_queued`
+- `429 QUOTA_EXCEEDED` → `quota_exhausted`
+- `400 INVALID_URL` → `failed`
+- `401` → `auth_failed`
+- `403 INVALID_USER_ID` → `invalid_user_id`
+- `404 HOST_NOT_VERIFIED` → `host_not_verified`
+
+At most one retry is used for true transient `5xx` / network / timeout.
+Quota-check auth and host-config errors stay distinct and are not collapsed
+into a generic `quota_check_failed`. Publication is fail-open.
 
 This automation is **not** wired to `/listens` or SEO articles.

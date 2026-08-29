@@ -12,7 +12,11 @@ import type { YandexRecrawlReason } from "@/lib/seo/yandex-webmaster/planner";
 export type NotifyYandexRecrawlStatus =
   | "disabled"
   | "submitted"
+  | "already_queued"
   | "failed"
+  | "auth_failed"
+  | "invalid_user_id"
+  | "host_not_verified"
   | "quota_exhausted"
   | "quota_check_failed";
 
@@ -121,16 +125,87 @@ export async function notifyYandexRecrawlUrl(
 
     const http = await submitYandexRecrawl(trimmedUrl, options);
 
+    if (http.errorCode === "already_queued") {
+      logYandexWebmasterEvent("already_queued", {
+        reason,
+        url: trimmedUrl,
+        status: http.status,
+        apiErrorCode: http.apiErrorCode ?? null,
+      });
+
+      return {
+        status: "already_queued",
+        reason,
+        url: trimmedUrl,
+        canSubmit: true,
+        http,
+      };
+    }
+
     if (http.errorCode === "quota_exhausted") {
       logYandexWebmasterEvent("skip_quota_exhausted", {
         reason,
         url: trimmedUrl,
+        status: http.status,
         dailyQuota: http.dailyQuota ?? null,
         quotaRemainder: http.quotaRemainder ?? null,
       });
 
       return {
         status: "quota_exhausted",
+        reason,
+        url: trimmedUrl,
+        canSubmit: true,
+        http,
+      };
+    }
+
+    if (http.errorCode === "auth_failed") {
+      logYandexWebmasterEvent("auth_failed", {
+        reason,
+        url: trimmedUrl,
+        status: http.status,
+        retried: http.retried,
+      });
+
+      return {
+        status: "auth_failed",
+        reason,
+        url: trimmedUrl,
+        canSubmit: true,
+        http,
+      };
+    }
+
+    if (http.errorCode === "invalid_user_id") {
+      logYandexWebmasterEvent("invalid_user_id", {
+        reason,
+        url: trimmedUrl,
+        status: http.status,
+        apiErrorCode: http.apiErrorCode ?? null,
+        retried: http.retried,
+      });
+
+      return {
+        status: "invalid_user_id",
+        reason,
+        url: trimmedUrl,
+        canSubmit: true,
+        http,
+      };
+    }
+
+    if (http.errorCode === "host_not_verified") {
+      logYandexWebmasterEvent("host_not_verified", {
+        reason,
+        url: trimmedUrl,
+        status: http.status,
+        apiErrorCode: http.apiErrorCode ?? null,
+        retried: http.retried,
+      });
+
+      return {
+        status: "host_not_verified",
         reason,
         url: trimmedUrl,
         canSubmit: true,
@@ -155,7 +230,7 @@ export async function notifyYandexRecrawlUrl(
       };
     }
 
-    if (http.ok) {
+    if (http.ok && http.accepted) {
       logYandexWebmasterEvent("submitted", {
         reason,
         url: trimmedUrl,
