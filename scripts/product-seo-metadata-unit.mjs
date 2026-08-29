@@ -177,8 +177,24 @@ const readiness = evaluateProductSeoReadiness({
   seoDescription: "Мягкая медитация для сна перед отдыхом.",
   description: "а".repeat(180),
 });
-assert.equal(readiness.total, 8);
+assert.equal(readiness.total, readiness.checks.length);
+assert.ok(readiness.doneCount <= readiness.total);
 assert.equal(readiness.doneCount, 4);
+
+const fullReadiness = evaluateProductSeoReadiness({
+  title: "Лавандовый сон",
+  seoPrimaryQuery: "медитация для сна",
+  seoTitle: "Медитация для сна – Лавандовый сон",
+  seoDescription: "Мягкая медитация для сна перед отдыхом.",
+  description: "а".repeat(180),
+  seoAbout: "Подробный текст о вечернем ритуале и темпе дыхания.",
+  seoUsageItems: ["Перед сном в наушниках"],
+  seoFaqCount: 3,
+  seoRelatedCount: 2,
+});
+assert.equal(fullReadiness.total, fullReadiness.checks.length);
+assert.equal(fullReadiness.doneCount, fullReadiness.total);
+assert.ok(fullReadiness.doneCount <= fullReadiness.total);
 assert.equal(
   readiness.checks.find((check) => check.id === "substantial_description")?.label,
   "Короткое описание продукта достаточно подробное",

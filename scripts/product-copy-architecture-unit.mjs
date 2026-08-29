@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
 import {
   AUTHOR_DESCRIPTION_HELPER,
   AUTHOR_DESCRIPTION_LABEL,
@@ -196,6 +197,26 @@ const duplicateMessage = formatSeoSecondaryQueryBulkMessage(
   parseSeoSecondaryQueryList("сон", { existing: ["сон"] }),
 );
 assert.equal(duplicateMessage, "Некоторые фразы уже были добавлены.");
+
+const overlongPhrase = "о".repeat(PRODUCT_CONTENT_LIMITS.seoSecondaryQuery + 1);
+const overlongBulk = parseSeoSecondaryQueryList(
+  `${overlongPhrase}, вечерняя практика, ${overlongPhrase}`,
+);
+assert.deepEqual(overlongBulk.added, ["вечерняя практика"]);
+assert.equal(overlongBulk.added.some((item) => item.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery), false);
+assert.equal(overlongBulk.skippedTooLong, 2);
+assert.match(
+  formatSeoSecondaryQueryBulkMessage(overlongBulk),
+  /Некоторые фразы слишком длинные и не были добавлены/,
+);
+assert.equal(
+  parseSeoSecondaryQueryList(overlongPhrase).added.length,
+  0,
+);
+assert.equal(
+  parseSeoSecondaryQueryList("1. медитация для сна\n2) вечерняя медитация").added.length,
+  2,
+);
 
 const prompt = read("src/lib/seo/product-autofill/prompt.ts");
 assert.match(

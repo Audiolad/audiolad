@@ -1,7 +1,6 @@
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
 import {
   canAddSecondaryQuery,
-  clipSeoQuery,
   isSameSeoQuery,
 } from "@/lib/seo/wordstat/ui";
 
@@ -21,6 +20,7 @@ export type ParseSeoSecondaryQueryListResult = {
   skippedDuplicates: number;
   skippedPrimary: number;
   skippedFull: number;
+  skippedTooLong: number;
 };
 
 export function stripObviousSeoListPrefix(value: string): string {
@@ -56,32 +56,35 @@ export function parseSeoSecondaryQueryList(
   let skippedDuplicates = 0;
   let skippedPrimary = 0;
   let skippedFull = 0;
+  let skippedTooLong = 0;
   let next = [...existing];
   const added: string[] = [];
 
   for (const rawPart of splitSecondaryQueryText(text)) {
-    const stripped = stripObviousSeoListPrefix(rawPart.trim()).trim();
-    const clipped = clipSeoQuery(
-      stripped,
-      PRODUCT_CONTENT_LIMITS.seoSecondaryQuery,
-    );
-    if (!clipped) {
+    const normalized = stripObviousSeoListPrefix(rawPart.trim())
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!normalized) {
       skippedEmpty += 1;
       continue;
     }
+    if (normalized.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery) {
+      skippedTooLong += 1;
+      continue;
+    }
 
-    if (primaryQuery && isSameSeoQuery(clipped, primaryQuery)) {
+    if (primaryQuery && isSameSeoQuery(normalized, primaryQuery)) {
       skippedPrimary += 1;
       continue;
     }
 
-    if (seenInPaste.some((item) => isSameSeoQuery(item, clipped))) {
+    if (seenInPaste.some((item) => isSameSeoQuery(item, normalized))) {
       skippedDuplicates += 1;
       continue;
     }
-    seenInPaste.push(clipped);
+    seenInPaste.push(normalized);
 
-    const result = canAddSecondaryQuery(clipped, next);
+    const result = canAddSecondaryQuery(normalized, next);
     if (!result.ok) {
       if (result.reason === "duplicate") {
         skippedDuplicates += 1;
@@ -94,7 +97,7 @@ export function parseSeoSecondaryQueryList(
     }
 
     next = result.next;
-    added.push(clipped);
+    added.push(normalized);
   }
 
   return {
@@ -105,6 +108,7 @@ export function parseSeoSecondaryQueryList(
     skippedDuplicates,
     skippedPrimary,
     skippedFull,
+    skippedTooLong,
   };
 }
 
@@ -121,6 +125,10 @@ export function formatSeoSecondaryQueryBulkMessage(
 
   if (result.skippedDuplicates > 0) {
     parts.push("Некоторые фразы уже были добавлены.");
+  }
+
+  if (result.skippedTooLong > 0) {
+    parts.push("Некоторые фразы слишком длинные и не были добавлены.");
   }
 
   if (parts.length === 0) {

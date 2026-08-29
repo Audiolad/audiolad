@@ -47,7 +47,7 @@ export type ProductSeoReadinessCheck = {
 
 export type ProductSeoReadiness = {
   doneCount: number;
-  total: 8;
+  total: number;
   checks: ProductSeoReadinessCheck[];
 };
 
@@ -275,7 +275,7 @@ export function evaluateProductSeoReadiness(
 
   return {
     doneCount: checks.filter((check) => check.done).length,
-    total: 8,
+    total: checks.length,
     checks,
   };
 }
