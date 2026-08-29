@@ -27,7 +27,7 @@
 
 Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `catalog_visibility`, `is_catalog_listed`.
 
-Необязательные SEO-поля публичной страницы продукта (миграция `20260905120000_practice_seo_fields.sql`, без backfill): `seo_primary_query` (text, max 120), `seo_title` (text, max 140), `seo_description` (text, max 300). NULL сохраняет прежние HTML title / description. Поля не делают продукт индексируемым сами по себе.
+Необязательные SEO-поля публичной страницы продукта (миграция `20260906120000_practice_seo_fields.sql`, без backfill): `seo_primary_query` (text, max 120), `seo_title` (text, max 140), `seo_description` (text, max 300). NULL сохраняет прежние HTML title / description. Поля не делают продукт индексируемым сами по себе.
 
 `catalog_visibility` — источник истины (`listed` | `unlisted` | `selected_users`). `is_catalog_listed` остаётся совместимым флагом и синхронизируется триггером: `listed` → true, `unlisted`/`selected_users` → false. Backfill: `is_catalog_listed=true` → `listed`, `false` → `unlisted` (никогда `selected_users`). Колонка без DEFAULT: legacy INSERT `is_catalog_listed=false` без `catalog_visibility` становится `unlisted`, а обычный INSERT без обоих полей — `listed` (через default `is_catalog_listed=true`).
 
