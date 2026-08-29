@@ -39,24 +39,28 @@ function parseTextItems(
       : PRODUCT_CONTENT_LIMITS.seoFaqItems)
   ) return null;
 
-  const items = value.flatMap((item) => {
-    if (!isRecord(item) || typeof item[key] !== "string") return [];
+  const items: Array<PracticeSeoUsageItem | PracticeSeoFaqItem> = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item[key] !== "string") continue;
     const primary = item[key].trim();
     // Draft placeholder rows are never persisted as public SEO content.
-    if (!primary) return [];
+    if (!primary) continue;
     if (key === "content") {
-      return primary.length <= PRODUCT_CONTENT_LIMITS.seoUsageItem
-        ? [{ content: primary }]
-        : [];
+      if (primary.length <= PRODUCT_CONTENT_LIMITS.seoUsageItem) {
+        items.push({ content: primary });
+      }
+      continue;
     }
-    if (!secondaryKey || typeof item[secondaryKey] !== "string") return [];
+    if (!secondaryKey || typeof item[secondaryKey] !== "string") continue;
     const answer = item[secondaryKey].trim();
-    if (!answer) return [];
-    return primary.length <= PRODUCT_CONTENT_LIMITS.seoFaqQuestion &&
+    if (
+      answer &&
+      primary.length <= PRODUCT_CONTENT_LIMITS.seoFaqQuestion &&
       answer.length <= PRODUCT_CONTENT_LIMITS.seoFaqAnswer
-      ? [{ question: primary, answer }]
-      : [];
-  });
+    ) {
+      items.push({ question: primary, answer });
+    }
+  }
   return items as PracticeSeoUsageItem[] | PracticeSeoFaqItem[];
 }
 
