@@ -93,10 +93,12 @@ assert.match(seoSection, /SEO_ABOUT_HELPER/);
 assert.match(seoSection, /parseSeoSecondaryQueryList/);
 assert.match(seoSection, /Добавить фразы/);
 assert.match(seoSection, /addSecondaryPhrasesFromDraft/);
-assert.doesNotMatch(
-  seoSection.slice(seoSection.indexOf("function addSecondaryPhrasesFromDraft")),
-  /fetch\(|alert\(|indexnow|webmaster/i,
+const bulkFn = seoSection.slice(
+  seoSection.indexOf("function addSecondaryPhrasesFromDraft"),
+  seoSection.indexOf("function applyGeneratedDraft"),
 );
+assert.match(bulkFn, /parseSeoSecondaryQueryList/);
+assert.doesNotMatch(bulkFn, /fetch\(|alert\(|indexnow|webmaster|PATCH/i);
 
 assert.match(read("src/lib/author-products/types.ts"), /seo_about/);
 assert.match(read("src/lib/author-products/form-merge.ts"), /description: practice\.description/);
