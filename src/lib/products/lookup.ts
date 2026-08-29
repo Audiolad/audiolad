@@ -42,6 +42,9 @@ export type PublicPracticeRow = {
   promo_button_text?: string | null;
   promo_url?: string | null;
   promo_open_in_new_tab?: boolean | null;
+  seo_primary_query?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -106,6 +109,9 @@ export async function getPracticeByAuthorAndSlug(
       promo_button_text,
       promo_url,
       promo_open_in_new_tab,
+      seo_primary_query,
+      seo_title,
+      seo_description,
       authors!practices_author_id_fkey!inner (
         id,
         name,

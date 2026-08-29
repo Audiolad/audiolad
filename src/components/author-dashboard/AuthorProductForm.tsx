@@ -10,6 +10,7 @@ import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGal
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
+import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
 import PracticeVisibilityUsersEditor from "@/components/author-dashboard/PracticeVisibilityUsersEditor";
 import {
   CATALOG_VISIBILITY,
@@ -183,6 +184,9 @@ type FormState = {
   listeningNoticeEnabled: boolean;
   listeningNoticeTitle: string;
   listeningNoticeText: string;
+  seoPrimaryQuery: string;
+  seoTitle: string;
+  seoDescription: string;
   status: string;
   moderationStatus: string;
   moderationSubmittedAt: string | null;
@@ -322,6 +326,9 @@ function buildInitialForm(
     listeningNoticeEnabled: listeningDefaults.listeningNoticeEnabled,
     listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
     listeningNoticeText: listeningDefaults.listeningNoticeText,
+    seoPrimaryQuery: "",
+    seoTitle: "",
+    seoDescription: "",
     status: "draft",
     moderationStatus: "not_submitted",
     moderationSubmittedAt: null,
@@ -434,6 +441,9 @@ function buildProductSavePayload(
         : form.listeningNoticeEnabled,
     listening_notice_title: form.listeningNoticeTitle,
     listening_notice_text: form.listeningNoticeText,
+    seo_primary_query: form.seoPrimaryQuery.trim() || null,
+    seo_title: form.seoTitle.trim() || null,
+    seo_description: form.seoDescription.trim() || null,
   };
 }
 
@@ -534,6 +544,9 @@ export default function AuthorProductForm({
     formatCustom?: string;
     listeningNoticeTitle?: string;
     listeningNoticeText?: string;
+    seoPrimaryQuery?: string;
+    seoTitle?: string;
+    seoDescription?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -1144,7 +1157,10 @@ export default function AuthorProductForm({
             fieldKey === "description" ||
             fieldKey === "formatCustom" ||
             fieldKey === "listeningNoticeTitle" ||
-            fieldKey === "listeningNoticeText"
+            fieldKey === "listeningNoticeText" ||
+            fieldKey === "seoPrimaryQuery" ||
+            fieldKey === "seoTitle" ||
+            fieldKey === "seoDescription"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
@@ -2568,6 +2584,35 @@ export default function AuthorProductForm({
             </p>
           ) : null}
         </label>
+
+        <AuthorProductSeoSection
+          title={form.title}
+          subtitle={form.subtitle}
+          description={form.description}
+          productKind={form.productKind}
+          seoPrimaryQuery={form.seoPrimaryQuery}
+          seoTitle={form.seoTitle}
+          seoDescription={form.seoDescription}
+          publicPath={publicPath}
+          fieldErrors={{
+            seoPrimaryQuery: fieldErrors.seoPrimaryQuery,
+            seoTitle: fieldErrors.seoTitle,
+            seoDescription: fieldErrors.seoDescription,
+          }}
+          onChange={(patch) => {
+            setFieldErrors((current) => ({
+              ...current,
+              ...(patch.seoPrimaryQuery !== undefined
+                ? { seoPrimaryQuery: undefined }
+                : {}),
+              ...(patch.seoTitle !== undefined ? { seoTitle: undefined } : {}),
+              ...(patch.seoDescription !== undefined
+                ? { seoDescription: undefined }
+                : {}),
+            }));
+            setForm((current) => ({ ...current, ...patch }));
+          }}
+        />
 
         {form.productKind === PRODUCT_KIND.PRACTICE ? (
         <>

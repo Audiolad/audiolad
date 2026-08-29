@@ -27,6 +27,8 @@
 
 Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `catalog_visibility`, `is_catalog_listed`.
 
+Необязательные SEO-поля публичной страницы продукта (миграция `20260905120000_practice_seo_fields.sql`, без backfill): `seo_primary_query` (text, max 120), `seo_title` (text, max 140), `seo_description` (text, max 300). NULL сохраняет прежние HTML title / description. Поля не делают продукт индексируемым сами по себе.
+
 `catalog_visibility` — источник истины (`listed` | `unlisted` | `selected_users`). `is_catalog_listed` остаётся совместимым флагом и синхронизируется триггером: `listed` → true, `unlisted`/`selected_users` → false. Backfill: `is_catalog_listed=true` → `listed`, `false` → `unlisted` (никогда `selected_users`). Колонка без DEFAULT: legacy INSERT `is_catalog_listed=false` без `catalog_visibility` становится `unlisted`, а обычный INSERT без обоих полей — `listed` (через default `is_catalog_listed=true`).
 
 Обычный каталог `/catalog` и `/api/catalog`: guest видит только `listed`; авторизованный — `listed` плюс свои `selected_users` по allowlist `practice_visibility_users`. `unlisted` в каталоге нет. Карточка скрывается, если у зрителя есть активный `user_practices` или `library_saves` (это не одно и то же; оба только убирают карточку из обычного каталога). Источник решения ordinary catalog — `applyOrdinaryCatalogEligibility`; legacy post-filter `is_catalog_listed === true` туда не применяется. Если viewer state (allowlist / grants / saves) недоступен, ordinary catalog отвечает ошибкой, а не «у пользователя ничего нет». Публичные витрины (главная, sitemap, editorial, страница автора) остаются listed-only.

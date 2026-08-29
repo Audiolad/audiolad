@@ -68,6 +68,9 @@ export const PRODUCT_CONTENT_LIMITS = {
   customFormat: 60,
   listeningNoticeTitle: 120,
   listeningNoticeText: 1000,
+  seoPrimaryQuery: 120,
+  seoTitle: 140,
+  seoDescription: 300,
 } as const;
 
 export type ProductFieldErrorCode =
@@ -79,7 +82,10 @@ export type ProductFieldErrorCode =
   | "custom_format_too_long"
   | "missing_custom_format"
   | "listening_notice_title_too_long"
-  | "listening_notice_text_too_long";
+  | "listening_notice_text_too_long"
+  | "seo_primary_query_too_long"
+  | "seo_title_too_long"
+  | "seo_description_too_long";
 
 export function validateTitleLength(value: string): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.title) {
@@ -159,6 +165,36 @@ export function validateListeningNoticeTextLength(
   return null;
 }
 
+export function validateSeoPrimaryQueryLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.seoPrimaryQuery) {
+    return "seo_primary_query_too_long";
+  }
+
+  return null;
+}
+
+export function validateSeoTitleLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.seoTitle) {
+    return "seo_title_too_long";
+  }
+
+  return null;
+}
+
+export function validateSeoDescriptionLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.seoDescription) {
+    return "seo_description_too_long";
+  }
+
+  return null;
+}
+
 export function getProductFieldErrorMessage(code: string): string | null {
   switch (code) {
     case "title_too_long":
@@ -179,6 +215,12 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Заголовок рекомендаций не должен превышать 120 символов.";
     case "listening_notice_text_too_long":
       return "Текст рекомендаций не должен превышать 1000 символов.";
+    case "seo_primary_query_too_long":
+      return "Основной поисковый запрос не должен превышать 120 символов.";
+    case "seo_title_too_long":
+      return "Заголовок для поиска не должен превышать 140 символов.";
+    case "seo_description_too_long":
+      return "Описание для поиска не должно превышать 300 символов.";
     default:
       return null;
   }
@@ -195,7 +237,10 @@ export function getProductFieldKeyForError(
   | "audioDescription"
   | "formatCustom"
   | "listeningNoticeTitle"
-  | "listeningNoticeText" {
+  | "listeningNoticeText"
+  | "seoPrimaryQuery"
+  | "seoTitle"
+  | "seoDescription" {
   switch (code) {
     case "title_too_long":
       return "title";
@@ -214,5 +259,11 @@ export function getProductFieldKeyForError(
       return "listeningNoticeTitle";
     case "listening_notice_text_too_long":
       return "listeningNoticeText";
+    case "seo_primary_query_too_long":
+      return "seoPrimaryQuery";
+    case "seo_title_too_long":
+      return "seoTitle";
+    case "seo_description_too_long":
+      return "seoDescription";
   }
 }

@@ -50,6 +50,9 @@ const VALIDATION_CODES = new Set([
   "missing_custom_format",
   "listening_notice_title_too_long",
   "listening_notice_text_too_long",
+  "seo_primary_query_too_long",
+  "seo_title_too_long",
+  "seo_description_too_long",
 ]);
 
 const PERMISSION_CODES = new Set([
