@@ -289,25 +289,72 @@ assert.match(formSource, /seo_content:/);
 const seoSection = read(
   "src/components/author-dashboard/AuthorProductSeoSection.tsx",
 );
+const seoAutofillUi = read("src/lib/seo/product-autofill/ui.ts");
 const wordstatPicker = read(
   "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
 );
 assert.match(seoSection, /useState\(false\)/);
 assert.match(seoSection, /aria-expanded=\{isOpen\}/);
-assert.match(seoSection, /SEO и продвижение · необязательно/);
-assert.match(seoSection, /Яндексе и Google/);
+assert.match(seoSection, /PRODUCT_SEO_ACCORDION_TITLE/);
+assert.match(seoAutofillUi, /SEO и продвижение/);
+assert.doesNotMatch(seoSection, /необязательно/);
+assert.doesNotMatch(seoAutofillUi, /необязательно/);
+assert.doesNotMatch(seoSection, /SEO можно не заполнять|можете пропустить/i);
+assert.doesNotMatch(seoAutofillUi, /SEO можно не заполнять|можете пропустить/i);
+assert.match(seoAutofillUi, /Яндексе и Google/);
+assert.match(seoAutofillUi, /Заполните этот раздел/);
+assert.match(seoAutofillUi, /Начните с поискового запроса/);
+assert.match(seoAutofillUi, /Подобрать основной запрос/);
+assert.match(seoAutofillUi, /Сгенерировать SEO для продукта/);
+assert.match(seoAutofillUi, /Рекомендуем заполнить для продвижения/);
+assert.match(seoAutofillUi, /SEO заполнено частично/);
+assert.match(seoAutofillUi, /SEO готово к продвижению/);
+assert.match(seoAutofillUi, /Чем полнее заполнен раздел/);
+assert.match(seoAutofillUi, /Мы можем подготовить SEO за вас/);
+assert.match(seoAutofillUi, /\+ Добавить свой вопрос/);
 assert.match(seoSection, /SEO-готовность/);
-assert.match(seoSection, /Это ориентир, а не условие публикации/);
-assert.match(seoSection, /Как заполнить SEO/);
-const openMarkup = seoSection.slice(seoSection.indexOf("{isOpen ? <>"));
-assert.ok(
-  seoSection.indexOf("Как заполнить SEO") >
-    seoSection.indexOf("{isOpen ? <>"),
-  "method card is rendered only after the accordion opens",
+assert.match(seoSection, /PRODUCT_SEO_READINESS_HINT/);
+assert.match(seoSection, /PRODUCT_SEO_SELLING_COPY/);
+assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
+assert.match(seoSection, /PRODUCT_SEO_GENERATE_CTA/);
+assert.match(seoSection, /AuthorProductSeoStyleControls/);
+assert.match(seoSection, /styleProfile/);
+assert.match(seoSection, /sanitizeProductSeoStyleProfile/);
+const afterPrimaryBlock = seoSection.slice(
+  seoSection.indexOf("PRODUCT_SEO_AFTER_PRIMARY_COPY"),
 );
 assert.ok(
-  openMarkup.indexOf("Как заполнить SEO") < openMarkup.indexOf("SEO-готовность"),
-  "method card comes before readiness",
+  afterPrimaryBlock.indexOf("<AuthorProductSeoStyleControls") <
+    afterPrimaryBlock.lastIndexOf("PRODUCT_SEO_GENERATE_CTA"),
+  "style selector sits before generate CTA",
+);
+assert.match(seoAutofillUi, /Стиль текста/);
+assert.match(seoAutofillUi, /Настроить стиль/);
+assert.match(seoAutofillUi, /Разнообразие текстов/);
+assert.match(seoAutofillUi, /мало подходящих дополнительных фраз/);
+assert.match(seoAutofillUi, /Дополнительные поисковые фразы не удалось подобрать/);
+assert.match(
+  read("src/components/author-dashboard/AuthorProductSeoStyleControls.tsx"),
+  /useState\(false\)/,
+);
+assert.doesNotMatch(seoSection, /localStorage|Пример моего стиля/);
+assert.match(seoSection, /requestGenerateProductSeo/);
+assert.match(seoSection, /api\/author\/seo\/product-autofill/);
+assert.match(seoSection, /hasFilledGeneratedSeoFields/);
+assert.match(seoSection, /Часть SEO уже заполнена|PRODUCT_SEO_OVERWRITE_CONFIRM/);
+assert.doesNotMatch(seoSection, /method: "PATCH"|\/api\/author\/products\//);
+assert.doesNotMatch(seoSection, /OpenAI|ChatGPT|GPT-4/i);
+assert.doesNotMatch(seoAutofillUi, /OpenAI|ChatGPT|GPT-4/i);
+assert.doesNotMatch(seoSection, /Как заполнить SEO/);
+const openMarkup = seoSection.slice(seoSection.indexOf("{isOpen ? <>"));
+assert.ok(
+  openMarkup.includes("{PRODUCT_SEO_SELLING_COPY}"),
+  "selling copy is rendered only after the accordion opens",
+);
+assert.ok(
+  openMarkup.indexOf("{PRODUCT_SEO_SELLING_COPY}") <
+    openMarkup.indexOf("SEO-готовность"),
+  "selling copy comes before readiness",
 );
 assert.ok(
   openMarkup.indexOf("SEO-готовность") <
@@ -358,11 +405,9 @@ assert.ok(
     openMarkup.indexOf("{preview.displayUrl}"),
   "related listens come before search preview",
 );
-assert.match(
-  seoSection,
-  /1\. Выберите один основной запрос, по которому люди могут искать такой продукт/,
-);
-assert.match(seoSection, /Пишите прежде всего для человека/);
+assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
+assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
+assert.match(seoSection, /suggestPrimaryQuerySeeds/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Подобрать похожие/);
