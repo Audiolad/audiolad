@@ -1,13 +1,21 @@
 /**
- * In-memory Wordstat quota guards. Process-local only — not a DB.
- * Limits are conservative: GetTop is billed per 1000 requests.
+ * In-memory Wordstat quota guards. Process-local only — not a DB or Redis.
+ *
+ * User limit: 8 logical lookups / 15 minutes (cache misses that reach
+ * the outbound path). Cache hits do not consume this quota.
+ *
+ * Process outbound limit: max 40 actual Wordstat HTTP attempts / 60 minutes.
+ * This is an intentionally conservative process-local guard vs default
+ * Yandex quota 100/hour, with headroom for zero-downtime overlapping
+ * processes. Cache hits MUST NOT consume outbound quota. The first real
+ * upstream fetch consumes one slot; a retry consumes a separate slot.
  */
 
 export const WORDSTAT_USER_LIMIT = 8;
 export const WORDSTAT_USER_WINDOW_MS = 15 * 60 * 1000;
-export const WORDSTAT_PROCESS_LIMIT = 40;
-export const WORDSTAT_PROCESS_WINDOW_MS = 15 * 60 * 1000;
-export const WORDSTAT_PROCESS_RATE_KEY = "wordstat:process";
+export const WORDSTAT_PROCESS_OUTBOUND_LIMIT = 40;
+export const WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS = 60 * 60 * 1000;
+export const WORDSTAT_PROCESS_OUTBOUND_KEY = "wordstat:outbound";
 
 type RateEntry = { count: number; resetAt: number };
 
@@ -51,24 +59,23 @@ export function getProcessWordstatRateLimit(): WordstatRateLimitStore {
   return processRateLimit;
 }
 
-export function consumeWordstatRateLimit(
+export function consumeWordstatUserRateLimit(
   userId: string,
   store: WordstatRateLimitStore = processRateLimit,
 ): boolean {
-  const userAllowed = store.consume(
+  return store.consume(
     `wordstat:user:${userId}`,
     WORDSTAT_USER_LIMIT,
     WORDSTAT_USER_WINDOW_MS,
   );
-  if (!userAllowed) {
-    return false;
-  }
+}
 
-  const processAllowed = store.consume(
-    WORDSTAT_PROCESS_RATE_KEY,
-    WORDSTAT_PROCESS_LIMIT,
-    WORDSTAT_PROCESS_WINDOW_MS,
+export function consumeWordstatOutboundSlot(
+  store: WordstatRateLimitStore = processRateLimit,
+): boolean {
+  return store.consume(
+    WORDSTAT_PROCESS_OUTBOUND_KEY,
+    WORDSTAT_PROCESS_OUTBOUND_LIMIT,
+    WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS,
   );
-
-  return processAllowed;
 }

@@ -9,7 +9,14 @@ import { evaluateWordstatOpportunity } from "../src/lib/seo/wordstat/opportunity
 import { getWordstatConfig } from "../src/lib/seo/wordstat/config.ts";
 import { fetchWordstatSuggestions } from "../src/lib/seo/wordstat/client.ts";
 import { createWordstatMemoryCache } from "../src/lib/seo/wordstat/cache.ts";
-import { createWordstatRateLimitStore } from "../src/lib/seo/wordstat/rate-limit.ts";
+import {
+  consumeWordstatOutboundSlot,
+  createWordstatRateLimitStore,
+  WORDSTAT_PROCESS_OUTBOUND_LIMIT,
+  WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS,
+  WORDSTAT_USER_LIMIT,
+  WORDSTAT_USER_WINDOW_MS,
+} from "../src/lib/seo/wordstat/rate-limit.ts";
 import { normalizeWordstatSuggestions } from "../src/lib/seo/wordstat/normalize.ts";
 import { normalizeWordstatPhrase } from "../src/lib/seo/wordstat/phrase.ts";
 import {
@@ -124,7 +131,7 @@ assert.equal(
 );
 assert.equal(
   evaluateWordstatOpportunity(10).description,
-  "Конкурировать может быть проще, но поискового спроса немного.",
+  "Запрос очень конкретный, но поискового спроса немного.",
 );
 assert.equal(
   evaluateWordstatOpportunity(1001).description,
@@ -414,16 +421,33 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(JSON.stringify(result).includes(TEST_KEY), false);
 });
 
+assert.equal(WORDSTAT_USER_LIMIT, 8);
+assert.equal(WORDSTAT_USER_WINDOW_MS, 15 * 60 * 1000);
+assert.equal(WORDSTAT_PROCESS_OUTBOUND_LIMIT, 40);
+assert.equal(WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS, 60 * 60 * 1000);
+
+function uniqueOkHandler() {
+  return jsonResponse(200, {
+    totalCount: "10",
+    results: [{ phrase: `уникальная ${Math.random()}`, count: "80" }],
+    associations: [],
+  });
+}
+
+function fillOutboundSlots(store, count) {
+  for (let index = 0; index < count; index += 1) {
+    assert.equal(
+      consumeWordstatOutboundSlot(store),
+      true,
+      `outbound slot ${index + 1} of ${count}`,
+    );
+  }
+}
+
 await withEnvAsync(enabledEnv(), async () => {
   const rateLimit = createWordstatRateLimitStore();
   const fetchImpl = mockFetch(
-    Array.from({ length: 9 }, () => () =>
-      jsonResponse(200, {
-        totalCount: "10",
-        results: [{ phrase: `уникальная ${Math.random()}`, count: "80" }],
-        associations: [],
-      }),
-    ),
+    Array.from({ length: 9 }, () => uniqueOkHandler),
   );
   const results = [];
   for (let index = 0; index < 9; index += 1) {
@@ -437,11 +461,122 @@ await withEnvAsync(enabledEnv(), async () => {
       }),
     );
   }
-  assert.equal(results.filter((item) => item.ok).length, 8);
+  assert.equal(results.filter((item) => item.ok).length, WORDSTAT_USER_LIMIT);
   assert.equal(results.at(-1).ok, false);
   assert.equal(results.at(-1).error.code, "RATE_LIMITED");
   assert.equal(results.at(-1).error.message, WORDSTAT_ERROR_MESSAGES.RATE_LIMITED);
-  assert.equal(fetchImpl.calls.length, 8);
+  assert.equal(fetchImpl.calls.length, WORDSTAT_USER_LIMIT);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const rateLimit = createWordstatRateLimitStore();
+  const fetchImpl = mockFetch(
+    Array.from({ length: WORDSTAT_PROCESS_OUTBOUND_LIMIT + 1 }, () => uniqueOkHandler),
+  );
+  const cache = createWordstatMemoryCache();
+  const results = [];
+  for (let index = 0; index < WORDSTAT_PROCESS_OUTBOUND_LIMIT + 1; index += 1) {
+    results.push(
+      await fetchWordstatSuggestions(`outbound ${index}`, {
+        fetchImpl,
+        cache,
+        rateLimit,
+        userId: `user-outbound-${index}`,
+        sleepImpl: async () => {},
+      }),
+    );
+  }
+  assert.equal(
+    results.filter((item) => item.ok).length,
+    WORDSTAT_PROCESS_OUTBOUND_LIMIT,
+  );
+  assert.equal(results.at(-1).ok, false);
+  assert.equal(results.at(-1).error.code, "RATE_LIMITED");
+  assert.equal(fetchImpl.calls.length, WORDSTAT_PROCESS_OUTBOUND_LIMIT);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const rateLimit = createWordstatRateLimitStore();
+  fillOutboundSlots(rateLimit, WORDSTAT_PROCESS_OUTBOUND_LIMIT - 2);
+  const fetchImpl = mockFetch([
+    () => jsonResponse(503, { message: "transient" }),
+    () => jsonResponse(200, sampleUpstream()),
+    uniqueOkHandler,
+  ]);
+  const retried = await fetchWordstatSuggestions("retry consumes two slots", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit,
+    userId: "user-retry-two-slots",
+    sleepImpl: async () => {},
+  });
+  const blocked = await fetchWordstatSuggestions("after retry quota full", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit,
+    userId: "user-after-retry",
+    sleepImpl: async () => {},
+  });
+  assert.equal(retried.ok, true);
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.error.code, "RATE_LIMITED");
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const rateLimit = createWordstatRateLimitStore();
+  fillOutboundSlots(rateLimit, WORDSTAT_PROCESS_OUTBOUND_LIMIT - 1);
+  const fetchImpl = mockFetch([
+    () => jsonResponse(503, { message: "would retry" }),
+    () => jsonResponse(200, sampleUpstream()),
+  ]);
+  const result = await fetchWordstatSuggestions("blocked retry", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit,
+    userId: "user-blocked-retry",
+    sleepImpl: async () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "RATE_LIMITED");
+  assert.equal(result.error.message, WORDSTAT_ERROR_MESSAGES.RATE_LIMITED);
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const rateLimit = createWordstatRateLimitStore();
+  fillOutboundSlots(rateLimit, WORDSTAT_PROCESS_OUTBOUND_LIMIT - 1);
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, sampleUpstream()),
+    uniqueOkHandler,
+  ]);
+  const cache = createWordstatMemoryCache();
+  const first = await fetchWordstatSuggestions("cache outbound seed", {
+    fetchImpl,
+    cache,
+    rateLimit,
+    userId: "user-cache-outbound",
+    sleepImpl: async () => {},
+  });
+  const cached = await fetchWordstatSuggestions("cache outbound seed", {
+    fetchImpl,
+    cache,
+    rateLimit,
+    userId: "user-cache-outbound",
+    sleepImpl: async () => {},
+  });
+  const nextMiss = await fetchWordstatSuggestions("cache outbound next miss", {
+    fetchImpl,
+    cache,
+    rateLimit,
+    userId: "user-cache-outbound-next",
+    sleepImpl: async () => {},
+  });
+  assert.equal(first.ok, true);
+  assert.equal(cached.ok, true);
+  assert.equal(nextMiss.ok, false);
+  assert.equal(nextMiss.error.code, "RATE_LIMITED");
+  assert.equal(fetchImpl.calls.length, 1);
 });
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
@@ -459,9 +594,29 @@ assert.match(client, /WORDSTAT_GET_TOP_URL/);
 assert.match(client, /Api-Key/);
 assert.match(client, /numPhrases/);
 assert.match(client, /sleepImpl\(400\)/);
+assert.match(client, /consumeWordstatOutboundSlot/);
+assert.match(client, /consumeWordstatUserRateLimit/);
 assert.match(client, /import "server-only"/);
 assert.doesNotMatch(client, /wordstat\.yandex\.ru/);
 assert.doesNotMatch(client, /YANDEX_WEBMASTER_/);
+assert.doesNotMatch(client, /consumeWordstatRateLimit\(/);
+
+const rateLimitSource = read("src/lib/seo/wordstat/rate-limit.ts");
+assert.match(rateLimitSource, /intentionally conservative process-local guard/);
+assert.match(rateLimitSource, /Yandex quota 100\/hour/);
+assert.match(rateLimitSource, /zero-downtime overlapping/);
+assert.match(rateLimitSource, /WORDSTAT_PROCESS_OUTBOUND_LIMIT = 40/);
+assert.match(rateLimitSource, /WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS = 60 \* 60 \* 1000/);
+assert.match(rateLimitSource, /WORDSTAT_USER_LIMIT = 8/);
+assert.match(rateLimitSource, /WORDSTAT_USER_WINDOW_MS = 15 \* 60 \* 1000/);
+assert.doesNotMatch(rateLimitSource, /WORDSTAT_PROCESS_WINDOW_MS = 15 \* 60 \* 1000/);
+
+const opportunity = read("src/lib/seo/wordstat/opportunity.ts");
+assert.match(
+  opportunity,
+  /Запрос очень конкретный, но поискового спроса немного\./,
+);
+assert.doesNotMatch(opportunity, /Конкурировать может быть проще/);
 
 const types = read("src/lib/seo/wordstat/types.ts");
 assert.match(types, /searchapi\.api\.cloud\.yandex\.net/);

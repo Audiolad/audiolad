@@ -18,7 +18,7 @@ const OPPORTUNITY_COPY: Record<
     color: "yellow",
     label: "Очень узкий запрос",
     description:
-      "Конкурировать может быть проще, но поискового спроса немного.",
+      "Запрос очень конкретный, но поискового спроса немного.",
   },
   yellow_high: {
     color: "yellow",

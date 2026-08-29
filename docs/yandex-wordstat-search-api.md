@@ -37,6 +37,12 @@ Data covers the last 30 days. GetTop is billed per 1000 requests;
 identical lookups are served from an in-memory 20-minute cache. Nothing
 is written to the product SEO tables.
 
+Process-local outbound guard: at most 40 real GetTop HTTP attempts per
+60 minutes. Cache hits do not count; a retry counts as a second attempt.
+This is intentionally conservative versus the default Yandex quota of
+100/hour, leaving headroom for zero-downtime overlapping processes.
+Authors are also limited to 8 logical lookups per 15 minutes.
+
 ## Server-only env (names only)
 
 Add later on the server if Wordstat should be available. Never use

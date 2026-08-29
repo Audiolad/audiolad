@@ -14,7 +14,8 @@ import {
   type WordstatCacheStore,
 } from "@/lib/seo/wordstat/cache";
 import {
-  consumeWordstatRateLimit,
+  consumeWordstatOutboundSlot,
+  consumeWordstatUserRateLimit,
   getProcessWordstatRateLimit,
   type WordstatRateLimitStore,
 } from "@/lib/seo/wordstat/rate-limit";
@@ -224,7 +225,11 @@ export async function fetchWordstatSuggestions(
 
   const userId = options.userId?.trim() || "anonymous";
   const rateLimit = options.rateLimit ?? getProcessWordstatRateLimit();
-  if (!consumeWordstatRateLimit(userId, rateLimit)) {
+  if (!consumeWordstatUserRateLimit(userId, rateLimit)) {
+    return redactResult(wordstatError("RATE_LIMITED"), env);
+  }
+
+  if (!consumeWordstatOutboundSlot(rateLimit)) {
     return redactResult(wordstatError("RATE_LIMITED"), env);
   }
 
@@ -253,6 +258,16 @@ export async function fetchWordstatSuggestions(
     first.status !== 200 &&
     isTransientFailure(first.errorCode, first.status)
   ) {
+    if (!consumeWordstatOutboundSlot(rateLimit)) {
+      logWordstatEvent("get_top_failed", {
+        status: first.status,
+        retried: false,
+        error: "RATE_LIMITED",
+        phraseLength: normalized.length,
+      });
+      return redactResult(wordstatError("RATE_LIMITED"), env);
+    }
+
     await sleepImpl(400);
     attempt = await requestOnce(WORDSTAT_GET_TOP_URL, {
       apiKey,
