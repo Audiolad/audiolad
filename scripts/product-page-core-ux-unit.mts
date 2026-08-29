@@ -214,6 +214,30 @@ function testBeforePurchaseRowKeepsBuy() {
     "desktop contents appear before the description block",
   );
 
+  const desktopDescriptionBody = desktop.slice(desktopDescription);
+  assert.match(
+    desktopDescriptionBody,
+    /className="[^"]*\bw-full\b[^"]*"/,
+    "desktop description body is w-full",
+  );
+  assert.match(
+    desktopDescriptionBody,
+    /className="[^"]*\bmax-w-none\b[^"]*"/,
+    "desktop description body uses max-w-none instead of prose width",
+  );
+  assert.doesNotMatch(
+    desktopDescriptionBody,
+    /max-w-prose/,
+    "desktop description body is not constrained by max-w-prose",
+  );
+
+  const mobileDescriptionBody = mobile.slice(mobileDescription);
+  assert.doesNotMatch(
+    mobileDescriptionBody,
+    /max-w-prose|max-w-none/,
+    "mobile description layout stays unchanged",
+  );
+
   assert.doesNotMatch(
     audioPost,
     /PracticePrimaryActionSection/,
