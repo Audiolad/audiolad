@@ -60,7 +60,6 @@ type EditorialPlaylistEditorClientProps = {
 
 const COVER_ACCEPT = "image/jpeg,image/png,image/webp";
 const COVER_MAX_BYTES = 5 * 1024 * 1024;
-const PAGE_SIZE = 20;
 
 function coverGradientForId(id: string): string {
   const gradients = [
@@ -96,7 +95,6 @@ export default function EditorialPlaylistEditorClient({
   const [hasCustomCover, setHasCustomCover] = useState(
     Boolean(detail.coverUrl || detail.playlist.cover_path),
   );
-  const [page, setPage] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [replacePracticeId, setReplacePracticeId] = useState<string | null>(null);
   const [replaceAudioItemId, setReplaceAudioItemId] = useState<string | null>(
@@ -185,8 +183,6 @@ export default function EditorialPlaylistEditorClient({
     );
     return ids.size;
   }, [items]);
-  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const pageItems = items.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const softCountWarning = itemsCount > 0 && itemsCount < 7;
   const diversityHint = detail.diversityHint;
 
@@ -473,9 +469,7 @@ export default function EditorialPlaylistEditorClient({
   }
 
   async function reorderItems(fromIndex: number, toIndex: number) {
-    const absoluteFrom = page * PAGE_SIZE + fromIndex;
-    const absoluteTo = page * PAGE_SIZE + toIndex;
-    const request = playlistItemReorderRequest(items, absoluteFrom, absoluteTo);
+    const request = playlistItemReorderRequest(items, fromIndex, toIndex);
 
     if (!request || movingPracticeId) {
       return;
@@ -484,7 +478,7 @@ export default function EditorialPlaylistEditorClient({
     const previous = items;
     setDraft({
       orderKey: serverOrderKey,
-      items: movePlaylistItems(items, absoluteFrom, absoluteTo),
+      items: movePlaylistItems(items, fromIndex, toIndex),
     });
     setMovingPracticeId(
       playlistItemKey(request.item.practiceId, request.item.audioItemId),
@@ -742,14 +736,14 @@ export default function EditorialPlaylistEditorClient({
 
         <div className="mt-4">
           <PlaylistItemsSortableList
-            items={pageItems}
+            items={items}
             className="space-y-2"
             disabled={movingPracticeId !== null}
             onReorder={({ fromIndex, toIndex }) => {
               void reorderItems(fromIndex, toIndex);
             }}
             renderRow={({ item, index, dragHandle }) => {
-              const absoluteIndex = page * PAGE_SIZE + index;
+              const absoluteIndex = index;
 
               return (
                 <PlaylistItemRow
@@ -824,32 +818,6 @@ export default function EditorialPlaylistEditorClient({
             }}
           />
         </div>
-
-        {pageCount > 1 ? (
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <button
-              type="button"
-              disabled={page === 0}
-              onClick={() => setPage((current) => Math.max(0, current - 1))}
-              className="font-medium text-[#7042c5] disabled:opacity-40"
-            >
-              Назад
-            </button>
-            <span className="text-[#7d70a2]">
-              {page + 1} / {pageCount}
-            </span>
-            <button
-              type="button"
-              disabled={page >= pageCount - 1}
-              onClick={() =>
-                setPage((current) => Math.min(pageCount - 1, current + 1))
-              }
-              className="font-medium text-[#7042c5] disabled:opacity-40"
-            >
-              Дальше
-            </button>
-          </div>
-        ) : null}
       </section>
 
       {detail.canManageCollaborators ? (
