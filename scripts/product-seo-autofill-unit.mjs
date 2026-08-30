@@ -2334,7 +2334,7 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
 });
 
-// Invented secondaries still rejected on Yandex after repair
+// Invalid title still rejected on Yandex after generate + repair
 await withEnvAsync(yandexEnv(), async () => {
   const fetchImpl = mockFetch([
     () =>
@@ -2343,7 +2343,7 @@ await withEnvAsync(yandexEnv(), async () => {
         yandexCompletion(
           JSON.stringify(
             validDraft({
-              secondaryQueries: ["изобретённая фраза"],
+              seoTitle: "Вечерний ритуал без запроса",
             }),
           ),
         ),
@@ -2354,7 +2354,7 @@ await withEnvAsync(yandexEnv(), async () => {
         yandexCompletion(
           JSON.stringify(
             validDraft({
-              secondaryQueries: ["изобретённая фраза"],
+              seoTitle: "Вечерний ритуал без запроса",
             }),
           ),
         ),
@@ -2366,16 +2366,14 @@ await withEnvAsync(yandexEnv(), async () => {
     rateLimit: createProductSeoAiRateLimitStore(),
   });
   const result = await generateProductSeoDraft(requestInput(), {
-    userId: "yandex-invented-secondary-guard",
+    userId: "yandex-invalid-title-guard",
     provider,
     wordstatSuggestions: sampleCandidates(),
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
-  assert.ok(
-    result.error.issues.some((issue) => String(issue).startsWith("invented_secondary")),
-  );
+  assert.ok(result.error.issues.includes("primary_missing_from_title"));
 });
 
 // NO_AUTO_SAVE
@@ -2450,6 +2448,23 @@ const inventedPhrase = "музыка для глубокого сна";
 const ungroundedDraft = validDraft({
   seoDescription:
     "Медитация для сна длится 30 минут, включает 10 треков и стоит 499 ₽ вечером.",
+  faqItems: [
+    {
+      question: "Когда лучше слушать медитацию для сна?",
+      answer: "Эта практика лечит бессонницу обещанием чуда, которого в карточке нет.",
+      anchor: "kogda-slushat",
+    },
+    {
+      question: "Нужен ли опыт медитации?",
+      answer: "Нет. Достаточно слушать и замечать дыхание в своём темпе.",
+      anchor: "nuzhen-li-opyt",
+    },
+    {
+      question: "Кому подойдёт эта практика?",
+      answer: "Тем, кто ищет спокойный вечерний ритуал и мягкое завершение дня.",
+      anchor: "komu-podoydyot",
+    },
+  ],
 });
 
 // FIRST_VALIDATION_SUCCESS_NO_FAILURE_LOG
