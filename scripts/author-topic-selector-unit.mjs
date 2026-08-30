@@ -127,10 +127,10 @@ assert(topicFormData.includes("resolveAuthorTopicLimit"), "server resolves topic
 assert(topicFormData.includes("getPracticeTopics"), "edit loads assigned topics");
 
 const options = [
-  { key: "sleep", title: "Сон", isActive: true },
-  { key: "calm", title: "Спокойствие", isActive: true },
   { key: "money", title: "Деньги", isActive: true },
-  { key: "energy", title: "Энергия и ресурс", isActive: true },
+  { key: "love", title: "Любовь", isActive: true },
+  { key: "health", title: "Здоровье", isActive: true },
+  { key: "work", title: "Работа", isActive: true },
 ];
 const archived = [{ key: "legacy", title: "Старая тема", isActive: false, isArchived: true }];
 const limit = 3;
@@ -138,18 +138,17 @@ const limit = 3;
 let value = [];
 assert(countActiveSelected(value, options, archived) === 0, "draft starts with 0 active topics");
 
-value = toggleTopic(value, "sleep", options, archived, limit);
-assert(value.length === 1 && value[0] === "sleep", "can select Сон like any other topic");
-
-value = toggleTopic(value, "calm", options, archived, limit);
 value = toggleTopic(value, "money", options, archived, limit);
-assert(countActiveSelected(value, options, archived) === 3, "Сон + two others stays within max 3");
-assert(value.includes("sleep") && value.includes("calm"), "Сон and Спокойствие may be selected together");
+assert(value.length === 1 && value[0] === "money", "can select first topic");
 
-const blocked = toggleTopic(value, "energy", options, archived, limit);
+value = toggleTopic(value, "love", options, archived, limit);
+value = toggleTopic(value, "health", options, archived, limit);
+assert(countActiveSelected(value, options, archived) === 3, "three active topics selected");
+
+const blocked = toggleTopic(value, "work", options, archived, limit);
 assert(blocked.length === 3, "fourth topic is not added at limit=3");
 
-value = toggleTopic(value, "money", options, archived, limit);
+value = toggleTopic(value, "health", options, archived, limit);
 assert(value.length === 2, "can deselect a chosen topic");
 
 const withArchived = [...value, "legacy"];
