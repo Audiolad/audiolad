@@ -69,6 +69,32 @@ assert(
 
 assert(playlistItemReorderRequest(items, 2, 2) === null, "same index request is null");
 
+const items30 = Array.from({ length: 30 }, (_, index) => ({
+  practiceId: `11111111-1111-4111-8111-11111111${String(index + 1).padStart(4, "0")}`,
+  audioItemId: index === 3 ? "22222222-2222-4222-8222-222222222222" : null,
+  position: index + 1,
+  title: `Item ${index + 1}`,
+}));
+
+next = movePlaylistItems(items30, 21, 2);
+assert(next[2]?.title === "Item 22" && next[3]?.title === "Item 3", "30-item 22→3");
+assert(
+  playlistItemReorderRequest(items30, 21, 2)?.targetPosition === 3,
+  "30-item 22→3 is absolute position 3",
+);
+
+next = movePlaylistItems(items30, 0, 24);
+assert(next[24]?.title === "Item 1" && next[0]?.title === "Item 2", "30-item 1→25");
+
+next = movePlaylistItems(items30, 24, 4);
+assert(next[4]?.title === "Item 25" && next[5]?.title === "Item 5", "30-item 25→5");
+
+next = movePlaylistItems(items30, 29, 0);
+assert(
+  next[0]?.title === "Item 30" && next[29]?.title === "Item 29",
+  "30-item last→first",
+);
+
 const serverKey = items.map((item) => `${item.practiceId}:${item.position}`).join("|");
 const optimistic = movePlaylistItems(items, 14, 0);
 assert(
@@ -166,6 +192,12 @@ const editorial = read(
 );
 const user = read("src/components/playlists/PlaylistDetailClient.tsx");
 assert(editorial.includes("PlaylistItemsSortableList"), "editorial uses shared list");
+assert(editorial.includes("items={items}"), "editorial sortable receives full items");
+assert(!editorial.includes("PAGE_SIZE"), "editorial editor has no PAGE_SIZE");
+assert(!editorial.includes("pageItems"), "editorial editor has no pageItems");
+assert(!editorial.includes("setPage"), "editorial editor has no page state");
+assert(!editorial.includes("absoluteFrom"), "editorial reorder indexes are absolute");
+assert(!/>\s*Назад\s*</.test(editorial) && !/>\s*Дальше\s*</.test(editorial), "no pagination UI");
 assert(user.includes("PlaylistItemsSortableList"), "user editor uses shared list");
 assert(editorial.includes("aria-label=\"Выше\"") && editorial.includes("↓"), "editorial arrows remain");
 assert(user.includes("Переместить выше") && user.includes("Переместить ниже"), "user arrows remain");
