@@ -34,7 +34,7 @@ async function requireAuthorSeoToolAccess() {
 
 /**
  * Author/admin short search-phrase hypotheses after Wordstat NO_RESULTS.
- * Does not save, notify IndexNow, or call Webmaster.
+ * Returns a local draft only and does not persist or notify search engines.
  */
 export async function POST(request: Request) {
   try {

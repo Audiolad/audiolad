@@ -749,6 +749,8 @@ await withEnvAsync(yandexEnv(), async () => {
 await withEnvAsync(
   yandexEnv({ PRODUCT_SEO_AI_PROVIDER: "openai", OPENAI_API_KEY: "unit-openai" }),
   async () => {
+    const originalInfo = console.info;
+    console.info = () => {};
     const fetchImpl = mockFetch([]);
     const result = await generatePrimaryQuerySuggestions(
       {
@@ -768,10 +770,13 @@ await withEnvAsync(
     assert.equal(result.ok, false);
     assert.equal(result.error.code, "UNSUPPORTED_PROVIDER");
     assert.equal(fetchImpl.calls.length, 0, "OpenAI path not used");
+    console.info = originalInfo;
   },
 );
 
 await withEnvAsync(yandexEnv({ PRODUCT_SEO_AI_ENABLED: "false" }), async () => {
+  const originalInfo = console.info;
+  console.info = () => {};
   const fetchImpl = mockFetch([]);
   const result = await generatePrimaryQuerySuggestions(
     {
@@ -791,6 +796,7 @@ await withEnvAsync(yandexEnv({ PRODUCT_SEO_AI_ENABLED: "false" }), async () => {
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "AI_DISABLED");
   assert.equal(fetchImpl.calls.length, 0);
+  console.info = originalInfo;
 });
 
 // Source wiring + flags
@@ -822,7 +828,10 @@ assert.doesNotMatch(picker, /Яндекс нашёл подходящие фра
 assert.match(route, /requireAuthenticatedUser/);
 assert.match(route, /admin_panel\.access/);
 assert.match(route, /listAuthorWorkspacesForUser/);
-assert.doesNotMatch(route, /indexnow|webmaster|replacePracticeSeoContent/i);
+assert.doesNotMatch(
+  route.replace(/\/\*[\s\S]*?\*\//g, ""),
+  /indexnow|webmaster|replacePracticeSeoContent/i,
+);
 assert.match(orchestrate, /primary_query_ai_ok/);
 assert.match(orchestrate, /primary_query_ai_failed/);
 assert.match(orchestrate, /SAFE_LOG_FIELDS/);
