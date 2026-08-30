@@ -108,6 +108,14 @@ assert.deepEqual(parsePlaylistTopicsRequestBody({ topicKeys: ["Money"] }), {
   ok: true,
   keys: ["money"],
 });
+assert.deepEqual(parsePlaylistTopicsRequestBody({ topicKeys: ["sleep"] }), {
+  ok: true,
+  keys: ["sleep"],
+});
+assert.deepEqual(
+  parsePlaylistTopicsRequestBody({ topicKeys: ["sleep", "calm", "money"] }),
+  { ok: true, keys: ["sleep", "calm", "money"] },
+);
 const tooManyKeys = parsePlaylistTopicKeysInput(["a", "b", "c", "d"]);
 if (!tooManyKeys.ok) {
   assert.equal(tooManyKeys.code, "topic_limit_exceeded");
@@ -159,7 +167,7 @@ for (const role of ["editorial admin", "direction editor", "collaborator"]) {
 const tooMany = await handleSetPlaylistTopics({
   userId: USER,
   playlistId: PLAYLIST,
-  body: { topicKeys: ["money", "purpose", "calm", "energy"] },
+  body: { topicKeys: ["sleep", "money", "purpose", "calm"] },
   deps: createDeps({ canEdit: true }).deps,
 });
 assert.equal(tooMany.status, 400);
@@ -243,5 +251,29 @@ assert.equal(
   true,
 );
 assert.doesNotMatch(editor, /PlaylistCatalogFilters|TopicFilterBar/);
+
+const sleepSeed = read("supabase/migrations/20260910120000_topics_sleep.sql");
+assert.match(sleepSeed, /INSERT INTO public\.topics/);
+assert.match(sleepSeed, /'sleep'/);
+assert.match(sleepSeed, /'Сон'/);
+assert.match(sleepSeed, /ON CONFLICT \(key\) DO NOTHING/);
+assert.doesNotMatch(sleepSeed, /UPDATE\s+public\.topics/i);
+assert.doesNotMatch(sleepSeed, /UPDATE\s+public\.playlist_topics/i);
+assert.doesNotMatch(sleepSeed, /Спокойствие/);
+assert.doesNotMatch(
+  editor,
+  /key:\s*"sleep"|title:\s*"Сон"/,
+  "editorial editor does not hardcode Сон",
+);
+assert.match(detail, /listActiveTopics/);
+
+const sleepSave = await handleSetPlaylistTopics({
+  userId: USER,
+  playlistId: PLAYLIST,
+  body: { topicKeys: ["sleep", "calm"] },
+  deps: createDeps({ canEdit: true, activeKeys: ["sleep", "calm"] }).deps,
+});
+assert.equal(sleepSave.status, 200);
+assert.deepEqual(sleepSave.body, { topicKeys: ["sleep", "calm"], topicCount: 2 });
 
 console.log("playlist-editorial-topics-unit: ok");

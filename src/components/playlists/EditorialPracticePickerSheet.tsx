@@ -11,7 +11,10 @@ import {
 import { useRouter } from "next/navigation";
 
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
-import type { EditorialPracticeOption } from "@/lib/playlists/editorial-practices";
+import {
+  isEditorialPracticeTrackExpandable,
+  type EditorialPracticeOption,
+} from "@/lib/playlists/editorial-practices";
 import {
   playlistItemKey,
   playlistItemQuery,
@@ -499,7 +502,10 @@ export default function EditorialPracticePickerSheet({
           {loadState.status === "ready" && filteredPractices.length > 0 ? (
             <ul className="space-y-3">
               {filteredPractices.map((practice) => {
-                const trackSelectable = practice.tracks.length > 0;
+                const trackSelectable = isEditorialPracticeTrackExpandable(
+                  practice.productKind,
+                  practice.tracks.length,
+                );
                 const queryMatchesTrack =
                   Boolean(query.trim()) &&
                   practice.tracks.some((track) =>

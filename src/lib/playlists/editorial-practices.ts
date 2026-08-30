@@ -68,6 +68,43 @@ export type EditorialPracticeOption = ProductCoverFields & {
   tracks: EditorialPracticeTrackOption[];
 };
 
+/**
+ * Music albums expand when they have any published tracks.
+ * Non-music products expand only when they have more than one published audio.
+ */
+export function isEditorialPracticeTrackExpandable(
+  productKind: ProductKind | string | null | undefined,
+  trackCount: number,
+): boolean {
+  if (isMusicProductKind(productKind)) {
+    return trackCount > 0;
+  }
+
+  return trackCount > 1;
+}
+
+export function resolveEditorialPracticeAlreadyAdded(input: {
+  productKind: ProductKind | string | null | undefined;
+  tracks: ReadonlyArray<{ alreadyAdded: boolean }>;
+  productAlreadyAdded: boolean;
+}): boolean {
+  if (isMusicProductKind(input.productKind)) {
+    return (
+      input.tracks.length > 0 &&
+      input.tracks.every((track) => track.alreadyAdded)
+    );
+  }
+
+  if (isEditorialPracticeTrackExpandable(input.productKind, input.tracks.length)) {
+    return input.tracks.every((track) => track.alreadyAdded);
+  }
+
+  return (
+    input.productAlreadyAdded ||
+    input.tracks.some((track) => track.alreadyAdded)
+  );
+}
+
 function normalizeAuthor(
   authors: EditorialPracticeRow["authors"],
 ): { id: string; name: string; slug: string } | null {
@@ -198,15 +235,13 @@ export async function listEditorialPracticeOptions(
 
     const productKind = normalizeProductKind(row.product_kind);
     const isMusic = isMusicProductKind(productKind);
-    const tracks = isMusic
-      ? (tracksByPractice.get(row.id) ?? []).map((track) => ({
-          id: track.id,
-          title: track.title,
-          position: track.position,
-          durationLabel: formatAudioDuration(track.durationSeconds),
-          alreadyAdded: addedTrackSet.has(track.id),
-        }))
-      : [];
+    const tracks = (tracksByPractice.get(row.id) ?? []).map((track) => ({
+      id: track.id,
+      title: track.title,
+      position: track.position,
+      durationLabel: formatAudioDuration(track.durationSeconds),
+      alreadyAdded: addedTrackSet.has(track.id),
+    }));
 
     practices.push({
       id: row.id,
@@ -225,9 +260,11 @@ export async function listEditorialPracticeOptions(
       ...mapProductCoverFields(row),
       isFree: isProductFree(row.is_free, row.price),
       priceLabel: getProductPriceLabel(row.price, row.is_free),
-      alreadyAdded: isMusic
-        ? tracks.length > 0 && tracks.every((track) => track.alreadyAdded)
-        : addedProductSet.has(row.id),
+      alreadyAdded: resolveEditorialPracticeAlreadyAdded({
+        productKind,
+        tracks,
+        productAlreadyAdded: addedProductSet.has(row.id),
+      }),
       tracks,
     });
   }
