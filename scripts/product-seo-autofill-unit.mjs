@@ -1050,7 +1050,11 @@ assert.match(stylePrompt, /warmth=80/);
 assert.match(stylePrompt, /variety=high/);
 assert.match(stylePrompt, /влияние стиля минимальное/);
 assert.match(stylePrompt, /Не начинай каждый seoAbout автоматически/);
-assert.match(stylePrompt, /Q1 naturally содержит основной запрос/);
+assert.match(
+  stylePrompt,
+  /Q1\.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «медитация для сна»/,
+);
+assert.doesNotMatch(stylePrompt, /naturally/);
 
 assert.equal(
   productSeoSecondaryStatusCopy("limited"),
@@ -1287,6 +1291,163 @@ assert.match(
   repairPrompt,
   /Не пересказывай короткое описание. Используй его только как источник фактов и добавь новую информацию./,
 );
+
+const FAQ_EXACT_PRIMARY = "музыка для сна";
+const faqExactPrimaryInput = {
+  request: { ...requestInput(), seoPrimaryQuery: FAQ_EXACT_PRIMARY },
+  candidates: eligibleSecondaryCandidates(sampleCandidates(), FAQ_EXACT_PRIMARY),
+};
+
+// SYSTEM_PROMPT_FAQ_EXACT_PRIMARY
+{
+  const systemPrompt = buildProductSeoSystemPrompt(faqExactPrimaryInput);
+  assert.match(systemPrompt, /музыка для сна/, "SYSTEM_PROMPT_FAQ_EXACT_PRIMARY exact primary");
+  assert.match(
+    systemPrompt,
+    /Q1\.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «музыка для сна»/,
+    "SYSTEM_PROMPT_FAQ_EXACT_PRIMARY Q1.question verbatim",
+  );
+  assert.match(systemPrompt, /Не изменяй слова запроса, их порядок и словоформу/);
+  assert.doesNotMatch(systemPrompt, /naturally/);
+}
+
+const FAQ_REPAIR_INSTRUCTION = /Исправление FAQ обязательно/;
+
+// REPAIR_PRIMARY_MISSING_FROM_FAQ
+{
+  const repairFaq = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["primary_missing_from_faq"],
+  );
+  assert.match(repairFaq, /музыка для сна/, "REPAIR_PRIMARY_MISSING_FROM_FAQ exact primary");
+  assert.match(repairFaq, /faqItems\.question/, "REPAIR_PRIMARY_MISSING_FROM_FAQ faqItems.question");
+  assert.match(repairFaq, FAQ_REPAIR_INSTRUCTION, "REPAIR_PRIMARY_MISSING_FROM_FAQ explicit FAQ fix");
+  assert.match(
+    repairFaq,
+    /Не переноси запрос только в answer/,
+    "REPAIR_PRIMARY_MISSING_FROM_FAQ answer is not enough",
+  );
+  assert.match(repairFaq, /Проблемы: primary_missing_from_faq/);
+}
+
+// REPAIR_OTHER_ISSUE_NO_FAQ_INSTRUCTION
+{
+  const repairOther = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["secondary_count"],
+  );
+  assert.doesNotMatch(
+    repairOther,
+    FAQ_REPAIR_INSTRUCTION,
+    "REPAIR_OTHER_ISSUE_NO_FAQ_INSTRUCTION",
+  );
+  assert.match(repairOther, /Проблемы: secondary_count/);
+}
+
+{
+  const repairInvented = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["invented_secondary"],
+  );
+  assert.doesNotMatch(
+    repairInvented,
+    FAQ_REPAIR_INSTRUCTION,
+    "REPAIR_OTHER_ISSUE_NO_FAQ_INSTRUCTION invented_secondary",
+  );
+}
+
+function musicSleepValidationInput() {
+  return {
+    primaryQuery: FAQ_EXACT_PRIMARY,
+    title: "Лавандовый сон",
+    subtitle: "Вечерняя практика",
+    description: "Мягкая музыка для сна.",
+    productKind: "practice",
+    usageItems: [],
+    candidates: eligibleSecondaryCandidates(sampleCandidates(), FAQ_EXACT_PRIMARY),
+  };
+}
+
+// VALIDATOR_PRIMARY_FAQ_PASS
+{
+  const faqPass = validateProductSeoAiDraft(
+    validDraft({
+      seoTitle: "Музыка для сна – расслабление перед сном",
+      seoDescription:
+        "Музыка для сна мягко помогает замедлиться вечером и подготовиться ко сну в спокойном темпе.",
+      seoAbout: [
+        "Эта музыка для сна создана для спокойного вечера, когда хочется замедлиться и отойти от дневных дел.",
+        "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник и обещаний чуда.",
+        "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как понятный ритуал завершения дня.",
+      ].join("\n\n"),
+      faqItems: [
+        {
+          question: "Что такое музыка для сна и когда её слушать?",
+          answer: "Обычно вечером, когда вы уже готовитесь ко сну и можете лечь удобно.",
+          anchor: "kogda-slushat",
+        },
+        {
+          question: "Нужен ли опыт медитации?",
+          answer: "Нет. Достаточно слушать и замечать дыхание в своём темпе.",
+          anchor: "nuzhen-li-opyt",
+        },
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Тем, кто ищет спокойный вечерний ритуал и мягкое завершение дня.",
+          anchor: "komu-podoydyot",
+        },
+      ],
+    }),
+    musicSleepValidationInput(),
+  );
+  assert.equal(faqPass.ok, true, "VALIDATOR_PRIMARY_FAQ_PASS draft ok");
+  assert.ok(
+    !("issues" in faqPass) || !faqPass.issues.includes("primary_missing_from_faq"),
+    "VALIDATOR_PRIMARY_FAQ_PASS",
+  );
+}
+
+// VALIDATOR_PRIMARY_FAQ_FAIL
+{
+  const faqFail = validateProductSeoAiDraft(
+    validDraft({
+      seoTitle: "Музыка для сна – расслабление перед сном",
+      seoDescription:
+        "Музыка для сна мягко помогает замедлиться вечером и подготовиться ко сну в спокойном темпе.",
+      seoAbout: [
+        "Эта музыка для сна создана для спокойного вечера, когда хочется замедлиться и отойти от дневных дел.",
+        "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник и обещаний чуда.",
+        "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как понятный ритуал завершения дня.",
+      ].join("\n\n"),
+      faqItems: [
+        {
+          question: "Когда лучше слушать?",
+          answer: "Вечером, когда вы уже в кровати.",
+          anchor: "kogda",
+        },
+        {
+          question: "Нужен ли опыт?",
+          answer: "Нет, опыт не нужен.",
+          anchor: "opyt",
+        },
+        {
+          question: "Кому подойдёт?",
+          answer: "Тем, кто хочет спокойный вечер.",
+          anchor: "komu",
+        },
+      ],
+    }),
+    musicSleepValidationInput(),
+  );
+  assert.equal(faqFail.ok, false, "VALIDATOR_PRIMARY_FAQ_FAIL");
+  assert.ok(
+    faqFail.issues.includes("primary_missing_from_faq"),
+    "VALIDATOR_PRIMARY_FAQ_FAIL primary_missing_from_faq",
+  );
+}
 
 assert.deepEqual(
   collectSeoAboutDuplicationIssues(
