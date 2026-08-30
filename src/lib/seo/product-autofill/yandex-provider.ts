@@ -10,10 +10,10 @@ import {
   productSeoAiError,
 } from "@/lib/seo/product-autofill/errors";
 import {
+  buildProductSeoAiJsonSchema,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
-  PRODUCT_SEO_AI_JSON_SCHEMA,
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
 import {
@@ -226,6 +226,7 @@ export function createYandexProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
+    input: ProductSeoAiPromptInput,
   ): Promise<YandexProductSeoAiProviderResult> {
     const apiKey = readYandexAiApiKey(env);
     const folderId = readYandexAiFolderId(env);
@@ -249,7 +250,7 @@ export function createYandexProductSeoAiProvider(
         { role: "user", text: prompts.userPrompt },
       ],
       jsonSchema: {
-        schema: PRODUCT_SEO_AI_JSON_SCHEMA,
+        schema: buildProductSeoAiJsonSchema(input),
       },
     });
 
@@ -333,6 +334,7 @@ export function createYandexProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
+        input,
       );
     },
     repair(input, previous, issues) {
@@ -342,6 +344,7 @@ export function createYandexProductSeoAiProvider(
           userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
         },
         "repair",
+        input,
       );
     },
   };

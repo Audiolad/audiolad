@@ -64,6 +64,26 @@ export type ProductSeoAiPromptInput = {
   candidates: EligibleSecondaryCandidate[];
 };
 
+export function buildProductSeoAiJsonSchema(
+  input: Pick<ProductSeoAiPromptInput, "candidates"> | number,
+) {
+  const candidateCount =
+    typeof input === "number" ? input : input.candidates.length;
+  const { min, max } = expectedSecondaryRange(candidateCount);
+
+  return {
+    ...PRODUCT_SEO_AI_JSON_SCHEMA,
+    properties: {
+      ...PRODUCT_SEO_AI_JSON_SCHEMA.properties,
+      secondaryQueries: {
+        ...PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+        minItems: min,
+        maxItems: max,
+      },
+    },
+  };
+}
+
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
   const secondaryRange = expectedSecondaryRange(input.candidates.length);
