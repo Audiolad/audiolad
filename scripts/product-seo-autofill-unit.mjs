@@ -2642,7 +2642,7 @@ function helperCandidates(phrases) {
 
 {
   // NORMALIZED_DUPLICATES_REMOVED
-  const candidates = helperCandidates(["Вечерняя медитация", "A", "B"]);
+  const candidates = helperCandidates(["Вечерняя медитация", "A"]);
   assert.deepEqual(
     canonicalizeYandexSecondaryQueries(
       ["  вечерняя   медитация  ", "Вечерняя Медитация", "A"],
