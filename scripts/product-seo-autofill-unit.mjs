@@ -1371,14 +1371,20 @@ assert.equal(
   true,
 );
 
+const TITLE_PIPE_SEED = "Белый шум воды | Источник Серафима Саровского";
+const DESCRIPTION_SENTENCE =
+  "Мягкий поток воды помогает расслабиться и замедлить дыхание перед сном.";
 const seeds = suggestPrimaryQuerySeeds({
-  title: "Лавандовый сон",
-  subtitle: "Вечерняя практика",
-  description: "Мягкая медитация для сна. Подходит для вечера.",
-  productKind: "practice",
+  title: TITLE_PIPE_SEED,
+  subtitle: "",
+  description: DESCRIPTION_SENTENCE,
+  productKind: "music",
 });
-assert.ok(seeds.includes("Лавандовый сон"));
-assert.ok(seeds.length >= 3 && seeds.length <= 5);
+assert.equal(seeds.length, 0);
+assert.equal(seeds.includes(TITLE_PIPE_SEED), false);
+assert.equal(seeds.includes(DESCRIPTION_SENTENCE), false);
+assert.equal(seeds.includes(`${TITLE_PIPE_SEED} музыка`), false);
+assert.equal(seeds.includes("Музыка"), false);
 
 await withEnvAsync(enabledEnv(), async () => {
   const config = getProductSeoAiConfig();

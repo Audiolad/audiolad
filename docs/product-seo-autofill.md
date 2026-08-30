@@ -12,9 +12,10 @@ issues, PRs, or chat.
 
 1. Author fills the ordinary product card (title, format, subtitle,
    description, other product fields).
-2. Author chooses a **primary query** — typed by hand, picked from the
-   existing Wordstat helper, or started from a seed taken from the product
-   card and then checked in Wordstat.
+2. Author chooses a **primary query** — typed by hand or picked from the
+   existing Wordstat helper. The primary CTA auto-searches a sanitized
+   title seed; Wordstat results are the choices. Autofill still starts
+   only after a primary is chosen.
 3. Wordstat returns real demand candidates (GetTop results + associations).
 4. Autofill **selects secondaries only from those candidates**.
    If Wordstat has 3+ eligible phrases, the draft includes 3–5. If it

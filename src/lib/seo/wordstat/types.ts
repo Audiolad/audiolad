@@ -61,7 +61,8 @@ export type WordstatErrorCode =
   | "TIMEOUT"
   | "UPSTREAM_ERROR"
   | "NO_RESULTS"
-  | "INVALID_PHRASE";
+  | "INVALID_PHRASE"
+  | "INVALID_QUERY";
 
 export type WordstatErrorResult = {
   ok: false;

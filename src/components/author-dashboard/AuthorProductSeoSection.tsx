@@ -27,12 +27,18 @@ import {
   parseSeoSecondaryQueryList,
 } from "@/lib/seo/secondary-query-list";
 import {
+  buildWordstatSuggestionsRequest,
   canAddSecondaryQuery,
   clipSeoQuery,
   getWordstatPrimaryCtaLabel,
-  resolveWordstatSeed,
+  planWordstatPickerOpen,
+  resolveWordstatRequestPhrase,
+  shouldAutoSearchOnPrimaryCta,
 } from "@/lib/seo/wordstat/ui";
-import { WORDSTAT_ERROR_MESSAGES } from "@/lib/seo/wordstat/errors";
+import {
+  WORDSTAT_ERROR_MESSAGES,
+  wordstatClientErrorMessage,
+} from "@/lib/seo/wordstat/errors";
 import type { WordstatSuggestionsPayload } from "@/lib/seo/wordstat/types";
 import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "@/lib/seo/product-autofill/errors";
 import {
@@ -57,7 +63,6 @@ import {
   productSeoPrimarySelectedLabel,
   productSeoSecondaryStatusCopy,
   resolveProductSeoAccordionBadge,
-  suggestPrimaryQuerySeeds,
 } from "@/lib/seo/product-autofill/ui";
 import {
   createDefaultProductSeoStyleProfile,
@@ -285,24 +290,25 @@ export default function AuthorProductSeoSection({
     seoAbout,
   });
   const primarySelected = Boolean(seoPrimaryQuery.trim());
-  const primarySeeds = primarySelected
-    ? []
-    : suggestPrimaryQuerySeeds({
-        title,
-        subtitle,
-        description,
-        productKind,
-      });
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
 
-  function openWordstatPicker(seedOverride?: string) {
+  function openWordstatPicker(options?: {
+    seedOverride?: string;
+    autoSearch?: boolean;
+  }) {
+    const { seed, shouldSearch } = planWordstatPickerOpen({
+      seoPrimaryQuery,
+      title,
+      seedOverride: options?.seedOverride,
+      autoSearch: options?.autoSearch,
+    });
     setWordstatOpen(true);
     setWordstatError(null);
-    setWordstatSeed(
-      seedOverride?.trim() ||
-        resolveWordstatSeed({ seoPrimaryQuery, title }),
-    );
+    setWordstatSeed(seed);
+    if (shouldSearch) {
+      void submitWordstat(seed);
+    }
   }
 
   function addSecondaryPhrase(phrase: string) {
@@ -460,36 +466,27 @@ export default function AuthorProductSeoSection({
     void generateProductSeo();
   }
 
-  async function submitWordstat() {
+  async function submitWordstat(seedOverride?: string) {
     if (wordstatLoading) {
       return;
     }
+
+    const phrase = resolveWordstatRequestPhrase(seedOverride, wordstatSeed);
+    const request = buildWordstatSuggestionsRequest(phrase);
 
     setWordstatLoading(true);
     setWordstatError(null);
 
     try {
-      const response = await fetch("/api/author/seo/wordstat/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrase: wordstatSeed }),
-      });
+      const response = await fetch(request.url, request.init);
       const payload = (await response.json().catch(() => null)) as
         | WordstatSuggestionsPayload
         | { error?: string; code?: string }
         | null;
 
       if (!response.ok || !payload || !("suggestions" in payload)) {
-        const code = payload && "code" in payload ? payload.code : null;
         setWordstatResult(null);
-        setWordstatError(
-          (payload && "error" in payload && typeof payload.error === "string"
-            ? payload.error
-            : null) ||
-            (code === "RATE_LIMITED"
-              ? WORDSTAT_ERROR_MESSAGES.RATE_LIMITED
-              : WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR),
-        );
+        setWordstatError(wordstatClientErrorMessage(payload));
         return;
       }
 
@@ -544,26 +541,15 @@ export default function AuthorProductSeoSection({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => openWordstatPicker()}
+            onClick={() =>
+              openWordstatPicker({
+                autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
+              })
+            }
             className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {PRODUCT_SEO_PICK_PRIMARY_CTA}
           </button>
-          {primarySeeds.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {primarySeeds.map((seed) => (
-                <button
-                  key={seed}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => openWordstatPicker(seed)}
-                  className="rounded-full border border-[#d4c4ee] bg-white px-3 py-1.5 text-sm text-[#4d336f] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {seed}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : (
         <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
@@ -664,7 +650,11 @@ export default function AuthorProductSeoSection({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => openWordstatPicker()}
+          onClick={() =>
+            openWordstatPicker({
+              autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
+            })
+          }
           className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {getWordstatPrimaryCtaLabel(seoPrimaryQuery)}
@@ -760,7 +750,9 @@ export default function AuthorProductSeoSection({
           type="button"
           disabled={disabled}
           onClick={() =>
-            openWordstatPicker(seoPrimaryQuery.trim() || undefined)
+            openWordstatPicker({
+              seedOverride: seoPrimaryQuery.trim() || undefined,
+            })
           }
           className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
         >

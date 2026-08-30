@@ -451,7 +451,9 @@ assert.equal(
 );
 assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
-assert.match(seoSection, /suggestPrimaryQuerySeeds/);
+assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
+assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
+assert.match(seoSection, /void submitWordstat\(seed\)/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Подобрать похожие/);
@@ -525,7 +527,11 @@ assert.match(seoSection, /api\/author\/seo\/related-product-options/);
 assert.match(seoSection, /RELATED_PRODUCT_SEARCH_DEBOUNCE_MS/);
 assert.match(seoSection, /shouldSearchRelatedProducts/);
 assert.match(seoSection, /canAddRelatedProductId/);
-assert.match(seoSection, /api\/author\/seo\/wordstat\/suggestions/);
+assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
+assert.match(
+  read("src/lib/seo/wordstat/ui.ts"),
+  /api\/author\/seo\/wordstat\/suggestions/,
+);
 assert.doesNotMatch(seoSection, /YANDEX_SEARCH_API_KEY|YANDEX_SEARCH_FOLDER_ID/);
 assert.match(seoSection, /relatedProductSourceId/);
 assert.match(seoSection, /Найти продукт/);

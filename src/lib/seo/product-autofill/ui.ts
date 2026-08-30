@@ -1,14 +1,7 @@
-import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
-import {
-  AUDIO_POST_KIND_LABEL,
-  MUSIC_KIND_LABEL,
-  PRACTICE_KIND_LABEL,
-} from "@/lib/author-products/product-kind";
 import {
   evaluateProductSeoReadiness,
   type ProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
-import { clipSeoQuery } from "@/lib/seo/wordstat/ui";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import type {
   ProductSeoAccordionBadgeKind,
@@ -187,72 +180,14 @@ export function hasFilledGeneratedSeoFields(input: {
   );
 }
 
-function uniquePhrases(values: string[]): string[] {
-  const seen = new Set<string>();
-  const phrases: string[] = [];
-
-  for (const value of values) {
-    const clipped = clipSeoQuery(value, PRODUCT_CONTENT_LIMITS.seoPrimaryQuery);
-    if (clipped.length < 3) {
-      continue;
-    }
-
-    const key = clipped.toLocaleLowerCase("ru-RU");
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    phrases.push(clipped);
-  }
-
-  return phrases;
-}
-
-function productKindSeed(productKind: string): string {
-  if (productKind === "music") {
-    return MUSIC_KIND_LABEL;
-  }
-
-  if (productKind === "audio_post") {
-    return AUDIO_POST_KIND_LABEL;
-  }
-
-  return PRACTICE_KIND_LABEL;
-}
-
-function descriptionSeeds(description: string): string[] {
-  const normalized = description.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return [];
-  }
-
-  return normalized
-    .split(/(?<=[.!?…])\s+/)
-    .map((sentence) => sentence.replace(/[.!?…]+$/g, "").trim())
-    .filter((sentence) => sentence.length >= 8 && sentence.length <= 80);
-}
-
 export function suggestPrimaryQuerySeeds(input: {
   title: string;
   subtitle: string;
   description: string;
   productKind: string;
 }): string[] {
-  const kind = productKindSeed(input.productKind);
-  const title = input.title.trim();
-  const combined =
-    title && kind && !title.toLocaleLowerCase("ru-RU").includes(kind.toLocaleLowerCase("ru-RU"))
-      ? `${title} ${kind.toLocaleLowerCase("ru-RU")}`
-      : "";
-
-  return uniquePhrases([
-    title,
-    input.subtitle,
-    ...descriptionSeeds(input.description),
-    combined,
-    kind,
-  ]).slice(0, 5);
+  void input;
+  return [];
 }
 
 export function productSeoPrimarySelectedLabel(primaryQuery: string): string {
