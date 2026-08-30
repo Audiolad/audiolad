@@ -24,7 +24,9 @@ async function measure(page, width) {
     const signUp = [...(header?.querySelectorAll("a") ?? [])].find((a) =>
       a.textContent?.includes("Регистрация"),
     );
-    const hero = document.querySelector(".listener-home-content h1");
+    const hero =
+      document.querySelector("[data-guest-home-intro]") ??
+      document.querySelector(".listener-home-content h1");
 
     const docWidth = document.documentElement.scrollWidth;
     const bodyOverflow = docWidth > viewportWidth;

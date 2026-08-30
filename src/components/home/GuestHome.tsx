@@ -1,14 +1,16 @@
 import Link from "next/link";
 
+import {
+  GUEST_HOME_INTRO,
+  GUEST_HOME_LISTEN_FREE_CTA,
+} from "@/lib/home/guest-slider";
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
-import type { GuestHomeData, HomeProduct } from "@/lib/home/types";
+import type { GuestHomeData } from "@/lib/home/types";
 
 import BecomeAuthorPromoBanner from "@/components/listener/BecomeAuthorPromoBanner";
 
 import AuthorsRail from "./AuthorsRail";
-import HeroFeaturedProduct from "./HeroFeaturedProduct";
-import { PlayIcon } from "./HomeIcons";
-import HomeProductPlayButton from "./HomeProductPlayButton";
+import GuestHomeSlider from "./GuestHomeSlider";
 import HowItWorks from "./HowItWorks";
 import HomeTopicNavigation from "./HomeTopicNavigation";
 import ProductRail from "./ProductRail";
@@ -19,65 +21,31 @@ type GuestHomeProps = {
   homeTopics: HomeTopicItem[];
 };
 
-function getPrimaryHomePlayProduct(data: GuestHomeData): HomeProduct | null {
-  const candidate = data.featuredFreeProduct ?? data.freeProducts[0] ?? null;
-
-  if (candidate?.authorSlug && candidate.slug) {
-    return candidate;
-  }
-
-  return null;
-}
-
 export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
-  const primaryPlayProduct = getPrimaryHomePlayProduct(data);
-
   return (
     <>
-      <section className="mt-8 xl:mt-5">
-        <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15] xl:text-[34px] xl:leading-[1.12]">
-          Аудио, которое помогает вернуться к себе
-        </h1>
-
-        <p className="mt-3 max-w-[720px] text-lg font-medium leading-7 text-[#7042c5] lg:text-xl xl:max-w-none xl:text-[17px] xl:leading-7">
-          АудиоЛад – платформа авторских аудиопрактик, медитаций и программ.
-          Находите любимых авторов и слушайте в одном спокойном пространстве.
+      <section className="mt-3 xl:mt-2">
+        <p
+          data-guest-home-intro
+          className="text-[15px] font-medium leading-snug text-[#25135c] sm:text-base xl:text-[17px] xl:leading-6"
+        >
+          {GUEST_HOME_INTRO}
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          {primaryPlayProduct?.authorSlug ? (
-            <HomeProductPlayButton
-              practiceId={primaryPlayProduct.id}
-              authorSlug={primaryPlayProduct.authorSlug}
-              productSlug={primaryPlayProduct.slug}
-              ariaLabel="Начать слушать"
-              className="home-primary-cta home-primary-cta--hero"
-            >
-              <PlayIcon />
-              Начать слушать
-            </HomeProductPlayButton>
-          ) : (
-            <Link
-              href="/catalog"
-              className="home-primary-cta home-primary-cta--hero"
-            >
-              <PlayIcon />
-              Начать слушать
-            </Link>
-          )}
+        <div className="mt-3">
+          <GuestHomeSlider />
+        </div>
 
+        <div className="mt-4 flex justify-center">
           <Link
-            href="/catalog"
-            className="inline-flex min-h-11 items-center rounded-[22px] border border-[#c9b5e8] bg-white px-5 py-3.5 text-[16px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            href={GUEST_HOME_LISTEN_FREE_CTA.href}
+            data-guest-home-cta
+            className="home-primary-cta home-primary-cta--compact"
           >
-            Открыть каталог
+            {GUEST_HOME_LISTEN_FREE_CTA.label}
           </Link>
         </div>
       </section>
-
-      {data.featuredFreeProduct ? (
-        <HeroFeaturedProduct product={data.featuredFreeProduct} />
-      ) : null}
 
       <ProductRail
         title="Попробуйте в подарок"

@@ -57,7 +57,7 @@ function testSharedShellIsTheHomepageCard() {
   assert.doesNotMatch(pdpHero, /grid-cols-\[minmax/);
   assert.doesNotMatch(pdpHero, /rounded-\[28px\] border border-\[#eadff8\]/);
 
-  assert.match(guestHome, /HeroFeaturedProduct/);
+  assert.doesNotMatch(guestHome, /HeroFeaturedProduct/);
   assert.doesNotMatch(homeCard, /featured-card--guest/);
 }
 
