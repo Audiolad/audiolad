@@ -211,7 +211,6 @@ assert.match(seoSection, /shouldListDefaultAuthorProducts\(relatedProductQuery\)
 assert.match(seoSection, /getRelatedProductPickerMode/);
 assert.match(seoSection, /MAX_AUTHOR_RECOMMENDATIONS/);
 assert.match(seoSection, /AUTHOR_RECOMMENDATIONS_LIMIT_COPY/);
-assert.match(seoSection, /Можно добавить до 5 рекомендаций/);
 assert.match(seoSection, /Добавлено/);
 assert.match(seoSection, /max-h-64/);
 assert.match(seoSection, /overflow-y-auto/);

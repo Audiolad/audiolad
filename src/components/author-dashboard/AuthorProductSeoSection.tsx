@@ -161,8 +161,8 @@ export default function AuthorProductSeoSection({
   const [defaultAuthorProducts, setDefaultAuthorProducts] = useState<
     RelatedProductSearchOption[]
   >([]);
-  const [defaultAuthorProductsReady, setDefaultAuthorProductsReady] =
-    useState(false);
+  const [completedDefaultAuthorSourceId, setCompletedDefaultAuthorSourceId] =
+    useState<string | null>(null);
   const [selectedRelatedProducts, setSelectedRelatedProducts] = useState<
     Record<string, SelectOption>
   >({});
@@ -214,6 +214,9 @@ export default function AuthorProductSeoSection({
   const relatedProductSearchSettled =
     relatedProductSearching &&
     completedRelatedProductQuery === relatedProductQuery;
+  const defaultAuthorProductsReady =
+    relatedProductListingDefaults &&
+    completedDefaultAuthorSourceId === relatedProductSourceId;
   const visibleRelatedProductResults = relatedProductSearching
     ? searchedRelatedProducts
     : relatedProductListingDefaults
@@ -259,7 +262,6 @@ export default function AuthorProductSeoSection({
     }
 
     const controller = new AbortController();
-    setDefaultAuthorProductsReady(false);
     const query = new URLSearchParams({
       source: relatedProductSourceId,
     });
@@ -280,7 +282,7 @@ export default function AuthorProductSeoSection({
       })
       .finally(() => {
         if (!controller.signal.aborted) {
-          setDefaultAuthorProductsReady(true);
+          setCompletedDefaultAuthorSourceId(relatedProductSourceId);
         }
       });
 
