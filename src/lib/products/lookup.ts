@@ -47,6 +47,7 @@ export type PublicPracticeRow = {
   seo_title?: string | null;
   seo_description?: string | null;
   seo_about?: string | null;
+  author_recommendations_title?: string | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -116,6 +117,7 @@ export async function getPracticeByAuthorAndSlug(
       seo_title,
       seo_description,
       seo_about,
+      author_recommendations_title,
       authors!practices_author_id_fkey!inner (
         id,
         name,

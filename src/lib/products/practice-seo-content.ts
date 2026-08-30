@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
+import { resolveAuthorRecommendationsTitle } from "@/lib/products/author-recommendations-title";
 import { formatProductDuration } from "@/lib/products/duration";
 import { getListenPageBySlug } from "@/lib/seo/listens/registry";
 
@@ -31,6 +32,7 @@ export type PublicPracticeSeoContent = {
   faqItems: PracticeSeoFaqItem[];
   relatedProducts: PublicRelatedProduct[];
   relatedListens: Array<{ title: string; href: string }>;
+  authorRecommendationsTitle: string;
 };
 
 /** Keep editor and public-page wording aligned for the ordered usage section. */
@@ -273,6 +275,7 @@ export function mapPublicRelatedProduct(target: {
 export async function loadPublicPracticeSeoContent(
   supabase: SupabaseClient,
   practiceId: string,
+  storedAuthorRecommendationsTitle?: string | null,
 ): Promise<PublicPracticeSeoContent> {
   const [usage, faq, relatedProducts] = await Promise.all([
     supabase.from("practice_seo_usage_items").select("content").eq("practice_id", practiceId).order("position"),
@@ -300,5 +303,8 @@ export async function loadPublicPracticeSeoContent(
       return mapped ? [mapped] : [];
     }),
     relatedListens: [],
+    authorRecommendationsTitle: resolveAuthorRecommendationsTitle(
+      storedAuthorRecommendationsTitle,
+    ),
   };
 }

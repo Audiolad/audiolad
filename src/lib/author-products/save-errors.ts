@@ -53,6 +53,7 @@ const VALIDATION_CODES = new Set([
   "seo_primary_query_too_long",
   "seo_title_too_long",
   "seo_description_too_long",
+  "author_recommendations_title_too_long",
 ]);
 
 const PERMISSION_CODES = new Set([
