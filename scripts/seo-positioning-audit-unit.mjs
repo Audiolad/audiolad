@@ -176,7 +176,7 @@ function testLayoutAndManifestSources() {
   assert(
     guestHome.includes("GUEST_HOME_INTRO") &&
       readFileSync(join(ROOT, "src/lib/home/guest-slider.ts"), "utf8").includes(
-        "платформа авторских аудиопрактик, медитаций, аудиокурсов, музыки и программ.",
+        "платформа авторского аудио: практики, медитации, музыка, аудиокурсы и программы.",
       ),
     "guest home visible text includes platform positioning",
   );
