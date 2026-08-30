@@ -16,6 +16,7 @@ type PracticeCoverInput = {
   cover_image?: unknown;
   updated_at?: string | null;
   duration_minutes?: number | null;
+  use_shared_cover?: boolean | null;
 };
 
 export function playlistItemAudioMap(

@@ -44,6 +44,7 @@ type PracticeEmbed = {
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string | null;
+  use_shared_cover?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   catalog_visibility?: string | null;
@@ -208,6 +209,7 @@ export const loadPublicPlaylistBySlug = cache(
         cover_url,
         cover_image,
         updated_at,
+        use_shared_cover,
         status,
         is_catalog_listed,
         catalog_visibility,

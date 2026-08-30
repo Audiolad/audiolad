@@ -10,6 +10,7 @@ import {
   buildOwnerPlaylistQueue,
   buildPublicPlaylistQueue,
 } from "../src/lib/playlists/build-playlist-queue.ts";
+import { resolvePlaylistItemPresentation } from "../src/lib/playlists/playlist-item-audio.ts";
 import {
   matchesPlaylistQueueEntry,
   playlistItemKey,
@@ -373,6 +374,88 @@ assert(
 assert(
   migration.includes("can_user_edit_playlist"),
   "add RPC keeps direction-editor authority",
+);
+
+const presentationPractice = {
+  title: "Музыка для крепкого сна",
+  cover_url: "https://cdn.test/product.png",
+  cover_image: null,
+  updated_at: "2026-01-01T00:00:00Z",
+  use_shared_cover: false,
+};
+const presentationA = resolvePlaylistItemPresentation({
+  practice: presentationPractice,
+  audioItem: {
+    id: track1,
+    practiceId: albumId,
+    title: "Кораблик снов",
+    position: 1,
+    durationSeconds: 180,
+    coverUrl: "https://cdn.test/track-a.png",
+    coverImage: null,
+    updatedAt: "2026-01-02T00:00:00Z",
+  },
+  audioCount: 1,
+  totalDurationSeconds: 180,
+});
+const presentationB = resolvePlaylistItemPresentation({
+  practice: presentationPractice,
+  audioItem: {
+    id: track2,
+    practiceId: albumId,
+    title: "Track B",
+    position: 2,
+    durationSeconds: 200,
+    coverUrl: "https://cdn.test/track-b.png",
+    coverImage: null,
+    updatedAt: "2026-01-03T00:00:00Z",
+  },
+  audioCount: 1,
+  totalDurationSeconds: 200,
+});
+const presentationFallback = resolvePlaylistItemPresentation({
+  practice: presentationPractice,
+  audioItem: {
+    id: track5,
+    practiceId: albumId,
+    title: "Track no cover",
+    position: 3,
+    durationSeconds: 90,
+    coverUrl: null,
+    coverImage: null,
+    updatedAt: null,
+  },
+  audioCount: 1,
+  totalDurationSeconds: 90,
+});
+assert(
+  presentationA.cover.coverUrl?.includes("track-a.png") &&
+    presentationB.cover.coverUrl?.includes("track-b.png"),
+  "same practice, different track covers stay distinct",
+);
+assert(
+  presentationFallback.cover.coverUrl?.includes("product.png"),
+  "track without cover uses product cover",
+);
+
+const ownedDetail = read("src/lib/playlists/detail.ts");
+const editorialDetail = read("src/lib/playlists/editorial-workspace-detail.ts");
+const publicDetail = read("src/lib/playlists/public-detail.ts");
+assert(ownedDetail.includes("use_shared_cover"), "owned detail selects use_shared_cover");
+assert(
+  editorialDetail.includes("use_shared_cover"),
+  "editorial detail selects use_shared_cover",
+);
+assert(publicDetail.includes("use_shared_cover"), "public detail selects use_shared_cover");
+
+const deleteRoute = read(
+  "src/app/api/playlists/[id]/items/[practiceId]/route.ts",
+);
+assert(deleteRoute.includes("remove_playlist_item"), "DELETE uses remove RPC");
+assert(deleteRoute.includes("p_audio_item_id"), "DELETE forwards audioItemId");
+assert(
+  deleteRoute.includes(".from(\"playlist_items\")") === false,
+  "DELETE no longer mutates playlist_items directly",
 );
 
 const player = read("src/components/audio/GlobalAudioPlayerProvider.tsx");

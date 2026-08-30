@@ -4,6 +4,7 @@
  */
 import { readFileSync } from "node:fs";
 
+import { resolvePlaylistItemPresentation } from "../src/lib/playlists/playlist-item-audio.ts";
 import {
   resolvePlaybackCoverFields,
   resolvePlaybackCoverUrl,
@@ -261,6 +262,86 @@ const fields = resolvePlaybackCoverFields(practice, trackWithCover);
 assert(
   fields.coverUrl?.includes("track-a.png"),
   "cover fields resolver prefers individual track cover",
+);
+
+const practiceId = "11111111-1111-4111-8111-111111111111";
+const trackA = {
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  practiceId,
+  title: "Track A",
+  position: 1,
+  durationSeconds: 90,
+  coverUrl: "https://cdn.test/cover-a.png",
+  coverImage: { kind: "a" },
+  updatedAt: "2026-01-02T00:00:00Z",
+};
+const trackB = {
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  practiceId,
+  title: "Track B",
+  position: 2,
+  durationSeconds: 120,
+  coverUrl: "https://cdn.test/cover-b.png",
+  coverImage: { kind: "b" },
+  updatedAt: "2026-01-03T00:00:00Z",
+};
+const trackNoCover = {
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  practiceId,
+  title: "Track C",
+  position: 3,
+  durationSeconds: 60,
+  coverUrl: null,
+  coverImage: null,
+  updatedAt: null,
+};
+
+const playlistPractice = {
+  title: "Музыка для крепкого сна",
+  cover_url: "https://cdn.test/product.png",
+  cover_image: { kind: "product" },
+  updated_at: "2026-01-01T00:00:00Z",
+  use_shared_cover: false,
+  duration_minutes: 40,
+};
+
+const itemA = resolvePlaylistItemPresentation({
+  practice: playlistPractice,
+  audioItem: trackA,
+  audioCount: 1,
+  totalDurationSeconds: 90,
+});
+const itemB = resolvePlaylistItemPresentation({
+  practice: playlistPractice,
+  audioItem: trackB,
+  audioCount: 1,
+  totalDurationSeconds: 120,
+});
+const itemFallback = resolvePlaylistItemPresentation({
+  practice: playlistPractice,
+  audioItem: trackNoCover,
+  audioCount: 1,
+  totalDurationSeconds: 60,
+});
+const sharedItem = resolvePlaylistItemPresentation({
+  practice: { ...playlistPractice, use_shared_cover: true },
+  audioItem: trackA,
+  audioCount: 1,
+  totalDurationSeconds: 90,
+});
+
+assert(
+  itemA.cover.coverUrl?.includes("cover-a.png") &&
+    itemB.cover.coverUrl?.includes("cover-b.png"),
+  "playlist item A/B get distinct track covers when use_shared_cover=false",
+);
+assert(
+  itemFallback.cover.coverUrl?.includes("product.png"),
+  "playlist track without cover falls back to product cover",
+);
+assert(
+  sharedItem.cover.coverUrl?.includes("product.png"),
+  "shared-cover products keep the product cover on playlist items",
 );
 
 console.log("product-contents-track-cover-unit: ok");
