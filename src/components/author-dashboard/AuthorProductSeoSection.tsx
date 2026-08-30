@@ -99,6 +99,7 @@ export type AuthorProductSeoSectionProps = {
   seoTitle: string;
   seoDescription: string;
   seoAbout: string;
+  authorRecommendationsTitle: string;
   seoContent: PracticeSeoContentInput;
   relatedProductOptions: SelectOption[];
   relatedProductSourceId?: string;
@@ -109,6 +110,7 @@ export type AuthorProductSeoSectionProps = {
     seoTitle?: string;
     seoDescription?: string;
     seoAbout?: string;
+    authorRecommendationsTitle?: string;
   };
   onChange: (
     patch: Partial<{
@@ -117,6 +119,7 @@ export type AuthorProductSeoSectionProps = {
       seoTitle: string;
       seoDescription: string;
       seoAbout: string;
+      authorRecommendationsTitle: string;
       seoContent: PracticeSeoContentInput;
     }>,
   ) => void;
@@ -133,6 +136,7 @@ export default function AuthorProductSeoSection({
   seoTitle,
   seoDescription,
   seoAbout,
+  authorRecommendationsTitle,
   seoContent,
   relatedProductOptions,
   relatedProductSourceId,
@@ -914,11 +918,38 @@ export default function AuthorProductSeoSection({
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
-        <p className="text-sm font-medium">Связанные продукты</p>
+        <p className="text-sm font-medium">Рекомендации автора</p>
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Выберите 2–4 продукта, которые действительно связаны с этой темой и
           могут быть полезны слушателю дальше.
         </p>
+        <label className="mt-3 block" htmlFor="author-recommendations-title">
+          <span className="text-sm font-medium">Заголовок блока</span>
+          <input
+            id="author-recommendations-title"
+            value={authorRecommendationsTitle}
+            maxLength={PRODUCT_CONTENT_LIMITS.authorRecommendationsTitle}
+            disabled={disabled}
+            placeholder="Рекомендации автора"
+            onChange={(event) =>
+              onChange({ authorRecommendationsTitle: event.target.value })
+            }
+            className="mt-2 w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2"
+          />
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            Можно оставить стандартный заголовок или написать свой – например
+            „Послушайте ещё“ или „Ещё про сон“.
+          </p>
+          <CharCounter
+            value={authorRecommendationsTitle}
+            max={PRODUCT_CONTENT_LIMITS.authorRecommendationsTitle}
+          />
+          {fieldErrors.authorRecommendationsTitle ? (
+            <p className="mt-2 text-sm text-[#9b3d3d]">
+              {fieldErrors.authorRecommendationsTitle}
+            </p>
+          ) : null}
+        </label>
         <label className="mt-3 block" htmlFor="related-product-search">
           <span className="text-sm font-medium">Найти продукт</span>
           <input

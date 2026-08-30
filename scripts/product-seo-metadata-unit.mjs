@@ -220,7 +220,8 @@ const seoContent = read("src/components/products/PracticeSeoContentSections.tsx"
 assert.match(seoContent, /getPracticeSeoUsageHeading/);
 assert.match(seoContent, /Вопросы и ответы/);
 assert.match(seoContent, /RelatedProductLinkCard/);
-assert.match(seoContent, /Связанные продукты/);
+assert.match(seoContent, /authorRecommendationsTitle/);
+assert.doesNotMatch(seoContent, /Связанные продукты/);
 assert.doesNotMatch(seoContent, /relatedListens|Связанные страницы/);
 assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
 assert.equal(

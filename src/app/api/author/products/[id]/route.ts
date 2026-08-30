@@ -19,6 +19,7 @@ import {
   validateSeoTitleLength,
   validateSubtitleLength,
   validateTitleLength,
+  validateAuthorRecommendationsTitleLength,
 } from "@/lib/author-products/limits";
 import {
   PRODUCT_PAID_PURCHASE_DELETE_LOCK,
@@ -117,7 +118,8 @@ function applyClearableTextField(
     | "seo_primary_query"
     | "seo_about"
     | "seo_title"
-    | "seo_description",
+    | "seo_description"
+    | "author_recommendations_title",
   updates: Record<string, unknown>,
   validate?: (value: string) => string | null,
 ) {
@@ -337,6 +339,22 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       if (seoDescriptionError) {
         return NextResponse.json({ error: seoDescriptionError }, { status: 400 });
+      }
+    }
+
+    if ("author_recommendations_title" in body) {
+      const recommendationsTitleError = applyClearableTextField(
+        body,
+        "author_recommendations_title",
+        updates,
+        validateAuthorRecommendationsTitleLength,
+      );
+
+      if (recommendationsTitleError) {
+        return NextResponse.json(
+          { error: recommendationsTitleError },
+          { status: 400 },
+        );
       }
     }
 

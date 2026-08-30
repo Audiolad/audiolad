@@ -44,7 +44,7 @@ export default function PracticeSeoContentSections({
       ) : null}
       {content.relatedProducts.length ? (
         <section className="overflow-hidden rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)] sm:p-6">
-          <h2 className="text-lg font-semibold text-[#2b2140]">Связанные продукты</h2>
+          <h2 className="text-lg font-semibold text-[#2b2140]">{content.authorRecommendationsTitle}</h2>
           <ul className="mt-3 grid w-full max-w-full grid-cols-1 gap-2">
             {content.relatedProducts.map((item) => (
               <li key={item.practiceId} className="min-w-0">

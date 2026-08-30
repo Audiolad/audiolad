@@ -105,7 +105,9 @@ assert.equal(
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
 assert.match(seoSection, /Найти продукт/);
 assert.match(seoSection, /Введите название или слово из названия/);
-assert.match(seoSection, /Связанные продукты/);
+assert.match(seoSection, /Рекомендации автора/);
+assert.match(seoSection, /Заголовок блока/);
+assert.doesNotMatch(seoSection, /Связанные продукты/);
 assert.doesNotMatch(seoSection, /Связанные страницы «Слушать»/);
 assert.doesNotMatch(seoSection, /listen-options/);
 assert.doesNotMatch(seoSection, /relatedListenSlugs/);
@@ -120,7 +122,8 @@ assert.doesNotMatch(seoSection, /Найти статью/);
 
 const publicSections = read("src/components/products/PracticeSeoContentSections.tsx");
 assert.match(publicSections, /RelatedProductLinkCard/);
-assert.match(publicSections, /Связанные продукты/);
+assert.match(publicSections, /authorRecommendationsTitle/);
+assert.doesNotMatch(publicSections, /Связанные продукты/);
 assert.doesNotMatch(publicSections, /relatedListens/);
 assert.doesNotMatch(publicSections, /Связанные страницы/);
 

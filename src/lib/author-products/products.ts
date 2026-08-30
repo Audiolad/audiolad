@@ -74,6 +74,7 @@ const PRACTICE_DETAIL_SELECT = `
   seo_title,
   seo_description,
   seo_about,
+  author_recommendations_title,
   created_at,
   updated_at
 `;

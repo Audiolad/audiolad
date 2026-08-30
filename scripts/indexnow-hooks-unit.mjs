@@ -112,6 +112,12 @@ function testPracticePublicFields() {
     hasPracticePublicIndexNowChanges({ seo_description: "Описание" }),
     "seo_description is public",
   );
+  assert(
+    hasPracticePublicIndexNowChanges({
+      author_recommendations_title: "Послушайте ещё",
+    }),
+    "author_recommendations_title is public",
+  );
 }
 
 function testSlugChange() {

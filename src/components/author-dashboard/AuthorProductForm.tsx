@@ -195,6 +195,7 @@ type FormState = {
   seoTitle: string;
   seoDescription: string;
   seoAbout: string;
+  authorRecommendationsTitle: string;
   seoContent: PracticeSeoContentInput;
   status: string;
   moderationStatus: string;
@@ -340,6 +341,7 @@ function buildInitialForm(
     seoTitle: "",
     seoDescription: "",
     seoAbout: "",
+    authorRecommendationsTitle: "",
     seoContent: {
       usageItems: [],
       faqItems: [],
@@ -463,6 +465,7 @@ function buildProductSavePayload(
     seo_title: form.seoTitle.trim() || null,
     seo_description: form.seoDescription.trim() || null,
     seo_about: form.seoAbout.trim() || null,
+    author_recommendations_title: form.authorRecommendationsTitle,
     seo_content: {
       usage_items: form.seoContent.usageItems,
       faq_items: form.seoContent.faqItems,
@@ -575,6 +578,7 @@ export default function AuthorProductForm({
     seoTitle?: string;
     seoDescription?: string;
     seoAbout?: string;
+    authorRecommendationsTitle?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -1190,7 +1194,8 @@ export default function AuthorProductForm({
             fieldKey === "seoSecondaryQueries" ||
             fieldKey === "seoTitle" ||
             fieldKey === "seoDescription" ||
-            fieldKey === "seoAbout"
+            fieldKey === "seoAbout" ||
+            fieldKey === "authorRecommendationsTitle"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
@@ -2628,6 +2633,7 @@ export default function AuthorProductForm({
           seoTitle={form.seoTitle}
           seoDescription={form.seoDescription}
           seoAbout={form.seoAbout}
+          authorRecommendationsTitle={form.authorRecommendationsTitle}
           seoContent={form.seoContent}
           relatedProductOptions={relatedProductOptions}
           relatedProductSourceId={practiceId || undefined}
@@ -2638,6 +2644,7 @@ export default function AuthorProductForm({
             seoTitle: fieldErrors.seoTitle,
             seoDescription: fieldErrors.seoDescription,
             seoAbout: fieldErrors.seoAbout,
+            authorRecommendationsTitle: fieldErrors.authorRecommendationsTitle,
           }}
           disabled={!canEditPublicFields || busy}
           onChange={(patch) => {
@@ -2654,6 +2661,9 @@ export default function AuthorProductForm({
                 ? { seoDescription: undefined }
                 : {}),
               ...(patch.seoAbout !== undefined ? { seoAbout: undefined } : {}),
+              ...(patch.authorRecommendationsTitle !== undefined
+                ? { authorRecommendationsTitle: undefined }
+                : {}),
             }));
             setForm((current) => ({ ...current, ...patch }));
           }}
