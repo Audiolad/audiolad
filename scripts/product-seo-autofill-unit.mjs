@@ -25,6 +25,7 @@ import {
   createProductSeoAiRateLimitStore,
   PRODUCT_SEO_AI_USER_LIMIT,
 } from "../src/lib/seo/product-autofill/rate-limit.ts";
+import { canonicalizeYandexSecondaryQueries } from "../src/lib/seo/product-autofill/canonicalize-secondaries.ts";
 import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/select-secondaries.ts";
 import { wordstatPhraseKey } from "../src/lib/seo/wordstat/phrase.ts";
 import {
@@ -630,15 +631,15 @@ assert.equal(onlyRed.some((item) => item.color === "red"), true);
     primary,
   );
   const keys = pool.map((item) => wordstatPhraseKey(item.phrase));
-  assert.equal(new Set(keys).size, keys.length, "CANDIDATE_PIPELINE_ALREADY_DEDUPED");
+  assert.equal(new Set(keys).size, keys.length, "CANDIDATE_PIPELINE_DEDUPES_BY_WORDSTAT_KEY");
   assert.equal(
     keys.filter((key) => key === wordstatPhraseKey("медитация перед сном")).length,
     1,
-    "CANDIDATE_PIPELINE_ALREADY_DEDUPED one phrase key",
+    "CANDIDATE_PIPELINE_DEDUPES_BY_WORDSTAT_KEY one phrase key",
   );
   assert.ok(
     !pool.some((item) => wordstatPhraseKey(item.phrase) === wordstatPhraseKey(primary)),
-    "CANDIDATE_PIPELINE_ALREADY_DEDUPED excludes primary",
+    "CANDIDATE_PIPELINE_DEDUPES_BY_WORDSTAT_KEY excludes primary",
   );
 }
 
@@ -1397,7 +1398,13 @@ const route = read("src/app/api/author/seo/product-autofill/route.ts");
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 
 assert.match(orchestrate, /fetchWordstatSuggestions/);
-assert.match(orchestrate, /eligibleSecondaryCandidates/);
+assert.equal(
+  orchestrate.includes("const candidates = eligibleSecondaryCandidates(suggestions, primary);"),
+  true,
+  "ORCHESTRATOR_USES_ELIGIBLE_SECONDARY_CANDIDATES",
+);
+assert.match(orchestrate, /canonicalizeYandexSecondaryQueries/);
+assert.match(orchestrate, /config\.provider !== "yandex"/);
 assert.match(orchestrate, /provider\.repair/);
 assert.match(orchestrate, /import "server-only"/);
 assert.doesNotMatch(orchestrate, /wordstat\.yandex\.ru/);
@@ -2078,7 +2085,9 @@ await withEnvAsync(yandexEnv(), async () => {
     () =>
       jsonResponse(
         200,
-        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] }))),
+        yandexCompletion(
+          JSON.stringify(validDraft({ seoTitle: "Спокойный вечер без ключа" })),
+        ),
       ),
     () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
   ]);
@@ -2203,7 +2212,7 @@ await withEnvAsync(yandexEnv(), async () => {
   const { result, fetchImpl } = await generateYandexFromBodies(
     [
       yandexCompletion(
-        JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] })),
+        JSON.stringify(validDraft({ seoTitle: "Спокойный вечер без ключа" })),
         "ALTERNATIVE_STATUS_FINAL",
       ),
       yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_TRUNCATED_FINAL"),
@@ -2222,12 +2231,16 @@ await withEnvAsync(yandexEnv(), async () => {
     () =>
       jsonResponse(
         200,
-        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] }))),
+        yandexCompletion(
+          JSON.stringify(validDraft({ seoTitle: "Спокойный вечер без ключа" })),
+        ),
       ),
     () =>
       jsonResponse(
         200,
-        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["другая выдумка"] }))),
+        yandexCompletion(
+          JSON.stringify(validDraft({ seoTitle: "Спокойный вечер без ключа" })),
+        ),
       ),
     () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
   ]);
@@ -2460,7 +2473,6 @@ assert.doesNotMatch(
 
 const inventedPhrase = "музыка для глубокого сна";
 const ungroundedDraft = validDraft({
-  secondaryQueries: [inventedPhrase],
   seoDescription:
     "Медитация для сна длится 30 минут, включает 10 треков и стоит 499 ₽ вечером.",
   seoAbout: [
@@ -2559,7 +2571,6 @@ const ungroundedDraft = validDraft({
   for (const payload of payloads) {
     assert.equal(payload.provider, "yandex");
     assert.equal(payload.model, "yandexgpt-lite");
-    assert.ok(payload.issues.includes("invented_secondary"));
     assert.ok(payload.issues.includes("ungrounded:duration"));
     assert.ok(payload.issues.includes("ungrounded:tracks"));
     assert.ok(payload.issues.includes("ungrounded:price"));
@@ -2592,5 +2603,329 @@ const ungroundedDraft = validDraft({
   assert.equal(JSON.stringify(apiBody).includes("invented_secondary"), false);
   assert.equal(JSON.stringify(apiBody).includes(inventedPhrase), false);
 }
+
+{
+  const helperSource = read("src/lib/seo/product-autofill/canonicalize-secondaries.ts");
+  assert.match(helperSource, /expectedSecondaryRange/);
+  assert.match(helperSource, /wordstatPhraseKey/);
+  assert.doesNotMatch(helperSource, /console\.(log|info|debug|warn)/);
+}
+
+function helperCandidates(phrases) {
+  return phrases.map((phrase, index) => ({
+    phrase,
+    count: 200 - index,
+    color: "green",
+    source: "result",
+  }));
+}
+
+{
+  // VALID_AI_CHOICES_PRESERVED
+  const candidates = helperCandidates(["A", "B", "C", "D"]);
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["C", "A", "B"], candidates),
+    ["C", "A", "B"],
+    "VALID_AI_CHOICES_PRESERVED",
+  );
+}
+
+{
+  // EXACT_DUPLICATES_REMOVED
+  const candidates = helperCandidates(["A", "B", "C"]);
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["A", "A", "B", "C"], candidates),
+    ["A", "B", "C"],
+    "EXACT_DUPLICATES_REMOVED",
+  );
+}
+
+{
+  // NORMALIZED_DUPLICATES_REMOVED
+  const candidates = helperCandidates(["Вечерняя медитация", "A", "B"]);
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(
+      ["  вечерняя   медитация  ", "Вечерняя Медитация", "A"],
+      candidates,
+    ),
+    ["Вечерняя медитация", "A"],
+    "NORMALIZED_DUPLICATES_REMOVED",
+  );
+}
+
+{
+  // INVENTED_REMOVED_AND_FILLED
+  const candidates = helperCandidates(["A", "B", "C", "D"]);
+  const range = expectedSecondaryRange(candidates.length);
+  assert.equal(range.min, 3);
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["A", "выдуманная фраза"], candidates),
+    ["A", "B", "C"],
+    "INVENTED_REMOVED_AND_FILLED",
+  );
+}
+
+{
+  // BELOW_MIN_FILLED
+  const candidates = helperCandidates(["A", "B", "C", "D"]);
+  const range = expectedSecondaryRange(candidates.length);
+  const result = canonicalizeYandexSecondaryQueries(["B"], candidates);
+  assert.equal(result.length, range.min, "BELOW_MIN_FILLED");
+  assert.equal(result[0], "B", "BELOW_MIN_FILLED preserves valid AI choice");
+  assert.deepEqual(result, ["B", "A", "C"]);
+}
+
+{
+  // ABOVE_MAX_TRIMMED
+  const candidates = helperCandidates(["A", "B", "C", "D", "E", "F"]);
+  const range = expectedSecondaryRange(candidates.length);
+  const result = canonicalizeYandexSecondaryQueries(
+    ["A", "B", "C", "D", "E", "F"],
+    candidates,
+  );
+  assert.equal(result.length, range.max, "ABOVE_MAX_TRIMMED");
+  assert.deepEqual(result, ["A", "B", "C", "D", "E"]);
+}
+
+{
+  // ZERO_CANDIDATES
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["A", "B"], []),
+    [],
+    "ZERO_CANDIDATES",
+  );
+}
+
+{
+  // ONE_CANDIDATE
+  const candidates = helperCandidates(["Only"]);
+  const range = expectedSecondaryRange(1);
+  assert.deepEqual(range, { min: 1, max: 1 });
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries([], candidates),
+    ["Only"],
+    "ONE_CANDIDATE empty AI fills to min",
+  );
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["Only"], candidates),
+    ["Only"],
+    "ONE_CANDIDATE valid AI preserved",
+  );
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["invented"], candidates),
+    ["Only"],
+    "ONE_CANDIDATE invented replaced",
+  );
+}
+
+{
+  // TWO_CANDIDATES
+  const candidates = helperCandidates(["First", "Second"]);
+  const range = expectedSecondaryRange(2);
+  assert.deepEqual(range, { min: 1, max: 2 });
+  assert.deepEqual(
+    canonicalizeYandexSecondaryQueries(["Second"], candidates),
+    ["Second"],
+    "TWO_CANDIDATES valid AI choice preserved",
+  );
+  assert.equal(
+    canonicalizeYandexSecondaryQueries(["Second"], candidates).length,
+    1,
+    "TWO_CANDIDATES does not force fill above min",
+  );
+}
+
+{
+  // PRODUCTION_CASE_REGRESSION helper: raw would fail validator
+  const rawSecondaries = [
+    "медитация перед сном",
+    "медитация перед сном",
+    "Медитация перед сном",
+  ];
+  const before = validateProductSeoAiDraft(
+    validDraft({ secondaryQueries: rawSecondaries }),
+    validationInput(),
+  );
+  assert.equal(before.ok, false);
+  assert.equal(
+    before.issues.filter((issue) => issue === "duplicate_secondary").length,
+    2,
+    "PRODUCTION_CASE_REGRESSION raw duplicate_secondary",
+  );
+  assert.ok(
+    before.issues.includes("secondary_count"),
+    "PRODUCTION_CASE_REGRESSION raw secondary_count",
+  );
+  assert.ok(!before.issues.some((issue) => issue.startsWith("invented_secondary")));
+  assert.ok(!before.issues.includes("primary_missing_from_faq"));
+
+  const canonical = canonicalizeYandexSecondaryQueries(
+    rawSecondaries,
+    validationInput().candidates,
+  );
+  const after = validateProductSeoAiDraft(
+    validDraft({ secondaryQueries: canonical }),
+    validationInput(),
+  );
+  assert.equal(after.ok, true, "PRODUCTION_CASE_REGRESSION validator PASS");
+  const afterKeys = after.draft.seoSecondaryQueries.map((phrase) =>
+    wordstatPhraseKey(phrase),
+  );
+  assert.equal(new Set(afterKeys).size, afterKeys.length);
+  const range = expectedSecondaryRange(validationInput().candidates.length);
+  assert.ok(after.draft.seoSecondaryQueries.length >= range.min);
+  assert.ok(after.draft.seoSecondaryQueries.length <= range.max);
+  const allowed = new Set(
+    validationInput().candidates.map((item) => item.phrase),
+  );
+  assert.ok(
+    after.draft.seoSecondaryQueries.every((phrase) => allowed.has(phrase)),
+    "PRODUCTION_CASE_REGRESSION exact candidate phrases",
+  );
+}
+
+await withEnvAsync(yandexEnv(), async () => {
+  const provider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({
+        secondaryQueries: [
+          "медитация перед сном",
+          "медитация перед сном",
+          "Медитация перед сном",
+        ],
+      }),
+      raw: {},
+    },
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-generate-canonicalize-no-repair",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true, "YANDEX_GENERATE_BAD_SECONDARIES_CAN_PASS_WITHOUT_REPAIR");
+  assert.equal(provider.calls.length, 1, "PROVIDER_GENERATE_CALLS=1");
+  assert.equal(provider.calls[0].kind, "generate");
+  assert.equal(
+    provider.calls.filter((item) => item.kind === "repair").length,
+    0,
+    "PROVIDER_REPAIR_CALLS=0",
+  );
+  const range = expectedSecondaryRange(
+    eligibleSecondaryCandidates(sampleCandidates(), requestInput().seoPrimaryQuery)
+      .length,
+  );
+  assert.ok(result.data.seoSecondaryQueries.length >= range.min);
+  assert.ok(result.data.seoSecondaryQueries.length <= range.max);
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const provider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({ seoTitle: "Спокойный вечер без ключа" }),
+      raw: {},
+    },
+    {
+      ok: true,
+      draft: validDraft({
+        secondaryQueries: [
+          "медитация перед сном",
+          "медитация перед сном",
+          "вечерняя медитация",
+          "вечерняя медитация",
+        ],
+      }),
+      raw: {},
+    },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-repair-canonicalize",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true, "YANDEX_REPAIR_RESULT_CANONICALIZED");
+  assert.equal(provider.calls.length, 2);
+  assert.equal(provider.calls[0].kind, "generate");
+  assert.equal(provider.calls[1].kind, "repair");
+  assert.ok(
+    provider.calls[1].issues.includes("primary_missing_from_title"),
+    "YANDEX_REPAIR_RESULT_CANONICALIZED repair invoked for non-secondary issue",
+  );
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const rawSecondaries = [
+    "медитация перед сном",
+    "медитация перед сном",
+    "вечерняя медитация",
+  ];
+  const provider = mockProvider([
+    { ok: true, draft: validDraft({ secondaryQueries: rawSecondaries }), raw: {} },
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "openai-no-canonicalize",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(provider.calls.length, 2, "OPENAI_BEHAVIOR_CHANGED repair still runs");
+  assert.equal(provider.calls[0].kind, "generate");
+  assert.equal(provider.calls[1].kind, "repair");
+  assert.deepEqual(
+    provider.calls[1].previous.secondaryQueries,
+    rawSecondaries,
+    "OPENAI_BEHAVIOR_CHANGED does not rewrite generate secondaries",
+  );
+  assert.ok(
+    provider.calls[1].issues.includes("duplicate_secondary"),
+    "OPENAI_BEHAVIOR_CHANGED validator still sees duplicates",
+  );
+  assert.equal(
+    getProductSeoAiConfig().provider,
+    "openai",
+    "OPENAI_BEHAVIOR_CHANGED = NO",
+  );
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const rawSecondaries = [
+    "медитация перед сном",
+    "медитация перед сном",
+    "Медитация перед сном",
+  ];
+  const provider = mockProvider([
+    { ok: true, draft: validDraft({ secondaryQueries: rawSecondaries }), raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-production-case",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true, "PRODUCTION_CASE_REGRESSION orchestration");
+  assert.equal(provider.calls.length, 1);
+  const allowed = new Set(
+    eligibleSecondaryCandidates(
+      sampleCandidates(),
+      requestInput().seoPrimaryQuery,
+    ).map((item) => item.phrase),
+  );
+  assert.ok(
+    result.data.seoSecondaryQueries.every((phrase) => allowed.has(phrase)),
+  );
+  const keys = result.data.seoSecondaryQueries.map((phrase) =>
+    wordstatPhraseKey(phrase),
+  );
+  assert.equal(new Set(keys).size, keys.length);
+  const range = expectedSecondaryRange(allowed.size);
+  assert.ok(result.data.seoSecondaryQueries.length >= range.min);
+  assert.ok(result.data.seoSecondaryQueries.length <= range.max);
+});
 
 console.log("product-seo-autofill-unit: ok");
