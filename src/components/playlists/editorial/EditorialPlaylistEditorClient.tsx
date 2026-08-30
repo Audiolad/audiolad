@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -37,6 +38,18 @@ import {
   visiblePlaylistItems,
   type PlaylistItemsDraft,
 } from "@/lib/playlists/playlist-item-reorder";
+import {
+  EDITORIAL_PLAYLIST_SAVE_ERROR_MESSAGE,
+  editorialCompositionConfirmationMessage,
+  editorialPlaylistHasMetadataChanges,
+  editorialPlaylistHasTopicChanges,
+  editorialPlaylistSaveButtonView,
+  isEditorialPlaylistFormDirty,
+  reduceEditorialPlaylistSaveUi,
+  snapshotEditorialPlaylistForm,
+  type EditorialPlaylistFormFields,
+  type EditorialPlaylistSaveUi,
+} from "@/lib/playlists/editorial-playlist-save-feedback";
 import { PLAYLIST_TOPIC_LIMIT } from "@/lib/playlists/playlist-topics";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
@@ -73,6 +86,7 @@ export default function EditorialPlaylistEditorClient({
   const slugId = useId();
   const descriptionId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const saveInFlightRef = useRef(false);
   const [title, setTitle] = useState(detail.playlist.title);
   const [slug, setSlug] = useState(detail.playlist.slug ?? "");
   const [description, setDescription] = useState(detail.playlist.description ?? "");
@@ -92,10 +106,43 @@ export default function EditorialPlaylistEditorClient({
   const [listError, setListError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [movingPracticeId, setMovingPracticeId] = useState<string | null>(null);
+  const [savedForm, setSavedForm] = useState<EditorialPlaylistFormFields>(() =>
+    snapshotEditorialPlaylistForm({
+      title: detail.playlist.title,
+      description: detail.playlist.description ?? "",
+      slug: detail.playlist.slug ?? "",
+      topicKeys: detail.topicKeys,
+    }),
+  );
+  const [saveUi, setSaveUi] = useState<EditorialPlaylistSaveUi>({
+    phase: "idle",
+    error: null,
+  });
+  const [toast, setToast] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
   const published = detail.playlist.visibility === "public";
   const slugLocked = detail.slugLocked;
+  const currentForm = {
+    title,
+    description,
+    slug,
+    topicKeys,
+  };
+  const dirty = isEditorialPlaylistFormDirty(
+    currentForm,
+    savedForm,
+    slugLocked,
+  );
+  const saveButton = editorialPlaylistSaveButtonView(saveUi.phase, dirty);
   const serverItems = useMemo(
     () =>
       detail.items.filter(
@@ -150,29 +197,39 @@ export default function EditorialPlaylistEditorClient({
   }
 
   function hasMetadataChanges() {
-    const nextDescription = description.trim() || null;
-    const previousDescription = detail.playlist.description?.trim() || null;
-
-    return (
-      title !== detail.playlist.title ||
-      nextDescription !== previousDescription ||
-      (!slugLocked && slug.trim() !== (detail.playlist.slug ?? ""))
+    return editorialPlaylistHasMetadataChanges(
+      currentForm,
+      savedForm,
+      slugLocked,
     );
   }
 
   function hasTopicChanges() {
-    return (
-      topicKeys.length !== detail.topicKeys.length ||
-      topicKeys.some((key, index) => key !== detail.topicKeys[index])
+    return editorialPlaylistHasTopicChanges(
+      currentForm.topicKeys,
+      savedForm.topicKeys,
     );
   }
 
+  function failSave(message: string) {
+    setSaveUi((current) =>
+      reduceEditorialPlaylistSaveUi(current, { type: "error", message }),
+    );
+    setFormError(message);
+  }
+
+  function confirmCompositionSaved() {
+    setToast(editorialCompositionConfirmationMessage("success"));
+  }
+
   async function saveMetadata() {
-    if (submitting) {
+    if (saveInFlightRef.current || submitting || !saveButton.canSubmit) {
       return;
     }
 
+    saveInFlightRef.current = true;
     setSubmitting(true);
+    setSaveUi((current) => reduceEditorialPlaylistSaveUi(current, { type: "submit" }));
     setFormError(null);
 
     try {
@@ -200,16 +257,16 @@ export default function EditorialPlaylistEditorClient({
 
         if (!response.ok) {
           if (data.error === "slug_conflict") {
-            setFormError("Такой адрес плейлиста уже занят.");
+            failSave("Такой адрес плейлиста уже занят.");
             return;
           }
 
           if (data.error === "slug_locked") {
-            setFormError("Адрес плейлиста закреплён после первой публикации.");
+            failSave("Адрес плейлиста закреплён после первой публикации.");
             return;
           }
 
-          setFormError(data.message || "Не удалось сохранить изменения.");
+          failSave(data.message || EDITORIAL_PLAYLIST_SAVE_ERROR_MESSAGE);
           return;
         }
       }
@@ -231,15 +288,20 @@ export default function EditorialPlaylistEditorClient({
         };
 
         if (!response.ok) {
-          setFormError(data.message || "Не удалось сохранить темы.");
+          failSave(data.message || "Не удалось сохранить темы.");
           return;
         }
       }
 
+      setSavedForm(snapshotEditorialPlaylistForm(currentForm));
+      setSaveUi((current) =>
+        reduceEditorialPlaylistSaveUi(current, { type: "success" }),
+      );
       refresh();
     } catch {
-      setFormError("Не удалось сохранить изменения.");
+      failSave(EDITORIAL_PLAYLIST_SAVE_ERROR_MESSAGE);
     } finally {
+      saveInFlightRef.current = false;
       setSubmitting(false);
     }
   }
@@ -401,6 +463,7 @@ export default function EditorialPlaylistEditorClient({
 
     try {
       await persistMove(practiceId, audioItemId, direction);
+      confirmCompositionSaved();
       refresh();
     } catch {
       setListError("Не удалось изменить порядок.");
@@ -435,6 +498,7 @@ export default function EditorialPlaylistEditorClient({
         request.direction,
         request.targetPosition,
       );
+      confirmCompositionSaved();
       refresh();
     } catch {
       setDraft({ orderKey: serverOrderKey, items: previous });
@@ -461,6 +525,7 @@ export default function EditorialPlaylistEditorClient({
         return;
       }
 
+      confirmCompositionSaved();
       setRemovedIds((current) => {
         const next = new Set(current);
         next.add(playlistItemKey(practiceId, audioItemId));
@@ -624,11 +689,12 @@ export default function EditorialPlaylistEditorClient({
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
-            disabled={submitting}
+            disabled={saveButton.disabled || submitting}
             onClick={() => void saveMetadata()}
             className="rounded-[18px] bg-[#7042c5] px-4 py-3 font-semibold text-white disabled:opacity-50"
+            aria-live="polite"
           >
-            Сохранить
+            {saveButton.label}
           </button>
           <button
             type="button"
@@ -822,9 +888,26 @@ export default function EditorialPlaylistEditorClient({
           setReplacePracticeId(null);
           setReplaceAudioItemId(null);
         }}
-        onAdded={refresh}
-        onReplaced={refresh}
+        onAdded={() => {
+          confirmCompositionSaved();
+          refresh();
+        }}
+        onReplaced={() => {
+          confirmCompositionSaved();
+          refresh();
+        }}
       />
+
+      {toast ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4"
+          role="status"
+        >
+          <p className="rounded-full bg-[#25135c] px-4 py-2 text-sm text-white shadow-lg">
+            {toast}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
