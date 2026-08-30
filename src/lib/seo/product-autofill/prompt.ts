@@ -113,11 +113,47 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
   ].join("\n");
 }
 
+function faqItemsSystemInstruction(primaryQuery: string): string {
+  const verbatimRequirement = primaryQuery
+    ? `Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «${primaryQuery}». Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.`
+    : "Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно. Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.";
+
+  return [
+    "faqItems: ровно 3 пары вопрос/ответ.",
+    verbatimRequirement,
+    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения. У каждого уникальный якорь-латиница.",
+  ].join(" ");
+}
+
+export function buildRepairIssueInstructions(
+  issues: string[],
+  primaryQuery: string,
+): string[] {
+  if (!issues.includes("primary_missing_from_faq")) {
+    return [];
+  }
+
+  const query = primaryQuery.trim();
+  if (!query) {
+    return [];
+  }
+
+  return [
+    [
+      "Исправление FAQ обязательно:",
+      `один faqItems.question, предпочтительно Q1, должен дословно содержать основной запрос: «${query}».`,
+      "Измени только необходимый вопрос FAQ.",
+      "Не переноси запрос только в answer.",
+    ].join(" "),
+  ];
+}
+
 export function buildProductSeoSystemPrompt(
   input?: ProductSeoAiPromptInput,
 ): string {
   const candidateCount = input?.candidates.length ?? 0;
   const secondaryRange = expectedSecondaryRange(candidateCount);
+  const primaryQuery = input?.request.seoPrimaryQuery.trim() ?? "";
   const styleLines = input
     ? productSeoStylePromptLines(
         input.request.styleProfile ?? createDefaultProductSeoStyleProfile(),
@@ -136,7 +172,7 @@ export function buildProductSeoSystemPrompt(
     `seoAbout (${SEO_ABOUT_LABEL}): ориентир 500–1500 символов, 2–4 коротких абзаца, если есть новая информация. Не начинай с того же предложения, что и короткое описание. Не копируй его структуру и не повторяй те же мысли в другом порядке. Не растягивай текст ради длины. Дополнительные запросы вплетай естественно. Не выдумывай факты.`,
     "Если исходного контекста мало, напиши более короткий блок «Подробнее о продукте». Новая полезная информация важнее длины. Не повторяй, не выдумывай и не растягивай текст.",
     "usageItems: 3–5 конкретных ситуаций, которые следуют из продукта.",
-    "faqItems: ровно 3 пары вопрос/ответ. Q1 naturally содержит основной запрос. Q2 и Q3 — разные намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения. У каждого уникальный якорь-латиница.",
+    faqItemsSystemInstruction(primaryQuery),
     "Не генерируй связанные продукты и URL.",
     "Не используй одну универсальную структуру для всех продуктов.",
     "Не начинай каждый seoAbout автоматически с «Эта медитация создана для тех, кто…», «Этот продукт создан для тех, кто…» или «Эта практика поможет вам…», если это не самый естественный вариант.",
@@ -162,6 +198,7 @@ export function buildProductSeoRepairPrompt(
     "Предыдущий черновик не прошёл проверку. Исправь только указанные проблемы.",
     "Нельзя придумывать дополнительные фразы вне списка кандидатов Яндекса.",
     "Не пересказывай короткое описание. Используй его только как источник фактов и добавь новую информацию.",
+    ...buildRepairIssueInstructions(issues, input.request.seoPrimaryQuery),
     `Проблемы: ${issues.join("; ")}`,
     `Предыдущий JSON: ${JSON.stringify(previous)}`,
     buildProductSeoGrounding(input),
