@@ -27,7 +27,7 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
       <section className="mt-3 xl:mt-2">
         <h1
           data-guest-home-intro
-          className="text-[15px] font-medium leading-snug text-[#25135c] sm:text-base xl:text-[17px] xl:leading-6"
+          className="text-[14px] leading-[19px] font-medium text-[#25135c] sm:text-base sm:leading-snug xl:text-[17px] xl:leading-6"
         >
           {GUEST_HOME_INTRO}
         </h1>
