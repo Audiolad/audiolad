@@ -91,6 +91,7 @@ import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "./content/voprosy-taro-pro-biznes"
 import { RABOTA_I_BIZNES_TARO_PAGE } from "./content/rabota-i-biznes-taro";
 import { TARO_BIZNES_I_DENGI_PAGE } from "./content/taro-biznes-i-dengi";
 import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "./content/rasklad-taro-na-biznes-i-dengi";
+import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-sna-dlya-zasypaniya-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -191,6 +192,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RABOTA_I_BIZNES_TARO_PAGE,
   TARO_BIZNES_I_DENGI_PAGE,
   RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE,
+  MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
