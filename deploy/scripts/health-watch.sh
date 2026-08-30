@@ -105,7 +105,7 @@ PY
 
   if ! curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}/" >"$home_body" 2>/dev/null; then
     guest_home_ok=false
-  elif ! grep -q "Аудио, которое помогает" "$home_body"; then
+  elif ! grep -q "data-guest-home-intro" "$home_body"; then
     guest_home_ok=false
   fi
 

@@ -101,10 +101,7 @@ async function runGuestScenario(page) {
     throw new Error(`pageerror: ${issues.pageErrors[0]}`);
   }
 
-  const heroVisible = await page
-    .getByText("Аудио, которое помогает вернуться к себе")
-    .isVisible()
-    .catch(() => false);
+  const heroVisible = await page.locator("[data-guest-home-intro]").isVisible().catch(() => false);
   if (!heroVisible) {
     throw new Error("guest_hero_missing");
   }
@@ -202,10 +199,7 @@ async function runAuthScenario(page) {
   await page.waitForTimeout(3000);
   await assertNoGlobalError(page);
 
-  const guestHero = await page
-    .getByText("Аудио, которое помогает вернуться к себе")
-    .isVisible()
-    .catch(() => false);
+  const guestHero = await page.locator("[data-guest-home-intro]").isVisible().catch(() => false);
   if (!guestHero) {
     throw new Error("guest_home_after_signout_missing");
   }
