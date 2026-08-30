@@ -58,6 +58,7 @@ export type ProductFormSnapshot = {
   seoTitle: string;
   seoDescription: string;
   seoAbout: string;
+  authorRecommendationsTitle: string;
   seoContent: PracticeSeoContentInput;
   status: string;
   moderationStatus: string;
@@ -123,6 +124,7 @@ export function productDetailToFormSnapshot(
     seoTitle: practice.seo_title ?? "",
     seoDescription: practice.seo_description ?? "",
     seoAbout: practice.seo_about ?? "",
+    authorRecommendationsTitle: practice.author_recommendations_title ?? "",
     seoContent: product.seo_content,
     status: practice.status,
     moderationStatus: practice.moderation_status ?? "not_submitted",
@@ -173,6 +175,7 @@ export function mergeServerProductIntoForm(
     seoTitle: current.seoTitle,
     seoDescription: current.seoDescription,
     seoAbout: current.seoAbout,
+    authorRecommendationsTitle: current.authorRecommendationsTitle,
     seoContent: current.seoContent,
     coverUrl: server.coverUrl ?? current.coverUrl,
     coverVersion: server.coverUrl ? server.coverVersion : current.coverVersion,

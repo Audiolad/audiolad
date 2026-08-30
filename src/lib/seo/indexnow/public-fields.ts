@@ -23,6 +23,7 @@ export const PRACTICE_PUBLIC_INDEXNOW_FIELDS = [
   "seo_title",
   "seo_description",
   "seo_about",
+  "author_recommendations_title",
   "seo_usage_items",
   "seo_faq_items",
   "related_products",

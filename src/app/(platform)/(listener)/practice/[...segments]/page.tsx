@@ -531,7 +531,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.id,
   );
   const listeningNotice = resolvePublicListeningNotice(practice);
-  const seoContent = await loadPublicPracticeSeoContent(supabase, practice.id);
+  const seoContent = await loadPublicPracticeSeoContent(
+    supabase,
+    practice.id,
+    practice.author_recommendations_title,
+  );
 
   const mobileCoverDisplayUrl = getProductCoverDisplayUrl(
     practice.cover_url,

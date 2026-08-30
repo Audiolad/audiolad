@@ -426,13 +426,23 @@ assert.ok(
 );
 assert.ok(
   openMarkup.indexOf("Вопросы и ответы") <
-    openMarkup.indexOf("Связанные продукты"),
-  "FAQ comes before related products",
+    openMarkup.indexOf("Рекомендации автора"),
+  "FAQ comes before author recommendations",
 );
 assert.ok(
-  openMarkup.indexOf("Связанные продукты") <
+  openMarkup.indexOf("Рекомендации автора") <
+    openMarkup.indexOf("Заголовок блока"),
+  "recommendations heading comes before block title field",
+);
+assert.ok(
+  openMarkup.indexOf("Заголовок блока") <
     openMarkup.indexOf("{preview.displayUrl}"),
-  "related products come before search preview",
+  "recommendations title field comes before search preview",
+);
+assert.equal(
+  openMarkup.includes("Связанные продукты"),
+  false,
+  "user-facing related-products label is replaced",
 );
 assert.equal(
   openMarkup.includes("Связанные страницы «Слушать»"),

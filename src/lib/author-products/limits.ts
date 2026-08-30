@@ -2,6 +2,7 @@ import {
   AUTHOR_DESCRIPTION_LABEL,
   SEO_ABOUT_LABEL,
 } from "@/lib/products/product-copy";
+import { AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH } from "@/lib/products/author-recommendations-title";
 
 export const MAX_COVER_BYTES = 3 * 1024 * 1024;
 export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
@@ -84,6 +85,7 @@ export const PRODUCT_CONTENT_LIMITS = {
   seoFaqItems: 8,
   seoFaqQuestion: 240,
   seoFaqAnswer: 1_500,
+  authorRecommendationsTitle: AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH,
 } as const;
 
 export type ProductFieldErrorCode =
@@ -100,7 +102,8 @@ export type ProductFieldErrorCode =
   | "seo_secondary_queries_invalid"
   | "seo_title_too_long"
   | "seo_description_too_long"
-  | "seo_about_too_long";
+  | "seo_about_too_long"
+  | "author_recommendations_title_too_long";
 
 export function validateTitleLength(value: string): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.title) {
@@ -244,6 +247,16 @@ export function validateSeoAboutLength(
     : null;
 }
 
+export function validateAuthorRecommendationsTitleLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.authorRecommendationsTitle) {
+    return "author_recommendations_title_too_long";
+  }
+
+  return null;
+}
+
 export function getProductFieldErrorMessage(code: string): string | null {
   switch (code) {
     case "title_too_long":
@@ -274,6 +287,8 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Описание для поиска не должно превышать 300 символов.";
     case "seo_about_too_long":
       return `Текст «${SEO_ABOUT_LABEL}» не должен превышать 3000 символов.`;
+    case "author_recommendations_title_too_long":
+      return "Заголовок блока рекомендаций не должен превышать 80 символов.";
     default:
       return null;
   }
@@ -295,7 +310,8 @@ export function getProductFieldKeyForError(
   | "seoSecondaryQueries"
   | "seoTitle"
   | "seoDescription"
-  | "seoAbout" {
+  | "seoAbout"
+  | "authorRecommendationsTitle" {
   switch (code) {
     case "title_too_long":
       return "title";
@@ -324,5 +340,7 @@ export function getProductFieldKeyForError(
       return "seoDescription";
     case "seo_about_too_long":
       return "seoAbout";
+    case "author_recommendations_title_too_long":
+      return "authorRecommendationsTitle";
   }
 }
