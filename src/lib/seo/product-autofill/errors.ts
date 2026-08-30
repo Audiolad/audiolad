@@ -35,6 +35,21 @@ export function productSeoAiError(
   };
 }
 
+export function classifyProductSeoAiHttpError(
+  status: number | null,
+  requestError?: "timeout" | "network",
+): ProductSeoAiErrorCode {
+  if (requestError === "timeout") {
+    return "TIMEOUT";
+  }
+
+  if (status === 429) {
+    return "RATE_LIMITED";
+  }
+
+  return "PROVIDER_ERROR";
+}
+
 export function productSeoAiHttpStatus(code: ProductSeoAiErrorCode): number {
   switch (code) {
     case "INVALID_PRIMARY":

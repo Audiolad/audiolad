@@ -12,8 +12,12 @@ import {
   generateProductSeoDraft,
   parseProductSeoAutofillRequest,
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
-import { getProductSeoAiConfig } from "../src/lib/seo/product-autofill/config.ts";
+import {
+  getProductSeoAiConfig,
+  readProductSeoAiProvider,
+} from "../src/lib/seo/product-autofill/config.ts";
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
+import { buildYandexAiModelUri } from "../src/lib/seo/product-autofill/yandex-provider.ts";
 import {
   createProductSeoAiRateLimitStore,
   PRODUCT_SEO_AI_USER_LIMIT,
@@ -47,13 +51,18 @@ import {
 import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "../src/lib/seo/product-autofill/errors.ts";
 import {
   PRODUCT_SEO_AI_DEFAULT_MODEL,
+  PRODUCT_SEO_AI_DEFAULT_PROVIDER,
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_RESPONSES_URL,
   PRODUCT_SEO_AI_STORE,
+  PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
+  PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL,
 } from "../src/lib/seo/product-autofill/types.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEST_KEY = "unit-test-openai-key-never-log";
+const TEST_YANDEX_KEY = "unit-test-yandex-ai-key-never-log";
+const TEST_YANDEX_FOLDER = "unit-test-yandex-folder";
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -90,6 +99,38 @@ function enabledEnv(extra = {}) {
     OPENAI_API_KEY: TEST_KEY,
     PRODUCT_SEO_AI_MODEL: "gpt-test-seo",
     ...extra,
+  };
+}
+
+function yandexEnv(extra = {}) {
+  return {
+    PRODUCT_SEO_AI_ENABLED: "true",
+    PRODUCT_SEO_AI_PROVIDER: "yandex",
+    YANDEX_AI_API_KEY: TEST_YANDEX_KEY,
+    YANDEX_AI_FOLDER_ID: TEST_YANDEX_FOLDER,
+    YANDEX_AI_MODEL: "yandexgpt-lite",
+    ...extra,
+  };
+}
+
+function yandexCompletion(text) {
+  return {
+    result: {
+      alternatives: [
+        {
+          message: { role: "assistant", text },
+          status: "ALTERNATIVE_STATUS_FINAL",
+        },
+      ],
+    },
+  };
+}
+
+function abortErrorFetch() {
+  return async () => {
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
   };
 }
 
@@ -1045,6 +1086,12 @@ assert.match(config, /PRODUCT_SEO_AI_ENABLED/);
 assert.match(config, /OPENAI_API_KEY/);
 assert.match(config, /PRODUCT_SEO_AI_MODEL/);
 assert.doesNotMatch(config, /NEXT_PUBLIC_/);
+assert.match(config, /PRODUCT_SEO_AI_PROVIDER/);
+assert.match(config, /YANDEX_AI_API_KEY/);
+assert.match(config, /YANDEX_AI_FOLDER_ID/);
+assert.match(config, /YANDEX_AI_MODEL/);
+assert.doesNotMatch(config, /YANDEX_SEARCH_API_KEY/);
+assert.doesNotMatch(config, /NEXT_PUBLIC_/);
 assert.match(route, /requireAuthenticatedUser/);
 assert.match(route, /generateProductSeoDraft/);
 assert.doesNotMatch(route, /seo_primary_query/);
@@ -1075,9 +1122,9 @@ assert.match(read("src/lib/seo/product-autofill/style-profile.ts"), /PRODUCT_SEO
 assert.doesNotMatch(section, /localStorage/);
 assert.doesNotMatch(section, /необязательно/);
 assert.doesNotMatch(ui, /необязательно/);
-assert.doesNotMatch(section, /OpenAI|ChatGPT/);
-assert.doesNotMatch(ui, /OpenAI|ChatGPT/);
-assert.doesNotMatch(form, /product-autofill|OpenAI/);
+assert.doesNotMatch(section, /OpenAI|ChatGPT|YandexGPT|Yandex AI Studio/);
+assert.doesNotMatch(ui, /OpenAI|ChatGPT|YandexGPT|Yandex AI Studio/);
+assert.doesNotMatch(form, /product-autofill|OpenAI|YandexGPT/);
 assert.doesNotMatch(section, /TOP-5|SERP|domain authority|SEO score/i);
 assert.match(read("src/lib/seo/wordstat/client.ts"), /fetchWordstatSuggestions/);
 assert.doesNotMatch(orchestrate, /WORDSTAT_GET_TOP_URL/);
@@ -1163,5 +1210,472 @@ assert.match(packageJson, /test:product-seo-autofill/);
 assert.match(packageJson, /test:wordstat/);
 assert.match(packageJson, /test:indexnow/);
 assert.match(packageJson, /test:yandex-webmaster/);
+
+const yandexProviderSource = read("src/lib/seo/product-autofill/yandex-provider.ts");
+const docs = read("docs/product-seo-autofill.md");
+assert.match(provider, /createYandexProductSeoAiProvider/);
+assert.match(provider, /config.provider === "yandex"/);
+assert.match(provider, /config.provider === "unknown"/);
+assert.match(yandexProviderSource, /PRODUCT_SEO_YANDEX_AI_COMPLETION_URL/);
+assert.match(yandexProviderSource, /Api-Key/);
+assert.match(yandexProviderSource, /jsonSchema/);
+assert.match(yandexProviderSource, /stream: false/);
+assert.match(yandexProviderSource, /JSON\.parse\(text\)/);
+assert.doesNotMatch(yandexProviderSource, /YANDEX_SEARCH_API_KEY/);
+assert.doesNotMatch(yandexProviderSource, /Bearer /);
+assert.doesNotMatch(yandexProviderSource, /almost JSON|JSON\.match|replace\(/);
+assert.match(orchestrate, /config.provider === "unknown"/);
+assert.match(docs, /PRODUCT_SEO_AI_PROVIDER/);
+assert.match(docs, /YANDEX_AI_API_KEY/);
+assert.match(docs, /YANDEX_AI_FOLDER_ID/);
+assert.match(docs, /YANDEX_AI_MODEL/);
+assert.match(docs, /yandexgpt-lite/);
+assert.match(docs, /yc.ai.languageModels.execute/);
+assert.match(docs, /llm.api.cloud.yandex.net\/foundationModels\/v1\/completion/);
+assert.match(docs, /Api-Key/);
+assert.match(docs, /Do \*\*not\*\* reuse `YANDEX_SEARCH_API_KEY`/);
+assert.match(docs, /Yandex AI Studio/);
+assert.match(docs, /RU egress/);
+assert.doesNotMatch(docs, /VPN|bypass|unsupported_country/i);
+
+assert.equal(PRODUCT_SEO_AI_DEFAULT_PROVIDER, "openai");
+assert.equal(PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL, "yandexgpt-lite");
+assert.equal(
+  PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
+  "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
+);
+assert.equal(
+  buildYandexAiModelUri("folder-1", "yandexgpt-lite"),
+  "gpt://folder-1/yandexgpt-lite/latest",
+);
+
+// PROVIDER_OPENAI_SELECTED
+await withEnvAsync(enabledEnv(), async () => {
+  const config = getProductSeoAiConfig();
+  assert.equal(config.provider, "openai");
+  assert.equal(readProductSeoAiProvider(), "openai");
+  assert.equal(config.canCall, true);
+  assert.equal(config.folderIdPresent, false);
+});
+
+await withEnvAsync(
+  enabledEnv({
+    PRODUCT_SEO_AI_PROVIDER: undefined,
+    YANDEX_AI_API_KEY: TEST_YANDEX_KEY,
+    YANDEX_AI_FOLDER_ID: TEST_YANDEX_FOLDER,
+  }),
+  async () => {
+    const config = getProductSeoAiConfig();
+    assert.equal(config.provider, "openai");
+    assert.equal(config.model, "gpt-test-seo");
+  },
+);
+
+await withEnvAsync(enabledEnv({ PRODUCT_SEO_AI_PROVIDER: "openai" }), async () => {
+  assert.equal(getProductSeoAiConfig().provider, "openai");
+});
+
+// PROVIDER_YANDEX_SELECTED
+await withEnvAsync(yandexEnv(), async () => {
+  const config = getProductSeoAiConfig();
+  assert.equal(config.provider, "yandex");
+  assert.equal(readProductSeoAiProvider(), "yandex");
+  assert.equal(config.canCall, true);
+  assert.equal(config.apiKeyPresent, true);
+  assert.equal(config.folderIdPresent, true);
+  assert.equal(config.model, PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL);
+  assert.equal("apiKey" in config, false);
+  assert.equal("folderId" in config, false);
+});
+
+await withEnvAsync(
+  yandexEnv({
+    OPENAI_API_KEY: TEST_KEY,
+    PRODUCT_SEO_AI_MODEL: "gpt-should-not-win",
+    YANDEX_AI_MODEL: undefined,
+  }),
+  async () => {
+    const config = getProductSeoAiConfig();
+    assert.equal(config.provider, "yandex");
+    assert.equal(config.model, PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL);
+  },
+);
+
+// UNKNOWN_PROVIDER_REJECTED / FAIL_OPEN
+await withEnvAsync(
+  {
+    PRODUCT_SEO_AI_ENABLED: "true",
+    PRODUCT_SEO_AI_PROVIDER: "anthropic",
+    OPENAI_API_KEY: TEST_KEY,
+    YANDEX_AI_API_KEY: TEST_YANDEX_KEY,
+    YANDEX_AI_FOLDER_ID: TEST_YANDEX_FOLDER,
+  },
+  async () => {
+    const config = getProductSeoAiConfig();
+    assert.equal(config.provider, "unknown");
+    assert.equal(config.canCall, false);
+    const provider = mockProvider([]);
+    const result = await generateProductSeoDraft(requestInput(), {
+      userId: "unknown-provider",
+      provider,
+      wordstatSuggestions: sampleCandidates(),
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, "PROVIDER_ERROR");
+    assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+    assert.equal(provider.calls.length, 0);
+  },
+);
+
+await withEnvAsync(
+  yandexEnv({ YANDEX_AI_API_KEY: undefined, YANDEX_SEARCH_API_KEY: "wordstat-only-key" }),
+  async () => {
+    const config = getProductSeoAiConfig();
+    assert.equal(config.provider, "yandex");
+    assert.equal(config.canCall, false);
+    const result = await generateProductSeoDraft(requestInput(), {
+      userId: "yandex-missing-ai-key",
+      wordstatSuggestions: sampleCandidates(),
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+      provider: mockProvider([]),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, "NOT_CONFIGURED");
+    assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+  },
+);
+
+await withEnvAsync(yandexEnv({ YANDEX_AI_FOLDER_ID: undefined }), async () => {
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-missing-folder",
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+    provider: mockProvider([]),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "NOT_CONFIGURED");
+});
+
+// YANDEX_SUCCESS + SECONDARIES_STILL_FROM_CANDIDATES + FAQ_EXACTLY_3
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-success",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.faqItems.length, 3);
+  assert.deepEqual(result.data.seoSecondaryQueries, [
+    "медитация перед сном",
+    "вечерняя медитация",
+    "медитация для расслабления",
+  ]);
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.equal(fetchImpl.calls[0].url, PRODUCT_SEO_YANDEX_AI_COMPLETION_URL);
+  assert.equal(
+    fetchImpl.calls[0].init.headers.Authorization,
+    `Api-Key ${TEST_YANDEX_KEY}`,
+  );
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(
+    sent.modelUri,
+    buildYandexAiModelUri(TEST_YANDEX_FOLDER, PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL),
+  );
+  assert.equal(sent.completionOptions.stream, false);
+  assert.equal(Boolean(sent.jsonObject), false);
+  assert.equal(sent.jsonSchema.schema.type, "object");
+  assert.deepEqual(sent.jsonSchema.schema.required, [
+    "secondaryQueries",
+    "seoTitle",
+    "seoDescription",
+    "seoAbout",
+    "usageItems",
+    "faqItems",
+  ]);
+  assert.equal(sent.messages[0].role, "system");
+  assert.equal(sent.messages[1].role, "user");
+  assert.equal(typeof sent.messages[0].text, "string");
+  assert.match(sent.messages[1].text, /медитация перед сном/);
+  assert.doesNotMatch(JSON.stringify(sent), new RegExp(TEST_YANDEX_KEY));
+  assert.doesNotMatch(fetchImpl.calls[0].url, /api\.openai\.com/);
+});
+
+// STYLE_PROFILE_UNCHANGED: Yandex still uses shared prompt builders
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: [] })))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(
+    { ...requestInput(), styleProfile: applyProductSeoStylePreset("inspiring", "high") },
+    {
+      userId: "yandex-style",
+      provider,
+      wordstatSuggestions: [],
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    },
+  );
+  assert.equal(result.ok, true);
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.match(sent.messages[0].text, /preset=inspiring/);
+  assert.match(sent.messages[0].text, /variety=high/);
+});
+
+// YANDEX_INVALID_JSON
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexCompletion("это почти JSON, но не JSON")),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-invalid-json",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_SCHEMA_INVALID
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexCompletion(JSON.stringify({ seoTitle: "x" }))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-schema-invalid",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_REPAIR_SUCCESS
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] }))),
+      ),
+    () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-repair-success",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(result.data.faqItems.length, 3);
+});
+
+// YANDEX_REPAIR_FAILURE_FAIL_OPEN
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] }))),
+      ),
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(JSON.stringify(validDraft({ secondaryQueries: ["другая выдумка"] }))),
+      ),
+    () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-repair-fail",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+  assert.equal(fetchImpl.calls.length, 2);
+});
+
+// YANDEX_401
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([() => jsonResponse(401, { error: "unauthorized" })]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-401",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_ERROR");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_403
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([() => jsonResponse(403, { error: "forbidden" })]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-403",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_ERROR");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_429
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([() => jsonResponse(429, { error: "rate" })]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-429",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "RATE_LIMITED");
+  assert.equal(result.error.message, "Слишком много попыток подряд. Попробуйте немного позже.");
+});
+
+// YANDEX_5XX
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([() => jsonResponse(503, { error: "upstream" })]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-5xx",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_ERROR");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_TIMEOUT
+await withEnvAsync(yandexEnv(), async () => {
+  const provider = createProductSeoAiProvider({
+    fetchImpl: abortErrorFetch(),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-timeout",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "TIMEOUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// DUPLICATION_GUARD_UNCHANGED + invented secondaries still rejected on Yandex
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(
+          JSON.stringify(
+            validDraft({
+              seoAbout: "Мягкая медитация для сна.",
+              secondaryQueries: ["изобретённая фраза"],
+            }),
+          ),
+        ),
+      ),
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(
+          JSON.stringify(
+            validDraft({
+              seoAbout: "Мягкая медитация для сна.",
+            }),
+          ),
+        ),
+      ),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-duplication-guard",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.ok(result.error.issues.includes("about_duplicates_description"));
+});
+
+// NO_AUTO_SAVE
+assert.match(route, /Returns a local SEO draft only/);
+assert.doesNotMatch(route, /replacePracticeSeoContent|seo_primary_query/);
+assert.doesNotMatch(route, /indexnow|webmaster/i);
+assert.doesNotMatch(orchestrate, /replacePracticeSeoContent|indexnow|webmaster/i);
 
 console.log("product-seo-autofill-unit: ok");

@@ -1,5 +1,6 @@
 import type { ProductSeoStyleProfile } from "@/lib/seo/product-autofill/style-profile";
 
+export const PRODUCT_SEO_AI_DEFAULT_PROVIDER = "openai";
 export const PRODUCT_SEO_AI_DEFAULT_MODEL = "gpt-5.4-mini";
 export const PRODUCT_SEO_AI_TIMEOUT_MS = 12_000;
 export const PRODUCT_SEO_AI_ORIGIN = "https://api.openai.com";
@@ -7,6 +8,15 @@ export const PRODUCT_SEO_AI_RESPONSES_PATH = "/v1/responses";
 export const PRODUCT_SEO_AI_RESPONSES_URL = `${PRODUCT_SEO_AI_ORIGIN}${PRODUCT_SEO_AI_RESPONSES_PATH}`;
 export const PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS = 3000;
 export const PRODUCT_SEO_AI_STORE = false;
+
+export const PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL = "yandexgpt-lite";
+export const PRODUCT_SEO_YANDEX_AI_ORIGIN = "https://llm.api.cloud.yandex.net";
+export const PRODUCT_SEO_YANDEX_AI_COMPLETION_PATH =
+  "/foundationModels/v1/completion";
+export const PRODUCT_SEO_YANDEX_AI_COMPLETION_URL = `${PRODUCT_SEO_YANDEX_AI_ORIGIN}${PRODUCT_SEO_YANDEX_AI_COMPLETION_PATH}`;
+
+export type ProductSeoAiProviderName = "openai" | "yandex";
+export type ProductSeoAiResolvedProvider = ProductSeoAiProviderName | "unknown";
 
 export const PRODUCT_SEO_SECONDARY_MIN = 3;
 export const PRODUCT_SEO_SECONDARY_MAX = 5;
