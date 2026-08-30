@@ -14,11 +14,6 @@ import {
   evaluateProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
 import {
-  SEO_ABOUT_AUTOFILL_HINT,
-  SEO_ABOUT_HELPER,
-  SEO_ABOUT_LABEL,
-} from "@/lib/products/product-copy";
-import {
   getPracticeSeoUsageHeading,
   type PracticeSeoContentInput,
 } from "@/lib/products/practice-seo-content";
@@ -107,7 +102,6 @@ export type AuthorProductSeoSectionProps = {
   seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
-  seoAbout: string;
   authorRecommendationsTitle: string;
   seoContent: PracticeSeoContentInput;
   relatedProductOptions: SelectOption[];
@@ -118,7 +112,6 @@ export type AuthorProductSeoSectionProps = {
     seoSecondaryQueries?: string;
     seoTitle?: string;
     seoDescription?: string;
-    seoAbout?: string;
     authorRecommendationsTitle?: string;
   };
   onChange: (
@@ -127,7 +120,6 @@ export type AuthorProductSeoSectionProps = {
       seoSecondaryQueries: string[];
       seoTitle: string;
       seoDescription: string;
-      seoAbout: string;
       authorRecommendationsTitle: string;
       seoContent: PracticeSeoContentInput;
     }>,
@@ -144,7 +136,6 @@ export default function AuthorProductSeoSection({
   seoSecondaryQueries,
   seoTitle,
   seoDescription,
-  seoAbout,
   authorRecommendationsTitle,
   seoContent,
   relatedProductOptions,
@@ -330,7 +321,6 @@ export default function AuthorProductSeoSection({
     seoSecondaryQueries,
     seoTitle,
     seoDescription,
-    seoAbout,
     seoUsageItems: seoContent.usageItems.map((item) => item.content),
     seoFaqCount: seoContent.faqItems.filter((item) => item.question.trim() && item.answer.trim()).length,
     seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length,
@@ -342,7 +332,6 @@ export default function AuthorProductSeoSection({
     seoPrimaryQuery,
     seoTitle,
     seoDescription,
-    seoAbout,
   });
   const primarySelected = Boolean(seoPrimaryQuery.trim());
   const secondariesFull =
@@ -391,7 +380,6 @@ export default function AuthorProductSeoSection({
     seoSecondaryQueries: string[];
     seoTitle: string;
     seoDescription: string;
-    seoAbout: string;
     usageItems: Array<{ content: string }>;
     faqItems: Array<{ question: string; answer: string }>;
   }) {
@@ -399,7 +387,6 @@ export default function AuthorProductSeoSection({
       seoSecondaryQueries: draft.seoSecondaryQueries,
       seoTitle: draft.seoTitle,
       seoDescription: draft.seoDescription,
-      seoAbout: draft.seoAbout,
       seoContent: {
         ...seoContent,
         usageItems: draft.usageItems,
@@ -445,7 +432,6 @@ export default function AuthorProductSeoSection({
             seoSecondaryQueries?: string[];
             seoTitle?: string;
             seoDescription?: string;
-            seoAbout?: string;
             usageItems?: Array<{ content: string }>;
             faqItems?: Array<{ question: string; answer: string }>;
             secondaryQueryStatus?: ProductSeoSecondaryQueryStatus;
@@ -459,7 +445,6 @@ export default function AuthorProductSeoSection({
         !payload ||
         typeof payload.seoTitle !== "string" ||
         typeof payload.seoDescription !== "string" ||
-        typeof payload.seoAbout !== "string" ||
         !Array.isArray(payload.seoSecondaryQueries) ||
         !Array.isArray(payload.usageItems) ||
         !Array.isArray(payload.faqItems)
@@ -475,7 +460,6 @@ export default function AuthorProductSeoSection({
         seoSecondaryQueries: payload.seoSecondaryQueries,
         seoTitle: payload.seoTitle,
         seoDescription: payload.seoDescription,
-        seoAbout: payload.seoAbout,
         usageItems: payload.usageItems,
         faqItems: payload.faqItems,
       });
@@ -509,7 +493,6 @@ export default function AuthorProductSeoSection({
         seoSecondaryQueries,
         seoTitle,
         seoDescription,
-        seoAbout,
         seoContent,
       })
     ) {
@@ -893,28 +876,6 @@ export default function AuthorProductSeoSection({
             {fieldErrors.seoDescription}
           </p>
         ) : null}
-      </label>
-
-      <label className="mt-4 block" data-submit-issue={fieldErrors.seoAbout ? "" : undefined}>
-        <span className="mb-2 block text-sm font-medium">{SEO_ABOUT_LABEL}</span>
-        <textarea
-          value={seoAbout}
-          maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
-          disabled={disabled}
-          onChange={(event) => onChange({ seoAbout: event.target.value })}
-          rows={6}
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
-        />
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          {SEO_ABOUT_HELPER}
-        </p>
-        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-          {SEO_ABOUT_AUTOFILL_HINT}
-        </p>
-        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-          Ориентир: 500–1500 символов.
-        </p>
-        {fieldErrors.seoAbout ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoAbout}</p> : null}
       </label>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">

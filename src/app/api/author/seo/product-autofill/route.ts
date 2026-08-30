@@ -76,7 +76,6 @@ export async function POST(request: Request) {
       seoSecondaryQueries: result.data.seoSecondaryQueries,
       seoTitle: result.data.seoTitle,
       seoDescription: result.data.seoDescription,
-      seoAbout: result.data.seoAbout,
       usageItems: result.data.usageItems,
       faqItems: result.data.faqItems.map((item) => ({
         question: item.question,

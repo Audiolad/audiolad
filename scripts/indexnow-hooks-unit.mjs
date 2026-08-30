@@ -113,6 +113,14 @@ function testPracticePublicFields() {
     "seo_description is public",
   );
   assert(
+    hasPracticePublicIndexNowChanges({ description: "О продукте" }),
+    "description remains public",
+  );
+  assert(
+    !hasPracticePublicIndexNowChanges({ seo_about: "legacy about" }),
+    "inert seo_about must not trigger IndexNow",
+  );
+  assert(
     hasPracticePublicIndexNowChanges({
       author_recommendations_title: "Послушайте ещё",
     }),

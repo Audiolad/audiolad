@@ -44,7 +44,6 @@ export type PracticePageViewModel = {
   productKind: string | null;
   subtitle: string | null;
   description: string | null;
-  seoAbout: string | null;
   seoContent: PublicPracticeSeoContent;
   meta: string | null;
   gallerySlides: CatalogSlide[];

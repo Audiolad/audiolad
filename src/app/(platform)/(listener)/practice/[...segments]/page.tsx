@@ -599,7 +599,6 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     productKind,
     subtitle,
     description,
-    seoAbout: practice.seo_about?.trim() || null,
     seoContent,
     meta,
     gallerySlides,

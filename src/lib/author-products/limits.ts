@@ -1,7 +1,4 @@
-import {
-  AUTHOR_DESCRIPTION_LABEL,
-  SEO_ABOUT_LABEL,
-} from "@/lib/products/product-copy";
+import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 import { AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH } from "@/lib/products/author-recommendations-title";
 
 export const MAX_COVER_BYTES = 3 * 1024 * 1024;
@@ -264,7 +261,7 @@ export function getProductFieldErrorMessage(code: string): string | null {
     case "subtitle_too_long":
       return "Подзаголовок не должен превышать 120 символов.";
     case "description_too_long":
-      return `${AUTHOR_DESCRIPTION_LABEL} не должно превышать 1000 символов.`;
+      return `Текст «${AUTHOR_DESCRIPTION_LABEL}» не должен превышать 1000 символов.`;
     case "audio_title_too_long":
       return "Название аудио не должно превышать 100 символов.";
     case "audio_description_too_long":
@@ -286,7 +283,7 @@ export function getProductFieldErrorMessage(code: string): string | null {
     case "seo_description_too_long":
       return "Описание для поиска не должно превышать 300 символов.";
     case "seo_about_too_long":
-      return `Текст «${SEO_ABOUT_LABEL}» не должен превышать 3000 символов.`;
+      return "Текст «Подробнее о продукте» не должен превышать 3000 символов.";
     case "author_recommendations_title_too_long":
       return "Заголовок блока рекомендаций не должен превышать 80 символов.";
     default:

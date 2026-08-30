@@ -353,6 +353,16 @@ assert.match(
   /const saved = await saveProduct\(\);[\s\S]*if \(!shouldSubmitProductAfterSave\(saved\)\)/,
 );
 assert.match(formSource, /logProductSaveFailure/);
+assert.doesNotMatch(
+  formSource,
+  /seo_about: form\.seoAbout/,
+  "ordinary save must omit seo_about so stored legacy values stay intact",
+);
+assert.match(
+  productPatch,
+  /if \("seo_about" in body\)/,
+  "PATCH updates seo_about only when the key is present",
+);
 
 const audioUpload = read(
   "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",

@@ -157,7 +157,6 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
             (item): item is NonNullable<ProductSeoAutofillRequest["fields"]>[number] =>
               item === "title" ||
               item === "description" ||
-              item === "about" ||
               item === "faq" ||
               item === "usage" ||
               item === "secondaries",

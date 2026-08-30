@@ -27,15 +27,12 @@ export const PRODUCT_SEO_TITLE_SOFT_MIN = 50;
 export const PRODUCT_SEO_TITLE_SOFT_MAX = 70;
 export const PRODUCT_SEO_DESCRIPTION_SOFT_MIN = 120;
 export const PRODUCT_SEO_DESCRIPTION_SOFT_MAX = 180;
-export const PRODUCT_SEO_ABOUT_SOFT_MIN = 500;
-export const PRODUCT_SEO_ABOUT_SOFT_MAX = 1500;
 
 export type ProductSeoGenerateMode = "full" | "field";
 
 export type ProductSeoGenerateField =
   | "title"
   | "description"
-  | "about"
   | "faq"
   | "usage"
   | "secondaries";
@@ -56,7 +53,6 @@ export type ProductSeoAutofillDraft = {
   seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
-  seoAbout: string;
   usageItems: ProductSeoUsageDraft[];
   faqItems: ProductSeoFaqDraft[];
   secondaryQueryStatus: ProductSeoSecondaryQueryStatus;
@@ -78,7 +74,6 @@ export type ProductSeoAiRawDraft = {
   secondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
-  seoAbout: string;
   usageItems: ProductSeoUsageDraft[];
   faqItems: ProductSeoFaqDraft[];
 };

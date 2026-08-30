@@ -21,7 +21,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
   const {
     practice,
     description,
-    seoAbout,
     seoContent,
     publicAudioItems,
     listeningNotice,
@@ -66,7 +65,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
         <ProductCopySections
           description={description}
-          seoAbout={seoAbout}
           variant="desktop"
         />
         <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
