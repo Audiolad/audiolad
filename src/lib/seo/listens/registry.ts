@@ -94,6 +94,7 @@ import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "./content/rasklad-taro-na-b
 import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-sna-dlya-zasypaniya-slushat-onlayn";
 import { MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-bystrogo-sna-slushat-onlayn";
 import { MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-glubokogo-sna-slushat-onlayn";
+import { MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-bystrogo-zasypaniya-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -197,6 +198,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE,
+  MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
