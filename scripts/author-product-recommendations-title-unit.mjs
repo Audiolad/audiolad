@@ -24,7 +24,12 @@ import {
   normalizeAuthorRecommendationsTitle,
   resolveAuthorRecommendationsTitle,
 } from "../src/lib/products/author-recommendations-title.ts";
-import { canAddRelatedProductId } from "../src/lib/seo/related-product-search.ts";
+import {
+  MAX_AUTHOR_RECOMMENDATIONS,
+  canAddRelatedProductId,
+  limitPublicRelatedProducts,
+  shouldRejectChangedAuthorRecommendations,
+} from "../src/lib/seo/related-product-search.ts";
 import { hasPracticePublicIndexNowChanges } from "../src/lib/seo/indexnow/public-fields.ts";
 import { hasPracticeYandexRecrawlChanges } from "../src/lib/seo/yandex-webmaster/planner.ts";
 
@@ -98,7 +103,7 @@ function practiceDetail(overrides = {}, seoOverrides = {}) {
 }
 
 function publicBlock(input) {
-  const relatedProducts = input.relatedProducts ?? [];
+  const relatedProducts = limitPublicRelatedProducts(input.relatedProducts ?? []);
   if (!relatedProducts.length) {
     return null;
   }
@@ -123,6 +128,7 @@ assert.doesNotMatch(migration, /Рекомендации АудиоЛада/);
 assert.equal(DEFAULT_AUTHOR_RECOMMENDATIONS_TITLE, "Рекомендации автора");
 assert.equal(AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH, 80);
 assert.equal(PRODUCT_CONTENT_LIMITS.authorRecommendationsTitle, 80);
+assert.equal(MAX_AUTHOR_RECOMMENDATIONS, 5);
 
 // DEFAULT_TITLE_FOR_EXISTING_PRODUCT
 const existing = productDetailToFormSnapshot(practiceDetail());
@@ -247,6 +253,26 @@ assert.equal(
   }),
   null,
   "NO_RECOMMENDATIONS_NO_BLOCK",
+);
+
+const sixPublicCards = [1, 2, 3, 4, 5, 6].map((n) => ({ practiceId: `p${n}` }));
+const publicFromLegacy = publicBlock({
+  authorRecommendationsTitle: "Рекомендации автора",
+  relatedProducts: sixPublicCards,
+});
+assert.equal(publicFromLegacy?.cards.length, 5, "public first 5 from legacy 6+");
+assert.deepEqual(
+  publicFromLegacy?.cards.map((item) => item.practiceId),
+  ["p1", "p2", "p3", "p4", "p5"],
+  "preserve stored order",
+);
+assert.equal(
+  shouldRejectChangedAuthorRecommendations(
+    sixPublicCards.map((item) => item.practiceId),
+    sixPublicCards.map((item) => item.practiceId),
+  ),
+  false,
+  "unchanged legacy list does not fail save",
 );
 
 // CUSTOM_TITLE_WITH_NO_RECOMMENDATIONS_NO_BLOCK

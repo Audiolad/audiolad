@@ -4,8 +4,10 @@ import { requirePracticeAccess, handleAuthorRouteError } from "@/lib/author-prod
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
+  RELATED_PRODUCT_DEFAULT_AUTHOR_LIST_LIMIT,
   RELATED_PRODUCT_SEARCH_LIMIT,
   parseRelatedProductIdsParam,
+  shouldListDefaultAuthorProducts,
   shouldSearchRelatedProducts,
   toRelatedProductOrFilter,
 } from "@/lib/seo/related-product-search";
@@ -13,6 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const MAX_RESULTS = RELATED_PRODUCT_SEARCH_LIMIT;
+const DEFAULT_AUTHOR_LIST_LIMIT = RELATED_PRODUCT_DEFAULT_AUTHOR_LIST_LIMIT;
 const MAX_QUERY_LENGTH = 120;
 
 function readAuthorName(value: unknown): string {
@@ -36,8 +39,9 @@ export async function GET(request: Request) {
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, MAX_QUERY_LENGTH);
     const selectedIds = parseRelatedProductIdsParam(url.searchParams.get("ids"));
     const searching = shouldSearchRelatedProducts(query);
+    const listingDefaults = shouldListDefaultAuthorProducts(query);
 
-    if (!searching && !selectedIds.length) {
+    if (!searching && !listingDefaults && !selectedIds.length) {
       return NextResponse.json({ options: [] });
     }
 
@@ -48,17 +52,31 @@ export async function GET(request: Request) {
       .is("deleted_at", null)
       .eq("catalog_visibility", "listed")
       .eq("is_catalog_listed", true)
-      .neq("id", practice.id)
-      .order("title")
-      .limit(MAX_RESULTS);
+      .neq("id", practice.id);
 
-    if (!isAdmin) {
-      productQuery = productQuery.eq("author_id", practice.author_id);
-    }
     if (searching) {
-      productQuery = productQuery.or(toRelatedProductOrFilter(query));
+      // Nonempty search: authors stay scoped to themselves; admin may search others.
+      if (!isAdmin) {
+        productQuery = productQuery.eq("author_id", practice.author_id);
+      }
+      productQuery = productQuery
+        .or(toRelatedProductOrFilter(query))
+        .order("title")
+        .limit(MAX_RESULTS);
+    } else if (selectedIds.length) {
+      // Label lookup for already-selected rows, including legacy extras.
+      if (!isAdmin) {
+        productQuery = productQuery.eq("author_id", practice.author_id);
+      }
+      productQuery = productQuery.in("id", selectedIds).order("title").limit(MAX_RESULTS);
     } else {
-      productQuery = productQuery.in("id", selectedIds);
+      // Empty query: same-author eligible products only, even for admin.
+      // DEFAULT_LIST_ORDER: published_at desc, then created_at desc.
+      productQuery = productQuery
+        .eq("author_id", practice.author_id)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(DEFAULT_AUTHOR_LIST_LIMIT);
     }
 
     const { data, error } = await productQuery;
