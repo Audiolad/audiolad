@@ -17,7 +17,10 @@ import {
   readProductSeoAiProvider,
 } from "../src/lib/seo/product-autofill/config.ts";
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
-import { buildYandexAiModelUri } from "../src/lib/seo/product-autofill/yandex-provider.ts";
+import {
+  buildYandexAiModelUri,
+  YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS,
+} from "../src/lib/seo/product-autofill/yandex-provider.ts";
 import {
   createProductSeoAiRateLimitStore,
   PRODUCT_SEO_AI_USER_LIMIT,
@@ -113,15 +116,16 @@ function yandexEnv(extra = {}) {
   };
 }
 
-function yandexCompletion(text) {
+function yandexCompletion(text, alternativeStatus = "ALTERNATIVE_STATUS_FINAL") {
+  const alternative = {
+    message: { role: "assistant", text },
+  };
+  if (alternativeStatus !== undefined && alternativeStatus !== null) {
+    alternative.status = alternativeStatus;
+  }
   return {
     result: {
-      alternatives: [
-        {
-          message: { role: "assistant", text },
-          status: "ALTERNATIVE_STATUS_FINAL",
-        },
-      ],
+      alternatives: [alternative],
     },
   };
 }
@@ -1221,6 +1225,16 @@ assert.match(yandexProviderSource, /Api-Key/);
 assert.match(yandexProviderSource, /jsonSchema/);
 assert.match(yandexProviderSource, /stream: false/);
 assert.match(yandexProviderSource, /JSON\.parse\(text\)/);
+assert.match(yandexProviderSource, /YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS/);
+assert.match(yandexProviderSource, /ALTERNATIVE_STATUS_FINAL/);
+const callModelSource = yandexProviderSource.slice(
+  yandexProviderSource.indexOf("async function callModel"),
+);
+assert.ok(
+  callModelSource.indexOf("YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS") <
+    callModelSource.indexOf("parseDraftFromJsonText"),
+  "Yandex alternative status must be checked before JSON.parse",
+);
 assert.doesNotMatch(yandexProviderSource, /YANDEX_SEARCH_API_KEY/);
 assert.doesNotMatch(yandexProviderSource, /Bearer /);
 assert.doesNotMatch(yandexProviderSource, /almost JSON|JSON\.match|replace\(/);
@@ -1231,6 +1245,10 @@ assert.match(docs, /YANDEX_AI_FOLDER_ID/);
 assert.match(docs, /YANDEX_AI_MODEL/);
 assert.match(docs, /yandexgpt-lite/);
 assert.match(docs, /yc.ai.languageModels.execute/);
+assert.match(docs, /ai.languageModels.user/);
+assert.match(docs, /audiolad-seo-ai/);
+assert.match(docs, /IAM ROLE/);
+assert.match(docs, /API KEY SCOPE/);
 assert.match(docs, /llm.api.cloud.yandex.net\/foundationModels\/v1\/completion/);
 assert.match(docs, /Api-Key/);
 assert.match(docs, /Do \*\*not\*\* reuse `YANDEX_SEARCH_API_KEY`/);
@@ -1240,6 +1258,7 @@ assert.doesNotMatch(docs, /VPN|bypass|unsupported_country/i);
 
 assert.equal(PRODUCT_SEO_AI_DEFAULT_PROVIDER, "openai");
 assert.equal(PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL, "yandexgpt-lite");
+assert.equal(YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS, "ALTERNATIVE_STATUS_FINAL");
 assert.equal(
   PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
   "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
@@ -1410,6 +1429,78 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.doesNotMatch(fetchImpl.calls[0].url, /api\.openai\.com/);
 });
 
+async function generateYandexFromBodies(bodies, userId) {
+  const fetchImpl = mockFetch(
+    bodies.map((body) => () => jsonResponse(200, body)),
+  );
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId,
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  return { result, fetchImpl };
+}
+
+// YANDEX_FINAL_ACCEPTED
+await withEnvAsync(yandexEnv(), async () => {
+  const { result } = await generateYandexFromBodies(
+    [yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_FINAL")],
+    "yandex-final-accepted",
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.data.faqItems.length, 3);
+});
+
+// YANDEX_TRUNCATED_FINAL_REJECTED
+await withEnvAsync(yandexEnv(), async () => {
+  const { result } = await generateYandexFromBodies(
+    [yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_TRUNCATED_FINAL")],
+    "yandex-truncated-final-rejected",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_CONTENT_FILTER_REJECTED
+await withEnvAsync(yandexEnv(), async () => {
+  const { result } = await generateYandexFromBodies(
+    [yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_CONTENT_FILTER")],
+    "yandex-content-filter-rejected",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_PARTIAL_REJECTED
+await withEnvAsync(yandexEnv(), async () => {
+  const { result } = await generateYandexFromBodies(
+    [yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_PARTIAL")],
+    "yandex-partial-rejected",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
+// YANDEX_MISSING_STATUS_REJECTED
+await withEnvAsync(yandexEnv(), async () => {
+  const { result } = await generateYandexFromBodies(
+    [yandexCompletion(JSON.stringify(validDraft()), null)],
+    "yandex-missing-status-rejected",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+});
+
 // STYLE_PROFILE_UNCHANGED: Yandex still uses shared prompt builders
 await withEnvAsync(yandexEnv(), async () => {
   const fetchImpl = mockFetch([
@@ -1501,6 +1592,24 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.ok, true);
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(result.data.faqItems.length, 3);
+});
+
+// Repair is successful only on FINAL
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl } = await generateYandexFromBodies(
+    [
+      yandexCompletion(
+        JSON.stringify(validDraft({ secondaryQueries: ["изобретённая фраза"] })),
+        "ALTERNATIVE_STATUS_FINAL",
+      ),
+      yandexCompletion(JSON.stringify(validDraft()), "ALTERNATIVE_STATUS_TRUNCATED_FINAL"),
+    ],
+    "yandex-repair-truncated-rejected",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
+  assert.equal(fetchImpl.calls.length, 2);
 });
 
 // YANDEX_REPAIR_FAILURE_FAIL_OPEN

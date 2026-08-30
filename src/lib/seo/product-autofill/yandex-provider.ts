@@ -68,6 +68,8 @@ const BLOCKED_LOG_FIELDS = new Set([
   "folder_id",
 ]);
 
+export const YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS = "ALTERNATIVE_STATUS_FINAL";
+
 export function buildYandexAiModelUri(folderId: string, modelId: string): string {
   return `gpt://${folderId}/${modelId}/latest`;
 }
@@ -84,7 +86,10 @@ function logAiEvent(
   console.info(`[product-seo-ai] ${message}`, safe);
 }
 
-function extractYandexCompletionText(body: unknown): string | null {
+function readYandexFirstAlternative(body: unknown): {
+  status: string | null;
+  text: string | null;
+} | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return null;
   }
@@ -104,13 +109,17 @@ function extractYandexCompletionText(body: unknown): string | null {
     return null;
   }
 
+  const rawStatus = (first as { status?: unknown }).status;
+  const status = typeof rawStatus === "string" && rawStatus.trim() ? rawStatus : null;
+
   const message = (first as { message?: unknown }).message;
   if (!message || typeof message !== "object" || Array.isArray(message)) {
-    return null;
+    return { status, text: null };
   }
 
-  const text = (message as { text?: unknown }).text;
-  return typeof text === "string" && text.trim() ? text : null;
+  const rawText = (message as { text?: unknown }).text;
+  const text = typeof rawText === "string" && rawText.trim() ? rawText : null;
+  return { status, text };
 }
 
 function parseDraftFromJsonText(text: string): ProductSeoAiRawDraft | null {
@@ -264,15 +273,26 @@ export function createYandexProductSeoAiProvider(
       return fail(code);
     }
 
-    const text = extractYandexCompletionText(attempt.body);
+    const alternative = readYandexFirstAlternative(attempt.body);
+    if (!alternative || alternative.status !== YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS) {
+      logAiEvent("yandex_completion_invalid", {
+        provider: "yandex",
+        model,
+        status: alternative?.status ?? "missing",
+        kind,
+        error: "INVALID_OUTPUT",
+      });
+      return fail("INVALID_OUTPUT", ["malformed"]);
+    }
+
+    const text = alternative.text;
     if (!text) {
       logAiEvent("yandex_completion_invalid", {
         provider: "yandex",
         model,
-        status: attempt.status,
-        error: "INVALID_OUTPUT",
+        status: alternative.status,
         kind,
-        latencyMs: attempt.latencyMs,
+        error: "INVALID_OUTPUT",
       });
       return fail("INVALID_OUTPUT", ["malformed"]);
     }
