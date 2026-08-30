@@ -68,11 +68,20 @@ Save and publish stay available. Manual SEO fields stay editable.
 
 ## What this helper does
 
-An author can type a seed and press **Подобрать в Яндексе**. The app
-suggests phrases; the author decides what to put into
-`seoPrimaryQuery` / `seoSecondaryQueries`. Selecting a card only updates
-the local product form. It does not write to the database and does not
-trigger Webmaster recrawl.
+When **Подобрать основной запрос** is clicked and `seoPrimaryQuery` is
+empty (`PRIMARY_CTA_AUTO_SEARCH`), the picker opens, fills a short title
+seed (`buildInitialWordstatSeed`: text before the first `|`, trimmed and
+clipped), and immediately runs one GetTop request with that same phrase.
+The in-picker **Подобрать в Яндексе** button stays for a manual re-search
+after the author edits **Что ищем**.
+
+If `seoPrimaryQuery` is already filled, **Подобрать похожие** / reopen
+seeds from that primary, never a title-derived phrase. Starter chips from
+title, description, or product kind are not shown; Yandex results are the
+choices.
+
+Selecting a card only updates the local product form. It does not write
+to the database and does not trigger Webmaster recrawl.
 
 Frequency bands (green 50–1000, yellow 10–49 / 1001–5000, red 0–9 /
 5001+) are a **UX heuristic**, not a ranking guarantee. The UI never
@@ -84,3 +93,14 @@ calls frequency «конкуренция» and never promises TOP-3 / TOP-5.
 - Not IndexNow
 - Not a SERP analyzer, keyword-difficulty score, or AI SEO score
 - Not a publication requirement
+
+## Errors the author can see
+
+Local empty / too-long phrases stay `INVALID_PHRASE` (app HTTP 400).
+A Yandex HTTP 400 is `INVALID_QUERY` (app HTTP 422) **only** when the
+structured error body has `fieldViolations` on the GetTop `phrase` /
+`query` field. Generic 400s, empty bodies, and violations on
+`devices`, `numPhrases`, `folderId`, or `regions` stay
+`UPSTREAM_ERROR` (app HTTP 502). 400 is not retried. Timeouts, 429,
+5xx, and network failures keep their existing codes and HTTP statuses.
+Client JSON never includes the raw Yandex body, API key, or `folderId`.
