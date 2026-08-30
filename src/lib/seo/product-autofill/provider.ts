@@ -5,7 +5,11 @@ import {
   readProductSeoAiApiKey,
   type ProductSeoAiConfig,
 } from "@/lib/seo/product-autofill/config";
-import { productSeoAiError } from "@/lib/seo/product-autofill/errors";
+import {
+  classifyProductSeoAiHttpError,
+  productSeoAiError,
+} from "@/lib/seo/product-autofill/errors";
+import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yandex-provider";
 import {
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
@@ -24,7 +28,6 @@ import {
   PRODUCT_SEO_AI_RESPONSES_URL,
   PRODUCT_SEO_AI_STORE,
   PRODUCT_SEO_AI_TIMEOUT_MS,
-  type ProductSeoAiErrorCode,
   type ProductSeoAiErrorResult,
   type ProductSeoAiRawDraft,
 } from "@/lib/seo/product-autofill/types";
@@ -166,21 +169,6 @@ async function requestOnce(
   }
 }
 
-function classifyHttpError(
-  status: number | null,
-  requestError?: "timeout" | "network",
-): ProductSeoAiErrorCode {
-  if (requestError === "timeout") {
-    return "TIMEOUT";
-  }
-
-  if (status === 429) {
-    return "RATE_LIMITED";
-  }
-
-  return "PROVIDER_ERROR";
-}
-
 function resultContainsSecret(value: unknown, secret: string | null): boolean {
   if (!secret) {
     return false;
@@ -193,8 +181,15 @@ function resultContainsSecret(value: unknown, secret: string | null): boolean {
   }
 }
 
-export function createProductSeoAiProvider(
-  options: ProductSeoAiProviderOptions = {},
+function createUnknownProductSeoAiProvider(): ProductSeoAiProvider {
+  return {
+    generate: async () => productSeoAiError("PROVIDER_ERROR"),
+    repair: async () => productSeoAiError("PROVIDER_ERROR"),
+  };
+}
+
+function createOpenAiProductSeoAiProvider(
+  options: ProductSeoAiProviderOptions,
 ): ProductSeoAiProvider {
   const env = options.env ?? process.env;
   const config = options.config ?? getProductSeoAiConfig(env);
@@ -242,8 +237,9 @@ export function createProductSeoAiProvider(
     });
 
     if (attempt.status !== 200) {
-      const code = classifyHttpError(attempt.status, attempt.errorCode);
+      const code = classifyProductSeoAiHttpError(attempt.status, attempt.errorCode);
       logAiEvent("responses_failed", {
+        provider: "openai",
         status: attempt.status,
         error: code,
         kind,
@@ -256,8 +252,10 @@ export function createProductSeoAiProvider(
     const draft = text ? parseDraftFromText(text) : parseProductSeoAiRawDraft(attempt.body);
     if (!draft) {
       logAiEvent("responses_invalid", {
+        provider: "openai",
         kind,
         model: config.model,
+        error: "INVALID_OUTPUT",
       });
       return productSeoAiError("INVALID_OUTPUT", ["malformed"]);
     }
@@ -268,6 +266,7 @@ export function createProductSeoAiProvider(
     }
 
     logAiEvent("responses_ok", {
+      provider: "openai",
       kind,
       model: config.model,
     });
@@ -294,4 +293,22 @@ export function createProductSeoAiProvider(
       );
     },
   };
+}
+
+export function createProductSeoAiProvider(
+  options: ProductSeoAiProviderOptions = {},
+): ProductSeoAiProvider {
+  const env = options.env ?? process.env;
+  const config = options.config ?? getProductSeoAiConfig(env);
+  const resolved = { ...options, env, config };
+
+  if (config.provider === "unknown") {
+    return createUnknownProductSeoAiProvider();
+  }
+
+  if (config.provider === "yandex") {
+    return createYandexProductSeoAiProvider(resolved);
+  }
+
+  return createOpenAiProductSeoAiProvider(resolved);
 }

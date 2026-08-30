@@ -159,7 +159,11 @@ export async function generateProductSeoDraft(
     return productSeoAiError("AI_DISABLED");
   }
 
-  if (!config.apiKeyPresent || !config.canCall) {
+  if (config.provider === "unknown") {
+    return productSeoAiError("PROVIDER_ERROR");
+  }
+
+  if (!config.canCall) {
     return productSeoAiError("NOT_CONFIGURED");
   }
 
