@@ -122,6 +122,7 @@ import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-bi
 import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes-i-dengi.ts";
 import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts";
 import { MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-bystrogo-sna-slushat-onlayn.ts";
+import { MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-glubokogo-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2802,6 +2803,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyFifthListenHref}`),
     "directory JSON-LD includes ninety-fifth listen href",
+  );
+
+  const ninetySixthListenHref = "/listens/muzyka-dlya-glubokogo-sna-slushat-onlayn";
+  const ninetySixthListenCard = data.articles.find((card) => card.href === ninetySixthListenHref);
+  assert(ninetySixthListenCard, "ninety-sixth indexable listen page is listed");
+  assert(
+    ninetySixthListenCard.title === "Музыка для глубокого сна – слушать онлайн бесплатно | АудиоЛад",
+    "ninety-sixth listen directory title",
+  );
+  assert(
+    ninetySixthListenCard.description === MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "ninety-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/muzyka-dlya-glubokogo-sna-slushat-onlayn"),
+    "no /articles duplicate for ninety-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetySixthListenHref}`),
+    "directory JSON-LD includes ninety-sixth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
