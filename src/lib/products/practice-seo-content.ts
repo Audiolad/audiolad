@@ -5,6 +5,10 @@ import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
 import { resolveAuthorRecommendationsTitle } from "@/lib/products/author-recommendations-title";
 import { formatProductDuration } from "@/lib/products/duration";
 import { getListenPageBySlug } from "@/lib/seo/listens/registry";
+import {
+  RELATED_PRODUCT_STORED_PARSE_LIMIT,
+  limitPublicRelatedProducts,
+} from "@/lib/seo/related-product-search";
 
 export type PracticeSeoUsageItem = { content: string };
 export type PracticeSeoFaqItem = { question: string; answer: string };
@@ -106,7 +110,7 @@ export function parsePracticeSeoContent(
     ? value.related_listen_slugs
     : [];
   if (
-    value.related_practice_ids.length > PRODUCT_CONTENT_LIMITS.seoUsageItems ||
+    value.related_practice_ids.length > RELATED_PRODUCT_STORED_PARSE_LIMIT ||
     relatedListenSlugsRaw.length > PRODUCT_CONTENT_LIMITS.seoUsageItems
   ) return null;
   const relatedPracticeIds = value.related_practice_ids
@@ -298,10 +302,14 @@ export async function loadPublicPracticeSeoContent(
   return {
     usageItems: usage.error ? [] : (usage.data ?? []).map((row) => ({ content: String(row.content) })),
     faqItems: faq.error ? [] : (faq.data ?? []).map((row) => ({ question: String(row.question), answer: String(row.answer) })),
-    relatedProducts: relatedProducts.error ? [] : ids.flatMap((id) => {
-      const mapped = mapPublicRelatedProduct(targetById.get(id) ?? {});
-      return mapped ? [mapped] : [];
-    }),
+    relatedProducts: relatedProducts.error
+      ? []
+      : limitPublicRelatedProducts(
+          ids.flatMap((id) => {
+            const mapped = mapPublicRelatedProduct(targetById.get(id) ?? {});
+            return mapped ? [mapped] : [];
+          }),
+        ),
     relatedListens: [],
     authorRecommendationsTitle: resolveAuthorRecommendationsTitle(
       storedAuthorRecommendationsTitle,

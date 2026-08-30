@@ -84,6 +84,7 @@ import {
   validateRelatedPracticeTargets,
   withPreservedRelatedListenSlugs,
 } from "@/lib/products/practice-seo-content";
+import { shouldRejectChangedAuthorRecommendations } from "@/lib/seo/related-product-search";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -796,6 +797,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const seoContent = parsedSeoContent && previousSeoContent
       ? withPreservedRelatedListenSlugs(parsedSeoContent, previousSeoContent)
       : parsedSeoContent;
+    if (
+      seoContent &&
+      previousSeoContent &&
+      shouldRejectChangedAuthorRecommendations(
+        previousSeoContent.relatedPracticeIds,
+        seoContent.relatedPracticeIds,
+      )
+    ) {
+      return NextResponse.json(
+        { error: "related_products_limit" },
+        { status: 400 },
+      );
+    }
     const seoContentChanged = Boolean(
       seoContent &&
         previousSeoContent &&

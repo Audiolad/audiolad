@@ -526,7 +526,11 @@ assert.doesNotMatch(seoSection, /api\/author\/seo\/listen-options/);
 assert.match(seoSection, /api\/author\/seo\/related-product-options/);
 assert.match(seoSection, /RELATED_PRODUCT_SEARCH_DEBOUNCE_MS/);
 assert.match(seoSection, /shouldSearchRelatedProducts/);
+assert.match(seoSection, /shouldListDefaultAuthorProducts/);
 assert.match(seoSection, /canAddRelatedProductId/);
+assert.match(seoSection, /MAX_AUTHOR_RECOMMENDATIONS/);
+assert.match(seoSection, /Добавлено/);
+assert.match(seoSection, /overflow-y-auto/);
 assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
 assert.match(
   read("src/lib/seo/wordstat/ui.ts"),
@@ -553,6 +557,7 @@ assert.match(patch, /validateSeoDescriptionLength/);
 assert.doesNotMatch(patch, /api\/author\/products\/\[id\]\/seo/);
 assert.match(patch, /replacePracticeSeoContent/);
 assert.match(patch, /validateRelatedPracticeTargets/);
+assert.match(patch, /shouldRejectChangedAuthorRecommendations/);
 assert.match(patch, /hasPracticeSeoContentChanges/);
 assert.match(patch, /seoContentChanged/);
 assert.match(patch, /scalarUpdates/);
@@ -585,10 +590,13 @@ assert.match(relatedOptionsRoute, /admin_panel\.access/);
 assert.match(relatedOptionsRoute, /\.limit\(MAX_RESULTS\)/);
 assert.match(relatedOptionsRoute, /RELATED_PRODUCT_SEARCH_LIMIT/);
 assert.match(relatedOptionsRoute, /shouldSearchRelatedProducts/);
+assert.match(relatedOptionsRoute, /shouldListDefaultAuthorProducts/);
 assert.match(relatedOptionsRoute, /toRelatedProductOrFilter/);
 assert.match(relatedOptionsRoute, /parseRelatedProductIdsParam/);
 assert.match(relatedOptionsRoute, /options: \[\]/);
 assert.match(relatedOptionsRoute, /— \$\{authorName\}/);
+assert.match(relatedOptionsRoute, /RELATED_PRODUCT_DEFAULT_AUTHOR_LIST_LIMIT/);
+assert.match(relatedOptionsRoute, /published_at/);
 assert.doesNotMatch(relatedOptionsRoute, /author_id.*searchParams/);
 
 console.log("author-product-seo-form-unit: ok");

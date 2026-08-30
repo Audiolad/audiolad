@@ -70,8 +70,12 @@ import {
 } from "@/lib/seo/product-autofill/style-profile";
 import type { ProductSeoSecondaryQueryStatus } from "@/lib/seo/product-autofill/types";
 import {
+  AUTHOR_RECOMMENDATIONS_LIMIT_COPY,
+  MAX_AUTHOR_RECOMMENDATIONS,
   RELATED_PRODUCT_SEARCH_DEBOUNCE_MS,
   canAddRelatedProductId,
+  getRelatedProductPickerMode,
+  shouldListDefaultAuthorProducts,
   shouldSearchRelatedProducts,
   type RelatedProductSearchOption,
 } from "@/lib/seo/related-product-search";
@@ -154,6 +158,11 @@ export default function AuthorProductSeoSection({
   const [relatedProductQuery, setRelatedProductQuery] = useState("");
   const [searchedRelatedProducts, setSearchedRelatedProducts] =
     useState<RelatedProductSearchOption[]>([]);
+  const [defaultAuthorProducts, setDefaultAuthorProducts] = useState<
+    RelatedProductSearchOption[]
+  >([]);
+  const [completedDefaultAuthorSourceId, setCompletedDefaultAuthorSourceId] =
+    useState<string | null>(null);
   const [selectedRelatedProducts, setSelectedRelatedProducts] = useState<
     Record<string, SelectOption>
   >({});
@@ -193,15 +202,26 @@ export default function AuthorProductSeoSection({
     }
     return next;
   }, [relatedProductOptions, selectedRelatedProducts]);
+  const relatedPickerMode = getRelatedProductPickerMode(relatedProductQuery);
   const relatedProductSearching = Boolean(
-    relatedProductSourceId && shouldSearchRelatedProducts(relatedProductQuery),
+    relatedProductSourceId && relatedPickerMode === "search",
   );
+  const relatedProductListingDefaults = Boolean(
+    relatedProductSourceId && relatedPickerMode === "default",
+  );
+  const relatedRecommendationsFull =
+    selectedRelatedIds.length >= MAX_AUTHOR_RECOMMENDATIONS;
   const relatedProductSearchSettled =
     relatedProductSearching &&
     completedRelatedProductQuery === relatedProductQuery;
+  const defaultAuthorProductsReady =
+    relatedProductListingDefaults &&
+    completedDefaultAuthorSourceId === relatedProductSourceId;
   const visibleRelatedProductResults = relatedProductSearching
     ? searchedRelatedProducts
-    : [];
+    : relatedProductListingDefaults
+      ? defaultAuthorProducts
+      : [];
   useEffect(() => {
     if (!relatedProductSourceId || !selectedRelatedIds.length) {
       return;
@@ -233,6 +253,41 @@ export default function AuthorProductSeoSection({
 
     return () => controller.abort();
   }, [relatedProductSourceId, selectedRelatedIds]);
+  useEffect(() => {
+    if (
+      !relatedProductSourceId ||
+      !shouldListDefaultAuthorProducts(relatedProductQuery)
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      source: relatedProductSourceId,
+    });
+    void fetch(`/api/author/seo/related-product-options?${query}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : { options: [] }))
+      .then((payload: { options?: RelatedProductSearchOption[] }) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setDefaultAuthorProducts(payload.options ?? []);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setDefaultAuthorProducts([]);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setCompletedDefaultAuthorSourceId(relatedProductSourceId);
+        }
+      });
+
+    return () => controller.abort();
+  }, [relatedProductSourceId, relatedProductQuery]);
   useEffect(() => {
     if (!relatedProductSourceId || !shouldSearchRelatedProducts(relatedProductQuery)) {
       return;
@@ -959,27 +1014,37 @@ export default function AuthorProductSeoSection({
         <div id="related-product-search-results" role="status">
         {!relatedProductSourceId ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Сначала сохраните продукт</p>
-        ) : relatedProductQuery.trim() && !shouldSearchRelatedProducts(relatedProductQuery) ? (
+        ) : relatedPickerMode === "hint" ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Начните вводить название</p>
         ) : relatedProductSearching && !relatedProductSearchSettled ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ищем…</p>
+        ) : relatedProductListingDefaults && !defaultAuthorProductsReady ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Загружаем…</p>
         ) : null}
         {visibleRelatedProductResults.length ? (
-          <ul className="mt-2 space-y-1">
-            {visibleRelatedProductResults
-              .filter((option) => !selectedRelatedIds.includes(option.value))
-              .map((option) => (
+          <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+            {visibleRelatedProductResults.map((option) => {
+              const alreadySelected = selectedRelatedIds.includes(option.value);
+              const addDisabled =
+                disabled || alreadySelected || relatedRecommendationsFull;
+              return (
                 <li key={option.value}>
                   <button
                     type="button"
-                    disabled={disabled}
-                    aria-label={`Добавить «${option.label}»`}
-                    className="flex w-full min-w-0 items-center gap-3 rounded-[14px] border border-[#eadff8] bg-white px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    disabled={addDisabled}
+                    aria-label={
+                      alreadySelected
+                        ? `«${option.label}» уже добавлен`
+                        : relatedRecommendationsFull
+                          ? AUTHOR_RECOMMENDATIONS_LIMIT_COPY
+                          : `Добавить «${option.label}»`
+                    }
+                    className="flex w-full min-w-0 items-center gap-3 rounded-[14px] border border-[#eadff8] bg-white px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => {
                       const result = canAddRelatedProductId(
                         option.value,
                         seoContent.relatedPracticeIds,
-                        PRODUCT_CONTENT_LIMITS.seoUsageItems,
+                        MAX_AUTHOR_RECOMMENDATIONS,
                       );
                       if (!result.ok) {
                         return;
@@ -1016,12 +1081,25 @@ export default function AuthorProductSeoSection({
                         <span className="mt-0.5 block truncate text-xs text-[#5c4f82]">{option.authorName}</span>
                       ) : null}
                     </span>
+                    {alreadySelected ? (
+                      <span className="shrink-0 text-xs font-medium text-[#7d70a2]">Добавлено</span>
+                    ) : null}
                   </button>
                 </li>
-              ))}
+              );
+            })}
           </ul>
         ) : relatedProductSearchSettled && !visibleRelatedProductResults.length ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Ничего не найдено</p>
+        ) : relatedProductListingDefaults &&
+          defaultAuthorProductsReady &&
+          !visibleRelatedProductResults.length ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">Пока нет других опубликованных продуктов</p>
+        ) : null}
+        {relatedRecommendationsFull ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {AUTHOR_RECOMMENDATIONS_LIMIT_COPY}
+          </p>
         ) : null}
         </div>
         {selectedRelatedIds.map((id, index) => (
