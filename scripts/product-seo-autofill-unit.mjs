@@ -29,6 +29,7 @@ import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/sel
 import {
   collectSeoAboutDuplicationIssues,
   expectedSecondaryRange,
+  normalizeProductSeoValidationIssue,
   parseProductSeoAiRawDraft,
   resolveSecondaryQueryStatus,
   validateProductSeoAiDraft,
@@ -258,6 +259,54 @@ function jsonResponse(status, body) {
   return {
     status,
     json: async () => body,
+  };
+}
+
+function serializeLogArg(arg) {
+  if (typeof arg === "string") {
+    return arg;
+  }
+  try {
+    return JSON.stringify(arg);
+  } catch {
+    return String(arg);
+  }
+}
+
+async function withCapturedInfo(fn) {
+  const entries = [];
+  const original = console.info;
+  console.info = (...args) => {
+    entries.push(args);
+  };
+  try {
+    const result = await fn();
+    return {
+      result,
+      entries,
+      text: entries.map((args) => args.map(serializeLogArg).join(" ")).join("\n"),
+    };
+  } finally {
+    console.info = original;
+  }
+}
+
+function validationFailurePayloads(entries) {
+  return entries
+    .filter((args) =>
+      args.some(
+        (arg) =>
+          typeof arg === "string" && arg.includes("product_seo_ai_validation_failed"),
+      ),
+    )
+    .map((args) => args.find((arg) => arg && typeof arg === "object" && !Array.isArray(arg)))
+    .filter(Boolean);
+}
+
+function apiErrorBody(result) {
+  return {
+    error: result.error.message,
+    code: result.error.code,
   };
 }
 
@@ -1786,5 +1835,207 @@ assert.match(route, /Returns a local SEO draft only/);
 assert.doesNotMatch(route, /replacePracticeSeoContent|seo_primary_query/);
 assert.doesNotMatch(route, /indexnow|webmaster/i);
 assert.doesNotMatch(orchestrate, /replacePracticeSeoContent|indexnow|webmaster/i);
+
+// NORMALIZES_INVENTED_SECONDARY
+assert.equal(
+  normalizeProductSeoValidationIssue("invented_secondary:музыка для глубокого сна"),
+  "invented_secondary",
+);
+
+// NORMALIZES_UNGROUNDED_DURATION
+assert.equal(
+  normalizeProductSeoValidationIssue("ungrounded:duration:30 минут"),
+  "ungrounded:duration",
+);
+
+// NORMALIZES_UNGROUNDED_TRACKS
+assert.equal(
+  normalizeProductSeoValidationIssue("ungrounded:tracks:10 треков"),
+  "ungrounded:tracks",
+);
+
+// NORMALIZES_UNGROUNDED_PRICE
+assert.equal(
+  normalizeProductSeoValidationIssue("ungrounded:price:499 ₽"),
+  "ungrounded:price",
+);
+
+// NORMALIZES_BANNED_CLAIM
+assert.equal(
+  normalizeProductSeoValidationIssue("banned_claim:/лечит/i"),
+  "banned_claim",
+);
+assert.equal(
+  normalizeProductSeoValidationIssue("banned_claim:лечит"),
+  "banned_claim",
+);
+
+// STATIC_ISSUE_PRESERVED
+for (const issue of [
+  "secondary_count",
+  "primary_missing_from_title",
+  "primary_missing_from_description_or_about",
+  "faq_count",
+  "primary_missing_from_faq",
+  "usage_count",
+  "duplicate_usage",
+  "duplicate_faq",
+  "duplicate_or_empty_anchor",
+  "faq_too_long",
+  "about_duplicates_description",
+  "about_starts_with_description",
+  "about_opening_copies_description",
+  "title_too_long",
+  "description_too_long",
+  "about_too_long",
+  "about_far_over_soft_max",
+  "malformed",
+]) {
+  assert.equal(normalizeProductSeoValidationIssue(issue), issue, issue);
+}
+
+assert.match(orchestrate, /product_seo_ai_validation_failed/);
+assert.match(orchestrate, /normalizeProductSeoValidationIssues/);
+assert.match(orchestrate, /stage: "generate"/);
+assert.match(orchestrate, /stage: "repair"/);
+assert.doesNotMatch(
+  route.slice(route.indexOf("if (!result.ok)")),
+  /issues|validationIssues|debug|provider/,
+);
+
+const inventedPhrase = "музыка для глубокого сна";
+const ungroundedDraft = validDraft({
+  secondaryQueries: [inventedPhrase],
+  seoDescription:
+    "Медитация для сна длится 30 минут, включает 10 треков и стоит 499 ₽ вечером.",
+  seoAbout: [
+    "Эта медитация для сна лечит бессонницу обещанием чуда, которого в карточке нет.",
+    "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник.",
+    "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как ритуал.",
+  ].join("\n\n"),
+});
+
+// FIRST_VALIDATION_SUCCESS_NO_FAILURE_LOG
+{
+  const captured = await withCapturedInfo(async () =>
+    withEnvAsync(enabledEnv(), async () => {
+      const provider = mockProvider([{ ok: true, draft: validDraft(), raw: {} }]);
+      return generateProductSeoDraft(requestInput(), {
+        userId: "validation-success",
+        provider,
+        wordstatSuggestions: sampleCandidates(),
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      });
+    }),
+  );
+  assert.equal(captured.result.ok, true);
+  assert.equal(validationFailurePayloads(captured.entries).length, 0);
+  assert.doesNotMatch(captured.text, /product_seo_ai_validation_failed/);
+}
+
+// VALIDATION_GENERATE_LOGGED + REPAIR_SUCCESS
+{
+  const captured = await withCapturedInfo(async () =>
+    withEnvAsync(enabledEnv(), async () => {
+      const provider = mockProvider([
+        { ok: true, draft: validDraft({ secondaryQueries: [inventedPhrase] }), raw: {} },
+        { ok: true, draft: validDraft(), raw: {} },
+      ]);
+      return generateProductSeoDraft(requestInput(), {
+        userId: "validation-generate-logged",
+        provider,
+        wordstatSuggestions: sampleCandidates(),
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      });
+    }),
+  );
+  assert.equal(captured.result.ok, true);
+  const payloads = validationFailurePayloads(captured.entries);
+  assert.equal(payloads.length, 1, "VALIDATION_GENERATE_LOGGED");
+  assert.equal(payloads[0].provider, "openai");
+  assert.equal(payloads[0].model, "gpt-test-seo");
+  assert.equal(payloads[0].stage, "generate");
+  assert.ok(Array.isArray(payloads[0].issues));
+  assert.ok(payloads[0].issues.includes("invented_secondary"));
+  assert.equal(typeof payloads[0].issueCount, "number");
+  assert.equal(payloads[0].issueCount, payloads[0].issues.length);
+  assert.ok(
+    payloads.every((payload) => payload.stage !== "repair"),
+    "REPAIR_SUCCESS has no repair failure log",
+  );
+
+  // NO_GENERATED_TEXT_IN_LOG
+  assert.doesNotMatch(captured.text, new RegExp(inventedPhrase));
+  // NO_PRIMARY_QUERY_IN_LOG
+  assert.doesNotMatch(captured.text, /медитация для сна/);
+  // NO_API_KEY_IN_LOG
+  assert.doesNotMatch(captured.text, new RegExp(TEST_KEY));
+}
+
+// VALIDATION_REPAIR_LOGGED + REPAIR_FAILURE
+{
+  const captured = await withCapturedInfo(async () =>
+    withEnvAsync(
+      yandexEnv({
+        YANDEX_AI_API_KEY: TEST_YANDEX_KEY,
+        YANDEX_AI_FOLDER_ID: TEST_YANDEX_FOLDER,
+      }),
+      async () => {
+        const provider = mockProvider([
+          { ok: true, draft: ungroundedDraft, raw: {} },
+          { ok: true, draft: ungroundedDraft, raw: {} },
+        ]);
+        return generateProductSeoDraft(requestInput(), {
+          userId: "validation-repair-logged",
+          provider,
+          wordstatSuggestions: sampleCandidates(),
+          aiRateLimit: createProductSeoAiRateLimitStore(),
+        });
+      },
+    ),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.equal(captured.result.error.code, "INVALID_OUTPUT");
+  const payloads = validationFailurePayloads(captured.entries);
+  assert.equal(payloads.length, 2, "REPAIR_FAILURE logs generate and repair");
+  assert.equal(payloads[0].stage, "generate");
+  assert.equal(payloads[1].stage, "repair");
+  assert.ok(payloads.some((payload) => payload.stage === "repair"), "VALIDATION_REPAIR_LOGGED");
+  for (const payload of payloads) {
+    assert.equal(payload.provider, "yandex");
+    assert.equal(payload.model, "yandexgpt-lite");
+    assert.ok(payload.issues.includes("invented_secondary"));
+    assert.ok(payload.issues.includes("ungrounded:duration"));
+    assert.ok(payload.issues.includes("ungrounded:tracks"));
+    assert.ok(payload.issues.includes("ungrounded:price"));
+    assert.ok(payload.issues.includes("banned_claim"));
+    assert.equal(payload.issueCount, payload.issues.length);
+    assert.ok(!payload.issues.some((issue) => issue.includes(inventedPhrase)));
+    assert.ok(!payload.issues.some((issue) => /30 минут|10 треков|499|лечит/.test(issue)));
+  }
+
+  // NO_GENERATED_TEXT_IN_LOG
+  assert.doesNotMatch(captured.text, new RegExp(inventedPhrase));
+  assert.doesNotMatch(captured.text, /30 минут/);
+  assert.doesNotMatch(captured.text, /10 треков/);
+  assert.doesNotMatch(captured.text, /499 ₽/);
+  assert.doesNotMatch(captured.text, /лечит/);
+  // NO_PRIMARY_QUERY_IN_LOG
+  assert.doesNotMatch(captured.text, /медитация для сна/);
+  // NO_API_KEY_IN_LOG
+  assert.doesNotMatch(captured.text, new RegExp(TEST_YANDEX_KEY));
+  // NO_FOLDER_ID_IN_LOG
+  assert.doesNotMatch(captured.text, new RegExp(TEST_YANDEX_FOLDER));
+
+  // API_RESPONSE_DOES_NOT_EXPOSE_ISSUES
+  const apiBody = apiErrorBody(captured.result);
+  assert.deepEqual(Object.keys(apiBody).sort(), ["code", "error"]);
+  assert.equal("issues" in apiBody, false);
+  assert.equal("validationIssues" in apiBody, false);
+  assert.equal("debug" in apiBody, false);
+  assert.equal("provider" in apiBody, false);
+  assert.equal(JSON.stringify(apiBody).includes("invented_secondary"), false);
+  assert.equal(JSON.stringify(apiBody).includes(inventedPhrase), false);
+}
 
 console.log("product-seo-autofill-unit: ok");

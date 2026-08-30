@@ -52,6 +52,36 @@ export type ProductSeoValidationResult =
   | { ok: true; draft: ProductSeoAutofillDraft }
   | { ok: false; issues: string[] };
 
+/**
+ * Category-only form of a local validation issue for safe server logs.
+ * Does not change validator issue strings. Strips generated/user text
+ * after known dynamic suffixes:
+ * - invented_secondary:<phrase> → invented_secondary
+ * - banned_claim:<pattern> → banned_claim
+ * - ungrounded:<label>:<snippet> → ungrounded:<label>
+ * Static codes (secondary_count, title_too_long, malformed, …) stay as-is.
+ */
+export function normalizeProductSeoValidationIssue(issue: string): string {
+  if (issue.startsWith("invented_secondary:")) {
+    return "invented_secondary";
+  }
+
+  if (issue.startsWith("banned_claim:")) {
+    return "banned_claim";
+  }
+
+  if (issue.startsWith("ungrounded:")) {
+    const [prefix, label] = issue.split(":");
+    return label ? `${prefix}:${label}` : prefix;
+  }
+
+  return issue;
+}
+
+export function normalizeProductSeoValidationIssues(issues: string[]): string[] {
+  return issues.map(normalizeProductSeoValidationIssue);
+}
+
 export function expectedSecondaryRange(candidateCount: number): {
   min: number;
   max: number;

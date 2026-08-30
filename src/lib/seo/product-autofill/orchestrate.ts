@@ -22,7 +22,10 @@ import {
   requestHasForbiddenStyleKeys,
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
-import { validateProductSeoAiDraft } from "@/lib/seo/product-autofill/validate";
+import {
+  normalizeProductSeoValidationIssues,
+  validateProductSeoAiDraft,
+} from "@/lib/seo/product-autofill/validate";
 import {
   type ProductSeoAiErrorCode,
   type ProductSeoAiResult,
@@ -35,6 +38,58 @@ import {
 import type { WordstatCacheStore } from "@/lib/seo/wordstat/cache";
 import type { WordstatRateLimitStore } from "@/lib/seo/wordstat/rate-limit";
 import type { WordstatSuggestion } from "@/lib/seo/wordstat/types";
+
+const BLOCKED_LOG_FIELDS = new Set([
+  "token",
+  "apikey",
+  "api_key",
+  "authorization",
+  "openai_api_key",
+  "openaiapikey",
+  "yandex_ai_api_key",
+  "yandexaiapikey",
+  "yandex_search_api_key",
+  "yandex_ai_folder_id",
+  "folderid",
+  "folder_id",
+  "userid",
+  "user_id",
+]);
+
+type ProductSeoAiLogField =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | null
+  | undefined;
+
+function logProductSeoAiEvent(
+  message: string,
+  fields: Record<string, ProductSeoAiLogField>,
+): void {
+  const safe = Object.fromEntries(
+    Object.entries(fields).filter(
+      ([field]) => !BLOCKED_LOG_FIELDS.has(field.toLowerCase()),
+    ),
+  );
+  console.info(`[product-seo-ai] ${message}`, safe);
+}
+
+function logProductSeoAiValidationFailed(input: {
+  provider: ProductSeoAiConfig["provider"];
+  model: string;
+  stage: "generate" | "repair";
+  issues: string[];
+}): void {
+  logProductSeoAiEvent("product_seo_ai_validation_failed", {
+    provider: input.provider,
+    model: input.model,
+    stage: input.stage,
+    issues: normalizeProductSeoValidationIssues(input.issues),
+    issueCount: input.issues.length,
+  });
+}
 
 export type GenerateProductSeoDraftOptions = {
   userId: string;
@@ -205,6 +260,13 @@ export async function generateProductSeoDraft(
     return { ok: true, data: firstValidation.draft };
   }
 
+  logProductSeoAiValidationFailed({
+    provider: config.provider,
+    model: config.model,
+    stage: "generate",
+    issues: firstValidation.issues,
+  });
+
   const repaired = await provider.repair(
     promptInput,
     first.draft,
@@ -225,6 +287,12 @@ export async function generateProductSeoDraft(
   });
 
   if (!repairedValidation.ok) {
+    logProductSeoAiValidationFailed({
+      provider: config.provider,
+      model: config.model,
+      stage: "repair",
+      issues: repairedValidation.issues,
+    });
     return productSeoAiError("INVALID_OUTPUT", repairedValidation.issues);
   }
 
