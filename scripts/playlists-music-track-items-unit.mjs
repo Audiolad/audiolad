@@ -18,6 +18,10 @@ import {
   isAudioItemQueueEntry,
   isProductQueueEntry,
 } from "../src/lib/playlists/player-queue-types.ts";
+import {
+  isEditorialPracticeTrackExpandable,
+  resolveEditorialPracticeAlreadyAdded,
+} from "../src/lib/playlists/editorial-practices.ts";
 import { parseEditorialPracticesPostBody } from "../src/lib/playlists/validation.ts";
 
 function assert(cond, msg) {
@@ -65,6 +69,126 @@ assert(
 assert(
   parseEditorialPracticesPostBody({ practiceIds: [albumId] }).ok === true,
   "legacy practiceIds body still parses as product items",
+);
+
+const practiceId = "33333333-3333-4333-8333-333333333333";
+const practiceTrackA = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const practiceTrackB = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+
+const mixed = parseEditorialPracticesPostBody({
+  items: [
+    { practiceId, audioItemId: practiceTrackA },
+    { practiceId, audioItemId: practiceTrackB },
+    { practiceId: albumId, audioItemId: track1 },
+  ],
+});
+assert(mixed.ok === true, "parser accepts practice tracks with a music track");
+assert(mixed.items.length === 3, "practice + album tracks stay independent items");
+assert(
+  mixed.items[0].practiceId === practiceId &&
+    mixed.items[2].practiceId === albumId,
+  "mixed selection keeps both product ids",
+);
+assert(
+  parseEditorialPracticesPostBody({
+    items: [
+      { practiceId, audioItemId: practiceTrackA },
+      { practiceId, audioItemId: practiceTrackA },
+    ],
+  }).ok === false,
+  "same practice track cannot be queued twice",
+);
+assert(
+  parseEditorialPracticesPostBody({
+    items: [{ practiceId, audioItemId: null }],
+  }).ok === true,
+  "single practice still adds as a whole-product card",
+);
+
+assert(
+  isEditorialPracticeTrackExpandable("practice", 0) === false,
+  "zero-track practice stays flat",
+);
+assert(
+  isEditorialPracticeTrackExpandable("practice", 1) === false,
+  "single-track practice stays a flat card",
+);
+assert(
+  isEditorialPracticeTrackExpandable("practice", 2) === true,
+  "practice expands only when published audio count > 1",
+);
+assert(
+  isEditorialPracticeTrackExpandable("practice", 10) === true,
+  "practice with 10 audios expands",
+);
+assert(
+  isEditorialPracticeTrackExpandable("music", 0) === false,
+  "empty music album stays flat",
+);
+assert(
+  isEditorialPracticeTrackExpandable("music", 1) === true,
+  "music still expands when tracks.length > 0",
+);
+assert(
+  isEditorialPracticeTrackExpandable("music", 10) === true,
+  "music albums with many tracks still expand",
+);
+
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "practice",
+    tracks: [{ alreadyAdded: false }],
+    productAlreadyAdded: true,
+  }) === true,
+  "whole-product playlist_item still blocks a flat practice",
+);
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "practice",
+    tracks: [{ alreadyAdded: true }],
+    productAlreadyAdded: false,
+  }) === true,
+  "already-added single audio still blocks a flat practice",
+);
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "practice",
+    tracks: [
+      { alreadyAdded: true },
+      { alreadyAdded: false },
+      { alreadyAdded: false },
+    ],
+    productAlreadyAdded: false,
+  }) === false,
+  "partially added multi-track practice stays selectable",
+);
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "practice",
+    tracks: [
+      { alreadyAdded: true },
+      { alreadyAdded: true },
+      { alreadyAdded: true },
+    ],
+    productAlreadyAdded: false,
+  }) === true,
+  "all published practice tracks already in playlist_items block add-all",
+);
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "music",
+    tracks: [{ alreadyAdded: true }, { alreadyAdded: true }],
+    productAlreadyAdded: false,
+  }) === true,
+  "music album alreadyAdded stays track-based",
+);
+assert(
+  resolveEditorialPracticeAlreadyAdded({
+    productKind: "music",
+    tracks: [],
+    productAlreadyAdded: true,
+  }) === false,
+  "empty music album alreadyAdded stays false even if product row exists",
 );
 
 const publicItems = [
@@ -204,12 +328,30 @@ assert(picker.includes("Добавить весь альбом"), "add-all is ex
 assert(picker.includes("toggleExpanded"), "album expands to tracks");
 assert(picker.includes("track.id"), "each track is independently selectable");
 assert(
+  picker.includes("isEditorialPracticeTrackExpandable"),
+  "picker reuses expand helper instead of a second component",
+);
+assert(
   picker.includes("items: Array.from(selectedIds).map(parseSelectedKey)"),
   "submit sends track items, not only album ids",
 );
 assert(
   picker.includes("canUserEditEditorialPlaylist") === false,
   "picker stays on existing editorial access path",
+);
+
+const loader = read("src/lib/playlists/editorial-practices.ts");
+assert(
+  loader.includes("const tracks = (tracksByPractice.get(row.id) ?? []).map"),
+  "loader attaches published tracks for every product kind",
+);
+assert(
+  /const tracks = isMusic\s*\?/.test(loader) === false,
+  "tracks are no longer gated on isMusicProductKind",
+);
+assert(
+  loader.includes("loadPublishedAudioItemsByPracticeIds"),
+  "published audio rows stay the source of track count",
 );
 
 const api = read("src/app/api/playlists/[id]/editorial-practices/route.ts");
