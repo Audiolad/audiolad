@@ -2,7 +2,7 @@ import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
 
 export const GUEST_HOME_INTRO =
-  "АудиоЛад – платформа авторского аудио: практики, медитации, музыка, аудиокурсы и программы.";
+  "АудиоЛад – платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.";
 
 export const GUEST_HOME_LISTEN_FREE_CTA = {
   label: "Начать слушать бесплатно",

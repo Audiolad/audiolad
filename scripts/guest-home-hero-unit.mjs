@@ -23,7 +23,7 @@ const listenerNav = read("src/lib/navigation/listener-nav.ts");
 const EN_DASH = "\u2013";
 const EM_DASH = "\u2014";
 const INTRO =
-  `АудиоЛад ${EN_DASH} платформа авторского аудио: практики, медитации, музыка, аудиокурсы и программы.`;
+  `АудиоЛад ${EN_DASH} платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.`;
 
 assert.doesNotMatch(
   guestHome,
