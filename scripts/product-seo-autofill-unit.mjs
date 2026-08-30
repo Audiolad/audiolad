@@ -43,8 +43,10 @@ import {
   withCustomStyleSliders,
 } from "../src/lib/seo/product-autofill/style-profile.ts";
 import {
+  buildProductSeoAiJsonSchema,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
+  PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
 import {
   hasFilledGeneratedSeoFields,
@@ -317,10 +319,72 @@ assert.equal(valid.draft.seoSecondaryQueries.length, 3);
 assert.equal(valid.draft.secondaryQueryStatus, "complete");
 
 assert.deepEqual(expectedSecondaryRange(5), { min: 3, max: 5 });
+assert.deepEqual(expectedSecondaryRange(4), { min: 3, max: 4 });
 assert.deepEqual(expectedSecondaryRange(3), { min: 3, max: 3 });
 assert.deepEqual(expectedSecondaryRange(2), { min: 1, max: 2 });
 assert.deepEqual(expectedSecondaryRange(1), { min: 1, max: 1 });
 assert.deepEqual(expectedSecondaryRange(0), { min: 0, max: 0 });
+assert.deepEqual(expectedSecondaryRange(20), { min: 3, max: 5 });
+assert.equal(
+  "minItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+  false,
+);
+assert.equal(
+  "maxItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+  false,
+);
+
+function assertYandexSecondarySchemaRange(schema, candidateCount, label) {
+  const range = expectedSecondaryRange(candidateCount);
+  const field = schema.properties.secondaryQueries;
+  assert.equal(field.type, "array", label);
+  assert.deepEqual(field.items, { type: "string" }, label);
+  assert.equal(field.minItems, range.min, `${label} min`);
+  assert.equal(field.maxItems, range.max, `${label} max`);
+}
+
+// YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(0),
+  0,
+  "YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES",
+);
+// YANDEX_SCHEMA_SECONDARIES_1_CANDIDATE
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(1),
+  1,
+  "YANDEX_SCHEMA_SECONDARIES_1_CANDIDATE",
+);
+// YANDEX_SCHEMA_SECONDARIES_2_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(2),
+  2,
+  "YANDEX_SCHEMA_SECONDARIES_2_CANDIDATES",
+);
+// YANDEX_SCHEMA_SECONDARIES_3_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(3),
+  3,
+  "YANDEX_SCHEMA_SECONDARIES_3_CANDIDATES",
+);
+// YANDEX_SCHEMA_SECONDARIES_4_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(4),
+  4,
+  "YANDEX_SCHEMA_SECONDARIES_4_CANDIDATES",
+);
+// YANDEX_SCHEMA_SECONDARIES_5_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(5),
+  5,
+  "YANDEX_SCHEMA_SECONDARIES_5_CANDIDATES",
+);
+// YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES
+assertYandexSecondarySchemaRange(
+  buildProductSeoAiJsonSchema(20),
+  20,
+  "YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES",
+);
 assert.equal(resolveSecondaryQueryStatus(4), "complete");
 assert.equal(resolveSecondaryQueryStatus(2), "limited");
 assert.equal(resolveSecondaryQueryStatus(0), "none");
@@ -639,6 +703,15 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(sent.store, PRODUCT_SEO_AI_STORE);
   assert.equal(sent.max_output_tokens, PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS);
   assert.equal(sent.text.format.type, "json_schema");
+  assert.deepEqual(sent.text.format.schema, PRODUCT_SEO_AI_JSON_SCHEMA);
+  assert.equal(
+    "minItems" in sent.text.format.schema.properties.secondaryQueries,
+    false,
+  );
+  assert.equal(
+    "maxItems" in sent.text.format.schema.properties.secondaryQueries,
+    false,
+  );
   assert.equal("tools" in sent, false);
   assert.doesNotMatch(JSON.stringify(sent), new RegExp(TEST_KEY));
 });
@@ -1131,6 +1204,8 @@ assert.match(orchestrate, /import "server-only"/);
 assert.doesNotMatch(orchestrate, /wordstat\.yandex\.ru/);
 assert.match(provider, /PRODUCT_SEO_AI_RESPONSES_URL/);
 assert.match(provider, /json_schema/);
+assert.match(provider, /PRODUCT_SEO_AI_JSON_SCHEMA/);
+assert.doesNotMatch(provider, /buildProductSeoAiJsonSchema/);
 assert.match(provider, /PRODUCT_SEO_AI_STORE/);
 assert.match(provider, /PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS/);
 assert.match(provider, /import "server-only"/);
@@ -1265,13 +1340,21 @@ assert.match(packageJson, /test:indexnow/);
 assert.match(packageJson, /test:yandex-webmaster/);
 
 const yandexProviderSource = read("src/lib/seo/product-autofill/yandex-provider.ts");
+const promptSource = read("src/lib/seo/product-autofill/prompt.ts");
 const docs = read("docs/product-seo-autofill.md");
+assert.match(promptSource, /export function buildProductSeoAiJsonSchema/);
+assert.match(promptSource, /expectedSecondaryRange\(candidateCount\)/);
+assert.doesNotMatch(
+  promptSource.slice(promptSource.indexOf("export function buildProductSeoAiJsonSchema")),
+  /if \(candidateCount/,
+);
 assert.match(provider, /createYandexProductSeoAiProvider/);
 assert.match(provider, /config.provider === "yandex"/);
 assert.match(provider, /config.provider === "unknown"/);
 assert.match(yandexProviderSource, /PRODUCT_SEO_YANDEX_AI_COMPLETION_URL/);
 assert.match(yandexProviderSource, /Api-Key/);
 assert.match(yandexProviderSource, /jsonSchema/);
+assert.match(yandexProviderSource, /buildProductSeoAiJsonSchema/);
 assert.match(yandexProviderSource, /stream: false/);
 assert.match(yandexProviderSource, /JSON\.parse\(text\)/);
 assert.match(yandexProviderSource, /YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS/);
@@ -1470,6 +1553,17 @@ await withEnvAsync(yandexEnv(), async () => {
     "usageItems",
     "faqItems",
   ]);
+  {
+    const yandexCandidates = eligibleSecondaryCandidates(
+      sampleCandidates(),
+      requestInput().seoPrimaryQuery,
+    );
+    assertYandexSecondarySchemaRange(
+      sent.jsonSchema.schema,
+      yandexCandidates.length,
+      "YANDEX_SUCCESS_DYNAMIC_SCHEMA",
+    );
+  }
   assert.equal(sent.messages[0].role, "system");
   assert.equal(sent.messages[1].role, "user");
   assert.equal(typeof sent.messages[0].text, "string");
@@ -1641,6 +1735,70 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.ok, true);
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(result.data.faqItems.length, 3);
+  {
+    const yandexCandidates = eligibleSecondaryCandidates(
+      sampleCandidates(),
+      requestInput().seoPrimaryQuery,
+    );
+    assertYandexSecondarySchemaRange(
+      JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema,
+      yandexCandidates.length,
+      "YANDEX_REPAIR_GENERATE_DYNAMIC_SCHEMA",
+    );
+    assertYandexSecondarySchemaRange(
+      JSON.parse(fetchImpl.calls[1].init.body).jsonSchema.schema,
+      yandexCandidates.length,
+      "YANDEX_REPAIR_REPAIR_DYNAMIC_SCHEMA",
+    );
+  }
+});
+
+function fakeEligibleCandidates(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    phrase: `кандидат ${index + 1}`,
+    count: 120,
+    color: "green",
+    source: "result",
+  }));
+}
+
+async function captureYandexJsonSchema(kind, candidateCount) {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexCompletion(JSON.stringify(validDraft()))),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const input = {
+    request: requestInput(),
+    candidates: fakeEligibleCandidates(candidateCount),
+  };
+  if (kind === "generate") {
+    await provider.generate(input);
+  } else {
+    await provider.repair(input, validDraft(), ["secondary_count"]);
+  }
+  assert.equal(fetchImpl.calls.length, 1, `${kind} ${candidateCount} calls`);
+  return JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema;
+}
+
+await withEnvAsync(yandexEnv(), async () => {
+  for (const candidateCount of [0, 1, 2, 3, 4, 5, 20]) {
+    const generateSchema = await captureYandexJsonSchema("generate", candidateCount);
+    assertYandexSecondarySchemaRange(
+      generateSchema,
+      candidateCount,
+      `YANDEX_GENERATE_SCHEMA_SECONDARIES_${candidateCount}`,
+    );
+    const repairSchema = await captureYandexJsonSchema("repair", candidateCount);
+    assertYandexSecondarySchemaRange(
+      repairSchema,
+      candidateCount,
+      `YANDEX_REPAIR_SCHEMA_SECONDARIES_${candidateCount}`,
+    );
+  }
 });
 
 // Repair is successful only on FINAL
