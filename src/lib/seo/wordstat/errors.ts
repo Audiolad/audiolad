@@ -18,15 +18,21 @@ export const WORDSTAT_ERROR_MESSAGES: Record<WordstatErrorCode, string> = {
     "Яндекс не смог обработать эту формулировку. Попробуйте сделать запрос короче или изменить его.",
 };
 
-export function wordstatClientErrorMessage(
-  payload: { error?: string; code?: string } | null,
-): string {
-  if (payload && typeof payload.error === "string" && payload.error.trim()) {
-    return payload.error;
+export function wordstatClientErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
+    return WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR;
   }
 
-  const code = payload?.code;
-  if (code && Object.prototype.hasOwnProperty.call(WORDSTAT_ERROR_MESSAGES, code)) {
+  const record = payload as { error?: unknown; code?: unknown };
+  if (typeof record.error === "string" && record.error.trim()) {
+    return record.error;
+  }
+
+  const code = record.code;
+  if (
+    typeof code === "string" &&
+    Object.prototype.hasOwnProperty.call(WORDSTAT_ERROR_MESSAGES, code)
+  ) {
     return WORDSTAT_ERROR_MESSAGES[code as WordstatErrorCode];
   }
 

@@ -180,12 +180,13 @@ export function hasFilledGeneratedSeoFields(input: {
   );
 }
 
-export function suggestPrimaryQuerySeeds(_input: {
+export function suggestPrimaryQuerySeeds(input: {
   title: string;
   subtitle: string;
   description: string;
   productKind: string;
 }): string[] {
+  void input;
   return [];
 }
 
