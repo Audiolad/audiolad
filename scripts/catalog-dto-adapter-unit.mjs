@@ -72,6 +72,10 @@ const meditation = adaptLegacyCatalogSourceToCard(
 assert.equal(meditation?.class, "practice");
 assertStorefrontDisplayLabel(meditation, "Медитация");
 
+const sound = adaptLegacyCatalogSourceToCard(source({ format: "Звук" }));
+assert.equal(sound?.class, "practice");
+assertStorefrontDisplayLabel(sound, "Звук");
+
 const customFormat = adaptLegacyCatalogSourceToCard(
   source({ format: "Голос для сна" }),
 );
