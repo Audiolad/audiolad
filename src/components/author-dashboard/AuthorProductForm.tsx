@@ -2631,7 +2631,7 @@ export default function AuthorProductForm({
           seoSecondaryQueries={form.seoSecondaryQueries}
           seoTitle={form.seoTitle}
           seoDescription={form.seoDescription}
-          authorRecommendationsTitle={form.authorRecommendationsTitle,
+          authorRecommendationsTitle={form.authorRecommendationsTitle}
           seoContent={form.seoContent}
           relatedProductOptions={relatedProductOptions}
           relatedProductSourceId={practiceId || undefined}
