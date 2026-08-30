@@ -232,7 +232,13 @@ export const MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE =
         title: "Музыка для крепкого сна – отдельный сценарий",
         paragraphs: [],
         blocks: [
-          { kind: "paragraph", text: "Запросы о крепком сне близки к теме ночного прослушивания, но это отдельный пользовательский intent." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { href: "/listens/muzyka-dlya-krepkogo-sna-slushat-onlayn", label: "Музыка для крепкого сна" },
+              { text: " относится к близкому, но отдельному пользовательскому intent." },
+            ],
+          },
           { kind: "paragraph", text: "На этой странице мы не разбираем продолжительность сна, его качество или ночные пробуждения." },
           { kind: "paragraph", text: "Основная тема здесь – момент перед сном и музыка в контексте быстрого засыпания." },
           { kind: "paragraph", text: "Поэтому соседние сценарии не объединяются в одну большую страницу." },

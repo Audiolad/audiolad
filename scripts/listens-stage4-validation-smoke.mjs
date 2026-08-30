@@ -29140,6 +29140,14 @@ const NINETY_FOURTH_PAGE_TITLE = "Музыка сна для засыпания 
 const NINETY_FOURTH_PAGE_DESCRIPTION = "Музыка сна для засыпания – слушайте онлайн бесплатно спокойные композиции перед сном и выбирайте комфортное звучание для вечернего отдыха.";
 const NINETY_FOURTH_PLAYLIST_SLUG = "muzyka-dlya-glubokogo-sna";
 const NINETY_FOURTH_PLAYLIST_TITLE = "Музыка для глубокого сна | Музыка для быстрого засыпания";
+const NINETY_FOURTH_INTERNAL_HREF_97 = "/listens/muzyka-dlya-bystrogo-zasypaniya-slushat-onlayn";
+const NINETY_FOURTH_INTERNAL_LABEL_97 = "музыка для быстрого засыпания";
+const NINETY_FOURTH_INTERNAL_HREF_95 = "/listens/muzyka-dlya-bystrogo-sna-slushat-onlayn";
+const NINETY_FOURTH_INTERNAL_LABEL_95 = "музыка для быстрого сна";
+const NINETY_FOURTH_INTERNAL_HREF_96 = "/listens/muzyka-dlya-glubokogo-sna-slushat-onlayn";
+const NINETY_FOURTH_INTERNAL_LABEL_96 = "Музыка для глубокого сна";
+const NINETY_FOURTH_INTERNAL_HREF_98 = "/listens/muzyka-dlya-krepkogo-sna-slushat-onlayn";
+const NINETY_FOURTH_INTERNAL_LABEL_98 = "Музыка для крепкого сна";
 const NINETY_FOURTH_EXPECTED_INTRO = [
   "Здесь можно слушать музыку сна для засыпания онлайн бесплатно – включить спокойное звучание вечером, во время отдыха или непосредственно перед тем, как лечь спать.",
   "В подборке можно выбрать музыку, которая подходит именно вам по темпу, настроению и характеру звучания. Попробуйте разные варианты и остановитесь на том, который не отвлекает и создаёт комфортный музыкальный фон.",
@@ -29319,9 +29327,17 @@ function testNinetyFourthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "ninety-fourth page has exactly 0 hrefs");
+  assert(allLinks.length === 4, "ninety-fourth page has exactly 4 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 0, "ninety-fourth page has exactly 0 unique dests");
+  assert(uniqueDests.size === 4, "ninety-fourth page has exactly 4 unique dests");
+  assert(allLinks[0].href === NINETY_FOURTH_INTERNAL_HREF_97, "ninety-fourth first href is Listen 97");
+  assert(allLinks[0].label === NINETY_FOURTH_INTERNAL_LABEL_97, "ninety-fourth first href label is музыка для быстрого засыпания");
+  assert(allLinks[1].href === NINETY_FOURTH_INTERNAL_HREF_95, "ninety-fourth second href is Listen 95");
+  assert(allLinks[1].label === NINETY_FOURTH_INTERNAL_LABEL_95, "ninety-fourth second href label is музыка для быстрого сна");
+  assert(allLinks[2].href === NINETY_FOURTH_INTERNAL_HREF_96, "ninety-fourth third href is Listen 96");
+  assert(allLinks[2].label === NINETY_FOURTH_INTERNAL_LABEL_96, "ninety-fourth third href label is Музыка для глубокого сна");
+  assert(allLinks[3].href === NINETY_FOURTH_INTERNAL_HREF_98, "ninety-fourth fourth href is Listen 98");
+  assert(allLinks[3].label === NINETY_FOURTH_INTERNAL_LABEL_98, "ninety-fourth fourth href label is Музыка для крепкого сна");
   for (const href of NINETY_FOURTH_FORBIDDEN_LISTEN_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-fourth has no ${href} href`);
   }
@@ -29329,11 +29345,17 @@ function testNinetyFourthPage() {
   const contentSource = read("src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "ninety-fourth content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "ninety-fourth content file has no https://");
-  assert(!contentSource.includes("/listens/"), "ninety-fourth content file has no /listens/ hrefs");
+  assert(contentSource.includes(`href: "${NINETY_FOURTH_INTERNAL_HREF_97}"`), "ninety-fourth content file has Listen 97 href");
+  assert(contentSource.includes(`label: "${NINETY_FOURTH_INTERNAL_LABEL_97}"`), "ninety-fourth content file has Listen 97 label");
+  assert(contentSource.includes(`href: "${NINETY_FOURTH_INTERNAL_HREF_95}"`), "ninety-fourth content file has Listen 95 href");
+  assert(contentSource.includes(`label: "${NINETY_FOURTH_INTERNAL_LABEL_95}"`), "ninety-fourth content file has Listen 95 label");
+  assert(contentSource.includes(`href: "${NINETY_FOURTH_INTERNAL_HREF_96}"`), "ninety-fourth content file has Listen 96 href");
+  assert(contentSource.includes(`label: "${NINETY_FOURTH_INTERNAL_LABEL_96}"`), "ninety-fourth content file has Listen 96 label");
+  assert(contentSource.includes(`href: "${NINETY_FOURTH_INTERNAL_HREF_98}"`), "ninety-fourth content file has Listen 98 href");
+  assert(contentSource.includes(`label: "${NINETY_FOURTH_INTERNAL_LABEL_98}"`), "ninety-fourth content file has Listen 98 label");
   assert(contentSource.includes(`playlistSlug: "${NINETY_FOURTH_PLAYLIST_SLUG}"`), "ninety-fourth content file has playlistSlug");
-  assert(!contentSource.includes("href:"), "ninety-fourth content file has no href fields");
   for (const href of NINETY_FOURTH_FORBIDDEN_LISTEN_HREFS) {
-    assert(!contentSource.includes(href), `ninety-fourth content file has no ${href}`);
+    assert(!contentSource.includes(`href: "${href}"`), `ninety-fourth content file has no ${href}`);
   }
   assert(!contentSource.includes("ListenSignupCta"), "ninety-fourth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-fourth content file has no primaryPractice");
@@ -29395,6 +29417,12 @@ const NINETY_FIFTH_PLAYLIST_SLUG = "muzyka-dlya-glubokogo-sna";
 const NINETY_FIFTH_PLAYLIST_TITLE = "Музыка для глубокого сна | Музыка для быстрого засыпания";
 const NINETY_FIFTH_INTERNAL_HREF = "/listens/muzyka-sna-dlya-zasypaniya-slushat-onlayn";
 const NINETY_FIFTH_INTERNAL_LABEL = "Музыка сна для засыпания";
+const NINETY_FIFTH_INTERNAL_HREF_97 = "/listens/muzyka-dlya-bystrogo-zasypaniya-slushat-onlayn";
+const NINETY_FIFTH_INTERNAL_LABEL_97 = "музыка для быстрого засыпания";
+const NINETY_FIFTH_INTERNAL_HREF_96 = "/listens/muzyka-dlya-glubokogo-sna-slushat-onlayn";
+const NINETY_FIFTH_INTERNAL_LABEL_96 = "Музыка для глубокого сна";
+const NINETY_FIFTH_INTERNAL_HREF_98 = "/listens/muzyka-dlya-krepkogo-sna-slushat-onlayn";
+const NINETY_FIFTH_INTERNAL_LABEL_98 = "Музыка для крепкого сна";
 const NINETY_FIFTH_EXPECTED_INTRO = [
   "Здесь можно слушать музыку для быстрого сна онлайн бесплатно – включить спокойные композиции вечером и подобрать комфортное звучание для времени перед сном.",
   "В подборке можно выбрать мягкий и ненавязчивый музыкальный фон, который подходит именно вам. Попробуйте разные варианты и остановитесь на музыке, которая не отвлекает и естественно вписывается в вечерний отдых.",
@@ -29536,9 +29564,11 @@ function testNinetyFifthPage() {
   const queryDiffLinks = (queryDiffSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(queryDiffLinks.length === 1, "ninety-fifth query-diff H2 has the one internal link");
+  assert(queryDiffLinks.length === 2, "ninety-fifth query-diff H2 has the two internal links");
   assert(queryDiffLinks[0].href === NINETY_FIFTH_INTERNAL_HREF, "ninety-fifth internal href is Listen 94");
   assert(queryDiffLinks[0].label === NINETY_FIFTH_INTERNAL_LABEL, "ninety-fifth internal label is Музыка сна для засыпания");
+  assert(queryDiffLinks[1].href === NINETY_FIFTH_INTERNAL_HREF_97, "ninety-fifth query-diff second href is Listen 97");
+  assert(queryDiffLinks[1].label === NINETY_FIFTH_INTERNAL_LABEL_97, "ninety-fifth query-diff second label is музыка для быстрого засыпания");
 
   const allTextChunks = [
     parsed.definition.h1,
@@ -29580,11 +29610,17 @@ function testNinetyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "ninety-fifth page has exactly 1 href");
+  assert(allLinks.length === 4, "ninety-fifth page has exactly 4 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 1, "ninety-fifth page has exactly 1 unique dest");
-  assert(allLinks[0].href === NINETY_FIFTH_INTERNAL_HREF, "ninety-fifth href is Listen 94");
-  assert(allLinks[0].label === NINETY_FIFTH_INTERNAL_LABEL, "ninety-fifth href label is Музыка сна для засыпания");
+  assert(uniqueDests.size === 4, "ninety-fifth page has exactly 4 unique dests");
+  assert(allLinks[0].href === NINETY_FIFTH_INTERNAL_HREF, "ninety-fifth first href is Listen 94");
+  assert(allLinks[0].label === NINETY_FIFTH_INTERNAL_LABEL, "ninety-fifth first href label is Музыка сна для засыпания");
+  assert(allLinks[1].href === NINETY_FIFTH_INTERNAL_HREF_97, "ninety-fifth second href is Listen 97");
+  assert(allLinks[1].label === NINETY_FIFTH_INTERNAL_LABEL_97, "ninety-fifth second href label is музыка для быстрого засыпания");
+  assert(allLinks[2].href === NINETY_FIFTH_INTERNAL_HREF_96, "ninety-fifth third href is Listen 96");
+  assert(allLinks[2].label === NINETY_FIFTH_INTERNAL_LABEL_96, "ninety-fifth third href label is Музыка для глубокого сна");
+  assert(allLinks[3].href === NINETY_FIFTH_INTERNAL_HREF_98, "ninety-fifth fourth href is Listen 98");
+  assert(allLinks[3].label === NINETY_FIFTH_INTERNAL_LABEL_98, "ninety-fifth fourth href label is Музыка для крепкого сна");
   for (const href of NINETY_FIFTH_FORBIDDEN_LISTEN_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-fifth has no ${href} href`);
   }
@@ -29592,8 +29628,14 @@ function testNinetyFifthPage() {
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-bystrogo-sna-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "ninety-fifth content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "ninety-fifth content file has no https://");
-  assert(contentSource.includes(`href: "${NINETY_FIFTH_INTERNAL_HREF}"`), "ninety-fifth content file has the one required href");
-  assert(contentSource.includes(`label: "${NINETY_FIFTH_INTERNAL_LABEL}"`), "ninety-fifth content file has the required label");
+  assert(contentSource.includes(`href: "${NINETY_FIFTH_INTERNAL_HREF}"`), "ninety-fifth content file has Listen 94 href");
+  assert(contentSource.includes(`label: "${NINETY_FIFTH_INTERNAL_LABEL}"`), "ninety-fifth content file has Listen 94 label");
+  assert(contentSource.includes(`href: "${NINETY_FIFTH_INTERNAL_HREF_97}"`), "ninety-fifth content file has Listen 97 href");
+  assert(contentSource.includes(`label: "${NINETY_FIFTH_INTERNAL_LABEL_97}"`), "ninety-fifth content file has Listen 97 label");
+  assert(contentSource.includes(`href: "${NINETY_FIFTH_INTERNAL_HREF_96}"`), "ninety-fifth content file has Listen 96 href");
+  assert(contentSource.includes(`label: "${NINETY_FIFTH_INTERNAL_LABEL_96}"`), "ninety-fifth content file has Listen 96 label");
+  assert(contentSource.includes(`href: "${NINETY_FIFTH_INTERNAL_HREF_98}"`), "ninety-fifth content file has Listen 98 href");
+  assert(contentSource.includes(`label: "${NINETY_FIFTH_INTERNAL_LABEL_98}"`), "ninety-fifth content file has Listen 98 label");
   assert(contentSource.includes(`playlistSlug: "${NINETY_FIFTH_PLAYLIST_SLUG}"`), "ninety-fifth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "ninety-fifth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-fifth content file has no primaryPractice");
@@ -29610,7 +29652,7 @@ function testNinetyFifthPage() {
   assert(!contentSource.includes("[ДАЛЕЕ]"), "ninety-fifth content file has no next marker");
   assert(!contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "ninety-fifth content file has no playlist placeholder");
   for (const href of NINETY_FIFTH_FORBIDDEN_LISTEN_HREFS) {
-    assert(!contentSource.includes(href), `ninety-fifth content file has no ${href}`);
+    assert(!contentSource.includes(`href: "${href}"`), `ninety-fifth content file has no ${href}`);
   }
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -29660,6 +29702,8 @@ const NINETY_SIXTH_INTERNAL_HREF_94 = "/listens/muzyka-sna-dlya-zasypaniya-slush
 const NINETY_SIXTH_INTERNAL_LABEL_94 = "Музыка сна для засыпания";
 const NINETY_SIXTH_INTERNAL_HREF_95 = "/listens/muzyka-dlya-bystrogo-sna-slushat-onlayn";
 const NINETY_SIXTH_INTERNAL_LABEL_95 = "музыка для быстрого сна";
+const NINETY_SIXTH_INTERNAL_HREF_98 = "/listens/muzyka-dlya-krepkogo-sna-slushat-onlayn";
+const NINETY_SIXTH_INTERNAL_LABEL_98 = "музыка для крепкого сна";
 const NINETY_SIXTH_EXPECTED_INTRO = [
   "Здесь можно слушать музыку для глубокого сна онлайн бесплатно – включить спокойные композиции вечером или оставить мягкое звучание фоном во время ночного отдыха.",
   "В подборке можно выбрать музыку с разным настроением и характером звучания. Попробуйте несколько вариантов и остановитесь на том, который воспринимается спокойно и не отвлекает.",
@@ -29866,13 +29910,15 @@ function testNinetySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "ninety-sixth page has exactly 2 hrefs");
+  assert(allLinks.length === 3, "ninety-sixth page has exactly 3 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 2, "ninety-sixth page has exactly 2 unique dests");
+  assert(uniqueDests.size === 3, "ninety-sixth page has exactly 3 unique dests");
   assert(allLinks[0].href === NINETY_SIXTH_INTERNAL_HREF_94, "ninety-sixth first href is Listen 94");
   assert(allLinks[0].label === NINETY_SIXTH_INTERNAL_LABEL_94, "ninety-sixth first href label is Музыка сна для засыпания");
   assert(allLinks[1].href === NINETY_SIXTH_INTERNAL_HREF_95, "ninety-sixth second href is Listen 95");
   assert(allLinks[1].label === NINETY_SIXTH_INTERNAL_LABEL_95, "ninety-sixth second href label is музыка для быстрого сна");
+  assert(allLinks[2].href === NINETY_SIXTH_INTERNAL_HREF_98, "ninety-sixth third href is Listen 98");
+  assert(allLinks[2].label === NINETY_SIXTH_INTERNAL_LABEL_98, "ninety-sixth third href label is музыка для крепкого сна");
   for (const href of NINETY_SIXTH_FORBIDDEN_LISTEN_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-sixth has no ${href} href`);
   }
@@ -29884,6 +29930,8 @@ function testNinetySixthPage() {
   assert(contentSource.includes(`label: "${NINETY_SIXTH_INTERNAL_LABEL_94}"`), "ninety-sixth content file has Listen 94 label");
   assert(contentSource.includes(`href: "${NINETY_SIXTH_INTERNAL_HREF_95}"`), "ninety-sixth content file has Listen 95 href");
   assert(contentSource.includes(`label: "${NINETY_SIXTH_INTERNAL_LABEL_95}"`), "ninety-sixth content file has Listen 95 label");
+  assert(contentSource.includes(`href: "${NINETY_SIXTH_INTERNAL_HREF_98}"`), "ninety-sixth content file has Listen 98 href");
+  assert(contentSource.includes(`label: "${NINETY_SIXTH_INTERNAL_LABEL_98}"`), "ninety-sixth content file has Listen 98 label");
   assert(contentSource.includes(`playlistSlug: "${NINETY_SIXTH_PLAYLIST_SLUG}"`), "ninety-sixth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "ninety-sixth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-sixth content file has no primaryPractice");
@@ -29900,7 +29948,7 @@ function testNinetySixthPage() {
   assert(!contentSource.includes("[ДАЛЕЕ]"), "ninety-sixth content file has no next marker");
   assert(!contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "ninety-sixth content file has no playlist placeholder");
   for (const href of NINETY_SIXTH_FORBIDDEN_LISTEN_HREFS) {
-    assert(!contentSource.includes(href), `ninety-sixth content file has no ${href}`);
+    assert(!contentSource.includes(`href: "${href}"`), `ninety-sixth content file has no ${href}`);
   }
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -29956,6 +30004,8 @@ const NINETY_SEVENTH_INTERNAL_HREF_95 = "/listens/muzyka-dlya-bystrogo-sna-slush
 const NINETY_SEVENTH_INTERNAL_LABEL_95 = "музыка для быстрого сна";
 const NINETY_SEVENTH_INTERNAL_HREF_96 = "/listens/muzyka-dlya-glubokogo-sna-slushat-onlayn";
 const NINETY_SEVENTH_INTERNAL_LABEL_96 = "Музыка для глубокого сна";
+const NINETY_SEVENTH_INTERNAL_HREF_98 = "/listens/muzyka-dlya-krepkogo-sna-slushat-onlayn";
+const NINETY_SEVENTH_INTERNAL_LABEL_98 = "Музыка для крепкого сна";
 const NINETY_SEVENTH_EXPECTED_INTRO = [
   "Здесь можно слушать музыку для быстрого засыпания онлайн бесплатно – включить спокойные композиции перед сном и подобрать звучание, которое комфортно сопровождает вечерний переход к отдыху.",
   "В подборке можно выбрать мягкую и ненавязчивую музыку для сна, попробовать разные варианты и найти композиции, которые не отвлекают именно вас.",
@@ -30128,7 +30178,9 @@ function testNinetySeventhPage() {
   const krepkiyLinks = (krepkiySection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(krepkiyLinks.length === 0, "ninety-seventh krepkiy-son H2 has no href");
+  assert(krepkiyLinks.length === 1, "ninety-seventh krepkiy-son H2 has the Listen 98 internal link");
+  assert(krepkiyLinks[0].href === NINETY_SEVENTH_INTERNAL_HREF_98, "ninety-seventh krepkiy-son href is Listen 98");
+  assert(krepkiyLinks[0].label === NINETY_SEVENTH_INTERNAL_LABEL_98, "ninety-seventh krepkiy-son label is Музыка для крепкого сна");
 
   const allTextChunks = [
     parsed.definition.h1,
@@ -30173,15 +30225,17 @@ function testNinetySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "ninety-seventh page has exactly 3 hrefs");
+  assert(allLinks.length === 4, "ninety-seventh page has exactly 4 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 3, "ninety-seventh page has exactly 3 unique dests");
+  assert(uniqueDests.size === 4, "ninety-seventh page has exactly 4 unique dests");
   assert(allLinks[0].href === NINETY_SEVENTH_INTERNAL_HREF_94, "ninety-seventh first href is Listen 94");
   assert(allLinks[0].label === NINETY_SEVENTH_INTERNAL_LABEL_94, "ninety-seventh first href label is Музыка сна для засыпания");
   assert(allLinks[1].href === NINETY_SEVENTH_INTERNAL_HREF_95, "ninety-seventh second href is Listen 95");
   assert(allLinks[1].label === NINETY_SEVENTH_INTERNAL_LABEL_95, "ninety-seventh second href label is музыка для быстрого сна");
   assert(allLinks[2].href === NINETY_SEVENTH_INTERNAL_HREF_96, "ninety-seventh third href is Listen 96");
   assert(allLinks[2].label === NINETY_SEVENTH_INTERNAL_LABEL_96, "ninety-seventh third href label is Музыка для глубокого сна");
+  assert(allLinks[3].href === NINETY_SEVENTH_INTERNAL_HREF_98, "ninety-seventh fourth href is Listen 98");
+  assert(allLinks[3].label === NINETY_SEVENTH_INTERNAL_LABEL_98, "ninety-seventh fourth href label is Музыка для крепкого сна");
   for (const href of NINETY_SEVENTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-seventh has no ${href} href`);
   }
@@ -30195,6 +30249,8 @@ function testNinetySeventhPage() {
   assert(contentSource.includes(`label: "${NINETY_SEVENTH_INTERNAL_LABEL_95}"`), "ninety-seventh content file has Listen 95 label");
   assert(contentSource.includes(`href: "${NINETY_SEVENTH_INTERNAL_HREF_96}"`), "ninety-seventh content file has Listen 96 href");
   assert(contentSource.includes(`label: "${NINETY_SEVENTH_INTERNAL_LABEL_96}"`), "ninety-seventh content file has Listen 96 label");
+  assert(contentSource.includes(`href: "${NINETY_SEVENTH_INTERNAL_HREF_98}"`), "ninety-seventh content file has Listen 98 href");
+  assert(contentSource.includes(`label: "${NINETY_SEVENTH_INTERNAL_LABEL_98}"`), "ninety-seventh content file has Listen 98 label");
   assert(contentSource.includes(`playlistSlug: "${NINETY_SEVENTH_PLAYLIST_SLUG}"`), "ninety-seventh content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "ninety-seventh content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-seventh content file has no primaryPractice");
@@ -30211,10 +30267,10 @@ function testNinetySeventhPage() {
   assert(!contentSource.includes("[ДАЛЕЕ]"), "ninety-seventh content file has no next marker");
   assert(!contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "ninety-seventh content file has no playlist placeholder");
   for (const href of NINETY_SEVENTH_FORBIDDEN_LISTEN_HREFS) {
-    assert(!contentSource.includes(href), `ninety-seventh content file has no ${href}`);
+    assert(!contentSource.includes(`href: "${href}"`), `ninety-seventh content file has no ${href}`);
   }
   assert(!contentSource.includes('href: "/listens/muzyka-dlya-glubokogo-sna"'), "ninety-seventh content file has no playlist-slug href");
-  assert(!contentSource.includes('href: "/listens/muzyka-dlya-krepkogo-sna'), "ninety-seventh content file has no krepkiy-son href");
+  assert(!contentSource.includes('href: "/listens/muzyka-dlya-krepkogo-sna"'), "ninety-seventh content file has no short krepkiy-son href");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_SEVENTH_PAGE_SLUG), "registry contains ninety-seventh listen slug");
