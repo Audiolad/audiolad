@@ -46,6 +46,7 @@ type PracticeEmbed = {
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string | null;
+  use_shared_cover?: boolean | null;
   audio_url: string | null;
   status: string | null;
   is_catalog_listed: boolean | null;
@@ -286,6 +287,7 @@ export async function loadOwnedPlaylistDetail(
         cover_url,
         cover_image,
         updated_at,
+        use_shared_cover,
         audio_url,
         status,
         is_catalog_listed,

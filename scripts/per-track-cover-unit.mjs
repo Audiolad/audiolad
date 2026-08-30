@@ -161,6 +161,41 @@ function testPlayerActiveCover() {
   );
 }
 
+function testPlaylistDetailSelectsUseSharedCover() {
+  const detail = readSource("src/lib/playlists/detail.ts");
+  const editorial = readSource("src/lib/playlists/editorial-workspace-detail.ts");
+  const pub = readSource("src/lib/playlists/public-detail.ts");
+  const presentation = readSource("src/lib/playlists/playlist-item-audio.ts");
+
+  for (const [name, source] of [
+    ["owned PlaylistDetail", detail],
+    ["editorial workspace", editorial],
+    ["public playlist", pub],
+  ]) {
+    assert(
+      source.includes("use_shared_cover"),
+      `${name} PracticeEmbed/SELECT includes use_shared_cover`,
+    );
+    assert(
+      source.includes("resolvePlaylistItemPresentation"),
+      `${name} keeps shared presentation resolver`,
+    );
+    assert(
+      !source.includes("resolvePlaybackCoverUrl"),
+      `${name} does not add parallel cover URL logic`,
+    );
+  }
+
+  assert(
+    presentation.includes("use_shared_cover?: boolean | null"),
+    "presentation input forwards use_shared_cover",
+  );
+  assert(
+    presentation.includes("resolvePlaybackCoverFields"),
+    "playlist items still use resolvePlaybackCoverFields",
+  );
+}
+
 function testCoverErrorIsolationSemantics() {
   const failedA = { trackId: "track-a", url: "https://cdn.example/a.jpg" };
   const failedB = { trackId: "track-b", url: "https://cdn.example/b.jpg" };
@@ -218,6 +253,7 @@ const tests = [
   ["cover upload manifest preview", testCoverUploadPreviewManifest],
   ["player active cover", testPlayerActiveCover],
   ["cover error isolation semantics", testCoverErrorIsolationSemantics],
+  ["playlist detail use_shared_cover", testPlaylistDetailSelectsUseSharedCover],
 ];
 
 for (const [name, fn] of tests) {

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { getOwnedPlaylistById } from "@/lib/playlists/queries";
 import {
   canUserEditPlaylist,
   loadPlaylistForAccessCheck,
-  logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
 import { isUuid, parseOptionalUuidQueryValue } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
@@ -40,24 +38,15 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  const { playlist, error: loadError } = await getOwnedPlaylistById(
-    supabase,
-    id,
-  );
-
-  if (loadError) {
-    console.error("playlist_item_delete_load_error", loadError);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  if (!playlist) {
-    return notFoundResponse();
-  }
-
   const { playlist: accessRow, error: accessError } =
     await loadPlaylistForAccessCheck(supabase, id);
 
-  if (accessError || !accessRow) {
+  if (accessError) {
+    console.error("playlist_item_delete_access_error", accessError);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (!accessRow) {
     return notFoundResponse();
   }
 
@@ -75,58 +64,45 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  let existingQuery = supabase
-    .from("playlist_items")
-    .select("id")
-    .eq("playlist_id", id)
-    .eq("practice_id", practiceId);
-
-  existingQuery = audioItemIdResult.id
-    ? existingQuery.eq("audio_item_id", audioItemIdResult.id)
-    : existingQuery.is("audio_item_id", null);
-
-  const { data: existing, error: existingError } = await existingQuery.maybeSingle();
-
-  if (existingError) {
-    console.error("playlist_item_delete_lookup_error", existingError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  if (!existing) {
-    return notFoundResponse();
-  }
-
-  let deleteQuery = supabase
-    .from("playlist_items")
-    .delete()
-    .eq("playlist_id", id)
-    .eq("practice_id", practiceId);
-
-  deleteQuery = audioItemIdResult.id
-    ? deleteQuery.eq("audio_item_id", audioItemIdResult.id)
-    : deleteQuery.is("audio_item_id", null);
-
-  const { error: deleteError } = await deleteQuery;
-
-  if (deleteError) {
-    console.error("playlist_item_delete_error", deleteError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  const { error: touchError } = await supabase
-    .from("playlists")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (touchError) {
-    console.error("playlist_item_delete_touch_error", touchError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  await logPlaylistAudit(supabase, id, "item_removed", {
-    practice_id: practiceId,
-    audio_item_id: audioItemIdResult.id,
+  const { error } = await supabase.rpc("remove_playlist_item", {
+    p_playlist_id: id,
+    p_practice_id: practiceId,
+    p_audio_item_id: audioItemIdResult.id,
   });
+
+  if (error) {
+    const message = error.message ?? "";
+    const code = error.code ?? "";
+
+    if (code === "28000" || message.includes("not_authenticated")) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    if (code === "P0002" || message.includes("playlist_or_item_not_found")) {
+      return notFoundResponse();
+    }
+
+    if (
+      code === "23505" ||
+      code === "40P01" ||
+      code === "55P03" ||
+      message.includes("reorder_conflict") ||
+      message.toLowerCase().includes("unique") ||
+      message.toLowerCase().includes("deadlock")
+    ) {
+      return NextResponse.json(
+        {
+          error: "reorder_conflict",
+          message:
+            "Порядок уже изменился. Обновите страницу и попробуйте ещё раз.",
+        },
+        { status: 409 },
+      );
+    }
+
+    console.error("playlist_item_delete_rpc_error", code, message);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
 
   return new NextResponse(null, { status: 204 });
 }
