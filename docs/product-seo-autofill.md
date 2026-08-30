@@ -74,8 +74,9 @@ Production prerequisite — two separate facts, do not mix them:
 - API KEY SCOPE on that service account key: `yc.ai.languageModels.execute`
 
 Recommend a separate service account for Product SEO AI, for example
-`audiolad-seo-ai`, and a separate API key. Do **not** reuse
-`YANDEX_SEARCH_API_KEY` (Wordstat scope is `yc.search-api.execute`).
+`audiolad-seo-ai`, and a separate API key.
+Do **not** reuse `YANDEX_SEARCH_API_KEY` (Wordstat scope is
+`yc.search-api.execute`).
 The folder id may later match the Search API folder, but the AI
 account and key are separate. Do not hardcode the folder id. This
 document does not create any account, key, or env.
