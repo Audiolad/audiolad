@@ -174,7 +174,10 @@ function testLayoutAndManifestSources() {
   assert(layout.includes("HOME_SEO_DESCRIPTION"), "root layout uses canonical description constant");
   assert(manifest.includes(HOME_SEO_DESCRIPTION), "manifest uses canonical description");
   assert(
-    guestHome.includes("платформа авторских аудиопрактик, медитаций и программ"),
+    guestHome.includes("GUEST_HOME_INTRO") &&
+      readFileSync(join(ROOT, "src/lib/home/guest-slider.ts"), "utf8").includes(
+        "платформа авторских аудиопрактик, медитаций, аудиокурсов, музыки и программ.",
+      ),
     "guest home visible text includes platform positioning",
   );
   assert(

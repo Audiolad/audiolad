@@ -37,7 +37,7 @@ function testSurfacesUseHomePlayButton() {
   assert.match(card, /HomeProductPlayButton/);
   assert.match(hero, /HomeProductPlayButton/);
   assert.match(cont, /HomeProductPlayButton/);
-  assert.match(guest, /HomeProductPlayButton/);
+  assert.doesNotMatch(guest, /HomeProductPlayButton/);
   assert.match(programs, /HomeProductPlayButton/);
 
   assert.doesNotMatch(card, /href=\{listenHref\}|href=\{product\.listenHref\}/);
@@ -108,11 +108,13 @@ function testBoundaries() {
 function testGuestHomeStartListenStaysOnHome() {
   const guest = read("src/components/home/GuestHome.tsx");
 
-  assert.match(guest, /HomeProductPlayButton/);
-  assert.match(guest, /Начать слушать/);
-  assert.match(guest, /featuredFreeProduct/);
-  assert.match(guest, /freeProducts\[0\]/);
-  assert.match(guest, /href="\/catalog"/);
+  assert.doesNotMatch(guest, /HomeProductPlayButton/);
+  assert.doesNotMatch(guest, /getPrimaryHomePlayProduct/);
+  assert.match(guest, /GUEST_HOME_LISTEN_FREE_CTA/);
+  assert.match(
+    read("src/lib/home/guest-slider.ts"),
+    /label: "Начать слушать бесплатно"/,
+  );
   assert.doesNotMatch(guest, /getPrimaryListenHref/);
   assert.doesNotMatch(guest, /listenHref/);
   assert.doesNotMatch(guest, /buildListenPath|\/listen\?autoplay/);

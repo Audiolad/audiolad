@@ -12,14 +12,17 @@ function read(relativePath: string) {
 function testGuestHomeStartListenHasNoListenHref() {
   const guest = read("src/components/home/GuestHome.tsx");
 
-  assert.match(guest, /HomeProductPlayButton/);
-  assert.match(guest, /Начать слушать/);
-  assert.match(guest, /getPrimaryHomePlayProduct/);
+  assert.doesNotMatch(guest, /HomeProductPlayButton/);
+  assert.doesNotMatch(guest, /getPrimaryHomePlayProduct/);
+  assert.match(guest, /GUEST_HOME_LISTEN_FREE_CTA/);
+  assert.match(
+    read("src/lib/home/guest-slider.ts"),
+    /label: "Начать слушать бесплатно"/,
+  );
   assert.doesNotMatch(guest, /getPrimaryListenHref/);
   assert.doesNotMatch(guest, /listenHref/);
   assert.doesNotMatch(guest, /href=\{primaryListenHref\}/);
   assert.doesNotMatch(guest, /buildListenPath|\/listen\?autoplay/);
-  assert.match(guest, /href="\/catalog"/);
 }
 
 function testActiveProgramsContinueHasNoListenHref() {
@@ -38,7 +41,7 @@ function testBothUseHomeProductPlayButton() {
   const programs = read("src/components/home/ActiveProgramsSection.tsx");
   const types = read("src/lib/home/types.ts");
 
-  assert.match(guest, /HomeProductPlayButton/);
+  assert.doesNotMatch(guest, /HomeProductPlayButton/);
   assert.match(programs, /HomeProductPlayButton/);
   assert.match(types, /listenHref: string \| null/);
   assert.match(types, /listenHref: string;/);
@@ -46,7 +49,6 @@ function testBothUseHomeProductPlayButton() {
 
 function testHomePlayButtonsDoNotOpenListen() {
   const files = [
-    "src/components/home/GuestHome.tsx",
     "src/components/home/ActiveProgramsSection.tsx",
     "src/components/home/HomeProductCard.tsx",
     "src/components/home/HeroFeaturedProduct.tsx",
