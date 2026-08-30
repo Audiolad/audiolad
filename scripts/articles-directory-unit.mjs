@@ -120,6 +120,7 @@ import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/vop
 import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota-i-biznes-taro.ts";
 import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-biznes-i-dengi.ts";
 import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes-i-dengi.ts";
+import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2760,6 +2761,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyThirdListenHref}`),
     "directory JSON-LD includes ninety-third listen href",
+  );
+
+  const ninetyFourthListenHref = "/listens/muzyka-sna-dlya-zasypaniya-slushat-onlayn";
+  const ninetyFourthListenCard = data.articles.find((card) => card.href === ninetyFourthListenHref);
+  assert(ninetyFourthListenCard, "ninety-fourth indexable listen page is listed");
+  assert(
+    ninetyFourthListenCard.title === "Музыка сна для засыпания – слушать онлайн бесплатно | АудиоЛад",
+    "ninety-fourth listen directory title",
+  );
+  assert(
+    ninetyFourthListenCard.description === MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE.description,
+    "ninety-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/muzyka-sna-dlya-zasypaniya-slushat-onlayn"),
+    "no /articles duplicate for ninety-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyFourthListenHref}`),
+    "directory JSON-LD includes ninety-fourth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();

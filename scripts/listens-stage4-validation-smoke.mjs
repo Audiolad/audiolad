@@ -100,6 +100,7 @@ import { VOPROSY_TARO_PRO_BIZNES_PAGE } from "../src/lib/seo/listens/content/vop
 import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota-i-biznes-taro.ts";
 import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-biznes-i-dengi.ts";
 import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes-i-dengi.ts";
+import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -4242,7 +4243,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4424,7 +4425,7 @@ function testTwelfthPage() {
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4599,7 +4600,7 @@ function testThirteenthPage() {
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4795,7 +4796,7 @@ function testFourteenthPage() {
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5012,7 +5013,7 @@ function testFifteenthPage() {
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_SNA_PAGE.playlistSlug === "shum-vody",
@@ -5247,7 +5248,7 @@ function testSixteenthPage() {
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5484,7 +5485,7 @@ function testSeventeenthPage() {
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5721,7 +5722,7 @@ function testEighteenthPage() {
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_DETEY_PAGE.playlistSlug === "shum-vody",
@@ -5969,7 +5970,7 @@ function testNineteenthPage() {
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE.playlistSlug === "shum-vody",
@@ -6212,7 +6213,7 @@ function testTwentiethPage() {
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -6467,7 +6468,7 @@ function testTwentyFirstPage() {
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -6705,7 +6706,7 @@ function testTwentySecondPage() {
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -6989,7 +6990,7 @@ function testTwentyThirdPage() {
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7292,7 +7293,7 @@ function testTwentyFourthPage() {
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
   assert(slugs.includes(TWENTY_FOURTH_PAGE_SLUG), "registry contains twenty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7507,7 +7508,7 @@ function testTwentyFifthPage() {
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry contains twenty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7708,7 +7709,7 @@ function testTwentySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7931,7 +7932,7 @@ function testTwentySeventhPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8175,7 +8176,7 @@ function testTwentyEighthPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8421,7 +8422,7 @@ function testTwentyNinthPage() {
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8662,7 +8663,7 @@ function testThirtiethPage() {
   assert(slugs.includes(TWENTY_NINTH_PAGE_SLUG), "registry still contains twenty-ninth listen slug");
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8973,7 +8974,7 @@ function testThirtyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry contains thirty-first listen slug");
   assert(slugs.includes(THIRTIETH_PAGE_SLUG), "registry still contains thirtieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9271,7 +9272,7 @@ function testThirtySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry contains thirty-second listen slug");
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry still contains thirty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -9552,7 +9553,7 @@ function testThirtyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry contains thirty-third listen slug");
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry still contains thirty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9832,7 +9833,7 @@ function testThirtyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FOURTH_PAGE_SLUG), "registry contains thirty-fourth listen slug");
   assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry still contains thirty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10180,7 +10181,7 @@ function testThirtyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FIFTH_PAGE_SLUG), "registry contains thirty-fifth listen slug");
   assert(slugs.includes(THIRTY_FOURTH_PAGE_SLUG), "registry still contains thirty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10366,7 +10367,7 @@ function testThirtySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SIXTH_PAGE_SLUG), "registry contains thirty-sixth listen slug");
   assert(slugs.includes(THIRTY_FIFTH_PAGE_SLUG), "registry still contains thirty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10623,7 +10624,7 @@ function testThirtySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SEVENTH_PAGE_SLUG), "registry contains thirty-seventh listen slug");
   assert(slugs.includes(THIRTY_SIXTH_PAGE_SLUG), "registry still contains thirty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10878,7 +10879,7 @@ function testThirtyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_EIGHTH_PAGE_SLUG), "registry contains thirty-eighth listen slug");
   assert(slugs.includes(THIRTY_SEVENTH_PAGE_SLUG), "registry still contains thirty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -11093,7 +11094,7 @@ function testThirtyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_NINTH_PAGE_SLUG), "registry contains thirty-ninth listen slug");
   assert(slugs.includes(THIRTY_EIGHTH_PAGE_SLUG), "registry still contains thirty-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === THIRTY_NINTH_PLAYLIST_SLUG,
@@ -11310,7 +11311,7 @@ function testFortiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTIETH_PAGE_SLUG), "registry contains fortieth listen slug");
   assert(slugs.includes(THIRTY_NINTH_PAGE_SLUG), "registry still contains thirty-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTIETH_PLAYLIST_SLUG,
@@ -11537,7 +11538,7 @@ function testFortyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FIRST_PAGE_SLUG), "registry contains forty-first listen slug");
   assert(slugs.includes(FORTIETH_PAGE_SLUG), "registry still contains fortieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FIRST_PLAYLIST_SLUG,
@@ -11771,7 +11772,7 @@ function testFortySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SECOND_PAGE_SLUG), "registry contains forty-second listen slug");
   assert(slugs.includes(FORTY_FIRST_PAGE_SLUG), "registry still contains forty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SECOND_PLAYLIST_SLUG,
@@ -12001,7 +12002,7 @@ function testFortyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_THIRD_PAGE_SLUG), "registry contains forty-third listen slug");
   assert(slugs.includes(FORTY_SECOND_PAGE_SLUG), "registry still contains forty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_THIRD_PLAYLIST_SLUG,
@@ -12234,7 +12235,7 @@ function testFortyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FOURTH_PAGE_SLUG), "registry contains forty-fourth listen slug");
   assert(slugs.includes(FORTY_THIRD_PAGE_SLUG), "registry still contains forty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FOURTH_PLAYLIST_SLUG,
@@ -12466,7 +12467,7 @@ function testFortyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FIFTH_PAGE_SLUG), "registry contains forty-fifth listen slug");
   assert(slugs.includes(FORTY_FOURTH_PAGE_SLUG), "registry still contains forty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FIFTH_PLAYLIST_SLUG,
@@ -12707,7 +12708,7 @@ function testFortySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SIXTH_PAGE_SLUG), "registry contains forty-sixth listen slug");
   assert(slugs.includes(FORTY_FIFTH_PAGE_SLUG), "registry still contains forty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SIXTH_PLAYLIST_SLUG,
@@ -12962,7 +12963,7 @@ function testFortySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SEVENTH_PAGE_SLUG), "registry contains forty-seventh listen slug");
   assert(slugs.includes(FORTY_SIXTH_PAGE_SLUG), "registry still contains forty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SEVENTH_PLAYLIST_SLUG,
@@ -13216,7 +13217,7 @@ function testFortyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_EIGHTH_PAGE_SLUG), "registry contains forty-eighth listen slug");
   assert(slugs.includes(FORTY_SEVENTH_PAGE_SLUG), "registry still contains forty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_EIGHTH_PLAYLIST_SLUG,
@@ -13484,7 +13485,7 @@ function testFortyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_NINTH_PAGE_SLUG), "registry contains forty-ninth listen slug");
   assert(slugs.includes(FORTY_EIGHTH_PAGE_SLUG), "registry still contains forty-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_NINTH_PLAYLIST_SLUG,
@@ -13662,7 +13663,7 @@ function testFiftiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTIETH_PAGE_SLUG), "registry contains fiftieth listen slug");
   assert(slugs.includes(FORTY_NINTH_PAGE_SLUG), "registry still contains forty-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FORTY_NINTH_PAGE_SLUG)), "calm neighbor stays registered");
@@ -13839,7 +13840,7 @@ function testFiftyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FIRST_PAGE_SLUG), "registry contains fifty-first listen slug");
   assert(slugs.includes(FIFTIETH_PAGE_SLUG), "registry still contains fiftieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTIETH_PAGE_SLUG)), "stress-relief neighbor stays registered");
@@ -13999,7 +14000,7 @@ function testFiftySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SECOND_PAGE_SLUG), "registry contains fifty-second listen slug");
   assert(slugs.includes(FIFTY_FIRST_PAGE_SLUG), "registry still contains fifty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FIRST_PAGE_SLUG)), "no-lyrics neighbor stays registered");
@@ -14226,7 +14227,7 @@ function testFiftyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_THIRD_PAGE_SLUG), "registry contains fifty-third listen slug");
   assert(slugs.includes(FIFTY_SECOND_PAGE_SLUG), "registry still contains fifty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SECOND_PAGE_SLUG)), "fifty-second neighbor stays registered");
@@ -14438,7 +14439,7 @@ function testFiftyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FOURTH_PAGE_SLUG), "registry contains fifty-fourth listen slug");
   assert(slugs.includes(FIFTY_THIRD_PAGE_SLUG), "registry still contains fifty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_THIRD_PAGE_SLUG)), "fifty-third neighbor stays registered");
@@ -14654,7 +14655,7 @@ function testFiftyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FIFTH_PAGE_SLUG), "registry contains fifty-fifth listen slug");
   assert(slugs.includes(FIFTY_FOURTH_PAGE_SLUG), "registry still contains fifty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FOURTH_PAGE_SLUG)), "fifty-fourth neighbor stays registered");
@@ -14909,7 +14910,7 @@ function testFiftySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SIXTH_PAGE_SLUG), "registry contains fifty-sixth listen slug");
   assert(slugs.includes(FIFTY_FIFTH_PAGE_SLUG), "registry still contains fifty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FIFTH_PAGE_SLUG)), "fifty-fifth neighbor stays registered");
@@ -15147,7 +15148,7 @@ function testFiftySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SEVENTH_PAGE_SLUG), "registry contains fifty-seventh listen slug");
   assert(slugs.includes(FIFTY_SIXTH_PAGE_SLUG), "registry still contains fifty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SIXTH_PAGE_SLUG)), "fifty-sixth neighbor stays registered");
@@ -15413,7 +15414,7 @@ function testFiftyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_EIGHTH_PAGE_SLUG), "registry contains fifty-eighth listen slug");
   assert(slugs.includes(FIFTY_SEVENTH_PAGE_SLUG), "registry still contains fifty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SEVENTH_PAGE_SLUG)), "fifty-seventh neighbor stays registered");
@@ -15692,7 +15693,7 @@ function testFiftyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_NINTH_PAGE_SLUG), "registry contains fifty-ninth listen slug");
   assert(slugs.includes(FIFTY_EIGHTH_PAGE_SLUG), "registry still contains fifty-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_EIGHTH_PAGE_SLUG)), "fifty-eighth neighbor stays registered");
@@ -15989,7 +15990,7 @@ function testSixtiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTIETH_PAGE_SLUG), "registry contains sixtieth listen slug");
   assert(slugs.includes(FIFTY_NINTH_PAGE_SLUG), "registry still contains fifty-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_NINTH_PAGE_SLUG)), "fifty-ninth neighbor stays registered");
@@ -16258,7 +16259,7 @@ function testSixtyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FIRST_PAGE_SLUG), "registry contains sixty-first listen slug");
   assert(slugs.includes(SIXTIETH_PAGE_SLUG), "registry still contains sixtieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTIETH_PAGE_SLUG)), "sixtieth neighbor stays registered");
@@ -16568,7 +16569,7 @@ function testSixtySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SECOND_PAGE_SLUG), "registry contains sixty-second listen slug");
   assert(slugs.includes(SIXTY_FIRST_PAGE_SLUG), "registry still contains sixty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FIRST_PAGE_SLUG)), "sixty-first neighbor stays registered");
@@ -16885,7 +16886,7 @@ function testSixtyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_THIRD_PAGE_SLUG), "registry contains sixty-third listen slug");
   assert(slugs.includes(SIXTY_SECOND_PAGE_SLUG), "registry still contains sixty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SECOND_PAGE_SLUG)), "sixty-second neighbor stays registered");
@@ -17220,7 +17221,7 @@ function testSixtyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FOURTH_PAGE_SLUG), "registry contains sixty-fourth listen slug");
   assert(slugs.includes(SIXTY_THIRD_PAGE_SLUG), "registry still contains sixty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_THIRD_PAGE_SLUG)), "sixty-third neighbor stays registered");
@@ -17574,7 +17575,7 @@ function testSixtyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FIFTH_PAGE_SLUG), "registry contains sixty-fifth listen slug");
   assert(slugs.includes(SIXTY_FOURTH_PAGE_SLUG), "registry still contains sixty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FOURTH_PAGE_SLUG)), "sixty-fourth neighbor stays registered");
@@ -17925,7 +17926,7 @@ function testSixtySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SIXTH_PAGE_SLUG), "registry contains sixty-sixth listen slug");
   assert(slugs.includes(SIXTY_FIFTH_PAGE_SLUG), "registry still contains sixty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FIFTH_PAGE_SLUG)), "sixty-fifth neighbor stays registered");
@@ -18312,7 +18313,7 @@ function testSixtySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SEVENTH_PAGE_SLUG), "registry contains sixty-seventh listen slug");
   assert(slugs.includes(SIXTY_SIXTH_PAGE_SLUG), "registry still contains sixty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SIXTH_PAGE_SLUG)), "sixty-sixth neighbor stays registered");
@@ -18751,7 +18752,7 @@ function testSixtyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_EIGHTH_PAGE_SLUG), "registry contains sixty-eighth listen slug");
   assert(slugs.includes(SIXTY_SEVENTH_PAGE_SLUG), "registry still contains sixty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SEVENTH_PAGE_SLUG)), "sixty-seventh neighbor stays registered");
@@ -19227,7 +19228,7 @@ function testSixtyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_NINTH_PAGE_SLUG), "registry contains sixty-ninth listen slug");
   assert(slugs.includes(SIXTY_EIGHTH_PAGE_SLUG), "registry still contains sixty-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_EIGHTH_PAGE_SLUG)), "sixty-eighth neighbor stays registered");
@@ -19642,7 +19643,7 @@ function testSeventiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTIETH_PAGE_SLUG), "registry contains seventieth listen slug");
   assert(slugs.includes(SIXTY_NINTH_PAGE_SLUG), "registry still contains sixty-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_NINTH_PAGE_SLUG)), "sixty-ninth neighbor stays registered");
@@ -20084,7 +20085,7 @@ function testSeventyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FIRST_PAGE_SLUG), "registry contains seventy-first listen slug");
   assert(slugs.includes(SEVENTIETH_PAGE_SLUG), "registry still contains seventieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTIETH_PAGE_SLUG)), "seventieth neighbor stays registered");
@@ -20521,7 +20522,7 @@ function testSeventySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SECOND_PAGE_SLUG), "registry contains seventy-second listen slug");
   assert(slugs.includes(SEVENTY_FIRST_PAGE_SLUG), "registry still contains seventy-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIRST_PAGE_SLUG)), "seventy-first neighbor stays registered");
@@ -20971,7 +20972,7 @@ function testSeventyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_THIRD_PAGE_SLUG), "registry contains seventy-third listen slug");
   assert(slugs.includes(SEVENTY_SECOND_PAGE_SLUG), "registry still contains seventy-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SECOND_PAGE_SLUG)), "seventy-second neighbor stays registered");
@@ -21433,7 +21434,7 @@ function testSeventyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FOURTH_PAGE_SLUG), "registry contains seventy-fourth listen slug");
   assert(slugs.includes(SEVENTY_THIRD_PAGE_SLUG), "registry still contains seventy-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_THIRD_PAGE_SLUG)), "seventy-third neighbor stays registered");
@@ -21840,7 +21841,7 @@ function testSeventyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FIFTH_PAGE_SLUG), "registry contains seventy-fifth listen slug");
   assert(slugs.includes(SEVENTY_FOURTH_PAGE_SLUG), "registry still contains seventy-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FOURTH_PAGE_SLUG)), "seventy-fourth neighbor stays registered");
@@ -22283,7 +22284,7 @@ function testSeventySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SIXTH_PAGE_SLUG), "registry contains seventy-sixth listen slug");
   assert(slugs.includes(SEVENTY_FIFTH_PAGE_SLUG), "registry still contains seventy-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIFTH_PAGE_SLUG)), "seventy-fifth neighbor stays registered");
@@ -22751,7 +22752,7 @@ function testSeventySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SEVENTH_PAGE_SLUG), "registry contains seventy-seventh listen slug");
   assert(slugs.includes(SEVENTY_SIXTH_PAGE_SLUG), "registry still contains seventy-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SIXTH_PAGE_SLUG)), "seventy-sixth neighbor stays registered");
@@ -23195,7 +23196,7 @@ function testSeventyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_EIGHTH_PAGE_SLUG), "registry contains seventy-eighth listen slug");
   assert(slugs.includes(SEVENTY_SEVENTH_PAGE_SLUG), "registry still contains seventy-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SEVENTH_PAGE_SLUG)), "seventy-seventh neighbor stays registered");
@@ -23655,7 +23656,7 @@ function testSeventyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_NINTH_PAGE_SLUG), "registry contains seventy-ninth listen slug");
   assert(slugs.includes(SEVENTY_EIGHTH_PAGE_SLUG), "registry still contains seventy-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_EIGHTH_PAGE_SLUG)), "seventy-eighth neighbor stays registered");
@@ -24076,7 +24077,7 @@ function testEightiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTIETH_PAGE_SLUG), "registry contains eightieth listen slug");
   assert(slugs.includes(SEVENTY_NINTH_PAGE_SLUG), "registry still contains seventy-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_NINTH_PAGE_SLUG)), "seventy-ninth neighbor stays registered");
@@ -24532,7 +24533,7 @@ function testEightyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FIRST_PAGE_SLUG), "registry contains eighty-first listen slug");
   assert(slugs.includes(EIGHTIETH_PAGE_SLUG), "registry still contains eightieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTIETH_PAGE_SLUG)), "eightieth neighbor stays registered");
@@ -24918,7 +24919,7 @@ function testEightySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SECOND_PAGE_SLUG), "registry contains eighty-second listen slug");
   assert(slugs.includes(EIGHTY_FIRST_PAGE_SLUG), "registry still contains eighty-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIRST_PAGE_SLUG)), "eighty-first neighbor stays registered");
@@ -25302,7 +25303,7 @@ function testEightyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_THIRD_PAGE_SLUG), "registry contains eighty-third listen slug");
   assert(slugs.includes(EIGHTY_SECOND_PAGE_SLUG), "registry still contains eighty-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SECOND_PAGE_SLUG)), "eighty-second neighbor stays registered");
@@ -25707,7 +25708,7 @@ function testEightyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FOURTH_PAGE_SLUG), "registry contains eighty-fourth listen slug");
   assert(slugs.includes(EIGHTY_THIRD_PAGE_SLUG), "registry still contains eighty-third listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_THIRD_PAGE_SLUG)), "eighty-third neighbor stays registered");
@@ -26088,7 +26089,7 @@ function testEightyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FIFTH_PAGE_SLUG), "registry contains eighty-fifth listen slug");
   assert(slugs.includes(EIGHTY_FOURTH_PAGE_SLUG), "registry still contains eighty-fourth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FOURTH_PAGE_SLUG)), "eighty-fourth neighbor stays registered");
@@ -26477,7 +26478,7 @@ function testEightySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SIXTH_PAGE_SLUG), "registry contains eighty-sixth listen slug");
   assert(slugs.includes(EIGHTY_FIFTH_PAGE_SLUG), "registry still contains eighty-fifth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIFTH_PAGE_SLUG)), "eighty-fifth neighbor stays registered");
@@ -26869,7 +26870,7 @@ function testEightySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SEVENTH_PAGE_SLUG), "registry contains eighty-seventh listen slug");
   assert(slugs.includes(EIGHTY_SIXTH_PAGE_SLUG), "registry still contains eighty-sixth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SIXTH_PAGE_SLUG)), "eighty-sixth neighbor stays registered");
@@ -27259,7 +27260,7 @@ function testEightyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_EIGHTH_PAGE_SLUG), "registry contains eighty-eighth listen slug");
   assert(slugs.includes(EIGHTY_SEVENTH_PAGE_SLUG), "registry still contains eighty-seventh listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SEVENTH_PAGE_SLUG)), "eighty-seventh neighbor stays registered");
@@ -27614,7 +27615,7 @@ function testEightyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_NINTH_PAGE_SLUG), "registry contains eighty-ninth listen slug");
   assert(slugs.includes(EIGHTY_EIGHTH_PAGE_SLUG), "registry still contains eighty-eighth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_EIGHTH_PAGE_SLUG)), "eighty-eighth neighbor stays registered");
@@ -27977,7 +27978,7 @@ function testNinetiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETIETH_PAGE_SLUG), "registry contains ninetieth listen slug");
   assert(slugs.includes(EIGHTY_NINTH_PAGE_SLUG), "registry still contains eighty-ninth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_NINTH_PAGE_SLUG)), "eighty-ninth neighbor stays registered");
@@ -28326,7 +28327,7 @@ function testNinetyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_FIRST_PAGE_SLUG), "registry contains ninety-first listen slug");
   assert(slugs.includes(NINETIETH_PAGE_SLUG), "registry still contains ninetieth listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETIETH_PAGE_SLUG)), "ninetieth neighbor stays registered");
@@ -28714,7 +28715,7 @@ function testNinetySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_SECOND_PAGE_SLUG), "registry contains ninety-second listen slug");
   assert(slugs.includes(NINETY_FIRST_PAGE_SLUG), "registry still contains ninety-first listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_FIRST_PAGE_SLUG)), "ninety-first neighbor stays registered");
@@ -29090,7 +29091,7 @@ function testNinetyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_THIRD_PAGE_SLUG), "registry contains ninety-third listen slug");
   assert(slugs.includes(NINETY_SECOND_PAGE_SLUG), "registry still contains ninety-second listen slug");
-  assert(slugs.length === 93, "registry contains all 93 listen slugs");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_SECOND_PAGE_SLUG)), "ninety-second neighbor stays registered");
@@ -29126,6 +29127,259 @@ function testNinetyThirdPage() {
   assert(
     data.canonicalUrl === `https://audiolad.ru/listens/${NINETY_THIRD_PAGE_SLUG}`,
     "ninety-third canonical",
+  );
+}
+
+const NINETY_FOURTH_PAGE_SLUG = "muzyka-sna-dlya-zasypaniya-slushat-onlayn";
+const NINETY_FOURTH_PAGE_H1 = "Музыка сна для засыпания – слушать онлайн бесплатно";
+const NINETY_FOURTH_PAGE_TITLE = "Музыка сна для засыпания – слушать онлайн бесплатно | АудиоЛад";
+const NINETY_FOURTH_PAGE_DESCRIPTION = "Музыка сна для засыпания – слушайте онлайн бесплатно спокойные композиции перед сном и выбирайте комфортное звучание для вечернего отдыха.";
+const NINETY_FOURTH_PLAYLIST_SLUG = "muzyka-dlya-glubokogo-sna";
+const NINETY_FOURTH_PLAYLIST_TITLE = "Музыка для глубокого сна | Музыка для быстрого засыпания";
+const NINETY_FOURTH_EXPECTED_INTRO = [
+  "Здесь можно слушать музыку сна для засыпания онлайн бесплатно – включить спокойное звучание вечером, во время отдыха или непосредственно перед тем, как лечь спать.",
+  "В подборке можно выбрать музыку, которая подходит именно вам по темпу, настроению и характеру звучания. Попробуйте разные варианты и остановитесь на том, который не отвлекает и создаёт комфортный музыкальный фон.",
+  "Музыку можно включить заранее перед сном или оставить звучать во время засыпания на удобной для вас громкости.",
+];
+const NINETY_FOURTH_EXPECTED_SECTION_TITLES = [
+  "Музыка сна для засыпания – спокойное звучание перед сном",
+  "Какой может быть музыка для засыпания",
+  "Музыка перед сном и во время засыпания",
+  "Как слушать музыку для засыпания",
+  "Обязательно ли музыка для засыпания должна быть без слов",
+  "Музыка для быстрого засыпания",
+  "Музыка для глубокого и крепкого сна",
+  "Можно ли оставить музыку включённой после засыпания",
+  "Где слушать музыку для засыпания онлайн",
+  "Как выбрать музыку перед сном именно для себя",
+  "Нужно ли каждый вечер слушать одну и ту же музыку",
+  "Музыка для засыпания как часть вечернего ритуала",
+  "Итог",
+];
+const NINETY_FOURTH_EXPECTED_H3_TITLES = [
+  "Включить музыку заранее перед сном",
+  "Оставить музыку во время засыпания",
+  "Выберите комфортную громкость",
+  "Создайте спокойную обстановку",
+  "Не пытайтесь заставить себя слушать определённую композицию",
+  "Попробуйте несколько вариантов",
+  "Ориентируйтесь на собственное восприятие",
+];
+const NINETY_FOURTH_BEFORE_SLEEP_H3S = NINETY_FOURTH_EXPECTED_H3_TITLES.slice(0, 2);
+const NINETY_FOURTH_HOW_TO_LISTEN_H3S = NINETY_FOURTH_EXPECTED_H3_TITLES.slice(2);
+const NINETY_FOURTH_EXPECTED_FAQ = [
+  {
+    question: "Где слушать музыку для засыпания онлайн?",
+    answer: "На этой странице можно открыть Public Playlist «Музыка для глубокого сна | Музыка для быстрого засыпания», выбрать подходящую композицию и начать прослушивание онлайн бесплатно.",
+  },
+  {
+    question: "Какую музыку можно включить перед сном?",
+    answer: "Можно попробовать спокойные композиции с мягким и ненавязчивым звучанием. Универсального варианта нет – лучше выбрать музыку, которая не отвлекает именно вас.",
+  },
+  {
+    question: "Можно ли слушать музыку непосредственно во время засыпания?",
+    answer: "Да, если такой формат вам комфортен. Можно включить музыку заранее и оставить её звучать фоном, когда вы уже легли спать.",
+  },
+  {
+    question: "Какая громкость подходит для вечернего прослушивания?",
+    answer: "Лучше выбирать комфортную громкость, при которой музыка слышна, но не становится слишком заметной и не требует постоянного внимания.",
+  },
+  {
+    question: "Обязательно ли музыка для засыпания должна быть без слов?",
+    answer: "Нет. Некоторым людям удобнее инструментальная музыка, поскольку текст может отвлекать. Но если вокал не мешает, можно слушать и композиции со словами.",
+  },
+  {
+    question: "Чем музыка для засыпания отличается от музыки для глубокого сна?",
+    answer: "Музыка для засыпания связана прежде всего с моментом перехода ко сну. Музыка для глубокого сна относится к отдельному сценарию прослушивания уже в контексте сна.",
+  },
+  {
+    question: "Помогает ли музыка быстрее заснуть?",
+    answer: "Спокойная музыка может быть частью привычного вечернего ритуала и создавать комфортный фон, но скорость засыпания индивидуальна. Музыка не гарантирует, что человек обязательно заснёт быстрее.",
+  },
+  {
+    question: "Можно ли оставить музыку включённой во время сна?",
+    answer: "Если вам комфортно, музыку можно оставить фоном. Другие люди предпочитают выключать её после засыпания или заранее. Здесь лучше ориентироваться на собственные ощущения и удобство.",
+  },
+];
+const NINETY_FOURTH_FORBIDDEN_LISTEN_HREFS = [
+  "/listens/muzyka-dlya-sna-slushat-onlayn",
+  "/listens/muzyka-dlya-bystrogo-sna",
+  "/listens/muzyka-dlya-glubokogo-sna",
+  "/listens/muzyka-dlya-krepkogo-sna",
+  "/listens/muzyka-sna-dlya-zasypaniya-slushat-onlayn",
+];
+
+function testNinetyFourthPage() {
+  const parsed = parseListenPageDefinition(MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE);
+  assert(parsed.ok, "ninety-fourth production definition valid");
+  assert(parsed.definition.slug === NINETY_FOURTH_PAGE_SLUG, "ninety-fourth page slug");
+  assert(parsed.definition.playlistSlug === NINETY_FOURTH_PLAYLIST_SLUG, "ninety-fourth playlistSlug exact");
+  assert(parsed.definition.h1 === NINETY_FOURTH_PAGE_H1, "ninety-fourth h1 exact");
+  assert(parsed.definition.title === NINETY_FOURTH_PAGE_TITLE, "ninety-fourth title is TZ Meta Title");
+  assert(
+    parsed.definition.description === NINETY_FOURTH_PAGE_DESCRIPTION,
+    "ninety-fourth description equals TZ meta string",
+  );
+  assert(parsed.definition.indexable === true, "ninety-fourth is indexable");
+  assert(parsed.definition.type === "listen", "ninety-fourth type is listen");
+  assert(parsed.definition.intro.length === 3, "ninety-fourth page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === NINETY_FOURTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === NINETY_FOURTH_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === NINETY_FOURTH_EXPECTED_INTRO[2],
+    "ninety-fourth intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 13, "ninety-fourth page has 13 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      NINETY_FOURTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "ninety-fourth page 13 section titles verbatim",
+  );
+  assert(parsed.definition.faq.length === 8, "ninety-fourth page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === NINETY_FOURTH_EXPECTED_FAQ[index].question &&
+        item.answer === NINETY_FOURTH_EXPECTED_FAQ[index].answer,
+    ),
+    "ninety-fourth page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "ninety-fourth page has no internalLinks");
+  assert(!("cta" in parsed.definition), "ninety-fourth page has no cta");
+  assert(!("topicSlug" in parsed.definition), "ninety-fourth page has no topicSlug");
+  assert(!("primaryPractice" in parsed.definition), "ninety-fourth page has no primaryPractice");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `ninety-fourth page has no static ${key}`);
+  }
+
+  const headings = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  assert(headings.length === 7, "ninety-fourth page has exactly 7 H3s");
+  assert(
+    headings.every((block) => block.level === 3),
+    "ninety-fourth H3s use level 3",
+  );
+  assert(
+    headings.map((block) => block.title).join("\n") === NINETY_FOURTH_EXPECTED_H3_TITLES.join("\n"),
+    "ninety-fourth 7 H3 titles verbatim",
+  );
+
+  const sectionByTitle = (title) => parsed.definition.sections.find((section) => section.title === title);
+  const headingTitles = (section) => (section.blocks ?? []).filter((block) => block.kind === "heading").map((block) => block.title);
+
+  const beforeSleepSection = sectionByTitle("Музыка перед сном и во время засыпания");
+  assert(beforeSleepSection, "ninety-fourth before-sleep H2 present");
+  assert(headingTitles(beforeSleepSection).length === 2, "ninety-fourth 2 H3s live inside before-sleep H2");
+  assert(headingTitles(beforeSleepSection).join("\n") === NINETY_FOURTH_BEFORE_SLEEP_H3S.join("\n"), "ninety-fourth before-sleep H3 titles verbatim");
+
+  const howToListenSection = sectionByTitle("Как слушать музыку для засыпания");
+  assert(howToListenSection, "ninety-fourth how-to-listen H2 present");
+  assert(headingTitles(howToListenSection).length === 5, "ninety-fourth 5 H3s live inside how-to-listen H2");
+  assert(headingTitles(howToListenSection).join("\n") === NINETY_FOURTH_HOW_TO_LISTEN_H3S.join("\n"), "ninety-fourth how-to-listen H3 titles verbatim");
+
+  const allTextChunks = [
+    parsed.definition.h1,
+    parsed.definition.title,
+    parsed.definition.description,
+    ...parsed.definition.intro,
+    ...parsed.definition.sections.flatMap((section) => [
+      section.title,
+      ...(section.paragraphs ?? []),
+      ...(section.blocks ?? []).flatMap((block) => {
+        if (block.kind === "paragraph") return [block.text];
+        if (block.kind === "list") return block.items ?? [];
+        if (block.kind === "rich_paragraph") {
+          return (block.segments ?? []).map((segment) => segment.text ?? segment.label ?? "");
+        }
+        if (block.kind === "heading") return [block.title];
+        return [];
+      }),
+    ]),
+    ...parsed.definition.faq.flatMap((item) => [item.question, item.answer]),
+  ].join("\n");
+
+  assert(allTextChunks.includes(NINETY_FOURTH_PLAYLIST_TITLE), "ninety-fourth visible text mentions playlist title");
+  assert(allTextChunks.includes("отложить дела → уменьшить количество отвлекающих факторов → включить спокойную музыку → подготовиться ко сну → лечь и продолжить слушать её фоном."), "ninety-fourth ritual arrows paragraph present");
+  assert(!allTextChunks.includes("https://audiolad.ru"), "ninety-fourth definition has no raw audiolad.ru URL");
+  assert(!allTextChunks.includes("https://"), "ninety-fourth visible text has no raw https URLs");
+  assert(!allTextChunks.includes("/listens/"), "ninety-fourth visible text has no listen paths");
+  assert(!allTextChunks.includes(EIGHTEENTH_BOOKMARK_PHRASE), "ninety-fourth definition has no bookmark phrase");
+  assert(!allTextChunks.includes("🔖"), "ninety-fourth definition has no bookmark emoji");
+  assert(!allTextChunks.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "ninety-fourth definition has no playlist placeholder");
+  assert(!allTextChunks.includes("[PUBLIC PLAYLIST]"), "ninety-fourth definition has no playlist marker");
+  assert(!allTextChunks.includes("[ДАЛЕЕ]"), "ninety-fourth definition has no next marker");
+  assert(!allTextChunks.includes("SEO-самопроверка"), "ninety-fourth definition has no SEO-самопроверка");
+
+  const allRich = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph");
+  const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 0, "ninety-fourth page has exactly 0 hrefs");
+  const uniqueDests = new Set(allLinks.map((link) => link.href));
+  assert(uniqueDests.size === 0, "ninety-fourth page has exactly 0 unique dests");
+  for (const href of NINETY_FOURTH_FORBIDDEN_LISTEN_HREFS) {
+    assert(!allLinks.some((link) => link.href === href), `ninety-fourth has no ${href} href`);
+  }
+
+  const contentSource = read("src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts");
+  assert(!contentSource.includes("https://audiolad.ru"), "ninety-fourth content file has no raw audiolad.ru URL");
+  assert(!contentSource.includes("https://"), "ninety-fourth content file has no https://");
+  assert(!contentSource.includes("/listens/"), "ninety-fourth content file has no /listens/ hrefs");
+  assert(contentSource.includes(`playlistSlug: "${NINETY_FOURTH_PLAYLIST_SLUG}"`), "ninety-fourth content file has playlistSlug");
+  assert(!contentSource.includes("href:"), "ninety-fourth content file has no href fields");
+  for (const href of NINETY_FOURTH_FORBIDDEN_LISTEN_HREFS) {
+    assert(!contentSource.includes(href), `ninety-fourth content file has no ${href}`);
+  }
+  assert(!contentSource.includes("ListenSignupCta"), "ninety-fourth content file does not edit ListenSignupCta");
+  assert(!contentSource.includes("primaryPractice"), "ninety-fourth content file has no primaryPractice");
+  assert(!contentSource.includes("practice-player"), "ninety-fourth content file has no practice-player");
+  assert(!contentSource.includes("Studio"), "ninety-fourth content file has no Studio");
+  assert(!contentSource.includes("School"), "ninety-fourth content file has no School");
+  assert(!contentSource.includes("internalLinks"), "ninety-fourth content file has no internalLinks");
+  assert(!contentSource.includes("topicSlug"), "ninety-fourth content file has no topicSlug");
+  assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "ninety-fourth content file has no bookmark phrase");
+  assert(!contentSource.includes("🔖"), "ninety-fourth content file has no bookmark emoji");
+  assert(!contentSource.includes("закладк"), "ninety-fourth content file has no bookmark word");
+  assert(!contentSource.includes("SEO-самопроверка"), "ninety-fourth content file has no SEO-самопроверка");
+  assert(!contentSource.includes("[PUBLIC PLAYLIST]"), "ninety-fourth content file has no playlist marker");
+  assert(!contentSource.includes("[ДАЛЕЕ]"), "ninety-fourth content file has no next marker");
+  assert(!contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "ninety-fourth content file has no playlist placeholder");
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry contains ninety-fourth listen slug");
+  assert(slugs.includes(NINETY_THIRD_PAGE_SLUG), "registry still contains ninety-third listen slug");
+  assert(slugs.length === 94, "registry contains all 94 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(Boolean(getListenPageBySlug(NINETY_FOURTH_PAGE_SLUG)), "new slug resolves");
+  assert(Boolean(getListenPageBySlug(NINETY_THIRD_PAGE_SLUG)), "ninety-third neighbor stays registered");
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(undefined, "https://audiolad.ru");
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${NINETY_FOURTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains ninety-fourth listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: NINETY_FOURTH_PLAYLIST_SLUG,
+          title: NINETY_FOURTH_PLAYLIST_TITLE,
+        },
+      }),
+    },
+  });
+  assert(data, "ninety-fourth page resolves against deep-sleep playlist");
+  assert(data.playlist.playlist.slug === NINETY_FOURTH_PLAYLIST_SLUG, "resolved playlist slug is muzyka-dlya-glubokogo-sna");
+  assert(data.playlist.playlist.title === NINETY_FOURTH_PLAYLIST_TITLE, "resolved playlist title is live title");
+  assert(data.path === `/listens/${NINETY_FOURTH_PAGE_SLUG}`, "ninety-fourth path");
+  assert(
+    data.canonicalUrl === `https://audiolad.ru/listens/${NINETY_FOURTH_PAGE_SLUG}`,
+    "ninety-fourth canonical",
   );
 }
 
@@ -29306,6 +29560,7 @@ const tests = [
   ["ninety-first listen page", testNinetyFirstPage],
   ["ninety-second listen page", testNinetySecondPage],
   ["ninety-third listen page", testNinetyThirdPage],
+  ["ninety-fourth listen page", testNinetyFourthPage],
   ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
