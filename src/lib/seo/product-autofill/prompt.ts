@@ -70,6 +70,12 @@ export function buildProductSeoAiJsonSchema(
   const candidateCount =
     typeof input === "number" ? input : input.candidates.length;
   const { min, max } = expectedSecondaryRange(candidateCount);
+  const phrases =
+    typeof input === "number" ? [] : input.candidates.map((c) => c.phrase);
+  const items =
+    phrases.length === 0
+      ? { type: "string" as const }
+      : { type: "string" as const, enum: phrases };
 
   return {
     ...PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -77,8 +83,10 @@ export function buildProductSeoAiJsonSchema(
       ...PRODUCT_SEO_AI_JSON_SCHEMA.properties,
       secondaryQueries: {
         ...PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+        items,
         minItems: min,
         maxItems: max,
+        uniqueItems: true,
       },
     },
   };

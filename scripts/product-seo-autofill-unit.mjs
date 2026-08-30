@@ -26,6 +26,7 @@ import {
   PRODUCT_SEO_AI_USER_LIMIT,
 } from "../src/lib/seo/product-autofill/rate-limit.ts";
 import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/select-secondaries.ts";
+import { wordstatPhraseKey } from "../src/lib/seo/wordstat/phrase.ts";
 import {
   collectSeoAboutDuplicationIssues,
   expectedSecondaryRange,
@@ -333,14 +334,44 @@ assert.equal(
   "maxItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
   false,
 );
+assert.equal(
+  "uniqueItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+  false,
+);
+assert.equal(
+  "enum" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries.items,
+  false,
+);
+
+function candidateObjects(phrases) {
+  return phrases.map((phrase, index) => ({
+    phrase,
+    count: 100 + index,
+    color: "green",
+    source: "result",
+  }));
+}
 
 function assertYandexSecondarySchemaRange(schema, candidateCount, label) {
   const range = expectedSecondaryRange(candidateCount);
   const field = schema.properties.secondaryQueries;
   assert.equal(field.type, "array", label);
-  assert.deepEqual(field.items, { type: "string" }, label);
+  assert.equal(field.items.type, "string", label);
   assert.equal(field.minItems, range.min, `${label} min`);
   assert.equal(field.maxItems, range.max, `${label} max`);
+  assert.equal(field.uniqueItems, true, `${label} uniqueItems`);
+}
+
+function assertSecondaryQueriesEnum(schema, expectedEnum, label) {
+  const field = schema.properties.secondaryQueries;
+  if (expectedEnum.length === 0) {
+    assert.equal("enum" in field.items, false, `${label} enum absent`);
+    assert.deepEqual(field.items, { type: "string" }, label);
+    return;
+  }
+
+  assert.deepEqual(field.items.enum, expectedEnum, `${label} enum`);
+  assert.equal(field.items.enum.length, expectedEnum.length, `${label} enum length`);
 }
 
 // YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES
@@ -349,11 +380,21 @@ assertYandexSecondarySchemaRange(
   0,
   "YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES",
 );
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(0),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES_NO_ENUM",
+);
 // YANDEX_SCHEMA_SECONDARIES_1_CANDIDATE
 assertYandexSecondarySchemaRange(
   buildProductSeoAiJsonSchema(1),
   1,
   "YANDEX_SCHEMA_SECONDARIES_1_CANDIDATE",
+);
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(1),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_1_CANDIDATE_NO_ENUM",
 );
 // YANDEX_SCHEMA_SECONDARIES_2_CANDIDATES
 assertYandexSecondarySchemaRange(
@@ -361,11 +402,21 @@ assertYandexSecondarySchemaRange(
   2,
   "YANDEX_SCHEMA_SECONDARIES_2_CANDIDATES",
 );
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(2),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_2_CANDIDATES_NO_ENUM",
+);
 // YANDEX_SCHEMA_SECONDARIES_3_CANDIDATES
 assertYandexSecondarySchemaRange(
   buildProductSeoAiJsonSchema(3),
   3,
   "YANDEX_SCHEMA_SECONDARIES_3_CANDIDATES",
+);
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(3),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_3_CANDIDATES_NO_ENUM",
 );
 // YANDEX_SCHEMA_SECONDARIES_4_CANDIDATES
 assertYandexSecondarySchemaRange(
@@ -379,12 +430,121 @@ assertYandexSecondarySchemaRange(
   5,
   "YANDEX_SCHEMA_SECONDARIES_5_CANDIDATES",
 );
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(5),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_5_CANDIDATES_NO_ENUM",
+);
 // YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES
 assertYandexSecondarySchemaRange(
   buildProductSeoAiJsonSchema(20),
   20,
   "YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES",
 );
+assertSecondaryQueriesEnum(
+  buildProductSeoAiJsonSchema(20),
+  [],
+  "YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES_NO_ENUM",
+);
+
+{
+  const schema = buildProductSeoAiJsonSchema({ candidates: [] });
+  assertYandexSecondarySchemaRange(schema, 0, "SCHEMA_ZERO_CANDIDATES");
+  assertSecondaryQueriesEnum(schema, [], "SCHEMA_ZERO_CANDIDATES");
+}
+
+{
+  const phrases = ["спокойная музыка для сна"];
+  const schema = buildProductSeoAiJsonSchema({ candidates: candidateObjects(phrases) });
+  assertYandexSecondarySchemaRange(schema, 1, "SCHEMA_ONE_CANDIDATE");
+  assertSecondaryQueriesEnum(schema, phrases, "SCHEMA_ONE_CANDIDATE");
+}
+
+{
+  const phrases = ["музыка для глубокого сна", "спокойная музыка для сна"];
+  const schema = buildProductSeoAiJsonSchema({ candidates: candidateObjects(phrases) });
+  assertYandexSecondarySchemaRange(schema, 2, "SCHEMA_TWO_CANDIDATES");
+  assertSecondaryQueriesEnum(schema, phrases, "SCHEMA_TWO_CANDIDATES");
+}
+
+{
+  const phrases = [
+    "музыка для глубокого сна",
+    "спокойная музыка для сна",
+    "музыка перед сном",
+  ];
+  const schema = buildProductSeoAiJsonSchema({ candidates: candidateObjects(phrases) });
+  assertYandexSecondarySchemaRange(schema, 3, "SCHEMA_THREE_CANDIDATES");
+  assertSecondaryQueriesEnum(schema, phrases, "SCHEMA_THREE_CANDIDATES");
+}
+
+{
+  const phrases = [
+    "фраза один",
+    "фраза два",
+    "фраза три",
+    "фраза четыре",
+    "фраза пять",
+  ];
+  const schema = buildProductSeoAiJsonSchema({ candidates: candidateObjects(phrases) });
+  assertYandexSecondarySchemaRange(schema, 5, "SCHEMA_FIVE_CANDIDATES");
+  assertSecondaryQueriesEnum(schema, phrases, "SCHEMA_FIVE_CANDIDATES");
+}
+
+{
+  const phrases = Array.from({ length: 20 }, (_, index) => `кандидат фраза ${index + 1}`);
+  const schema = buildProductSeoAiJsonSchema({ candidates: candidateObjects(phrases) });
+  assertYandexSecondarySchemaRange(schema, 20, "SCHEMA_TWENTY_CANDIDATES");
+  assertSecondaryQueriesEnum(schema, phrases, "SCHEMA_TWENTY_CANDIDATES");
+  assert.equal(
+    schema.properties.secondaryQueries.items.enum.length,
+    20,
+    "SCHEMA_TWENTY_CANDIDATES enum.length",
+  );
+}
+
+{
+  const phrases = [
+    "музыка для глубокого сна",
+    "спокойная музыка для сна",
+    "музыка перед сном",
+  ];
+  const schema = buildProductSeoAiJsonSchema({
+    candidates: phrases.map((phrase) => ({
+      phrase,
+      count: 999,
+      color: "yellow",
+      source: "association",
+    })),
+  });
+  assert.deepEqual(
+    schema.properties.secondaryQueries.items.enum,
+    phrases,
+    "SCHEMA_ENUM_EXACT_TEST",
+  );
+  const enumJson = JSON.stringify(schema.properties.secondaryQueries.items.enum);
+  assert.equal(enumJson.includes("count"), false, "SCHEMA_ENUM_EXACT_TEST no count");
+  assert.equal(enumJson.includes("color"), false, "SCHEMA_ENUM_EXACT_TEST no color");
+  assert.equal(enumJson.includes("source"), false, "SCHEMA_ENUM_EXACT_TEST no source");
+  assert.equal(enumJson.includes("999"), false, "SCHEMA_ENUM_EXACT_TEST no metadata");
+}
+
+{
+  const schema = buildProductSeoAiJsonSchema({
+    candidates: candidateObjects(["музыка перед сном"]),
+  });
+  assert.equal(
+    schema.properties.secondaryQueries.uniqueItems,
+    true,
+    "SCHEMA_UNIQUE_ITEMS_TEST",
+  );
+  const zeroSchema = buildProductSeoAiJsonSchema({ candidates: [] });
+  assert.equal(
+    zeroSchema.properties.secondaryQueries.uniqueItems,
+    true,
+    "SCHEMA_UNIQUE_ITEMS_TEST zero",
+  );
+}
 assert.equal(resolveSecondaryQueryStatus(4), "complete");
 assert.equal(resolveSecondaryQueryStatus(2), "limited");
 assert.equal(resolveSecondaryQueryStatus(0), "none");
@@ -456,6 +616,31 @@ const onlyRed = eligibleSecondaryCandidates(
   "медитация для сна",
 );
 assert.equal(onlyRed.some((item) => item.color === "red"), true);
+
+{
+  const primary = "медитация для сна";
+  const pool = eligibleSecondaryCandidates(
+    [
+      suggestion("медитация перед сном", 320),
+      suggestion("Медитация перед сном", 200),
+      suggestion("медитация   перед сном", 100),
+      suggestion(primary, 500),
+      suggestion("вечерняя медитация", 180),
+    ],
+    primary,
+  );
+  const keys = pool.map((item) => wordstatPhraseKey(item.phrase));
+  assert.equal(new Set(keys).size, keys.length, "CANDIDATE_PIPELINE_ALREADY_DEDUPED");
+  assert.equal(
+    keys.filter((key) => key === wordstatPhraseKey("медитация перед сном")).length,
+    1,
+    "CANDIDATE_PIPELINE_ALREADY_DEDUPED one phrase key",
+  );
+  assert.ok(
+    !pool.some((item) => wordstatPhraseKey(item.phrase) === wordstatPhraseKey(primary)),
+    "CANDIDATE_PIPELINE_ALREADY_DEDUPED excludes primary",
+  );
+}
 
 const missingPrimaryTitle = validateProductSeoAiDraft(
   validDraft({ seoTitle: "Спокойный вечер без ключа" }),
@@ -711,6 +896,16 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(
     "maxItems" in sent.text.format.schema.properties.secondaryQueries,
     false,
+  );
+  assert.equal(
+    "uniqueItems" in sent.text.format.schema.properties.secondaryQueries,
+    false,
+    "OPENAI_STATIC_SCHEMA_TEST uniqueItems",
+  );
+  assert.equal(
+    "enum" in sent.text.format.schema.properties.secondaryQueries.items,
+    false,
+    "OPENAI_STATIC_SCHEMA_TEST enum",
   );
   assert.equal("tools" in sent, false);
   assert.doesNotMatch(JSON.stringify(sent), new RegExp(TEST_KEY));
@@ -1724,6 +1919,11 @@ await withEnvAsync(yandexEnv(), async () => {
       yandexCandidates.length,
       "YANDEX_SUCCESS_DYNAMIC_SCHEMA",
     );
+    assertSecondaryQueriesEnum(
+      sent.jsonSchema.schema,
+      yandexCandidates.map((item) => item.phrase),
+      "YANDEX_SUCCESS_DYNAMIC_SCHEMA",
+    );
   }
   assert.equal(sent.messages[0].role, "system");
   assert.equal(sent.messages[1].role, "user");
@@ -1901,15 +2101,33 @@ await withEnvAsync(yandexEnv(), async () => {
       sampleCandidates(),
       requestInput().seoPrimaryQuery,
     );
+    const generateSchema = JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema;
+    const repairSchema = JSON.parse(fetchImpl.calls[1].init.body).jsonSchema.schema;
+    const expectedPhrases = yandexCandidates.map((item) => item.phrase);
     assertYandexSecondarySchemaRange(
-      JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema,
+      generateSchema,
       yandexCandidates.length,
       "YANDEX_REPAIR_GENERATE_DYNAMIC_SCHEMA",
     );
     assertYandexSecondarySchemaRange(
-      JSON.parse(fetchImpl.calls[1].init.body).jsonSchema.schema,
+      repairSchema,
       yandexCandidates.length,
       "YANDEX_REPAIR_REPAIR_DYNAMIC_SCHEMA",
+    );
+    assertSecondaryQueriesEnum(
+      generateSchema,
+      expectedPhrases,
+      "YANDEX_REPAIR_GENERATE_DYNAMIC_SCHEMA",
+    );
+    assertSecondaryQueriesEnum(
+      repairSchema,
+      expectedPhrases,
+      "YANDEX_REPAIR_REPAIR_DYNAMIC_SCHEMA",
+    );
+    assert.deepEqual(
+      generateSchema.properties.secondaryQueries,
+      repairSchema.properties.secondaryQueries,
+      "YANDEX_REPAIR generate and repair structural constraints equal",
     );
   }
 });
@@ -1947,17 +2165,35 @@ async function captureYandexJsonSchema(kind, candidateCount) {
 
 await withEnvAsync(yandexEnv(), async () => {
   for (const candidateCount of [0, 1, 2, 3, 4, 5, 20]) {
+    const expectedPhrases = fakeEligibleCandidates(candidateCount).map(
+      (item) => item.phrase,
+    );
     const generateSchema = await captureYandexJsonSchema("generate", candidateCount);
     assertYandexSecondarySchemaRange(
       generateSchema,
       candidateCount,
       `YANDEX_GENERATE_SCHEMA_SECONDARIES_${candidateCount}`,
     );
+    assertSecondaryQueriesEnum(
+      generateSchema,
+      expectedPhrases,
+      `YANDEX_GENERATE_SCHEMA_TEST_${candidateCount}`,
+    );
     const repairSchema = await captureYandexJsonSchema("repair", candidateCount);
     assertYandexSecondarySchemaRange(
       repairSchema,
       candidateCount,
       `YANDEX_REPAIR_SCHEMA_SECONDARIES_${candidateCount}`,
+    );
+    assertSecondaryQueriesEnum(
+      repairSchema,
+      expectedPhrases,
+      `YANDEX_REPAIR_SCHEMA_TEST_${candidateCount}`,
+    );
+    assert.deepEqual(
+      generateSchema.properties.secondaryQueries,
+      repairSchema.properties.secondaryQueries,
+      `YANDEX_GENERATE_REPAIR_SCHEMA_EQUAL_${candidateCount}`,
     );
   }
 });
