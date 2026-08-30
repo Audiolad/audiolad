@@ -16,6 +16,7 @@ import {
   getProcessProductSeoAiRateLimit,
   type ProductSeoAiRateLimitStore,
 } from "@/lib/seo/product-autofill/rate-limit";
+import { canonicalizeYandexSecondaryQueries } from "@/lib/seo/product-autofill/canonicalize-secondaries";
 import { eligibleSecondaryCandidates } from "@/lib/seo/product-autofill/select-secondaries";
 import {
   createDefaultProductSeoStyleProfile,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/seo/product-autofill/validate";
 import {
   type ProductSeoAiErrorCode,
+  type ProductSeoAiRawDraft,
   type ProductSeoAiResult,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
@@ -240,13 +242,30 @@ export async function generateProductSeoDraft(
     candidates,
   };
 
+  function withCanonicalYandexSecondaries(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    if (config.provider !== "yandex") {
+      return draft;
+    }
+
+    return {
+      ...draft,
+      secondaryQueries: canonicalizeYandexSecondaryQueries(
+        draft.secondaryQueries,
+        candidates,
+      ),
+    };
+  }
+
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
   const first = await provider.generate(promptInput);
   if (!first.ok) {
     return first;
   }
 
-  const firstValidation = validateProductSeoAiDraft(first.draft, {
+  const firstDraft = withCanonicalYandexSecondaries(first.draft);
+  const firstValidation = validateProductSeoAiDraft(firstDraft, {
     primaryQuery: primary,
     title: request.title,
     subtitle: request.subtitle,
@@ -276,7 +295,8 @@ export async function generateProductSeoDraft(
     return repaired;
   }
 
-  const repairedValidation = validateProductSeoAiDraft(repaired.draft, {
+  const repairedDraft = withCanonicalYandexSecondaries(repaired.draft);
+  const repairedValidation = validateProductSeoAiDraft(repairedDraft, {
     primaryQuery: primary,
     title: request.title,
     subtitle: request.subtitle,

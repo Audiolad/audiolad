@@ -37,6 +37,12 @@ Wordstat = real demand and frequency. AI = semantic selection + writing.
 AI does not invent frequency. The author decides. Generated chips and
 texts stay editable. No ranking, indexing, TOP-5, or traffic promise.
 
+For **Yandex only**, after generate and after the one repair, the server
+rewrites `secondaryQueries` onto exact unique Wordstat candidate phrases
+and fills or trims to the existing expected range before the validator.
+This is not a third model call. OpenAI is unchanged. The JSON Schema
+enum/`uniqueItems` layer and the strict validator stay as they are.
+
 ## AI provider
 
 Autofill can call **OpenAI Responses API** or **Yandex AI Studio**
