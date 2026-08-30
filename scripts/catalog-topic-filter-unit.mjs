@@ -191,6 +191,23 @@ assert(
   ]) === "Духовность",
   "spirituality title resolves in filter labels",
 );
+assert(
+  parseCatalogTopicFilter("sleep", allowedKeys) === "sleep",
+  "sleep topic key is a platform facet, not a publication class",
+);
+assert(
+  getCatalogTopicFilterLabel("sleep", [
+    { key: "sleep", title: "Сон" },
+  ]) === "Сон",
+  "sleep title resolves in filter labels",
+);
+assert(
+  getCatalogTopicFilterLabel("sleep,calm", [
+    { key: "sleep", title: "Сон" },
+    { key: "calm", title: "Спокойствие" },
+  ]) === "Сон, Спокойствие",
+  "Сон and Спокойствие stay independent filter keys",
+);
 
 const topicSeed = readFileSync(
   "supabase/migrations/20260825120000_topics_career_business_learning.sql",
@@ -234,6 +251,26 @@ assert(
     !/UPDATE\s+public\.practices/i.test(spiritualitySeed),
   "spirituality seed only inserts a topic facet and does not add a publication class",
 );
+const sleepSeedPath = "supabase/migrations/20260910120000_topics_sleep.sql";
+const sleepSeed = readFileSync(sleepSeedPath, "utf8");
+assert(
+  sleepSeedPath.includes("20260910120000"),
+  "sleep seed timestamp is 20260910120000",
+);
+assert(sleepSeed.includes("'sleep'"), "sleep seed has key");
+assert(sleepSeed.includes("'Сон'"), "sleep seed has Сон title");
+assert(sleepSeed.includes("ON CONFLICT (key) DO NOTHING"), "sleep seed is insert-if-not-exists");
+assert(
+  sleepSeed.includes("INSERT INTO public.topics") &&
+    !sleepSeed.includes("publication_class") &&
+    !sleepSeed.includes("product_kind") &&
+    !sleepSeed.includes("CREATE TABLE") &&
+    !sleepSeed.includes("ALTER TABLE") &&
+    !/UPDATE\s+public\.practices/i.test(sleepSeed) &&
+    !/UPDATE\s+public\.practice_topics/i.test(sleepSeed) &&
+    !/UPDATE\s+public\.playlist_topics/i.test(sleepSeed),
+  "sleep seed only inserts a topic facet and does not backfill assignments",
+);
 
 assert(
   topicQueries.includes('from("topics")') && topicQueries.includes("listActiveTopics"),
@@ -243,14 +280,16 @@ assert(
   !catalogFilterUi.includes("Карьера") &&
     !catalogFilterUi.includes("Бизнес") &&
     !catalogFilterUi.includes("Обучение") &&
-    !catalogFilterUi.includes("Духовность"),
+    !catalogFilterUi.includes("Духовность") &&
+    !catalogFilterUi.includes("Сон"),
   "catalog-filter-ui does not hardcode the new topic titles",
 );
 assert(
   !listingContract.includes('"learning"') &&
     !listingContract.includes('"career"') &&
     !listingContract.includes('"business"') &&
-    !listingContract.includes('"spirituality"'),
+    !listingContract.includes('"spirituality"') &&
+    !listingContract.includes('"sleep"'),
   "listing class filters stay independent of the new topic keys",
 );
 assert(
@@ -258,8 +297,9 @@ assert(
     !catalogDto.includes('"learning"') &&
     !catalogDto.includes('"career"') &&
     !catalogDto.includes('"business"') &&
-    !catalogDto.includes('"spirituality"'),
-  "Freeze v2 publication classes unchanged; learning/spirituality are not classes",
+    !catalogDto.includes('"spirituality"') &&
+    !catalogDto.includes('"sleep"'),
+  "Freeze v2 publication classes unchanged; learning/spirituality/sleep are not classes",
 );
 assert(
   catalogFilterUi.includes('value: "course"') &&

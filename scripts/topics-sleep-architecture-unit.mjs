@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -92,5 +92,65 @@ assert.doesNotMatch(sleepSql, /Сон и расслабление/);
 const topicsDocs = read("docs/TOPICS.md");
 assert.match(topicsDocs, /`calm` \| Спокойствие \| 30/);
 assert.match(topicsDocs, /`sleep` \| Сон \| 35/);
+assert.match(topicsDocs, /`body-wellbeing` \| Тело и самочувствие \| 50/);
+assert.match(topicsDocs, /`energy` \| Энергия и ресурс \| 60/);
+
+const foundation = read("supabase/migrations/20260717140000_topics_foundation.sql");
+assert.match(
+  foundation,
+  /CHECK \(key ~ '\^\[a-z0-9\]\+\(-\[a-z0-9\]\+\)\*\$'\)/,
+  "topics key format accepts sleep",
+);
+assert.doesNotMatch(
+  foundation,
+  /key\s+IN\s*\(|topics_key_enum|CREATE TYPE[\s\S]*topic/i,
+  "no topic-key enum or closed CHECK list",
+);
+assert.match(
+  foundation,
+  /FROM public\.topics AS t\s+WHERE t\.key = v_key\s+AND t\.is_active = true/,
+  "set_practice_topics resolves keys from public.topics",
+);
+assert.doesNotMatch(
+  foundation,
+  /WHERE t\.key IN \(/,
+  "RPC does not allowlist a closed topic-key set",
+);
+
+const syncLib = read("src/lib/topics/sync.ts");
+assert.match(syncLib, /rpc\("set_practice_topics"/);
+assert.doesNotMatch(syncLib, /"sleep"|"spirituality"|"calm"/);
+
+const authorProfilePage = read(
+  "src/app/(platform)/author-dashboard/profile/page.tsx",
+);
+assert.match(authorProfilePage, /listActiveTopics/);
+const authorProfile = read("src/components/author-dashboard/AuthorProfileClient.tsx");
+assert.match(authorProfile, /TopicSelector/);
+
+const newProductPage = read(
+  "src/app/(platform)/author-dashboard/products/new/page.tsx",
+);
+assert.match(newProductPage, /loadAuthorProductTopicFormData/);
+assert.match(authorForm, /productKind/);
+assert.match(authorForm, /PRODUCT_KIND\.MUSIC/);
+
+const editorialDetail = read("src/lib/playlists/editorial-workspace-detail.ts");
+assert.match(editorialDetail, /listActiveTopics/);
+const editorialEditor = read(
+  "src/components/playlists/editorial/EditorialPlaylistEditorClient.tsx",
+);
+assert.match(editorialEditor, /TopicSelector/);
+
+const ownerPlaylist = read("src/app/(platform)/playlists/[id]/page.tsx");
+assert.doesNotMatch(ownerPlaylist, /TopicSelector/);
+assert.doesNotMatch(ownerPlaylist, /listActiveTopics/);
+
+assert.match(topicsDocs, /\/admin\/topics/);
+assert.equal(
+  existsSync(path.join(root, "src/app/(platform)/admin/topics")),
+  false,
+  "admin topics CRUD is not implemented; dictionary stays SQL-seeded",
+);
 
 console.log("topics-sleep-architecture-unit: ok");
