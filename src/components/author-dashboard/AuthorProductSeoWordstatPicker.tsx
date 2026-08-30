@@ -2,6 +2,12 @@
 
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
 import {
+  PRIMARY_QUERY_AI_ALTERNATIVES_HEADING,
+  PRIMARY_QUERY_AI_ALTERNATIVES_HINT,
+  PRIMARY_QUERY_INITIAL_SUBMIT_CTA,
+  PRIMARY_QUERY_LOADING_WORDSTAT,
+} from "@/lib/seo/primary-query-suggestions/ui";
+import {
   clipSeoQuery,
   formatWordstatCount,
   isSameSeoQuery,
@@ -17,14 +23,18 @@ export type AuthorProductSeoWordstatPickerProps = {
   seed: string;
   onSeedChange: (value: string) => void;
   loading: boolean;
+  loadingLabel?: string;
+  submitLabel?: string;
   error: string | null;
   result: WordstatSuggestionsPayload | null;
+  alternativeSuggestions?: string[];
   seoPrimaryQuery: string;
   seoSecondaryQueries: string[];
   disabled?: boolean;
   onSubmit: () => void;
   onSelectPrimary: (phrase: string) => void;
   onAddSecondary: (phrase: string) => void;
+  onSelectAlternative?: (phrase: string) => void;
 };
 
 function sourceCaption(source: WordstatSuggestion["source"]): string {
@@ -101,14 +111,18 @@ export default function AuthorProductSeoWordstatPicker({
   seed,
   onSeedChange,
   loading,
+  loadingLabel = PRIMARY_QUERY_LOADING_WORDSTAT,
+  submitLabel = PRIMARY_QUERY_INITIAL_SUBMIT_CTA,
   error,
   result,
+  alternativeSuggestions = [],
   seoPrimaryQuery,
   seoSecondaryQueries,
   disabled = false,
   onSubmit,
   onSelectPrimary,
   onAddSecondary,
+  onSelectAlternative,
 }: AuthorProductSeoWordstatPickerProps) {
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
@@ -141,7 +155,7 @@ export default function AuthorProductSeoWordstatPicker({
         onClick={onSubmit}
         className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Ищем запросы в Яндексе…" : "Подобрать в Яндексе"}
+        {loading ? loadingLabel : submitLabel}
       </button>
       <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
         Для нового продукта чаще всего удобно начинать с конкретного запроса
@@ -159,6 +173,29 @@ export default function AuthorProductSeoWordstatPicker({
       </p>
       {error ? (
         <p className="mt-3 text-sm text-[#9b3d3d]">{error}</p>
+      ) : null}
+      {alternativeSuggestions.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-sm font-medium text-[#2b2140]">
+            {PRIMARY_QUERY_AI_ALTERNATIVES_HEADING}
+          </p>
+          <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+            {PRIMARY_QUERY_AI_ALTERNATIVES_HINT}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {alternativeSuggestions.map((phrase) => (
+              <button
+                key={phrase}
+                type="button"
+                disabled={disabled || loading}
+                onClick={() => onSelectAlternative?.(phrase)}
+                className="rounded-full border border-[#d4c4ee] bg-[#f7f1ff] px-3 py-1.5 text-sm text-[#4d336f] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {phrase}
+              </button>
+            ))}
+          </div>
+        </div>
       ) : null}
       {result && !seedInResults && result.topicTotalCount !== null ? (
         <p className="mt-3 text-sm leading-5 text-[#5c5278]">

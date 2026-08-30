@@ -68,12 +68,17 @@ Save and publish stay available. Manual SEO fields stay editable.
 
 ## What this helper does
 
-When **Подобрать основной запрос** is clicked and `seoPrimaryQuery` is
-empty (`PRIMARY_CTA_AUTO_SEARCH`), the picker opens, fills a short title
-seed (`buildInitialWordstatSeed`: text before the first `|`, trimmed and
-clipped), and immediately runs one GetTop request with that same phrase.
-The in-picker **Подобрать в Яндексе** button stays for a manual re-search
-after the author edits **Что ищем**.
+When **Подобрать поисковый запрос** is clicked and `seoPrimaryQuery` is
+empty (`PRIMARY_CTA_AUTO_SEARCH`), the picker opens, scrolls into view,
+fills a short title seed (`buildInitialWordstatSeed`: text before the
+first `|`, trimmed and clipped), and immediately runs one GetTop request
+with that same phrase. If that first auto-search returns exactly
+`NO_RESULTS`, the author tool may ask Yandex AI once for three short
+search-phrase hypotheses and auto-check the first hypothesis in
+Wordstat. Other Wordstat errors stay on the existing error UI. AI
+hypotheses are not Wordstat data. After the first auto-search, the
+in-picker button is **Проверить другой вариант** and runs one Wordstat
+POST with the current **Что ищем**, without AI fallback.
 
 If `seoPrimaryQuery` is already filled, **Подобрать похожие** / reopen
 seeds from that primary, never a title-derived phrase. Starter chips from

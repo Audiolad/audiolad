@@ -20,7 +20,7 @@ export const PRODUCT_SEO_START_HEADING = "Начните с поискового
 export const PRODUCT_SEO_START_TEXT =
   "Выберите фразу, по которой люди могут искать такой продукт. Мы покажем реальные данные Яндекса и поможем подобрать подходящий вариант.";
 
-export const PRODUCT_SEO_PICK_PRIMARY_CTA = "Подобрать основной запрос";
+export const PRODUCT_SEO_PICK_PRIMARY_CTA = "Подобрать поисковый запрос";
 
 export const PRODUCT_SEO_AFTER_PRIMARY_COPY =
   "Основной запрос выбран. Теперь АудиоЛад может подготовить остальное SEO за вас.";

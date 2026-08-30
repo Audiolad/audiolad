@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
@@ -35,11 +35,26 @@ import {
   resolveWordstatRequestPhrase,
   shouldAutoSearchOnPrimaryCta,
 } from "@/lib/seo/wordstat/ui";
-import {
-  WORDSTAT_ERROR_MESSAGES,
-  wordstatClientErrorMessage,
-} from "@/lib/seo/wordstat/errors";
+import { WORDSTAT_ERROR_MESSAGES } from "@/lib/seo/wordstat/errors";
 import type { WordstatSuggestionsPayload } from "@/lib/seo/wordstat/types";
+import {
+  buildPrimaryQuerySuggestionsRequest,
+  classifyWordstatClientPayload,
+} from "@/lib/seo/primary-query-suggestions/client";
+import { runPrimaryQueryDiscovery } from "@/lib/seo/primary-query-suggestions/discovery";
+import {
+  PRIMARY_QUERY_AI_FALLBACK_FAILED_COPY,
+  planPrimaryCtaPickerOpen,
+  resolvePickerSubmitLabel,
+  resolvePrimaryQueryLoadingCopy,
+  scheduleWordstatPickerScroll,
+} from "@/lib/seo/primary-query-suggestions/ui";
+import { sanitizePrimaryQuerySuggestions } from "@/lib/seo/primary-query-suggestions/validate";
+import type {
+  PrimaryQueryDiscoveryEvent,
+  PrimaryQueryDiscoveryStage,
+  WordstatClientOutcome,
+} from "@/lib/seo/primary-query-suggestions/types";
 import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "@/lib/seo/product-autofill/errors";
 import {
   hasFilledGeneratedSeoFields,
@@ -165,6 +180,15 @@ export default function AuthorProductSeoSection({
   const [wordstatError, setWordstatError] = useState<string | null>(null);
   const [wordstatResult, setWordstatResult] =
     useState<WordstatSuggestionsPayload | null>(null);
+  const [wordstatAiAlternatives, setWordstatAiAlternatives] = useState<
+    string[]
+  >([]);
+  const wordstatAiFallbackUsedRef = useRef(false);
+  const [wordstatHasAutoSearched, setWordstatHasAutoSearched] = useState(false);
+  const [wordstatDiscoveryStage, setWordstatDiscoveryStage] =
+    useState<PrimaryQueryDiscoveryStage | null>(null);
+  const pickerAnchorRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollPickerRef = useRef(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [generateStage, setGenerateStage] = useState<
     "queries" | "text" | null
@@ -293,21 +317,126 @@ export default function AuthorProductSeoSection({
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
 
+  useEffect(() => {
+    if (!wordstatOpen || !shouldScrollPickerRef.current) {
+      return;
+    }
+
+    shouldScrollPickerRef.current = false;
+    scheduleWordstatPickerScroll(pickerAnchorRef.current);
+  }, [wordstatOpen]);
+
+  function applyDiscoveryEvent(event: PrimaryQueryDiscoveryEvent) {
+    if (event.type === "stage") {
+      setWordstatDiscoveryStage(event.stage);
+      return;
+    }
+
+    if (event.type === "seed") {
+      setWordstatSeed(event.phrase);
+      return;
+    }
+
+    if (event.type === "wordstat_success") {
+      setWordstatResult(event.result);
+      setWordstatError(null);
+      return;
+    }
+
+    if (event.type === "wordstat_error") {
+      setWordstatResult(null);
+      setWordstatError(event.message);
+      return;
+    }
+
+    if (event.type === "ai_alternatives") {
+      setWordstatAiAlternatives(event.suggestions);
+      return;
+    }
+
+    if (event.type === "ai_fallback_failed") {
+      setWordstatResult(null);
+      setWordstatError(PRIMARY_QUERY_AI_FALLBACK_FAILED_COPY);
+      return;
+    }
+
+    if (event.type === "ai_primary_no_results_with_alternatives") {
+      setWordstatResult(null);
+      setWordstatError(null);
+    }
+  }
+
+  async function fetchWordstatOnce(phrase: string): Promise<WordstatClientOutcome> {
+    const request = buildWordstatSuggestionsRequest(phrase);
+    try {
+      const response = await fetch(request.url, request.init);
+      const payload = (await response.json().catch(() => null)) as unknown;
+      return classifyWordstatClientPayload(response.ok, payload);
+    } catch {
+      return {
+        kind: "error",
+        code: "UPSTREAM_ERROR",
+        message: WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR,
+      };
+    }
+  }
+
+  async function fetchPrimaryQuerySuggestions(input: {
+    title: string;
+    subtitle: string;
+    description: string;
+    productKind: string;
+    failedSeed: string;
+  }) {
+    const request = buildPrimaryQuerySuggestionsRequest(input);
+    try {
+      const response = await fetch(request.url, request.init);
+      const payload = (await response.json().catch(() => null)) as {
+        suggestions?: unknown;
+      } | null;
+      if (!response.ok || !payload || !Array.isArray(payload.suggestions)) {
+        return { ok: false as const };
+      }
+
+      const suggestions = sanitizePrimaryQuerySuggestions(
+        payload.suggestions,
+        input.failedSeed,
+      );
+      if (suggestions.length < 1) {
+        return { ok: false as const };
+      }
+
+      return { ok: true as const, suggestions };
+    } catch {
+      return { ok: false as const };
+    }
+  }
+
   function openWordstatPicker(options?: {
     seedOverride?: string;
     autoSearch?: boolean;
   }) {
-    const { seed, shouldSearch } = planWordstatPickerOpen({
+    if (wordstatLoading) {
+      return;
+    }
+
+    const planned = planWordstatPickerOpen({
       seoPrimaryQuery,
       title,
       seedOverride: options?.seedOverride,
       autoSearch: options?.autoSearch,
     });
+    const { seed, shouldSearch, shouldScroll } = planPrimaryCtaPickerOpen(planned);
     setWordstatOpen(true);
     setWordstatError(null);
     setWordstatSeed(seed);
+    setWordstatAiAlternatives([]);
+    wordstatAiFallbackUsedRef.current = false;
+    setWordstatHasAutoSearched(shouldSearch);
+    setWordstatDiscoveryStage(shouldSearch ? "wordstat_initial" : null);
+    shouldScrollPickerRef.current = shouldScroll;
     if (shouldSearch) {
-      void submitWordstat(seed);
+      void submitWordstat(seed, { allowAiFallback: true });
     }
   }
 
@@ -466,39 +595,47 @@ export default function AuthorProductSeoSection({
     void generateProductSeo();
   }
 
-  async function submitWordstat(seedOverride?: string) {
+  async function submitWordstat(
+    seedOverride?: string,
+    options?: { allowAiFallback?: boolean },
+  ) {
     if (wordstatLoading) {
       return;
     }
 
     const phrase = resolveWordstatRequestPhrase(seedOverride, wordstatSeed);
-    const request = buildWordstatSuggestionsRequest(phrase);
+    const allowAiFallback =
+      Boolean(options?.allowAiFallback) && !wordstatAiFallbackUsedRef.current;
 
     setWordstatLoading(true);
     setWordstatError(null);
+    setWordstatDiscoveryStage("wordstat_initial");
+    if (allowAiFallback) {
+      wordstatAiFallbackUsedRef.current = true;
+    }
 
     try {
-      const response = await fetch(request.url, request.init);
-      const payload = (await response.json().catch(() => null)) as
-        | WordstatSuggestionsPayload
-        | { error?: string; code?: string }
-        | null;
-
-      if (!response.ok || !payload || !("suggestions" in payload)) {
-        setWordstatResult(null);
-        setWordstatError(wordstatClientErrorMessage(payload));
-        return;
-      }
-
-      setWordstatResult(payload);
-      if (payload.suggestions.length === 0) {
-        setWordstatError(WORDSTAT_ERROR_MESSAGES.NO_RESULTS);
-      }
-    } catch {
-      setWordstatResult(null);
-      setWordstatError(WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
+      await runPrimaryQueryDiscovery(
+        {
+          initialSeed: phrase,
+          product: {
+            title,
+            subtitle,
+            description,
+            productKind,
+          },
+          allowAiFallback,
+        },
+        {
+          fetchWordstat: fetchWordstatOnce,
+          fetchAiSuggestions: fetchPrimaryQuerySuggestions,
+        },
+        applyDiscoveryEvent,
+      );
     } finally {
       setWordstatLoading(false);
+      setWordstatDiscoveryStage(null);
+      setWordstatHasAutoSearched(true);
     }
   }
 
@@ -540,7 +677,7 @@ export default function AuthorProductSeoSection({
           </p>
           <button
             type="button"
-            disabled={disabled}
+            disabled={disabled || wordstatLoading}
             onClick={() =>
               openWordstatPicker({
                 autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
@@ -649,7 +786,7 @@ export default function AuthorProductSeoSection({
         </p>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || wordstatLoading}
           onClick={() =>
             openWordstatPicker({
               autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
@@ -671,28 +808,37 @@ export default function AuthorProductSeoSection({
       </label>
 
       {wordstatOpen ? (
-        <AuthorProductSeoWordstatPicker
-          seed={wordstatSeed}
-          onSeedChange={setWordstatSeed}
-          loading={wordstatLoading}
-          error={wordstatError}
-          result={wordstatResult}
-          seoPrimaryQuery={seoPrimaryQuery}
-          seoSecondaryQueries={seoSecondaryQueries}
-          disabled={disabled}
-          onSubmit={() => {
-            void submitWordstat();
-          }}
-          onSelectPrimary={(phrase) =>
-            onChange({
-              seoPrimaryQuery: clipSeoQuery(
-                phrase,
-                PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
-              ),
-            })
-          }
-          onAddSecondary={addSecondaryPhrase}
-        />
+        <div ref={pickerAnchorRef}>
+          <AuthorProductSeoWordstatPicker
+            seed={wordstatSeed}
+            onSeedChange={setWordstatSeed}
+            loading={wordstatLoading}
+            loadingLabel={resolvePrimaryQueryLoadingCopy(wordstatDiscoveryStage)}
+            submitLabel={resolvePickerSubmitLabel(wordstatHasAutoSearched)}
+            error={wordstatError}
+            result={wordstatResult}
+            alternativeSuggestions={wordstatAiAlternatives}
+            seoPrimaryQuery={seoPrimaryQuery}
+            seoSecondaryQueries={seoSecondaryQueries}
+            disabled={disabled}
+            onSubmit={() => {
+              void submitWordstat();
+            }}
+            onSelectPrimary={(phrase) =>
+              onChange({
+                seoPrimaryQuery: clipSeoQuery(
+                  phrase,
+                  PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
+                ),
+              })
+            }
+            onAddSecondary={addSecondaryPhrase}
+            onSelectAlternative={(phrase) => {
+              setWordstatSeed(phrase);
+              void submitWordstat(phrase);
+            }}
+          />
+        </div>
       ) : null}
 
       <div className="mt-4">
@@ -748,7 +894,7 @@ export default function AuthorProductSeoSection({
         ) : null}
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || wordstatLoading}
           onClick={() =>
             openWordstatPicker({
               seedOverride: seoPrimaryQuery.trim() || undefined,
