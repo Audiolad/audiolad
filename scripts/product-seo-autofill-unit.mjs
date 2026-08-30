@@ -333,14 +333,45 @@ assert.equal(
   "maxItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
   false,
 );
+assert.equal(
+  "uniqueItems" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
+  false,
+);
+assert.equal(
+  "enum" in PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries.items,
+  false,
+);
 
-function assertYandexSecondarySchemaRange(schema, candidateCount, label) {
+// LIVE_YANDEX_ENUM_UNIQUE_CONTRACT_ALREADY_CONFIRMED = YES
+// Do not add those live Yandex enum/uniqueItems values into production code.
+function schemaCandidates(phrases) {
+  return phrases.map((phrase, index) => ({
+    phrase,
+    count: 100 + index,
+    color: index % 2 === 0 ? "green" : "yellow",
+    source: index % 2 === 0 ? "result" : "association",
+  }));
+}
+
+function assertYandexSecondarySchemaRange(schema, candidateCount, label, phrases) {
   const range = expectedSecondaryRange(candidateCount);
   const field = schema.properties.secondaryQueries;
   assert.equal(field.type, "array", label);
-  assert.deepEqual(field.items, { type: "string" }, label);
+  assert.equal(field.uniqueItems, true, `${label} uniqueItems`);
   assert.equal(field.minItems, range.min, `${label} min`);
   assert.equal(field.maxItems, range.max, `${label} max`);
+  if (phrases && phrases.length > 0) {
+    assert.deepEqual(field.items, { type: "string", enum: phrases }, label);
+  } else {
+    assert.deepEqual(field.items, { type: "string" }, label);
+    assert.equal("enum" in field.items, false, `${label} enum omitted`);
+  }
+}
+
+function assertSecondaryQueriesEnumOnlyPhrases(field, phrases, label) {
+  assert.deepEqual(field.items.enum, phrases, label);
+  const serialized = JSON.stringify(field.items.enum);
+  assert.doesNotMatch(serialized, /count=|"count"|color=|"color"|"source"|wordform/i, label);
 }
 
 // YANDEX_SCHEMA_SECONDARIES_0_CANDIDATES
@@ -385,6 +416,121 @@ assertYandexSecondarySchemaRange(
   20,
   "YANDEX_SCHEMA_SECONDARIES_20_CANDIDATES",
 );
+
+{
+  // SCHEMA_ZERO_CANDIDATES
+  const zeroSchema = buildProductSeoAiJsonSchema({ candidates: [] });
+  assertYandexSecondarySchemaRange(zeroSchema, 0, "SCHEMA_ZERO_CANDIDATES");
+  assert.equal("enum" in zeroSchema.properties.secondaryQueries.items, false);
+
+  // SCHEMA_ONE
+  const onePhrases = ["медитация перед сном"];
+  assertYandexSecondarySchemaRange(
+    buildProductSeoAiJsonSchema({ candidates: schemaCandidates(onePhrases) }),
+    1,
+    "SCHEMA_ONE",
+    onePhrases,
+  );
+
+  // SCHEMA_TWO
+  const twoPhrases = ["медитация перед сном", "вечерняя медитация"];
+  assertYandexSecondarySchemaRange(
+    buildProductSeoAiJsonSchema({ candidates: schemaCandidates(twoPhrases) }),
+    2,
+    "SCHEMA_TWO",
+    twoPhrases,
+  );
+
+  // SCHEMA_THREE
+  const threePhrases = [
+    "медитация перед сном",
+    "вечерняя медитация",
+    "медитация для расслабления",
+  ];
+  assertYandexSecondarySchemaRange(
+    buildProductSeoAiJsonSchema({ candidates: schemaCandidates(threePhrases) }),
+    3,
+    "SCHEMA_THREE",
+    threePhrases,
+  );
+
+  // SCHEMA_FIVE
+  const fivePhrases = [
+    "медитация перед сном",
+    "вечерняя медитация",
+    "медитация для расслабления",
+    "практика перед сном",
+    "медитация ночью",
+  ];
+  assertYandexSecondarySchemaRange(
+    buildProductSeoAiJsonSchema({ candidates: schemaCandidates(fivePhrases) }),
+    5,
+    "SCHEMA_FIVE",
+    fivePhrases,
+  );
+
+  // SCHEMA_TWENTY
+  const twentyPhrases = Array.from(
+    { length: 20 },
+    (_, index) => `кандидат ${index + 1}`,
+  );
+  assertYandexSecondarySchemaRange(
+    buildProductSeoAiJsonSchema({ candidates: schemaCandidates(twentyPhrases) }),
+    20,
+    "SCHEMA_TWENTY",
+    twentyPhrases,
+  );
+
+  // SCHEMA_EXACT_ENUM
+  const exactPhrases = [
+    "музыка для глубокого сна",
+    "спокойная музыка для сна",
+    "музыка перед сном",
+  ];
+  const exactSchema = buildProductSeoAiJsonSchema({
+    candidates: schemaCandidates(exactPhrases),
+  });
+  assertYandexSecondarySchemaRange(
+    exactSchema,
+    3,
+    "SCHEMA_EXACT_ENUM",
+    exactPhrases,
+  );
+  assertSecondaryQueriesEnumOnlyPhrases(
+    exactSchema.properties.secondaryQueries,
+    exactPhrases,
+    "SCHEMA_EXACT_ENUM metadata omitted",
+  );
+  assert.equal(
+    exactSchema.properties.secondaryQueries.items.enum.includes("медитация для сна"),
+    false,
+  );
+
+  // SCHEMA_UNIQUE_ENUM_INPUT — production pipeline already unique
+  const uniquePhrases = exactPhrases;
+  assert.equal(new Set(uniquePhrases).size, uniquePhrases.length);
+  const uniqueSchema = buildProductSeoAiJsonSchema({
+    candidates: schemaCandidates(uniquePhrases),
+  });
+  assert.deepEqual(
+    uniqueSchema.properties.secondaryQueries.items.enum,
+    uniquePhrases,
+  );
+
+  // Optional builder exact-dedupe of identical strings only
+  const duplicateCandidates = [
+    ...schemaCandidates(["одна и та же фраза"]),
+    ...schemaCandidates(["одна и та же фраза"]),
+    ...schemaCandidates(["другая фраза"]),
+  ];
+  const dedupedSchema = buildProductSeoAiJsonSchema({
+    candidates: duplicateCandidates,
+  });
+  assert.deepEqual(dedupedSchema.properties.secondaryQueries.items.enum, [
+    "одна и та же фраза",
+    "другая фраза",
+  ]);
+}
 assert.equal(resolveSecondaryQueryStatus(4), "complete");
 assert.equal(resolveSecondaryQueryStatus(2), "limited");
 assert.equal(resolveSecondaryQueryStatus(0), "none");
@@ -710,6 +856,14 @@ await withEnvAsync(enabledEnv(), async () => {
   );
   assert.equal(
     "maxItems" in sent.text.format.schema.properties.secondaryQueries,
+    false,
+  );
+  assert.equal(
+    "uniqueItems" in sent.text.format.schema.properties.secondaryQueries,
+    false,
+  );
+  assert.equal(
+    "enum" in sent.text.format.schema.properties.secondaryQueries.items,
     false,
   );
   assert.equal("tools" in sent, false);
@@ -1505,6 +1659,10 @@ const promptSource = read("src/lib/seo/product-autofill/prompt.ts");
 const docs = read("docs/product-seo-autofill.md");
 assert.match(promptSource, /export function buildProductSeoAiJsonSchema/);
 assert.match(promptSource, /expectedSecondaryRange\(candidateCount\)/);
+assert.match(
+  promptSource.slice(promptSource.indexOf("export function buildProductSeoAiJsonSchema")),
+  /uniqueItems: true/,
+);
 assert.doesNotMatch(
   promptSource.slice(promptSource.indexOf("export function buildProductSeoAiJsonSchema")),
   /if \(candidateCount/,
@@ -1719,10 +1877,12 @@ await withEnvAsync(yandexEnv(), async () => {
       sampleCandidates(),
       requestInput().seoPrimaryQuery,
     );
+    const phrases = yandexCandidates.map((item) => item.phrase);
     assertYandexSecondarySchemaRange(
       sent.jsonSchema.schema,
       yandexCandidates.length,
       "YANDEX_SUCCESS_DYNAMIC_SCHEMA",
+      phrases,
     );
   }
   assert.equal(sent.messages[0].role, "system");
@@ -1901,15 +2061,18 @@ await withEnvAsync(yandexEnv(), async () => {
       sampleCandidates(),
       requestInput().seoPrimaryQuery,
     );
+    const phrases = yandexCandidates.map((item) => item.phrase);
     assertYandexSecondarySchemaRange(
       JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema,
       yandexCandidates.length,
       "YANDEX_REPAIR_GENERATE_DYNAMIC_SCHEMA",
+      phrases,
     );
     assertYandexSecondarySchemaRange(
       JSON.parse(fetchImpl.calls[1].init.body).jsonSchema.schema,
       yandexCandidates.length,
       "YANDEX_REPAIR_REPAIR_DYNAMIC_SCHEMA",
+      phrases,
     );
   }
 });
@@ -1947,17 +2110,25 @@ async function captureYandexJsonSchema(kind, candidateCount) {
 
 await withEnvAsync(yandexEnv(), async () => {
   for (const candidateCount of [0, 1, 2, 3, 4, 5, 20]) {
+    const phrases = fakeEligibleCandidates(candidateCount).map((item) => item.phrase);
     const generateSchema = await captureYandexJsonSchema("generate", candidateCount);
     assertYandexSecondarySchemaRange(
       generateSchema,
       candidateCount,
-      `YANDEX_GENERATE_SCHEMA_SECONDARIES_${candidateCount}`,
+      `GENERATE_SCHEMA_TEST_${candidateCount}`,
+      phrases,
     );
     const repairSchema = await captureYandexJsonSchema("repair", candidateCount);
     assertYandexSecondarySchemaRange(
       repairSchema,
       candidateCount,
-      `YANDEX_REPAIR_SCHEMA_SECONDARIES_${candidateCount}`,
+      `REPAIR_SCHEMA_TEST_${candidateCount}`,
+      phrases,
+    );
+    assert.deepEqual(
+      generateSchema.properties.secondaryQueries,
+      repairSchema.properties.secondaryQueries,
+      `GENERATE_REPAIR_SCHEMA_SAME_${candidateCount}`,
     );
   }
 });

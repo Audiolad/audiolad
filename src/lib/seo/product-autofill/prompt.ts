@@ -67,9 +67,16 @@ export type ProductSeoAiPromptInput = {
 export function buildProductSeoAiJsonSchema(
   input: Pick<ProductSeoAiPromptInput, "candidates"> | number,
 ) {
+  const candidates = typeof input === "number" ? [] : input.candidates;
   const candidateCount =
-    typeof input === "number" ? input : input.candidates.length;
+    typeof input === "number" ? input : candidates.length;
   const { min, max } = expectedSecondaryRange(candidateCount);
+  const candidatePhrases: string[] = [];
+  for (const candidate of candidates) {
+    if (!candidatePhrases.includes(candidate.phrase)) {
+      candidatePhrases.push(candidate.phrase);
+    }
+  }
 
   return {
     ...PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -79,6 +86,11 @@ export function buildProductSeoAiJsonSchema(
         ...PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
         minItems: min,
         maxItems: max,
+        uniqueItems: true,
+        items:
+          candidatePhrases.length > 0
+            ? { type: "string" as const, enum: candidatePhrases }
+            : { type: "string" as const },
       },
     },
   };
