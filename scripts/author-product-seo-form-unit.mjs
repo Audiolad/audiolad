@@ -514,7 +514,16 @@ assert.match(seoSection, /Ориентир: около 50–70 символов/
 assert.match(seoSection, /Ориентир: 120–180 символов/);
 assert.doesNotMatch(seoSection, /Ориентир: 500–1500 символов/);
 assert.match(seoSection, /Когда лучше слушать/);
-assert.match(seoSection, /Выберите 2–4 продукта/);
+assert.match(seoSection, /AUTHOR_RECOMMENDATIONS_HELPER_COPY/);
+assert.match(
+  read("src/lib/seo/related-product-search.ts"),
+  /Выберите до 5 продуктов, которые связаны с этой темой и могут быть полезны слушателю дальше\./,
+);
+assert.doesNotMatch(seoSection, /Выберите 2–4 продукта/);
+assert.doesNotMatch(
+  read("src/lib/seo/related-product-search.ts"),
+  /Выберите 2–4 продукта/,
+);
 assert.match(seoSection, /Найти продукт/);
 assert.match(seoSection, /Введите название или слово из названия/);
 assert.doesNotMatch(seoSection, /близкие по теме статьи АудиоЛада/);

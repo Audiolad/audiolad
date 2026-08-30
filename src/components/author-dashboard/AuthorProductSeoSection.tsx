@@ -65,6 +65,7 @@ import {
 } from "@/lib/seo/product-autofill/style-profile";
 import type { ProductSeoSecondaryQueryStatus } from "@/lib/seo/product-autofill/types";
 import {
+  AUTHOR_RECOMMENDATIONS_HELPER_COPY,
   AUTHOR_RECOMMENDATIONS_LIMIT_COPY,
   MAX_AUTHOR_RECOMMENDATIONS,
   RELATED_PRODUCT_SEARCH_DEBOUNCE_MS,
@@ -928,8 +929,7 @@ export default function AuthorProductSeoSection({
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
         <p className="text-sm font-medium">Рекомендации автора</p>
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Выберите 2–4 продукта, которые действительно связаны с этой темой и
-          могут быть полезны слушателю дальше.
+          {AUTHOR_RECOMMENDATIONS_HELPER_COPY}
         </p>
         <label className="mt-3 block" htmlFor="author-recommendations-title">
           <span className="text-sm font-medium">Заголовок блока</span>
