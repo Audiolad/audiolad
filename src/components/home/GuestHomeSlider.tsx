@@ -165,16 +165,14 @@ export default function GuestHomeSlider() {
         ))}
       </ul>
 
-      <div
+      <nav
         className="guest-home-slider__dots"
-        role="tablist"
         aria-label="Слайды гостевой главной"
       >
         {GUEST_HOME_SLIDES.map((slide, index) => (
           <button
             key={slide.id}
             type="button"
-            role="tab"
             data-guest-home-dot={slide.id}
             aria-label={`Перейти к слайду ${index + 1}`}
             aria-current={index === activeIndex ? "true" : undefined}
@@ -186,7 +184,7 @@ export default function GuestHomeSlider() {
             onClick={() => scrollToSlide(index)}
           />
         ))}
-      </div>
+      </nav>
     </section>
   );
 }

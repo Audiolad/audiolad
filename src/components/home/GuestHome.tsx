@@ -25,12 +25,12 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
   return (
     <>
       <section className="mt-3 xl:mt-2">
-        <p
+        <h1
           data-guest-home-intro
           className="text-[15px] font-medium leading-snug text-[#25135c] sm:text-base xl:text-[17px] xl:leading-6"
         >
           {GUEST_HOME_INTRO}
-        </p>
+        </h1>
 
         <div className="mt-3">
           <GuestHomeSlider />

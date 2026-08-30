@@ -51,6 +51,21 @@ assert.doesNotMatch(
   "old Начать слушать play CTA is gone from GuestHome",
 );
 
+assert.match(
+  guestHome,
+  /<h1\s+data-guest-home-intro/,
+  "compact intro is a semantic h1",
+);
+assert.doesNotMatch(
+  guestHome,
+  /<p\s+data-guest-home-intro/,
+  "intro is no longer a paragraph",
+);
+assert.equal(
+  (guestHome.match(/<h1\b/g) ?? []).length,
+  1,
+  "guest home first screen has exactly one h1",
+);
 assert.match(guestHome, /GUEST_HOME_INTRO/);
 assert.ok(slidesLib.includes(INTRO), "intro copy uses a regular en-dash");
 assert.ok(!slidesLib.includes(EM_DASH), "intro copy must not use an em-dash");
@@ -99,7 +114,10 @@ assert.doesNotMatch(
   "slide data has no autoplay",
 );
 
-assert.match(slider, /role="tablist"/, "slider exposes a dot tablist");
+assert.doesNotMatch(slider, /role="tablist"/, "dots are not a tablist");
+assert.doesNotMatch(slider, /role="tab"/, "dots are not tabs");
+assert.match(slider, /aria-current=\{index === activeIndex \? "true" : undefined\}/, "active dot keeps aria-current");
+assert.match(slider, /aria-label="Слайды гостевой главной"/, "dots keep their group label");
 assert.match(slider, /GUEST_HOME_SLIDES\.map/, "dots iterate the 7 slides");
 assert.match(slider, /data-guest-home-dot/, "each dot is marked");
 assert.match(slider, /scroll-snap|guest-home-slider__track/, "uses snap track");
