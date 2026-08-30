@@ -10,6 +10,7 @@ import { getWordstatConfig } from "../src/lib/seo/wordstat/config.ts";
 import {
   classifyWordstatHttpError,
   fetchWordstatSuggestions,
+  isWordstatInvalidQueryResponse,
 } from "../src/lib/seo/wordstat/client.ts";
 import { createWordstatMemoryCache } from "../src/lib/seo/wordstat/cache.ts";
 import {
@@ -122,6 +123,24 @@ function sampleUpstream() {
     associations: [
       { phrase: "музыка для сна", count: "3200" },
       { phrase: "Медитация для сна", count: "12" },
+    ],
+  };
+}
+
+function yandexFieldViolationBody(field, extra = {}) {
+  return {
+    code: 3,
+    message: extra.message ?? `${field} violation raw message`,
+    details: [
+      {
+        "@type": "type.googleapis.com/google.rpc.BadRequest",
+        fieldViolations: [
+          {
+            field,
+            description: extra.description ?? `${field} violation raw details`,
+          },
+        ],
+      },
     ],
   };
 }
@@ -464,16 +483,68 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(JSON.stringify(result).includes(TEST_KEY), false);
 });
 
+const PHRASE_SPECIFIC_400 = yandexFieldViolationBody("phrase", {
+  message: "phrase field violation raw message",
+  description: "phrase field violation raw details",
+});
+const GENERIC_400 = { message: "bad request raw" };
+const BAD_DEVICE_OR_REQUEST_PARAMETER_400 = yandexFieldViolationBody(
+  "devices",
+  {
+    message: "devices field violation raw message",
+    description: "unknown device enum raw details",
+  },
+);
+
+assert.equal(isWordstatInvalidQueryResponse(PHRASE_SPECIFIC_400), true);
+assert.equal(
+  isWordstatInvalidQueryResponse({
+    error: {
+      details: [
+        {
+          "@type": "type.googleapis.com/google.rpc.BadRequest",
+          fieldViolations: [{ field: "query" }],
+        },
+      ],
+    },
+  }),
+  true,
+);
+assert.equal(isWordstatInvalidQueryResponse(GENERIC_400), false);
+assert.equal(isWordstatInvalidQueryResponse(null), false);
+assert.equal(isWordstatInvalidQueryResponse({ message: "invalid phrase" }), false);
+assert.equal(
+  isWordstatInvalidQueryResponse(BAD_DEVICE_OR_REQUEST_PARAMETER_400),
+  false,
+);
+assert.equal(
+  isWordstatInvalidQueryResponse(yandexFieldViolationBody("numPhrases")),
+  false,
+);
+assert.equal(
+  isWordstatInvalidQueryResponse({
+    details: [
+      {
+        fieldViolations: [
+          { field: "phrase" },
+          { field: "devices" },
+        ],
+      },
+    ],
+  }),
+  false,
+);
+
 await withEnvAsync(enabledEnv(), async () => {
   const fetchImpl = mockFetch([
-    () => jsonResponse(400, { message: "bad request raw" }),
+    () => jsonResponse(400, PHRASE_SPECIFIC_400),
     () => jsonResponse(200, sampleUpstream()),
   ]);
   const result = await fetchWordstatSuggestions("медитация", {
     fetchImpl,
     cache: createWordstatMemoryCache(),
     rateLimit: createWordstatRateLimitStore(),
-    userId: "user-400",
+    userId: "user-phrase-400",
     sleepImpl: async () => {},
   });
   assert.equal(result.ok, false);
@@ -486,10 +557,59 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.match(result.error.message, /формулировку|короче|изменить/);
   assert.equal(wordstatHttpStatus(result.error.code), 422);
   assert.equal(fetchImpl.calls.length, 1);
+  const resultJson = JSON.stringify(result);
+  assert.equal(resultJson.includes("phrase field violation raw message"), false);
+  assert.equal(resultJson.includes("phrase field violation raw details"), false);
+  assert.equal(resultJson.includes(TEST_KEY), false);
+  assert.equal(resultJson.includes(TEST_FOLDER), false);
+  assert.equal(resultJson.includes("Authorization"), false);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(400, GENERIC_400),
+    () => jsonResponse(200, sampleUpstream()),
+  ]);
+  const result = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit: createWordstatRateLimitStore(),
+    userId: "user-400",
+    sleepImpl: async () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "UPSTREAM_ERROR");
+  assert.equal(result.error.message, WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
+  assert.equal(wordstatHttpStatus(result.error.code), 502);
+  assert.equal(fetchImpl.calls.length, 1);
   assert.equal(JSON.stringify(result).includes("bad request raw"), false);
   assert.equal(JSON.stringify(result).includes(TEST_KEY), false);
   assert.equal(JSON.stringify(result).includes(TEST_FOLDER), false);
   assert.equal(JSON.stringify(result).includes("Authorization"), false);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(400, BAD_DEVICE_OR_REQUEST_PARAMETER_400),
+    () => jsonResponse(200, sampleUpstream()),
+  ]);
+  const result = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit: createWordstatRateLimitStore(),
+    userId: "user-devices-400",
+    sleepImpl: async () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "UPSTREAM_ERROR");
+  assert.equal(result.error.code !== "INVALID_QUERY", true);
+  assert.equal(result.error.message, WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
+  assert.equal(wordstatHttpStatus(result.error.code), 502);
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.equal(
+    JSON.stringify(result).includes("devices field violation raw message"),
+    false,
+  );
 });
 
 await withEnvAsync(enabledEnv(), async () => {
@@ -700,11 +820,32 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(fetchImpl.calls.length, 1);
 });
 
-assert.equal(classifyWordstatHttpError(400), "INVALID_QUERY");
-assert.equal(classifyWordstatHttpError(429), "RATE_LIMITED");
-assert.equal(classifyWordstatHttpError(500), "UPSTREAM_ERROR");
-assert.equal(classifyWordstatHttpError(null, "timeout"), "TIMEOUT");
-assert.equal(classifyWordstatHttpError(null, "network"), "UPSTREAM_ERROR");
+assert.equal(classifyWordstatHttpError({ status: 400 }), "UPSTREAM_ERROR");
+assert.equal(
+  classifyWordstatHttpError({ status: 400, body: GENERIC_400 }),
+  "UPSTREAM_ERROR",
+);
+assert.equal(
+  classifyWordstatHttpError({ status: 400, body: PHRASE_SPECIFIC_400 }),
+  "INVALID_QUERY",
+);
+assert.equal(
+  classifyWordstatHttpError({
+    status: 400,
+    body: BAD_DEVICE_OR_REQUEST_PARAMETER_400,
+  }),
+  "UPSTREAM_ERROR",
+);
+assert.equal(classifyWordstatHttpError({ status: 429 }), "RATE_LIMITED");
+assert.equal(classifyWordstatHttpError({ status: 500 }), "UPSTREAM_ERROR");
+assert.equal(
+  classifyWordstatHttpError({ status: null, requestError: "timeout" }),
+  "TIMEOUT",
+);
+assert.equal(
+  classifyWordstatHttpError({ status: null, requestError: "network" }),
+  "UPSTREAM_ERROR",
+);
 assert.equal(wordstatHttpStatus("INVALID_QUERY"), 422);
 assert.equal(wordstatHttpStatus("UPSTREAM_ERROR"), 502);
 assert.equal(wordstatHttpStatus("TIMEOUT"), 502);
@@ -766,6 +907,11 @@ assert.match(client, /sleepImpl\(400\)/);
 assert.match(client, /consumeWordstatOutboundSlot/);
 assert.match(client, /consumeWordstatUserRateLimit/);
 assert.match(client, /import "server-only"/);
+assert.match(client, /isWordstatInvalidQueryResponse/);
+assert.match(client, /fieldViolations/);
+assert.match(client, /classifyWordstatHttpError\(\{\s*status: attempt\.status/);
+assert.doesNotMatch(client, /if \(status === 400\) \{\s*return "INVALID_QUERY"/);
+assert.doesNotMatch(client, /error\.message.*INVALID_QUERY|INVALID_QUERY.*error\.message/);
 assert.doesNotMatch(client, /wordstat\.yandex\.ru/);
 assert.doesNotMatch(client, /YANDEX_WEBMASTER_/);
 assert.doesNotMatch(client, /consumeWordstatRateLimit\(/);

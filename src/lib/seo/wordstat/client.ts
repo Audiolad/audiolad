@@ -161,19 +161,91 @@ async function requestOnce(
   }
 }
 
-export function classifyWordstatHttpError(
-  status: number | null,
-  requestError?: WordstatRequestError,
-): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" | "INVALID_QUERY" {
-  if (requestError === "timeout") {
+const PHRASE_FIELD_NAMES = new Set(["phrase", "query"]);
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function normalizeViolationFieldPath(field: string): string {
+  const last = field.trim().split(".").pop() ?? "";
+  return last.replace(/\[\d+\]$/g, "");
+}
+
+function readFieldViolationFields(value: unknown): string[] {
+  const record = asRecord(value);
+  if (!record || !Array.isArray(record.fieldViolations)) {
+    return [];
+  }
+
+  const fields: string[] = [];
+  for (const item of record.fieldViolations) {
+    const violation = asRecord(item);
+    if (violation && typeof violation.field === "string") {
+      fields.push(violation.field);
+    }
+  }
+
+  return fields;
+}
+
+function collectWordstatFieldViolationFields(body: unknown): string[] {
+  const record = asRecord(body);
+  if (!record) {
+    return [];
+  }
+
+  const fields = readFieldViolationFields(record);
+  const detailLists = [record.details];
+  const nestedError = asRecord(record.error);
+  if (nestedError) {
+    fields.push(...readFieldViolationFields(nestedError));
+    detailLists.push(nestedError.details);
+  }
+
+  for (const details of detailLists) {
+    if (!Array.isArray(details)) {
+      continue;
+    }
+
+    for (const detail of details) {
+      fields.push(...readFieldViolationFields(detail));
+    }
+  }
+
+  return fields;
+}
+
+/** True only when structured fieldViolations name the GetTop phrase/query field. */
+export function isWordstatInvalidQueryResponse(body: unknown): boolean {
+  const fields = collectWordstatFieldViolationFields(body);
+  if (fields.length === 0) {
+    return false;
+  }
+
+  return fields.every((field) =>
+    PHRASE_FIELD_NAMES.has(normalizeViolationFieldPath(field)),
+  );
+}
+
+export function classifyWordstatHttpError(input: {
+  status: number | null;
+  requestError?: WordstatRequestError;
+  body?: unknown;
+}): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" | "INVALID_QUERY" {
+  if (input.requestError === "timeout") {
     return "TIMEOUT";
   }
 
-  if (status === 429) {
+  if (input.status === 429) {
     return "RATE_LIMITED";
   }
 
-  if (status === 400) {
+  if (input.status === 400 && isWordstatInvalidQueryResponse(input.body)) {
     return "INVALID_QUERY";
   }
 
@@ -283,7 +355,11 @@ export async function fetchWordstatSuggestions(
   }
 
   if (attempt.status !== 200) {
-    const code = classifyWordstatHttpError(attempt.status, attempt.errorCode);
+    const code = classifyWordstatHttpError({
+      status: attempt.status,
+      requestError: attempt.errorCode,
+      body: attempt.body,
+    });
     logWordstatEvent("get_top_failed", {
       status: attempt.status,
       retried,

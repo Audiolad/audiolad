@@ -97,9 +97,10 @@ calls frequency «конкуренция» and never promises TOP-3 / TOP-5.
 ## Errors the author can see
 
 Local empty / too-long phrases stay `INVALID_PHRASE` (app HTTP 400).
-Yandex HTTP 400 is `INVALID_QUERY` (app HTTP 422): the wording could not
-be processed; the author is asked to shorten or change the query. That
-400 is not retried. Timeouts, 429, 5xx, and network failures keep their
-existing codes and HTTP statuses (`TIMEOUT` / `RATE_LIMITED` /
-`UPSTREAM_ERROR`). Client JSON never includes the raw Yandex body, API
-key, or `folderId`.
+A Yandex HTTP 400 is `INVALID_QUERY` (app HTTP 422) **only** when the
+structured error body has `fieldViolations` on the GetTop `phrase` /
+`query` field. Generic 400s, empty bodies, and violations on
+`devices`, `numPhrases`, `folderId`, or `regions` stay
+`UPSTREAM_ERROR` (app HTTP 502). 400 is not retried. Timeouts, 429,
+5xx, and network failures keep their existing codes and HTTP statuses.
+Client JSON never includes the raw Yandex body, API key, or `folderId`.
