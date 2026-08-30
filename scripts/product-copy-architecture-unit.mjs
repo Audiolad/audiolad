@@ -9,12 +9,8 @@ import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
 import {
   AUTHOR_DESCRIPTION_HELPER,
   AUTHOR_DESCRIPTION_LABEL,
-  PUBLIC_DETAIL_HEADING,
-  PUBLIC_SHORT_HEADING,
+  PUBLIC_PRODUCT_DESCRIPTION_HEADING,
   resolveProductCopySections,
-  SEO_ABOUT_AUTOFILL_HINT,
-  SEO_ABOUT_HELPER,
-  SEO_ABOUT_LABEL,
 } from "../src/lib/products/product-copy.ts";
 import {
   formatSeoSecondaryQueryBulkMessage,
@@ -28,46 +24,45 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
-assert.equal(AUTHOR_DESCRIPTION_LABEL, "Короткое описание продукта");
-assert.equal(SEO_ABOUT_LABEL, "Подробнее о продукте");
-assert.equal(PUBLIC_SHORT_HEADING, "Коротко о продукте");
-assert.equal(PUBLIC_DETAIL_HEADING, "Подробнее о продукте");
+assert.equal(AUTHOR_DESCRIPTION_LABEL, "О продукте");
+assert.equal(PUBLIC_PRODUCT_DESCRIPTION_HEADING, "О продукте");
 assert.match(
   AUTHOR_DESCRIPTION_HELPER,
-  /2–4 предложений/,
+  /Расскажите, что это за продукт, для кого он/,
 );
-assert.match(SEO_ABOUT_HELPER, /Не повторяйте его/);
-assert.match(SEO_ABOUT_AUTOFILL_HINT, /АудиоЛад подготовит этот текст автоматически/);
+assert.match(AUTHOR_DESCRIPTION_HELPER, /До 1000 символов/);
+assert.doesNotMatch(AUTHOR_DESCRIPTION_HELPER, /2–4 предложений/);
 
-const both = resolveProductCopySections(
-  "Короткий текст о практике.",
-  "Подробности о вечернем ритуале.",
+const filled = resolveProductCopySections(
+  "Авторский текст о практике.",
 );
-assert.deepEqual(both, {
-  short: {
-    heading: PUBLIC_SHORT_HEADING,
-    text: "Короткий текст о практике.",
-  },
-  detail: {
-    heading: PUBLIC_DETAIL_HEADING,
-    text: "Подробности о вечернем ритуале.",
+assert.deepEqual(filled, {
+  about: {
+    heading: PUBLIC_PRODUCT_DESCRIPTION_HEADING,
+    text: "Авторский текст о практике.",
   },
 });
 
-assert.equal(
-  resolveProductCopySections("Короткий текст о практике.", "").detail,
-  null,
+assert.equal(resolveProductCopySections("").about, null);
+assert.equal(resolveProductCopySections("   ").about, null);
+assert.equal(resolveProductCopySections(null).about, null);
+assert.deepEqual(
+  resolveProductCopySections(
+    "Авторский текст о практике.",
+    "LEGACY_SEO_ABOUT_MUST_NOT_RENDER",
+  ),
+  {
+    about: {
+      heading: PUBLIC_PRODUCT_DESCRIPTION_HEADING,
+      text: "Авторский текст о практике.",
+    },
+  },
 );
-assert.equal(
-  resolveProductCopySections("Короткий текст о практике.", "   ").detail,
-  null,
-);
-assert.equal(
-  resolveProductCopySections("", "Подробности о вечернем ритуале.").short,
-  null,
-);
-assert.equal(resolveProductCopySections(null, null).short, null);
-assert.equal(resolveProductCopySections(null, null).detail, null);
+
+const copyModule = read("src/lib/products/product-copy.ts");
+assert.doesNotMatch(copyModule, /SEO_ABOUT_LABEL|SEO_ABOUT_HELPER|SEO_ABOUT_AUTOFILL_HINT/);
+assert.doesNotMatch(copyModule, /PUBLIC_SHORT_HEADING|PUBLIC_DETAIL_HEADING/);
+assert.doesNotMatch(copyModule, /Коротко о продукте|Подробнее о продукте|Короткое описание продукта/);
 
 const desktop = read("src/components/products/practice-page/PracticePageDesktop.tsx");
 const mobile = read("src/components/products/practice-page/PracticePageMobile.tsx");
@@ -76,21 +71,35 @@ const copySections = read("src/components/products/ProductCopySections.tsx");
 assert.match(desktop, /ProductCopySections/);
 assert.match(mobile, /ProductCopySections/);
 assert.match(audioPost, /ProductCopySections/);
-assert.match(copySections, /PUBLIC_SHORT_HEADING|sections\.short\.heading/);
-assert.match(copySections, /PUBLIC_DETAIL_HEADING|sections\.detail\.heading/);
-assert.doesNotMatch(desktop, /О продукте/);
-assert.doesNotMatch(mobile, /О продукте/);
-assert.doesNotMatch(audioPost, /О продукте/);
+assert.match(copySections, /sections\.about\.heading/);
+assert.doesNotMatch(copySections, /seoAbout|sections\.short|sections\.detail/);
+assert.doesNotMatch(copySections, /Коротко о продукте|Подробнее о продукте/);
+assert.doesNotMatch(desktop, /seoAbout/);
+assert.doesNotMatch(mobile, /seoAbout/);
+assert.doesNotMatch(audioPost, /seoAbout/);
+assert.doesNotMatch(desktop, /Коротко о продукте|Подробнее о продукте/);
+assert.doesNotMatch(mobile, /Коротко о продукте|Подробнее о продукте/);
+assert.doesNotMatch(audioPost, /Коротко о продукте|Подробнее о продукте/);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /AUTHOR_DESCRIPTION_LABEL/);
 assert.match(form, /AUTHOR_DESCRIPTION_HELPER/);
 assert.doesNotMatch(form, /"Описание"/);
 assert.doesNotMatch(form, /"Описание \(необязательно\)"/);
+assert.doesNotMatch(form, /Короткое описание продукта/);
+assert.doesNotMatch(form, /seo_about: form\.seoAbout/);
+assert.match(form, /seo_description: form\.seoDescription\.trim\(\) \|\| null/);
+
+const practicePage = read(
+  "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+);
+assert.doesNotMatch(practicePage, /seoAbout: practice\.seo_about/);
+assert.match(read("src/components/products/practice-page/types.ts"), /description: string \| null;/);
+assert.doesNotMatch(read("src/components/products/practice-page/types.ts"), /seoAbout:/);
 
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-assert.match(seoSection, /SEO_ABOUT_LABEL/);
-assert.match(seoSection, /SEO_ABOUT_HELPER/);
+assert.doesNotMatch(seoSection, /SEO_ABOUT_LABEL|SEO_ABOUT_HELPER|SEO_ABOUT_AUTOFILL_HINT/);
+assert.doesNotMatch(seoSection, /Подробнее о продукте|seoAbout/);
 assert.match(seoSection, /parseSeoSecondaryQueryList/);
 assert.match(seoSection, /Добавить фразы/);
 assert.match(seoSection, /addSecondaryPhrasesFromDraft/);
@@ -219,22 +228,20 @@ assert.equal(
 );
 
 const prompt = read("src/lib/seo/product-autofill/prompt.ts");
-assert.match(
-  prompt,
-  /Короткое описание продукта уже будет показано выше на публичной странице/,
-);
-assert.match(prompt, /Не пересказывай и не перефразируй его/);
-assert.match(prompt, /Новая полезная информация важнее длины/);
-assert.match(
+assert.match(prompt, /Не переписывай, не пересказывай и не заменяй его/);
+assert.match(prompt, /не возвращай поле seoAbout/);
+assert.doesNotMatch(prompt, /Подробнее о продукте/);
+assert.doesNotMatch(
   prompt,
   /Не пересказывай короткое описание. Используй его только как источник фактов и добавь новую информацию./,
 );
 
 const validate = read("src/lib/seo/product-autofill/validate.ts");
-assert.match(validate, /collectSeoAboutDuplicationIssues/);
-assert.match(validate, /about_duplicates_description/);
-assert.match(validate, /about_starts_with_description/);
-assert.match(validate, /about_opening_copies_description/);
+assert.doesNotMatch(validate, /collectSeoAboutDuplicationIssues/);
+assert.doesNotMatch(validate, /about_duplicates_description/);
+assert.doesNotMatch(validate, /about_starts_with_description/);
+assert.doesNotMatch(validate, /about_opening_copies_description/);
+assert.doesNotMatch(validate, /seoAbout/);
 assert.doesNotMatch(validate, /cosine|embedding|similarity analyzer/i);
 
 assert.match(read("src/lib/author-products/types.ts"), /description:/);

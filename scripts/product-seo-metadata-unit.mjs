@@ -180,6 +180,12 @@ const readiness = evaluateProductSeoReadiness({
 assert.equal(readiness.total, readiness.checks.length);
 assert.ok(readiness.doneCount <= readiness.total);
 assert.equal(readiness.doneCount, 4);
+assert.equal(readiness.total, 8);
+assert.equal(readiness.checks.length, 8);
+assert.equal(
+  readiness.checks.some((check) => check.id === "about"),
+  false,
+);
 
 const fullReadiness = evaluateProductSeoReadiness({
   title: "Лавандовый сон",
@@ -192,16 +198,30 @@ const fullReadiness = evaluateProductSeoReadiness({
   seoFaqCount: 3,
   seoRelatedCount: 2,
 });
+assert.equal(fullReadiness.total, 8);
 assert.equal(fullReadiness.total, fullReadiness.checks.length);
 assert.equal(fullReadiness.doneCount, fullReadiness.total);
 assert.ok(fullReadiness.doneCount <= fullReadiness.total);
 assert.equal(
   readiness.checks.find((check) => check.id === "substantial_description")?.label,
-  "Короткое описание продукта достаточно подробное",
+  "Блок «О продукте» достаточно подробный",
 );
+assert.equal(fullReadiness.checks.find((check) => check.id === "about"), undefined);
+
+const queryOnlyInLegacyAbout = evaluateProductSeoReadiness({
+  title: "Лавандовый сон",
+  seoPrimaryQuery: "медитация для сна",
+  seoTitle: "Лавандовый сон",
+  seoDescription: "Вечерняя практика без этого запроса в сниппете.",
+  description: "а".repeat(180),
+  seoAbout: "Подробный текст про медитацию для сна и вечерний ритуал.",
+  seoUsageItems: ["Перед отдыхом в наушниках"],
+});
 assert.equal(
-  readiness.checks.find((check) => check.id === "about")?.label,
-  "Заполнен блок «Подробнее о продукте»",
+  queryOnlyInLegacyAbout.checks.find((check) => check.id === "query_in_description")
+    ?.done,
+  false,
+  "primary query in legacy seoAbout must not satisfy readiness",
 );
 
 const page = read(

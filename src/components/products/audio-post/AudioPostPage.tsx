@@ -150,7 +150,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
         <ProductCopySections
           description={description}
-          seoAbout={viewModel.seoAbout}
         />
         <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
 
@@ -211,7 +210,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
         <ProductCopySections
           description={description}
-          seoAbout={viewModel.seoAbout}
         />
         <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
 

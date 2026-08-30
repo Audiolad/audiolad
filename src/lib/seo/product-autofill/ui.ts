@@ -93,7 +93,6 @@ const MAIN_READINESS_IDS = new Set([
   "primary_query",
   "query_in_title",
   "query_in_description",
-  "about",
   "usage",
   "faq",
 ]);
@@ -104,7 +103,6 @@ export function resolveProductSeoAccordionBadge(
     seoPrimaryQuery?: string | null;
     seoTitle?: string | null;
     seoDescription?: string | null;
-    seoAbout?: string | null;
   } = {},
 ): ProductSeoAccordionBadgeKind {
   const mainDone = readiness.checks.filter(
@@ -113,8 +111,7 @@ export function resolveProductSeoAccordionBadge(
   const hasExplicitSeo =
     Boolean(seoFields.seoPrimaryQuery?.trim()) ||
     Boolean(seoFields.seoTitle?.trim()) ||
-    Boolean(seoFields.seoDescription?.trim()) ||
-    Boolean(seoFields.seoAbout?.trim());
+    Boolean(seoFields.seoDescription?.trim());
 
   if (mainDone >= MAIN_READINESS_IDS.size) {
     return "ready";
@@ -139,7 +136,6 @@ export function resolveProductSeoAccordionBadgeFromInput(input: {
   seoPrimaryQuery?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
-  seoAbout?: string | null;
   seoUsageItems?: string[] | null;
   seoFaqCount?: number;
   seoRelatedCount?: number;
@@ -148,7 +144,6 @@ export function resolveProductSeoAccordionBadgeFromInput(input: {
     seoPrimaryQuery: input.seoPrimaryQuery,
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
-    seoAbout: input.seoAbout,
   });
 }
 
@@ -156,18 +151,13 @@ export function hasFilledGeneratedSeoFields(input: {
   seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
-  seoAbout: string;
   seoContent: PracticeSeoContentInput;
 }): boolean {
   if (input.seoSecondaryQueries.some((item) => item.trim())) {
     return true;
   }
 
-  if (
-    input.seoTitle.trim() ||
-    input.seoDescription.trim() ||
-    input.seoAbout.trim()
-  ) {
+  if (input.seoTitle.trim() || input.seoDescription.trim()) {
     return true;
   }
 

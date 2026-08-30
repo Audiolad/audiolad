@@ -219,6 +219,34 @@ assert.equal(
     nextStatus: "published",
     catalogVisibility: "listed",
     isCatalogListed: true,
+    changedFields: ["seo_about"],
+    authorSlug: "sergey",
+    practiceSlug: "lavandovyy-son",
+  }),
+  null,
+  "inert seo_about must not spend Webmaster recrawl quota",
+);
+assert.deepEqual(
+  planPracticeYandexRecrawl({
+    previousStatus: "published",
+    nextStatus: "published",
+    catalogVisibility: "listed",
+    isCatalogListed: true,
+    changedFields: ["seo_description"],
+    authorSlug: "sergey",
+    practiceSlug: "lavandovyy-son",
+  }),
+  {
+    reason: "practice_seo_updated",
+    url: buildPracticeCanonicalUrl("sergey", "lavandovyy-son"),
+  },
+);
+assert.equal(
+  planPracticeYandexRecrawl({
+    previousStatus: "published",
+    nextStatus: "published",
+    catalogVisibility: "listed",
+    isCatalogListed: true,
     changedFields: ["cover_url"],
     authorSlug: "sergey",
     practiceSlug: "lavandovyy-son",

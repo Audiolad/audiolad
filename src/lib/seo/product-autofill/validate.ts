@@ -8,7 +8,6 @@ import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
 import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
 import type { EligibleSecondaryCandidate } from "@/lib/seo/product-autofill/select-secondaries";
 import {
-  PRODUCT_SEO_ABOUT_SOFT_MAX,
   PRODUCT_SEO_FAQ_GENERATED_COUNT,
   PRODUCT_SEO_SECONDARY_MAX,
   PRODUCT_SEO_SECONDARY_MIN,
@@ -144,12 +143,10 @@ export function parseProductSeoAiRawDraft(
   const secondaryQueries = readStringArray(value.secondaryQueries);
   const seoTitle = readString(value.seoTitle);
   const seoDescription = readString(value.seoDescription);
-  const seoAbout = readString(value.seoAbout);
   if (
     !secondaryQueries ||
     seoTitle === null ||
     seoDescription === null ||
-    seoAbout === null ||
     !Array.isArray(value.usageItems) ||
     !Array.isArray(value.faqItems)
   ) {
@@ -185,7 +182,6 @@ export function parseProductSeoAiRawDraft(
     secondaryQueries,
     seoTitle,
     seoDescription,
-    seoAbout,
     usageItems,
     faqItems,
   };
@@ -238,74 +234,6 @@ function containsPrimaryInFaqQuestion(
     const stem = word.slice(0, Math.max(4, word.length - 2));
     return source.includes(stem);
   });
-}
-
-export function normalizeProductCopyText(value: string): string {
-  return value
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("ru-RU")
-    .replace(/[.!?…]+$/g, "")
-    .trim();
-}
-
-function firstSubstantialParagraph(value: string): string {
-  for (const paragraph of value.split(/\n+/)) {
-    const normalized = normalizeProductCopyText(paragraph);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return "";
-}
-
-function hasWordBoundaryAfterPrefix(text: string, prefix: string): boolean {
-  if (!text.startsWith(prefix)) {
-    return false;
-  }
-
-  const rest = text.slice(prefix.length);
-  return rest === "" || /^[\s.,;:!?…"—–-]/.test(rest);
-}
-
-export function collectSeoAboutDuplicationIssues(
-  seoAbout: string,
-  description: string,
-): string[] {
-  const about = normalizeProductCopyText(seoAbout);
-  const source = normalizeProductCopyText(description);
-  if (!about || !source) {
-    return [];
-  }
-
-  const issues: string[] = [];
-  if (about === source) {
-    issues.push("about_duplicates_description");
-  }
-
-  if (
-    about !== source &&
-    hasWordBoundaryAfterPrefix(about, source)
-  ) {
-    issues.push("about_starts_with_description");
-  }
-
-  const aboutOpening = firstSubstantialParagraph(seoAbout);
-  const descriptionOpening = firstSubstantialParagraph(description);
-  if (
-    aboutOpening &&
-    (aboutOpening === source || aboutOpening === descriptionOpening)
-  ) {
-    if (
-      !issues.includes("about_duplicates_description") &&
-      !issues.includes("about_starts_with_description")
-    ) {
-      issues.push("about_opening_copies_description");
-    }
-  }
-
-  return issues;
 }
 
 function uniqueAnchors(faqItems: ProductSeoAiRawDraft["faqItems"]): boolean {
@@ -385,7 +313,6 @@ export function validateProductSeoAiDraft(
 
   const seoTitle = parsed.seoTitle.trim();
   const seoDescription = parsed.seoDescription.trim();
-  const seoAbout = parsed.seoAbout.trim();
 
   if (!seoTitle) {
     issues.push("empty_title");
@@ -411,25 +338,8 @@ export function validateProductSeoAiDraft(
     issues.push("description_too_long");
   }
 
-  if (seoAbout.length > PRODUCT_CONTENT_LIMITS.seoAbout) {
-    issues.push("about_too_long");
-  }
-
-  if (seoAbout.length > PRODUCT_SEO_ABOUT_SOFT_MAX + 400) {
-    issues.push("about_far_over_soft_max");
-  }
-
-  issues.push(
-    ...collectSeoAboutDuplicationIssues(seoAbout, input.description),
-  );
-
-  const substantialStart = seoAbout.slice(0, 250);
-  if (
-    primary &&
-    !containsSeoPhrase(seoDescription, primary) &&
-    !containsSeoPhrase(substantialStart, primary)
-  ) {
-    issues.push("primary_missing_from_description_or_about");
+  if (primary && !containsSeoPhrase(seoDescription, primary)) {
+    issues.push("primary_missing_from_description");
   }
 
   const usageItems = parsed.usageItems
@@ -498,7 +408,6 @@ export function validateProductSeoAiDraft(
   const allText = [
     seoTitle,
     seoDescription,
-    seoAbout,
     ...usageItems.map((item) => item.content),
     ...faqItems.map((item) => `${item.question} ${item.answer}`),
   ].join("\n");
@@ -526,7 +435,6 @@ export function validateProductSeoAiDraft(
       seoSecondaryQueries: secondaries.slice(0, PRODUCT_SEO_SECONDARY_MAX),
       seoTitle,
       seoDescription,
-      seoAbout,
       usageItems,
       faqItems,
       secondaryQueryStatus: resolveSecondaryQueryStatus(secondaries.length),

@@ -1,8 +1,5 @@
 import { AUDIO_POST_KIND_LABEL } from "@/lib/author-products/product-kind";
-import {
-  AUTHOR_DESCRIPTION_LABEL,
-  SEO_ABOUT_LABEL,
-} from "@/lib/products/product-copy";
+import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 
 export const PRODUCT_SEO_BRAND = "АудиоЛад";
 export const PRODUCT_SEO_TITLE_SEPARATOR = " – ";
@@ -37,7 +34,6 @@ export type ProductSeoReadinessCheck = {
     | "query_in_description"
     | "substantial_description"
     | "usable_search_description"
-    | "about"
     | "usage"
     | "faq"
     | "related";
@@ -213,10 +209,9 @@ export function evaluateProductSeoReadiness(
   const seoDescription = trimOrEmpty(input.seoDescription);
   const description = trimOrEmpty(input.description);
   const subtitle = trimOrEmpty(input.subtitle);
-  const about = trimOrEmpty(input.seoAbout);
   const usageItems = input.seoUsageItems?.filter((item) => trimOrEmpty(item)) ?? [];
   const finalTitle = resolveProductSeoTitle(input);
-  const content = [description, about, ...usageItems].filter(Boolean).join("\n");
+  const content = [description, ...usageItems].filter(Boolean).join("\n");
   const descriptionWindow = [...content]
     .slice(0, PRODUCT_SEO_DESCRIPTION_QUERY_WINDOW)
     .join("");
@@ -243,18 +238,13 @@ export function evaluateProductSeoReadiness(
     },
     {
       id: "substantial_description",
-      label: `${AUTHOR_DESCRIPTION_LABEL} достаточно подробное`,
+      label: `Блок «${AUTHOR_DESCRIPTION_LABEL}» достаточно подробный`,
       done: description.length >= PRODUCT_SEO_SUBSTANTIAL_DESCRIPTION_LENGTH,
     },
     {
       id: "usable_search_description",
       label: "Поисковое описание готово",
       done: Boolean(seoDescription || description || subtitle),
-    },
-    {
-      id: "about",
-      label: `Заполнен блок «${SEO_ABOUT_LABEL}»`,
-      done: Boolean(about),
     },
     {
       id: "usage",

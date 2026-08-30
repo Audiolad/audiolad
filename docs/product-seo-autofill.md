@@ -21,13 +21,14 @@ issues, PRs, or chat.
    If Wordstat has 3+ eligible phrases, the draft includes 3–5. If it
    has 1–2, generation still succeeds with those phrases. If it has none,
    secondaries stay empty and the other SEO fields are still prepared.
-5. Autofill writes a local SEO draft: title, description, about, usage,
-   and exactly 3 FAQ pairs. Ordinary `description` stays the public short
-   product copy. `seoAbout` is «Подробнее о продукте»: a continuation, not
-   a rewrite. The model may use the short description only as a fact
-   source. If context is thin, a shorter about text is better than
-   repeating or padding. An optional style profile changes tone, not
-   facts or Wordstat phrases. The search title stays SEO-first.
+5. Autofill writes a local SEO draft: search title, search/meta
+   description (`seoDescription`), secondary queries, usage, and exactly
+   3 FAQ pairs. Ordinary `description` stays author-owned public copy
+   for the «О продукте» block. Autofill must not rewrite it and must not
+   generate `seoAbout` or a second public «about» text. The model may use
+   `description` only as a fact source for the remaining SEO fields. An
+   optional style profile changes tone, not facts or Wordstat phrases.
+   The search title stays SEO-first.
 6. Author reviews and edits everything.
 7. The usual product save writes the form. There is no auto-save, no
    PATCH during generation, no IndexNow, and no Webmaster recrawl.
@@ -48,7 +49,7 @@ enum/`uniqueItems` layer and the strict validator stay as they are.
 
 Autofill can call **OpenAI Responses API** or **Yandex AI Studio**
 (YandexGPT Text Generation API). Orchestration, prompts, validation,
-one repair attempt, rate limit, style profile, duplication guard,
+one repair attempt, rate limit, style profile,
 Wordstat candidate secondaries, exactly-3 FAQ, and fail-open UX stay
 the same. Only the provider layer changes.
 

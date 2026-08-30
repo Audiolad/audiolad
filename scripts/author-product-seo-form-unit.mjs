@@ -317,7 +317,11 @@ assert.match(formSource, /AuthorProductSeoSection/);
 assert.match(formSource, /seo_primary_query: form\.seoPrimaryQuery\.trim\(\) \|\| null/);
 assert.match(formSource, /seo_title: form\.seoTitle\.trim\(\) \|\| null/);
 assert.match(formSource, /seo_description: form\.seoDescription\.trim\(\) \|\| null/);
+assert.doesNotMatch(formSource, /seo_about: form\.seoAbout/);
+assert.doesNotMatch(formSource, /Короткое описание продукта/);
 assert.match(formSource, /seo_content:/);
+assert.match(read("src/lib/products/product-copy.ts"), /export const AUTHOR_DESCRIPTION_LABEL = "О продукте"/);
+assert.match(read("src/lib/author-products/limits.ts"), /description: 1000/);
 
 const seoSection = read(
   "src/components/author-dashboard/AuthorProductSeoSection.tsx",
@@ -411,13 +415,14 @@ assert.ok(
 );
 assert.ok(
   openMarkup.indexOf("Описание для поиска") <
-    openMarkup.indexOf("{SEO_ABOUT_LABEL}"),
-  "search description comes before about",
-);
-assert.ok(
-  openMarkup.indexOf("{SEO_ABOUT_LABEL}") <
     openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}"),
-  "about comes before usage",
+  "search description comes before usage",
+);
+assert.equal(
+  openMarkup.includes("SEO_ABOUT_LABEL") ||
+    openMarkup.includes("Подробнее о продукте"),
+  false,
+  "SEO editor no longer shows seoAbout",
 );
 assert.ok(
   openMarkup.indexOf("{getPracticeSeoUsageHeading(productKind)}") <
@@ -497,7 +502,8 @@ assert.match(seoSection, /Подбор запросов временно нед�
 assert.doesNotMatch(seoSection, /нельзя опубликовать|обязательно для публикации|publication gate/i);
 assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoTitle\}/);
 assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoDescription\}/);
-assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoAbout\}/);
+assert.doesNotMatch(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoAbout\}/);
+assert.doesNotMatch(seoSection, /Подробнее о продукте|seoAbout|SEO_ABOUT_/);
 assert.match(seoSection, /maxLength=\{PRODUCT_CONTENT_LIMITS\.seoPrimaryQuery\}/);
 assert.match(seoSection, /evaluateProductSeoReadiness/);
 assert.match(seoSection, /buildProductSeoPreview/);
@@ -506,7 +512,7 @@ assert.match(seoSection, /preview\.displayUrl/);
 assert.match(seoSection, /preview\.description/);
 assert.match(seoSection, /Ориентир: около 50–70 символов/);
 assert.match(seoSection, /Ориентир: 120–180 символов/);
-assert.match(seoSection, /Ориентир: 500–1500 символов/);
+assert.doesNotMatch(seoSection, /Ориентир: 500–1500 символов/);
 assert.match(seoSection, /Когда лучше слушать/);
 assert.match(seoSection, /Выберите 2–4 продукта/);
 assert.match(seoSection, /Найти продукт/);

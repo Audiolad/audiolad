@@ -464,7 +464,6 @@ function buildProductSavePayload(
     seo_secondary_queries: form.seoSecondaryQueries.map((item) => item.trim()).filter(Boolean),
     seo_title: form.seoTitle.trim() || null,
     seo_description: form.seoDescription.trim() || null,
-    seo_about: form.seoAbout.trim() || null,
     author_recommendations_title: form.authorRecommendationsTitle,
     seo_content: {
       usage_items: form.seoContent.usageItems,
@@ -2632,7 +2631,6 @@ export default function AuthorProductForm({
           seoSecondaryQueries={form.seoSecondaryQueries}
           seoTitle={form.seoTitle}
           seoDescription={form.seoDescription}
-          seoAbout={form.seoAbout}
           authorRecommendationsTitle={form.authorRecommendationsTitle}
           seoContent={form.seoContent}
           relatedProductOptions={relatedProductOptions}
@@ -2643,7 +2641,6 @@ export default function AuthorProductForm({
             seoSecondaryQueries: fieldErrors.seoSecondaryQueries,
             seoTitle: fieldErrors.seoTitle,
             seoDescription: fieldErrors.seoDescription,
-            seoAbout: fieldErrors.seoAbout,
             authorRecommendationsTitle: fieldErrors.authorRecommendationsTitle,
           }}
           disabled={!canEditPublicFields || busy}
@@ -2660,7 +2657,6 @@ export default function AuthorProductForm({
               ...(patch.seoDescription !== undefined
                 ? { seoDescription: undefined }
                 : {}),
-              ...(patch.seoAbout !== undefined ? { seoAbout: undefined } : {}),
               ...(patch.authorRecommendationsTitle !== undefined
                 ? { authorRecommendationsTitle: undefined }
                 : {}),

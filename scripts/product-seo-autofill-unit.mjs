@@ -29,7 +29,6 @@ import { canonicalizeYandexSecondaryQueries } from "../src/lib/seo/product-autof
 import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/select-secondaries.ts";
 import { wordstatPhraseKey } from "../src/lib/seo/wordstat/phrase.ts";
 import {
-  collectSeoAboutDuplicationIssues,
   expectedSecondaryRange,
   normalizeProductSeoValidationIssue,
   parseProductSeoAiRawDraft,
@@ -173,11 +172,6 @@ function validDraft(overrides = {}) {
     seoTitle: "Медитация для сна – расслабление перед сном",
     seoDescription:
       "Медитация для сна мягко помогает замедлиться вечером и подготовиться ко сну в спокойном темпе.",
-    seoAbout: [
-      "Эта медитация для сна создана для спокойного вечера, когда хочется замедлиться и отойти от дневных дел.",
-      "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник и обещаний чуда.",
-      "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как понятный ритуал завершения дня.",
-    ].join("\n\n"),
     usageItems: [
       { content: "Перед сном, когда мысли ещё крутятся" },
       { content: "После напряжённого дня" },
@@ -319,6 +313,22 @@ assert.equal(valid.ok, true);
 assert.equal(valid.draft.faqItems.length, 3);
 assert.equal(valid.draft.seoSecondaryQueries.length, 3);
 assert.equal(valid.draft.secondaryQueryStatus, "complete");
+assert.equal("seoAbout" in valid.draft, false);
+assert.equal(
+  validateProductSeoAiDraft(
+    { ...validDraft(), seoAbout: "LEGACY ABOUT MUST BE IGNORED" },
+    validationInput(),
+  ).ok,
+  true,
+);
+assert.equal(
+  "seoAbout" in
+    validateProductSeoAiDraft(
+      { ...validDraft(), seoAbout: "LEGACY ABOUT MUST BE IGNORED" },
+      validationInput(),
+    ).draft,
+  false,
+);
 
 assert.deepEqual(expectedSecondaryRange(5), { min: 3, max: 5 });
 assert.deepEqual(expectedSecondaryRange(4), { min: 3, max: 4 });
@@ -916,7 +926,7 @@ await withEnvAsync(enabledEnv(), async () => {
   const fetchImpl = mockFetch([
     () =>
       jsonResponse(200, {
-        output_text: JSON.stringify(validDraft({ seoAbout: `секрет ${TEST_KEY}` })),
+        output_text: JSON.stringify(validDraft({ seoDescription: `секрет ${TEST_KEY}` })),
       }),
   ]);
   const provider = createProductSeoAiProvider({
@@ -1245,7 +1255,8 @@ assert.match(stylePrompt, /preset=inspiring/);
 assert.match(stylePrompt, /warmth=80/);
 assert.match(stylePrompt, /variety=high/);
 assert.match(stylePrompt, /влияние стиля минимальное/);
-assert.match(stylePrompt, /Не начинай каждый seoAbout автоматически/);
+assert.doesNotMatch(stylePrompt, /Не начинай каждый seoAbout автоматически/);
+assert.match(stylePrompt, /не возвращай поле seoAbout/);
 assert.match(
   stylePrompt,
   /Q1\.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «медитация для сна»/,
@@ -1325,7 +1336,6 @@ const emptyBadge = resolveProductSeoAccordionBadgeFromInput({
   seoPrimaryQuery: "",
   seoTitle: "",
   seoDescription: "",
-  seoAbout: "",
 });
 assert.equal(emptyBadge, "recommend");
 
@@ -1335,7 +1345,6 @@ const readyBadge = resolveProductSeoAccordionBadgeFromInput({
   seoPrimaryQuery: "медитация для сна",
   seoTitle: "Медитация для сна – расслабление перед сном",
   seoDescription: "Медитация для сна помогает мягко замедлиться вечером.",
-  seoAbout: "Эта медитация для сна создана для вечера.",
   seoUsageItems: ["Перед сном"],
   seoFaqCount: 3,
 });
@@ -1346,7 +1355,6 @@ const partialBadge = resolveProductSeoAccordionBadgeFromInput({
   seoPrimaryQuery: "медитация для сна",
   seoTitle: "",
   seoDescription: "",
-  seoAbout: "",
 });
 assert.equal(partialBadge, "partial");
 
@@ -1355,7 +1363,6 @@ assert.equal(
     seoSecondaryQueries: [],
     seoTitle: "",
     seoDescription: "",
-    seoAbout: "",
     seoContent: { usageItems: [], faqItems: [], relatedPracticeIds: [], relatedListenSlugs: [] },
   }),
   false,
@@ -1365,7 +1372,6 @@ assert.equal(
     seoSecondaryQueries: [],
     seoTitle: "Есть заголовок",
     seoDescription: "",
-    seoAbout: "",
     seoContent: { usageItems: [], faqItems: [], relatedPracticeIds: [], relatedListenSlugs: [] },
   }),
   true,
@@ -1443,6 +1449,17 @@ assert.match(section, /PRODUCT_SEO_GENERATE_CTA/);
 assert.match(section, /generateLoading/);
 assert.match(section, /Готовим SEO|PRODUCT_SEO_GENERATE_LOADING/);
 assert.match(section, /hasFilledGeneratedSeoFields/);
+assert.doesNotMatch(section, /seoAbout:/);
+assert.doesNotMatch(
+  section.slice(section.indexOf("function applyGeneratedDraft")),
+  /description:/,
+);
+assert.doesNotMatch(route, /seoAbout:/);
+assert.doesNotMatch(
+  read("src/lib/seo/product-autofill/types.ts"),
+  /seoAbout/,
+);
+assert.equal("seoAbout" in PRODUCT_SEO_AI_JSON_SCHEMA.properties, false);
 assert.match(section, /AuthorProductSeoStyleControls/);
 assert.match(section, /styleProfile/);
 assert.match(section, /sanitizeProductSeoStyleProfile/);
@@ -1473,16 +1490,13 @@ const copyPrompt = buildProductSeoSystemPrompt({
   request: requestInput(),
   candidates: eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна"),
 });
-assert.match(
-  copyPrompt,
-  /Короткое описание продукта уже будет показано выше на публичной странице/,
-);
-assert.match(copyPrompt, /Не пересказывай и не перефразируй его/);
-assert.match(copyPrompt, /должен продолжать короткое описание/);
-assert.match(copyPrompt, /Новая полезная информация важнее длины/);
+assert.match(copyPrompt, /Не переписывай, не пересказывай и не заменяй его/);
+assert.match(copyPrompt, /не возвращай поле seoAbout/);
+assert.doesNotMatch(copyPrompt, /должен продолжать короткое описание/);
+assert.doesNotMatch(copyPrompt, /Новая полезная информация важнее длины/);
 assert.match(copyPrompt, /Не генерируй связанные продукты и URL/);
 assert.doesNotMatch(copyPrompt, /relatedListen|related_listen|статьи АудиоЛада/);
-assert.match(
+assert.doesNotMatch(
   copyPrompt,
   /напиши более короткий блок «Подробнее о продукте»/,
 );
@@ -1493,11 +1507,11 @@ const repairPrompt = buildProductSeoRepairPrompt(
     candidates: eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна"),
   },
   validDraft(),
-  ["about_duplicates_description"],
+  ["primary_missing_from_description"],
 );
 assert.match(
   repairPrompt,
-  /Не пересказывай короткое описание. Используй его только как источник фактов и добавь новую информацию./,
+  /Не переписывай описание продукта. Используй его только как источник фактов./,
 );
 
 const FAQ_EXACT_PRIMARY = "музыка для сна";
@@ -1586,11 +1600,6 @@ function musicSleepValidationInput() {
       seoTitle: "Музыка для сна – расслабление перед сном",
       seoDescription:
         "Музыка для сна мягко помогает замедлиться вечером и подготовиться ко сну в спокойном темпе.",
-      seoAbout: [
-        "Эта музыка для сна создана для спокойного вечера, когда хочется замедлиться и отойти от дневных дел.",
-        "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник и обещаний чуда.",
-        "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как понятный ритуал завершения дня.",
-      ].join("\n\n"),
       faqItems: [
         {
           question: "Что такое музыка для сна и когда её слушать?",
@@ -1625,11 +1634,6 @@ function musicSleepValidationInput() {
       seoTitle: "Музыка для сна – расслабление перед сном",
       seoDescription:
         "Музыка для сна мягко помогает замедлиться вечером и подготовиться ко сну в спокойном темпе.",
-      seoAbout: [
-        "Эта музыка для сна создана для спокойного вечера, когда хочется замедлиться и отойти от дневных дел.",
-        "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник и обещаний чуда.",
-        "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как понятный ритуал завершения дня.",
-      ].join("\n\n"),
       faqItems: [
         {
           question: "Когда лучше слушать?",
@@ -1657,50 +1661,18 @@ function musicSleepValidationInput() {
   );
 }
 
-assert.deepEqual(
-  collectSeoAboutDuplicationIssues(
-    "Мягкая медитация для сна.",
-    "Мягкая медитация для сна.",
-  ),
-  ["about_duplicates_description"],
-);
-assert.deepEqual(
-  collectSeoAboutDuplicationIssues(
-    "Мягкая медитация для сна. А вечером можно замедлиться ещё сильнее и заметить дыхание.",
-    "Мягкая медитация для сна.",
-  ),
-  ["about_starts_with_description"],
-);
-assert.deepEqual(
-  collectSeoAboutDuplicationIssues(
-    "Мягкая медитация для сна.\n\nПозже можно добавить вечерний ритуал и заметить дыхание.",
-    "Мягкая медитация для сна.\nДля тех, кто хочет спокойно завершить день.",
-  ),
-  ["about_opening_copies_description"],
-);
-assert.deepEqual(
-  collectSeoAboutDuplicationIssues(
-    "Вечерняя практика помогает замедлиться. Медитация для сна здесь звучит естественно.",
-    "Мягкая медитация для сна.",
-  ),
-  [],
-);
-
-const shortAbout = validateProductSeoAiDraft(
+const leftoverAboutStillValid = validateProductSeoAiDraft(
   validDraft({
-    seoAbout:
-      "Вечером практика продолжает короткое описание: вы ложитесь удобно и следуете спокойному голосу, не повторяя те же фразы.",
+    seoAbout: "Мягкая медитация для сна.",
   }),
   validationInput(),
 );
-assert.equal(shortAbout.ok, true, "short useful seoAbout must pass when context is thin");
-
-const exactDuplicateAbout = validateProductSeoAiDraft(
-  validDraft({ seoAbout: "Мягкая медитация для сна." }),
-  validationInput(),
+assert.equal(
+  leftoverAboutStillValid.ok,
+  true,
+  "leftover seoAbout in model JSON must be ignored",
 );
-assert.equal(exactDuplicateAbout.ok, false);
-assert.ok(exactDuplicateAbout.issues.includes("about_duplicates_description"));
+assert.equal("seoAbout" in leftoverAboutStillValid.draft, false);
 
 const packageJson = read("package.json");
 assert.match(packageJson, /test:product-seo-autofill/);
@@ -1894,6 +1866,7 @@ await withEnvAsync(yandexEnv(), async () => {
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, true);
+  assert.equal("seoAbout" in result.data, false);
   assert.equal(result.data.faqItems.length, 3);
   assert.deepEqual(result.data.seoSecondaryQueries, [
     "медитация перед сном",
@@ -1918,10 +1891,10 @@ await withEnvAsync(yandexEnv(), async () => {
     "secondaryQueries",
     "seoTitle",
     "seoDescription",
-    "seoAbout",
     "usageItems",
     "faqItems",
   ]);
+  assert.equal("seoAbout" in sent.jsonSchema.schema.properties, false);
   {
     const yandexCandidates = eligibleSecondaryCandidates(
       sampleCandidates(),
@@ -2361,7 +2334,7 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.error.message, PRODUCT_SEO_AI_ERROR_MESSAGE);
 });
 
-// DUPLICATION_GUARD_UNCHANGED + invented secondaries still rejected on Yandex
+// Invalid title still rejected on Yandex after generate + repair
 await withEnvAsync(yandexEnv(), async () => {
   const fetchImpl = mockFetch([
     () =>
@@ -2370,8 +2343,7 @@ await withEnvAsync(yandexEnv(), async () => {
         yandexCompletion(
           JSON.stringify(
             validDraft({
-              seoAbout: "Мягкая медитация для сна.",
-              secondaryQueries: ["изобретённая фраза"],
+              seoTitle: "Вечерний ритуал без запроса",
             }),
           ),
         ),
@@ -2382,7 +2354,7 @@ await withEnvAsync(yandexEnv(), async () => {
         yandexCompletion(
           JSON.stringify(
             validDraft({
-              seoAbout: "Мягкая медитация для сна.",
+              seoTitle: "Вечерний ритуал без запроса",
             }),
           ),
         ),
@@ -2394,14 +2366,14 @@ await withEnvAsync(yandexEnv(), async () => {
     rateLimit: createProductSeoAiRateLimitStore(),
   });
   const result = await generateProductSeoDraft(requestInput(), {
-    userId: "yandex-duplication-guard",
+    userId: "yandex-invalid-title-guard",
     provider,
     wordstatSuggestions: sampleCandidates(),
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
-  assert.ok(result.error.issues.includes("about_duplicates_description"));
+  assert.ok(result.error.issues.includes("primary_missing_from_title"));
 });
 
 // NO_AUTO_SAVE
@@ -2448,7 +2420,7 @@ assert.equal(
 for (const issue of [
   "secondary_count",
   "primary_missing_from_title",
-  "primary_missing_from_description_or_about",
+  "primary_missing_from_description",
   "faq_count",
   "primary_missing_from_faq",
   "usage_count",
@@ -2456,13 +2428,8 @@ for (const issue of [
   "duplicate_faq",
   "duplicate_or_empty_anchor",
   "faq_too_long",
-  "about_duplicates_description",
-  "about_starts_with_description",
-  "about_opening_copies_description",
   "title_too_long",
   "description_too_long",
-  "about_too_long",
-  "about_far_over_soft_max",
   "malformed",
 ]) {
   assert.equal(normalizeProductSeoValidationIssue(issue), issue, issue);
@@ -2481,11 +2448,23 @@ const inventedPhrase = "музыка для глубокого сна";
 const ungroundedDraft = validDraft({
   seoDescription:
     "Медитация для сна длится 30 минут, включает 10 треков и стоит 499 ₽ вечером.",
-  seoAbout: [
-    "Эта медитация для сна лечит бессонницу обещанием чуда, которого в карточке нет.",
-    "Во время прослушивания вы следуете спокойному голосу и замечаете дыхание, без сложных техник.",
-    "Практика подойдёт тем, кто ищет вечернюю медитацию или медитацию перед сном как ритуал.",
-  ].join("\n\n"),
+  faqItems: [
+    {
+      question: "Когда лучше слушать медитацию для сна?",
+      answer: "Эта практика лечит бессонницу обещанием чуда, которого в карточке нет.",
+      anchor: "kogda-slushat",
+    },
+    {
+      question: "Нужен ли опыт медитации?",
+      answer: "Нет. Достаточно слушать и замечать дыхание в своём темпе.",
+      anchor: "nuzhen-li-opyt",
+    },
+    {
+      question: "Кому подойдёт эта практика?",
+      answer: "Тем, кто ищет спокойный вечерний ритуал и мягкое завершение дня.",
+      anchor: "komu-podoydyot",
+    },
+  ],
 });
 
 // FIRST_VALIDATION_SUCCESS_NO_FAILURE_LOG

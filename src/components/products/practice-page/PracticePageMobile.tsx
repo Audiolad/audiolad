@@ -18,7 +18,7 @@ type PracticePageMobileProps = {
 };
 
 export default function PracticePageMobile({ viewModel }: PracticePageMobileProps) {
-  const { practice, description, seoAbout, seoContent, publicAudioItems, listeningNotice, presentation, resolvedAuthorSlug } =
+  const { practice, description, seoContent, publicAudioItems, listeningNotice, presentation, resolvedAuthorSlug } =
     viewModel;
 
   return (
@@ -57,7 +57,6 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
 
         <ProductCopySections
           description={description}
-          seoAbout={seoAbout}
         />
         <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
 
