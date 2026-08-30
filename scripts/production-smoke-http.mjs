@@ -92,7 +92,7 @@ async function main() {
   await checkRoute("health_build", "/api/health/build", { status: 200 });
   await checkRoute("guest_home", "/", {
     status: 200,
-    includes: ["Аудио, которое помогает вернуться к себе"],
+    includes: ["data-guest-home-intro"],
   });
   await checkRoute("catalog", "/catalog", { status: 200 });
   const catalog = await fetchResponse("/catalog", { ua: IPHONE_SAFARI_UA });
