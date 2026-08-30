@@ -391,6 +391,11 @@ assertStorefrontDisplayLabel(
   "practice format preset is preserved",
 );
 assertStorefrontDisplayLabel(
+  candidate({ format: "Звук" }),
+  "Звук",
+  "ordinary sound format is preserved as Звук",
+);
+assertStorefrontDisplayLabel(
   candidate({ format: "Голос для сна" }),
   "Голос для сна",
   "custom author format is preserved",
