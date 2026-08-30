@@ -164,13 +164,17 @@ async function requestOnce(
 export function classifyWordstatHttpError(
   status: number | null,
   requestError?: WordstatRequestError,
-): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" {
+): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" | "INVALID_QUERY" {
   if (requestError === "timeout") {
     return "TIMEOUT";
   }
 
   if (status === 429) {
     return "RATE_LIMITED";
+  }
+
+  if (status === 400) {
+    return "INVALID_QUERY";
   }
 
   return "UPSTREAM_ERROR";

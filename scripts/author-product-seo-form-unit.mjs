@@ -451,7 +451,9 @@ assert.equal(
 );
 assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
-assert.match(seoSection, /suggestPrimaryQuerySeeds/);
+assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
+assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
+assert.match(seoSection, /void submitWordstat\(seed\)/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Подобрать похожие/);

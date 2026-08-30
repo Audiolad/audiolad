@@ -20,6 +20,19 @@ export function getWordstatPrimaryCtaLabel(primaryQuery: string): string {
     : "Помочь подобрать запрос";
 }
 
+/** Primary CTA opens the picker and runs Wordstat in the same click. */
+export const PRIMARY_CTA_AUTO_SEARCH = true;
+
+export const WORDSTAT_SUGGESTIONS_PATH =
+  "/api/author/seo/wordstat/suggestions" as const;
+
+export function buildInitialWordstatSeed(title: string): string {
+  const collapsed = title.trim().replace(/\s+/g, " ");
+  const pipeIndex = collapsed.indexOf("|");
+  const head = pipeIndex === -1 ? collapsed : collapsed.slice(0, pipeIndex);
+  return clipSeoQuery(head, PRODUCT_CONTENT_LIMITS.seoPrimaryQuery);
+}
+
 export function resolveWordstatSeed(input: {
   seoPrimaryQuery: string;
   title: string;
@@ -29,7 +42,55 @@ export function resolveWordstatSeed(input: {
     return primary;
   }
 
-  return input.title.trim();
+  return buildInitialWordstatSeed(input.title);
+}
+
+export function shouldAutoSearchOnPrimaryCta(seoPrimaryQuery: string): boolean {
+  return PRIMARY_CTA_AUTO_SEARCH && !seoPrimaryQuery.trim();
+}
+
+export function planWordstatPickerOpen(input: {
+  seoPrimaryQuery: string;
+  title: string;
+  seedOverride?: string;
+  autoSearch?: boolean;
+}): { seed: string; shouldSearch: boolean } {
+  const seed =
+    input.seedOverride?.trim() ||
+    resolveWordstatSeed({
+      seoPrimaryQuery: input.seoPrimaryQuery,
+      title: input.title,
+    });
+
+  return {
+    seed,
+    shouldSearch: Boolean(input.autoSearch),
+  };
+}
+
+export function resolveWordstatRequestPhrase(
+  seedOverride: string | undefined,
+  currentSeed: string,
+): string {
+  return seedOverride ?? currentSeed;
+}
+
+export function buildWordstatSuggestionsRequest(phrase: string): {
+  url: typeof WORDSTAT_SUGGESTIONS_PATH;
+  init: {
+    method: "POST";
+    headers: { "Content-Type": "application/json" };
+    body: string;
+  };
+} {
+  return {
+    url: WORDSTAT_SUGGESTIONS_PATH,
+    init: {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phrase }),
+    },
+  };
 }
 
 export function canAddSecondaryQuery(

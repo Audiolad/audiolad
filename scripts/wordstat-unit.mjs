@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import { evaluateWordstatOpportunity } from "../src/lib/seo/wordstat/opportunity.ts";
 import { getWordstatConfig } from "../src/lib/seo/wordstat/config.ts";
-import { fetchWordstatSuggestions } from "../src/lib/seo/wordstat/client.ts";
+import {
+  classifyWordstatHttpError,
+  fetchWordstatSuggestions,
+} from "../src/lib/seo/wordstat/client.ts";
 import { createWordstatMemoryCache } from "../src/lib/seo/wordstat/cache.ts";
 import {
   consumeWordstatOutboundSlot,
@@ -20,15 +23,28 @@ import {
 import { normalizeWordstatSuggestions } from "../src/lib/seo/wordstat/normalize.ts";
 import { normalizeWordstatPhrase } from "../src/lib/seo/wordstat/phrase.ts";
 import {
+  PRIMARY_CTA_AUTO_SEARCH,
+  buildInitialWordstatSeed,
+  buildWordstatSuggestionsRequest,
   canAddSecondaryQuery,
   getWordstatPrimaryCtaLabel,
+  planWordstatPickerOpen,
+  resolveWordstatRequestPhrase,
   resolveWordstatSeed,
+  shouldAutoSearchOnPrimaryCta,
 } from "../src/lib/seo/wordstat/ui.ts";
+import { suggestPrimaryQuerySeeds } from "../src/lib/seo/product-autofill/ui.ts";
+import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
 import {
   WORDSTAT_GET_TOP_URL,
   WORDSTAT_NUM_PHRASES,
 } from "../src/lib/seo/wordstat/types.ts";
-import { WORDSTAT_ERROR_MESSAGES } from "../src/lib/seo/wordstat/errors.ts";
+import {
+  WORDSTAT_ERROR_MESSAGES,
+  wordstatClientErrorMessage,
+  wordstatError,
+  wordstatHttpStatus,
+} from "../src/lib/seo/wordstat/errors.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEST_KEY = "unit-test-wordstat-api-key-never-log";
@@ -161,6 +177,101 @@ assert.equal(
   resolveWordstatSeed({ seoPrimaryQuery: "", title: "Лавандовый сон" }),
   "Лавандовый сон",
 );
+
+const TITLE_PIPE_SEED = "Белый шум воды | Источник Серафима Саровского";
+const TITLE_WITHOUT_PIPE = "Музыка для глубокого сна";
+const TITLE_SPACES = "  Звук дождя   ";
+const EXISTING_PRIMARY_WINS = "белый шум";
+const REQUEST_PHRASE = "Белый шум воды";
+const MANUAL_CHANGE = "белый шум воды для сна";
+
+assert.equal(buildInitialWordstatSeed(TITLE_PIPE_SEED), REQUEST_PHRASE);
+assert.equal(buildInitialWordstatSeed(TITLE_WITHOUT_PIPE), TITLE_WITHOUT_PIPE);
+assert.equal(buildInitialWordstatSeed(TITLE_SPACES), "Звук дождя");
+assert.equal(
+  resolveWordstatSeed({
+    seoPrimaryQuery: EXISTING_PRIMARY_WINS,
+    title: TITLE_PIPE_SEED,
+  }),
+  EXISTING_PRIMARY_WINS,
+);
+assert.equal(
+  resolveWordstatSeed({ seoPrimaryQuery: "  ", title: TITLE_PIPE_SEED }),
+  REQUEST_PHRASE,
+);
+assert.equal(
+  buildInitialWordstatSeed(`  ${TITLE_PIPE_SEED}  `),
+  REQUEST_PHRASE,
+);
+assert.equal(
+  buildInitialWordstatSeed(`${"а".repeat(200)} | хвост`).length,
+  PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
+);
+
+const starterChips = suggestPrimaryQuerySeeds({
+  title: TITLE_PIPE_SEED,
+  subtitle: "",
+  description:
+    "Мягкий поток воды помогает расслабиться и замедлить дыхание перед сном.",
+  productKind: "music",
+});
+assert.equal(starterChips.length, 0);
+assert.equal(starterChips.includes(TITLE_PIPE_SEED), false);
+assert.equal(
+  starterChips.includes(
+    "Мягкий поток воды помогает расслабиться и замедлить дыхание перед сном.",
+  ),
+  false,
+);
+assert.equal(starterChips.includes(`${TITLE_PIPE_SEED} музыка`), false);
+assert.equal(starterChips.includes("Музыка"), false);
+assert.equal(PRIMARY_CTA_AUTO_SEARCH, true);
+assert.equal(shouldAutoSearchOnPrimaryCta(""), true);
+assert.equal(shouldAutoSearchOnPrimaryCta(EXISTING_PRIMARY_WINS), false);
+
+const primaryCtaPlan = planWordstatPickerOpen({
+  seoPrimaryQuery: "",
+  title: TITLE_PIPE_SEED,
+  autoSearch: shouldAutoSearchOnPrimaryCta(""),
+});
+assert.equal(primaryCtaPlan.seed, REQUEST_PHRASE);
+assert.equal(primaryCtaPlan.shouldSearch, true);
+assert.equal(
+  resolveWordstatRequestPhrase(primaryCtaPlan.seed, "stale-full-title"),
+  REQUEST_PHRASE,
+);
+
+const existingPrimaryPlan = planWordstatPickerOpen({
+  seoPrimaryQuery: EXISTING_PRIMARY_WINS,
+  title: TITLE_PIPE_SEED,
+  autoSearch: shouldAutoSearchOnPrimaryCta(EXISTING_PRIMARY_WINS),
+});
+assert.equal(existingPrimaryPlan.seed, EXISTING_PRIMARY_WINS);
+assert.equal(existingPrimaryPlan.shouldSearch, false);
+
+const primaryCtaRequest = buildWordstatSuggestionsRequest(primaryCtaPlan.seed);
+assert.equal(primaryCtaRequest.init.method, "POST");
+assert.equal(JSON.parse(primaryCtaRequest.init.body).phrase, REQUEST_PHRASE);
+assert.equal(JSON.parse(primaryCtaRequest.init.body).phrase.includes("|"), false);
+
+const primaryCtaFetch = mockFetch([
+  () => jsonResponse(200, { suggestions: [] }),
+]);
+await primaryCtaFetch(primaryCtaRequest.url, primaryCtaRequest.init);
+assert.equal(primaryCtaFetch.calls.length, 1, "PRIMARY_CTA starts ONE Wordstat request");
+assert.equal(
+  JSON.parse(primaryCtaFetch.calls[0].init.body).phrase,
+  REQUEST_PHRASE,
+);
+
+const manualRequest = buildWordstatSuggestionsRequest(
+  resolveWordstatRequestPhrase(undefined, MANUAL_CHANGE),
+);
+assert.equal(JSON.parse(manualRequest.init.body).phrase, MANUAL_CHANGE);
+const manualFetch = mockFetch([() => jsonResponse(200, { suggestions: [] })]);
+await manualFetch(manualRequest.url, manualRequest.init);
+assert.equal(manualFetch.calls.length, 1);
+assert.equal(JSON.parse(manualFetch.calls[0].init.body).phrase, MANUAL_CHANGE);
 
 const firstSecondary = canAddSecondaryQuery("сон", []);
 assert.equal(firstSecondary.ok, true);
@@ -366,9 +477,19 @@ await withEnvAsync(enabledEnv(), async () => {
     sleepImpl: async () => {},
   });
   assert.equal(result.ok, false);
-  assert.equal(result.error.code, "UPSTREAM_ERROR");
+  assert.equal(result.error.code, "INVALID_QUERY");
+  assert.equal(result.error.code !== "RATE_LIMITED", true);
+  assert.equal(result.error.code !== "TIMEOUT", true);
+  assert.equal(result.error.code !== "UPSTREAM_ERROR", true);
+  assert.equal(result.error.code !== "INVALID_PHRASE", true);
+  assert.equal(result.error.message, WORDSTAT_ERROR_MESSAGES.INVALID_QUERY);
+  assert.match(result.error.message, /формулировку|короче|изменить/);
+  assert.equal(wordstatHttpStatus(result.error.code), 422);
   assert.equal(fetchImpl.calls.length, 1);
   assert.equal(JSON.stringify(result).includes("bad request raw"), false);
+  assert.equal(JSON.stringify(result).includes(TEST_KEY), false);
+  assert.equal(JSON.stringify(result).includes(TEST_FOLDER), false);
+  assert.equal(JSON.stringify(result).includes("Authorization"), false);
 });
 
 await withEnvAsync(enabledEnv(), async () => {
@@ -578,6 +699,54 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(nextMiss.error.code, "RATE_LIMITED");
   assert.equal(fetchImpl.calls.length, 1);
 });
+
+assert.equal(classifyWordstatHttpError(400), "INVALID_QUERY");
+assert.equal(classifyWordstatHttpError(429), "RATE_LIMITED");
+assert.equal(classifyWordstatHttpError(500), "UPSTREAM_ERROR");
+assert.equal(classifyWordstatHttpError(null, "timeout"), "TIMEOUT");
+assert.equal(classifyWordstatHttpError(null, "network"), "UPSTREAM_ERROR");
+assert.equal(wordstatHttpStatus("INVALID_QUERY"), 422);
+assert.equal(wordstatHttpStatus("UPSTREAM_ERROR"), 502);
+assert.equal(wordstatHttpStatus("TIMEOUT"), 502);
+assert.equal(wordstatHttpStatus("INVALID_PHRASE"), 400);
+assert.equal(
+  wordstatClientErrorMessage({ code: "INVALID_QUERY" }),
+  WORDSTAT_ERROR_MESSAGES.INVALID_QUERY,
+);
+assert.equal(
+  wordstatClientErrorMessage({
+    error: WORDSTAT_ERROR_MESSAGES.INVALID_QUERY,
+    code: "INVALID_QUERY",
+  }),
+  WORDSTAT_ERROR_MESSAGES.INVALID_QUERY,
+);
+const invalidQueryJson = JSON.stringify(wordstatError("INVALID_QUERY"));
+assert.equal(invalidQueryJson.includes("bad request raw"), false);
+assert.equal(invalidQueryJson.includes(TEST_KEY), false);
+assert.equal(invalidQueryJson.includes(TEST_FOLDER), false);
+assert.doesNotMatch(invalidQueryJson, /Api-Key|folderId|Authorization/i);
+
+const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
+const wordstatPicker = read(
+  "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
+);
+assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
+assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
+assert.match(seoSection, /planWordstatPickerOpen/);
+assert.match(seoSection, /void submitWordstat\(seed\)/);
+assert.match(seoSection, /resolveWordstatRequestPhrase\(seedOverride, wordstatSeed\)/);
+assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
+assert.match(seoSection, /onSubmit=\{\(\) => \{\s*void submitWordstat\(\);/);
+assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
+assert.doesNotMatch(seoSection, /primarySeeds/);
+assert.doesNotMatch(seoSection, /setWordstatSeed\(seed\);\s*void submitWordstat\(\)/);
+assert.match(wordstatPicker, /Выбрать основным/);
+assert.match(wordstatPicker, /\+ В дополнительные/);
+assert.match(wordstatPicker, /wordstatColorClasses/);
+assert.match(wordstatPicker, /formatWordstatCount/);
+assert.match(wordstatPicker, /item\.phrase/);
+assert.match(seoSection, /wordstatClientErrorMessage/);
+assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

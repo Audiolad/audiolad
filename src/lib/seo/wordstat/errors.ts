@@ -14,7 +14,24 @@ export const WORDSTAT_ERROR_MESSAGES: Record<WordstatErrorCode, string> = {
     "Яндекс не нашёл подходящих фраз. Попробуйте другую формулировку или напишите запрос сами.",
   INVALID_PHRASE:
     "Введите поисковую фразу — не длиннее 400 символов.",
+  INVALID_QUERY:
+    "Яндекс не смог обработать эту формулировку. Попробуйте сделать запрос короче или изменить его.",
 };
+
+export function wordstatClientErrorMessage(
+  payload: { error?: string; code?: string } | null,
+): string {
+  if (payload && typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error;
+  }
+
+  const code = payload?.code;
+  if (code && Object.prototype.hasOwnProperty.call(WORDSTAT_ERROR_MESSAGES, code)) {
+    return WORDSTAT_ERROR_MESSAGES[code as WordstatErrorCode];
+  }
+
+  return WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR;
+}
 
 export function wordstatError(
   code: WordstatErrorCode,
@@ -32,6 +49,8 @@ export function wordstatHttpStatus(code: WordstatErrorCode): number {
   switch (code) {
     case "INVALID_PHRASE":
       return 400;
+    case "INVALID_QUERY":
+      return 422;
     case "RATE_LIMITED":
       return 429;
     case "WORDSTAT_DISABLED":
