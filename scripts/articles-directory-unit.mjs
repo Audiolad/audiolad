@@ -121,6 +121,7 @@ import { RABOTA_I_BIZNES_TARO_PAGE } from "../src/lib/seo/listens/content/rabota
 import { TARO_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-biznes-i-dengi.ts";
 import { RASKLAD_TARO_NA_BIZNES_I_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-biznes-i-dengi.ts";
 import { MUZYKA_SNA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-sna-dlya-zasypaniya-slushat-onlayn.ts";
+import { MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-bystrogo-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2781,6 +2782,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyFourthListenHref}`),
     "directory JSON-LD includes ninety-fourth listen href",
+  );
+
+  const ninetyFifthListenHref = "/listens/muzyka-dlya-bystrogo-sna-slushat-onlayn";
+  const ninetyFifthListenCard = data.articles.find((card) => card.href === ninetyFifthListenHref);
+  assert(ninetyFifthListenCard, "ninety-fifth indexable listen page is listed");
+  assert(
+    ninetyFifthListenCard.title === "Музыка для быстрого сна – слушать онлайн бесплатно | АудиоЛад",
+    "ninety-fifth listen directory title",
+  );
+  assert(
+    ninetyFifthListenCard.description === MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "ninety-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/muzyka-dlya-bystrogo-sna-slushat-onlayn"),
+    "no /articles duplicate for ninety-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyFifthListenHref}`),
+    "directory JSON-LD includes ninety-fifth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
