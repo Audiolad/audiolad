@@ -10,6 +10,7 @@ import {
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { remapStudioProjectForDuplicate } from "../duplicate-project";
 import { resolveStudioActor, toStudioActorView } from "../guest-access";
 import {
   canCreateGuestProject,
@@ -234,6 +235,40 @@ export async function createStudioProject(input: {
   return data as StudioProjectRow;
 }
 
+async function removeStudioStoragePaths(paths: readonly string[]) {
+  if (paths.length === 0) return;
+  const service = createServiceRoleClient();
+  const { error } = await service.storage.from(STUDIO_ASSETS_BUCKET).remove([...new Set(paths)]);
+  if (error) {
+    console.error("studio_asset_source_cleanup_error", error.message);
+  }
+}
+
+export async function duplicateStudioProject(sourceProjectId: string) {
+  const source = await getStudioProject(sourceProjectId);
+  const { service } = await requireStudioProjectAccess(sourceProjectId);
+  const remapped = remapStudioProjectForDuplicate(source.project_data);
+  const projectId = randomUUID();
+  const { data, error } = await service.rpc("duplicate_studio_project", {
+    p_source_project_id: sourceProjectId,
+    p_project_id: projectId,
+    p_project_data: remapped.projectData,
+    p_asset_refs: remapped.assets.map((asset) => ({
+      source_asset_id: asset.sourceAssetId,
+      asset_id: asset.assetId,
+    })),
+  });
+  if (error) mapServiceError(error);
+  if (!data) throw new StudioApiError("internal_error", 500);
+  await recordAuthorSupportAudit({
+    action: "studio_project_duplicated",
+    resourceType: "studio_project",
+    resourceId: projectId,
+    metadata: { source_project_id: sourceProjectId },
+  });
+  return data as StudioProjectRow;
+}
+
 export async function getStudioProject(projectId: string) {
   const { service } = await requireStudioProjectAccess(projectId);
   const { data, error } = await service
@@ -338,26 +373,12 @@ export async function softDeleteStudioProject(input: {
     resourceId: input.projectId,
     metadata: { changed_fields: ["status"], status: "deleted" },
   });
-  const deletedAt = new Date().toISOString();
-  const { data, error } = await service
-    .from("studio_projects")
-    .update({
-      status: "deleted",
-      deleted_at: deletedAt,
-      revision: input.expectedRevision + 1,
-      updated_at: deletedAt,
-    })
-    .eq("id", input.projectId)
-    .eq("status", "active")
-    .eq("revision", input.expectedRevision)
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    mapServiceError(error);
-  }
-  if (!data) {
-    throw new StudioApiError("project_conflict", 409);
-  }
+  const { data, error } = await service.rpc("soft_delete_studio_project", {
+    p_project_id: input.projectId,
+    p_expected_revision: input.expectedRevision,
+  });
+  if (error) mapServiceError(error);
+  await removeStudioStoragePaths((data ?? []).map((row: { storage_path: string }) => row.storage_path));
 }
 
 export async function listStudioAssets(projectId: string) {
@@ -414,21 +435,7 @@ export async function reserveStudioAssetUpload(input: {
 }
 
 export async function cleanupStudioAssetReservation(asset: StudioProjectAssetRow) {
-  const service = createServiceRoleClient();
-  const remove = await service.storage
-    .from(STUDIO_ASSETS_BUCKET)
-    .remove([asset.storage_path]);
-  if (remove.error) {
-    console.error("studio_asset_cleanup_object_error", remove.error.message);
-  }
-  const { error } = await service
-    .from("studio_project_assets")
-    .delete()
-    .eq("id", asset.id)
-    .eq("project_id", asset.project_id);
-  if (error) {
-    console.error("studio_asset_cleanup_reservation_error", error.message);
-  }
+  await deleteStudioProjectAsset(asset.project_id, asset.id);
 }
 
 export async function uploadReservedStudioAsset(
@@ -481,48 +488,48 @@ export async function replaceStudioProjectAsset(input: {
     metadata: { project_id: input.projectId },
   });
 
+  const sourceId = randomUUID();
+  const storagePath = buildStudioAssetPath(
+    ownerId,
+    input.projectId,
+    sourceId,
+    input.filename,
+    ownerKind,
+  );
   const { error: uploadError } = await service.storage
     .from(STUDIO_ASSETS_BUCKET)
-    .upload(asset.storage_path, Buffer.from(await input.file.arrayBuffer()), {
+    .upload(storagePath, Buffer.from(await input.file.arrayBuffer()), {
       contentType: input.mimeType,
-      upsert: true,
+      upsert: false,
     });
   if (uploadError) {
     console.error("studio_asset_replace_error", uploadError.message);
     throw new StudioApiError("storage_upload_failed", 502);
   }
 
-  const { data, error } = await service
-    .from("studio_project_assets")
-    .update({
-      original_name: input.filename,
-      mime_type: input.mimeType,
-      size_bytes: input.byteSize,
-      duration_seconds: input.durationSeconds,
-    })
-    .eq("id", input.assetId)
-    .eq("project_id", input.projectId)
-    .is("deleted_at", null)
-    .select(ASSET_SELECT)
-    .maybeSingle();
+  const { data: released, error } = await service.rpc("replace_studio_project_asset", {
+    p_project_id: input.projectId,
+    p_asset_id: input.assetId,
+    p_source_id: sourceId,
+    p_storage_path: storagePath,
+    p_original_name: input.filename,
+    p_mime_type: input.mimeType,
+    p_size_bytes: input.byteSize,
+    p_duration_seconds: input.durationSeconds,
+  });
   if (error) {
+    await removeStudioStoragePaths([storagePath]);
     mapServiceError(error);
   }
-  if (!data) {
-    throw new StudioApiError("not_found", 404);
-  }
-  if (
-    !isStudioStoragePath(
-      (data as StudioProjectAssetRow).storage_path,
-      ownerId,
-      input.projectId,
-      input.assetId,
-      ownerKind,
-    )
-  ) {
-    throw new StudioApiError("not_found", 404);
-  }
-  return data as StudioProjectAssetRow;
+  await removeStudioStoragePaths((released ?? []).map((row: { storage_path: string }) => row.storage_path));
+  return {
+    ...asset,
+    storage_path: storagePath,
+    original_name: input.filename,
+    mime_type: input.mimeType,
+    size_bytes: input.byteSize,
+    duration_seconds: input.durationSeconds,
+  };
 }
 
 export async function deleteStudioProjectAsset(projectId: string, assetId: string) {
@@ -534,36 +541,19 @@ export async function deleteStudioProjectAsset(projectId: string, assetId: strin
     metadata: { project_id: projectId },
   });
 
-  const removedAt = new Date().toISOString();
-  const { data, error } = await service
-    .from("studio_project_assets")
-    .update({ deleted_at: removedAt })
-    .eq("id", assetId)
-    .eq("project_id", projectId)
-    .is("deleted_at", null)
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    mapServiceError(error);
-  }
-  if (!data) {
-    throw new StudioApiError("not_found", 404);
-  }
-
-  const remove = await service.storage
-    .from(STUDIO_ASSETS_BUCKET)
-    .remove([asset.storage_path]);
-  if (remove.error) {
-    console.error("studio_asset_delete_object_error", remove.error.message);
-    throw new StudioApiError("storage_upload_failed", 502);
-  }
+  const { data, error } = await service.rpc("release_studio_project_asset", {
+    p_project_id: projectId,
+    p_asset_id: assetId,
+  });
+  if (error) mapServiceError(error);
+  await removeStudioStoragePaths((data ?? []).map((row: { storage_path: string }) => row.storage_path));
 }
 
 export async function getStudioProjectAsset(
   projectId: string,
   assetId: string,
 ) {
-  const { ownerId, ownerKind, service } = await requireStudioProjectAccess(projectId);
+  const { service } = await requireStudioProjectAccess(projectId);
   const { data, error } = await service
     .from("studio_project_assets")
     .select(ASSET_SELECT)
@@ -578,10 +568,8 @@ export async function getStudioProjectAsset(
     throw new StudioApiError("not_found", 404);
   }
   const asset = data as StudioProjectAssetRow;
-  if (!isStudioStoragePath(asset.storage_path, ownerId, projectId, assetId, ownerKind)) {
-    throw new StudioApiError("not_found", 404);
-  }
-  return { asset, service, ownerId, ownerKind };
+  const access = await requireStudioProjectAccess(projectId);
+  return { asset, service, ownerId: access.ownerId, ownerKind: access.ownerKind };
 }
 
 export async function downloadStudioProjectAsset(projectId: string, assetId: string) {
