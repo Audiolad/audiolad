@@ -41,9 +41,9 @@ export default async function StudioPage() {
           <div className="w-full">
             <p className="text-sm font-medium text-[#9bdab5]">Выберите режим работы</p>
             <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Создавайте аудиопрактики и готовьтесь к будущим эфирам
+              Создавайте аудиопрактики, аудиокниги и проводите аудиоэфиры
             </h2>
-            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+            <div className="mt-8 grid gap-5 lg:grid-cols-3">
               <article className="rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
                 <h3 className="text-2xl font-semibold">Создать аудиопрактику</h3>
                 <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
@@ -55,6 +55,20 @@ export default async function StudioPage() {
                   className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
                 >
                   Открыть Студию
+                </Link>
+              </article>
+
+              <article className="rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
+                <h3 className="text-2xl font-semibold">Студия аудиокниг</h3>
+                <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
+                  Записывайте аудиокниги своим голосом по главам и создавайте
+                  готовые аудиофайлы без сложного монтажа.
+                </p>
+                <Link
+                  href="/studio/audiobooks"
+                  className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
+                >
+                  Создать аудиокнигу
                 </Link>
               </article>
 
