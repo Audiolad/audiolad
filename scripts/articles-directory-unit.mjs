@@ -134,6 +134,7 @@ import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } fro
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3173,6 +3174,20 @@ function testOneHundredEighthListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-eighth listen slug");
 }
 
+function testOneHundredNinthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-ninth indexable listen page is listed");
+  assert(card.title === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-ninth directory title");
+  assert(card.description === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-ninth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn"), "no /articles duplicate for one-hundred-ninth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3191,6 +3206,7 @@ const tests = [
   ["one-hundred-fifth listen page in directory", testOneHundredFifthListenInDirectory],
   ["one-hundred-sixth listen page in directory", testOneHundredSixthListenInDirectory],
   ["one-hundred-eighth listen page in directory", testOneHundredEighthListenInDirectory],
+  ["one-hundred-ninth listen page in directory", testOneHundredNinthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
