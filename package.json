@@ -35,7 +35,7 @@
     "test:studio-autosave": "npx tsx scripts/studio-autosave-unit.mts",
     "test:studio-persistence-integration": "npx tsx scripts/studio-persistence-integration-unit.mts",
     "test:studio-persistence:isolated": "AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_STUDIO_PERSISTENCE_ISOLATED=1 npx tsx scripts/studio-persistence-isolated-integration.mts",
-    "test:studio-shared-assets:isolated": "AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_STUDIO_PERSISTENCE_ISOLATED=1 npx tsx scripts/studio-shared-assets-isolated-integration.mts",
+    "test:studio-shared-assets:isolated": "npx tsx scripts/studio-shared-assets-isolated-integration.mts",
     "test:test-user-reset:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 npx tsx scripts/test-user-reset-integration.mjs",
     "test:admin-operation-log:migration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/admin-operation-log-migration-validation.mjs",
     "test:admin-operational-overview": "npx tsx scripts/admin-operational-overview-unit.mts",
