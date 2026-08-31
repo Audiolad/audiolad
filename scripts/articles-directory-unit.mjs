@@ -127,6 +127,7 @@ import { MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/
 import { MUZYKA_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-krepkogo-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2907,6 +2908,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredthListenHref}`),
     "directory JSON-LD includes hundredth listen href",
+  );
+
+  const hundredFirstListenHref = "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const hundredFirstListenCard = data.articles.find((card) => card.href === hundredFirstListenHref);
+  assert(hundredFirstListenCard, "hundred-first indexable listen page is listed");
+  assert(
+    hundredFirstListenCard.title === "Успокаивающая музыка для сна с дождём – слушать онлайн бесплатно | АудиоЛад",
+    "hundred-first listen directory title",
+  );
+  assert(
+    hundredFirstListenCard.description === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE.description,
+    "hundred-first listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn"),
+    "no /articles duplicate for hundred-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredFirstListenHref}`),
+    "directory JSON-LD includes hundred-first listen href",
   );
 
 const articleCards = listArticleDirectoryCards();

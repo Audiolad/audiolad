@@ -98,6 +98,7 @@ import { MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "./content/m
 import { MUZYKA_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-krepkogo-sna-slushat-onlayn";
 import { MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
 import { MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "./content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -205,6 +206,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   MUZYKA_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
