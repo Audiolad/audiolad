@@ -11,6 +11,7 @@ import {
   withPreservedRelatedListenSlugs,
 } from "../src/lib/products/practice-seo-content.ts";
 import {
+  AUTHOR_RECOMMENDATIONS_HELPER_COPY,
   AUTHOR_RECOMMENDATIONS_LIMIT_COPY,
   MAX_AUTHOR_RECOMMENDATIONS,
   RELATED_PRODUCT_DEFAULT_AUTHOR_LIST_LIMIT,
@@ -52,6 +53,10 @@ assert.ok(RELATED_PRODUCT_DEFAULT_AUTHOR_LIST_LIMIT <= 30);
 assert.ok(RELATED_PRODUCT_SELECTED_IDS_LOOKUP_LIMIT > MAX_AUTHOR_RECOMMENDATIONS);
 assert.equal(RELATED_PRODUCT_STORED_PARSE_LIMIT, 8);
 assert.equal(AUTHOR_RECOMMENDATIONS_LIMIT_COPY, "Можно добавить до 5 рекомендаций");
+assert.equal(
+  AUTHOR_RECOMMENDATIONS_HELPER_COPY,
+  "Выберите до 5 продуктов, которые связаны с этой темой и могут быть полезны слушателю дальше.",
+);
 assert.equal(shouldSearchRelatedProducts(""), false);
 assert.equal(shouldSearchRelatedProducts("а"), false);
 assert.equal(shouldSearchRelatedProducts("сон"), true);
@@ -211,6 +216,8 @@ assert.match(seoSection, /shouldListDefaultAuthorProducts\(relatedProductQuery\)
 assert.match(seoSection, /getRelatedProductPickerMode/);
 assert.match(seoSection, /MAX_AUTHOR_RECOMMENDATIONS/);
 assert.match(seoSection, /AUTHOR_RECOMMENDATIONS_LIMIT_COPY/);
+assert.match(seoSection, /AUTHOR_RECOMMENDATIONS_HELPER_COPY/);
+assert.doesNotMatch(seoSection, /Выберите 2–4 продукта/);
 assert.match(seoSection, /Добавлено/);
 assert.match(seoSection, /max-h-64/);
 assert.match(seoSection, /overflow-y-auto/);

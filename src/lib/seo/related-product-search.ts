@@ -26,6 +26,10 @@ export const RELATED_PRODUCT_STORED_PARSE_LIMIT = 8;
 export const AUTHOR_RECOMMENDATIONS_LIMIT_COPY =
   "Можно добавить до 5 рекомендаций";
 
+/** Helper under «Рекомендации автора» — selection guidance, not the max-reached copy. */
+export const AUTHOR_RECOMMENDATIONS_HELPER_COPY =
+  "Выберите до 5 продуктов, которые связаны с этой темой и могут быть полезны слушателю дальше.";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
