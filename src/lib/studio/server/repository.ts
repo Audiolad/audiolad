@@ -54,10 +54,13 @@ function mapServiceError(error: { message: string }, fallback = "internal_error"
   if (message.includes("guest_project_limit")) {
     throw new StudioApiError("guest_project_limit", 403);
   }
+  if (message.includes("project_conflict")) {
+    throw new StudioApiError("project_conflict", 409);
+  }
   if (message.includes("project_not_found")) {
     throw new StudioApiError("not_found", 404);
   }
-  if (message.includes("invalid_asset")) {
+  if (message.includes("invalid_asset") || message.includes("invalid_project")) {
     throw new StudioApiError("invalid_asset", 422);
   }
   console.error("studio_service_error", error.message);

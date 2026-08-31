@@ -169,6 +169,14 @@ BEGIN
            ON source_asset.id = requested.source_asset_id AND source_asset.project_id = v_source.id AND source_asset.deleted_at IS NULL) THEN
     RAISE EXCEPTION 'invalid_asset' USING ERRCODE = '22023';
   END IF;
+  IF (SELECT count(*) FROM jsonb_to_recordset(p_asset_refs) AS requested(source_asset_id uuid, asset_id uuid))
+     <> (SELECT count(*) FROM jsonb_to_recordset(p_asset_refs) AS requested(source_asset_id uuid, asset_id uuid)
+         JOIN public.studio_project_assets AS source_asset
+           ON source_asset.id = requested.source_asset_id AND source_asset.project_id = v_source.id AND source_asset.deleted_at IS NULL
+         JOIN public.studio_asset_sources AS source
+           ON source.id = source_asset.source_id AND source.deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'invalid_asset' USING ERRCODE = '22023';
+  END IF;
   INSERT INTO public.studio_projects (
     id, author_id, guest_session_id, name, project_data, schema_version, revision, status
   ) VALUES (p_project_id, v_source.author_id, v_source.guest_session_id, v_name, p_project_data, 2, 1, 'active')
