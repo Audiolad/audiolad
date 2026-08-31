@@ -158,13 +158,16 @@ export function isCoursePublication(
 }
 
 /**
- * Product Gallery is for product classes only: practice, course, audiobook.
- * Release (Music) and post (AudioPost) are never eligible.
+ * Product Gallery is for practice, course, audiobook, and release (Music).
+ * Post (AudioPost) is never eligible.
  */
 export function isProductGalleryClass(
   publicationClass: PublicationClass,
 ): boolean {
-  return isProductPublicationClass(publicationClass);
+  return (
+    isProductPublicationClass(publicationClass) ||
+    publicationClass === "release"
+  );
 }
 
 export function isProductGalleryEligible(
