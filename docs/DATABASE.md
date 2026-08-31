@@ -126,7 +126,7 @@ trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
 `position`, размером до 200 MiB и состоянием `uploading` или `active`.
 `reserve_audiobook_fragment` под блокировкой проекта атомарно резервирует
 квоту книги 5 GiB и следующую позицию. Объект кладётся браузером напрямую в
-private bucket `audiobook-fragments` по short-lived signed upload token; в
+private bucket `audiobook-fragments` по signed upload token; в
 Next API не передаётся тело файла. Finalize проверяет объект в Storage и
 переводит зарезервированную строку в `active`; повторный finalize идемпотентен.
 `delete_audiobook_fragment` удаляет строку и нормализует позиции в одной
