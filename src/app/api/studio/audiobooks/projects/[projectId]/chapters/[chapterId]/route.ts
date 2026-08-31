@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { AuthorAccessError } from "@/lib/author-products/auth";
+import { AudiobookError, deleteAudiobookChapter, parseAudiobookTitle, parseAudiobookUuid, renameAudiobookChapter } from "@/lib/audiobooks/server";
+type Context = { params: Promise<{ projectId: string; chapterId: string }> };
+function respond(error: unknown) { if (error instanceof AudiobookError || error instanceof AuthorAccessError) return NextResponse.json({ error: error.code }, { status: error.status }); console.error("audiobook_chapter_route_error", error); return NextResponse.json({ error: "internal_error" }, { status: 500 }); }
+export async function PATCH(request: Request, context: Context) { try { const body = await request.json(); const { projectId, chapterId } = await context.params; const chapter = await renameAudiobookChapter(parseAudiobookUuid(projectId, "not_found"), parseAudiobookUuid(chapterId, "not_found"), parseAudiobookUuid(body?.authorId, "invalid_author_id"), parseAudiobookTitle(body?.title)); return NextResponse.json({ chapter }); } catch (error) { return respond(error); } }
+export async function DELETE(request: Request, context: Context) { try { const { projectId, chapterId } = await context.params; const authorId = parseAudiobookUuid(new URL(request.url).searchParams.get("authorId"), "invalid_author_id"); await deleteAudiobookChapter(parseAudiobookUuid(projectId, "not_found"), parseAudiobookUuid(chapterId, "not_found"), authorId); return new NextResponse(null, { status: 204 }); } catch (error) { return respond(error); } }

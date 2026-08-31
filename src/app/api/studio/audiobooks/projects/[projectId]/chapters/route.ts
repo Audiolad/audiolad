@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { AuthorAccessError } from "@/lib/author-products/auth";
+import { AudiobookError, createAudiobookChapter, listAudiobookChapters, parseAudiobookTitle, parseAudiobookUuid } from "@/lib/audiobooks/server";
+type Context = { params: Promise<{ projectId: string }> };
+function respond(error: unknown) { if (error instanceof AudiobookError || error instanceof AuthorAccessError) return NextResponse.json({ error: error.code }, { status: error.status }); console.error("audiobook_chapters_route_error", error); return NextResponse.json({ error: "internal_error" }, { status: 500 }); }
+export async function GET(request: Request, context: Context) { try { const projectId = parseAudiobookUuid((await context.params).projectId, "not_found"); const authorId = parseAudiobookUuid(new URL(request.url).searchParams.get("authorId"), "invalid_author_id"); return NextResponse.json({ chapters: await listAudiobookChapters(projectId, authorId) }); } catch (error) { return respond(error); } }
+export async function POST(request: Request, context: Context) { try { const body = await request.json(); const chapter = await createAudiobookChapter(parseAudiobookUuid((await context.params).projectId, "not_found"), parseAudiobookUuid(body?.authorId, "invalid_author_id"), parseAudiobookTitle(body?.title)); return NextResponse.json({ chapter }, { status: 201 }); } catch (error) { return respond(error); } }
