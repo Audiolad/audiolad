@@ -47,7 +47,7 @@ function database(): Promise<IDBDatabase> {
 function completedTransaction<T>(
   stores: string | string[],
   mode: IDBTransactionMode,
-  operation: (transaction: IDBTransaction) => IDBRequest<T> | void,
+  operation: (transaction: IDBTransaction) => IDBRequest<unknown> | void,
 ) {
   return database().then((db) => new Promise<T | undefined>((resolve, reject) => {
     const transaction = db.transaction(stores, mode);
@@ -55,7 +55,7 @@ function completedTransaction<T>(
     const request = operation(transaction);
     if (request) {
       request.onerror = () => reject(request.error ?? new Error("indexeddb_request_failed"));
-      request.onsuccess = () => { result = request.result; };
+      request.onsuccess = () => { result = request.result as T; };
     }
     transaction.oncomplete = () => {
       db.close();
