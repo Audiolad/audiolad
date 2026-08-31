@@ -99,6 +99,7 @@ export const MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         title: "Какой характер музыки с дождём выбрать",
         paragraphs: [],
         blocks: [
+          { kind: "paragraph", text: "Музыка с дождём и грозой может быть разной по настроению." },
           { kind: "rich_paragraph", segments: [{ text: "Если хочется прежде всего мягкого и ненавязчивого звучания, можно посмотреть " }, { href: "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn", label: "спокойную музыку для сна с дождём" }, { text: ". Там основной акцент сделан именно на спокойном характере композиции." }] },
           { kind: "rich_paragraph", segments: [{ text: "Если важен сценарий более тихого вечернего перехода к отдыху, ближе может быть " }, { href: "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn", label: "успокаивающая музыка для сна с дождём" }, { text: ". Это соседний intent, где гроза не является центральным элементом." }] },
           { kind: "rich_paragraph", segments: [{ text: "Для сценария вечернего отдыха отдельно опубликована " }, { href: "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "расслабляющая музыка с дождём для сна" }, { text: ". В ней внимание направлено на расслабляющий формат прослушивания." }] },
