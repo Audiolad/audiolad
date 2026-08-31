@@ -8,19 +8,34 @@ const hook = readFileSync("src/components/studio/audiobooks/useAudiobookRecorder
 const component = readFileSync("src/components/studio/audiobooks/AudiobookRecorder.tsx", "utf8");
 
 assert.match(store, /indexedDB\.open/);
+assert.match(store, /recording_drafts/);
+assert.match(store, /recording_chunks/);
 assert.match(store, /projectCreated/);
-assert.match(store, /blob: Blob/);
+assert.match(store, /transaction\.oncomplete/);
+assert.match(store, /appendAudiobookRecordingChunk/);
+assert.match(store, /getAudiobookRecordingBlob/);
+assert.doesNotMatch(store, /blob: Blob/);
 assert.match(sync, /for \(const draft of await listAudiobookRecordingDrafts\(projectId\)\)/);
 assert.match(sync, /uploadToSignedUrl/);
 assert.match(sync, /sourceType: "recording"/);
 assert.match(sync, /deleteAudiobookRecordingDraft\(draft\.id\)/);
+assert.match(sync, /remoteFragmentId[\s\S]*?\/finalize/);
+assert.match(sync, /new Map<string, Promise<void>>/);
+assert.match(sync, /activeProjectSync\.get\(projectId\)/);
 assert.match(recorder, /AUDIOBOOK_RECORDER_AUTO_STOP_MARGIN_MS/);
 assert.match(recorder, /audio\/webm/);
-assert.match(hook, /recorder\.stop\(\)/);
+assert.match(hook, /await saveAudiobookRecordingDraft\(draft\)[\s\S]*getUserMedia/);
+assert.match(hook, /recorder\.start\(1000\)/);
+assert.match(hook, /recorder\.requestData\(\)/);
+assert.match(hook, /await writeChainRef\.current/);
+assert.match(hook, /appendAudiobookRecordingChunk/);
+assert.match(hook, /AUDIOBOOK_LIMITS\.maxFragmentBytes/);
+assert.match(hook, /AUDIOBOOK_LIMITS\.maxProjectSourceBytes/);
 assert.match(hook, /statusRef\.current !== "recording"/);
 assert.match(hook, /getUserMedia\(\{ audio: AUDIOBOOK_MICROPHONE_CONSTRAINTS \}\)/);
 assert.doesNotMatch(hook, /useStudioRecorder/);
 assert.match(component, /Удалить локальный черновик/);
 assert.match(component, /Восстановить запись будет невозможно/);
+assert.match(component, /discarding/);
 
 console.log("audiobook-recorder-unit: ok");

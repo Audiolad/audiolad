@@ -13,12 +13,14 @@ import {
 } from "@/lib/audiobooks/recorder";
 import {
   deleteAudiobookRecordingDraft,
+  appendAudiobookRecordingChunk,
   listAudiobookRecordingDrafts,
   saveAudiobookRecordingDraft,
   type AudiobookRecordingDraft,
 } from "@/lib/audiobooks/recorder-store";
 import { syncPendingAudiobookRecordingDrafts } from "@/lib/audiobooks/recorder-sync";
 import type { AudiobookFragment } from "@/lib/audiobooks/server";
+import { AUDIOBOOK_LIMITS } from "@/lib/audiobooks/limits";
 
 type RecorderStatus = "idle" | "arming" | "recording" | "stopping" | "saving";
 
@@ -45,6 +47,13 @@ export function useAudiobookRecorder({
   const startedAtRef = useRef(0);
   const disposedRef = useRef(false);
   const statusRef = useRef<RecorderStatus>("idle");
+  const draftRef = useRef<AudiobookRecordingDraft | null>(null);
+  const bytesRef = useRef(0);
+  const projectPendingBytesRef = useRef(0);
+  const chunkSequenceRef = useRef(0);
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve());
+  const persistenceFailedRef = useRef(false);
+  const storageLimitReachedRef = useRef(false);
   const setRecorderStatus = useCallback((next: RecorderStatus) => {
     statusRef.current = next;
     setStatus(next);
@@ -79,6 +88,11 @@ export function useAudiobookRecorder({
     if (statusRef.current !== "recording" || !recorder || recorder.state === "inactive") return;
     setRecorderStatus("stopping");
     stopTimers();
+    try {
+      recorder.requestData();
+    } catch {
+      // A final dataavailable event is also dispatched by stop().
+    }
     recorder.stop();
   }, [setRecorderStatus, stopTimers]);
 
@@ -96,6 +110,30 @@ export function useAudiobookRecorder({
     setError(null);
     setRecorderStatus("arming");
     try {
+      const existingDrafts = await listAudiobookRecordingDrafts(projectId);
+      projectPendingBytesRef.current = existingDrafts.reduce((total, draft) => total + draft.sizeBytes, 0);
+      if (projectPendingBytesRef.current >= AUDIOBOOK_LIMITS.maxProjectSourceBytes) {
+        throw new Error("project_recording_limit_reached");
+      }
+      const createdAt = Date.now();
+      const draft: AudiobookRecordingDraft = {
+        id: crypto.randomUUID(),
+        projectId,
+        chapterId,
+        authorId,
+        originalName: `Запись-${new Date(createdAt).toISOString().replace(/[:.]/g, "-")}.${getAudiobookRecordingExtension(requestedMimeType)}`,
+        mimeType: requestedMimeType.split(";", 1)[0].toLowerCase(),
+        durationMs: 0,
+        sizeBytes: 0,
+        createdAt,
+      };
+      await saveAudiobookRecordingDraft(draft);
+      draftRef.current = draft;
+      bytesRef.current = 0;
+      chunkSequenceRef.current = 0;
+      persistenceFailedRef.current = false;
+      storageLimitReachedRef.current = false;
+      writeChainRef.current = Promise.resolve();
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIOBOOK_MICROPHONE_CONSTRAINTS });
@@ -108,46 +146,69 @@ export function useAudiobookRecorder({
         return;
       }
       const recorder = new MediaRecorder(stream, { mimeType: requestedMimeType });
-      const chunks: BlobPart[] = [];
       streamRef.current = stream;
       recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.ondataavailable = (event) => {
+        if (!event.data.size || !draftRef.current) return;
+        const chunk = event.data;
+        const sequence = chunkSequenceRef.current++;
+        writeChainRef.current = writeChainRef.current.then(async () => {
+          if (storageLimitReachedRef.current) return;
+          const wouldExceedFragment = bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxFragmentBytes;
+          const wouldExceedProject = projectPendingBytesRef.current + bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxProjectSourceBytes;
+          if (wouldExceedFragment || wouldExceedProject) {
+            storageLimitReachedRef.current = true;
+            setError(wouldExceedFragment
+              ? "Достигнут лимит записи в 200 МБ."
+              : "Достигнут лимит исходных файлов книги.");
+            window.setTimeout(stopRecording, 0);
+            return;
+          }
+          await appendAudiobookRecordingChunk(draft.id, sequence, chunk);
+          bytesRef.current += chunk.size;
+        }).catch(() => {
+          persistenceFailedRef.current = true;
+          setError("Не удалось сохранить запись на этом устройстве.");
+          window.setTimeout(stopRecording, 0);
+        });
+      };
       recorder.onerror = () => {
         setError("Не удалось записать звук с микрофона.");
         if (recorder.state !== "inactive") recorder.stop();
       };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         recorderRef.current = null;
         stopTimers();
         releaseStream();
         const durationMs = Math.max(0, performance.now() - startedAtRef.current);
-        const blob = new Blob(chunks, { type: recorder.mimeType });
-        const validationError = validateAudiobookRecordedBlob(blob);
-        if (validationError) {
-          setError(validationError);
+        await writeChainRef.current;
+        const completedDraft = draftRef.current;
+        draftRef.current = null;
+        if (!completedDraft || persistenceFailedRef.current) {
+          if (completedDraft) await deleteAudiobookRecordingDraft(completedDraft.id).catch(() => undefined);
           setRecorderStatus("idle");
           return;
         }
         setRecorderStatus("saving");
-        const mimeType = blob.type.split(";", 1)[0].toLowerCase();
-        const createdAt = Date.now();
-        const draft = {
-          id: crypto.randomUUID(),
-          projectId,
-          chapterId,
-          authorId,
-          originalName: `Запись-${new Date(createdAt).toISOString().replace(/[:.]/g, "-")}.${getAudiobookRecordingExtension(mimeType)}`,
-          mimeType,
-          blob,
+        const finalizedDraft = {
+          ...completedDraft,
           durationMs,
-          createdAt,
+          sizeBytes: bytesRef.current,
+          readyAt: Date.now(),
         };
-        void saveAudiobookRecordingDraft(draft)
+        const validationError = validateAudiobookRecordedBlob(new Blob([new Uint8Array(1)], { type: finalizedDraft.mimeType }));
+        if (validationError) {
+          await deleteAudiobookRecordingDraft(finalizedDraft.id).catch(() => undefined);
+          setError(validationError);
+          setRecorderStatus("idle");
+          return;
+        }
+        void saveAudiobookRecordingDraft(finalizedDraft)
           .then(sync)
           .catch(() => setError("Не удалось сохранить запись на этом устройстве."))
           .finally(() => setRecorderStatus("idle"));
       };
-      recorder.start();
+      recorder.start(1000);
       startedAtRef.current = performance.now();
       setElapsedMs(0);
       timerRef.current = window.setInterval(() => setElapsedMs(performance.now() - startedAtRef.current), 250);
@@ -155,9 +216,14 @@ export function useAudiobookRecorder({
       setRecorderStatus("recording");
     } catch (startError) {
       releaseStream();
+      const draft = draftRef.current;
+      draftRef.current = null;
+      if (draft) await deleteAudiobookRecordingDraft(draft.id).catch(() => undefined);
       setRecorderStatus("idle");
-      const name = startError instanceof DOMException ? startError.name : "";
-      setError(name === "NotAllowedError" || name === "SecurityError"
+      const name = startError instanceof DOMException || startError instanceof Error ? startError.name : "";
+      setError(name === "project_recording_limit_reached"
+        ? "Достигнут лимит исходных файлов книги."
+        : name === "NotAllowedError" || name === "SecurityError"
         ? "Нет доступа к микрофону. Разрешите его использование в браузере."
         : name === "NotFoundError" ? "Микрофон не найден или недоступен." : "Не удалось включить микрофон для записи.");
     }
@@ -172,15 +238,23 @@ export function useAudiobookRecorder({
       window.removeEventListener("online", onOnline);
       stopTimers();
       const recorder = recorderRef.current;
-      if (recorder && recorder.state !== "inactive") recorder.stop();
-      releaseStream();
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.requestData();
+        } catch {
+          // stop() still requests final buffered data.
+        }
+        recorder.stop();
+      } else {
+        releaseStream();
+      }
       statusRef.current = "idle";
     };
   }, [releaseStream, stopTimers, sync]);
 
   return {
     status,
-    isLocked: status === "arming" || status === "recording" || status === "stopping",
+    isLocked: status !== "idle",
     elapsedMs,
     error,
     pendingDraftCount,

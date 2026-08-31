@@ -22,6 +22,7 @@ export function AudiobookRecorder({
 }) {
   const recorder = useAudiobookRecorder({ authorId, projectId, chapterId, onSynced });
   const [draftToDiscard, setDraftToDiscard] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
 
   useEffect(() => {
     onLockChange(recorder.isLocked);
@@ -40,22 +41,28 @@ export function AudiobookRecorder({
           </button>
         )}
         {recorder.status === "stopping" ? <span className="text-sm text-[#ddd2f5]">Останавливаем запись…</span> : null}
-        {recorder.pendingDraftCount ? <span className="text-sm text-[#ddd2f5]">Синхронизация черновика…</span> : null}
+        {recorder.status === "saving" || recorder.pendingDraftCount ? <span className="text-sm text-[#ddd2f5]">Синхронизация черновика…</span> : null}
       </div>
       <p className="mt-3 text-sm text-[#ddd2f5]">Запись сохраняется на устройстве до успешной загрузки и будет отправлена при восстановлении сети.</p>
       {recorder.error ? <p role="alert" className="mt-3 text-sm text-[#ffb4b4]">{recorder.error}</p> : null}
       {recorder.drafts.filter((draft) => draft.chapterId === chapterId).map((draft) => (
         <div key={draft.id} className="mt-3 flex items-center justify-between gap-3 text-sm text-[#ddd2f5]">
           <span>Локальный черновик записи</span>
-          <button type="button" disabled={recorder.isLocked} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
+          <button type="button" disabled={recorder.isLocked || discarding} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
         </div>
       ))}
       {draftToDiscard ? (
         <div role="dialog" aria-modal="true" className="mt-4 rounded-xl border border-[#d95d6b] p-4">
           <p className="text-sm">Удалить локальный черновик? Восстановить запись будет невозможно.</p>
           <div className="mt-3 flex gap-3">
-            <button type="button" onClick={() => void recorder.discardDraft(draftToDiscard).then(() => setDraftToDiscard(null))} className="text-[#ffb4b4] underline">Удалить</button>
-            <button type="button" onClick={() => setDraftToDiscard(null)} className="underline">Отмена</button>
+            <button type="button" disabled={discarding} onClick={() => {
+              setDiscarding(true);
+              void recorder.discardDraft(draftToDiscard)
+                .then(() => setDraftToDiscard(null))
+                .catch(() => undefined)
+                .finally(() => setDiscarding(false));
+            }} className="text-[#ffb4b4] underline">{discarding ? "Удаляем…" : "Удалить"}</button>
+            <button type="button" disabled={discarding} onClick={() => setDraftToDiscard(null)} className="underline">Отмена</button>
           </div>
         </div>
       ) : null}
