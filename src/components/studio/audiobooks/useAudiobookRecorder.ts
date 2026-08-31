@@ -221,7 +221,8 @@ export function useAudiobookRecorder({
       if (draft) await deleteAudiobookRecordingDraft(draft.id).catch(() => undefined);
       setRecorderStatus("idle");
       const name = startError instanceof DOMException || startError instanceof Error ? startError.name : "";
-      setError(name === "project_recording_limit_reached"
+      const message = startError instanceof Error ? startError.message : "";
+      setError(message === "project_recording_limit_reached"
         ? "Достигнут лимит исходных файлов книги."
         : name === "NotAllowedError" || name === "SecurityError"
         ? "Нет доступа к микрофону. Разрешите его использование в браузере."
