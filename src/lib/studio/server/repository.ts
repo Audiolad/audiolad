@@ -536,7 +536,7 @@ export async function replaceStudioProjectAsset(input: {
 }
 
 export async function deleteStudioProjectAsset(projectId: string, assetId: string) {
-  const { asset, service } = await getStudioProjectAsset(projectId, assetId);
+  const { service } = await getStudioProjectAsset(projectId, assetId);
   await recordAuthorSupportAudit({
     action: "studio_asset_deleted",
     resourceType: "studio_project_asset",
