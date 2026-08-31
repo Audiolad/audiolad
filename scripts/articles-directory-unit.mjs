@@ -129,6 +129,7 @@ import { MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/li
 import { MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn.ts";
+import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2949,6 +2950,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredSecondListenHref}`),
     "directory JSON-LD includes hundred-second listen href",
+  );
+
+  const hundredThirdListenHref = "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const hundredThirdListenCard = data.articles.find((card) => card.href === hundredThirdListenHref);
+  assert(hundredThirdListenCard, "hundred-third indexable listen page is listed");
+  assert(
+    hundredThirdListenCard.title === "Спокойная музыка для сна с дождём – слушать онлайн бесплатно | АудиоЛад",
+    "hundred-third listen directory title",
+  );
+  assert(
+    hundredThirdListenCard.description === SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE.description,
+    "hundred-third listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn"),
+    "no /articles duplicate for hundred-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredThirdListenHref}`),
+    "directory JSON-LD includes hundred-third listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
