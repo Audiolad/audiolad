@@ -135,7 +135,10 @@ export function StudioProjectLibrary({
 
         <div className="mt-8">
           {duplicateError ? (
-            <p role="alert" className="mb-4 text-sm font-medium text-rose-100">
+            <p
+              role="alert"
+              className="pointer-events-none fixed inset-x-5 bottom-5 z-50 mx-auto w-fit rounded-lg border border-rose-300/35 bg-rose-950/95 px-4 py-3 text-sm font-medium text-rose-100 shadow-xl"
+            >
               {duplicateError}
             </p>
           ) : null}

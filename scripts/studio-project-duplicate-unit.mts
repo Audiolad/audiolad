@@ -66,6 +66,7 @@ assert.match(library, /Копировать/);
 assert.match(library, /Копируем…/);
 assert.match(library, /duplicatingProjectId/);
 assert.match(library, /guest_project_limit|STUDIO_GUEST_MAX_PROJECTS/);
+assert.match(library, /pointer-events-none fixed/);
 
 const snapshot = createStudioRenderSnapshot({
   project: {
