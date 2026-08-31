@@ -194,6 +194,13 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/studio/projects/[projectId]/route.ts"],
     },
     {
+      key: "studio_project_duplicate",
+      group: "studio",
+      disposition: "allowed_audited",
+      action: "studio_project_duplicated",
+      routePatterns: ["src/app/api/studio/projects/[projectId]/duplicate/route.ts"],
+    },
+    {
       key: "studio_project_delete",
       group: "studio",
       disposition: "allowed_audited",

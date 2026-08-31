@@ -45,7 +45,7 @@ export async function cleanupExpiredGuestSessions(
   const { data: assets, error: assetError } = projectIds.length
     ? await service
         .from("studio_project_assets")
-        .select("id, project_id, storage_path")
+    .select("id, project_id, storage_path, source_id")
         .in("project_id", projectIds)
     : { data: [], error: null };
   if (assetError) {
@@ -88,8 +88,23 @@ export async function cleanupExpiredGuestSessions(
     })),
   });
 
-  const draftPaths = plan.storagePaths.filter((path) => path.startsWith("studio/"));
-  const renderPaths = plan.storagePaths.filter((path) => !path.startsWith("studio/"));
+  const releasedSourcePaths: string[] = [];
+  for (const asset of assets ?? []) {
+    const { data, error } = await service.rpc("release_studio_project_asset", {
+      p_project_id: asset.project_id,
+      p_asset_id: asset.id,
+    });
+    // An already-released reference is safe to hard-delete during expiry cleanup.
+    if (error && !error.message.includes("project_not_found")) {
+      throw new Error(`studio_guest_cleanup_release_assets: ${error.message}`);
+    }
+    releasedSourcePaths.push(...(data ?? []).map((row: { storage_path: string }) => row.storage_path));
+  }
+
+  const draftPaths = releasedSourcePaths;
+  const renderPaths = (jobs ?? [])
+    .map((job) => job.output_storage_path as string | null)
+    .filter((path): path is string => Boolean(path));
 
   if (draftPaths.length > 0) {
     const remove = await service.storage.from(STUDIO_ASSETS_BUCKET).remove(draftPaths);
@@ -118,6 +133,15 @@ export async function cleanupExpiredGuestSessions(
       .delete()
       .in("id", plan.assetIds);
     if (error) throw new Error(`studio_guest_cleanup_delete_assets: ${error.message}`);
+  }
+  const sourceIds = [...new Set((assets ?? []).map((asset) => asset.source_id as string))];
+  if (sourceIds.length > 0) {
+    const { error } = await service
+      .from("studio_asset_sources")
+      .delete()
+      .in("id", sourceIds)
+      .not("deleted_at", "is", null);
+    if (error) throw new Error(`studio_guest_cleanup_delete_sources: ${error.message}`);
   }
   if (plan.projectIds.length > 0) {
     const { error } = await service

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { StudioGuestProjectLimitGate } from "@/components/studio/StudioGuestGate";
 import {
   deleteStudioProject,
+  duplicateStudioProject,
   listStudioProjects,
   StudioPersistenceClientError,
   type StudioProjectListItem,
@@ -28,12 +30,15 @@ export function StudioProjectLibrary({
   authorId?: string;
   accessMode?: "author" | "guest";
 }) {
+  const router = useRouter();
   const [projects, setProjects] = useState<StudioProjectListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [projectToDelete, setProjectToDelete] = useState<StudioProjectListItem | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [duplicatingProjectId, setDuplicatingProjectId] = useState<string | null>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -90,6 +95,24 @@ export function StudioProjectLibrary({
     }
   }, [deletingProjectId, projectToDelete]);
 
+  const duplicateProject = useCallback(async (project: StudioProjectListItem) => {
+    if (
+      duplicatingProjectId ||
+      (accessMode === "guest" && (projects?.length ?? 0) >= STUDIO_GUEST_MAX_PROJECTS)
+    ) {
+      return;
+    }
+    setDuplicateError(null);
+    setDuplicatingProjectId(project.id);
+    try {
+      const duplicate = await duplicateStudioProject({ projectId: project.id });
+      router.push(`/studio/project/${encodeURIComponent(duplicate.id)}`);
+    } catch {
+      setDuplicateError("Не удалось скопировать проект. Попробуйте ещё раз.");
+      setDuplicatingProjectId(null);
+    }
+  }, [accessMode, duplicatingProjectId, projects?.length, router]);
+
   return (
     <section className="flex-1 py-10 sm:py-14">
       <div className="mx-auto w-full max-w-3xl">
@@ -111,6 +134,11 @@ export function StudioProjectLibrary({
         </div>
 
         <div className="mt-8">
+          {duplicateError ? (
+            <p role="alert" className="mb-4 text-sm font-medium text-rose-100">
+              {duplicateError}
+            </p>
+          ) : null}
           {error ? (
             <section
               role="alert"
@@ -178,8 +206,19 @@ export function StudioProjectLibrary({
                     </Link>
                     <button
                       type="button"
+                      onClick={() => void duplicateProject(project)}
+                      disabled={
+                        duplicatingProjectId !== null ||
+                        (accessMode === "guest" && projects.length >= STUDIO_GUEST_MAX_PROJECTS)
+                      }
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/25 px-3 text-sm font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {duplicatingProjectId === project.id ? "Копируем…" : "Копировать"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => requestDelete(project)}
-                      disabled={deletingProjectId === project.id}
+                      disabled={deletingProjectId === project.id || duplicatingProjectId !== null}
                       className="inline-flex min-h-10 items-center justify-center rounded-lg border border-rose-300/45 px-3 text-sm font-semibold text-rose-100 hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Удалить
