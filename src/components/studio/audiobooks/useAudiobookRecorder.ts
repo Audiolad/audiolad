@@ -153,7 +153,7 @@ export function useAudiobookRecorder({
         const chunk = event.data;
         const sequence = chunkSequenceRef.current++;
         writeChainRef.current = writeChainRef.current.then(async () => {
-          if (storageLimitReachedRef.current) return;
+          if (storageLimitReachedRef.current || persistenceFailedRef.current) return;
           const wouldExceedFragment = bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxFragmentBytes;
           const wouldExceedProject = projectPendingBytesRef.current + bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxProjectSourceBytes;
           if (wouldExceedFragment || wouldExceedProject) {
