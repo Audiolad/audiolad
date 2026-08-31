@@ -64,3 +64,39 @@ The migration is additive for data: application rollback can leave
 `studio_asset_sources` and `source_id` in place. Do not attempt a destructive
 database rollback; the previous application continues to read the retained
 `studio_project_assets.storage_path` values.
+
+### Disposable shared-assets verification VM
+
+Use the official Supabase Docker stack pinned to `self-hosted/v0.8.0`. Its
+gateway service is `api-gw` and the actual host-port variable is
+`API_GW_HTTP_PORT` (not `API_PORT`). Bind it locally:
+
+```bash
+API_GW_HTTP_PORT=127.0.0.1:54321
+SUPABASE_PUBLIC_URL=http://127.0.0.1:54321
+API_EXTERNAL_URL=http://127.0.0.1:54321/auth/v1
+```
+
+Generate the stack's disposable keys with its verified
+`utils/generate-keys.sh` and `utils/add-new-auth-keys.sh`; store them only in
+the VM's ignored stack `.env`. After the application baseline immediately
+before the shared-assets migration is installed, run:
+
+```bash
+export AUDIOLAD_TEST_DATABASE=1
+export AUDIOLAD_STUDIO_PERSISTENCE_ISOLATED=1
+export AUDIOLAD_STUDIO_TEST_STACK_DIR=/absolute/path/to/disposable/stack
+export NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<disposable-publishable-key>
+export SUPABASE_SERVICE_ROLE_KEY=<disposable-service-role-key>
+npm run test:studio-shared-assets:isolated
+```
+
+The harness refuses a non-local URL, missing safety flags, production-like
+stack paths, a missing pre-migration schema, or a missing migration file. It
+creates synthetic legacy author/project/assets, uploads isolated bucket
+objects, applies the checkout migration through the disposable Docker stack,
+checks source backfill/reference integrity, duplicates through the application
+API, verifies shared Storage survives original deletion, and checks autosave.
+Reset the disposable stack (`docker compose down -v`) before a repeated
+pre-migration/backfill run.
