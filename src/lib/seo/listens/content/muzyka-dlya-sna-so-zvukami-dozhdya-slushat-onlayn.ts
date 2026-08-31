@@ -54,6 +54,14 @@ export const MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE =
             "композиции, где дождь слышен более отчётливо.",
           ]},
           { kind: "paragraph", text: "Это примеры возможного формата, а не описание обязательного состава текущей подборки." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если инструментальный слой – именно пианино, есть страница " },
+              { href: "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn", label: "музыка пианино и дождя для сна" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Состав плейлиста может пополняться, поэтому лучше ориентироваться на доступные сейчас варианты и пробовать несколько композиций." },
         ],
       },
@@ -154,7 +162,24 @@ export const MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Это не означает, что все перечисленные варианты обязательно присутствуют в текущем плейлисте." },
           { kind: "paragraph", text: "Конкретное звучание зависит от композиции." },
           { kind: "paragraph", text: "Если вам хочется отчётливее слышать отдельные капли, можно выбирать материалы, где такой элемент действительно заметен. Но текущая страница не строится отдельно вокруг капель дождя." },
-          { kind: "paragraph", text: "Точно так же здесь нет основного акцента на громе или грозе. Такие элементы относятся к более узкому сценарию и не должны восприниматься как обязательная характеристика всей подборки." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Отдельная страница про этот акцент – " },
+              { href: "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn", label: "музыка с каплями дождя для сна" },
+              { text: ". Если к каплям добавляется расслабляющий сценарий, ближе " },
+              { href: "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn", label: "расслабляющая музыка для сна с каплями дождя" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Точно так же здесь нет основного акцента на громе или грозе. Для такого узкого сценария опубликована " },
+              { href: "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn", label: "музыка дождя и грозы для сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {

@@ -113,6 +113,7 @@ import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn.ts";
@@ -30870,11 +30871,25 @@ function testNinetyNinthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 0, "ninety-ninth page has no rich_paragraph");
+  assert(allRich.length === 8, "ninety-ninth page has exactly 8 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 0, "ninety-ninth page has exactly 0 hrefs");
+  const ninetyNinthClusterHrefs = [
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 11, "ninety-ninth page has exactly 11 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 0, "ninety-ninth page has exactly 0 unique dests");
+  assert(uniqueDests.size === 11, "ninety-ninth page has exactly 11 unique dests");
+  assert(allLinks.map((link) => link.href).join("\n") === ninetyNinthClusterHrefs.join("\n"), "ninety-ninth hub links all 11 children in order");
   for (const href of NINETY_NINTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-ninth has no ${href} href`);
   }
@@ -30882,7 +30897,8 @@ function testNinetyNinthPage() {
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "ninety-ninth content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "ninety-ninth content file has no https://");
-  assert(!contentSource.includes('href: "/listens/"'), "ninety-ninth content file has no href: \"/listens/\"");
+  assert(!contentSource.includes('href: "/listens/"\n'), "ninety-ninth content file has no empty listen href");
+  assert(contentSource.includes('href: "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn"'), "ninety-ninth content file links noise child");
   assert(contentSource.includes(`playlistSlug: "${NINETY_NINTH_PLAYLIST_SLUG}"`), "ninety-ninth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "ninety-ninth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-ninth content file has no primaryPractice");
@@ -30891,7 +30907,7 @@ function testNinetyNinthPage() {
   assert(!contentSource.includes("School"), "ninety-ninth content file has no School");
   assert(!contentSource.includes("internalLinks"), "ninety-ninth content file has no internalLinks");
   assert(!contentSource.includes("topicSlug"), "ninety-ninth content file has no topicSlug");
-  assert(!contentSource.includes("rich_paragraph"), "ninety-ninth content file has no rich_paragraph");
+  assert(contentSource.includes("rich_paragraph"), "ninety-ninth content file has rich_paragraph cluster links");
   assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "ninety-ninth content file has no bookmark phrase");
   assert(!contentSource.includes("🔖"), "ninety-ninth content file has no bookmark emoji");
   assert(!contentSource.includes("закладк"), "ninety-ninth content file has no bookmark word");
@@ -31131,13 +31147,20 @@ function testOneHundredthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 1, "one-hundredth page has exactly 1 rich_paragraph");
+  assert(allRich.length === 4, "one-hundredth page has exactly 4 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 1, "one-hundredth page has exactly 1 href");
+  const oneHundredthClusterHrefs = [
+    ONE_HUNDREDTH_LISTEN_99_HREF,
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 4, "one-hundredth page has exactly 4 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 1, "one-hundredth page has exactly 1 unique dest");
+  assert(uniqueDests.size === 4, "one-hundredth page has exactly 4 unique dest");
   assert(allLinks[0].href === ONE_HUNDREDTH_LISTEN_99_HREF, "one-hundredth dest is Listen 99");
   assert(allLinks[0].label === ONE_HUNDREDTH_LISTEN_99_LABEL, "one-hundredth label is exact Listen 99 title");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredthClusterHrefs.join("\n"), "one-hundredth cluster hrefs exact");
   for (const href of ONE_HUNDREDTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundredth has no ${href} href`);
   }
@@ -31147,8 +31170,8 @@ function testOneHundredthPage() {
   assert(!contentSource.includes("https://"), "one-hundredth content file has no https://");
   assert(contentSource.includes(`href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`), "one-hundredth content file has Listen 99 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 1, "one-hundredth content file has exactly 1 /listens/ href");
-  assert(listenHrefMatches[0] === `href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`, "one-hundredth content file href is Listen 99 only");
+  assert(listenHrefMatches.length === 4, "one-hundredth content file has exactly 4 /listens/ href");
+  assert(listenHrefMatches[0] === `href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`, "one-hundredth first content file href is Listen 99");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDREDTH_PLAYLIST_SLUG}"`), "one-hundredth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundredth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundredth content file has no primaryPractice");
@@ -31420,15 +31443,25 @@ function testOneHundredFirstPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 2, "one-hundred-first page has exactly 2 rich_paragraph");
+  assert(allRich.length === 5, "one-hundred-first page has exactly 5 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 2, "one-hundred-first page has exactly 2 href");
+  const oneHundredFirstClusterHrefs = [
+    ONE_HUNDRED_FIRST_LISTEN_99_HREF,
+    ONE_HUNDRED_FIRST_LISTEN_100_HREF,
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+  ];
+  assert(allLinks.length === 7, "one-hundred-first page has exactly 7 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 2, "one-hundred-first page has exactly 2 unique dest");
+  assert(uniqueDests.size === 7, "one-hundred-first page has exactly 7 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_FIRST_LISTEN_99_HREF, "one-hundred-first first dest is Listen 99");
   assert(allLinks[0].label === ONE_HUNDRED_FIRST_LISTEN_99_LABEL, "one-hundred-first first label is exact Listen 99 title");
   assert(allLinks[1].href === ONE_HUNDRED_FIRST_LISTEN_100_HREF, "one-hundred-first second dest is Listen 100");
   assert(allLinks[1].label === ONE_HUNDRED_FIRST_LISTEN_100_LABEL, "one-hundred-first second label is exact Listen 100 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredFirstClusterHrefs.join("\n"), "one-hundred-first cluster hrefs exact");
   for (const href of ONE_HUNDRED_FIRST_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-first has no ${href} href`);
   }
@@ -31439,7 +31472,7 @@ function testOneHundredFirstPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FIRST_LISTEN_99_HREF}"`), "one-hundred-first content file has Listen 99 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FIRST_LISTEN_100_HREF}"`), "one-hundred-first content file has Listen 100 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 2, "one-hundred-first content file has exactly 2 /listens/ href");
+  assert(listenHrefMatches.length === 7, "one-hundred-first content file has exactly 7 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_FIRST_LISTEN_99_HREF}"`, "one-hundred-first first content file href is Listen 99");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_FIRST_LISTEN_100_HREF}"`, "one-hundred-first second content file href is Listen 100");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_FIRST_PLAYLIST_SLUG}"`), "one-hundred-first content file has playlistSlug");
@@ -31694,17 +31727,27 @@ function testOneHundredSecondPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 3, "one-hundred-second page has exactly 3 rich_paragraph");
+  assert(allRich.length === 6, "one-hundred-second page has exactly 6 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 3, "one-hundred-second page has exactly 3 href");
+  const oneHundredSecondClusterHrefs = [
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    ONE_HUNDRED_SECOND_LISTEN_99_HREF,
+    ONE_HUNDRED_SECOND_LISTEN_100_HREF,
+    ONE_HUNDRED_SECOND_LISTEN_101_HREF,
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 7, "one-hundred-second page has exactly 7 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 3, "one-hundred-second page has exactly 3 unique dest");
-  assert(allLinks[0].href === ONE_HUNDRED_SECOND_LISTEN_99_HREF, "one-hundred-second first dest is Listen 99");
-  assert(allLinks[0].label === ONE_HUNDRED_SECOND_LISTEN_99_LABEL, "one-hundred-second first label is exact Listen 99 title");
-  assert(allLinks[1].href === ONE_HUNDRED_SECOND_LISTEN_100_HREF, "one-hundred-second second dest is Listen 100");
-  assert(allLinks[1].label === ONE_HUNDRED_SECOND_LISTEN_100_LABEL, "one-hundred-second second label is exact Listen 100 label");
-  assert(allLinks[2].href === ONE_HUNDRED_SECOND_LISTEN_101_HREF, "one-hundred-second third dest is Listen 101");
-  assert(allLinks[2].label === ONE_HUNDRED_SECOND_LISTEN_101_LABEL, "one-hundred-second third label is exact Listen 101 label");
+  assert(uniqueDests.size === 7, "one-hundred-second page has exactly 7 unique dest");
+  assert(allLinks[1].href === ONE_HUNDRED_SECOND_LISTEN_99_HREF, "one-hundred-second hub dest is Listen 99");
+  assert(allLinks[1].label === ONE_HUNDRED_SECOND_LISTEN_99_LABEL, "one-hundred-second hub label is exact Listen 99 title");
+  assert(allLinks[2].href === ONE_HUNDRED_SECOND_LISTEN_100_HREF, "one-hundred-second second dest is Listen 100");
+  assert(allLinks[2].label === ONE_HUNDRED_SECOND_LISTEN_100_LABEL, "one-hundred-second second label is exact Listen 100 label");
+  assert(allLinks[3].href === ONE_HUNDRED_SECOND_LISTEN_101_HREF, "one-hundred-second third dest is Listen 101");
+  assert(allLinks[3].label === ONE_HUNDRED_SECOND_LISTEN_101_LABEL, "one-hundred-second third label is exact Listen 101 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredSecondClusterHrefs.join("\n"), "one-hundred-second cluster hrefs exact");
   for (const href of ONE_HUNDRED_SECOND_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-second has no ${href} href`);
   }
@@ -31716,10 +31759,10 @@ function testOneHundredSecondPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`), "one-hundred-second content file has Listen 100 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`), "one-hundred-second content file has Listen 101 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 3, "one-hundred-second content file has exactly 3 /listens/ href");
-  assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_SECOND_LISTEN_99_HREF}"`, "one-hundred-second first content file href is Listen 99");
-  assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`, "one-hundred-second second content file href is Listen 100");
-  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`, "one-hundred-second third content file href is Listen 101");
+  assert(listenHrefMatches.length === 7, "one-hundred-second content file has exactly 7 /listens/ href");
+  assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_SECOND_LISTEN_99_HREF}"`, "one-hundred-second hub content file href is Listen 99");
+  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`, "one-hundred-second second content file href is Listen 100");
+  assert(listenHrefMatches[3] === `href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`, "one-hundred-second third content file href is Listen 101");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_SECOND_PLAYLIST_SLUG}"`), "one-hundred-second content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundred-second content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundred-second content file has no primaryPractice");
@@ -32006,19 +32049,30 @@ function testOneHundredThirdPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 4, "one-hundred-third page has exactly 4 rich_paragraph");
+  assert(allRich.length === 6, "one-hundred-third page has exactly 6 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 4, "one-hundred-third page has exactly 4 href");
+  const oneHundredThirdClusterHrefs = [
+    ONE_HUNDRED_THIRD_LISTEN_102_HREF,
+    ONE_HUNDRED_THIRD_LISTEN_101_HREF,
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    ONE_HUNDRED_THIRD_LISTEN_99_HREF,
+    ONE_HUNDRED_THIRD_LISTEN_100_HREF,
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+  ];
+  assert(allLinks.length === 8, "one-hundred-third page has exactly 8 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 4, "one-hundred-third page has exactly 4 unique dest");
+  assert(uniqueDests.size === 8, "one-hundred-third page has exactly 8 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_THIRD_LISTEN_102_HREF, "one-hundred-third first dest is Listen 102");
   assert(allLinks[0].label === ONE_HUNDRED_THIRD_LISTEN_102_LABEL, "one-hundred-third first label is exact Listen 102 label");
   assert(allLinks[1].href === ONE_HUNDRED_THIRD_LISTEN_101_HREF, "one-hundred-third second dest is Listen 101");
   assert(allLinks[1].label === ONE_HUNDRED_THIRD_LISTEN_101_LABEL, "one-hundred-third second label is exact Listen 101 label");
-  assert(allLinks[2].href === ONE_HUNDRED_THIRD_LISTEN_99_HREF, "one-hundred-third third dest is Listen 99");
-  assert(allLinks[2].label === ONE_HUNDRED_THIRD_LISTEN_99_LABEL, "one-hundred-third third label is exact Listen 99 title");
-  assert(allLinks[3].href === ONE_HUNDRED_THIRD_LISTEN_100_HREF, "one-hundred-third fourth dest is Listen 100");
-  assert(allLinks[3].label === ONE_HUNDRED_THIRD_LISTEN_100_LABEL, "one-hundred-third fourth label is exact Listen 100 label");
+  assert(allLinks[4].href === ONE_HUNDRED_THIRD_LISTEN_99_HREF, "one-hundred-third hub dest is Listen 99");
+  assert(allLinks[4].label === ONE_HUNDRED_THIRD_LISTEN_99_LABEL, "one-hundred-third hub label is exact Listen 99 title");
+  assert(allLinks[5].href === ONE_HUNDRED_THIRD_LISTEN_100_HREF, "one-hundred-third noise dest is Listen 100");
+  assert(allLinks[5].label === ONE_HUNDRED_THIRD_LISTEN_100_LABEL, "one-hundred-third noise label is exact Listen 100 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredThirdClusterHrefs.join("\n"), "one-hundred-third cluster hrefs exact");
   for (const href of ONE_HUNDRED_THIRD_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-third has no ${href} href`);
   }
@@ -32031,11 +32085,11 @@ function testOneHundredThirdPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`), "one-hundred-third content file has Listen 99 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`), "one-hundred-third content file has Listen 100 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 4, "one-hundred-third content file has exactly 4 /listens/ href");
+  assert(listenHrefMatches.length === 8, "one-hundred-third content file has exactly 8 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_THIRD_LISTEN_102_HREF}"`, "one-hundred-third first content file href is Listen 102");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_THIRD_LISTEN_101_HREF}"`, "one-hundred-third second content file href is Listen 101");
-  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`, "one-hundred-third third content file href is Listen 99");
-  assert(listenHrefMatches[3] === `href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`, "one-hundred-third fourth content file href is Listen 100");
+  assert(listenHrefMatches[4] === `href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`, "one-hundred-third hub content file href is Listen 99");
+  assert(listenHrefMatches[5] === `href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`, "one-hundred-third noise content file href is Listen 100");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_THIRD_PLAYLIST_SLUG}"`), "one-hundred-third content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundred-third content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundred-third content file has no primaryPractice");
@@ -32324,11 +32378,21 @@ function testOneHundredFourthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 5, "one-hundred-fourth page has exactly 5 rich_paragraph");
+  assert(allRich.length === 7, "one-hundred-fourth page has exactly 7 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 5, "one-hundred-fourth page has exactly 5 href");
+  const oneHundredFourthClusterHrefs = [
+    ONE_HUNDRED_FOURTH_LISTEN_102_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_101_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_103_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_100_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_99_HREF,
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+  ];
+  assert(allLinks.length === 8, "one-hundred-fourth page has exactly 8 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 5, "one-hundred-fourth page has exactly 5 unique dest");
+  assert(uniqueDests.size === 8, "one-hundred-fourth page has exactly 8 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_FOURTH_LISTEN_102_HREF, "one-hundred-fourth first dest is Listen 102");
   assert(allLinks[0].label === ONE_HUNDRED_FOURTH_LISTEN_102_LABEL, "one-hundred-fourth first label is exact Listen 102 label");
   assert(allLinks[1].href === ONE_HUNDRED_FOURTH_LISTEN_101_HREF, "one-hundred-fourth second dest is Listen 101");
@@ -32339,6 +32403,7 @@ function testOneHundredFourthPage() {
   assert(allLinks[3].label === ONE_HUNDRED_FOURTH_LISTEN_100_LABEL, "one-hundred-fourth fourth label is exact Listen 100 label");
   assert(allLinks[4].href === ONE_HUNDRED_FOURTH_LISTEN_99_HREF, "one-hundred-fourth fifth dest is Listen 99");
   assert(allLinks[4].label === ONE_HUNDRED_FOURTH_LISTEN_99_LABEL, "one-hundred-fourth fifth label is exact Listen 99 title");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredFourthClusterHrefs.join("\n"), "one-hundred-fourth cluster hrefs exact");
   for (const href of ONE_HUNDRED_FOURTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-fourth has no ${href} href`);
   }
@@ -32352,7 +32417,7 @@ function testOneHundredFourthPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FOURTH_LISTEN_100_HREF}"`), "one-hundred-fourth content file has Listen 100 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FOURTH_LISTEN_99_HREF}"`), "one-hundred-fourth content file has Listen 99 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 5, "one-hundred-fourth content file has exactly 5 /listens/ href");
+  assert(listenHrefMatches.length === 8, "one-hundred-fourth content file has exactly 8 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_102_HREF}"`, "one-hundred-fourth first content file href is Listen 102");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_101_HREF}"`, "one-hundred-fourth second content file href is Listen 101");
   assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_103_HREF}"`, "one-hundred-fourth third content file href is Listen 103");
@@ -32494,6 +32559,8 @@ function testOneHundredEighthPage() {
     "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
     "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
     "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
   ];
   const expectedLabels = [
     "Музыка для сна с дождём",
@@ -32502,6 +32569,8 @@ function testOneHundredEighthPage() {
     "музыка пианино и дождя для сна",
     "спокойную музыку для сна с дождём",
     "успокаивающая музыка для сна с дождём",
+    "расслабляющая музыка для сна с каплями дождя",
+    "расслабляющая музыка с дождём для сна",
   ];
   const links = collectListenLinks(definition);
 
@@ -32520,8 +32589,8 @@ function testOneHundredEighthPage() {
   assert(definition.faq[0].question === "Где слушать музыку с каплями дождя для сна онлайн?", "one-hundred-eighth first FAQ question");
   assert(definition.faq[7].question === "Гарантирует ли музыка с каплями дождя быстрое засыпание?", "one-hundred-eighth last FAQ question");
   assert(definition.faq[7].answer === "Нет. Музыка и дождевое звучание не гарантируют скорость засыпания или определённый результат сна.", "one-hundred-eighth last FAQ answer");
-  assert(links.length === 6, "one-hundred-eighth has six href");
-  assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-eighth has six unique destinations");
+  assert(links.length === 8, "one-hundred-eighth has eight href");
+  assert(new Set(links.map((link) => link.href)).size === 8, "one-hundred-eighth has eight unique destinations");
   assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-eighth links exact");
   assert(links.map((link) => link.label).join("\n") === expectedLabels.join("\n"), "one-hundred-eighth labels exact");
   assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-eighth slug");
@@ -32753,6 +32822,93 @@ function testKidsSleepClusterInternalLinks() {
   assert(ageLinks.length === 4, "hub age paragraph has 4 links");
 }
 
+function testRainSleepClusterInternalLinks() {
+  const hub = "muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const noise = "muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn";
+  const calming = "uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const sounds = "muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn";
+  const calm = "spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const relaxing = "rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const relax = "relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const thunder = "muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn";
+  const piano = "muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn";
+  const drops = "muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn";
+  const calmingPiano = "uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+  const relaxingDrops = "rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+  const pages = [
+    MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const slugs = [hub, noise, calming, sounds, calm, relaxing, relax, thunder, piano, drops, calmingPiano, relaxingDrops];
+  const hrefOf = (slug) => `/listens/${slug}`;
+  const clusterHrefs = new Set(slugs.map(hrefOf));
+  const inbound = Object.fromEntries(slugs.map((slug) => [slug, 0]));
+  const matrix = {};
+  const weakLabels = ["здесь", "тут", "подробнее", "читать далее", "по ссылке"];
+
+  for (const page of pages) {
+    const links = collectListenLinks(page);
+    const hrefs = links.map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} has no duplicate href`);
+    assert(!hrefs.includes(hrefOf(page.slug)), `${page.slug} has no self-link`);
+    for (const link of links) {
+      assert(typeof link.label === "string" && link.label.length > 0, `${page.slug} link has visible label`);
+      assert(!link.label.includes("http"), `${page.slug} label is not a raw URL`);
+      assert(!link.label.includes("/listens/"), `${page.slug} label is not a raw path`);
+      assert(!link.label.includes("слушать онлайн бесплатно"), `${page.slug} label is not full H1`);
+      const labelLower = link.label.toLowerCase();
+      for (const weak of weakLabels) {
+        assert(labelLower !== weak, `${page.slug} label is not weak "${weak}"`);
+      }
+    }
+    const outs = hrefs.filter((href) => clusterHrefs.has(href));
+    matrix[page.slug] = outs;
+    for (const href of outs) {
+      inbound[href.replace("/listens/", "")] += 1;
+    }
+    const source = read(`src/lib/seo/listens/content/${page.slug}.ts`);
+    assert(!source.includes("https://"), `${page.slug} has no raw https URL`);
+    assert(!source.includes("Читайте также"), `${page.slug} has no Читайте также block`);
+    assert(!source.includes("Другие статьи"), `${page.slug} has no Другие статьи block`);
+    assert(!source.includes("Полезные ссылки"), `${page.slug} has no Полезные ссылки block`);
+  }
+
+  const hubOuts = new Set(matrix[hub]);
+  const children = slugs.filter((slug) => slug !== hub);
+  for (const child of children) {
+    assert(hubOuts.has(hrefOf(child)), `rain hub links to ${child}`);
+    assert(matrix[child].includes(hrefOf(hub)), `${child} links rain hub`);
+  }
+  assert(hubOuts.size === 11, "rain hub has 11 unique cluster destinations");
+  for (const slug of slugs) {
+    assert(inbound[slug] >= 2, `${slug} inbound is at least 2`);
+  }
+  assert(inbound[hub] === 11, "rain hub inbound is 11");
+  assert(matrix[piano].includes(hrefOf(calmingPiano)), "piano page links calming+piano");
+  assert(matrix[calmingPiano].includes(hrefOf(piano)), "calming+piano page links piano");
+  assert(matrix[drops].includes(hrefOf(relaxingDrops)), "drops page links relaxing+drops");
+  assert(matrix[relaxingDrops].includes(hrefOf(drops)), "relaxing+drops page links drops");
+  assert(inbound[piano] >= 2, "piano page has reverse inbound");
+  assert(inbound[drops] >= 2, "drops page has reverse inbound");
+  assert(inbound[calmingPiano] >= 2, "calming+piano page has reverse inbound");
+  assert(inbound[relaxingDrops] >= 2, "relaxing+drops page has reverse inbound");
+
+  let directed = 0;
+  for (const slug of slugs) directed += matrix[slug].length;
+  assert(directed < 132, "rain cluster is not a mechanical full-mesh");
+  assert(parseListenPageDefinition(MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE).ok, "rain hub still valid after cluster links");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -32865,6 +33021,7 @@ const tests = [
   ["one-hundred-ninth listen page", testOneHundredNinthPage],
   ["one-hundred-tenth listen page", testOneHundredTenthPage],
   ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
+  ["rain sleep cluster internal links", testRainSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
