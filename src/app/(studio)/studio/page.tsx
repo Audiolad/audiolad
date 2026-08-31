@@ -41,7 +41,7 @@ export default async function StudioPage() {
           <div className="w-full">
             <p className="text-sm font-medium text-[#9bdab5]">Выберите режим работы</p>
             <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Создавайте аудиопрактики и готовьтесь к будущим эфирам
+              Создавайте аудиопрактики, аудиокниги и проводите аудиоэфиры
             </h2>
             <div className="mt-8 grid gap-5 lg:grid-cols-3">
               <article className="rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
