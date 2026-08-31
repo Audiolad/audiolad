@@ -51,6 +51,7 @@ export function useAudiobookRecorder({
   const bytesRef = useRef(0);
   const projectPendingBytesRef = useRef(0);
   const chunkSequenceRef = useRef(0);
+  const persistedChunkCountRef = useRef(0);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
   const persistenceFailedRef = useRef(false);
   const storageLimitReachedRef = useRef(false);
@@ -133,6 +134,7 @@ export function useAudiobookRecorder({
       draftRef.current = draft;
       bytesRef.current = 0;
       chunkSequenceRef.current = 0;
+      persistedChunkCountRef.current = 0;
       persistenceFailedRef.current = false;
       storageLimitReachedRef.current = false;
       writeChainRef.current = Promise.resolve();
@@ -168,6 +170,7 @@ export function useAudiobookRecorder({
           }
           await appendAudiobookRecordingChunk(draft.id, sequence, chunk);
           bytesRef.current += chunk.size;
+          persistedChunkCountRef.current += 1;
         }).catch(() => {
           persistenceFailedRef.current = true;
           setError("Не удалось сохранить запись на этом устройстве.");
@@ -192,7 +195,7 @@ export function useAudiobookRecorder({
               ...completedDraft,
               durationMs,
               sizeBytes: bytesRef.current,
-              chunkCount: chunkSequenceRef.current,
+              chunkCount: persistedChunkCountRef.current,
               status: "interrupted",
             }).catch(() => undefined);
           }
@@ -205,7 +208,7 @@ export function useAudiobookRecorder({
           ...completedDraft,
           durationMs,
           sizeBytes: bytesRef.current,
-          chunkCount: chunkSequenceRef.current,
+          chunkCount: persistedChunkCountRef.current,
           status: "ready" as const,
           readyAt: Date.now(),
         };
