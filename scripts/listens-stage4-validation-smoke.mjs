@@ -112,6 +112,7 @@ import { MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/l
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -32444,7 +32445,7 @@ function testOneHundredFifthPage() {
   assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-fifth has six unique destinations");
   assert(links.map((link) => link.href).join("\n") === destinations.join("\n"), "one-hundred-fifth exact link destinations and order");
   assert(listListenPageDefinitions().map((page) => page.slug).includes(slug), "registry contains one-hundred-fifth slug");
-  assert(listListenPageDefinitions().length === 105, "registry contains all 105 listen slugs");
+  assert(listListenPageDefinitions().length === 106, "registry contains all 106 listen slugs");
 
   const data = resolveListenPageFromPlaylist({
     definition,
@@ -32455,6 +32456,29 @@ function testOneHundredFifthPage() {
   const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
   assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-fifth omits SEO self-check");
   assert(!contentSource.includes("https://"), "one-hundred-fifth has no raw URLs");
+}
+
+function testOneHundredSixthPage() {
+  const definition = MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const expectedHrefs = [
+    "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+  ];
+  const links = collectListenLinks(definition);
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-sixth production definition valid");
+  assert(definition.slug === "muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn", "one-hundred-sixth slug exact");
+  assert(definition.playlistSlug === "muzyka-dlya-sna-s-dozhdem", "one-hundred-sixth playlist slug exact");
+  assert(definition.intro.length === 3, "one-hundred-sixth has three intro paragraphs");
+  assert(definition.faq.length === 8, "one-hundred-sixth has eight FAQ items");
+  assert(links.length === 7, "one-hundred-sixth has seven href");
+  assert(new Set(links.map((link) => link.href)).size === 7, "one-hundred-sixth has seven unique destinations");
+  assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-sixth links exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === definition.slug), "registry contains one-hundred-sixth slug");
 }
 
 function collectListenLinks(definition) {
@@ -32646,6 +32670,7 @@ const tests = [
   ["one-hundred-third listen page", testOneHundredThirdPage],
   ["one-hundred-fourth listen page", testOneHundredFourthPage],
   ["one-hundred-fifth listen page", testOneHundredFifthPage],
+  ["one-hundred-sixth listen page", testOneHundredSixthPage],
   ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
