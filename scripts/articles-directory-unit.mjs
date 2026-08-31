@@ -131,6 +131,7 @@ import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from
 import { MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn.ts";
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
+import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3118,6 +3119,30 @@ function testIndividualArticlesStillWork() {
   assert(articlePage.includes("ArticlePageView"), "article detail route intact");
 }
 
+function testOneHundredFifthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+
+  assert(card, "one-hundred-fifth indexable listen page is listed");
+  assert(
+    card.title === RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.title,
+    "one-hundred-fifth directory title",
+  );
+  assert(
+    card.description === RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "one-hundred-fifth directory description",
+  );
+  assert(
+    !data.articles.some((item) => item.href === "/articles/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn"),
+    "no /articles duplicate for one-hundred-fifth listen slug",
+  );
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3133,6 +3158,7 @@ const tests = [
   ["sitemap /articles", testSitemapContainsDirectory],
   ["structured data", testStructuredData],
   ["listen pages in directory", testListenPagesAppearInDirectory],
+  ["one-hundred-fifth listen page in directory", testOneHundredFifthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
