@@ -41,7 +41,7 @@ function database(): Promise<IDBDatabase> {
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("indexeddb_open_failed"));
-  }));
+  });
 }
 
 function completedTransaction<T>(
@@ -65,7 +65,7 @@ function completedTransaction<T>(
       db.close();
       reject(transaction.error ?? new Error("indexeddb_transaction_failed"));
     };
-  });
+  }));
 }
 
 export function saveAudiobookRecordingDraft(draft: AudiobookRecordingDraft) {
