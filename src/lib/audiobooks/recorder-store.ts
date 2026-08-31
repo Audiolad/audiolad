@@ -9,6 +9,8 @@ export type AudiobookRecordingDraft = {
   mimeType: string;
   durationMs: number;
   sizeBytes: number;
+  chunkCount: number;
+  status: "recording" | "ready" | "interrupted";
   createdAt: number;
   readyAt?: number;
   remoteFragmentId?: string;
@@ -96,21 +98,48 @@ export async function listAudiobookRecordingDrafts(projectId: string) {
 }
 
 export async function appendAudiobookRecordingChunk(draftId: string, sequence: number, data: Blob) {
-  const draft = await getAudiobookRecordingDraft(draftId);
-  if (!draft) throw new Error("recording_draft_missing");
-  const nextDraft = { ...draft, sizeBytes: draft.sizeBytes + data.size };
-  await completedTransaction(
-    [DRAFTS_STORE, CHUNKS_STORE],
-    "readwrite",
-    (transaction) => {
-      transaction.objectStore(CHUNKS_STORE).put({ draftId, sequence, data } satisfies AudiobookRecordingChunk);
-      return transaction.objectStore(DRAFTS_STORE).put(nextDraft);
-    },
-  );
-  return nextDraft;
+  const db = await database();
+  return new Promise<AudiobookRecordingDraft>((resolve, reject) => {
+    const transaction = db.transaction([DRAFTS_STORE, CHUNKS_STORE], "readwrite");
+    const drafts = transaction.objectStore(DRAFTS_STORE);
+    const chunks = transaction.objectStore(CHUNKS_STORE);
+    let nextDraft: AudiobookRecordingDraft | null = null;
+
+    const draftRequest = drafts.get(draftId);
+    draftRequest.onerror = () => reject(draftRequest.error ?? new Error("indexeddb_request_failed"));
+    draftRequest.onsuccess = () => {
+      const draft = draftRequest.result as AudiobookRecordingDraft | undefined;
+      if (!draft) {
+        transaction.abort();
+        reject(new Error("recording_draft_missing"));
+        return;
+      }
+      const chunkCount = draft.chunkCount ?? 0;
+      if (sequence !== chunkCount) {
+        transaction.abort();
+        reject(new Error("recording_chunk_sequence_invalid"));
+        return;
+      }
+      nextDraft = {
+        ...draft,
+        chunkCount: chunkCount + 1,
+        sizeBytes: draft.sizeBytes + data.size,
+      };
+      chunks.put({ draftId, sequence, data } satisfies AudiobookRecordingChunk);
+      drafts.put(nextDraft);
+    };
+    transaction.oncomplete = () => {
+      db.close();
+      if (nextDraft) resolve(nextDraft);
+    };
+    transaction.onabort = transaction.onerror = () => {
+      db.close();
+      reject(transaction.error ?? new Error("indexeddb_transaction_failed"));
+    };
+  });
 }
 
-export async function getAudiobookRecordingBlob(draftId: string, mimeType: string) {
+export async function getAudiobookRecordingData(draftId: string, mimeType: string) {
   const chunks = await completedTransaction<AudiobookRecordingChunk[]>(
     CHUNKS_STORE,
     "readonly",
@@ -118,7 +147,17 @@ export async function getAudiobookRecordingBlob(draftId: string, mimeType: strin
       IDBKeyRange.bound([draftId, 0], [draftId, Number.MAX_SAFE_INTEGER]),
     ),
   );
-  return new Blob((chunks ?? []).sort((left, right) => left.sequence - right.sequence).map((chunk) => chunk.data), { type: mimeType });
+  const ordered = (chunks ?? []).sort((left, right) => left.sequence - right.sequence);
+  return {
+    blob: new Blob(ordered.map((chunk) => chunk.data), { type: mimeType }),
+    chunkCount: ordered.length,
+    contiguous: ordered.every((chunk, index) => chunk.sequence === index),
+    sizeBytes: ordered.reduce((total, chunk) => total + chunk.data.size, 0),
+  };
+}
+
+export async function getAudiobookRecordingBlob(draftId: string, mimeType: string) {
+  return (await getAudiobookRecordingData(draftId, mimeType)).blob;
 }
 
 export async function deleteAudiobookRecordingDraft(id: string) {
@@ -138,4 +177,43 @@ export async function deleteAudiobookRecordingDraft(id: string) {
       return transaction.objectStore(DRAFTS_STORE).delete(id);
     },
   );
+}
+
+async function deleteAudiobookRecordingDraftsBy(
+  indexName: "projectCreated" | "chapterCreated",
+  id: string,
+) {
+  await completedTransaction(
+    [DRAFTS_STORE, CHUNKS_STORE],
+    "readwrite",
+    (transaction) => {
+      const drafts = transaction.objectStore(DRAFTS_STORE).index(indexName).openKeyCursor(
+        IDBKeyRange.bound([id, 0], [id, Number.MAX_SAFE_INTEGER]),
+      );
+      drafts.onsuccess = () => {
+        const cursor = drafts.result;
+        if (!cursor) return;
+        const draftId = cursor.primaryKey as string;
+        const chunks = transaction.objectStore(CHUNKS_STORE).index("draftSequence").openKeyCursor(
+          IDBKeyRange.bound([draftId, 0], [draftId, Number.MAX_SAFE_INTEGER]),
+        );
+        chunks.onsuccess = () => {
+          const chunk = chunks.result;
+          if (!chunk) return;
+          transaction.objectStore(CHUNKS_STORE).delete(chunk.primaryKey);
+          chunk.continue();
+        };
+        transaction.objectStore(DRAFTS_STORE).delete(draftId);
+        cursor.continue();
+      };
+    },
+  );
+}
+
+export function deleteAudiobookRecordingDraftsForChapter(chapterId: string) {
+  return deleteAudiobookRecordingDraftsBy("chapterCreated", chapterId);
+}
+
+export function deleteAudiobookRecordingDraftsForProject(projectId: string) {
+  return deleteAudiobookRecordingDraftsBy("projectCreated", projectId);
 }

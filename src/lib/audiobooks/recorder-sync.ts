@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AudiobookFragment } from "./server";
 import {
   deleteAudiobookRecordingDraft,
-  getAudiobookRecordingBlob,
+  getAudiobookRecordingData,
   getAudiobookRecordingDraft,
   listAudiobookRecordingDrafts,
   saveAudiobookRecordingDraft,
@@ -74,12 +74,18 @@ export async function syncAudiobookRecordingDraft(draftId: string) {
     }
   }
   const reservation = await reservationFor(draft);
-  const blob = await getAudiobookRecordingBlob(draft.id, draft.mimeType);
-  if (blob.size !== draft.sizeBytes || !blob.size) throw new Error("recording_chunks_incomplete");
+  const recording = await getAudiobookRecordingData(draft.id, draft.mimeType);
+  if (
+    !recording.contiguous
+    || recording.chunkCount !== draft.chunkCount
+    || recording.sizeBytes !== draft.sizeBytes
+    || recording.blob.size !== draft.sizeBytes
+    || !recording.blob.size
+  ) throw new Error("recording_chunks_incomplete");
   const upload = await createClient().storage.from("audiobook-fragments").uploadToSignedUrl(
     reservation.signedUpload.path,
     reservation.signedUpload.token,
-    blob,
+    recording.blob,
     { contentType: draft.mimeType },
   );
   if (upload.error) throw new Error("storage_upload_failed");
@@ -95,27 +101,39 @@ export async function syncAudiobookRecordingDraft(draftId: string) {
   return response.fragment;
 }
 
-const activeProjectSync = new Map<string, Promise<void>>();
+type ProjectSync = {
+  promise: Promise<void>;
+  rerunRequested: boolean;
+};
+
+const activeProjectSync = new Map<string, ProjectSync>();
 
 export async function syncPendingAudiobookRecordingDrafts(
   projectId: string,
   onSynced?: (fragment: AudiobookFragment) => void,
 ) {
   const active = activeProjectSync.get(projectId);
-  if (active) return active;
-  const sync = (async () => {
-    for (const draft of await listAudiobookRecordingDrafts(projectId)) {
-      if (!draft.readyAt || !draft.sizeBytes) continue;
-      try {
-        const fragment = await syncAudiobookRecordingDraft(draft.id);
-        if (fragment) onSynced?.(fragment);
-      } catch {
-        break;
+  if (active) {
+    active.rerunRequested = true;
+    return active.promise;
+  }
+  const entry = {} as ProjectSync;
+  entry.promise = (async () => {
+    do {
+      entry.rerunRequested = false;
+      for (const draft of await listAudiobookRecordingDrafts(projectId)) {
+        if ((!draft.readyAt && draft.status !== "ready") || !draft.sizeBytes) continue;
+        try {
+          const fragment = await syncAudiobookRecordingDraft(draft.id);
+          if (fragment) onSynced?.(fragment);
+        } catch {
+          break;
+        }
       }
-    }
+    } while (entry.rerunRequested);
   })().finally(() => {
     activeProjectSync.delete(projectId);
   });
-  activeProjectSync.set(projectId, sync);
-  return sync;
+  activeProjectSync.set(projectId, entry);
+  return entry.promise;
 }

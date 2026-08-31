@@ -41,14 +41,18 @@ export function AudiobookRecorder({
           </button>
         )}
         {recorder.status === "stopping" ? <span className="text-sm text-[#ddd2f5]">Останавливаем запись…</span> : null}
-        {recorder.status === "saving" || recorder.pendingDraftCount ? <span className="text-sm text-[#ddd2f5]">Синхронизация черновика…</span> : null}
+        {recorder.status === "saving" ? <span className="text-sm text-[#ddd2f5]">Сохраняем запись на устройстве…</span> : null}
+        {recorder.pendingDraftCount ? <span className="text-sm text-[#ddd2f5]">Загружаем черновики…</span> : null}
       </div>
-      <p className="mt-3 text-sm text-[#ddd2f5]">Запись сохраняется на устройстве до успешной загрузки и будет отправлена при восстановлении сети.</p>
+      <p className="mt-3 text-sm text-[#ddd2f5]">Запись сохраняется на устройстве до успешной загрузки.</p>
       {recorder.error ? <p role="alert" className="mt-3 text-sm text-[#ffb4b4]">{recorder.error}</p> : null}
       {recorder.drafts.filter((draft) => draft.chapterId === chapterId).map((draft) => (
         <div key={draft.id} className="mt-3 flex items-center justify-between gap-3 text-sm text-[#ddd2f5]">
-          <span>Локальный черновик записи</span>
-          <button type="button" disabled={recorder.isLocked || discarding} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
+          <span>{draft.status === "ready" || draft.readyAt ? "Локальный черновик готов к загрузке" : "Прерванная локальная запись"}</span>
+          <span className="flex gap-3">
+            {draft.status === "ready" || draft.readyAt ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.sync()} className="text-[#9bdab5] underline">Загрузить</button> : null}
+            <button type="button" disabled={recorder.isLocked || discarding} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
+          </span>
         </div>
       ))}
       {draftToDiscard ? (

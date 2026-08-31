@@ -9,7 +9,6 @@ import {
   getAudiobookRecorderMimeType,
   getAudiobookRecordingExtension,
   shouldFallbackToBasicAudiobookMicrophoneRequest,
-  validateAudiobookRecordedBlob,
 } from "@/lib/audiobooks/recorder";
 import {
   deleteAudiobookRecordingDraft,
@@ -23,6 +22,7 @@ import type { AudiobookFragment } from "@/lib/audiobooks/server";
 import { AUDIOBOOK_LIMITS } from "@/lib/audiobooks/limits";
 
 type RecorderStatus = "idle" | "arming" | "recording" | "stopping" | "saving";
+const RECORDING_BYTE_SAFETY_MARGIN = 1024 * 1024;
 
 export function useAudiobookRecorder({
   authorId,
@@ -125,6 +125,8 @@ export function useAudiobookRecorder({
         mimeType: requestedMimeType.split(";", 1)[0].toLowerCase(),
         durationMs: 0,
         sizeBytes: 0,
+        chunkCount: 0,
+        status: "recording",
         createdAt,
       };
       await saveAudiobookRecordingDraft(draft);
@@ -154,8 +156,8 @@ export function useAudiobookRecorder({
         const sequence = chunkSequenceRef.current++;
         writeChainRef.current = writeChainRef.current.then(async () => {
           if (storageLimitReachedRef.current || persistenceFailedRef.current) return;
-          const wouldExceedFragment = bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxFragmentBytes;
-          const wouldExceedProject = projectPendingBytesRef.current + bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxProjectSourceBytes;
+          const wouldExceedFragment = bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxFragmentBytes - RECORDING_BYTE_SAFETY_MARGIN;
+          const wouldExceedProject = projectPendingBytesRef.current + bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxProjectSourceBytes - RECORDING_BYTE_SAFETY_MARGIN;
           if (wouldExceedFragment || wouldExceedProject) {
             storageLimitReachedRef.current = true;
             setError(wouldExceedFragment
@@ -185,7 +187,16 @@ export function useAudiobookRecorder({
         const completedDraft = draftRef.current;
         draftRef.current = null;
         if (!completedDraft || persistenceFailedRef.current) {
-          if (completedDraft) await deleteAudiobookRecordingDraft(completedDraft.id).catch(() => undefined);
+          if (completedDraft) {
+            await saveAudiobookRecordingDraft({
+              ...completedDraft,
+              durationMs,
+              sizeBytes: bytesRef.current,
+              chunkCount: chunkSequenceRef.current,
+              status: "interrupted",
+            }).catch(() => undefined);
+          }
+          setDrafts(await listAudiobookRecordingDrafts(projectId).catch(() => []));
           setRecorderStatus("idle");
           return;
         }
@@ -194,19 +205,19 @@ export function useAudiobookRecorder({
           ...completedDraft,
           durationMs,
           sizeBytes: bytesRef.current,
+          chunkCount: chunkSequenceRef.current,
+          status: "ready" as const,
           readyAt: Date.now(),
         };
-        const validationError = validateAudiobookRecordedBlob(new Blob([new Uint8Array(1)], { type: finalizedDraft.mimeType }));
-        if (validationError) {
-          await deleteAudiobookRecordingDraft(finalizedDraft.id).catch(() => undefined);
-          setError(validationError);
+        try {
+          await saveAudiobookRecordingDraft(finalizedDraft);
+          setDrafts(await listAudiobookRecordingDrafts(projectId));
           setRecorderStatus("idle");
-          return;
+          if (!disposedRef.current) void sync();
+        } catch {
+          setError("Не удалось сохранить запись на этом устройстве.");
+          setRecorderStatus("idle");
         }
-        void saveAudiobookRecordingDraft(finalizedDraft)
-          .then(sync)
-          .catch(() => setError("Не удалось сохранить запись на этом устройстве."))
-          .finally(() => setRecorderStatus("idle"));
       };
       recorder.start(1000);
       startedAtRef.current = performance.now();
@@ -231,12 +242,11 @@ export function useAudiobookRecorder({
   }, [authorId, chapterId, projectId, releaseStream, setRecorderStatus, stopRecording, stopTimers, sync]);
 
   useEffect(() => {
-    queueMicrotask(() => { void sync(); });
-    const onOnline = () => { void sync(); };
-    window.addEventListener("online", onOnline);
+    void listAudiobookRecordingDrafts(projectId).then(setDrafts).catch(() => {
+      setError("Не удалось открыть локальные черновики.");
+    });
     return () => {
       disposedRef.current = true;
-      window.removeEventListener("online", onOnline);
       stopTimers();
       const recorder = recorderRef.current;
       if (recorder && recorder.state !== "inactive") {
@@ -251,7 +261,7 @@ export function useAudiobookRecorder({
       }
       statusRef.current = "idle";
     };
-  }, [releaseStream, stopTimers, sync]);
+  }, [projectId, releaseStream, stopTimers]);
 
   return {
     status,
