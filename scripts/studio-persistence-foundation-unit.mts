@@ -295,8 +295,8 @@ assert.match(repository, /parseStudioProjectData\(\(data as StudioProjectRow\)\.
 assert.match(repository, /project_conflict/);
 assert.match(repository, /softDeleteStudioProject/);
 assert.match(repository, /\.eq\("status", "active"\)/);
-assert.match(repository, /status: "deleted"/);
-assert.match(repository, /deleted_at: deletedAt/);
+assert.match(repository, /soft_delete_studio_project/);
+assert.match(repository, /release_studio_project_asset/);
 assert.doesNotMatch(repository, /last_opened_at: lastOpenedAt/);
 assert.doesNotMatch(repository, /createSignedUrl|normalizeStorageSignedUrl/);
 
