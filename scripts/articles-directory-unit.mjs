@@ -126,6 +126,7 @@ import { MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/li
 import { MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-bystrogo-zasypaniya-slushat-onlayn.ts";
 import { MUZYKA_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-krepkogo-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2886,6 +2887,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyNinthListenHref}`),
     "directory JSON-LD includes ninety-ninth listen href",
+  );
+
+  const hundredthListenHref = "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn";
+  const hundredthListenCard = data.articles.find((card) => card.href === hundredthListenHref);
+  assert(hundredthListenCard, "hundredth indexable listen page is listed");
+  assert(
+    hundredthListenCard.title === "Музыка для сна с шумом дождя – слушать онлайн бесплатно | АудиоЛад",
+    "hundredth listen directory title",
+  );
+  assert(
+    hundredthListenCard.description === MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE.description,
+    "hundredth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn"),
+    "no /articles duplicate for hundredth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredthListenHref}`),
+    "directory JSON-LD includes hundredth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
