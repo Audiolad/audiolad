@@ -20,7 +20,7 @@ export function AudiobookProjectWorkspace({ project, chapters: initialChapters, 
   async function deleteBook() { setBusy(true); try { await request(`/api/studio/audiobooks/projects/${project.id}?authorId=${authorId}`, { method: "DELETE" }); router.push("/studio/audiobooks"); } finally { setBusy(false); } }
   const fragmentBase = selected ? `${base}/${selected}/fragments` : null;
   useEffect(() => {
-    if (!fragmentBase) { setFragments([]); return; }
+    if (!fragmentBase) return;
     let active = true;
     request(`${fragmentBase}?authorId=${authorId}`).then(({ fragments: next }) => {
       if (active) setFragments(next);
