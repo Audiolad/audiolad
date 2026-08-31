@@ -47,7 +47,7 @@ function database(): Promise<IDBDatabase> {
 function completedTransaction<T>(
   stores: string | string[],
   mode: IDBTransactionMode,
-  operation: (transaction: IDBTransaction) => IDBRequest<unknown> | void,
+  operation: (transaction: IDBTransaction) => IDBRequest<any> | void,
 ) {
   return database().then((db) => new Promise<T | undefined>((resolve, reject) => {
     const transaction = db.transaction(stores, mode);
