@@ -104,6 +104,19 @@ trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
 | `publication_files` | Приватные файлы. Phase 2A: `mime = 'application/pdf'`, `size_bytes <= 20MiB`. Колонки публичного URL нет. |
 | `course_completion_ctas` | 1:1 CTA курса (`publication_id` PK). `title`, `description`, `button_text`, `url`, `enabled`. Не `promo_*` и не блок урока. |
 
+### Studio audiobook projects
+
+Миграция: `20260911130000_audiobook_projects_and_chapters.sql`.
+
+Изолированный author-only domain Studio: он не связан с `studio_projects`,
+`practices`, `audio_items` или Storage. `audiobook_projects.author_id`
+ссылается на `authors.id`; title нормализуется сервером и ограничен 1–200
+символами. `audiobook_chapters.project_id` удаляется каскадно с книгой,
+а `position` уникален внутри книги и хранится непрерывно от 1. Reorder
+выполняет service-role RPC `reorder_audiobook_chapters` после server-side
+проверки author membership; RPC принимает полный ordered set и проверяет
+его точное совпадение с главами книги.
+
 **Доступ:** наличие строки урока / блока / файла / CTA **никогда** не даёт
 чтение. Learner SELECT policy нет. RLS: ENABLE, REVOKE PUBLIC/anon, нет
 public SELECT, author members (`owner`/`editor`) CRUD, `service_role` ALL.
