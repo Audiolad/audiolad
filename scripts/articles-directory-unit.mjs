@@ -125,6 +125,7 @@ import { MUZYKA_DLYA_BYSTROGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/lis
 import { MUZYKA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-glubokogo-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_BYSTROGO_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-bystrogo-zasypaniya-slushat-onlayn.ts";
 import { MUZYKA_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-krepkogo-sna-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2865,6 +2866,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyEighthListenHref}`),
     "directory JSON-LD includes ninety-eighth listen href",
+  );
+
+  const ninetyNinthListenHref = "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const ninetyNinthListenCard = data.articles.find((card) => card.href === ninetyNinthListenHref);
+  assert(ninetyNinthListenCard, "ninety-ninth indexable listen page is listed");
+  assert(
+    ninetyNinthListenCard.title === "Музыка для сна с дождём – слушать онлайн бесплатно | АудиоЛад",
+    "ninety-ninth listen directory title",
+  );
+  assert(
+    ninetyNinthListenCard.description === MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE.description,
+    "ninety-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/muzyka-dlya-sna-s-dozhdem-slushat-onlayn"),
+    "no /articles duplicate for ninety-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${ninetyNinthListenHref}`),
+    "directory JSON-LD includes ninety-ninth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
