@@ -309,11 +309,8 @@ function testReusablePdpWiring() {
   const page = read(
     "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
-  );
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
@@ -333,8 +330,12 @@ function testReusablePdpWiring() {
   );
   assert.doesNotMatch(page, /25-meditation-solutions/);
   assert.doesNotMatch(hero, /25-meditation-solutions/);
-  assert.match(mobile, /ListenerAppShell|PracticeProductHero/);
-  assert.match(desktop, /PracticeProductHero/);
+  assert.match(practiceContent, /PracticeProductHero/);
+  assert.equal(
+    (practiceContent.match(/<PracticeProductHero/g) || []).length,
+    1,
+    "ONE practice hero mount",
+  );
   assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
   assert.match(hero, /FEATURED_CARD_META_CLASS/);
   assert.match(hero, /\{viewModel\.meta\}/);
@@ -361,7 +362,7 @@ function testReusablePdpWiring() {
     /\[data-practice-product-hero\][\s\S]*\.featured-card__chip[\s\S]*width:\s*fit-content/,
   );
   assert.match(hero, /practice-product-hero/);
-  assert.match(hero, /data-practice-product-hero=\{layout\}/);
+  assert.match(hero, /data-practice-product-hero=/);
   assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);
   assert.doesNotMatch(hero, /grid-cols-\[minmax/);
 
@@ -383,11 +384,8 @@ function testStandardPdpNotBroken() {
   const page = read(
     "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
-  );
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
 
   assert.match(parts, /BuyPracticeButton/);
@@ -395,12 +393,13 @@ function testStandardPdpNotBroken() {
   assert.match(parts, /CatalogProductHeartButton/);
   assert.match(parts, /PublishPreviewBanner/);
   assert.match(page, /publishPreview/);
-  assert.match(mobile, /ProductContentsSection/);
-  assert.match(desktop, /ProductContentsSection/);
-  assert.match(mobile, /ProductCopySections/);
-  assert.match(desktop, /ProductCopySections/);
-  assert.match(mobile, /description=\{description\}/);
-  assert.match(desktop, /description=\{description\}/);
+  assert.match(practiceContent, /ProductContentsSection/);
+  assert.match(practiceContent, /ProductCopySections/);
+  assert.match(practiceContent, /description=\{description\}/);
+  assert.equal(
+    (practiceContent.match(/<ProductCopySections/g) || []).length,
+    1,
+  );
 }
 
 function testDesktopHeroHeightFollowsSquareCover() {
@@ -412,9 +411,10 @@ function testDesktopHeroHeightFollowsSquareCover() {
     "src/components/products/practice-page/PracticePageParts.tsx",
   );
 
-  const desktopBlock = css.slice(
-    css.indexOf('[data-practice-product-hero="desktop"]'),
+  const desktopBlockStart = css.indexOf(
+    "Standard PDP desktop hero only",
   );
+  const desktopBlock = css.slice(desktopBlockStart);
 
   assert.match(
     hero,
@@ -423,12 +423,12 @@ function testDesktopHeroHeightFollowsSquareCover() {
   );
   assert.match(
     desktopBlock,
-    /\[data-practice-product-hero="desktop"\] \.featured-card__cover\s*\{[^}]*aspect-ratio:\s*1 \/ 1/,
+    /\[data-practice-product-hero\] \.featured-card__cover\s*\{[^}]*aspect-ratio:\s*1 \/ 1/,
     "desktop cover stays 1:1",
   );
   assert.match(
     desktopBlock,
-    /\[data-practice-product-hero="desktop"\] \.featured-card__content\s*\{[^}]*position:\s*absolute/,
+    /\[data-practice-product-hero\] \.featured-card__content\s*\{[^}]*position:\s*absolute/,
     "info column is fitted inside the square height",
   );
   assert.match(
@@ -439,9 +439,9 @@ function testDesktopHeroHeightFollowsSquareCover() {
   assert.doesNotMatch(
     desktopBlock.slice(
       0,
-      desktopBlock.indexOf("[data-practice-product-hero=\"mobile\"]") === -1
+      desktopBlock.indexOf("@media (max-width: 1279px)") === -1
         ? desktopBlock.length
-        : desktopBlock.indexOf("[data-practice-product-hero=\"mobile\"]"),
+        : desktopBlock.indexOf("@media (max-width: 1279px)"),
     ),
     /object-fit:\s*cover/,
     "do not stretch the cover to fill leftover white",
@@ -453,27 +453,27 @@ function testDesktopHeroHeightFollowsSquareCover() {
   );
   assert.match(
     css,
-    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*nowrap/,
+    /@media \(max-width: 1279px\)[\s\S]*\[data-practice-product-hero\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*nowrap/,
     "mobile Buy + Listen stay on one row",
   );
   assert.match(
     css,
-    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*align-items:\s*stretch/,
+    /@media \(max-width: 1279px\)[\s\S]*\[data-practice-product-hero\] \.practice-product-hero__actions\s*\{[^}]*align-items:\s*stretch/,
     "mobile CTA row stretches both buttons to one height",
   );
   assert.match(
     css,
-    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions > :first-child\s*\{[^}]*flex:\s*0 0 auto/,
+    /@media \(max-width: 1279px\)[\s\S]*\[data-practice-product-hero\] \.practice-product-hero__actions > :first-child\s*\{[^}]*flex:\s*0 0 auto/,
     "mobile Buy stays compact",
   );
   assert.match(
     css,
-    /\[data-practice-product-hero="mobile"\][\s\S]*\[data-practice-primary-play\]:not\(:only-child\)\s*\{[^}]*flex:\s*1 1 0/,
+    /@media \(max-width: 1279px\)[\s\S]*\[data-practice-product-hero\][\s\S]*\[data-practice-primary-play\]:not\(:only-child\)\s*\{[^}]*flex:\s*1 1 0/,
     "mobile Listen takes leftover width",
   );
   assert.doesNotMatch(
     css,
-    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*wrap/,
+    /@media \(max-width: 1279px\)[\s\S]*\[data-practice-product-hero\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*wrap/,
     "mobile CTA row must not wrap",
   );
   assert.match(
@@ -543,7 +543,7 @@ function testMobileWindowedDotsKeepDesktopArrows() {
   );
   const css = read("src/app/globals.css");
 
-  assert.match(productHero, /showMobileDots=\{layout === "mobile"\}/);
+  assert.match(productHero, /showMobileDots/);
   assert.match(hero, /buildWindowedHeroDots/);
   assert.match(hero, /data-practice-hero-dots/);
   assert.match(hero, /data-practice-hero-gallery-counter/);
@@ -568,11 +568,8 @@ function testHeroAuthorNameLinksToPublicAuthorPage() {
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
-  );
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
   const authorName = "Сергей";
   const authorSlug = "sergey-audiolad";
@@ -608,8 +605,7 @@ function testHeroAuthorNameLinksToPublicAuthorPage() {
   );
   assert.match(hero, /resolvePracticeHeroLightMetaRest\(viewModel\.meta, authorName\)/);
   assert.match(hero, /PracticeHeroMetaLine/);
-  assert.match(mobile, /<PracticeProductHero viewModel=\{viewModel\} layout="mobile" \/>/);
-  assert.match(desktop, /<PracticeProductHero viewModel=\{viewModel\} layout="desktop" \/>/);
+  assert.match(practiceContent, /<PracticeProductHero viewModel=\{viewModel\} \/>/);
   assert.doesNotMatch(
     hero,
     /\/authors\//,

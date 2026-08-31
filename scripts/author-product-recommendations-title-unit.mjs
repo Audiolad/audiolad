@@ -316,12 +316,17 @@ assert.doesNotMatch(
   "PUBLIC_DEFAULT_HEADING_NO_LONGER_CONNECTED_PRODUCTS",
 );
 assert.match(
-  read("src/components/products/practice-page/PracticePageMobile.tsx"),
+  read("src/components/products/practice-page/PracticePageContent.tsx"),
   /PracticeSeoContentSections content=\{seoContent\}/,
 );
-assert.match(
-  read("src/components/products/practice-page/PracticePageDesktop.tsx"),
-  /PracticeSeoContentSections content=\{seoContent\}/,
+assert.equal(
+  (
+    read("src/components/products/practice-page/PracticePageContent.tsx").match(
+      /<PracticeSeoContentSections/g,
+    ) || []
+  ).length,
+  1,
+  "ONE public recommendations path",
 );
 
 const loader = read("src/lib/products/practice-seo-content.ts");

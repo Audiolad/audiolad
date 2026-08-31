@@ -3,9 +3,8 @@ import type { Metadata } from "next";
 
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import AudioPostPage from "@/components/products/audio-post/AudioPostPage";
-import PracticePageDesktop from "@/components/products/practice-page/PracticePageDesktop";
+import PracticePageContent from "@/components/products/practice-page/PracticePageContent";
 import PracticePageErrorState from "@/components/products/practice-page/PracticePageErrorState";
-import PracticePageMobile from "@/components/products/practice-page/PracticePageMobile";
 import { BuyerPreviewExitControl } from "@/components/products/practice-page/PracticePageParts";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import JsonLd from "@/components/seo/JsonLd";
@@ -745,10 +744,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
           }}
         />
       ) : (
-        <>
-          <PracticePageMobile viewModel={viewModel} />
-          <PracticePageDesktop viewModel={viewModel} />
-        </>
+        <PracticePageContent viewModel={viewModel} />
       )}
     </>
   );

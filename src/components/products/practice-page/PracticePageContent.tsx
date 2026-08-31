@@ -2,9 +2,9 @@ import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
-
 import ProductCopySections from "@/components/products/ProductCopySections";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
   PracticeAccessBanners,
@@ -13,11 +13,11 @@ import {
 import PracticeProductHero from "./PracticeProductHero";
 import type { PracticePageViewModel } from "./types";
 
-type PracticePageDesktopProps = {
+type PracticePageContentProps = {
   viewModel: PracticePageViewModel;
 };
 
-export default function PracticePageDesktop({ viewModel }: PracticePageDesktopProps) {
+export default function PracticePageContent({ viewModel }: PracticePageContentProps) {
   const {
     practice,
     description,
@@ -30,8 +30,8 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
   } = viewModel;
 
   return (
-    <div className="hidden min-w-0 xl:block">
-      <div className="box-border min-w-0 max-w-full px-6 pt-3">
+    <div className={`min-w-0 ${platformBottomContentPaddingClass}`}>
+      <div className="pt-6 xl:box-border xl:min-w-0 xl:max-w-full xl:px-6 xl:pt-3">
         <PracticeBackLink />
 
         <PracticeAccessBanners
@@ -41,7 +41,7 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
         />
 
         <section className="mt-6 min-w-0">
-          <PracticeProductHero viewModel={viewModel} layout="desktop" />
+          <PracticeProductHero viewModel={viewModel} />
         </section>
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
@@ -63,17 +63,14 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
           }}
         />
 
-        <ProductCopySections
-          description={description}
-          variant="desktop"
-        />
+        <ProductCopySections description={description} />
         <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />
         ) : null}
 
-        <LegalFooter className="mt-10" />
+        <LegalFooter className="mt-8 xl:mt-10" />
       </div>
     </div>
   );

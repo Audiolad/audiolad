@@ -9,11 +9,8 @@ function read(relativePath: string) {
   return readFileSync(join(repoRoot, relativePath), "utf8");
 }
 
-const mobile = read(
-  "src/components/products/practice-page/PracticePageMobile.tsx",
-);
-const desktop = read(
-  "src/components/products/practice-page/PracticePageDesktop.tsx",
+const practiceContent = read(
+  "src/components/products/practice-page/PracticePageContent.tsx",
 );
 const hero = read(
   "src/components/products/practice-page/PracticeProductHero.tsx",
@@ -28,8 +25,7 @@ const page = read(
 
 function testPracticeHasNoClaimCta() {
   for (const [name, source] of [
-    ["mobile", mobile],
-    ["desktop", desktop],
+    ["practice-content", practiceContent],
     ["audio-post", audioPost],
   ] as const) {
     assert.doesNotMatch(
@@ -53,8 +49,7 @@ function testPracticeHasNoClaimCta() {
 function testHeartRemains() {
   assert.match(parts, /CatalogProductHeartButton/);
   assert.match(hero, /toPracticeHeartProduct\(viewModel\)/);
-  assert.match(mobile, /PracticeProductHero/);
-  assert.match(desktop, /PracticeProductHero/);
+  assert.match(practiceContent, /PracticeProductHero/);
   assert.match(page, /listSavedPracticeIds/);
   assert.match(page, /isSaved/);
 }
@@ -63,14 +58,12 @@ function testBuyRemains() {
   assert.match(parts, /BuyPracticeButton/);
   assert.match(parts, /PracticePrimaryActionSection/);
   assert.match(hero, /PracticePrimaryActionSection/);
-  assert.match(mobile, /PracticeProductHero/);
-  assert.match(desktop, /PracticeProductHero/);
+  assert.match(practiceContent, /PracticeProductHero/);
 }
 
 function testPdpDoesNotCallLibraryClaim() {
   for (const [name, source] of [
-    ["mobile", mobile],
-    ["desktop", desktop],
+    ["practice-content", practiceContent],
     ["audio-post", audioPost],
     ["page", page],
     ["parts-primary", parts],
