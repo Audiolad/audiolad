@@ -16,7 +16,7 @@ function read(relativePath) {
 const globals = read("src/app/globals.css");
 const nav = read("src/lib/navigation/bottom-nav.ts");
 const practice = read(
-  "src/components/products/practice-page/PracticePageMobile.tsx",
+  "src/components/products/practice-page/PracticePageContent.tsx",
 );
 const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
 const catalog = read("src/components/products/CatalogProductGrid.tsx");

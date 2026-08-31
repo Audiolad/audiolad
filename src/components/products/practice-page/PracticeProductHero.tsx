@@ -51,31 +51,29 @@ function PracticeHeroMetaLine({
 
 type PracticeProductHeroProps = {
   viewModel: PracticePageViewModel;
-  layout: "mobile" | "desktop";
 };
 
 export default function PracticeProductHero({
   viewModel,
-  layout,
 }: PracticeProductHeroProps) {
   const typeChip = viewModel.productTypeLabel;
   const promoActive = isHeroPromoOfferActive(viewModel.priceOffer);
-  const cover = layout === "desktop" ? viewModel.desktopCover : viewModel.mobileCover;
 
   return (
     <FeaturedProductCard
       className="practice-product-hero"
-      data-practice-product-hero={layout}
+      data-practice-product-hero=""
       data-practice-hero-has-gallery={
         viewModel.gallerySlides.length > 0 ? "true" : "false"
       }
       data-practice-hero-has-promo={promoActive ? "true" : "false"}
       cover={
         <PracticeHeroGallery
-          cover={cover}
+          cover={viewModel.mobileCover}
+          desktopCover={viewModel.desktopCover}
           slides={viewModel.gallerySlides}
           priority
-          showMobileDots={layout === "mobile"}
+          showMobileDots
           heartProduct={toPracticeHeartProduct(viewModel)}
           isAuthenticated={viewModel.isAuthenticated}
           signInReturnPath={viewModel.practicePagePath}

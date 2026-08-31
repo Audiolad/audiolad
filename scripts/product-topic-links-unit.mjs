@@ -20,12 +20,8 @@ const practicePage = readFileSync(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   "utf8",
 );
-const practiceDesktopPage = readFileSync(
-  "src/components/products/practice-page/PracticePageDesktop.tsx",
-  "utf8",
-);
-const practiceMobilePage = readFileSync(
-  "src/components/products/practice-page/PracticePageMobile.tsx",
+const practiceContentPage = readFileSync(
+  "src/components/products/practice-page/PracticePageContent.tsx",
   "utf8",
 );
 const practiceHero = readFileSync(
@@ -93,12 +89,12 @@ assert(
   "public product page loads topics on server",
 );
 assert(
-  practiceMobilePage.includes("ProductTopicLinks"),
+  practiceContentPage.includes("ProductTopicLinks"),
   "public product page renders ProductTopicLinks",
 );
 assert(
-  practiceDesktopPage.includes("ProductTopicLinks"),
-  "desktop page renders ProductTopicLinks below hero",
+  (practiceContentPage.match(/<ProductTopicLinks/g) || []).length === 1,
+  "ONE ProductTopicLinks mount",
 );
 assert(
   !practiceHero.includes("ProductTopicLinks"),
@@ -113,8 +109,8 @@ assert(
   "PracticeMetaSection authorMetaLayout defaults to stacked",
 );
 assert(
-  practiceMobilePage.includes("<ProductTopicLinks"),
-  "mobile keeps topics below the hero",
+  practiceContentPage.includes("<ProductTopicLinks"),
+  "topics stay below the hero",
 );
 assert(component.includes("flex-wrap"), "topic chips wrap horizontally");
 assert(
