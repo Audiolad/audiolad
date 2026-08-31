@@ -164,7 +164,7 @@ export function useAudiobookRecorder({
   }, [authorId, chapterId, projectId, releaseStream, setRecorderStatus, stopRecording, stopTimers, sync]);
 
   useEffect(() => {
-    void sync();
+    queueMicrotask(() => { void sync(); });
     const onOnline = () => { void sync(); };
     window.addEventListener("online", onOnline);
     return () => {
