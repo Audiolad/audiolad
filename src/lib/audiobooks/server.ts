@@ -1,10 +1,21 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { AuthorAccessError, requireAuthorMembership, requireAuthorMutationMembership } from "@/lib/author-products/auth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  AUDIOBOOK_FRAGMENTS_BUCKET,
+  buildAudiobookFragmentStoragePath,
+  isAudiobookFragmentStoragePath,
+  normalizeAudiobookMimeType,
+  sanitizeAudiobookFilename,
+} from "./storage";
+import { AUDIOBOOK_LIMITS } from "./limits";
 
 const PROJECT_SELECT = "id, author_id, title, book_author_name, narrator_name, status, created_at, updated_at";
 const CHAPTER_SELECT = "id, project_id, position, title, status, created_at, updated_at";
+const FRAGMENT_SELECT = "id, chapter_id, position, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, status, created_at, updated_at";
 
 export type AudiobookProject = {
   id: string; author_id: string; title: string; book_author_name: string | null;
@@ -12,6 +23,12 @@ export type AudiobookProject = {
 };
 export type AudiobookChapter = {
   id: string; project_id: string; position: number; title: string; status: "draft";
+  created_at: string; updated_at: string;
+};
+export type AudiobookFragment = {
+  id: string; chapter_id: string; position: number; storage_path: string;
+  original_name: string; mime_type: string; size_bytes: number;
+  duration_seconds: number | null; source_type: "upload"; status: "uploading" | "active";
   created_at: string; updated_at: string;
 };
 
@@ -48,8 +65,25 @@ async function mutationAccess(authorId: string) {
   }
 }
 function fail(error: { message: string } | null, label: string): never {
-  console.error(label, error?.message);
+  console.error(label, { message: error?.message });
   throw new AudiobookError("internal_error", 500);
+}
+
+async function removeFragmentStorage(paths: string[], context: Record<string, string>) {
+  const unique = [...new Set(paths.filter(Boolean))];
+  if (!unique.length) return;
+  const { error } = await createServiceRoleClient().storage
+    .from(AUDIOBOOK_FRAGMENTS_BUCKET).remove(unique);
+  if (error) console.error("audiobook_fragment_storage_cleanup_error", {
+    ...context, paths: unique, message: error.message,
+  });
+}
+
+async function listChapterFragmentPaths(chapterId: string) {
+  const { data, error } = await createServiceRoleClient().from("audiobook_fragments")
+    .select("storage_path").eq("chapter_id", chapterId);
+  if (error) fail(error, "audiobook_fragments_list_cleanup_error");
+  return (data ?? []).map((fragment) => fragment.storage_path).filter((path): path is string => typeof path === "string");
 }
 
 export async function listAudiobookProjects(authorId: string) {
@@ -97,10 +131,24 @@ export async function renameAudiobookProject(projectId: string, authorId: string
 
 export async function deleteAudiobookProject(projectId: string, authorId: string) {
   await mutationAccess(authorId);
-  const { data, error } = await createServiceRoleClient().from("audiobook_projects").delete()
+  await getAudiobookProject(projectId, authorId);
+  const service = createServiceRoleClient();
+  const { data: chapters, error: chaptersError } = await service.from("audiobook_chapters")
+    .select("id").eq("project_id", projectId);
+  if (chaptersError) fail(chaptersError, "audiobook_project_fragments_cleanup_list_error");
+  const chapterIds = (chapters ?? []).map((chapter) => chapter.id);
+  const { data: fragments, error: fragmentsError } = chapterIds.length
+    ? await service.from("audiobook_fragments").select("storage_path").in("chapter_id", chapterIds)
+    : { data: [], error: null };
+  if (fragmentsError) fail(fragmentsError, "audiobook_project_fragments_cleanup_list_error");
+  const { data, error } = await service.from("audiobook_projects").delete()
     .eq("id", projectId).eq("author_id", authorId).eq("status", "active").select("id").maybeSingle();
   if (error) fail(error, "audiobook_project_delete_error");
   if (!data) throw new AudiobookError("not_found", 404);
+  await removeFragmentStorage(
+    (fragments ?? []).map((fragment) => fragment.storage_path).filter((path): path is string => typeof path === "string"),
+    { projectId, authorId },
+  );
 }
 
 export async function createAudiobookChapter(projectId: string, authorId: string, title: string) {
@@ -136,11 +184,13 @@ export async function renameAudiobookChapter(projectId: string, chapterId: strin
 export async function deleteAudiobookChapter(projectId: string, chapterId: string, authorId: string) {
   await mutationAccess(authorId); await ownedChapter(projectId, chapterId, authorId);
   const service = createServiceRoleClient();
+  const fragmentPaths = await listChapterFragmentPaths(chapterId);
   const { error } = await service.rpc("delete_audiobook_chapter", {
     p_project_id: projectId,
     p_chapter_id: chapterId,
   });
   if (error) fail(error, "audiobook_chapter_delete_error");
+  await removeFragmentStorage(fragmentPaths, { projectId, chapterId, authorId });
 }
 
 export async function reorderAudiobookChapters(projectId: string, authorId: string, chapterIds: unknown) {
@@ -152,4 +202,103 @@ export async function reorderAudiobookChapters(projectId: string, authorId: stri
   const { error } = await createServiceRoleClient().rpc("reorder_audiobook_chapters", { p_project_id: projectId, p_chapter_ids: ids });
   if (error) throw new AudiobookError(error.message.includes("not_found") ? "not_found" : "invalid_reorder", error.message.includes("not_found") ? 404 : 422);
   return listAudiobookChapters(projectId, authorId);
+}
+
+export async function listAudiobookFragments(projectId: string, chapterId: string, authorId: string) {
+  await ownedChapter(projectId, chapterId, authorId);
+  const { data, error } = await createServiceRoleClient().from("audiobook_fragments")
+    .select(FRAGMENT_SELECT).eq("chapter_id", chapterId).eq("status", "active")
+    .order("position", { ascending: true }).order("id", { ascending: true });
+  if (error) fail(error, "audiobook_fragments_list_error");
+  return (data ?? []) as AudiobookFragment[];
+}
+
+export async function reserveAudiobookFragment(input: {
+  projectId: string; chapterId: string; authorId: string;
+  originalName: unknown; mimeType: unknown; sizeBytes: unknown;
+}) {
+  await mutationAccess(input.authorId);
+  const chapter = await ownedChapter(input.projectId, input.chapterId, input.authorId);
+  const originalName = sanitizeAudiobookFilename(input.originalName);
+  const mimeType = normalizeAudiobookMimeType(input.mimeType);
+  const sizeBytes = typeof input.sizeBytes === "number" ? input.sizeBytes : NaN;
+  if (!originalName || !mimeType || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > AUDIOBOOK_LIMITS.maxFragmentBytes) {
+    throw new AudiobookError("invalid_fragment", 422);
+  }
+  const id = randomUUID();
+  const storagePath = buildAudiobookFragmentStoragePath(input.authorId, input.projectId, input.chapterId, id, originalName);
+  const service = createServiceRoleClient();
+  const { data: fragment, error } = await service.rpc("reserve_audiobook_fragment", {
+    p_project_id: input.projectId, p_chapter_id: input.chapterId, p_fragment_id: id,
+    p_storage_path: storagePath, p_original_name: originalName, p_mime_type: mimeType,
+    p_size_bytes: sizeBytes, p_source_type: "upload",
+  });
+  if (error || !fragment) {
+    if (error?.message.includes("quota_exceeded")) throw new AudiobookError("quota_exceeded", 422);
+    fail(error, "audiobook_fragment_reserve_error");
+  }
+  const { data: signed, error: signedError } = await service.storage.from(AUDIOBOOK_FRAGMENTS_BUCKET)
+    .createSignedUploadUrl(storagePath, { upsert: false });
+  if (signedError || !signed) {
+    await service.rpc("delete_audiobook_fragment", {
+      p_project_id: input.projectId, p_chapter_id: input.chapterId, p_fragment_id: id,
+    });
+    fail(signedError, "audiobook_fragment_signed_upload_error");
+  }
+  void chapter;
+  return { fragment: fragment as AudiobookFragment, signedUpload: { path: signed.path, token: signed.token } };
+}
+
+export async function retryAudiobookFragmentUpload(projectId: string, chapterId: string, fragmentId: string, authorId: string) {
+  await mutationAccess(authorId);
+  await ownedChapter(projectId, chapterId, authorId);
+  const service = createServiceRoleClient();
+  const { data: fragment, error } = await service.from("audiobook_fragments").select(FRAGMENT_SELECT)
+    .eq("id", fragmentId).eq("chapter_id", chapterId).eq("status", "uploading").maybeSingle();
+  if (error) fail(error, "audiobook_fragment_retry_get_error");
+  if (!fragment || !isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) {
+    throw new AudiobookError("not_found", 404);
+  }
+  const { data: signed, error: signedError } = await service.storage.from(AUDIOBOOK_FRAGMENTS_BUCKET)
+    .createSignedUploadUrl(fragment.storage_path, { upsert: false });
+  if (signedError || !signed) fail(signedError, "audiobook_fragment_retry_signed_upload_error");
+  return { fragment: fragment as AudiobookFragment, signedUpload: { path: signed.path, token: signed.token } };
+}
+
+export async function finalizeAudiobookFragment(projectId: string, chapterId: string, fragmentId: string, authorId: string) {
+  await mutationAccess(authorId);
+  await ownedChapter(projectId, chapterId, authorId);
+  const service = createServiceRoleClient();
+  const { data: fragment, error } = await service.from("audiobook_fragments").select(FRAGMENT_SELECT)
+    .eq("id", fragmentId).eq("chapter_id", chapterId).maybeSingle();
+  if (error) fail(error, "audiobook_fragment_finalize_get_error");
+  if (!fragment || !isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) throw new AudiobookError("not_found", 404);
+  const directory = fragment.storage_path.slice(0, fragment.storage_path.lastIndexOf("/"));
+  const filename = fragment.storage_path.slice(fragment.storage_path.lastIndexOf("/") + 1);
+  const { data: objects, error: objectError } = await service.storage.from(AUDIOBOOK_FRAGMENTS_BUCKET)
+    .list(directory, { limit: 1, search: filename });
+  const object = objects?.find((entry) => entry.name === filename);
+  const metadata = object?.metadata as { size?: number | string; mimetype?: string } | undefined;
+  if (objectError || !object || Number(metadata?.size) !== Number(fragment.size_bytes) || normalizeAudiobookMimeType(metadata?.mimetype) !== fragment.mime_type) {
+    console.error("audiobook_fragment_finalize_storage_invalid", { projectId, chapterId, fragmentId, message: objectError?.message });
+    throw new AudiobookError("upload_not_complete", 409);
+  }
+  const { data: finalized, error: finalizeError } = await service.rpc("finalize_audiobook_fragment", {
+    p_project_id: projectId, p_chapter_id: chapterId, p_fragment_id: fragmentId,
+  });
+  if (finalizeError || !finalized) fail(finalizeError, "audiobook_fragment_finalize_error");
+  return finalized as AudiobookFragment;
+}
+
+export async function deleteAudiobookFragment(projectId: string, chapterId: string, fragmentId: string, authorId: string) {
+  await mutationAccess(authorId);
+  await ownedChapter(projectId, chapterId, authorId);
+  const { data: storagePath, error } = await createServiceRoleClient().rpc("delete_audiobook_fragment", {
+    p_project_id: projectId, p_chapter_id: chapterId, p_fragment_id: fragmentId,
+  });
+  if (error || typeof storagePath !== "string") {
+    if (error?.message.includes("not_found")) throw new AudiobookError("not_found", 404);
+    fail(error, "audiobook_fragment_delete_error");
+  }
+  await removeFragmentStorage([storagePath], { projectId, chapterId, fragmentId, authorId });
 }

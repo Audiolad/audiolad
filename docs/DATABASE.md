@@ -109,7 +109,7 @@ trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
 Миграция: `20260911130000_audiobook_projects_and_chapters.sql`.
 
 Изолированный author-only domain Studio: он не связан с `studio_projects`,
-`practices`, `audio_items` или Storage. `audiobook_projects.author_id`
+`practices` или `audio_items`. `audiobook_projects.author_id`
 ссылается на `authors.id`; title нормализуется сервером и ограничен 1–200
 символами. `audiobook_chapters.project_id` удаляется каскадно с книгой,
 а `position` уникален внутри книги и хранится непрерывно от 1. Создание и
@@ -118,6 +118,20 @@ trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
 выполняет service-role RPC `reorder_audiobook_chapters` после server-side
 проверки author membership; RPC принимает полный ordered set и проверяет
 его точное совпадение с главами книги.
+
+#### Fragments (2026-09-11)
+
+Миграция `20260911140000_audiobook_chapter_fragments.sql` добавляет
+`audiobook_fragments`: приватные исходные аудиофайлы главы с непрерывной
+`position`, размером до 200 MiB и состоянием `uploading` или `active`.
+`reserve_audiobook_fragment` под блокировкой проекта атомарно резервирует
+квоту книги 5 GiB и следующую позицию. Объект кладётся браузером напрямую в
+private bucket `audiobook-fragments` по short-lived signed upload token; в
+Next API не передаётся тело файла. Finalize проверяет объект в Storage и
+переводит зарезервированную строку в `active`; повторный finalize идемпотентен.
+`delete_audiobook_fragment` удаляет строку и нормализует позиции в одной
+транзакции. Storage-очистка после удаления фрагмента, главы или проекта
+выполняется приложением best-effort и не отменяет удаление данных БД.
 
 **Доступ:** наличие строки урока / блока / файла / CTA **никогда** не даёт
 чтение. Learner SELECT policy нет. RLS: ENABLE, REVOKE PUBLIC/anon, нет
