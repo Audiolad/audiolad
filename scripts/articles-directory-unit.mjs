@@ -135,6 +135,7 @@ import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3188,6 +3189,20 @@ function testOneHundredNinthListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn"), "no /articles duplicate for one-hundred-ninth listen slug");
 }
 
+function testOneHundredTenthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-tenth indexable listen page is listed");
+  assert(card.title === RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-tenth directory title");
+  assert(card.description === RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-tenth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn"), "no /articles duplicate for one-hundred-tenth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3207,6 +3222,7 @@ const tests = [
   ["one-hundred-sixth listen page in directory", testOneHundredSixthListenInDirectory],
   ["one-hundred-eighth listen page in directory", testOneHundredEighthListenInDirectory],
   ["one-hundred-ninth listen page in directory", testOneHundredNinthListenInDirectory],
+  ["one-hundred-tenth listen page in directory", testOneHundredTenthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
