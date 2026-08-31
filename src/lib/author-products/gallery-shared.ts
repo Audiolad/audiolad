@@ -61,7 +61,7 @@ export function getAuthorGalleryErrorMessage(code: string | undefined): string {
     case "not_found":
       return "Слайд не найден.";
     case GALLERY_NOT_SUPPORTED_ERROR:
-      return "Галерея продукта доступна только для практики, курса и аудиокниги.";
+      return "Галерея продукта доступна только для практики, курса, аудиокниги и музыки.";
     default:
       return "Не удалось сохранить слайд галереи.";
   }

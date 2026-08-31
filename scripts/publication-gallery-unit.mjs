@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { adaptLegacyCatalogSourceToCard } from "../src/lib/catalog/legacy-adapter.ts";
 import { mapCatalogProductToListingItem } from "../src/lib/catalog/listing.ts";
 import { CATALOG_GALLERY_MAX_SLIDES } from "../src/lib/catalog/gallery.ts";
+import { buildCoverFirstHeroSlides } from "../src/lib/catalog/product-hero-gallery.ts";
 import {
   catalogGalleryForPublication,
   groupPublicationGalleryRowsByPublicationId,
@@ -76,16 +77,16 @@ assert.equal(CATALOG_GALLERY_MAX_SLIDES, 30);
 assert.equal(isProductGalleryClass("practice"), true);
 assert.equal(isProductGalleryClass("course"), true);
 assert.equal(isProductGalleryClass("audiobook"), true);
-assert.equal(isProductGalleryClass("release"), false);
+assert.equal(isProductGalleryClass("release"), true);
 assert.equal(isProductGalleryClass("post"), false);
 
 assert.equal(isProductGalleryEligible("practice", "practice"), true);
 assert.equal(isProductGalleryEligible("course", "practice"), true);
 assert.equal(isProductGalleryEligible("audiobook", "practice"), true);
 assert.equal(isProductGalleryEligible(null, "practice"), true, "legacy NULL+practice");
-assert.equal(isProductGalleryEligible("release", "music"), false);
+assert.equal(isProductGalleryEligible("release", "music"), true);
 assert.equal(isProductGalleryEligible("post", "audio_post"), false);
-assert.equal(isProductGalleryEligible(null, "music"), false, "legacy music");
+assert.equal(isProductGalleryEligible(null, "music"), true, "legacy music");
 assert.equal(isProductGalleryEligible(null, "audio_post"), false, "legacy audio_post");
 assert.equal(
   isProductGalleryEligible("course", "music"),
@@ -188,9 +189,9 @@ const leftover = [
   { id: "leftover", image_url: "/x.jpg", position: 0, alt: "x" },
 ];
 assert.deepEqual(
-  catalogGalleryForPublication("release", "music", leftover),
-  [],
-  "release leftover rows do not become catalog gallery",
+  catalogGalleryForPublication("release", "music", leftover).map((slide) => slide.id),
+  ["leftover"],
+  "release + music gallery reaches catalog DTO",
 );
 assert.deepEqual(
   catalogGalleryForPublication("post", "audio_post", leftover),
@@ -198,9 +199,9 @@ assert.deepEqual(
   "post leftover rows do not become catalog gallery",
 );
 assert.deepEqual(
-  catalogGalleryForPublication(null, "music", leftover),
-  [],
-  "legacy music leftover rows stay empty",
+  catalogGalleryForPublication(null, "music", leftover).map((slide) => slide.id),
+  ["leftover"],
+  "legacy music gallery reaches catalog DTO",
 );
 
 const courseSlides = catalogGalleryForPublication("course", "practice", [
@@ -236,8 +237,28 @@ const leftoverReleaseCard = adaptLegacyCatalogSourceToCard(
   }),
 );
 assert.equal(leftoverReleaseCard?.class, "release");
-assert.deepEqual(leftoverReleaseCard?.gallery, []);
+assert.deepEqual(
+  leftoverReleaseCard?.gallery.map((slide) => slide.id),
+  ["leftover"],
+);
 assert.equal(leftoverReleaseCard?.default_offer?.access, "paid");
+
+const freeMusicCard = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "music",
+    publicationClass: "release",
+    isFree: true,
+    price: 0,
+    gallery: leftover,
+  }),
+);
+assert.equal(freeMusicCard?.class, "release");
+assert.equal(freeMusicCard?.default_offer?.access, "free");
+assert.deepEqual(
+  freeMusicCard?.gallery.map((slide) => slide.id),
+  ["leftover"],
+  "free music PDP/catalog still receives gallery slides",
+);
 
 const leftoverPostCard = adaptLegacyCatalogSourceToCard(
   source({
@@ -278,7 +299,11 @@ const listingRelease = mapCatalogProductToListingItem(
   }),
 );
 assert.equal(listingRelease.class, "release");
-assert.deepEqual(listingRelease.gallery, []);
+assert.deepEqual(
+  listingRelease.gallery.map((slide) => slide.id),
+  ["leftover"],
+  "music listing card receives gallery slides",
+);
 
 const listingCourse = mapCatalogProductToListingItem(
   product({
@@ -295,6 +320,28 @@ assert.equal(listingCourse.class, "course");
 assert.deepEqual(
   listingCourse.gallery.map((slide) => slide.id),
   ["first", "late"],
+);
+
+const musicHeroSlides = buildCoverFirstHeroSlides(
+  { displayUrl: "/album-cover.jpg", alt: "Альбом" },
+  catalogGalleryForPublication("release", "music", leftover),
+);
+assert.deepEqual(
+  musicHeroSlides.map((slide) => slide.id),
+  ["cover", "leftover"],
+  "public music PDP keeps cover first, then gallery slides",
+);
+assert.equal(musicHeroSlides[0]?.src, "/album-cover.jpg");
+assert.equal(musicHeroSlides[1]?.src, "/x.jpg");
+
+const practiceHeroSlides = buildCoverFirstHeroSlides(
+  { displayUrl: "/practice-cover.jpg", alt: "Практика" },
+  catalogGalleryForPublication("practice", "practice", leftover),
+);
+assert.deepEqual(
+  practiceHeroSlides.map((slide) => slide.id),
+  ["cover", "leftover"],
+  "existing practice gallery still reaches the public hero",
 );
 
 console.log("publication-gallery-unit: ok");

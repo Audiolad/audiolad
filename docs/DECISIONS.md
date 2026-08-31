@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-08-31 — Product Gallery for Music / release
+
+**Контекст:** Phase 1B закрывала витрину для `release` и `post`. Музыкальным
+альбомам нужна та же витрина, что у практики/курса/аудиокниги: до 30
+дополнительных 1:1 слайдов в кабинете, каталоге и PDP. Отдельные обложки
+треков остаются своей функцией и не становятся слайдами автоматически.
+
+**Решение:**
+
+- Расширить `isProductGalleryClass` / `isProductGalleryEligible` на
+  `release` (включая legacy `product_kind=music`). `post` / `audio_post`
+  по-прежнему не eligible.
+- Новая таблица, bucket, API и миграция не нужны: `publication_gallery_slides`
+  уже FK на `practices.id` без фильтра класса.
+- Кабинет, author gallery API, catalog DTO и публичный PDP используют ту же
+  инфраструктуру. Главная обложка релиза остаётся на `practices`.
+- Не менять `PRODUCT_KIND.MUSIC`, `publication_class=release`,
+  `music_usage_permission`, Studio reuse и track covers.
+
+**Принято:** владелец продукта (задание «витрина для Музыки»).
+
+---
+
 ## 2026-08-28 — Analytics heavy RPC protection
 
 **Контекст:** один клиент (~400–500/мин) вызывал `POST /api/analytics/session/link` и `POST /api/analytics/signup/complete` на каждом `onAuthStateChange`, включая `TOKEN_REFRESHED`. `SIGNED_IN` делал link + signup/complete, а signup RPC снова вызывал link. Тяжёлые UPDATE + `pg_advisory_xact_lock` → 55P03 → пул PostgREST (10) → PGRST003 → 504 на несвязанных RPC.

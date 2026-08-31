@@ -235,7 +235,8 @@ const leftoverReleaseGallery = adaptLegacyCatalogSourceToCard(
   }),
 );
 assert.equal(leftoverReleaseGallery?.class, "release");
-assert.deepEqual(leftoverReleaseGallery?.gallery, []);
+assert.equal(leftoverReleaseGallery?.gallery.length, 1);
+assert.equal(leftoverReleaseGallery?.gallery[0]?.id, "leftover");
 
 const leftoverPostGallery = adaptLegacyCatalogSourceToCard(
   source({

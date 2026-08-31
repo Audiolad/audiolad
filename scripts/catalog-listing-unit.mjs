@@ -283,8 +283,8 @@ assert(
     publicationClass: "release",
     format: "Музыка",
     gallery: [{ id: "x", image_url: "/x.jpg", position: 0, alt: "" }],
-  }).gallery.length === 0,
-  "release listing gallery is always empty",
+  }).gallery.length === 1,
+  "release listing gallery is attached",
 );
 assert(
   candidate({

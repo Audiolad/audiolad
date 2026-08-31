@@ -208,11 +208,12 @@ Timeweb Cloud
   → `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API
   `POST/DELETE .../audio/[audioId]/cover`.
 - Phase 1B Product Gallery: `publication_gallery_slides` +
-  `isProductGalleryEligible` (`practice` / `course` / `audiobook`).
-  Author API `GET/POST .../gallery`, `PATCH .../gallery/reorder`,
-  `PATCH/DELETE .../gallery/[slideId]`. Каталог кладёт слайды в
-  `CatalogCard.gallery` только для product-классов; `release` / `post`
-  всегда `[]`. Cover не является слайдом.
+  `isProductGalleryEligible` (`practice` / `course` / `audiobook` /
+  `release`). Author API `GET/POST .../gallery`,
+  `PATCH .../gallery/reorder`, `PATCH/DELETE .../gallery/[slideId]`.
+  Каталог кладёт слайды в `CatalogCard.gallery` для eligible классов;
+  `post` всегда `[]`. Cover не является слайдом. Обложки треков музыки
+  не генерируют витрину.
 - Phase 2A Course Content Foundation: `Course → Lesson → LessonBlock`.
   Section / Module нет. Таблицы `course_lessons`, `course_lesson_blocks`,
   `publication_files`, `course_completion_ctas`. Доступ к содержимому
