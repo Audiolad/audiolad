@@ -111,6 +111,7 @@ import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from
 import { MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn.ts";
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
+import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -32417,6 +32418,45 @@ function testOneHundredFourthPage() {
   );
 }
 
+function testOneHundredFifthPage() {
+  const definition = RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const destinations = [
+    "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+  ];
+  const parsed = parseListenPageDefinition(definition);
+
+  assert(parsed.ok, "one-hundred-fifth production definition valid");
+  assert(definition.slug === slug, "one-hundred-fifth slug exact");
+  assert(definition.playlistSlug === "muzyka-dlya-sna-s-dozhdem", "one-hundred-fifth playlistSlug exact");
+  assert(definition.h1 === "Релакс музыка с дождём для сна – слушать онлайн бесплатно", "one-hundred-fifth h1 exact");
+  assert(definition.title === "Релакс музыка с дождём для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-fifth title exact");
+  assert(definition.intro.length === 3, "one-hundred-fifth has three intro paragraphs");
+  assert(definition.faq.length === 8, "one-hundred-fifth has eight FAQ items");
+
+  const links = collectListenLinks(definition);
+  assert(links.length === 6, "one-hundred-fifth has six href");
+  assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-fifth has six unique destinations");
+  assert(links.map((link) => link.href).join("\n") === destinations.join("\n"), "one-hundred-fifth exact link destinations and order");
+  assert(listListenPageDefinitions().map((page) => page.slug).includes(slug), "registry contains one-hundred-fifth slug");
+  assert(listListenPageDefinitions().length === 105, "registry contains all 105 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: "muzyka-dlya-sna-s-dozhdem", title: "Музыка для сна с дождём | Шум дождя для сна" } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-fifth canonical");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-fifth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-fifth has no raw URLs");
+}
+
 function collectListenLinks(definition) {
   const rich = (definition.sections ?? []).flatMap((section) => section.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   return rich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
@@ -32605,6 +32645,7 @@ const tests = [
   ["one-hundred-second listen page", testOneHundredSecondPage],
   ["one-hundred-third listen page", testOneHundredThirdPage],
   ["one-hundred-fourth listen page", testOneHundredFourthPage],
+  ["one-hundred-fifth listen page", testOneHundredFifthPage],
   ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
