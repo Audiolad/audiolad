@@ -22,6 +22,7 @@ import type { PracticePageCoverData } from "./types";
 
 type PracticeHeroGalleryProps = {
   cover: PracticePageCoverData;
+  desktopCover?: PracticePageCoverData;
   slides: readonly CatalogSlide[];
   priority?: boolean;
   showMobileDots?: boolean;
@@ -33,11 +34,70 @@ type PracticeHeroGalleryProps = {
   shareSubtitle?: string | null;
 };
 
+function PracticeHeroCoverPicture({
+  cover,
+  desktopCover,
+  alt,
+  priority,
+  className,
+  draggable,
+}: {
+  cover: PracticePageCoverData;
+  desktopCover?: PracticePageCoverData;
+  alt: string;
+  priority?: boolean;
+  className: string;
+  draggable?: boolean;
+}) {
+  const image = (
+    <ResponsiveCoverImage
+      src={cover.responsive.src ?? cover.displayUrl}
+      alt={alt}
+      manifest={cover.responsive.manifest}
+      srcSet={cover.responsive.srcSet}
+      sizes={
+        cover.responsive.srcSet
+          ? desktopCover
+            ? "(min-width: 1280px) 360px, 100vw"
+            : cover.responsive.sizes
+          : undefined
+      }
+      displayWidth={cover.displayWidth}
+      priority={priority}
+      draggable={draggable}
+      className={className}
+    />
+  );
+
+  if (!desktopCover?.displayUrl && !desktopCover?.responsive.srcSet) {
+    return image;
+  }
+
+  const desktopSrcSet =
+    desktopCover.responsive.srcSet ?? desktopCover.displayUrl ?? undefined;
+
+  if (!desktopSrcSet) {
+    return image;
+  }
+
+  return (
+    <picture>
+      <source
+        media="(min-width: 1280px)"
+        srcSet={desktopSrcSet}
+        sizes={desktopCover.responsive.sizes || "(min-width: 1280px) 360px"}
+      />
+      {image}
+    </picture>
+  );
+}
+
 export default function PracticeHeroGallery({
   cover,
+  desktopCover,
   slides,
   priority = false,
-  showMobileDots = false,
+  showMobileDots = true,
   heartProduct = null,
   isAuthenticated = false,
   signInReturnPath = "/catalog",
@@ -159,13 +219,10 @@ export default function PracticeHeroGallery({
     return (
       <div className="featured-card__cover relative">
         {cover.displayUrl ? (
-          <ResponsiveCoverImage
-            src={cover.responsive.src ?? cover.displayUrl}
+          <PracticeHeroCoverPicture
+            cover={cover}
+            desktopCover={desktopCover}
             alt={cover.alt}
-            manifest={cover.responsive.manifest}
-            srcSet={cover.responsive.srcSet}
-            sizes={cover.responsive.srcSet ? cover.responsive.sizes : undefined}
-            displayWidth={cover.displayWidth}
             priority={priority}
             className="h-full w-full rounded-none"
           />
@@ -229,13 +286,10 @@ export default function PracticeHeroGallery({
             className="practice-hero-gallery-slide"
           >
             {page.type === "cover" && page.src ? (
-              <ResponsiveCoverImage
-                src={cover.responsive.src ?? page.src}
+              <PracticeHeroCoverPicture
+                cover={cover}
+                desktopCover={desktopCover}
                 alt={page.alt}
-                manifest={cover.responsive.manifest}
-                srcSet={cover.responsive.srcSet}
-                sizes={cover.responsive.srcSet ? cover.responsive.sizes : undefined}
-                displayWidth={cover.displayWidth}
                 priority={priority && index === 0}
                 draggable={false}
                 className="h-full w-full rounded-none"

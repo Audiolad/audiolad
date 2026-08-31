@@ -41,11 +41,8 @@ function testHeartOnCover() {
   const gallery = read(
     "src/components/products/practice-page/PracticeHeroGallery.tsx",
   );
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
-  );
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
   const page = read(
     "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
@@ -58,10 +55,8 @@ function testHeartOnCover() {
   assert.match(gallery, /CatalogProductHeartButton/);
   assert.match(gallery, /PracticeProductShareButton/);
   assert.match(gallery, /data-practice-hero-cover-actions/);
-  assert.match(mobile, /PracticeProductHero/);
-  assert.match(desktop, /PracticeProductHero/);
-  assert.doesNotMatch(mobile, /PracticeLibraryActionSection|LibraryAddButton/);
-  assert.doesNotMatch(desktop, /PracticeLibraryActionSection|LibraryAddButton/);
+  assert.match(practiceContent, /PracticeProductHero/);
+  assert.doesNotMatch(practiceContent, /PracticeLibraryActionSection|LibraryAddButton/);
   assert.match(page, /listSavedPracticeIds/);
   assert.match(page, /isSaved/);
 }
@@ -80,11 +75,8 @@ function testBeforePurchaseRowKeepsBuy() {
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
   const featuredCard = read("src/components/home/FeaturedProductCard.tsx");
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
-  );
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
   const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
 
@@ -174,66 +166,54 @@ function testBeforePurchaseRowKeepsBuy() {
     "listen path does not render BuyPracticeButton",
   );
 
-  const mobileCta = mobile.indexOf("<PracticeProductHero");
-  const mobileDescription = mobile.indexOf("<ProductCopySections");
-  const mobileContents = mobile.indexOf("<ProductContentsSection");
+  const cta = practiceContent.indexOf("<PracticeProductHero");
+  const description = practiceContent.indexOf("<ProductCopySections");
+  const contents = practiceContent.indexOf("<ProductContentsSection");
   assert.match(hero, /PracticePrimaryActionSection/, "hero mounts the primary CTA");
-  assert.ok(mobileCta >= 0, "mobile mounts the product hero");
+  assert.ok(cta >= 0, "practice tree mounts the product hero");
   assert.ok(
-    mobileCta < mobileContents,
-    "mobile CTA appears before ProductContentsSection",
+    cta < contents,
+    "CTA appears before ProductContentsSection",
   );
   assert.ok(
-    mobileCta < mobileDescription,
-    "mobile CTA appears before description",
+    cta < description,
+    "CTA appears before description",
   );
   assert.ok(
-    mobileContents < mobileDescription,
-    "mobile contents appear before the description block",
+    contents < description,
+    "contents appear before the description block",
   );
-
-  const desktopCta = desktop.indexOf("<PracticeProductHero");
-  const desktopDescription = desktop.indexOf("<ProductCopySections");
-  const desktopContents = desktop.indexOf("<ProductContentsSection");
   assert.doesNotMatch(
-    desktop,
+    practiceContent,
     /mt-auto/,
-    "desktop CTA is not pinned to the cover baseline",
+    "CTA is not pinned to the cover baseline",
   );
-  assert.ok(desktopCta >= 0, "desktop mounts the product hero");
-  assert.ok(
-    desktopCta < desktopContents,
-    "desktop CTA appears before ProductContentsSection",
-  );
-  assert.ok(
-    desktopCta < desktopDescription,
-    "desktop CTA appears before description",
-  );
-  assert.ok(
-    desktopContents < desktopDescription,
-    "desktop contents appear before the description block",
+  assert.equal(
+    (practiceContent.match(/<ProductCopySections/g) || []).length,
+    1,
+    "ONE ProductCopySections mount",
   );
 
   const copySections = read("src/components/products/ProductCopySections.tsx");
   assert.match(
-    desktop.slice(desktopDescription),
-    /variant="desktop"/,
-    "desktop copy sections use the desktop variant",
-  );
-  assert.match(
     copySections,
-    /w-full max-w-none/,
-    "desktop description body is w-full and max-w-none",
+    /xl:w-full xl:max-w-none/,
+    "desktop description body is w-full and max-w-none via responsive classes",
   );
   assert.doesNotMatch(
     copySections,
     /max-w-prose/,
-    "desktop description body is not constrained by max-w-prose",
+    "description body is not constrained by max-w-prose",
   );
   assert.doesNotMatch(
-    mobile.slice(mobileDescription),
-    /variant="desktop"|max-w-prose|max-w-none/,
-    "mobile description layout stays compact",
+    copySections,
+    /variant=/,
+    "copy sections are one responsive mount, not a variant fork",
+  );
+  assert.doesNotMatch(
+    practiceContent,
+    /variant="desktop"/,
+    "practice tree does not mount a second desktop copy variant",
   );
 
   assert.doesNotMatch(

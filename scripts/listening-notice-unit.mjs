@@ -225,38 +225,26 @@ function testDesktopMobileCoursePdpAbsent() {
     "course view-model notice is null for both desktop and mobile PDP",
   );
 
-  const desktop = read(
-    "src/components/products/practice-page/PracticePageDesktop.tsx",
-  );
-  const mobile = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
+  const practiceContent = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
 
   assert(
-    desktop.includes("ListeningNoticeCard"),
-    "desktop PDP still uses shared card",
+    practiceContent.includes("ListeningNoticeCard"),
+    "practice PDP still uses shared card",
   );
   assert(
-    mobile.includes("ListeningNoticeCard"),
-    "mobile PDP still uses shared card",
+    (practiceContent.match(/<ListeningNoticeCard/g) || []).length === 1,
+    "ONE ListeningNoticeCard mount",
   );
   assert(
-    /\{listeningNotice \? \(/.test(desktop),
-    "desktop renders card only when view-model notice is set",
+    /\{listeningNotice \? \(/.test(practiceContent),
+    "practice PDP renders card only when view-model notice is set",
   );
   assert(
-    /\{listeningNotice \? \(/.test(mobile),
-    "mobile renders card only when view-model notice is set",
-  );
-  assert(
-    !desktop.includes("resolveListeningNotice") &&
-      !desktop.includes("shouldShowListeningNoticeForPublication"),
-    "desktop does not copy the publication-class rule",
-  );
-  assert(
-    !mobile.includes("resolveListeningNotice") &&
-      !mobile.includes("shouldShowListeningNoticeForPublication"),
-    "mobile does not copy the publication-class rule",
+    !practiceContent.includes("resolveListeningNotice") &&
+      !practiceContent.includes("shouldShowListeningNoticeForPublication"),
+    "practice PDP does not copy the publication-class rule",
   );
 }
 
@@ -323,11 +311,11 @@ function testWiring() {
   const practicePage = read(
     "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
-  const practiceMobilePage = read(
-    "src/components/products/practice-page/PracticePageMobile.tsx",
+  const practiceContentPage = read(
+    "src/components/products/practice-page/PracticePageContent.tsx",
   );
   assert(
-    practiceMobilePage.includes("ListeningNoticeCard"),
+    practiceContentPage.includes("ListeningNoticeCard"),
     "practice page uses shared card",
   );
   assert(

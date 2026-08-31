@@ -126,7 +126,7 @@ function testHomepageGuestCardRulesStayPixelEquivalent() {
   );
   assert.match(
     css,
-    /\[data-practice-product-hero="desktop"\][\s\S]*position:\s*absolute/,
+    /\[data-practice-product-hero\][\s\S]*position:\s*absolute/,
     "PDP desktop info column is scoped off the homepage card",
   );
 }

@@ -40,8 +40,8 @@ const practicePage = readFileSync(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   "utf8",
 );
-const practiceMobilePage = readFileSync(
-  "src/components/products/practice-page/PracticePageMobile.tsx",
+const practiceContentPage = readFileSync(
+  "src/components/products/practice-page/PracticePageContent.tsx",
   "utf8",
 );
 const globalPlayerTypes = readFileSync(
@@ -175,20 +175,24 @@ assert(
   "practice page builds a shared view model for mobile and desktop",
 );
 assert(
-  practiceMobilePage.includes("ProductContentsSection"),
-  "practice mobile view wires contents section from shared view model",
+  practiceContentPage.includes("ProductContentsSection"),
+  "practice view wires contents section from shared view model",
 );
 assert(
-  practiceMobilePage.includes("practiceCover={{"),
+  practiceContentPage.includes("practiceCover={{"),
   "practice page passes practice cover context to contents section",
 );
 assert(
-  practiceMobilePage.includes("use_shared_cover"),
+  practiceContentPage.includes("use_shared_cover"),
   "practice page passes use_shared_cover for per-track fallback",
 );
 assert(
-  practiceMobilePage.includes('enabled: presentation.primaryAction.kind === "listen"'),
+  practiceContentPage.includes('enabled: presentation.primaryAction.kind === "listen"'),
   "playback enabled only when listen action is available",
+);
+assert(
+  (practiceContentPage.match(/<ProductContentsSection/g) || []).length === 1,
+  "ONE ProductContentsSection mount",
 );
 
 assert(

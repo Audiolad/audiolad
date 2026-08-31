@@ -64,22 +64,58 @@ assert.doesNotMatch(copyModule, /SEO_ABOUT_LABEL|SEO_ABOUT_HELPER|SEO_ABOUT_AUTO
 assert.doesNotMatch(copyModule, /PUBLIC_SHORT_HEADING|PUBLIC_DETAIL_HEADING/);
 assert.doesNotMatch(copyModule, /Коротко о продукте|Подробнее о продукте|Короткое описание продукта/);
 
-const desktop = read("src/components/products/practice-page/PracticePageDesktop.tsx");
-const mobile = read("src/components/products/practice-page/PracticePageMobile.tsx");
+const practiceContent = read(
+  "src/components/products/practice-page/PracticePageContent.tsx",
+);
 const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
 const copySections = read("src/components/products/ProductCopySections.tsx");
-assert.match(desktop, /ProductCopySections/);
-assert.match(mobile, /ProductCopySections/);
+const practiceHero = read(
+  "src/components/products/practice-page/PracticeProductHero.tsx",
+);
+assert.match(practiceContent, /ProductCopySections/);
 assert.match(audioPost, /ProductCopySections/);
 assert.match(copySections, /sections\.about\.heading/);
 assert.doesNotMatch(copySections, /seoAbout|sections\.short|sections\.detail/);
 assert.doesNotMatch(copySections, /Коротко о продукте|Подробнее о продукте/);
-assert.doesNotMatch(desktop, /seoAbout/);
-assert.doesNotMatch(mobile, /seoAbout/);
+assert.doesNotMatch(practiceContent, /seoAbout/);
 assert.doesNotMatch(audioPost, /seoAbout/);
-assert.doesNotMatch(desktop, /Коротко о продукте|Подробнее о продукте/);
-assert.doesNotMatch(mobile, /Коротко о продукте|Подробнее о продукте/);
+assert.doesNotMatch(practiceContent, /Коротко о продукте|Подробнее о продукте/);
 assert.doesNotMatch(audioPost, /Коротко о продукте|Подробнее о продукте/);
+assert.equal(
+  (practiceContent.match(/<ProductCopySections/g) || []).length,
+  1,
+  "ONE ProductCopySections mount",
+);
+assert.equal(
+  (practiceContent.match(/<PracticeSeoContentSections/g) || []).length,
+  1,
+  "ONE PracticeSeoContentSections mount",
+);
+assert.doesNotMatch(
+  practiceContent,
+  /xl:hidden|hidden min-w-0 xl:block/,
+  "practice content is not a dual hidden tree",
+);
+assert.doesNotMatch(
+  practiceContent,
+  /innerWidth|matchMedia|useEffect/,
+  "no viewport JS branching in the public practice tree",
+);
+assert.equal(
+  (practiceHero.match(/<h1\b/g) || []).length,
+  1,
+  "ONE semantic H1 path in the practice hero",
+);
+assert.doesNotMatch(
+  practiceHero,
+  /layout === ["']mobile["']|layout === ["']desktop["']/,
+  "hero is not a mobile/desktop layout fork",
+);
+assert.match(
+  practiceContent,
+  /<PracticeSeoContentSections content=\{seoContent\}/,
+  "ONE public recommendations path via PracticeSeoContentSections",
+);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /AUTHOR_DESCRIPTION_LABEL/);
@@ -92,6 +128,12 @@ assert.match(form, /seo_description: form\.seoDescription\.trim\(\) \|\| null/);
 
 const practicePage = read(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+);
+assert.match(practicePage, /<PracticePageContent viewModel=\{viewModel\} \/>/);
+assert.doesNotMatch(
+  practicePage,
+  /PracticePageMobile|PracticePageDesktop/,
+  "page.tsx must not mount dual mobile+desktop practice trees",
 );
 assert.doesNotMatch(practicePage, /seoAbout: practice\.seo_about/);
 assert.match(read("src/components/products/practice-page/types.ts"), /description: string \| null;/);
