@@ -64,7 +64,6 @@ The migration is additive for data: application rollback can leave
 `studio_asset_sources` and `source_id` in place. Do not attempt a destructive
 database rollback; the previous application continues to read the retained
 `studio_project_assets.storage_path` values.
-
 ### Disposable shared-assets verification VM
 
 Use the official Supabase Docker stack pinned to `self-hosted/v0.8.0`. Its
