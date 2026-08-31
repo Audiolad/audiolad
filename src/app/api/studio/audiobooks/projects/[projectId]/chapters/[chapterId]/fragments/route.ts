@@ -44,6 +44,7 @@ export async function POST(request: Request, context: Context) {
       originalName: body?.originalName,
       mimeType: body?.mimeType,
       sizeBytes: body?.sizeBytes,
+      sourceType: body?.sourceType,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

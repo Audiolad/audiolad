@@ -16,7 +16,7 @@ CREATE TABLE public.audiobook_fragments (
   CONSTRAINT audiobook_fragments_position_check CHECK (position >= 1),
   CONSTRAINT audiobook_fragments_size_check CHECK (size_bytes > 0 AND size_bytes <= 209715200),
   CONSTRAINT audiobook_fragments_mime_check CHECK (mime_type IN ('audio/webm','audio/mp4','audio/mpeg','audio/wav','audio/x-wav','audio/aac')),
-  CONSTRAINT audiobook_fragments_source_check CHECK (source_type = 'upload'),
+  CONSTRAINT audiobook_fragments_source_check CHECK (source_type IN ('upload', 'recording')),
   CONSTRAINT audiobook_fragments_status_check CHECK (status IN ('uploading','active')),
   CONSTRAINT audiobook_fragments_chapter_position_key UNIQUE (chapter_id, position) DEFERRABLE INITIALLY IMMEDIATE
 );
@@ -78,7 +78,7 @@ BEGIN
     OR p_mime_type IS NULL
     OR p_size_bytes IS NULL
     OR p_size_bytes <= 0
-    OR p_source_type <> 'upload' THEN
+    OR p_source_type NOT IN ('upload', 'recording') THEN
     RAISE EXCEPTION 'invalid_audiobook_fragment' USING ERRCODE = '22023';
   END IF;
 

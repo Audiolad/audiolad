@@ -28,7 +28,7 @@ export type AudiobookChapter = {
 export type AudiobookFragment = {
   id: string; chapter_id: string; position: number; storage_path: string;
   original_name: string; mime_type: string; size_bytes: number;
-  duration_seconds: number | null; source_type: "upload"; status: "uploading" | "active";
+  duration_seconds: number | null; source_type: "upload" | "recording"; status: "uploading" | "active";
   created_at: string; updated_at: string;
 };
 
@@ -207,7 +207,7 @@ export async function reorderAudiobookChapters(projectId: string, authorId: stri
 export async function listAudiobookFragments(projectId: string, chapterId: string, authorId: string) {
   await ownedChapter(projectId, chapterId, authorId);
   const { data, error } = await createServiceRoleClient().from("audiobook_fragments")
-    .select(FRAGMENT_SELECT).eq("chapter_id", chapterId).eq("status", "active")
+    .select(FRAGMENT_SELECT).eq("chapter_id", chapterId)
     .order("position", { ascending: true }).order("id", { ascending: true });
   if (error) fail(error, "audiobook_fragments_list_error");
   return (data ?? []) as AudiobookFragment[];
@@ -215,7 +215,7 @@ export async function listAudiobookFragments(projectId: string, chapterId: strin
 
 export async function reserveAudiobookFragment(input: {
   projectId: string; chapterId: string; authorId: string;
-  originalName: unknown; mimeType: unknown; sizeBytes: unknown;
+  originalName: unknown; mimeType: unknown; sizeBytes: unknown; sourceType: unknown;
 }) {
   await mutationAccess(input.authorId);
   const chapter = await ownedChapter(input.projectId, input.chapterId, input.authorId);
@@ -225,13 +225,14 @@ export async function reserveAudiobookFragment(input: {
   if (!originalName || !mimeType || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > AUDIOBOOK_LIMITS.maxFragmentBytes) {
     throw new AudiobookError("invalid_fragment", 422);
   }
+  if (input.sourceType !== "upload" && input.sourceType !== "recording") throw new AudiobookError("invalid_fragment", 422);
   const id = randomUUID();
   const storagePath = buildAudiobookFragmentStoragePath(input.authorId, input.projectId, input.chapterId, id, originalName);
   const service = createServiceRoleClient();
   const { data: fragment, error } = await service.rpc("reserve_audiobook_fragment", {
     p_project_id: input.projectId, p_chapter_id: input.chapterId, p_fragment_id: id,
     p_storage_path: storagePath, p_original_name: originalName, p_mime_type: mimeType,
-    p_size_bytes: sizeBytes, p_source_type: "upload",
+    p_size_bytes: sizeBytes, p_source_type: input.sourceType,
   });
   if (error || !fragment) {
     if (error?.message.includes("quota_exceeded")) throw new AudiobookError("quota_exceeded", 422);

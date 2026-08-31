@@ -31,7 +31,7 @@ export function AudiobookProjectWorkspace({ project, chapters: initialChapters, 
     if (!fragmentBase) return;
     setBusy(true); setUploadError(null);
     try {
-      const reserved = await request(fragmentBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authorId, originalName: file.name, mimeType: file.type, sizeBytes: file.size }) });
+      const reserved = await request(fragmentBase, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authorId, originalName: file.name, mimeType: file.type, sizeBytes: file.size, sourceType: "upload" }) });
       let signedUpload = reserved.signedUpload;
       let uploadResult = await createClient().storage.from("audiobook-fragments").uploadToSignedUrl(signedUpload.path, signedUpload.token, file, { contentType: file.type });
       if (uploadResult.error) {
