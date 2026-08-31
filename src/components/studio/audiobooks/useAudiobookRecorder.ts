@@ -14,6 +14,7 @@ import {
   deleteAudiobookRecordingDraft,
   appendAudiobookRecordingChunk,
   listAudiobookRecordingDrafts,
+  recoverInterruptedAudiobookRecordingDrafts,
   saveAudiobookRecordingDraft,
   type AudiobookRecordingDraft,
 } from "@/lib/audiobooks/recorder-store";
@@ -72,6 +73,11 @@ export function useAudiobookRecorder({
   }, []);
   const sync = useCallback(async () => {
     setPendingDraftCount((count) => count + 1);
+    setDrafts((current) => current.map((draft) => (
+      ["ready", "interrupted", "failed"].includes(draft.status)
+        ? { ...draft, status: "syncing" }
+        : draft
+    )));
     try {
       await syncPendingAudiobookRecordingDrafts(projectId, onSynced);
     } finally {
@@ -158,11 +164,13 @@ export function useAudiobookRecorder({
         const sequence = chunkSequenceRef.current++;
         writeChainRef.current = writeChainRef.current.then(async () => {
           if (storageLimitReachedRef.current || persistenceFailedRef.current) return;
-          const wouldExceedFragment = bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxFragmentBytes - RECORDING_BYTE_SAFETY_MARGIN;
-          const wouldExceedProject = projectPendingBytesRef.current + bytesRef.current + chunk.size > AUDIOBOOK_LIMITS.maxProjectSourceBytes - RECORDING_BYTE_SAFETY_MARGIN;
-          if (wouldExceedFragment || wouldExceedProject) {
+          const nextFragmentBytes = bytesRef.current + chunk.size;
+          const nextProjectBytes = projectPendingBytesRef.current + nextFragmentBytes;
+          const exceedsFragmentHardMax = nextFragmentBytes > AUDIOBOOK_LIMITS.maxFragmentBytes;
+          const exceedsProjectHardMax = nextProjectBytes > AUDIOBOOK_LIMITS.maxProjectSourceBytes;
+          if (exceedsFragmentHardMax || exceedsProjectHardMax) {
             storageLimitReachedRef.current = true;
-            setError(wouldExceedFragment
+            setError(exceedsFragmentHardMax
               ? "Достигнут лимит записи в 200 МБ."
               : "Достигнут лимит исходных файлов книги.");
             window.setTimeout(stopRecording, 0);
@@ -171,6 +179,15 @@ export function useAudiobookRecorder({
           await appendAudiobookRecordingChunk(draft.id, sequence, chunk);
           bytesRef.current += chunk.size;
           persistedChunkCountRef.current += 1;
+          const crossesFragmentSoftLimit = nextFragmentBytes > AUDIOBOOK_LIMITS.maxFragmentBytes - RECORDING_BYTE_SAFETY_MARGIN;
+          const crossesProjectSoftLimit = nextProjectBytes > AUDIOBOOK_LIMITS.maxProjectSourceBytes - RECORDING_BYTE_SAFETY_MARGIN;
+          if (crossesFragmentSoftLimit || crossesProjectSoftLimit) {
+            storageLimitReachedRef.current = true;
+            setError(crossesFragmentSoftLimit
+              ? "Достигнут лимит записи в 200 МБ."
+              : "Достигнут лимит исходных файлов книги.");
+            window.setTimeout(stopRecording, 0);
+          }
         }).catch(() => {
           persistenceFailedRef.current = true;
           setError("Не удалось сохранить запись на этом устройстве.");
@@ -245,7 +262,7 @@ export function useAudiobookRecorder({
   }, [authorId, chapterId, projectId, releaseStream, setRecorderStatus, stopRecording, stopTimers, sync]);
 
   useEffect(() => {
-    void listAudiobookRecordingDrafts(projectId).then(setDrafts).catch(() => {
+    void recoverInterruptedAudiobookRecordingDrafts(projectId).then(setDrafts).catch(() => {
       setError("Не удалось открыть локальные черновики.");
     });
     return () => {

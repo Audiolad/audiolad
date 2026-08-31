@@ -50,55 +50,66 @@ async function reservationFor(draft: AudiobookRecordingDraft): Promise<Reservati
       sourceType: "recording",
     }),
   }) as ReservationResponse;
-  await saveAudiobookRecordingDraft({ ...draft, remoteFragmentId: reservation.fragment.id });
+  await saveAudiobookRecordingDraft({ ...draft, remoteFragmentId: reservation.fragment.id, status: "syncing" });
   return reservation;
+}
+
+async function updateDraftStatus(draftId: string, status: AudiobookRecordingDraft["status"]) {
+  const draft = await getAudiobookRecordingDraft(draftId);
+  if (draft) await saveAudiobookRecordingDraft({ ...draft, status });
 }
 
 export async function syncAudiobookRecordingDraft(draftId: string) {
   const draft = await getAudiobookRecordingDraft(draftId);
   if (!draft) return null;
-  if (draft.remoteFragmentId) {
-    try {
-      const finalized = await request(
-        `${fragmentBase(draft)}/${draft.remoteFragmentId}/finalize`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ authorId: draft.authorId }),
-        },
-      ) as { fragment: AudiobookFragment };
-      await deleteAudiobookRecordingDraft(draft.id);
-      return finalized.fragment;
-    } catch (error) {
-      if (!(error instanceof Error) || error.message !== "upload_not_complete") throw error;
+  await saveAudiobookRecordingDraft({ ...draft, status: "syncing" });
+  try {
+    if (draft.remoteFragmentId) {
+      try {
+        const finalized = await request(
+          `${fragmentBase(draft)}/${draft.remoteFragmentId}/finalize`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ authorId: draft.authorId }),
+          },
+        ) as { fragment: AudiobookFragment };
+        await deleteAudiobookRecordingDraft(draft.id);
+        return finalized.fragment;
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "upload_not_complete") throw error;
+      }
     }
+    const reservation = await reservationFor(draft);
+    const recording = await getAudiobookRecordingData(draft.id, draft.mimeType);
+    if (
+      !recording.contiguous
+      || recording.chunkCount !== draft.chunkCount
+      || recording.sizeBytes !== draft.sizeBytes
+      || recording.blob.size !== draft.sizeBytes
+      || !recording.blob.size
+    ) throw new Error("recording_chunks_incomplete");
+    const upload = await createClient().storage.from("audiobook-fragments").uploadToSignedUrl(
+      reservation.signedUpload.path,
+      reservation.signedUpload.token,
+      recording.blob,
+      { contentType: draft.mimeType },
+    );
+    if (upload.error) throw new Error("storage_upload_failed");
+    const response = await request(
+      `${fragmentBase(draft)}/${reservation.fragment.id}/finalize`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authorId: draft.authorId }),
+      },
+    ) as { fragment: AudiobookFragment };
+    await deleteAudiobookRecordingDraft(draft.id);
+    return response.fragment;
+  } catch (error) {
+    await updateDraftStatus(draft.id, "failed").catch(() => undefined);
+    throw error;
   }
-  const reservation = await reservationFor(draft);
-  const recording = await getAudiobookRecordingData(draft.id, draft.mimeType);
-  if (
-    !recording.contiguous
-    || recording.chunkCount !== draft.chunkCount
-    || recording.sizeBytes !== draft.sizeBytes
-    || recording.blob.size !== draft.sizeBytes
-    || !recording.blob.size
-  ) throw new Error("recording_chunks_incomplete");
-  const upload = await createClient().storage.from("audiobook-fragments").uploadToSignedUrl(
-    reservation.signedUpload.path,
-    reservation.signedUpload.token,
-    recording.blob,
-    { contentType: draft.mimeType },
-  );
-  if (upload.error) throw new Error("storage_upload_failed");
-  const response = await request(
-    `${fragmentBase(draft)}/${reservation.fragment.id}/finalize`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorId: draft.authorId }),
-    },
-  ) as { fragment: AudiobookFragment };
-  await deleteAudiobookRecordingDraft(draft.id);
-  return response.fragment;
 }
 
 type ProjectSync = {
@@ -122,7 +133,7 @@ export async function syncPendingAudiobookRecordingDrafts(
     do {
       entry.rerunRequested = false;
       for (const draft of await listAudiobookRecordingDrafts(projectId)) {
-        if ((!draft.readyAt && draft.status !== "ready") || !draft.sizeBytes) continue;
+        if (!["ready", "interrupted", "failed"].includes(draft.status) || !draft.sizeBytes) continue;
         try {
           const fragment = await syncAudiobookRecordingDraft(draft.id);
           if (fragment) onSynced?.(fragment);

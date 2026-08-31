@@ -10,6 +10,7 @@ export function AudiobookRecorder({
   projectId,
   chapterId,
   disabled,
+  hasServerRecording,
   onSynced,
   onLockChange,
 }: {
@@ -17,12 +18,15 @@ export function AudiobookRecorder({
   projectId: string;
   chapterId: string;
   disabled: boolean;
+  hasServerRecording: boolean;
   onSynced: (fragment: AudiobookFragment) => void;
   onLockChange: (locked: boolean) => void;
 }) {
   const recorder = useAudiobookRecorder({ authorId, projectId, chapterId, onSynced });
   const [draftToDiscard, setDraftToDiscard] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  const chapterDrafts = recorder.drafts.filter((draft) => draft.chapterId === chapterId);
+  const hasLocalRecording = chapterDrafts.length > 0;
 
   useEffect(() => {
     onLockChange(recorder.isLocked);
@@ -37,7 +41,7 @@ export function AudiobookRecorder({
           </button>
         ) : (
           <button type="button" disabled={disabled || recorder.status !== "idle"} onClick={() => void recorder.startRecording()} className="rounded-full bg-[#9bdab5] px-5 py-3 text-sm font-semibold text-[#1c1530] disabled:opacity-50">
-            {recorder.status === "arming" ? "Подключаем микрофон…" : recorder.status === "saving" ? "Сохраняем запись…" : "Записать с микрофона"}
+            {recorder.status === "arming" ? "Подключаем микрофон…" : recorder.status === "saving" ? "Сохраняем запись…" : hasServerRecording || hasLocalRecording ? "Продолжить запись" : "Начать запись"}
           </button>
         )}
         {recorder.status === "stopping" ? <span className="text-sm text-[#ddd2f5]">Останавливаем запись…</span> : null}
@@ -46,11 +50,19 @@ export function AudiobookRecorder({
       </div>
       <p className="mt-3 text-sm text-[#ddd2f5]">Запись сохраняется на устройстве до успешной загрузки.</p>
       {recorder.error ? <p role="alert" className="mt-3 text-sm text-[#ffb4b4]">{recorder.error}</p> : null}
-      {recorder.drafts.filter((draft) => draft.chapterId === chapterId).map((draft) => (
+      {chapterDrafts.map((draft) => (
         <div key={draft.id} className="mt-3 flex items-center justify-between gap-3 text-sm text-[#ddd2f5]">
-          <span>{draft.status === "ready" || draft.readyAt ? "Локальный черновик готов к загрузке" : "Прерванная локальная запись"}</span>
+          <span>{draft.status === "syncing"
+            ? "Загружаем локальную запись…"
+            : draft.status === "failed"
+              ? "Не удалось загрузить локальную запись"
+              : draft.status === "ready"
+                ? "Локальная запись готова к загрузке"
+                : draft.status === "interrupted"
+                  ? "Прерванная запись готова к сохранению"
+                  : "Запись сохраняется на устройстве…"}</span>
           <span className="flex gap-3">
-            {draft.status === "ready" || draft.readyAt ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.sync()} className="text-[#9bdab5] underline">Загрузить</button> : null}
+            {["ready", "interrupted", "failed"].includes(draft.status) ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.sync()} className="text-[#9bdab5] underline">{draft.status === "failed" ? "Повторить загрузку" : "Сохранить"}</button> : null}
             <button type="button" disabled={recorder.isLocked || discarding} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
           </span>
         </div>

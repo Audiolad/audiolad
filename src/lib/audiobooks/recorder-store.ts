@@ -10,7 +10,7 @@ export type AudiobookRecordingDraft = {
   durationMs: number;
   sizeBytes: number;
   chunkCount: number;
-  status: "recording" | "ready" | "interrupted";
+  status: "recording" | "ready" | "syncing" | "failed" | "interrupted";
   createdAt: number;
   readyAt?: number;
   remoteFragmentId?: string;
@@ -95,6 +95,22 @@ export async function listAudiobookRecordingDrafts(projectId: string) {
     ),
   );
   return (drafts ?? []).sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function recoverInterruptedAudiobookRecordingDrafts(projectId: string) {
+  const drafts = await listAudiobookRecordingDrafts(projectId);
+  await Promise.all(drafts.filter((draft) => draft.status === "recording" || draft.status === "syncing").map(async (draft) => {
+    if (draft.status === "syncing") {
+      await saveAudiobookRecordingDraft({ ...draft, status: "failed" });
+      return;
+    }
+    if (draft.sizeBytes > 0 && draft.chunkCount > 0) {
+      await saveAudiobookRecordingDraft({ ...draft, status: "interrupted" });
+      return;
+    }
+    await deleteAudiobookRecordingDraft(draft.id);
+  }));
+  return listAudiobookRecordingDrafts(projectId);
 }
 
 export async function appendAudiobookRecordingChunk(draftId: string, sequence: number, data: Blob) {
