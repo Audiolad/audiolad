@@ -65,7 +65,7 @@ assert.match(component, /discarding/);
 assert.match(component, /Загружаем локальную запись/);
 assert.match(component, /Не удалось загрузить локальную запись/);
 assert.match(component, /Прерванная запись готова к сохранению/);
-assert.match(component, />Сохранить</);
+assert.match(component, /"Сохранить"/);
 assert.match(component, /Повторить загрузку/);
 assert.match(component, /hasServerRecording \|\| hasLocalRecording \? "Продолжить запись" : "Начать запись"/);
 assert.match(workspace, /hasServerRecording=\{fragments\.some\(\(fragment\) => fragment\.source_type === "recording"\)\}/);
