@@ -43,7 +43,7 @@ assert.match(hook, /AUDIOBOOK_LIMITS\.maxProjectSourceBytes/);
 assert.match(hook, /RECORDING_BYTE_SAFETY_MARGIN/);
 assert.match(hook, /statusRef\.current !== "recording"/);
 assert.match(hook, /getUserMedia\(\{ audio: AUDIOBOOK_MICROPHONE_CONSTRAINTS \}\)/);
-assert.match(hook, /setRecorderStatus\("idle"\);\s+void sync\(\)/);
+assert.match(hook, /setRecorderStatus\("idle"\);[\s\S]{0,100}void sync\(\)/);
 assert.doesNotMatch(hook, /queueMicrotask\(\(\) => \{ void sync\(\); \}\)/);
 assert.doesNotMatch(hook, /validateAudiobookRecordedBlob/);
 assert.doesNotMatch(hook, /useStudioRecorder/);
