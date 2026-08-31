@@ -37,13 +37,13 @@ assert.match(
 assert.match(getAuthorGalleryErrorMessage("invalid_file_size"), /3 МБ/);
 assert.match(
   getAuthorGalleryErrorMessage("gallery_not_supported"),
-  /практики, курса и аудиокниги/,
+  /практики, курса, аудиокниги и музыки/,
 );
 
 assert.equal(isProductGalleryEligible("practice", "practice"), true);
 assert.equal(isProductGalleryEligible("course", "practice"), true);
 assert.equal(isProductGalleryEligible("audiobook", "practice"), true);
-assert.equal(isProductGalleryEligible("release", "music"), false);
+assert.equal(isProductGalleryEligible("release", "music"), true);
 assert.equal(isProductGalleryEligible("post", "audio_post"), false);
 
 const courseCreate = resolveCreateClassification({
@@ -187,5 +187,65 @@ assert.doesNotMatch(
 const listing = read("src/lib/catalog/listing.ts");
 assert.match(listing, /gallery: product\.gallery \?\? \[\]/);
 assert.match(listing, /resolvePublicationClass/);
+
+assert.match(
+  helpers,
+  /publicationClass === "release"/,
+  "release is explicitly gallery-eligible",
+);
+assert.match(
+  helpers,
+  /Post \(AudioPost\) is never eligible/,
+  "post remains excluded from gallery",
+);
+assert.doesNotMatch(
+  helpers,
+  /Release \(Music\) and post/,
+  "music is no longer grouped with post as ineligible",
+);
+
+const galleryStore = read("src/lib/author-products/gallery.ts");
+assert.doesNotMatch(
+  galleryStore,
+  /audio_items|track cover|cover_url.*track|use_shared_cover/,
+  "author gallery store does not mix track covers into product gallery",
+);
+assert.doesNotMatch(
+  galleryStore,
+  /music_usage_permission|PLATFORM_REUSE|PRODUCT_KIND\.MUSIC/,
+  "author gallery store does not change music licensing",
+);
+
+const publicationGallery = read("src/lib/catalog/publication-gallery.ts");
+assert.doesNotMatch(
+  publicationGallery,
+  /audio_items|use_shared_cover|track cover/,
+  "catalog gallery attach does not generate slides from track covers",
+);
+
+const pdp = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+assert.match(pdp, /catalogGalleryForPublication/);
+assert.match(
+  pdp,
+  /catalogGalleryForPublication\(\s*practice\.publication_class,\s*practice\.product_kind,/,
+  "public PDP uses shared gallery eligibility for every class including music",
+);
+assert.match(pdp, /PracticeProductHero|gallerySlides/);
+
+const formSource = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(
+  formSource,
+  /isProductGalleryEligible\(form\.publicationClass, form\.productKind\)/,
+  "cabinet gallery gate is the shared helper, so music sees the section",
+);
+assert.match(
+  formSource,
+  /shouldShowSharedTrackCoverToggle/,
+  "music track cover toggle stays a separate section",
+);
+
+const productKind = read("src/lib/author-products/product-kind.ts");
+assert.match(productKind, /MUSIC: "music"/);
+assert.match(productKind, /music_usage_permission|MUSIC_USAGE_PERMISSION/);
 
 console.log("author-product-gallery-unit: ok");

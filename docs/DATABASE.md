@@ -134,7 +134,7 @@ personal-materials, но объекты пишутся только в `publicat
 
 Лимит 30 слайдов — CHECK + INSERT trigger. RLS: public SELECT для published; author members CRUD.
 
-Eligibility только в приложении через `isProductGalleryEligible` / `resolvePublicationClass`: `practice` / `course` / `audiobook` (включая legacy NULL+`practice`). `release` и `post` не создают и не показывают слайды. Колонки класса на слайдах нет. Cover остаётся на `practices`. Backfill / `UPDATE practices` нет.
+Eligibility только в приложении через `isProductGalleryEligible` / `resolvePublicationClass`: `practice` / `course` / `audiobook` / `release` (включая legacy NULL+`practice` и legacy `product_kind=music`). `post` / `audio_post` не создают и не показывают слайды. Колонки класса на слайдах нет. Cover остаётся на `practices`. Обложки отдельных музыкальных треков в витрину не копируются. Backfill / `UPDATE practices` нет.
 
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 
