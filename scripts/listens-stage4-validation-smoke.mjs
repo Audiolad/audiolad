@@ -32445,7 +32445,7 @@ function testOneHundredFifthPage() {
   assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-fifth has six unique destinations");
   assert(links.map((link) => link.href).join("\n") === destinations.join("\n"), "one-hundred-fifth exact link destinations and order");
   assert(listListenPageDefinitions().map((page) => page.slug).includes(slug), "registry contains one-hundred-fifth slug");
-  assert(listListenPageDefinitions().length === 106, "registry contains all 106 listen slugs");
+  assert(listListenPageDefinitions().length === 107, "registry contains all 107 listen slugs");
 
   const data = resolveListenPageFromPlaylist({
     definition,
