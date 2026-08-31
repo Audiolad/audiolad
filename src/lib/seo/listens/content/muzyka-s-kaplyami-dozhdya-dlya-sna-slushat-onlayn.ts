@@ -116,6 +116,16 @@ export const MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
             { text: "." },
           ]},
           { kind: "paragraph", text: "Эти страницы близки по тематике, но текущая отличается конкретным типом дождевого образа – каплями." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если к каплям добавляется расслабляющий вечерний сценарий, ближе страница " },
+              { href: "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn", label: "расслабляющая музыка для сна с каплями дождя" },
+              { text: ". Сам расслабляющий формат без акцента на каплях раскрывает " },
+              { href: "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "расслабляющая музыка с дождём для сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {

@@ -133,6 +133,7 @@ import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn.ts";
@@ -3109,6 +3110,43 @@ function testListenKidsClusterInternalLinks() {
   }
 }
 
+function testListenRainSleepClusterInternalLinks() {
+  const hubHref = "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const pages = [
+    MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const dests = pages.slice(1).map((page) => `/listens/${page.slug}`);
+  const hubHrefs = new Set(collectListenLinks(MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE).map((link) => link.href));
+  assert(hubHrefs.size === 11, "rain hub has 11 unique cluster dests");
+  for (const href of dests) {
+    assert(hubHrefs.has(href), `rain hub links ${href}`);
+  }
+  for (const page of pages.slice(1)) {
+    assert(
+      collectListenLinks(page).some((link) => link.href === hubHref),
+      `${page.slug} links rain hub`,
+    );
+  }
+  for (const page of pages) {
+    const hrefs = collectListenLinks(page).map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} no duplicate href`);
+    for (const link of collectListenLinks(page)) {
+      assert(!String(link.label).includes("http") && !String(link.label).includes("/listens/"), `${page.slug} no raw URL label`);
+    }
+  }
+}
+
 function testIndividualArticlesStillWork() {
   assert(
     getArticleBySlug("kak-razvit-lyubov-k-sebe")?.title.includes("любовь к себе"),
@@ -3224,6 +3262,7 @@ const tests = [
   ["one-hundred-ninth listen page in directory", testOneHundredNinthListenInDirectory],
   ["one-hundred-tenth listen page in directory", testOneHundredTenthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
+  ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
 ];

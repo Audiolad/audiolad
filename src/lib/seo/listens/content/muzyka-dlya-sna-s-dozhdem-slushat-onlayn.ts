@@ -75,6 +75,16 @@ export const MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Это не означает, что все такие варианты обязательно присутствуют в подборке одновременно." },
           { kind: "paragraph", text: "Состав подборки может пополняться, поэтому лучше открыть плейлист и посмотреть, какие варианты доступны сейчас." },
           { kind: "paragraph", text: "Можно начать с одной композиции, затем переключиться на другую и сравнить, какое сочетание музыки и дождя подходит вам больше." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Иногда дождевую музыку выбирают именно с фортепианным звучанием. Тогда ближе страница " },
+              { href: "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn", label: "музыка пианино и дождя для сна" },
+              { text: ". Если к этому добавляется мягкий вечерний характер, есть " },
+              { href: "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn", label: "успокаивающая музыка для сна с дождём и пианино" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {
@@ -115,8 +125,32 @@ export const MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
         blocks: [
           { kind: "paragraph", text: "Эти формулировки близки, но пользователи могут вкладывать в них немного разный смысл." },
           { kind: "paragraph", text: "Музыка для сна с дождём – широкий сценарий, где музыкальная композиция сочетается с дождевой атмосферой." },
-          { kind: "paragraph", text: "Шум дождя может означать более выраженный дождевой фон." },
-          { kind: "paragraph", text: "Звуки дождя – ещё одна распространённая пользовательская формулировка, в которой внимание сильнее переносится на само звучание дождя." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если акцент именно на характерном фоне, отдельно опубликована " },
+              { href: "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn", label: "музыка для сна с шумом дождя" },
+              { text: ". Такая формулировка может означать более выраженный дождевой слой." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Ещё одна распространённая формулировка – " },
+              { href: "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn", label: "музыка для сна со звуками дождя" },
+              { text: ". В ней внимание сильнее переносится на само звучание дождя." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если внимание направлено на отдельные капли, есть страница " },
+              { href: "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn", label: "музыка с каплями дождя для сна" },
+              { text: ". Соседний сценарий, где капли сочетаются с вечерним отдыхом, – " },
+              { href: "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn", label: "расслабляющая музыка для сна с каплями дождя" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Кроме того, есть отдельный сценарий, когда человек хочет слушать дождь вообще без музыки. Это уже другой формат и не является основной темой этой страницы." },
           { kind: "paragraph", text: "Здесь акцент остаётся именно на сочетании:" },
           { kind: "paragraph", text: "музыка + дождь + вечернее прослушивание перед сном." },
@@ -128,7 +162,22 @@ export const MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
         title: "Спокойная музыка с дождём перед сном",
         paragraphs: [],
         blocks: [
-          { kind: "paragraph", text: "Слово «спокойная» естественно возникает в контексте такой музыки, потому что многие пользователи ищут перед сном звучание без излишней динамики." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Слово «спокойная» естественно возникает в контексте такой музыки, потому что многие пользователи ищут перед сном звучание без излишней динамики. Если важен именно этот характер, есть отдельная страница " },
+              { href: "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn", label: "спокойная музыка для сна с дождём" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Близкий, но не тождественный сценарий – " },
+              { href: "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn", label: "успокаивающая музыка для сна с дождём" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Но спокойствие музыки тоже воспринимается индивидуально." },
           { kind: "paragraph", text: "Одному человеку подходит почти незаметная мелодия." },
           { kind: "paragraph", text: "Другому нравится более выраженная инструментальная композиция." },
@@ -160,6 +209,16 @@ export const MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
             "при желании продолжить прослушивание уже в кровати.",
           ]},
           { kind: "paragraph", text: "Так музыка становится частью вечернего пространства." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если вечерний отдых формулируется через слово «расслабляющая», отдельно опубликована " },
+              { href: "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "расслабляющая музыка с дождём для сна" },
+              { text: ". Соседний запрос – " },
+              { href: "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "релакс музыка с дождём для сна" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Это не специальная методика засыпания и не способ гарантированно вызвать сон. Это просто удобный сценарий прослушивания." },
         ],
       },
@@ -207,7 +266,14 @@ export const MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Дождь может звучать по-разному, и иногда пользователи ищут композиции, где вместе с дождём слышна гроза или гром." },
-          { kind: "paragraph", text: "Это уже более узкий сценарий." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Это уже более узкий сценарий. Для него опубликована отдельная страница " },
+              { href: "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn", label: "музыка дождя и грозы для сна" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Текущая страница не строится вокруг грома или грозы, поэтому нельзя считать, что весь плейлист содержит такое звучание." },
           { kind: "paragraph", text: "Если отдельная композиция включает подобные элементы, их можно воспринимать как один из возможных вариантов дождевой атмосферы." },
           { kind: "paragraph", text: "Но основной intent здесь остаётся более широким – музыка для сна с дождём." },
