@@ -130,6 +130,7 @@ import { MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn.ts";
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2970,6 +2971,26 @@ function testListenPagesAppearInDirectory() {
   assert(
     collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredThirdListenHref}`),
     "directory JSON-LD includes hundred-third listen href",
+  );
+
+  const hundredFourthListenHref = "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const hundredFourthListenCard = data.articles.find((card) => card.href === hundredFourthListenHref);
+  assert(hundredFourthListenCard, "hundred-fourth indexable listen page is listed");
+  assert(
+    hundredFourthListenCard.title === "Расслабляющая музыка с дождём для сна – слушать онлайн бесплатно | АудиоЛад",
+    "hundred-fourth listen directory title",
+  );
+  assert(
+    hundredFourthListenCard.description === RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "hundred-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some((card) => card.href === "/articles/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn"),
+    "no /articles duplicate for hundred-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some((item) => item.url === `https://audiolad.ru${hundredFourthListenHref}`),
+    "directory JSON-LD includes hundred-fourth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
