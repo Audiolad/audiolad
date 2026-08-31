@@ -79,6 +79,85 @@ REVOKE ALL ON TABLE public.audiobook_chapters FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.audiobook_projects TO service_role;
 GRANT ALL ON TABLE public.audiobook_chapters TO service_role;
 
+CREATE OR REPLACE FUNCTION public.create_audiobook_chapter(
+  p_project_id uuid,
+  p_title text
+)
+RETURNS public.audiobook_chapters
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_chapter public.audiobook_chapters;
+  v_position integer;
+BEGIN
+  IF p_project_id IS NULL OR p_title IS NULL THEN
+    RAISE EXCEPTION 'invalid_audiobook_chapter' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM 1 FROM public.audiobook_projects
+  WHERE id = p_project_id AND status = 'active' FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'audiobook_project_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  SELECT coalesce(max(position), 0) + 1 INTO v_position
+  FROM public.audiobook_chapters WHERE project_id = p_project_id;
+
+  INSERT INTO public.audiobook_chapters (project_id, position, title)
+  VALUES (p_project_id, v_position, p_title)
+  RETURNING * INTO v_chapter;
+
+  RETURN v_chapter;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_audiobook_chapter(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_audiobook_chapter(uuid, text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.delete_audiobook_chapter(
+  p_project_id uuid,
+  p_chapter_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF p_project_id IS NULL OR p_chapter_id IS NULL THEN
+    RAISE EXCEPTION 'invalid_audiobook_chapter' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM 1 FROM public.audiobook_projects
+  WHERE id = p_project_id AND status = 'active' FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'audiobook_project_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  DELETE FROM public.audiobook_chapters
+  WHERE id = p_chapter_id AND project_id = p_project_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'audiobook_chapter_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  SET CONSTRAINTS audiobook_chapters_project_position_key DEFERRED;
+  WITH numbered AS (
+    SELECT id, row_number() OVER (ORDER BY position, id)::integer AS position
+    FROM public.audiobook_chapters
+    WHERE project_id = p_project_id
+  )
+  UPDATE public.audiobook_chapters AS chapter
+  SET position = numbered.position
+  FROM numbered
+  WHERE chapter.id = numbered.id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_audiobook_chapter(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_audiobook_chapter(uuid, uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.reorder_audiobook_chapters(
   p_project_id uuid,
   p_chapter_ids uuid[]

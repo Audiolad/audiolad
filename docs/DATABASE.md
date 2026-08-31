@@ -112,7 +112,9 @@ trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
 `practices`, `audio_items` или Storage. `audiobook_projects.author_id`
 ссылается на `authors.id`; title нормализуется сервером и ограничен 1–200
 символами. `audiobook_chapters.project_id` удаляется каскадно с книгой,
-а `position` уникален внутри книги и хранится непрерывно от 1. Reorder
+а `position` уникален внутри книги и хранится непрерывно от 1. Создание и
+удаление главы выполняют отдельные service-role RPC под блокировкой проекта;
+удаление нормализует позиции в той же транзакции. Reorder
 выполняет service-role RPC `reorder_audiobook_chapters` после server-side
 проверки author membership; RPC принимает полный ordered set и проверяет
 его точное совпадение с главами книги.

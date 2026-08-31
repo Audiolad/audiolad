@@ -107,12 +107,10 @@ export async function createAudiobookChapter(projectId: string, authorId: string
   await mutationAccess(authorId);
   await getAudiobookProject(projectId, authorId);
   const service = createServiceRoleClient();
-  const { data: last, error: lastError } = await service.from("audiobook_chapters").select("position")
-    .eq("project_id", projectId).order("position", { ascending: false }).limit(1).maybeSingle();
-  if (lastError) fail(lastError, "audiobook_chapter_position_error");
-  const { data, error } = await service.from("audiobook_chapters").insert({
-    project_id: projectId, title, position: (last?.position ?? 0) + 1,
-  }).select(CHAPTER_SELECT).single();
+  const { data, error } = await service.rpc("create_audiobook_chapter", {
+    p_project_id: projectId,
+    p_title: title,
+  });
   if (error || !data) fail(error, "audiobook_chapter_create_error");
   return data as AudiobookChapter;
 }
@@ -138,11 +136,11 @@ export async function renameAudiobookChapter(projectId: string, chapterId: strin
 export async function deleteAudiobookChapter(projectId: string, chapterId: string, authorId: string) {
   await mutationAccess(authorId); await ownedChapter(projectId, chapterId, authorId);
   const service = createServiceRoleClient();
-  const { error } = await service.from("audiobook_chapters").delete().eq("id", chapterId).eq("project_id", projectId);
+  const { error } = await service.rpc("delete_audiobook_chapter", {
+    p_project_id: projectId,
+    p_chapter_id: chapterId,
+  });
   if (error) fail(error, "audiobook_chapter_delete_error");
-  const chapters = await listAudiobookChapters(projectId, authorId);
-  const { error: reorderError } = await service.rpc("reorder_audiobook_chapters", { p_project_id: projectId, p_chapter_ids: chapters.map((chapter) => chapter.id) });
-  if (reorderError) fail(reorderError, "audiobook_chapter_normalize_error");
 }
 
 export async function reorderAudiobookChapters(projectId: string, authorId: string, chapterIds: unknown) {
