@@ -31,6 +31,7 @@ import { eligibleSecondaryCandidates } from "../src/lib/seo/product-autofill/sel
 import { wordstatPhraseKey } from "../src/lib/seo/wordstat/phrase.ts";
 import {
   expectedSecondaryRange,
+  faqAnswerIsQuestion,
   normalizeProductSeoValidationIssue,
   parseProductSeoAiRawDraft,
   resolveSecondaryQueryStatus,
@@ -866,6 +867,76 @@ await withEnvAsync(enabledEnv(), async () => {
 });
 
 await withEnvAsync(enabledEnv(), async () => {
+  const invalidFaqAnswers = validDraft({
+    faqItems: [
+      {
+        question: "Когда лучше слушать медитацию для сна?",
+        answer: "Когда лучше слушать медитацию для сна?",
+        anchor: "kogda-slushat",
+      },
+      {
+        question: "Нужен ли опыт медитации?",
+        answer: "Можно ли слушать практику днём.",
+        anchor: "nuzhen-li-opyt",
+      },
+      validDraft().faqItems[2],
+    ],
+  });
+  const provider = mockProvider([
+    { ok: true, draft: invalidFaqAnswers, raw: {} },
+    {
+      ok: true,
+      draft: validDraft({
+        seoTitle: "Нельзя принимать изменения других полей",
+        faqItems: [
+          {
+            question: "Изменённый первый вопрос",
+            answer: "Лучше выбрать спокойное время вечером.",
+            anchor: "changed-first-anchor",
+          },
+          {
+            question: "Изменённый второй вопрос",
+            answer: "Да, практику можно слушать в удобное время дня.",
+            anchor: "changed-second-anchor",
+          },
+          {
+            question: "Изменённый третий вопрос",
+            answer: "Нельзя принимать изменение хорошего ответа.",
+            anchor: "changed-third-anchor",
+          },
+        ],
+      }),
+      raw: {},
+    },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "author-repair-faq-answer-issues",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    provider.calls[1].issues,
+    ["faq_answer_repeats_question", "faq_answer_is_question"],
+    "FAQ_ANSWER_REPAIR_SUPPORTS_BOTH_ISSUES",
+  );
+  assert.equal(result.data.seoTitle, invalidFaqAnswers.seoTitle);
+  assert.deepEqual(
+    result.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    invalidFaqAnswers.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    "FAQ_ANSWER_REPAIR_PRESERVES_QUESTION_AND_ANCHOR",
+  );
+  assert.equal(result.data.faqItems[0].answer, "Лучше выбрать спокойное время вечером.");
+  assert.equal(result.data.faqItems[1].answer, "Да, практику можно слушать в удобное время дня.");
+  assert.equal(
+    result.data.faqItems[2].answer,
+    invalidFaqAnswers.faqItems[2].answer,
+    "FAQ_ANSWER_REPAIR_PRESERVES_VALID_OTHER_ANSWER",
+  );
+});
+
+await withEnvAsync(enabledEnv(), async () => {
   const provider = mockProvider([
     { ok: true, draft: validDraft({ secondaryQueries: ["изобретённая фраза"] }), raw: {} },
     { ok: true, draft: validDraft({ secondaryQueries: ["другая выдумка"] }), raw: {} },
@@ -1675,6 +1746,11 @@ const faqExactPrimaryInput = {
     "SYSTEM_PROMPT_FAQ_EXACT_PRIMARY Q1.question verbatim",
   );
   assert.match(systemPrompt, /Не изменяй слова запроса, их порядок и словоформу/);
+  assert.match(
+    systemPrompt,
+    /Q1\.question должен быть сформулирован как вопрос и заканчиваться знаком «\?»/,
+    "SYSTEM_PROMPT_FAQ_Q1_IS_QUESTION",
+  );
   assert.doesNotMatch(systemPrompt, /naturally/);
 }
 
@@ -1736,6 +1812,18 @@ const FAQ_REPAIR_INSTRUCTION = /Исправление FAQ обязательн�
   assert.match(repairFaqAnswer, /измени только faqItems\.answer/);
   assert.match(repairFaqAnswer, /не меняй question, anchor и другие поля/);
   assert.doesNotMatch(repairFaqAnswer, /должен дословно содержать основной запрос/);
+}
+
+// REPAIR_FAQ_ANSWER_ISSUES_CHANGE_ONLY_ANSWER
+{
+  const repairFaqAnswers = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["faq_answer_repeats_question", "faq_answer_is_question"],
+  );
+  assert.match(repairFaqAnswers, /измени только faqItems\.answer/);
+  assert.match(repairFaqAnswers, /сформулирован как вопрос/);
+  assert.match(repairFaqAnswers, /не меняй question, anchor и другие поля/);
 }
 
 function musicSleepValidationInput() {
@@ -1815,6 +1903,39 @@ function musicSleepValidationInput() {
   assert.ok(
     faqFail.issues.includes("primary_missing_from_faq"),
     "VALIDATOR_PRIMARY_FAQ_FAIL primary_missing_from_faq",
+  );
+}
+
+// FAQ_ANSWER_QUESTION_DETECTION
+assert.equal(faqAnswerIsQuestion("Можно ли слушать практику днём."), true);
+assert.equal(faqAnswerIsQuestion("Когда лучше слушать практику."), true);
+assert.equal(faqAnswerIsQuestion("Ответ можно уточнить?"), true);
+assert.equal(
+  faqAnswerIsQuestion("Как правило, практику слушают в спокойное время."),
+  false,
+);
+assert.equal(faqAnswerIsQuestion("Практику можно слушать в удобное время."), false);
+
+// VALIDATOR_FAQ_ANSWER_MUST_NOT_BE_A_QUESTION
+{
+  const questionFaqAnswer = validateProductSeoAiDraft(
+    validDraft({
+      faqItems: [
+        {
+          question: "Когда лучше слушать медитацию для сна?",
+          answer: "Можно ли слушать её днём.",
+          anchor: "kogda-slushat",
+        },
+        validDraft().faqItems[1],
+        validDraft().faqItems[2],
+      ],
+    }),
+    validationInput(),
+  );
+  assert.equal(questionFaqAnswer.ok, false);
+  assert.ok(
+    questionFaqAnswer.issues.includes("faq_answer_is_question"),
+    "FAQ_ANSWER_QUESTION_HAS_STABLE_ERROR",
   );
 }
 
@@ -2604,6 +2725,7 @@ for (const issue of [
   "faq_count",
   "primary_missing_from_faq",
   "faq_answer_repeats_question",
+  "faq_answer_is_question",
   "usage_count",
   "duplicate_usage",
   "duplicate_faq",

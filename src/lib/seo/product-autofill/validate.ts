@@ -262,6 +262,13 @@ export function faqAnswerRepeatsQuestion(question: string, answer: string): bool
   return shared / answerSet.size >= 0.8 || shared / questionSet.size >= 0.8;
 }
 
+const FAQ_ANSWER_QUESTION_LEAD_PATTERN =
+  /^[\s«“"(\[]*(?:(?:как(?!\s+правило\b)|когда|где|почему|зачем|кто|что|какой|какая|какие|сколько)\b|(?:можно|нужно|стоит|следует|получится|удастся|подойд[её]т)\s+ли\b)/iu;
+
+export function faqAnswerIsQuestion(answer: string): boolean {
+  return answer.includes("?") || FAQ_ANSWER_QUESTION_LEAD_PATTERN.test(answer.trim());
+}
+
 export function validateProductSeoAiDraft(
   raw: unknown,
   input: ProductSeoValidationInput,
@@ -434,6 +441,10 @@ export function validateProductSeoAiDraft(
     faqItems.some((item) => faqAnswerRepeatsQuestion(item.question, item.answer))
   ) {
     issues.push("faq_answer_repeats_question");
+  }
+
+  if (faqItems.some((item) => faqAnswerIsQuestion(item.answer))) {
+    issues.push("faq_answer_is_question");
   }
 
   const allText = [

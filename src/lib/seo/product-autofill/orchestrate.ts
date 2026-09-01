@@ -24,6 +24,7 @@ import {
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
 import {
+  faqAnswerIsQuestion,
   faqAnswerRepeatsQuestion,
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
@@ -325,8 +326,16 @@ export async function generateProductSeoDraft(
     issues: string[],
   ): ProductSeoAiRawDraft {
     if (
-      issues.length !== 1 ||
-      issues[0] !== "faq_answer_repeats_question" ||
+      !issues.some(
+        (issue) =>
+          issue === "faq_answer_repeats_question" ||
+          issue === "faq_answer_is_question",
+      ) ||
+      issues.some(
+        (issue) =>
+          issue !== "faq_answer_repeats_question" &&
+          issue !== "faq_answer_is_question",
+      ) ||
       draft.faqItems.length !== previous.faqItems.length
     ) {
       return draft;
@@ -335,7 +344,8 @@ export async function generateProductSeoDraft(
     return {
       ...previous,
       faqItems: previous.faqItems.map((item, index) =>
-        faqAnswerRepeatsQuestion(item.question, item.answer)
+        faqAnswerRepeatsQuestion(item.question, item.answer) ||
+        faqAnswerIsQuestion(item.answer)
           ? { ...item, answer: draft.faqItems[index].answer }
           : item,
       ),
