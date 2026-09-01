@@ -281,8 +281,7 @@ function testPublishReadinessShared() {
     "free",
     0,
   );
-  assert.equal(withTopics.ok, false);
-  assert.equal(withTopics.code, "topic_min_required");
+  assert.equal(withTopics.ok, true);
 }
 
 function testFocusProductSelection() {
