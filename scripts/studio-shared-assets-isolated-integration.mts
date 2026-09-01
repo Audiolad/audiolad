@@ -213,7 +213,35 @@ async function main() {
       const asset = copied.data![0]!;
       assert(!((await service.storage.from(BUCKET).download(asset.storage_path)).error), "shared object must survive original delete");
       const duplicateData = (await (await fetch(`${next.value}/api/studio/projects/${duplicateId}`, { headers: headers(token) })).json()).project;
-      assert.equal((await fetch(`${next.value}/api/studio/projects/${duplicateId}?expectedRevision=${duplicateData.revision}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })).status, 204);
+      const rawRelease = await service.rpc("soft_delete_studio_project", {
+        p_project_id: duplicateId,
+        p_expected_revision: duplicateData.revision,
+      });
+      const source = copied.data?.find((item) => item.storage_path === musicPath)?.source_id;
+      const sourceState = await service.from("studio_asset_sources")
+        .select("id,storage_path,deleted_at")
+        .eq("id", source ?? "")
+        .single();
+      const activeRefs = await service.from("studio_project_assets")
+        .select("id", { count: "exact", head: true })
+        .eq("source_id", source ?? "")
+        .is("deleted_at", null);
+      const rawRows = rawRelease.data ?? [];
+      const cleanupPaths = rawRows.map((row: { storage_path: string }) => row.storage_path);
+      const cleanup = await service.storage.from(BUCKET).remove(cleanupPaths);
+      const directAfterCleanup = await service.storage.from(BUCKET).download(musicPath);
+      console.log(JSON.stringify({
+        diagnostic: "final_reference_release",
+        rawRpc: { isNull: rawRelease.data === null, length: rawRows.length, rows: rawRows, error: rawRelease.error?.message ?? null },
+        source: sourceState.data,
+        activeReferenceCount: activeRefs.count,
+        cleanup: { bucket: BUCKET, paths: cleanupPaths, data: cleanup.data, error: cleanup.error?.message ?? null },
+        directStorageAfterCleanup: directAfterCleanup.error ? "not_found" : "exists",
+      }));
+      assert.ifError(rawRelease.error);
+      assert.equal(activeRefs.count, 0);
+      assert.equal(sourceState.data?.deleted_at !== null, true);
+      assert.ifError(cleanup.error);
       await mustNotExist(service, BUCKET, musicPath, "last reference deletion removes shared storage");
       // Keep the disposable stack reusable even if its normal fixture cleanup
       // is disabled; no guest project/session is intentionally retained.
