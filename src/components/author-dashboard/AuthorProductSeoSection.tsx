@@ -383,6 +383,13 @@ export default function AuthorProductSeoSection({
     setWordstatOpen(true);
     setWordstatOutcome(null);
     setWordstatSeed(seed);
+    window.requestAnimationFrame(() => {
+      wordstatPickerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+      wordstatPickerRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+    });
     if (shouldSearch) {
       void submitWordstat(seed);
     }
