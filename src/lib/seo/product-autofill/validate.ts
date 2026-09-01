@@ -244,6 +244,23 @@ function uniqueAnchors(faqItems: ProductSeoAiRawDraft["faqItems"]): boolean {
   return anchors.length === faqItems.length && new Set(anchors).size === anchors.length;
 }
 
+export function faqAnswerRepeatsQuestion(question: string, answer: string): boolean {
+  const questionWords = normalizeSeoPhrase(question)
+    .split(" ")
+    .filter((word) => word.length > 2);
+  const answerWords = normalizeSeoPhrase(answer)
+    .split(" ")
+    .filter((word) => word.length > 2);
+  if (questionWords.length < 3 || answerWords.length < 3) {
+    return false;
+  }
+
+  const questionSet = new Set(questionWords);
+  const answerSet = new Set(answerWords);
+  const shared = [...answerSet].filter((word) => questionSet.has(word)).length;
+  return shared / answerSet.size >= 0.8 || shared / questionSet.size >= 0.8;
+}
+
 export function validateProductSeoAiDraft(
   raw: unknown,
   input: ProductSeoValidationInput,
@@ -410,6 +427,12 @@ export function validateProductSeoAiDraft(
     !faqItems.some((item) => containsPrimaryInFaqQuestion(item.question, primary))
   ) {
     issues.push("primary_missing_from_faq");
+  }
+
+  if (
+    faqItems.some((item) => faqAnswerRepeatsQuestion(item.question, item.answer))
+  ) {
+    issues.push("faq_answer_repeats_question");
   }
 
   const allText = [

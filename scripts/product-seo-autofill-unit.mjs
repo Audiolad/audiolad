@@ -815,6 +815,57 @@ await withEnvAsync(enabledEnv(), async () => {
 });
 
 await withEnvAsync(enabledEnv(), async () => {
+  const repeatedAnswerDraft = validDraft({
+    faqItems: [
+      {
+        question: "Когда лучше слушать медитацию для сна?",
+        answer: "Когда лучше слушать медитацию для сна?",
+        anchor: "kogda-slushat",
+      },
+      validDraft().faqItems[1],
+      validDraft().faqItems[2],
+    ],
+  });
+  const provider = mockProvider([
+    { ok: true, draft: repeatedAnswerDraft, raw: {} },
+    {
+      ok: true,
+      draft: validDraft({
+        seoTitle: "Нельзя принимать изменения других полей",
+        faqItems: [
+          {
+            question: "Изменённый вопрос",
+            answer: validDraft().faqItems[0].answer,
+            anchor: "changed-anchor",
+          },
+          validDraft().faqItems[1],
+          validDraft().faqItems[2],
+        ],
+      }),
+      raw: {},
+    },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "author-repair-faq-answer-only",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    provider.calls[1].issues,
+    ["faq_answer_repeats_question"],
+    "FAQ_REPEAT_REPAIR_IS_TARGETED_TO_ANSWER",
+  );
+  assert.equal(result.data.seoTitle, repeatedAnswerDraft.seoTitle);
+  assert.equal(
+    result.data.faqItems[0].question,
+    repeatedAnswerDraft.faqItems[0].question,
+  );
+  assert.equal(result.data.faqItems[0].anchor, "kogda-slushat");
+});
+
+await withEnvAsync(enabledEnv(), async () => {
   const provider = mockProvider([
     { ok: true, draft: validDraft({ secondaryQueries: ["изобретённая фраза"] }), raw: {} },
     { ok: true, draft: validDraft({ secondaryQueries: ["другая выдумка"] }), raw: {} },
@@ -1066,6 +1117,21 @@ assert.deepEqual(parsedLocked.request.seoSecondaryQueries, [
   "Вечерняя медитация",
   "другая фраза",
 ]);
+const parsedAuthoritativeSecondaries = parseProductSeoAutofillRequest({
+  ...requestInput(),
+  seoSecondaryQueries: ["  Вечерняя   медитация "],
+  locked: false,
+});
+assert.equal(
+  parsedAuthoritativeSecondaries.request.locked,
+  true,
+  "NORMALIZED_SECONDARIES_ARE_AUTHORITATIVE_LOCK",
+);
+assert.deepEqual(
+  parsedAuthoritativeSecondaries.request.seoSecondaryQueries,
+  ["Вечерняя медитация"],
+  "NORMALIZED_SECONDARIES_ARE_RETURNED_CANONICALLY",
+);
 assert.deepEqual(
   normalizeLockedSecondaryQueries(
     Array.from({ length: 12 }, (_, index) => `фраза ${index + 1}`),
@@ -1493,7 +1559,6 @@ assert.doesNotMatch(orchestrate, /wordstat\.yandex\.ru/);
 assert.match(provider, /PRODUCT_SEO_AI_RESPONSES_URL/);
 assert.match(provider, /json_schema/);
 assert.match(provider, /buildProductSeoAiJsonSchema/);
-assert.doesNotMatch(provider, /buildProductSeoAiJsonSchema/);
 assert.match(provider, /PRODUCT_SEO_AI_STORE/);
 assert.match(provider, /PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS/);
 assert.match(provider, /import "server-only"/);
@@ -1521,8 +1586,18 @@ assert.match(section, /Готовим SEO|PRODUCT_SEO_GENERATE_LOADING/);
 assert.match(section, /hasFilledGeneratedSeoFields/);
 assert.doesNotMatch(section, /seoAbout:/);
 assert.doesNotMatch(
-  section.slice(section.indexOf("function applyGeneratedDraft")),
+  section.slice(
+    section.indexOf("function applyGeneratedDraft"),
+    section.indexOf("async function generateProductSeo"),
+  ),
   /description:/,
+);
+assert.match(
+  section.slice(
+    section.indexOf("function applyGeneratedDraft"),
+    section.indexOf("async function generateProductSeo"),
+  ),
+  /seoSecondaryQueries: draft\.seoSecondaryQueries/,
 );
 assert.doesNotMatch(route, /seoAbout:/);
 assert.doesNotMatch(
@@ -1651,6 +1726,18 @@ const FAQ_REPAIR_INSTRUCTION = /Исправление FAQ обязательн�
   );
 }
 
+// REPAIR_FAQ_REPEAT_CHANGES_ONLY_ANSWER
+{
+  const repairFaqAnswer = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["faq_answer_repeats_question"],
+  );
+  assert.match(repairFaqAnswer, /измени только faqItems\.answer/);
+  assert.match(repairFaqAnswer, /не меняй question, anchor и другие поля/);
+  assert.doesNotMatch(repairFaqAnswer, /должен дословно содержать основной запрос/);
+}
+
 function musicSleepValidationInput() {
   return {
     primaryQuery: FAQ_EXACT_PRIMARY,
@@ -1728,6 +1815,29 @@ function musicSleepValidationInput() {
   assert.ok(
     faqFail.issues.includes("primary_missing_from_faq"),
     "VALIDATOR_PRIMARY_FAQ_FAIL primary_missing_from_faq",
+  );
+}
+
+// VALIDATOR_FAQ_ANSWER_MUST_NOT_REPEAT_QUESTION
+{
+  const repeatedFaqAnswer = validateProductSeoAiDraft(
+    validDraft({
+      faqItems: [
+        {
+          question: "Нужен ли опыт медитации?",
+          answer: "Опыт медитации нужен?",
+          anchor: "opyt",
+        },
+        validDraft().faqItems[1],
+        validDraft().faqItems[2],
+      ],
+    }),
+    validationInput(),
+  );
+  assert.equal(repeatedFaqAnswer.ok, false);
+  assert.ok(
+    repeatedFaqAnswer.issues.includes("faq_answer_repeats_question"),
+    "FAQ_REPEAT_HAS_STABLE_ERROR",
   );
 }
 
@@ -2493,6 +2603,7 @@ for (const issue of [
   "primary_missing_from_description",
   "faq_count",
   "primary_missing_from_faq",
+  "faq_answer_repeats_question",
   "usage_count",
   "duplicate_usage",
   "duplicate_faq",
@@ -2999,6 +3110,7 @@ assert.equal(
 assert.deepEqual(
   getProductSeoSecondaryUsage({
     seoSecondaryQueries: ["вечерняя медитация", "музыка для сна"],
+    productDescription: "Это вечерняя медитация для отдыха.",
     seoTitle: "Вечерняя медитация для отдыха",
     seoDescription: "Мягкая музыка для сна.",
     usageItems: [{ content: "Слушайте вечернюю медитацию дома" }],
@@ -3011,6 +3123,7 @@ assert.deepEqual(
     productKind: "music",
   }),
   [
+    { id: "productDescription", label: "О продукте", queries: ["вечерняя медитация"] },
     { id: "title", label: "Заголовок для поиска", queries: ["вечерняя медитация"] },
     { id: "description", label: "Описание для поиска", queries: ["музыка для сна"] },
     { id: "usage", label: "Как слушать музыку", queries: ["вечерняя медитация"] },

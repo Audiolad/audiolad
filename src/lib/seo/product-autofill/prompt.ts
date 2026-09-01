@@ -156,7 +156,7 @@ function faqItemsSystemInstruction(primaryQuery: string): string {
   return [
     "faqItems: ровно 3 пары вопрос/ответ.",
     verbatimRequirement,
-    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения. У каждого уникальный якорь-латиница.",
+    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения и отвечают на вопрос, а не повторяют или перефразируют его. Основной запрос в answer не обязателен. У каждого уникальный якорь-латиница.",
   ].join(" ");
 }
 
@@ -164,23 +164,28 @@ export function buildRepairIssueInstructions(
   issues: string[],
   primaryQuery: string,
 ): string[] {
-  if (!issues.includes("primary_missing_from_faq")) {
-    return [];
+  const instructions: string[] = [];
+  if (issues.includes("primary_missing_from_faq")) {
+    const query = primaryQuery.trim();
+    if (query) {
+      instructions.push(
+        [
+          "Исправление FAQ обязательно:",
+          `один faqItems.question, предпочтительно Q1, должен дословно содержать основной запрос: «${query}».`,
+          "Измени только необходимый вопрос FAQ.",
+          "Не переноси запрос только в answer.",
+        ].join(" "),
+      );
+    }
   }
 
-  const query = primaryQuery.trim();
-  if (!query) {
-    return [];
+  if (issues.includes("faq_answer_repeats_question")) {
+    instructions.push(
+      "Исправление FAQ обязательно: измени только faqItems.answer, который повторяет или перефразирует свой question. Ответь по существу; не меняй question, anchor и другие поля.",
+    );
   }
 
-  return [
-    [
-      "Исправление FAQ обязательно:",
-      `один faqItems.question, предпочтительно Q1, должен дословно содержать основной запрос: «${query}».`,
-      "Измени только необходимый вопрос FAQ.",
-      "Не переноси запрос только в answer.",
-    ].join(" "),
-  ];
+  return instructions;
 }
 
 export function buildProductSeoSystemPrompt(

@@ -24,6 +24,7 @@ import {
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
 import {
+  faqAnswerRepeatsQuestion,
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
@@ -178,7 +179,9 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
     record.seoSecondaryQueries,
     record.seoPrimaryQuery,
   );
-  const locked = record.locked === true && seoSecondaryQueries.length > 0;
+  // A normalized author selection is authoritative. Do not let a stale client
+  // `locked` flag cause regeneration to replace a valid selected list.
+  const locked = seoSecondaryQueries.length > 0;
 
   return {
     ok: true,
@@ -316,6 +319,29 @@ export async function generateProductSeoDraft(
     };
   }
 
+  function mergeFaqAnswerOnlyRepair(
+    draft: ProductSeoAiRawDraft,
+    previous: ProductSeoAiRawDraft,
+    issues: string[],
+  ): ProductSeoAiRawDraft {
+    if (
+      issues.length !== 1 ||
+      issues[0] !== "faq_answer_repeats_question" ||
+      draft.faqItems.length !== previous.faqItems.length
+    ) {
+      return draft;
+    }
+
+    return {
+      ...previous,
+      faqItems: previous.faqItems.map((item, index) =>
+        faqAnswerRepeatsQuestion(item.question, item.answer)
+          ? { ...item, answer: draft.faqItems[index].answer }
+          : item,
+      ),
+    };
+  }
+
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
   const first = await provider.generate(promptInput);
   if (!first.ok) {
@@ -354,7 +380,11 @@ export async function generateProductSeoDraft(
     return repaired;
   }
 
-  const repairedDraft = mergeSecondaryQueries(repaired.draft);
+  const repairedDraft = mergeFaqAnswerOnlyRepair(
+    mergeSecondaryQueries(repaired.draft),
+    firstDraft,
+    firstValidation.issues,
+  );
   const repairedValidation = validateProductSeoAiDraft(repairedDraft, {
     primaryQuery: primary,
     title: request.title,

@@ -88,34 +88,6 @@ function CharCounter({ value, max }: { value: string; max: number }) {
   );
 }
 
-function SecondaryUsageBadges({
-  label,
-  queries,
-}: {
-  label: string;
-  queries: string[];
-}) {
-  if (!queries.length) {
-    return null;
-  }
-
-  return (
-    <div
-      className="mt-2 flex flex-wrap gap-1.5"
-      aria-label={`${label}: использованные дополнительные фразы`}
-    >
-      {queries.map((query) => (
-        <span
-          key={query}
-          className="rounded-full bg-[#f0e7fb] px-2 py-1 text-xs text-[#4d336f]"
-        >
-          {query}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
   const nextIndex = index + direction;
   if (nextIndex < 0 || nextIndex >= items.length) return items;
@@ -369,14 +341,20 @@ export default function AuthorProductSeoSection({
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
   const secondaryUsage = getProductSeoSecondaryUsage({
     seoSecondaryQueries,
+    productDescription: description,
     seoTitle,
     seoDescription,
     usageItems: seoContent.usageItems,
     faqItems: seoContent.faqItems,
     productKind,
   });
-  const secondaryUsageByField = Object.fromEntries(
-    secondaryUsage.map((field) => [field.id, field.queries]),
+  const secondaryUsageByQuery = Object.fromEntries(
+    seoSecondaryQueries.map((query) => [
+      query,
+      secondaryUsage
+        .filter((field) => field.queries.includes(query))
+        .map((field) => field.label),
+    ]),
   );
 
   function openWordstatPicker(options?: {
@@ -426,10 +404,8 @@ export default function AuthorProductSeoSection({
     faqItems: Array<{ question: string; answer: string }>;
   }) {
     onChange({
-      // Existing author-selected phrases are locked for regeneration.
-      seoSecondaryQueries: seoSecondaryQueries.length
-        ? seoSecondaryQueries
-        : draft.seoSecondaryQueries,
+      // The server returns the canonical normalized list, including locked lists.
+      seoSecondaryQueries: draft.seoSecondaryQueries,
       seoTitle: draft.seoTitle,
       seoDescription: draft.seoDescription,
       seoContent: {
@@ -791,17 +767,27 @@ export default function AuthorProductSeoSection({
         ) : null}
         <div className="flex flex-wrap gap-2">
           {seoSecondaryQueries.map((query, index) => (
-            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
-              {query}
-              <button
-                type="button"
-                aria-label={`Удалить фразу ${query}`}
-                disabled={disabled}
-                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
-              >
-                ×
-              </button>
-            </span>
+            <div key={`${query}-${index}`} className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
+                {query}
+                <button
+                  type="button"
+                  aria-label={`Удалить фразу ${query}`}
+                  disabled={disabled}
+                  onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
+                >
+                  ×
+                </button>
+              </span>
+              {secondaryUsageByQuery[query]?.map((label) => (
+                <span
+                  key={`${query}-${label}`}
+                  className="rounded-full bg-[#f0e7fb] px-2 py-1 text-xs text-[#4d336f]"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
         {secondariesFull ? null : (
@@ -884,10 +870,6 @@ export default function AuthorProductSeoSection({
           Ориентир: около 50–70 символов. Это рекомендация, а не обязательный лимит.
         </p>
         <CharCounter value={seoTitle} max={PRODUCT_CONTENT_LIMITS.seoTitle} />
-        <SecondaryUsageBadges
-          label="Заголовок для поиска"
-          queries={secondaryUsageByField.title ?? []}
-        />
         {fieldErrors.seoTitle ? (
           <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoTitle}</p>
         ) : null}
@@ -924,10 +906,6 @@ export default function AuthorProductSeoSection({
           value={seoDescription}
           max={PRODUCT_CONTENT_LIMITS.seoDescription}
         />
-        <SecondaryUsageBadges
-          label="Описание для поиска"
-          queries={secondaryUsageByField.description ?? []}
-        />
         {fieldErrors.seoDescription ? (
           <p className="mt-2 text-sm text-[#9b3d3d]">
             {fieldErrors.seoDescription}
@@ -959,10 +937,6 @@ export default function AuthorProductSeoSection({
           </div>
         ))}
         {seoContent.usageItems.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, usageItems: [...seoContent.usageItems, { content: "" }] } })}>+ Добавить пункт</button> : null}
-        <SecondaryUsageBadges
-          label={getPracticeSeoUsageHeading(productKind)}
-          queries={secondaryUsageByField.usage ?? []}
-        />
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
@@ -984,10 +958,6 @@ export default function AuthorProductSeoSection({
           </div>
         ))}
         {seoContent.faqItems.length < PRODUCT_CONTENT_LIMITS.seoFaqItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, faqItems: [...seoContent.faqItems, { question: "", answer: "" }] } })}>{PRODUCT_SEO_ADD_OWN_FAQ}</button> : null}
-        <SecondaryUsageBadges
-          label="Вопросы и ответы"
-          queries={secondaryUsageByField.faq ?? []}
-        />
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">

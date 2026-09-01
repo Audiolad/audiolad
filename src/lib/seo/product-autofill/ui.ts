@@ -38,7 +38,7 @@ export const PRODUCT_SEO_READINESS_HINT =
   "Чем полнее заполнен раздел, тем понятнее поисковым системам тема вашего продукта.";
 
 export type ProductSeoSecondaryUsage = {
-  id: "title" | "description" | "usage" | "faq";
+  id: "productDescription" | "title" | "description" | "usage" | "faq";
   label: string;
   queries: string[];
 };
@@ -226,6 +226,7 @@ export function containsExactProductSeoQuery(text: string, query: string): boole
 
 export function getProductSeoSecondaryUsage(input: {
   seoSecondaryQueries: string[];
+  productDescription: string;
   seoTitle: string;
   seoDescription: string;
   usageItems: Array<{ content: string }>;
@@ -233,6 +234,11 @@ export function getProductSeoSecondaryUsage(input: {
   productKind: string;
 }): ProductSeoSecondaryUsage[] {
   const fields: Array<Omit<ProductSeoSecondaryUsage, "queries"> & { text: string }> = [
+    {
+      id: "productDescription",
+      label: "О продукте",
+      text: input.productDescription,
+    },
     { id: "title", label: "Заголовок для поиска", text: input.seoTitle },
     { id: "description", label: "Описание для поиска", text: input.seoDescription },
     {
