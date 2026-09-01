@@ -175,7 +175,14 @@ async function main() {
       assert.equal(numberedProject.name, "Название — копия 2");
       assert.equal((await fetch(`${next.value}/api/studio/projects/${numberedProject.id}?expectedRevision=${numberedProject.revision}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })).status, 204);
       const hole = await fetch(`${next.value}/api/studio/projects/${projectId}/duplicate`, { method: "POST", headers: headers(token) });
-      assert.equal(hole.status, 201); assert.equal((await hole.json()).project.name, "Название — копия 2", "name hole reuses copy 2");
+      assert.equal(hole.status, 201);
+      const holeProject = (await hole.json()).project;
+      assert.equal(holeProject.name, "Название — копия 2", "name hole reuses copy 2");
+      // Naming copies are an independent fixture; release them before the
+      // lifecycle fixture asserts the final reference for its shared sources.
+      assert.equal((await fetch(`${next.value}/api/studio/projects/${holeProject.id}?expectedRevision=${holeProject.revision}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      })).status, 204);
       // A controlled disposable-only trigger proves the RPC rolls back its
       // project/reference graph when failure happens after the project insert.
       sql(stack, "CREATE OR REPLACE FUNCTION public.audiolad_harness_duplicate_abort() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audiolad_harness_abort'; END $$; CREATE TRIGGER audiolad_harness_duplicate_abort AFTER INSERT ON public.studio_projects FOR EACH ROW EXECUTE FUNCTION public.audiolad_harness_duplicate_abort();");
