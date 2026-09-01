@@ -28,7 +28,6 @@ import {
   getWordstatPrimaryCtaLabel,
   planWordstatPickerOpen,
   resolveWordstatRequestPhrase,
-  shouldAutoSearchOnPrimaryCta,
 } from "@/lib/seo/wordstat/ui";
 import {
   WORDSTAT_ERROR_MESSAGES,
@@ -442,7 +441,11 @@ export default function AuthorProductSeoSection({
     }
 
     setGenerateLoading(true);
-    setGenerateStage(seoSecondaryQueries.length > 0 ? "text" : "queries");
+    setGenerateStage(
+      !seoPrimaryQuery.trim() || seoSecondaryQueries.length > 0
+        ? "text"
+        : "queries",
+    );
     setGenerateError(null);
     setOverwriteOpen(false);
     const stageTimer = window.setTimeout(() => {
@@ -624,7 +627,7 @@ export default function AuthorProductSeoSection({
             disabled={disabled}
             onClick={() =>
               openWordstatPicker({
-                autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
+                autoSearch: true,
               })
             }
             className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -757,7 +760,7 @@ export default function AuthorProductSeoSection({
           disabled={disabled}
           onClick={() =>
             openWordstatPicker({
-              autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
+              autoSearch: true,
             })
           }
           className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
@@ -869,6 +872,7 @@ export default function AuthorProductSeoSection({
           onClick={() =>
             openWordstatPicker({
               seedOverride: seoPrimaryQuery.trim() || undefined,
+              autoSearch: true,
             })
           }
           className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"

@@ -47,6 +47,7 @@ import {
 } from "../src/lib/seo/product-autofill/style-profile.ts";
 import {
   buildProductSeoAiJsonSchema,
+  buildYandexProductSeoAiJsonSchema,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -466,6 +467,13 @@ assertSecondaryQueriesEnum(
   const schema = buildProductSeoAiJsonSchema({ candidates: [] });
   assertYandexSecondarySchemaRange(schema, 0, "SCHEMA_ZERO_CANDIDATES");
   assertSecondaryQueriesEnum(schema, [], "SCHEMA_ZERO_CANDIDATES");
+}
+
+{
+  const schema = buildYandexProductSeoAiJsonSchema({ candidates: [] });
+  assert.equal(schema.properties.secondaryQueries.minItems, 0);
+  assert.equal(schema.properties.secondaryQueries.maxItems, 5);
+  assertSecondaryQueriesEnum(schema, [], "YANDEX_ZERO_CANDIDATES_NO_ENUM");
 }
 
 {
@@ -2275,6 +2283,43 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.doesNotMatch(fetchImpl.calls[0].url, /api\.openai\.com/);
 });
 
+// YANDEX_ZERO_CANDIDATES: schema remains acceptable to Yandex, while
+// deterministic canonicalization removes any invented secondary phrases.
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(
+          JSON.stringify(validDraft({ secondaryQueries: ["выдуманная фраза"] })),
+        ),
+      ),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-zero-candidates",
+    provider,
+    wordstatSuggestions: [],
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.seoSecondaryQueries, []);
+  assert.equal(fetchImpl.calls.length, 1);
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(sent.jsonSchema.schema.properties.secondaryQueries.minItems, 0);
+  assert.equal(sent.jsonSchema.schema.properties.secondaryQueries.maxItems, 5);
+  assertSecondaryQueriesEnum(
+    sent.jsonSchema.schema,
+    [],
+    "YANDEX_ZERO_CANDIDATES_PROVIDER_SCHEMA",
+  );
+  assert.match(sent.messages[1].text, /secondaryQueries: \[\]/);
+});
+
 async function generateYandexFromBodies(bodies, userId) {
   const fetchImpl = mockFetch(
     bodies.map((body) => () => jsonResponse(200, body)),
@@ -2507,13 +2552,24 @@ async function captureYandexJsonSchema(kind, candidateCount) {
   return JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema;
 }
 
+function assertYandexProviderSecondarySchemaRange(schema, candidateCount, label) {
+  if (candidateCount === 0) {
+    const field = schema.properties.secondaryQueries;
+    assert.equal(field.minItems, 0, `${label} min`);
+    assert.equal(field.maxItems, 5, `${label} max`);
+    return;
+  }
+
+  assertYandexSecondarySchemaRange(schema, candidateCount, label);
+}
+
 await withEnvAsync(yandexEnv(), async () => {
   for (const candidateCount of [0, 1, 2, 3, 4, 5, 20]) {
     const expectedPhrases = fakeEligibleCandidates(candidateCount).map(
       (item) => item.phrase,
     );
     const generateSchema = await captureYandexJsonSchema("generate", candidateCount);
-    assertYandexSecondarySchemaRange(
+    assertYandexProviderSecondarySchemaRange(
       generateSchema,
       candidateCount,
       `YANDEX_GENERATE_SCHEMA_SECONDARIES_${candidateCount}`,
@@ -2524,7 +2580,7 @@ await withEnvAsync(yandexEnv(), async () => {
       `YANDEX_GENERATE_SCHEMA_TEST_${candidateCount}`,
     );
     const repairSchema = await captureYandexJsonSchema("repair", candidateCount);
-    assertYandexSecondarySchemaRange(
+    assertYandexProviderSecondarySchemaRange(
       repairSchema,
       candidateCount,
       `YANDEX_REPAIR_SCHEMA_SECONDARIES_${candidateCount}`,

@@ -465,7 +465,11 @@ assert.equal(
 assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
 assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
-assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
+assert.equal(
+  [...seoSection.matchAll(/autoSearch: true/g)].length,
+  3,
+  "every Wordstat CTA requests an automatic search when seeded",
+);
 assert.match(seoSection, /void submitWordstat\(seed\)/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);

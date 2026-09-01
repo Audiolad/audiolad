@@ -5,7 +5,10 @@ import {
   createDefaultProductSeoStyleProfile,
   productSeoStylePromptLines,
 } from "@/lib/seo/product-autofill/style-profile";
-import type { ProductSeoAutofillRequest } from "@/lib/seo/product-autofill/types";
+import {
+  PRODUCT_SEO_SECONDARY_MAX,
+  type ProductSeoAutofillRequest,
+} from "@/lib/seo/product-autofill/types";
 import { expectedSecondaryRange } from "@/lib/seo/product-autofill/validate";
 
 export const PRODUCT_SEO_AI_SCHEMA_NAME = "product_seo_draft";
@@ -107,6 +110,31 @@ export function buildProductSeoAiJsonSchema(
   };
 }
 
+/**
+ * Yandex rejects an array schema whose maximum is zero. Keep OpenAI's stricter
+ * zero-candidate schema unchanged, while allowing Yandex to produce an array
+ * that is canonicalized to [] before the draft is returned.
+ */
+export function buildYandexProductSeoAiJsonSchema(
+  input: ProductSeoAiSchemaInput,
+) {
+  const schema = buildProductSeoAiJsonSchema(input);
+  if (getLockedSecondaryQueries(input).length || input.candidates.length > 0) {
+    return schema;
+  }
+
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      secondaryQueries: {
+        ...schema.properties.secondaryQueries,
+        maxItems: PRODUCT_SEO_SECONDARY_MAX,
+      },
+    },
+  };
+}
+
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
   const lockedSecondaryQueries = getLockedSecondaryQueries(input);
@@ -138,7 +166,7 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
               `- ${item.phrase} | count=${item.count} | color=${item.color} | source=${item.source}`,
           )
           .join("\n")
-      : "нет подходящих кандидатов — верните пустой массив secondaryQueries",
+      : "нет подходящих кандидатов — верните secondaryQueries: []",
     lockedSecondaryQueries.length > 0
       ? `secondaryQueries должен содержать ровно ${lockedSecondaryQueries.length} зафиксированных фраз.`
       : `Допустимое число secondaryQueries: ${secondaryRange.min}–${secondaryRange.max}.`,
