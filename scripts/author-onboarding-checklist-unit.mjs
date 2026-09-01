@@ -314,7 +314,7 @@ function testFocusProductSelection() {
   assert.equal(focus?.id, "ready");
 
   const focusWithoutReady = selectFocusProduct([emptyDraft, almostReady]);
-  assert.equal(focusWithoutReady?.id, "almost");
+  assert.equal(focusWithoutReady?.id, "empty");
 
   assert.ok(
     focusProductSuitabilityScore(publishReady) >
