@@ -3113,7 +3113,7 @@ assert.deepEqual(
     productDescription: "Это вечерняя медитация для отдыха.",
     seoTitle: "Вечерняя медитация для отдыха",
     seoDescription: "Мягкая музыка для сна.",
-    usageItems: [{ content: "Слушайте вечернюю медитацию дома" }],
+    usageItems: [{ content: "Включите «вечерняя медитация» дома" }],
     faqItems: [
       {
         question: "Кому подходит музыка для сна?",
