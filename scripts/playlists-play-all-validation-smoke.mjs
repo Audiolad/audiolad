@@ -121,20 +121,32 @@ const publicItems = [
     href: "/listen/a/free-one",
   },
   {
-    practiceId: "22222222-2222-4222-8222-222222222222",
+    practiceId: "55555555-5555-4555-8555-555555555555",
     position: 2,
-    title: "Product page only",
+    title: "Paid published",
     authorName: "A",
     authorSlug: "a",
     formatLabel: null,
     metaLabel: null,
     coverDisplayUrl: null,
     available: true,
-    href: "/practice/a/paid-ish",
+    href: "/listen/a/paid-one",
+  },
+  {
+    practiceId: "22222222-2222-4222-8222-222222222222",
+    position: 3,
+    title: "Product page only",
+    authorName: "A",
+    authorSlug: "a",
+    formatLabel: null,
+    metaLabel: null,
+    coverDisplayUrl: null,
+    available: false,
+    href: "/practice/a/no-audio",
   },
   {
     practiceId: "33333333-3333-4333-8333-333333333333",
-    position: 3,
+    position: 4,
     title: "Unavailable",
     authorName: null,
     authorSlug: null,
@@ -153,8 +165,9 @@ const pub = buildPublicPlaylistQueue({
 });
 
 assert(pub.ok, "public ok");
-assert(pub.queue.entries.length === 1, "public only listen hrefs");
-assert(pub.queue.skippedCount === 2, "public skipped");
+assert(pub.queue.entries.length === 2, "public listen hrefs include paid");
+assert(pub.queue.skippedCount === 2, "public skipped non-listen items");
+assert(pub.queue.entries[1].productSlug === "paid-one", "paid storefront item in queue");
 assert(pub.queue.source.returnHref === "/p/my-public", "public return");
 assert(pub.queue.currentIndex === 0, "public default startIndex 0");
 assert(
@@ -298,7 +311,8 @@ assert(provider.includes("beginPendingQueueNavigation"), "begin pending");
 assert(provider.includes("persistentAudioRef"), "persistent audio");
 assert(provider.includes("lastExhaustedPracticeIdRef"), "exhaust dedupe");
 assert(provider.includes("playbackInstanceId"), "remount instance");
-assert(provider.includes("forceStartAtBeginning"), "restart from start");
+assert(provider.includes("resolvePlaylistQueueEntrySession"), "queue uses listen-first catalog fallback");
+assert(provider.includes("preview: session.playbackMode === \"preview\""), "preview signed URL flag");
 assert(provider.includes("isInternalQueueNavigation"), "nav guard export");
 assert(
   provider.includes("Survives engine remounts"),

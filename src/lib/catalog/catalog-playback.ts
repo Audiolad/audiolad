@@ -3,9 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolvePublicationClass } from "@/lib/author-products/publication-class";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
+import { chooseCatalogPreviewAudioRow } from "@/lib/catalog/catalog-preview-audio-choice";
 import {
   fromAudioPreviewWindowColumns,
-  isConfiguredStorefrontPreviewWindow,
   resolvePlaybackPreviewWindow,
 } from "@/lib/listen/preview-window";
 import {
@@ -67,6 +67,7 @@ async function loadCatalogPreviewSession(
   supabase: SupabaseClient,
   authorSlug: string,
   productSlug: string,
+  audioItemId?: string | null,
 ): Promise<
   | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: "not_found" | "unavailable" | "no_audio" | "error" }
@@ -118,17 +119,16 @@ async function loadCatalogPreviewSession(
     resolvePublicationClass(practice.publication_class, practice.product_kind) ===
     "course";
 
-  let chosen = rows.find((item) =>
-    isConfiguredStorefrontPreviewWindow(fromAudioPreviewWindowColumns(item)),
-  );
+  const chosenResult = chooseCatalogPreviewAudioRow(rows, {
+    isCourse,
+    audioItemId,
+  });
 
-  if (!chosen && !isCourse) {
-    chosen = rows.find((item) => item.is_preview === true) ?? rows[0];
-  }
-
-  if (isCourse && !chosen) {
+  if (!chosenResult.ok) {
     return { ok: false, reason: "unavailable" };
   }
+
+  const chosen = chosenResult.row;
 
   let track = chosen
     ? mapRowToListenTrack(chosen, practiceContext)
@@ -213,6 +213,7 @@ export async function loadCatalogPlaySession(
   authorSlug: string,
   productSlug: string,
   userId: string | null,
+  options?: { audioItemId?: string | null },
 ): Promise<
   | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: "not_found" | "unavailable" | "no_audio" | "error" }
@@ -240,5 +241,10 @@ export async function loadCatalogPlaySession(
     return entitled;
   }
 
-  return loadCatalogPreviewSession(supabase, authorSlug, productSlug);
+  return loadCatalogPreviewSession(
+    supabase,
+    authorSlug,
+    productSlug,
+    options?.audioItemId,
+  );
 }

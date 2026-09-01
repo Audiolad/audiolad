@@ -54,8 +54,27 @@ const publicItems = [
     durationSeconds: 60,
     productSlug: "paid-one",
     productHref: "/practice/a/paid-one",
+    available: true,
+    href: "/listen/a/paid-one",
+    coverUrl: null,
+    coverImage: null,
+    updatedAt: null,
+  },
+  {
+    practiceId: "33333333-3333-4333-8333-333333333333",
+    audioItemId: null,
+    position: 3,
+    title: "Missing audio",
+    authorName: "A",
+    authorSlug: "a",
+    formatLabel: null,
+    metaLabel: null,
+    durationLabel: null,
+    durationSeconds: null,
+    productSlug: "gone",
+    productHref: "/practice/a/gone",
     available: false,
-    href: null,
+    href: "/practice/a/gone",
     coverUrl: null,
     coverImage: null,
     updatedAt: null,
@@ -170,8 +189,9 @@ function testSameQueueAsPublicPlayAll() {
   assert.equal(catalog.queue.source.returnHref, "/playlists/catalog");
   assert.equal(catalog.queue.navigationPolicy, "stay_on_source");
   assert.equal(page.queue.source.returnHref, "/p/morning");
-  assert.equal(catalog.queue.entries.length, 1);
-  assert.equal(catalog.queue.skippedCount, 1, "paid/unavailable items stay out");
+  assert.equal(catalog.queue.entries.length, 2);
+  assert.equal(catalog.queue.skippedCount, 1, "true unavailable items stay out");
+  assert.equal(catalog.queue.entries[1].productSlug, "paid-one");
 }
 
 async function testRepeatPressTogglesWithoutReload() {
@@ -230,7 +250,7 @@ async function testIdlePressLoadsOnce() {
       assert.equal(queue.source.playlistSlug, "morning");
       assert.equal(queue.source.returnHref, "/playlists/catalog");
       assert.equal(queue.navigationPolicy, "stay_on_source");
-      assert.equal(queue.entries.length, 1);
+      assert.equal(queue.entries.length, 2);
       return { ok: true };
     },
   });
