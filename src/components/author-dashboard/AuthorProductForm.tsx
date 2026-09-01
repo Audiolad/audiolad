@@ -2622,49 +2622,6 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
-        <AuthorProductSeoSection
-          title={form.title}
-          subtitle={form.subtitle}
-          description={form.description}
-          productKind={form.productKind}
-          seoPrimaryQuery={form.seoPrimaryQuery}
-          seoSecondaryQueries={form.seoSecondaryQueries}
-          seoTitle={form.seoTitle}
-          seoDescription={form.seoDescription}
-          authorRecommendationsTitle={form.authorRecommendationsTitle}
-          seoContent={form.seoContent}
-          relatedProductOptions={relatedProductOptions}
-          relatedProductSourceId={practiceId || undefined}
-          publicPath={publicPath}
-          fieldErrors={{
-            seoPrimaryQuery: fieldErrors.seoPrimaryQuery,
-            seoSecondaryQueries: fieldErrors.seoSecondaryQueries,
-            seoTitle: fieldErrors.seoTitle,
-            seoDescription: fieldErrors.seoDescription,
-            authorRecommendationsTitle: fieldErrors.authorRecommendationsTitle,
-          }}
-          disabled={!canEditPublicFields || busy}
-          onChange={(patch) => {
-            setFieldErrors((current) => ({
-              ...current,
-              ...(patch.seoPrimaryQuery !== undefined
-                ? { seoPrimaryQuery: undefined }
-                : {}),
-              ...(patch.seoSecondaryQueries !== undefined
-                ? { seoSecondaryQueries: undefined }
-                : {}),
-              ...(patch.seoTitle !== undefined ? { seoTitle: undefined } : {}),
-              ...(patch.seoDescription !== undefined
-                ? { seoDescription: undefined }
-                : {}),
-              ...(patch.authorRecommendationsTitle !== undefined
-                ? { authorRecommendationsTitle: undefined }
-                : {}),
-            }));
-            setForm((current) => ({ ...current, ...patch }));
-          }}
-        />
-
         {form.productKind === PRODUCT_KIND.PRACTICE ? (
         <>
         <label className="block">
@@ -3654,6 +3611,49 @@ export default function AuthorProductForm({
         </div>
       </section>
       )}
+
+      <AuthorProductSeoSection
+        title={form.title}
+        subtitle={form.subtitle}
+        description={form.description}
+        productKind={form.productKind}
+        seoPrimaryQuery={form.seoPrimaryQuery}
+        seoSecondaryQueries={form.seoSecondaryQueries}
+        seoTitle={form.seoTitle}
+        seoDescription={form.seoDescription}
+        authorRecommendationsTitle={form.authorRecommendationsTitle}
+        seoContent={form.seoContent}
+        relatedProductOptions={relatedProductOptions}
+        relatedProductSourceId={practiceId || undefined}
+        publicPath={publicPath}
+        fieldErrors={{
+          seoPrimaryQuery: fieldErrors.seoPrimaryQuery,
+          seoSecondaryQueries: fieldErrors.seoSecondaryQueries,
+          seoTitle: fieldErrors.seoTitle,
+          seoDescription: fieldErrors.seoDescription,
+          authorRecommendationsTitle: fieldErrors.authorRecommendationsTitle,
+        }}
+        disabled={!canEditPublicFields || busy}
+        onChange={(patch) => {
+          setFieldErrors((current) => ({
+            ...current,
+            ...(patch.seoPrimaryQuery !== undefined
+              ? { seoPrimaryQuery: undefined }
+              : {}),
+            ...(patch.seoSecondaryQueries !== undefined
+              ? { seoSecondaryQueries: undefined }
+              : {}),
+            ...(patch.seoTitle !== undefined ? { seoTitle: undefined } : {}),
+            ...(patch.seoDescription !== undefined
+              ? { seoDescription: undefined }
+              : {}),
+            ...(patch.authorRecommendationsTitle !== undefined
+              ? { authorRecommendationsTitle: undefined }
+              : {}),
+          }));
+          setForm((current) => ({ ...current, ...patch }));
+        }}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button

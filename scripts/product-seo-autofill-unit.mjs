@@ -10,6 +10,7 @@ import { createWordstatMemoryCache } from "../src/lib/seo/wordstat/cache.ts";
 import { createWordstatRateLimitStore } from "../src/lib/seo/wordstat/rate-limit.ts";
 import {
   generateProductSeoDraft,
+  normalizeLockedSecondaryQueries,
   parseProductSeoAutofillRequest,
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
 import {
@@ -51,6 +52,8 @@ import {
 } from "../src/lib/seo/product-autofill/prompt.ts";
 import {
   hasFilledGeneratedSeoFields,
+  containsExactProductSeoQuery,
+  getProductSeoSecondaryUsage,
   productSeoSecondaryStatusCopy,
   resolveProductSeoAccordionBadgeFromInput,
   suggestPrimaryQuerySeeds,
@@ -745,6 +748,57 @@ await withEnvAsync(enabledEnv(), async () => {
 });
 
 await withEnvAsync(enabledEnv(), async () => {
+  let wordstatCalls = 0;
+  const lockedSecondaries = ["Вечерняя медитация", "Практика перед сном"];
+  const provider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({ secondaryQueries: ["заменённая фраза"] }),
+      raw: {},
+    },
+  ]);
+  const result = await generateProductSeoDraft(
+    {
+      ...requestInput(),
+      seoSecondaryQueries: lockedSecondaries,
+      locked: true,
+    },
+    {
+      userId: "author-locked-secondaries",
+      provider,
+      wordstat: {
+        fetchImpl: async () => {
+          wordstatCalls += 1;
+          return jsonResponse(200, { results: [], associations: [] });
+        },
+        env: {
+          YANDEX_WORDSTAT_ENABLED: "true",
+          YANDEX_SEARCH_API_KEY: "wordstat-test-key",
+          YANDEX_SEARCH_FOLDER_ID: "folder",
+        },
+      },
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    },
+  );
+  assert.equal(result.ok, true, "LOCKED_SECONDARIES_GENERATE_OK");
+  assert.equal(wordstatCalls, 0, "LOCKED_SECONDARIES_SKIP_WORDSTAT");
+  assert.deepEqual(
+    result.data.seoSecondaryQueries,
+    lockedSecondaries,
+    "LOCKED_SECONDARIES_PRESERVED_IN_ORDER",
+  );
+  assert.match(
+    provider.calls[0].input.request.seoSecondaryQueries.join("\n"),
+    /Вечерняя медитация/,
+  );
+  assert.deepEqual(
+    buildProductSeoAiJsonSchema(provider.calls[0].input).properties.secondaryQueries.items.enum,
+    lockedSecondaries,
+    "LOCKED_SECONDARIES_DYNAMIC_SCHEMA",
+  );
+});
+
+await withEnvAsync(enabledEnv(), async () => {
   const provider = mockProvider([
     { ok: true, draft: validDraft({ secondaryQueries: ["изобретённая фраза"] }), raw: {} },
     { ok: true, draft: validDraft(), raw: {} },
@@ -758,6 +812,57 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(result.ok, true);
   assert.equal(provider.calls.map((item) => item.kind).join(","), "generate,repair");
   assert.ok(provider.calls[1].issues.some((issue) => issue.startsWith("invented_secondary:")));
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const repeatedAnswerDraft = validDraft({
+    faqItems: [
+      {
+        question: "Когда лучше слушать медитацию для сна?",
+        answer: "Когда лучше слушать медитацию для сна?",
+        anchor: "kogda-slushat",
+      },
+      validDraft().faqItems[1],
+      validDraft().faqItems[2],
+    ],
+  });
+  const provider = mockProvider([
+    { ok: true, draft: repeatedAnswerDraft, raw: {} },
+    {
+      ok: true,
+      draft: validDraft({
+        seoTitle: "Нельзя принимать изменения других полей",
+        faqItems: [
+          {
+            question: "Изменённый вопрос",
+            answer: validDraft().faqItems[0].answer,
+            anchor: "changed-anchor",
+          },
+          validDraft().faqItems[1],
+          validDraft().faqItems[2],
+        ],
+      }),
+      raw: {},
+    },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "author-repair-faq-answer-only",
+    provider,
+    wordstatSuggestions: sampleCandidates(),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    provider.calls[1].issues,
+    ["faq_answer_repeats_question"],
+    "FAQ_REPEAT_REPAIR_IS_TARGETED_TO_ANSWER",
+  );
+  assert.equal(result.data.seoTitle, repeatedAnswerDraft.seoTitle);
+  assert.equal(
+    result.data.faqItems[0].question,
+    repeatedAnswerDraft.faqItems[0].question,
+  );
+  assert.equal(result.data.faqItems[0].anchor, "kogda-slushat");
 });
 
 await withEnvAsync(enabledEnv(), async () => {
@@ -899,24 +1004,16 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(sent.store, PRODUCT_SEO_AI_STORE);
   assert.equal(sent.max_output_tokens, PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS);
   assert.equal(sent.text.format.type, "json_schema");
-  assert.deepEqual(sent.text.format.schema, PRODUCT_SEO_AI_JSON_SCHEMA);
-  assert.equal(
-    "minItems" in sent.text.format.schema.properties.secondaryQueries,
-    false,
+  assert.deepEqual(
+    sent.text.format.schema,
+    buildProductSeoAiJsonSchema({
+      candidates: eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна"),
+    }),
   );
-  assert.equal(
-    "maxItems" in sent.text.format.schema.properties.secondaryQueries,
-    false,
-  );
-  assert.equal(
-    "uniqueItems" in sent.text.format.schema.properties.secondaryQueries,
-    false,
-    "OPENAI_STATIC_SCHEMA_TEST uniqueItems",
-  );
-  assert.equal(
-    "enum" in sent.text.format.schema.properties.secondaryQueries.items,
-    false,
-    "OPENAI_STATIC_SCHEMA_TEST enum",
+  assertYandexSecondarySchemaRange(
+    sent.text.format.schema,
+    eligibleSecondaryCandidates(sampleCandidates(), "медитация для сна").length,
+    "OPENAI_DYNAMIC_SCHEMA_TEST",
   );
   assert.equal("tools" in sent, false);
   assert.doesNotMatch(JSON.stringify(sent), new RegExp(TEST_KEY));
@@ -1003,6 +1100,45 @@ assert.deepEqual(
 );
 assert.equal(parseProductSeoAutofillRequest({ title: "A" }).ok, false);
 assert.equal(parseProductSeoAutofillRequest({ title: "A" }).code, "INVALID_PRIMARY");
+
+const parsedLocked = parseProductSeoAutofillRequest({
+  ...requestInput(),
+  seoSecondaryQueries: [
+    "  Вечерняя   медитация ",
+    "вечерняя медитация",
+    "МЕДИТАЦИЯ ДЛЯ СНА",
+    "другая фраза",
+  ],
+  locked: true,
+});
+assert.equal(parsedLocked.ok, true);
+assert.equal(parsedLocked.request.locked, true);
+assert.deepEqual(parsedLocked.request.seoSecondaryQueries, [
+  "Вечерняя медитация",
+  "другая фраза",
+]);
+const parsedAuthoritativeSecondaries = parseProductSeoAutofillRequest({
+  ...requestInput(),
+  seoSecondaryQueries: ["  Вечерняя   медитация "],
+  locked: false,
+});
+assert.equal(
+  parsedAuthoritativeSecondaries.request.locked,
+  true,
+  "NORMALIZED_SECONDARIES_ARE_AUTHORITATIVE_LOCK",
+);
+assert.deepEqual(
+  parsedAuthoritativeSecondaries.request.seoSecondaryQueries,
+  ["Вечерняя медитация"],
+  "NORMALIZED_SECONDARIES_ARE_RETURNED_CANONICALLY",
+);
+assert.deepEqual(
+  normalizeLockedSecondaryQueries(
+    Array.from({ length: 12 }, (_, index) => `фраза ${index + 1}`),
+    "",
+  ),
+  Array.from({ length: 10 }, (_, index) => `фраза ${index + 1}`),
+);
 
 const defaultStyle = createDefaultProductSeoStyleProfile();
 assert.equal(defaultStyle.preset, "balanced");
@@ -1422,8 +1558,7 @@ assert.match(orchestrate, /import "server-only"/);
 assert.doesNotMatch(orchestrate, /wordstat\.yandex\.ru/);
 assert.match(provider, /PRODUCT_SEO_AI_RESPONSES_URL/);
 assert.match(provider, /json_schema/);
-assert.match(provider, /PRODUCT_SEO_AI_JSON_SCHEMA/);
-assert.doesNotMatch(provider, /buildProductSeoAiJsonSchema/);
+assert.match(provider, /buildProductSeoAiJsonSchema/);
 assert.match(provider, /PRODUCT_SEO_AI_STORE/);
 assert.match(provider, /PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS/);
 assert.match(provider, /import "server-only"/);
@@ -1451,8 +1586,18 @@ assert.match(section, /Готовим SEO|PRODUCT_SEO_GENERATE_LOADING/);
 assert.match(section, /hasFilledGeneratedSeoFields/);
 assert.doesNotMatch(section, /seoAbout:/);
 assert.doesNotMatch(
-  section.slice(section.indexOf("function applyGeneratedDraft")),
+  section.slice(
+    section.indexOf("function applyGeneratedDraft"),
+    section.indexOf("async function generateProductSeo"),
+  ),
   /description:/,
+);
+assert.match(
+  section.slice(
+    section.indexOf("function applyGeneratedDraft"),
+    section.indexOf("async function generateProductSeo"),
+  ),
+  /seoSecondaryQueries: draft\.seoSecondaryQueries/,
 );
 assert.doesNotMatch(route, /seoAbout:/);
 assert.doesNotMatch(
@@ -1581,6 +1726,18 @@ const FAQ_REPAIR_INSTRUCTION = /Исправление FAQ обязательн�
   );
 }
 
+// REPAIR_FAQ_REPEAT_CHANGES_ONLY_ANSWER
+{
+  const repairFaqAnswer = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["faq_answer_repeats_question"],
+  );
+  assert.match(repairFaqAnswer, /измени только faqItems\.answer/);
+  assert.match(repairFaqAnswer, /не меняй question, anchor и другие поля/);
+  assert.doesNotMatch(repairFaqAnswer, /должен дословно содержать основной запрос/);
+}
+
 function musicSleepValidationInput() {
   return {
     primaryQuery: FAQ_EXACT_PRIMARY,
@@ -1658,6 +1815,29 @@ function musicSleepValidationInput() {
   assert.ok(
     faqFail.issues.includes("primary_missing_from_faq"),
     "VALIDATOR_PRIMARY_FAQ_FAIL primary_missing_from_faq",
+  );
+}
+
+// VALIDATOR_FAQ_ANSWER_MUST_NOT_REPEAT_QUESTION
+{
+  const repeatedFaqAnswer = validateProductSeoAiDraft(
+    validDraft({
+      faqItems: [
+        {
+          question: "Нужен ли опыт медитации?",
+          answer: "Опыт медитации нужен?",
+          anchor: "opyt",
+        },
+        validDraft().faqItems[1],
+        validDraft().faqItems[2],
+      ],
+    }),
+    validationInput(),
+  );
+  assert.equal(repeatedFaqAnswer.ok, false);
+  assert.ok(
+    repeatedFaqAnswer.issues.includes("faq_answer_repeats_question"),
+    "FAQ_REPEAT_HAS_STABLE_ERROR",
   );
 }
 
@@ -2423,6 +2603,7 @@ for (const issue of [
   "primary_missing_from_description",
   "faq_count",
   "primary_missing_from_faq",
+  "faq_answer_repeats_question",
   "usage_count",
   "duplicate_usage",
   "duplicate_faq",
@@ -2912,5 +3093,43 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.ok(result.data.seoSecondaryQueries.length >= range.min);
   assert.ok(result.data.seoSecondaryQueries.length <= range.max);
 });
+
+assert.equal(
+  containsExactProductSeoQuery(
+    "ВЕЧЕРНЯЯ, медитация — для сна.",
+    "вечерняя медитация для сна",
+  ),
+  true,
+  "SECONDARY_USAGE_NORMALIZES_CASE_WHITESPACE_YO_AND_PUNCTUATION",
+);
+assert.equal(
+  containsExactProductSeoQuery("Вечерняя медитация", "медитация для сна"),
+  false,
+  "SECONDARY_USAGE_REQUIRES_EXACT_PHRASE",
+);
+assert.deepEqual(
+  getProductSeoSecondaryUsage({
+    seoSecondaryQueries: ["вечерняя медитация", "музыка для сна"],
+    productDescription: "Это вечерняя медитация для отдыха.",
+    seoTitle: "Вечерняя медитация для отдыха",
+    seoDescription: "Мягкая музыка для сна.",
+    usageItems: [{ content: "Включите «вечерняя медитация» дома" }],
+    faqItems: [
+      {
+        question: "Кому подходит музыка для сна?",
+        answer: "Тем, кто хочет отдохнуть.",
+      },
+    ],
+    productKind: "music",
+  }),
+  [
+    { id: "productDescription", label: "О продукте", queries: ["вечерняя медитация"] },
+    { id: "title", label: "Заголовок для поиска", queries: ["вечерняя медитация"] },
+    { id: "description", label: "Описание для поиска", queries: ["музыка для сна"] },
+    { id: "usage", label: "Как слушать музыку", queries: ["вечерняя медитация"] },
+    { id: "faq", label: "Вопросы и ответы", queries: ["музыка для сна"] },
+  ],
+  "SECONDARY_USAGE_BADGES_PER_FIELD_WITH_PRODUCT_KIND_LABEL",
+);
 
 console.log("product-seo-autofill-unit: ok");

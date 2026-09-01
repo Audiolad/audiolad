@@ -141,6 +141,91 @@ async function assertCatalogMobileChrome(page, contextLabel) {
   }
 }
 
+async function catalogChromeMetrics(page) {
+  return page.evaluate(() => {
+    const search = document.querySelector(".listener-catalog-mobile-search");
+    const spacer = document.querySelector(".listener-catalog-mobile-search-spacer");
+    const bottomNav = document.querySelector(".bottom-nav");
+    const searchRect = search?.getBoundingClientRect();
+    const spacerRect = spacer?.getBoundingClientRect();
+    const bottomNavRect = bottomNav?.getBoundingClientRect();
+
+    return {
+      activeElementIsCatalogSearch:
+        document.activeElement?.getAttribute("aria-label") ===
+        "Поиск аудиопродуктов в каталоге",
+      bottomNavBottom: bottomNavRect ? window.innerHeight - bottomNavRect.bottom : null,
+      bottomNavParentIsBody: bottomNav?.parentElement === document.body,
+      bottomNavPosition: bottomNav ? getComputedStyle(bottomNav).position : null,
+      bottomNavTransform: bottomNav ? getComputedStyle(bottomNav).transform : null,
+      scrollY: window.scrollY,
+      searchHeight: searchRect?.height ?? null,
+      searchPosition: search ? getComputedStyle(search).position : null,
+      searchTop: searchRect?.top ?? null,
+      spacerHeight: spacerRect?.height ?? null,
+    };
+  });
+}
+
+function assertCatalogChromeStable(before, after, contextLabel) {
+  for (const [label, metrics] of [
+    ["before filtering", before],
+    ["after filtering", after],
+  ]) {
+    if (metrics.searchPosition !== "fixed" || Math.abs(metrics.searchTop ?? Infinity) > 1) {
+      throw new Error(`${contextLabel} ${label}: catalog search is not fixed at viewport top`);
+    }
+    if (Math.abs((metrics.searchHeight ?? 0) - 76) > 1) {
+      throw new Error(`${contextLabel} ${label}: catalog search height is not 76px`);
+    }
+    if (Math.abs((metrics.spacerHeight ?? 0) - (metrics.searchHeight ?? 0)) > 1) {
+      throw new Error(`${contextLabel} ${label}: catalog spacer does not match fixed search height`);
+    }
+    if (
+      metrics.bottomNavPosition !== "fixed" ||
+      metrics.bottomNavParentIsBody !== true ||
+      metrics.bottomNavTransform !== "none" ||
+      Math.abs(metrics.bottomNavBottom ?? Infinity) > 1
+    ) {
+      throw new Error(`${contextLabel} ${label}: BottomNav is no longer viewport-pinned`);
+    }
+  }
+
+  if (
+    Math.abs((after.searchTop ?? Infinity) - (before.searchTop ?? Infinity)) > 1 ||
+    Math.abs((after.searchHeight ?? Infinity) - (before.searchHeight ?? Infinity)) > 1 ||
+    Math.abs((after.bottomNavBottom ?? Infinity) - (before.bottomNavBottom ?? Infinity)) > 1 ||
+    after.scrollY !== before.scrollY ||
+    !after.activeElementIsCatalogSearch
+  ) {
+    throw new Error(`${contextLabel}: catalog chrome moved during search results rerender`);
+  }
+}
+
+async function assertCatalogSearchRerenderStability(page, contextLabel) {
+  const input = catalogSearchInput(page);
+  await input.focus();
+  const before = await catalogChromeMetrics(page);
+
+  await page.keyboard.type("прогноз");
+  await waitForCatalogDebounce(page);
+  await page.waitForURL(
+    (url) => url.searchParams.get("q") === "прогноз",
+    { timeout: 10_000 },
+  );
+
+  const after = await catalogChromeMetrics(page);
+  assertCatalogChromeStable(before, after, contextLabel);
+
+  await input.fill("");
+  await waitForCatalogDebounce(page);
+  await page.waitForFunction(
+    () => !new URL(window.location.href).searchParams.get("q"),
+    undefined,
+    { timeout: 10_000 },
+  );
+}
+
 async function runSuggestQueryChecks(page, results) {
   await page.setViewportSize(desktopViewport);
   await page.goto(`${BASE_URL}/`, { waitUntil: "load" });
@@ -260,6 +345,11 @@ async function runMobileSmoke(browser, viewport, results) {
   await assertDomSearchFormCount(page, 1, `${viewport.name} catalog`);
   await assertVisibleSearchFormCount(page, 1, `${viewport.name} catalog`);
   await assertCatalogMobileChrome(page, viewport.name);
+  await assertCatalogSearchRerenderStability(
+    page,
+    `${viewport.name} catalog search rerender`,
+  );
+  results.push({ check: `${viewport.name}_catalog_search_rerender_stable`, ok: true });
 
   if (viewport.name === "390x844") {
     await page.screenshot({

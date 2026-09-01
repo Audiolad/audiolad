@@ -49,6 +49,7 @@ import {
   PRODUCT_SEO_GENERATE_STAGE_TEXT,
   PRODUCT_SEO_OVERWRITE_CANCEL,
   PRODUCT_SEO_OVERWRITE_CONFIRM,
+  PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM,
   PRODUCT_SEO_OVERWRITE_REPLACE,
   PRODUCT_SEO_PICK_PRIMARY_CTA,
   PRODUCT_SEO_READINESS_HINT,
@@ -56,6 +57,7 @@ import {
   PRODUCT_SEO_START_HEADING,
   PRODUCT_SEO_START_TEXT,
   productSeoPrimarySelectedLabel,
+  getProductSeoSecondaryUsage,
   productSeoSecondaryStatusCopy,
   resolveProductSeoAccordionBadge,
 } from "@/lib/seo/product-autofill/ui";
@@ -337,6 +339,23 @@ export default function AuthorProductSeoSection({
   const primarySelected = Boolean(seoPrimaryQuery.trim());
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
+  const secondaryUsage = getProductSeoSecondaryUsage({
+    seoSecondaryQueries,
+    productDescription: description,
+    seoTitle,
+    seoDescription,
+    usageItems: seoContent.usageItems,
+    faqItems: seoContent.faqItems,
+    productKind,
+  });
+  const secondaryUsageByQuery = Object.fromEntries(
+    seoSecondaryQueries.map((query) => [
+      query,
+      secondaryUsage
+        .filter((field) => field.queries.includes(query))
+        .map((field) => field.label),
+    ]),
+  );
 
   function openWordstatPicker(options?: {
     seedOverride?: string;
@@ -385,6 +404,7 @@ export default function AuthorProductSeoSection({
     faqItems: Array<{ question: string; answer: string }>;
   }) {
     onChange({
+      // The server returns the canonical normalized list, including locked lists.
       seoSecondaryQueries: draft.seoSecondaryQueries,
       seoTitle: draft.seoTitle,
       seoDescription: draft.seoDescription,
@@ -402,7 +422,7 @@ export default function AuthorProductSeoSection({
     }
 
     setGenerateLoading(true);
-    setGenerateStage("queries");
+    setGenerateStage(seoSecondaryQueries.length > 0 ? "text" : "queries");
     setGenerateError(null);
     setOverwriteOpen(false);
     const stageTimer = window.setTimeout(() => {
@@ -419,6 +439,8 @@ export default function AuthorProductSeoSection({
           description,
           productKind,
           seoPrimaryQuery,
+          seoSecondaryQueries,
+          locked: seoSecondaryQueries.length > 0,
           usageItems: seoContent.usageItems.map((item) => item.content),
           styleProfile: (() => {
             const sanitized = sanitizeProductSeoStyleProfile(styleProfile);
@@ -620,7 +642,9 @@ export default function AuthorProductSeoSection({
           {overwriteOpen ? (
             <div className="mt-3 rounded-[14px] border border-[#ead48a] bg-[#fff8e6] px-3 py-3">
               <p className="text-sm leading-5 text-[#5c5278]">
-                {PRODUCT_SEO_OVERWRITE_CONFIRM}
+                {seoSecondaryQueries.length > 0
+                  ? PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM
+                  : PRODUCT_SEO_OVERWRITE_CONFIRM}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
@@ -743,17 +767,27 @@ export default function AuthorProductSeoSection({
         ) : null}
         <div className="flex flex-wrap gap-2">
           {seoSecondaryQueries.map((query, index) => (
-            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
-              {query}
-              <button
-                type="button"
-                aria-label={`Удалить фразу ${query}`}
-                disabled={disabled}
-                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
-              >
-                ×
-              </button>
-            </span>
+            <div key={`${query}-${index}`} className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
+                {query}
+                <button
+                  type="button"
+                  aria-label={`Удалить фразу ${query}`}
+                  disabled={disabled}
+                  onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
+                >
+                  ×
+                </button>
+              </span>
+              {secondaryUsageByQuery[query]?.map((label) => (
+                <span
+                  key={`${query}-${label}`}
+                  className="rounded-full bg-[#f0e7fb] px-2 py-1 text-xs text-[#4d336f]"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
         {secondariesFull ? null : (
