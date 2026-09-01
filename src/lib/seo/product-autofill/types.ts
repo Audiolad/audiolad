@@ -18,8 +18,6 @@ export const PRODUCT_SEO_YANDEX_AI_COMPLETION_URL = `${PRODUCT_SEO_YANDEX_AI_ORI
 export type ProductSeoAiProviderName = "openai" | "yandex";
 export type ProductSeoAiResolvedProvider = ProductSeoAiProviderName | "unknown";
 
-export const PRODUCT_SEO_SECONDARY_MIN = 3;
-export const PRODUCT_SEO_SECONDARY_MAX = 5;
 export const PRODUCT_SEO_USAGE_MIN = 3;
 export const PRODUCT_SEO_USAGE_MAX = 3;
 export const PRODUCT_SEO_FAQ_GENERATED_COUNT = 3;
@@ -34,8 +32,7 @@ export type ProductSeoGenerateField =
   | "title"
   | "description"
   | "faq"
-  | "usage"
-  | "secondaries";
+  | "usage";
 
 export type ProductSeoFaqDraft = {
   question: string;
@@ -47,15 +44,12 @@ export type ProductSeoUsageDraft = {
   content: string;
 };
 
-export type ProductSeoSecondaryQueryStatus = "complete" | "limited" | "none";
-
 export type ProductSeoAutofillDraft = {
   seoSecondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
   usageItems: ProductSeoUsageDraft[];
   faqItems: ProductSeoFaqDraft[];
-  secondaryQueryStatus: ProductSeoSecondaryQueryStatus;
 };
 
 export type ProductSeoAutofillRequest = {
@@ -64,12 +58,8 @@ export type ProductSeoAutofillRequest = {
   description: string;
   productKind: string;
   seoPrimaryQuery: string;
-  /**
-   * Author-selected secondary phrases that must survive regeneration unchanged.
-   * They are local editor state, never a replacement for the primary Wordstat flow.
-   */
+  /** Author-entered phrases preserved by autofill after legacy-safe normalization. */
   seoSecondaryQueries?: string[];
-  locked?: boolean;
   usageItems?: string[];
   styleProfile?: ProductSeoStyleProfile;
   mode?: ProductSeoGenerateMode;
@@ -77,7 +67,6 @@ export type ProductSeoAutofillRequest = {
 };
 
 export type ProductSeoAiRawDraft = {
-  secondaryQueries: string[];
   seoTitle: string;
   seoDescription: string;
   usageItems: ProductSeoUsageDraft[];

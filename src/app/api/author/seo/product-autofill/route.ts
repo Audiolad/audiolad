@@ -81,7 +81,6 @@ export async function POST(request: Request) {
         question: item.question,
         answer: item.answer,
       })),
-      secondaryQueryStatus: result.data.secondaryQueryStatus,
     });
   } catch (error) {
     if (error instanceof AuthorAccessError) {

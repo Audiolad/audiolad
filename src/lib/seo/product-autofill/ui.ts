@@ -4,15 +4,12 @@ import {
 } from "@/lib/seo/product-metadata";
 import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
-import type {
-  ProductSeoAccordionBadgeKind,
-  ProductSeoSecondaryQueryStatus,
-} from "@/lib/seo/product-autofill/types";
+import type { ProductSeoAccordionBadgeKind } from "@/lib/seo/product-autofill/types";
 
 export const PRODUCT_SEO_ACCORDION_TITLE = "SEO и продвижение";
 
 export const PRODUCT_SEO_SELLING_COPY =
-  "Хотите, чтобы вашу практику или продукт находили в Яндексе и Google? Заполните этот раздел. АудиоЛад поможет подобрать поисковые запросы и подготовить SEO-тексты.";
+  "Заполните этот раздел, чтобы помочь людям находить вашу практику или продукт в поиске. АудиоЛад поможет подготовить SEO-тексты.";
 
 export const PRODUCT_SEO_CLOSED_TEASER = "Мы можем подготовить SEO за вас.";
 
@@ -192,20 +189,6 @@ export function suggestPrimaryQuerySeeds(input: {
 
 export function productSeoPrimarySelectedLabel(primaryQuery: string): string {
   return `Основной запрос: «${primaryQuery.trim()}»`;
-}
-
-export function productSeoSecondaryStatusCopy(
-  status: ProductSeoSecondaryQueryStatus | null,
-): string | null {
-  if (status === "limited") {
-    return PRODUCT_SEO_SECONDARY_LIMITED_COPY;
-  }
-
-  if (status === "none") {
-    return PRODUCT_SEO_SECONDARY_NONE_COPY;
-  }
-
-  return null;
 }
 
 /** Normalizes only comparison surface: case, spacing, ё/е and punctuation. */
