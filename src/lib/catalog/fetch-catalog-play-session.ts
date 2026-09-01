@@ -7,11 +7,17 @@ export type FetchCatalogPlaySessionResult =
 export function buildCatalogPlaySessionUrl(
   authorSlug: string,
   productSlug: string,
+  audioItemId?: string | null,
 ): string {
   const params = new URLSearchParams({
     author: authorSlug,
     slug: productSlug,
   });
+  const requestedAudioItemId = audioItemId?.trim() || "";
+
+  if (requestedAudioItemId) {
+    params.set("audioItemId", requestedAudioItemId);
+  }
 
   return `/api/catalog/play?${params.toString()}`;
 }
@@ -19,10 +25,11 @@ export function buildCatalogPlaySessionUrl(
 export async function fetchCatalogPlaySession(
   authorSlug: string,
   productSlug: string,
+  audioItemId?: string | null,
 ): Promise<FetchCatalogPlaySessionResult> {
   try {
     const response = await fetch(
-      buildCatalogPlaySessionUrl(authorSlug, productSlug),
+      buildCatalogPlaySessionUrl(authorSlug, productSlug, audioItemId),
       {
         method: "GET",
         credentials: "same-origin",

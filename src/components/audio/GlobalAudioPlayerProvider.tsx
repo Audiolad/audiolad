@@ -62,6 +62,7 @@ import {
   fetchListenSessionPayload,
 } from "@/lib/playlists/fetch-listen-session";
 import { queueEntryIdentityKey } from "@/lib/playlists/playlist-item-identity";
+import { resolvePlaylistQueueEntrySession } from "@/lib/playlists/queue-entry-session";
 import {
   getQueueEntryListenSlugs,
   getQueueEntryPracticeId,
@@ -153,38 +154,26 @@ async function resolveQueueEntryPlayback(
     return null;
   }
 
-  const loaded = await fetchListenSessionPayload(
-    slugs.authorSlug,
-    slugs.productSlug,
-    { fromStart: options.fromStart },
-  );
+  const loaded = await resolvePlaylistQueueEntrySession(entry, {
+    fromStart: options.fromStart,
+  });
 
   if (!loaded.ok) {
     return null;
   }
 
-  let session = loaded.session;
-  const track =
-    entry.kind === "audio_item"
-      ? session.tracks.find((item) => item.id === entry.audioItemId)
-      : session.tracks[0];
+  const session = loaded.session;
+  const track = session.tracks[0];
 
   if (!track) {
     return null;
-  }
-
-  if (entry.kind === "audio_item") {
-    session = {
-      ...session,
-      tracks: [track],
-      initialTrackId: track.id,
-    };
   }
 
   const signed = await fetchSignedAudioUrl({
     audioItemId: track.id,
     sourceType: "catalog",
     listenApiBase: buildListenApiBase(slugs.authorSlug, slugs.productSlug),
+    preview: session.playbackMode === "preview",
     signal: options.signal,
   });
 
@@ -1245,11 +1234,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             continue;
           }
 
-          const loaded = await fetchListenSessionPayload(
-            slugs.authorSlug,
-            slugs.productSlug,
-            { fromStart: options.fromStart },
-          );
+          const loaded = await resolvePlaylistQueueEntrySession(entry, {
+            fromStart: options.fromStart,
+          });
 
           if (!loaded.ok) {
             runtimeSkipped += 1;
@@ -1257,25 +1244,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             continue;
           }
 
-          let session = loaded.session;
-
-          if (entry.kind === "audio_item") {
-            const track = session.tracks.find(
-              (item) => item.id === entry.audioItemId,
-            );
-
-            if (!track) {
-              runtimeSkipped += 1;
-              index += direction === "forward" ? 1 : -1;
-              continue;
-            }
-
-            session = {
-              ...session,
-              tracks: [track],
-              initialTrackId: track.id,
-            };
-          }
+          const session = loaded.session;
 
           const nextQueue: PlaylistQueue = {
             ...queue,

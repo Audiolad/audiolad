@@ -61,5 +61,11 @@ assert.match(
   "first 60s is compatibility only",
 );
 assert.match(playLoader, /previewNeedsSetup: previewWindow.needsSetup/, "play session keeps the setup flag");
+assert.match(playLoader, /chooseCatalogPreviewAudioRow/, "preview can target a playlist audio item");
+assert.match(
+  read("src/app/api/catalog/play/route.ts"),
+  /audioItemId/,
+  "catalog play accepts optional audioItemId",
+);
 
 console.log("catalog-play-ui-unit: ok");

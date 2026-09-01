@@ -119,6 +119,7 @@ import { BELYY_SHUM_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/bely
 import { BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-bez-muzyki-slushat-onlayn";
 import { BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-novorozhdennyh-slushat-onlayn";
 import { BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+import { BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-detey-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -247,6 +248,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

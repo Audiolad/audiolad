@@ -11,13 +11,25 @@ export type PlaylistPublishPractice = {
   cover_image?: unknown;
 };
 
+export type PlaylistStorefrontPractice = {
+  id?: string;
+  status: string | null;
+  is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
+  cover_image?: unknown;
+};
+
 /**
- * Mirrors claim_free_practice / free catalog listen eligibility:
- * published + is_catalog_listed IS TRUE + is_free IS TRUE + price is null or not > 0.
- * Does not invent a parallel free/paid model.
+ * Two different public-playlist rules — do not mix them:
+ *
+ * - isPracticeEligibleForPublicPlaylist = membership/publishing rule for
+ *   user-owned public playlists. Gift-only. Paid products stay out.
+ * - isPracticePlayableOnPublicStorefront = public display/play rule for
+ *   /p, /listens, and catalog playlist Play. Paid published listed products
+ *   are playable via catalog preview when the listener has no entitlement.
  */
-export function isPracticeEligibleForPublicPlaylist(
-  practice: PlaylistPublishPractice,
+function isPublishedListedNonFixturePractice(
+  practice: PlaylistStorefrontPractice,
 ): boolean {
   if (isFixtureMarkedPractice(practice)) {
     return false;
@@ -36,6 +48,21 @@ export function isPracticeEligibleForPublicPlaylist(
     return false;
   }
 
+  return true;
+}
+
+/**
+ * Mirrors claim_free_practice / free catalog listen eligibility:
+ * published + is_catalog_listed IS TRUE + is_free IS TRUE + price is null or not > 0.
+ * Does not invent a parallel free/paid model.
+ */
+export function isPracticeEligibleForPublicPlaylist(
+  practice: PlaylistPublishPractice,
+): boolean {
+  if (!isPublishedListedNonFixturePractice(practice)) {
+    return false;
+  }
+
   if (practice.is_free !== true) {
     return false;
   }
@@ -46,6 +73,16 @@ export function isPracticeEligibleForPublicPlaylist(
   }
 
   return true;
+}
+
+/**
+ * Public storefront display/play: published listed catalog products, including
+ * paid ones. Does not grant full listen access and does not inspect price.
+ */
+export function isPracticePlayableOnPublicStorefront(
+  practice: PlaylistStorefrontPractice,
+): boolean {
+  return isPublishedListedNonFixturePractice(practice);
 }
 
 export function arePracticesEligibleForPublicPlaylist(
