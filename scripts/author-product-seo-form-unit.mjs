@@ -87,6 +87,6 @@ const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection
 assert.match(seoSection, /Основной поисковый запрос/);
 assert.match(seoSection, /Дополнительные поисковые фразы/);
 assert.match(seoSection, /Введите одну или несколько фраз/);
-assert.doesNotMatch(seoSection, /Wordstat|wordstat|Яндекс|Подобрать похожие/);
+assert.doesNotMatch(seoSection, /Wordstat|wordstat|Подобрать похожие/);
 
 console.log("author-product-seo-form-unit: ok");

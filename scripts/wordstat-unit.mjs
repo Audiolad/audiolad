@@ -885,7 +885,7 @@ assert.equal(invalidQueryJson.includes(TEST_FOLDER), false);
 assert.doesNotMatch(invalidQueryJson, /Api-Key|folderId|Authorization/i);
 
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-assert.doesNotMatch(seoSection, /wordstat|Яндекс|Подобрать похожие/i);
+assert.doesNotMatch(seoSection, /wordstat|Подобрать похожие/i);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

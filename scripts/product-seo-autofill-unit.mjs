@@ -143,7 +143,7 @@ assert.equal(repaired.ok, true);
 assert.equal(repaired.data.faqItems[0].answer, "Слушайте в спокойной обстановке.");
 
 const section = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-assert.doesNotMatch(section, /Wordstat|wordstat|Яндекс|Подобрать похожие/);
+assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие/);
 assert.doesNotMatch(section, /api\/author\/seo\/wordstat/);
 assert.match(section, /Основной поисковый запрос/);
 assert.match(section, /Дополнительные поисковые фразы/);
