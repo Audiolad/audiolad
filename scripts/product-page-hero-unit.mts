@@ -129,6 +129,33 @@ function testPromoBlockOnlyWhenOfferActive() {
   assert.doesNotMatch(offer, /4 999|4999/);
   assert.match(hero, /isHeroPromoOfferActive/);
   assert.match(hero, /data-practice-hero-has-promo/);
+
+  const parts = read(
+    "src/components/products/practice-page/PracticePageParts.tsx",
+  );
+  const page = read(
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+  );
+  assert.match(
+    parts,
+    /data-product-price-offer="initializing"/,
+    "valid promo initialization renders a neutral price skeleton",
+  );
+  assert.match(
+    parts,
+    /viewModel\.promoStartPending[\s\S]*PracticePriceOfferLoading/,
+    "price and actions defer together while promo start resolves",
+  );
+  assert.match(
+    parts,
+    /min-h-\[9rem\]/,
+    "promo loading reserves price/action layout height",
+  );
+  assert.match(
+    page,
+    /validPromoStart && !isHeroPromoOfferActive\(priceOffer\)/,
+    "only a valid unresolved promo start defers price rendering",
+  );
 }
 
 function testHeroLightMetaAuthorPrefix() {

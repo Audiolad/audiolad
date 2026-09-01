@@ -85,6 +85,7 @@ import {
 } from "@/lib/catalog/publication-gallery";
 import {
   buildPracticeHeroLightMeta,
+  isHeroPromoOfferActive,
   resolvePracticeHeroSubtitle,
 } from "@/lib/catalog/product-hero-gallery";
 import {
@@ -95,6 +96,7 @@ import {
 } from "@/lib/pricing/author-promo-preview";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
 import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
+import { loadPricePromotionsForPractice } from "@/lib/pricing/queries";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 
@@ -433,6 +435,17 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     });
   }
 
+  const shouldStartPromo = shouldMountPricePromotionStartHandler({
+    promoStartToken,
+    promoPreviewMode,
+  });
+  const validPromoStart =
+    shouldStartPromo && promoStartToken
+      ? (await loadPricePromotionsForPractice(supabase, practice.id)).some(
+          (promotion) => promotion.startToken === promoStartToken,
+        )
+      : false;
+
   const presentation = buildPracticeAccessPresentation({
     access,
     practice: {
@@ -578,6 +591,23 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     }
   }
 
+  const priceOffer =
+    !practice.is_free &&
+    typeof (resolvedPrice?.basePrice ?? practice.price) === "number" &&
+    (resolvedPrice?.basePrice ?? practice.price ?? 0) > 0
+      ? {
+          basePrice: resolvedPrice?.basePrice ?? practice.price ?? 0,
+          salePrice: resolvedPrice?.salePrice ?? null,
+          endsAt: resolvedPrice?.promotion?.endsAt ?? null,
+          expiresAt: resolvedPrice?.promotion?.expiresAt ?? null,
+          promotionType: resolvedPrice?.promotion?.promotionType ?? null,
+          aboveTimerText: resolvedPrice?.promotion?.aboveTimerText ?? null,
+          belowButtonText: resolvedPrice?.promotion?.belowButtonText ?? null,
+        }
+      : null;
+  const promoStartPending =
+    validPromoStart && !isHeroPromoOfferActive(priceOffer);
+
   const viewModel: PracticePageViewModel = {
     practice: {
       id: practice.id,
@@ -628,21 +658,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       symbol,
       displayWidth: DESKTOP_COVER_DISPLAY_WIDTH,
     },
-    priceOffer:
-      !practice.is_free &&
-      typeof (resolvedPrice?.basePrice ?? practice.price) === "number" &&
-      (resolvedPrice?.basePrice ?? practice.price ?? 0) > 0
-        ? {
-            basePrice: resolvedPrice?.basePrice ?? practice.price ?? 0,
-            salePrice: resolvedPrice?.salePrice ?? null,
-            endsAt: resolvedPrice?.promotion?.endsAt ?? null,
-            expiresAt: resolvedPrice?.promotion?.expiresAt ?? null,
-            promotionType: resolvedPrice?.promotion?.promotionType ?? null,
-            aboveTimerText: resolvedPrice?.promotion?.aboveTimerText ?? null,
-            belowButtonText: resolvedPrice?.promotion?.belowButtonText ?? null,
-          }
-        : null,
+    priceOffer,
     promoStartToken,
+    promoStartPending,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {
