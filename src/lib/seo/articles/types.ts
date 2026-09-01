@@ -132,7 +132,7 @@ export type PracticeArticleDefinition = ArticleDefinitionBase & {
   brandNote?: string;
 };
 
-/** Author-focused funnel with Studio and School as equal product paths. */
+/** Author-focused funnel with Studio and the 25 solutions product as equal paths. */
 export type CreatorArticleDefinition = ArticleDefinitionBase & {
   productContinuation: ArticleCreatorPathsContinuation;
   /** Optional editorial summary; omit when the authoritative copy has no summary. */
