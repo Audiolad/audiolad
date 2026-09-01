@@ -135,7 +135,7 @@ assert.equal(
   "audio_post_requires_single_audio",
 );
 
-const incompletePromo = evaluatePublishReadiness(
+const incompleteOptionalPromo = evaluatePublishReadiness(
   basePractice({
     promo_enabled: true,
     promo_title: "",
@@ -146,7 +146,7 @@ const incompletePromo = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(incompletePromo.firstFailure?.code, "promo_title_required");
+assert.equal(incompleteOptionalPromo.ok, true);
 
 const practiceWithoutDescription = evaluatePublishReadiness(
   basePractice({
