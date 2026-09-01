@@ -1,7 +1,6 @@
 import {
   authorAccessAllowsContentMutations,
   authorAccessAllowsPaidProducts,
-  getPaidPricingDisabledReason,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import {
@@ -43,28 +42,6 @@ export type AuthorSubmitEligibilityInput = {
   price: number;
 };
 
-function resolveCommercialBlock(input: AuthorSubmitEligibilityInput): {
-  code: string;
-  message: string;
-} | null {
-  if (input.isFree && input.price === 0) {
-    return null;
-  }
-
-  if (authorAccessAllowsPaidProducts(input.accessStatus)) {
-    return null;
-  }
-
-  return {
-    code: "paid_products_not_allowed",
-    message:
-      getPaidPricingDisabledReason(
-        (input.accessStatus ?? "free") as AuthorAccessStatus,
-      ) ??
-      "Отправка будет отклонена: платные продукты недоступны при текущем статусе авторского доступа.",
-  };
-}
-
 /**
  * Mirrors AuthorProductForm submit/publish button visibility.
  * Diagnosis only — does not change the form.
@@ -101,7 +78,9 @@ export function evaluateAuthorSubmitEligibility(
     moderationStatus: input.moderationStatus,
     deletedAt: input.deletedAt,
   });
-  const commercialBlock = resolveCommercialBlock(input);
+  // Pricing is optional while a product is sent to moderation. Commercial
+  // eligibility is enforced only when a paid product is later published.
+  const commercialBlock = null;
 
   const base = {
     visibleStatus,

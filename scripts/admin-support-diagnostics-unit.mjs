@@ -175,18 +175,13 @@ assert.equal(ready.tsReadiness.ok, true, "ready product passes TS readiness");
 assert.equal(ready.dbReadiness.ok, true, "ready product passes DB readiness");
 assert.equal(ready.fieldsReady, true, "ready product passes field readiness");
 
-// Failed readiness: missing cover / audio / topics
+// Optional metadata does not block readiness; audio still does.
 const missingCover = readinessPair(
   basePractice({ cover_url: null }),
   [baseAudio()],
   { accessStatus: "free", activeTopicCount: 1 },
 );
-assert.equal(missingCover.tsReadiness.ok, false);
-assert.equal(
-  missingCover.tsReadiness.requirements.find((item) => item.key === "cover")?.code,
-  "missing_cover",
-);
-assert.equal(missingCover.fieldsReady, false);
+assert.equal(missingCover.fieldsReady, true);
 
 const missingAudio = readinessPair(basePractice(), [], {
   accessStatus: "free",
@@ -205,28 +200,15 @@ const missingTopics = readinessPair(basePractice(), [baseAudio()], {
   accessStatus: "free",
   activeTopicCount: 0,
 });
-assert.equal(missingTopics.tsReadiness.ok, false);
-assert.equal(missingTopics.tsReadiness.firstFailure?.code, "topic_min_required");
-assert.equal(missingTopics.fieldsReady, false);
+assert.equal(missingTopics.fieldsReady, true);
 
-// Paid product without commercial eligibility
+// Price selection is optional before moderation.
 const paidFreeAuthor = readinessPair(
   basePractice({ is_free: false, price: 990 }),
   [baseAudio()],
   { accessStatus: "free", activeTopicCount: 1 },
 );
-assert.equal(paidFreeAuthor.tsReadiness.ok, false);
-assert.equal(
-  paidFreeAuthor.tsReadiness.requirements.find((item) => item.key === "price")
-    ?.code,
-  "paid_products_not_allowed",
-);
-assert.ok(
-  paidFreeAuthor.dbReadiness.checks.some(
-    (check) => check.code === "commercial_eligibility_required" && !check.ok,
-  ),
-);
-assert.equal(paidFreeAuthor.fieldsReady, false);
+assert.equal(paidFreeAuthor.fieldsReady, true);
 
 const paidEligibility = evaluateAuthorSubmitEligibility({
   status: "draft",
@@ -238,32 +220,22 @@ const paidEligibility = evaluateAuthorSubmitEligibility({
 });
 assert.equal(paidEligibility.action, "submit");
 assert.equal(paidEligibility.enabled, true);
-assert.equal(paidEligibility.commercialBlock?.code, "paid_products_not_allowed");
-assert.match(paidEligibility.reason, /paid_products_not_allowed/);
+assert.equal(paidEligibility.commercialBlock, null);
 
-// SQL-only issue must not produce false READY: invalid slug
+// Optional SEO metadata does not block readiness.
 const invalidSlug = readinessPair(
   basePractice({ slug: "Invalid Slug" }),
   [baseAudio()],
   { accessStatus: "free", activeTopicCount: 1 },
 );
-assert.equal(invalidSlug.tsReadiness.ok, true, "TS still accepts non-canonical slug");
-assert.equal(invalidSlug.dbReadiness.ok, false);
-assert.ok(
-  invalidSlug.dbReadiness.checks.some(
-    (check) => check.code === "invalid_slug" && !check.ok,
-  ),
-);
-assert.equal(invalidSlug.fieldsReady, false, "combined field ready must stay false");
+assert.equal(invalidSlug.fieldsReady, true);
 
-// SQL-only: currency
+// Currency is optional metadata before moderation.
 const usd = readinessPair(basePractice({ currency: "USD" }), [baseAudio()], {
   accessStatus: "free",
   activeTopicCount: 1,
 });
-assert.equal(usd.tsReadiness.ok, true);
-assert.equal(usd.dbReadiness.ok, false);
-assert.equal(usd.fieldsReady, false);
+assert.equal(usd.fieldsReady, true);
 
 // Course with a nonempty text lesson and no flat audio: TS and SQL agree READY
 const courseNoAudio = readinessPair(
@@ -426,8 +398,8 @@ assert.equal(
     [baseAudio()],
     readyOptions,
   ).answer,
-  "НЕТ",
-  "missing cover stays NET",
+  "ДА",
+  "missing cover is optional",
 );
 assert.equal(
   headlineFor(basePractice(), [], readyOptions).answer,
@@ -439,8 +411,8 @@ assert.equal(
     accessStatus: "free",
     activeTopicCount: 0,
   }).answer,
-  "НЕТ",
-  "missing topics stays NET",
+  "ДА",
+  "topics are optional",
 );
 assert.equal(
   headlineFor(
@@ -448,8 +420,8 @@ assert.equal(
     [baseAudio()],
     readyOptions,
   ).answer,
-  "НЕТ",
-  "paid without commercial eligibility stays NET",
+  "ДА",
+  "pricing is optional before moderation",
 );
 assert.equal(
   headlineFor(
@@ -457,24 +429,18 @@ assert.equal(
     [baseAudio()],
     readyOptions,
   ).answer,
-  "НЕТ",
-  "SQL-only invalid slug stays NET",
+  "ДА",
+  "slug is optional before moderation",
 );
 
 const layered = collectLayeredDiagnosticIssues({
   submitEligibility: paidEligibility,
-  tsReadiness: paidFreeAuthor.tsReadiness,
-  dbReadiness: paidFreeAuthor.dbReadiness,
+  tsReadiness: missingAudio.tsReadiness,
+  dbReadiness: missingAudio.dbReadiness,
 });
 assert.ok(layered.some((issue) => issue.layer === "client"));
 assert.ok(layered.some((issue) => issue.layer === "server"));
-assert.ok(
-  layered.some(
-    (issue) =>
-      issue.code === "paid_products_not_allowed" ||
-      issue.code === "commercial_eligibility_required",
-  ),
-);
+assert.ok(layered.some((issue) => issue.code === "missing_audio"));
 
 // Source guards
 const usersPage = read("src/app/(platform)/admin/users/page.tsx");
