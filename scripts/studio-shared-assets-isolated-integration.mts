@@ -55,7 +55,7 @@ async function assertSources(
   return refs.data ?? [];
 }
 function sql(stack: string, statement: string) {
-  const result = spawnSync("docker", ["compose", "-f", path.join(stack, "docker-compose.yml"), "exec", "-T", "db", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"], { input: statement, encoding: "utf8" });
+  const result = spawnSync("docker", ["compose", "-f", path.join(stack, "docker-compose.yml"), "exec", "-T", "db", "psql", "-U", "postgres", "-d", "postgres", "-tA", "-v", "ON_ERROR_STOP=1"], { input: statement, encoding: "utf8" });
   if (result.status !== 0) throw new Error(`isolated_sql_failed:${result.stderr}`);
   return result.stdout;
 }
