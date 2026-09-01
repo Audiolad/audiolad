@@ -855,7 +855,7 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(result.ok, true);
   assert.deepEqual(
     provider.calls[1].issues,
-    ["faq_answer_repeats_question"],
+    ["faq_answer_repeats_question", "faq_answer_is_question"],
     "FAQ_REPEAT_REPAIR_IS_TARGETED_TO_ANSWER",
   );
   assert.equal(result.data.seoTitle, repeatedAnswerDraft.seoTitle);
