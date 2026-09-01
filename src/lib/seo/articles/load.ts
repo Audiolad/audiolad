@@ -3,10 +3,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
 import { resolveProductAccess } from "@/lib/products/access";
 import {
+  getPracticeAuthorSlug,
+  getPracticeByAuthorAndSlug,
+} from "@/lib/products/lookup";
+import { buildPracticePublicPath } from "@/lib/products/paths";
+import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
 import { resolveLibraryAction } from "@/lib/products/practice-access-ui";
+import { buildCatalogListingPriceView } from "@/lib/pricing/catalog-listing";
+import {
+  loadPersonalPromotionStarts,
+  loadPricePromotionsForPractice,
+} from "@/lib/pricing/queries";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 
 import { buildArticlePath } from "./paths";
@@ -31,6 +42,64 @@ function assertNever(value: never): never {
 
 function assertInvalidArticleDefinition(): never {
   throw new Error("Article continuation does not match its definition");
+}
+
+const MEDITATION_SOLUTIONS_AUTHOR_SLUG = "sergey-petrov";
+const MEDITATION_SOLUTIONS_PRODUCT_SLUG =
+  "25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy";
+
+/**
+ * Reuses the Catalog's existing personal-countdown entry calculation.
+ *
+ * Article pages are already force-dynamic and this function reads the current
+ * request's auth/cookie context; its returned `?promo=` URL is never cached or
+ * shared between viewers.
+ */
+async function loadMeditationSolutionsPromoHref(
+  supabase: SupabaseClient,
+): Promise<string> {
+  const fallbackHref = buildPracticePublicPath(
+    MEDITATION_SOLUTIONS_AUTHOR_SLUG,
+    MEDITATION_SOLUTIONS_PRODUCT_SLUG,
+  );
+  const [{ practice, error }, visitorId, authResult] = await Promise.all([
+    getPracticeByAuthorAndSlug(
+      supabase,
+      MEDITATION_SOLUTIONS_AUTHOR_SLUG,
+      MEDITATION_SOLUTIONS_PRODUCT_SLUG,
+    ),
+    readPriceVisitorId(),
+    supabase.auth.getUser(),
+  ]);
+
+  if (error || !practice) {
+    return fallbackHref;
+  }
+
+  const [promotions, starts] = await Promise.all([
+    loadPricePromotionsForPractice(supabase, practice.id),
+    loadPersonalPromotionStarts({
+      supabase,
+      practiceId: practice.id,
+      visitorId,
+      userId: authResult.data.user?.id ?? null,
+    }),
+  ]);
+  const authorSlug = getPracticeAuthorSlug(practice);
+
+  if (!authorSlug) {
+    return fallbackHref;
+  }
+
+  return buildCatalogListingPriceView({
+    isFree: practice.is_free,
+    basePrice: practice.price,
+    promotions,
+    starts,
+    authorSlug,
+    productSlug: practice.slug,
+    personalTeaser: true,
+  }).href;
 }
 
 async function resolvePrimaryLibraryAction(
@@ -104,6 +173,7 @@ export async function loadArticlePageData(
         path,
         canonicalUrl: buildSiteCanonicalUrl(path),
         readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
+        solutionsPromoHref: await loadMeditationSolutionsPromoHref(supabase),
       } satisfies CreatorArticlePageData;
     }
 
