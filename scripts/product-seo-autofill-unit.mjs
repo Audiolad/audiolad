@@ -1912,6 +1912,12 @@ assert.equal(faqAnswerIsQuestion("Когда лучше слушать прак�
 assert.equal(faqAnswerIsQuestion("Ответ можно уточнить?"), true);
 assert.equal(faqAnswerIsQuestion("Как работает медитация «Таро на деньги»."), true);
 assert.equal(faqAnswerIsQuestion("Что такое «Таро на деньги»."), true);
+assert.equal(faqAnswerIsQuestion("Кому подходит эта медитация."), true);
+assert.equal(faqAnswerIsQuestion("Кому подойдёт эта медитация."), true);
+assert.equal(
+  faqAnswerIsQuestion("Эта медитация подходит тем, кто хочет спокойнее посмотреть на тему денег."),
+  false,
+);
 assert.equal(
   faqAnswerIsQuestion("Что касается времени прослушивания, выбирайте удобный момент."),
   false,
