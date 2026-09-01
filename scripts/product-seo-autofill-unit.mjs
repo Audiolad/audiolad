@@ -2059,7 +2059,7 @@ assert.match(provider, /config.provider === "unknown"/);
 assert.match(yandexProviderSource, /PRODUCT_SEO_YANDEX_AI_COMPLETION_URL/);
 assert.match(yandexProviderSource, /Api-Key/);
 assert.match(yandexProviderSource, /jsonSchema/);
-assert.match(yandexProviderSource, /buildProductSeoAiJsonSchema/);
+assert.match(yandexProviderSource, /buildYandexProductSeoAiJsonSchema/);
 assert.match(yandexProviderSource, /stream: false/);
 assert.match(yandexProviderSource, /JSON\.parse\(text\)/);
 assert.match(yandexProviderSource, /YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS/);
