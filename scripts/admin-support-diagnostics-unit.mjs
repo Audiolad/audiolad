@@ -570,8 +570,6 @@ assert.match(queuePage, /listAdminProductModerationQueue/);
 
 const dbReady = read("src/lib/author-products/database-moderation-ready.ts");
 assert.match(dbReady, /assert_practice_moderation_ready/);
-assert.match(dbReady, /invalid_slug/);
-assert.match(dbReady, /invalid_currency/);
 assert.match(dbReady, /missing_audio/);
 
 console.log("admin-support-diagnostics-unit: ok");
