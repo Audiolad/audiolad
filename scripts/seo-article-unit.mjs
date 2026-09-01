@@ -8259,13 +8259,22 @@ assert(
   "creator paths CTA links Studio directly to meditation studio",
 );
 assert(
-  creatorPathsCtaSource.includes('import { SCHOOL_ORIGIN }'),
-  "creator paths CTA uses the configured School production origin",
+  creatorPathsCtaSource.includes(
+    "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy",
+  ),
+  "creator paths CTA links the right card to the 25 solutions product",
 );
 assert(
-  creatorPathsCtaSource.includes("Посмотреть Школу Аудиопрактик") &&
+  !creatorPathsCtaSource.includes("import { SCHOOL_ORIGIN }") &&
+    !creatorPathsCtaSource.includes("Посмотреть Школу Аудиопрактик") &&
+    !creatorPathsCtaSource.includes("ШКОЛА"),
+  "creator paths CTA no longer uses the School card",
+);
+assert(
+  creatorPathsCtaSource.includes("Посмотреть 25 готовых решений сейчас") &&
+    creatorPathsCtaSource.includes("25 ГОТОВЫХ РЕШЕНИЙ") &&
     !creatorPathsCtaSource.includes("sm:hidden"),
-  "creator paths CTA uses the full School label on every viewport",
+  "creator paths CTA uses the full 25 solutions label on every viewport",
 );
 assert(
   creatorPathsCtaSource.includes('target="_blank"') &&
@@ -8278,6 +8287,13 @@ assert(
       "без специальных навыков и сложных программ.",
     ),
   "creator paths CTA uses the balanced Studio copy",
+);
+assert(
+  creatorPathsCtaSource.includes("Хотите готовые темы, тексты и инструкции?") &&
+    creatorPathsCtaSource.includes(
+      "пошаговые инструкции для старта.",
+    ),
+  "creator paths CTA uses the 25 solutions copy",
 );
 const viewSource = fullViewSource.slice(
   fullViewSource.indexOf("function PracticeArticlePageView"),
@@ -8301,8 +8317,11 @@ assert(
 assert(
   creatorViewSource.includes("openCreatorProductLinksInNewTab") &&
     fullViewSource.includes("shouldOpenCreatorProductLinkInNewTab") &&
+    fullViewSource.includes(
+      "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy",
+    ) &&
     fullViewSource.includes('rel: "noopener noreferrer"'),
-  "creator article opens only Studio and School product links in a new tab",
+  "creator article opens Studio, School, and 25 solutions product links in a new tab",
 );
 assert(
   !viewSource.includes("CreatorPathsCta"),

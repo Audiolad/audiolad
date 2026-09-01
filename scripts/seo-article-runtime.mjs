@@ -10,6 +10,8 @@ const BUILD_ID_PATH = resolve(ROOT, ".next/BUILD_ID");
 const CTA_HEADING = "Хотите создать свою медитацию? Выберите, с чего начать.";
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
 const SCHOOL_ORIGIN = "https://school.audiolad.ru";
+const SOLUTIONS_HREF =
+  "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy";
 const CREATOR_ARTICLES = [
   {
     path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -578,6 +580,10 @@ async function main() {
         renderedHtml.includes(SCHOOL_ORIGIN),
         `${article.path} is missing School URL`,
       );
+      assert(
+        renderedHtml.includes(SOLUTIONS_HREF),
+        `${article.path} is missing 25 solutions product URL`,
+      );
       const requiredSnippets = [
         ...(article.requiredSnippet ? [article.requiredSnippet] : []),
         ...(article.requiredSnippets ?? []),
@@ -591,10 +597,11 @@ async function main() {
       const creatorProductAnchors = [
         ...anchorsForHref(pageHtml, STUDIO_HREF),
         ...anchorsForHref(pageHtml, SCHOOL_ORIGIN),
+        ...anchorsForHref(pageHtml, SOLUTIONS_HREF),
       ];
       assert(
         creatorProductAnchors.length === article.productLinkCount,
-        `${article.path} must render all Studio and School links (found ${creatorProductAnchors.length})`,
+        `${article.path} must render all Studio, School, and 25 solutions links (found ${creatorProductAnchors.length})`,
       );
       assert(
         creatorProductAnchors.every(
@@ -602,7 +609,7 @@ async function main() {
             anchor.includes('target="_blank"') &&
             anchor.includes('rel="noopener noreferrer"'),
         ),
-        `${article.path} Studio and School links must preserve the article in a safe new tab`,
+        `${article.path} Studio, School, and 25 solutions links must preserve the article in a safe new tab`,
       );
       assert(
         [...pageHtml.matchAll(/<a\b[^>]*target="_blank"[^>]*>/gi)]
@@ -610,9 +617,10 @@ async function main() {
           .every(
             (anchor) =>
               anchor.includes(`href="${STUDIO_HREF}"`) ||
-              anchor.includes(`href="${SCHOOL_ORIGIN}"`),
+              anchor.includes(`href="${SCHOOL_ORIGIN}"`) ||
+              anchor.includes(`href="${SOLUTIONS_HREF}"`),
           ),
-        `${article.path} may open only Studio and School links in a new tab`,
+        `${article.path} may open only Studio, School, and 25 solutions links in a new tab`,
       );
       assert(
         renderedHtml.lastIndexOf("Частые вопросы") >
