@@ -141,6 +141,7 @@ import { BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/
 import { BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-1-chas-slushat-onlayn.ts";
 import { BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-2-chasa-slushat-onlayn.ts";
 import { BELYY_SHUM_DLYA_SNA_3_CHASA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-3-chasa-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3301,6 +3302,20 @@ function testOneHundredFourteenthListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-dlya-sna-3-chasa-slushat-onlayn"), "no /articles duplicate for one-hundred-fourteenth listen slug");
 }
 
+function testOneHundredFifteenthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-fifteenth indexable listen page is listed");
+  assert(card.title === USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-fifteenth directory title");
+  assert(card.description === USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-fifteenth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-fifteenth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3325,6 +3340,7 @@ const tests = [
   ["one-hundred-twelfth listen page in directory", testOneHundredTwelfthListenInDirectory],
   ["one-hundred-thirteenth listen page in directory", testOneHundredThirteenthListenInDirectory],
   ["one-hundred-fourteenth listen page in directory", testOneHundredFourteenthListenInDirectory],
+  ["one-hundred-fifteenth listen page in directory", testOneHundredFifteenthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
