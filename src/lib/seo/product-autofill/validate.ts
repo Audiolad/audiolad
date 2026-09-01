@@ -263,7 +263,7 @@ export function faqAnswerRepeatsQuestion(question: string, answer: string): bool
 }
 
 const FAQ_ANSWER_QUESTION_LEAD_PATTERN =
-  /^[\s«“"(\[]*(?:(?:как(?!\s+правило(?:\s|[,.!?:;]|$))|когда|где|почему|зачем|кто|что|какой|какая|какие|сколько)(?:\s|[,.!?:;]|$)|(?:можно|нужно|стоит|следует|получится|удастся|подойд[её]т)\s+ли(?:\s|[,.!?:;]|$))/iu;
+  /^[\s«“"(\[]*(?:(?:что\s+(?:такое|значит|означает|делать)|как\s+(?:работает|использовать|слушать|выбрать)|когда\s+(?:лучше|нужно|стоит)|кому\s+подойд[её]т?|(?:можно|нужно|стоит|следует)\s+ли|почему\s+(?:это|так|нужно|следует)|зачем\s+(?:это|нужно|следует))(?:\s|[,.!?:;]|$))/iu;
 
 export function faqAnswerIsQuestion(answer: string): boolean {
   return answer.includes("?") || FAQ_ANSWER_QUESTION_LEAD_PATTERN.test(answer.trim());

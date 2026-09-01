@@ -1910,6 +1910,20 @@ function musicSleepValidationInput() {
 assert.equal(faqAnswerIsQuestion("Можно ли слушать практику днём."), true);
 assert.equal(faqAnswerIsQuestion("Когда лучше слушать практику."), true);
 assert.equal(faqAnswerIsQuestion("Ответ можно уточнить?"), true);
+assert.equal(faqAnswerIsQuestion("Как работает медитация «Таро на деньги»."), true);
+assert.equal(faqAnswerIsQuestion("Что такое «Таро на деньги»."), true);
+assert.equal(
+  faqAnswerIsQuestion("Что касается времени прослушивания, выбирайте удобный момент."),
+  false,
+);
+assert.equal(
+  faqAnswerIsQuestion("Когда человек готов к практике, её можно включить в спокойной обстановке."),
+  false,
+);
+assert.equal(
+  faqAnswerIsQuestion("Кто хочет познакомиться с темой глубже, может использовать эту практику."),
+  false,
+);
 assert.equal(
   faqAnswerIsQuestion("Как правило, практику слушают в спокойное время."),
   false,
