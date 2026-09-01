@@ -3,7 +3,7 @@ import { cache } from "react";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
-import { isPracticeEligibleForPublicPlaylist } from "@/lib/playlists/public-content";
+import { isPracticePlayableOnPublicStorefront } from "@/lib/playlists/public-content";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
 import { USER_PLAYLIST_OWNER_LABEL } from "@/lib/playlists/listing-labels";
 import { isPlatformOwnedPlaylist } from "@/lib/playlists/public-seo";
@@ -278,12 +278,12 @@ export const loadPublicPlaylistBySlug = cache(
         continue;
       }
 
-      const eligible = isPracticeEligibleForPublicPlaylist({
+      // Storefront playable (paid preview allowed), not gift-membership eligibility.
+      const storefrontPlayable = isPracticePlayableOnPublicStorefront({
         id: practice.id,
         status: practice.status,
         is_catalog_listed: practice.is_catalog_listed,
-        is_free: practice.is_free,
-        price: practice.price,
+        catalog_visibility: practice.catalog_visibility,
         cover_image: practice.cover_image,
       });
 
@@ -305,7 +305,7 @@ export const loadPublicPlaylistBySlug = cache(
       const audioCount = audioItem ? 1 : audioSummary?.audioCount ?? 0;
       const coverFields = presentation.cover;
 
-      if (eligible) {
+      if (storefrontPlayable) {
         if (durationSeconds && durationSeconds > 0) {
           totalDurationSeconds += durationSeconds;
           hasAnyDuration = true;
@@ -319,17 +319,20 @@ export const loadPublicPlaylistBySlug = cache(
         ? Boolean(audioItem)
         : audioCount > 0;
       const canOpen =
-        eligible && audioReady && Boolean(practice.slug) && Boolean(authorSlug);
+        storefrontPlayable &&
+        audioReady &&
+        Boolean(practice.slug) &&
+        Boolean(authorSlug);
 
       let href: string | null = null;
 
       if (canOpen && authorSlug) {
         href = buildListenPath(authorSlug, practice.slug, { autoplay: true });
-      } else if (eligible && authorSlug && practice.slug) {
+      } else if (storefrontPlayable && authorSlug && practice.slug) {
         href = buildPracticePublicPath(authorSlug, practice.slug);
       }
 
-      if (href) {
+      if (canOpen) {
         availableCount += 1;
       } else {
         hasUnavailable = true;
@@ -356,19 +359,19 @@ export const loadPublicPlaylistBySlug = cache(
         authorName,
         authorSlug,
         formatLabel: getDisplayFormat(practice.format),
-        metaLabel: eligible ? presentation.metaLabel : null,
-        durationLabel: eligible ? presentation.durationLabel : null,
-        durationSeconds: eligible ? resolvedDurationSeconds : null,
+        metaLabel: storefrontPlayable ? presentation.metaLabel : null,
+        durationLabel: storefrontPlayable ? presentation.durationLabel : null,
+        durationSeconds: storefrontPlayable ? resolvedDurationSeconds : null,
         productSlug,
         productHref,
-        ...(eligible || practice.status === "published"
+        ...(storefrontPlayable || practice.status === "published"
           ? coverFields
           : {
               coverUrl: null,
               coverImage: null,
               updatedAt: null,
             }),
-        available: Boolean(href),
+        available: canOpen,
         href,
       });
     }

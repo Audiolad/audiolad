@@ -15,6 +15,7 @@ import {
   buildPublicPlaylistCanonicalUrl,
 } from "../src/lib/playlists/public-url.ts";
 import { isPracticeEligibleForPublicPlaylist } from "../src/lib/playlists/public-content.ts";
+import { isPracticePlayableOnPublicStorefront } from "../src/lib/playlists/public-content.ts";
 
 const SCRIPT_NAME = "scripts/playlists-pr5-validation-smoke.mjs";
 const SUPABASE_URL =
@@ -79,7 +80,7 @@ assert(
     price: 100,
     is_catalog_listed: true,
   }),
-  "paid not eligible",
+  "paid not eligible for user-public membership",
 );
 
 assert(
@@ -93,6 +94,22 @@ assert(
   "archived not eligible",
 );
 
+assert(
+  isPracticePlayableOnPublicStorefront({
+    status: "published",
+    is_catalog_listed: true,
+  }),
+  "paid published listed is storefront playable",
+);
+
+assert(
+  !isPracticePlayableOnPublicStorefront({
+    status: "unpublished",
+    is_catalog_listed: true,
+  }),
+  "unpublished is not storefront playable",
+);
+
 const page = read("src/app/(platform)/p/[slug]/page.tsx");
 assert(page.includes("force-dynamic"), "dynamic");
 assert(page.includes("loadPublicPlaylistBySlug"), "loader");
@@ -103,7 +120,14 @@ assert(!page.includes("createServiceRoleClient"), "no service role in page");
 const loader = read("src/lib/playlists/public-detail.ts");
 assert(loader.includes("visibility"), "visibility check");
 assert(loader.includes("published_at"), "published_at gate");
-assert(loader.includes("isPracticeEligibleForPublicPlaylist"), "content gate");
+assert(
+  loader.includes("isPracticePlayableOnPublicStorefront"),
+  "storefront playable gate",
+);
+assert(
+  !loader.includes("isPracticeEligibleForPublicPlaylist"),
+  "gift membership not used for public detail",
+);
 assert(loader.includes("createPlaylistCoverSignedUrl"), "signed cover");
 assert(loader.includes("cache("), "react cache");
 assert(

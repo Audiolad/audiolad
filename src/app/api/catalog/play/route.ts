@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadCatalogPlaySession } from "@/lib/catalog/catalog-playback";
+import { parseOptionalUuidQueryValue } from "@/lib/playlists/validation";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +19,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const authorSlug = searchParams.get("author")?.trim() ?? "";
   const productSlug = searchParams.get("slug")?.trim() ?? "";
+  const parsedAudioItemId = parseOptionalUuidQueryValue(
+    searchParams.get("audioItemId"),
+  );
 
   if (!authorSlug || !productSlug) {
     return NextResponse.json(
       { ok: false, reason: "not_found" },
       { status: 400, headers: NO_STORE_HEADERS },
+    );
+  }
+
+  if (!parsedAudioItemId.ok) {
+    return NextResponse.json(
+      { ok: false, reason: "unavailable" },
+      { status: 403, headers: NO_STORE_HEADERS },
     );
   }
 
@@ -37,6 +48,7 @@ export async function GET(request: Request) {
       authorSlug,
       productSlug,
       user?.id ?? null,
+      { audioItemId: parsedAudioItemId.id },
     );
 
     if (!loaded.ok) {

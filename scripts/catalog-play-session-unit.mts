@@ -7,6 +7,7 @@ import {
   applyCatalogPlayContract,
   resolveCatalogPlaybackMode,
 } from "../src/lib/catalog/catalog-playback-contract";
+import { chooseCatalogPreviewAudioRow } from "../src/lib/catalog/catalog-preview-audio-choice";
 import { parsePracticePublicPath } from "../src/lib/products/paths";
 import type { CatalogGlobalPlayerSession } from "../src/lib/listen/global-player-types";
 
@@ -122,10 +123,41 @@ function testListingApiUnchanged() {
   assert.doesNotMatch(listingApi, /entrySurface/);
 }
 
+function testRequestedAudioItemPreview() {
+  const defaultTrack = {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    is_preview: true,
+    preview_start_ms: null,
+    preview_end_ms: null,
+  };
+  const otherTrack = {
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    is_preview: false,
+    preview_start_ms: null,
+    preview_end_ms: null,
+  };
+
+  const chosen = chooseCatalogPreviewAudioRow([defaultTrack, otherTrack], {
+    isCourse: false,
+    audioItemId: otherTrack.id,
+  });
+  assert.equal(chosen.ok, true);
+  if (chosen.ok) {
+    assert.equal(chosen.row?.id, otherTrack.id);
+  }
+
+  const foreign = chooseCatalogPreviewAudioRow([defaultTrack], {
+    isCourse: false,
+    audioItemId: otherTrack.id,
+  });
+  assert.equal(foreign.ok, false);
+}
+
 testPlaybackModeResolution();
 testCatalogPlayContract();
 testPracticePathParse();
 testSourceTypeUnchanged();
 testListingApiUnchanged();
+testRequestedAudioItemPreview();
 
 console.log("catalog-play-session-unit: ok");

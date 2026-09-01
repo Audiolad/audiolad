@@ -5,6 +5,32 @@ export type FetchListenSessionResult =
   | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: string };
 
+const LISTEN_SESSION_FAILURE_REASONS = new Set([
+  "not_found",
+  "unavailable",
+  "no_audio",
+  "error",
+]);
+
+export function resolveListenSessionFailureReason(
+  status: number,
+  reason: string | undefined,
+): string {
+  if (reason && LISTEN_SESSION_FAILURE_REASONS.has(reason)) {
+    return reason;
+  }
+
+  if (status === 404) {
+    return "not_found";
+  }
+
+  if (status === 403) {
+    return "unavailable";
+  }
+
+  return "error";
+}
+
 export function isSafeListenPath(pathname: string): boolean {
   if (!pathname.startsWith("/listen/")) {
     return false;
@@ -44,7 +70,7 @@ export async function fetchListenSessionPayload(
     if (!response.ok || !data?.ok || !data.session) {
       return {
         ok: false,
-        reason: data?.reason || "unavailable",
+        reason: resolveListenSessionFailureReason(response.status, data?.reason),
       };
     }
 
