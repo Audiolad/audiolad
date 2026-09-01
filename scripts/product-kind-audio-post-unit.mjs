@@ -152,7 +152,7 @@ const incompletePromo = evaluatePublishReadiness(
 );
 assert.equal(incompletePromo.firstFailure?.code, "promo_title_required");
 
-const practiceNeedsDescription = evaluatePublishReadiness(
+const practiceWithoutDescription = evaluatePublishReadiness(
   basePractice({
     product_kind: PRODUCT_KIND.PRACTICE,
     format: "Медитация",
@@ -162,12 +162,9 @@ const practiceNeedsDescription = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(
-  practiceNeedsDescription.firstFailure?.code,
-  "missing_description",
-);
+assert.equal(practiceWithoutDescription.ok, true);
 
-const musicNeedsDescription = evaluatePublishReadiness(
+const musicWithoutDescription = evaluatePublishReadiness(
   basePractice({
     product_kind: PRODUCT_KIND.MUSIC,
     format: "Музыка",
@@ -178,7 +175,7 @@ const musicNeedsDescription = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(musicNeedsDescription.firstFailure?.code, "missing_description");
+assert.equal(musicWithoutDescription.ok, true);
 
 const paidAudioPost = evaluatePublishReadiness(
   basePractice({ is_free: false, price: 99 }),

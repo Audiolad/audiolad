@@ -1617,31 +1617,6 @@ export default function AuthorProductForm({
     setFieldErrors({});
     setTopicError(undefined);
 
-    if (form.productKind === PRODUCT_KIND.PRACTICE) {
-      if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
-        setFieldErrors({
-          formatCustom: "Укажите название своего формата",
-        });
-        requestScrollToFirstSubmitIssue();
-        setBusy(false);
-        return;
-      }
-    }
-
-    const activeTopicCount = countActiveSelectedTopics(
-      topicKeys,
-      topicOptions,
-      archivedTopics,
-    );
-    const topicMinimumCheck = assertPublishedTopicMinimum(activeTopicCount);
-
-    if (!topicMinimumCheck.ok) {
-      setTopicError(topicMinimumCheck.message);
-      requestScrollToFirstSubmitIssue();
-      setBusy(false);
-      return;
-    }
-
     const courseContentCheck = evaluateCoursePublishContentGate({
       publicationClass: form.publicationClass,
       productKind: form.productKind,
