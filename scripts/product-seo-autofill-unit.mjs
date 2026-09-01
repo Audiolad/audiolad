@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   generateProductSeoDraft,
-  normalizeLockedSecondaryQueries,
+  normalizeManualSecondaryQueries,
   parseProductSeoAutofillRequest,
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
 import {
@@ -69,7 +69,7 @@ assert.deepEqual(parsed.request.seoSecondaryQueries, [
 ]);
 assert.equal("locked" in parsed.request, false);
 assert.deepEqual(
-  normalizeLockedSecondaryQueries(
+  normalizeManualSecondaryQueries(
     ["  практика перед сном  ", "ПРАКТИКА ПЕРЕД СНОМ", "медитация для сна"],
     "медитация для сна",
   ),

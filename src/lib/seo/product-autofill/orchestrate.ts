@@ -33,7 +33,6 @@ import {
   type ProductSeoAiResult,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
-import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
 
 const BLOCKED_LOG_FIELDS = new Set([
   "token",
@@ -99,7 +98,11 @@ export type ParseProductSeoAutofillRequestResult =
   | { ok: true; request: ProductSeoAutofillRequest }
   | { ok: false; code: Extract<ProductSeoAiErrorCode, "INVALID_PRIMARY" | "INVALID_STYLE_PROFILE"> };
 
-export function normalizeLockedSecondaryQueries(
+function secondaryQueryKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
+}
+
+export function normalizeManualSecondaryQueries(
   value: unknown,
   primaryQuery: string,
 ): string[] {
@@ -107,7 +110,7 @@ export function normalizeLockedSecondaryQueries(
     return [];
   }
 
-  const primaryKey = wordstatPhraseKey(primaryQuery);
+  const primaryKey = secondaryQueryKey(primaryQuery);
   const seen = new Set<string>();
   const normalized: string[] = [];
   for (const item of value) {
@@ -115,7 +118,7 @@ export function normalizeLockedSecondaryQueries(
       continue;
     }
     const phrase = item.trim().replace(/\s+/g, " ");
-    const key = wordstatPhraseKey(phrase);
+    const key = secondaryQueryKey(phrase);
     if (
       !phrase ||
       phrase.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery ||
@@ -160,7 +163,7 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
   const usageItems = Array.isArray(record.usageItems)
     ? record.usageItems.filter((item): item is string => typeof item === "string")
     : [];
-  const seoSecondaryQueries = normalizeLockedSecondaryQueries(
+  const seoSecondaryQueries = normalizeManualSecondaryQueries(
     record.seoSecondaryQueries,
     record.seoPrimaryQuery,
   );
@@ -224,7 +227,7 @@ export async function generateProductSeoDraft(
     return productSeoAiError("RATE_LIMITED");
   }
 
-  const manualSecondaryQueries = normalizeLockedSecondaryQueries(
+  const manualSecondaryQueries = normalizeManualSecondaryQueries(
     request.seoSecondaryQueries,
     primary,
   );
