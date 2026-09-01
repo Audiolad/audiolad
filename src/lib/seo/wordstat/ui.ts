@@ -64,7 +64,9 @@ export function planWordstatPickerOpen(input: {
 
   return {
     seed,
-    shouldSearch: Boolean(input.autoSearch),
+    // Opening the picker is useful even for an untitled product. A request
+    // without a phrase is not: it can only produce an invalid-query response.
+    shouldSearch: Boolean(input.autoSearch && seed.trim()),
   };
 }
 

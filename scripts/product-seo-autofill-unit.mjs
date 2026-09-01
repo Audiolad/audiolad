@@ -47,6 +47,7 @@ import {
 } from "../src/lib/seo/product-autofill/style-profile.ts";
 import {
   buildProductSeoAiJsonSchema,
+  buildYandexProductSeoAiJsonSchema,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -466,6 +467,13 @@ assertSecondaryQueriesEnum(
   const schema = buildProductSeoAiJsonSchema({ candidates: [] });
   assertYandexSecondarySchemaRange(schema, 0, "SCHEMA_ZERO_CANDIDATES");
   assertSecondaryQueriesEnum(schema, [], "SCHEMA_ZERO_CANDIDATES");
+}
+
+{
+  const schema = buildYandexProductSeoAiJsonSchema({ candidates: [] });
+  assert.equal(schema.properties.secondaryQueries.minItems, 0);
+  assert.equal(schema.properties.secondaryQueries.maxItems, 5);
+  assertSecondaryQueriesEnum(schema, [], "YANDEX_ZERO_CANDIDATES_NO_ENUM");
 }
 
 {
@@ -1013,17 +1021,19 @@ await withEnvAsync(
 );
 
 await withEnvAsync(enabledEnv(), async () => {
-  const missing = await generateProductSeoDraft(
+  const noPrimary = await generateProductSeoDraft(
     { ...requestInput(), seoPrimaryQuery: "   " },
     {
       userId: "author-empty-primary",
-      provider: mockProvider([]),
+      provider: mockProvider([
+        { ok: true, draft: validDraft({ secondaryQueries: [] }), raw: {} },
+      ]),
       wordstatSuggestions: sampleCandidates(),
       aiRateLimit: createProductSeoAiRateLimitStore(),
     },
   );
-  assert.equal(missing.ok, false);
-  assert.equal(missing.error.code, "MISSING_PRIMARY");
+  assert.equal(noPrimary.ok, true);
+  assert.equal(noPrimary.data.secondaryQueryStatus, "none");
 });
 
 await withEnvAsync(enabledEnv(), async () => {
@@ -1149,6 +1159,39 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(result.ok, true);
   assert.equal(wordstatCalls, 1);
 });
+
+for (const [name, handlers] of [
+  ["no_results", [() => jsonResponse(200, { results: [], associations: [] })]],
+  ["upstream", [() => jsonResponse(503, {}), () => jsonResponse(503, {})]],
+  ["timeout", [() => Promise.reject(Object.assign(new Error("timeout"), { name: "AbortError" })), () => Promise.reject(Object.assign(new Error("timeout"), { name: "AbortError" }))]],
+]) {
+  await withEnvAsync(enabledEnv(), async () => {
+    const provider = mockProvider([
+      { ok: true, draft: validDraft({ secondaryQueries: [] }), raw: {} },
+    ]);
+    const { result, text } = await withCapturedInfo(() =>
+      generateProductSeoDraft(requestInput(), {
+        userId: `author-wordstat-${name}`,
+        provider,
+        wordstat: {
+          fetchImpl: mockFetch(handlers),
+          cache: createWordstatMemoryCache(),
+          rateLimit: createWordstatRateLimitStore(),
+          env: {
+            YANDEX_WORDSTAT_ENABLED: "true",
+            YANDEX_SEARCH_API_KEY: "wordstat-test-key",
+            YANDEX_SEARCH_FOLDER_ID: "folder",
+          },
+        },
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    );
+    assert.equal(result.ok, true, `WORDSTAT_${name}_DOES_NOT_BLOCK_AI`);
+    assert.equal(provider.calls.length, 1);
+    assert.match(text, /wordstat_unavailable/);
+    assert.doesNotMatch(text, /медитация для сна|author-wordstat/);
+  });
+}
 
 const parsedDefault = parseProductSeoAutofillRequest({
   title: "A",
@@ -2016,7 +2059,7 @@ assert.match(provider, /config.provider === "unknown"/);
 assert.match(yandexProviderSource, /PRODUCT_SEO_YANDEX_AI_COMPLETION_URL/);
 assert.match(yandexProviderSource, /Api-Key/);
 assert.match(yandexProviderSource, /jsonSchema/);
-assert.match(yandexProviderSource, /buildProductSeoAiJsonSchema/);
+assert.match(yandexProviderSource, /buildYandexProductSeoAiJsonSchema/);
 assert.match(yandexProviderSource, /stream: false/);
 assert.match(yandexProviderSource, /JSON\.parse\(text\)/);
 assert.match(yandexProviderSource, /YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS/);
@@ -2238,6 +2281,43 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.match(sent.messages[1].text, /медитация перед сном/);
   assert.doesNotMatch(JSON.stringify(sent), new RegExp(TEST_YANDEX_KEY));
   assert.doesNotMatch(fetchImpl.calls[0].url, /api\.openai\.com/);
+});
+
+// YANDEX_ZERO_CANDIDATES: schema remains acceptable to Yandex, while
+// deterministic canonicalization removes any invented secondary phrases.
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(
+          JSON.stringify(validDraft({ secondaryQueries: ["выдуманная фраза"] })),
+        ),
+      ),
+  ]);
+  const provider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "yandex-zero-candidates",
+    provider,
+    wordstatSuggestions: [],
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.seoSecondaryQueries, []);
+  assert.equal(fetchImpl.calls.length, 1);
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(sent.jsonSchema.schema.properties.secondaryQueries.minItems, 0);
+  assert.equal(sent.jsonSchema.schema.properties.secondaryQueries.maxItems, 5);
+  assertSecondaryQueriesEnum(
+    sent.jsonSchema.schema,
+    [],
+    "YANDEX_ZERO_CANDIDATES_PROVIDER_SCHEMA",
+  );
+  assert.match(sent.messages[1].text, /secondaryQueries: \[\]/);
 });
 
 async function generateYandexFromBodies(bodies, userId) {
@@ -2472,13 +2552,24 @@ async function captureYandexJsonSchema(kind, candidateCount) {
   return JSON.parse(fetchImpl.calls[0].init.body).jsonSchema.schema;
 }
 
+function assertYandexProviderSecondarySchemaRange(schema, candidateCount, label) {
+  if (candidateCount === 0) {
+    const field = schema.properties.secondaryQueries;
+    assert.equal(field.minItems, 0, `${label} min`);
+    assert.equal(field.maxItems, 5, `${label} max`);
+    return;
+  }
+
+  assertYandexSecondarySchemaRange(schema, candidateCount, label);
+}
+
 await withEnvAsync(yandexEnv(), async () => {
   for (const candidateCount of [0, 1, 2, 3, 4, 5, 20]) {
     const expectedPhrases = fakeEligibleCandidates(candidateCount).map(
       (item) => item.phrase,
     );
     const generateSchema = await captureYandexJsonSchema("generate", candidateCount);
-    assertYandexSecondarySchemaRange(
+    assertYandexProviderSecondarySchemaRange(
       generateSchema,
       candidateCount,
       `YANDEX_GENERATE_SCHEMA_SECONDARIES_${candidateCount}`,
@@ -2489,7 +2580,7 @@ await withEnvAsync(yandexEnv(), async () => {
       `YANDEX_GENERATE_SCHEMA_TEST_${candidateCount}`,
     );
     const repairSchema = await captureYandexJsonSchema("repair", candidateCount);
-    assertYandexSecondarySchemaRange(
+    assertYandexProviderSecondarySchemaRange(
       repairSchema,
       candidateCount,
       `YANDEX_REPAIR_SCHEMA_SECONDARIES_${candidateCount}`,

@@ -16,10 +16,10 @@ export const PRODUCT_SEO_SELLING_COPY =
 
 export const PRODUCT_SEO_CLOSED_TEASER = "Мы можем подготовить SEO за вас.";
 
-export const PRODUCT_SEO_START_HEADING = "Начните с поискового запроса";
+export const PRODUCT_SEO_START_HEADING = "Поисковый запрос — по желанию";
 
 export const PRODUCT_SEO_START_TEXT =
-  "Выберите фразу, по которой люди могут искать такой продукт. Мы покажем реальные данные Яндекса и поможем подобрать подходящий вариант.";
+  "Можно выбрать фразу, по которой люди ищут такой продукт. Мы покажем реальные данные Яндекса и поможем подобрать подходящий вариант, а SEO-тексты можно подготовить и без запроса.";
 
 export const PRODUCT_SEO_PICK_PRIMARY_CTA = "Подобрать основной запрос";
 

@@ -17,7 +17,7 @@ export type AuthorProductSeoWordstatPickerProps = {
   seed: string;
   onSeedChange: (value: string) => void;
   loading: boolean;
-  error: string | null;
+  outcome: string | null;
   result: WordstatSuggestionsPayload | null;
   seoPrimaryQuery: string;
   seoSecondaryQueries: string[];
@@ -101,7 +101,7 @@ export default function AuthorProductSeoWordstatPicker({
   seed,
   onSeedChange,
   loading,
-  error,
+  outcome,
   result,
   seoPrimaryQuery,
   seoSecondaryQueries,
@@ -131,6 +131,7 @@ export default function AuthorProductSeoWordstatPicker({
           maxLength={WORDSTAT_MAX_PHRASE_LENGTH}
           disabled={disabled}
           onChange={(event) => onSeedChange(event.target.value)}
+          autoFocus
           className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
         />
       </label>
@@ -157,8 +158,10 @@ export default function AuthorProductSeoWordstatPicker({
         Яндексе. Для нового продукта чаще удобнее начинать с конкретных запросов
         с умеренным спросом.
       </p>
-      {error ? (
-        <p className="mt-3 text-sm text-[#9b3d3d]">{error}</p>
+      {outcome ? (
+        <p className="mt-3 text-sm leading-5 text-[#5c5278]" role="status">
+          {outcome}
+        </p>
       ) : null}
       {result && !seedInResults && result.topicTotalCount !== null ? (
         <p className="mt-3 text-sm leading-5 text-[#5c5278]">
