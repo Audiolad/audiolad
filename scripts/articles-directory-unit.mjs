@@ -152,6 +152,7 @@ import { BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listen
 import { BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-malyshey-slushat-onlayn.ts";
 import { BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-mladenca-slushat-onlayn.ts";
 import { BELYY_SHUM_PYLESOSA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-pylesosa-slushat-onlayn.ts";
+import { ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-pylesosa-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3466,6 +3467,20 @@ function testOneHundredTwentyFifthListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-pylesosa-slushat-onlayn"), "no /articles duplicate for one-hundred-twenty-fifth listen slug");
 }
 
+function testOneHundredTwentySixthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/zvuk-pylesosa-dlya-sna-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-twenty-sixth indexable listen page is listed");
+  assert(card.title === ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-twenty-sixth directory title");
+  assert(card.description === ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-twenty-sixth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/zvuk-pylesosa-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-twenty-sixth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3501,6 +3516,7 @@ const tests = [
   ["one-hundred-twenty-third listen page in directory", testOneHundredTwentyThirdListenInDirectory],
   ["one-hundred-twenty-fourth listen page in directory", testOneHundredTwentyFourthListenInDirectory],
   ["one-hundred-twenty-fifth listen page in directory", testOneHundredTwentyFifthListenInDirectory],
+  ["one-hundred-twenty-sixth listen page in directory", testOneHundredTwentySixthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
