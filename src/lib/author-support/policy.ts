@@ -22,6 +22,7 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
   "product_soft_deleted",
   "author_profile_updated",
   "studio_project_created",
+  "studio_project_duplicated",
   "studio_project_updated",
   "studio_project_deleted",
   "studio_asset_uploaded",
