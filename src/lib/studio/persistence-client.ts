@@ -229,6 +229,25 @@ export async function createStudioProject({
   return body.project;
 }
 
+export async function duplicateStudioProject({
+  projectId,
+  signal,
+}: {
+  projectId: string;
+  signal?: AbortSignal;
+}): Promise<StudioPersistedProject> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/duplicate`,
+    { method: "POST", signal },
+  );
+  if (!response.ok) throw await toStudioFetchError(response);
+  const body = await response.json() as { project?: unknown };
+  if (!isProject(body.project)) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return body.project;
+}
+
 export async function createStudioGuestHandoff({
   projectId,
   signal,
