@@ -125,7 +125,7 @@ type StudioAudioContextValue = {
     file: File,
     options: { startTime: number },
   ) => Promise<StudioLocalTrack | null>;
-  replaceTrackAudio: (trackId: string, file: File) => Promise<void>;
+  replaceTrackAudio: (trackId: string, file: File) => Promise<boolean>;
   retryTrackAssetUpload: (trackId: string) => void;
   decodePersistedAsset: (blob: Blob) => Promise<AudioBuffer>;
   hydratePersistedProject: (
@@ -1105,7 +1105,7 @@ export function StudioAudioProvider({
       const track = tracksRef.current.find((item) => item.id === trackId);
       const runtime = trackRuntimesRef.current.get(trackId);
       if (!track || !runtime || track.isReplacing) {
-        return;
+        return false;
       }
 
       const validationError = validateStudioLocalFile(file);
@@ -1114,7 +1114,7 @@ export function StudioAudioProvider({
           ...item,
           replacementError: `Не удалось заменить аудио. ${validationError}`,
         }));
-        return;
+        return false;
       }
 
       const projectSize = tracksRef.current.reduce(
@@ -1130,7 +1130,7 @@ export function StudioAudioProvider({
           replacementError:
             "Не удалось заменить аудио. Общий размер дорожек не может превышать 750 МБ.",
         }));
-        return;
+        return false;
       }
 
       const position = getPlaybackPosition();
@@ -1160,13 +1160,13 @@ export function StudioAudioProvider({
         }
 
         if (replacementGenerationRef.current.get(trackId) !== generation) {
-          return;
+          return false;
         }
 
         const currentTrack = tracksRef.current.find((item) => item.id === trackId);
         const oldRuntime = trackRuntimesRef.current.get(trackId);
         if (!currentTrack || !oldRuntime) {
-          return;
+          return false;
         }
 
         for (const { source, envelopeGain } of oldRuntime.sources.values()) {
@@ -1222,9 +1222,10 @@ export function StudioAudioProvider({
         setStatusValue(
           nextPosition >= projectDurationRef.current ? "ready" : "paused",
         );
+        return true;
       } catch (error) {
         if (replacementGenerationRef.current.get(trackId) !== generation) {
-          return;
+          return false;
         }
 
         updateTrack(trackId, (item) => ({
@@ -1232,6 +1233,7 @@ export function StudioAudioProvider({
           isReplacing: false,
           replacementError: `Не удалось заменить аудио. ${formatDecodeError(error)}`,
         }));
+        return false;
       }
     },
     [

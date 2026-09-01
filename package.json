@@ -15,6 +15,7 @@
     "test:studio-history": "npx tsx scripts/studio-history-unit.mjs",
     "test:studio-shortcuts": "node scripts/studio-shortcuts-unit.mjs",
     "test:studio-copy-duplicate": "npx tsx scripts/studio-copy-duplicate-unit.mjs",
+    "test:studio-track-source-name": "npx tsx scripts/studio-track-source-name-unit.mts",
     "test:studio-clip-math": "npx tsx scripts/studio-clip-math-unit.mjs",
     "test:studio-fade-math": "npx tsx scripts/studio-fade-math-unit.mjs",
     "test:studio-recorder": "npx tsx scripts/studio-recorder-unit.mjs",
