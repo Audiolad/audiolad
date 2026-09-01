@@ -2,6 +2,7 @@ import {
   evaluateProductSeoReadiness,
   type ProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
+import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import type {
   ProductSeoAccordionBadgeKind,
@@ -36,8 +37,17 @@ export const PRODUCT_SEO_GENERATE_STAGE_TEXT = "Готовим текст…";
 export const PRODUCT_SEO_READINESS_HINT =
   "Чем полнее заполнен раздел, тем понятнее поисковым системам тема вашего продукта.";
 
+export type ProductSeoSecondaryUsage = {
+  id: "title" | "description" | "usage" | "faq";
+  label: string;
+  queries: string[];
+};
+
 export const PRODUCT_SEO_OVERWRITE_CONFIRM =
   "Часть SEO уже заполнена. Заменить её новым вариантом?";
+
+export const PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM =
+  "Дополнительные фразы сохранятся. Заменить SEO-тексты новым вариантом?";
 
 export const PRODUCT_SEO_OVERWRITE_REPLACE = "Заменить";
 
@@ -196,4 +206,51 @@ export function productSeoSecondaryStatusCopy(
   }
 
   return null;
+}
+
+/** Normalizes only comparison surface: case, spacing, ё/е and punctuation. */
+export function normalizeProductSeoUsageText(value: string): string {
+  return ` ${value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ")} `;
+}
+
+export function containsExactProductSeoQuery(text: string, query: string): boolean {
+  const normalizedQuery = normalizeProductSeoUsageText(query).trim();
+  return Boolean(normalizedQuery) &&
+    normalizeProductSeoUsageText(text).includes(` ${normalizedQuery} `);
+}
+
+export function getProductSeoSecondaryUsage(input: {
+  seoSecondaryQueries: string[];
+  seoTitle: string;
+  seoDescription: string;
+  usageItems: Array<{ content: string }>;
+  faqItems: Array<{ question: string; answer: string }>;
+  productKind: string;
+}): ProductSeoSecondaryUsage[] {
+  const fields: Array<Omit<ProductSeoSecondaryUsage, "queries"> & { text: string }> = [
+    { id: "title", label: "Заголовок для поиска", text: input.seoTitle },
+    { id: "description", label: "Описание для поиска", text: input.seoDescription },
+    {
+      id: "usage",
+      label: getPracticeSeoUsageHeading(input.productKind),
+      text: input.usageItems.map((item) => item.content).join("\n"),
+    },
+    {
+      id: "faq",
+      label: "Вопросы и ответы",
+      text: input.faqItems.map((item) => `${item.question}\n${item.answer}`).join("\n"),
+    },
+  ];
+
+  return fields.map(({ text, ...field }) => ({
+    ...field,
+    queries: input.seoSecondaryQueries.filter((query) =>
+      containsExactProductSeoQuery(text, query),
+    ),
+  }));
 }

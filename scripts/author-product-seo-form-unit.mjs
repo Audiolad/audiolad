@@ -378,6 +378,13 @@ assert.doesNotMatch(seoSection, /localStorage|Пример моего стиля
 assert.match(seoSection, /requestGenerateProductSeo/);
 assert.match(seoSection, /api\/author\/seo\/product-autofill/);
 assert.match(seoSection, /hasFilledGeneratedSeoFields/);
+assert.match(seoSection, /seoSecondaryQueries,/);
+assert.match(seoSection, /locked: seoSecondaryQueries\.length > 0/);
+assert.match(seoSection, /getProductSeoSecondaryUsage/);
+assert.match(seoSection, /SecondaryUsageBadges/);
+assert.match(seoAutofillUi, /normalizeProductSeoUsageText/);
+assert.match(seoAutofillUi, /containsExactProductSeoQuery/);
+assert.match(seoAutofillUi, /getPracticeSeoUsageHeading/);
 assert.match(seoSection, /Часть SEO уже заполнена|PRODUCT_SEO_OVERWRITE_CONFIRM/);
 assert.doesNotMatch(seoSection, /method: "PATCH"|\/api\/author\/products\//);
 assert.doesNotMatch(seoSection, /OpenAI|ChatGPT|GPT-4/i);

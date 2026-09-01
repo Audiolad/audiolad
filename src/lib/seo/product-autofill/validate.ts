@@ -45,6 +45,7 @@ export type ProductSeoValidationInput = {
   productKind: string;
   usageItems: string[];
   candidates: EligibleSecondaryCandidate[];
+  lockedSecondaryQueries?: string[];
 };
 
 export type ProductSeoValidationResult =
@@ -258,9 +259,13 @@ export function validateProductSeoAiDraft(
     issues.push("missing_primary");
   }
 
-  const allowed = new Set(
-    input.candidates.map((item) => wordstatPhraseKey(item.phrase)),
+  const lockedKeys = new Set(
+    (input.lockedSecondaryQueries ?? []).map(wordstatPhraseKey),
   );
+  const allowed = new Set([
+    ...input.candidates.map((item) => wordstatPhraseKey(item.phrase)),
+    ...lockedKeys,
+  ]);
   const secondaries: string[] = [];
   const secondaryKeys = new Set<string>();
 
@@ -295,7 +300,7 @@ export function validateProductSeoAiDraft(
     secondaries.push(clipped);
   }
 
-  if (secondaries.length > PRODUCT_SEO_SECONDARY_MAX) {
+  if (!lockedKeys.size && secondaries.length > PRODUCT_SEO_SECONDARY_MAX) {
     issues.push("too_many_secondaries");
   }
 
@@ -303,10 +308,12 @@ export function validateProductSeoAiDraft(
     issues.push("secondary_limit");
   }
 
-  const expectedSecondaries = expectedSecondaryRange(input.candidates.length);
+  const expectedSecondaries = expectedSecondaryRange(
+    lockedKeys.size || input.candidates.length,
+  );
   if (
-    secondaries.length < expectedSecondaries.min ||
-    secondaries.length > expectedSecondaries.max
+    (!lockedKeys.size && secondaries.length < expectedSecondaries.min) ||
+    (!lockedKeys.size && secondaries.length > expectedSecondaries.max)
   ) {
     issues.push("secondary_count");
   }
