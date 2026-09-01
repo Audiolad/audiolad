@@ -142,6 +142,18 @@ const repaired = await generateProductSeoDraft(parsed.request, {
 assert.equal(repaired.ok, true);
 assert.equal(repaired.data.faqItems[0].answer, "Слушайте в спокойной обстановке.");
 
+const withoutPrimary = await generateProductSeoDraft(
+  { ...parsed.request, seoPrimaryQuery: "", seoSecondaryQueries: [] },
+  {
+    userId: "author-without-primary",
+    config,
+    provider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  },
+);
+assert.equal(withoutPrimary.ok, true, "primary query remains optional");
+assert.deepEqual(withoutPrimary.data.seoSecondaryQueries, []);
+
 const section = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
 assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие/);
 assert.doesNotMatch(section, /api\/author\/seo\/wordstat/);
