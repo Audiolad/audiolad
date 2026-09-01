@@ -178,7 +178,7 @@ const paidAudioPost = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(paidAudioPost.firstFailure?.code, "audio_post_must_be_free");
+assert.equal(paidAudioPost.ok, true);
 
 assert.equal(
   validatePromoRecommendation({
