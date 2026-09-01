@@ -185,7 +185,13 @@ export type PracticeArticlePageData = ArticlePageDataBase<PracticeArticleDefinit
   libraryAction: "sign_in" | "add" | "in_library" | "hidden";
 };
 
-export type CreatorArticlePageData = ArticlePageDataBase<CreatorArticleDefinition>;
+export type CreatorArticlePageData = ArticlePageDataBase<CreatorArticleDefinition> & {
+  /**
+   * Viewer-specific entry URL for the 25 meditation solutions product.
+   * It is calculated per request and may include the existing `?promo=` token.
+   */
+  solutionsPromoHref: string;
+};
 
 /** Backward-compatible alias for the creator product continuation page data. */
 export type CreatorPathsArticlePageData = CreatorArticlePageData;

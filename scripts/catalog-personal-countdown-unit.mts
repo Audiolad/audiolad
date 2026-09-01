@@ -619,7 +619,7 @@ function testSeoAndSitemapStayCanonical() {
   assert.doesNotMatch(home, /buildPracticePromoStartPath|\?promo=/, "homepage has no promo query");
   assert.match(
     catalog,
-    /Omitted for sitemap\/home\/SEO/,
+    /Omit for listed-only public showcases: home, sitemap, topic hubs, author page/,
     "catalog documents crawler surfaces stay canonical",
   );
 

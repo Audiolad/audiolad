@@ -459,7 +459,7 @@ function decodeUnicodeEscapes(value) {
 function anchorsForHref(html, href) {
   return [...html.matchAll(/<a\b[^>]*>/gi)]
     .map((match) => match[0])
-    .filter((anchor) => anchor.includes(`href="${href}"`));
+    .filter((anchor) => anchor.includes(`href="${href}`));
 }
 
 async function fetchWhenReady(url, processRef, logs) {

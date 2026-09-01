@@ -8259,10 +8259,22 @@ assert(
   "creator paths CTA links Studio directly to meditation studio",
 );
 assert(
-  creatorPathsCtaSource.includes(
-    "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy",
-  ),
-  "creator paths CTA links the right card to the 25 solutions product",
+  creatorPathsCtaSource.includes("solutionsPromoHref") &&
+    creatorPathsCtaSource.includes("href = isStudio ? STUDIO_HREF : solutionsPromoHref"),
+  "creator paths CTA receives its visitor-specific 25 solutions entry href",
+);
+const articleLoadSource = read("src/lib/seo/articles/load.ts");
+assert(
+  articleLoadSource.includes("buildCatalogListingPriceView") &&
+    articleLoadSource.includes("loadPersonalPromotionStarts") &&
+    articleLoadSource.includes("personalTeaser: true") &&
+    articleLoadSource.includes("solutionsPromoHref"),
+  "creator article reuses the Catalog personal countdown entry flow",
+);
+assert(
+  articleLoadSource.includes("readPriceVisitorId") &&
+    pageSource.includes('export const dynamic = "force-dynamic"'),
+  "creator promo entry href is resolved per request without shared article caching",
 );
 assert(
   !creatorPathsCtaSource.includes("import { SCHOOL_ORIGIN }") &&

@@ -1,12 +1,11 @@
 import type { ArticleCreatorPathsContinuation } from "@/lib/seo/articles";
 
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
-const SOLUTIONS_HREF =
-  "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy";
 
 type CreatorPathsCtaProps = {
   emphasis: ArticleCreatorPathsContinuation["emphasis"];
   placement: "top" | "bottom";
+  solutionsPromoHref: string;
 };
 
 function StudioVisual() {
@@ -62,7 +61,10 @@ type CreatorPathCardProps = {
   kind: "studio" | "solutions";
 };
 
-function CreatorPathCard({ kind }: CreatorPathCardProps) {
+function CreatorPathCard({
+  kind,
+  solutionsPromoHref,
+}: CreatorPathCardProps & Pick<CreatorPathsCtaProps, "solutionsPromoHref">) {
   const isStudio = kind === "studio";
   const title = isStudio
     ? "Уже готовы записать свою медитацию?"
@@ -70,7 +72,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
   const description = isStudio
     ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере – без специальных навыков и сложных программ."
     : "Получите 25 готовых решений для создания своих медитаций – темы, тексты, шаблоны и пошаговые инструкции для старта.";
-  const href = isStudio ? STUDIO_HREF : SOLUTIONS_HREF;
+  const href = isStudio ? STUDIO_HREF : solutionsPromoHref;
 
   return (
     <a
@@ -106,6 +108,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
 export default function CreatorPathsCta({
   emphasis,
   placement,
+  solutionsPromoHref,
 }: CreatorPathsCtaProps) {
   return (
     <section
@@ -125,8 +128,14 @@ export default function CreatorPathsCta({
         </h2>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
-        <CreatorPathCard kind="studio" />
-        <CreatorPathCard kind="solutions" />
+        <CreatorPathCard
+          kind="studio"
+          solutionsPromoHref={solutionsPromoHref}
+        />
+        <CreatorPathCard
+          kind="solutions"
+          solutionsPromoHref={solutionsPromoHref}
+        />
       </div>
     </section>
   );

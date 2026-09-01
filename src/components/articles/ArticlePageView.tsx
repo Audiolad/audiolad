@@ -299,6 +299,7 @@ function CreatorPathsArticlePageView({
           <CreatorPathsCta
             emphasis={article.productContinuation.emphasis}
             placement="top"
+            solutionsPromoHref={data.solutionsPromoHref}
           />
         </div>
 
@@ -418,6 +419,7 @@ function CreatorPathsArticlePageView({
           <CreatorPathsCta
             emphasis={article.productContinuation.emphasis}
             placement="bottom"
+            solutionsPromoHref={data.solutionsPromoHref}
           />
         </div>
 
