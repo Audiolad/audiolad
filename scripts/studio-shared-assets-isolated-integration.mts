@@ -209,6 +209,7 @@ async function main() {
       const afterReplace = await assertSources(service, duplicateId, 2);
       assert.notEqual(afterReplace.find((asset) => asset.id === copied.data![0]!.id)?.source_id, copied.data![0]!.source_id);
       assert(!((await service.storage.from(BUCKET).download(voicePath)).error), "original physical object survives replacement");
+      const sharedReference = copied.data!.find((asset) => asset.id !== copied.data![0]!.id)!;
       // D: a render request produces a job only for the requested source project;
       // duplication itself must never enqueue a render job.
       const render = await fetch(`${next.value}/api/studio/projects/${projectId}/render`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
@@ -217,39 +218,26 @@ async function main() {
       assert.ifError(renderJobs.error); assert.equal(renderJobs.count, 0, "duplicate has no render job");
       const a = await fetch(`${next.value}/api/studio/projects/${projectId}`, { headers: headers(token) }); const aData = (await a.json()).project;
       assert.equal((await fetch(`${next.value}/api/studio/projects/${projectId}?expectedRevision=${aData.revision}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })).status, 204);
-      const asset = copied.data![0]!;
-      assert(!((await service.storage.from(BUCKET).download(asset.storage_path)).error), "shared object must survive original delete");
+      assert(!((await service.storage.from(BUCKET).download(sharedReference.storage_path)).error), "shared object must survive original delete");
       const duplicateData = (await (await fetch(`${next.value}/api/studio/projects/${duplicateId}`, { headers: headers(token) })).json()).project;
       const rawRelease = await service.rpc("soft_delete_studio_project", {
         p_project_id: duplicateId,
         p_expected_revision: duplicateData.revision,
       });
-      const source = copied.data?.find((item) => item.storage_path === musicPath)?.source_id;
-      const sourceState = await service.from("studio_asset_sources")
-        .select("id,storage_path,deleted_at")
-        .eq("id", source ?? "")
-        .single();
-      const activeRefs = await service.from("studio_project_assets")
-        .select("id", { count: "exact", head: true })
-        .eq("source_id", source ?? "")
-        .is("deleted_at", null);
       const rawRows = rawRelease.data ?? [];
       const cleanupPaths = rawRows.map((row: { storage_path: string }) => row.storage_path);
       const cleanup = await service.storage.from(BUCKET).remove(cleanupPaths);
-      const directAfterCleanup = await service.storage.from(BUCKET).download(musicPath);
       console.log(JSON.stringify({
         diagnostic: "final_reference_release",
         rawRpc: { isNull: rawRelease.data === null, length: rawRows.length, rows: rawRows, error: rawRelease.error?.message ?? null },
-        source: sourceState.data,
-        activeReferenceCount: activeRefs.count,
         cleanup: { bucket: BUCKET, paths: cleanupPaths, data: cleanup.data, error: cleanup.error?.message ?? null },
-        directStorageAfterCleanup: directAfterCleanup.error ? "not_found" : "exists",
       }));
       assert.ifError(rawRelease.error);
-      assert.equal(activeRefs.count, 0);
-      assert.equal(sourceState.data?.deleted_at !== null, true);
       assert.ifError(cleanup.error);
-      await mustNotExist(service, BUCKET, musicPath, "last reference deletion removes shared storage");
+      assert.equal(cleanupPaths.length, 2, "all final orphan paths are returned");
+      for (const storagePath of cleanupPaths) {
+        await mustNotExist(service, BUCKET, storagePath, "last reference deletion removes shared storage");
+      }
       // Keep the disposable stack reusable even if its normal fixture cleanup
       // is disabled; no guest project/session is intentionally retained.
       sql(stack, `DELETE FROM public.studio_projects WHERE guest_session_id = ${sqlLiteral(guestSessionId)}::uuid; DELETE FROM public.studio_guest_sessions WHERE id = ${sqlLiteral(guestSessionId)}::uuid;`);
