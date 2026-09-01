@@ -88,13 +88,22 @@ function CharCounter({ value, max }: { value: string; max: number }) {
   );
 }
 
-function SecondaryUsageBadges({ queries }: { queries: string[] }) {
+function SecondaryUsageBadges({
+  label,
+  queries,
+}: {
+  label: string;
+  queries: string[];
+}) {
   if (!queries.length) {
     return null;
   }
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Использованные дополнительные фразы">
+    <div
+      className="mt-2 flex flex-wrap gap-1.5"
+      aria-label={`${label}: использованные дополнительные фразы`}
+    >
       {queries.map((query) => (
         <span
           key={query}
@@ -872,7 +881,10 @@ export default function AuthorProductSeoSection({
           Ориентир: около 50–70 символов. Это рекомендация, а не обязательный лимит.
         </p>
         <CharCounter value={seoTitle} max={PRODUCT_CONTENT_LIMITS.seoTitle} />
-        <SecondaryUsageBadges queries={secondaryUsageByField.title ?? []} />
+        <SecondaryUsageBadges
+          label="Заголовок для поиска"
+          queries={secondaryUsageByField.title ?? []}
+        />
         {fieldErrors.seoTitle ? (
           <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoTitle}</p>
         ) : null}
@@ -909,7 +921,10 @@ export default function AuthorProductSeoSection({
           value={seoDescription}
           max={PRODUCT_CONTENT_LIMITS.seoDescription}
         />
-        <SecondaryUsageBadges queries={secondaryUsageByField.description ?? []} />
+        <SecondaryUsageBadges
+          label="Описание для поиска"
+          queries={secondaryUsageByField.description ?? []}
+        />
         {fieldErrors.seoDescription ? (
           <p className="mt-2 text-sm text-[#9b3d3d]">
             {fieldErrors.seoDescription}
@@ -941,7 +956,10 @@ export default function AuthorProductSeoSection({
           </div>
         ))}
         {seoContent.usageItems.length < PRODUCT_CONTENT_LIMITS.seoUsageItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, usageItems: [...seoContent.usageItems, { content: "" }] } })}>+ Добавить пункт</button> : null}
-        <SecondaryUsageBadges queries={secondaryUsageByField.usage ?? []} />
+        <SecondaryUsageBadges
+          label={getPracticeSeoUsageHeading(productKind)}
+          queries={secondaryUsageByField.usage ?? []}
+        />
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
@@ -963,7 +981,10 @@ export default function AuthorProductSeoSection({
           </div>
         ))}
         {seoContent.faqItems.length < PRODUCT_CONTENT_LIMITS.seoFaqItems ? <button type="button" disabled={disabled} className="mt-2 text-sm text-[#7042c5]" onClick={() => onChange({ seoContent: { ...seoContent, faqItems: [...seoContent.faqItems, { question: "", answer: "" }] } })}>{PRODUCT_SEO_ADD_OWN_FAQ}</button> : null}
-        <SecondaryUsageBadges queries={secondaryUsageByField.faq ?? []} />
+        <SecondaryUsageBadges
+          label="Вопросы и ответы"
+          queries={secondaryUsageByField.faq ?? []}
+        />
       </div>
 
       <div className="mt-5 border-t border-[#e4d7f4] pt-5">
