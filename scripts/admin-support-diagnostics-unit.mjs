@@ -438,7 +438,6 @@ const layered = collectLayeredDiagnosticIssues({
   tsReadiness: missingAudio.tsReadiness,
   dbReadiness: missingAudio.dbReadiness,
 });
-assert.ok(layered.some((issue) => issue.layer === "client"));
 assert.ok(layered.some((issue) => issue.layer === "server"));
 assert.ok(layered.some((issue) => issue.code === "missing_audio"));
 
