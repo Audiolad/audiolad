@@ -110,6 +110,7 @@ import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_P
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
 import { BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-slushat-onlayn";
 import { BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-2-chasa-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -229,6 +230,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
