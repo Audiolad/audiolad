@@ -121,6 +121,7 @@ import { BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/be
 import { BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
 import { BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-detey-slushat-onlayn";
 import { BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-malyshey-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-mladenca-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -251,6 +252,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
