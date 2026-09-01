@@ -12,9 +12,9 @@ import {
 import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yandex-provider";
 import {
   buildProductSeoRepairPrompt,
+  buildProductSeoAiJsonSchema,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
-  PRODUCT_SEO_AI_JSON_SCHEMA,
   PRODUCT_SEO_AI_SCHEMA_NAME,
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
@@ -200,6 +200,7 @@ function createOpenAiProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
+    input: ProductSeoAiPromptInput,
   ): Promise<ProductSeoAiProviderResult> {
     const { systemPrompt, userPrompt } = prompts;
     const apiKey = readProductSeoAiApiKey(env);
@@ -224,7 +225,7 @@ function createOpenAiProductSeoAiProvider(
           type: "json_schema",
           name: PRODUCT_SEO_AI_SCHEMA_NAME,
           strict: true,
-          schema: PRODUCT_SEO_AI_JSON_SCHEMA,
+          schema: buildProductSeoAiJsonSchema(input),
         },
       },
     });
@@ -281,6 +282,7 @@ function createOpenAiProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
+        input,
       );
     },
     repair(input, previous, issues) {
@@ -290,6 +292,7 @@ function createOpenAiProductSeoAiProvider(
           userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
         },
         "repair",
+        input,
       );
     },
   };

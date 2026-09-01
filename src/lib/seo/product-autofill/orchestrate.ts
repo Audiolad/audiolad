@@ -24,6 +24,7 @@ import {
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
 import {
+  faqAnswerRepeatsQuestion,
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
@@ -38,6 +39,7 @@ import {
   type WordstatClientOptions,
 } from "@/lib/seo/wordstat/client";
 import type { WordstatCacheStore } from "@/lib/seo/wordstat/cache";
+import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
 import type { WordstatRateLimitStore } from "@/lib/seo/wordstat/rate-limit";
 import type { WordstatSuggestion } from "@/lib/seo/wordstat/types";
 
@@ -112,6 +114,39 @@ export type ParseProductSeoAutofillRequestResult =
   | { ok: true; request: ProductSeoAutofillRequest }
   | { ok: false; code: Extract<ProductSeoAiErrorCode, "INVALID_PRIMARY" | "INVALID_STYLE_PROFILE"> };
 
+export function normalizeLockedSecondaryQueries(
+  value: unknown,
+  primaryQuery: string,
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const primaryKey = wordstatPhraseKey(primaryQuery);
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const phrase = item.trim().replace(/\s+/g, " ");
+    const key = wordstatPhraseKey(phrase);
+    if (
+      !phrase ||
+      phrase.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery ||
+      key === primaryKey ||
+      seen.has(key) ||
+      normalized.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries
+    ) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push(phrase);
+  }
+
+  return normalized;
+}
+
 function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResult {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { ok: false, code: "INVALID_PRIMARY" };
@@ -140,6 +175,13 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
   const usageItems = Array.isArray(record.usageItems)
     ? record.usageItems.filter((item): item is string => typeof item === "string")
     : [];
+  const seoSecondaryQueries = normalizeLockedSecondaryQueries(
+    record.seoSecondaryQueries,
+    record.seoPrimaryQuery,
+  );
+  // A normalized author selection is authoritative. Do not let a stale client
+  // `locked` flag cause regeneration to replace a valid selected list.
+  const locked = seoSecondaryQueries.length > 0;
 
   return {
     ok: true,
@@ -149,6 +191,8 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
       description: record.description,
       productKind: record.productKind,
       seoPrimaryQuery: record.seoPrimaryQuery,
+      seoSecondaryQueries,
+      locked,
       usageItems,
       styleProfile: style.profile,
       mode: record.mode === "field" ? "field" : "full",
@@ -228,7 +272,13 @@ export async function generateProductSeoDraft(
     return productSeoAiError("RATE_LIMITED");
   }
 
-  const suggestions = await loadWordstatCandidates(primary, options);
+  const lockedSecondaryQueries =
+    request.locked === true
+      ? normalizeLockedSecondaryQueries(request.seoSecondaryQueries, primary)
+      : [];
+  const suggestions = lockedSecondaryQueries.length
+    ? []
+    : await loadWordstatCandidates(primary, options);
   const candidates = eligibleSecondaryCandidates(suggestions, primary);
   const styleProfile =
     request.styleProfile ?? createDefaultProductSeoStyleProfile();
@@ -236,23 +286,58 @@ export async function generateProductSeoDraft(
     request: {
       ...request,
       seoPrimaryQuery: primary,
+      seoSecondaryQueries: lockedSecondaryQueries,
+      locked: lockedSecondaryQueries.length > 0,
       styleProfile,
     },
     candidates,
+    lockedSecondaryQueries,
   };
 
-  function withCanonicalYandexSecondaries(
+  function mergeSecondaryQueries(
     draft: ProductSeoAiRawDraft,
   ): ProductSeoAiRawDraft {
+    const generatedSecondaryQueries =
+      config.provider === "yandex"
+        ? canonicalizeYandexSecondaryQueries(draft.secondaryQueries, candidates)
+        : draft.secondaryQueries;
+
+    if (lockedSecondaryQueries.length > 0) {
+      return {
+        ...draft,
+        secondaryQueries: lockedSecondaryQueries,
+      };
+    }
+
     if (config.provider !== "yandex") {
       return draft;
     }
 
     return {
       ...draft,
-      secondaryQueries: canonicalizeYandexSecondaryQueries(
-        draft.secondaryQueries,
-        candidates,
+      secondaryQueries: generatedSecondaryQueries,
+    };
+  }
+
+  function mergeFaqAnswerOnlyRepair(
+    draft: ProductSeoAiRawDraft,
+    previous: ProductSeoAiRawDraft,
+    issues: string[],
+  ): ProductSeoAiRawDraft {
+    if (
+      issues.length !== 1 ||
+      issues[0] !== "faq_answer_repeats_question" ||
+      draft.faqItems.length !== previous.faqItems.length
+    ) {
+      return draft;
+    }
+
+    return {
+      ...previous,
+      faqItems: previous.faqItems.map((item, index) =>
+        faqAnswerRepeatsQuestion(item.question, item.answer)
+          ? { ...item, answer: draft.faqItems[index].answer }
+          : item,
       ),
     };
   }
@@ -263,7 +348,7 @@ export async function generateProductSeoDraft(
     return first;
   }
 
-  const firstDraft = withCanonicalYandexSecondaries(first.draft);
+  const firstDraft = mergeSecondaryQueries(first.draft);
   const firstValidation = validateProductSeoAiDraft(firstDraft, {
     primaryQuery: primary,
     title: request.title,
@@ -272,6 +357,7 @@ export async function generateProductSeoDraft(
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
     candidates,
+    lockedSecondaryQueries,
   });
 
   if (firstValidation.ok) {
@@ -294,7 +380,11 @@ export async function generateProductSeoDraft(
     return repaired;
   }
 
-  const repairedDraft = withCanonicalYandexSecondaries(repaired.draft);
+  const repairedDraft = mergeFaqAnswerOnlyRepair(
+    mergeSecondaryQueries(repaired.draft),
+    firstDraft,
+    firstValidation.issues,
+  );
   const repairedValidation = validateProductSeoAiDraft(repairedDraft, {
     primaryQuery: primary,
     title: request.title,
@@ -303,6 +393,7 @@ export async function generateProductSeoDraft(
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
     candidates,
+    lockedSecondaryQueries,
   });
 
   if (!repairedValidation.ok) {

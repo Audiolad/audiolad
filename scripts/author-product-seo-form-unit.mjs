@@ -378,6 +378,14 @@ assert.doesNotMatch(seoSection, /localStorage|Пример моего стиля
 assert.match(seoSection, /requestGenerateProductSeo/);
 assert.match(seoSection, /api\/author\/seo\/product-autofill/);
 assert.match(seoSection, /hasFilledGeneratedSeoFields/);
+assert.match(seoSection, /seoSecondaryQueries,/);
+assert.match(seoSection, /locked: seoSecondaryQueries\.length > 0/);
+assert.match(seoSection, /getProductSeoSecondaryUsage/);
+assert.match(seoSection, /secondaryUsageByQuery/);
+assert.doesNotMatch(seoSection, /SecondaryUsageBadges/);
+assert.match(seoAutofillUi, /normalizeProductSeoUsageText/);
+assert.match(seoAutofillUi, /containsExactProductSeoQuery/);
+assert.match(seoAutofillUi, /getPracticeSeoUsageHeading/);
 assert.match(seoSection, /Часть SEO уже заполнена|PRODUCT_SEO_OVERWRITE_CONFIRM/);
 assert.doesNotMatch(seoSection, /method: "PATCH"|\/api\/author\/products\//);
 assert.doesNotMatch(seoSection, /OpenAI|ChatGPT|GPT-4/i);
@@ -555,6 +563,8 @@ assert.doesNotMatch(seoSection, /YANDEX_SEARCH_API_KEY|YANDEX_SEARCH_FOLDER_ID/)
 assert.match(seoSection, /relatedProductSourceId/);
 assert.match(seoSection, /Найти продукт/);
 assert.match(seoSection, /Удалить фразу/);
+assert.match(seoSection, /productDescription: description/);
+assert.match(seoAutofillUi, /О продукте/);
 assert.doesNotMatch(seoSection, /listListenPageDefinitions/);
 assert.doesNotMatch(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
@@ -562,6 +572,16 @@ assert.doesNotMatch(seoSection, /relatedListenUrl|listen_url/i);
 assert.match(formSource, /related_listen_slugs: form\.seoContent\.relatedListenSlugs/);
 assert.match(formSource, /disabled=\{!canEditPublicFields \|\| busy\}/);
 assert.doesNotMatch(formSource, /wordstat|Wordstat/);
+assert.equal(
+  [...formSource.matchAll(/<AuthorProductSeoSection/g)].length,
+  1,
+  "SEO_SECTION_RENDERED_ONCE",
+);
+assert.ok(
+  formSource.indexOf("<AuthorProductSeoSection") <
+    formSource.indexOf('className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"'),
+  "SEO_SECTION_IMMEDIATELY_PRECEDES_SAVE_PUBLISH_ACTIONS",
+);
 
 const patch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patch, /withPreservedRelatedListenSlugs/);

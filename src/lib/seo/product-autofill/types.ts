@@ -64,6 +64,12 @@ export type ProductSeoAutofillRequest = {
   description: string;
   productKind: string;
   seoPrimaryQuery: string;
+  /**
+   * Author-selected secondary phrases that must survive regeneration unchanged.
+   * They are local editor state, never a replacement for the primary Wordstat flow.
+   */
+  seoSecondaryQueries?: string[];
+  locked?: boolean;
   usageItems?: string[];
   styleProfile?: ProductSeoStyleProfile;
   mode?: ProductSeoGenerateMode;
