@@ -221,6 +221,10 @@ async function loadWordstatCandidates(
   primaryQuery: string,
   options: GenerateProductSeoDraftOptions,
 ): Promise<WordstatSuggestion[]> {
+  if (!primaryQuery) {
+    return [];
+  }
+
   if (options.wordstatSuggestions) {
     return options.wordstatSuggestions;
   }
@@ -234,6 +238,9 @@ async function loadWordstatCandidates(
   });
 
   if (!result.ok) {
+    logProductSeoAiEvent("wordstat_unavailable", {
+      outcome: result.error.code,
+    });
     return [];
   }
 
@@ -245,10 +252,6 @@ export async function generateProductSeoDraft(
   options: GenerateProductSeoDraftOptions,
 ): Promise<ProductSeoAiResult> {
   const primary = request.seoPrimaryQuery.trim();
-  if (!primary) {
-    return productSeoAiError("MISSING_PRIMARY");
-  }
-
   if (primary.length > PRODUCT_CONTENT_LIMITS.seoPrimaryQuery) {
     return productSeoAiError("INVALID_PRIMARY");
   }

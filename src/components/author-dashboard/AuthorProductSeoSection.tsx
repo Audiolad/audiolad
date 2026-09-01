@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
@@ -165,7 +165,7 @@ export default function AuthorProductSeoSection({
   const [wordstatOpen, setWordstatOpen] = useState(false);
   const [wordstatSeed, setWordstatSeed] = useState("");
   const [wordstatLoading, setWordstatLoading] = useState(false);
-  const [wordstatError, setWordstatError] = useState<string | null>(null);
+  const [wordstatOutcome, setWordstatOutcome] = useState<string | null>(null);
   const [wordstatResult, setWordstatResult] =
     useState<WordstatSuggestionsPayload | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
@@ -183,6 +183,7 @@ export default function AuthorProductSeoSection({
   const [secondaryBulkMessage, setSecondaryBulkMessage] = useState<string | null>(
     null,
   );
+  const wordstatPickerRef = useRef<HTMLDivElement>(null);
   const selectedRelatedIds = useMemo(
     () => seoContent.relatedPracticeIds.filter(Boolean),
     [seoContent.relatedPracticeIds],
@@ -216,6 +217,18 @@ export default function AuthorProductSeoSection({
     : relatedProductListingDefaults
       ? defaultAuthorProducts
       : [];
+  useEffect(() => {
+    if (!wordstatOpen) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      wordstatPickerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+  }, [wordstatOpen]);
   useEffect(() => {
     if (!relatedProductSourceId || !selectedRelatedIds.length) {
       return;
@@ -368,7 +381,7 @@ export default function AuthorProductSeoSection({
       autoSearch: options?.autoSearch,
     });
     setWordstatOpen(true);
-    setWordstatError(null);
+    setWordstatOutcome(null);
     setWordstatSeed(seed);
     if (shouldSearch) {
       void submitWordstat(seed);
@@ -417,7 +430,7 @@ export default function AuthorProductSeoSection({
   }
 
   async function generateProductSeo() {
-    if (generateLoading || disabled || !primarySelected) {
+    if (generateLoading || disabled) {
       return;
     }
 
@@ -507,7 +520,7 @@ export default function AuthorProductSeoSection({
   }
 
   function requestGenerateProductSeo() {
-    if (generateLoading || disabled || !primarySelected) {
+    if (generateLoading || disabled) {
       return;
     }
 
@@ -536,7 +549,7 @@ export default function AuthorProductSeoSection({
     const request = buildWordstatSuggestionsRequest(phrase);
 
     setWordstatLoading(true);
-    setWordstatError(null);
+    setWordstatOutcome(null);
 
     try {
       const response = await fetch(request.url, request.init);
@@ -547,17 +560,17 @@ export default function AuthorProductSeoSection({
 
       if (!response.ok || !payload || !("suggestions" in payload)) {
         setWordstatResult(null);
-        setWordstatError(wordstatClientErrorMessage(payload));
+        setWordstatOutcome(wordstatClientErrorMessage(payload));
         return;
       }
 
       setWordstatResult(payload);
       if (payload.suggestions.length === 0) {
-        setWordstatError(WORDSTAT_ERROR_MESSAGES.NO_RESULTS);
+        setWordstatOutcome(WORDSTAT_ERROR_MESSAGES.NO_RESULTS);
       }
     } catch {
       setWordstatResult(null);
-      setWordstatError(WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
+      setWordstatOutcome(WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
     } finally {
       setWordstatLoading(false);
     }
@@ -611,6 +624,28 @@ export default function AuthorProductSeoSection({
           >
             {PRODUCT_SEO_PICK_PRIMARY_CTA}
           </button>
+          <AuthorProductSeoStyleControls
+            profile={styleProfile}
+            onChange={setStyleProfile}
+            disabled={disabled}
+          />
+          <button
+            type="button"
+            disabled={disabled || generateLoading}
+            onClick={requestGenerateProductSeo}
+            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generateLoading
+              ? generateStage === "queries"
+                ? PRODUCT_SEO_GENERATE_STAGE_QUERIES
+                : generateStage === "text"
+                  ? PRODUCT_SEO_GENERATE_STAGE_TEXT
+                  : PRODUCT_SEO_GENERATE_LOADING
+              : PRODUCT_SEO_GENERATE_CTA}
+          </button>
+          {generateError ? (
+            <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
+          ) : null}
         </div>
       ) : (
         <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
@@ -734,28 +769,30 @@ export default function AuthorProductSeoSection({
       </label>
 
       {wordstatOpen ? (
-        <AuthorProductSeoWordstatPicker
-          seed={wordstatSeed}
-          onSeedChange={setWordstatSeed}
-          loading={wordstatLoading}
-          error={wordstatError}
-          result={wordstatResult}
-          seoPrimaryQuery={seoPrimaryQuery}
-          seoSecondaryQueries={seoSecondaryQueries}
-          disabled={disabled}
-          onSubmit={() => {
-            void submitWordstat();
-          }}
-          onSelectPrimary={(phrase) =>
-            onChange({
-              seoPrimaryQuery: clipSeoQuery(
-                phrase,
-                PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
-              ),
-            })
-          }
-          onAddSecondary={addSecondaryPhrase}
-        />
+        <div ref={wordstatPickerRef}>
+          <AuthorProductSeoWordstatPicker
+            seed={wordstatSeed}
+            onSeedChange={setWordstatSeed}
+            loading={wordstatLoading}
+            outcome={wordstatOutcome}
+            result={wordstatResult}
+            seoPrimaryQuery={seoPrimaryQuery}
+            seoSecondaryQueries={seoSecondaryQueries}
+            disabled={disabled}
+            onSubmit={() => {
+              void submitWordstat();
+            }}
+            onSelectPrimary={(phrase) =>
+              onChange({
+                seoPrimaryQuery: clipSeoQuery(
+                  phrase,
+                  PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
+                ),
+              })
+            }
+            onAddSecondary={addSecondaryPhrase}
+          />
+        </div>
       ) : null}
 
       <div className="mt-4">

@@ -1013,17 +1013,19 @@ await withEnvAsync(
 );
 
 await withEnvAsync(enabledEnv(), async () => {
-  const missing = await generateProductSeoDraft(
+  const noPrimary = await generateProductSeoDraft(
     { ...requestInput(), seoPrimaryQuery: "   " },
     {
       userId: "author-empty-primary",
-      provider: mockProvider([]),
+      provider: mockProvider([
+        { ok: true, draft: validDraft({ secondaryQueries: [] }), raw: {} },
+      ]),
       wordstatSuggestions: sampleCandidates(),
       aiRateLimit: createProductSeoAiRateLimitStore(),
     },
   );
-  assert.equal(missing.ok, false);
-  assert.equal(missing.error.code, "MISSING_PRIMARY");
+  assert.equal(noPrimary.ok, true);
+  assert.equal(noPrimary.data.secondaryQueryStatus, "none");
 });
 
 await withEnvAsync(enabledEnv(), async () => {

@@ -259,6 +259,15 @@ assert.equal(
   resolveWordstatRequestPhrase(primaryCtaPlan.seed, "stale-full-title"),
   REQUEST_PHRASE,
 );
+assert.deepEqual(
+  planWordstatPickerOpen({
+    seoPrimaryQuery: "",
+    title: "",
+    autoSearch: shouldAutoSearchOnPrimaryCta(""),
+  }),
+  { seed: "", shouldSearch: false },
+  "EMPTY_TITLE_OPENS_PICKER_WITHOUT_INVALID_WORDSTAT_REQUEST",
+);
 
 const existingPrimaryPlan = planWordstatPickerOpen({
   seoPrimaryQuery: EXISTING_PRIMARY_WINS,
@@ -888,6 +897,9 @@ assert.match(wordstatPicker, /formatWordstatCount/);
 assert.match(wordstatPicker, /item\.phrase/);
 assert.match(seoSection, /wordstatClientErrorMessage/);
 assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
+assert.match(seoSection, /scrollIntoView/);
+assert.match(wordstatPicker, /autoFocus/);
+assert.match(wordstatPicker, /role="status"/);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

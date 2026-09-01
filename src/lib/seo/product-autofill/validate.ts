@@ -280,9 +280,6 @@ export function validateProductSeoAiDraft(
 
   const issues: string[] = [];
   const primary = input.primaryQuery.trim();
-  if (!primary) {
-    issues.push("missing_primary");
-  }
 
   const lockedKeys = new Set(
     (input.lockedSecondaryQueries ?? []).map(wordstatPhraseKey),
