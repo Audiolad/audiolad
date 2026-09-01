@@ -340,7 +340,8 @@ assert.doesNotMatch(seoSection, /SEO можно не заполнять|може
 assert.doesNotMatch(seoAutofillUi, /SEO можно не заполнять|можете пропустить/i);
 assert.match(seoAutofillUi, /Яндексе и Google/);
 assert.match(seoAutofillUi, /Заполните этот раздел/);
-assert.match(seoAutofillUi, /Начните с поискового запроса/);
+assert.match(seoAutofillUi, /Поисковый запрос — по желанию/);
+assert.match(seoAutofillUi, /SEO-тексты можно подготовить и без запроса/);
 assert.match(seoAutofillUi, /Подобрать основной запрос/);
 assert.match(seoAutofillUi, /Сгенерировать SEO для продукта/);
 assert.match(seoAutofillUi, /Рекомендуем заполнить для продвижения/);
@@ -465,7 +466,16 @@ assert.equal(
 assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
 assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
-assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
+assert.equal(
+  [...seoSection.matchAll(/autoSearch: true/g)].length,
+  3,
+  "every Wordstat CTA requests an automatic search when seeded",
+);
+assert.match(
+  seoSection,
+  /!seoPrimaryQuery\.trim\(\)\s*\|\|\s*seoSecondaryQueries\.length > 0\s*\?\s*"text"\s*:\s*"queries"/s,
+  "generation without a primary query starts with direct text loading",
+);
 assert.match(seoSection, /void submitWordstat\(seed\)/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);

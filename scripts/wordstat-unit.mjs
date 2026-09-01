@@ -259,14 +259,31 @@ assert.equal(
   resolveWordstatRequestPhrase(primaryCtaPlan.seed, "stale-full-title"),
   REQUEST_PHRASE,
 );
+assert.deepEqual(
+  planWordstatPickerOpen({
+    seoPrimaryQuery: "",
+    title: "",
+    autoSearch: shouldAutoSearchOnPrimaryCta(""),
+  }),
+  { seed: "", shouldSearch: false },
+  "EMPTY_TITLE_OPENS_PICKER_WITHOUT_INVALID_WORDSTAT_REQUEST",
+);
 
 const existingPrimaryPlan = planWordstatPickerOpen({
   seoPrimaryQuery: EXISTING_PRIMARY_WINS,
   title: TITLE_PIPE_SEED,
-  autoSearch: shouldAutoSearchOnPrimaryCta(EXISTING_PRIMARY_WINS),
+  autoSearch: true,
 });
 assert.equal(existingPrimaryPlan.seed, EXISTING_PRIMARY_WINS);
-assert.equal(existingPrimaryPlan.shouldSearch, false);
+assert.equal(existingPrimaryPlan.shouldSearch, true);
+
+const secondaryCtaPlan = planWordstatPickerOpen({
+  seoPrimaryQuery: EXISTING_PRIMARY_WINS,
+  title: TITLE_PIPE_SEED,
+  seedOverride: EXISTING_PRIMARY_WINS,
+  autoSearch: true,
+});
+assert.equal(secondaryCtaPlan.shouldSearch, true);
 
 const primaryCtaRequest = buildWordstatSuggestionsRequest(primaryCtaPlan.seed);
 assert.equal(primaryCtaRequest.init.method, "POST");
@@ -872,7 +889,6 @@ const wordstatPicker = read(
   "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
 );
 assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
-assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
 assert.match(seoSection, /planWordstatPickerOpen/);
 assert.match(seoSection, /void submitWordstat\(seed\)/);
 assert.match(seoSection, /resolveWordstatRequestPhrase\(seedOverride, wordstatSeed\)/);
@@ -888,6 +904,14 @@ assert.match(wordstatPicker, /formatWordstatCount/);
 assert.match(wordstatPicker, /item\.phrase/);
 assert.match(seoSection, /wordstatClientErrorMessage/);
 assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
+assert.match(seoSection, /scrollIntoView/);
+assert.match(wordstatPicker, /autoFocus/);
+assert.match(wordstatPicker, /role="status"/);
+assert.equal(
+  [...seoSection.matchAll(/autoSearch: true/g)].length,
+  3,
+  "ALL_WORDSTAT_CTAS_AUTO_SEARCH_WHEN_A_SEED_EXISTS",
+);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

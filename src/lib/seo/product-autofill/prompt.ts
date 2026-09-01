@@ -5,7 +5,10 @@ import {
   createDefaultProductSeoStyleProfile,
   productSeoStylePromptLines,
 } from "@/lib/seo/product-autofill/style-profile";
-import type { ProductSeoAutofillRequest } from "@/lib/seo/product-autofill/types";
+import {
+  PRODUCT_SEO_SECONDARY_MAX,
+  type ProductSeoAutofillRequest,
+} from "@/lib/seo/product-autofill/types";
 import { expectedSecondaryRange } from "@/lib/seo/product-autofill/validate";
 
 export const PRODUCT_SEO_AI_SCHEMA_NAME = "product_seo_draft";
@@ -107,6 +110,31 @@ export function buildProductSeoAiJsonSchema(
   };
 }
 
+/**
+ * Yandex rejects an array schema whose maximum is zero. Keep OpenAI's stricter
+ * zero-candidate schema unchanged, while allowing Yandex to produce an array
+ * that is canonicalized to [] before the draft is returned.
+ */
+export function buildYandexProductSeoAiJsonSchema(
+  input: ProductSeoAiSchemaInput,
+) {
+  const schema = buildProductSeoAiJsonSchema(input);
+  if (getLockedSecondaryQueries(input).length || input.candidates.length > 0) {
+    return schema;
+  }
+
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      secondaryQueries: {
+        ...schema.properties.secondaryQueries,
+        maxItems: PRODUCT_SEO_SECONDARY_MAX,
+      },
+    },
+  };
+}
+
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
   const lockedSecondaryQueries = getLockedSecondaryQueries(input);
@@ -138,7 +166,7 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
               `- ${item.phrase} | count=${item.count} | color=${item.color} | source=${item.source}`,
           )
           .join("\n")
-      : "нет подходящих кандидатов — верните пустой массив secondaryQueries",
+      : "нет подходящих кандидатов — верните secondaryQueries: []",
     lockedSecondaryQueries.length > 0
       ? `secondaryQueries должен содержать ровно ${lockedSecondaryQueries.length} зафиксированных фраз.`
       : `Допустимое число secondaryQueries: ${secondaryRange.min}–${secondaryRange.max}.`,
@@ -151,7 +179,7 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
 function faqItemsSystemInstruction(primaryQuery: string): string {
   const verbatimRequirement = primaryQuery
     ? `Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «${primaryQuery}». Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.`
-    : "Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно. Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.";
+    : "Основной запрос не выбран: не выдумывай его и не добавляй требование включить его в FAQ.";
 
   return [
     "faqItems: ровно 3 пары вопрос/ответ.",
@@ -214,10 +242,14 @@ export function buildProductSeoSystemPrompt(
     lockedSecondaryQueries.length > 0
       ? `secondaryQueries: верни ровно зафиксированные автором ${lockedSecondaryQueries.length} фразы в том же порядке. Не заменяй, не добавляй и не удаляй их.`
       : `secondaryQueries: выбери ${secondaryRange.min}–${secondaryRange.max} фраз строго из переданного списка кандидатов Яндекса. Если кандидатов нет, верни пустой массив. Не выдумывай новые фразы и не меняй частотность. Предпочитай green, yellow только если фраза очень уместна, red не выбирай, если есть другие варианты.`,
-    "seoTitle: естественный заголовок, основной запрос один раз ближе к началу, без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Стиль почти не влияет на заголовок.",
-    "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Основной запрос один раз естественно.",
+    primaryQuery
+      ? "seoTitle: естественный заголовок, основной запрос один раз ближе к началу, без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Стиль почти не влияет на заголовок."
+      : "seoTitle: естественный заголовок без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Не выдумывай основной запрос.",
+    primaryQuery
+      ? "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Основной запрос один раз естественно."
+      : "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Не выдумывай основной запрос.",
     `Поле description («${AUTHOR_DESCRIPTION_LABEL}») уже задано автором и будет показано на публичной странице. Используй его только как источник фактов. Не переписывай, не пересказывай и не заменяй его. Не генерируй отдельный текст «о продукте» и не возвращай поле seoAbout.`,
-    "usageItems: 3–5 конкретных ситуаций, которые следуют из продукта.",
+    "usageItems: ровно 3 конкретные ситуации, которые следуют из продукта.",
     faqItemsSystemInstruction(primaryQuery),
     "Не генерируй связанные продукты и URL.",
     "Не используй одну универсальную структуру для всех продуктов.",
