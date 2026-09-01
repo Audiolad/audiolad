@@ -75,7 +75,7 @@ async function port() {
 }
 async function startNext() {
   const sandbox = await mkdtemp(path.join(tmpdir(), "audiolad-studio-shared-assets-"));
-  for (const item of ["src", "public", "next.config.ts", "postcss.config.mjs", "tsconfig.json", "next-env.d.ts", "package.json"]) {
+  for (const item of ["src", "public", "next.config.ts", "postcss.config.mjs", "tsconfig.json", "package.json"]) {
     await cp(path.join(process.cwd(), item), path.join(sandbox, item), { recursive: true });
   }
   await symlink(path.join(process.cwd(), "node_modules"), path.join(sandbox, "node_modules"));
