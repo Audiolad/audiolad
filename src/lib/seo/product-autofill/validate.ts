@@ -245,12 +245,13 @@ function uniqueAnchors(faqItems: ProductSeoAiRawDraft["faqItems"]): boolean {
 }
 
 export function faqAnswerRepeatsQuestion(question: string, answer: string): boolean {
-  const questionWords = normalizeSeoPhrase(question)
+  const words = (text: string) =>
+    normalizeSeoPhrase(text)
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
     .split(" ")
     .filter((word) => word.length > 2);
-  const answerWords = normalizeSeoPhrase(answer)
-    .split(" ")
-    .filter((word) => word.length > 2);
+  const questionWords = words(question);
+  const answerWords = words(answer);
   if (questionWords.length < 3 || answerWords.length < 3) {
     return false;
   }
