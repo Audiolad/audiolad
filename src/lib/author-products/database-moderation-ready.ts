@@ -125,12 +125,11 @@ export function evaluateDatabaseModerationReady(
       !isCourse &&
         input.audioItems.some(
           (item) =>
-            !item.title?.trim() ||
             !item.audio_path?.trim() ||
             !item.duration_seconds ||
             item.duration_seconds <= 0,
         )
-        ? "У одной или нескольких аудиозаписей нет названия, файла или длительности."
+        ? "У одной или нескольких аудиозаписей нет файла или длительности."
         : null,
     ),
   ];
