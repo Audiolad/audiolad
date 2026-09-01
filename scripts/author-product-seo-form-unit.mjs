@@ -341,7 +341,8 @@ assert.doesNotMatch(seoAutofillUi, /SEO можно не заполнять|мо�
 assert.match(seoAutofillUi, /Яндексе и Google/);
 assert.match(seoAutofillUi, /Заполните этот раздел/);
 assert.match(seoAutofillUi, /Начните с поискового запроса/);
-assert.match(seoAutofillUi, /Подобрать основной запрос/);
+assert.match(seoAutofillUi, /Подобрать поисковый запрос/);
+assert.doesNotMatch(seoAutofillUi, /Подобрать основной запрос/);
 assert.match(seoAutofillUi, /Сгенерировать SEO для продукта/);
 assert.match(seoAutofillUi, /Рекомендуем заполнить для продвижения/);
 assert.match(seoAutofillUi, /SEO заполнено частично/);
@@ -458,7 +459,8 @@ assert.match(seoSection, /PRODUCT_SEO_START_HEADING/);
 assert.match(seoSection, /PRODUCT_SEO_AFTER_PRIMARY_COPY/);
 assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
 assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
-assert.match(seoSection, /void submitWordstat\(seed\)/);
+assert.match(seoSection, /void submitWordstat\(seed, \{ allowAiFallback: true \}\)/);
+assert.match(seoSection, /runPrimaryQueryDiscovery/);
 assert.match(seoSection, /Например: медитация для сна/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Помочь подобрать запрос/);
 assert.match(read("src/lib/seo/wordstat/ui.ts"), /Подобрать похожие/);
@@ -466,10 +468,23 @@ assert.match(seoSection, /getWordstatPrimaryCtaLabel\(seoPrimaryQuery\)/);
 assert.match(seoSection, /onChange=\{\(event\) =>\s+onChange\(\{ seoPrimaryQuery: event\.target\.value \}\)/s);
 assert.match(seoSection, /disabled=\{disabled\}/);
 assert.match(seoSection, /wordstatLoading/);
-assert.match(wordstatPicker, /Ищем запросы в Яндексе/);
+assert.match(wordstatPicker, /PRIMARY_QUERY_LOADING_WORDSTAT/);
+assert.match(wordstatPicker, /PRIMARY_QUERY_INITIAL_SUBMIT_CTA/);
+assert.match(wordstatPicker, /PRIMARY_QUERY_AI_ALTERNATIVES_HEADING/);
 assert.match(wordstatPicker, /Подбор поискового запроса/);
 assert.match(wordstatPicker, /Что ищем/);
-assert.match(wordstatPicker, /Подобрать в Яндексе/);
+assert.match(
+  read("src/lib/seo/primary-query-suggestions/ui.ts"),
+  /Ищем варианты в Яндексе/,
+);
+assert.match(
+  read("src/lib/seo/primary-query-suggestions/ui.ts"),
+  /Подобрать в Яндексе/,
+);
+assert.match(
+  read("src/lib/seo/primary-query-suggestions/ui.ts"),
+  /Проверить другой вариант/,
+);
 assert.match(wordstatPicker, /Россия · все устройства/);
 assert.match(wordstatPicker, /50–1000 запросов за 30 дней/);
 assert.match(wordstatPicker, /подходит для старта/);

@@ -874,9 +874,10 @@ const wordstatPicker = read(
 assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
 assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
 assert.match(seoSection, /planWordstatPickerOpen/);
-assert.match(seoSection, /void submitWordstat\(seed\)/);
+assert.match(seoSection, /void submitWordstat\(seed, \{ allowAiFallback: true \}\)/);
 assert.match(seoSection, /resolveWordstatRequestPhrase\(seedOverride, wordstatSeed\)/);
 assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
+assert.match(seoSection, /runPrimaryQueryDiscovery/);
 assert.match(seoSection, /onSubmit=\{\(\) => \{\s*void submitWordstat\(\);/);
 assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
 assert.doesNotMatch(seoSection, /primarySeeds/);
@@ -886,8 +887,8 @@ assert.match(wordstatPicker, /\+ В дополнительные/);
 assert.match(wordstatPicker, /wordstatColorClasses/);
 assert.match(wordstatPicker, /formatWordstatCount/);
 assert.match(wordstatPicker, /item\.phrase/);
-assert.match(seoSection, /wordstatClientErrorMessage/);
-assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
+assert.match(seoSection, /classifyWordstatClientPayload/);
+assert.match(seoSection, /INVALID_QUERY|classifyWordstatClientPayload/);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);
