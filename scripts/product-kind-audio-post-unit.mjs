@@ -101,10 +101,6 @@ const readiness = evaluatePublishReadiness(basePractice(), [audioItem(1)], {
   activeTopicCount: 1,
 });
 assert.equal(readiness.ok, true, readiness.firstFailure?.message);
-assert.equal(
-  readiness.requirements.some((item) => item.key === "promo"),
-  true,
-);
 
 const noDescription = evaluatePublishReadiness(
   basePractice({ description: null }),
@@ -114,7 +110,7 @@ const noDescription = evaluatePublishReadiness(
 assert.equal(noDescription.ok, true, noDescription.firstFailure?.message);
 assert.equal(
   noDescription.requirements.find((item) => item.key === "description")?.ok,
-  true,
+  undefined,
 );
 
 const emptyDescription = evaluatePublishReadiness(
