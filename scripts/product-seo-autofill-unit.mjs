@@ -1152,6 +1152,39 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(wordstatCalls, 1);
 });
 
+for (const [name, handlers] of [
+  ["no_results", [() => jsonResponse(200, { results: [], associations: [] })]],
+  ["upstream", [() => jsonResponse(503, {}), () => jsonResponse(503, {})]],
+  ["timeout", [() => Promise.reject(Object.assign(new Error("timeout"), { name: "AbortError" })), () => Promise.reject(Object.assign(new Error("timeout"), { name: "AbortError" }))]],
+]) {
+  await withEnvAsync(enabledEnv(), async () => {
+    const provider = mockProvider([
+      { ok: true, draft: validDraft({ secondaryQueries: [] }), raw: {} },
+    ]);
+    const { result, text } = await withCapturedInfo(() =>
+      generateProductSeoDraft(requestInput(), {
+        userId: `author-wordstat-${name}`,
+        provider,
+        wordstat: {
+          fetchImpl: mockFetch(handlers),
+          cache: createWordstatMemoryCache(),
+          rateLimit: createWordstatRateLimitStore(),
+          env: {
+            YANDEX_WORDSTAT_ENABLED: "true",
+            YANDEX_SEARCH_API_KEY: "wordstat-test-key",
+            YANDEX_SEARCH_FOLDER_ID: "folder",
+          },
+        },
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    );
+    assert.equal(result.ok, true, `WORDSTAT_${name}_DOES_NOT_BLOCK_AI`);
+    assert.equal(provider.calls.length, 1);
+    assert.match(text, /wordstat_unavailable/);
+    assert.doesNotMatch(text, /медитация для сна|author-wordstat/);
+  });
+}
+
 const parsedDefault = parseProductSeoAutofillRequest({
   title: "A",
   subtitle: "",
