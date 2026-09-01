@@ -21,8 +21,10 @@
    */
   --bottom-nav-viewport-offset: 0px;
   --home-page-gutter: 1.25rem;
-  /* Fixed catalog search + matching spacer (safe-area-top + 52px field). */
-  --catalog-mobile-search-height: calc(max(0.25rem, env(safe-area-inset-top, 0px)) + 52px);
+  /* Fixed catalog search + matching spacer (safe-area-top + chrome padding + 52px field). */
+  --catalog-mobile-search-height: calc(
+    max(0.75rem, env(safe-area-inset-top, 0px)) + 52px + 0.75rem
+  );
 
   /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
   --listener-sidebar-width: 240px;
