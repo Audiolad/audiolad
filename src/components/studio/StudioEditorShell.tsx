@@ -50,6 +50,10 @@ import {
   type StudioEditingSnapshot,
   type StudioHistory,
 } from "@/lib/studio/history";
+import {
+  getStudioTrackNameFromSourceDisplayName,
+  isStudioDefaultTrackName,
+} from "@/lib/studio/track-source-name";
 import type { StudioProjectHydration } from "@/lib/studio/hydration";
 import type { StudioTrackKind, StudioVoicePreset } from "@/lib/studio/persistence";
 import {
@@ -1257,6 +1261,29 @@ export default function StudioEditorShell({
     }
     setEditingSlotId(null);
   };
+  const renameDefaultSlotFromSource = useCallback((
+    slotId: string,
+    sourceDisplayName: string,
+  ) => {
+    const name = getStudioTrackNameFromSourceDisplayName(sourceDisplayName);
+    if (!name) return false;
+    let renamed = false;
+    setSlots((currentSlots) => {
+      const next = currentSlots.map((slot) => {
+        if (
+          slot.id !== slotId ||
+          !isStudioDefaultTrackName(slot.name, slot.trackKind ?? "voice")
+        ) {
+          return slot;
+        }
+        renamed = true;
+        return { ...slot, name };
+      });
+      slotsRef.current = next;
+      return next;
+    });
+    return renamed;
+  }, []);
 
   const cancelSlotRename = () => {
     setEditingSlotId(null);
@@ -2606,7 +2633,16 @@ export default function StudioEditorShell({
                   setSlots((currentSlots) =>
                     currentSlots.map((slot) =>
                       slot.id === slotId
-                        ? { ...slot, audioTrackId: track.id }
+                        ? {
+                            ...slot,
+                            audioTrackId: track.id,
+                            name: isStudioDefaultTrackName(
+                              slot.name,
+                              slot.trackKind ?? "voice",
+                            )
+                              ? getStudioTrackNameFromSourceDisplayName(file.name) || slot.name
+                              : slot.name,
+                          }
                         : slot,
                     ),
                   );
@@ -2626,7 +2662,13 @@ export default function StudioEditorShell({
               event.currentTarget.value = "";
               delete event.currentTarget.dataset.trackId;
               if (trackId && file) {
-                void replaceTrackAudio(trackId, file);
+                void replaceTrackAudio(trackId, file).then((replaced) => {
+                  if (!replaced) return;
+                  const slot = slotsRef.current.find((item) => item.audioTrackId === trackId);
+                  if (slot && renameDefaultSlotFromSource(slot.id, file.name)) {
+                    markSavedChange();
+                  }
+                });
               }
             }}
           />
