@@ -133,6 +133,12 @@ import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-1-chas-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3106,6 +3112,43 @@ function testListenKidsClusterInternalLinks() {
   }
 }
 
+function testListenRainSleepClusterInternalLinks() {
+  const hubHref = "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const pages = [
+    MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const dests = pages.slice(1).map((page) => `/listens/${page.slug}`);
+  const hubHrefs = new Set(collectListenLinks(MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE).map((link) => link.href));
+  assert(hubHrefs.size === 11, "rain hub has 11 unique cluster dests");
+  for (const href of dests) {
+    assert(hubHrefs.has(href), `rain hub links ${href}`);
+  }
+  for (const page of pages.slice(1)) {
+    assert(
+      collectListenLinks(page).some((link) => link.href === hubHref),
+      `${page.slug} links rain hub`,
+    );
+  }
+  for (const page of pages) {
+    const hrefs = collectListenLinks(page).map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} no duplicate href`);
+    for (const link of collectListenLinks(page)) {
+      assert(!String(link.label).includes("http") && !String(link.label).includes("/listens/"), `${page.slug} no raw URL label`);
+    }
+  }
+}
+
 function testIndividualArticlesStillWork() {
   assert(
     getArticleBySlug("kak-razvit-lyubov-k-sebe")?.title.includes("любовь к себе"),
@@ -3158,6 +3201,76 @@ function testOneHundredSixthListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-sixth listen slug");
 }
 
+function testOneHundredEighthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-eighth indexable listen page is listed");
+  assert(card.title === MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-eighth directory title");
+  assert(card.description === MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-eighth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-eighth listen slug");
+}
+
+function testOneHundredNinthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-ninth indexable listen page is listed");
+  assert(card.title === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-ninth directory title");
+  assert(card.description === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-ninth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn"), "no /articles duplicate for one-hundred-ninth listen slug");
+}
+
+function testOneHundredTenthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-tenth indexable listen page is listed");
+  assert(card.title === RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-tenth directory title");
+  assert(card.description === RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-tenth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn"), "no /articles duplicate for one-hundred-tenth listen slug");
+}
+
+function testOneHundredEleventhListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-eleventh indexable listen page is listed");
+  assert(card.title === BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-eleventh directory title");
+  assert(card.description === BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-eleventh directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-eleventh listen slug");
+}
+
+function testOneHundredTwelfthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-twelfth indexable listen page is listed");
+  assert(card.title === BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-twelfth directory title");
+  assert(card.description === BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-twelfth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-dlya-sna-1-chas-slushat-onlayn"), "no /articles duplicate for one-hundred-twelfth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3175,7 +3288,13 @@ const tests = [
   ["listen pages in directory", testListenPagesAppearInDirectory],
   ["one-hundred-fifth listen page in directory", testOneHundredFifthListenInDirectory],
   ["one-hundred-sixth listen page in directory", testOneHundredSixthListenInDirectory],
+  ["one-hundred-eighth listen page in directory", testOneHundredEighthListenInDirectory],
+  ["one-hundred-ninth listen page in directory", testOneHundredNinthListenInDirectory],
+  ["one-hundred-tenth listen page in directory", testOneHundredTenthListenInDirectory],
+  ["one-hundred-eleventh listen page in directory", testOneHundredEleventhListenInDirectory],
+  ["one-hundred-twelfth listen page in directory", testOneHundredTwelfthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
+  ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
 ];

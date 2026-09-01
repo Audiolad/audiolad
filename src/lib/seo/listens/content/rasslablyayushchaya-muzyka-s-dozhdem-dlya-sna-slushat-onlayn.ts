@@ -189,6 +189,14 @@ export const RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Расслабляющая музыка с дождём для сна описывает прежде всего назначение прослушивания – отдых, переключение после активных дел и мягкий музыкальный фон." },
           { kind: "paragraph", text: "Релакс музыка чаще звучит как более общая разговорная формулировка того же желания отдохнуть." },
           { kind: "paragraph", text: "Текущая страница отвечает на запрос расслабляющей музыки с дождём, а не на отдельный широкий формат релакс музыки без дождевого фона." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если пользователь формулирует запрос именно через слово «релакс», ближе страница " },
+              { href: "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "релакс музыка с дождём для сна" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "При этом ни одно из этих слов не обещает обязательного эффекта." },
         ],
       },
@@ -198,6 +206,16 @@ export const RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Иногда человеку хочется услышать именно отдельные капли дождя, а не общий дождевой фон." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для такого акцента есть страница " },
+              { href: "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn", label: "музыка с каплями дождя для сна" },
+              { text: ". Если капли сочетаются с расслабляющим сценарием, ближе " },
+              { href: "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn", label: "расслабляющая музыка для сна с каплями дождя" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Это уже другой акцент восприятия." },
           { kind: "paragraph", text: "На текущей странице дождь выступает частью общей атмосферы вместе с музыкой." },
           { kind: "paragraph", text: "Отдельные капли могут быть слышны в некоторых композициях, но это не обязательное требование подборки." },

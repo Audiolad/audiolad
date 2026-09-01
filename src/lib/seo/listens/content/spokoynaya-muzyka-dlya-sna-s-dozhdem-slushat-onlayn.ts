@@ -89,6 +89,16 @@ export const SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "При этом ни слово «спокойная», ни слово «успокаивающая» не означает гарантированного воздействия." },
           { kind: "paragraph", text: "Одна и та же композиция может восприниматься разными людьми совершенно по разному." },
           { kind: "paragraph", text: "Поэтому текущая статья делает акцент на спокойном характере звучания, а не на обещании определённого эффекта." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если вечерний сценарий формулируется через «расслабляющая», отдельно есть " },
+              { href: "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "расслабляющая музыка с дождём для сна" },
+              { text: ". Соседний запрос – " },
+              { href: "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "релакс музыка с дождём для сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {
@@ -291,6 +301,16 @@ export const SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
         blocks: [
           { kind: "paragraph", text: "Музыкальное восприятие слишком индивидуально, чтобы определить один универсальный вариант." },
           { kind: "paragraph", text: "Одному человеку подходит фортепиано." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен именно фортепианный слой, есть страница " },
+              { href: "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn", label: "музыка пианино и дождя для сна" },
+              { text: ". Более узкий сценарий, где мягкий характер сочетается с пианино, – " },
+              { href: "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn", label: "успокаивающая музыка для сна с дождём и пианино" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Другому – мягкое атмосферное звучание." },
           { kind: "paragraph", text: "Третьему важнее дождевой фон." },
           { kind: "paragraph", text: "Поэтому вместо поиска композиции, которая якобы лучше всех остальных, полезнее сравнить несколько вариантов." },
