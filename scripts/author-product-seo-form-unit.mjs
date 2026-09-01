@@ -564,7 +564,7 @@ assert.match(seoSection, /relatedProductSourceId/);
 assert.match(seoSection, /Найти продукт/);
 assert.match(seoSection, /Удалить фразу/);
 assert.match(seoSection, /productDescription: description/);
-assert.match(seoSection, /О продукте/);
+assert.match(seoAutofillUi, /О продукте/);
 assert.doesNotMatch(seoSection, /listListenPageDefinitions/);
 assert.doesNotMatch(seoSection, /relatedListenSlugs/);
 assert.match(seoSection, /moveItem/);
