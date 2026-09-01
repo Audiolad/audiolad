@@ -426,7 +426,10 @@ export default function AuthorProductSeoSection({
     faqItems: Array<{ question: string; answer: string }>;
   }) {
     onChange({
-      seoSecondaryQueries: draft.seoSecondaryQueries,
+      // Existing author-selected phrases are locked for regeneration.
+      seoSecondaryQueries: seoSecondaryQueries.length
+        ? seoSecondaryQueries
+        : draft.seoSecondaryQueries,
       seoTitle: draft.seoTitle,
       seoDescription: draft.seoDescription,
       seoContent: {
