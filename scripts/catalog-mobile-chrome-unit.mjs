@@ -104,33 +104,28 @@ assert.match(search, /isCompact \? null/, "compact catalog search has no Най�
 assert.match(search, />\s*Найти\s*</, "shell search still has Найти");
 assert.match(
   globals,
-  /--catalog-mobile-search-height:\s*calc\(max\(0\.25rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\)/,
-  "search spacer is safe-area + 52px field only",
+  /--catalog-mobile-search-height:\s*calc\(\s*max\(0\.75rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\+\s*0\.75rem\s*\)/,
+  "search spacer reserves the full fixed search chrome height",
 );
-assert.doesNotMatch(
+assert.match(
   globals,
-  /--catalog-mobile-search-height:[^;]*52px\s*\+/,
-  "search height has no rem tail after the 52px field",
+  /--catalog-mobile-search-height:[\s\S]*52px\s*\+\s*0\.75rem/,
+  "search spacer includes the matching bottom chrome padding",
 );
 assert.match(
   layout,
-  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\]/,
-  "search padding-top floor is 0.25rem so Android is not flush",
+  /pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\]/,
+  "search padding-top floor keeps mobile chrome clear of the viewport edge",
 );
 assert.match(
   layout,
-  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
-  "search chrome drops the extra bottom padding",
+  /pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\] pb-3/,
+  "search chrome and spacer use the restored matching padding",
 );
-assert.doesNotMatch(
+assert.match(
   layout,
-  /pt-\[max\(0\.75rem/,
-  "old 0.75rem top floor is gone",
-);
-assert.doesNotMatch(
-  layout,
-  /listener-catalog-mobile-search[\s\S]*pb-1(?:\s|"|')/,
-  "old pb-1 search tail is gone",
+  /listener-catalog-mobile-search[\s\S]*pb-3(?:\s|"|')/,
+  "search retains bottom padding below the 52px field",
 );
 assert.match(
   globals,
