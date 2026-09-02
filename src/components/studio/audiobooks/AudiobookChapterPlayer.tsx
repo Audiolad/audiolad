@@ -17,11 +17,49 @@ type Props = {
 };
 
 const PLAYBACK_ERROR = "Не удалось воспроизвести аудио. Попробуйте ещё раз.";
+const RESUME_ERROR = "Не удалось возобновить аудио. Нажмите «Повторить».";
+
+function pausedPlaybackTime(audio: HTMLAudioElement) {
+  const currentTime = Number.isFinite(audio.currentTime) && audio.currentTime > 0
+    ? audio.currentTime
+    : 0;
+
+  if (!Number.isFinite(audio.duration)) return currentTime;
+
+  // Seeking exactly to duration can emit `ended` and advance the queue.
+  const lastPlayableTime = audio.duration > 0 ? audio.duration - 0.01 : 0;
+  return Math.min(currentTime, lastPlayableTime);
+}
+
+function waitForAudioReadiness(audio: HTMLAudioElement) {
+  if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      audio.removeEventListener("loadedmetadata", handleReady);
+      audio.removeEventListener("error", handleError);
+    };
+    const handleReady = () => {
+      cleanup();
+      resolve();
+    };
+    const handleError = () => {
+      cleanup();
+      reject(new Error("playback_url_load_failed"));
+    };
+
+    audio.addEventListener("loadedmetadata", handleReady, { once: true });
+    audio.addEventListener("error", handleError, { once: true });
+  });
+}
 
 export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragments }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const requestRef = useRef(0);
   const retryRef = useRef(0);
+  const recoveryRef = useRef<number | null>(null);
   const playAtRef = useRef<(index: number, retry?: boolean) => void>(() => {});
   const currentIndexRef = useRef(0);
   const queue = useMemo(() => activeAudiobookFragmentQueue(fragments), [fragments]);
@@ -38,6 +76,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const reset = useCallback(() => {
     requestRef.current += 1;
     retryRef.current = 0;
+    recoveryRef.current = null;
     currentIndexRef.current = 0;
     const audio = audioRef.current;
     audio?.pause();
@@ -70,12 +109,56 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     }
   }, [queue, reset]);
 
+  const recoverPausedPlayback = useCallback(async (
+    index: number,
+    requestId: number,
+    pausedAt: number,
+  ) => {
+    const fragment = queue[index];
+    const audio = audioRef.current;
+    if (!fragment || !audio || requestId !== requestRef.current || recoveryRef.current !== null) return;
+
+    recoveryRef.current = requestId;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/studio/audiobooks/projects/${encodeURIComponent(projectId)}/chapters/${encodeURIComponent(chapterId)}/fragments/${encodeURIComponent(fragment.id)}/playback?authorId=${encodeURIComponent(authorId)}`,
+        { credentials: "same-origin" },
+      );
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.url) throw new Error("playback_url_failed");
+      if (requestId !== requestRef.current || recoveryRef.current !== requestId) return;
+
+      audio.pause();
+      audio.src = body.url;
+      audio.load();
+      await waitForAudioReadiness(audio);
+      if (requestId !== requestRef.current || recoveryRef.current !== requestId) return;
+
+      audio.currentTime = pausedAt;
+      await audio.play();
+      if (requestId === requestRef.current && recoveryRef.current === requestId) {
+        setIsPlaying(true);
+      }
+    } catch {
+      if (requestId === requestRef.current && recoveryRef.current === requestId) {
+        setIsPlaying(false);
+        setError(RESUME_ERROR);
+      }
+    } finally {
+      if (recoveryRef.current === requestId) recoveryRef.current = null;
+      if (requestId === requestRef.current) setLoading(false);
+    }
+  }, [authorId, chapterId, projectId, queue]);
+
   const playAt = useCallback(async (index: number, retry = false) => {
     const fragment = queue[index];
     const audio = audioRef.current;
     if (!fragment || !audio) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
+    recoveryRef.current = null;
     currentIndexRef.current = index;
     setCurrentIndex(index);
     setLoading(true);
@@ -111,6 +194,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   }, [playAt]);
 
   const handleEnded = useCallback(() => {
+    if (recoveryRef.current !== null) return;
     const transition = audiobookFragmentEndedTransition(queue, currentIndexRef.current);
     if (transition.shouldReset) {
       reset();
@@ -121,6 +205,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   }, [playAt, queue, reset]);
 
   const handleMediaError = useCallback(() => {
+    if (recoveryRef.current !== null) return;
     const index = currentIndexRef.current;
     if (retryRef.current === 0) {
       retryRef.current = 1;
@@ -141,17 +226,28 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     const audio = audioRef.current;
     if (!audio || !queue.length) return;
     if (!audio.paused) {
+      requestRef.current += 1;
+      recoveryRef.current = null;
       audio.pause();
       setIsPlaying(false);
+      setLoading(false);
       return;
     }
     if (audio.currentSrc) {
+      const requestId = requestRef.current + 1;
+      requestRef.current = requestId;
+      recoveryRef.current = null;
+      const pausedAt = pausedPlaybackTime(audio);
       try {
         await audio.play();
-        setIsPlaying(true);
-        setError(null);
+        if (requestId === requestRef.current) {
+          setIsPlaying(true);
+          setError(null);
+        }
       } catch {
-        setError(PLAYBACK_ERROR);
+        if (requestId === requestRef.current) {
+          void recoverPausedPlayback(currentIndexRef.current, requestId, pausedAt);
+        }
       }
       return;
     }
