@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 
 import {
   activeAudiobookFragmentQueue,
+  audiobookFragmentEndedTransition,
   nextAudiobookFragmentIndex,
+  reconcileAudiobookFragmentQueue,
 } from "../src/components/studio/audiobooks/audiobook-chapter-player-queue";
 import { isAudiobookActiveFragmentStoragePath } from "../src/lib/audiobooks/storage";
 
@@ -27,6 +29,25 @@ const queue = activeAudiobookFragmentQueue([
 assert.deepEqual(queue.map((fragment) => fragment.id), ["first", "second"]);
 assert.equal(nextAudiobookFragmentIndex(queue, 0), 1);
 assert.equal(nextAudiobookFragmentIndex(queue, 1), null);
+assert.deepEqual(audiobookFragmentEndedTransition(queue, 0), {
+  currentIndex: 1,
+  shouldReset: false,
+});
+assert.deepEqual(audiobookFragmentEndedTransition(queue, 1), {
+  currentIndex: 0,
+  shouldReset: true,
+});
+assert.deepEqual(reconcileAudiobookFragmentQueue(queue, 1, [
+  ...queue,
+  { id: "third", position: 3, status: "active" as const },
+]), {
+  currentIndex: 1,
+  shouldReset: false,
+});
+assert.deepEqual(reconcileAudiobookFragmentQueue(queue, 1, [queue[0]]), {
+  currentIndex: 0,
+  shouldReset: true,
+});
 
 const server = readFileSync("src/lib/audiobooks/server.ts", "utf8");
 const route = readFileSync("src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/fragments/[fragmentId]/playback/route.ts", "utf8");
@@ -39,9 +60,13 @@ assert.match(server, /createSignedUrl\(fragment\.storage_path, AUDIOBOOK_PLAYBAC
 assert.match(route, /createAudiobookFragmentPlaybackUrl/);
 assert.match(player, /<audio ref=\{audioRef\}/);
 assert.equal((player.match(/<audio\b/g) ?? []).length, 1);
-assert.match(player, /nextAudiobookFragmentIndex/);
+assert.match(player, /audiobookFragmentEndedTransition/);
+assert.match(player, /reconcileAudiobookFragmentQueue/);
+assert.match(player, /if \(transition\.shouldReset\) \{\s+reset\(\);/);
+assert.match(player, /Фрагмент \$\{currentIndex \+ 1\} из \$\{queue\.length\}/);
+assert.doesNotMatch(player, /current\.original_name/);
 assert.match(player, /retryRef\.current === 0/);
-assert.match(player, /useEffect\(\(\) => reset, \[chapterId, queueKey, reset\]\)/);
+assert.match(player, /useEffect\(\(\) => reset, \[chapterId, reset\]\)/);
 assert.match(workspace, /AudiobookChapterPlayer/);
 assert.doesNotMatch(player, /createClient\(\)|uploadToSignedUrl|MediaRecorder/);
 

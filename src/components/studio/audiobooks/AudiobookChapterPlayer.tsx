@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AudiobookFragment } from "@/lib/audiobooks/server";
 import {
   activeAudiobookFragmentQueue,
-  nextAudiobookFragmentIndex,
+  audiobookFragmentEndedTransition,
+  reconcileAudiobookFragmentQueue,
 } from "./audiobook-chapter-player-queue";
 
 type Props = {
@@ -24,7 +25,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const playAtRef = useRef<(index: number, retry?: boolean) => void>(() => {});
   const currentIndexRef = useRef(0);
   const queue = useMemo(() => activeAudiobookFragmentQueue(fragments), [fragments]);
-  const queueKey = useMemo(() => queue.map((fragment) => fragment.id).join("\0"), [queue]);
+  const previousQueueRef = useRef(queue);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const reset = useCallback(() => {
     requestRef.current += 1;
     retryRef.current = 0;
+    currentIndexRef.current = 0;
     const audio = audioRef.current;
     audio?.pause();
     if (audio) {
@@ -49,7 +51,24 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     setError(null);
   }, []);
 
-  useEffect(() => reset, [chapterId, queueKey, reset]);
+  useEffect(() => reset, [chapterId, reset]);
+
+  useEffect(() => {
+    const transition = reconcileAudiobookFragmentQueue(
+      previousQueueRef.current,
+      currentIndexRef.current,
+      queue,
+    );
+    previousQueueRef.current = queue;
+    if (transition.shouldReset) {
+      reset();
+      return;
+    }
+    if (transition.currentIndex !== currentIndexRef.current) {
+      currentIndexRef.current = transition.currentIndex;
+      setCurrentIndex(transition.currentIndex);
+    }
+  }, [queue, reset]);
 
   const playAt = useCallback(async (index: number, retry = false) => {
     const fragment = queue[index];
@@ -88,14 +107,14 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   playAtRef.current = playAt;
 
   const handleEnded = useCallback(() => {
-    const next = nextAudiobookFragmentIndex(queue, currentIndexRef.current);
-    if (next === null) {
-      setIsPlaying(false);
+    const transition = audiobookFragmentEndedTransition(queue, currentIndexRef.current);
+    if (transition.shouldReset) {
+      reset();
       return;
     }
     retryRef.current = 0;
-    void playAt(next);
-  }, [playAt, queue]);
+    void playAt(transition.currentIndex);
+  }, [playAt, queue, reset]);
 
   const handleMediaError = useCallback(() => {
     const index = currentIndexRef.current;
@@ -135,7 +154,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const current = queue[currentIndex];
   return <section className="mt-6 rounded-xl bg-white/5 p-4">
     <audio ref={audioRef} onEnded={handleEnded} onPause={() => setIsPlaying(false)} onPlaying={() => setIsPlaying(true)} onError={handleMediaError} />
-    <p className="text-sm text-[#ddd2f5]">Прослушивание главы: {current ? `${current.position}. ${current.original_name}` : "—"}</p>
+    <p className="text-sm text-[#ddd2f5]">Прослушивание главы: {current ? `Фрагмент ${currentIndex + 1} из ${queue.length}` : "—"}</p>
     <div className="mt-3 flex flex-wrap gap-3">
       <button type="button" onClick={() => void handlePlayPause()} disabled={loading} className="rounded-full border border-[#9bdab5] px-4 py-2 text-sm font-semibold text-[#9bdab5]">
         {loading ? "Подготовка…" : isPlaying ? "Пауза" : "Слушать"}
