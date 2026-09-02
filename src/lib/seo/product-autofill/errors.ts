@@ -61,7 +61,7 @@ export function productSeoAiInvalidOutputError(
 export function classifyProductSeoAiHttpError(
   status: number | null,
   requestError?: "timeout" | "network",
-): ProductSeoAiErrorCode {
+): Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT"> {
   if (requestError === "timeout") {
     return "TIMEOUT";
   }
