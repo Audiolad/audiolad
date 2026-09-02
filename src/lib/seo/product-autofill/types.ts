@@ -110,6 +110,18 @@ export type ProductSeoInvalidOutputDiagnostic =
       repairIssues: string[];
       /** Category-only issues from the final FAQ-answer-only repair validation; never generated or user-provided text. */
       finalFaqRepairIssues: string[];
+    }
+  | {
+      /** A local, deterministic FAQ answer fallback was still invalid. */
+      stage: "validation_deterministic_faq_fallback";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
+      repairIssues: string[];
+      /** Category-only issues from the final FAQ-answer-only repair validation; never generated or user-provided text. */
+      finalFaqRepairIssues: string[];
+      /** Category-only issues from validating the local fallback; never generated or user-provided text. */
+      deterministicFaqFallbackIssues: string[];
     };
 
 export type ProductSeoAiErrorResult = {
