@@ -537,7 +537,132 @@ assert.equal(
   assert.ok(faqFail.issues.includes("primary_missing_from_faq"));
 }
 
-assert.equal(faqAnswerRepeatsQuestion("Когда лучше слушать эту практику?", "Когда лучше слушать эту практику?"), true);
+// FAQ answers may share a subject with their questions. Only exact or
+// sequence-preserving near copies are repeats; natural direct answers are
+// neither repeats nor questions.
+const NATURAL_DIRECT_ANSWER_PAIRS = [
+  {
+    label: "A",
+    question: "Когда лучше слушать эту практику?",
+    answer: "Эту практику лучше слушать вечером.",
+  },
+  {
+    label: "B",
+    question: "Как использовать медитацию для сна?",
+    answer: "Медитацию для сна удобно включать вечером перед отдыхом.",
+  },
+  {
+    label: "C",
+    question: "Кому подходит эта практика?",
+    answer: "Практика подойдёт тем, кто хочет спокойно настроиться на отдых.",
+  },
+];
+
+for (const { question, answer, repeats, isQuestion } of [
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать эту практику?",
+    repeats: true,
+    isQuestion: true,
+  },
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать эту практику.",
+    repeats: true,
+    isQuestion: true,
+  },
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать практику.",
+    repeats: true,
+    isQuestion: true,
+  },
+  {
+    question: "Как использовать практику?",
+    answer: "Использовать практику — это использовать практику.",
+    repeats: true,
+    isQuestion: false,
+  },
+  ...NATURAL_DIRECT_ANSWER_PAIRS.map(({ question, answer }) => ({
+    question,
+    answer,
+    repeats: false,
+    isQuestion: false,
+  })),
+]) {
+  assert.equal(faqAnswerRepeatsQuestion(question, answer), repeats, `${question} / ${answer}`);
+  assert.equal(faqAnswerIsQuestion(answer), isQuestion, `${question} / ${answer}`);
+}
+
+// Production regression: a direct answer with the question's nouns must
+// remain valid and must not consume a repair attempt.
+{
+  const directAnswerDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index === 1
+        ? {
+            ...item,
+            question: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
+            answer: NATURAL_DIRECT_ANSWER_PAIRS[0].answer,
+          }
+        : item,
+    ),
+  });
+  const directAnswerProvider = mockProvider([{ ok: true, draft: directAnswerDraft, raw: {} }]);
+  const directAnswerResult = await generateProductSeoDraft(requestInput(), {
+    userId: "direct-faq-answer-no-repair",
+    config,
+    provider: directAnswerProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(directAnswerResult.ok, true);
+  assert.equal(directAnswerProvider.calls.length, 1);
+  assert.equal(directAnswerResult.data.faqItems[1].answer, directAnswerDraft.faqItems[1].answer);
+}
+
+// Latest production regression: the initial "Когда" FAQ answer exactly repeats
+// its question and is therefore also a question. The first FAQ-only repair
+// supplies the exact natural direct answer and must be accepted without
+// consuming the final repair attempt.
+{
+  const exactRepeatDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index === 1
+        ? {
+            ...item,
+            question: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
+            answer: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
+          }
+        : item,
+    ),
+  });
+  const naturalDirectAnswer = NATURAL_DIRECT_ANSWER_PAIRS[0].answer;
+  const repairedDirectAnswerDraft = validDraft({
+    faqItems: exactRepeatDraft.faqItems.map((item, index) =>
+      index === 1 ? { ...item, answer: naturalDirectAnswer } : item,
+    ),
+  });
+  const firstFaqRepairProvider = mockProvider([
+    { ok: true, draft: exactRepeatDraft, raw: {} },
+    { ok: true, draft: repairedDirectAnswerDraft, raw: {} },
+  ]);
+  const firstFaqRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "first-faq-repair-natural-direct-answer",
+    config,
+    provider: firstFaqRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(firstFaqRepaired.ok, true);
+  assert.equal(firstFaqRepairProvider.calls.length, 2);
+  assert.deepEqual(firstFaqRepairProvider.calls[1].issues, [
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+  assert.equal(firstFaqRepaired.data.faqItems[1].answer, naturalDirectAnswer);
+  assert.equal(firstFaqRepaired.data.faqItems[1].question, exactRepeatDraft.faqItems[1].question);
+  assert.equal(firstFaqRepaired.data.faqItems[1].anchor, exactRepeatDraft.faqItems[1].anchor);
+}
+
 assert.equal(faqAnswerIsQuestion("Можно ли слушать вечером?"), true);
 assert.equal(faqAnswerIsQuestion("Можно ли слушать практику днём."), true);
 assert.equal(

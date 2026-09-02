@@ -194,18 +194,70 @@ export function faqAnswerRepeatsQuestion(question: string, answer: string): bool
   const words = (text: string) =>
     normalizeSeoPhrase(text)
       .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .split(" ")
-    .filter((word) => word.length > 2);
+      .split(" ")
+      .filter(Boolean);
   const questionWords = words(question);
   const answerWords = words(answer);
-  if (questionWords.length < 3 || answerWords.length < 3) {
+  if (!questionWords.length || !answerWords.length) {
     return false;
   }
 
-  const questionSet = new Set(questionWords);
-  const answerSet = new Set(answerWords);
-  const shared = [...answerSet].filter((word) => questionSet.has(word)).length;
-  return shared / answerSet.size >= 0.8 || shared / questionSet.size >= 0.8;
+  if (questionWords.join(" ") === answerWords.join(" ")) {
+    return true;
+  }
+
+  // Reject only the narrow tautology "<semantic question core> — это
+  // <semantic question core>". The recognized "как использовать …" scaffold
+  // is removed so that "Как использовать практику?" and "Использовать
+  // практику — это использовать практику." are caught. This is intentionally
+  // not an overlap check: a direct answer can naturally reuse the question's
+  // subject words in a different sentence.
+  const questionText = questionWords.join(" ");
+  const questionCore =
+    questionWords[0] === "как" && questionWords[1] === "использовать"
+      ? questionWords.slice(1).join(" ")
+      : questionText;
+  if (answerWords.join(" ") === `${questionCore} это ${questionCore}`) {
+    return true;
+  }
+
+  // A repeated FAQ question normally preserves word order. Compare that
+  // sequence directly, allowing only one omitted or changed word for a
+  // near-exact restatement. Set overlap is deliberately not used: a direct
+  // answer naturally shares the question's subject terms but changes the
+  // sentence structure and adds useful information.
+  const maximumDistance = 1;
+  if (Math.abs(questionWords.length - answerWords.length) > maximumDistance) {
+    return false;
+  }
+
+  let previous = Array.from(
+    { length: answerWords.length + 1 },
+    (_, index) => index,
+  );
+  for (let questionIndex = 1; questionIndex <= questionWords.length; questionIndex += 1) {
+    const current = [questionIndex];
+    let rowMinimum = current[0];
+
+    for (let answerIndex = 1; answerIndex <= answerWords.length; answerIndex += 1) {
+      const distance = questionWords[questionIndex - 1] === answerWords[answerIndex - 1]
+        ? previous[answerIndex - 1]
+        : 1 + Math.min(
+            previous[answerIndex - 1],
+            previous[answerIndex],
+            current[answerIndex - 1],
+          );
+      current.push(distance);
+      rowMinimum = Math.min(rowMinimum, distance);
+    }
+
+    if (rowMinimum > maximumDistance) {
+      return false;
+    }
+    previous = current;
+  }
+
+  return previous[answerWords.length] <= maximumDistance;
 }
 
 const FAQ_ANSWER_QUESTION_LEAD_PATTERN =
