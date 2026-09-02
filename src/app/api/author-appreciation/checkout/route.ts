@@ -14,6 +14,10 @@ import {
   createGetCourseAppreciationDeal,
   getGetCourseConfig,
 } from "@/lib/author-appreciation/getcourse/provider";
+import type {
+  GetCourseConfig,
+  GetCourseDeal,
+} from "@/lib/author-appreciation/getcourse/provider";
 import { validateEmailFormat } from "@/lib/auth/email/validate-format";
 import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import { isAllowedSupportRequestOrigin } from "@/lib/help/request-guard";
@@ -75,6 +79,12 @@ export async function POST(request: Request) {
     amountMinor % 100 !== 0
   ) {
     return error("appreciation_unavailable", 404);
+  }
+  let getCourseConfig: GetCourseConfig;
+  try {
+    getCourseConfig = getGetCourseConfig();
+  } catch {
+    return error("checkout_unavailable", 503);
   }
 
   let userId: string | null = null;
@@ -177,14 +187,39 @@ export async function POST(request: Request) {
     idempotency_key: idempotencyKey,
     provider_metadata: { offer_id: getGetCourseConfig().appreciationOfferId },
   });
-  if (insertError) return error("internal_error", 500);
+  if (insertError) {
+    // A concurrent retry can win between the initial replay lookup and INSERT.
+    const { data: concurrentReplay } = await service
+      .from("author_appreciation_payment_intents")
+      .select("id, status")
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    if (concurrentReplay) {
+      return NextResponse.json({
+        intent_id: concurrentReplay.id,
+        status: concurrentReplay.status,
+      });
+    }
+    return error("internal_error", 500);
+  }
 
+  let deal: GetCourseDeal;
   try {
-    const deal = await createGetCourseAppreciationDeal(getGetCourseConfig(), {
+    deal = await createGetCourseAppreciationDeal(getCourseConfig, {
       email,
       amountMinor,
       localDealNumber,
     });
+  } catch {
+    await service
+      .from("author_appreciation_payment_intents")
+      .update({ status: "failed", updated_at: new Date().toISOString() })
+      .eq("id", intentId)
+      .eq("status", "pending");
+    return error("checkout_unavailable", 502);
+  }
+
+  try {
     const { error: updateError } = await service
       .from("author_appreciation_payment_intents")
       .update({
@@ -202,7 +237,7 @@ export async function POST(request: Request) {
   } catch {
     await service
       .from("author_appreciation_payment_intents")
-      .update({ status: "failed", updated_at: new Date().toISOString() })
+      .update({ status: "needs_review", updated_at: new Date().toISOString() })
       .eq("id", intentId)
       .eq("status", "pending");
     return error("checkout_unavailable", 502);

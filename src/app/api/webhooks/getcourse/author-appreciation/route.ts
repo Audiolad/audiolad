@@ -29,16 +29,16 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
-function firstOfferId(value: unknown): string | null {
+function extractOfferIds(value: unknown): string[] {
   if (Array.isArray(value)) {
-    for (const entry of value) {
+    return value.flatMap((entry) => {
       const item = record(entry);
       const found = firstString(item?.offer_id, item?.id, entry);
-      if (found) return found;
-    }
-    return null;
+      return found ? [found] : [];
+    });
   }
-  return firstString(value);
+  const found = firstString(value);
+  return found ? [found] : [];
 }
 
 function rublesToMinor(value: unknown): number | null {
@@ -54,6 +54,9 @@ export function parseGetCourseCallback(payload: unknown) {
   const root = record(payload);
   const data = record(root?.data);
   const deal = record(root?.deal) ?? record(data?.deal);
+  const offerIds = extractOfferIds(
+    deal?.offer_id ?? deal?.offer_ids ?? root?.offer_id ?? root?.offer_ids ?? data?.offer_id ?? data?.offer_ids,
+  );
   return {
     dealId: firstString(deal?.id, deal?.deal_id, root?.deal_id, data?.deal_id),
     dealNumber: firstString(
@@ -62,9 +65,8 @@ export function parseGetCourseCallback(payload: unknown) {
       root?.deal_number,
       data?.deal_number,
     ),
-    offerId: firstOfferId(
-      deal?.offer_id ?? deal?.offer_ids ?? root?.offer_id ?? root?.offer_ids ?? data?.offer_id ?? data?.offer_ids,
-    ),
+    offerId: offerIds[0] ?? null,
+    offerIds,
     amountMinor: rublesToMinor(
       deal?.deal_cost ?? deal?.cost ?? root?.deal_cost ?? root?.amount ?? data?.deal_cost ?? data?.amount,
     ),
@@ -95,12 +97,15 @@ export async function POST(request: Request) {
   // Confirm the offer configuration is present, without logging it or any
   // callback contents. The RPC performs the row lock and all state changes.
   try {
-    getGetCourseConfig();
+    const config = getGetCourseConfig();
+    const offerId = callback.offerIds.includes(config.appreciationOfferId)
+      ? config.appreciationOfferId
+      : callback.offerId;
     const service = createServiceRoleClient();
     const { error } = await service.rpc("apply_author_appreciation_getcourse_callback", {
       p_provider_deal_id: callback.dealId,
       p_provider_deal_number: callback.dealNumber,
-      p_offer_id: callback.offerId,
+      p_offer_id: offerId,
       p_amount_minor: callback.amountMinor,
     });
     return new NextResponse(null, { status: error ? 500 : 200 });

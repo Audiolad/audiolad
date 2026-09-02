@@ -55,7 +55,7 @@ await assert.rejects(
 
 assert.deepEqual(
   parseGetCourseCallback({ data: { deal: { id: 42, number: "aa-test", offer_ids: ["offer-1"], deal_cost: "500" } } }),
-  { dealId: "42", dealNumber: "aa-test", offerId: "offer-1", amountMinor: 50_000 },
+  { dealId: "42", dealNumber: "aa-test", offerId: "offer-1", offerIds: ["offer-1"], amountMinor: 50_000 },
 );
 assert.equal(parseGetCourseCallback({ deal_id: "x", amount: "500.50" }).amountMinor, null);
 
