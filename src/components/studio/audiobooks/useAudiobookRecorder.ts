@@ -18,7 +18,10 @@ import {
   saveAudiobookRecordingDraft,
   type AudiobookRecordingDraft,
 } from "@/lib/audiobooks/recorder-store";
-import { syncPendingAudiobookRecordingDrafts } from "@/lib/audiobooks/recorder-sync";
+import {
+  prepareInterruptedAudiobookRecordingDraft,
+  syncPendingAudiobookRecordingDrafts,
+} from "@/lib/audiobooks/recorder-sync";
 import type { AudiobookFragment } from "@/lib/audiobooks/server";
 import { AUDIOBOOK_LIMITS } from "@/lib/audiobooks/limits";
 
@@ -74,7 +77,7 @@ export function useAudiobookRecorder({
   const sync = useCallback(async () => {
     setPendingDraftCount((count) => count + 1);
     setDrafts((current) => current.map((draft) => (
-      ["ready", "interrupted", "failed"].includes(draft.status)
+      ["ready", "failed"].includes(draft.status)
         ? { ...draft, status: "syncing" }
         : draft
     )));
@@ -85,6 +88,21 @@ export function useAudiobookRecorder({
       setDrafts(await listAudiobookRecordingDrafts(projectId));
     }
   }, [onSynced, projectId]);
+  const saveInterruptedDraft = useCallback(async (draftId: string) => {
+    setError(null);
+    try {
+      const prepared = await prepareInterruptedAudiobookRecordingDraft(draftId);
+      if (prepared) await sync();
+      else setDrafts(await listAudiobookRecordingDrafts(projectId));
+    } catch (saveError) {
+      if (saveError instanceof Error && saveError.message === "interrupted_recording_invalid") {
+        setError("Прерванную запись нельзя сохранить: локальные аудиоданные неполны или повреждены.");
+      } else {
+        setError("Не удалось проверить прерванную запись на этом устройстве.");
+      }
+      setDrafts(await listAudiobookRecordingDrafts(projectId).catch(() => []));
+    }
+  }, [projectId, sync]);
   const discardDraft = useCallback(async (draftId: string) => {
     await deleteAudiobookRecordingDraft(draftId);
     setDrafts(await listAudiobookRecordingDrafts(projectId));
@@ -293,6 +311,7 @@ export function useAudiobookRecorder({
     startRecording,
     stopRecording,
     sync,
+    saveInterruptedDraft,
     discardDraft,
   };
 }

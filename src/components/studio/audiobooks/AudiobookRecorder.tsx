@@ -62,7 +62,8 @@ export function AudiobookRecorder({
                   ? "Прерванная запись готова к сохранению"
                   : "Запись сохраняется на устройстве…"}</span>
           <span className="flex gap-3">
-            {["ready", "interrupted", "failed"].includes(draft.status) ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.sync()} className="text-[#9bdab5] underline">{draft.status === "failed" ? "Повторить загрузку" : "Сохранить"}</button> : null}
+            {draft.status === "interrupted" ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.saveInterruptedDraft(draft.id)} className="text-[#9bdab5] underline">Попробовать сохранить</button> : null}
+            {["ready", "failed"].includes(draft.status) ? <button type="button" disabled={recorder.isLocked} onClick={() => void recorder.sync()} className="text-[#9bdab5] underline">{draft.status === "failed" ? "Повторить загрузку" : "Сохранить"}</button> : null}
             <button type="button" disabled={recorder.isLocked || discarding} onClick={() => setDraftToDiscard(draft.id)} className="text-[#ffb4b4] underline">Удалить</button>
           </span>
         </div>

@@ -10,6 +10,7 @@ import {
   saveAudiobookRecordingDraft,
   type AudiobookRecordingDraft,
 } from "./recorder-store";
+import { validateAudiobookRecordedBlob } from "./recorder";
 
 type ReservationResponse = {
   fragment: AudiobookFragment;
@@ -57,6 +58,22 @@ async function reservationFor(draft: AudiobookRecordingDraft): Promise<Reservati
 async function updateDraftStatus(draftId: string, status: AudiobookRecordingDraft["status"]) {
   const draft = await getAudiobookRecordingDraft(draftId);
   if (draft) await saveAudiobookRecordingDraft({ ...draft, status });
+}
+
+export async function prepareInterruptedAudiobookRecordingDraft(draftId: string) {
+  const draft = await getAudiobookRecordingDraft(draftId);
+  if (!draft || draft.status !== "interrupted") return false;
+
+  const recording = await getAudiobookRecordingData(draft.id, draft.mimeType);
+  const invalidRecording = !recording.contiguous
+    || recording.chunkCount !== draft.chunkCount
+    || recording.sizeBytes !== draft.sizeBytes
+    || recording.blob.size !== draft.sizeBytes
+    || Boolean(validateAudiobookRecordedBlob(recording.blob));
+  if (invalidRecording) throw new Error("interrupted_recording_invalid");
+
+  await saveAudiobookRecordingDraft({ ...draft, status: "ready", readyAt: Date.now() });
+  return true;
 }
 
 export async function syncAudiobookRecordingDraft(draftId: string) {
@@ -133,7 +150,7 @@ export async function syncPendingAudiobookRecordingDrafts(
     do {
       entry.rerunRequested = false;
       for (const draft of await listAudiobookRecordingDrafts(projectId)) {
-        if (!["ready", "interrupted", "failed"].includes(draft.status) || !draft.sizeBytes) continue;
+        if (!["ready", "failed"].includes(draft.status) || !draft.sizeBytes) continue;
         try {
           const fragment = await syncAudiobookRecordingDraft(draft.id);
           if (fragment) onSynced?.(fragment);
