@@ -374,7 +374,7 @@ assert.match(
 );
 assert.match(
   prompt,
-  /seoDescription:.*дословно содержит полный основной запрос «медитация для сна»/i,
+  /seoDescription:.*Начинается с полного основного запроса «медитация для сна» дословно и содержит его ровно один раз/i,
 );
 assert.match(
   buildProductSeoRepairPrompt({ request: parsed.request }, validDraft(), ["faq_answer_is_question"]),
@@ -420,8 +420,14 @@ const faqExactPrimaryInput = {
   );
   assert.match(
     repairPrimary,
-    /дословно включи полный основной запрос «музыка для сна» в seoTitle и seoDescription/,
+    /дословно включи полный основной запрос «музыка для сна» в seoTitle/,
   );
+  assert.match(
+    repairPrimary,
+    /Начни seoDescription с полного основного запроса «музыка для сна» дословно и используй его ровно один раз/,
+  );
+  assert.equal((repairPrimary.match(/Исправление seoDescription обязательно:/g) ?? []).length, 1);
+  assert.doesNotMatch(repairPrimary, /в seoTitle и seoDescription/);
   assert.match(repairPrimary, /Не изменяй слова запроса, их порядок или словоформу/);
 }
 
@@ -674,7 +680,55 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       primaryRepairProvider.calls[1].previous,
       primaryRepairProvider.calls[1].issues,
     ),
-    /дословно включи полный основной запрос «медитация для сна» в seoTitle и seoDescription/,
+    /дословно включи полный основной запрос «медитация для сна» в seoTitle/,
+  );
+}
+
+// Production regression: a long description without the primary must send
+// exactly both description issues to repair and accept a compliant correction.
+{
+  const tooLongDescriptionWithoutPrimary =
+    "Мягкая практика для спокойного завершения дня и вечернего отдыха. ".repeat(6);
+  const repairedDescription =
+    "медитация для сна помогает мягко завершить день, замедлиться перед отдыхом и настроиться на спокойный вечер в привычном ритме.";
+  assert.ok(tooLongDescriptionWithoutPrimary.length > 300);
+  assert.ok(repairedDescription.length >= 120 && repairedDescription.length <= 180);
+  assert.ok(repairedDescription.startsWith(requestInput().seoPrimaryQuery));
+  assert.equal(
+    repairedDescription.split(requestInput().seoPrimaryQuery).length - 1,
+    1,
+  );
+
+  const descriptionRepairProvider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({ seoDescription: tooLongDescriptionWithoutPrimary }),
+      raw: {},
+    },
+    { ok: true, draft: validDraft({ seoDescription: repairedDescription }), raw: {} },
+  ]);
+  const descriptionRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "description-length-primary-repair",
+    config,
+    provider: descriptionRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const exactIssues = ["description_too_long", "primary_missing_from_description"];
+  assert.equal(descriptionRepaired.ok, true);
+  assert.equal(descriptionRepairProvider.calls.length, 2);
+  assert.deepEqual(descriptionRepairProvider.calls[1].issues, exactIssues);
+  assert.deepEqual(
+    validateProductSeoAiDraft(descriptionRepaired.data, validationInput()),
+    { ok: true, draft: descriptionRepaired.data },
+  );
+  const descriptionRepairPrompt = buildProductSeoRepairPrompt(
+    descriptionRepairProvider.calls[1].input,
+    descriptionRepairProvider.calls[1].previous,
+    descriptionRepairProvider.calls[1].issues,
+  );
+  assert.match(
+    descriptionRepairPrompt,
+    /seoDescription.*120–180 символов.*не превышала 300 символов.*Начни seoDescription с полного основного запроса «медитация для сна» дословно и используй его ровно один раз/is,
   );
 }
 
