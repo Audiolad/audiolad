@@ -540,6 +540,24 @@ assert.equal(
 // FAQ answers may share a subject with their questions. Only exact or
 // sequence-preserving near copies are repeats; natural direct answers are
 // neither repeats nor questions.
+const NATURAL_DIRECT_ANSWER_PAIRS = [
+  {
+    label: "A",
+    question: "Когда лучше слушать эту практику?",
+    answer: "Эту практику можно слушать в любое удобное время.",
+  },
+  {
+    label: "B",
+    question: "Как использовать практику?",
+    answer: "Включите практику в удобное время и следуйте голосовым подсказкам.",
+  },
+  {
+    label: "C",
+    question: "Кому подходит практика?",
+    answer: "Практика подходит тем, кто хочет уделить себе несколько спокойных минут.",
+  },
+];
+
 for (const { question, answer, repeats, isQuestion } of [
   {
     question: "Когда лучше слушать эту практику?",
@@ -565,24 +583,12 @@ for (const { question, answer, repeats, isQuestion } of [
     repeats: true,
     isQuestion: false,
   },
-  {
-    question: "Когда лучше включать вечернюю практику?",
-    answer: "Вечернюю практику лучше включать вечером.",
+  ...NATURAL_DIRECT_ANSWER_PAIRS.map(({ question, answer }) => ({
+    question,
+    answer,
     repeats: false,
     isQuestion: false,
-  },
-  {
-    question: "Как слушать медитацию для сна?",
-    answer: "Медитацию для сна слушайте в тихом месте, где можно удобно устроиться.",
-    repeats: false,
-    isQuestion: false,
-  },
-  {
-    question: "Можно ли слушать медитацию для сна перед сном?",
-    answer: "Медитацию для сна можно слушать перед сном.",
-    repeats: false,
-    isQuestion: false,
-  },
+  })),
 ]) {
   assert.equal(faqAnswerRepeatsQuestion(question, answer), repeats, `${question} / ${answer}`);
   assert.equal(faqAnswerIsQuestion(answer), isQuestion, `${question} / ${answer}`);
@@ -596,8 +602,8 @@ for (const { question, answer, repeats, isQuestion } of [
       index === 1
         ? {
             ...item,
-            question: "Когда лучше включать вечернюю практику?",
-            answer: "Вечернюю практику лучше включать вечером.",
+            question: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
+            answer: NATURAL_DIRECT_ANSWER_PAIRS[0].answer,
           }
         : item,
     ),
@@ -624,13 +630,13 @@ for (const { question, answer, repeats, isQuestion } of [
       index === 1
         ? {
             ...item,
-            question: "Когда лучше включать вечернюю практику?",
-            answer: "Когда лучше включать вечернюю практику?",
+            question: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
+            answer: NATURAL_DIRECT_ANSWER_PAIRS[0].question,
           }
         : item,
     ),
   });
-  const naturalDirectAnswer = "Вечернюю практику лучше включать вечером.";
+  const naturalDirectAnswer = NATURAL_DIRECT_ANSWER_PAIRS[0].answer;
   const repairedDirectAnswerDraft = validDraft({
     faqItems: exactRepeatDraft.faqItems.map((item, index) =>
       index === 1 ? { ...item, answer: naturalDirectAnswer } : item,
