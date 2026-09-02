@@ -69,5 +69,10 @@ export type PracticePageViewModel = {
   promoStartToken: string | null;
   /** Price is hidden only while a valid first-time `?promo=` start resolves. */
   promoStartPending: boolean;
+  /**
+   * Phase 1 UX prototype only. Phase 2 replaces this preview state with the
+   * effective commercial-author and product-visibility eligibility result.
+   */
+  showAuthorSupportPrototype: boolean;
   publishPreview: PracticePagePublishPreview | null;
 };

@@ -105,6 +105,7 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ segments: string[] }>;
   searchParams: Promise<{
+    author_support_preview?: string;
     listen?: string;
     preview?: string;
     view?: string;
@@ -278,6 +279,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
   const {
+    author_support_preview: authorSupportPreview,
     listen: listenParam,
     preview: previewParam,
     view: viewParam,
@@ -470,6 +472,12 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const authorName = getAuthorName(practice);
   const productKind = normalizeProductKind(practice.product_kind);
   const isAudioPost = isAudioPostProductKind(productKind);
+  // Stage 1 design prototype only. Phase 2 will replace this explicit preview
+  // flag with commercial eligibility and persisted author/product preferences.
+  const showAuthorSupportPrototype =
+    authorSupportPreview === "1" &&
+    practice.is_free === true &&
+    practice.publication_class !== "course";
   const musicTypeLabel = isMusicProductKind(productKind)
     ? getMusicProductTypeLabel()
     : null;
@@ -661,6 +669,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     priceOffer,
     promoStartToken,
     promoStartPending,
+    showAuthorSupportPrototype,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {

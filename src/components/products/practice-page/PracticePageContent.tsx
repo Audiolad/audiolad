@@ -1,4 +1,5 @@
 import LegalFooter from "@/components/LegalFooter";
+import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
@@ -43,6 +44,16 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
         <section className="mt-6 min-w-0">
           <PracticeProductHero viewModel={viewModel} />
         </section>
+
+        {viewModel.showAuthorSupportPrototype && viewModel.authorName ? (
+          <div className="mt-4">
+            <AuthorAppreciationPrototype
+              authorName={viewModel.authorName}
+              isAuthenticated={viewModel.isAuthenticated}
+              surface="product"
+            />
+          </div>
+        ) : null}
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
 
