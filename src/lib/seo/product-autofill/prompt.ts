@@ -48,6 +48,9 @@ export type ProductSeoAiPromptInput = {
 
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
+  const secondaryQueries = (input.request.seoSecondaryQueries ?? []).filter(
+    (item) => item.trim(),
+  );
   return [
     `Название продукта: ${input.request.title.trim() || "—"}`,
     `Подзаголовок: ${input.request.subtitle.trim() || "—"}`,
@@ -55,6 +58,9 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
     `Тип продукта: ${input.request.productKind.trim() || "practice"}`,
     `Заголовок блока использования: ${getPracticeSeoUsageHeading(input.request.productKind)}`,
     `Основной запрос: ${input.request.seoPrimaryQuery.trim()}`,
+    secondaryQueries.length > 0
+      ? `Дополнительные запросы автора: ${secondaryQueries.join("; ")}`
+      : "Дополнительные запросы автора: нет",
     usage.length > 0
       ? `Уже указанные ситуации использования: ${usage.join("; ")}`
       : "Уже указанные ситуации использования: нет",
@@ -164,6 +170,7 @@ export function buildProductSeoSystemPrompt(
     primaryQuery
       ? `seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Начинается с полного основного запроса «${primaryQuery}» дословно и содержит его ровно один раз. Не изменяй слова запроса, их порядок или словоформу.`
       : "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Не выдумывай основной запрос.",
+    "Дополнительные поисковые фразы принадлежат автору и заданы вручную. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем. Не обязан использовать каждую фразу в черновике.",
     `Поле description («${AUTHOR_DESCRIPTION_LABEL}») уже задано автором и будет показано на публичной странице. Используй его только как источник фактов. Не переписывай, не пересказывай и не заменяй его. Не генерируй отдельный текст «о продукте» и не возвращай поле seoAbout.`,
     "usageItems: ровно 3 конкретные ситуации, которые следуют из продукта.",
     faqItemsSystemInstruction(primaryQuery),

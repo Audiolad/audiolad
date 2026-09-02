@@ -343,16 +343,39 @@ assert.ok([...section.matchAll(/disabled=\{disabled\}/g)].length >= 3);
 assert.match(section, /disabled:cursor-not-allowed disabled:opacity-60/);
 assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие|api\/author\/seo\/wordstat/);
 assert.doesNotMatch(section, /seoAbout|SEO_ABOUT_/);
+assert.equal((section.match(/Основной поисковый запрос/g) ?? []).length, 1);
+assert.equal((section.match(/Дополнительные поисковые фразы/g) ?? []).length, 1);
+assert.equal((section.match(/Заголовок для поиска/g) ?? []).length, 1);
+assert.equal((section.match(/Описание для поиска/g) ?? []).length, 1);
+assert.match(section, /Поле необязательное\. Напишите понятный заголовок результата поиска\./);
+assert.match(section, /!seoPrimaryQuery\.trim\(\) && title\.trim\(\)/);
+assert.match(section, /onChange\(\{ seoPrimaryQuery: title\.trim\(\) \}\)/);
+assert.match(section, />\s*Использовать название продукта\s*</);
 
 const openMarkup = section.slice(section.indexOf("{isOpen ? <>"));
-assert.ok(openMarkup.indexOf("{PRODUCT_SEO_SELLING_COPY}") < openMarkup.indexOf("SEO-готовность"));
-assert.ok(openMarkup.indexOf("SEO-готовность") < openMarkup.indexOf("Основной поисковый запрос"));
+assert.ok(openMarkup.indexOf("{PRODUCT_SEO_SELLING_COPY}") < openMarkup.indexOf("Основной поисковый запрос"));
 assert.ok(
   openMarkup.indexOf("Основной поисковый запрос") <
     openMarkup.indexOf("Дополнительные поисковые фразы"),
 );
 assert.ok(
   openMarkup.indexOf("Дополнительные поисковые фразы") <
+    openMarkup.indexOf("<AuthorProductSeoStyleControls"),
+);
+assert.ok(
+  openMarkup.indexOf("<AuthorProductSeoStyleControls") <
+    openMarkup.indexOf("PRODUCT_SEO_GENERATE_CTA"),
+);
+assert.ok(
+  openMarkup.indexOf("PRODUCT_SEO_GENERATE_CTA") <
+    openMarkup.indexOf("PRODUCT_SEO_OVERWRITE_CONFIRM"),
+);
+assert.ok(
+  openMarkup.indexOf("PRODUCT_SEO_OVERWRITE_CONFIRM") <
+    openMarkup.indexOf("SEO-готовность"),
+);
+assert.ok(
+  openMarkup.indexOf("SEO-готовность") <
     openMarkup.indexOf("Заголовок для поиска"),
 );
 assert.ok(
@@ -367,10 +390,6 @@ assert.ok(
     openMarkup.indexOf("Вопросы и ответы"),
 );
 assert.ok(openMarkup.indexOf("Вопросы и ответы") < openMarkup.indexOf("Рекомендации автора"));
-assert.ok(
-  openMarkup.indexOf("<AuthorProductSeoStyleControls") <
-    openMarkup.indexOf("PRODUCT_SEO_GENERATE_CTA"),
-);
 
 const patch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patch, /withPreservedRelatedListenSlugs/);
