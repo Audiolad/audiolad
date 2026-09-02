@@ -239,6 +239,22 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/studio/guest/handoff/route.ts"],
     },
     {
+      key: "studio_audiobooks",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: [
+        "src/app/api/studio/audiobooks/projects/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/reorder/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/fragments/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/fragments/[fragmentId]/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/fragments/[fragmentId]/retry/route.ts",
+        "src/app/api/studio/audiobooks/projects/[projectId]/chapters/[chapterId]/fragments/[fragmentId]/finalize/route.ts",
+      ],
+    },
+    {
       key: "finance_payout",
       group: "blocked",
       disposition: "blocked",
@@ -299,6 +315,15 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "author_seo_tools",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: [
+        "src/app/api/author/seo/product-autofill/route.ts",
+        "src/app/api/author/seo/wordstat/suggestions/route.ts",
+      ],
+    },
+    {
       key: "terms_commercial_projects",
       group: "blocked",
       disposition: "blocked",
@@ -307,6 +332,7 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/commercial-application/route.ts",
         "src/app/api/author/projects/route.ts",
         "src/app/api/author/onboarding/route.ts",
+        "src/app/api/author/onboarding/ui/route.ts",
       ],
     },
   ];

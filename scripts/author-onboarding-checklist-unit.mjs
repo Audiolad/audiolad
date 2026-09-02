@@ -255,21 +255,12 @@ function testPublishReadinessShared() {
   );
 
   assert.equal(empty.ok, false);
-  assert.equal(empty.requirements.some((item) => item.key === "topics"), true);
   assert.equal(
     empty.requirements.find((item) => item.key === "description")?.ok,
-    false,
-  );
-  assert.equal(
-    empty.requirements.find((item) => item.key === "cover")?.ok,
-    false,
+    undefined,
   );
   assert.equal(
     empty.requirements.find((item) => item.key === "audio")?.ok,
-    false,
-  );
-  assert.equal(
-    empty.requirements.find((item) => item.key === "topics")?.ok,
     false,
   );
 
@@ -282,8 +273,7 @@ function testPublishReadinessShared() {
     [baseAudio()],
     "free",
   );
-  assert.equal(legacy.ok, false);
-  assert.equal(legacy.code, "missing_description");
+  assert.equal(legacy.ok, true);
 
   const withTopics = validatePublishRequirements(
     basePractice(),
@@ -291,8 +281,7 @@ function testPublishReadinessShared() {
     "free",
     0,
   );
-  assert.equal(withTopics.ok, false);
-  assert.equal(withTopics.code, "topic_min_required");
+  assert.equal(withTopics.ok, true);
 }
 
 function testFocusProductSelection() {
@@ -325,7 +314,7 @@ function testFocusProductSelection() {
   assert.equal(focus?.id, "ready");
 
   const focusWithoutReady = selectFocusProduct([emptyDraft, almostReady]);
-  assert.equal(focusWithoutReady?.id, "almost");
+  assert.equal(focusWithoutReady?.id, "empty");
 
   assert.ok(
     focusProductSuitabilityScore(publishReady) >

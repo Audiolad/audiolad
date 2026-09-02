@@ -99,6 +99,7 @@
     "test:product-format": "npx tsx scripts/product-format-sound-unit.mjs",
     "test:commercial-application:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/author-commercial-application-integration.mjs",
     "test:admin-support-diagnostics": "npx tsx scripts/admin-support-diagnostics-unit.mjs",
+    "test:author-product-minimal-moderation-readiness": "npx tsx scripts/author-product-minimal-moderation-readiness-unit.mjs",
     "test:author-product-edit-page-access": "NODE_OPTIONS='--require ./scripts/author-practice-access-cjs-stub.cjs --import ./scripts/author-practice-access-test-register.mjs' npx tsx scripts/author-product-edit-page-access-unit.mts",
     "test:author-product-draft-save": "npx tsx scripts/author-product-draft-save-unit.mjs && NODE_OPTIONS='--require ./scripts/author-practice-access-cjs-stub.cjs --import ./scripts/author-practice-access-test-register.mjs' npx tsx scripts/author-product-save-access-unit.mts",
     "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs && node scripts/author-support-sql-unit.mjs && node scripts/author-support-sql-integration.mjs && npm run test:author-product-edit-page-access && npm run test:author-product-draft-save",

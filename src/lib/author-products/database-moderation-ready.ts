@@ -1,6 +1,6 @@
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
- * (latest: supabase/migrations/20260902120000_course_moderation_readiness.sql).
+ * (latest: supabase/migrations/20260913120000_minimal_product_moderation_readiness.sql).
  *
  * Used by admin support diagnostics so a product is never reported READY
  * when the live submit RPC would fail existing DB validation.
@@ -9,27 +9,14 @@
 
 import {
   authorAccessAllowsContentMutations,
-  authorAccessAllowsPaidProducts,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import {
   evaluateCourseLessonsReadiness,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
-import {
-  AUTHOR_DESCRIPTION_LABEL,
-  AUTHOR_DESCRIPTION_MISSING_MESSAGE,
-} from "@/lib/products/product-copy";
-import {
-  AUDIO_POST_KIND_LABEL,
-  MUSIC_KIND_LABEL,
-  normalizeProductKind,
-  PRODUCT_KIND,
-} from "@/lib/author-products/product-kind";
-import { LEGACY_OTHER_FORMAT } from "@/lib/author-products/format";
+import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
 import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
-
-export const PRACTICE_SLUG_DB_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type DatabaseModerationReadyCheck = {
   code: string;
@@ -85,21 +72,15 @@ function summarize(
  * currently does not enforce the same way.
  */
 export function listKnownTsSqlReadinessDivergences(): readonly string[] {
-  return [
-    "SQL требует slug вида ^[a-z0-9]+(?:-[a-z0-9]+)*$; TS проверяет только непустое значение.",
-    "SQL требует currency = RUB; TS не проверяет валюту.",
-    "SQL не проверяет диапазон цены 49–100 000 ₽ и позиции треков.",
-  ];
+  return [];
 }
 
 export function evaluateDatabaseModerationReady(
   input: EvaluateDatabaseModerationReadyInput,
 ): DatabaseModerationReadyResult {
   const practice = input.practice;
-  const productKind = normalizeProductKind(practice.product_kind);
   const isCourse = practice.publication_class === "course";
   const audioCount = input.audioItems.length;
-  const format = practice.format?.trim() ?? "";
   const courseContentCheck = isCourse
     ? evaluateCourseLessonsReadiness(input.courseContent?.lessons)
     : ({ ok: true } as const);
@@ -125,103 +106,6 @@ export function evaluateDatabaseModerationReady(
       !practice.title?.trim() ? "Укажите название аудиопродукта." : null,
     ),
     check(
-      "missing_description",
-      AUTHOR_DESCRIPTION_LABEL,
-      productKind !== PRODUCT_KIND.AUDIO_POST && !practice.description?.trim()
-        ? AUTHOR_DESCRIPTION_MISSING_MESSAGE
-        : null,
-    ),
-    check(
-      "slug_required",
-      "Адрес",
-      !practice.slug?.trim() ? "Укажите адрес аудиопродукта." : null,
-    ),
-    check(
-      "invalid_slug",
-      "Формат адреса (SQL)",
-      practice.slug?.trim() && !PRACTICE_SLUG_DB_PATTERN.test(practice.slug.trim())
-        ? "Адрес должен состоять из строчных латинских букв, цифр и дефисов."
-        : null,
-    ),
-    check(
-      "missing_cover",
-      "Обложка",
-      !practice.cover_url?.trim() ? "Загрузите обложку аудиопродукта." : null,
-    ),
-    check(
-      "invalid_currency",
-      "Валюта",
-      (practice.currency ?? "") !== "RUB"
-        ? "Валюта продукта должна быть RUB."
-        : null,
-    ),
-    check(
-      "invalid_product_kind",
-      "Тип продукта",
-      productKind !== PRODUCT_KIND.PRACTICE &&
-        productKind !== PRODUCT_KIND.MUSIC &&
-        productKind !== PRODUCT_KIND.AUDIO_POST
-        ? "Недопустимый тип продукта."
-        : null,
-    ),
-    check(
-      "invalid_format",
-      "Формат (SQL)",
-      !format ||
-        (productKind === PRODUCT_KIND.PRACTICE && format === LEGACY_OTHER_FORMAT) ||
-        (productKind === PRODUCT_KIND.MUSIC && format !== MUSIC_KIND_LABEL) ||
-        (productKind === PRODUCT_KIND.AUDIO_POST && format !== AUDIO_POST_KIND_LABEL)
-        ? "Формат не проходит проверку базы данных."
-        : null,
-    ),
-    check(
-      "music_permission_required",
-      "Условия использования музыки",
-      productKind === PRODUCT_KIND.MUSIC &&
-        practice.music_usage_permission !== "listen_only" &&
-        practice.music_usage_permission !== "platform_reuse_allowed"
-        ? "Для музыки нужно выбрать условие использования."
-        : null,
-    ),
-    check(
-      "music_permission_not_allowed",
-      "Музыкальное разрешение только для музыки",
-      productKind !== PRODUCT_KIND.MUSIC &&
-        practice.music_usage_permission != null
-        ? "Условия использования музыки нельзя задавать для этого типа продукта."
-        : null,
-    ),
-    check(
-      "audio_post_must_be_free",
-      "Аудиопост бесплатный",
-      productKind === PRODUCT_KIND.AUDIO_POST &&
-        (!practice.is_free || practice.price !== 0)
-        ? "Аудиопост может быть только бесплатным."
-        : null,
-    ),
-    check(
-      "invalid_price",
-      "Цена",
-      (practice.is_free && practice.price !== 0) ||
-        (!practice.is_free && practice.price <= 0)
-        ? "Цена не согласована с признаком бесплатности."
-        : null,
-    ),
-    check(
-      "commercial_eligibility_required",
-      "Коммерческий доступ для платного продукта",
-      !practice.is_free && !authorAccessAllowsPaidProducts(input.accessStatus)
-        ? "Платный продукт нельзя отправить: авторский доступ не разрешает продажи."
-        : null,
-    ),
-    check(
-      "topic_min_required",
-      "Темы",
-      input.activeTopicCount < 1
-        ? "Выберите хотя бы одну тему перед отправкой на модерацию."
-        : null,
-    ),
-    check(
       "missing_audio",
       "Аудиозаписи (SQL)",
       !isCourse && audioCount === 0
@@ -231,7 +115,7 @@ export function evaluateDatabaseModerationReady(
     check(
       "audio_post_requires_single_audio",
       "Одна аудиозапись для аудиопоста",
-      !isCourse && productKind === PRODUCT_KIND.AUDIO_POST && audioCount !== 1
+      !isCourse && isAudioPostProductKind(practice.product_kind) && audioCount !== 1
         ? "Для аудиопоста требуется ровно одна аудиозапись."
         : null,
     ),
@@ -241,12 +125,11 @@ export function evaluateDatabaseModerationReady(
       !isCourse &&
         input.audioItems.some(
           (item) =>
-            !item.title?.trim() ||
             !item.audio_path?.trim() ||
             !item.duration_seconds ||
             item.duration_seconds <= 0,
         )
-        ? "У одной или нескольких аудиозаписей нет названия, файла или длительности."
+        ? "У одной или нескольких аудиозаписей нет файла или длительности."
         : null,
     ),
   ];
@@ -257,33 +140,6 @@ export function evaluateDatabaseModerationReady(
         courseContentCheck.ok ? "course_content" : courseContentCheck.code,
         "Содержание курса (SQL)",
         courseContentCheck.ok ? null : courseContentCheck.message,
-      ),
-    );
-  }
-
-  if (productKind === PRODUCT_KIND.AUDIO_POST && practice.promo_enabled) {
-    checks.push(
-      check(
-        "promo_title_required",
-        "Заголовок рекомендации",
-        !practice.promo_title?.trim() ? "Укажите заголовок рекомендации." : null,
-      ),
-      check(
-        "promo_text_required",
-        "Текст рекомендации",
-        !practice.promo_text?.trim() ? "Укажите текст рекомендации." : null,
-      ),
-      check(
-        "promo_button_text_required",
-        "Текст кнопки рекомендации",
-        !practice.promo_button_text?.trim()
-          ? "Укажите текст кнопки рекомендации."
-          : null,
-      ),
-      check(
-        "promo_url_required",
-        "Ссылка рекомендации",
-        !practice.promo_url?.trim() ? "Укажите ссылку рекомендации." : null,
       ),
     );
   }

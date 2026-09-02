@@ -101,10 +101,6 @@ const readiness = evaluatePublishReadiness(basePractice(), [audioItem(1)], {
   activeTopicCount: 1,
 });
 assert.equal(readiness.ok, true, readiness.firstFailure?.message);
-assert.equal(
-  readiness.requirements.some((item) => item.key === "promo"),
-  true,
-);
 
 const noDescription = evaluatePublishReadiness(
   basePractice({ description: null }),
@@ -114,7 +110,7 @@ const noDescription = evaluatePublishReadiness(
 assert.equal(noDescription.ok, true, noDescription.firstFailure?.message);
 assert.equal(
   noDescription.requirements.find((item) => item.key === "description")?.ok,
-  true,
+  undefined,
 );
 
 const emptyDescription = evaluatePublishReadiness(
@@ -139,7 +135,7 @@ assert.equal(
   "audio_post_requires_single_audio",
 );
 
-const incompletePromo = evaluatePublishReadiness(
+const incompleteOptionalPromo = evaluatePublishReadiness(
   basePractice({
     promo_enabled: true,
     promo_title: "",
@@ -150,9 +146,9 @@ const incompletePromo = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(incompletePromo.firstFailure?.code, "promo_title_required");
+assert.equal(incompleteOptionalPromo.ok, true);
 
-const practiceNeedsDescription = evaluatePublishReadiness(
+const practiceWithoutDescription = evaluatePublishReadiness(
   basePractice({
     product_kind: PRODUCT_KIND.PRACTICE,
     format: "Медитация",
@@ -162,12 +158,9 @@ const practiceNeedsDescription = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(
-  practiceNeedsDescription.firstFailure?.code,
-  "missing_description",
-);
+assert.equal(practiceWithoutDescription.ok, true);
 
-const musicNeedsDescription = evaluatePublishReadiness(
+const musicWithoutDescription = evaluatePublishReadiness(
   basePractice({
     product_kind: PRODUCT_KIND.MUSIC,
     format: "Музыка",
@@ -178,14 +171,14 @@ const musicNeedsDescription = evaluatePublishReadiness(
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(musicNeedsDescription.firstFailure?.code, "missing_description");
+assert.equal(musicWithoutDescription.ok, true);
 
 const paidAudioPost = evaluatePublishReadiness(
   basePractice({ is_free: false, price: 99 }),
   [audioItem(1)],
   { activeTopicCount: 1 },
 );
-assert.equal(paidAudioPost.firstFailure?.code, "audio_post_must_be_free");
+assert.equal(paidAudioPost.ok, true);
 
 assert.equal(
   validatePromoRecommendation({
