@@ -4,6 +4,10 @@ import {
   isPracticePublished,
 } from "@/lib/products/access";
 import {
+  isDirectLinkPublicVisibility,
+  isSelectedUsersCatalogVisibility,
+} from "@/lib/products/catalog-visibility";
+import {
   buildListenPath,
   buildPracticeBuyerPreviewPath,
   buildPracticePublicPath,
@@ -236,6 +240,36 @@ export function resolvePublishPreviewListenerAccess(
   };
 }
 
+function hasPositivePurchasablePrice(
+  price: number | null | undefined,
+): price is number {
+  return typeof price === "number" && Number.isFinite(price) && price > 0;
+}
+
+function canPresentPublicFreeListen(
+  practice: PracticePricing,
+  access: ProductAccessResult,
+): boolean {
+  if (practice.is_free !== true || !isPracticePublished(practice.status)) {
+    return false;
+  }
+
+  if (
+    isDirectLinkPublicVisibility(
+      practice.catalog_visibility,
+      practice.is_catalog_listed,
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    access.canSeeSelectedUsers === true ||
+    access.isAuthorMember === true ||
+    access.hasEntitlement === true
+  );
+}
+
 function resolveCommercialAccess(
   access: ProductAccessResult,
   practice: PracticePricing,
@@ -248,13 +282,20 @@ function resolveCommercialAccess(
     const isPubliclyListed = isPracticeCatalogListed(practice);
     const canAcquire =
       isPracticePublished(practice.status) &&
-      practice.catalog_visibility !== "selected_users";
+      !isSelectedUsersCatalogVisibility(
+        practice.catalog_visibility,
+        practice.is_catalog_listed,
+      );
 
     // Visual-only simulation of an anonymous visitor without product access.
+    // Listing is discovery only: unlisted published free still looks like a gift.
     if (
       practice.is_free === true &&
       isPracticePublished(practice.status) &&
-      isPubliclyListed
+      isDirectLinkPublicVisibility(
+        practice.catalog_visibility,
+        practice.is_catalog_listed,
+      )
     ) {
       return {
         canListen: true,
@@ -440,6 +481,28 @@ function buildCommercialPresentation(input: {
     };
   }
 
+  // Fail-safe: never sell a published free product, even if access drifted.
+  if (canPresentPublicFreeListen(practice, access)) {
+    const guestFreeEntry = !isAuthenticated;
+    return {
+      statusBadge: getFreeStatusLabel(practice.format),
+      statusDetail: guestFreeEntry
+        ? "Можно слушать без регистрации"
+        : null,
+      primaryAction: audioReady
+        ? {
+            kind: "listen",
+            href: listenHref,
+            label: guestFreeEntry ? "Начать слушать" : PLAY_ACTION_LABEL,
+          }
+        : {
+            kind: "audio_pending",
+            label: getAudioPendingLabel(practice.audio_url),
+          },
+      showPaymentLegalNote: false,
+    };
+  }
+
   const buyLabel = BUY_ACTION_LABEL;
 
   if (access.reason === "unavailable" || !access.canAcquire) {
@@ -461,6 +524,18 @@ function buildCommercialPresentation(input: {
     };
   }
 
+  if (!hasPositivePurchasablePrice(effectivePrice)) {
+    return {
+      statusBadge: "Стоимость уточняется",
+      statusDetail: null,
+      primaryAction: {
+        kind: "audio_pending",
+        label: "Стоимость уточняется",
+      },
+      showPaymentLegalNote: false,
+    };
+  }
+
   return {
     statusBadge: priceLabel ?? "Стоимость уточняется",
     statusDetail: null,
@@ -471,12 +546,7 @@ function buildCommercialPresentation(input: {
       practiceSlug: practice.slug,
       practiceId: practice.id,
       authorId: practice.author_id ?? null,
-      productPriceMinorSnapshot:
-        typeof effectivePrice === "number" &&
-        Number.isFinite(effectivePrice) &&
-        effectivePrice > 0
-          ? Math.floor(effectivePrice) * 100
-          : null,
+      productPriceMinorSnapshot: Math.floor(effectivePrice) * 100,
       currency: "RUB",
       purchaseSurface,
     },

@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import {
   isListedCatalogVisibility,
@@ -260,19 +259,13 @@ export async function resolveProductAccess(
   const canAcquire = canAcquirePractice(practice, { canSeeSelectedUsers });
   const canSeeProduct = !selectedUsers || canSeeSelectedUsers;
 
-  // Free audio posts stay listenable by direct link even when unlisted.
-  // selected_users free audio posts stay hidden from strangers.
-  const freeAudioPostListen =
-    isAudioPostProductKind(practice.product_kind) &&
+  // Free classification is independent of catalog listing.
+  // listed = discovery; published + unlisted + is_free = gift by direct link.
+  // selected_users stays closed unless the viewer is allowlisted.
+  if (
     practice.is_free === true &&
     isPracticePublished(practice.status) &&
-    canSeeProduct;
-
-  if (
-    (practice.is_free === true &&
-      isPracticePublished(practice.status) &&
-      isPubliclyListed) ||
-    freeAudioPostListen
+    canSeeProduct
   ) {
     return {
       canListen: true,
