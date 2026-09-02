@@ -58,7 +58,8 @@ export function productSeoAiInvalidOutputError(
               diagnostic.repairIssues,
             ),
           }
-          : {
+          : diagnostic.stage === "validation_final_faq_repair"
+            ? {
               ...diagnostic,
               generateIssues: normalizeProductSeoValidationIssues(
                 diagnostic.generateIssues,
@@ -70,7 +71,7 @@ export function productSeoAiInvalidOutputError(
                 diagnostic.finalFaqRepairIssues,
               ),
             }
-          : {
+            : {
               ...diagnostic,
               generateIssues: normalizeProductSeoValidationIssues(
                 diagnostic.generateIssues,
