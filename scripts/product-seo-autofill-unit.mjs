@@ -626,7 +626,7 @@ for (const { question, answer, repeats, isQuestion } of [
             ...item,
             question: "Когда лучше включать вечернюю практику?",
             answer: "Когда лучше включать вечернюю практику?",
-          },
+          }
         : item,
     ),
   });
