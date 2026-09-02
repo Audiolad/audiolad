@@ -953,13 +953,14 @@ for (const [question, expectedAnswer] of [
 // remains fail-closed after the third provider response.
 {
   const mixedResidualDraft = validDraft({
-    seoTitle: "Спокойный вечер без ключа",
     faqItems: validDraft().faqItems.map((item, index) =>
-      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+      index ? item : { ...item, answer: item.question },
     ),
   });
   const faqQuestionOnlyDraft = validDraft({
-    faqItems: mixedResidualDraft.faqItems,
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+    ),
   });
   const mixedResidualProvider = mockProvider([
     { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
@@ -978,7 +979,10 @@ for (const [question, expectedAnswer] of [
     stage: "validation_final_faq_repair",
     generateIssues: ["faq_answer_is_question"],
     repairIssues: ["faq_answer_is_question"],
-    finalFaqRepairIssues: ["primary_missing_from_title", "faq_answer_is_question"],
+    finalFaqRepairIssues: [
+      "faq_answer_repeats_question",
+      "faq_answer_is_question",
+    ],
   });
 }
 
