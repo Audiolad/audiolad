@@ -5,7 +5,10 @@ import {
   getProductSeoAiConfig,
   type ProductSeoAiConfig,
 } from "@/lib/seo/product-autofill/config";
-import { productSeoAiError } from "@/lib/seo/product-autofill/errors";
+import {
+  productSeoAiError,
+  productSeoAiInvalidOutputError,
+} from "@/lib/seo/product-autofill/errors";
 import {
   createProductSeoAiProvider,
   type ProductSeoAiProvider,
@@ -333,7 +336,13 @@ export async function generateProductSeoDraft(
       stage: "repair",
       issues: repairedValidation.issues,
     });
-    return productSeoAiError("INVALID_OUTPUT", repairedValidation.issues);
+    return productSeoAiInvalidOutputError(
+      {
+        stage: "validation_repair",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+      },
+    );
   }
 
   return { ok: true, data: repairedValidation.draft };

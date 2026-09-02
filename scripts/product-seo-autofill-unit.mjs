@@ -9,7 +9,10 @@ import {
   getProductSeoAiConfig,
   readProductSeoAiProvider,
 } from "../src/lib/seo/product-autofill/config.ts";
-import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "../src/lib/seo/product-autofill/errors.ts";
+import {
+  PRODUCT_SEO_AI_ERROR_MESSAGE,
+  productSeoAiInvalidOutputError,
+} from "../src/lib/seo/product-autofill/errors.ts";
 import {
   generateProductSeoDraft,
   normalizeManualSecondaryQueries,
@@ -199,6 +202,9 @@ function apiErrorBody(result) {
   return {
     error: result.error.message,
     code: result.error.code,
+    ...(result.error.code === "INVALID_OUTPUT" && result.error.diagnostic
+      ? { diagnostic: result.error.diagnostic }
+      : {}),
   };
 }
 
@@ -541,6 +547,19 @@ for (const issue of [
 ]) {
   assert.equal(normalizeProductSeoValidationIssue(issue), issue, issue);
 }
+{
+  const error = productSeoAiInvalidOutputError({
+    stage: "validation_repair",
+    generateIssues: ["ungrounded:duration:30 минут", "banned_claim:лечит"],
+    repairIssues: ["ungrounded:tracks:10 треков", "banned_claim:гарантирует"],
+  });
+  assert.deepEqual(error.error.diagnostic, {
+    stage: "validation_repair",
+    generateIssues: ["ungrounded:duration", "banned_claim"],
+    repairIssues: ["ungrounded:tracks", "banned_claim"],
+  });
+  assert.doesNotMatch(JSON.stringify(error), /30 минут|10 треков|лечит|гарантирует/);
+}
 
 const calls = [];
 const provider = {
@@ -729,6 +748,7 @@ await withEnvAsync(yandexEnv(), async () => {
   );
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.deepEqual(result.error.diagnostic, { stage: "provider_generate" });
 });
 
 await withEnvAsync(yandexEnv(), async () => {
@@ -747,6 +767,7 @@ await withEnvAsync(yandexEnv(), async () => {
   });
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.deepEqual(result.error.diagnostic, { stage: "provider_generate" });
 });
 
 await withEnvAsync(yandexEnv(), async () => {
@@ -804,6 +825,10 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
   assert.equal(fetchImpl.calls.length, 2);
+  assert.deepEqual(result.error.diagnostic, {
+    stage: "provider_repair",
+    generateIssues: ["primary_missing_from_title"],
+  });
 });
 
 for (const [label, status, expectedCode] of [
@@ -868,7 +893,11 @@ await withEnvAsync(yandexEnv(), async () => {
   });
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
-  assert.ok(result.error.issues.includes("primary_missing_from_title"));
+  assert.deepEqual(result.error.diagnostic, {
+    stage: "validation_repair",
+    generateIssues: ["primary_missing_from_title"],
+    repairIssues: ["primary_missing_from_title"],
+  });
 });
 
 // UI helpers and no-persist API.
@@ -919,6 +948,8 @@ assert.doesNotMatch(
   route.slice(route.indexOf("if (!result.ok)")),
   /issues|validationIssues|debug|provider/,
 );
+assert.match(route, /result\.error\.code === "INVALID_OUTPUT"/);
+assert.match(route, /\? \{ diagnostic: result\.error\.diagnostic \}/);
 
 await withEnvAsync(
   { PRODUCT_SEO_AI_ENABLED: "true", OPENAI_API_KEY: TEST_KEY, PRODUCT_SEO_AI_MODEL: undefined },
@@ -992,6 +1023,21 @@ const ungroundedDraft = validDraft({
   );
   assert.equal(captured.result.ok, false);
   assert.equal(captured.result.error.code, "INVALID_OUTPUT");
+  assert.deepEqual(captured.result.error.diagnostic, {
+    stage: "validation_repair",
+    generateIssues: [
+      "banned_claim",
+      "ungrounded:duration",
+      "ungrounded:tracks",
+      "ungrounded:price",
+    ],
+    repairIssues: [
+      "banned_claim",
+      "ungrounded:duration",
+      "ungrounded:tracks",
+      "ungrounded:price",
+    ],
+  });
   const payloads = validationFailurePayloads(captured.entries);
   assert.equal(payloads.length, 2);
   assert.equal(payloads[0].stage, "generate");
@@ -1001,8 +1047,8 @@ const ungroundedDraft = validDraft({
   assert.doesNotMatch(captured.text, new RegExp(TEST_YANDEX_KEY));
   assert.doesNotMatch(captured.text, new RegExp(TEST_YANDEX_FOLDER));
   const apiBody = apiErrorBody(captured.result);
-  assert.deepEqual(Object.keys(apiBody).sort(), ["code", "error"]);
-  assert.equal("issues" in apiBody, false);
+  assert.deepEqual(Object.keys(apiBody).sort(), ["code", "diagnostic", "error"]);
+  assert.doesNotMatch(JSON.stringify(apiBody), /30 минут|10 треков|499 ₽|лечит/);
 }
 
 console.log("product-seo-autofill-unit: ok");

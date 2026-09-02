@@ -86,13 +86,35 @@ export type ProductSeoAiErrorCode =
   | "MISSING_PRIMARY"
   | "INVALID_STYLE_PROFILE";
 
+export type ProductSeoInvalidOutputDiagnostic =
+  | {
+      stage: "provider_generate";
+    }
+  | {
+      stage: "provider_repair";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+    }
+  | {
+      stage: "validation_repair";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+      /** Category-only issues from the repaired draft validation; never generated or user-provided text. */
+      repairIssues: string[];
+    };
+
 export type ProductSeoAiErrorResult = {
   ok: false;
-  error: {
-    code: ProductSeoAiErrorCode;
-    message: string;
-    issues?: string[];
-  };
+  error:
+    | {
+        code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">;
+        message: string;
+      }
+    | {
+        code: "INVALID_OUTPUT";
+        message: string;
+        diagnostic: ProductSeoInvalidOutputDiagnostic;
+      };
 };
 
 export type ProductSeoAiSuccessResult = {

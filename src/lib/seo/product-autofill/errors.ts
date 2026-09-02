@@ -1,7 +1,9 @@
 import type {
   ProductSeoAiErrorCode,
   ProductSeoAiErrorResult,
+  ProductSeoInvalidOutputDiagnostic,
 } from "@/lib/seo/product-autofill/types";
+import { normalizeProductSeoValidationIssues } from "@/lib/seo/product-autofill/validate";
 
 export const PRODUCT_SEO_AI_ERROR_MESSAGE =
   "Не удалось подготовить SEO. Вы можете заполнить поля вручную или попробовать ещё раз позже.";
@@ -22,15 +24,46 @@ export const PRODUCT_SEO_AI_ERROR_MESSAGES: Record<
 };
 
 export function productSeoAiError(
-  code: ProductSeoAiErrorCode,
-  issues?: string[],
+  code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">,
 ): ProductSeoAiErrorResult {
   return {
     ok: false,
     error: {
       code,
       message: PRODUCT_SEO_AI_ERROR_MESSAGES[code],
-      ...(issues && issues.length > 0 ? { issues } : {}),
+    },
+  };
+}
+
+export function productSeoAiInvalidOutputError(
+  diagnostic: ProductSeoInvalidOutputDiagnostic,
+): ProductSeoAiErrorResult {
+  const normalizedDiagnostic: ProductSeoInvalidOutputDiagnostic =
+    diagnostic.stage === "provider_generate"
+      ? diagnostic
+      : diagnostic.stage === "provider_repair"
+        ? {
+            ...diagnostic,
+            generateIssues: normalizeProductSeoValidationIssues(
+              diagnostic.generateIssues,
+            ),
+          }
+        : {
+            ...diagnostic,
+            generateIssues: normalizeProductSeoValidationIssues(
+              diagnostic.generateIssues,
+            ),
+            repairIssues: normalizeProductSeoValidationIssues(
+              diagnostic.repairIssues,
+            ),
+          };
+
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_OUTPUT",
+      message: PRODUCT_SEO_AI_ERROR_MESSAGES.INVALID_OUTPUT,
+      diagnostic: normalizedDiagnostic,
     },
   };
 }
@@ -38,7 +71,7 @@ export function productSeoAiError(
 export function classifyProductSeoAiHttpError(
   status: number | null,
   requestError?: "timeout" | "network",
-): ProductSeoAiErrorCode {
+): Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT"> {
   if (requestError === "timeout") {
     return "TIMEOUT";
   }

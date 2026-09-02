@@ -8,6 +8,7 @@ import {
 import {
   classifyProductSeoAiHttpError,
   productSeoAiError,
+  productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import {
   buildProductSeoRepairPrompt,
@@ -206,10 +207,20 @@ function resultContainsSecret(value: unknown, secret: string | null): boolean {
 }
 
 function fail(
-  code: ProductSeoAiErrorCode,
-  issues?: string[],
+  code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">,
 ): ProductSeoAiErrorResult {
-  return productSeoAiError(code, issues);
+  return productSeoAiError(code);
+}
+
+function invalidOutput(
+  kind: "generate" | "repair",
+  generateIssues?: string[],
+): ProductSeoAiErrorResult {
+  return productSeoAiInvalidOutputError(
+    kind === "generate"
+      ? { stage: "provider_generate" }
+      : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
+  );
 }
 
 export function createYandexProductSeoAiProvider(
@@ -226,7 +237,7 @@ export function createYandexProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
-    input: ProductSeoAiPromptInput,
+    generateIssues?: string[],
   ): Promise<YandexProductSeoAiProviderResult> {
     const apiKey = readYandexAiApiKey(env);
     const folderId = readYandexAiFolderId(env);
@@ -283,7 +294,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind, generateIssues);
     }
 
     const text = alternative.text;
@@ -295,7 +306,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind, generateIssues);
     }
 
     const draft = parseDraftFromJsonText(text);
@@ -308,7 +319,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         latencyMs: attempt.latencyMs,
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind, generateIssues);
     }
 
     const result = { ok: true as const, draft, raw: attempt.body };
@@ -334,17 +345,16 @@ export function createYandexProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
-        input,
       );
     },
-    repair(input, previous, issues) {
+    repair(input, previous, generateIssues) {
       return callModel(
         {
           systemPrompt: buildProductSeoSystemPrompt(input),
-          userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
+          userPrompt: buildProductSeoRepairPrompt(input, previous, generateIssues),
         },
         "repair",
-        input,
+        generateIssues,
       );
     },
   };
