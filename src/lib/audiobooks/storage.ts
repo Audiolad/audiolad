@@ -3,7 +3,7 @@ import { AUDIOBOOK_LIMITS } from "./limits";
 export const AUDIOBOOK_FRAGMENTS_BUCKET = "audiobook-fragments";
 export function normalizeAudiobookMimeType(value: unknown) {
   if (typeof value !== "string") return null;
-  const mime = value.toLowerCase().trim().replace(/^audio\/x-m4a$/, "audio/mp4");
+  const mime = value.split(";", 1)[0].toLowerCase().trim().replace(/^audio\/x-m4a$/, "audio/mp4");
   return AUDIOBOOK_LIMITS.allowedMimeTypes.has(mime) ? mime : null;
 }
 export function sanitizeAudiobookFilename(value: unknown) {

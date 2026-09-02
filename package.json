@@ -24,6 +24,7 @@
     "test:studio-render-jobs-schema": "npx tsx scripts/studio-render-jobs-schema-unit.mts",
     "test:studio-render-export": "node scripts/studio-render-export-unit.mjs",
     "test:audiobook-fragment-storage": "node scripts/audiobook-fragment-storage-unit.mjs",
+    "test:audiobook-recorder": "node scripts/audiobook-recorder-unit.mjs",
     "run:studio-render-worker": "npx tsx scripts/run-studio-render-worker.mts",
     "test:studio-waveform-peaks": "npx tsx scripts/studio-waveform-peaks-unit.mjs",
     "test:studio-persistence-foundation": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-persistence-foundation-unit.mts",
