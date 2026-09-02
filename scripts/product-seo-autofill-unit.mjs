@@ -871,18 +871,226 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       aiRateLimit: createProductSeoAiRateLimitStore(),
     }),
   );
-  assert.equal(captured.result.ok, false);
-  assert.deepEqual(captured.result.error.diagnostic, {
-    stage: "validation_final_faq_repair",
-    generateIssues: ["faq_answer_is_question"],
-    repairIssues: ["faq_answer_is_question"],
-    finalFaqRepairIssues: ["faq_answer_is_question"],
+  assert.equal(captured.result.ok, true);
+  assert.equal(captured.result.data.faqItems[0].answer,
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.");
+  assert.equal(captured.result.data.seoTitle, stillQuestion.seoTitle);
+  assert.equal(captured.result.data.seoDescription, stillQuestion.seoDescription);
+  assert.deepEqual(captured.result.data.usageItems, stillQuestion.usageItems);
+  assert.deepEqual(
+    captured.result.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    stillQuestion.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+  );
+  assert.deepEqual(validateProductSeoAiDraft(captured.result.data, validationInput()), {
+    ok: true,
+    draft: captured.result.data,
   });
   const payloads = validationFailurePayloads(captured.entries);
   assert.deepEqual(
     payloads.map((payload) => payload.stage),
     ["generate", "repair", "final_faq_repair"],
   );
+}
+
+// The deterministic post-third-provider fallback is constrained to the exact
+// residual faq_answer_is_question issue. It makes no fourth provider call and
+// keeps all non-answer content intact.
+async function runDeterministicFaqFallback(question, answer, userId, requestOverride = {}) {
+  const questionOnlyDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, question, answer },
+    ),
+  });
+  const provider = mockProvider([
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(requestOverride), {
+    userId,
+    config,
+    provider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true, userId);
+  assert.equal(provider.calls.length, 3, userId);
+  assert.deepEqual(validateProductSeoAiDraft(result.data, validationInput()), {
+    ok: true,
+    draft: result.data,
+  });
+  return result.data.faqItems[0].answer;
+}
+
+// A — retain a declarative sentence after the final question mark.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Можно ли слушать медитация для сна?",
+    "Можно ли слушать медитация для сна? Практику можно включать в спокойной обстановке.",
+    "deterministic-faq-fallback-A",
+  ),
+  "Практику можно включать в спокойной обстановке.",
+);
+
+// B — change only a trailing question mark when that produces a declarative answer.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Кому подходит медитация для сна?",
+    "Практика подходит для спокойного вечернего прослушивания?",
+    "deterministic-faq-fallback-B",
+  ),
+  "Практика подходит для спокойного вечернего прослушивания.",
+);
+
+// C — use intent fallback when neither salvage is a valid declarative answer.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Когда лучше включать медитация для сна?",
+    "Можно ли слушать перед сном?",
+    "deterministic-faq-fallback-C",
+  ),
+  "Практику можно включить в спокойное время, когда удобно уделить внимание себе.",
+);
+
+// D — definition fallback is grounded only in the request title.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Что такое медитация для сна?",
+    "Можно ли слушать медитация для сна?",
+    "deterministic-faq-fallback-D",
+    { productKind: "audio_post" },
+  ),
+  "«Лавандовый сон» — аудиоматериал.",
+);
+
+for (const [question, expectedAnswer] of [
+  [
+    "Когда лучше включать медитация для сна?",
+    "Практику можно включить в спокойное время, когда удобно уделить внимание себе.",
+  ],
+  [
+    "Как использовать медитация для сна?",
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.",
+  ],
+  [
+    "Кому подходит медитация для сна?",
+    "Практика подойдёт тем, кому откликаются её тема и формат.",
+  ],
+  [
+    "Что такое медитация для сна?",
+    "«Лавандовый сон» — аудиоматериал.",
+  ],
+]) {
+  const questionOnlyDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, question, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const fallbackProvider = mockProvider([
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+  ]);
+  const fallbackResult = await generateProductSeoDraft(requestInput(), {
+    userId: `deterministic-faq-fallback-${question}`,
+    config,
+    provider: fallbackProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(fallbackResult.ok, true, question);
+  assert.equal(fallbackProvider.calls.length, 3, question);
+  assert.equal(fallbackResult.data.faqItems[0].answer, expectedAnswer, question);
+  assert.deepEqual(
+    fallbackResult.data.faqItems.map(({ question: itemQuestion, anchor }) => ({
+      question: itemQuestion,
+      anchor,
+    })),
+    questionOnlyDraft.faqItems.map(({ question: itemQuestion, anchor }) => ({
+      question: itemQuestion,
+      anchor,
+    })),
+    question,
+  );
+  assert.deepEqual(validateProductSeoAiDraft(fallbackResult.data, validationInput()), {
+    ok: true,
+    draft: fallbackResult.data,
+  });
+}
+
+// A residual issue set that contains anything besides faq_answer_is_question
+// remains fail-closed after the third provider response.
+{
+  const mixedResidualDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: item.question },
+    ),
+  });
+  const faqQuestionOnlyDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const mixedResidualProvider = mockProvider([
+    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
+    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
+    { ok: true, draft: mixedResidualDraft, raw: {} },
+  ]);
+  const mixedResidualResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-faq-fallback-mixed-residual",
+    config,
+    provider: mixedResidualProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(mixedResidualResult.ok, false);
+  assert.equal(mixedResidualProvider.calls.length, 3);
+  assert.deepEqual(mixedResidualResult.error.diagnostic, {
+    stage: "validation_final_faq_repair",
+    generateIssues: ["faq_answer_is_question"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: [
+      "faq_answer_repeats_question",
+      "faq_answer_is_question",
+    ],
+  });
+}
+
+// If a deterministic answer could introduce another violation, expose only
+// normalized category codes through a distinct safe diagnostic.
+{
+  const fallbackCollisionDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index === 1
+        ? {
+            ...item,
+            question: "Когда лучше включать медитация для сна?",
+            anchor: "kogda-meditatsiya",
+          }
+        : index
+          ? item
+          : {
+            ...item,
+            question: "Практика помогает спокойно познакомиться с темой в удобном для себя темпе.",
+            answer: "Можно ли слушать перед сном?",
+          },
+    ),
+  });
+  const fallbackCollisionResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-faq-fallback-diagnostic",
+    config,
+    provider: mockProvider([
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+    ]),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(fallbackCollisionResult.ok, false);
+  assert.deepEqual(fallbackCollisionResult.error.diagnostic, {
+    stage: "validation_deterministic_faq_fallback",
+    generateIssues: ["faq_answer_is_question"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: ["faq_answer_is_question"],
+    deterministicFaqFallbackIssues: ["faq_answer_is_question"],
+  });
 }
 
 // Production regression: an initial draft missing the primary in both metadata
