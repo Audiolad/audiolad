@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     (surface !== "author" && surface !== "product") ||
     (surface === "author" && practiceId !== null) ||
     (surface === "product" && !practiceId) ||
+    typeof amountMinor !== "number" ||
     !Number.isSafeInteger(amountMinor)
   ) {
     return error("invalid_request", 400);

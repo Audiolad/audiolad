@@ -2,18 +2,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   createGetCourseAppreciationDeal,
-} from "../src/lib/author-appreciation/getcourse/provider.ts";
+} from "../src/lib/author-appreciation/getcourse/provider";
 import {
   getAuthorAppreciationRolloutConfig,
   isAuthorAppreciationRolloutEnabled,
-} from "../src/lib/author-appreciation/config.ts";
-import { parseGetCourseCallback } from "../src/app/api/webhooks/getcourse/author-appreciation/route.ts";
+} from "../src/lib/author-appreciation/config";
+import { parseGetCourseCallback } from "../src/app/api/webhooks/getcourse/author-appreciation/route";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = process.cwd();
 const read = (file: string) => readFileSync(path.join(root, file), "utf8");
 
 const config = {
@@ -21,12 +20,16 @@ const config = {
   apiKey: "secret-not-logged",
   appreciationOfferId: "offer-1",
 };
-let request: Request | null = null;
+let requestUrl = "";
+let requestMethod = "";
+let requestBody = "";
 const deal = await createGetCourseAppreciationDeal(
   config,
   { email: "listener@example.test", amountMinor: 50_000, localDealNumber: "aa-test" },
   async (input, init) => {
-    request = new Request(input, init);
+    requestUrl = String(input);
+    requestMethod = init?.method ?? "";
+    requestBody = String(init?.body ?? "");
     return new Response(JSON.stringify({
       result: { deal_id: "deal-1", deal_number: "provider-1", payment_link: "https://pay.example.test/1" },
     }), { status: 200, headers: { "content-type": "application/json" } });
@@ -35,9 +38,9 @@ const deal = await createGetCourseAppreciationDeal(
 assert.equal(deal.dealId, "deal-1");
 assert.equal(deal.dealNumber, "provider-1");
 assert.equal(deal.paymentLink, "https://pay.example.test/1");
-assert.equal(request?.method, "POST");
-assert.match(request?.url ?? "", /^https:\/\/example\.getcourse\.ru\/pl\/api\/deals$/);
-const form = new URLSearchParams(await request!.text());
+assert.equal(requestMethod, "POST");
+assert.match(requestUrl, /^https:\/\/example\.getcourse\.ru\/pl\/api\/deals$/);
+const form = new URLSearchParams(requestBody);
 assert.equal(form.get("action"), "add");
 assert.equal(form.get("key"), config.apiKey);
 const params = JSON.parse(Buffer.from(form.get("params")!, "base64").toString("utf8"));
@@ -75,8 +78,10 @@ assert.doesNotMatch(migration, /\b(?:INSERT INTO|UPDATE|ALTER TABLE)\s+public\.(
 const checkout = read("src/app/api/author-appreciation/checkout/route.ts");
 assert.match(checkout, /isAllowedSupportRequestOrigin/);
 assert.match(checkout, /idempotency_key_required/);
-assert.match(checkout, /from\("author_appreciation_payment_intents"\)\.insert/);
-assert.ok(checkout.indexOf('.insert({') < checkout.indexOf("createGetCourseAppreciationDeal"));
+assert.match(checkout, /from\("author_appreciation_payment_intents"\)[\s\S]{0,80}\.insert/);
+assert.ok(
+  checkout.indexOf('.insert({') < checkout.indexOf("const deal = await createGetCourseAppreciationDeal"),
+);
 assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?:orders|payments|user_practices)"\)/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
