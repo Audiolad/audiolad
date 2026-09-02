@@ -15,11 +15,6 @@ import {
 } from "@/lib/seo/product-autofill/provider";
 import type { ProductSeoAiPromptInput } from "@/lib/seo/product-autofill/prompt";
 import {
-  consumeProductSeoAiUserRateLimit,
-  getProcessProductSeoAiRateLimit,
-  type ProductSeoAiRateLimitStore,
-} from "@/lib/seo/product-autofill/rate-limit";
-import {
   createDefaultProductSeoStyleProfile,
   requestHasForbiddenStyleKeys,
   sanitizeProductSeoStyleProfile,
@@ -81,7 +76,8 @@ function logProductSeoAiValidationFailed(input: {
     | "generate"
     | "repair"
     | "final_faq_repair"
-    | "deterministic_faq_fallback";
+    | "deterministic_faq_fallback"
+    | "deterministic_description_shorten";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -98,7 +94,6 @@ export type GenerateProductSeoDraftOptions = {
   env?: NodeJS.ProcessEnv;
   config?: ProductSeoAiConfig;
   provider?: ProductSeoAiProvider;
-  aiRateLimit?: ProductSeoAiRateLimitStore;
 };
 
 export type ParseProductSeoAutofillRequestResult =
@@ -229,11 +224,6 @@ export async function generateProductSeoDraft(
     return productSeoAiError("NOT_CONFIGURED");
   }
 
-  const aiRateLimit = options.aiRateLimit ?? getProcessProductSeoAiRateLimit();
-  if (!consumeProductSeoAiUserRateLimit(options.userId, aiRateLimit)) {
-    return productSeoAiError("RATE_LIMITED");
-  }
-
   const manualSecondaryQueries = normalizeManualSecondaryQueries(
     request.seoSecondaryQueries,
     primary,
@@ -354,6 +344,44 @@ export async function generateProductSeoDraft(
     };
   }
 
+  function shortenDescriptionDeterministically(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    const description = draft.seoDescription.trim();
+    if (description.length <= PRODUCT_CONTENT_LIMITS.seoDescription) {
+      return draft;
+    }
+
+    const allowedPrefix = description.slice(
+      0,
+      PRODUCT_CONTENT_LIMITS.seoDescription + 1,
+    );
+    const lastSentenceBoundary = Math.max(
+      allowedPrefix.lastIndexOf("."),
+      allowedPrefix.lastIndexOf("!"),
+      allowedPrefix.lastIndexOf("…"),
+    );
+    const shortenedAtSentenceBoundary =
+      lastSentenceBoundary >= 0
+        ? allowedPrefix.slice(0, lastSentenceBoundary + 1).trim()
+        : null;
+    const shortened = shortenedAtSentenceBoundary ?? description
+      .slice(0, PRODUCT_CONTENT_LIMITS.seoDescription)
+      .trim();
+
+    // Do not alter the description unless its exact primary-query spelling
+    // survives. A failed local fallback remains fail-closed with diagnostics.
+    if (
+      !shortened ||
+      shortened.length > PRODUCT_CONTENT_LIMITS.seoDescription ||
+      (primary && (!description.includes(primary) || !shortened.includes(primary)))
+    ) {
+      return draft;
+    }
+
+    return { ...draft, seoDescription: shortened };
+  }
+
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
   const first = await provider.generate(promptInput);
   if (!first.ok) {
@@ -413,6 +441,40 @@ export async function generateProductSeoDraft(
       stage: "repair",
       issues: repairedValidation.issues,
     });
+    if (
+      repairedValidation.issues.length === 1 &&
+      repairedValidation.issues[0] === "description_too_long"
+    ) {
+      const shortenedDescriptionDraft = shortenDescriptionDeterministically(repairedDraft);
+      const shortenedDescriptionValidation = validateProductSeoAiDraft(
+        shortenedDescriptionDraft,
+        {
+          primaryQuery: primary,
+          title: request.title,
+          subtitle: request.subtitle,
+          description: request.description,
+          productKind: request.productKind,
+          usageItems: request.usageItems ?? [],
+          manualSecondaryQueries,
+        },
+      );
+      if (shortenedDescriptionValidation.ok) {
+        return { ok: true, data: shortenedDescriptionValidation.draft };
+      }
+
+      logProductSeoAiValidationFailed({
+        provider: config.provider,
+        model: config.model,
+        stage: "deterministic_description_shorten",
+        issues: shortenedDescriptionValidation.issues,
+      });
+      return productSeoAiInvalidOutputError({
+        stage: "validation_deterministic_description_shorten",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+        deterministicDescriptionShortenIssues: shortenedDescriptionValidation.issues,
+      });
+    }
     if (hasOnlyFaqAnswerRepairIssues(repairedValidation.issues)) {
       const finalFaqRepaired = await provider.repair(
         promptInput,

@@ -71,7 +71,8 @@ export function productSeoAiInvalidOutputError(
                 diagnostic.finalFaqRepairIssues,
               ),
             }
-            : {
+            : diagnostic.stage === "validation_deterministic_faq_fallback"
+              ? {
               ...diagnostic,
               generateIssues: normalizeProductSeoValidationIssues(
                 diagnostic.generateIssues,
@@ -85,6 +86,18 @@ export function productSeoAiInvalidOutputError(
               deterministicFaqFallbackIssues: normalizeProductSeoValidationIssues(
                 diagnostic.deterministicFaqFallbackIssues,
               ),
+              }
+              : {
+                ...diagnostic,
+                generateIssues: normalizeProductSeoValidationIssues(
+                  diagnostic.generateIssues,
+                ),
+                repairIssues: normalizeProductSeoValidationIssues(
+                  diagnostic.repairIssues,
+                ),
+                deterministicDescriptionShortenIssues: normalizeProductSeoValidationIssues(
+                  diagnostic.deterministicDescriptionShortenIssues,
+                ),
             };
 
   return {

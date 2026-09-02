@@ -18,11 +18,6 @@ import {
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
 import {
-  consumeProductSeoAiOutboundSlot,
-  getProcessProductSeoAiRateLimit,
-  type ProductSeoAiRateLimitStore,
-} from "@/lib/seo/product-autofill/rate-limit";
-import {
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_TIMEOUT_MS,
   PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
@@ -51,7 +46,6 @@ export type YandexProductSeoAiProviderOptions = {
   timeoutMs?: number;
   env?: NodeJS.ProcessEnv;
   config?: ProductSeoAiConfig;
-  rateLimit?: ProductSeoAiRateLimitStore;
 };
 
 const BLOCKED_LOG_FIELDS = new Set([
@@ -230,8 +224,6 @@ export function createYandexProductSeoAiProvider(
   const config = options.config as ProductSeoAiConfig | undefined;
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? config?.timeoutMs ?? PRODUCT_SEO_AI_TIMEOUT_MS;
-  const rateLimit: ProductSeoAiRateLimitStore =
-    options.rateLimit ?? getProcessProductSeoAiRateLimit();
   const model = config?.model ?? PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL;
 
   async function callModel(
@@ -243,10 +235,6 @@ export function createYandexProductSeoAiProvider(
     const folderId = readYandexAiFolderId(env);
     if (!apiKey || !folderId) {
       return fail("NOT_CONFIGURED");
-    }
-
-    if (!consumeProductSeoAiOutboundSlot(rateLimit)) {
-      return fail("RATE_LIMITED");
     }
 
     const modelUri = buildYandexAiModelUri(folderId, model);
