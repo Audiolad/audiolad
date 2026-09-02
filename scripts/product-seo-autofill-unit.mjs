@@ -684,7 +684,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   const tooLongDescriptionWithoutPrimary =
     "Мягкая практика для спокойного завершения дня и вечернего отдыха. ".repeat(6);
   const repairedDescription =
-    "Медитация для сна помогает мягко завершить день, замедлиться перед отдыхом и настроиться на спокойный вечер в привычном ритме.";
+    "медитация для сна помогает мягко завершить день, замедлиться перед отдыхом и настроиться на спокойный вечер в привычном ритме.";
   assert.ok(tooLongDescriptionWithoutPrimary.length > 300);
   assert.ok(repairedDescription.length >= 120 && repairedDescription.length <= 180);
   assert.ok(repairedDescription.startsWith(requestInput().seoPrimaryQuery));
