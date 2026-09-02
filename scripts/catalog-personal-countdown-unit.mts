@@ -321,6 +321,21 @@ function testDirectPromoUnchanged() {
   assert.match(page, /PricePromotionStartHandler/, "PDP still mounts start handler");
   assert.match(startRoute, /start_practice_price_promotion/, "direct token still uses RPC");
   assert.match(
+    handler,
+    /const PROMOTION_START_TIMEOUT_MS = 8_000/,
+    "promo start has a bounded client timeout",
+  );
+  assert.match(
+    handler,
+    /signal: controller\.signal/,
+    "promo start aborts its only request after timeout",
+  );
+  assert.match(
+    handler,
+    /startedRef\.current = true/,
+    "promo start remains one request per mounted handler",
+  );
+  assert.match(
     page,
     /shouldMountPricePromotionStartHandler/,
     "author preview still blocks real start",
@@ -619,7 +634,7 @@ function testSeoAndSitemapStayCanonical() {
   assert.doesNotMatch(home, /buildPracticePromoStartPath|\?promo=/, "homepage has no promo query");
   assert.match(
     catalog,
-    /Omitted for sitemap\/home\/SEO/,
+    /Omit for listed-only public showcases: home, sitemap, topic hubs, author page/,
     "catalog documents crawler surfaces stay canonical",
   );
 

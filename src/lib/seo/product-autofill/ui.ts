@@ -2,23 +2,21 @@ import {
   evaluateProductSeoReadiness,
   type ProductSeoReadiness,
 } from "@/lib/seo/product-metadata";
+import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
-import type {
-  ProductSeoAccordionBadgeKind,
-  ProductSeoSecondaryQueryStatus,
-} from "@/lib/seo/product-autofill/types";
+import type { ProductSeoAccordionBadgeKind } from "@/lib/seo/product-autofill/types";
 
 export const PRODUCT_SEO_ACCORDION_TITLE = "SEO и продвижение";
 
 export const PRODUCT_SEO_SELLING_COPY =
-  "Хотите, чтобы вашу практику или продукт находили в Яндексе и Google? Заполните этот раздел. АудиоЛад поможет подобрать поисковые запросы и подготовить SEO-тексты.";
+  "Заполните этот раздел, чтобы помочь людям находить вашу практику или продукт в поиске. АудиоЛад поможет подготовить SEO-тексты.";
 
 export const PRODUCT_SEO_CLOSED_TEASER = "Мы можем подготовить SEO за вас.";
 
-export const PRODUCT_SEO_START_HEADING = "Начните с поискового запроса";
+export const PRODUCT_SEO_START_HEADING = "Поисковый запрос — по желанию";
 
 export const PRODUCT_SEO_START_TEXT =
-  "Выберите фразу, по которой люди могут искать такой продукт. Мы покажем реальные данные Яндекса и поможем подобрать подходящий вариант.";
+  "Можно выбрать фразу, по которой люди ищут такой продукт. Мы покажем реальные данные Яндекса и поможем подобрать подходящий вариант, а SEO-тексты можно подготовить и без запроса.";
 
 export const PRODUCT_SEO_PICK_PRIMARY_CTA = "Подобрать основной запрос";
 
@@ -36,8 +34,17 @@ export const PRODUCT_SEO_GENERATE_STAGE_TEXT = "Готовим текст…";
 export const PRODUCT_SEO_READINESS_HINT =
   "Чем полнее заполнен раздел, тем понятнее поисковым системам тема вашего продукта.";
 
+export type ProductSeoSecondaryUsage = {
+  id: "productDescription" | "title" | "description" | "usage" | "faq";
+  label: string;
+  queries: string[];
+};
+
 export const PRODUCT_SEO_OVERWRITE_CONFIRM =
   "Часть SEO уже заполнена. Заменить её новым вариантом?";
+
+export const PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM =
+  "Дополнительные фразы сохранятся. Заменить SEO-тексты новым вариантом?";
 
 export const PRODUCT_SEO_OVERWRITE_REPLACE = "Заменить";
 
@@ -184,16 +191,55 @@ export function productSeoPrimarySelectedLabel(primaryQuery: string): string {
   return `Основной запрос: «${primaryQuery.trim()}»`;
 }
 
-export function productSeoSecondaryStatusCopy(
-  status: ProductSeoSecondaryQueryStatus | null,
-): string | null {
-  if (status === "limited") {
-    return PRODUCT_SEO_SECONDARY_LIMITED_COPY;
-  }
+/** Normalizes only comparison surface: case, spacing, ё/е and punctuation. */
+export function normalizeProductSeoUsageText(value: string): string {
+  return ` ${value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ")} `;
+}
 
-  if (status === "none") {
-    return PRODUCT_SEO_SECONDARY_NONE_COPY;
-  }
+export function containsExactProductSeoQuery(text: string, query: string): boolean {
+  const normalizedQuery = normalizeProductSeoUsageText(query).trim();
+  return Boolean(normalizedQuery) &&
+    normalizeProductSeoUsageText(text).includes(` ${normalizedQuery} `);
+}
 
-  return null;
+export function getProductSeoSecondaryUsage(input: {
+  seoSecondaryQueries: string[];
+  productDescription: string;
+  seoTitle: string;
+  seoDescription: string;
+  usageItems: Array<{ content: string }>;
+  faqItems: Array<{ question: string; answer: string }>;
+  productKind: string;
+}): ProductSeoSecondaryUsage[] {
+  const fields: Array<Omit<ProductSeoSecondaryUsage, "queries"> & { text: string }> = [
+    {
+      id: "productDescription",
+      label: "О продукте",
+      text: input.productDescription,
+    },
+    { id: "title", label: "Заголовок для поиска", text: input.seoTitle },
+    { id: "description", label: "Описание для поиска", text: input.seoDescription },
+    {
+      id: "usage",
+      label: getPracticeSeoUsageHeading(input.productKind),
+      text: input.usageItems.map((item) => item.content).join("\n"),
+    },
+    {
+      id: "faq",
+      label: "Вопросы и ответы",
+      text: input.faqItems.map((item) => `${item.question}\n${item.answer}`).join("\n"),
+    },
+  ];
+
+  return fields.map(({ text, ...field }) => ({
+    ...field,
+    queries: input.seoSecondaryQueries.filter((query) =>
+      containsExactProductSeoQuery(text, query),
+    ),
+  }));
 }

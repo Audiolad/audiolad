@@ -67,5 +67,7 @@ export type PracticePageViewModel = {
     belowButtonText: string | null;
   } | null;
   promoStartToken: string | null;
+  /** Price is hidden only while a valid first-time `?promo=` start resolves. */
+  promoStartPending: boolean;
   publishPreview: PracticePagePublishPreview | null;
 };

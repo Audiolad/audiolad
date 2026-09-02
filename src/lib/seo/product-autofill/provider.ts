@@ -8,6 +8,7 @@ import {
 import {
   classifyProductSeoAiHttpError,
   productSeoAiError,
+  productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yandex-provider";
 import {
@@ -200,6 +201,7 @@ function createOpenAiProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
+    generateIssues?: string[],
   ): Promise<ProductSeoAiProviderResult> {
     const { systemPrompt, userPrompt } = prompts;
     const apiKey = readProductSeoAiApiKey(env);
@@ -257,7 +259,11 @@ function createOpenAiProductSeoAiProvider(
         model: config.model,
         error: "INVALID_OUTPUT",
       });
-      return productSeoAiError("INVALID_OUTPUT", ["malformed"]);
+      return productSeoAiInvalidOutputError(
+        kind === "generate"
+          ? { stage: "provider_generate" }
+          : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
+      );
     }
 
     const result = { ok: true as const, draft, raw: attempt.body };
@@ -283,13 +289,14 @@ function createOpenAiProductSeoAiProvider(
         "generate",
       );
     },
-    repair(input, previous, issues) {
+    repair(input, previous, generateIssues) {
       return callModel(
         {
           systemPrompt: buildProductSeoSystemPrompt(input),
-          userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
+          userPrompt: buildProductSeoRepairPrompt(input, previous, generateIssues),
         },
         "repair",
+        generateIssues,
       );
     },
   };

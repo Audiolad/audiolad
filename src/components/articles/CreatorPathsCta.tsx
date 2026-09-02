@@ -1,4 +1,3 @@
-import { SCHOOL_ORIGIN } from "@/lib/school/host";
 import type { ArticleCreatorPathsContinuation } from "@/lib/seo/articles";
 
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
@@ -6,6 +5,7 @@ const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
 type CreatorPathsCtaProps = {
   emphasis: ArticleCreatorPathsContinuation["emphasis"];
   placement: "top" | "bottom";
+  solutionsPromoHref: string;
 };
 
 function StudioVisual() {
@@ -37,49 +37,42 @@ function StudioVisual() {
   );
 }
 
-function SchoolVisual() {
+function SolutionsVisual() {
   return (
     <div
-      className="grid h-14 grid-cols-[1.25rem_1fr] items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-3"
+      className="flex h-14 items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-3"
       aria-hidden="true"
     >
-      <span className="flex flex-col items-center gap-0.5">
-        {[1, 2, 3].map((step) => (
-          <span
-            key={step}
-            className={[
-              "grid h-4 w-4 place-items-center rounded-full text-[9px] font-semibold",
-              step === 2
-                ? "bg-[#7042c5] text-white"
-                : "bg-[#eadff8] text-[#7d70a2]",
-            ].join(" ")}
-          >
-            {step}
-          </span>
-        ))}
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-[#7042c5] text-[10px] font-semibold leading-none tracking-tight text-white">
+        25
       </span>
-      <span className="flex flex-col gap-1.5">
-        <span className="h-1 w-[88%] rounded-full bg-[#c9b6ea]" />
-        <span className="h-1 w-[72%] rounded-full bg-[#c9b6ea]" />
-        <span className="h-1 w-[80%] rounded-full bg-[#c9b6ea]" />
+      <span className="relative h-7 w-10 shrink-0">
+        <span className="absolute left-[18px] top-[7px] h-[18px] w-3.5 rounded-[4px] bg-[#eadff8]" />
+        <span className="absolute left-[10px] top-[4px] h-[18px] w-3.5 rounded-[4px] bg-[#c9b6ea]" />
+        <span className="absolute left-0.5 top-px h-[18px] w-3.5 rounded-[4px] border border-[#dfd0f3] bg-white" />
       </span>
+      <span className="h-7 w-px bg-[#dfd0f3]" />
+      <span className="h-1.5 w-5 rounded-full bg-[#c9b6ea]" />
     </div>
   );
 }
 
 type CreatorPathCardProps = {
-  kind: "studio" | "school";
+  kind: "studio" | "solutions";
 };
 
-function CreatorPathCard({ kind }: CreatorPathCardProps) {
+function CreatorPathCard({
+  kind,
+  solutionsPromoHref,
+}: CreatorPathCardProps & Pick<CreatorPathsCtaProps, "solutionsPromoHref">) {
   const isStudio = kind === "studio";
   const title = isStudio
     ? "Уже готовы записать свою медитацию?"
-    : "Хотите научиться создавать медитации?";
+    : "Хотите готовые темы, тексты и инструкции?";
   const description = isStudio
     ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере – без специальных навыков и сложных программ."
-    : "Научитесь выбирать тему, писать сценарий, работать с голосом и создавать собственные аудиопрактики.";
-  const href = isStudio ? STUDIO_HREF : SCHOOL_ORIGIN;
+    : "Получите 25 готовых решений для создания своих медитаций – темы, тексты, шаблоны и пошаговые инструкции для старта.";
+  const href = isStudio ? STUDIO_HREF : solutionsPromoHref;
 
   return (
     <a
@@ -90,17 +83,10 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold tracking-[0.08em] text-[#7d70a2]">
-          {isStudio ? (
-            "СТУДИЯ АУДИОЛАД"
-          ) : (
-            <>
-              <span className="block">ШКОЛА</span>
-              <span className="block">АУДИОПРАКТИК</span>
-            </>
-          )}
+          {isStudio ? "СТУДИЯ АУДИОЛАД" : "25 ГОТОВЫХ РЕШЕНИЙ"}
         </p>
         <div className="w-[7.25rem] shrink-0">
-          {isStudio ? <StudioVisual /> : <SchoolVisual />}
+          {isStudio ? <StudioVisual /> : <SolutionsVisual />}
         </div>
       </div>
       <h3 className="mt-3 text-[17px] font-semibold leading-snug tracking-tight text-[#25135c] sm:text-lg">
@@ -110,7 +96,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
       <span className="mt-auto pt-3 text-sm font-semibold text-[#7042c5] group-hover:text-[#6338b0]">
         {isStudio
           ? "Попробуйте бесплатно прямо сейчас"
-          : "Посмотреть Школу Аудиопрактик"}
+          : "Посмотреть 25 готовых решений сейчас"}
         <span className="ml-1.5" aria-hidden="true">
           →
         </span>
@@ -122,6 +108,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
 export default function CreatorPathsCta({
   emphasis,
   placement,
+  solutionsPromoHref,
 }: CreatorPathsCtaProps) {
   return (
     <section
@@ -141,8 +128,14 @@ export default function CreatorPathsCta({
         </h2>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
-        <CreatorPathCard kind="studio" />
-        <CreatorPathCard kind="school" />
+        <CreatorPathCard
+          kind="studio"
+          solutionsPromoHref={solutionsPromoHref}
+        />
+        <CreatorPathCard
+          kind="solutions"
+          solutionsPromoHref={solutionsPromoHref}
+        />
       </div>
     </section>
   );

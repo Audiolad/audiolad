@@ -117,7 +117,7 @@ const STEP_META: Record<
   prepare_product: {
     title: "Подготовьте продукт к публикации",
     description:
-      "Добавьте обложку, описание и аудиозапись. Перед публикацией проверьте, как продукт будет выглядеть для слушателей.",
+      "Добавьте название и аудиозапись. Остальные поля можно заполнить позже.",
   },
   publish_product: {
     title: "Опубликуйте первый продукт",
@@ -131,12 +131,10 @@ const STEP_META: Record<
   },
 };
 
-/** User-facing readiness chips for step 3 (subset of shared publish rules). */
+/** User-facing readiness chips for the minimum moderation requirement. */
 export const ONBOARDING_VISIBLE_READINESS_KEYS = [
-  "description",
-  "cover",
+  "title",
   "audio",
-  "topics",
 ] as const;
 
 export function buildAuthorOnboardingStorageKey(authorId: string): string {

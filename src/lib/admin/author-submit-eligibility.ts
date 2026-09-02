@@ -1,7 +1,6 @@
 import {
   authorAccessAllowsContentMutations,
   authorAccessAllowsPaidProducts,
-  getPaidPricingDisabledReason,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import {
@@ -43,28 +42,6 @@ export type AuthorSubmitEligibilityInput = {
   price: number;
 };
 
-function resolveCommercialBlock(input: AuthorSubmitEligibilityInput): {
-  code: string;
-  message: string;
-} | null {
-  if (input.isFree && input.price === 0) {
-    return null;
-  }
-
-  if (authorAccessAllowsPaidProducts(input.accessStatus)) {
-    return null;
-  }
-
-  return {
-    code: "paid_products_not_allowed",
-    message:
-      getPaidPricingDisabledReason(
-        (input.accessStatus ?? "free") as AuthorAccessStatus,
-      ) ??
-      "Отправка будет отклонена: платные продукты недоступны при текущем статусе авторского доступа.",
-  };
-}
-
 /**
  * Mirrors AuthorProductForm submit/publish button visibility.
  * Diagnosis only — does not change the form.
@@ -101,7 +78,9 @@ export function evaluateAuthorSubmitEligibility(
     moderationStatus: input.moderationStatus,
     deletedAt: input.deletedAt,
   });
-  const commercialBlock = resolveCommercialBlock(input);
+  // Pricing is optional while a product is sent to moderation. Commercial
+  // eligibility is enforced only when a paid product is later published.
+  const commercialBlock = null;
 
   const base = {
     visibleStatus,
@@ -165,9 +144,7 @@ export function evaluateAuthorSubmitEligibility(
       actionLabel: "Отправить на модерацию",
       enabled: canEditPublicFields,
       reason: canEditPublicFields
-        ? commercialBlock
-          ? `Кнопка «Отправить на модерацию» видна, но отправка будет отклонена: ${commercialBlock.code} при access_status=${input.accessStatus ?? "—"}.`
-          : "Кнопка «Отправить на модерацию» видна и активна."
+        ? "Кнопка «Отправить на модерацию» видна и активна."
         : "Кнопка «Отправить на модерацию» неактивна: публичные поля нельзя редактировать.",
     };
   }
@@ -179,9 +156,7 @@ export function evaluateAuthorSubmitEligibility(
       actionLabel: "Повторно отправить на модерацию",
       enabled: canEditPublicFields,
       reason: canEditPublicFields
-        ? commercialBlock
-          ? `Кнопка повторной отправки видна, но отправка будет отклонена: ${commercialBlock.code} при access_status=${input.accessStatus ?? "—"}.`
-          : "Кнопка «Повторно отправить на модерацию» видна и активна."
+        ? "Кнопка «Повторно отправить на модерацию» видна и активна."
         : "Кнопка повторной отправки неактивна: публичные поля нельзя редактировать.",
     };
   }

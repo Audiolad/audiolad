@@ -259,14 +259,31 @@ assert.equal(
   resolveWordstatRequestPhrase(primaryCtaPlan.seed, "stale-full-title"),
   REQUEST_PHRASE,
 );
+assert.deepEqual(
+  planWordstatPickerOpen({
+    seoPrimaryQuery: "",
+    title: "",
+    autoSearch: shouldAutoSearchOnPrimaryCta(""),
+  }),
+  { seed: "", shouldSearch: false },
+  "EMPTY_TITLE_OPENS_PICKER_WITHOUT_INVALID_WORDSTAT_REQUEST",
+);
 
 const existingPrimaryPlan = planWordstatPickerOpen({
   seoPrimaryQuery: EXISTING_PRIMARY_WINS,
   title: TITLE_PIPE_SEED,
-  autoSearch: shouldAutoSearchOnPrimaryCta(EXISTING_PRIMARY_WINS),
+  autoSearch: true,
 });
 assert.equal(existingPrimaryPlan.seed, EXISTING_PRIMARY_WINS);
-assert.equal(existingPrimaryPlan.shouldSearch, false);
+assert.equal(existingPrimaryPlan.shouldSearch, true);
+
+const secondaryCtaPlan = planWordstatPickerOpen({
+  seoPrimaryQuery: EXISTING_PRIMARY_WINS,
+  title: TITLE_PIPE_SEED,
+  seedOverride: EXISTING_PRIMARY_WINS,
+  autoSearch: true,
+});
+assert.equal(secondaryCtaPlan.shouldSearch, true);
 
 const primaryCtaRequest = buildWordstatSuggestionsRequest(primaryCtaPlan.seed);
 assert.equal(primaryCtaRequest.init.method, "POST");
@@ -868,26 +885,7 @@ assert.equal(invalidQueryJson.includes(TEST_FOLDER), false);
 assert.doesNotMatch(invalidQueryJson, /Api-Key|folderId|Authorization/i);
 
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-const wordstatPicker = read(
-  "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
-);
-assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
-assert.match(seoSection, /shouldAutoSearchOnPrimaryCta\(seoPrimaryQuery\)/);
-assert.match(seoSection, /planWordstatPickerOpen/);
-assert.match(seoSection, /void submitWordstat\(seed\)/);
-assert.match(seoSection, /resolveWordstatRequestPhrase\(seedOverride, wordstatSeed\)/);
-assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
-assert.match(seoSection, /onSubmit=\{\(\) => \{\s*void submitWordstat\(\);/);
-assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
-assert.doesNotMatch(seoSection, /primarySeeds/);
-assert.doesNotMatch(seoSection, /setWordstatSeed\(seed\);\s*void submitWordstat\(\)/);
-assert.match(wordstatPicker, /Выбрать основным/);
-assert.match(wordstatPicker, /\+ В дополнительные/);
-assert.match(wordstatPicker, /wordstatColorClasses/);
-assert.match(wordstatPicker, /formatWordstatCount/);
-assert.match(wordstatPicker, /item\.phrase/);
-assert.match(seoSection, /wordstatClientErrorMessage/);
-assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
+assert.doesNotMatch(seoSection, /wordstat|Подобрать похожие/i);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

@@ -3,19 +3,13 @@ import {
   containsSeoPhrase,
   normalizeSeoPhrase,
 } from "@/lib/seo/product-metadata";
-import { clipSeoQuery, isSameSeoQuery } from "@/lib/seo/wordstat/ui";
-import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
 import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
-import type { EligibleSecondaryCandidate } from "@/lib/seo/product-autofill/select-secondaries";
 import {
   PRODUCT_SEO_FAQ_GENERATED_COUNT,
-  PRODUCT_SEO_SECONDARY_MAX,
-  PRODUCT_SEO_SECONDARY_MIN,
   PRODUCT_SEO_USAGE_MAX,
   PRODUCT_SEO_USAGE_MIN,
   type ProductSeoAiRawDraft,
   type ProductSeoAutofillDraft,
-  type ProductSeoSecondaryQueryStatus,
 } from "@/lib/seo/product-autofill/types";
 
 export const BANNED_SEO_CLAIM_PATTERNS: RegExp[] = [
@@ -44,7 +38,7 @@ export type ProductSeoValidationInput = {
   description: string;
   productKind: string;
   usageItems: string[];
-  candidates: EligibleSecondaryCandidate[];
+  manualSecondaryQueries: string[];
 };
 
 export type ProductSeoValidationResult =
@@ -81,56 +75,12 @@ export function normalizeProductSeoValidationIssues(issues: string[]): string[] 
   return issues.map(normalizeProductSeoValidationIssue);
 }
 
-export function expectedSecondaryRange(candidateCount: number): {
-  min: number;
-  max: number;
-} {
-  if (candidateCount <= 0) {
-    return { min: 0, max: 0 };
-  }
-
-  if (candidateCount < PRODUCT_SEO_SECONDARY_MIN) {
-    return { min: 1, max: candidateCount };
-  }
-
-  return {
-    min: PRODUCT_SEO_SECONDARY_MIN,
-    max: Math.min(PRODUCT_SEO_SECONDARY_MAX, candidateCount),
-  };
-}
-
-export function resolveSecondaryQueryStatus(
-  selectedCount: number,
-): ProductSeoSecondaryQueryStatus {
-  if (selectedCount <= 0) {
-    return "none";
-  }
-
-  if (selectedCount < PRODUCT_SEO_SECONDARY_MIN) {
-    return "limited";
-  }
-
-  return "complete";
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function readString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
-}
-
-function readStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  if (value.some((item) => typeof item !== "string")) {
-    return null;
-  }
-
-  return value as string[];
 }
 
 export function parseProductSeoAiRawDraft(
@@ -140,11 +90,9 @@ export function parseProductSeoAiRawDraft(
     return null;
   }
 
-  const secondaryQueries = readStringArray(value.secondaryQueries);
   const seoTitle = readString(value.seoTitle);
   const seoDescription = readString(value.seoDescription);
   if (
-    !secondaryQueries ||
     seoTitle === null ||
     seoDescription === null ||
     !Array.isArray(value.usageItems) ||
@@ -179,7 +127,6 @@ export function parseProductSeoAiRawDraft(
   }
 
   return {
-    secondaryQueries,
     seoTitle,
     seoDescription,
     usageItems,
@@ -243,6 +190,31 @@ function uniqueAnchors(faqItems: ProductSeoAiRawDraft["faqItems"]): boolean {
   return anchors.length === faqItems.length && new Set(anchors).size === anchors.length;
 }
 
+export function faqAnswerRepeatsQuestion(question: string, answer: string): boolean {
+  const words = (text: string) =>
+    normalizeSeoPhrase(text)
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(" ")
+    .filter((word) => word.length > 2);
+  const questionWords = words(question);
+  const answerWords = words(answer);
+  if (questionWords.length < 3 || answerWords.length < 3) {
+    return false;
+  }
+
+  const questionSet = new Set(questionWords);
+  const answerSet = new Set(answerWords);
+  const shared = [...answerSet].filter((word) => questionSet.has(word)).length;
+  return shared / answerSet.size >= 0.8 || shared / questionSet.size >= 0.8;
+}
+
+const FAQ_ANSWER_QUESTION_LEAD_PATTERN =
+  /^[\s«“"(\[]*(?:(?:что\s+(?:такое|значит|означает|делать)|как\s+(?:работает|использовать|слушать|выбрать)|когда\s+(?:лучше|нужно|стоит)|кому\s+(?:подходит|подойд[её]т)|(?:можно|нужно|стоит|следует)\s+ли|почему\s+(?:это|так|нужно|следует)|зачем\s+(?:это|нужно|следует))(?:\s|[,.!?:;]|$))/iu;
+
+export function faqAnswerIsQuestion(answer: string): boolean {
+  return answer.includes("?") || FAQ_ANSWER_QUESTION_LEAD_PATTERN.test(answer.trim());
+}
+
 export function validateProductSeoAiDraft(
   raw: unknown,
   input: ProductSeoValidationInput,
@@ -254,62 +226,6 @@ export function validateProductSeoAiDraft(
 
   const issues: string[] = [];
   const primary = input.primaryQuery.trim();
-  if (!primary) {
-    issues.push("missing_primary");
-  }
-
-  const allowed = new Set(
-    input.candidates.map((item) => wordstatPhraseKey(item.phrase)),
-  );
-  const secondaries: string[] = [];
-  const secondaryKeys = new Set<string>();
-
-  for (const phrase of parsed.secondaryQueries) {
-    const clipped = clipSeoQuery(phrase, PRODUCT_CONTENT_LIMITS.seoSecondaryQuery);
-    if (!clipped) {
-      issues.push("empty_secondary");
-      continue;
-    }
-
-    if (clipped.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery) {
-      issues.push("secondary_too_long");
-    }
-
-    const key = wordstatPhraseKey(clipped);
-    if (!allowed.has(key)) {
-      issues.push(`invented_secondary:${clipped}`);
-      continue;
-    }
-
-    if (isSameSeoQuery(clipped, primary)) {
-      issues.push("secondary_equals_primary");
-      continue;
-    }
-
-    if (secondaryKeys.has(key)) {
-      issues.push("duplicate_secondary");
-      continue;
-    }
-
-    secondaryKeys.add(key);
-    secondaries.push(clipped);
-  }
-
-  if (secondaries.length > PRODUCT_SEO_SECONDARY_MAX) {
-    issues.push("too_many_secondaries");
-  }
-
-  if (secondaries.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQueries) {
-    issues.push("secondary_limit");
-  }
-
-  const expectedSecondaries = expectedSecondaryRange(input.candidates.length);
-  if (
-    secondaries.length < expectedSecondaries.min ||
-    secondaries.length > expectedSecondaries.max
-  ) {
-    issues.push("secondary_count");
-  }
 
   const seoTitle = parsed.seoTitle.trim();
   const seoDescription = parsed.seoDescription.trim();
@@ -405,6 +321,16 @@ export function validateProductSeoAiDraft(
     issues.push("primary_missing_from_faq");
   }
 
+  if (
+    faqItems.some((item) => faqAnswerRepeatsQuestion(item.question, item.answer))
+  ) {
+    issues.push("faq_answer_repeats_question");
+  }
+
+  if (faqItems.some((item) => faqAnswerIsQuestion(item.answer))) {
+    issues.push("faq_answer_is_question");
+  }
+
   const allText = [
     seoTitle,
     seoDescription,
@@ -418,7 +344,7 @@ export function validateProductSeoAiDraft(
     input.productKind,
     getPracticeSeoUsageHeading(input.productKind),
     primary,
-    ...secondaries,
+    ...input.manualSecondaryQueries,
     ...input.usageItems,
   ].join("\n");
 
@@ -432,12 +358,11 @@ export function validateProductSeoAiDraft(
   return {
     ok: true,
     draft: {
-      seoSecondaryQueries: secondaries.slice(0, PRODUCT_SEO_SECONDARY_MAX),
+      seoSecondaryQueries: input.manualSecondaryQueries,
       seoTitle,
       seoDescription,
       usageItems,
       faqItems,
-      secondaryQueryStatus: resolveSecondaryQueryStatus(secondaries.length),
     },
   };
 }

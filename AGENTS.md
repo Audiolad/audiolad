@@ -192,13 +192,13 @@ ARTICLE TYPE: listen
 - `practice` — использовать только `PracticeArticleDefinition` и practice
   template с обязательной связанной практикой.
 - `creator` — использовать только `CreatorArticleDefinition` и
-  `creator_paths` template со Студией и Школой.
+  `creator_paths` template со Студией и продуктом «25 готовых решений».
 - `listen` — использовать только модуль `src/lib/seo/listens`, не
   `ArticleDefinition`. Явный `playlistSlug` обязателен, угадывать нельзя.
   Static playlist items запрещены. `primaryPractice` не нужен.
   `ArticleAudioBlock` запрещён. `CreatorPathsCta` запрещён.
-  Studio / School continuation запрещены. Authoritative content нельзя
-  переписывать.
+  Studio / «25 готовых решений» continuation запрещены. Authoritative
+  content нельзя переписывать.
 
 ---
 

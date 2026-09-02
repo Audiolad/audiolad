@@ -76,10 +76,13 @@ function readingTimeLabel(minutes: number): string {
 const SECTION_SCROLL_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
 const STUDIO_MEDITATION_HREF = "https://audiolad.ru/studio/meditation";
+const SOLUTIONS_HREF =
+  "https://audiolad.ru/practice/sergey-petrov/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy";
 
 function shouldOpenCreatorProductLinkInNewTab(href: string): boolean {
   return (
     href === STUDIO_MEDITATION_HREF ||
+    href === SOLUTIONS_HREF ||
     href === SCHOOL_ORIGIN ||
     href === `${SCHOOL_ORIGIN}/`
   );
@@ -296,6 +299,7 @@ function CreatorPathsArticlePageView({
           <CreatorPathsCta
             emphasis={article.productContinuation.emphasis}
             placement="top"
+            solutionsPromoHref={data.solutionsPromoHref}
           />
         </div>
 
@@ -415,6 +419,7 @@ function CreatorPathsArticlePageView({
           <CreatorPathsCta
             emphasis={article.productContinuation.emphasis}
             placement="bottom"
+            solutionsPromoHref={data.solutionsPromoHref}
           />
         </div>
 

@@ -1,30 +1,18 @@
 import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
-import type { EligibleSecondaryCandidate } from "@/lib/seo/product-autofill/select-secondaries";
 import {
   createDefaultProductSeoStyleProfile,
   productSeoStylePromptLines,
 } from "@/lib/seo/product-autofill/style-profile";
 import type { ProductSeoAutofillRequest } from "@/lib/seo/product-autofill/types";
-import { expectedSecondaryRange } from "@/lib/seo/product-autofill/validate";
 
 export const PRODUCT_SEO_AI_SCHEMA_NAME = "product_seo_draft";
 
 export const PRODUCT_SEO_AI_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "secondaryQueries",
-    "seoTitle",
-    "seoDescription",
-    "usageItems",
-    "faqItems",
-  ],
+  required: ["seoTitle", "seoDescription", "usageItems", "faqItems"],
   properties: {
-    secondaryQueries: {
-      type: "array",
-      items: { type: "string" },
-    },
     seoTitle: { type: "string" },
     seoDescription: { type: "string" },
     usageItems: {
@@ -56,40 +44,10 @@ export const PRODUCT_SEO_AI_JSON_SCHEMA = {
 
 export type ProductSeoAiPromptInput = {
   request: ProductSeoAutofillRequest;
-  candidates: EligibleSecondaryCandidate[];
 };
-
-export function buildProductSeoAiJsonSchema(
-  input: Pick<ProductSeoAiPromptInput, "candidates"> | number,
-) {
-  const candidateCount =
-    typeof input === "number" ? input : input.candidates.length;
-  const { min, max } = expectedSecondaryRange(candidateCount);
-  const phrases =
-    typeof input === "number" ? [] : input.candidates.map((c) => c.phrase);
-  const items =
-    phrases.length === 0
-      ? { type: "string" as const }
-      : { type: "string" as const, enum: phrases };
-
-  return {
-    ...PRODUCT_SEO_AI_JSON_SCHEMA,
-    properties: {
-      ...PRODUCT_SEO_AI_JSON_SCHEMA.properties,
-      secondaryQueries: {
-        ...PRODUCT_SEO_AI_JSON_SCHEMA.properties.secondaryQueries,
-        items,
-        minItems: min,
-        maxItems: max,
-        uniqueItems: true,
-      },
-    },
-  };
-}
 
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
-  const secondaryRange = expectedSecondaryRange(input.candidates.length);
   return [
     `Название продукта: ${input.request.title.trim() || "—"}`,
     `Подзаголовок: ${input.request.subtitle.trim() || "—"}`,
@@ -100,16 +58,6 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
     usage.length > 0
       ? `Уже указанные ситуации использования: ${usage.join("; ")}`
       : "Уже указанные ситуации использования: нет",
-    "Кандидаты дополнительных фраз из Яндекса (можно выбрать только из этого списка, частотность уже известна и её нельзя придумывать):",
-    input.candidates.length > 0
-      ? input.candidates
-          .map(
-            (item) =>
-              `- ${item.phrase} | count=${item.count} | color=${item.color} | source=${item.source}`,
-          )
-          .join("\n")
-      : "нет подходящих кандидатов — верните пустой массив secondaryQueries",
-    `Допустимое число secondaryQueries: ${secondaryRange.min}–${secondaryRange.max}.`,
     ...productSeoStylePromptLines(
       input.request.styleProfile ?? createDefaultProductSeoStyleProfile(),
     ),
@@ -119,12 +67,12 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
 function faqItemsSystemInstruction(primaryQuery: string): string {
   const verbatimRequirement = primaryQuery
     ? `Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «${primaryQuery}». Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.`
-    : "Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно. Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно.";
+    : "Основной запрос не выбран: не выдумывай его и не добавляй требование включить его в FAQ.";
 
   return [
     "faqItems: ровно 3 пары вопрос/ответ.",
-    verbatimRequirement,
-    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения. У каждого уникальный якорь-латиница.",
+    `${verbatimRequirement} Q1.question должен быть сформулирован как вопрос и заканчиваться знаком «?».`,
+    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения, отвечают по существу и являются утверждениями: не повторяют или не перефразируют question, не содержат знак «?» и не начинаются с вопросительных формулировок. Основной запрос в answer не обязателен. У каждого уникальный якорь-латиница.",
   ].join(" ");
 }
 
@@ -132,30 +80,72 @@ export function buildRepairIssueInstructions(
   issues: string[],
   primaryQuery: string,
 ): string[] {
-  if (!issues.includes("primary_missing_from_faq")) {
-    return [];
-  }
-
+  const instructions: string[] = [];
   const query = primaryQuery.trim();
-  if (!query) {
-    return [];
+  const primaryFields = [
+    issues.includes("primary_missing_from_title") ? "seoTitle" : null,
+  ].filter((field): field is "seoTitle" => Boolean(field));
+  if (query && primaryFields.length > 0) {
+    instructions.push(
+      [
+        "Исправление основного запроса обязательно:",
+        `дословно включи полный основной запрос «${query}» в ${primaryFields.join(" и ")}.`,
+        "Не изменяй слова запроса, их порядок или словоформу.",
+        `Измени ${primaryFields.join(" и ")} для этой проблемы; также исправь другие поля, если для них перечислены отдельные проблемы.`,
+      ].join(" "),
+    );
   }
 
-  return [
-    [
-      "Исправление FAQ обязательно:",
-      `один faqItems.question, предпочтительно Q1, должен дословно содержать основной запрос: «${query}».`,
-      "Измени только необходимый вопрос FAQ.",
-      "Не переноси запрос только в answer.",
-    ].join(" "),
-  ];
+  if (
+    issues.includes("description_too_long") ||
+    issues.includes("primary_missing_from_description")
+  ) {
+    instructions.push(
+      query
+        ? [
+            "Исправление seoDescription обязательно:",
+            "измени seoDescription так, чтобы его длина была 120–180 символов и не превышала 300 символов.",
+            `Начни seoDescription с полного основного запроса «${query}» дословно и используй его ровно один раз.`,
+            "Не изменяй слова запроса, их порядок или словоформу.",
+            "Также исправь другие поля, если для них перечислены отдельные проблемы.",
+          ].join(" ")
+        : [
+            "Исправление seoDescription обязательно:",
+            "измени seoDescription так, чтобы его длина была 120–180 символов и не превышала 300 символов.",
+            "Также исправь другие поля, если для них перечислены отдельные проблемы.",
+          ].join(" "),
+    );
+  }
+
+  if (issues.includes("primary_missing_from_faq")) {
+    if (query) {
+      instructions.push(
+        [
+          "Исправление FAQ обязательно:",
+          `один faqItems.question, предпочтительно Q1, должен дословно содержать основной запрос: «${query}».`,
+          "Измени необходимый вопрос FAQ для этой проблемы и сохрани его anchor дословно.",
+          "Также исправь другие поля, если для них перечислены отдельные проблемы.",
+          "Не переноси запрос только в answer.",
+        ].join(" "),
+      );
+    }
+  }
+
+  if (
+    issues.includes("faq_answer_repeats_question") ||
+    issues.includes("faq_answer_is_question")
+  ) {
+    instructions.push(
+      "Исправление FAQ обязательно: для каждого ответа, который повторяет или перефразирует свой question либо сформулирован как вопрос, измени только его faqItems.answer. Ответь по существу коротким утверждением: без знака «?», без вопросительной формулировки и без начала с вопросительных конструкций («что», «как», «когда», «кому», «можно ли» и подобных). Сохрани faqItems.question и anchor таких пунктов дословно. Исправь другие поля только при наличии отдельной перечисленной проблемы; не меняй ответы FAQ без этой проблемы.",
+    );
+  }
+
+  return instructions;
 }
 
 export function buildProductSeoSystemPrompt(
   input?: ProductSeoAiPromptInput,
 ): string {
-  const candidateCount = input?.candidates.length ?? 0;
-  const secondaryRange = expectedSecondaryRange(candidateCount);
   const primaryQuery = input?.request.seoPrimaryQuery.trim() ?? "";
   const styleLines = input
     ? productSeoStylePromptLines(
@@ -168,11 +158,14 @@ export function buildProductSeoSystemPrompt(
     "Пиши естественным русским языком. Не обещай позиций, индексацию, ТОП или трафик.",
     "Не выдумывай факты, которых нет в исходном контексте: длительность, число треков, голос, конкретную музыку, автора, технику, цену, срок доступа, противопоказания, лечебный эффект.",
     "Запрещены формулировки вроде: лечит, исцеляет, устраняет бессонницу, избавляет от тревоги, гарантирует.",
-    `secondaryQueries: выбери ${secondaryRange.min}–${secondaryRange.max} фраз строго из переданного списка кандидатов Яндекса. Если кандидатов нет, верни пустой массив. Не выдумывай новые фразы и не меняй частотность. Предпочитай green, yellow только если фраза очень уместна, red не выбирай, если есть другие варианты.`,
-    "seoTitle: естественный заголовок, основной запрос один раз ближе к началу, без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Стиль почти не влияет на заголовок.",
-    "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Основной запрос один раз естественно.",
+    primaryQuery
+      ? `seoTitle: естественный заголовок, дословно содержит полный основной запрос «${primaryQuery}» отдельной последовательностью слов один раз ближе к началу. Не изменяй слова запроса, их порядок или словоформу. Без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Стиль почти не влияет на заголовок.`
+      : "seoTitle: естественный заголовок без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Не выдумывай основной запрос.",
+    primaryQuery
+      ? `seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Начинается с полного основного запроса «${primaryQuery}» дословно и содержит его ровно один раз. Не изменяй слова запроса, их порядок или словоформу.`
+      : "seoDescription: 120–180 символов, максимум 300. Что это, для кого, что получает слушатель. Не выдумывай основной запрос.",
     `Поле description («${AUTHOR_DESCRIPTION_LABEL}») уже задано автором и будет показано на публичной странице. Используй его только как источник фактов. Не переписывай, не пересказывай и не заменяй его. Не генерируй отдельный текст «о продукте» и не возвращай поле seoAbout.`,
-    "usageItems: 3–5 конкретных ситуаций, которые следуют из продукта.",
+    "usageItems: ровно 3 конкретные ситуации, которые следуют из продукта.",
     faqItemsSystemInstruction(primaryQuery),
     "Не генерируй связанные продукты и URL.",
     "Не используй одну универсальную структуру для всех продуктов.",
@@ -196,7 +189,7 @@ export function buildProductSeoRepairPrompt(
 ): string {
   return [
     "Предыдущий черновик не прошёл проверку. Исправь только указанные проблемы.",
-    "Нельзя придумывать дополнительные фразы вне списка кандидатов Яндекса.",
+    "Если проблем несколько, исправь все поля, затронутые каждой из них; ограничения для одной проблемы не запрещают изменения, необходимые для другой.",
     "Не переписывай описание продукта. Используй его только как источник фактов.",
     ...buildRepairIssueInstructions(issues, input.request.seoPrimaryQuery),
     `Проблемы: ${issues.join("; ")}`,

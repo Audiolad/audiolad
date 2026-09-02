@@ -5,7 +5,10 @@ import {
   getProductSeoAiConfig,
   type ProductSeoAiConfig,
 } from "@/lib/seo/product-autofill/config";
-import { productSeoAiError } from "@/lib/seo/product-autofill/errors";
+import {
+  productSeoAiError,
+  productSeoAiInvalidOutputError,
+} from "@/lib/seo/product-autofill/errors";
 import {
   createProductSeoAiProvider,
   type ProductSeoAiProvider,
@@ -16,14 +19,14 @@ import {
   getProcessProductSeoAiRateLimit,
   type ProductSeoAiRateLimitStore,
 } from "@/lib/seo/product-autofill/rate-limit";
-import { canonicalizeYandexSecondaryQueries } from "@/lib/seo/product-autofill/canonicalize-secondaries";
-import { eligibleSecondaryCandidates } from "@/lib/seo/product-autofill/select-secondaries";
 import {
   createDefaultProductSeoStyleProfile,
   requestHasForbiddenStyleKeys,
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
 import {
+  faqAnswerIsQuestion,
+  faqAnswerRepeatsQuestion,
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
@@ -33,13 +36,6 @@ import {
   type ProductSeoAiResult,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
-import {
-  fetchWordstatSuggestions,
-  type WordstatClientOptions,
-} from "@/lib/seo/wordstat/client";
-import type { WordstatCacheStore } from "@/lib/seo/wordstat/cache";
-import type { WordstatRateLimitStore } from "@/lib/seo/wordstat/rate-limit";
-import type { WordstatSuggestion } from "@/lib/seo/wordstat/types";
 
 const BLOCKED_LOG_FIELDS = new Set([
   "token",
@@ -81,7 +77,7 @@ function logProductSeoAiEvent(
 function logProductSeoAiValidationFailed(input: {
   provider: ProductSeoAiConfig["provider"];
   model: string;
-  stage: "generate" | "repair";
+  stage: "generate" | "repair" | "final_faq_repair";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -98,19 +94,49 @@ export type GenerateProductSeoDraftOptions = {
   env?: NodeJS.ProcessEnv;
   config?: ProductSeoAiConfig;
   provider?: ProductSeoAiProvider;
-  wordstat?: {
-    fetchImpl?: WordstatClientOptions["fetchImpl"];
-    cache?: WordstatCacheStore;
-    rateLimit?: WordstatRateLimitStore;
-    env?: NodeJS.ProcessEnv;
-  };
   aiRateLimit?: ProductSeoAiRateLimitStore;
-  wordstatSuggestions?: WordstatSuggestion[];
 };
 
 export type ParseProductSeoAutofillRequestResult =
   | { ok: true; request: ProductSeoAutofillRequest }
   | { ok: false; code: Extract<ProductSeoAiErrorCode, "INVALID_PRIMARY" | "INVALID_STYLE_PROFILE"> };
+
+function secondaryQueryKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
+}
+
+export function normalizeManualSecondaryQueries(
+  value: unknown,
+  primaryQuery: string,
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const primaryKey = secondaryQueryKey(primaryQuery);
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const phrase = item.trim().replace(/\s+/g, " ");
+    const key = secondaryQueryKey(phrase);
+    if (
+      !phrase ||
+      phrase.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery ||
+      key === primaryKey ||
+      seen.has(key) ||
+      normalized.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries
+    ) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push(phrase);
+  }
+
+  return normalized;
+}
 
 function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResult {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -140,7 +166,10 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
   const usageItems = Array.isArray(record.usageItems)
     ? record.usageItems.filter((item): item is string => typeof item === "string")
     : [];
-
+  const seoSecondaryQueries = normalizeManualSecondaryQueries(
+    record.seoSecondaryQueries,
+    record.seoPrimaryQuery,
+  );
   return {
     ok: true,
     request: {
@@ -149,6 +178,7 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
       description: record.description,
       productKind: record.productKind,
       seoPrimaryQuery: record.seoPrimaryQuery,
+      seoSecondaryQueries,
       usageItems,
       styleProfile: style.profile,
       mode: record.mode === "field" ? "field" : "full",
@@ -158,8 +188,7 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
               item === "title" ||
               item === "description" ||
               item === "faq" ||
-              item === "usage" ||
-              item === "secondaries",
+              item === "usage",
           )
         : undefined,
     },
@@ -172,38 +201,11 @@ export function parseProductSeoAutofillRequest(
   return readAutofillRequest(body);
 }
 
-async function loadWordstatCandidates(
-  primaryQuery: string,
-  options: GenerateProductSeoDraftOptions,
-): Promise<WordstatSuggestion[]> {
-  if (options.wordstatSuggestions) {
-    return options.wordstatSuggestions;
-  }
-
-  const result = await fetchWordstatSuggestions(primaryQuery, {
-    userId: options.userId,
-    fetchImpl: options.wordstat?.fetchImpl,
-    cache: options.wordstat?.cache,
-    rateLimit: options.wordstat?.rateLimit,
-    env: options.wordstat?.env ?? options.env,
-  });
-
-  if (!result.ok) {
-    return [];
-  }
-
-  return result.data.suggestions;
-}
-
 export async function generateProductSeoDraft(
   request: ProductSeoAutofillRequest,
   options: GenerateProductSeoDraftOptions,
 ): Promise<ProductSeoAiResult> {
   const primary = request.seoPrimaryQuery.trim();
-  if (!primary) {
-    return productSeoAiError("MISSING_PRIMARY");
-  }
-
   if (primary.length > PRODUCT_CONTENT_LIMITS.seoPrimaryQuery) {
     return productSeoAiError("INVALID_PRIMARY");
   }
@@ -228,31 +230,51 @@ export async function generateProductSeoDraft(
     return productSeoAiError("RATE_LIMITED");
   }
 
-  const suggestions = await loadWordstatCandidates(primary, options);
-  const candidates = eligibleSecondaryCandidates(suggestions, primary);
+  const manualSecondaryQueries = normalizeManualSecondaryQueries(
+    request.seoSecondaryQueries,
+    primary,
+  );
   const styleProfile =
     request.styleProfile ?? createDefaultProductSeoStyleProfile();
   const promptInput: ProductSeoAiPromptInput = {
     request: {
       ...request,
       seoPrimaryQuery: primary,
+      seoSecondaryQueries: manualSecondaryQueries,
       styleProfile,
     },
-    candidates,
   };
 
-  function withCanonicalYandexSecondaries(
+  function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {
+    return (
+      issues.length > 0 &&
+      issues.every(
+        (issue) =>
+          issue === "faq_answer_repeats_question" ||
+          issue === "faq_answer_is_question",
+      )
+    );
+  }
+
+  function mergeFaqAnswerOnlyRepair(
     draft: ProductSeoAiRawDraft,
+    previous: ProductSeoAiRawDraft,
+    issues: string[],
   ): ProductSeoAiRawDraft {
-    if (config.provider !== "yandex") {
+    if (
+      !hasOnlyFaqAnswerRepairIssues(issues) ||
+      draft.faqItems.length !== previous.faqItems.length
+    ) {
       return draft;
     }
 
     return {
-      ...draft,
-      secondaryQueries: canonicalizeYandexSecondaryQueries(
-        draft.secondaryQueries,
-        candidates,
+      ...previous,
+      faqItems: previous.faqItems.map((item, index) =>
+        faqAnswerRepeatsQuestion(item.question, item.answer) ||
+        faqAnswerIsQuestion(item.answer)
+          ? { ...item, answer: draft.faqItems[index].answer }
+          : item,
       ),
     };
   }
@@ -263,7 +285,7 @@ export async function generateProductSeoDraft(
     return first;
   }
 
-  const firstDraft = withCanonicalYandexSecondaries(first.draft);
+  const firstDraft = first.draft;
   const firstValidation = validateProductSeoAiDraft(firstDraft, {
     primaryQuery: primary,
     title: request.title,
@@ -271,7 +293,7 @@ export async function generateProductSeoDraft(
     description: request.description,
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
-    candidates,
+    manualSecondaryQueries,
   });
 
   if (firstValidation.ok) {
@@ -294,7 +316,11 @@ export async function generateProductSeoDraft(
     return repaired;
   }
 
-  const repairedDraft = withCanonicalYandexSecondaries(repaired.draft);
+  const repairedDraft = mergeFaqAnswerOnlyRepair(
+    repaired.draft,
+    firstDraft,
+    firstValidation.issues,
+  );
   const repairedValidation = validateProductSeoAiDraft(repairedDraft, {
     primaryQuery: primary,
     title: request.title,
@@ -302,7 +328,7 @@ export async function generateProductSeoDraft(
     description: request.description,
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
-    candidates,
+    manualSecondaryQueries,
   });
 
   if (!repairedValidation.ok) {
@@ -312,7 +338,58 @@ export async function generateProductSeoDraft(
       stage: "repair",
       issues: repairedValidation.issues,
     });
-    return productSeoAiError("INVALID_OUTPUT", repairedValidation.issues);
+    if (hasOnlyFaqAnswerRepairIssues(repairedValidation.issues)) {
+      const finalFaqRepaired = await provider.repair(
+        promptInput,
+        repairedDraft,
+        repairedValidation.issues,
+      );
+      if (!finalFaqRepaired.ok) {
+        return finalFaqRepaired;
+      }
+
+      const finalFaqRepairedDraft = mergeFaqAnswerOnlyRepair(
+        finalFaqRepaired.draft,
+        repairedDraft,
+        repairedValidation.issues,
+      );
+      const finalFaqRepairValidation = validateProductSeoAiDraft(
+        finalFaqRepairedDraft,
+        {
+          primaryQuery: primary,
+          title: request.title,
+          subtitle: request.subtitle,
+          description: request.description,
+          productKind: request.productKind,
+          usageItems: request.usageItems ?? [],
+          manualSecondaryQueries,
+        },
+      );
+      if (finalFaqRepairValidation.ok) {
+        return { ok: true, data: finalFaqRepairValidation.draft };
+      }
+
+      logProductSeoAiValidationFailed({
+        provider: config.provider,
+        model: config.model,
+        stage: "final_faq_repair",
+        issues: finalFaqRepairValidation.issues,
+      });
+      return productSeoAiInvalidOutputError({
+        stage: "validation_final_faq_repair",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+        finalFaqRepairIssues: finalFaqRepairValidation.issues,
+      });
+    }
+
+    return productSeoAiInvalidOutputError(
+      {
+        stage: "validation_repair",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+      },
+    );
   }
 
   return { ok: true, data: repairedValidation.draft };

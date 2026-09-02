@@ -181,6 +181,24 @@ export const USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Человек может описывать одну композицию как мягкую, спокойную или успокаивающую, не вкладывая в эти слова строгих различий." },
           { kind: "paragraph", text: "Но в рамках поискового кластера эти формулировки лучше не объединять полностью." },
           { kind: "paragraph", text: "Текущая страница отвечает именно на запрос об успокаивающей музыке с дождём. Спокойный характер звучания здесь можно естественно упоминать как характеристику, не превращая его во второй основной intent." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если главным критерием является именно спокойный характер композиции, ближе страница " },
+              { href: "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn", label: "спокойная музыка для сна с дождём" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Соседние сценарии вечернего отдыха – " },
+              { href: "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "расслабляющая музыка с дождём для сна" },
+              { text: " и " },
+              { href: "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn", label: "релакс музыка с дождём для сна" },
+              { text: ". Они близки по настроению, но отвечают на другие формулировки." },
+            ],
+          },
         ],
       },
       {
@@ -191,6 +209,16 @@ export const USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Пианино может быть одним из инструментов в мягкой музыке для вечернего прослушивания." },
           { kind: "paragraph", text: "Если вам нравится фортепианное звучание, можно выбирать такие композиции среди доступных вариантов." },
           { kind: "paragraph", text: "При этом текущая страница не посвящена отдельно сочетанию пианино и дождя." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен именно инструментальный акцент, есть страница " },
+              { href: "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn", label: "музыка пианино и дождя для сна" },
+              { text: ". Более узкий сценарий, где мягкий характер сочетается с фортепиано, – " },
+              { href: "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn", label: "успокаивающая музыка для сна с дождём и пианино" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Главная тема остаётся шире – успокаивающая музыка для сна с дождевой атмосферой." },
         ],
       },

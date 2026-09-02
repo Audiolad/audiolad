@@ -105,6 +105,26 @@ import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } fro
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn";
 import { MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn";
+import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "./content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-2-chasa-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_3_CHASA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-3-chasa-slushat-onlayn";
+import { USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_VZROSLYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-vzroslyh-slushat-onlayn";
+import { MYAGKIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/myagkiy-belyy-shum-dlya-sna-slushat-onlayn";
+import { BELYY_SHUM_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-krepkogo-sna-slushat-onlayn";
+import { BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-bez-muzyki-slushat-onlayn";
+import { BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-novorozhdennyh-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+import { BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-detey-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-malyshey-slushat-onlayn";
+import { BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-dlya-sna-mladenca-slushat-onlayn";
+import { BELYY_SHUM_PYLESOSA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-pylesosa-slushat-onlayn";
+import { ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-pylesosa-dlya-sna-slushat-onlayn";
+import { SHUM_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/shum-pylesosa-dlya-sna-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -219,6 +239,26 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE,
+  RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_3_CHASA_SLUSHAT_ONLAYN_PAGE,
+  USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_VZROSLYH_SLUSHAT_ONLAYN_PAGE,
+  MYAGKIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE,
+  BELYY_SHUM_PYLESOSA_SLUSHAT_ONLAYN_PAGE,
+  ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  SHUM_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

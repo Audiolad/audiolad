@@ -357,6 +357,23 @@ export function PracticeMetaSection({
   );
 }
 
+function PracticePriceOfferLoading() {
+  return (
+    <div
+      data-product-price-offer="initializing"
+      aria-busy="true"
+      aria-label="Загрузка цены"
+      className="min-h-[9rem] space-y-3"
+    >
+      <span className="sr-only">Загрузка цены</span>
+      <div className="h-7 w-28 animate-pulse rounded-md bg-[#eadff8]/70" />
+      <div className="h-4 w-52 animate-pulse rounded bg-[#eadff8]/70" />
+      <div className="h-11 w-full animate-pulse rounded-[16px] bg-[#eadff8]/70 sm:w-48" />
+      <div className="h-11 w-full animate-pulse rounded-[16px] bg-[#eadff8]/70 sm:w-48" />
+    </div>
+  );
+}
+
 export function PracticePrimaryActionSection({
   viewModel,
   className = "mt-6",
@@ -386,7 +403,9 @@ export function PracticePrimaryActionSection({
       {buyAction ? (
         <div data-practice-hero-sell>
           <div className="min-w-0">
-            {viewModel.priceOffer ? (
+            {viewModel.promoStartPending ? (
+              <PracticePriceOfferLoading />
+            ) : viewModel.priceOffer ? (
               <ProductPriceOffer
                 basePrice={viewModel.priceOffer.basePrice}
                 salePrice={viewModel.priceOffer.salePrice}

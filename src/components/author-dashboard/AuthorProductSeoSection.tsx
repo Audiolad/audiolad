@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import AuthorProductSeoWordstatPicker from "@/components/author-dashboard/AuthorProductSeoWordstatPicker";
 import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorProductSeoStyleControls";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
@@ -21,49 +20,29 @@ import {
   formatSeoSecondaryQueryBulkMessage,
   parseSeoSecondaryQueryList,
 } from "@/lib/seo/secondary-query-list";
-import {
-  buildWordstatSuggestionsRequest,
-  canAddSecondaryQuery,
-  clipSeoQuery,
-  getWordstatPrimaryCtaLabel,
-  planWordstatPickerOpen,
-  resolveWordstatRequestPhrase,
-  shouldAutoSearchOnPrimaryCta,
-} from "@/lib/seo/wordstat/ui";
-import {
-  WORDSTAT_ERROR_MESSAGES,
-  wordstatClientErrorMessage,
-} from "@/lib/seo/wordstat/errors";
-import type { WordstatSuggestionsPayload } from "@/lib/seo/wordstat/types";
 import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "@/lib/seo/product-autofill/errors";
 import {
   hasFilledGeneratedSeoFields,
   PRODUCT_SEO_ACCORDION_BADGE_COPY,
   PRODUCT_SEO_ACCORDION_TITLE,
   PRODUCT_SEO_ADD_OWN_FAQ,
-  PRODUCT_SEO_AFTER_PRIMARY_COPY,
   PRODUCT_SEO_CLOSED_TEASER,
   PRODUCT_SEO_GENERATE_CTA,
   PRODUCT_SEO_GENERATE_LOADING,
-  PRODUCT_SEO_GENERATE_STAGE_QUERIES,
   PRODUCT_SEO_GENERATE_STAGE_TEXT,
   PRODUCT_SEO_OVERWRITE_CANCEL,
   PRODUCT_SEO_OVERWRITE_CONFIRM,
+  PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM,
   PRODUCT_SEO_OVERWRITE_REPLACE,
-  PRODUCT_SEO_PICK_PRIMARY_CTA,
   PRODUCT_SEO_READINESS_HINT,
   PRODUCT_SEO_SELLING_COPY,
-  PRODUCT_SEO_START_HEADING,
-  PRODUCT_SEO_START_TEXT,
-  productSeoPrimarySelectedLabel,
-  productSeoSecondaryStatusCopy,
+  getProductSeoSecondaryUsage,
   resolveProductSeoAccordionBadge,
 } from "@/lib/seo/product-autofill/ui";
 import {
   createDefaultProductSeoStyleProfile,
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
-import type { ProductSeoSecondaryQueryStatus } from "@/lib/seo/product-autofill/types";
 import {
   AUTHOR_RECOMMENDATIONS_HELPER_COPY,
   AUTHOR_RECOMMENDATIONS_LIMIT_COPY,
@@ -160,23 +139,13 @@ export default function AuthorProductSeoSection({
   >({});
   const [completedRelatedProductQuery, setCompletedRelatedProductQuery] =
     useState("");
-  const [wordstatOpen, setWordstatOpen] = useState(false);
-  const [wordstatSeed, setWordstatSeed] = useState("");
-  const [wordstatLoading, setWordstatLoading] = useState(false);
-  const [wordstatError, setWordstatError] = useState<string | null>(null);
-  const [wordstatResult, setWordstatResult] =
-    useState<WordstatSuggestionsPayload | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
-  const [generateStage, setGenerateStage] = useState<
-    "queries" | "text" | null
-  >(null);
+  const [generateStage, setGenerateStage] = useState<"text" | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [overwriteOpen, setOverwriteOpen] = useState(false);
   const [styleProfile, setStyleProfile] = useState(
     createDefaultProductSeoStyleProfile,
   );
-  const [secondaryQueryStatus, setSecondaryQueryStatus] =
-    useState<ProductSeoSecondaryQueryStatus | null>(null);
   const [secondaryDraft, setSecondaryDraft] = useState("");
   const [secondaryBulkMessage, setSecondaryBulkMessage] = useState<string | null>(
     null,
@@ -334,36 +303,25 @@ export default function AuthorProductSeoSection({
     seoTitle,
     seoDescription,
   });
-  const primarySelected = Boolean(seoPrimaryQuery.trim());
   const secondariesFull =
     seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
-
-  function openWordstatPicker(options?: {
-    seedOverride?: string;
-    autoSearch?: boolean;
-  }) {
-    const { seed, shouldSearch } = planWordstatPickerOpen({
-      seoPrimaryQuery,
-      title,
-      seedOverride: options?.seedOverride,
-      autoSearch: options?.autoSearch,
-    });
-    setWordstatOpen(true);
-    setWordstatError(null);
-    setWordstatSeed(seed);
-    if (shouldSearch) {
-      void submitWordstat(seed);
-    }
-  }
-
-  function addSecondaryPhrase(phrase: string) {
-    const result = canAddSecondaryQuery(phrase, seoSecondaryQueries);
-    if (!result.ok) {
-      return;
-    }
-
-    onChange({ seoSecondaryQueries: result.next });
-  }
+  const secondaryUsage = getProductSeoSecondaryUsage({
+    seoSecondaryQueries,
+    productDescription: description,
+    seoTitle,
+    seoDescription,
+    usageItems: seoContent.usageItems,
+    faqItems: seoContent.faqItems,
+    productKind,
+  });
+  const secondaryUsageByQuery = Object.fromEntries(
+    seoSecondaryQueries.map((query) => [
+      query,
+      secondaryUsage
+        .filter((field) => field.queries.includes(query))
+        .map((field) => field.label),
+    ]),
+  );
 
   function addSecondaryPhrasesFromDraft() {
     const result = parseSeoSecondaryQueryList(secondaryDraft, {
@@ -385,6 +343,7 @@ export default function AuthorProductSeoSection({
     faqItems: Array<{ question: string; answer: string }>;
   }) {
     onChange({
+      // The server returns the canonical normalized list, including locked lists.
       seoSecondaryQueries: draft.seoSecondaryQueries,
       seoTitle: draft.seoTitle,
       seoDescription: draft.seoDescription,
@@ -397,12 +356,12 @@ export default function AuthorProductSeoSection({
   }
 
   async function generateProductSeo() {
-    if (generateLoading || disabled || !primarySelected) {
+    if (generateLoading || disabled) {
       return;
     }
 
     setGenerateLoading(true);
-    setGenerateStage("queries");
+    setGenerateStage("text");
     setGenerateError(null);
     setOverwriteOpen(false);
     const stageTimer = window.setTimeout(() => {
@@ -419,6 +378,7 @@ export default function AuthorProductSeoSection({
           description,
           productKind,
           seoPrimaryQuery,
+          seoSecondaryQueries,
           usageItems: seoContent.usageItems.map((item) => item.content),
           styleProfile: (() => {
             const sanitized = sanitizeProductSeoStyleProfile(styleProfile);
@@ -435,7 +395,6 @@ export default function AuthorProductSeoSection({
             seoDescription?: string;
             usageItems?: Array<{ content: string }>;
             faqItems?: Array<{ question: string; answer: string }>;
-            secondaryQueryStatus?: ProductSeoSecondaryQueryStatus;
             error?: string;
             code?: string;
           }
@@ -464,17 +423,6 @@ export default function AuthorProductSeoSection({
         usageItems: payload.usageItems,
         faqItems: payload.faqItems,
       });
-      setSecondaryQueryStatus(
-        payload.secondaryQueryStatus === "limited" ||
-          payload.secondaryQueryStatus === "none" ||
-          payload.secondaryQueryStatus === "complete"
-          ? payload.secondaryQueryStatus
-          : payload.seoSecondaryQueries.length >= 3
-            ? "complete"
-            : payload.seoSecondaryQueries.length > 0
-              ? "limited"
-              : "none",
-      );
     } catch {
       setGenerateError(PRODUCT_SEO_AI_ERROR_MESSAGE);
     } finally {
@@ -485,7 +433,7 @@ export default function AuthorProductSeoSection({
   }
 
   function requestGenerateProductSeo() {
-    if (generateLoading || disabled || !primarySelected) {
+    if (generateLoading || disabled) {
       return;
     }
 
@@ -503,42 +451,6 @@ export default function AuthorProductSeoSection({
     }
 
     void generateProductSeo();
-  }
-
-  async function submitWordstat(seedOverride?: string) {
-    if (wordstatLoading) {
-      return;
-    }
-
-    const phrase = resolveWordstatRequestPhrase(seedOverride, wordstatSeed);
-    const request = buildWordstatSuggestionsRequest(phrase);
-
-    setWordstatLoading(true);
-    setWordstatError(null);
-
-    try {
-      const response = await fetch(request.url, request.init);
-      const payload = (await response.json().catch(() => null)) as
-        | WordstatSuggestionsPayload
-        | { error?: string; code?: string }
-        | null;
-
-      if (!response.ok || !payload || !("suggestions" in payload)) {
-        setWordstatResult(null);
-        setWordstatError(wordstatClientErrorMessage(payload));
-        return;
-      }
-
-      setWordstatResult(payload);
-      if (payload.suggestions.length === 0) {
-        setWordstatError(WORDSTAT_ERROR_MESSAGES.NO_RESULTS);
-      }
-    } catch {
-      setWordstatResult(null);
-      setWordstatError(WORDSTAT_ERROR_MESSAGES.UPSTREAM_ERROR);
-    } finally {
-      setWordstatLoading(false);
-    }
   }
 
   return (
@@ -568,36 +480,7 @@ export default function AuthorProductSeoSection({
         {PRODUCT_SEO_SELLING_COPY}
       </p>
 
-      {!primarySelected ? (
-        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
-          <p className="text-sm leading-6 text-[#5c5278]">{PRODUCT_SEO_CLOSED_TEASER}</p>
-          <p className="mt-3 text-sm font-medium text-[#2b2140]">
-            {PRODUCT_SEO_START_HEADING}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[#5c5278]">
-            {PRODUCT_SEO_START_TEXT}
-          </p>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() =>
-              openWordstatPicker({
-                autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
-              })
-            }
-            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {PRODUCT_SEO_PICK_PRIMARY_CTA}
-          </button>
-        </div>
-      ) : (
-        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
-          <p className="text-sm leading-6 text-[#5c5278]">
-            {PRODUCT_SEO_AFTER_PRIMARY_COPY}
-          </p>
-          <p className="mt-2 text-sm font-medium text-[#2b2140]">
-            {productSeoPrimarySelectedLabel(seoPrimaryQuery)}
-          </p>
+      <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
           <AuthorProductSeoStyleControls
             profile={styleProfile}
             onChange={setStyleProfile}
@@ -610,17 +493,17 @@ export default function AuthorProductSeoSection({
             className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {generateLoading
-              ? generateStage === "queries"
-                ? PRODUCT_SEO_GENERATE_STAGE_QUERIES
-                : generateStage === "text"
-                  ? PRODUCT_SEO_GENERATE_STAGE_TEXT
-                  : PRODUCT_SEO_GENERATE_LOADING
+              ? generateStage === "text"
+                ? PRODUCT_SEO_GENERATE_STAGE_TEXT
+                : PRODUCT_SEO_GENERATE_LOADING
               : PRODUCT_SEO_GENERATE_CTA}
           </button>
           {overwriteOpen ? (
             <div className="mt-3 rounded-[14px] border border-[#ead48a] bg-[#fff8e6] px-3 py-3">
               <p className="text-sm leading-5 text-[#5c5278]">
-                {PRODUCT_SEO_OVERWRITE_CONFIRM}
+                {seoSecondaryQueries.length > 0
+                  ? PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM
+                  : PRODUCT_SEO_OVERWRITE_CONFIRM}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
@@ -647,8 +530,7 @@ export default function AuthorProductSeoSection({
           {generateError ? (
             <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
           ) : null}
-        </div>
-      )}
+      </div>
 
       <p className="mt-4 text-sm font-medium text-[#2b2140]">
         SEO-готовность: {readiness.doneCount} из {readiness.total}
@@ -683,21 +565,8 @@ export default function AuthorProductSeoSection({
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Одна главная фраза, по которой человек может искать именно такой
-          продукт. Можно написать её самостоятельно или подобрать по данным
-          Яндекса.
+          продукт. Поле можно оставить пустым.
         </p>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() =>
-            openWordstatPicker({
-              autoSearch: shouldAutoSearchOnPrimaryCta(seoPrimaryQuery),
-            })
-          }
-          className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {getWordstatPrimaryCtaLabel(seoPrimaryQuery)}
-        </button>
         <CharCounter
           value={seoPrimaryQuery}
           max={PRODUCT_CONTENT_LIMITS.seoPrimaryQuery}
@@ -709,51 +578,31 @@ export default function AuthorProductSeoSection({
         ) : null}
       </label>
 
-      {wordstatOpen ? (
-        <AuthorProductSeoWordstatPicker
-          seed={wordstatSeed}
-          onSeedChange={setWordstatSeed}
-          loading={wordstatLoading}
-          error={wordstatError}
-          result={wordstatResult}
-          seoPrimaryQuery={seoPrimaryQuery}
-          seoSecondaryQueries={seoSecondaryQueries}
-          disabled={disabled}
-          onSubmit={() => {
-            void submitWordstat();
-          }}
-          onSelectPrimary={(phrase) =>
-            onChange({
-              seoPrimaryQuery: clipSeoQuery(
-                phrase,
-                PRODUCT_CONTENT_LIMITS.seoPrimaryQuery,
-              ),
-            })
-          }
-          onAddSecondary={addSecondaryPhrase}
-        />
-      ) : null}
-
       <div className="mt-4">
         <span className="mb-2 block text-sm font-medium">Дополнительные поисковые фразы</span>
-        {productSeoSecondaryStatusCopy(secondaryQueryStatus) ? (
-          <p className="mb-2 text-sm leading-5 text-[#7d70a2]">
-            {productSeoSecondaryStatusCopy(secondaryQueryStatus)}
-          </p>
-        ) : null}
         <div className="flex flex-wrap gap-2">
           {seoSecondaryQueries.map((query, index) => (
-            <span key={`${query}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
-              {query}
-              <button
-                type="button"
-                aria-label={`Удалить фразу ${query}`}
-                disabled={disabled}
-                onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
-              >
-                ×
-              </button>
-            </span>
+            <div key={`${query}-${index}`} className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#f0e7fb] px-3 py-1 text-sm text-[#4d336f]">
+                {query}
+                <button
+                  type="button"
+                  aria-label={`Удалить фразу ${query}`}
+                  disabled={disabled}
+                  onClick={() => onChange({ seoSecondaryQueries: seoSecondaryQueries.filter((_, itemIndex) => itemIndex !== index) })}
+                >
+                  ×
+                </button>
+              </span>
+              {secondaryUsageByQuery[query]?.map((label) => (
+                <span
+                  key={`${query}-${label}`}
+                  className="rounded-full bg-[#f0e7fb] px-2 py-1 text-xs text-[#4d336f]"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
         {secondariesFull ? null : (
@@ -785,18 +634,6 @@ export default function AuthorProductSeoSection({
             {secondaryBulkMessage}
           </p>
         ) : null}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() =>
-            openWordstatPicker({
-              seedOverride: seoPrimaryQuery.trim() || undefined,
-            })
-          }
-          className="mt-2 text-sm text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Подобрать похожие
-        </button>
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
           Добавьте несколько близких вариантов основного запроса. Они должны
           описывать тот же продукт и ту же потребность человека.

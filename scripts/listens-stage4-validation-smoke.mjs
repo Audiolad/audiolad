@@ -113,6 +113,27 @@ import { SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE } from "../src
 import { RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-1-chas-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-2-chasa-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_3_CHASA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-3-chasa-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_VZROSLYH_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-vzroslyh-slushat-onlayn.ts";
+import { MYAGKIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/myagkiy-belyy-shum-dlya-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-krepkogo-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-bez-muzyki-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-novorozhdennyh-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-detey-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-malyshey-slushat-onlayn.ts";
+import { BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-dlya-sna-mladenca-slushat-onlayn.ts";
+import { BELYY_SHUM_PYLESOSA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-pylesosa-slushat-onlayn.ts";
+import { ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-pylesosa-dlya-sna-slushat-onlayn.ts";
+import { SHUM_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-pylesosa-dlya-sna-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -4255,7 +4276,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4437,7 +4458,7 @@ function testTwelfthPage() {
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4612,7 +4633,7 @@ function testThirteenthPage() {
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4808,7 +4829,7 @@ function testFourteenthPage() {
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5025,7 +5046,7 @@ function testFifteenthPage() {
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_SNA_PAGE.playlistSlug === "shum-vody",
@@ -5260,7 +5281,7 @@ function testSixteenthPage() {
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5497,7 +5518,7 @@ function testSeventeenthPage() {
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5734,7 +5755,7 @@ function testEighteenthPage() {
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_DETEY_PAGE.playlistSlug === "shum-vody",
@@ -5982,7 +6003,7 @@ function testNineteenthPage() {
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE.playlistSlug === "shum-vody",
@@ -6225,7 +6246,7 @@ function testTwentiethPage() {
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -6480,7 +6501,7 @@ function testTwentyFirstPage() {
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -6718,7 +6739,7 @@ function testTwentySecondPage() {
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7002,7 +7023,7 @@ function testTwentyThirdPage() {
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7305,7 +7326,7 @@ function testTwentyFourthPage() {
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
   assert(slugs.includes(TWENTY_FOURTH_PAGE_SLUG), "registry contains twenty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7520,7 +7541,7 @@ function testTwentyFifthPage() {
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry contains twenty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7721,7 +7742,7 @@ function testTwentySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7944,7 +7965,7 @@ function testTwentySeventhPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8188,7 +8209,7 @@ function testTwentyEighthPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8434,7 +8455,7 @@ function testTwentyNinthPage() {
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8675,7 +8696,7 @@ function testThirtiethPage() {
   assert(slugs.includes(TWENTY_NINTH_PAGE_SLUG), "registry still contains twenty-ninth listen slug");
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8986,7 +9007,7 @@ function testThirtyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry contains thirty-first listen slug");
   assert(slugs.includes(THIRTIETH_PAGE_SLUG), "registry still contains thirtieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9284,7 +9305,7 @@ function testThirtySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry contains thirty-second listen slug");
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry still contains thirty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -9565,7 +9586,7 @@ function testThirtyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry contains thirty-third listen slug");
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry still contains thirty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9845,7 +9866,7 @@ function testThirtyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FOURTH_PAGE_SLUG), "registry contains thirty-fourth listen slug");
   assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry still contains thirty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10193,7 +10214,7 @@ function testThirtyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FIFTH_PAGE_SLUG), "registry contains thirty-fifth listen slug");
   assert(slugs.includes(THIRTY_FOURTH_PAGE_SLUG), "registry still contains thirty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10379,7 +10400,7 @@ function testThirtySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SIXTH_PAGE_SLUG), "registry contains thirty-sixth listen slug");
   assert(slugs.includes(THIRTY_FIFTH_PAGE_SLUG), "registry still contains thirty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10636,7 +10657,7 @@ function testThirtySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SEVENTH_PAGE_SLUG), "registry contains thirty-seventh listen slug");
   assert(slugs.includes(THIRTY_SIXTH_PAGE_SLUG), "registry still contains thirty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -10891,7 +10912,7 @@ function testThirtyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_EIGHTH_PAGE_SLUG), "registry contains thirty-eighth listen slug");
   assert(slugs.includes(THIRTY_SEVENTH_PAGE_SLUG), "registry still contains thirty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -11106,7 +11127,7 @@ function testThirtyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_NINTH_PAGE_SLUG), "registry contains thirty-ninth listen slug");
   assert(slugs.includes(THIRTY_EIGHTH_PAGE_SLUG), "registry still contains thirty-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === THIRTY_NINTH_PLAYLIST_SLUG,
@@ -11323,7 +11344,7 @@ function testFortiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTIETH_PAGE_SLUG), "registry contains fortieth listen slug");
   assert(slugs.includes(THIRTY_NINTH_PAGE_SLUG), "registry still contains thirty-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTIETH_PLAYLIST_SLUG,
@@ -11550,7 +11571,7 @@ function testFortyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FIRST_PAGE_SLUG), "registry contains forty-first listen slug");
   assert(slugs.includes(FORTIETH_PAGE_SLUG), "registry still contains fortieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FIRST_PLAYLIST_SLUG,
@@ -11784,7 +11805,7 @@ function testFortySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SECOND_PAGE_SLUG), "registry contains forty-second listen slug");
   assert(slugs.includes(FORTY_FIRST_PAGE_SLUG), "registry still contains forty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SECOND_PLAYLIST_SLUG,
@@ -12014,7 +12035,7 @@ function testFortyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_THIRD_PAGE_SLUG), "registry contains forty-third listen slug");
   assert(slugs.includes(FORTY_SECOND_PAGE_SLUG), "registry still contains forty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_THIRD_PLAYLIST_SLUG,
@@ -12247,7 +12268,7 @@ function testFortyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FOURTH_PAGE_SLUG), "registry contains forty-fourth listen slug");
   assert(slugs.includes(FORTY_THIRD_PAGE_SLUG), "registry still contains forty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FOURTH_PLAYLIST_SLUG,
@@ -12479,7 +12500,7 @@ function testFortyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_FIFTH_PAGE_SLUG), "registry contains forty-fifth listen slug");
   assert(slugs.includes(FORTY_FOURTH_PAGE_SLUG), "registry still contains forty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_FIFTH_PLAYLIST_SLUG,
@@ -12720,7 +12741,7 @@ function testFortySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SIXTH_PAGE_SLUG), "registry contains forty-sixth listen slug");
   assert(slugs.includes(FORTY_FIFTH_PAGE_SLUG), "registry still contains forty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SIXTH_PLAYLIST_SLUG,
@@ -12975,7 +12996,7 @@ function testFortySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SEVENTH_PAGE_SLUG), "registry contains forty-seventh listen slug");
   assert(slugs.includes(FORTY_SIXTH_PAGE_SLUG), "registry still contains forty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_SEVENTH_PLAYLIST_SLUG,
@@ -13229,7 +13250,7 @@ function testFortyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_EIGHTH_PAGE_SLUG), "registry contains forty-eighth listen slug");
   assert(slugs.includes(FORTY_SEVENTH_PAGE_SLUG), "registry still contains forty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_EIGHTH_PLAYLIST_SLUG,
@@ -13497,7 +13518,7 @@ function testFortyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_NINTH_PAGE_SLUG), "registry contains forty-ninth listen slug");
   assert(slugs.includes(FORTY_EIGHTH_PAGE_SLUG), "registry still contains forty-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === FORTY_NINTH_PLAYLIST_SLUG,
@@ -13675,7 +13696,7 @@ function testFiftiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTIETH_PAGE_SLUG), "registry contains fiftieth listen slug");
   assert(slugs.includes(FORTY_NINTH_PAGE_SLUG), "registry still contains forty-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FORTY_NINTH_PAGE_SLUG)), "calm neighbor stays registered");
@@ -13852,7 +13873,7 @@ function testFiftyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FIRST_PAGE_SLUG), "registry contains fifty-first listen slug");
   assert(slugs.includes(FIFTIETH_PAGE_SLUG), "registry still contains fiftieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTIETH_PAGE_SLUG)), "stress-relief neighbor stays registered");
@@ -14012,7 +14033,7 @@ function testFiftySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SECOND_PAGE_SLUG), "registry contains fifty-second listen slug");
   assert(slugs.includes(FIFTY_FIRST_PAGE_SLUG), "registry still contains fifty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FIRST_PAGE_SLUG)), "no-lyrics neighbor stays registered");
@@ -14239,7 +14260,7 @@ function testFiftyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_THIRD_PAGE_SLUG), "registry contains fifty-third listen slug");
   assert(slugs.includes(FIFTY_SECOND_PAGE_SLUG), "registry still contains fifty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SECOND_PAGE_SLUG)), "fifty-second neighbor stays registered");
@@ -14451,7 +14472,7 @@ function testFiftyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FOURTH_PAGE_SLUG), "registry contains fifty-fourth listen slug");
   assert(slugs.includes(FIFTY_THIRD_PAGE_SLUG), "registry still contains fifty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_THIRD_PAGE_SLUG)), "fifty-third neighbor stays registered");
@@ -14667,7 +14688,7 @@ function testFiftyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_FIFTH_PAGE_SLUG), "registry contains fifty-fifth listen slug");
   assert(slugs.includes(FIFTY_FOURTH_PAGE_SLUG), "registry still contains fifty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FOURTH_PAGE_SLUG)), "fifty-fourth neighbor stays registered");
@@ -14922,7 +14943,7 @@ function testFiftySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SIXTH_PAGE_SLUG), "registry contains fifty-sixth listen slug");
   assert(slugs.includes(FIFTY_FIFTH_PAGE_SLUG), "registry still contains fifty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_FIFTH_PAGE_SLUG)), "fifty-fifth neighbor stays registered");
@@ -15160,7 +15181,7 @@ function testFiftySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_SEVENTH_PAGE_SLUG), "registry contains fifty-seventh listen slug");
   assert(slugs.includes(FIFTY_SIXTH_PAGE_SLUG), "registry still contains fifty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SIXTH_PAGE_SLUG)), "fifty-sixth neighbor stays registered");
@@ -15426,7 +15447,7 @@ function testFiftyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_EIGHTH_PAGE_SLUG), "registry contains fifty-eighth listen slug");
   assert(slugs.includes(FIFTY_SEVENTH_PAGE_SLUG), "registry still contains fifty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_SEVENTH_PAGE_SLUG)), "fifty-seventh neighbor stays registered");
@@ -15705,7 +15726,7 @@ function testFiftyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FIFTY_NINTH_PAGE_SLUG), "registry contains fifty-ninth listen slug");
   assert(slugs.includes(FIFTY_EIGHTH_PAGE_SLUG), "registry still contains fifty-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(FIFTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_EIGHTH_PAGE_SLUG)), "fifty-eighth neighbor stays registered");
@@ -16002,7 +16023,7 @@ function testSixtiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTIETH_PAGE_SLUG), "registry contains sixtieth listen slug");
   assert(slugs.includes(FIFTY_NINTH_PAGE_SLUG), "registry still contains fifty-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(FIFTY_NINTH_PAGE_SLUG)), "fifty-ninth neighbor stays registered");
@@ -16271,7 +16292,7 @@ function testSixtyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FIRST_PAGE_SLUG), "registry contains sixty-first listen slug");
   assert(slugs.includes(SIXTIETH_PAGE_SLUG), "registry still contains sixtieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTIETH_PAGE_SLUG)), "sixtieth neighbor stays registered");
@@ -16581,7 +16602,7 @@ function testSixtySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SECOND_PAGE_SLUG), "registry contains sixty-second listen slug");
   assert(slugs.includes(SIXTY_FIRST_PAGE_SLUG), "registry still contains sixty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FIRST_PAGE_SLUG)), "sixty-first neighbor stays registered");
@@ -16898,7 +16919,7 @@ function testSixtyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_THIRD_PAGE_SLUG), "registry contains sixty-third listen slug");
   assert(slugs.includes(SIXTY_SECOND_PAGE_SLUG), "registry still contains sixty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SECOND_PAGE_SLUG)), "sixty-second neighbor stays registered");
@@ -17233,7 +17254,7 @@ function testSixtyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FOURTH_PAGE_SLUG), "registry contains sixty-fourth listen slug");
   assert(slugs.includes(SIXTY_THIRD_PAGE_SLUG), "registry still contains sixty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_THIRD_PAGE_SLUG)), "sixty-third neighbor stays registered");
@@ -17587,7 +17608,7 @@ function testSixtyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_FIFTH_PAGE_SLUG), "registry contains sixty-fifth listen slug");
   assert(slugs.includes(SIXTY_FOURTH_PAGE_SLUG), "registry still contains sixty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FOURTH_PAGE_SLUG)), "sixty-fourth neighbor stays registered");
@@ -17938,7 +17959,7 @@ function testSixtySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SIXTH_PAGE_SLUG), "registry contains sixty-sixth listen slug");
   assert(slugs.includes(SIXTY_FIFTH_PAGE_SLUG), "registry still contains sixty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_FIFTH_PAGE_SLUG)), "sixty-fifth neighbor stays registered");
@@ -18325,7 +18346,7 @@ function testSixtySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_SEVENTH_PAGE_SLUG), "registry contains sixty-seventh listen slug");
   assert(slugs.includes(SIXTY_SIXTH_PAGE_SLUG), "registry still contains sixty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SIXTH_PAGE_SLUG)), "sixty-sixth neighbor stays registered");
@@ -18764,7 +18785,7 @@ function testSixtyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_EIGHTH_PAGE_SLUG), "registry contains sixty-eighth listen slug");
   assert(slugs.includes(SIXTY_SEVENTH_PAGE_SLUG), "registry still contains sixty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_SEVENTH_PAGE_SLUG)), "sixty-seventh neighbor stays registered");
@@ -19240,7 +19261,7 @@ function testSixtyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SIXTY_NINTH_PAGE_SLUG), "registry contains sixty-ninth listen slug");
   assert(slugs.includes(SIXTY_EIGHTH_PAGE_SLUG), "registry still contains sixty-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SIXTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_EIGHTH_PAGE_SLUG)), "sixty-eighth neighbor stays registered");
@@ -19655,7 +19676,7 @@ function testSeventiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTIETH_PAGE_SLUG), "registry contains seventieth listen slug");
   assert(slugs.includes(SIXTY_NINTH_PAGE_SLUG), "registry still contains sixty-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SIXTY_NINTH_PAGE_SLUG)), "sixty-ninth neighbor stays registered");
@@ -20097,7 +20118,7 @@ function testSeventyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FIRST_PAGE_SLUG), "registry contains seventy-first listen slug");
   assert(slugs.includes(SEVENTIETH_PAGE_SLUG), "registry still contains seventieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTIETH_PAGE_SLUG)), "seventieth neighbor stays registered");
@@ -20534,7 +20555,7 @@ function testSeventySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SECOND_PAGE_SLUG), "registry contains seventy-second listen slug");
   assert(slugs.includes(SEVENTY_FIRST_PAGE_SLUG), "registry still contains seventy-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIRST_PAGE_SLUG)), "seventy-first neighbor stays registered");
@@ -20984,7 +21005,7 @@ function testSeventyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_THIRD_PAGE_SLUG), "registry contains seventy-third listen slug");
   assert(slugs.includes(SEVENTY_SECOND_PAGE_SLUG), "registry still contains seventy-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SECOND_PAGE_SLUG)), "seventy-second neighbor stays registered");
@@ -21446,7 +21467,7 @@ function testSeventyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FOURTH_PAGE_SLUG), "registry contains seventy-fourth listen slug");
   assert(slugs.includes(SEVENTY_THIRD_PAGE_SLUG), "registry still contains seventy-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_THIRD_PAGE_SLUG)), "seventy-third neighbor stays registered");
@@ -21853,7 +21874,7 @@ function testSeventyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_FIFTH_PAGE_SLUG), "registry contains seventy-fifth listen slug");
   assert(slugs.includes(SEVENTY_FOURTH_PAGE_SLUG), "registry still contains seventy-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FOURTH_PAGE_SLUG)), "seventy-fourth neighbor stays registered");
@@ -22296,7 +22317,7 @@ function testSeventySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SIXTH_PAGE_SLUG), "registry contains seventy-sixth listen slug");
   assert(slugs.includes(SEVENTY_FIFTH_PAGE_SLUG), "registry still contains seventy-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_FIFTH_PAGE_SLUG)), "seventy-fifth neighbor stays registered");
@@ -22764,7 +22785,7 @@ function testSeventySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_SEVENTH_PAGE_SLUG), "registry contains seventy-seventh listen slug");
   assert(slugs.includes(SEVENTY_SIXTH_PAGE_SLUG), "registry still contains seventy-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SIXTH_PAGE_SLUG)), "seventy-sixth neighbor stays registered");
@@ -23208,7 +23229,7 @@ function testSeventyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_EIGHTH_PAGE_SLUG), "registry contains seventy-eighth listen slug");
   assert(slugs.includes(SEVENTY_SEVENTH_PAGE_SLUG), "registry still contains seventy-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_SEVENTH_PAGE_SLUG)), "seventy-seventh neighbor stays registered");
@@ -23668,7 +23689,7 @@ function testSeventyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(SEVENTY_NINTH_PAGE_SLUG), "registry contains seventy-ninth listen slug");
   assert(slugs.includes(SEVENTY_EIGHTH_PAGE_SLUG), "registry still contains seventy-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(SEVENTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_EIGHTH_PAGE_SLUG)), "seventy-eighth neighbor stays registered");
@@ -24089,7 +24110,7 @@ function testEightiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTIETH_PAGE_SLUG), "registry contains eightieth listen slug");
   assert(slugs.includes(SEVENTY_NINTH_PAGE_SLUG), "registry still contains seventy-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(SEVENTY_NINTH_PAGE_SLUG)), "seventy-ninth neighbor stays registered");
@@ -24545,7 +24566,7 @@ function testEightyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FIRST_PAGE_SLUG), "registry contains eighty-first listen slug");
   assert(slugs.includes(EIGHTIETH_PAGE_SLUG), "registry still contains eightieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTIETH_PAGE_SLUG)), "eightieth neighbor stays registered");
@@ -24931,7 +24952,7 @@ function testEightySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SECOND_PAGE_SLUG), "registry contains eighty-second listen slug");
   assert(slugs.includes(EIGHTY_FIRST_PAGE_SLUG), "registry still contains eighty-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIRST_PAGE_SLUG)), "eighty-first neighbor stays registered");
@@ -25315,7 +25336,7 @@ function testEightyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_THIRD_PAGE_SLUG), "registry contains eighty-third listen slug");
   assert(slugs.includes(EIGHTY_SECOND_PAGE_SLUG), "registry still contains eighty-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SECOND_PAGE_SLUG)), "eighty-second neighbor stays registered");
@@ -25720,7 +25741,7 @@ function testEightyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FOURTH_PAGE_SLUG), "registry contains eighty-fourth listen slug");
   assert(slugs.includes(EIGHTY_THIRD_PAGE_SLUG), "registry still contains eighty-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_THIRD_PAGE_SLUG)), "eighty-third neighbor stays registered");
@@ -26101,7 +26122,7 @@ function testEightyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_FIFTH_PAGE_SLUG), "registry contains eighty-fifth listen slug");
   assert(slugs.includes(EIGHTY_FOURTH_PAGE_SLUG), "registry still contains eighty-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FOURTH_PAGE_SLUG)), "eighty-fourth neighbor stays registered");
@@ -26490,7 +26511,7 @@ function testEightySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SIXTH_PAGE_SLUG), "registry contains eighty-sixth listen slug");
   assert(slugs.includes(EIGHTY_FIFTH_PAGE_SLUG), "registry still contains eighty-fifth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_FIFTH_PAGE_SLUG)), "eighty-fifth neighbor stays registered");
@@ -26882,7 +26903,7 @@ function testEightySeventhPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_SEVENTH_PAGE_SLUG), "registry contains eighty-seventh listen slug");
   assert(slugs.includes(EIGHTY_SIXTH_PAGE_SLUG), "registry still contains eighty-sixth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SIXTH_PAGE_SLUG)), "eighty-sixth neighbor stays registered");
@@ -27272,7 +27293,7 @@ function testEightyEighthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_EIGHTH_PAGE_SLUG), "registry contains eighty-eighth listen slug");
   assert(slugs.includes(EIGHTY_SEVENTH_PAGE_SLUG), "registry still contains eighty-seventh listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_SEVENTH_PAGE_SLUG)), "eighty-seventh neighbor stays registered");
@@ -27627,7 +27648,7 @@ function testEightyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(EIGHTY_NINTH_PAGE_SLUG), "registry contains eighty-ninth listen slug");
   assert(slugs.includes(EIGHTY_EIGHTH_PAGE_SLUG), "registry still contains eighty-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(EIGHTY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_EIGHTH_PAGE_SLUG)), "eighty-eighth neighbor stays registered");
@@ -27990,7 +28011,7 @@ function testNinetiethPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETIETH_PAGE_SLUG), "registry contains ninetieth listen slug");
   assert(slugs.includes(EIGHTY_NINTH_PAGE_SLUG), "registry still contains eighty-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETIETH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(EIGHTY_NINTH_PAGE_SLUG)), "eighty-ninth neighbor stays registered");
@@ -28339,7 +28360,7 @@ function testNinetyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_FIRST_PAGE_SLUG), "registry contains ninety-first listen slug");
   assert(slugs.includes(NINETIETH_PAGE_SLUG), "registry still contains ninetieth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETIETH_PAGE_SLUG)), "ninetieth neighbor stays registered");
@@ -28727,7 +28748,7 @@ function testNinetySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_SECOND_PAGE_SLUG), "registry contains ninety-second listen slug");
   assert(slugs.includes(NINETY_FIRST_PAGE_SLUG), "registry still contains ninety-first listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_FIRST_PAGE_SLUG)), "ninety-first neighbor stays registered");
@@ -29103,7 +29124,7 @@ function testNinetyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_THIRD_PAGE_SLUG), "registry contains ninety-third listen slug");
   assert(slugs.includes(NINETY_SECOND_PAGE_SLUG), "registry still contains ninety-second listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_SECOND_PAGE_SLUG)), "ninety-second neighbor stays registered");
@@ -29383,7 +29404,7 @@ function testNinetyFourthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry contains ninety-fourth listen slug");
   assert(slugs.includes(NINETY_THIRD_PAGE_SLUG), "registry still contains ninety-third listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_THIRD_PAGE_SLUG)), "ninety-third neighbor stays registered");
@@ -29666,7 +29687,7 @@ function testNinetyFifthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_FIFTH_PAGE_SLUG), "registry contains ninety-fifth listen slug");
   assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry still contains ninety-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_FIFTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_FOURTH_PAGE_SLUG)), "ninety-fourth neighbor stays registered");
@@ -29963,7 +29984,7 @@ function testNinetySixthPage() {
   assert(slugs.includes(NINETY_SIXTH_PAGE_SLUG), "registry contains ninety-sixth listen slug");
   assert(slugs.includes(NINETY_FIFTH_PAGE_SLUG), "registry still contains ninety-fifth listen slug");
   assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry still contains ninety-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_SIXTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_FIFTH_PAGE_SLUG)), "ninety-fifth neighbor stays registered");
@@ -30285,7 +30306,7 @@ function testNinetySeventhPage() {
   assert(slugs.includes(NINETY_SIXTH_PAGE_SLUG), "registry still contains ninety-sixth listen slug");
   assert(slugs.includes(NINETY_FIFTH_PAGE_SLUG), "registry still contains ninety-fifth listen slug");
   assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry still contains ninety-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_SEVENTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_SIXTH_PAGE_SLUG)), "ninety-sixth neighbor stays registered");
@@ -30625,7 +30646,7 @@ function testNinetyEighthPage() {
   assert(slugs.includes(NINETY_SIXTH_PAGE_SLUG), "registry still contains ninety-sixth listen slug");
   assert(slugs.includes(NINETY_FIFTH_PAGE_SLUG), "registry still contains ninety-fifth listen slug");
   assert(slugs.includes(NINETY_FOURTH_PAGE_SLUG), "registry still contains ninety-fourth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_EIGHTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_SEVENTH_PAGE_SLUG)), "ninety-seventh neighbor stays registered");
@@ -30867,11 +30888,25 @@ function testNinetyNinthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 0, "ninety-ninth page has no rich_paragraph");
+  assert(allRich.length === 8, "ninety-ninth page has exactly 8 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 0, "ninety-ninth page has exactly 0 hrefs");
+  const ninetyNinthClusterHrefs = [
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 11, "ninety-ninth page has exactly 11 hrefs");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 0, "ninety-ninth page has exactly 0 unique dests");
+  assert(uniqueDests.size === 11, "ninety-ninth page has exactly 11 unique dests");
+  assert(allLinks.map((link) => link.href).join("\n") === ninetyNinthClusterHrefs.join("\n"), "ninety-ninth hub links all 11 children in order");
   for (const href of NINETY_NINTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `ninety-ninth has no ${href} href`);
   }
@@ -30879,7 +30914,8 @@ function testNinetyNinthPage() {
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-s-dozhdem-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "ninety-ninth content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "ninety-ninth content file has no https://");
-  assert(!contentSource.includes('href: "/listens/"'), "ninety-ninth content file has no href: \"/listens/\"");
+  assert(!contentSource.includes('href: "/listens/"\n'), "ninety-ninth content file has no empty listen href");
+  assert(contentSource.includes('href: "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn"'), "ninety-ninth content file links noise child");
   assert(contentSource.includes(`playlistSlug: "${NINETY_NINTH_PLAYLIST_SLUG}"`), "ninety-ninth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "ninety-ninth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "ninety-ninth content file has no primaryPractice");
@@ -30888,7 +30924,7 @@ function testNinetyNinthPage() {
   assert(!contentSource.includes("School"), "ninety-ninth content file has no School");
   assert(!contentSource.includes("internalLinks"), "ninety-ninth content file has no internalLinks");
   assert(!contentSource.includes("topicSlug"), "ninety-ninth content file has no topicSlug");
-  assert(!contentSource.includes("rich_paragraph"), "ninety-ninth content file has no rich_paragraph");
+  assert(contentSource.includes("rich_paragraph"), "ninety-ninth content file has rich_paragraph cluster links");
   assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "ninety-ninth content file has no bookmark phrase");
   assert(!contentSource.includes("🔖"), "ninety-ninth content file has no bookmark emoji");
   assert(!contentSource.includes("закладк"), "ninety-ninth content file has no bookmark word");
@@ -30905,7 +30941,7 @@ function testNinetyNinthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry contains ninety-ninth listen slug");
   assert(slugs.includes(NINETY_EIGHTH_PAGE_SLUG), "registry still contains ninety-eighth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(NINETY_NINTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_EIGHTH_PAGE_SLUG)), "ninety-eighth neighbor stays registered");
@@ -31128,13 +31164,20 @@ function testOneHundredthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 1, "one-hundredth page has exactly 1 rich_paragraph");
+  assert(allRich.length === 4, "one-hundredth page has exactly 4 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 1, "one-hundredth page has exactly 1 href");
+  const oneHundredthClusterHrefs = [
+    ONE_HUNDREDTH_LISTEN_99_HREF,
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 4, "one-hundredth page has exactly 4 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 1, "one-hundredth page has exactly 1 unique dest");
+  assert(uniqueDests.size === 4, "one-hundredth page has exactly 4 unique dest");
   assert(allLinks[0].href === ONE_HUNDREDTH_LISTEN_99_HREF, "one-hundredth dest is Listen 99");
   assert(allLinks[0].label === ONE_HUNDREDTH_LISTEN_99_LABEL, "one-hundredth label is exact Listen 99 title");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredthClusterHrefs.join("\n"), "one-hundredth cluster hrefs exact");
   for (const href of ONE_HUNDREDTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundredth has no ${href} href`);
   }
@@ -31144,8 +31187,8 @@ function testOneHundredthPage() {
   assert(!contentSource.includes("https://"), "one-hundredth content file has no https://");
   assert(contentSource.includes(`href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`), "one-hundredth content file has Listen 99 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 1, "one-hundredth content file has exactly 1 /listens/ href");
-  assert(listenHrefMatches[0] === `href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`, "one-hundredth content file href is Listen 99 only");
+  assert(listenHrefMatches.length === 4, "one-hundredth content file has exactly 4 /listens/ href");
+  assert(listenHrefMatches[0] === `href: "${ONE_HUNDREDTH_LISTEN_99_HREF}"`, "one-hundredth first content file href is Listen 99");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDREDTH_PLAYLIST_SLUG}"`), "one-hundredth content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundredth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundredth content file has no primaryPractice");
@@ -31168,7 +31211,7 @@ function testOneHundredthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(ONE_HUNDREDTH_PAGE_SLUG), "registry contains one-hundredth listen slug");
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry still contains ninety-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(ONE_HUNDREDTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(NINETY_NINTH_PAGE_SLUG)), "ninety-ninth neighbor stays registered");
@@ -31417,15 +31460,25 @@ function testOneHundredFirstPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 2, "one-hundred-first page has exactly 2 rich_paragraph");
+  assert(allRich.length === 5, "one-hundred-first page has exactly 5 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 2, "one-hundred-first page has exactly 2 href");
+  const oneHundredFirstClusterHrefs = [
+    ONE_HUNDRED_FIRST_LISTEN_99_HREF,
+    ONE_HUNDRED_FIRST_LISTEN_100_HREF,
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+  ];
+  assert(allLinks.length === 7, "one-hundred-first page has exactly 7 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 2, "one-hundred-first page has exactly 2 unique dest");
+  assert(uniqueDests.size === 7, "one-hundred-first page has exactly 7 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_FIRST_LISTEN_99_HREF, "one-hundred-first first dest is Listen 99");
   assert(allLinks[0].label === ONE_HUNDRED_FIRST_LISTEN_99_LABEL, "one-hundred-first first label is exact Listen 99 title");
   assert(allLinks[1].href === ONE_HUNDRED_FIRST_LISTEN_100_HREF, "one-hundred-first second dest is Listen 100");
   assert(allLinks[1].label === ONE_HUNDRED_FIRST_LISTEN_100_LABEL, "one-hundred-first second label is exact Listen 100 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredFirstClusterHrefs.join("\n"), "one-hundred-first cluster hrefs exact");
   for (const href of ONE_HUNDRED_FIRST_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-first has no ${href} href`);
   }
@@ -31436,7 +31489,7 @@ function testOneHundredFirstPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FIRST_LISTEN_99_HREF}"`), "one-hundred-first content file has Listen 99 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FIRST_LISTEN_100_HREF}"`), "one-hundred-first content file has Listen 100 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 2, "one-hundred-first content file has exactly 2 /listens/ href");
+  assert(listenHrefMatches.length === 7, "one-hundred-first content file has exactly 7 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_FIRST_LISTEN_99_HREF}"`, "one-hundred-first first content file href is Listen 99");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_FIRST_LISTEN_100_HREF}"`, "one-hundred-first second content file href is Listen 100");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_FIRST_PLAYLIST_SLUG}"`), "one-hundred-first content file has playlistSlug");
@@ -31462,7 +31515,7 @@ function testOneHundredFirstPage() {
   assert(slugs.includes(ONE_HUNDRED_FIRST_PAGE_SLUG), "registry contains one-hundred-first listen slug");
   assert(slugs.includes(ONE_HUNDREDTH_PAGE_SLUG), "registry still contains one-hundredth listen slug");
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry still contains ninety-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_FIRST_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(ONE_HUNDREDTH_PAGE_SLUG)), "one-hundredth neighbor stays registered");
@@ -31691,17 +31744,27 @@ function testOneHundredSecondPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 3, "one-hundred-second page has exactly 3 rich_paragraph");
+  assert(allRich.length === 6, "one-hundred-second page has exactly 6 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 3, "one-hundred-second page has exactly 3 href");
+  const oneHundredSecondClusterHrefs = [
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    ONE_HUNDRED_SECOND_LISTEN_99_HREF,
+    ONE_HUNDRED_SECOND_LISTEN_100_HREF,
+    ONE_HUNDRED_SECOND_LISTEN_101_HREF,
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn",
+  ];
+  assert(allLinks.length === 7, "one-hundred-second page has exactly 7 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 3, "one-hundred-second page has exactly 3 unique dest");
-  assert(allLinks[0].href === ONE_HUNDRED_SECOND_LISTEN_99_HREF, "one-hundred-second first dest is Listen 99");
-  assert(allLinks[0].label === ONE_HUNDRED_SECOND_LISTEN_99_LABEL, "one-hundred-second first label is exact Listen 99 title");
-  assert(allLinks[1].href === ONE_HUNDRED_SECOND_LISTEN_100_HREF, "one-hundred-second second dest is Listen 100");
-  assert(allLinks[1].label === ONE_HUNDRED_SECOND_LISTEN_100_LABEL, "one-hundred-second second label is exact Listen 100 label");
-  assert(allLinks[2].href === ONE_HUNDRED_SECOND_LISTEN_101_HREF, "one-hundred-second third dest is Listen 101");
-  assert(allLinks[2].label === ONE_HUNDRED_SECOND_LISTEN_101_LABEL, "one-hundred-second third label is exact Listen 101 label");
+  assert(uniqueDests.size === 7, "one-hundred-second page has exactly 7 unique dest");
+  assert(allLinks[1].href === ONE_HUNDRED_SECOND_LISTEN_99_HREF, "one-hundred-second hub dest is Listen 99");
+  assert(allLinks[1].label === ONE_HUNDRED_SECOND_LISTEN_99_LABEL, "one-hundred-second hub label is exact Listen 99 title");
+  assert(allLinks[2].href === ONE_HUNDRED_SECOND_LISTEN_100_HREF, "one-hundred-second second dest is Listen 100");
+  assert(allLinks[2].label === ONE_HUNDRED_SECOND_LISTEN_100_LABEL, "one-hundred-second second label is exact Listen 100 label");
+  assert(allLinks[3].href === ONE_HUNDRED_SECOND_LISTEN_101_HREF, "one-hundred-second third dest is Listen 101");
+  assert(allLinks[3].label === ONE_HUNDRED_SECOND_LISTEN_101_LABEL, "one-hundred-second third label is exact Listen 101 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredSecondClusterHrefs.join("\n"), "one-hundred-second cluster hrefs exact");
   for (const href of ONE_HUNDRED_SECOND_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-second has no ${href} href`);
   }
@@ -31713,10 +31776,10 @@ function testOneHundredSecondPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`), "one-hundred-second content file has Listen 100 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`), "one-hundred-second content file has Listen 101 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 3, "one-hundred-second content file has exactly 3 /listens/ href");
-  assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_SECOND_LISTEN_99_HREF}"`, "one-hundred-second first content file href is Listen 99");
-  assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`, "one-hundred-second second content file href is Listen 100");
-  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`, "one-hundred-second third content file href is Listen 101");
+  assert(listenHrefMatches.length === 7, "one-hundred-second content file has exactly 7 /listens/ href");
+  assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_SECOND_LISTEN_99_HREF}"`, "one-hundred-second hub content file href is Listen 99");
+  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_SECOND_LISTEN_100_HREF}"`, "one-hundred-second second content file href is Listen 100");
+  assert(listenHrefMatches[3] === `href: "${ONE_HUNDRED_SECOND_LISTEN_101_HREF}"`, "one-hundred-second third content file href is Listen 101");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_SECOND_PLAYLIST_SLUG}"`), "one-hundred-second content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundred-second content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundred-second content file has no primaryPractice");
@@ -31741,7 +31804,7 @@ function testOneHundredSecondPage() {
   assert(slugs.includes(ONE_HUNDRED_FIRST_PAGE_SLUG), "registry still contains one-hundred-first listen slug");
   assert(slugs.includes(ONE_HUNDREDTH_PAGE_SLUG), "registry still contains one-hundredth listen slug");
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry still contains ninety-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_SECOND_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_FIRST_PAGE_SLUG)), "one-hundred-first neighbor stays registered");
@@ -32003,19 +32066,30 @@ function testOneHundredThirdPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 4, "one-hundred-third page has exactly 4 rich_paragraph");
+  assert(allRich.length === 6, "one-hundred-third page has exactly 6 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 4, "one-hundred-third page has exactly 4 href");
+  const oneHundredThirdClusterHrefs = [
+    ONE_HUNDRED_THIRD_LISTEN_102_HREF,
+    ONE_HUNDRED_THIRD_LISTEN_101_HREF,
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    ONE_HUNDRED_THIRD_LISTEN_99_HREF,
+    ONE_HUNDRED_THIRD_LISTEN_100_HREF,
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn",
+  ];
+  assert(allLinks.length === 8, "one-hundred-third page has exactly 8 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 4, "one-hundred-third page has exactly 4 unique dest");
+  assert(uniqueDests.size === 8, "one-hundred-third page has exactly 8 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_THIRD_LISTEN_102_HREF, "one-hundred-third first dest is Listen 102");
   assert(allLinks[0].label === ONE_HUNDRED_THIRD_LISTEN_102_LABEL, "one-hundred-third first label is exact Listen 102 label");
   assert(allLinks[1].href === ONE_HUNDRED_THIRD_LISTEN_101_HREF, "one-hundred-third second dest is Listen 101");
   assert(allLinks[1].label === ONE_HUNDRED_THIRD_LISTEN_101_LABEL, "one-hundred-third second label is exact Listen 101 label");
-  assert(allLinks[2].href === ONE_HUNDRED_THIRD_LISTEN_99_HREF, "one-hundred-third third dest is Listen 99");
-  assert(allLinks[2].label === ONE_HUNDRED_THIRD_LISTEN_99_LABEL, "one-hundred-third third label is exact Listen 99 title");
-  assert(allLinks[3].href === ONE_HUNDRED_THIRD_LISTEN_100_HREF, "one-hundred-third fourth dest is Listen 100");
-  assert(allLinks[3].label === ONE_HUNDRED_THIRD_LISTEN_100_LABEL, "one-hundred-third fourth label is exact Listen 100 label");
+  assert(allLinks[4].href === ONE_HUNDRED_THIRD_LISTEN_99_HREF, "one-hundred-third hub dest is Listen 99");
+  assert(allLinks[4].label === ONE_HUNDRED_THIRD_LISTEN_99_LABEL, "one-hundred-third hub label is exact Listen 99 title");
+  assert(allLinks[5].href === ONE_HUNDRED_THIRD_LISTEN_100_HREF, "one-hundred-third noise dest is Listen 100");
+  assert(allLinks[5].label === ONE_HUNDRED_THIRD_LISTEN_100_LABEL, "one-hundred-third noise label is exact Listen 100 label");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredThirdClusterHrefs.join("\n"), "one-hundred-third cluster hrefs exact");
   for (const href of ONE_HUNDRED_THIRD_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-third has no ${href} href`);
   }
@@ -32028,11 +32102,11 @@ function testOneHundredThirdPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`), "one-hundred-third content file has Listen 99 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`), "one-hundred-third content file has Listen 100 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 4, "one-hundred-third content file has exactly 4 /listens/ href");
+  assert(listenHrefMatches.length === 8, "one-hundred-third content file has exactly 8 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_THIRD_LISTEN_102_HREF}"`, "one-hundred-third first content file href is Listen 102");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_THIRD_LISTEN_101_HREF}"`, "one-hundred-third second content file href is Listen 101");
-  assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`, "one-hundred-third third content file href is Listen 99");
-  assert(listenHrefMatches[3] === `href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`, "one-hundred-third fourth content file href is Listen 100");
+  assert(listenHrefMatches[4] === `href: "${ONE_HUNDRED_THIRD_LISTEN_99_HREF}"`, "one-hundred-third hub content file href is Listen 99");
+  assert(listenHrefMatches[5] === `href: "${ONE_HUNDRED_THIRD_LISTEN_100_HREF}"`, "one-hundred-third noise content file href is Listen 100");
   assert(contentSource.includes(`playlistSlug: "${ONE_HUNDRED_THIRD_PLAYLIST_SLUG}"`), "one-hundred-third content file has playlistSlug");
   assert(!contentSource.includes("ListenSignupCta"), "one-hundred-third content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "one-hundred-third content file has no primaryPractice");
@@ -32058,7 +32132,7 @@ function testOneHundredThirdPage() {
   assert(slugs.includes(ONE_HUNDRED_FIRST_PAGE_SLUG), "registry still contains one-hundred-first listen slug");
   assert(slugs.includes(ONE_HUNDREDTH_PAGE_SLUG), "registry still contains one-hundredth listen slug");
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry still contains ninety-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_THIRD_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_SECOND_PAGE_SLUG)), "one-hundred-second neighbor stays registered");
@@ -32321,11 +32395,21 @@ function testOneHundredFourthPage() {
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
-  assert(allRich.length === 5, "one-hundred-fourth page has exactly 5 rich_paragraph");
+  assert(allRich.length === 7, "one-hundred-fourth page has exactly 7 rich_paragraph");
   const allLinks = collectListenLinks(parsed.definition);
-  assert(allLinks.length === 5, "one-hundred-fourth page has exactly 5 href");
+  const oneHundredFourthClusterHrefs = [
+    ONE_HUNDRED_FOURTH_LISTEN_102_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_101_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_103_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_100_HREF,
+    ONE_HUNDRED_FOURTH_LISTEN_99_HREF,
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+  ];
+  assert(allLinks.length === 8, "one-hundred-fourth page has exactly 8 href");
   const uniqueDests = new Set(allLinks.map((link) => link.href));
-  assert(uniqueDests.size === 5, "one-hundred-fourth page has exactly 5 unique dest");
+  assert(uniqueDests.size === 8, "one-hundred-fourth page has exactly 8 unique dest");
   assert(allLinks[0].href === ONE_HUNDRED_FOURTH_LISTEN_102_HREF, "one-hundred-fourth first dest is Listen 102");
   assert(allLinks[0].label === ONE_HUNDRED_FOURTH_LISTEN_102_LABEL, "one-hundred-fourth first label is exact Listen 102 label");
   assert(allLinks[1].href === ONE_HUNDRED_FOURTH_LISTEN_101_HREF, "one-hundred-fourth second dest is Listen 101");
@@ -32336,6 +32420,7 @@ function testOneHundredFourthPage() {
   assert(allLinks[3].label === ONE_HUNDRED_FOURTH_LISTEN_100_LABEL, "one-hundred-fourth fourth label is exact Listen 100 label");
   assert(allLinks[4].href === ONE_HUNDRED_FOURTH_LISTEN_99_HREF, "one-hundred-fourth fifth dest is Listen 99");
   assert(allLinks[4].label === ONE_HUNDRED_FOURTH_LISTEN_99_LABEL, "one-hundred-fourth fifth label is exact Listen 99 title");
+  assert(allLinks.map((link) => link.href).join("\n") === oneHundredFourthClusterHrefs.join("\n"), "one-hundred-fourth cluster hrefs exact");
   for (const href of ONE_HUNDRED_FOURTH_FORBIDDEN_EXACT_HREFS) {
     assert(!allLinks.some((link) => link.href === href), `one-hundred-fourth has no ${href} href`);
   }
@@ -32349,7 +32434,7 @@ function testOneHundredFourthPage() {
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FOURTH_LISTEN_100_HREF}"`), "one-hundred-fourth content file has Listen 100 href");
   assert(contentSource.includes(`href: "${ONE_HUNDRED_FOURTH_LISTEN_99_HREF}"`), "one-hundred-fourth content file has Listen 99 href");
   const listenHrefMatches = contentSource.match(/href: "\/listens\/[^"]+"/g) ?? [];
-  assert(listenHrefMatches.length === 5, "one-hundred-fourth content file has exactly 5 /listens/ href");
+  assert(listenHrefMatches.length === 8, "one-hundred-fourth content file has exactly 8 /listens/ href");
   assert(listenHrefMatches[0] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_102_HREF}"`, "one-hundred-fourth first content file href is Listen 102");
   assert(listenHrefMatches[1] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_101_HREF}"`, "one-hundred-fourth second content file href is Listen 101");
   assert(listenHrefMatches[2] === `href: "${ONE_HUNDRED_FOURTH_LISTEN_103_HREF}"`, "one-hundred-fourth third content file href is Listen 103");
@@ -32381,7 +32466,7 @@ function testOneHundredFourthPage() {
   assert(slugs.includes(ONE_HUNDRED_FIRST_PAGE_SLUG), "registry still contains one-hundred-first listen slug");
   assert(slugs.includes(ONE_HUNDREDTH_PAGE_SLUG), "registry still contains one-hundredth listen slug");
   assert(slugs.includes(NINETY_NINTH_PAGE_SLUG), "registry still contains ninety-ninth listen slug");
-  assert(slugs.length === 104, "registry contains all 104 listen slugs");
+  assert(slugs.length === 127, "registry contains all 127 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_FOURTH_PAGE_SLUG)), "new slug resolves");
   assert(Boolean(getListenPageBySlug(ONE_HUNDRED_THIRD_PAGE_SLUG)), "one-hundred-third neighbor stays registered");
@@ -32445,7 +32530,7 @@ function testOneHundredFifthPage() {
   assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-fifth has six unique destinations");
   assert(links.map((link) => link.href).join("\n") === destinations.join("\n"), "one-hundred-fifth exact link destinations and order");
   assert(listListenPageDefinitions().map((page) => page.slug).includes(slug), "registry contains one-hundred-fifth slug");
-  assert(listListenPageDefinitions().length === 107, "registry contains all 107 listen slugs");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
 
   const data = resolveListenPageFromPlaylist({
     definition,
@@ -32479,6 +32564,2167 @@ function testOneHundredSixthPage() {
   assert(new Set(links.map((link) => link.href)).size === 7, "one-hundred-sixth has seven unique destinations");
   assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-sixth links exact");
   assert(listListenPageDefinitions().some((page) => page.slug === definition.slug), "registry contains one-hundred-sixth slug");
+}
+
+function testOneHundredEighthPage() {
+  const definition = MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn";
+  const expectedHrefs = [
+    "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn",
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+  ];
+  const expectedLabels = [
+    "Музыка для сна с дождём",
+    "музыка для сна со звуками дождя",
+    "музыку для сна с шумом дождя",
+    "музыка пианино и дождя для сна",
+    "спокойную музыку для сна с дождём",
+    "успокаивающая музыка для сна с дождём",
+    "расслабляющая музыка для сна с каплями дождя",
+    "расслабляющая музыка с дождём для сна",
+  ];
+  const links = collectListenLinks(definition);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-eighth production definition valid");
+  assert(definition.slug === slug, "one-hundred-eighth slug exact");
+  assert(definition.playlistSlug === "muzyka-dlya-sna-s-dozhdem", "one-hundred-eighth playlist slug exact");
+  assert(definition.h1 === "Музыка с каплями дождя для сна – слушать онлайн бесплатно", "one-hundred-eighth h1 exact");
+  assert(definition.title === "Музыка с каплями дождя для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-eighth title exact");
+  assert(
+    definition.description ===
+      "Музыка с каплями дождя для сна – слушайте онлайн бесплатно композиции с дождевым звучанием и выбирайте комфортный музыкальный фон перед сном.",
+    "one-hundred-eighth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-eighth has three intro paragraphs");
+  assert(definition.faq.length === 8, "one-hundred-eighth has eight FAQ items");
+  assert(definition.faq[0].question === "Где слушать музыку с каплями дождя для сна онлайн?", "one-hundred-eighth first FAQ question");
+  assert(definition.faq[7].question === "Гарантирует ли музыка с каплями дождя быстрое засыпание?", "one-hundred-eighth last FAQ question");
+  assert(definition.faq[7].answer === "Нет. Музыка и дождевое звучание не гарантируют скорость засыпания или определённый результат сна.", "one-hundred-eighth last FAQ answer");
+  assert(links.length === 8, "one-hundred-eighth has eight href");
+  assert(new Set(links.map((link) => link.href)).size === 8, "one-hundred-eighth has eight unique destinations");
+  assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-eighth links exact");
+  assert(links.map((link) => link.label).join("\n") === expectedLabels.join("\n"), "one-hundred-eighth labels exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-eighth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: "muzyka-dlya-sna-s-dozhdem", title: "Музыка для сна с дождём | Шум дождя для сна" } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-eighth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-eighth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-eighth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-eighth has no raw URLs");
+  assert(!contentSource.includes("🔖"), "one-hundred-eighth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-eighth uses shared bookmark CTA");
+}
+
+function testOneHundredNinthPage() {
+  const definition = USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE;
+  const slug = "uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+  const expectedHrefs = [
+    "/listens/muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+  ];
+  const expectedLabels = [
+    "музыка пианино и дождя для сна",
+    "Успокаивающая музыка для сна с дождём",
+    "спокойную музыку для сна с дождём",
+    "музыка для сна со звуками дождя",
+    "музыку для сна с шумом дождя",
+    "музыка для сна с дождём",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-ninth production definition valid");
+  assert(definition.slug === slug, "one-hundred-ninth slug exact");
+  assert(definition.playlistSlug === "muzyka-dlya-sna-s-dozhdem", "one-hundred-ninth playlist slug exact");
+  assert(definition.h1 === "Успокаивающая музыка для сна с дождём и пианино – слушать онлайн бесплатно", "one-hundred-ninth h1 exact");
+  assert(definition.title === "Успокаивающая музыка для сна с дождём и пианино – слушать онлайн бесплатно | АудиоЛад", "one-hundred-ninth title exact");
+  assert(
+    definition.description ===
+      "Успокаивающая музыка с пианино и дождём для сна – слушайте онлайн бесплатно мягкие композиции и выбирайте комфортное звучание перед сном.",
+    "one-hundred-ninth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-ninth has three intro paragraphs");
+  assert(definition.sections.length === 10, "one-hundred-ninth has ten H2 sections");
+  assert(headings.length === 4, "one-hundred-ninth has four H3 headings");
+  assert(headings.map((block) => block.title).join("\n") === [
+    "Громкость пианино",
+    "Интенсивность дождя",
+    "Характер композиции",
+    "Собственное восприятие",
+  ].join("\n"), "one-hundred-ninth H3 titles exact");
+  assert(definition.faq.length === 8, "one-hundred-ninth has eight FAQ items");
+  assert(definition.faq[0].question === "Где слушать успокаивающую музыку с дождём и пианино для сна?", "one-hundred-ninth first FAQ question");
+  assert(definition.faq[7].question === "Гарантирует ли успокаивающая музыка быстрое засыпание?", "one-hundred-ninth last FAQ question");
+  assert(definition.faq[7].answer === "Нет. Музыка не гарантирует скорость засыпания или определённый результат сна.", "one-hundred-ninth last FAQ answer");
+  assert(links.length === 6, "one-hundred-ninth has six href");
+  assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-ninth has six unique destinations");
+  assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-ninth links exact");
+  assert(links.map((link) => link.label).join("\n") === expectedLabels.join("\n"), "one-hundred-ninth labels exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-ninth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: "muzyka-dlya-sna-s-dozhdem", title: "Музыка для сна с дождём | Шум дождя для сна" } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-ninth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-ninth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-ninth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-ninth has no raw URLs");
+  assert(!contentSource.includes("🔖"), "one-hundred-ninth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-ninth uses shared bookmark CTA");
+}
+
+function testOneHundredTenthPage() {
+  const definition = RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+  const expectedHrefs = [
+    "/listens/rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn",
+    "/listens/spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-s-dozhdem-slushat-onlayn",
+    "/listens/relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn",
+  ];
+  const expectedLabels = [
+    "Расслабляющая музыка с дождём для сна",
+    "музыка с каплями дождя для сна",
+    "музыку для сна со звуками дождя",
+    "спокойную музыку для сна с дождём",
+    "музыка для сна с дождём",
+    "релакс музыка с дождём для сна",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-tenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-tenth slug exact");
+  assert(definition.playlistSlug === "muzyka-dlya-sna-s-dozhdem", "one-hundred-tenth playlist slug exact");
+  assert(definition.h1 === "Расслабляющая музыка для сна с каплями дождя – слушать онлайн бесплатно", "one-hundred-tenth h1 exact");
+  assert(definition.title === "Расслабляющая музыка для сна с каплями дождя – слушать онлайн бесплатно | АудиоЛад", "one-hundred-tenth title exact");
+  assert(
+    definition.description ===
+      "Расслабляющая музыка с каплями дождя для сна – слушайте онлайн бесплатно композиции с дождевым фоном и выбирайте комфортное звучание перед сном.",
+    "one-hundred-tenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-tenth has three intro paragraphs");
+  assert(definition.sections.length === 10, "one-hundred-tenth has ten H2 sections");
+  assert(headings.length === 0, "one-hundred-tenth has no H3 headings");
+  assert(definition.faq.length === 8, "one-hundred-tenth has eight FAQ items");
+  assert(definition.faq[0].question === "Где слушать расслабляющую музыку с каплями дождя для сна?", "one-hundred-tenth first FAQ question");
+  assert(definition.faq[7].question === "Гарантирует ли расслабляющая музыка быстрое засыпание?", "one-hundred-tenth last FAQ question");
+  assert(definition.faq[7].answer === "Нет. Музыка не гарантирует скорость засыпания или определённый результат сна.", "one-hundred-tenth last FAQ answer");
+  assert(links.length === 6, "one-hundred-tenth has six href");
+  assert(new Set(links.map((link) => link.href)).size === 6, "one-hundred-tenth has six unique destinations");
+  assert(links.map((link) => link.href).join("\n") === expectedHrefs.join("\n"), "one-hundred-tenth links exact");
+  assert(links.map((link) => link.label).join("\n") === expectedLabels.join("\n"), "one-hundred-tenth labels exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-tenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: "muzyka-dlya-sna-s-dozhdem", title: "Музыка для сна с дождём | Шум дождя для сна" } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-tenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-tenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-tenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-tenth has no raw URLs");
+  assert(!contentSource.includes("🔖"), "one-hundred-tenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-tenth uses shared bookmark CTA");
+}
+
+function testOneHundredEleventhPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна онлайн бесплатно – выбрать ровный фоновый звук и включить его вечером, перед сном или во время отдыха.",
+    "В подборке представлены разные типы бытового фонового звучания без музыкального содержания: можно сравнить звук пылесоса, фена, вентилятора, воды и другие доступные варианты.",
+    "Если вы ищете белый шум слушать для сна, попробуйте несколько записей и выберите тот фон, который комфортнее воспринимается именно вами.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна – слушать онлайн",
+    "Где слушать белый шум для сна онлайн",
+    "Белый шум для сна онлайн бесплатно",
+    "Какие бытовые звуки могут использоваться как белый шум",
+    "Белый шум пылесоса и фена",
+    "Белый шум без музыки",
+    "Как выбрать подходящий белый шум",
+    "Как слушать белый шум перед сном",
+    "Итог",
+  ];
+  const expectedH3Titles = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Звук воды из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки могут использоваться как белый шум",
+  );
+  const householdHeadings = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "heading")
+    .map((block) => block.title);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-eleventh production definition valid");
+  assert(definition.slug === slug, "one-hundred-eleventh slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-eleventh playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна – слушать онлайн бесплатно", "one-hundred-eleventh h1 exact");
+  assert(definition.title === "Белый шум для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-eleventh title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна – слушайте онлайн бесплатно разные варианты ровных бытовых фоновых звуков и выбирайте комфортное звучание для отдыха и сна.",
+    "one-hundred-eleventh description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-eleventh has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-eleventh intro verbatim",
+  );
+  assert(definition.sections.length === 9, "one-hundred-eleventh has nine H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-eleventh H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-eleventh last section id is itog");
+  assert(headings.length === 4, "one-hundred-eleventh has four H3 headings");
+  assert(headings.every((block) => block.level === 3), "one-hundred-eleventh H3s use level 3");
+  assert(headings.map((block) => block.title).join("\n") === expectedH3Titles.join("\n"), "one-hundred-eleventh H3 titles exact");
+  assert(householdHeadings.join("\n") === expectedH3Titles.join("\n"), "one-hundred-eleventh H3s live inside household H2");
+  assert(definition.faq.length === 9, "one-hundred-eleventh has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна онлайн?", "one-hundred-eleventh first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли белый шум быстрое засыпание?", "one-hundred-eleventh last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания и воспринимается разными людьми по-разному.",
+    "one-hundred-eleventh last FAQ answer",
+  );
+  assert(links.length === 0, "one-hundred-eleventh has zero href");
+  assert(new Set(links.map((link) => link.href)).size === 0, "one-hundred-eleventh has zero unique destinations");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-eleventh slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-eleventh canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-eleventh path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-eleventh omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-eleventh has no raw URLs");
+  assert(!contentSource.includes("href:"), "one-hundred-eleventh content file has no href");
+  assert(!contentSource.includes("🔖"), "one-hundred-eleventh content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-eleventh uses shared bookmark CTA");
+}
+
+function testOneHundredTwelfthPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_1_CHAS_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна 1 час онлайн бесплатно – выбрать подходящий бытовой фоновый звук и включить его перед сном или во время отдыха.",
+    "В подборке доступно достаточно аудио для часового прослушивания. Можно выбрать несколько последовательных записей и составить подходящий фон примерно на час.",
+    "Если вы ищете белый шум час, попробуйте разные варианты звучания и выберите тот, который комфортнее воспринимается именно вами.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна 1 час – слушать онлайн",
+    "Белый шум час – как слушать",
+    "Белый шум для сна час",
+    "Белый шум слушать час",
+    "Какие звуки можно выбрать на час",
+    "Чем часовой формат отличается от общего белого шума для сна",
+    "Почему необязательно выбирать один звук на весь час",
+    "Как слушать белый шум около часа",
+    "Где слушать белый шум для сна 1 час онлайн",
+    "Итог",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twelfth production definition valid");
+  assert(definition.slug === slug, "one-hundred-twelfth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twelfth playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна 1 час – слушать онлайн бесплатно", "one-hundred-twelfth h1 exact");
+  assert(definition.title === "Белый шум для сна 1 час – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twelfth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна 1 час – слушайте онлайн бесплатно разные варианты бытового фонового шума и выбирайте комфортное звучание примерно на час.",
+    "one-hundred-twelfth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twelfth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twelfth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-twelfth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twelfth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twelfth last section id is itog");
+  assert(headings.length === 0, "one-hundred-twelfth has no H3 headings");
+  assert(definition.faq.length === 8, "one-hundred-twelfth has eight FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна 1 час?", "one-hundred-twelfth first FAQ question");
+  assert(definition.faq[7].question === "Гарантирует ли белый шум быстрое засыпание?", "one-hundred-twelfth last FAQ question");
+  assert(
+    definition.faq[7].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания и воспринимается людьми по-разному.",
+    "one-hundred-twelfth last FAQ answer",
+  );
+  assert(links.length === 1, "one-hundred-twelfth has one href");
+  assert(new Set(links.map((link) => link.href)).size === 1, "one-hundred-twelfth has one unique destination");
+  assert(links[0].href === hubHref, "one-hundred-twelfth links hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-twelfth hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twelfth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twelfth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twelfth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twelfth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twelfth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twelfth content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chas"), "one-hundred-twelfth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twelfth has no 3-hour href");
+  assert(!contentSource.includes("🔖"), "one-hundred-twelfth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twelfth uses shared bookmark CTA");
+}
+
+function testOneHundredThirteenthPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-2-chasa-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна 2 часа онлайн бесплатно – выбрать несколько бытовых фоновых звуков и составить последовательность примерно на два часа.",
+    "К моменту публикации страницы в подборке должно быть доступно достаточно аудио для двухчасового прослушивания. При этом не требуется одна непрерывная запись продолжительностью два часа.",
+    "Если вы ищете белый шум 2 часа, можно попробовать разные варианты звучания и подобрать последовательность, которая комфортно воспринимается именно вами.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна 2 часа – слушать онлайн",
+    "Белый шум 2 часа",
+    "Белый шум слушать 2 часа",
+    "Чем 2 часа отличаются от часового формата",
+    "Белый шум для сна в целом",
+    "Какие бытовые звуки можно слушать два часа",
+    "Обязательно ли слушать один звук все два часа",
+    "Как организовать двухчасовое прослушивание",
+    "Где слушать белый шум для сна 2 часа онлайн",
+    "Итог",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-thirteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-thirteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-thirteenth playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна 2 часа – слушать онлайн бесплатно", "one-hundred-thirteenth h1 exact");
+  assert(definition.title === "Белый шум для сна 2 часа – слушать онлайн бесплатно | АудиоЛад", "one-hundred-thirteenth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна 2 часа – слушайте онлайн бесплатно бытовые фоновые звуки и составляйте комфортное двухчасовое прослушивание из доступных записей.",
+    "one-hundred-thirteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-thirteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-thirteenth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-thirteenth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-thirteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-thirteenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-thirteenth has no H3 headings");
+  assert(definition.faq.length === 8, "one-hundred-thirteenth has eight FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна 2 часа?", "one-hundred-thirteenth first FAQ question");
+  assert(definition.faq[7].question === "Гарантирует ли двухчасовой белый шум быстрое засыпание?", "one-hundred-thirteenth last FAQ question");
+  assert(
+    definition.faq[7].answer ===
+      "Нет. Продолжительность прослушивания и сам белый шум не гарантируют скорость засыпания.",
+    "one-hundred-thirteenth last FAQ answer",
+  );
+  assert(links.length === 2, "one-hundred-thirteenth has two href");
+  assert(new Set(links.map((link) => link.href)).size === 2, "one-hundred-thirteenth has two unique destinations");
+  assert(links[0].href === oneHourHref, "one-hundred-thirteenth first dest is 1-hour page");
+  assert(links[0].label === "белый шум для сна 1 час", "one-hundred-thirteenth 1-hour label exact");
+  assert(links[1].href === hubHref, "one-hundred-thirteenth second dest is hub");
+  assert(links[1].label === "белый шум для сна", "one-hundred-thirteenth hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-thirteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-thirteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-thirteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-thirteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-thirteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-thirteenth content file has 1-hour href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-thirteenth content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-thirteenth has no 3-hour href");
+  assert(!contentSource.includes("🔖"), "one-hundred-thirteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-thirteenth uses shared bookmark CTA");
+}
+
+function testOneHundredFourteenthPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_3_CHASA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-3-chasa-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const twoHourHref = "/listens/belyy-shum-dlya-sna-2-chasa-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна 3 часа онлайн бесплатно – выбрать несколько бытовых фоновых звуков и составить длительное прослушивание примерно на три часа.",
+    "В подборке доступно около трёх часов аудио, поэтому белый шум 3 часа можно слушать последовательно из нескольких записей, меняя фон по своим предпочтениям.",
+    "Можно выбрать разные варианты бытового звучания без музыки и включить их вечером, перед сном или во время отдыха.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна 3 часа – слушать онлайн",
+    "Белый шум 3 часа",
+    "Белый шум три часа",
+    "Белый шум слушать 3 часа",
+    "Чем 3 часа отличаются от 1 и 2 часов",
+    "Какие бытовые звуки можно слушать 3 часа",
+    "Белый шум для сна без привязки к длительности",
+    "Как организовать трёхчасовое прослушивание",
+    "Где слушать белый шум для сна 3 часа онлайн",
+    "Итог",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-fourteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-fourteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-fourteenth playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна 3 часа – слушать онлайн бесплатно", "one-hundred-fourteenth h1 exact");
+  assert(definition.title === "Белый шум для сна 3 часа – слушать онлайн бесплатно | АудиоЛад", "one-hundred-fourteenth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна 3 часа – слушайте онлайн бесплатно разные бытовые фоновые звуки и составляйте длительное прослушивание примерно на три часа.",
+    "one-hundred-fourteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-fourteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-fourteenth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-fourteenth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-fourteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-fourteenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-fourteenth has no H3 headings");
+  assert(definition.faq.length === 9, "one-hundred-fourteenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна 3 часа?", "one-hundred-fourteenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли трёхчасовой белый шум хороший сон?", "one-hundred-fourteenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Ни длительность прослушивания, ни сам белый шум не гарантируют качество сна или скорость засыпания.",
+    "one-hundred-fourteenth last FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-fourteenth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-fourteenth has three unique destinations");
+  assert(links[0].href === oneHourHref, "one-hundred-fourteenth first dest is 1-hour page");
+  assert(links[0].label === "белый шум для сна 1 час", "one-hundred-fourteenth 1-hour label exact");
+  assert(links[1].href === twoHourHref, "one-hundred-fourteenth second dest is 2-hour page");
+  assert(links[1].label === "белый шум для сна 2 часа", "one-hundred-fourteenth 2-hour label exact");
+  assert(links[2].href === hubHref, "one-hundred-fourteenth third dest is hub");
+  assert(links[2].label === "белый шум для сна", "one-hundred-fourteenth hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-fourteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-fourteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-fourteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-fourteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-fourteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-fourteenth content file has 1-hour href");
+  assert(contentSource.includes(`href: "${twoHourHref}"`), "one-hundred-fourteenth content file has 2-hour href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-fourteenth content file has hub href");
+  assert(!contentSource.includes("🔖"), "one-hundred-fourteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-fourteenth uses shared bookmark CTA");
+}
+
+function testOneHundredFifteenthPage() {
+  const definition = USPOKAIVAYUSHCHIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const twoHourHref = "/listens/belyy-shum-dlya-sna-2-chasa-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать успокаивающий белый шум для сна онлайн бесплатно – выбрать ровный бытовой фон и включить его вечером, перед сном или во время отдыха.",
+    "В подборке представлены разные варианты фонового звучания без музыкального содержания. Один звук может восприниматься более мягко и спокойно, другой – плотнее и заметнее.",
+    "Попробуйте несколько вариантов и выберите тот, который комфортнее именно для вас.",
+  ];
+  const expectedSectionTitles = [
+    "Успокаивающий белый шум для сна – слушать онлайн",
+    "Белый шум для успокоения и сна",
+    "Белый шум слушать для сна успокаивающие",
+    "Какие бытовые звуки могут восприниматься как спокойный фон",
+    "Успокаивающий и обычный белый шум для сна",
+    "Можно ли выбрать белый шум по длительности",
+    "Как выбрать комфортный успокаивающий белый шум",
+    "Где слушать успокаивающий белый шум для сна онлайн",
+    "Итог",
+  ];
+  const expectedH3Titles = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Звук воды из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки могут восприниматься как спокойный фон",
+  );
+  const householdHeadings = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "heading")
+    .map((block) => block.title);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-fifteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-fifteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-fifteenth playlist slug exact");
+  assert(definition.h1 === "Успокаивающий белый шум для сна – слушать онлайн бесплатно", "one-hundred-fifteenth h1 exact");
+  assert(definition.title === "Успокаивающий белый шум для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-fifteenth title exact");
+  assert(
+    definition.description ===
+      "Успокаивающий белый шум для сна – слушайте онлайн бесплатно разные варианты бытового фонового звука и выбирайте комфортное звучание перед сном.",
+    "one-hundred-fifteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-fifteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-fifteenth intro verbatim",
+  );
+  assert(definition.sections.length === 9, "one-hundred-fifteenth has nine H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-fifteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-fifteenth last section id is itog");
+  assert(headings.length === 4, "one-hundred-fifteenth has four H3 headings");
+  assert(headings.every((block) => block.level === 3), "one-hundred-fifteenth H3s use level 3");
+  assert(headings.map((block) => block.title).join("\n") === expectedH3Titles.join("\n"), "one-hundred-fifteenth H3 titles exact");
+  assert(householdHeadings.join("\n") === expectedH3Titles.join("\n"), "one-hundred-fifteenth H3s live inside household H2");
+  assert(definition.faq.length === 9, "one-hundred-fifteenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать успокаивающий белый шум для сна онлайн?", "one-hundred-fifteenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли успокаивающий белый шум быстрое засыпание?", "one-hundred-fifteenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания, а его восприятие индивидуально.",
+    "one-hundred-fifteenth last FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-fifteenth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-fifteenth has three unique destinations");
+  assert(links[0].href === hubHref, "one-hundred-fifteenth first dest is hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-fifteenth hub label exact");
+  assert(links[1].href === oneHourHref, "one-hundred-fifteenth second dest is 1-hour page");
+  assert(links[1].label === "белый шум для сна 1 час", "one-hundred-fifteenth 1-hour label exact");
+  assert(links[2].href === twoHourHref, "one-hundred-fifteenth third dest is 2-hour page");
+  assert(links[2].label === "белый шум для сна 2 часа", "one-hundred-fifteenth 2-hour label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-fifteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-fifteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-fifteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-fifteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-fifteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-fifteenth content file has hub href");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-fifteenth content file has 1-hour href");
+  assert(contentSource.includes(`href: "${twoHourHref}"`), "one-hundred-fifteenth content file has 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-fifteenth has no 3-hour href");
+  assert(!contentSource.includes("🔖"), "one-hundred-fifteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-fifteenth uses shared bookmark CTA");
+}
+
+function testOneHundredSixteenthPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_VZROSLYH_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-vzroslyh-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const calmingHref = "/listens/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна взрослых онлайн бесплатно – выбрать ровный бытовой фон и включить его вечером, во время отдыха или перед сном.",
+    "В подборке представлены разные варианты фонового звучания. Можно сравнить их и выбрать тот бытовой шум, который комфортнее воспринимается именно вами.",
+    "Если вы хотите белый шум для сна взрослых слушать без музыкального сопровождения, откройте подборку и попробуйте несколько доступных вариантов.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна взрослых – слушать онлайн",
+    "Белый шум для сна взрослых слушать",
+    "Белый шум для сна взрослых слушать онлайн",
+    "Какие бытовые звуки могут выбрать взрослые",
+    "Белый шум для взрослых и общий белый шум для сна",
+    "Успокаивающий белый шум для взрослых",
+    "Можно ли выбрать продолжительность прослушивания",
+    "Как слушать белый шум взрослым перед сном",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки могут выбрать взрослые",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-sixteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-sixteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-sixteenth playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна взрослых – слушать онлайн бесплатно", "one-hundred-sixteenth h1 exact");
+  assert(definition.title === "Белый шум для сна взрослых – слушать онлайн бесплатно | АудиоЛад", "one-hundred-sixteenth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна взрослых – слушайте онлайн бесплатно разные варианты бытового фонового звука и выбирайте комфортное звучание для вечера и сна.",
+    "one-hundred-sixteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-sixteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-sixteenth intro verbatim",
+  );
+  assert(definition.sections.length === 9, "one-hundred-sixteenth has nine H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-sixteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-sixteenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-sixteenth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-sixteenth household labels are bold not H3");
+  assert(definition.faq.length === 9, "one-hundred-sixteenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна взрослых онлайн?", "one-hundred-sixteenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли белый шум взрослым быстрое засыпание?", "one-hundred-sixteenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания или определённый результат сна.",
+    "one-hundred-sixteenth last FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-sixteenth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-sixteenth has three unique destinations");
+  assert(links[0].href === hubHref, "one-hundred-sixteenth first dest is hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-sixteenth hub label exact");
+  assert(links[1].href === calmingHref, "one-hundred-sixteenth second dest is calming page");
+  assert(links[1].label === "успокаивающий белый шум для сна", "one-hundred-sixteenth calming label exact");
+  assert(links[2].href === oneHourHref, "one-hundred-sixteenth third dest is 1-hour page");
+  assert(links[2].label === "белый шум для сна 1 час", "one-hundred-sixteenth 1-hour label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-sixteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-sixteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-sixteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-sixteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-sixteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-sixteenth content file has hub href");
+  assert(contentSource.includes(`href: "${calmingHref}"`), "one-hundred-sixteenth content file has calming href");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-sixteenth content file has 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-sixteenth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-sixteenth has no 3-hour href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-sixteenth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-sixteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-sixteenth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для сна взрослых слушать"), "one-hundred-sixteenth keeps listen phrase");
+  assert(contentSource.includes("белый шум для сна взрослых слушать онлайн"), "one-hundred-sixteenth keeps listen-online phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-sixteenth keeps technical white-noise distinction");
+  assert(!contentSource.includes("—"), "one-hundred-sixteenth uses en-dash not em-dash");
+}
+
+function testOneHundredSeventeenthPage() {
+  const definition = MYAGKIY_BELYY_SHUM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "myagkiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const calmingHref = "/listens/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать мягкий белый шум для сна онлайн бесплатно – выбрать ровный бытовой фон и включить его вечером, во время отдыха или перед сном.",
+    "В подборке представлены разные варианты бытового фонового звучания. Один звук может восприниматься мягче и ненавязчивее, другой – плотнее и заметнее.",
+    "Если вы ищете белый шум для мягкого сна, попробуйте несколько записей и выберите тот вариант, который комфортнее именно для вас.",
+  ];
+  const expectedSectionTitles = [
+    "Мягкий белый шум для сна – слушать онлайн",
+    "Мягкий белый шум",
+    "Мягкий белый шум звук",
+    "Какие бытовые звуки могут восприниматься мягче",
+    "Мягкий и успокаивающий белый шум – в чём разница",
+    "Белый шум для сна в целом",
+    "Можно ли выбрать мягкий белый шум по длительности",
+    "Как выбрать комфортный мягкий белый шум",
+    "Где слушать мягкий белый шум для сна онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Пылесос",
+    "Фен",
+    "Вентилятор",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки могут восприниматься мягче",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-seventeenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-seventeenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-seventeenth playlist slug exact");
+  assert(definition.h1 === "Мягкий белый шум для сна – слушать онлайн бесплатно", "one-hundred-seventeenth h1 exact");
+  assert(definition.title === "Мягкий белый шум для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-seventeenth title exact");
+  assert(
+    definition.description ===
+      "Мягкий белый шум для сна – слушайте онлайн бесплатно разные варианты ровного бытового фона и выбирайте комфортное звучание для вечернего отдыха.",
+    "one-hundred-seventeenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-seventeenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-seventeenth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-seventeenth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-seventeenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-seventeenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-seventeenth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-seventeenth household labels are bold not H3");
+  assert(definition.faq.length === 9, "one-hundred-seventeenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать мягкий белый шум для сна онлайн?", "one-hundred-seventeenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли мягкий белый шум быстрое засыпание?", "one-hundred-seventeenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания, а его восприятие индивидуально.",
+    "one-hundred-seventeenth last FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-seventeenth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-seventeenth has three unique destinations");
+  assert(links[0].href === calmingHref, "one-hundred-seventeenth first dest is calming page");
+  assert(links[0].label === "успокаивающий белый шум для сна", "one-hundred-seventeenth calming label exact");
+  assert(links[1].href === hubHref, "one-hundred-seventeenth second dest is hub");
+  assert(links[1].label === "белый шум для сна", "one-hundred-seventeenth hub label exact");
+  assert(links[2].href === oneHourHref, "one-hundred-seventeenth third dest is 1-hour page");
+  assert(links[2].label === "белый шум для сна 1 час", "one-hundred-seventeenth 1-hour label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-seventeenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-seventeenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-seventeenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-seventeenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-seventeenth has no raw URLs");
+  assert(contentSource.includes(`href: "${calmingHref}"`), "one-hundred-seventeenth content file has calming href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-seventeenth content file has hub href");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-seventeenth content file has 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-seventeenth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-seventeenth has no 3-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-vzroslyh"), "one-hundred-seventeenth has no adult-sleep href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-seventeenth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-seventeenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-seventeenth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для мягкого сна"), "one-hundred-seventeenth keeps soft-sleep phrase");
+  assert(contentSource.includes("мягкий белый шум звук"), "one-hundred-seventeenth keeps sound phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-seventeenth keeps technical white-noise distinction");
+  assert(contentSource.includes("не отдельная научная категория"), "one-hundred-seventeenth does not invent a scientific category");
+  assert(!contentSource.includes("—"), "one-hundred-seventeenth uses en-dash not em-dash");
+}
+
+function testOneHundredEighteenthPage() {
+  const definition = BELYY_SHUM_DLYA_KREPKOGO_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-krepkogo-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const softHref = "/listens/myagkiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const calmingHref = "/listens/uspokaivayushchiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для крепкого сна онлайн бесплатно – выбрать ровный бытовой фон и включить его вечером, во время отдыха или перед сном.",
+    "В подборке представлены разные варианты фонового звучания без музыкального содержания. Можно попробовать несколько записей и выбрать ту, которая комфортнее воспринимается именно вами.",
+    "Формулировка «крепкий сон» здесь отражает поисковый сценарий, а не обещание результата от прослушивания белого шума.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для крепкого сна – слушать онлайн",
+    "Белый шум и крепкий сон",
+    "Белый шум для глубокого сна",
+    "Какие бытовые звуки можно выбрать",
+    "Белый шум для сна в целом",
+    "Мягкий белый шум и крепкий сон",
+    "Успокаивающий белый шум",
+    "Можно ли выбрать продолжительность",
+    "Как выбрать белый шум для вечернего прослушивания",
+    "Где слушать белый шум для крепкого сна онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки можно выбрать",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-eighteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-eighteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-eighteenth playlist slug exact");
+  assert(definition.h1 === "Белый шум для крепкого сна – слушать онлайн бесплатно", "one-hundred-eighteenth h1 exact");
+  assert(definition.title === "Белый шум для крепкого сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-eighteenth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для крепкого сна – слушайте онлайн бесплатно ровные бытовые звуки и выбирайте комфортный фон для вечернего прослушивания и сна.",
+    "one-hundred-eighteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-eighteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-eighteenth intro verbatim",
+  );
+  assert(definition.sections.length === 11, "one-hundred-eighteenth has eleven H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-eighteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-eighteenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-eighteenth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-eighteenth household labels are bold not H3");
+  assert(definition.faq.length === 9, "one-hundred-eighteenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для крепкого сна онлайн?", "one-hundred-eighteenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли белый шум крепкий сон?", "one-hundred-eighteenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует крепкий сон, глубину сна или быстрое засыпание. Восприятие фонового звука индивидуально.",
+    "one-hundred-eighteenth last FAQ answer",
+  );
+  assert(links.length === 4, "one-hundred-eighteenth has four href");
+  assert(new Set(links.map((link) => link.href)).size === 4, "one-hundred-eighteenth has four unique destinations");
+  assert(links[0].href === hubHref, "one-hundred-eighteenth first dest is hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-eighteenth hub label exact");
+  assert(links[1].href === softHref, "one-hundred-eighteenth second dest is soft page");
+  assert(links[1].label === "мягкий белый шум для сна", "one-hundred-eighteenth soft label exact");
+  assert(links[2].href === calmingHref, "one-hundred-eighteenth third dest is calming page");
+  assert(links[2].label === "успокаивающий белый шум для сна", "one-hundred-eighteenth calming label exact");
+  assert(links[3].href === oneHourHref, "one-hundred-eighteenth fourth dest is 1-hour page");
+  assert(links[3].label === "белый шум для сна 1 час", "one-hundred-eighteenth 1-hour label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-eighteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-eighteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-eighteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-eighteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-eighteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-eighteenth content file has hub href");
+  assert(contentSource.includes(`href: "${softHref}"`), "one-hundred-eighteenth content file has soft href");
+  assert(contentSource.includes(`href: "${calmingHref}"`), "one-hundred-eighteenth content file has calming href");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-eighteenth content file has 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-eighteenth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-eighteenth has no 3-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-glubokogo-sna"), "one-hundred-eighteenth has no invented deep-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-vzroslyh"), "one-hundred-eighteenth has no adult-sleep href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-eighteenth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-eighteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-eighteenth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для крепкого сна"), "one-hundred-eighteenth keeps primary phrase");
+  assert(contentSource.includes("белый шум крепкий сон"), "one-hundred-eighteenth keeps compact phrase");
+  assert(contentSource.includes("белый шум для глубокого сна"), "one-hundred-eighteenth keeps neighboring deep-sleep phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-eighteenth keeps technical white-noise distinction");
+  assert(contentSource.includes("не гарантирует качество, глубину или продолжительность сна"), "one-hundred-eighteenth does not claim better sleep");
+  assert(!contentSource.includes("—"), "one-hundred-eighteenth uses en-dash not em-dash");
+}
+
+function testOneHundredNineteenthPage() {
+  const definition = BELYY_SHUM_BEZ_MUZYKI_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-bez-muzyki-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const softHref = "/listens/myagkiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const oneHourHref = "/listens/belyy-shum-dlya-sna-1-chas-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум без музыки онлайн бесплатно – выбрать ровный бытовой фон без мелодии и музыкального сопровождения.",
+    "В подборке представлены разные варианты бытового звучания. Можно попробовать звук пылесоса, фена, вентилятора, воды и другие доступные записи.",
+    "Выберите подходящий вариант и включите его вечером, во время отдыха или перед сном.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум без музыки – слушать онлайн",
+    "Что значит белый шум без музыки",
+    "Какие звуки можно слушать без музыки",
+    "Белый шум без музыки и белый шум для сна",
+    "Мягкий белый шум без музыки",
+    "Можно ли слушать белый шум без музыки долго",
+    "Как выбрать бытовой фон без музыки",
+    "Где слушать белый шум без музыки онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Пылесос",
+    "Фен",
+    "Вентилятор",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие звуки можно слушать без музыки",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-nineteenth production definition valid");
+  assert(definition.slug === slug, "one-hundred-nineteenth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-nineteenth playlist slug exact");
+  assert(definition.h1 === "Белый шум без музыки – слушать онлайн бесплатно", "one-hundred-nineteenth h1 exact");
+  assert(definition.title === "Белый шум без музыки – слушать онлайн бесплатно | АудиоЛад", "one-hundred-nineteenth title exact");
+  assert(
+    definition.description ===
+      "Белый шум без музыки – слушайте онлайн бесплатно разные бытовые фоновые звуки без мелодии и выбирайте комфортное звучание для отдыха и сна.",
+    "one-hundred-nineteenth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-nineteenth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-nineteenth intro verbatim",
+  );
+  assert(definition.sections.length === 9, "one-hundred-nineteenth has nine H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-nineteenth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-nineteenth last section id is itog");
+  assert(headings.length === 0, "one-hundred-nineteenth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-nineteenth household labels are bold not H3");
+  assert(definition.faq.length === 9, "one-hundred-nineteenth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум без музыки онлайн?", "one-hundred-nineteenth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли белый шум без музыки быстрое засыпание?", "one-hundred-nineteenth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует скорость засыпания или определённый результат сна.",
+    "one-hundred-nineteenth last FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-nineteenth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-nineteenth has three unique destinations");
+  assert(links[0].href === hubHref, "one-hundred-nineteenth first dest is hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-nineteenth hub label exact");
+  assert(links[1].href === softHref, "one-hundred-nineteenth second dest is soft page");
+  assert(links[1].label === "мягкий белый шум для сна", "one-hundred-nineteenth soft label exact");
+  assert(links[2].href === oneHourHref, "one-hundred-nineteenth third dest is 1-hour page");
+  assert(links[2].label === "белый шум для сна 1 час", "one-hundred-nineteenth 1-hour label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-nineteenth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-nineteenth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-nineteenth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-nineteenth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-nineteenth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-nineteenth content file has hub href");
+  assert(contentSource.includes(`href: "${softHref}"`), "one-hundred-nineteenth content file has soft href");
+  assert(contentSource.includes(`href: "${oneHourHref}"`), "one-hundred-nineteenth content file has 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-nineteenth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-nineteenth has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-nineteenth has no calming href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-bez-slov"), "one-hundred-nineteenth has no music-without-words href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-nineteenth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-nineteenth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-nineteenth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум без музыки"), "one-hundred-nineteenth keeps primary phrase");
+  assert(contentSource.includes("музыкой без слов"), "one-hundred-nineteenth keeps music-without-words distinction");
+  assert(contentSource.includes("white noise"), "one-hundred-nineteenth keeps technical white-noise distinction");
+  assert(contentSource.includes("не каждый бытовой шум технически является классическим white noise"), "one-hundred-nineteenth does not treat household noise as classical white noise");
+  assert(!contentSource.includes("—"), "one-hundred-nineteenth uses en-dash not em-dash");
+}
+
+function testOneHundredTwentiethPage() {
+  const definition = BELYY_SHUM_DLYA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-novorozhdennyh-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const noMusicHref = "/listens/belyy-shum-bez-muzyki-slushat-onlayn";
+  const softHref = "/listens/myagkiy-belyy-shum-dlya-sna-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для новорождённых онлайн бесплатно – выбрать один из вариантов ровного бытового фонового звучания и включить его рядом с ребёнком.",
+    "В подборке могут встречаться разные типы шума – пылесос, фен, вентилятор, вода и другие доступные записи.",
+    "Взрослый может попробовать несколько вариантов и выбрать наиболее комфортный по собственному восприятию, начиная с небольшой громкости.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для новорождённых – слушать онлайн",
+    "Белый шум для новорождённых слушать",
+    "Какие бытовые звуки входят в подборку",
+    "Белый шум без музыки",
+    "Мягкий белый шум для новорождённых",
+    "Белый шум для сна в целом",
+    "Как выбрать громкость",
+    "Нужно ли оставлять белый шум надолго",
+    "Где слушать белый шум для новорождённых онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Пылесос",
+    "Фен",
+    "Вентилятор",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки входят в подборку",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twentieth production definition valid");
+  assert(definition.slug === slug, "one-hundred-twentieth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twentieth playlist slug exact");
+  assert(definition.h1 === "Белый шум для новорождённых – слушать онлайн бесплатно", "one-hundred-twentieth h1 exact");
+  assert(definition.title === "Белый шум для новорождённых – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twentieth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для новорождённых – слушайте онлайн бесплатно разные варианты ровного бытового фонового звука и выбирайте комфортное звучание.",
+    "one-hundred-twentieth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twentieth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twentieth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-twentieth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twentieth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twentieth last section id is itog");
+  assert(headings.length === 0, "one-hundred-twentieth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-twentieth household labels are bold not H3");
+  assert(definition.faq.length === 10, "one-hundred-twentieth has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для новорождённых онлайн?", "one-hundred-twentieth first FAQ question");
+  assert(definition.faq[9].question === "Чем эта страница отличается от «Белый шум для сна новорождённых»?", "one-hundred-twentieth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует сон, быстрое засыпание или отсутствие пробуждений.",
+    "one-hundred-twentieth sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-twentieth has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-twentieth has three unique destinations");
+  assert(links[0].href === noMusicHref, "one-hundred-twentieth first dest is no-music page");
+  assert(links[0].label === "белый шум без музыки", "one-hundred-twentieth no-music label exact");
+  assert(links[1].href === softHref, "one-hundred-twentieth second dest is soft page");
+  assert(links[1].label === "мягкий белый шум для сна", "one-hundred-twentieth soft label exact");
+  assert(links[2].href === hubHref, "one-hundred-twentieth third dest is hub");
+  assert(links[2].label === "белый шум для сна", "one-hundred-twentieth hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twentieth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twentieth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twentieth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twentieth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twentieth has no raw URLs");
+  assert(contentSource.includes(`href: "${noMusicHref}"`), "one-hundred-twentieth content file has no-music href");
+  assert(contentSource.includes(`href: "${softHref}"`), "one-hundred-twentieth content file has soft href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twentieth content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-novorozhdennyh"), "one-hundred-twentieth has no invented newborn-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twentieth has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twentieth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twentieth has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twentieth has no calming href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-bez-slov"), "one-hundred-twentieth has no music-without-words href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twentieth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twentieth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twentieth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для новорожденных"), "one-hundred-twentieth keeps exact search phrase");
+  assert(contentSource.includes("белый шум для новорожденных слушать"), "one-hundred-twentieth keeps listen search phrase");
+  assert(contentSource.includes("белый шум для новорождённых"), "one-hundred-twentieth keeps primary phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twentieth keeps technical white-noise distinction");
+  assert(contentSource.includes("не является обязательным для новорождённого"), "one-hundred-twentieth does not claim white noise is required");
+  assert(contentSource.includes("не гарантирует сон"), "one-hundred-twentieth does not claim sleep guarantee");
+  assert(contentSource.includes("Не располагайте источник звука слишком близко"), "one-hundred-twentieth keeps source-distance caution");
+  assert(contentSource.includes("лучше обсудить их с медицинским специалистом"), "one-hundred-twentieth keeps medical-consult caution");
+  assert(!contentSource.includes("дБ"), "one-hundred-twentieth has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twentieth uses en-dash not em-dash");
+}
+
+function testOneHundredTwentyFirstPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_NOVOROZHDENNYH_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const newbornHref = "/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна новорождённых онлайн бесплатно – выбрать ровный бытовой фон и включить его в подходящий момент рядом с ребёнком.",
+    "В подборке представлены разные варианты фонового звучания. Взрослый может сравнить доступные записи и выбрать наиболее комфортный вариант.",
+    "Если вы ищете белый шум для новорожденных для сна, начинайте с небольшой громкости и выключите или смените запись, если фон кажется некомфортным.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна новорождённых – слушать онлайн",
+    "Белый шум для сна новорождённых слушать",
+    "Чем эта страница отличается от общего белого шума для новорождённых",
+    "Какие бытовые звуки можно выбрать",
+    "Белый шум для сна в целом",
+    "Как выбрать громкость",
+    "Нужно ли оставлять белый шум на всю ночь",
+    "Где слушать белый шум для сна новорождённых онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки можно выбрать",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-first production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-first slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-first playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна новорождённых – слушать онлайн бесплатно", "one-hundred-twenty-first h1 exact");
+  assert(definition.title === "Белый шум для сна новорождённых – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-first title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна новорождённых – слушайте онлайн бесплатно разные варианты ровного бытового фона и выбирайте комфортное звучание рядом с ребёнком.",
+    "one-hundred-twenty-first description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-first has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-first intro verbatim",
+  );
+  assert(definition.sections.length === 9, "one-hundred-twenty-first has nine H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-first H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-first last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-first has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-twenty-first household labels are bold not H3");
+  assert(definition.faq.length === 10, "one-hundred-twenty-first has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна новорождённых?", "one-hundred-twenty-first first FAQ question");
+  assert(definition.faq[9].question === "Можно ли использовать белый шум вместо других способов укладывания?", "one-hundred-twenty-first last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует засыпание, крепкий сон или отсутствие пробуждений.",
+    "one-hundred-twenty-first sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 2, "one-hundred-twenty-first has two href");
+  assert(new Set(links.map((link) => link.href)).size === 2, "one-hundred-twenty-first has two unique destinations");
+  assert(links[0].href === newbornHref, "one-hundred-twenty-first first dest is general newborn page");
+  assert(links[0].label === "белый шум для новорождённых", "one-hundred-twenty-first newborn label exact");
+  assert(links[1].href === hubHref, "one-hundred-twenty-first second dest is hub");
+  assert(links[1].label === "белый шум для сна", "one-hundred-twenty-first hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-first slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-first canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-first path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-first omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-first has no raw URLs");
+  assert(contentSource.includes(`href: "${newbornHref}"`), "one-hundred-twenty-first content file has newborn href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-first content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-first has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-first has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-first has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-first has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-first has no soft href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-bez-slov"), "one-hundred-twenty-first has no music-without-words href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-dlya-malyshey"), "one-hundred-twenty-first has no toddler music href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-mladencev"), "one-hundred-twenty-first has no infant music href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-first does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-first content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-first uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для новорожденных для сна"), "one-hundred-twenty-first keeps exact search phrase");
+  assert(contentSource.includes("белый шум для сна новорожденных слушать"), "one-hundred-twenty-first keeps listen search phrase");
+  assert(contentSource.includes("белый шум для сна новорождённых"), "one-hundred-twenty-first keeps primary phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-first keeps technical white-noise distinction");
+  assert(contentSource.includes("не гарантирует засыпание, крепкий сон или отсутствие пробуждений"), "one-hundred-twenty-first does not claim sleep guarantee");
+  assert(contentSource.includes("Не располагайте источник звука слишком близко"), "one-hundred-twenty-first keeps source-distance caution");
+  assert(contentSource.includes("рекомендации медицинского специалиста"), "one-hundred-twenty-first keeps medical-consult caution");
+  assert(contentSource.includes("Текущая страница уже по смыслу."), "one-hundred-twenty-first preserves supplied wording");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-first has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-first uses en-dash not em-dash");
+}
+
+function testOneHundredTwentySecondPage() {
+  const definition = BELYY_SHUM_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-detey-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const newbornHref = "/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn";
+  const noMusicHref = "/listens/belyy-shum-bez-muzyki-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для детей онлайн бесплатно – выбрать один из вариантов ровного бытового фонового звучания и включить его рядом с ребёнком.",
+    "В подборке представлены разные типы шума без музыкального содержания. Взрослый может сравнить доступные записи и выбрать наиболее комфортный вариант.",
+    "Если хочется белый шум для детей слушать онлайн, откройте подборку и начните с небольшой громкости.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для детей – слушать онлайн",
+    "Белый шум детский",
+    "Белый шум для детей слушать",
+    "Какие бытовые звуки можно выбрать",
+    "Белый шум для детей и белый шум для новорождённых",
+    "Белый шум без музыки",
+    "Белый шум для сна в целом",
+    "Как выбрать громкость",
+    "Как долго слушать белый шум",
+    "Где слушать белый шум для детей онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Пылесос",
+    "Фен",
+    "Вентилятор",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки можно выбрать",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-second production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-second slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-second playlist slug exact");
+  assert(definition.h1 === "Белый шум для детей – слушать онлайн бесплатно", "one-hundred-twenty-second h1 exact");
+  assert(definition.title === "Белый шум для детей – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-second title exact");
+  assert(
+    definition.description ===
+      "Белый шум для детей – слушайте онлайн бесплатно разные бытовые фоновые звуки и выбирайте комфортное звучание для ребёнка и домашнего отдыха.",
+    "one-hundred-twenty-second description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-second has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-second intro verbatim",
+  );
+  assert(definition.sections.length === 11, "one-hundred-twenty-second has eleven H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-second H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-second last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-second has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-twenty-second household labels are bold not H3");
+  assert(definition.faq.length === 10, "one-hundred-twenty-second has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для детей онлайн?", "one-hundred-twenty-second first FAQ question");
+  assert(definition.faq[9].question === "Чем эта страница отличается от будущей страницы для малышей?", "one-hundred-twenty-second last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует засыпание или определённый результат сна.",
+    "one-hundred-twenty-second sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-twenty-second has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-twenty-second has three unique destinations");
+  assert(links[0].href === newbornHref, "one-hundred-twenty-second first dest is newborn page");
+  assert(links[0].label === "белый шум для новорождённых", "one-hundred-twenty-second newborn label exact");
+  assert(links[1].href === noMusicHref, "one-hundred-twenty-second second dest is no-music page");
+  assert(links[1].label === "белый шум без музыки", "one-hundred-twenty-second no-music label exact");
+  assert(links[2].href === hubHref, "one-hundred-twenty-second third dest is hub");
+  assert(links[2].label === "белый шум для сна", "one-hundred-twenty-second hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-second slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-second canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-second path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-second omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-second has no raw URLs");
+  assert(contentSource.includes(`href: "${newbornHref}"`), "one-hundred-twenty-second content file has newborn href");
+  assert(contentSource.includes(`href: "${noMusicHref}"`), "one-hundred-twenty-second content file has no-music href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-second content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-novorozhdennyh"), "one-hundred-twenty-second has no newborn-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-malyshey"), "one-hundred-twenty-second has no invented toddler href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-mladencev"), "one-hundred-twenty-second has no invented infant href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-second has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-second has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-second has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-second has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-second has no soft href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-dlya-malyshey"), "one-hundred-twenty-second has no toddler music href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-mladencev"), "one-hundred-twenty-second has no infant music href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-second does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-second content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-second uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для детей"), "one-hundred-twenty-second keeps primary phrase");
+  assert(contentSource.includes("белый шум детский"), "one-hundred-twenty-second keeps compact phrase");
+  assert(contentSource.includes("белый шум для детей слушать"), "one-hundred-twenty-second keeps listen search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-second keeps technical white-noise distinction");
+  assert(contentSource.includes("не является обязательным для детей"), "one-hundred-twenty-second does not claim white noise is required");
+  assert(contentSource.includes("не гарантирует сон, успокаивающий эффект"), "one-hundred-twenty-second does not claim sleep or calming");
+  assert(contentSource.includes("Не располагайте источник звука слишком близко"), "one-hundred-twenty-second keeps source-distance caution");
+  assert(contentSource.includes("рекомендации специалиста"), "one-hundred-twenty-second keeps specialist-consult caution");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-second has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-second uses en-dash not em-dash");
+}
+
+function testOneHundredTwentyThirdPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-malyshey-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const childrenHref = "/listens/belyy-shum-dlya-detey-slushat-onlayn";
+  const newbornSleepHref = "/listens/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна малышей онлайн бесплатно – выбрать ровный бытовой фон и включить его перед сном или в другой подходящий момент.",
+    "В подборке представлены разные варианты фонового звучания. Взрослый может сравнить доступные записи и выбрать наиболее комфортный вариант.",
+    "Если вы хотите белый шум слушать для малышей, начните с небольшой громкости и при необходимости смените или выключите запись.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна малышей – слушать онлайн",
+    "Белый шум для малышей",
+    "Белый шум слушать для малышей",
+    "Какие бытовые звуки можно выбрать",
+    "Белый шум для малышей и белый шум для детей",
+    "Белый шум для сна малышей и новорождённых",
+    "Белый шум для сна в целом",
+    "Как выбрать громкость",
+    "Как долго слушать белый шум",
+    "Где слушать белый шум для сна малышей онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Звук пылесоса",
+    "Звук фена",
+    "Шум вентилятора",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки можно выбрать",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+  const intentSection = definition.sections.find(
+    (section) => section.title === "Белый шум для малышей",
+  );
+  const intentStrong = (intentSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-third production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-third slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-third playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна малышей – слушать онлайн бесплатно", "one-hundred-twenty-third h1 exact");
+  assert(definition.title === "Белый шум для сна малышей – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-third title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна малышей – слушайте онлайн бесплатно разные бытовые фоновые звуки и выбирайте комфортное звучание для вечернего прослушивания.",
+    "one-hundred-twenty-third description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-third has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-third intro verbatim",
+  );
+  assert(definition.sections.length === 11, "one-hundred-twenty-third has eleven H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-third H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-third last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-third has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-twenty-third household labels are bold not H3");
+  assert(intentStrong.join("\n") === "белый шум + малыши + сон.", "one-hundred-twenty-third intent strong exact");
+  assert(definition.faq.length === 10, "one-hundred-twenty-third has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна малышей онлайн?", "one-hundred-twenty-third first FAQ question");
+  assert(definition.faq[9].question === "Чем эта страница отличается от будущей страницы для младенцев?", "one-hundred-twenty-third last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует засыпание или определённый результат сна.",
+    "one-hundred-twenty-third sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 3, "one-hundred-twenty-third has three href");
+  assert(new Set(links.map((link) => link.href)).size === 3, "one-hundred-twenty-third has three unique destinations");
+  assert(links[0].href === childrenHref, "one-hundred-twenty-third first dest is children page");
+  assert(links[0].label === "белый шум для детей", "one-hundred-twenty-third children label exact");
+  assert(links[1].href === newbornSleepHref, "one-hundred-twenty-third second dest is newborn-sleep page");
+  assert(links[1].label === "белый шум для сна новорождённых", "one-hundred-twenty-third newborn-sleep label exact");
+  assert(links[2].href === hubHref, "one-hundred-twenty-third third dest is hub");
+  assert(links[2].label === "белый шум для сна", "one-hundred-twenty-third hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-third slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-third canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-third path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-third omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-third has no raw URLs");
+  assert(contentSource.includes(`href: "${childrenHref}"`), "one-hundred-twenty-third content file has children href");
+  assert(contentSource.includes(`href: "${newbornSleepHref}"`), "one-hundred-twenty-third content file has newborn-sleep href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-third content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn"), "one-hundred-twenty-third has no generic newborn href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-mladenca"), "one-hundred-twenty-third has no invented infant-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-mladencev"), "one-hundred-twenty-third has no invented infants href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-mladencev"), "one-hundred-twenty-third has no invented infant href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-third has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-third has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-third has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-third has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-third has no soft href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-dlya-malyshey"), "one-hundred-twenty-third has no toddler music href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-third does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-third content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-third uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для сна малышей"), "one-hundred-twenty-third keeps primary phrase");
+  assert(contentSource.includes("белый шум для малышей"), "one-hundred-twenty-third keeps compact phrase");
+  assert(contentSource.includes("белый шум слушать для малышей"), "one-hundred-twenty-third keeps listen search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-third keeps technical white-noise distinction");
+  assert(contentSource.includes("белый шум + малыши + сон."), "one-hundred-twenty-third keeps intent formula");
+  assert(contentSource.includes("Текущая страница уже – она посвящена малышам и конкретному сценарию сна."), "one-hundred-twenty-third preserves supplied wording");
+  assert(contentSource.includes("не гарантирует засыпание, крепкий сон или успокаивающий эффект"), "one-hundred-twenty-third does not claim sleep or calming");
+  assert(contentSource.includes("Не располагайте источник звука слишком близко к малышу"), "one-hundred-twenty-third keeps source-distance caution");
+  assert(contentSource.includes("рекомендации медицинского специалиста"), "one-hundred-twenty-third keeps medical-consult caution");
+  assert(contentSource.includes("Универсальной продолжительности для всех малышей нет"), "one-hundred-twenty-third has no universal duration");
+  assert(contentSource.includes("Необязательно оставлять звук на всю ночь"), "one-hundred-twenty-third does not recommend all-night playback");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-third has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-third uses en-dash not em-dash");
+}
+
+function testOneHundredTwentyFourthPage() {
+  const definition = BELYY_SHUM_DLYA_SNA_MLADENCA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-dlya-sna-mladenca-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const toddlerHref = "/listens/belyy-shum-dlya-sna-malyshey-slushat-onlayn";
+  const newbornSleepHref = "/listens/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+  const childrenHref = "/listens/belyy-shum-dlya-detey-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум для сна младенца онлайн бесплатно – выбрать ровный бытовой фон и включить его перед сном или в другой подходящий момент.",
+    "В подборке представлены разные варианты фонового звучания. Взрослый может сравнить доступные записи и выбрать наиболее комфортный вариант.",
+    "Если вы хотите белый шум для младенцев слушать онлайн, начните с небольшой громкости и при необходимости смените или выключите запись.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум для сна младенца – слушать онлайн",
+    "Белый шум для младенцев",
+    "Белый шум для младенцев слушать",
+    "Какие бытовые звуки можно выбрать",
+    "Белый шум для младенцев и для малышей",
+    "Белый шум для младенцев и новорождённых",
+    "Белый шум для детей",
+    "Белый шум для сна в целом",
+    "Как выбрать громкость",
+    "Как долго слушать белый шум",
+    "Где слушать белый шум для сна младенца онлайн",
+    "Итог",
+  ];
+  const expectedStrongLabels = [
+    "Пылесос",
+    "Фен",
+    "Вентилятор",
+    "Вода из крана",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Какие бытовые звуки можно выбрать",
+  );
+  const householdStrong = (householdSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+  const intentSection = definition.sections.find(
+    (section) => section.title === "Белый шум для младенцев",
+  );
+  const intentStrong = (intentSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-fourth production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-fourth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-fourth playlist slug exact");
+  assert(definition.h1 === "Белый шум для сна младенца – слушать онлайн бесплатно", "one-hundred-twenty-fourth h1 exact");
+  assert(definition.title === "Белый шум для сна младенца – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-fourth title exact");
+  assert(
+    definition.description ===
+      "Белый шум для сна младенца – слушайте онлайн бесплатно разные бытовые фоновые звуки и выбирайте комфортный вариант для вечернего прослушивания.",
+    "one-hundred-twenty-fourth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-fourth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-fourth intro verbatim",
+  );
+  assert(definition.sections.length === 12, "one-hundred-twenty-fourth has twelve H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-fourth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-fourth last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-fourth has no H3 headings");
+  assert(householdStrong.join("\n") === expectedStrongLabels.join("\n"), "one-hundred-twenty-fourth household labels are bold not H3");
+  assert(intentStrong.join("\n") === "белый шум + младенец + сон.", "one-hundred-twenty-fourth intent strong exact");
+  assert(definition.faq.length === 10, "one-hundred-twenty-fourth has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум для сна младенца онлайн?", "one-hundred-twenty-fourth first FAQ question");
+  assert(definition.faq[9].question === "Чем эта страница отличается от общего «Белый шум для детей»?", "one-hundred-twenty-fourth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Белый шум не гарантирует засыпание, качество сна или отсутствие пробуждений.",
+    "one-hundred-twenty-fourth sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 4, "one-hundred-twenty-fourth has four href");
+  assert(new Set(links.map((link) => link.href)).size === 4, "one-hundred-twenty-fourth has four unique destinations");
+  assert(links[0].href === toddlerHref, "one-hundred-twenty-fourth first dest is toddler-sleep page");
+  assert(links[0].label === "белый шум для сна малышей", "one-hundred-twenty-fourth toddler-sleep label exact");
+  assert(links[1].href === newbornSleepHref, "one-hundred-twenty-fourth second dest is newborn-sleep page");
+  assert(links[1].label === "белый шум для сна новорождённых", "one-hundred-twenty-fourth newborn-sleep label exact");
+  assert(links[2].href === childrenHref, "one-hundred-twenty-fourth third dest is children page");
+  assert(links[2].label === "белый шум для детей", "one-hundred-twenty-fourth children label exact");
+  assert(links[3].href === hubHref, "one-hundred-twenty-fourth fourth dest is hub");
+  assert(links[3].label === "белый шум для сна", "one-hundred-twenty-fourth hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-fourth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-fourth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-fourth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-fourth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-fourth has no raw URLs");
+  assert(contentSource.includes(`href: "${toddlerHref}"`), "one-hundred-twenty-fourth content file has toddler-sleep href");
+  assert(contentSource.includes(`href: "${newbornSleepHref}"`), "one-hundred-twenty-fourth content file has newborn-sleep href");
+  assert(contentSource.includes(`href: "${childrenHref}"`), "one-hundred-twenty-fourth content file has children href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-fourth content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn"), "one-hundred-twenty-fourth has no generic newborn href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-mladencev"), "one-hundred-twenty-fourth has no invented infants href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-mladencev"), "one-hundred-twenty-fourth has no invented infant href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-fourth has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-fourth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-fourth has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-fourth has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-fourth has no soft href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-dlya-malyshey"), "one-hundred-twenty-fourth has no toddler music href");
+  assert(!contentSource.includes("/listens/muzyka-dlya-sna-mladencev"), "one-hundred-twenty-fourth has no infant music href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-fourth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-fourth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-fourth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум для сна младенца"), "one-hundred-twenty-fourth keeps primary phrase");
+  assert(contentSource.includes("белый шум для младенцев"), "one-hundred-twenty-fourth keeps compact phrase");
+  assert(contentSource.includes("белый шум для младенцев слушать"), "one-hundred-twenty-fourth keeps listen search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-fourth keeps technical white-noise distinction");
+  assert(contentSource.includes("белый шум + младенец + сон."), "one-hundred-twenty-fourth keeps intent formula");
+  assert(contentSource.includes("не гарантирует засыпание, крепкий сон или успокаивающий эффект"), "one-hundred-twenty-fourth does not claim sleep or calming");
+  assert(contentSource.includes("Не располагайте источник звука слишком близко к младенцу"), "one-hundred-twenty-fourth keeps source-distance caution");
+  assert(contentSource.includes("рекомендации медицинского специалиста"), "one-hundred-twenty-fourth keeps medical-consult caution");
+  assert(contentSource.includes("Универсальной продолжительности для всех младенцев нет"), "one-hundred-twenty-fourth has no universal duration");
+  assert(contentSource.includes("Необязательно оставлять звук на всю ночь"), "one-hundred-twenty-fourth does not recommend all-night playback");
+  assert(contentSource.includes("Точные медицинские нормативы громкости и расстояния здесь не устанавливаются"), "one-hundred-twenty-fourth has no medical thresholds");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-fourth has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-fourth uses en-dash not em-dash");
+}
+
+function testOneHundredTwentyFifthPage() {
+  const definition = BELYY_SHUM_PYLESOSA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "belyy-shum-pylesosa-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const noMusicHref = "/listens/belyy-shum-bez-muzyki-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать белый шум пылесоса онлайн бесплатно – выбрать ровный бытовой фон и включить его во время отдыха, вечером или перед сном.",
+    "Звук работающего пылесоса может восприниматься как постоянное фоновое звучание без речи и музыкального содержания.",
+    "В подборке доступны разные варианты бытового шума, поэтому можно попробовать несколько записей и выбрать наиболее комфортную.",
+  ];
+  const expectedSectionTitles = [
+    "Белый шум пылесоса – слушать онлайн",
+    "Почему звук пылесоса называют белым шумом",
+    "Белый шум для сна пылесос",
+    "Звук пылесоса белый шум звуки для сна",
+    "Белый шум пылесоса и общий белый шум для сна",
+    "Белый шум пылесоса без музыки",
+    "Какие варианты звука пылесоса можно выбрать",
+    "Как слушать звук пылесоса как фоновый шум",
+    "Где слушать белый шум пылесоса онлайн",
+    "Итог",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const intentSection = definition.sections.find(
+    (section) => section.title === "Белый шум пылесоса и общий белый шум для сна",
+  );
+  const intentStrong = (intentSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-fifth production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-fifth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-fifth playlist slug exact");
+  assert(definition.h1 === "Белый шум пылесоса – слушать онлайн бесплатно", "one-hundred-twenty-fifth h1 exact");
+  assert(definition.title === "Белый шум пылесоса – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-fifth title exact");
+  assert(
+    definition.description ===
+      "Белый шум пылесоса – слушайте онлайн бесплатно ровный бытовой фон без музыки и выбирайте подходящее звучание для отдыха или сна.",
+    "one-hundred-twenty-fifth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-fifth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-fifth intro verbatim",
+  );
+  assert(definition.sections.length === 10, "one-hundred-twenty-fifth has ten H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-fifth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-fifth last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-fifth has no H3 headings");
+  assert(
+    !expectedSectionTitles.some((title) => /фен|вентилятор|кран/i.test(title)),
+    "one-hundred-twenty-fifth does not expand other household sources into H2",
+  );
+  assert(intentStrong.join("\n") === "белый шум + пылесос.", "one-hundred-twenty-fifth intent strong exact");
+  assert(definition.faq.length === 9, "one-hundred-twenty-fifth has nine FAQ items");
+  assert(definition.faq[0].question === "Где слушать белый шум пылесоса онлайн?", "one-hundred-twenty-fifth first FAQ question");
+  assert(definition.faq[8].question === "Гарантирует ли звук пылесоса быстрое засыпание?", "one-hundred-twenty-fifth last FAQ question");
+  assert(
+    definition.faq[8].answer ===
+      "Нет. Звук пылесоса не гарантирует скорость засыпания или определённый результат сна.",
+    "one-hundred-twenty-fifth sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 2, "one-hundred-twenty-fifth has two href");
+  assert(new Set(links.map((link) => link.href)).size === 2, "one-hundred-twenty-fifth has two unique destinations");
+  assert(links[0].href === hubHref, "one-hundred-twenty-fifth first dest is hub");
+  assert(links[0].label === "белый шум для сна", "one-hundred-twenty-fifth hub label exact");
+  assert(links[1].href === noMusicHref, "one-hundred-twenty-fifth second dest is no-music page");
+  assert(links[1].label === "белый шум без музыки", "one-hundred-twenty-fifth no-music label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-fifth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-fifth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-fifth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-fifth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-fifth has no raw URLs");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-fifth content file has hub href");
+  assert(contentSource.includes(`href: "${noMusicHref}"`), "one-hundred-twenty-fifth content file has no-music href");
+  assert(!contentSource.includes("/listens/zvuk-pylesosa-dlya-sna"), "one-hundred-twenty-fifth has no invented vacuum-sound-for-sleep href");
+  assert(!contentSource.includes("/listens/shum-pylesosa-dlya-sna"), "one-hundred-twenty-fifth has no invented vacuum-noise-for-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-pylesosa-dlya-sna"), "one-hundred-twenty-fifth has no invented vacuum-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-fifth has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-fifth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-fifth has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-fifth has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-fifth has no soft href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-fifth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-fifth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-fifth uses shared bookmark CTA");
+  assert(contentSource.includes("белый шум пылесоса"), "one-hundred-twenty-fifth keeps primary phrase");
+  assert(contentSource.includes("белый шум пылесос"), "one-hundred-twenty-fifth keeps search phrase");
+  assert(contentSource.includes("белый шум для сна пылесос"), "one-hundred-twenty-fifth keeps sleep-search phrase");
+  assert(contentSource.includes("звук пылесоса белый шум звуки для сна"), "one-hundred-twenty-fifth keeps long search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-fifth keeps technical white-noise distinction");
+  assert(contentSource.includes("белый шум + пылесос."), "one-hundred-twenty-fifth keeps intent formula");
+  assert(contentSource.includes("Текущая страница уже – она посвящена именно шуму пылесоса."), "one-hundred-twenty-fifth preserves supplied wording");
+  assert(contentSource.includes("не следует утверждать, что любой пылесос создаёт классический белый шум"), "one-hundred-twenty-fifth does not claim classical white noise");
+  assert(contentSource.includes("не гарантирует засыпание"), "one-hundred-twenty-fifth does not claim sleep");
+  assert(contentSource.includes("не гарантирует скорость засыпания"), "one-hundred-twenty-fifth does not claim faster sleep");
+  assert(contentSource.includes("Отдельные запросы про звук пылесоса для сна и шум пылесоса для сна будут раскрыты на самостоятельных страницах"), "one-hundred-twenty-fifth keeps future intents neighboring only");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-fifth has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-fifth uses en-dash not em-dash");
+}
+
+function testOneHundredTwentySixthPage() {
+  const definition = ZVUK_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "zvuk-pylesosa-dlya-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const vacuumHref = "/listens/belyy-shum-pylesosa-slushat-onlayn";
+  const newbornSleepHref = "/listens/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const noMusicHref = "/listens/belyy-shum-bez-muzyki-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать звук пылесоса для сна онлайн бесплатно – выбрать запись с ровным бытовым звучанием и включить её вечером или перед сном.",
+    "Работающий пылесос создаёт достаточно постоянный фон без речи и музыкальной мелодии. Некоторым людям такой характер звучания комфортен для фонового прослушивания.",
+    "В подборке можно выбрать подходящий вариант и при необходимости попробовать другие бытовые звуки.",
+  ];
+  const expectedSectionTitles = [
+    "Звук пылесоса для сна – слушать онлайн",
+    "Почему для сна ищут звук пылесоса",
+    "Слушать пылесос звук для сна",
+    "Звук пылесоса и белый шум пылесоса – в чём разница",
+    "Звук пылесоса для сна новорождённого",
+    "Другие бытовые звуки для фонового прослушивания",
+    "Белый шум для сна",
+    "Звук пылесоса без музыки",
+    "Как слушать звук пылесоса перед сном",
+    "Где слушать звук пылесоса для сна онлайн",
+    "Итог",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Другие бытовые звуки для фонового прослушивания",
+  );
+  const householdHeadings = (householdSection?.blocks ?? []).filter((block) => block.kind === "heading");
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-sixth production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-sixth slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-sixth playlist slug exact");
+  assert(definition.h1 === "Звук пылесоса для сна – слушать онлайн бесплатно", "one-hundred-twenty-sixth h1 exact");
+  assert(definition.title === "Звук пылесоса для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-sixth title exact");
+  assert(
+    definition.description ===
+      "Звук пылесоса для сна – слушайте онлайн бесплатно ровный бытовой фон, выбирайте подходящий вариант звучания и включайте его перед сном.",
+    "one-hundred-twenty-sixth description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-sixth has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-sixth intro verbatim",
+  );
+  assert(definition.sections.length === 11, "one-hundred-twenty-sixth has eleven H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-sixth H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-sixth last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-sixth has no H3 headings");
+  assert(householdHeadings.length === 0, "one-hundred-twenty-sixth keeps other household sources secondary not H3");
+  assert(
+    expectedSectionTitles.filter((title) => /фен|вентилятор|кран/i.test(title)).length === 0,
+    "one-hundred-twenty-sixth does not expand other household sources into H2",
+  );
+  assert(definition.faq.length === 10, "one-hundred-twenty-sixth has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать звук пылесоса для сна онлайн?", "one-hundred-twenty-sixth first FAQ question");
+  assert(definition.faq[9].question === "Гарантирует ли звук пылесоса быстрое засыпание?", "one-hundred-twenty-sixth last FAQ question");
+  assert(
+    definition.faq[6].answer ===
+      "Нельзя давать универсальную рекомендацию для всех новорождённых. Начинайте с небольшой громкости, не располагайте источник слишком близко и при вопросах ориентируйтесь на рекомендации специалиста.",
+    "one-hundred-twenty-sixth newborn safety FAQ answer",
+  );
+  assert(
+    definition.faq[9].answer ===
+      "Нет. Звук пылесоса не гарантирует скорость засыпания или определённый результат сна.",
+    "one-hundred-twenty-sixth sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 4, "one-hundred-twenty-sixth has four href");
+  assert(new Set(links.map((link) => link.href)).size === 4, "one-hundred-twenty-sixth has four unique destinations");
+  assert(links[0].href === vacuumHref, "one-hundred-twenty-sixth first dest is vacuum white-noise page");
+  assert(links[0].label === "белый шум пылесоса", "one-hundred-twenty-sixth vacuum label exact");
+  assert(links[1].href === newbornSleepHref, "one-hundred-twenty-sixth second dest is newborn-sleep page");
+  assert(links[1].label === "белый шум для сна новорождённых", "one-hundred-twenty-sixth newborn-sleep label exact");
+  assert(links[2].href === hubHref, "one-hundred-twenty-sixth third dest is hub");
+  assert(links[2].label === "белый шум для сна", "one-hundred-twenty-sixth hub label exact");
+  assert(links[3].href === noMusicHref, "one-hundred-twenty-sixth fourth dest is no-music page");
+  assert(links[3].label === "белый шум без музыки", "one-hundred-twenty-sixth no-music label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-sixth slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-sixth canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-sixth path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-sixth omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-sixth has no raw URLs");
+  assert(contentSource.includes(`href: "${vacuumHref}"`), "one-hundred-twenty-sixth content file has vacuum href");
+  assert(contentSource.includes(`href: "${newbornSleepHref}"`), "one-hundred-twenty-sixth content file has newborn-sleep href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-sixth content file has hub href");
+  assert(contentSource.includes(`href: "${noMusicHref}"`), "one-hundred-twenty-sixth content file has no-music href");
+  assert(!contentSource.includes("/listens/shum-pylesosa-dlya-sna"), "one-hundred-twenty-sixth has no invented vacuum-noise-for-sleep href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn"), "one-hundred-twenty-sixth has no generic newborn href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-sixth has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-sixth has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-sixth has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-sixth has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-sixth has no soft href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-sixth does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-sixth content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-sixth uses shared bookmark CTA");
+  assert(contentSource.includes("звук пылесоса для сна"), "one-hundred-twenty-sixth keeps primary phrase");
+  assert(contentSource.includes("слушать пылесос звук для сна"), "one-hundred-twenty-sixth keeps listen search phrase");
+  assert(contentSource.includes("звук пылесоса для сна новорожденного"), "one-hundred-twenty-sixth keeps newborn search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-sixth keeps technical white-noise distinction");
+  assert(contentSource.includes("не обязательно является классическим белым шумом"), "one-hundred-twenty-sixth does not claim classical white noise");
+  assert(contentSource.includes("не гарантирует быстрое засыпание"), "one-hundred-twenty-sixth does not claim faster sleep");
+  assert(contentSource.includes("гарантированно расслабляет или помогает уснуть"), "one-hundred-twenty-sixth does not claim relaxation");
+  assert(contentSource.includes("Нельзя давать универсальную рекомендацию для всех новорождённых"), "one-hundred-twenty-sixth has no universal newborn recommendation");
+  assert(contentSource.includes("не располагайте источник слишком близко"), "one-hundred-twenty-sixth keeps source-distance caution");
+  assert(contentSource.includes("рекомендации медицинского специалиста"), "one-hundred-twenty-sixth keeps medical-consult caution");
+  assert(contentSource.includes("её главный смысловой центр – звук пылесоса для сна"), "one-hundred-twenty-sixth keeps vacuum as primary intent");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-sixth has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-sixth uses en-dash not em-dash");
+}
+
+function testOneHundredTwentySeventhPage() {
+  const definition = SHUM_PYLESOSA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+  const slug = "shum-pylesosa-dlya-sna-slushat-onlayn";
+  const playlistSlug = "belyy-shum-dlya-sna-zvuk-pylesosa-fena-ventily";
+  const playlistTitle = "Белый шум для сна | Звук пылесоса, фена, вентилятора, крана";
+  const soundHref = "/listens/zvuk-pylesosa-dlya-sna-slushat-onlayn";
+  const vacuumHref = "/listens/belyy-shum-pylesosa-slushat-onlayn";
+  const newbornSleepHref = "/listens/belyy-shum-dlya-sna-novorozhdennyh-slushat-onlayn";
+  const childrenHref = "/listens/belyy-shum-dlya-detey-slushat-onlayn";
+  const hubHref = "/listens/belyy-shum-dlya-sna-slushat-onlayn";
+  const expectedIntro = [
+    "Здесь можно слушать шум пылесоса для сна онлайн бесплатно – выбрать ровное бытовое звучание и включить его вечером, во время отдыха или перед сном.",
+    "Работающий пылесос создаёт достаточно постоянный фон без речи и музыкальной композиции. Некоторым слушателям такой характер шума комфортен как фон.",
+    "В подборке можно выбрать подходящий вариант и при необходимости попробовать другие бытовые звуки.",
+  ];
+  const expectedSectionTitles = [
+    "Шум пылесоса для сна – слушать онлайн",
+    "Шум пылесоса для сна слушать",
+    "Шум и звук пылесоса для сна – в чём разница",
+    "Шум пылесоса и белый шум пылесоса",
+    "Шум пылесоса для новорождённых для сна",
+    "Шум пылесоса для детей для сна",
+    "Другие бытовые фоновые звуки",
+    "Белый шум для сна",
+    "Какие варианты шума пылесоса можно выбрать",
+    "Как слушать шум пылесоса",
+    "Где слушать шум пылесоса для сна онлайн",
+    "Итог",
+  ];
+  const expectedHouseholdItems = [
+    "фен;",
+    "вентилятор;",
+    "вода из крана.",
+  ];
+  const links = collectListenLinks(definition);
+  const headings = (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "heading");
+  const householdSection = definition.sections.find(
+    (section) => section.title === "Другие бытовые фоновые звуки",
+  );
+  const householdList = (householdSection?.blocks ?? []).find((block) => block.kind === "list");
+  const intentSection = definition.sections.find(
+    (section) => section.title === "Шум и звук пылесоса для сна – в чём разница",
+  );
+  const intentStrong = (intentSection?.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => block.segments ?? [])
+    .filter((segment) => "strong" in segment)
+    .map((segment) => segment.strong);
+
+  assert(parseListenPageDefinition(definition).ok, "one-hundred-twenty-seventh production definition valid");
+  assert(definition.slug === slug, "one-hundred-twenty-seventh slug exact");
+  assert(definition.playlistSlug === playlistSlug, "one-hundred-twenty-seventh playlist slug exact");
+  assert(definition.h1 === "Шум пылесоса для сна – слушать онлайн бесплатно", "one-hundred-twenty-seventh h1 exact");
+  assert(definition.title === "Шум пылесоса для сна – слушать онлайн бесплатно | АудиоЛад", "one-hundred-twenty-seventh title exact");
+  assert(
+    definition.description ===
+      "Шум пылесоса для сна – слушайте онлайн бесплатно ровный бытовой фоновый шум, выбирайте подходящее звучание и включайте его перед сном.",
+    "one-hundred-twenty-seventh description exact",
+  );
+  assert(definition.intro.length === 3, "one-hundred-twenty-seventh has three intro paragraphs");
+  assert(
+    definition.intro[0] === expectedIntro[0] &&
+      definition.intro[1] === expectedIntro[1] &&
+      definition.intro[2] === expectedIntro[2],
+    "one-hundred-twenty-seventh intro verbatim",
+  );
+  assert(definition.sections.length === 12, "one-hundred-twenty-seventh has twelve H2 sections");
+  assert(
+    definition.sections.map((section) => section.title).join("\n") === expectedSectionTitles.join("\n"),
+    "one-hundred-twenty-seventh H2 titles exact",
+  );
+  assert(definition.sections.at(-1).id === "itog", "one-hundred-twenty-seventh last section id is itog");
+  assert(headings.length === 0, "one-hundred-twenty-seventh has no H3 headings");
+  assert(householdList?.items.join("\n") === expectedHouseholdItems.join("\n"), "one-hundred-twenty-seventh keeps other household sources as a list not H3");
+  assert(
+    expectedSectionTitles.filter((title) => /фен|вентилятор|кран/i.test(title)).length === 0,
+    "one-hundred-twenty-seventh does not expand other household sources into H2",
+  );
+  assert(intentStrong.join("\n") === "шум пылесоса", "one-hundred-twenty-seventh intent strong exact");
+  assert(definition.faq.length === 10, "one-hundred-twenty-seventh has ten FAQ items");
+  assert(definition.faq[0].question === "Где слушать шум пылесоса для сна онлайн?", "one-hundred-twenty-seventh first FAQ question");
+  assert(definition.faq[9].question === "Гарантирует ли шум пылесоса быстрое засыпание?", "one-hundred-twenty-seventh last FAQ question");
+  assert(
+    definition.faq[4].answer ===
+      "Нельзя давать универсальную рекомендацию для всех новорождённых. При использовании фонового звука рядом с ребёнком важны умеренная громкость и индивидуальный подход.",
+    "one-hundred-twenty-seventh newborn safety FAQ answer",
+  );
+  assert(
+    definition.faq[9].answer ===
+      "Нет. Шум пылесоса не гарантирует скорость засыпания или определённый результат сна.",
+    "one-hundred-twenty-seventh sleep-guarantee FAQ answer",
+  );
+  assert(links.length === 5, "one-hundred-twenty-seventh has five href");
+  assert(new Set(links.map((link) => link.href)).size === 5, "one-hundred-twenty-seventh has five unique destinations");
+  assert(links[0].href === soundHref, "one-hundred-twenty-seventh first dest is vacuum-sound-for-sleep page");
+  assert(links[0].label === "звук пылесоса для сна", "one-hundred-twenty-seventh vacuum-sound label exact");
+  assert(links[1].href === vacuumHref, "one-hundred-twenty-seventh second dest is vacuum white-noise page");
+  assert(links[1].label === "белый шум пылесоса", "one-hundred-twenty-seventh vacuum label exact");
+  assert(links[2].href === newbornSleepHref, "one-hundred-twenty-seventh third dest is newborn-sleep page");
+  assert(links[2].label === "белый шум для сна новорождённых", "one-hundred-twenty-seventh newborn-sleep label exact");
+  assert(links[3].href === childrenHref, "one-hundred-twenty-seventh fourth dest is children page");
+  assert(links[3].label === "белый шум для детей", "one-hundred-twenty-seventh children label exact");
+  assert(links[4].href === hubHref, "one-hundred-twenty-seventh fifth dest is hub");
+  assert(links[4].label === "белый шум для сна", "one-hundred-twenty-seventh hub label exact");
+  assert(listListenPageDefinitions().some((page) => page.slug === slug), "registry contains one-hundred-twenty-seventh slug");
+  assert(listListenPageDefinitions().length === 127, "registry contains all 127 listen slugs");
+
+  const data = resolveListenPageFromPlaylist({
+    definition,
+    loaded: { ok: true, detail: makePlaylist({ playlist: { slug: playlistSlug, title: playlistTitle } }) },
+  });
+  assert(data?.canonicalUrl === `https://audiolad.ru/listens/${slug}`, "one-hundred-twenty-seventh canonical");
+  assert(data?.path === `/listens/${slug}`, "one-hundred-twenty-seventh path");
+
+  const contentSource = read(`src/lib/seo/listens/content/${slug}.ts`);
+  assert(!contentSource.includes("SEO-самопроверка"), "one-hundred-twenty-seventh omits SEO self-check");
+  assert(!contentSource.includes("https://"), "one-hundred-twenty-seventh has no raw URLs");
+  assert(contentSource.includes(`href: "${soundHref}"`), "one-hundred-twenty-seventh content file has vacuum-sound href");
+  assert(contentSource.includes(`href: "${vacuumHref}"`), "one-hundred-twenty-seventh content file has vacuum href");
+  assert(contentSource.includes(`href: "${newbornSleepHref}"`), "one-hundred-twenty-seventh content file has newborn-sleep href");
+  assert(contentSource.includes(`href: "${childrenHref}"`), "one-hundred-twenty-seventh content file has children href");
+  assert(contentSource.includes(`href: "${hubHref}"`), "one-hundred-twenty-seventh content file has hub href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-novorozhdennyh-slushat-onlayn"), "one-hundred-twenty-seventh has no generic newborn href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-1-chas"), "one-hundred-twenty-seventh has no 1-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-2-chasa"), "one-hundred-twenty-seventh has no 2-hour href");
+  assert(!contentSource.includes("/listens/belyy-shum-dlya-sna-3-chas"), "one-hundred-twenty-seventh has no 3-hour href");
+  assert(!contentSource.includes("/listens/uspokaivayushchiy-belyy-shum"), "one-hundred-twenty-seventh has no calming href");
+  assert(!contentSource.includes("/listens/myagkiy-belyy-shum"), "one-hundred-twenty-seventh has no soft href");
+  assert(!contentSource.includes("kind: \"heading\""), "one-hundred-twenty-seventh does not invent household H3 pages");
+  assert(!contentSource.includes("🔖"), "one-hundred-twenty-seventh content file has no bookmark emoji");
+  assert(!contentSource.includes("Сохраните эту страницу в закладки"), "one-hundred-twenty-seventh uses shared bookmark CTA");
+  assert(contentSource.includes("шум пылесоса для сна"), "one-hundred-twenty-seventh keeps primary phrase");
+  assert(contentSource.includes("шум пылесоса для сна слушать"), "one-hundred-twenty-seventh keeps listen search phrase");
+  assert(contentSource.includes("шум пылесоса для новорожденных для сна"), "one-hundred-twenty-seventh keeps newborn search phrase");
+  assert(contentSource.includes("шум пылесоса для детей для сна"), "one-hundred-twenty-seventh keeps children search phrase");
+  assert(contentSource.includes("white noise"), "one-hundred-twenty-seventh keeps technical white-noise distinction");
+  assert(contentSource.includes("искусственную физическую или акустическую границу"), "one-hundred-twenty-seventh does not invent acoustic distinction");
+  assert(contentSource.includes("не означает, что любой пылесос технически создаёт классический white noise"), "one-hundred-twenty-seventh does not claim classical white noise");
+  assert(contentSource.includes("не гарантирует быстрое засыпание, крепкий сон"), "one-hundred-twenty-seventh does not claim sleep");
+  assert(contentSource.includes("Нельзя давать универсальную рекомендацию для всех новорождённых"), "one-hundred-twenty-seventh has no universal newborn recommendation");
+  assert(contentSource.includes("Универсального ответа для всех детей нет"), "one-hundred-twenty-seventh has no universal child recommendation");
+  assert(contentSource.includes("рекомендации специалиста"), "one-hundred-twenty-seventh keeps specialist-consult caution");
+  assert(contentSource.includes("Более долгое прослушивание не означает лучший результат сна"), "one-hundred-twenty-seventh does not claim longer is better");
+  assert(!contentSource.includes("дБ"), "one-hundred-twenty-seventh has no dB thresholds");
+  assert(!contentSource.includes("—"), "one-hundred-twenty-seventh uses en-dash not em-dash");
 }
 
 function collectListenLinks(definition) {
@@ -32561,6 +34807,93 @@ function testKidsSleepClusterInternalLinks() {
   const ageSection = hubParsed.definition.sections.find((section) => section.id === "muzyka-dlya-sna-detyam-raznogo-vozrasta");
   const ageLinks = (ageSection.blocks ?? []).flatMap((block) => (block.kind === "rich_paragraph" ? block.segments : [])).filter((segment) => segment.href);
   assert(ageLinks.length === 4, "hub age paragraph has 4 links");
+}
+
+function testRainSleepClusterInternalLinks() {
+  const hub = "muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const noise = "muzyka-dlya-sna-s-shumom-dozhdya-slushat-onlayn";
+  const calming = "uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const sounds = "muzyka-dlya-sna-so-zvukami-dozhdya-slushat-onlayn";
+  const calm = "spokoynaya-muzyka-dlya-sna-s-dozhdem-slushat-onlayn";
+  const relaxing = "rasslablyayushchaya-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const relax = "relaks-muzyka-s-dozhdem-dlya-sna-slushat-onlayn";
+  const thunder = "muzyka-dozhdya-i-grozy-dlya-sna-slushat-onlayn";
+  const piano = "muzyka-pianino-i-dozhdya-dlya-sna-slushat-onlayn";
+  const drops = "muzyka-s-kaplyami-dozhdya-dlya-sna-slushat-onlayn";
+  const calmingPiano = "uspokaivayushchaya-muzyka-dlya-sna-s-dozhdem-i-pianino-slushat-onlayn";
+  const relaxingDrops = "rasslablyayushchaya-muzyka-dlya-sna-s-kaplyami-dozhdya-slushat-onlayn";
+  const pages = [
+    MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_S_SHUMOM_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_SO_ZVUKAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+    SPOKOYNAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    RELAKS_MUZYKA_S_DOZHDEM_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DOZHDYA_I_GROZY_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_PIANINO_I_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_S_KAPLYAMI_DOZHDYA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_S_DOZHDEM_I_PIANINO_SLUSHAT_ONLAYN_PAGE,
+    RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_S_KAPLYAMI_DOZHDYA_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const slugs = [hub, noise, calming, sounds, calm, relaxing, relax, thunder, piano, drops, calmingPiano, relaxingDrops];
+  const hrefOf = (slug) => `/listens/${slug}`;
+  const clusterHrefs = new Set(slugs.map(hrefOf));
+  const inbound = Object.fromEntries(slugs.map((slug) => [slug, 0]));
+  const matrix = {};
+  const weakLabels = ["здесь", "тут", "подробнее", "читать далее", "по ссылке"];
+
+  for (const page of pages) {
+    const links = collectListenLinks(page);
+    const hrefs = links.map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} has no duplicate href`);
+    assert(!hrefs.includes(hrefOf(page.slug)), `${page.slug} has no self-link`);
+    for (const link of links) {
+      assert(typeof link.label === "string" && link.label.length > 0, `${page.slug} link has visible label`);
+      assert(!link.label.includes("http"), `${page.slug} label is not a raw URL`);
+      assert(!link.label.includes("/listens/"), `${page.slug} label is not a raw path`);
+      assert(!link.label.includes("слушать онлайн бесплатно"), `${page.slug} label is not full H1`);
+      const labelLower = link.label.toLowerCase();
+      for (const weak of weakLabels) {
+        assert(labelLower !== weak, `${page.slug} label is not weak "${weak}"`);
+      }
+    }
+    const outs = hrefs.filter((href) => clusterHrefs.has(href));
+    matrix[page.slug] = outs;
+    for (const href of outs) {
+      inbound[href.replace("/listens/", "")] += 1;
+    }
+    const source = read(`src/lib/seo/listens/content/${page.slug}.ts`);
+    assert(!source.includes("https://"), `${page.slug} has no raw https URL`);
+    assert(!source.includes("Читайте также"), `${page.slug} has no Читайте также block`);
+    assert(!source.includes("Другие статьи"), `${page.slug} has no Другие статьи block`);
+    assert(!source.includes("Полезные ссылки"), `${page.slug} has no Полезные ссылки block`);
+  }
+
+  const hubOuts = new Set(matrix[hub]);
+  const children = slugs.filter((slug) => slug !== hub);
+  for (const child of children) {
+    assert(hubOuts.has(hrefOf(child)), `rain hub links to ${child}`);
+    assert(matrix[child].includes(hrefOf(hub)), `${child} links rain hub`);
+  }
+  assert(hubOuts.size === 11, "rain hub has 11 unique cluster destinations");
+  for (const slug of slugs) {
+    assert(inbound[slug] >= 2, `${slug} inbound is at least 2`);
+  }
+  assert(inbound[hub] === 11, "rain hub inbound is 11");
+  assert(matrix[piano].includes(hrefOf(calmingPiano)), "piano page links calming+piano");
+  assert(matrix[calmingPiano].includes(hrefOf(piano)), "calming+piano page links piano");
+  assert(matrix[drops].includes(hrefOf(relaxingDrops)), "drops page links relaxing+drops");
+  assert(matrix[relaxingDrops].includes(hrefOf(drops)), "relaxing+drops page links drops");
+  assert(inbound[piano] >= 2, "piano page has reverse inbound");
+  assert(inbound[drops] >= 2, "drops page has reverse inbound");
+  assert(inbound[calmingPiano] >= 2, "calming+piano page has reverse inbound");
+  assert(inbound[relaxingDrops] >= 2, "relaxing+drops page has reverse inbound");
+
+  let directed = 0;
+  for (const slug of slugs) directed += matrix[slug].length;
+  assert(directed < 132, "rain cluster is not a mechanical full-mesh");
+  assert(parseListenPageDefinition(MUZYKA_DLYA_SNA_S_DOZHDEM_SLUSHAT_ONLAYN_PAGE).ok, "rain hub still valid after cluster links");
 }
 
 const tests = [
@@ -32671,7 +35004,28 @@ const tests = [
   ["one-hundred-fourth listen page", testOneHundredFourthPage],
   ["one-hundred-fifth listen page", testOneHundredFifthPage],
   ["one-hundred-sixth listen page", testOneHundredSixthPage],
+  ["one-hundred-eighth listen page", testOneHundredEighthPage],
+  ["one-hundred-ninth listen page", testOneHundredNinthPage],
+  ["one-hundred-tenth listen page", testOneHundredTenthPage],
+  ["one-hundred-eleventh listen page", testOneHundredEleventhPage],
+  ["one-hundred-twelfth listen page", testOneHundredTwelfthPage],
+  ["one-hundred-thirteenth listen page", testOneHundredThirteenthPage],
+  ["one-hundred-fourteenth listen page", testOneHundredFourteenthPage],
+  ["one-hundred-fifteenth listen page", testOneHundredFifteenthPage],
+  ["one-hundred-sixteenth listen page", testOneHundredSixteenthPage],
+  ["one-hundred-seventeenth listen page", testOneHundredSeventeenthPage],
+  ["one-hundred-eighteenth listen page", testOneHundredEighteenthPage],
+  ["one-hundred-nineteenth listen page", testOneHundredNineteenthPage],
+  ["one-hundred-twentieth listen page", testOneHundredTwentiethPage],
+  ["one-hundred-twenty-first listen page", testOneHundredTwentyFirstPage],
+  ["one-hundred-twenty-second listen page", testOneHundredTwentySecondPage],
+  ["one-hundred-twenty-third listen page", testOneHundredTwentyThirdPage],
+  ["one-hundred-twenty-fourth listen page", testOneHundredTwentyFourthPage],
+  ["one-hundred-twenty-fifth listen page", testOneHundredTwentyFifthPage],
+  ["one-hundred-twenty-sixth listen page", testOneHundredTwentySixthPage],
+  ["one-hundred-twenty-seventh listen page", testOneHundredTwentySeventhPage],
   ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
+  ["rain sleep cluster internal links", testRainSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
