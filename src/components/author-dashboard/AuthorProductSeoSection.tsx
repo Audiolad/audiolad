@@ -480,74 +480,8 @@ export default function AuthorProductSeoSection({
         {PRODUCT_SEO_SELLING_COPY}
       </p>
 
-      <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
-          <AuthorProductSeoStyleControls
-            profile={styleProfile}
-            onChange={setStyleProfile}
-            disabled={disabled}
-          />
-          <button
-            type="button"
-            disabled={disabled || generateLoading}
-            onClick={requestGenerateProductSeo}
-            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {generateLoading
-              ? generateStage === "text"
-                ? PRODUCT_SEO_GENERATE_STAGE_TEXT
-                : PRODUCT_SEO_GENERATE_LOADING
-              : PRODUCT_SEO_GENERATE_CTA}
-          </button>
-          {overwriteOpen ? (
-            <div className="mt-3 rounded-[14px] border border-[#ead48a] bg-[#fff8e6] px-3 py-3">
-              <p className="text-sm leading-5 text-[#5c5278]">
-                {seoSecondaryQueries.length > 0
-                  ? PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM
-                  : PRODUCT_SEO_OVERWRITE_CONFIRM}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={disabled || generateLoading}
-                  onClick={() => {
-                    void generateProductSeo();
-                  }}
-                  className="rounded-full bg-[#7042c5] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {PRODUCT_SEO_OVERWRITE_REPLACE}
-                </button>
-                <button
-                  type="button"
-                  disabled={generateLoading}
-                  onClick={() => setOverwriteOpen(false)}
-                  className="rounded-full border border-[#d4c4ee] bg-white px-3 py-1.5 text-sm text-[#4d336f]"
-                >
-                  {PRODUCT_SEO_OVERWRITE_CANCEL}
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {generateError ? (
-            <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
-          ) : null}
-      </div>
-
-      <p className="mt-4 text-sm font-medium text-[#2b2140]">
-        SEO-готовность: {readiness.doneCount} из {readiness.total}
-      </p>
-      <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-        {PRODUCT_SEO_READINESS_HINT}
-      </p>
-      <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[#5c5278]">
-        {readiness.checks.map((check) => (
-          <li key={check.id}>
-            {check.done ? "✓" : "○"} {check.label}
-          </li>
-        ))}
-      </ul>
-
       <label
-        className="mt-5 block"
+        className="mt-4 block"
         data-submit-issue={fieldErrors.seoPrimaryQuery ? "" : undefined}
       >
         <span className="mb-2 block text-sm font-medium">
@@ -608,7 +542,7 @@ export default function AuthorProductSeoSection({
         {secondariesFull ? null : (
           <div className="mt-2">
             <textarea
-              aria-label="Дополнительные поисковые фразы"
+              aria-label="Введите дополнительные фразы"
               disabled={disabled}
               value={secondaryDraft}
               onChange={(event) => {
@@ -646,6 +580,72 @@ export default function AuthorProductSeoSection({
         {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
       </div>
 
+      <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+        <AuthorProductSeoStyleControls
+          profile={styleProfile}
+          onChange={setStyleProfile}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          disabled={disabled || generateLoading}
+          onClick={requestGenerateProductSeo}
+          className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {generateLoading
+            ? generateStage === "text"
+              ? PRODUCT_SEO_GENERATE_STAGE_TEXT
+              : PRODUCT_SEO_GENERATE_LOADING
+            : PRODUCT_SEO_GENERATE_CTA}
+        </button>
+        {overwriteOpen ? (
+          <div className="mt-3 rounded-[14px] border border-[#ead48a] bg-[#fff8e6] px-3 py-3">
+            <p className="text-sm leading-5 text-[#5c5278]">
+              {seoSecondaryQueries.length > 0
+                ? PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM
+                : PRODUCT_SEO_OVERWRITE_CONFIRM}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={disabled || generateLoading}
+                onClick={() => {
+                  void generateProductSeo();
+                }}
+                className="rounded-full bg-[#7042c5] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {PRODUCT_SEO_OVERWRITE_REPLACE}
+              </button>
+              <button
+                type="button"
+                disabled={generateLoading}
+                onClick={() => setOverwriteOpen(false)}
+                className="rounded-full border border-[#d4c4ee] bg-white px-3 py-1.5 text-sm text-[#4d336f]"
+              >
+                {PRODUCT_SEO_OVERWRITE_CANCEL}
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {generateError ? (
+          <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
+        ) : null}
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-[#2b2140]">
+        SEO-готовность: {readiness.doneCount} из {readiness.total}
+      </p>
+      <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+        {PRODUCT_SEO_READINESS_HINT}
+      </p>
+      <ul className="mt-2 space-y-1.5 text-sm leading-5 text-[#5c5278]">
+        {readiness.checks.map((check) => (
+          <li key={check.id}>
+            {check.done ? "✓" : "○"} {check.label}
+          </li>
+        ))}
+      </ul>
+
       <label
         className="mt-4 block"
         data-submit-issue={fieldErrors.seoTitle ? "" : undefined}
@@ -662,9 +662,9 @@ export default function AuthorProductSeoSection({
           placeholder={preview.title}
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Напишите понятный заголовок результата поиска. Основной запрос
-          желательно использовать один раз и ближе к началу. Не перечисляйте
-          ключевые фразы через | или запятые.
+          Поле необязательное. Напишите понятный заголовок результата поиска.
+          Основной запрос желательно использовать один раз и ближе к началу.
+          Не перечисляйте ключевые фразы через | или запятые.
         </p>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
           Например: Медитация для сна – расслабление перед сном

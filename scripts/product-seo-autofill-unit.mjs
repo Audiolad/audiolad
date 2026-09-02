@@ -20,6 +20,7 @@ import {
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
 import {
+  buildProductSeoGrounding,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -365,6 +366,10 @@ assert.deepEqual(PRODUCT_SEO_AI_JSON_SCHEMA.required, [
 assert.equal("secondaryQueries" in PRODUCT_SEO_AI_JSON_SCHEMA.properties, false);
 const prompt = buildProductSeoSystemPrompt({ request: parsed.request });
 assert.doesNotMatch(prompt, /Wordstat|secondaryQueries|кандидат/i);
+assert.match(
+  prompt,
+  /Дополнительные поисковые фразы заданы автором вручную только как контекст\. Не придумывай, не изменяй и не возвращай их отдельным полем\./,
+);
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /не возвращай поле seoAbout/);
@@ -375,6 +380,20 @@ assert.match(
 assert.match(
   prompt,
   /seoDescription:.*Начинается с полного основного запроса «медитация для сна» дословно и содержит его ровно один раз/i,
+);
+assert.match(
+  buildProductSeoGrounding({ request: parsed.request }),
+  /Дополнительные запросы автора: практика перед сном; Вечерняя медитация/,
+);
+assert.match(
+  buildProductSeoGrounding({ request: { ...parsed.request, seoSecondaryQueries: [] } }),
+  /Дополнительные запросы автора: нет/,
+);
+assert.match(
+  buildProductSeoSystemPrompt({
+    request: { ...parsed.request, seoPrimaryQuery: "", seoSecondaryQueries: [] },
+  }),
+  /Основной запрос не выбран: не выдумывай его/,
 );
 assert.match(
   buildProductSeoRepairPrompt({ request: parsed.request }, validDraft(), ["faq_answer_is_question"]),
@@ -763,6 +782,10 @@ assert.equal(generated.ok, true);
 assert.deepEqual(generated.data.seoSecondaryQueries, ["практика перед сном", "Вечерняя медитация"]);
 assert.equal(calls.length, 1);
 assert.equal("candidates" in calls[0].promptInput, false);
+assert.deepEqual(
+  calls[0].promptInput.request.seoSecondaryQueries,
+  ["практика перед сном", "Вечерняя медитация"],
+);
 
 const repaired = await generateProductSeoDraft(parsed.request, {
   userId: "author-repair",
