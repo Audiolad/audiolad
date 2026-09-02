@@ -1,7 +1,9 @@
 import type {
   ProductSeoAiErrorCode,
   ProductSeoAiErrorResult,
+  ProductSeoInvalidOutputDiagnostic,
 } from "@/lib/seo/product-autofill/types";
+import { normalizeProductSeoValidationIssues } from "@/lib/seo/product-autofill/validate";
 
 export const PRODUCT_SEO_AI_ERROR_MESSAGE =
   "Не удалось подготовить SEO. Вы можете заполнить поля вручную или попробовать ещё раз позже.";
@@ -22,15 +24,36 @@ export const PRODUCT_SEO_AI_ERROR_MESSAGES: Record<
 };
 
 export function productSeoAiError(
-  code: ProductSeoAiErrorCode,
-  issues?: string[],
+  code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">,
 ): ProductSeoAiErrorResult {
   return {
     ok: false,
     error: {
       code,
       message: PRODUCT_SEO_AI_ERROR_MESSAGES[code],
-      ...(issues && issues.length > 0 ? { issues } : {}),
+    },
+  };
+}
+
+export function productSeoAiInvalidOutputError(
+  stage: ProductSeoInvalidOutputDiagnostic["stage"],
+  validationIssues?: string[],
+): ProductSeoAiErrorResult {
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_OUTPUT",
+      message: PRODUCT_SEO_AI_ERROR_MESSAGES.INVALID_OUTPUT,
+      diagnostic: {
+        stage,
+        ...(validationIssues && validationIssues.length > 0
+          ? {
+              validationIssues: normalizeProductSeoValidationIssues(
+                validationIssues,
+              ),
+            }
+          : {}),
+      },
     },
   };
 }

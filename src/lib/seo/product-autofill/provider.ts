@@ -8,6 +8,7 @@ import {
 import {
   classifyProductSeoAiHttpError,
   productSeoAiError,
+  productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yandex-provider";
 import {
@@ -258,7 +259,9 @@ function createOpenAiProductSeoAiProvider(
         model: config.model,
         error: "INVALID_OUTPUT",
       });
-      return productSeoAiError("INVALID_OUTPUT", ["malformed"]);
+      return productSeoAiInvalidOutputError(
+        kind === "generate" ? "provider_generate" : "provider_repair",
+      );
     }
 
     const result = { ok: true as const, draft, raw: attempt.body };

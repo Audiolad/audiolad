@@ -8,6 +8,7 @@ import {
 import {
   classifyProductSeoAiHttpError,
   productSeoAiError,
+  productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import {
   buildProductSeoRepairPrompt,
@@ -206,10 +207,17 @@ function resultContainsSecret(value: unknown, secret: string | null): boolean {
 }
 
 function fail(
-  code: ProductSeoAiErrorCode,
-  issues?: string[],
+  code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">,
 ): ProductSeoAiErrorResult {
-  return productSeoAiError(code, issues);
+  return productSeoAiError(code);
+}
+
+function invalidOutput(
+  kind: "generate" | "repair",
+): ProductSeoAiErrorResult {
+  return productSeoAiInvalidOutputError(
+    kind === "generate" ? "provider_generate" : "provider_repair",
+  );
 }
 
 export function createYandexProductSeoAiProvider(
@@ -283,7 +291,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind);
     }
 
     const text = alternative.text;
@@ -295,7 +303,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind);
     }
 
     const draft = parseDraftFromJsonText(text);
@@ -308,7 +316,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         latencyMs: attempt.latencyMs,
       });
-      return fail("INVALID_OUTPUT", ["malformed"]);
+      return invalidOutput(kind);
     }
 
     const result = { ok: true as const, draft, raw: attempt.body };

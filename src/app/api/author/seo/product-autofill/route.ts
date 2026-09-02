@@ -67,6 +67,10 @@ export async function POST(request: Request) {
         {
           error: result.error.message,
           code: result.error.code,
+          ...(result.error.code === "INVALID_OUTPUT" &&
+          result.error.diagnostic
+            ? { diagnostic: result.error.diagnostic }
+            : {}),
         },
         { status: productSeoAiHttpStatus(result.error.code) },
       );
