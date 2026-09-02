@@ -54,8 +54,8 @@ await assert.rejects(
 );
 
 assert.deepEqual(
-  parseGetCourseCallback({ data: { deal: { id: 42, number: "aa-test", offer_ids: ["offer-1"], deal_cost: "500" } } }),
-  { dealId: "42", dealNumber: "aa-test", offerId: "offer-1", offerIds: ["offer-1"], amountMinor: 50_000 },
+  parseGetCourseCallback({ data: { deal: { id: 42, number: "aa-test", offer_ids: ["offer-1"], deal_cost: "500", status: "payed", payed_money: "500", left_cost_money: "0" } } }),
+  { dealId: "42", dealNumber: "aa-test", offerId: "offer-1", offerIds: ["offer-1"], amountMinor: 50_000, status: "payed", payedMoneyMinor: 50_000, leftCostMoneyMinor: 0 },
 );
 assert.equal(parseGetCourseCallback({ deal_id: "x", amount: "500.50" }).amountMinor, null);
 
@@ -87,6 +87,8 @@ assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
 assert.match(webhook, /timingSafeEqual/);
+assert.match(webhook, /callback\.status !== "payed"/);
+assert.match(webhook, /x-audiolad-getcourse-secret/);
 assert.match(webhook, /apply_author_appreciation_getcourse_callback/);
 assert.doesNotMatch(webhook, /@\/lib\/payments|@\/lib\/author-finance/);
 

@@ -45,7 +45,10 @@ CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback(
   p_provider_deal_id text,
   p_provider_deal_number text,
   p_offer_id text,
-  p_amount_minor bigint
+  p_amount_minor bigint,
+  p_status text,
+  p_payed_money_minor bigint,
+  p_left_cost_money_minor bigint
 )
 RETURNS TABLE(outcome text, intent_id uuid)
 LANGUAGE plpgsql
@@ -103,8 +106,11 @@ BEGIN
   END IF;
 
   IF v_intent.status <> 'pending'
+    OR p_status <> 'payed'
     OR p_offer_id IS NULL
     OR p_amount_minor IS NULL
+    OR (p_payed_money_minor IS NOT NULL AND p_payed_money_minor < p_amount_minor)
+    OR (p_left_cost_money_minor IS NOT NULL AND p_left_cost_money_minor > 0)
     OR v_intent.amount_minor <> p_amount_minor
     OR COALESCE(v_intent.provider_metadata->>'offer_id', '') <> p_offer_id
   THEN
@@ -123,9 +129,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_author_appreciation_getcourse_callback(text, text, text, bigint)
+REVOKE ALL ON FUNCTION public.apply_author_appreciation_getcourse_callback(text, text, text, bigint, text, bigint, bigint)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.apply_author_appreciation_getcourse_callback(text, text, text, bigint)
+GRANT EXECUTE ON FUNCTION public.apply_author_appreciation_getcourse_callback(text, text, text, bigint, text, bigint, bigint)
   TO service_role;
 
 COMMIT;

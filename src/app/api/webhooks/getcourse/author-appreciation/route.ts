@@ -70,13 +70,25 @@ export function parseGetCourseCallback(payload: unknown) {
     amountMinor: rublesToMinor(
       deal?.deal_cost ?? deal?.cost ?? root?.deal_cost ?? root?.amount ?? data?.deal_cost ?? data?.amount,
     ),
+    status: firstString(
+      deal?.status,
+      deal?.deal_status,
+      root?.status,
+      data?.status,
+    ),
+    payedMoneyMinor: rublesToMinor(
+      deal?.payed_money ?? root?.payed_money ?? data?.payed_money,
+    ),
+    leftCostMoneyMinor: rublesToMinor(
+      deal?.left_cost_money ?? root?.left_cost_money ?? data?.left_cost_money,
+    ),
   };
 }
 
 export async function POST(request: Request) {
   const expectedSecret = process.env.GETCOURSE_CALLBACK_SECRET?.trim();
   if (!expectedSecret) return new NextResponse(null, { status: 500 });
-  if (!safeEqual(request.headers.get("x-getcourse-callback-secret"), expectedSecret)) {
+  if (!safeEqual(request.headers.get("x-audiolad-getcourse-secret"), expectedSecret)) {
     return new NextResponse(null, { status: 401 });
   }
   if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
@@ -90,7 +102,12 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 400 });
   }
   const callback = parseGetCourseCallback(payload);
-  if ((!callback.dealId && !callback.dealNumber) || !callback.offerId || callback.amountMinor === null) {
+  if (
+    (!callback.dealId && !callback.dealNumber) ||
+    !callback.offerId ||
+    callback.amountMinor === null ||
+    callback.status !== "payed"
+  ) {
     return new NextResponse(null, { status: 200 });
   }
 
@@ -107,6 +124,9 @@ export async function POST(request: Request) {
       p_provider_deal_number: callback.dealNumber,
       p_offer_id: offerId,
       p_amount_minor: callback.amountMinor,
+      p_status: callback.status,
+      p_payed_money_minor: callback.payedMoneyMinor,
+      p_left_cost_money_minor: callback.leftCostMoneyMinor,
     });
     return new NextResponse(null, { status: error ? 500 : 200 });
   } catch {
