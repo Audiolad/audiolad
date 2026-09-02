@@ -689,8 +689,8 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
         ? item
         : {
             ...item,
-            question: "Как слушать эту практику?",
-            answer: "Как слушать эту практику?",
+            question: "Эта практика подходит вечером?",
+            answer: "Эта практика подходит вечером.",
           },
     ),
   });
