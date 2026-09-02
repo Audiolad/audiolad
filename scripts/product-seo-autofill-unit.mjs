@@ -537,7 +537,69 @@ assert.equal(
   assert.ok(faqFail.issues.includes("primary_missing_from_faq"));
 }
 
-assert.equal(faqAnswerRepeatsQuestion("Когда лучше слушать эту практику?", "Когда лучше слушать эту практику?"), true);
+// FAQ answers may share a subject with their questions. Only exact or
+// sequence-preserving near copies are repeats.
+for (const { question, answer, repeats } of [
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать эту практику?",
+    repeats: true,
+  },
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать эту практику.",
+    repeats: true,
+  },
+  {
+    question: "Когда лучше слушать эту практику?",
+    answer: "Когда лучше слушать практику.",
+    repeats: true,
+  },
+  {
+    question: "Когда лучше включать вечернюю практику?",
+    answer: "Вечернюю практику лучше включать вечером.",
+    repeats: false,
+  },
+  {
+    question: "Как слушать медитацию для сна?",
+    answer: "Медитацию для сна слушайте в тихом месте, где можно удобно устроиться.",
+    repeats: false,
+  },
+  {
+    question: "Можно ли слушать медитацию для сна перед сном?",
+    answer: "Медитацию для сна можно слушать перед сном.",
+    repeats: false,
+  },
+]) {
+  assert.equal(faqAnswerRepeatsQuestion(question, answer), repeats, `${question} / ${answer}`);
+}
+
+// Production regression: a direct answer with the question's nouns must
+// remain valid and must not consume a repair attempt.
+{
+  const directAnswerDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index === 1
+        ? {
+            ...item,
+            question: "Когда лучше включать вечернюю практику?",
+            answer: "Вечернюю практику лучше включать вечером.",
+          }
+        : item,
+    ),
+  });
+  const directAnswerProvider = mockProvider([{ ok: true, draft: directAnswerDraft, raw: {} }]);
+  const directAnswerResult = await generateProductSeoDraft(requestInput(), {
+    userId: "direct-faq-answer-no-repair",
+    config,
+    provider: directAnswerProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(directAnswerResult.ok, true);
+  assert.equal(directAnswerProvider.calls.length, 1);
+  assert.equal(directAnswerResult.data.faqItems[1].answer, directAnswerDraft.faqItems[1].answer);
+}
+
 assert.equal(faqAnswerIsQuestion("Можно ли слушать вечером?"), true);
 assert.equal(faqAnswerIsQuestion("Можно ли слушать практику днём."), true);
 assert.equal(
