@@ -59,6 +59,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const audioRef = useRef<HTMLAudioElement>(null);
   const requestRef = useRef(0);
   const retryRef = useRef(0);
+  const resumeAttemptRef = useRef<number | null>(null);
   const recoveryRef = useRef<number | null>(null);
   const playAtRef = useRef<(index: number, retry?: boolean) => void>(() => {});
   const currentIndexRef = useRef(0);
@@ -76,6 +77,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const reset = useCallback(() => {
     requestRef.current += 1;
     retryRef.current = 0;
+    resumeAttemptRef.current = null;
     recoveryRef.current = null;
     currentIndexRef.current = 0;
     const audio = audioRef.current;
@@ -116,7 +118,13 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   ) => {
     const fragment = queue[index];
     const audio = audioRef.current;
-    if (!fragment || !audio || requestId !== requestRef.current || recoveryRef.current !== null) return;
+    if (
+      !fragment
+      || !audio
+      || requestId !== requestRef.current
+      || resumeAttemptRef.current !== requestId
+      || recoveryRef.current !== null
+    ) return;
 
     recoveryRef.current = requestId;
     setLoading(true);
@@ -148,6 +156,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       }
     } finally {
       if (recoveryRef.current === requestId) recoveryRef.current = null;
+      if (resumeAttemptRef.current === requestId) resumeAttemptRef.current = null;
       if (requestId === requestRef.current) setLoading(false);
     }
   }, [authorId, chapterId, projectId, queue]);
@@ -158,6 +167,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     if (!fragment || !audio) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
+    resumeAttemptRef.current = null;
     recoveryRef.current = null;
     currentIndexRef.current = index;
     setCurrentIndex(index);
@@ -205,7 +215,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   }, [playAt, queue, reset]);
 
   const handleMediaError = useCallback(() => {
-    if (recoveryRef.current !== null) return;
+    if (resumeAttemptRef.current !== null || recoveryRef.current !== null) return;
     const index = currentIndexRef.current;
     if (retryRef.current === 0) {
       retryRef.current = 1;
@@ -227,6 +237,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     if (!audio || !queue.length) return;
     if (!audio.paused) {
       requestRef.current += 1;
+      resumeAttemptRef.current = null;
       recoveryRef.current = null;
       audio.pause();
       setIsPlaying(false);
@@ -236,17 +247,22 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     if (audio.currentSrc) {
       const requestId = requestRef.current + 1;
       requestRef.current = requestId;
-      recoveryRef.current = null;
       const pausedAt = pausedPlaybackTime(audio);
+      resumeAttemptRef.current = requestId;
+      recoveryRef.current = null;
       try {
         await audio.play();
-        if (requestId === requestRef.current) {
+        if (requestId === requestRef.current && resumeAttemptRef.current === requestId) {
           setIsPlaying(true);
           setError(null);
         }
       } catch {
-        if (requestId === requestRef.current) {
-          void recoverPausedPlayback(currentIndexRef.current, requestId, pausedAt);
+        if (requestId === requestRef.current && resumeAttemptRef.current === requestId) {
+          await recoverPausedPlayback(currentIndexRef.current, requestId, pausedAt);
+        }
+      } finally {
+        if (resumeAttemptRef.current === requestId && recoveryRef.current !== requestId) {
+          resumeAttemptRef.current = null;
         }
       }
       return;

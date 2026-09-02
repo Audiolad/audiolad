@@ -71,11 +71,15 @@ assert.match(player, /const handleRetry = useCallback\(\(\) => \{\s+retryRef\.cu
 assert.match(player, /function pausedPlaybackTime\(audio: HTMLAudioElement\)/);
 assert.match(player, /function waitForAudioReadiness\(audio: HTMLAudioElement\)/);
 assert.match(player, /audio\.addEventListener\("loadedmetadata", handleReady, \{ once: true \}\)/);
+assert.match(player, /const resumeAttemptRef = useRef<number \| null>\(null\);/);
 assert.match(player, /const recoverPausedPlayback = useCallback\(async/);
+assert.match(player, /resumeAttemptRef\.current !== requestId/);
 assert.match(player, /audio\.src = body\.url;\s+audio\.load\(\);\s+await waitForAudioReadiness\(audio\);\s+if \(requestId !== requestRef\.current \|\| recoveryRef\.current !== requestId\) return;\s+audio\.currentTime = pausedAt;\s+await audio\.play\(\);/);
-assert.match(player, /if \(recoveryRef\.current !== null\) return;\s+const transition = audiobookFragmentEndedTransition/);
+assert.match(player, /if \(resumeAttemptRef\.current !== null \|\| recoveryRef\.current !== null\) return;\s+const index = currentIndexRef\.current;/);
+assert.match(player, /resumeAttemptRef\.current = requestId;\s+recoveryRef\.current = null;\s+try \{\s+await audio\.play\(\);/);
 assert.match(player, /const pausedAt = pausedPlaybackTime\(audio\);/);
-assert.match(player, /void recoverPausedPlayback\(currentIndexRef\.current, requestId, pausedAt\)/);
+assert.match(player, /await recoverPausedPlayback\(currentIndexRef\.current, requestId, pausedAt\)/);
+assert.match(player, /if \(resumeAttemptRef\.current === requestId\) resumeAttemptRef\.current = null;/);
 assert.match(player, /Нажмите «Повторить»/);
 assert.match(player, /"Слушать главу"/);
 assert.match(player, />Повторить</);
