@@ -285,6 +285,17 @@ function testRepairSqlIsOneRowAndNotAMigration() {
     repair,
     /WHERE id = '7f7da757-9191-4e3d-95c0-02834321ad35'/,
   );
+  assert.match(repair, /GET DIAGNOSTICS v_row_count = ROW_COUNT/);
+  assert.match(
+    repair,
+    /IF v_row_count IS DISTINCT FROM 1 THEN/,
+  );
+  assert.match(
+    repair,
+    /RAISE EXCEPTION[\s\S]*potok_izobiliya_repair_row_count_mismatch/,
+  );
+  assert.match(repair, /^BEGIN;/m);
+  assert.match(repair, /^COMMIT;/m);
   const migrations = readdirSync(migrationsDir).join("\n");
   assert.doesNotMatch(migrations, /repair-potok-izobiliya/);
 }
