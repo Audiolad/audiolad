@@ -15,6 +15,10 @@ const fragmentsRoute = readFileSync(
   "utf8",
 );
 const databaseDocs = readFileSync("docs/DATABASE.md", "utf8");
+const asciiKeyMigration = readFileSync(
+  "supabase/migrations/20260914130000_audiobook_fragment_ascii_storage_keys.sql",
+  "utf8",
+);
 
 assert.match(sql, /CREATE TABLE public\.audiobook_fragments/);
 assert.match(sql, /reserve_audiobook_fragment[\s\S]*FOR UPDATE[\s\S]*quota_exceeded/);
@@ -27,6 +31,9 @@ assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.delete_audiobook_fragment[\
 assert.match(server, /createSignedUploadUrl/);
 assert.match(server, /upload_not_complete/);
 assert.match(server, /audiobook_fragment_storage_cleanup_error/);
+assert.match(server, /audiobook_fragment_retry_repair_error/);
+assert.match(server, /\.update\(\{ storage_path: repairedPath \}\)/);
+assert.match(server, /void removeFragmentStorage\(\[fragment\.storage_path\]/);
 assert.match(server, /delete_audiobook_fragment/);
 assert.match(server, /sourceType: unknown/);
 assert.match(server, /input\.sourceType !== "upload" && input\.sourceType !== "recording"/);
@@ -37,7 +44,7 @@ assert.match(ui, /uploadToSignedUrl/);
 assert.match(ui, /matchesReservation/);
 assert.match(ui, /file\.size === fragment\.size_bytes/);
 assert.match(ui, /normalizeAudiobookMimeType\(file\.type\) === fragment\.mime_type/);
-assert.match(ui, /sanitizeAudiobookFilename\(file\.name\) === fragment\.original_name/);
+assert.match(ui, /validateAudiobookOriginalFilename\(file\.name\) === fragment\.original_name/);
 assert.match(ui, /fragmentBase\}\/\$\{fragment\.id\}\/retry/);
 assert.match(ui, /Выбрать файл и повторить/);
 assert.match(ui, /Загрузка не завершена/);
@@ -45,5 +52,6 @@ assert.doesNotMatch(ui, /FormData/);
 assert.doesNotMatch(ui, /MediaRecorder/);
 assert.doesNotMatch(databaseDocs, /short-lived signed upload token|signed upload TTL/i);
 assert.match(ui, /Загрузить аудиофрагмент/);
+assert.match(asciiKeyMigration, /p_fragment_id::text[\s\S]*\\\.\(webm\|m4a\|mp3\|wav\|aac\)\$/);
 
 console.log("audiobook-fragment-storage-unit: ok");

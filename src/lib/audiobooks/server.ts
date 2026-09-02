@@ -9,7 +9,7 @@ import {
   buildAudiobookFragmentStoragePath,
   isAudiobookFragmentStoragePath,
   normalizeAudiobookMimeType,
-  sanitizeAudiobookFilename,
+  validateAudiobookOriginalFilename,
 } from "./storage";
 import { AUDIOBOOK_LIMITS } from "./limits";
 
@@ -219,7 +219,7 @@ export async function reserveAudiobookFragment(input: {
 }) {
   await mutationAccess(input.authorId);
   const chapter = await ownedChapter(input.projectId, input.chapterId, input.authorId);
-  const originalName = sanitizeAudiobookFilename(input.originalName);
+  const originalName = validateAudiobookOriginalFilename(input.originalName);
   const mimeType = normalizeAudiobookMimeType(input.mimeType);
   const sizeBytes = typeof input.sizeBytes === "number" ? input.sizeBytes : NaN;
   if (!originalName || !mimeType || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > AUDIOBOOK_LIMITS.maxFragmentBytes) {
@@ -227,7 +227,7 @@ export async function reserveAudiobookFragment(input: {
   }
   if (input.sourceType !== "upload" && input.sourceType !== "recording") throw new AudiobookError("invalid_fragment", 422);
   const id = randomUUID();
-  const storagePath = buildAudiobookFragmentStoragePath(input.authorId, input.projectId, input.chapterId, id, originalName);
+  const storagePath = buildAudiobookFragmentStoragePath(input.authorId, input.projectId, input.chapterId, id, mimeType);
   const service = createServiceRoleClient();
   const { data: fragment, error } = await service.rpc("reserve_audiobook_fragment", {
     p_project_id: input.projectId, p_chapter_id: input.chapterId, p_fragment_id: id,
@@ -257,13 +257,23 @@ export async function retryAudiobookFragmentUpload(projectId: string, chapterId:
   const { data: fragment, error } = await service.from("audiobook_fragments").select(FRAGMENT_SELECT)
     .eq("id", fragmentId).eq("chapter_id", chapterId).eq("status", "uploading").maybeSingle();
   if (error) fail(error, "audiobook_fragment_retry_get_error");
-  if (!fragment || !isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) {
-    throw new AudiobookError("not_found", 404);
+  if (!fragment) throw new AudiobookError("not_found", 404);
+
+  let uploadFragment = fragment as AudiobookFragment;
+  if (!isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) {
+    const repairedPath = buildAudiobookFragmentStoragePath(authorId, projectId, chapterId, fragmentId, fragment.mime_type);
+    const { data: repaired, error: repairError } = await service.from("audiobook_fragments")
+      .update({ storage_path: repairedPath })
+      .eq("id", fragmentId).eq("chapter_id", chapterId).eq("status", "uploading")
+      .select(FRAGMENT_SELECT).maybeSingle();
+    if (repairError || !repaired) fail(repairError, "audiobook_fragment_retry_repair_error");
+    uploadFragment = repaired as AudiobookFragment;
+    void removeFragmentStorage([fragment.storage_path], { projectId, chapterId, fragmentId, authorId });
   }
   const { data: signed, error: signedError } = await service.storage.from(AUDIOBOOK_FRAGMENTS_BUCKET)
-    .createSignedUploadUrl(fragment.storage_path, { upsert: false });
+    .createSignedUploadUrl(uploadFragment.storage_path, { upsert: false });
   if (signedError || !signed) fail(signedError, "audiobook_fragment_retry_signed_upload_error");
-  return { fragment: fragment as AudiobookFragment, signedUpload: { path: signed.path, token: signed.token } };
+  return { fragment: uploadFragment, signedUpload: { path: signed.path, token: signed.token } };
 }
 
 export async function finalizeAudiobookFragment(projectId: string, chapterId: string, fragmentId: string, authorId: string) {
@@ -273,7 +283,10 @@ export async function finalizeAudiobookFragment(projectId: string, chapterId: st
   const { data: fragment, error } = await service.from("audiobook_fragments").select(FRAGMENT_SELECT)
     .eq("id", fragmentId).eq("chapter_id", chapterId).maybeSingle();
   if (error) fail(error, "audiobook_fragment_finalize_get_error");
-  if (!fragment || !isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) throw new AudiobookError("not_found", 404);
+  if (!fragment) throw new AudiobookError("not_found", 404);
+  if (!isAudiobookFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) {
+    throw new AudiobookError("upload_not_complete", 409);
+  }
   const directory = fragment.storage_path.slice(0, fragment.storage_path.lastIndexOf("/"));
   const filename = fragment.storage_path.slice(fragment.storage_path.lastIndexOf("/") + 1);
   const { data: objects, error: objectError } = await service.storage.from(AUDIOBOOK_FRAGMENTS_BUCKET)
