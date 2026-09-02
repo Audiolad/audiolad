@@ -173,7 +173,7 @@
     "test:author-course-builder": "npx tsx scripts/author-course-builder-unit.mjs && npx tsx scripts/course-moderation-readiness-unit.mjs && node scripts/course-moderation-readiness-sql-unit.mjs",
     "test:course-moderation-readiness": "npx tsx scripts/course-moderation-readiness-unit.mjs && node scripts/course-moderation-readiness-sql-unit.mjs",
     "test:production-deploy-gha": "node scripts/production-deploy-github-actions-unit.mjs",
-    "test:catalog-visibility": "node scripts/catalog-visibility-unlisted-unit.mjs && node scripts/catalog-visibility-sql-unit.mjs && npx tsx scripts/catalog-visibility-mvp-unit.mjs && npx tsx scripts/catalog-visibility-review-unit.mjs && npx tsx scripts/catalog-visibility-user-search-unit.mjs && node scripts/catalog-visibility-grant-persistence-unit.mjs && npm run test:catalog-visibility:rls",
+    "test:catalog-visibility": "node scripts/catalog-visibility-unlisted-unit.mjs && node scripts/catalog-visibility-sql-unit.mjs && npx tsx scripts/catalog-visibility-mvp-unit.mjs && npx tsx scripts/catalog-visibility-review-unit.mjs && npx tsx scripts/catalog-visibility-user-search-unit.mjs && node scripts/catalog-visibility-grant-persistence-unit.mjs && npx tsx scripts/free-unlisted-republish-unit.mjs && npm run test:catalog-visibility:rls",
     "test:catalog-visibility:rls": "node scripts/catalog-visibility-rls-integration.mjs",
     "test:catalog-visibility:grant-persistence": "node scripts/catalog-visibility-grant-persistence.mjs",
     "test:catalog-visibility:user-search-isolated": "node scripts/catalog-visibility-user-search-isolated.mjs",

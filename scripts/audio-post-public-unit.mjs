@@ -100,11 +100,11 @@ assert.equal(unlistedAccess.reason, "free");
 assert.equal(unlistedAccess.canAcquire, false);
 assert.equal(unlistedAccess.isPubliclyListed, false);
 
-// Unlisted free practice (non audio_post) stays non-listenable without entitlement.
+// Unlisted free ordinary practice is a direct-link gift, not a paid unknown-price product.
 const unlistedPractice = await resolveProductAccess(
   {
     from() {
-      throw new Error("supabase_should_not_be_called_for_anonymous_blocked_path");
+      throw new Error("supabase_should_not_be_called_for_anonymous_free_path");
     },
   },
   {
@@ -117,13 +117,16 @@ const unlistedPractice = await resolveProductAccess(
   },
   null,
 );
-assert.equal(unlistedPractice.canListen, false);
+assert.equal(unlistedPractice.canListen, true);
+assert.equal(unlistedPractice.reason, "free");
+assert.equal(unlistedPractice.canAcquire, false);
+assert.equal(unlistedPractice.isPubliclyListed, false);
 
-// Without product_kind the free-audio-post exception must not apply.
+// Missing product_kind still follows ordinary published free + unlisted.
 const missingKind = await resolveProductAccess(
   {
     from() {
-      throw new Error("supabase_should_not_be_called_for_anonymous_blocked_path");
+      throw new Error("supabase_should_not_be_called_for_anonymous_free_path");
     },
   },
   {
@@ -135,7 +138,29 @@ const missingKind = await resolveProductAccess(
   },
   null,
 );
-assert.equal(missingKind.canListen, false);
+assert.equal(missingKind.canListen, true);
+assert.equal(missingKind.reason, "free");
+assert.equal(missingKind.canAcquire, false);
+
+const selectedUsersFree = await resolveProductAccess(
+  {
+    from() {
+      throw new Error("supabase_should_not_be_called_for_anonymous_selected_users");
+    },
+  },
+  {
+    id: "p4",
+    author_id: "a1",
+    is_free: true,
+    status: "published",
+    is_catalog_listed: false,
+    catalog_visibility: "selected_users",
+    product_kind: PRODUCT_KIND.PRACTICE,
+  },
+  null,
+);
+assert.equal(selectedUsersFree.canListen, false);
+assert.equal(selectedUsersFree.canAcquire, false);
 
 const listenSessionLoader = read("src/lib/listen/load-session-payload.ts");
 assert.match(

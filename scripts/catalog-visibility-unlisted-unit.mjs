@@ -88,6 +88,20 @@ assert.match(sitemap, /\.eq\("is_catalog_listed", true\)/);
 const editorial = read("src/lib/playlists/editorial-practices.ts");
 assert.match(editorial, /\.eq\("is_catalog_listed", true\)/);
 
+const startEditing = read(
+  "supabase/migrations/20260915120000_preserve_catalog_visibility_on_start_editing.sql",
+);
+assert.match(
+  startEditing,
+  /CREATE OR REPLACE FUNCTION public\.start_practice_editing/,
+);
+assert.doesNotMatch(startEditing, /is_catalog_listed\s*=\s*false/);
+const startEditingFn = startEditing.slice(
+  startEditing.indexOf("CREATE OR REPLACE FUNCTION public.start_practice_editing"),
+  startEditing.indexOf("COMMENT ON FUNCTION public.start_practice_editing"),
+);
+assert.doesNotMatch(startEditingFn, /catalog_visibility/);
+
 // Direct product lookup must NOT require catalog listing
 const lookup = read("src/lib/products/lookup.ts");
 assert.doesNotMatch(lookup, /\.eq\("is_catalog_listed"/);
