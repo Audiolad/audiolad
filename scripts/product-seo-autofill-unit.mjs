@@ -844,6 +844,75 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   );
 }
 
+// E2E regression: a same-product repair first corrects description-only
+// metadata issues while leaving one FAQ answer invalid. The final repair must
+// receive just that remaining FAQ issue and retain every non-answer value.
+{
+  const tooLongDescriptionWithoutPrimary =
+    "Мягкая практика для спокойного завершения дня и вечернего отдыха. ".repeat(6);
+  const repairedDescription =
+    "медитация для сна помогает мягко завершить день, замедлиться перед отдыхом и настроиться на спокойный вечер в привычном ритме.";
+  const firstDraft = validDraft({
+    seoDescription: tooLongDescriptionWithoutPrimary,
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const firstRepair = validDraft({
+    seoDescription: repairedDescription,
+    faqItems: firstDraft.faqItems,
+  });
+  const finalFaqRepair = validDraft({
+    seoTitle: "Несвязанная попытка изменить заголовок",
+    seoDescription: "Несвязанная попытка изменить описание.",
+    usageItems: [{ content: "Несвязанное использование" }],
+    faqItems: firstRepair.faqItems.map((item, index) =>
+      index
+        ? { ...item, question: "Несвязанный вопрос?", anchor: `other-${index}` }
+        : {
+            ...item,
+            question: "Несвязанный вопрос?",
+            answer: "Выберите тихое место и устройтесь удобно.",
+            anchor: "other-0",
+          },
+    ),
+  });
+  const sameProductProvider = mockProvider([
+    { ok: true, draft: firstDraft, raw: {} },
+    { ok: true, draft: firstRepair, raw: {} },
+    { ok: true, draft: finalFaqRepair, raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId: "description-then-final-faq-same-product",
+    config,
+    provider: sameProductProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(sameProductProvider.calls.length, 3);
+  assert.deepEqual(sameProductProvider.calls[1].issues, [
+    "description_too_long",
+    "primary_missing_from_description",
+    "faq_answer_is_question",
+  ]);
+  assert.deepEqual(sameProductProvider.calls[2].issues, ["faq_answer_is_question"]);
+  assert.equal(result.data.seoTitle, firstRepair.seoTitle);
+  assert.equal(result.data.seoDescription, repairedDescription);
+  assert.deepEqual(result.data.usageItems, firstRepair.usageItems);
+  assert.deepEqual(
+    result.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    firstRepair.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+  );
+  assert.equal(
+    result.data.faqItems[0].answer,
+    "Выберите тихое место и устройтесь удобно.",
+  );
+  assert.deepEqual(validateProductSeoAiDraft(result.data, validationInput()), {
+    ok: true,
+    draft: result.data,
+  });
+}
+
 // Regression: a repair with simultaneous title, description, and FAQ-answer
 // issues must receive every issue and return a valid merged draft.
 {
