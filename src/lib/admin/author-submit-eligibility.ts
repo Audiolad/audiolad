@@ -144,9 +144,7 @@ export function evaluateAuthorSubmitEligibility(
       actionLabel: "Отправить на модерацию",
       enabled: canEditPublicFields,
       reason: canEditPublicFields
-        ? commercialBlock
-          ? `Кнопка «Отправить на модерацию» видна, но отправка будет отклонена: ${commercialBlock.code} при access_status=${input.accessStatus ?? "—"}.`
-          : "Кнопка «Отправить на модерацию» видна и активна."
+        ? "Кнопка «Отправить на модерацию» видна и активна."
         : "Кнопка «Отправить на модерацию» неактивна: публичные поля нельзя редактировать.",
     };
   }
@@ -158,9 +156,7 @@ export function evaluateAuthorSubmitEligibility(
       actionLabel: "Повторно отправить на модерацию",
       enabled: canEditPublicFields,
       reason: canEditPublicFields
-        ? commercialBlock
-          ? `Кнопка повторной отправки видна, но отправка будет отклонена: ${commercialBlock.code} при access_status=${input.accessStatus ?? "—"}.`
-          : "Кнопка «Повторно отправить на модерацию» видна и активна."
+        ? "Кнопка «Повторно отправить на модерацию» видна и активна."
         : "Кнопка повторной отправки неактивна: публичные поля нельзя редактировать.",
     };
   }

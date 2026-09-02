@@ -547,8 +547,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260911130000",
     "20260911140000",
     "20260912120000",
+    "20260913120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 34);
+  assert.equal(plan.database_migrations_pending, 35);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -607,8 +608,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260911130000",
     "20260911140000",
     "20260912120000",
+    "20260913120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 25);
+  assert.equal(plan.database_migrations_pending, 26);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
