@@ -538,40 +538,54 @@ assert.equal(
 }
 
 // FAQ answers may share a subject with their questions. Only exact or
-// sequence-preserving near copies are repeats.
-for (const { question, answer, repeats } of [
+// sequence-preserving near copies are repeats; natural direct answers are
+// neither repeats nor questions.
+for (const { question, answer, repeats, isQuestion } of [
   {
     question: "Когда лучше слушать эту практику?",
     answer: "Когда лучше слушать эту практику?",
     repeats: true,
+    isQuestion: true,
   },
   {
     question: "Когда лучше слушать эту практику?",
     answer: "Когда лучше слушать эту практику.",
     repeats: true,
+    isQuestion: true,
   },
   {
     question: "Когда лучше слушать эту практику?",
     answer: "Когда лучше слушать практику.",
     repeats: true,
+    isQuestion: true,
+  },
+  {
+    question: "Использовать практику",
+    answer: "Использовать практику — это использовать практику.",
+    repeats: true,
+    isQuestion: false,
   },
   {
     question: "Когда лучше включать вечернюю практику?",
     answer: "Вечернюю практику лучше включать вечером.",
     repeats: false,
+    isQuestion: false,
   },
   {
     question: "Как слушать медитацию для сна?",
     answer: "Медитацию для сна слушайте в тихом месте, где можно удобно устроиться.",
     repeats: false,
+    isQuestion: false,
   },
   {
     question: "Можно ли слушать медитацию для сна перед сном?",
     answer: "Медитацию для сна можно слушать перед сном.",
     repeats: false,
+    isQuestion: false,
   },
 ]) {
   assert.equal(faqAnswerRepeatsQuestion(question, answer), repeats, `${question} / ${answer}`);
+  assert.equal(faqAnswerIsQuestion(answer), isQuestion, `${question} / ${answer}`);
 }
 
 // Production regression: a direct answer with the question's nouns must
@@ -598,6 +612,47 @@ for (const { question, answer, repeats } of [
   assert.equal(directAnswerResult.ok, true);
   assert.equal(directAnswerProvider.calls.length, 1);
   assert.equal(directAnswerResult.data.faqItems[1].answer, directAnswerDraft.faqItems[1].answer);
+}
+
+// Latest production regression: an answer that exactly repeats a question is
+// also a question. The first FAQ-only repair supplies a natural direct answer
+// and must be accepted without consuming the final repair attempt.
+{
+  const exactRepeatDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : {
+            ...item,
+            answer: item.question,
+          },
+    ),
+  });
+  const naturalDirectAnswer = "Медитацию для сна слушайте в тихом месте, где можно удобно устроиться.";
+  const repairedDirectAnswerDraft = validDraft({
+    faqItems: exactRepeatDraft.faqItems.map((item, index) =>
+      index ? item : { ...item, answer: naturalDirectAnswer },
+    ),
+  });
+  const firstFaqRepairProvider = mockProvider([
+    { ok: true, draft: exactRepeatDraft, raw: {} },
+    { ok: true, draft: repairedDirectAnswerDraft, raw: {} },
+  ]);
+  const firstFaqRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "first-faq-repair-natural-direct-answer",
+    config,
+    provider: firstFaqRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(firstFaqRepaired.ok, true);
+  assert.equal(firstFaqRepairProvider.calls.length, 2);
+  assert.deepEqual(firstFaqRepairProvider.calls[1].issues, [
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+  assert.equal(firstFaqRepaired.data.faqItems[0].answer, naturalDirectAnswer);
+  assert.equal(firstFaqRepaired.data.faqItems[0].question, exactRepeatDraft.faqItems[0].question);
+  assert.equal(firstFaqRepaired.data.faqItems[0].anchor, exactRepeatDraft.faqItems[0].anchor);
 }
 
 assert.equal(faqAnswerIsQuestion("Можно ли слушать вечером?"), true);

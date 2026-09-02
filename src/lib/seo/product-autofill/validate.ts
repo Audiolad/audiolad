@@ -206,6 +206,14 @@ export function faqAnswerRepeatsQuestion(question: string, answer: string): bool
     return true;
   }
 
+  // Reject only the narrow tautology "<question> — это <question>". This is
+  // intentionally not an overlap check: a direct answer can naturally reuse
+  // the question's subject words in a different sentence.
+  const questionText = questionWords.join(" ");
+  if (answerWords.join(" ") === `${questionText} это ${questionText}`) {
+    return true;
+  }
+
   // A repeated FAQ question normally preserves word order. Compare that
   // sequence directly, allowing only one omitted or changed word for a
   // near-exact restatement. Set overlap is deliberately not used: a direct
