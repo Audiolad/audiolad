@@ -30,6 +30,10 @@ export default function AuthorAppreciationPrototype({
 
   const selectedAmount =
     customAmount.trim() === "" ? amount : Number(customAmount.replace(",", "."));
+  const isValidAmount =
+    typeof selectedAmount === "number" &&
+    Number.isFinite(selectedAmount) &&
+    selectedAmount > 0;
 
   useEffect(() => {
     if (!open) {
@@ -180,7 +184,7 @@ export default function AuthorAppreciationPrototype({
 
             <button
               type="button"
-              disabled={!Number.isFinite(selectedAmount) || selectedAmount <= 0}
+              disabled={!isValidAmount}
               className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Поблагодарить на {resolveAmountLabel(selectedAmount)}
