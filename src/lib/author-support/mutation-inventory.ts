@@ -299,6 +299,15 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "author_seo_tools",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: [
+        "src/app/api/author/seo/product-autofill/route.ts",
+        "src/app/api/author/seo/wordstat/suggestions/route.ts",
+      ],
+    },
+    {
       key: "terms_commercial_projects",
       group: "blocked",
       disposition: "blocked",
