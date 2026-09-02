@@ -720,6 +720,45 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
     "Выберите тихое место и устройтесь удобно.",
   );
 }
+{
+  const stillQuestion = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const captured = await withCapturedInfo(async () =>
+    generateProductSeoDraft(requestInput(), {
+      userId: "final-faq-repair-diagnostic",
+      config,
+      provider: mockProvider([
+        {
+          ok: true,
+          draft: validDraft({
+            faqItems: validDraft().faqItems.map((item, index) =>
+              index ? item : { ...item, answer: "Когда лучше слушать?" },
+            ),
+          }),
+          raw: {},
+        },
+        { ok: true, draft: stillQuestion, raw: {} },
+        { ok: true, draft: stillQuestion, raw: {} },
+      ]),
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    }),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.deepEqual(captured.result.error.diagnostic, {
+    stage: "validation_final_faq_repair",
+    generateIssues: ["faq_answer_is_question"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: ["faq_answer_is_question"],
+  });
+  const payloads = validationFailurePayloads(captured.entries);
+  assert.deepEqual(
+    payloads.map((payload) => payload.stage),
+    ["generate", "repair", "final_faq_repair"],
+  );
+}
 
 // Production regression: an initial draft missing the primary in both metadata
 // fields must send both exact issues to repair and accept a corrected draft.
