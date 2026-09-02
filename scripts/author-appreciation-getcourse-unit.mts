@@ -64,6 +64,13 @@ process.env.AUTHOR_APPRECIATION_GETCOURSE_AUTHOR_ALLOWLIST = "11111111-1111-4111
 const rollout = getAuthorAppreciationRolloutConfig();
 assert.equal(isAuthorAppreciationRolloutEnabled(rollout, "11111111-1111-4111-8111-111111111111"), true);
 assert.equal(isAuthorAppreciationRolloutEnabled(rollout, "22222222-2222-4222-8222-222222222222"), false);
+assert.equal(
+  isAuthorAppreciationRolloutEnabled(
+    { ...rollout, enabled: false },
+    "11111111-1111-4111-8111-111111111111",
+  ),
+  false,
+);
 
 const migration = read("supabase/migrations/20260916120000_author_appreciation_getcourse_intents.sql");
 assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.author_appreciation_payment_intents/);
@@ -91,5 +98,16 @@ assert.match(webhook, /callback\.status !== "payed"/);
 assert.match(webhook, /x-audiolad-getcourse-secret/);
 assert.match(webhook, /apply_author_appreciation_getcourse_callback/);
 assert.doesNotMatch(webhook, /@\/lib\/payments|@\/lib\/author-finance/);
+
+for (const page of [
+  "src/app/(platform)/(listener)/authors/[slug]/page.tsx",
+  "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+]) {
+  const source = read(page);
+  assert.match(source, /author_appreciation_preview/);
+  assert.match(source, /getAuthorAppreciationRolloutConfig/);
+  assert.match(source, /isAuthorAppreciationRolloutEnabled/);
+  assert.match(source, /resolveAuthorAppreciationVisibility/);
+}
 
 console.log("author-appreciation-getcourse-unit: ok");

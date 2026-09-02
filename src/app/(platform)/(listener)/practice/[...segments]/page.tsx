@@ -23,6 +23,10 @@ import {
   resolveAuthorAppreciationVisibility,
 } from "@/lib/author-appreciation/effective-visibility";
 import {
+  getAuthorAppreciationRolloutConfig,
+  isAuthorAppreciationRolloutEnabled,
+} from "@/lib/author-appreciation/config";
+import {
   AUDIO_POST_KIND_LABEL,
   getMusicProductTypeLabel,
   isAudioPostProductKind,
@@ -493,21 +497,24 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         }
       : null,
   );
-  const showAuthorAppreciationPrototype = resolveAuthorAppreciationVisibility({
-    surface: "product",
-    previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
-    accessStatus: appreciationAuthor?.access_status,
-    settings: appreciationSettings,
-    product: {
-      status: practice.status,
-      isFree: practice.is_free,
-      publicationClass: practice.publication_class,
-      productKind: practice.product_kind,
-      catalogVisibility: practice.catalog_visibility,
-      isCatalogListed: practice.is_catalog_listed,
-      override: practice.listener_appreciation_override,
-    },
-  });
+  const rollout = getAuthorAppreciationRolloutConfig();
+  const showAuthorAppreciationPrototype =
+    isAuthorAppreciationRolloutEnabled(rollout, practice.author_id) &&
+    resolveAuthorAppreciationVisibility({
+      surface: "product",
+      previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+      accessStatus: appreciationAuthor?.access_status,
+      settings: appreciationSettings,
+      product: {
+        status: practice.status,
+        isFree: practice.is_free,
+        publicationClass: practice.publication_class,
+        productKind: practice.product_kind,
+        catalogVisibility: practice.catalog_visibility,
+        isCatalogListed: practice.is_catalog_listed,
+        override: practice.listener_appreciation_override,
+      },
+    });
   const musicTypeLabel = isMusicProductKind(productKind)
     ? getMusicProductTypeLabel()
     : null;

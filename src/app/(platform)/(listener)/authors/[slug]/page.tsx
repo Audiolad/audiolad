@@ -16,6 +16,10 @@ import {
   isAuthorAppreciationPreviewActive,
   resolveAuthorAppreciationVisibility,
 } from "@/lib/author-appreciation/effective-visibility";
+import {
+  getAuthorAppreciationRolloutConfig,
+  isAuthorAppreciationRolloutEnabled,
+} from "@/lib/author-appreciation/config";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
 import {
@@ -108,12 +112,15 @@ export default async function AuthorPublicPage({
   } = await supabase.auth.getUser();
   // Stage 1 design prototype only. Phase 2 will replace this explicit preview
   // flag with commercial eligibility and persisted author/product preferences.
-  const showAuthorAppreciationPrototype = resolveAuthorAppreciationVisibility({
-    surface: "author",
-    previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
-    accessStatus: data.accessStatus,
-    settings: data.appreciationSettings,
-  });
+  const rollout = getAuthorAppreciationRolloutConfig();
+  const showAuthorAppreciationPrototype =
+    isAuthorAppreciationRolloutEnabled(rollout, data.id) &&
+    resolveAuthorAppreciationVisibility({
+      surface: "author",
+      previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+      accessStatus: data.accessStatus,
+      settings: data.appreciationSettings,
+    });
 
   return (
     <>
