@@ -871,18 +871,149 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       aiRateLimit: createProductSeoAiRateLimitStore(),
     }),
   );
-  assert.equal(captured.result.ok, false);
-  assert.deepEqual(captured.result.error.diagnostic, {
-    stage: "validation_final_faq_repair",
-    generateIssues: ["faq_answer_is_question"],
-    repairIssues: ["faq_answer_is_question"],
-    finalFaqRepairIssues: ["faq_answer_is_question"],
+  assert.equal(captured.result.ok, true);
+  assert.equal(captured.result.data.faqItems[0].answer,
+    "Ориентируйтесь на своё самочувствие и выбирайте комфортный для себя формат.");
+  assert.equal(captured.result.data.seoTitle, stillQuestion.seoTitle);
+  assert.equal(captured.result.data.seoDescription, stillQuestion.seoDescription);
+  assert.deepEqual(captured.result.data.usageItems, stillQuestion.usageItems);
+  assert.deepEqual(
+    captured.result.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    stillQuestion.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+  );
+  assert.deepEqual(validateProductSeoAiDraft(captured.result.data, validationInput()), {
+    ok: true,
+    draft: captured.result.data,
   });
   const payloads = validationFailurePayloads(captured.entries);
   assert.deepEqual(
     payloads.map((payload) => payload.stage),
     ["generate", "repair", "final_faq_repair"],
   );
+}
+
+// The deterministic post-third-provider fallback is constrained to the exact
+// residual faq_answer_is_question issue. It makes no fourth provider call and
+// keeps all non-answer content intact.
+for (const [question, expectedAnswer] of [
+  [
+    "Когда лучше включать практику?",
+    "Практику можно включить в спокойное время, когда удобно уделить внимание себе.",
+  ],
+  [
+    "Как использовать практику?",
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.",
+  ],
+  [
+    "Кому подходит практика?",
+    "Практика подойдёт тем, кому откликаются её тема и формат.",
+  ],
+  [
+    "Что такое эта практика?",
+    "Это способ спокойно познакомиться с темой и выбрать подходящий для себя ритм.",
+  ],
+]) {
+  const questionOnlyDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, question, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const fallbackProvider = mockProvider([
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+  ]);
+  const fallbackResult = await generateProductSeoDraft(requestInput(), {
+    userId: `deterministic-faq-fallback-${question}`,
+    config,
+    provider: fallbackProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(fallbackResult.ok, true, question);
+  assert.equal(fallbackProvider.calls.length, 3, question);
+  assert.equal(fallbackResult.data.faqItems[0].answer, expectedAnswer, question);
+  assert.deepEqual(
+    fallbackResult.data.faqItems.map(({ question: itemQuestion, anchor }) => ({
+      question: itemQuestion,
+      anchor,
+    })),
+    questionOnlyDraft.faqItems.map(({ question: itemQuestion, anchor }) => ({
+      question: itemQuestion,
+      anchor,
+    })),
+    question,
+  );
+  assert.deepEqual(validateProductSeoAiDraft(fallbackResult.data, validationInput()), {
+    ok: true,
+    draft: fallbackResult.data,
+  });
+}
+
+// A residual issue set that contains anything besides faq_answer_is_question
+// remains fail-closed after the third provider response.
+{
+  const mixedResidualDraft = validDraft({
+    seoTitle: "Спокойный вечер без ключа",
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
+    ),
+  });
+  const mixedResidualProvider = mockProvider([
+    { ok: true, draft: validDraft({
+      seoTitle: "Спокойный вечер без ключа",
+      faqItems: mixedResidualDraft.faqItems,
+    }), raw: {} },
+    { ok: true, draft: mixedResidualDraft, raw: {} },
+    { ok: true, draft: mixedResidualDraft, raw: {} },
+  ]);
+  const mixedResidualResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-faq-fallback-mixed-residual",
+    config,
+    provider: mixedResidualProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(mixedResidualResult.ok, false);
+  assert.equal(mixedResidualProvider.calls.length, 3);
+  assert.deepEqual(mixedResidualResult.error.diagnostic, {
+    stage: "validation_final_faq_repair",
+    generateIssues: ["primary_missing_from_title", "faq_answer_is_question"],
+    repairIssues: ["primary_missing_from_title", "faq_answer_is_question"],
+    finalFaqRepairIssues: ["primary_missing_from_title", "faq_answer_is_question"],
+  });
+}
+
+// If a deterministic answer could introduce another violation, expose only
+// normalized category codes through a distinct safe diagnostic.
+{
+  const fallbackCollisionDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : {
+            ...item,
+            question: "Практика помогает спокойно познакомиться с темой в удобном для себя темпе.",
+            answer: "Можно ли слушать перед сном?",
+          },
+    ),
+  });
+  const fallbackCollisionResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-faq-fallback-diagnostic",
+    config,
+    provider: mockProvider([
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+      { ok: true, draft: fallbackCollisionDraft, raw: {} },
+    ]),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(fallbackCollisionResult.ok, false);
+  assert.deepEqual(fallbackCollisionResult.error.diagnostic, {
+    stage: "validation_deterministic_faq_fallback",
+    generateIssues: ["faq_answer_is_question"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: ["faq_answer_is_question"],
+    deterministicFaqFallbackIssues: ["faq_answer_repeats_question"],
+  });
 }
 
 // Production regression: an initial draft missing the primary in both metadata

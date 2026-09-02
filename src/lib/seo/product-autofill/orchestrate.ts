@@ -77,7 +77,11 @@ function logProductSeoAiEvent(
 function logProductSeoAiValidationFailed(input: {
   provider: ProductSeoAiConfig["provider"];
   model: string;
-  stage: "generate" | "repair" | "final_faq_repair";
+  stage:
+    | "generate"
+    | "repair"
+    | "final_faq_repair"
+    | "deterministic_faq_fallback";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -279,6 +283,39 @@ export async function generateProductSeoDraft(
     };
   }
 
+  function deterministicFaqAnswer(question: string): string {
+    const normalizedQuestion = question.trim().toLocaleLowerCase("ru-RU");
+    if (/^(когда|в какое время|в какой момент)\b/u.test(normalizedQuestion)) {
+      return "Практику можно включить в спокойное время, когда удобно уделить внимание себе.";
+    }
+    if (/^(как|каким образом)\b/u.test(normalizedQuestion)) {
+      return "Выберите комфортное место и слушайте практику в удобном для себя темпе.";
+    }
+    if (/^(кому|для кого)\b/u.test(normalizedQuestion)) {
+      return "Практика подойдёт тем, кому откликаются её тема и формат.";
+    }
+    if (/^(что такое|что значит|зачем|почему)\b/u.test(normalizedQuestion)) {
+      return "Это способ спокойно познакомиться с темой и выбрать подходящий для себя ритм.";
+    }
+    if (/^(можно|нужно|стоит|следует)\s+ли\b/u.test(normalizedQuestion)) {
+      return "Ориентируйтесь на своё самочувствие и выбирайте комфортный для себя формат.";
+    }
+    return "Практика помогает спокойно познакомиться с темой в удобном для себя темпе.";
+  }
+
+  function applyDeterministicFaqAnswerFallback(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    return {
+      ...draft,
+      faqItems: draft.faqItems.map((item) =>
+        faqAnswerIsQuestion(item.answer)
+          ? { ...item, answer: deterministicFaqAnswer(item.question) }
+          : item,
+      ),
+    };
+  }
+
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
   const first = await provider.generate(promptInput);
   if (!first.ok) {
@@ -375,6 +412,43 @@ export async function generateProductSeoDraft(
         stage: "final_faq_repair",
         issues: finalFaqRepairValidation.issues,
       });
+      if (
+        finalFaqRepairValidation.issues.length === 1 &&
+        finalFaqRepairValidation.issues[0] === "faq_answer_is_question"
+      ) {
+        const deterministicFaqFallbackDraft = applyDeterministicFaqAnswerFallback(
+          finalFaqRepairedDraft,
+        );
+        const deterministicFaqFallbackValidation = validateProductSeoAiDraft(
+          deterministicFaqFallbackDraft,
+          {
+            primaryQuery: primary,
+            title: request.title,
+            subtitle: request.subtitle,
+            description: request.description,
+            productKind: request.productKind,
+            usageItems: request.usageItems ?? [],
+            manualSecondaryQueries,
+          },
+        );
+        if (deterministicFaqFallbackValidation.ok) {
+          return { ok: true, data: deterministicFaqFallbackValidation.draft };
+        }
+
+        logProductSeoAiValidationFailed({
+          provider: config.provider,
+          model: config.model,
+          stage: "deterministic_faq_fallback",
+          issues: deterministicFaqFallbackValidation.issues,
+        });
+        return productSeoAiInvalidOutputError({
+          stage: "validation_deterministic_faq_fallback",
+          generateIssues: firstValidation.issues,
+          repairIssues: repairedValidation.issues,
+          finalFaqRepairIssues: finalFaqRepairValidation.issues,
+          deterministicFaqFallbackIssues: deterministicFaqFallbackValidation.issues,
+        });
+      }
       return productSeoAiInvalidOutputError({
         stage: "validation_final_faq_repair",
         generateIssues: firstValidation.issues,

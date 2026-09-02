@@ -69,6 +69,21 @@ export function productSeoAiInvalidOutputError(
               finalFaqRepairIssues: normalizeProductSeoValidationIssues(
                 diagnostic.finalFaqRepairIssues,
               ),
+            }
+          : {
+              ...diagnostic,
+              generateIssues: normalizeProductSeoValidationIssues(
+                diagnostic.generateIssues,
+              ),
+              repairIssues: normalizeProductSeoValidationIssues(
+                diagnostic.repairIssues,
+              ),
+              finalFaqRepairIssues: normalizeProductSeoValidationIssues(
+                diagnostic.finalFaqRepairIssues,
+              ),
+              deterministicFaqFallbackIssues: normalizeProductSeoValidationIssues(
+                diagnostic.deterministicFaqFallbackIssues,
+              ),
             };
 
   return {
