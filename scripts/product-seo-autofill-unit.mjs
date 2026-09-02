@@ -997,7 +997,9 @@ for (const [question, expectedAnswer] of [
             question: "Когда лучше включать медитация для сна?",
             anchor: "kogda-meditatsiya",
           }
-        : {
+        : index
+          ? item
+          : {
             ...item,
             question: "Практика помогает спокойно познакомиться с темой в удобном для себя темпе.",
             answer: "Можно ли слушать перед сном?",
