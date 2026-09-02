@@ -285,19 +285,19 @@ export async function generateProductSeoDraft(
 
   function deterministicFaqAnswer(question: string): string {
     const normalizedQuestion = question.trim().toLocaleLowerCase("ru-RU");
-    if (/^(когда|в какое время|в какой момент)\b/u.test(normalizedQuestion)) {
+    if (/^(когда|в какое время|в какой момент)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Практику можно включить в спокойное время, когда удобно уделить внимание себе.";
     }
-    if (/^(как|каким образом)\b/u.test(normalizedQuestion)) {
+    if (/^(как|каким образом)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Выберите комфортное место и слушайте практику в удобном для себя темпе.";
     }
-    if (/^(кому|для кого)\b/u.test(normalizedQuestion)) {
+    if (/^(кому|для кого)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Практика подойдёт тем, кому откликаются её тема и формат.";
     }
-    if (/^(что такое|что значит|зачем|почему)\b/u.test(normalizedQuestion)) {
+    if (/^(что такое|что значит|зачем|почему)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Это способ спокойно познакомиться с темой и выбрать подходящий для себя ритм.";
     }
-    if (/^(можно|нужно|стоит|следует)\s+ли\b/u.test(normalizedQuestion)) {
+    if (/^(можно|нужно|стоит|следует)\s+ли(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Ориентируйтесь на своё самочувствие и выбирайте комфортный для себя формат.";
     }
     return "Практика помогает спокойно познакомиться с темой в удобном для себя темпе.";
