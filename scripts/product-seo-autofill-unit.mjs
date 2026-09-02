@@ -420,8 +420,14 @@ const faqExactPrimaryInput = {
   );
   assert.match(
     repairPrimary,
-    /дословно включи полный основной запрос «музыка для сна» в seoTitle и seoDescription/,
+    /дословно включи полный основной запрос «музыка для сна» в seoTitle/,
   );
+  assert.match(
+    repairPrimary,
+    /Начни seoDescription с полного основного запроса «музыка для сна» дословно и используй его ровно один раз/,
+  );
+  assert.equal((repairPrimary.match(/Исправление seoDescription обязательно:/g) ?? []).length, 1);
+  assert.doesNotMatch(repairPrimary, /в seoTitle и seoDescription/);
   assert.match(repairPrimary, /Не изменяй слова запроса, их порядок или словоформу/);
 }
 
@@ -674,7 +680,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       primaryRepairProvider.calls[1].previous,
       primaryRepairProvider.calls[1].issues,
     ),
-    /дословно включи полный основной запрос «медитация для сна» в seoTitle и seoDescription/,
+    /дословно включи полный основной запрос «медитация для сна» в seoTitle/,
   );
 }
 

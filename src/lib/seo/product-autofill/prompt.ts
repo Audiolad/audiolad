@@ -84,8 +84,7 @@ export function buildRepairIssueInstructions(
   const query = primaryQuery.trim();
   const primaryFields = [
     issues.includes("primary_missing_from_title") ? "seoTitle" : null,
-    issues.includes("primary_missing_from_description") ? "seoDescription" : null,
-  ].filter((field): field is "seoTitle" | "seoDescription" => Boolean(field));
+  ].filter((field): field is "seoTitle" => Boolean(field));
   if (query && primaryFields.length > 0) {
     instructions.push(
       [
