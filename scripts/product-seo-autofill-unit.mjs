@@ -378,7 +378,7 @@ assert.match(
 );
 assert.match(
   buildProductSeoRepairPrompt({ request: parsed.request }, validDraft(), ["faq_answer_is_question"]),
-  /измени только faqItems.answer.*без знака «\?».*Сохрани faqItems.question и anchor дословно/is,
+  /измени только его faqItems.answer.*без знака «\?».*Сохрани faqItems.question и anchor таких пунктов дословно/is,
 );
 
 const FAQ_EXACT_PRIMARY = "музыка для сна";
@@ -675,6 +675,78 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       primaryRepairProvider.calls[1].issues,
     ),
     /дословно включи полный основной запрос «медитация для сна» в seoTitle и seoDescription/,
+  );
+}
+
+// Regression: a repair with simultaneous title, description, FAQ-question and
+// FAQ-answer issues must receive every issue and return a valid merged draft.
+{
+  const fourIssueDraft = validDraft({
+    seoTitle: "Спокойный вечер перед отдыхом",
+    seoDescription: "Мягкая практика для спокойного завершения дня.",
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : {
+            ...item,
+            question: "Как слушать эту практику?",
+            answer: "Как слушать эту практику?",
+          },
+    ),
+  });
+  const fourIssueRepairProvider = mockProvider([
+    { ok: true, draft: fourIssueDraft, raw: {} },
+    {
+      ok: true,
+      draft: validDraft({
+        faqItems: validDraft().faqItems.map((item, index) =>
+          index
+            ? item
+            : {
+                ...item,
+                question: "Как слушать медитация для сна?",
+                answer: "Выберите тихое место и удобное положение.",
+              },
+        ),
+      }),
+      raw: {},
+    },
+  ]);
+  const fourIssueRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "four-issue-repair",
+    config,
+    provider: fourIssueRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const exactIssues = [
+    "primary_missing_from_title",
+    "primary_missing_from_description",
+    "primary_missing_from_faq",
+    "faq_answer_repeats_question",
+  ];
+  assert.equal(fourIssueRepaired.ok, true);
+  assert.equal(fourIssueRepairProvider.calls.length, 2);
+  assert.deepEqual(fourIssueRepairProvider.calls[1].issues, exactIssues);
+  assert.equal(
+    fourIssueRepaired.data.faqItems[0].anchor,
+    fourIssueDraft.faqItems[0].anchor,
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(fourIssueRepaired.data, validationInput()),
+    { ok: true, draft: fourIssueRepaired.data },
+  );
+  const fourIssuePrompt = buildProductSeoRepairPrompt(
+    fourIssueRepairProvider.calls[1].input,
+    fourIssueRepairProvider.calls[1].previous,
+    fourIssueRepairProvider.calls[1].issues,
+  );
+  assert.match(
+    fourIssuePrompt,
+    /Если проблем несколько, исправь все поля, затронутые каждой из них/is,
+  );
+  assert.match(
+    fourIssuePrompt,
+    /Исправь другие поля только при наличии отдельной перечисленной проблемы/is,
   );
 }
 
