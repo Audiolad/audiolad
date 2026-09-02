@@ -264,15 +264,16 @@ const accept = readFileSync(
 assert.ok(accept.includes("Актуальные коммерческие параметры"));
 assert.ok(accept.includes("commercialShare"));
 
-// approved content hash untouched
+// approved current edition hash
 const approved = readFileSync(
   path.join(root, "src/lib/author-terms/approved-content.ts"),
   "utf8",
 );
 assert.ok(
   approved.includes(
-    'contentHash: "22c32683c3b91781c1419d455e2a837c6d83999e9a2cf700cd8d330fda0fd5fc"',
+    'contentHash: "594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d"',
   ),
 );
+assert.ok(approved.includes('version: "1.1"'));
 
 console.log("author-status-page-unit: ok");

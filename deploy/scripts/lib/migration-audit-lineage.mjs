@@ -460,6 +460,29 @@ AND NOT EXISTS (
       ),
     ],
   },
+
+  "20260914120000": {
+    extraProbes: [
+      dataProbe(
+        "data:author_terms_versions.v1_1_current",
+        `SELECT EXISTS (
+  SELECT 1
+  FROM public.author_terms_versions
+  WHERE id = '7b95bb3d-9047-4a2b-9546-0e6b5af6bb26'
+    AND version = '1.1'
+    AND is_current IS TRUE
+    AND content_hash = '594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d'
+) AND EXISTS (
+  SELECT 1
+  FROM public.author_terms_versions
+  WHERE id = 'c0a7e001-7e12-4a01-9c01-81dfcb4acf97'
+    AND version = '1.0'
+    AND is_current IS FALSE
+)`,
+        "author terms 1.1 is current; 1.0 is retained and not current",
+      ),
+    ],
+  },
 };
 
 export function lineageForVersion(version) {
