@@ -10,10 +10,10 @@ import {
   productSeoAiError,
 } from "@/lib/seo/product-autofill/errors";
 import {
-  buildYandexProductSeoAiJsonSchema,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
+  PRODUCT_SEO_AI_JSON_SCHEMA,
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
 import {
@@ -250,7 +250,7 @@ export function createYandexProductSeoAiProvider(
         { role: "user", text: prompts.userPrompt },
       ],
       jsonSchema: {
-        schema: buildYandexProductSeoAiJsonSchema(input),
+        schema: PRODUCT_SEO_AI_JSON_SCHEMA,
       },
     });
 

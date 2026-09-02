@@ -885,33 +885,7 @@ assert.equal(invalidQueryJson.includes(TEST_FOLDER), false);
 assert.doesNotMatch(invalidQueryJson, /Api-Key|folderId|Authorization/i);
 
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-const wordstatPicker = read(
-  "src/components/author-dashboard/AuthorProductSeoWordstatPicker.tsx",
-);
-assert.match(seoSection, /PRODUCT_SEO_PICK_PRIMARY_CTA/);
-assert.match(seoSection, /planWordstatPickerOpen/);
-assert.match(seoSection, /void submitWordstat\(seed\)/);
-assert.match(seoSection, /resolveWordstatRequestPhrase\(seedOverride, wordstatSeed\)/);
-assert.match(seoSection, /buildWordstatSuggestionsRequest\(phrase\)/);
-assert.match(seoSection, /onSubmit=\{\(\) => \{\s*void submitWordstat\(\);/);
-assert.doesNotMatch(seoSection, /suggestPrimaryQuerySeeds/);
-assert.doesNotMatch(seoSection, /primarySeeds/);
-assert.doesNotMatch(seoSection, /setWordstatSeed\(seed\);\s*void submitWordstat\(\)/);
-assert.match(wordstatPicker, /Выбрать основным/);
-assert.match(wordstatPicker, /\+ В дополнительные/);
-assert.match(wordstatPicker, /wordstatColorClasses/);
-assert.match(wordstatPicker, /formatWordstatCount/);
-assert.match(wordstatPicker, /item\.phrase/);
-assert.match(seoSection, /wordstatClientErrorMessage/);
-assert.match(seoSection, /INVALID_QUERY|wordstatClientErrorMessage/);
-assert.match(seoSection, /scrollIntoView/);
-assert.match(wordstatPicker, /autoFocus/);
-assert.match(wordstatPicker, /role="status"/);
-assert.equal(
-  [...seoSection.matchAll(/autoSearch: true/g)].length,
-  3,
-  "ALL_WORDSTAT_CTAS_AUTO_SEARCH_WHEN_A_SEED_EXISTS",
-);
+assert.doesNotMatch(seoSection, /wordstat|Подобрать похожие/i);
 
 const route = read("src/app/api/author/seo/wordstat/suggestions/route.ts");
 assert.match(route, /requireAuthenticatedUser/);

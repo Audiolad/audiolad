@@ -16,8 +16,6 @@ import {
   getProcessProductSeoAiRateLimit,
   type ProductSeoAiRateLimitStore,
 } from "@/lib/seo/product-autofill/rate-limit";
-import { canonicalizeYandexSecondaryQueries } from "@/lib/seo/product-autofill/canonicalize-secondaries";
-import { eligibleSecondaryCandidates } from "@/lib/seo/product-autofill/select-secondaries";
 import {
   createDefaultProductSeoStyleProfile,
   requestHasForbiddenStyleKeys,
@@ -35,14 +33,6 @@ import {
   type ProductSeoAiResult,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
-import {
-  fetchWordstatSuggestions,
-  type WordstatClientOptions,
-} from "@/lib/seo/wordstat/client";
-import type { WordstatCacheStore } from "@/lib/seo/wordstat/cache";
-import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
-import type { WordstatRateLimitStore } from "@/lib/seo/wordstat/rate-limit";
-import type { WordstatSuggestion } from "@/lib/seo/wordstat/types";
 
 const BLOCKED_LOG_FIELDS = new Set([
   "token",
@@ -101,21 +91,18 @@ export type GenerateProductSeoDraftOptions = {
   env?: NodeJS.ProcessEnv;
   config?: ProductSeoAiConfig;
   provider?: ProductSeoAiProvider;
-  wordstat?: {
-    fetchImpl?: WordstatClientOptions["fetchImpl"];
-    cache?: WordstatCacheStore;
-    rateLimit?: WordstatRateLimitStore;
-    env?: NodeJS.ProcessEnv;
-  };
   aiRateLimit?: ProductSeoAiRateLimitStore;
-  wordstatSuggestions?: WordstatSuggestion[];
 };
 
 export type ParseProductSeoAutofillRequestResult =
   | { ok: true; request: ProductSeoAutofillRequest }
   | { ok: false; code: Extract<ProductSeoAiErrorCode, "INVALID_PRIMARY" | "INVALID_STYLE_PROFILE"> };
 
-export function normalizeLockedSecondaryQueries(
+function secondaryQueryKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
+}
+
+export function normalizeManualSecondaryQueries(
   value: unknown,
   primaryQuery: string,
 ): string[] {
@@ -123,7 +110,7 @@ export function normalizeLockedSecondaryQueries(
     return [];
   }
 
-  const primaryKey = wordstatPhraseKey(primaryQuery);
+  const primaryKey = secondaryQueryKey(primaryQuery);
   const seen = new Set<string>();
   const normalized: string[] = [];
   for (const item of value) {
@@ -131,7 +118,7 @@ export function normalizeLockedSecondaryQueries(
       continue;
     }
     const phrase = item.trim().replace(/\s+/g, " ");
-    const key = wordstatPhraseKey(phrase);
+    const key = secondaryQueryKey(phrase);
     if (
       !phrase ||
       phrase.length > PRODUCT_CONTENT_LIMITS.seoSecondaryQuery ||
@@ -176,14 +163,10 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
   const usageItems = Array.isArray(record.usageItems)
     ? record.usageItems.filter((item): item is string => typeof item === "string")
     : [];
-  const seoSecondaryQueries = normalizeLockedSecondaryQueries(
+  const seoSecondaryQueries = normalizeManualSecondaryQueries(
     record.seoSecondaryQueries,
     record.seoPrimaryQuery,
   );
-  // A normalized author selection is authoritative. Do not let a stale client
-  // `locked` flag cause regeneration to replace a valid selected list.
-  const locked = seoSecondaryQueries.length > 0;
-
   return {
     ok: true,
     request: {
@@ -193,7 +176,6 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
       productKind: record.productKind,
       seoPrimaryQuery: record.seoPrimaryQuery,
       seoSecondaryQueries,
-      locked,
       usageItems,
       styleProfile: style.profile,
       mode: record.mode === "field" ? "field" : "full",
@@ -203,8 +185,7 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
               item === "title" ||
               item === "description" ||
               item === "faq" ||
-              item === "usage" ||
-              item === "secondaries",
+              item === "usage",
           )
         : undefined,
     },
@@ -215,36 +196,6 @@ export function parseProductSeoAutofillRequest(
   body: unknown,
 ): ParseProductSeoAutofillRequestResult {
   return readAutofillRequest(body);
-}
-
-async function loadWordstatCandidates(
-  primaryQuery: string,
-  options: GenerateProductSeoDraftOptions,
-): Promise<WordstatSuggestion[]> {
-  if (!primaryQuery) {
-    return [];
-  }
-
-  if (options.wordstatSuggestions) {
-    return options.wordstatSuggestions;
-  }
-
-  const result = await fetchWordstatSuggestions(primaryQuery, {
-    userId: options.userId,
-    fetchImpl: options.wordstat?.fetchImpl,
-    cache: options.wordstat?.cache,
-    rateLimit: options.wordstat?.rateLimit,
-    env: options.wordstat?.env ?? options.env,
-  });
-
-  if (!result.ok) {
-    logProductSeoAiEvent("wordstat_unavailable", {
-      outcome: result.error.code,
-    });
-    return [];
-  }
-
-  return result.data.suggestions;
 }
 
 export async function generateProductSeoDraft(
@@ -276,52 +227,20 @@ export async function generateProductSeoDraft(
     return productSeoAiError("RATE_LIMITED");
   }
 
-  const lockedSecondaryQueries =
-    request.locked === true
-      ? normalizeLockedSecondaryQueries(request.seoSecondaryQueries, primary)
-      : [];
-  const suggestions = lockedSecondaryQueries.length
-    ? []
-    : await loadWordstatCandidates(primary, options);
-  const candidates = eligibleSecondaryCandidates(suggestions, primary);
+  const manualSecondaryQueries = normalizeManualSecondaryQueries(
+    request.seoSecondaryQueries,
+    primary,
+  );
   const styleProfile =
     request.styleProfile ?? createDefaultProductSeoStyleProfile();
   const promptInput: ProductSeoAiPromptInput = {
     request: {
       ...request,
       seoPrimaryQuery: primary,
-      seoSecondaryQueries: lockedSecondaryQueries,
-      locked: lockedSecondaryQueries.length > 0,
+      seoSecondaryQueries: manualSecondaryQueries,
       styleProfile,
     },
-    candidates,
-    lockedSecondaryQueries,
   };
-
-  function mergeSecondaryQueries(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    const generatedSecondaryQueries =
-      config.provider === "yandex"
-        ? canonicalizeYandexSecondaryQueries(draft.secondaryQueries, candidates)
-        : draft.secondaryQueries;
-
-    if (lockedSecondaryQueries.length > 0) {
-      return {
-        ...draft,
-        secondaryQueries: lockedSecondaryQueries,
-      };
-    }
-
-    if (config.provider !== "yandex") {
-      return draft;
-    }
-
-    return {
-      ...draft,
-      secondaryQueries: generatedSecondaryQueries,
-    };
-  }
 
   function mergeFaqAnswerOnlyRepair(
     draft: ProductSeoAiRawDraft,
@@ -361,7 +280,7 @@ export async function generateProductSeoDraft(
     return first;
   }
 
-  const firstDraft = mergeSecondaryQueries(first.draft);
+  const firstDraft = first.draft;
   const firstValidation = validateProductSeoAiDraft(firstDraft, {
     primaryQuery: primary,
     title: request.title,
@@ -369,8 +288,7 @@ export async function generateProductSeoDraft(
     description: request.description,
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
-    candidates,
-    lockedSecondaryQueries,
+    manualSecondaryQueries,
   });
 
   if (firstValidation.ok) {
@@ -394,7 +312,7 @@ export async function generateProductSeoDraft(
   }
 
   const repairedDraft = mergeFaqAnswerOnlyRepair(
-    mergeSecondaryQueries(repaired.draft),
+    repaired.draft,
     firstDraft,
     firstValidation.issues,
   );
@@ -405,8 +323,7 @@ export async function generateProductSeoDraft(
     description: request.description,
     productKind: request.productKind,
     usageItems: request.usageItems ?? [],
-    candidates,
-    lockedSecondaryQueries,
+    manualSecondaryQueries,
   });
 
   if (!repairedValidation.ok) {
