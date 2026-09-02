@@ -678,8 +678,8 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   );
 }
 
-// Regression: a repair with simultaneous title, description, FAQ-question and
-// FAQ-answer issues must receive every issue and return a valid merged draft.
+// Regression: a repair with simultaneous title, description, and FAQ-answer
+// issues must receive every issue and return a valid merged draft.
 {
   const fourIssueDraft = validDraft({
     seoTitle: "Спокойный вечер перед отдыхом",
@@ -689,8 +689,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
         ? item
         : {
             ...item,
-            question: "Эта практика подходит вечером?",
-            answer: "Эта практика подходит вечером.",
+            answer: "Как слушать медитация для сна?",
           },
     ),
   });
@@ -721,12 +720,16 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   const exactIssues = [
     "primary_missing_from_title",
     "primary_missing_from_description",
-    "primary_missing_from_faq",
     "faq_answer_repeats_question",
+    "faq_answer_is_question",
   ];
   assert.equal(fourIssueRepaired.ok, true);
   assert.equal(fourIssueRepairProvider.calls.length, 2);
   assert.deepEqual(fourIssueRepairProvider.calls[1].issues, exactIssues);
+  assert.equal(
+    fourIssueRepaired.data.faqItems[0].question,
+    fourIssueDraft.faqItems[0].question,
+  );
   assert.equal(
     fourIssueRepaired.data.faqItems[0].anchor,
     fourIssueDraft.faqItems[0].anchor,
