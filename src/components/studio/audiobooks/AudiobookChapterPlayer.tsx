@@ -105,7 +105,10 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       if (requestId === requestRef.current) setLoading(false);
     }
   }, [authorId, chapterId, projectId, queue]);
-  playAtRef.current = playAt;
+
+  useEffect(() => {
+    playAtRef.current = playAt;
+  }, [playAt]);
 
   const handleEnded = useCallback(() => {
     const transition = audiobookFragmentEndedTransition(queue, currentIndexRef.current);
