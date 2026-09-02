@@ -560,7 +560,7 @@ for (const { question, answer, repeats, isQuestion } of [
     isQuestion: true,
   },
   {
-    question: "Использовать практику",
+    question: "Как использовать практику?",
     answer: "Использовать практику — это использовать практику.",
     repeats: true,
     isQuestion: false,
@@ -614,9 +614,10 @@ for (const { question, answer, repeats, isQuestion } of [
   assert.equal(directAnswerResult.data.faqItems[1].answer, directAnswerDraft.faqItems[1].answer);
 }
 
-// Latest production regression: an answer that exactly repeats a question is
-// also a question. The first FAQ-only repair supplies a natural direct answer
-// and must be accepted without consuming the final repair attempt.
+// Latest production regression: the initial "Когда" FAQ answer exactly repeats
+// its question and is therefore also a question. The first FAQ-only repair
+// supplies the exact natural direct answer and must be accepted without
+// consuming the final repair attempt.
 {
   const exactRepeatDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
@@ -624,11 +625,12 @@ for (const { question, answer, repeats, isQuestion } of [
         ? item
         : {
             ...item,
-            answer: item.question,
+            question: "Когда лучше включать вечернюю практику?",
+            answer: "Когда лучше включать вечернюю практику?",
           },
     ),
   });
-  const naturalDirectAnswer = "Медитацию для сна слушайте в тихом месте, где можно удобно устроиться.";
+  const naturalDirectAnswer = "Вечернюю практику лучше включать вечером.";
   const repairedDirectAnswerDraft = validDraft({
     faqItems: exactRepeatDraft.faqItems.map((item, index) =>
       index ? item : { ...item, answer: naturalDirectAnswer },

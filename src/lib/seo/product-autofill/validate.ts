@@ -206,11 +206,18 @@ export function faqAnswerRepeatsQuestion(question: string, answer: string): bool
     return true;
   }
 
-  // Reject only the narrow tautology "<question> — это <question>". This is
-  // intentionally not an overlap check: a direct answer can naturally reuse
-  // the question's subject words in a different sentence.
+  // Reject only the narrow tautology "<semantic question core> — это
+  // <semantic question core>". The recognized "как использовать …" scaffold
+  // is removed so that "Как использовать практику?" and "Использовать
+  // практику — это использовать практику." are caught. This is intentionally
+  // not an overlap check: a direct answer can naturally reuse the question's
+  // subject words in a different sentence.
   const questionText = questionWords.join(" ");
-  if (answerWords.join(" ") === `${questionText} это ${questionText}`) {
+  const questionCore =
+    questionWords[0] === "как" && questionWords[1] === "использовать"
+      ? questionWords.slice(1).join(" ")
+      : questionText;
+  if (answerWords.join(" ") === `${questionCore} это ${questionCore}`) {
     return true;
   }
 
