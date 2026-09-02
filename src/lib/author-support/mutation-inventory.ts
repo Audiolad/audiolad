@@ -307,6 +307,7 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/commercial-application/route.ts",
         "src/app/api/author/projects/route.ts",
         "src/app/api/author/onboarding/route.ts",
+        "src/app/api/author/onboarding/ui/route.ts",
       ],
     },
   ];
