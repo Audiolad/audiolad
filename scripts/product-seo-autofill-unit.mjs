@@ -369,8 +369,16 @@ assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /не возвращай поле seoAbout/);
 assert.match(
+  prompt,
+  /seoTitle:.*дословно содержит полный основной запрос «медитация для сна»/i,
+);
+assert.match(
+  prompt,
+  /seoDescription:.*дословно содержит полный основной запрос «медитация для сна»/i,
+);
+assert.match(
   buildProductSeoRepairPrompt({ request: parsed.request }, validDraft(), ["faq_answer_is_question"]),
-  /измени только faqItems.answer/,
+  /измени только его faqItems.answer.*без знака «\?».*Сохрани faqItems.question и anchor таких пунктов дословно/is,
 );
 
 const FAQ_EXACT_PRIMARY = "музыка для сна";
@@ -403,6 +411,18 @@ const faqExactPrimaryInput = {
   );
   assert.doesNotMatch(repairOther, /Исправление FAQ обязательно/);
   assert.match(repairOther, /Проблемы: primary_missing_from_title/);
+}
+{
+  const repairPrimary = buildProductSeoRepairPrompt(
+    faqExactPrimaryInput,
+    validDraft(),
+    ["primary_missing_from_title", "primary_missing_from_description"],
+  );
+  assert.match(
+    repairPrimary,
+    /дословно включи полный основной запрос «музыка для сна» в seoTitle и seoDescription/,
+  );
+  assert.match(repairPrimary, /Не изменяй слова запроса, их порядок или словоформу/);
 }
 
 // Validator safety constraints.
@@ -573,7 +593,14 @@ const provider = {
       ok: true,
       draft: validDraft({
         faqItems: validDraft().faqItems.map((item, index) =>
-          index ? item : { ...item, answer: "Слушайте в спокойной обстановке." },
+          index
+            ? item
+            : {
+                ...item,
+                question: "Изменённый вопрос?",
+                answer: "Слушайте в спокойной обстановке.",
+                anchor: "izmenen",
+              },
         ),
       }),
       raw: {},
@@ -612,6 +639,119 @@ const repaired = await generateProductSeoDraft(parsed.request, {
 });
 assert.equal(repaired.ok, true);
 assert.equal(repaired.data.faqItems[0].answer, "Слушайте в спокойной обстановке.");
+assert.equal(repaired.data.faqItems[0].question, validDraft().faqItems[0].question);
+assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
+
+// Production regression: an initial draft missing the primary in both metadata
+// fields must send both exact issues to repair and accept a corrected draft.
+{
+  const primaryRepairProvider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({
+        seoTitle: "Спокойный вечер перед отдыхом",
+        seoDescription: "Мягкая практика для спокойного завершения дня.",
+      }),
+      raw: {},
+    },
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const primaryRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "primary-title-description-repair",
+    config,
+    provider: primaryRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(primaryRepaired.ok, true);
+  assert.equal(primaryRepairProvider.calls.length, 2);
+  assert.deepEqual(primaryRepairProvider.calls[1].issues, [
+    "primary_missing_from_title",
+    "primary_missing_from_description",
+  ]);
+  assert.match(
+    buildProductSeoRepairPrompt(
+      primaryRepairProvider.calls[1].input,
+      primaryRepairProvider.calls[1].previous,
+      primaryRepairProvider.calls[1].issues,
+    ),
+    /дословно включи полный основной запрос «медитация для сна» в seoTitle и seoDescription/,
+  );
+}
+
+// Regression: a repair with simultaneous title, description, and FAQ-answer
+// issues must receive every issue and return a valid merged draft.
+{
+  const fourIssueDraft = validDraft({
+    seoTitle: "Спокойный вечер перед отдыхом",
+    seoDescription: "Мягкая практика для спокойного завершения дня.",
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : {
+            ...item,
+            answer: "Как слушать медитация для сна?",
+          },
+    ),
+  });
+  const fourIssueRepairProvider = mockProvider([
+    { ok: true, draft: fourIssueDraft, raw: {} },
+    {
+      ok: true,
+      draft: validDraft({
+        faqItems: validDraft().faqItems.map((item, index) =>
+          index
+            ? item
+            : {
+                ...item,
+                question: "Как слушать медитация для сна?",
+                answer: "Выберите тихое место и удобное положение.",
+              },
+        ),
+      }),
+      raw: {},
+    },
+  ]);
+  const fourIssueRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "four-issue-repair",
+    config,
+    provider: fourIssueRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const exactIssues = [
+    "primary_missing_from_title",
+    "primary_missing_from_description",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ];
+  assert.equal(fourIssueRepaired.ok, true);
+  assert.equal(fourIssueRepairProvider.calls.length, 2);
+  assert.deepEqual(fourIssueRepairProvider.calls[1].issues, exactIssues);
+  assert.equal(
+    fourIssueRepaired.data.faqItems[0].question,
+    fourIssueDraft.faqItems[0].question,
+  );
+  assert.equal(
+    fourIssueRepaired.data.faqItems[0].anchor,
+    fourIssueDraft.faqItems[0].anchor,
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(fourIssueRepaired.data, validationInput()),
+    { ok: true, draft: fourIssueRepaired.data },
+  );
+  const fourIssuePrompt = buildProductSeoRepairPrompt(
+    fourIssueRepairProvider.calls[1].input,
+    fourIssueRepairProvider.calls[1].previous,
+    fourIssueRepairProvider.calls[1].issues,
+  );
+  assert.match(
+    fourIssuePrompt,
+    /Если проблем несколько, исправь все поля, затронутые каждой из них/is,
+  );
+  assert.match(
+    fourIssuePrompt,
+    /Исправь другие поля только при наличии отдельной перечисленной проблемы/is,
+  );
+}
 
 const noPrimary = await generateProductSeoDraft(
   { ...parsed.request, seoPrimaryQuery: "", seoSecondaryQueries: [] },
