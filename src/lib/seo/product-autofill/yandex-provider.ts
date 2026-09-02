@@ -214,9 +214,12 @@ function fail(
 
 function invalidOutput(
   kind: "generate" | "repair",
+  generateIssues?: string[],
 ): ProductSeoAiErrorResult {
   return productSeoAiInvalidOutputError(
-    kind === "generate" ? "provider_generate" : "provider_repair",
+    kind === "generate"
+      ? { stage: "provider_generate" }
+      : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
   );
 }
 
@@ -234,7 +237,7 @@ export function createYandexProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
-    input: ProductSeoAiPromptInput,
+    generateIssues?: string[],
   ): Promise<YandexProductSeoAiProviderResult> {
     const apiKey = readYandexAiApiKey(env);
     const folderId = readYandexAiFolderId(env);
@@ -291,7 +294,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return invalidOutput(kind);
+      return invalidOutput(kind, generateIssues);
     }
 
     const text = alternative.text;
@@ -303,7 +306,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         error: "INVALID_OUTPUT",
       });
-      return invalidOutput(kind);
+      return invalidOutput(kind, generateIssues);
     }
 
     const draft = parseDraftFromJsonText(text);
@@ -316,7 +319,7 @@ export function createYandexProductSeoAiProvider(
         kind,
         latencyMs: attempt.latencyMs,
       });
-      return invalidOutput(kind);
+      return invalidOutput(kind, generateIssues);
     }
 
     const result = { ok: true as const, draft, raw: attempt.body };
@@ -342,17 +345,16 @@ export function createYandexProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
-        input,
       );
     },
-    repair(input, previous, issues) {
+    repair(input, previous, generateIssues) {
       return callModel(
         {
           systemPrompt: buildProductSeoSystemPrompt(input),
-          userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
+          userPrompt: buildProductSeoRepairPrompt(input, previous, generateIssues),
         },
         "repair",
-        input,
+        generateIssues,
       );
     },
   };

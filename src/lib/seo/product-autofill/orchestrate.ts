@@ -337,8 +337,11 @@ export async function generateProductSeoDraft(
       issues: repairedValidation.issues,
     });
     return productSeoAiInvalidOutputError(
-      "validation_repair",
-      repairedValidation.issues,
+      {
+        stage: "validation_repair",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+      },
     );
   }
 

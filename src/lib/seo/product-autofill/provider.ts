@@ -201,7 +201,7 @@ function createOpenAiProductSeoAiProvider(
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
     kind: "generate" | "repair",
-    input: ProductSeoAiPromptInput,
+    generateIssues?: string[],
   ): Promise<ProductSeoAiProviderResult> {
     const { systemPrompt, userPrompt } = prompts;
     const apiKey = readProductSeoAiApiKey(env);
@@ -260,7 +260,9 @@ function createOpenAiProductSeoAiProvider(
         error: "INVALID_OUTPUT",
       });
       return productSeoAiInvalidOutputError(
-        kind === "generate" ? "provider_generate" : "provider_repair",
+        kind === "generate"
+          ? { stage: "provider_generate" }
+          : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
       );
     }
 
@@ -285,17 +287,16 @@ function createOpenAiProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
-        input,
       );
     },
-    repair(input, previous, issues) {
+    repair(input, previous, generateIssues) {
       return callModel(
         {
           systemPrompt: buildProductSeoSystemPrompt(input),
-          userPrompt: buildProductSeoRepairPrompt(input, previous, issues),
+          userPrompt: buildProductSeoRepairPrompt(input, previous, generateIssues),
         },
         "repair",
-        input,
+        generateIssues,
       );
     },
   };

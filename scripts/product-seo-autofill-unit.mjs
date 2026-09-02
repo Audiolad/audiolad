@@ -548,15 +548,17 @@ for (const issue of [
   assert.equal(normalizeProductSeoValidationIssue(issue), issue, issue);
 }
 {
-  const error = productSeoAiInvalidOutputError("validation_repair", [
-    "ungrounded:duration:30 минут",
-    "banned_claim:лечит",
-  ]);
+  const error = productSeoAiInvalidOutputError({
+    stage: "validation_repair",
+    generateIssues: ["ungrounded:duration:30 минут", "banned_claim:лечит"],
+    repairIssues: ["ungrounded:tracks:10 треков", "banned_claim:гарантирует"],
+  });
   assert.deepEqual(error.error.diagnostic, {
     stage: "validation_repair",
-    validationIssues: ["ungrounded:duration", "banned_claim"],
+    generateIssues: ["ungrounded:duration", "banned_claim"],
+    repairIssues: ["ungrounded:tracks", "banned_claim"],
   });
-  assert.doesNotMatch(JSON.stringify(error), /30 минут|лечит/);
+  assert.doesNotMatch(JSON.stringify(error), /30 минут|10 треков|лечит|гарантирует/);
 }
 
 const calls = [];
@@ -823,7 +825,10 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
   assert.equal(fetchImpl.calls.length, 2);
-  assert.deepEqual(result.error.diagnostic, { stage: "provider_repair" });
+  assert.deepEqual(result.error.diagnostic, {
+    stage: "provider_repair",
+    generateIssues: ["primary_missing_from_title"],
+  });
 });
 
 for (const [label, status, expectedCode] of [
@@ -890,7 +895,8 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.error.code, "INVALID_OUTPUT");
   assert.deepEqual(result.error.diagnostic, {
     stage: "validation_repair",
-    validationIssues: ["primary_missing_from_title"],
+    generateIssues: ["primary_missing_from_title"],
+    repairIssues: ["primary_missing_from_title"],
   });
 });
 
@@ -1019,7 +1025,13 @@ const ungroundedDraft = validDraft({
   assert.equal(captured.result.error.code, "INVALID_OUTPUT");
   assert.deepEqual(captured.result.error.diagnostic, {
     stage: "validation_repair",
-    validationIssues: [
+    generateIssues: [
+      "banned_claim",
+      "ungrounded:duration",
+      "ungrounded:tracks",
+      "ungrounded:price",
+    ],
+    repairIssues: [
       "banned_claim",
       "ungrounded:duration",
       "ungrounded:tracks",

@@ -36,24 +36,34 @@ export function productSeoAiError(
 }
 
 export function productSeoAiInvalidOutputError(
-  stage: ProductSeoInvalidOutputDiagnostic["stage"],
-  validationIssues?: string[],
+  diagnostic: ProductSeoInvalidOutputDiagnostic,
 ): ProductSeoAiErrorResult {
+  const normalizedDiagnostic: ProductSeoInvalidOutputDiagnostic =
+    diagnostic.stage === "provider_generate"
+      ? diagnostic
+      : diagnostic.stage === "provider_repair"
+        ? {
+            ...diagnostic,
+            generateIssues: normalizeProductSeoValidationIssues(
+              diagnostic.generateIssues,
+            ),
+          }
+        : {
+            ...diagnostic,
+            generateIssues: normalizeProductSeoValidationIssues(
+              diagnostic.generateIssues,
+            ),
+            repairIssues: normalizeProductSeoValidationIssues(
+              diagnostic.repairIssues,
+            ),
+          };
+
   return {
     ok: false,
     error: {
       code: "INVALID_OUTPUT",
       message: PRODUCT_SEO_AI_ERROR_MESSAGES.INVALID_OUTPUT,
-      diagnostic: {
-        stage,
-        ...(validationIssues && validationIssues.length > 0
-          ? {
-              validationIssues: normalizeProductSeoValidationIssues(
-                validationIssues,
-              ),
-            }
-          : {}),
-      },
+      diagnostic: normalizedDiagnostic,
     },
   };
 }
