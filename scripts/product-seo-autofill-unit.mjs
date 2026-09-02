@@ -675,7 +675,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   const firstFaqRepair = validDraft({
     seoTitle: "Несвязанная попытка изменить продукт",
     faqItems: validDraft().faqItems.map((item, index) =>
-      index ? item : { ...item, answer: "Как слушать медитация для сна?" },
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
     ),
   });
   const finalFaqRepair = validDraft({
@@ -705,7 +705,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   assert.deepEqual(finalFaqRepairProvider.calls[2].previous, {
     ...initialFaqFailure,
     faqItems: initialFaqFailure.faqItems.map((item, index) =>
-      index ? item : { ...item, answer: "Как слушать медитация для сна?" },
+      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
     ),
   });
   assert.equal(finalFaqRepaired.data.seoTitle, initialFaqFailure.seoTitle);
