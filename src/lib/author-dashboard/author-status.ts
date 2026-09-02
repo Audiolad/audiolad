@@ -12,6 +12,7 @@ import {
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import { resolveAuthorCommercialCapabilities } from "@/lib/authors/commercial-capabilities";
+import type { AuthorAppreciationSettings } from "@/lib/author-appreciation/effective-visibility";
 
 export const AUTHOR_STATUS_VIEW_KINDS = [
   "starter",
@@ -67,6 +68,8 @@ export type AuthorStatusViewModel = {
   premiumCapabilities: string[];
   paidProductsLocked: boolean;
   capabilities: ReturnType<typeof resolveAuthorCommercialCapabilities>;
+  appreciationSettings: AuthorAppreciationSettings;
+  appreciationEligible: boolean;
 };
 
 export type ResolveAuthorStatusViewInput = {
@@ -89,6 +92,7 @@ export type ResolveAuthorStatusViewInput = {
    * When false/omitted, first commercial submit CTA stays blocked.
    */
   hasPublishedFreeProduct?: boolean;
+  appreciationSettings?: AuthorAppreciationSettings;
 };
 
 const STARTER_CAPABILITIES = [
@@ -167,6 +171,12 @@ export function resolveAuthorStatusView(
     commercialCapabilities: [...COMMERCIAL_CAPABILITIES],
     premiumCapabilities: [...PREMIUM_CAPABILITIES],
     capabilities,
+    appreciationSettings: input.appreciationSettings ?? {
+      enabled: true,
+      profileEnabled: true,
+      freeProductsDefault: true,
+    },
+    appreciationEligible: isAuthorCommercialActiveAccess(accessStatus),
   };
 
   const applicationHref = withAuthorQuery(

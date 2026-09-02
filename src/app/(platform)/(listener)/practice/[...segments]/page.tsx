@@ -18,6 +18,11 @@ import {
 } from "@/lib/products/cover-display";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import {
+  isAuthorAppreciationPreviewActive,
+  resolveAuthorAppreciationSettings,
+  resolveAuthorAppreciationVisibility,
+} from "@/lib/author-appreciation/effective-visibility";
+import {
   AUDIO_POST_KIND_LABEL,
   getMusicProductTypeLabel,
   isAudioPostProductKind,
@@ -105,7 +110,7 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ segments: string[] }>;
   searchParams: Promise<{
-    author_support_preview?: string;
+    author_appreciation_preview?: string;
     listen?: string;
     preview?: string;
     view?: string;
@@ -279,7 +284,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
   const {
-    author_support_preview: authorSupportPreview,
+    author_appreciation_preview: authorAppreciationPreview,
     listen: listenParam,
     preview: previewParam,
     view: viewParam,
@@ -472,12 +477,37 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const authorName = getAuthorName(practice);
   const productKind = normalizeProductKind(practice.product_kind);
   const isAudioPost = isAudioPostProductKind(productKind);
-  // Stage 1 design prototype only. Phase 2 will replace this explicit preview
-  // flag with commercial eligibility and persisted author/product preferences.
-  const showAuthorSupportPrototype =
-    authorSupportPreview === "1" &&
-    practice.is_free === true &&
-    practice.publication_class !== "course";
+  const appreciationAuthor = normalizeOne(practice.authors);
+  const appreciationSettings = resolveAuthorAppreciationSettings(
+    appreciationAuthor?.author_appreciation_settings?.[0]
+      ? {
+          enabled:
+            appreciationAuthor.author_appreciation_settings[0]
+              .listener_appreciation_enabled,
+          profileEnabled:
+            appreciationAuthor.author_appreciation_settings[0]
+              .listener_appreciation_profile_enabled,
+          freeProductsDefault:
+            appreciationAuthor.author_appreciation_settings[0]
+              .listener_appreciation_free_products_default,
+        }
+      : null,
+  );
+  const showAuthorAppreciationPrototype = resolveAuthorAppreciationVisibility({
+    surface: "product",
+    previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+    accessStatus: appreciationAuthor?.access_status,
+    settings: appreciationSettings,
+    product: {
+      status: practice.status,
+      isFree: practice.is_free,
+      publicationClass: practice.publication_class,
+      productKind: practice.product_kind,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
+      override: practice.listener_appreciation_override,
+    },
+  });
   const musicTypeLabel = isMusicProductKind(productKind)
     ? getMusicProductTypeLabel()
     : null;
@@ -669,7 +699,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     priceOffer,
     promoStartToken,
     promoStartPending,
-    showAuthorSupportPrototype,
+    showAuthorAppreciationPrototype,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {

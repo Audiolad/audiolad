@@ -8,6 +8,12 @@ export type PublicPracticeAuthor = {
   description: string | null;
   avatar_url: string | null;
   author_type: string | null;
+  access_status?: string | null;
+  author_appreciation_settings?: Array<{
+    listener_appreciation_enabled: boolean;
+    listener_appreciation_profile_enabled: boolean;
+    listener_appreciation_free_products_default: boolean;
+  }> | null;
 };
 
 export type PublicPracticeRow = {
@@ -48,6 +54,7 @@ export type PublicPracticeRow = {
   seo_description?: string | null;
   seo_about?: string | null;
   author_recommendations_title?: string | null;
+  listener_appreciation_override?: boolean | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -118,13 +125,16 @@ export async function getPracticeByAuthorAndSlug(
       seo_description,
       seo_about,
       author_recommendations_title,
+      listener_appreciation_override,
       authors!practices_author_id_fkey!inner (
         id,
         name,
         slug,
         description,
         avatar_url,
-        author_type
+        author_type,
+        access_status,
+        author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)
       )
     `,
     )

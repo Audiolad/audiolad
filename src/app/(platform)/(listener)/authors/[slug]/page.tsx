@@ -12,6 +12,10 @@ import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
 import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
 import { collectAuthorContactSameAs } from "@/lib/authors/contacts";
+import {
+  isAuthorAppreciationPreviewActive,
+  resolveAuthorAppreciationVisibility,
+} from "@/lib/author-appreciation/effective-visibility";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
 import {
@@ -26,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ author_support_preview?: string }>;
+  searchParams: Promise<{ author_appreciation_preview?: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -69,7 +73,8 @@ export default async function AuthorPublicPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  const { author_support_preview: authorSupportPreview } = await searchParams;
+  const { author_appreciation_preview: authorAppreciationPreview } =
+    await searchParams;
   const supabase = await createClient();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
@@ -103,7 +108,12 @@ export default async function AuthorPublicPage({
   } = await supabase.auth.getUser();
   // Stage 1 design prototype only. Phase 2 will replace this explicit preview
   // flag with commercial eligibility and persisted author/product preferences.
-  const showAuthorSupportPrototype = authorSupportPreview === "1";
+  const showAuthorAppreciationPrototype = resolveAuthorAppreciationVisibility({
+    surface: "author",
+    previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+    accessStatus: data.accessStatus,
+    settings: data.appreciationSettings,
+  });
 
   return (
     <>
@@ -142,7 +152,7 @@ export default async function AuthorPublicPage({
           publishedCount={data.publishedCount}
         />
 
-        {showAuthorSupportPrototype ? (
+        {showAuthorAppreciationPrototype ? (
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={data.name}

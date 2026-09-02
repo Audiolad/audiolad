@@ -46,6 +46,7 @@ export type ProductFormSnapshot = {
   promoButtonText: string;
   promoUrl: string;
   promoOpenInNewTab: boolean;
+  listenerAppreciationOverride: boolean | null;
   coverUrl: string | null;
   coverVersion: string | null;
   coverImage?: unknown;
@@ -110,6 +111,7 @@ export function productDetailToFormSnapshot(
     promoButtonText: practice.promo_button_text ?? "",
     promoUrl: practice.promo_url ?? "",
     promoOpenInNewTab: practice.promo_open_in_new_tab === true,
+    listenerAppreciationOverride: practice.listener_appreciation_override,
     coverUrl: practice.cover_url,
     coverVersion: practice.cover_url ? practice.updated_at : null,
     coverImage: practice.cover_image ?? null,
@@ -166,6 +168,7 @@ export function mergeServerProductIntoForm(
     promoButtonText: current.promoButtonText,
     promoUrl: current.promoUrl,
     promoOpenInNewTab: current.promoOpenInNewTab,
+    listenerAppreciationOverride: current.listenerAppreciationOverride,
     useSharedCover: current.useSharedCover,
     listeningNoticeEnabled: current.listeningNoticeEnabled,
     listeningNoticeTitle: current.listeningNoticeTitle,
