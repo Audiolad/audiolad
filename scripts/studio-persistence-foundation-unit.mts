@@ -66,6 +66,13 @@ const validProjectData = {
 };
 
 assert.deepEqual(parseStudioProjectData(validProjectData), validProjectData);
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    slots: [{ ...validProjectData.slots[0], audioTrackId: "missing-track" }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "dangling_slot_track",
+);
 assert.deepEqual(
   parseStudioProjectData({
     ...validProjectData,

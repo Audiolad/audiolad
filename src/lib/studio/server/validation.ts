@@ -129,6 +129,13 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
   const assignedTracks = new Set<string>();
   for (const slot of value.slots) {
     if (
+      isRecord(slot) &&
+      typeof slot.audioTrackId === "string" &&
+      !trackIds.has(slot.audioTrackId)
+    ) {
+      throw new StudioApiError("dangling_slot_track", 422);
+    }
+    if (
       !isRecord(slot) ||
       !hasOnlyKeys(slot, ["id", "name", "audioTrackId", "trackKind"]) ||
       typeof slot.name !== "string" ||

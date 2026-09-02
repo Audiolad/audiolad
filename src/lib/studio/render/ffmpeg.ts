@@ -63,7 +63,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   });
   const nextAssetSplit = new Map<string, number>();
 
-  timeline.tracks.forEach(({ track }, trackIndex) => {
+  timeline.tracks.forEach(({ track, audibleEnd }, trackIndex) => {
     let cursor = 0;
     const timelineParts: string[] = [];
     track.clips.forEach((clip, clipIndex) => {
@@ -101,7 +101,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
 
     const timelineLabel = `track_timeline_${trackIndex}`;
     filters.push(
-      `${timelineParts.join("")}concat=n=${timelineParts.length}:v=0:a=1,asetpts=PTS-STARTPTS[${timelineLabel}]`,
+      `${timelineParts.join("")}concat=n=${timelineParts.length}:v=0:a=1,asetpts=PTS-STARTPTS,apad=whole_dur=${seconds(audibleEnd)},atrim=duration=${seconds(audibleEnd)}[${timelineLabel}]`,
     );
     let currentLabel = timelineLabel;
     if (track.trackKind === "voice" && track.voicePreset !== "none") {
