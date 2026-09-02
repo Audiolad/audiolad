@@ -21,6 +21,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
   const audioRef = useRef<HTMLAudioElement>(null);
   const requestRef = useRef(0);
   const retryRef = useRef(0);
+  const playAtRef = useRef<(index: number, retry?: boolean) => void>(() => {});
   const currentIndexRef = useRef(0);
   const queue = useMemo(() => activeAudiobookFragmentQueue(fragments), [fragments]);
   const queueKey = useMemo(() => queue.map((fragment) => fragment.id).join("\0"), [queue]);
@@ -75,7 +76,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       if (requestId !== requestRef.current) return;
       if (!retry) {
         retryRef.current = 1;
-        void playAt(index, true);
+        void playAtRef.current(index, true);
         return;
       }
       setIsPlaying(false);
@@ -84,6 +85,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       if (requestId === requestRef.current) setLoading(false);
     }
   }, [authorId, chapterId, projectId, queue]);
+  playAtRef.current = playAt;
 
   const handleEnded = useCallback(() => {
     const next = nextAudiobookFragmentIndex(queue, currentIndexRef.current);
