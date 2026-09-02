@@ -40,7 +40,11 @@ assert.equal(
   false,
 );
 
-assert.equal(validateAudiobookOriginalFilename("Медитация — осень.m4a"), "Медитация — осень.m4a");
+assert.equal(
+  validateAudiobookOriginalFilename("Медитация — осень.m4a"),
+  "Медитация-осень.m4a",
+  "legacy normalization preserves retry matching for existing fragments",
+);
 assert.equal(validateAudiobookOriginalFilename("../audio.m4a"), null);
 assert.equal(validateAudiobookOriginalFilename("folder/audio.m4a"), null);
 

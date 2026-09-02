@@ -18,8 +18,8 @@ const AUDIOBOOK_EXTENSION_BY_MIME = {
 
 export function validateAudiobookOriginalFilename(value: unknown) {
   if (typeof value !== "string") return null;
-  const name = value.trim();
-  return name && name.length <= 160 && !/[\\/\u0000-\u001f]/.test(name) && !name.includes("..")
+  const name = value.trim().replace(/[^A-Za-zА-Яа-я0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return name && name.length <= 160 && !name.includes("..")
     ? name
     : null;
 }
