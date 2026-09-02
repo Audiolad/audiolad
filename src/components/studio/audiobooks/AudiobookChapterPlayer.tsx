@@ -250,7 +250,8 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       setLoading(false);
       return;
     }
-    if (loadedFragmentRef.current !== null) {
+    const currentFragment = queue[currentIndexRef.current];
+    if (currentFragment && loadedFragmentRef.current === currentFragment.id && audio.currentSrc) {
       const requestId = requestRef.current + 1;
       requestRef.current = requestId;
       const pausedAt = pausedPlaybackTime(audio);
@@ -274,7 +275,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
       return;
     }
     retryRef.current = 0;
-    void playAt(0);
+    void playAt(currentIndexRef.current);
   };
 
   if (!queue.length) return null;

@@ -72,8 +72,8 @@ assert.match(player, /const loadedFragmentRef = useRef<string \| null>\(null\);/
 assert.match(player, /loadedFragmentRef\.current = null;\s+currentIndexRef\.current = 0;\s+const audio = audioRef\.current;\s+audio\?\.pause\(\);\s+if \(audio\) \{\s+audio\.removeAttribute\("src"\);/);
 assert.match(player, /loadedFragmentRef\.current = fragment\.id;\s+audio\.src = body\.url;/);
 assert.match(player, /const handleMediaError = useCallback\(\(\) => \{\s+if \(loadedFragmentRef\.current === null\) return;/);
-assert.match(player, /if \(loadedFragmentRef\.current !== null\) \{\s+const requestId/);
-assert.match(player, /retryRef\.current = 0;\s+void playAt\(0\);/);
+assert.match(player, /currentFragment && loadedFragmentRef\.current === currentFragment\.id && audio\.currentSrc/);
+assert.match(player, /void playAt\(currentIndexRef\.current\);/);
 assert.match(player, /function pausedPlaybackTime\(audio: HTMLAudioElement\)/);
 assert.match(player, /function waitForAudioReadiness\(audio: HTMLAudioElement\)/);
 assert.match(player, /audio\.addEventListener\("loadedmetadata", handleReady, \{ once: true \}\)/);
