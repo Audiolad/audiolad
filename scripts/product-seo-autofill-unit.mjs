@@ -621,19 +621,19 @@ for (const { question, answer, repeats, isQuestion } of [
 {
   const exactRepeatDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
-      index
-        ? item
-        : {
+      index === 1
+        ? {
             ...item,
             question: "Когда лучше включать вечернюю практику?",
             answer: "Когда лучше включать вечернюю практику?",
           },
+        : item,
     ),
   });
   const naturalDirectAnswer = "Вечернюю практику лучше включать вечером.";
   const repairedDirectAnswerDraft = validDraft({
     faqItems: exactRepeatDraft.faqItems.map((item, index) =>
-      index ? item : { ...item, answer: naturalDirectAnswer },
+      index === 1 ? { ...item, answer: naturalDirectAnswer } : item,
     ),
   });
   const firstFaqRepairProvider = mockProvider([
@@ -652,9 +652,9 @@ for (const { question, answer, repeats, isQuestion } of [
     "faq_answer_repeats_question",
     "faq_answer_is_question",
   ]);
-  assert.equal(firstFaqRepaired.data.faqItems[0].answer, naturalDirectAnswer);
-  assert.equal(firstFaqRepaired.data.faqItems[0].question, exactRepeatDraft.faqItems[0].question);
-  assert.equal(firstFaqRepaired.data.faqItems[0].anchor, exactRepeatDraft.faqItems[0].anchor);
+  assert.equal(firstFaqRepaired.data.faqItems[1].answer, naturalDirectAnswer);
+  assert.equal(firstFaqRepaired.data.faqItems[1].question, exactRepeatDraft.faqItems[1].question);
+  assert.equal(firstFaqRepaired.data.faqItems[1].anchor, exactRepeatDraft.faqItems[1].anchor);
 }
 
 assert.equal(faqAnswerIsQuestion("Можно ли слушать вечером?"), true);
