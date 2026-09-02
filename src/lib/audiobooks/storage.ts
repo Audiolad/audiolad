@@ -47,3 +47,24 @@ export function buildAudiobookFragmentStoragePath(authorId: string, projectId: s
 export function isAudiobookFragmentStoragePath(path: string, authorId: string, projectId: string, chapterId: string, fragmentId: string) {
   return new RegExp(`^audiobooks/${authorId}/${projectId}/${chapterId}/${fragmentId}\\.(webm|m4a|mp3|wav|aac)$`).test(path);
 }
+
+/**
+ * Playback accepts only the current flat ASCII key or a legacy key created by
+ * the original fragment reservation flow. Callers must additionally require
+ * the fragment to be active before exposing a signed URL.
+ */
+export function isAudiobookActiveFragmentStoragePath(
+  path: string,
+  authorId: string,
+  projectId: string,
+  chapterId: string,
+  fragmentId: string,
+) {
+  if (isAudiobookFragmentStoragePath(path, authorId, projectId, chapterId, fragmentId)) {
+    return true;
+  }
+
+  return new RegExp(
+    `^audiobooks/${authorId}/${projectId}/${chapterId}/${fragmentId}/[A-Za-zА-Яа-я0-9._-]+$`,
+  ).test(path);
+}
