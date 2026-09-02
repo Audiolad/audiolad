@@ -160,10 +160,6 @@ export function hasFilledGeneratedSeoFields(input: {
   seoDescription: string;
   seoContent: PracticeSeoContentInput;
 }): boolean {
-  if (input.seoSecondaryQueries.some((item) => item.trim())) {
-    return true;
-  }
-
   if (input.seoTitle.trim() || input.seoDescription.trim()) {
     return true;
   }

@@ -348,6 +348,9 @@ assert.equal((section.match(/Дополнительные поисковые ф�
 assert.equal((section.match(/Заголовок для поиска/g) ?? []).length, 1);
 assert.equal((section.match(/Описание для поиска/g) ?? []).length, 1);
 assert.match(section, /Поле необязательное\. Напишите понятный заголовок результата поиска\./);
+assert.match(section, /!seoPrimaryQuery\.trim\(\) && title\.trim\(\)/);
+assert.match(section, /onChange\(\{ seoPrimaryQuery: title\.trim\(\) \}\)/);
+assert.match(section, />\s*Использовать название продукта\s*</);
 
 const openMarkup = section.slice(section.indexOf("{isOpen ? <>"));
 assert.ok(openMarkup.indexOf("{PRODUCT_SEO_SELLING_COPY}") < openMarkup.indexOf("Основной поисковый запрос"));

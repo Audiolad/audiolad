@@ -501,6 +501,16 @@ export default function AuthorProductSeoSection({
           Одна главная фраза, по которой человек может искать именно такой
           продукт. Поле можно оставить пустым.
         </p>
+        {!seoPrimaryQuery.trim() && title.trim() ? (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange({ seoPrimaryQuery: title.trim() })}
+            className="mt-2 text-sm font-medium text-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Использовать название продукта
+          </button>
+        ) : null}
         <CharCounter
           value={seoPrimaryQuery}
           max={PRODUCT_CONTENT_LIMITS.seoPrimaryQuery}

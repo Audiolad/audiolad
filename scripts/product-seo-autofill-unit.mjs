@@ -368,7 +368,7 @@ const prompt = buildProductSeoSystemPrompt({ request: parsed.request });
 assert.doesNotMatch(prompt, /Wordstat|secondaryQueries|кандидат/i);
 assert.match(
   prompt,
-  /Дополнительные поисковые фразы заданы автором вручную только как контекст\. Не придумывай, не изменяй и не возвращай их отдельным полем\./,
+  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\. Не обязан использовать каждую фразу в черновике\./,
 );
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
@@ -1650,6 +1650,15 @@ assert.equal(
     seoContent: { usageItems: [], faqItems: [], relatedPracticeIds: [], relatedListenSlugs: [] },
   }),
   true,
+);
+assert.equal(
+  hasFilledGeneratedSeoFields({
+    seoSecondaryQueries: ["практика перед сном"],
+    seoTitle: "",
+    seoDescription: "",
+    seoContent: { usageItems: [], faqItems: [], relatedPracticeIds: [], relatedListenSlugs: [] },
+  }),
+  false,
 );
 
 const section = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
