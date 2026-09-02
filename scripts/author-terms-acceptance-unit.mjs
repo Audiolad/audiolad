@@ -37,7 +37,7 @@ assert.equal(
 );
 assert.equal(
   AUTHOR_TERMS_APPROVED_META.contentHash,
-  "e4d72807867d8db14846a9b34fe2956a4de3fa44e0b7aacb9d16478e4528abc9",
+  "594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d",
 );
 assert.equal(AUTHOR_TERMS_APPROVED_META.publicPath, "/author-terms");
 assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes("\u2014"), "em-dash forbidden");
@@ -123,19 +123,27 @@ for (const clause of ["1.1.", "1.2.", "6.1.", "6.4.", "7.5.", "17.3.", "23.3."])
 }
 assert.ok(
   bodyText.includes(
-    "в том числе на платной и бесплатной основе, а также в отношении продуктов со стоимостью, самостоятельно определяемой слушателем",
+    "предоставлении платного или бесплатного доступа к ним слушателям, приёме платежей, включая оплату со стоимостью, самостоятельно определяемой слушателем",
   ),
 );
 assert.ok(bodyText.includes("Поблагодарить автора"));
 assert.ok(
   bodyText.includes(
-    "не является обозначением благотворительного пожертвования",
+    "является пользовательским обозначением такой платёжной функции",
+  ),
+);
+assert.ok(
+  bodyText.includes(
+    "Коммерческие условия и индивидуальные параметры Автора применяются также к платежам слушателей",
   ),
 );
 assert.ok(
   bodyText.includes(
     "Если по платёжной операции, ранее учтённой в расчёте авторского вознаграждения",
   ),
+);
+assert.ok(
+  bodyText.includes("или иная корректировка платёжной операции, Платформа вправе"),
 );
 assert.ok(
   !bodyText.includes(

@@ -61,8 +61,8 @@ assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes(EM_DASH), "author terms must not 
 assert.ok(AUTHOR_TERMS_APPROVED_TEXT.includes(EN_DASH), "author terms keep en-dash");
 assert.ok(terms.includes('version: "1.1"'));
 assert.ok(terms.includes("2026-09-02T00:00:00+03:00"));
-assert.ok(terms.includes("7.5. Обозначение «Поблагодарить автора»"));
-assert.ok(terms.includes("6.4. Если продукт предоставляется со стоимостью"));
+assert.ok(terms.includes("7.5. Платёж со стоимостью, самостоятельно определяемой слушателем"));
+assert.ok(terms.includes("6.4. Коммерческие условия и индивидуальные параметры Автора применяются также к платежам слушателей"));
 
 const footer = read("src/lib/legal/links.ts");
 assert.deepEqual(

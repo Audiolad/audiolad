@@ -471,7 +471,7 @@ AND NOT EXISTS (
   WHERE id = '7b95bb3d-9047-4a2b-9546-0e6b5af6bb26'
     AND version = '1.1'
     AND is_current IS TRUE
-    AND content_hash = 'e4d72807867d8db14846a9b34fe2956a4de3fa44e0b7aacb9d16478e4528abc9'
+    AND content_hash = '594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d'
 ) AND EXISTS (
   SELECT 1
   FROM public.author_terms_versions

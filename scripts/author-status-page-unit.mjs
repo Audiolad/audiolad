@@ -271,7 +271,7 @@ const approved = readFileSync(
 );
 assert.ok(
   approved.includes(
-    'contentHash: "e4d72807867d8db14846a9b34fe2956a4de3fa44e0b7aacb9d16478e4528abc9"',
+    'contentHash: "594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d"',
   ),
 );
 assert.ok(approved.includes('version: "1.1"'));

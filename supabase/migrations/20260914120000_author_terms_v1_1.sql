@@ -25,7 +25,7 @@ INSERT INTO public.author_terms_versions (
   'Авторские условия сотрудничества платформы «АудиоЛад»',
   '2026-09-02T00:00:00+03:00',
   '2026-09-02T00:00:00+03:00',
-  'e4d72807867d8db14846a9b34fe2956a4de3fa44e0b7aacb9d16478e4528abc9',
+  '594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d',
   'author-terms',
   true
 );
