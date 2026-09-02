@@ -77,7 +77,7 @@ function logProductSeoAiEvent(
 function logProductSeoAiValidationFailed(input: {
   provider: ProductSeoAiConfig["provider"];
   model: string;
-  stage: "generate" | "repair";
+  stage: "generate" | "repair" | "final_faq_repair";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -245,22 +245,24 @@ export async function generateProductSeoDraft(
     },
   };
 
+  function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {
+    return (
+      issues.length > 0 &&
+      issues.every(
+        (issue) =>
+          issue === "faq_answer_repeats_question" ||
+          issue === "faq_answer_is_question",
+      )
+    );
+  }
+
   function mergeFaqAnswerOnlyRepair(
     draft: ProductSeoAiRawDraft,
     previous: ProductSeoAiRawDraft,
     issues: string[],
   ): ProductSeoAiRawDraft {
     if (
-      !issues.some(
-        (issue) =>
-          issue === "faq_answer_repeats_question" ||
-          issue === "faq_answer_is_question",
-      ) ||
-      issues.some(
-        (issue) =>
-          issue !== "faq_answer_repeats_question" &&
-          issue !== "faq_answer_is_question",
-      ) ||
+      !hasOnlyFaqAnswerRepairIssues(issues) ||
       draft.faqItems.length !== previous.faqItems.length
     ) {
       return draft;
@@ -336,6 +338,51 @@ export async function generateProductSeoDraft(
       stage: "repair",
       issues: repairedValidation.issues,
     });
+    if (hasOnlyFaqAnswerRepairIssues(repairedValidation.issues)) {
+      const finalFaqRepaired = await provider.repair(
+        promptInput,
+        repairedDraft,
+        repairedValidation.issues,
+      );
+      if (!finalFaqRepaired.ok) {
+        return finalFaqRepaired;
+      }
+
+      const finalFaqRepairedDraft = mergeFaqAnswerOnlyRepair(
+        finalFaqRepaired.draft,
+        repairedDraft,
+        repairedValidation.issues,
+      );
+      const finalFaqRepairValidation = validateProductSeoAiDraft(
+        finalFaqRepairedDraft,
+        {
+          primaryQuery: primary,
+          title: request.title,
+          subtitle: request.subtitle,
+          description: request.description,
+          productKind: request.productKind,
+          usageItems: request.usageItems ?? [],
+          manualSecondaryQueries,
+        },
+      );
+      if (finalFaqRepairValidation.ok) {
+        return { ok: true, data: finalFaqRepairValidation.draft };
+      }
+
+      logProductSeoAiValidationFailed({
+        provider: config.provider,
+        model: config.model,
+        stage: "final_faq_repair",
+        issues: finalFaqRepairValidation.issues,
+      });
+      return productSeoAiInvalidOutputError({
+        stage: "validation_final_faq_repair",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+        finalFaqRepairIssues: finalFaqRepairValidation.issues,
+      });
+    }
+
     return productSeoAiInvalidOutputError(
       {
         stage: "validation_repair",

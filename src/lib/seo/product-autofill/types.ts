@@ -101,6 +101,15 @@ export type ProductSeoInvalidOutputDiagnostic =
       generateIssues: string[];
       /** Category-only issues from the repaired draft validation; never generated or user-provided text. */
       repairIssues: string[];
+    }
+  | {
+      stage: "validation_final_faq_repair";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
+      repairIssues: string[];
+      /** Category-only issues from the final FAQ-answer-only repair validation; never generated or user-provided text. */
+      finalFaqRepairIssues: string[];
     };
 
 export type ProductSeoAiErrorResult = {

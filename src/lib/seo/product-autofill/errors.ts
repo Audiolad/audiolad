@@ -48,7 +48,8 @@ export function productSeoAiInvalidOutputError(
               diagnostic.generateIssues,
             ),
           }
-        : {
+        : diagnostic.stage === "validation_repair"
+          ? {
             ...diagnostic,
             generateIssues: normalizeProductSeoValidationIssues(
               diagnostic.generateIssues,
@@ -56,7 +57,19 @@ export function productSeoAiInvalidOutputError(
             repairIssues: normalizeProductSeoValidationIssues(
               diagnostic.repairIssues,
             ),
-          };
+          }
+          : {
+              ...diagnostic,
+              generateIssues: normalizeProductSeoValidationIssues(
+                diagnostic.generateIssues,
+              ),
+              repairIssues: normalizeProductSeoValidationIssues(
+                diagnostic.repairIssues,
+              ),
+              finalFaqRepairIssues: normalizeProductSeoValidationIssues(
+                diagnostic.finalFaqRepairIssues,
+              ),
+            };
 
   return {
     ok: false,
