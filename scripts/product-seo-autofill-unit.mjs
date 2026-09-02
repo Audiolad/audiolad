@@ -55,6 +55,10 @@ import {
   parseProductSeoAiRawDraft,
   validateProductSeoAiDraft,
 } from "../src/lib/seo/product-autofill/validate.ts";
+import {
+  applyProductSeoDraftRussianTypography,
+  applyProductSeoRussianTypography,
+} from "../src/lib/seo/product-autofill/typography.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) => readFileSync(path.join(root, relativePath), "utf8");
@@ -290,6 +294,48 @@ const input = (overrides = {}) => ({
 
 const config = { enabledFlag: true, provider: "openai", canCall: true, model: "test-model" };
 
+// Typography is restricted to AI-generated display copy. It replaces only em
+// dashes and paired quotes around Cyrillic names, preserving hyphens, ranges,
+// and FAQ anchors exactly.
+assert.equal(
+  applyProductSeoRussianTypography(
+    `"Лавандовый сон" — практика на 15–20 минут, 15-20 повторов и 'Тихий вечер'.`,
+  ),
+  "«Лавандовый сон» – практика на 15–20 минут, 15-20 повторов и «Тихий вечер».",
+);
+assert.equal(
+  applyProductSeoRussianTypography("“Лавандовый сон” — «Тихий вечер» и ‘Ночной ритуал’."),
+  "«Лавандовый сон» – «Тихий вечер» и «Ночной ритуал».",
+);
+assert.equal(
+  applyProductSeoRussianTypography('"Sleep ritual" — OpenAI'),
+  '"Sleep ritual" – OpenAI',
+);
+const typographyDraft = applyProductSeoDraftRussianTypography({
+  seoTitle: '"Лавандовый сон" — вечерняя практика',
+  seoDescription: "'Тихий вечер' — аудиоматериал",
+  usageItems: [{ content: "После дня — с «Тихим вечером»" }],
+  faqItems: [
+    {
+      question: 'Что такое "Лавандовый сон" — практика?',
+      answer: "Это ‘Тихий вечер’ — аудиоматериал.",
+      anchor: "lavandovyy-son",
+    },
+  ],
+});
+assert.deepEqual(typographyDraft, {
+  seoTitle: "«Лавандовый сон» – вечерняя практика",
+  seoDescription: "«Тихий вечер» – аудиоматериал",
+  usageItems: [{ content: "После дня – с «Тихим вечером»" }],
+  faqItems: [
+    {
+      question: "Что такое «Лавандовый сон» – практика?",
+      answer: "Это «Тихий вечер» – аудиоматериал.",
+      anchor: "lavandovyy-son",
+    },
+  ],
+});
+
 // Manual secondary phrases are author-owned.
 assert.deepEqual(
   normalizeManualSecondaryQueries(
@@ -376,6 +422,10 @@ assert.match(
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /не возвращай поле seoAbout/);
+assert.match(
+  prompt,
+  /Для тире используй короткое тире «–», а парные кавычки вокруг русских названий оформляй как «ёлочки»/,
+);
 assert.match(
   prompt,
   /seoTitle:.*дословно содержит полный основной запрос «медитация для сна»/i,
@@ -766,7 +816,7 @@ const provider = {
             : {
                 ...item,
                 question: "Изменённый вопрос?",
-                answer: "Слушайте в спокойной обстановке.",
+                answer: 'Слушайте "Лавандовый сон" — в спокойной обстановке.',
                 anchor: "izmenen",
               },
         ),
@@ -790,6 +840,57 @@ assert.deepEqual(
   ["практика перед сном", "Вечерняя медитация"],
 );
 
+// The initial provider draft is normalized at the generated-draft boundary.
+{
+  const generatedTypography = await generateProductSeoDraft(requestInput(), {
+    userId: "generated-russian-typography",
+    config,
+    provider: mockProvider([
+      {
+        ok: true,
+        draft: validDraft({
+          seoTitle: 'Медитация для сна — "Лавандовый сон"',
+          seoDescription:
+            "Медитация для сна — это ‘Лавандовый сон’ для спокойного завершения дня и мягкого вечернего отдыха.",
+          usageItems: [
+            { content: '"Лавандовый сон" — перед сном' },
+            { content: "После дня — ‘Тихий вечер’" },
+            { content: "Вечером — спокойный ритм" },
+          ],
+          faqItems: validDraft().faqItems.map((item, index) =>
+            index
+              ? item
+              : {
+                  ...item,
+                  question: 'Как слушать "Лавандовый сон" — медитация для сна?',
+                  answer: "Выберите ‘Тихий вечер’ — и удобное положение.",
+                  anchor: "kak-slushat",
+                },
+          ),
+        }),
+        raw: {},
+      },
+    ]),
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(generatedTypography.ok, true);
+  assert.equal(generatedTypography.data.seoTitle, "Медитация для сна – «Лавандовый сон»");
+  assert.equal(
+    generatedTypography.data.seoDescription,
+    "Медитация для сна – это «Лавандовый сон» для спокойного завершения дня и мягкого вечернего отдыха.",
+  );
+  assert.deepEqual(generatedTypography.data.usageItems, [
+    { content: "«Лавандовый сон» – перед сном" },
+    { content: "После дня – «Тихий вечер»" },
+    { content: "Вечером – спокойный ритм" },
+  ]);
+  assert.deepEqual(generatedTypography.data.faqItems[0], {
+    question: "Как слушать «Лавандовый сон» – медитация для сна?",
+    answer: "Выберите «Тихий вечер» – и удобное положение.",
+    anchor: "kak-slushat",
+  });
+}
+
 const repaired = await generateProductSeoDraft(parsed.request, {
   userId: "author-repair",
   config,
@@ -810,7 +911,10 @@ const repaired = await generateProductSeoDraft(parsed.request, {
   aiRateLimit: createProductSeoAiRateLimitStore(),
 });
 assert.equal(repaired.ok, true);
-assert.equal(repaired.data.faqItems[0].answer, "Слушайте в спокойной обстановке.");
+assert.equal(
+  repaired.data.faqItems[0].answer,
+  "Слушайте «Лавандовый сон» – в спокойной обстановке.",
+);
 assert.equal(repaired.data.faqItems[0].question, validDraft().faqItems[0].question);
 assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
 
@@ -834,7 +938,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
     faqItems: validDraft().faqItems.map((item, index) =>
       index
         ? item
-        : { ...item, answer: "Выберите тихое место и устройтесь удобно." },
+        : { ...item, answer: 'Выберите "тихое место" — и устройтесь удобно.' },
     ),
   });
   const finalFaqRepairProvider = mockProvider([
@@ -868,7 +972,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   );
   assert.equal(
     finalFaqRepaired.data.faqItems[0].answer,
-    "Выберите тихое место и устройтесь удобно.",
+    "Выберите «тихое место» – и устройтесь удобно.",
   );
 }
 {
@@ -985,7 +1089,7 @@ assert.equal(
     "deterministic-faq-fallback-D",
     { productKind: "audio_post" },
   ),
-  "«Лавандовый сон» — аудиоматериал.",
+  "«Лавандовый сон» – аудиоматериал.",
 );
 
 for (const [question, expectedAnswer] of [
@@ -1003,7 +1107,7 @@ for (const [question, expectedAnswer] of [
   ],
   [
     "Что такое медитация для сна?",
-    "«Лавандовый сон» — аудиоматериал.",
+    "«Лавандовый сон» – аудиоматериал.",
   ],
 ]) {
   const questionOnlyDraft = validDraft({
