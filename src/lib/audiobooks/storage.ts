@@ -26,7 +26,16 @@ export function validateAudiobookOriginalFilename(value: unknown) {
 
 export function audiobookExtensionForMimeType(value: unknown) {
   const mime = normalizeAudiobookMimeType(value);
-  return mime ? AUDIOBOOK_EXTENSION_BY_MIME[mime] : null;
+  if (!mime) return null;
+  switch (mime) {
+    case "audio/webm": return AUDIOBOOK_EXTENSION_BY_MIME["audio/webm"];
+    case "audio/mp4": return AUDIOBOOK_EXTENSION_BY_MIME["audio/mp4"];
+    case "audio/mpeg": return AUDIOBOOK_EXTENSION_BY_MIME["audio/mpeg"];
+    case "audio/wav": return AUDIOBOOK_EXTENSION_BY_MIME["audio/wav"];
+    case "audio/x-wav": return AUDIOBOOK_EXTENSION_BY_MIME["audio/x-wav"];
+    case "audio/aac": return AUDIOBOOK_EXTENSION_BY_MIME["audio/aac"];
+    default: return null;
+  }
 }
 
 export function buildAudiobookFragmentStoragePath(authorId: string, projectId: string, chapterId: string, fragmentId: string, mimeType: string) {
