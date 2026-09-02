@@ -3,6 +3,10 @@
  * Regression: start_practice_editing must preserve catalog visibility,
  * and published free + unlisted ordinary practices must classify as free
  * on the public PDP without becoming a Buy / «Стоимость уточняется» state.
+ *
+ * First publish of a listed free product is already correct and must stay
+ * listed without going through start_practice_editing. The bug is only
+ * start_editing → resubmit → approve_and_publish.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -224,6 +228,47 @@ function testLifecycleSqlPreservesVisibility() {
   const selectedRepublished = applyApproveAndPublish(selectedEditing);
   assert.equal(selectedRepublished.catalog_visibility, "selected_users");
   assert.equal(selectedRepublished.is_catalog_listed, false);
+}
+
+function testFirstPublishControlCaseVersusRepublish() {
+  // Production control: first publish of a listed free product never calls
+  // start_practice_editing. approve_and_publish preserves listing.
+  // Example: Наталья Кощеева / nastroy-na-izobilie (moderation_attempt=1).
+  const firstSubmit = {
+    status: "unpublished",
+    is_catalog_listed: true,
+    catalog_visibility: "listed",
+    moderation_status: "submitted",
+    moderation_attempt: 1,
+  };
+  const firstPublished = applyApproveAndPublish(firstSubmit);
+  assert.equal(firstPublished.status, "published");
+  assert.equal(firstPublished.is_catalog_listed, true);
+  assert.equal(firstPublished.catalog_visibility, "listed");
+
+  // Regression path: same listed free product after start_practice_editing
+  // then resubmit/approve must still be listed. The old SQL wiped listing
+  // here (Поток Изобилия, moderation_attempt=2).
+  const afterEdit = applyStartEditing(firstPublished);
+  assert.equal(afterEdit.status, "unpublished");
+  assert.equal(afterEdit.is_catalog_listed, true);
+  assert.equal(afterEdit.catalog_visibility, "listed");
+  const republished = applyApproveAndPublish({
+    ...afterEdit,
+    moderation_status: "submitted",
+    moderation_attempt: 2,
+  });
+  assert.equal(republished.status, "published");
+  assert.equal(republished.is_catalog_listed, true);
+  assert.equal(republished.catalog_visibility, "listed");
+
+  const catalogCard = read("src/components/catalog/cards/CatalogCardShell.tsx");
+  assert.match(catalogCard, /PLAY_ACTION_LABEL/);
+  assert.match(
+    catalogCard,
+    /card\.default_offer\?\.access === "free"/,
+    "catalog free card uses Слушать, not Buy",
+  );
 }
 
 function testRepairSqlIsOneRowAndNotAMigration() {
@@ -468,6 +513,7 @@ function testPaidUnlistedStillAcquirable() {
 
 async function main() {
   testLifecycleSqlPreservesVisibility();
+  testFirstPublishControlCaseVersusRepublish();
   testRepairSqlIsOneRowAndNotAMigration();
   await testFreeListedPdp();
   await testFreeUnlistedPdp();
