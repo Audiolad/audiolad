@@ -76,6 +76,7 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     if (!fragment || !audio) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
+    currentIndexRef.current = index;
     setCurrentIndex(index);
     setLoading(true);
     setError(null);
@@ -128,6 +129,11 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     setError(PLAYBACK_ERROR);
   }, [playAt]);
 
+  const handleRetry = useCallback(() => {
+    retryRef.current = 0;
+    void playAt(currentIndexRef.current);
+  }, [playAt]);
+
   const handlePlayPause = async () => {
     const audio = audioRef.current;
     if (!audio || !queue.length) return;
@@ -157,10 +163,10 @@ export function AudiobookChapterPlayer({ authorId, projectId, chapterId, fragmen
     <p className="text-sm text-[#ddd2f5]">Прослушивание главы: {current ? `Фрагмент ${currentIndex + 1} из ${queue.length}` : "—"}</p>
     <div className="mt-3 flex flex-wrap gap-3">
       <button type="button" onClick={() => void handlePlayPause()} disabled={loading} className="rounded-full border border-[#9bdab5] px-4 py-2 text-sm font-semibold text-[#9bdab5]">
-        {loading ? "Подготовка…" : isPlaying ? "Пауза" : "Слушать"}
+        {loading ? "Подготовка…" : isPlaying ? "Пауза" : "Слушать главу"}
       </button>
       <button type="button" onClick={reset} className="rounded-full border border-white/25 px-4 py-2 text-sm">С начала</button>
     </div>
-    {error ? <p role="alert" className="mt-3 text-sm text-[#ffb4b4]">{error}</p> : null}
+    {error ? <div className="mt-3"><p role="alert" className="text-sm text-[#ffb4b4]">{error}</p><button type="button" onClick={handleRetry} className="mt-2 rounded-full border border-white/25 px-4 py-2 text-sm">Повторить</button></div> : null}
   </section>;
 }
