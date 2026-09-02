@@ -80,7 +80,8 @@ assert.match(checkout, /isAllowedSupportRequestOrigin/);
 assert.match(checkout, /idempotency_key_required/);
 assert.match(checkout, /from\("author_appreciation_payment_intents"\)[\s\S]{0,80}\.insert/);
 assert.ok(
-  checkout.indexOf('.insert({') < checkout.indexOf("const deal = await createGetCourseAppreciationDeal"),
+  checkout.indexOf("const { error: insertError }") <
+    checkout.indexOf("deal = await createGetCourseAppreciationDeal"),
 );
 assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?:orders|payments|user_practices)"\)/);
 
