@@ -586,6 +586,21 @@ for (const issue of [
   });
   assert.doesNotMatch(JSON.stringify(error), /30 минут|10 треков|лечит|гарантирует/);
 }
+{
+  const error = productSeoAiInvalidOutputError({
+    stage: "validation_final_faq_repair",
+    generateIssues: ["ungrounded:duration:30 минут"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: ["banned_claim:гарантирует"],
+  });
+  assert.deepEqual(error.error.diagnostic, {
+    stage: "validation_final_faq_repair",
+    generateIssues: ["ungrounded:duration"],
+    repairIssues: ["faq_answer_is_question"],
+    finalFaqRepairIssues: ["banned_claim"],
+  });
+  assert.doesNotMatch(JSON.stringify(error), /30 минут|гарантирует/);
+}
 
 const calls = [];
 const provider = {
@@ -647,6 +662,64 @@ assert.equal(repaired.ok, true);
 assert.equal(repaired.data.faqItems[0].answer, "Слушайте в спокойной обстановке.");
 assert.equal(repaired.data.faqItems[0].question, validDraft().faqItems[0].question);
 assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
+
+// Regression: when the first FAQ-only repair still fails, the final repair
+// receives only the remaining FAQ issues and cannot alter the same product's
+// non-FAQ content, questions, or anchors.
+{
+  const initialFaqFailure = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Когда лучше слушать?" },
+    ),
+  });
+  const firstFaqRepair = validDraft({
+    seoTitle: "Несвязанная попытка изменить продукт",
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Как слушать медитация для сна?" },
+    ),
+  });
+  const finalFaqRepair = validDraft({
+    seoTitle: "Ещё одна несвязанная попытка изменить продукт",
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : { ...item, answer: "Выберите тихое место и устройтесь удобно." },
+    ),
+  });
+  const finalFaqRepairProvider = mockProvider([
+    { ok: true, draft: initialFaqFailure, raw: {} },
+    { ok: true, draft: firstFaqRepair, raw: {} },
+    { ok: true, draft: finalFaqRepair, raw: {} },
+  ]);
+  const finalFaqRepaired = await generateProductSeoDraft(requestInput(), {
+    userId: "final-faq-repair-same-product",
+    config,
+    provider: finalFaqRepairProvider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(finalFaqRepaired.ok, true);
+  assert.equal(finalFaqRepairProvider.calls.length, 3);
+  assert.deepEqual(finalFaqRepairProvider.calls[2].issues, [
+    "faq_answer_is_question",
+  ]);
+  assert.deepEqual(finalFaqRepairProvider.calls[2].previous, {
+    ...initialFaqFailure,
+    faqItems: initialFaqFailure.faqItems.map((item, index) =>
+      index ? item : { ...item, answer: "Как слушать медитация для сна?" },
+    ),
+  });
+  assert.equal(finalFaqRepaired.data.seoTitle, initialFaqFailure.seoTitle);
+  assert.equal(finalFaqRepaired.data.seoDescription, initialFaqFailure.seoDescription);
+  assert.deepEqual(finalFaqRepaired.data.usageItems, initialFaqFailure.usageItems);
+  assert.deepEqual(
+    finalFaqRepaired.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    initialFaqFailure.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+  );
+  assert.equal(
+    finalFaqRepaired.data.faqItems[0].answer,
+    "Выберите тихое место и устройтесь удобно.",
+  );
+}
 
 // Production regression: an initial draft missing the primary in both metadata
 // fields must send both exact issues to repair and accept a corrected draft.
