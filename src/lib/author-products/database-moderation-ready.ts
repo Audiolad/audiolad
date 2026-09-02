@@ -1,6 +1,6 @@
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
- * (latest: supabase/migrations/20260902120000_course_moderation_readiness.sql).
+ * (latest: supabase/migrations/20260913120000_minimal_product_moderation_readiness.sql).
  *
  * Used by admin support diagnostics so a product is never reported READY
  * when the live submit RPC would fail existing DB validation.

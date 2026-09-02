@@ -45,7 +45,6 @@ import {
   PRODUCT_PRESET_FORMATS,
   isCustomFormatSelection,
   resolveFormatForStorage,
-  validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
 import { PRODUCT_LANGUAGE_GUIDELINES } from "@/lib/author-products/language-guidelines";
 import {
@@ -130,7 +129,6 @@ import {
   DEFAULT_LISTENING_NOTICE_TITLE,
 } from "@/lib/products/listening-notice";
 import type { AssignedTopic, TopicOption } from "@/lib/topics/types";
-import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 import {
   evaluateCoursePublishContentGate,
   shouldCreateDefaultAudioItem,
@@ -371,19 +369,6 @@ function getActiveTopicKeysForSync(
   const archivedKeySet = new Set(archivedTopics.map((topic) => topic.key));
 
   return topicKeys.filter((key) => !archivedKeySet.has(key));
-}
-
-function countActiveSelectedTopics(
-  topicKeys: string[],
-  topicOptions: TopicOption[],
-  archivedTopics: AssignedTopic[],
-): number {
-  const optionKeys = new Set(topicOptions.map((topic) => topic.key));
-  const archivedKeySet = new Set(archivedTopics.map((topic) => topic.key));
-
-  return topicKeys.filter(
-    (key) => optionKeys.has(key) && !archivedKeySet.has(key),
-  ).length;
 }
 
 function mapTopicOptionsForSelector(
@@ -1380,45 +1365,21 @@ export default function AuthorProductForm({
     setFieldErrors({});
     setTopicError(undefined);
 
-    if (form.productKind === PRODUCT_KIND.PRACTICE) {
-      if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
+    if (
+      form.productKind === PRODUCT_KIND.PRACTICE &&
+      isCustomFormatSelection(form.formatPreset)
+    ) {
+      const lengthError = validateStoredFormatLength(form.customFormat);
+
+      if (lengthError) {
         setFieldErrors({
-          formatCustom: "Укажите название своего формата",
+          formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
         });
         publishInFlightRef.current = false;
         setPublishing(false);
         setBusy(false);
         return;
       }
-
-      if (isCustomFormatSelection(form.formatPreset)) {
-        const lengthError = validateStoredFormatLength(form.customFormat);
-
-        if (lengthError) {
-          setFieldErrors({
-            formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
-          });
-          publishInFlightRef.current = false;
-          setPublishing(false);
-          setBusy(false);
-          return;
-        }
-      }
-    }
-
-    const activeTopicCount = countActiveSelectedTopics(
-      topicKeys,
-      topicOptions,
-      archivedTopics,
-    );
-    const topicMinimumCheck = assertPublishedTopicMinimum(activeTopicCount);
-
-    if (!topicMinimumCheck.ok) {
-      setTopicError(topicMinimumCheck.message);
-      publishInFlightRef.current = false;
-      setPublishing(false);
-      setBusy(false);
-      return;
     }
 
     const courseContentCheck = evaluateCoursePublishContentGate({

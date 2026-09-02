@@ -117,4 +117,17 @@ assert.match(migration, /DETAIL = 'missing_audio'/);
 assert.match(migration, /DETAIL = 'incomplete_audio'/);
 assert.doesNotMatch(migration, /missing_description|missing_cover|slug_required|topic_min_required/);
 
+const form = readFileSync(
+  path.join(root, "src/components/author-dashboard/AuthorProductForm.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(
+  form,
+  /async function (?:submitForModeration|publishProduct)\(\) \{[\s\S]*validateCustomFormatForPublish/,
+);
+assert.doesNotMatch(
+  form,
+  /async function (?:submitForModeration|publishProduct)\(\) \{[\s\S]*topicMinimumCheck/,
+);
+
 console.log("author-product-minimal-moderation-readiness-unit: ok");
