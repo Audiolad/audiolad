@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     provider: "getcourse",
     local_deal_number: localDealNumber,
     idempotency_key: idempotencyKey,
-    provider_metadata: { offer_id: getGetCourseConfig().appreciationOfferId },
+    provider_metadata: { offer_id: getCourseConfig.appreciationOfferId },
   });
   if (insertError) {
     // A concurrent retry can win between the initial replay lookup and INSERT.
