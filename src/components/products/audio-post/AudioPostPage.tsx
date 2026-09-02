@@ -153,8 +153,11 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={authorName}
+              authorId={viewModel.authorId}
+              practiceId={practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
+              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}
@@ -223,8 +226,11 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={authorName}
+              authorId={viewModel.authorId}
+              practiceId={practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
+              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}

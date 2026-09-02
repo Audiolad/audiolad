@@ -49,8 +49,11 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={viewModel.authorName}
+              authorId={viewModel.authorId}
+              practiceId={viewModel.practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
+              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}

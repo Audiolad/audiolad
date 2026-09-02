@@ -156,8 +156,11 @@ export default async function AuthorPublicPage({
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={data.name}
+              authorId={data.id}
+              practiceId={null}
               isAuthenticated={Boolean(user)}
               surface="author"
+              path={authorPath}
             />
           </div>
         ) : null}

@@ -659,6 +659,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     },
     isSaved,
     isAuthenticated: Boolean(user),
+    authorId: practice.author_id,
     accessState: practice.is_free === true ? "free" : "paid",
     resolvedAuthorSlug,
     authorName,

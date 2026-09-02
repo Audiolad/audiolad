@@ -37,6 +37,7 @@ export type PracticePageViewModel = {
   };
   isSaved: boolean;
   isAuthenticated: boolean;
+  authorId: string;
   accessState: "free" | "paid";
   resolvedAuthorSlug: string;
   authorName: string | null;

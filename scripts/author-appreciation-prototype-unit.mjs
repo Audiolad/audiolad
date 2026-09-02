@@ -26,10 +26,10 @@ assert.ok(prototype.includes("Email для получения чека"));
 assert.ok(prototype.includes("100, 300, 500, 1000"));
 assert.ok(prototype.includes("Своя сумма"));
 assert.ok(prototype.includes("Поблагодарить на {resolveAmountLabel(selectedAmount)}"));
-assert.ok(prototype.includes("Оплата будет подключена на следующем этапе."));
+assert.ok(prototype.includes("Вы перейдёте на защищённую страницу оплаты."));
 assert.ok(!prototype.includes("GetCourse"));
-assert.ok(!prototype.includes("/api/"));
-assert.ok(!prototype.includes("fetch("));
+assert.ok(prototype.includes('fetch("/api/author-appreciation/checkout"'));
+assert.ok(prototype.includes("idempotency-key"));
 assert.ok(!prototype.includes("—"), "use en-dash, not em-dash");
 
 const authorPage = read(

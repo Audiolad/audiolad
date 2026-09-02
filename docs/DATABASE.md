@@ -12,6 +12,24 @@ author free-products default, while `true` and `false` are explicit product
 overrides. These are visibility settings only; they do not create payments,
 orders, ledger entries, commissions, or payouts.
 
+## Author appreciation GetCourse intents
+
+Migration `20260916120000_author_appreciation_getcourse_intents.sql` adds the
+isolated `author_appreciation_payment_intents` table for the Stage 3A GetCourse
+rollout. It records an `author_id`, optional `practice_id` and `user_id`,
+email, whole-RUB minor amount, `author` or `product` surface, GetCourse deal
+identifiers, a unique local deal number, and a unique idempotency key.
+
+The only lifecycle states are `pending`, `paid`, `needs_review`, and `failed`.
+RLS is enabled with no public or authenticated access; the application uses
+the service-role client. Partial unique indexes protect non-null provider deal
+IDs and numbers. `apply_author_appreciation_getcourse_callback` locks the
+matching intent and moves a matching pending GetCourse callback to `paid` only
+once; an amount, offer, status, or identifier anomaly becomes
+`needs_review`. This isolated provider fact does not create or alter orders,
+existing payments, entitlements, finance ledger entries, obligations,
+commissions, or payouts.
+
 # DATABASE.md
 
 База данных проекта «АудиоЛад».
