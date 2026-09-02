@@ -24,4 +24,4 @@
 
 ## Notes
 
-The first seeded edition is official version `1.0` (`published_at` / `effective_at` = `2026-07-28T00:00:00+03:00`). UI shows the marketing version label, not the content hash.
+The first seeded edition is official version `1.0` (`published_at` / `effective_at` = `2026-07-28T00:00:00+03:00`). The current edition in application code is official version `1.1` (`published_at` / `effective_at` = `2026-09-02T00:00:00+03:00`). UI shows the marketing version label, not the content hash. Applying `20260914120000_author_terms_v1_1.sql` is required together with the code deploy so that `author_terms_versions.is_current` matches the served text. Production apply remains a separate decision.

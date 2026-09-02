@@ -26,10 +26,10 @@ function sha256(text) {
 
 // 1) current edition published in code
 assert.equal(AUTHOR_TERMS_TOC.length, 25);
-assert.equal(AUTHOR_TERMS_APPROVED_META.version, "1.0");
-assert.equal(AUTHOR_TERMS_APPROVED_META.versionId, "c0a7e001-7e12-4a01-9c01-81dfcb4acf97");
-assert.equal(AUTHOR_TERMS_APPROVED_META.publishedAt, "2026-07-28T00:00:00+03:00");
-assert.equal(AUTHOR_TERMS_APPROVED_META.effectiveAt, "2026-07-28T00:00:00+03:00");
+assert.equal(AUTHOR_TERMS_APPROVED_META.version, "1.1");
+assert.equal(AUTHOR_TERMS_APPROVED_META.versionId, "7b95bb3d-9047-4a2b-9546-0e6b5af6bb26");
+assert.equal(AUTHOR_TERMS_APPROVED_META.publishedAt, "2026-09-02T00:00:00+03:00");
+assert.equal(AUTHOR_TERMS_APPROVED_META.effectiveAt, "2026-09-02T00:00:00+03:00");
 assert.match(AUTHOR_TERMS_APPROVED_META.contentHash, /^[0-9a-f]{64}$/);
 assert.equal(
   sha256(AUTHOR_TERMS_APPROVED_TEXT),
@@ -37,7 +37,7 @@ assert.equal(
 );
 assert.equal(
   AUTHOR_TERMS_APPROVED_META.contentHash,
-  "22c32683c3b91781c1419d455e2a837c6d83999e9a2cf700cd8d330fda0fd5fc",
+  "e4d72807867d8db14846a9b34fe2956a4de3fa44e0b7aacb9d16478e4528abc9",
 );
 assert.equal(AUTHOR_TERMS_APPROVED_META.publicPath, "/author-terms");
 assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes("\u2014"), "em-dash forbidden");
@@ -118,9 +118,30 @@ const bodyText = blocks
   .join("\n");
 assert.ok(bodyText.includes("1.1."));
 // representative clauses across the document remain present
-for (const clause of ["1.1.", "1.2.", "6.1.", "17.3.", "23.3."]) {
+for (const clause of ["1.1.", "1.2.", "6.1.", "6.4.", "7.5.", "17.3.", "23.3."]) {
   assert.ok(bodyText.includes(clause), `missing clause marker ${clause}`);
 }
+assert.ok(
+  bodyText.includes(
+    "в том числе на платной и бесплатной основе, а также в отношении продуктов со стоимостью, самостоятельно определяемой слушателем",
+  ),
+);
+assert.ok(bodyText.includes("Поблагодарить автора"));
+assert.ok(
+  bodyText.includes(
+    "не является обозначением благотворительного пожертвования",
+  ),
+);
+assert.ok(
+  bodyText.includes(
+    "Если по платёжной операции, ранее учтённой в расчёте авторского вознаграждения",
+  ),
+);
+assert.ok(
+  !bodyText.includes(
+    "Если по продаже, ранее учтённой в расчёте авторского вознаграждения",
+  ),
+);
 // section 25 is operator requisites without 25.x numbering
 assert.ok(bodyText.includes("25. Реквизиты оператора"));
 assert.ok(bodyText.includes("ОГРНИП: 316505300063237"));
@@ -129,26 +150,44 @@ assert.ok(bodyText.includes("Конец документа"));
 assert.ok(AUTHOR_TERMS_APPROVED_TEXT.includes("Содержание"));
 assert.ok(AUTHOR_TERMS_APPROVED_TEXT.startsWith("АУДИОЛАД"));
 
-// migration seed matches code hash/id
-const migration = readFileSync(
+// original seed remains historical 1.0
+const seedMigration = readFileSync(
   path.join(
     root,
     "supabase/migrations/20260728140000_author_terms_acceptance.sql",
   ),
   "utf8",
 );
-assert.ok(migration.includes(AUTHOR_TERMS_APPROVED_META.versionId));
-assert.ok(migration.includes(AUTHOR_TERMS_APPROVED_META.contentHash));
-assert.ok(migration.includes(`'${AUTHOR_TERMS_APPROVED_META.version}'`));
-assert.ok(migration.includes(AUTHOR_TERMS_APPROVED_META.publishedAt));
-assert.ok(migration.includes(AUTHOR_TERMS_APPROVED_META.effectiveAt));
-assert.ok(migration.includes("author_terms_versions_one_current_idx"));
-assert.ok(!migration.includes("sha256:81dfcb4acf97"));
+assert.ok(seedMigration.includes("c0a7e001-7e12-4a01-9c01-81dfcb4acf97"));
 assert.ok(
-  !migration.includes(
+  seedMigration.includes(
+    "22c32683c3b91781c1419d455e2a837c6d83999e9a2cf700cd8d330fda0fd5fc",
+  ),
+);
+assert.ok(seedMigration.includes("'1.0'"));
+assert.ok(seedMigration.includes("author_terms_versions_one_current_idx"));
+assert.ok(!seedMigration.includes("sha256:81dfcb4acf97"));
+assert.ok(
+  !seedMigration.includes(
     "81dfcb4acf97f327dc37865bed6f12db82c1b13cd014b455ae9d3e9db6a5b608",
   ),
 );
+
+// current edition 1.1 is published by a later data migration
+const currentMigration = readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260914120000_author_terms_v1_1.sql",
+  ),
+  "utf8",
+);
+assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.versionId));
+assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.contentHash));
+assert.ok(currentMigration.includes(`'${AUTHOR_TERMS_APPROVED_META.version}'`));
+assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.publishedAt));
+assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.effectiveAt));
+assert.ok(currentMigration.includes("is_current = false"));
+assert.ok(!currentMigration.includes("CREATE TABLE"));
 
 const page = readFileSync(
   path.join(root, "src/app/(platform)/author-terms/page.tsx"),
