@@ -32,6 +32,7 @@
     "test:studio-persistence-serialization": "npx tsx scripts/studio-persistence-serialization-unit.mts",
     "test:studio-asset-persistence": "npx tsx scripts/studio-asset-persistence-unit.mts",
     "test:studio-project-hydration": "npx tsx scripts/studio-project-hydration-unit.mts",
+    "test:studio-project-integrity-audit": "npx tsx scripts/studio-project-integrity-audit-unit.mts",
     "test:studio-project-creation": "npx tsx scripts/studio-project-creation-unit.mts",
     "test:studio-project-duplicate": "npx tsx scripts/studio-project-duplicate-unit.mts",
     "test:studio-autosave": "npx tsx scripts/studio-autosave-unit.mts",

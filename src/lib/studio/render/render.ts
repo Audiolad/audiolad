@@ -9,10 +9,27 @@ import type { StudioRenderInput } from "./types";
 
 export type StudioRenderResult = Readonly<{
   outputPath: string;
+  /** @deprecated Use expectedDurationSeconds for render timeline duration. */
   durationSeconds: number;
+  expectedDurationSeconds: number;
+  actualDurationSeconds: number;
+  durationDeltaSeconds: number;
   sizeBytes: number;
   stderr: string;
 }>;
+
+export class StudioRenderDurationError extends Error {
+  readonly code = "render_duration_mismatch";
+
+  constructor(
+    readonly expectedDurationSeconds: number,
+    readonly actualDurationSeconds: number,
+  ) {
+    super(
+      `Rendered audio is shorter than its timeline: expected ${expectedDurationSeconds}s, got ${actualDurationSeconds}s.`,
+    );
+  }
+}
 
 export async function withStudioRenderWorkspace<T>(
   renderId: string,
@@ -40,6 +57,35 @@ function run(binary: string, args: readonly string[]): Promise<string> {
     });
   });
 }
+
+async function probeDuration(path: string, ffprobePath = "ffprobe"): Promise<number> {
+  const output = await new Promise<string>((resolve, reject) => {
+    const child = spawn(ffprobePath, [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      path,
+    ], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => { stdout += chunk; });
+    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`${ffprobePath} exited with ${code ?? "unknown"}: ${stderr}`));
+    });
+  });
+  const duration = Number(output.trim());
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`ffprobe returned an invalid duration for ${path}.`);
+  }
+  return duration;
+}
+
+const DURATION_EPSILON_SECONDS = 0.25;
 
 /**
  * Renders only local, already-authorized asset files. Callers own moving the
@@ -75,7 +121,20 @@ async function renderStudioProject(
     ];
     const stderr = await run(ffmpegPath, args);
     const output = await stat(outputPath);
-    return { outputPath, durationSeconds: graph.durationSeconds, sizeBytes: output.size, stderr };
+    const actualDurationSeconds = await probeDuration(outputPath);
+    const durationDeltaSeconds = actualDurationSeconds - graph.durationSeconds;
+    if (durationDeltaSeconds < -DURATION_EPSILON_SECONDS) {
+      throw new StudioRenderDurationError(graph.durationSeconds, actualDurationSeconds);
+    }
+    return {
+      outputPath,
+      durationSeconds: graph.durationSeconds,
+      expectedDurationSeconds: graph.durationSeconds,
+      actualDurationSeconds,
+      durationDeltaSeconds,
+      sizeBytes: output.size,
+      stderr,
+    };
   });
 }
 

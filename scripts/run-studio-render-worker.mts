@@ -7,7 +7,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { renderStudioProjectToMp3 } from "../src/lib/studio/render/render";
+import {
+  renderStudioProjectToMp3,
+  StudioRenderDurationError,
+} from "../src/lib/studio/render/render";
 import { renderOutputPath } from "../src/lib/studio/render/storage";
 import type { StudioRenderSnapshot } from "../src/lib/studio/render/types";
 
@@ -44,6 +47,21 @@ async function main() {
       { snapshot, localAssetPaths: paths },
       { renderId: job.id, outputDirectory: workspace },
     );
+    console.log(JSON.stringify({
+      event: "studio_render_completed",
+      jobId: job.id,
+      projectId: job.project_id,
+      snapshotRevision: snapshot.project.revision,
+      expectedTimelineDurationSeconds: result.expectedDurationSeconds,
+      perTrackMaxEndSeconds: snapshot.tracks.map((track) => ({
+        trackId: track.id,
+        maxEndSeconds: Math.max(...track.clips.map((clip) => clip.startTime + clip.duration)),
+      })),
+      actualDurationSeconds: result.actualDurationSeconds,
+      durationDeltaSeconds: result.durationDeltaSeconds,
+      ffmpegExitCode: 0,
+      ffmpegStderrSummary: result.stderr.slice(-1000),
+    }));
     const outputPath = renderOutputPath(job.id);
     const bytes = await (await import("node:fs/promises")).readFile(result.outputPath);
     const { error: uploadError } = await service.storage
@@ -81,11 +99,22 @@ async function main() {
     }
     console.log(JSON.stringify({ jobId: job.id, status: "completed", bytes: result.sizeBytes }));
   } catch (error) {
+    const errorCode = error instanceof StudioRenderDurationError
+      ? error.code
+      : "render_failed";
+    console.error(JSON.stringify({
+      event: "studio_render_failed",
+      jobId: job.id,
+      projectId: job.project_id,
+      snapshotRevision: (job.project_snapshot as StudioRenderSnapshot).project?.revision ?? null,
+      errorCode,
+      error: error instanceof Error ? error.message : "unknown_error",
+    }));
     const { data: failedJob, error: failureUpdateError } = await service
       .from("studio_render_jobs")
       .update({
         status: "failed",
-        error_code: "render_failed",
+        error_code: errorCode,
         error_message_safe: "Не удалось подготовить экспорт. Исходники проекта сохранены.",
         lease_expires_at: null,
         updated_at: new Date().toISOString(),
