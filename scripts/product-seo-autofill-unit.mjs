@@ -873,7 +873,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   );
   assert.equal(captured.result.ok, true);
   assert.equal(captured.result.data.faqItems[0].answer,
-    "Ориентируйтесь на своё самочувствие и выбирайте комфортный для себя формат.");
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.");
   assert.equal(captured.result.data.seoTitle, stillQuestion.seoTitle);
   assert.equal(captured.result.data.seoDescription, stillQuestion.seoDescription);
   assert.deepEqual(captured.result.data.usageItems, stillQuestion.usageItems);
@@ -958,12 +958,12 @@ for (const [question, expectedAnswer] of [
       index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
     ),
   });
+  const faqQuestionOnlyDraft = validDraft({
+    faqItems: mixedResidualDraft.faqItems,
+  });
   const mixedResidualProvider = mockProvider([
-    { ok: true, draft: validDraft({
-      seoTitle: "Спокойный вечер без ключа",
-      faqItems: mixedResidualDraft.faqItems,
-    }), raw: {} },
-    { ok: true, draft: mixedResidualDraft, raw: {} },
+    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
+    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
     { ok: true, draft: mixedResidualDraft, raw: {} },
   ]);
   const mixedResidualResult = await generateProductSeoDraft(requestInput(), {
@@ -976,8 +976,8 @@ for (const [question, expectedAnswer] of [
   assert.equal(mixedResidualProvider.calls.length, 3);
   assert.deepEqual(mixedResidualResult.error.diagnostic, {
     stage: "validation_final_faq_repair",
-    generateIssues: ["primary_missing_from_title", "faq_answer_is_question"],
-    repairIssues: ["primary_missing_from_title", "faq_answer_is_question"],
+    generateIssues: ["faq_answer_is_question"],
+    repairIssues: ["faq_answer_is_question"],
     finalFaqRepairIssues: ["primary_missing_from_title", "faq_answer_is_question"],
   });
 }
