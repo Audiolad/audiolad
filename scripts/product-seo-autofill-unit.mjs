@@ -368,7 +368,7 @@ const prompt = buildProductSeoSystemPrompt({ request: parsed.request });
 assert.doesNotMatch(prompt, /Wordstat|secondaryQueries|кандидат/i);
 assert.match(
   prompt,
-  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\. Не обязан использовать каждую фразу в черновике\./,
+  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\. Не обязан использовать каждую фразу в черновике\./,
 );
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
@@ -1668,6 +1668,10 @@ const configSource = read("src/lib/seo/product-autofill/config.ts");
 const route = read("src/app/api/author/seo/product-autofill/route.ts");
 
 assert.match(section, /Основной поисковый запрос/);
+assert.match(
+  section,
+  /Выберите одну главную фразу, по которой человек может искать именно\s+такой продукт\. Можно использовать название продукта или оставить поле пустым\./,
+);
 assert.match(section, /Дополнительные поисковые фразы/);
 assert.match(section, /api\/author\/seo\/product-autofill/);
 assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие|api\/author\/seo\/wordstat/);
