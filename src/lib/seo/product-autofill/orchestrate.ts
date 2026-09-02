@@ -283,6 +283,34 @@ export async function generateProductSeoDraft(
     };
   }
 
+  function isValidDeterministicFaqAnswer(question: string, answer: string): boolean {
+    return (
+      Boolean(answer.trim()) &&
+      !faqAnswerIsQuestion(answer) &&
+      !faqAnswerRepeatsQuestion(question, answer)
+    );
+  }
+
+  function salvageDeterministicFaqAnswer(question: string, answer: string): string | null {
+    const trimmedAnswer = answer.trim();
+    const finalQuestionMark = trimmedAnswer.lastIndexOf("?");
+    if (finalQuestionMark >= 0) {
+      const trailingDeclarative = trimmedAnswer.slice(finalQuestionMark + 1).trim();
+      if (isValidDeterministicFaqAnswer(question, trailingDeclarative)) {
+        return trailingDeclarative;
+      }
+    }
+
+    if (trimmedAnswer.endsWith("?")) {
+      const punctuationOnly = `${trimmedAnswer.slice(0, -1).trim()}.`;
+      if (isValidDeterministicFaqAnswer(question, punctuationOnly)) {
+        return punctuationOnly;
+      }
+    }
+
+    return null;
+  }
+
   function deterministicFaqAnswer(question: string): string {
     const normalizedQuestion = question.trim().toLocaleLowerCase("ru-RU");
     if (/^(когда|в какое время|в какой момент)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
@@ -294,8 +322,12 @@ export async function generateProductSeoDraft(
     if (/^(кому|для кого)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Практика подойдёт тем, кому откликаются её тема и формат.";
     }
-    if (/^(что такое|что значит|зачем|почему)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
-      return "Это способ спокойно познакомиться с темой и выбрать подходящий для себя ритм.";
+    if (/^(что такое|что значит|что означает)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
+      const title = request.title.trim().replace(/\s+/g, " ");
+      const productKind = request.productKind.trim().replace(/\s+/g, " ");
+      if (title && productKind) {
+        return `«${title}» — это ${productKind}.`;
+      }
     }
     if (/^(можно|нужно|стоит|следует)\s+ли(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       return "Ориентируйтесь на своё самочувствие и выбирайте комфортный для себя формат.";
@@ -310,7 +342,14 @@ export async function generateProductSeoDraft(
       ...draft,
       faqItems: draft.faqItems.map((item) =>
         faqAnswerIsQuestion(item.answer)
-          ? { ...item, answer: deterministicFaqAnswer(item.question) }
+          ? (() => {
+              const answer =
+                salvageDeterministicFaqAnswer(item.question, item.answer) ??
+                deterministicFaqAnswer(item.question);
+              return isValidDeterministicFaqAnswer(item.question, answer)
+                ? { ...item, answer }
+                : item;
+            })()
           : item,
       ),
     };

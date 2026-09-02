@@ -895,6 +895,72 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
 // The deterministic post-third-provider fallback is constrained to the exact
 // residual faq_answer_is_question issue. It makes no fourth provider call and
 // keeps all non-answer content intact.
+async function runDeterministicFaqFallback(question, answer, userId) {
+  const questionOnlyDraft = validDraft({
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, question, answer },
+    ),
+  });
+  const provider = mockProvider([
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+    { ok: true, draft: questionOnlyDraft, raw: {} },
+  ]);
+  const result = await generateProductSeoDraft(requestInput(), {
+    userId,
+    config,
+    provider,
+    aiRateLimit: createProductSeoAiRateLimitStore(),
+  });
+  assert.equal(result.ok, true, userId);
+  assert.equal(provider.calls.length, 3, userId);
+  assert.deepEqual(validateProductSeoAiDraft(result.data, validationInput()), {
+    ok: true,
+    draft: result.data,
+  });
+  return result.data.faqItems[0].answer;
+}
+
+// A — retain a declarative sentence after the final question mark.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Можно ли слушать медитация для сна?",
+    "Можно ли слушать медитация для сна? Практику можно включать в спокойной обстановке.",
+    "deterministic-faq-fallback-A",
+  ),
+  "Практику можно включать в спокойной обстановке.",
+);
+
+// B — change only a trailing question mark when that produces a declarative answer.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Кому подходит медитация для сна?",
+    "Практика подходит для спокойного вечернего прослушивания?",
+    "deterministic-faq-fallback-B",
+  ),
+  "Практика подходит для спокойного вечернего прослушивания.",
+);
+
+// C — use intent fallback when neither salvage is a valid declarative answer.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Когда лучше включать медитация для сна?",
+    "Можно ли слушать перед сном?",
+    "deterministic-faq-fallback-C",
+  ),
+  "Практику можно включить в спокойное время, когда удобно уделить внимание себе.",
+);
+
+// D — definition fallback is grounded only in the request title and product kind.
+assert.equal(
+  await runDeterministicFaqFallback(
+    "Что такое медитация для сна?",
+    "Можно ли слушать медитация для сна?",
+    "deterministic-faq-fallback-D",
+  ),
+  "«Лавандовый сон» — это practice.",
+);
+
 for (const [question, expectedAnswer] of [
   [
     "Когда лучше включать медитация для сна?",
@@ -910,7 +976,7 @@ for (const [question, expectedAnswer] of [
   ],
   [
     "Что такое медитация для сна?",
-    "Это способ спокойно познакомиться с темой и выбрать подходящий для себя ритм.",
+    "«Лавандовый сон» — это practice.",
   ],
 ]) {
   const questionOnlyDraft = validDraft({
@@ -1022,7 +1088,7 @@ for (const [question, expectedAnswer] of [
     generateIssues: ["faq_answer_is_question"],
     repairIssues: ["faq_answer_is_question"],
     finalFaqRepairIssues: ["faq_answer_is_question"],
-    deterministicFaqFallbackIssues: ["faq_answer_repeats_question"],
+    deterministicFaqFallbackIssues: ["faq_answer_is_question"],
   });
 }
 
