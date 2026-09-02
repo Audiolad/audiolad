@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { AudiobookChapter, AudiobookFragment, AudiobookProject } from "@/lib/audiobooks/server";
-import { normalizeAudiobookMimeType, sanitizeAudiobookFilename } from "@/lib/audiobooks/storage";
+import { normalizeAudiobookMimeType, validateAudiobookOriginalFilename } from "@/lib/audiobooks/storage";
 import {
   deleteAudiobookRecordingDraftsForChapter,
   deleteAudiobookRecordingDraftsForProject,
@@ -44,7 +44,7 @@ export function AudiobookProjectWorkspace({ project, chapters: initialChapters, 
   function matchesReservation(file: File, fragment: AudiobookFragment) {
     return file.size === fragment.size_bytes
       && normalizeAudiobookMimeType(file.type) === fragment.mime_type
-      && sanitizeAudiobookFilename(file.name) === fragment.original_name;
+      && validateAudiobookOriginalFilename(file.name) === fragment.original_name;
   }
   async function upload(file: File) {
     if (!fragmentBase || recorderLocked) return;
