@@ -324,9 +324,8 @@ export async function generateProductSeoDraft(
     }
     if (/^(что такое|что значит|что означает)(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {
       const title = request.title.trim().replace(/\s+/g, " ");
-      const productKind = request.productKind.trim().replace(/\s+/g, " ");
-      if (title && productKind) {
-        return `«${title}» — это ${productKind}.`;
+      if (title) {
+        return `«${title}» — аудиоматериал.`;
       }
     }
     if (/^(можно|нужно|стоит|следует)\s+ли(?=\s|[?.!,:;]|$)/u.test(normalizedQuestion)) {

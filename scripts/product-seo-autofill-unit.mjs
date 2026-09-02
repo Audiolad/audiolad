@@ -895,7 +895,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
 // The deterministic post-third-provider fallback is constrained to the exact
 // residual faq_answer_is_question issue. It makes no fourth provider call and
 // keeps all non-answer content intact.
-async function runDeterministicFaqFallback(question, answer, userId) {
+async function runDeterministicFaqFallback(question, answer, userId, requestOverride = {}) {
   const questionOnlyDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
       index ? item : { ...item, question, answer },
@@ -906,7 +906,7 @@ async function runDeterministicFaqFallback(question, answer, userId) {
     { ok: true, draft: questionOnlyDraft, raw: {} },
     { ok: true, draft: questionOnlyDraft, raw: {} },
   ]);
-  const result = await generateProductSeoDraft(requestInput(), {
+  const result = await generateProductSeoDraft(requestInput(requestOverride), {
     userId,
     config,
     provider,
@@ -951,14 +951,15 @@ assert.equal(
   "Практику можно включить в спокойное время, когда удобно уделить внимание себе.",
 );
 
-// D — definition fallback is grounded only in the request title and product kind.
+// D — definition fallback is grounded only in the request title.
 assert.equal(
   await runDeterministicFaqFallback(
     "Что такое медитация для сна?",
     "Можно ли слушать медитация для сна?",
     "deterministic-faq-fallback-D",
+    { productKind: "audio_post" },
   ),
-  "«Лавандовый сон» — это practice.",
+  "«Лавандовый сон» — аудиоматериал.",
 );
 
 for (const [question, expectedAnswer] of [
@@ -976,7 +977,7 @@ for (const [question, expectedAnswer] of [
   ],
   [
     "Что такое медитация для сна?",
-    "«Лавандовый сон» — это practice.",
+    "«Лавандовый сон» — аудиоматериал.",
   ],
 ]) {
   const questionOnlyDraft = validDraft({
