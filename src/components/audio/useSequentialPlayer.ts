@@ -63,6 +63,7 @@ import {
   verifyRealPlayback,
   waitForPlayingEvent,
 } from "@/lib/audio/playback-recovery";
+import { ensureSharedAudioAudible } from "@/lib/audio/shared-audio-audibility";
 import { logPlayerDebug } from "@/lib/audio/player-debug";
 import {
   fetchSignedAudioUrl,
@@ -764,6 +765,7 @@ export function useSequentialPlayer({
       skipSrcReloadRef.current = url;
       userWantsPlaybackRef.current = true;
       wasPlayingBeforeSwitchRef.current = false;
+      ensureSharedAudioAudible(audio);
 
       // Shared next-track path (iOS / Android / desktop). play() stays in this
       // turn so lock-screen / screen-off Media Session can continue.
@@ -1213,6 +1215,7 @@ export function useSequentialPlayer({
         wasPlayingBeforeSwitchRef.current = false;
         userWantsPlaybackRef.current = true;
         initialPlaybackBufferingRef.current = true;
+        ensureSharedAudioAudible(audio);
         void audio.play().catch((error: unknown) => {
           if (!isHandlerCurrent()) {
             return;
@@ -1240,6 +1243,7 @@ export function useSequentialPlayer({
         autoplayUrlCleanupPendingRef.current = true;
         userWantsPlaybackRef.current = true;
         initialPlaybackBufferingRef.current = true;
+        ensureSharedAudioAudible(audio);
 
         void audio.play().catch((error: unknown) => {
           if (!isHandlerCurrent()) {
@@ -1551,6 +1555,7 @@ export function useSequentialPlayer({
     initialPlaybackBufferingRef.current = true;
 
     try {
+      ensureSharedAudioAudible(audio);
       await audio.play();
       setPlayerError(null);
       setAutoplayHint(null);
@@ -1596,6 +1601,7 @@ export function useSequentialPlayer({
     autoplayUrlCleanupPendingRef.current = true;
     userWantsPlaybackRef.current = true;
     initialPlaybackBufferingRef.current = true;
+    ensureSharedAudioAudible(audio);
 
     void audio.play().catch((error: unknown) => {
       const name =
@@ -1728,6 +1734,7 @@ export function useSequentialPlayer({
         setAutoplayHint(null);
 
         try {
+          ensureSharedAudioAudible(audio);
           await audio.play();
           setPlayerError(null);
         } catch (error: unknown) {
@@ -1808,6 +1815,7 @@ export function useSequentialPlayer({
 
         if (options.autoPlay) {
           try {
+            ensureSharedAudioAudible(audio);
             await audio.play();
           } catch {
             userWantsPlaybackRef.current = false;
@@ -1975,13 +1983,7 @@ export function useSequentialPlayer({
       debugSnapshot("foreground-recovery", "start");
 
       try {
-        if (audio.muted) {
-          audio.muted = false;
-        }
-
-        if (audio.volume === 0) {
-          audio.volume = 1;
-        }
+        ensureSharedAudioAudible(audio);
 
         resumePositionRef.current = audio.currentTime;
         setCurrentTime(audio.currentTime);
@@ -2073,6 +2075,7 @@ export function useSequentialPlayer({
             }
 
             try {
+              ensureSharedAudioAudible(refreshedAudio);
               await refreshedAudio.play();
               const ok =
                 (await waitForPlayingEvent(refreshedAudio, 3000)) ||

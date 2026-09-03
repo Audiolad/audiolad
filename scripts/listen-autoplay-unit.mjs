@@ -279,6 +279,41 @@ function testProductCtaPreservesSharedAudioGesture() {
   );
 }
 
+function testSharedAudioWarmupIsRaceSafeAndAudible() {
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
+  );
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+  const warmup = readSource("src/lib/audio/shared-audio-warmup.ts");
+  const audibility = readSource("src/lib/audio/shared-audio-audibility.ts");
+
+  assert(
+    provider.includes("createSharedAudioWarmupController"),
+    "provider uses a shared warm-up controller",
+  );
+  assert(
+    provider.includes("invalidateSharedAudioWarmup()"),
+    "new session and hard-stop invalidate stale warm-up completion",
+  );
+  assert(
+    warmup.includes("audio.muted = wasMuted"),
+    "warm-up restores mute synchronously",
+  );
+  assert(
+    warmup.includes("epoch !== warmupEpoch") && warmup.includes("hasRealSource"),
+    "warm-up completion cannot affect a newer source/session",
+  );
+  assert(
+    player.includes("ensureSharedAudioAudible(audio)"),
+    "normal play paths restore audible shared audio state",
+  );
+  assert(
+    audibility.includes("audio.volume <= 0") &&
+      audibility.includes("audio.volume = 1"),
+    "audible gate repairs only zero/invalid volume",
+  );
+}
+
 function testSignedUrlRaceHandling() {
   const player = readSource("src/components/audio/useSequentialPlayer.ts");
   const provider = readSource(
@@ -333,6 +368,7 @@ function main() {
   testInitialAutoplayDefersResumeSeek();
   testForegroundRecoverySkipsInitialBuffering();
   testProductCtaPreservesSharedAudioGesture();
+  testSharedAudioWarmupIsRaceSafeAndAudible();
   console.log("listen-autoplay-unit: ok");
 }
 
