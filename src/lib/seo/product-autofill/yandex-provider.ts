@@ -11,12 +11,14 @@ import {
   productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import {
+  buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
+import type { ProductSeoQualityRepairInput } from "@/lib/seo/secondary-query-coverage";
 import {
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_TIMEOUT_MS,
@@ -38,6 +40,11 @@ export type YandexProductSeoAiProvider = {
     input: ProductSeoAiPromptInput,
     previous: unknown,
     issues: string[],
+  ): Promise<YandexProductSeoAiProviderResult>;
+  qualityRepair(
+    input: ProductSeoAiPromptInput,
+    previous: unknown,
+    coverage: ProductSeoQualityRepairInput,
   ): Promise<YandexProductSeoAiProviderResult>;
 };
 
@@ -207,7 +214,7 @@ function fail(
 }
 
 function invalidOutput(
-  kind: "generate" | "repair",
+  kind: "generate" | "repair" | "quality_repair",
   generateIssues?: string[],
 ): ProductSeoAiErrorResult {
   return productSeoAiInvalidOutputError(
@@ -228,7 +235,7 @@ export function createYandexProductSeoAiProvider(
 
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
-    kind: "generate" | "repair",
+    kind: "generate" | "repair" | "quality_repair",
     generateIssues?: string[],
   ): Promise<YandexProductSeoAiProviderResult> {
     const apiKey = readYandexAiApiKey(env);
@@ -343,6 +350,15 @@ export function createYandexProductSeoAiProvider(
         },
         "repair",
         generateIssues,
+      );
+    },
+    qualityRepair(input, previous, coverage) {
+      return callModel(
+        {
+          systemPrompt: buildProductSeoSystemPrompt(input),
+          userPrompt: buildProductSeoQualityRepairPrompt(input, previous, coverage),
+        },
+        "quality_repair",
       );
     },
   };

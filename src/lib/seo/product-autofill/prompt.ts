@@ -6,6 +6,10 @@ import {
 } from "@/lib/seo/product-autofill/style-profile";
 import type { ProductSeoAutofillRequest } from "@/lib/seo/product-autofill/types";
 import {
+  selectActiveSecondaryQueries,
+  type ProductSeoQualityRepairInput,
+} from "@/lib/seo/secondary-query-coverage";
+import {
   containsSeoPhrase,
   normalizeSeoPhrase,
 } from "@/lib/seo/product-metadata";
@@ -52,9 +56,10 @@ export type ProductSeoAiPromptInput = {
 
 export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string {
   const usage = (input.request.usageItems ?? []).filter((item) => item.trim());
-  const secondaryQueries = (input.request.seoSecondaryQueries ?? []).filter(
+  const storedSecondaryQueries = (input.request.seoSecondaryQueries ?? []).filter(
     (item) => item.trim(),
   );
+  const activeSecondaryQueries = selectActiveSecondaryQueries(storedSecondaryQueries);
   return [
     `Название продукта: ${input.request.title.trim() || "—"}`,
     `Подзаголовок: ${input.request.subtitle.trim() || "—"}`,
@@ -62,16 +67,21 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
     `Тип продукта: ${input.request.productKind.trim() || "practice"}`,
     `Заголовок блока использования: ${getPracticeSeoUsageHeading(input.request.productKind)}`,
     `Основной запрос: ${input.request.seoPrimaryQuery.trim()}`,
-    secondaryQueries.length > 0
-      ? `Дополнительные запросы автора: ${secondaryQueries.join("; ")}`
+    storedSecondaryQueries.length > 0
+      ? `Дополнительные запросы автора: ${storedSecondaryQueries.join("; ")}`
       : "Дополнительные запросы автора: нет",
+    activeSecondaryQueries.length > 0
+      ? `Активные дополнительные запросы для черновика (первые по порядку автора): ${activeSecondaryQueries.join("; ")}`
+      : null,
     usage.length > 0
       ? `Уже указанные ситуации использования: ${usage.join("; ")}`
       : "Уже указанные ситуации использования: нет",
     ...productSeoStylePromptLines(
       input.request.styleProfile ?? createDefaultProductSeoStyleProfile(),
     ),
-  ].join("\n");
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
 }
 
 function primaryKeywordBudgetInstruction(
@@ -107,8 +117,29 @@ function secondaryContainsExactPrimary(
   return Boolean(primary) && phrase !== primary && containsSeoPhrase(secondary, primaryQuery);
 }
 
-function secondaryQuerySystemInstruction(
+function secondaryOverlapInstruction(
   secondaryQueries: readonly string[],
+  primaryQuery: string,
+): string {
+  const overlapping = secondaryQueries.filter((item) =>
+    secondaryContainsExactPrimary(item, primaryQuery),
+  );
+  if (!overlapping.length) {
+    return "";
+  }
+
+  return [
+    `Дополнительный запрос «${overlapping.join("»; «")}» содержит точный основной запрос непрерывной фразой.`,
+    "Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1.",
+    "Сохрани смысловое направление естественно: склони или перефразируй так, чтобы точная фраза основного запроса не повторилась.",
+    "Пример: не «Для настройки на канал денежная энергия...», а «Для работы с темой денежного канала...».",
+    "Бюджет точного основного запроса важнее дословной формулировки дополнительного запроса.",
+    "Никакой дополнительный запрос не должен создавать ещё одно точное вхождение основного запроса вне seoTitle, seoDescription и Q1.",
+  ].join(" ");
+}
+
+function secondaryQuerySystemInstruction(
+  storedSecondaryQueries: readonly string[],
   primaryQuery: string,
 ): string {
   const owned = [
@@ -117,8 +148,8 @@ function secondaryQuerySystemInstruction(
     "Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем.",
   ].join(" ");
 
-  const count = secondaryQueries.filter((item) => item.trim()).length;
-  if (count === 0) {
+  const active = selectActiveSecondaryQueries(storedSecondaryQueries);
+  if (active.length === 0) {
     return owned;
   }
 
@@ -127,37 +158,29 @@ function secondaryQuerySystemInstruction(
     "В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление.",
   ].join(" ");
 
-  const coverage =
-    count === 1
-      ? "Используй это направление естественно один раз."
-      : count === 2
-        ? "Используй оба направления естественно, каждое не больше одного раза."
-        : "Используй 2–3 РАЗНЫХ дополнительных направления естественно. Приоритет выбора: (1) смысловая релевантность (2) естественный русский (3) порядок автора как разрешающий критерий.";
-
-  const overlapping = secondaryQueries.filter((item) =>
-    secondaryContainsExactPrimary(item, primaryQuery),
-  );
-  const overlapRule = overlapping.length
-    ? [
-        `Дополнительный запрос «${overlapping.join("»; «")}» содержит точный основной запрос непрерывной фразой.`,
-        "Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1.",
-        "Предпочитай другие релевантные дополнительные направления, которые не повторяют точный основной запрос.",
-        "Если это смысловое направление полезно или это единственный дополнительный запрос, склони или естественно перефразируй его так, чтобы точная фраза основного запроса не повторилась.",
-        "Пример: не «Для настройки на канал денежная энергия...», а «Для работы с темой денежного канала...».",
-        "Бюджет точного основного запроса важнее дословной формулировки дополнительного запроса.",
-        "Никакой дополнительный запрос не должен создавать ещё одно точное вхождение основного запроса вне seoTitle, seoDescription и Q1.",
-      ].join(" ")
-    : "";
+  const slotAssignment =
+    active.length === 1
+      ? [
+          `Дополнительный запрос №1: «${active[0]}».`,
+          "Обязательно используй смысл этого дополнительного запроса в одном из трёх пунктов блока «Как использовать практику». Используй один раз, естественным русским языком.",
+          "Не помещай это направление в seoTitle, seoDescription и Q1.",
+        ].join(" ")
+      : [
+          `Дополнительный запрос №1: «${active[0]}». Используй смысл ровно в одном usageItem, один раз, естественным русским языком.`,
+          `Дополнительный запрос №2: «${active[1]}». Используй смысл ровно один раз в Q2 или Q3 — в вопросе или в ответе, где звучит естественнее.`,
+          "Не помещай дополнительные запросы в seoTitle, seoDescription и Q1 только ради покрытия.",
+        ].join(" ");
 
   return [
     owned,
     storageVsProse,
-    coverage,
-    "Максимум 3 использования дополнительных запросов во всём черновике. Каждую выбранную фразу — не больше одного раза.",
-    "Предпочтительные места: usageItems, Q2/Q3 и ответы FAQ, когда это звучит естественно.",
+    slotAssignment,
+    "Не игнорируй введённый активный дополнительный запрос.",
+    "Не дублируй одно направление сразу в нескольких полях.",
+    "Естественный русский важнее дословного повтора поисковой фразы. Не превращай черновик в SEO-копирайтинг.",
     "Не набивай дополнительные запросы в seoTitle и seoDescription: там уже есть основной запрос.",
     "Дополнительные запросы — SEO-направления, а не факты. Не выводи из них утверждения, которых нет в описании продукта.",
-    overlapRule,
+    secondaryOverlapInstruction(active, primaryQuery),
   ]
     .filter(Boolean)
     .join(" ");
@@ -312,6 +335,48 @@ export function buildProductSeoRepairPrompt(
     "Не переписывай описание продукта. Используй его только как источник фактов.",
     ...buildRepairIssueInstructions(issues, input.request.seoPrimaryQuery),
     `Проблемы: ${issues.join("; ")}`,
+    `Предыдущий JSON: ${JSON.stringify(previous)}`,
+    buildProductSeoGrounding(input),
+  ].join("\n\n");
+}
+
+export function buildProductSeoQualityRepairPrompt(
+  input: ProductSeoAiPromptInput,
+  previous: unknown,
+  coverage: ProductSeoQualityRepairInput,
+): string {
+  const primary = input.request.seoPrimaryQuery.trim();
+  const instructions: string[] = [
+    "Черновик уже технически валиден. Улучши только покрытие дополнительных запросов.",
+    "Не ломай валидные поля. Не обещай позиций, индексацию, ТОП или трафик.",
+    "Естественный русский важнее дословного повтора. Не превращай текст в SEO-копирайтинг.",
+    "Не помещай дополнительные запросы в seoTitle и seoDescription только ради покрытия.",
+    "Сохранённые значения дополнительных запросов не редактируй.",
+  ];
+
+  if (coverage.secondary1 && !coverage.secondary1UsageCovered) {
+    instructions.push(
+      `Измени только один подходящий usageItem так, чтобы он естественно отражал смысл дополнительного запроса «${coverage.secondary1}». Не меняй остальные валидные поля.`,
+    );
+  }
+
+  if (coverage.secondary2 && !coverage.secondary2FaqCovered) {
+    instructions.push(
+      `Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «${coverage.secondary2}». Сохрани anchors.`,
+      "Предпочитай изменить answer, а не question. Не меняй Q1, seoTitle, seoDescription и usageItems, если они не нужны для этого направления.",
+    );
+  }
+
+  const active = [coverage.secondary1, coverage.secondary2].filter(
+    (item): item is string => Boolean(item?.trim()),
+  );
+  const overlap = secondaryOverlapInstruction(active, primary);
+  if (overlap) {
+    instructions.push(overlap);
+  }
+
+  return [
+    ...instructions,
     `Предыдущий JSON: ${JSON.stringify(previous)}`,
     buildProductSeoGrounding(input),
   ].join("\n\n");

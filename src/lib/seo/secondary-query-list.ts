@@ -119,8 +119,10 @@ export function formatSeoSecondaryQueryBulkMessage(
 
   if (result.addedCount > 0 && result.skippedFull > 0) {
     parts.push(
-      `Добавлено ${formatRussianPhraseCount(result.addedCount)}. Можно использовать не больше 10.`,
+      `Добавлено ${formatRussianPhraseCount(result.addedCount)}. Можно добавить до двух дополнительных поисковых фраз.`,
     );
+  } else if (result.addedCount === 0 && result.skippedFull > 0) {
+    parts.push("Можно добавить до двух дополнительных поисковых фраз.");
   }
 
   if (result.skippedDuplicates > 0) {

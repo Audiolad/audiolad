@@ -1,4 +1,7 @@
-import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
+import {
+  AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
+  PRODUCT_CONTENT_LIMITS,
+} from "@/lib/author-products/limits";
 import { wordstatPhraseKey } from "@/lib/seo/wordstat/phrase";
 import type { WordstatOpportunityColor } from "@/lib/seo/wordstat/types";
 
@@ -104,7 +107,7 @@ export function canAddSecondaryQuery(
     return { ok: false, reason: "empty" };
   }
 
-  if (current.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries) {
+  if (current.length >= AUTHOR_SEO_SECONDARY_ACTIVE_MAX) {
     return { ok: false, reason: "full" };
   }
 

@@ -23,10 +23,20 @@ import {
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
 import {
   buildProductSeoGrounding,
+  buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
+import {
+  evaluateSecondaryQueryCoverage,
+  isSecondaryCoverageComplete,
+  selectActiveSecondaryQueries,
+} from "../src/lib/seo/secondary-query-coverage.ts";
+import {
+  AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
+  PRODUCT_CONTENT_LIMITS,
+} from "../src/lib/author-products/limits.ts";
 import {
   applyProductSeoStylePreset,
   createDefaultProductSeoStyleProfile,
@@ -135,17 +145,25 @@ function abortErrorFetch() {
 
 function mockProvider(sequence) {
   const calls = [];
+  function take(kind, extra = {}) {
+    calls.push({ kind, ...extra });
+    const next = sequence.shift();
+    return typeof next === "function" ? next(kind) : next;
+  }
   return {
     calls,
     async generate(input) {
-      calls.push({ kind: "generate", input });
-      const next = sequence.shift();
-      return typeof next === "function" ? next("generate") : next;
+      return take("generate", { input });
     },
     async repair(input, previous, issues) {
-      calls.push({ kind: "repair", input, previous, issues });
-      const next = sequence.shift();
-      return typeof next === "function" ? next("repair") : next;
+      return take("repair", { input, previous, issues });
+    },
+    async qualityRepair(input, previous, coverage) {
+      if (!sequence.length) {
+        calls.push({ kind: "qualityRepair", input, previous, coverage });
+        return { ok: true, draft: previous, raw: {} };
+      }
+      return take("qualityRepair", { input, previous, coverage });
     },
   };
 }
@@ -434,8 +452,15 @@ assert.match(
   prompt,
   /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./,
 );
-assert.match(prompt, /Используй оба направления естественно, каждое не больше одного раза/);
-assert.match(prompt, /Максимум 3 использования дополнительных запросов во всём черновике/);
+assert.match(
+  prompt,
+  /Дополнительный запрос №1: «практика перед сном»\. Используй смысл ровно в одном usageItem, один раз, естественным русским языком/,
+);
+assert.match(
+  prompt,
+  /Дополнительный запрос №2: «Вечерняя медитация»\. Используй смысл ровно один раз в Q2 или Q3/,
+);
+assert.match(prompt, /Не игнорируй введённый активный дополнительный запрос/);
 assert.match(prompt, /Не набивай дополнительные запросы в seoTitle и seoDescription/);
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
@@ -475,18 +500,22 @@ assert.match(
     /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем\./;
   const STORAGE_VS_PROSE =
     /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./;
-  const SECONDARY_MAX_USES =
-    /Максимум 3 использования дополнительных запросов во всём черновике\. Каждую выбранную фразу — не больше одного раза/;
+  const SECONDARY_SLOT_ONE =
+    /Обязательно используй смысл этого дополнительного запроса в одном из трёх пунктов блока «Как использовать практику»\. Используй один раз, естественным русским языком/;
+  const SECONDARY_SLOT_TWO_USAGE =
+    /Дополнительный запрос №1: «[^»]+»\. Используй смысл ровно в одном usageItem, один раз, естественным русским языком/;
+  const SECONDARY_SLOT_TWO_FAQ =
+    /Дополнительный запрос №2: «[^»]+»\. Используй смысл ровно один раз в Q2 или Q3 — в вопросе или в ответе, где звучит естественнее/;
+  const SECONDARY_DO_NOT_IGNORE =
+    /Не игнорируй введённый активный дополнительный запрос/;
   const SECONDARY_NOT_FACTS =
     /Дополнительные запросы — SEO-направления, а не факты\. Не выводи из них утверждения, которых нет в описании продукта/;
   const SECONDARY_NOT_IN_TITLE_DESCRIPTION =
     /Не набивай дополнительные запросы в seoTitle и seoDescription: там уже есть основной запрос/;
   const OVERLAP_VERBATIM =
     /Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1/;
-  const OVERLAP_PREFER_NON_OVERLAPPING =
-    /Предпочитай другие релевантные дополнительные направления, которые не повторяют точный основной запрос/;
   const OVERLAP_REPHRASE =
-    /Если это смысловое направление полезно или это единственный дополнительный запрос, склони или естественно перефразируй его так, чтобы точная фраза основного запроса не повторилась/;
+    /Сохрани смысловое направление естественно: склони или перефразируй так, чтобы точная фраза основного запроса не повторилась/;
   const OVERLAP_EXAMPLE =
     /Пример: не «Для настройки на канал денежная энергия\.\.\.», а «Для работы с темой денежного канала\.\.\.»/;
   const OVERLAP_BUDGET_PRIORITY =
@@ -514,7 +543,6 @@ assert.match(
       );
     }
     assert.match(systemPrompt, OVERLAP_VERBATIM);
-    assert.match(systemPrompt, OVERLAP_PREFER_NON_OVERLAPPING);
     assert.match(systemPrompt, OVERLAP_REPHRASE);
     assert.match(systemPrompt, OVERLAP_EXAMPLE);
     assert.match(systemPrompt, OVERLAP_BUDGET_PRIORITY);
@@ -524,7 +552,7 @@ assert.match(
     );
     assert.match(systemPrompt, AUTHOR_OWNED_SECONDARIES);
     assert.match(systemPrompt, STORAGE_VS_PROSE);
-    assert.match(systemPrompt, SECONDARY_MAX_USES);
+    assert.match(systemPrompt, SECONDARY_DO_NOT_IGNORE);
   }
 
   const zeroSecondaryPrompt = buildProductSeoSystemPrompt({
@@ -533,7 +561,8 @@ assert.match(
   assert.match(zeroSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
   assert.doesNotMatch(zeroSecondaryPrompt, STORAGE_VS_PROSE);
   assert.doesNotMatch(zeroSecondaryPrompt, /Не обязан использовать каждую фразу в черновике/);
-  assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_SLOT_ONE);
+  assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_SLOT_TWO_USAGE);
   assert.doesNotMatch(
     zeroSecondaryPrompt,
     /Используй это направление естественно один раз|Используй оба направления естественно|Используй 2–3 РАЗНЫХ дополнительных направления/,
@@ -545,26 +574,33 @@ assert.match(
   });
   assert.match(oneSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
   assert.match(oneSecondaryPrompt, STORAGE_VS_PROSE);
-  assert.match(oneSecondaryPrompt, /Используй это направление естественно один раз/);
-  assert.match(oneSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.match(oneSecondaryPrompt, SECONDARY_SLOT_ONE);
+  assert.match(oneSecondaryPrompt, /Дополнительный запрос №1: «практика перед сном»/);
+  assert.match(oneSecondaryPrompt, SECONDARY_DO_NOT_IGNORE);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_FACTS);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.doesNotMatch(oneSecondaryPrompt, SECONDARY_SLOT_TWO_FAQ);
   assert.doesNotMatch(oneSecondaryPrompt, OVERLAP_VERBATIM);
 
   const twoSecondaryPrompt = buildProductSeoSystemPrompt({
     request: parsed.request,
   });
-  assert.match(twoSecondaryPrompt, /Используй оба направления естественно, каждое не больше одного раза/);
+  assert.match(twoSecondaryPrompt, SECONDARY_SLOT_TWO_USAGE);
+  assert.match(twoSecondaryPrompt, SECONDARY_SLOT_TWO_FAQ);
   assert.match(twoSecondaryPrompt, STORAGE_VS_PROSE);
-  assert.match(twoSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.match(twoSecondaryPrompt, SECONDARY_DO_NOT_IGNORE);
   assert.doesNotMatch(twoSecondaryPrompt, OVERLAP_VERBATIM);
 
   const moneyPrompt = buildProductSeoSystemPrompt({ request: moneyRequest });
   assert.match(
     moneyPrompt,
-    /Используй 2–3 РАЗНЫХ дополнительных направления естественно\. Приоритет выбора: \(1\) смысловая релевантность \(2\) естественный русский \(3\) порядок автора как разрешающий критерий/,
+    /Дополнительный запрос №1: «канал денежная энергия»\. Используй смысл ровно в одном usageItem/,
   );
-  assert.match(moneyPrompt, SECONDARY_MAX_USES);
+  assert.match(
+    moneyPrompt,
+    /Дополнительный запрос №2: «денежный поток энергии»\. Используй смысл ровно один раз в Q2 или Q3/,
+  );
+  assert.doesNotMatch(moneyPrompt, /Используй 2–3 РАЗНЫХ дополнительных направления/);
   assert.match(moneyPrompt, SECONDARY_NOT_FACTS);
   assert.match(moneyPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
   assert.match(
@@ -585,7 +621,7 @@ assert.match(
       seoSecondaryQueries: ["канал денежная энергия"],
     }),
   });
-  assert.match(oneOverlappingPrompt, /Используй это направление естественно один раз/);
+  assert.match(oneOverlappingPrompt, SECONDARY_SLOT_ONE);
   assertOverlapContract(oneOverlappingPrompt, ["канал денежная энергия"]);
 
   const twoWithOverlapPrompt = buildProductSeoSystemPrompt({
@@ -595,10 +631,8 @@ assert.match(
       seoSecondaryQueries: ["канал денежная энергия", "денежный поток энергии"],
     }),
   });
-  assert.match(
-    twoWithOverlapPrompt,
-    /Используй оба направления естественно, каждое не больше одного раза/,
-  );
+  assert.match(twoWithOverlapPrompt, SECONDARY_SLOT_TWO_USAGE);
+  assert.match(twoWithOverlapPrompt, SECONDARY_SLOT_TWO_FAQ);
   assertOverlapContract(twoWithOverlapPrompt, ["канал денежная энергия"]);
   assert.doesNotMatch(
     twoWithOverlapPrompt,
@@ -610,6 +644,16 @@ assert.match(
     moneyGrounding,
     /Дополнительные запросы автора: канал денежная энергия; денежный поток энергии; энергия денежных средств; энергия входа в денежный канал/,
   );
+  assert.match(
+    moneyGrounding,
+    /Активные дополнительные запросы для черновика \(первые по порядку автора\): канал денежная энергия; денежный поток энергии/,
+  );
+  assert.deepEqual(selectActiveSecondaryQueries(MONEY_SECONDARIES), [
+    "канал денежная энергия",
+    "денежный поток энергии",
+  ]);
+  assert.equal(AUTHOR_SEO_SECONDARY_ACTIVE_MAX, 2);
+  assert.equal(PRODUCT_CONTENT_LIMITS.seoSecondaryQueries, 10);
 
   const storedSecondaries = normalizeManualSecondaryQueries(
     [...MONEY_SECONDARIES, "  канал денежная энергия  "],
@@ -1028,11 +1072,27 @@ for (const issue of [
   assert.doesNotMatch(JSON.stringify(error), /30 минут|гарантирует/);
 }
 
+const coveredSecondaryDraft = validDraft({
+  usageItems: [
+    { content: "Когда нужна спокойная практика перед сном" },
+    { content: "После напряжённого дня" },
+    { content: "Во время вечернего отдыха" },
+  ],
+  faqItems: [
+    validDraft().faqItems[0],
+    {
+      question: "Когда лучше включать практику?",
+      answer: "Вечерняя медитация хорошо подходит в привычное время отдыха.",
+      anchor: "kogda",
+    },
+    validDraft().faqItems[2],
+  ],
+});
 const calls = [];
 const provider = {
   async generate(promptInput) {
     calls.push({ kind: "generate", promptInput });
-    return { ok: true, draft: validDraft(), raw: {} };
+    return { ok: true, draft: coveredSecondaryDraft, raw: {} };
   },
   async repair(promptInput, previous, issues) {
     calls.push({ kind: "repair", promptInput, previous, issues });
@@ -1052,6 +1112,9 @@ const provider = {
       }),
       raw: {},
     };
+  },
+  async qualityRepair() {
+    throw new Error("quality repair must not run when secondaries are already covered");
   },
 };
 const generated = await generateProductSeoDraft(parsed.request, {
@@ -1120,7 +1183,7 @@ assert.deepEqual(
   });
 }
 
-const repaired = await generateProductSeoDraft(parsed.request, {
+const repaired = await generateProductSeoDraft(requestInput(), {
   userId: "author-repair",
   config,
   provider: {
@@ -1856,7 +1919,7 @@ for (const [question, expectedAnswer] of [
     seoDescription:
       "Практика «Денежная энергия» помогает мягко настроиться и уделить внимание спокойному вечеру.",
     usageItems: [
-      { content: "Перед важным разговором" },
+      { content: "Для работы с темой денежного канала." },
       { content: "После напряжённого дня" },
       { content: "Во время вечернего отдыха" },
     ],
@@ -1868,7 +1931,7 @@ for (const [question, expectedAnswer] of [
       },
       {
         question: "Когда лучше слушать?",
-        answer: "В спокойное время, когда можно уделить внимание себе.",
+        answer: "Когда хочется сосредоточиться на теме денежного потока.",
         anchor: "kogda",
       },
       {
@@ -2126,7 +2189,7 @@ async function generateYandexFromBodies(bodies, userId, requestOverride = {}) {
 
 await withEnvAsync(yandexEnv(), async () => {
   const { result, fetchImpl } = await generateYandexFromBodies(
-    [yandexCompletion(JSON.stringify(validDraft()))],
+    [yandexCompletion(JSON.stringify(coveredSecondaryDraft))],
     "yandex-success",
     { seoSecondaryQueries: ["практика перед сном"] },
   );
@@ -2352,6 +2415,10 @@ assert.match(
   /Выберите одну главную фразу, по которой человек может искать именно\s+такой продукт\. Можно использовать название продукта или оставить поле пустым\./,
 );
 assert.match(section, /Дополнительные поисковые фразы/);
+assert.match(section, /PRODUCT_SEO_SECONDARY_HELPER/);
+assert.match(section, /AUTHOR_SEO_SECONDARY_ACTIVE_MAX/);
+assert.doesNotMatch(section, /Можно добавить не больше 10 фраз/);
+assert.doesNotMatch(section, /coverage|validator|quality repair/i);
 assert.match(section, /api\/author\/seo\/product-autofill/);
 assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие|api\/author\/seo\/wordstat/);
 assert.doesNotMatch(orchestrate, /wordstat|Wordstat|candidates/i);
@@ -2490,6 +2557,360 @@ const ungroundedDraft = validDraft({
   const apiBody = apiErrorBody(captured.result);
   assert.deepEqual(Object.keys(apiBody).sort(), ["code", "diagnostic", "error"]);
   assert.doesNotMatch(JSON.stringify(apiBody), /30 минут|10 треков|499 ₽|лечит/);
+}
+
+{
+  const MONEY_PRIMARY = "денежная энергия";
+  const moneyUncoveredDraft = {
+    seoTitle: "денежная энергия перед вечерним настроем",
+    seoDescription:
+      "Практика «Денежная энергия» помогает мягко настроиться и уделить внимание спокойному вечеру.",
+    usageItems: [
+      { content: "Перед важным разговором" },
+      { content: "После напряжённого дня" },
+      { content: "Во время вечернего отдыха" },
+    ],
+    faqItems: [
+      {
+        question: "Что такое денежная энергия в этой практике?",
+        answer: "Это аудиоматериал, который помогает спокойно познакомиться с темой.",
+        anchor: "chto",
+      },
+      {
+        question: "Когда лучше слушать?",
+        answer: "В спокойное время, когда можно уделить внимание себе.",
+        anchor: "kogda",
+      },
+      {
+        question: "Нужен ли опыт?",
+        answer: "Практика подходит для спокойного знакомства с форматом.",
+        anchor: "opyt",
+      },
+    ],
+  };
+  const moneyCoveredDraft = {
+    ...moneyUncoveredDraft,
+    usageItems: [
+      { content: "Используйте практику, когда хочется сосредоточиться на теме денежного потока." },
+      moneyUncoveredDraft.usageItems[1],
+      moneyUncoveredDraft.usageItems[2],
+    ],
+    faqItems: [
+      moneyUncoveredDraft.faqItems[0],
+      {
+        ...moneyUncoveredDraft.faqItems[1],
+        answer:
+          "Материал можно включать, когда хочется уделить внимание теме входа в денежный канал.",
+      },
+      moneyUncoveredDraft.faqItems[2],
+    ],
+  };
+  const moneyRequest = requestInput({
+    title: "Денежная энергия",
+    seoPrimaryQuery: MONEY_PRIMARY,
+    seoSecondaryQueries: [
+      "денежный поток энергии",
+      "энергия входа в денежный канал",
+    ],
+  });
+
+  const ignoredCoverage = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: moneyRequest.seoSecondaryQueries,
+    usageItems: moneyUncoveredDraft.usageItems,
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.deepEqual(ignoredCoverage, {
+    secondary1UsageCovered: false,
+    secondary2FaqCovered: false,
+  });
+
+  assert.deepEqual(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: MONEY_PRIMARY,
+      activeSecondaryQueries: ["денежный поток энергии"],
+      usageItems: [
+        { content: "Когда хочется сосредоточиться на ощущении денежного потока." },
+      ],
+      faqItems: moneyUncoveredDraft.faqItems,
+    }),
+    { secondary1UsageCovered: true, secondary2FaqCovered: true },
+  );
+  assert.deepEqual(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: MONEY_PRIMARY,
+      activeSecondaryQueries: [
+        "денежный поток энергии",
+        "энергия входа в денежный канал",
+      ],
+      usageItems: moneyUncoveredDraft.usageItems,
+      faqItems: [
+        moneyUncoveredDraft.faqItems[0],
+        {
+          ...moneyUncoveredDraft.faqItems[1],
+          answer: "Подойдёт для знакомства с темой входа в денежный канал.",
+        },
+        moneyUncoveredDraft.faqItems[2],
+      ],
+    }),
+    { secondary1UsageCovered: false, secondary2FaqCovered: true },
+  );
+  const overlapCoverage = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: ["канал денежная энергия"],
+    usageItems: [{ content: "Используйте практику для работы с темой денежного канала." }],
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.equal(overlapCoverage.secondary1UsageCovered, true);
+  assert.equal(
+    moneyUncoveredDraft.usageItems.some((item) =>
+      item.content.includes("денежная энергия"),
+    ),
+    false,
+  );
+
+  const productionRepairProvider = mockProvider([
+    { ok: true, draft: moneyUncoveredDraft, raw: {} },
+    { ok: true, draft: moneyCoveredDraft, raw: {} },
+  ]);
+  const productionRepair = await generateProductSeoDraft(moneyRequest, {
+    userId: "secondary-quality-repair-production",
+    config,
+    provider: productionRepairProvider,
+  });
+  assert.equal(productionRepair.ok, true);
+  assert.equal(productionRepairProvider.calls.length, 2);
+  assert.equal(productionRepairProvider.calls[1].kind, "qualityRepair");
+  assert.deepEqual(productionRepairProvider.calls[1].coverage, {
+    secondary1UsageCovered: false,
+    secondary2FaqCovered: false,
+    secondary1: "денежный поток энергии",
+    secondary2: "энергия входа в денежный канал",
+  });
+  const qualityPrompt = buildProductSeoQualityRepairPrompt(
+    productionRepairProvider.calls[1].input,
+    productionRepairProvider.calls[1].previous,
+    productionRepairProvider.calls[1].coverage,
+  );
+  assert.match(
+    qualityPrompt,
+    /Измени только один подходящий usageItem так, чтобы он естественно отражал смысл дополнительного запроса «денежный поток энергии»/,
+  );
+  assert.match(
+    qualityPrompt,
+    /Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «энергия входа в денежный канал»/,
+  );
+  assert.equal(
+    productionRepair.data.usageItems[0].content,
+    "Используйте практику, когда хочется сосредоточиться на теме денежного потока.",
+  );
+  assert.equal(
+    productionRepair.data.faqItems[1].answer,
+    "Материал можно включать, когда хочется уделить внимание теме входа в денежный канал.",
+  );
+  assert.deepEqual(validateProductSeoAiDraft(productionRepair.data, validationInput(moneyRequest)), {
+    ok: true,
+    draft: productionRepair.data,
+  });
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: MONEY_PRIMARY,
+        activeSecondaryQueries: moneyRequest.seoSecondaryQueries,
+        usageItems: productionRepair.data.usageItems,
+        faqItems: productionRepair.data.faqItems,
+      }),
+      2,
+    ),
+    true,
+  );
+
+  const oneSecondaryProvider = mockProvider([
+    {
+      ok: true,
+      draft: validDraft({
+        usageItems: [
+          { content: "Когда хочется вечернее расслабление перед сном" },
+          { content: "После напряжённого дня" },
+          { content: "Во время спокойного отдыха" },
+        ],
+      }),
+      raw: {},
+    },
+  ]);
+  const oneSecondary = await generateProductSeoDraft(
+    requestInput({ seoSecondaryQueries: ["вечернее расслабление"] }),
+    {
+      userId: "one-secondary-usage-slot",
+      config,
+      provider: oneSecondaryProvider,
+    },
+  );
+  assert.equal(oneSecondary.ok, true);
+  assert.equal(oneSecondaryProvider.calls.length, 1);
+  assert.equal(
+    oneSecondary.data.usageItems.filter((item) =>
+      /вечерн\S*\s+расслабл/i.test(item.content),
+    ).length,
+    1,
+  );
+  assert.equal(
+    oneSecondary.data.faqItems.some((item) =>
+      /расслабл/i.test(`${item.question} ${item.answer}`),
+    ),
+    false,
+  );
+  assert.doesNotMatch(oneSecondary.data.seoTitle, /расслабл/i);
+  assert.doesNotMatch(oneSecondary.data.seoDescription, /расслабл/i);
+
+  const overlapProvider = mockProvider([
+    {
+      ok: true,
+      draft: {
+        seoTitle: "денежная энергия перед вечерним настроем",
+        seoDescription:
+          "Практика «Денежная энергия» помогает мягко настроиться и уделить внимание спокойному вечеру.",
+        usageItems: [
+          { content: "Для работы с темой денежного канала." },
+          { content: "После напряжённого дня" },
+          { content: "Во время вечернего отдыха" },
+        ],
+        faqItems: moneyUncoveredDraft.faqItems,
+      },
+      raw: {},
+    },
+  ]);
+  const overlapResult = await generateProductSeoDraft(
+    requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: ["канал денежная энергия"],
+    }),
+    {
+      userId: "overlap-secondary-rephrase",
+      config,
+      provider: overlapProvider,
+    },
+  );
+  assert.equal(overlapResult.ok, true);
+  assert.equal(overlapProvider.calls.length, 1);
+  assert.equal(
+    overlapResult.data.usageItems.some((item) =>
+      item.content.includes("денежная энергия"),
+    ),
+    false,
+  );
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: MONEY_PRIMARY,
+      activeSecondaryQueries: ["канал денежная энергия"],
+      usageItems: overlapResult.data.usageItems,
+      faqItems: overlapResult.data.faqItems,
+    }).secondary1UsageCovered,
+    true,
+  );
+
+  const malformedQualityProvider = mockProvider([
+    { ok: true, draft: moneyUncoveredDraft, raw: {} },
+    productSeoAiInvalidOutputError({ stage: "provider_repair", generateIssues: [] }),
+  ]);
+  const malformedQuality = await generateProductSeoDraft(moneyRequest, {
+    userId: "quality-repair-malformed-fallback",
+    config,
+    provider: malformedQualityProvider,
+  });
+  assert.equal(malformedQuality.ok, true);
+  assert.equal(malformedQualityProvider.calls.length, 2);
+  assert.equal(malformedQualityProvider.calls[1].kind, "qualityRepair");
+  assert.deepEqual(malformedQuality.data.usageItems, moneyUncoveredDraft.usageItems);
+  assert.deepEqual(malformedQuality.data.faqItems, moneyUncoveredDraft.faqItems);
+  assert.deepEqual(validateProductSeoAiDraft(malformedQuality.data, validationInput(moneyRequest)), {
+    ok: true,
+    draft: malformedQuality.data,
+  });
+
+  const bannedQualityProvider = mockProvider([
+    { ok: true, draft: moneyUncoveredDraft, raw: {} },
+    {
+      ok: true,
+      draft: {
+        ...moneyCoveredDraft,
+        usageItems: [
+          {
+            content:
+              "Используйте практику, когда хочется сосредоточиться на теме денежного потока. Практика лечит бессонницу.",
+          },
+          moneyCoveredDraft.usageItems[1],
+          moneyCoveredDraft.usageItems[2],
+        ],
+      },
+      raw: {},
+    },
+  ]);
+  const bannedQuality = await generateProductSeoDraft(moneyRequest, {
+    userId: "quality-repair-banned-fallback",
+    config,
+    provider: bannedQualityProvider,
+  });
+  assert.equal(bannedQuality.ok, true);
+  assert.equal(bannedQuality.error, undefined);
+  assert.deepEqual(bannedQuality.data.usageItems, moneyUncoveredDraft.usageItems);
+
+  const stillMissingProvider = mockProvider([
+    { ok: true, draft: moneyUncoveredDraft, raw: {} },
+    { ok: true, draft: moneyUncoveredDraft, raw: {} },
+  ]);
+  const stillMissing = await generateProductSeoDraft(moneyRequest, {
+    userId: "quality-repair-still-missing-fallback",
+    config,
+    provider: stillMissingProvider,
+  });
+  assert.equal(stillMissing.ok, true);
+  assert.equal(stillMissingProvider.calls.length, 2);
+  assert.deepEqual(stillMissing.data.usageItems, moneyUncoveredDraft.usageItems);
+
+  const storedLegacy = normalizeManualSecondaryQueries(
+    [
+      "денежный поток энергии",
+      "энергия входа в денежный канал",
+      "энергия денежных средств",
+      "канал денежная энергия",
+    ],
+    MONEY_PRIMARY,
+  );
+  assert.deepEqual(storedLegacy, [
+    "денежный поток энергии",
+    "энергия входа в денежный канал",
+    "энергия денежных средств",
+    "канал денежная энергия",
+  ]);
+  assert.deepEqual(selectActiveSecondaryQueries(storedLegacy), [
+    "денежный поток энергии",
+    "энергия входа в денежный канал",
+  ]);
+  const legacyGenerateProvider = mockProvider([
+    { ok: true, draft: moneyCoveredDraft, raw: {} },
+  ]);
+  const legacyGenerate = await generateProductSeoDraft(
+    requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: storedLegacy,
+    }),
+    {
+      userId: "legacy-secondaries-preserved",
+      config,
+      provider: legacyGenerateProvider,
+    },
+  );
+  assert.equal(legacyGenerate.ok, true);
+  assert.deepEqual(legacyGenerate.data.seoSecondaryQueries, storedLegacy);
+  assert.equal(legacyGenerateProvider.calls.length, 1);
+
+  const validateSource = read("src/lib/seo/product-autofill/validate.ts");
+  assert.doesNotMatch(validateSource, /evaluateSecondaryQueryCoverage/);
+  assert.doesNotMatch(validateSource, /secondary1UsageCovered/);
+  assert.doesNotMatch(validateSource, /secondary_coverage/);
 }
 
 console.log("product-seo-autofill-unit: ok");

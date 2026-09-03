@@ -311,9 +311,13 @@ assert.equal(JSON.parse(manualFetch.calls[0].init.body).phrase, MANUAL_CHANGE);
 
 const firstSecondary = canAddSecondaryQuery("сон", []);
 assert.equal(firstSecondary.ok, true);
+const secondSecondary = canAddSecondaryQuery("отдых", firstSecondary.next);
+assert.equal(secondSecondary.ok, true);
 const duplicateSecondary = canAddSecondaryQuery("СОН", firstSecondary.next);
 assert.equal(duplicateSecondary.ok, false);
 assert.equal(duplicateSecondary.reason, "duplicate");
+assert.equal(canAddSecondaryQuery("ещё", secondSecondary.next).ok, false);
+assert.equal(canAddSecondaryQuery("ещё", secondSecondary.next).reason, "full");
 const ten = Array.from({ length: 10 }, (_, index) => `фраза ${index}`);
 assert.equal(canAddSecondaryQuery("ещё", ten).ok, false);
 assert.equal(canAddSecondaryQuery("ещё", ten).reason, "full");
