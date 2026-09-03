@@ -8,6 +8,7 @@
     "start": "node scripts/lib/guard-production-start.mjs && next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",
     "test:health-build": "npx tsx scripts/health-build-route-unit.mts",
     "test:production-pr-safety": "node scripts/production-pr-safety-guard-unit.mjs",
     "test:studio-provider-isolation": "node scripts/studio-provider-isolation-unit.mjs",
