@@ -7,11 +7,12 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   AUDIOBOOK_FRAGMENTS_BUCKET,
   buildAudiobookFragmentStoragePath,
-  isAudiobookFragmentStoragePath,
+  isAudiobookActiveFragmentStoragePath, isAudiobookFragmentStoragePath,
   normalizeAudiobookMimeType,
   validateAudiobookOriginalFilename,
 } from "./storage";
 import { AUDIOBOOK_LIMITS } from "./limits";
+import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 const PROJECT_SELECT = "id, author_id, title, book_author_name, narrator_name, status, created_at, updated_at";
 const CHAPTER_SELECT = "id, project_id, position, title, status, created_at, updated_at";
@@ -211,6 +212,39 @@ export async function listAudiobookFragments(projectId: string, chapterId: strin
     .order("position", { ascending: true }).order("id", { ascending: true });
   if (error) fail(error, "audiobook_fragments_list_error");
   return (data ?? []) as AudiobookFragment[];
+}
+
+const AUDIOBOOK_PLAYBACK_EXPIRES_IN = 900;
+
+export async function createAudiobookFragmentPlaybackUrl(
+  projectId: string,
+  chapterId: string,
+  fragmentId: string,
+  authorId: string,
+) {
+  await ownedChapter(projectId, chapterId, authorId);
+  const service = createServiceRoleClient();
+  const { data: fragment, error } = await service.from("audiobook_fragments")
+    .select(FRAGMENT_SELECT).eq("id", fragmentId).eq("chapter_id", chapterId)
+    .eq("status", "active").maybeSingle();
+  if (error) fail(error, "audiobook_fragment_playback_lookup_error");
+  if (!fragment) throw new AudiobookError("not_found", 404);
+  if (!isAudiobookActiveFragmentStoragePath(fragment.storage_path, authorId, projectId, chapterId, fragmentId)) {
+    console.error("audiobook_fragment_playback_path_invalid", { projectId, chapterId, fragmentId });
+    throw new AudiobookError("not_found", 404);
+  }
+
+  const { data: signed, error: signedError } = await service.storage
+    .from(AUDIOBOOK_FRAGMENTS_BUCKET)
+    .createSignedUrl(fragment.storage_path, AUDIOBOOK_PLAYBACK_EXPIRES_IN);
+  const url = signed?.signedUrl ? normalizeStorageSignedUrl(signed.signedUrl) : null;
+  if (signedError || !url) {
+    console.error("audiobook_fragment_playback_sign_error", {
+      projectId, chapterId, fragmentId, message: signedError?.message,
+    });
+    throw new AudiobookError("playback_unavailable", 500);
+  }
+  return { url, expiresAt: new Date(Date.now() + AUDIOBOOK_PLAYBACK_EXPIRES_IN * 1000).toISOString() };
 }
 
 export async function reserveAudiobookFragment(input: {
