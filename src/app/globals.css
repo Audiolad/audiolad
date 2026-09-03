@@ -1197,6 +1197,35 @@ html.catalog-sheet-lock body {
   }
 }
 
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  .practice-product-hero__actions,
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  .practice-product-hero__actions > *,
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  .practice-product-hero__actions > :first-child,
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  [data-practice-primary-play] {
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+}
+
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  .author-appreciation-hero,
+[data-practice-product-hero] .practice-product-hero__cta--with-appreciation
+  .author-appreciation-cta {
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+}
+
 .primary-cta,
 .home-primary-cta {
   display: inline-flex;

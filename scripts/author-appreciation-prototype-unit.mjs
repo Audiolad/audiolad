@@ -49,6 +49,9 @@ assert.ok(
   "caption 🙏 must not be wrapped by the heart pulse class",
 );
 assert.ok(prototype.includes('surface: "author" | "product"'));
+assert.ok(prototype.includes('layout?: "card" | "hero-stack"'));
+assert.ok(prototype.includes("event.stopPropagation()"));
+assert.ok(prototype.includes('type="button"'));
 assert.ok(prototype.includes('role="dialog"'));
 assert.ok(prototype.includes('aria-modal="true"'));
 assert.ok(prototype.includes("items-end"));
@@ -92,9 +95,33 @@ const practiceContent = read(
   "src/components/products/practice-page/PracticePageContent.tsx",
 );
 assert.ok(
-  practiceContent.indexOf("<AuthorAppreciationPrototype") <
-    practiceContent.indexOf("<ProductTopicLinks"),
-  "product block must follow hero and precede topics",
+  !practiceContent.includes("<AuthorAppreciationPrototype"),
+  "practice appreciation lives in the hero action stack, not below the hero",
+);
+
+const practiceParts = read(
+  "src/components/products/practice-page/PracticePageParts.tsx",
+);
+const actionSection = practiceParts.slice(
+  practiceParts.indexOf("export function PracticePrimaryActionSection"),
+);
+assert.ok(actionSection.includes("<AuthorAppreciationPrototype"));
+assert.ok(actionSection.includes('layout="hero-stack"'));
+assert.ok(
+  actionSection.indexOf("<PracticeListenCtaLink") <
+    actionSection.indexOf("<AuthorAppreciationPrototype"),
+  "Listen / Pause stays first; appreciation is immediately below",
+);
+assert.ok(
+  actionSection.indexOf("<AuthorAppreciationPrototype") <
+    actionSection.indexOf("<PaymentLegalNote"),
+  "appreciation stays in the hero CTA stack, not after legal notes",
+);
+assert.ok(actionSection.includes("practice-product-hero__cta--with-appreciation"));
+assert.ok(
+  !actionSection.includes("flex-row") &&
+    actionSection.includes("PracticeListenCtaLink"),
+  "hero stack remains a vertical CTA column when appreciation is present",
 );
 
 const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");

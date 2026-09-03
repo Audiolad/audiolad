@@ -12,10 +12,8 @@ import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
 import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
 import { collectAuthorContactSameAs } from "@/lib/authors/contacts";
-import {
-  isAuthorAppreciationPreviewActive,
-  resolveAuthorAppreciationVisibility,
-} from "@/lib/author-appreciation/effective-visibility";
+import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
+import { resolveAuthorAppreciationVisibility } from "@/lib/author-appreciation/effective-visibility";
 import {
   getAuthorAppreciationRolloutConfig,
   isAuthorAppreciationRolloutEnabled,
@@ -77,8 +75,7 @@ export default async function AuthorPublicPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  const { author_appreciation_preview: authorAppreciationPreview } =
-    await searchParams;
+  await searchParams;
   const supabase = await createClient();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
@@ -110,14 +107,13 @@ export default async function AuthorPublicPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // Stage 1 design prototype only. Phase 2 will replace this explicit preview
-  // flag with commercial eligibility and persisted author/product preferences.
   const rollout = getAuthorAppreciationRolloutConfig();
+  const currentTermsAccepted = await hasAcceptedCurrentAppreciationTerms(data.id);
   const showAuthorAppreciationPrototype =
-    isAuthorAppreciationRolloutEnabled(rollout, data.id) &&
+    isAuthorAppreciationRolloutEnabled(rollout) &&
     resolveAuthorAppreciationVisibility({
       surface: "author",
-      previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+      currentTermsAccepted,
       accessStatus: data.accessStatus,
       settings: data.appreciationSettings,
     });

@@ -17,8 +17,8 @@ import {
   getProductCoverSymbol,
 } from "@/lib/products/cover-display";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
+import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
 import {
-  isAuthorAppreciationPreviewActive,
   resolveAuthorAppreciationSettings,
   resolveAuthorAppreciationVisibility,
 } from "@/lib/author-appreciation/effective-visibility";
@@ -288,7 +288,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
   const {
-    author_appreciation_preview: authorAppreciationPreview,
     listen: listenParam,
     preview: previewParam,
     view: viewParam,
@@ -498,11 +497,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       : null,
   );
   const rollout = getAuthorAppreciationRolloutConfig();
+  const currentTermsAccepted = await hasAcceptedCurrentAppreciationTerms(
+    practice.author_id,
+  );
   const showAuthorAppreciationPrototype =
-    isAuthorAppreciationRolloutEnabled(rollout, practice.author_id) &&
+    isAuthorAppreciationRolloutEnabled(rollout) &&
     resolveAuthorAppreciationVisibility({
       surface: "product",
-      previewActive: isAuthorAppreciationPreviewActive(authorAppreciationPreview),
+      currentTermsAccepted,
       accessStatus: appreciationAuthor?.access_status,
       settings: appreciationSettings,
       product: {

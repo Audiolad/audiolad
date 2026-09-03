@@ -6,6 +6,11 @@ import {
   getAuthorAppreciationRolloutConfig,
   isAuthorAppreciationRolloutEnabled,
 } from "@/lib/author-appreciation/config";
+import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
+import {
+  canReceiveCanonicalAppreciationAccrual,
+  isCommercialTermsFound,
+} from "@/lib/author-appreciation/finance-eligibility";
 import {
   isAppreciationProductEligible,
   resolveAuthorAppreciationSettings,
@@ -77,7 +82,7 @@ export async function POST(request: Request) {
 
   const rollout = getAuthorAppreciationRolloutConfig();
   if (
-    !isAuthorAppreciationRolloutEnabled(rollout, authorId) ||
+    !isAuthorAppreciationRolloutEnabled(rollout) ||
     amountMinor < rollout.minAmountMinor ||
     amountMinor > rollout.maxAmountMinor ||
     amountMinor % 100 !== 0
@@ -127,10 +132,30 @@ export async function POST(request: Request) {
 
   const { data: author, error: authorError } = await service
     .from("authors")
-    .select("id, name, slug, access_status, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
+    .select("id, name, slug, access_status, payout_eligible, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
     .eq("id", authorId)
     .maybeSingle();
   if (authorError || !author || !isAuthorCommercialActiveAccess(author.access_status)) {
+    return error("appreciation_unavailable", 404);
+  }
+  if (!(await hasAcceptedCurrentAppreciationTerms(authorId))) {
+    return error("appreciation_unavailable", 404);
+  }
+  const { data: commercialTerms, error: commercialTermsError } = await service.rpc(
+    "resolve_author_commercial_terms",
+    {
+      p_author_id: authorId,
+      p_at_time: new Date().toISOString(),
+      p_currency: "RUB",
+    },
+  );
+  if (
+    commercialTermsError ||
+    !canReceiveCanonicalAppreciationAccrual({
+      payoutEligible: author.payout_eligible === true,
+      commercialTermsFound: isCommercialTermsFound(commercialTerms),
+    })
+  ) {
     return error("appreciation_unavailable", 404);
   }
   const settingsRow = Array.isArray(author.author_appreciation_settings)
