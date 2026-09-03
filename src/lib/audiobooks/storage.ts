@@ -73,3 +73,13 @@ export function isAudiobookActiveFragmentStoragePath(
 export function buildAudiobookChapterRenderStoragePath(authorId: string, projectId: string, chapterId: string, jobId: string) {
   return `audiobooks/${authorId}/${projectId}/${chapterId}/renders/${jobId}.mp3`;
 }
+
+export function isAudiobookChapterRenderStoragePath(
+  path: string,
+  authorId: string,
+  projectId: string,
+  chapterId: string,
+  jobId: string,
+) {
+  return path === buildAudiobookChapterRenderStoragePath(authorId, projectId, chapterId, jobId);
+}

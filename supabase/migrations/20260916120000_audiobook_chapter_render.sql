@@ -9,6 +9,7 @@ CREATE TABLE public.audiobook_chapter_render_jobs (
   snapshot_sha256 text NOT NULL,
   status text NOT NULL DEFAULT 'queued',
   output_storage_path text NULL,
+  output_size_bytes bigint NULL,
   error_code text NULL,
   error_message_safe text NULL,
   attempt_count integer NOT NULL DEFAULT 0,
@@ -22,8 +23,8 @@ CREATE TABLE public.audiobook_chapter_render_jobs (
   CONSTRAINT audiobook_chapter_render_status_check CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
   CONSTRAINT audiobook_chapter_render_attempt_check CHECK (attempt_count >= 0 AND attempt_count <= 2),
   CONSTRAINT audiobook_chapter_render_output_check CHECK (
-    (status = 'completed' AND output_storage_path IS NOT NULL AND completed_at IS NOT NULL)
-    OR (status <> 'completed' AND output_storage_path IS NULL)
+    (status = 'completed' AND output_storage_path IS NOT NULL AND output_size_bytes > 0 AND completed_at IS NOT NULL)
+    OR (status <> 'completed' AND output_storage_path IS NULL AND output_size_bytes IS NULL)
   )
 );
 CREATE INDEX audiobook_chapter_render_queued_idx ON public.audiobook_chapter_render_jobs(created_at) WHERE status = 'queued';

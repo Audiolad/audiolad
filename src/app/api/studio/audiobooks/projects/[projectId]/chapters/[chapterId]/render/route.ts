@@ -12,7 +12,9 @@ export async function GET(request: Request, context: Context) {
   try {
     const { projectId, chapterId } = await context.params;
     const authorId = parseAudiobookUuid(new URL(request.url).searchParams.get("authorId"), "invalid_author_id");
-    return NextResponse.json({ job: await getAudiobookChapterRenderState(parseAudiobookUuid(projectId, "not_found"), parseAudiobookUuid(chapterId, "not_found"), authorId) }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await getAudiobookChapterRenderState(
+      parseAudiobookUuid(projectId, "not_found"), parseAudiobookUuid(chapterId, "not_found"), authorId,
+    ), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return respond(error); }
 }
 export async function POST(request: Request, context: Context) {

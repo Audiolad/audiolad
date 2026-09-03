@@ -2,10 +2,13 @@
  * One bounded queue pass; schedule externally only after the migration is applied.
  * PM2 must not start this script until an operator explicitly enables it.
  */
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
   renderStudioProjectToMp3,
@@ -15,10 +18,15 @@ import { renderOutputPath } from "../src/lib/studio/render/storage";
 import type { StudioRenderSnapshot } from "../src/lib/studio/render/types";
 import { renderAudiobookChapterToMp3 } from "../src/lib/audiobooks/render";
 import { AUDIOBOOK_RENDERS_BUCKET, buildAudiobookChapterRenderStoragePath } from "../src/lib/audiobooks/storage";
+import { audiobookRenderSnapshotSha256, parseAudiobookRenderSnapshot } from "../src/lib/audiobooks/render-snapshot";
 
 const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
 const assetsBucket = "studio-draft-assets";
 const outputBucket = "studio-renders";
+
+async function streamStorageObjectToFile(file: Blob, path: string) {
+  await pipeline(Readable.fromWeb(file.stream() as import("node:stream/web").ReadableStream), createWriteStream(path));
+}
 
 async function processAudiobookChapterRender() {
   await service.rpc("recover_stale_audiobook_chapter_render_jobs");
@@ -28,27 +36,28 @@ async function processAudiobookChapterRender() {
   if (!job || typeof job !== "object" || typeof job.id !== "string") return false;
   const workspace = join(tmpdir(), `audiolad-audiobook-render-${randomUUID()}`);
   try {
-    const snapshot = job.fragment_snapshot;
-    const canonical = JSON.stringify(snapshot);
-    if (!snapshot || createHash("sha256").update(canonical).digest("hex") !== job.snapshot_sha256) throw new Error("snapshot_fingerprint_mismatch");
-    const fragments = Array.isArray(snapshot.fragments) ? snapshot.fragments : [];
-    if (!fragments.length || fragments.some((fragment) => !fragment || typeof fragment.storagePath !== "string")) throw new Error("invalid_snapshot");
+    const snapshot = parseAudiobookRenderSnapshot(job.fragment_snapshot, {
+      authorId: job.author_id, projectId: job.project_id, chapterId: job.chapter_id,
+    });
+    if (!snapshot || audiobookRenderSnapshotSha256(snapshot) !== job.snapshot_sha256) throw new Error("snapshot_fingerprint_mismatch");
+    const fragments = snapshot.fragments;
     await mkdir(workspace, { recursive: true });
     const paths: string[] = [];
     for (const [index, fragment] of fragments.entries()) {
       const { data: file, error: downloadError } = await service.storage.from("audiobook-fragments").download(fragment.storagePath);
       if (downloadError || !file) throw new Error("source_unavailable");
       const path = join(workspace, `source-${index}`);
-      await writeFile(path, Buffer.from(await file.arrayBuffer()));
+      await streamStorageObjectToFile(file, path);
       paths.push(path);
     }
     const result = await renderAudiobookChapterToMp3(paths, workspace, job.id);
     const outputPath = buildAudiobookChapterRenderStoragePath(job.author_id, job.project_id, job.chapter_id, job.id);
     const { error: uploadError } = await service.storage.from(AUDIOBOOK_RENDERS_BUCKET)
-      .upload(outputPath, await (await import("node:fs/promises")).readFile(result.outputPath), { contentType: "audio/mpeg", upsert: true });
+      .upload(outputPath, createReadStream(result.outputPath), { contentType: "audio/mpeg", upsert: true });
     if (uploadError) throw uploadError;
     const { data: completed, error: completeError } = await service.from("audiobook_chapter_render_jobs").update({
-      status: "completed", output_storage_path: outputPath, completed_at: new Date().toISOString(), lease_expires_at: null, updated_at: new Date().toISOString(),
+      status: "completed", output_storage_path: outputPath, output_size_bytes: result.sizeBytes,
+      completed_at: new Date().toISOString(), lease_expires_at: null, updated_at: new Date().toISOString(),
     }).eq("id", job.id).eq("status", "processing").select("id").maybeSingle();
     if (completeError || !completed) throw new Error("render_job_completion_state_lost");
     console.log(JSON.stringify({ event: "audiobook_chapter_render_completed", jobId: job.id, bytes: result.sizeBytes }));
@@ -89,7 +98,7 @@ async function main() {
       const { data, error: downloadError } = await service.storage.from(assetsBucket).download(asset.storagePath);
       if (downloadError || !data) throw new Error("source_unavailable");
       const path = join(workspace, `${asset.id}.audio`);
-      await writeFile(path, Buffer.from(await data.arrayBuffer()));
+      await streamStorageObjectToFile(data, path);
       paths.set(asset.id, path);
     }
     const result = await renderStudioProjectToMp3(
@@ -112,10 +121,9 @@ async function main() {
       ffmpegStderrSummary: result.stderr.slice(-1000),
     }));
     const outputPath = renderOutputPath(job.id);
-    const bytes = await (await import("node:fs/promises")).readFile(result.outputPath);
     const { error: uploadError } = await service.storage
       .from(outputBucket)
-      .upload(outputPath, bytes, { contentType: "audio/mpeg", upsert: true });
+      .upload(outputPath, createReadStream(result.outputPath), { contentType: "audio/mpeg", upsert: true });
     if (uploadError) throw uploadError;
     const { data: completedJob, error: completionError } = await service
       .from("studio_render_jobs")

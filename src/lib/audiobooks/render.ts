@@ -13,7 +13,7 @@ function run(args: string[]) {
   });
 }
 
-/** Normalizes every source before concat, so mixed browser recordings upload safely. */
+/** Normalizes every source to lossless PCM before the chapter's single MP3 encode. */
 export async function renderAudiobookChapterToMp3(
   sourcePaths: readonly string[],
   workspace: string,
@@ -22,8 +22,8 @@ export async function renderAudiobookChapterToMp3(
   if (!sourcePaths.length) throw new Error("no_active_fragments");
   const normalized: string[] = [];
   for (const [index, source] of sourcePaths.entries()) {
-    const output = join(workspace, `fragment-${index}.mp3`);
-    await run(["-i", source, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-write_xing", "0", "-y", output]);
+    const output = join(workspace, `fragment-${index}.wav`);
+    await run(["-i", source, "-vn", "-c:a", "pcm_f32le", "-ar", "44100", "-ac", "2", "-y", output]);
     normalized.push(output);
   }
   const outputPath = join(workspace, `${renderId}.mp3`);
