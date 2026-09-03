@@ -1310,6 +1310,154 @@ html.catalog-sheet-lock body {
   }
 }
 
+/*
+ * Author appreciation CTA: same filled primary language as Listen/Buy,
+ * plus a soft attention pulse. Animate transform/opacity only.
+ */
+.author-appreciation-cta {
+  position: relative;
+  transform-origin: center;
+  box-shadow: 0 8px 18px rgba(112, 66, 197, 0.18);
+  transition:
+    background-color 160ms ease,
+    box-shadow 200ms ease,
+    filter 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.author-appreciation-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 36%,
+    rgba(255, 255, 255, 0.16) 50%,
+    transparent 64%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-position: 120% 0;
+  opacity: 0;
+}
+
+.author-appreciation-cta__heart {
+  display: inline-block;
+  transform-origin: center;
+}
+
+.author-appreciation-cta:hover {
+  box-shadow: 0 10px 22px rgba(112, 66, 197, 0.28);
+}
+
+.author-appreciation-cta:active {
+  filter: brightness(0.9);
+  box-shadow: 0 6px 14px rgba(112, 66, 197, 0.2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .author-appreciation-cta {
+    animation:
+      author-appreciation-cta-breathe 3.8s ease-in-out infinite,
+      author-appreciation-cta-glow 5.6s ease-in-out infinite;
+  }
+
+  .author-appreciation-cta::after {
+    animation: author-appreciation-cta-sheen 5.6s ease-in-out infinite;
+  }
+
+  .author-appreciation-cta__heart {
+    animation: author-appreciation-cta-heart 2.6s ease-in-out infinite;
+  }
+
+  .author-appreciation-cta:hover,
+  .author-appreciation-cta:focus-visible {
+    animation-play-state: paused;
+  }
+
+  .author-appreciation-cta:hover::after,
+  .author-appreciation-cta:focus-visible::after {
+    animation-play-state: paused;
+    opacity: 0;
+  }
+
+  .author-appreciation-cta:hover .author-appreciation-cta__heart,
+  .author-appreciation-cta:focus-visible .author-appreciation-cta__heart {
+    animation-play-state: paused;
+  }
+
+  .author-appreciation-cta:active {
+    animation: none;
+    transform: scale(0.985);
+  }
+
+  .author-appreciation-cta:active::after,
+  .author-appreciation-cta:active .author-appreciation-cta__heart {
+    animation: none;
+  }
+}
+
+@keyframes author-appreciation-cta-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.018);
+  }
+}
+
+@keyframes author-appreciation-cta-heart {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes author-appreciation-cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 8px 18px rgba(112, 66, 197, 0.18);
+  }
+  50% {
+    box-shadow: 0 12px 28px rgba(112, 66, 197, 0.3);
+  }
+}
+
+@keyframes author-appreciation-cta-sheen {
+  0%,
+  68% {
+    opacity: 0;
+    background-position: 120% 0;
+  }
+  76% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    opacity: 0;
+    background-position: -20% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .author-appreciation-cta,
+  .author-appreciation-cta::after,
+  .author-appreciation-cta__heart {
+    animation: none;
+  }
+
+  .author-appreciation-cta:active {
+    transform: none;
+  }
+}
+
 .signup-invitation-banner {
   position: relative;
   overflow: hidden;

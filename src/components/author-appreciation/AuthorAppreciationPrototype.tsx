@@ -2,9 +2,12 @@
 
 import { useEffect, useId, useState } from "react";
 
+import { FEATURED_CARD_PRIMARY_CTA_CLASS } from "@/components/home/FeaturedProductCard";
 import { formatRubles } from "@/lib/products/price-format";
 
 const QUICK_AMOUNTS = [100, 300, 500, 1000] as const;
+const APPRECIATION_CTA_LABEL = "🙏 Поблагодарить автора ❤️";
+const APPRECIATION_CTA_HEART = "❤️";
 
 type AuthorAppreciationPrototypeProps = {
   authorName: string;
@@ -115,11 +118,17 @@ export default function AuthorAppreciationPrototype({
             setError(null);
             setOpen(true);
           }}
-          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#c6afe6] bg-white px-4 py-2.5 text-sm font-semibold text-[#7042c5] transition-colors hover:border-[#7042c5] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} author-appreciation-cta max-w-full justify-center text-center hover:bg-[#6338b0] active:bg-[#5a32a3]`}
         >
-          🙏 Поблагодарить автора ❤️
+          {APPRECIATION_CTA_LABEL.slice(
+            0,
+            APPRECIATION_CTA_LABEL.indexOf(APPRECIATION_CTA_HEART),
+          ).trimEnd()}
+          <span className="author-appreciation-cta__heart">
+            {APPRECIATION_CTA_HEART}
+          </span>
         </button>
-        <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+        <p className="mt-2.5 text-sm leading-5 text-[#7d70a2]">
           Благодарность возвращается изобилием
         </p>
       </section>
