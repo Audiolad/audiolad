@@ -157,7 +157,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               practiceId={practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
-              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}
@@ -230,7 +229,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               practiceId={practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
-              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}

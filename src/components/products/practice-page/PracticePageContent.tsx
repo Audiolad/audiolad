@@ -53,7 +53,6 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
               practiceId={viewModel.practice.id}
               isAuthenticated={viewModel.isAuthenticated}
               surface="product"
-              path={viewModel.practicePagePath}
             />
           </div>
         ) : null}

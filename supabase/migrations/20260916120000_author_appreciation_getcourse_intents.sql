@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.author_appreciation_payment_intents (
   surface text NOT NULL CHECK (surface IN ('author', 'product')),
   user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
   email text NOT NULL,
+  source_title text NOT NULL,
+  source_path text NOT NULL,
   amount_minor bigint NOT NULL CHECK (amount_minor > 0),
   currency text NOT NULL DEFAULT 'RUB' CHECK (currency = 'RUB'),
   status text NOT NULL DEFAULT 'pending'

@@ -12,7 +12,6 @@ type AuthorAppreciationPrototypeProps = {
   practiceId: string | null;
   isAuthenticated: boolean;
   surface: "author" | "product";
-  path: string;
 };
 
 function resolveAmountLabel(amount: number | null): string {
@@ -25,7 +24,6 @@ export default function AuthorAppreciationPrototype({
   practiceId,
   isAuthenticated,
   surface,
-  path,
 }: AuthorAppreciationPrototypeProps) {
   const titleId = useId();
   const emailId = useId();
@@ -62,7 +60,6 @@ export default function AuthorAppreciationPrototype({
           surface,
           amount_minor: selectedAmount * 100,
           guest_email: isAuthenticated ? undefined : guestEmail,
-          path,
         }),
       });
       const payload = (await response.json()) as {

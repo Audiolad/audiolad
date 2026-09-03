@@ -167,7 +167,6 @@ export default async function AuthorPublicPage({
               practiceId={null}
               isAuthenticated={Boolean(user)}
               surface="author"
-              path={authorPath}
             />
           </div>
         ) : null}

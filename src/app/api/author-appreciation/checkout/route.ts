@@ -23,6 +23,10 @@ import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import { isAllowedSupportRequestOrigin } from "@/lib/help/request-guard";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  buildAuthorPublicPath,
+  buildPracticePublicPath,
+} from "@/lib/products/paths";
 
 type CheckoutBody = Record<string, unknown>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
 
   const { data: author, error: authorError } = await service
     .from("authors")
-    .select("id, access_status, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
+    .select("id, name, slug, access_status, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
     .eq("id", authorId)
     .maybeSingle();
   if (authorError || !author || !isAuthorCommercialActiveAccess(author.access_status)) {
@@ -145,10 +149,12 @@ export async function POST(request: Request) {
     return error("appreciation_unavailable", 404);
   }
 
+  let sourceTitle = author.name;
+  let sourcePath = buildAuthorPublicPath(author.slug);
   if (practiceId) {
     const { data: practice, error: practiceError } = await service
       .from("practices")
-      .select("id, author_id, status, is_free, publication_class, product_kind, catalog_visibility, is_catalog_listed, listener_appreciation_override")
+      .select("id, author_id, title, slug, status, is_free, publication_class, product_kind, catalog_visibility, is_catalog_listed, listener_appreciation_override")
       .eq("id", practiceId)
       .eq("author_id", authorId)
       .maybeSingle();
@@ -168,6 +174,8 @@ export async function POST(request: Request) {
     ) {
       return error("appreciation_unavailable", 404);
     }
+    sourceTitle = practice.title;
+    sourcePath = buildPracticePublicPath(author.slug, practice.slug);
   }
 
   const intentId = randomUUID();
@@ -179,6 +187,8 @@ export async function POST(request: Request) {
     surface,
     user_id: userId,
     email,
+    source_title: sourceTitle,
+    source_path: sourcePath,
     amount_minor: amountMinor,
     currency: "RUB",
     status: "pending",
