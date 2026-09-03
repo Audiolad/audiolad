@@ -350,7 +350,8 @@ export async function generateProductSeoDraft(
     return {
       ...draft,
       faqItems: draft.faqItems.map((item) =>
-        faqAnswerIsQuestion(item.answer)
+        faqAnswerIsQuestion(item.answer) ||
+        faqAnswerRepeatsQuestion(item.question, item.answer)
           ? (() => {
               const answer =
                 salvageDeterministicFaqAnswer(item.question, item.answer) ??
@@ -364,18 +365,13 @@ export async function generateProductSeoDraft(
     };
   }
 
-  function shortenDescriptionDeterministically(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    const description = draft.seoDescription.trim();
-    if (description.length <= PRODUCT_CONTENT_LIMITS.seoDescription) {
-      return draft;
+  function shortenTextDeterministically(value: string, limit: number): string | null {
+    const text = value.trim();
+    if (text.length <= limit) {
+      return text || null;
     }
 
-    const allowedPrefix = description.slice(
-      0,
-      PRODUCT_CONTENT_LIMITS.seoDescription + 1,
-    );
+    const allowedPrefix = text.slice(0, limit + 1);
     const lastSentenceBoundary = Math.max(
       allowedPrefix.lastIndexOf("."),
       allowedPrefix.lastIndexOf("!"),
@@ -387,13 +383,43 @@ export async function generateProductSeoDraft(
         : null;
     const wordBoundary = allowedPrefix.lastIndexOf(" ");
     const shortenedAtWordBoundary =
-      wordBoundary > 0
-        ? allowedPrefix.slice(0, wordBoundary).trim()
-        : null;
-    const shortened =
+      wordBoundary > 0 ? allowedPrefix.slice(0, wordBoundary).trim() : null;
+
+    return (
       shortenedAtSentenceBoundary ??
       shortenedAtWordBoundary ??
-      description.slice(0, PRODUCT_CONTENT_LIMITS.seoDescription).trim();
+      text.slice(0, limit).trim() ??
+      null
+    );
+  }
+
+  function finalizeTitleDeterministically(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    const shortened = shortenTextDeterministically(
+      draft.seoTitle,
+      PRODUCT_CONTENT_LIMITS.seoTitle,
+    );
+    if (
+      shortened &&
+      (!primary || containsSeoPhrase(shortened, primary))
+    ) {
+      return { ...draft, seoTitle: shortened };
+    }
+
+    return primary && primary.length <= PRODUCT_CONTENT_LIMITS.seoTitle
+      ? { ...draft, seoTitle: primary }
+      : draft;
+  }
+
+  function shortenDescriptionDeterministically(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    const description = draft.seoDescription.trim();
+    const shortened = shortenTextDeterministically(
+      description,
+      PRODUCT_CONTENT_LIMITS.seoDescription,
+    );
 
     // Match the primary exactly as the validator does. A failed local fallback
     // remains fail-closed with diagnostics.
@@ -410,6 +436,39 @@ export async function generateProductSeoDraft(
     return { ...draft, seoDescription: shortened };
   }
 
+  function finalizeDescriptionDeterministically(
+    draft: ProductSeoAiRawDraft,
+  ): ProductSeoAiRawDraft {
+    if (!primary || containsSeoPhrase(draft.seoDescription, primary)) {
+      const shortened = shortenDescriptionDeterministically(draft);
+      if (
+        shortened.seoDescription.length <= PRODUCT_CONTENT_LIMITS.seoDescription &&
+        (!primary || containsSeoPhrase(shortened.seoDescription, primary))
+      ) {
+        return shortened;
+      }
+    }
+
+    // The author-owned primary is capped at 120 characters and so is always a
+    // valid, literal, length-safe metadata value. This is used only when
+    // shortening cannot retain it or when it was absent. Final validation
+    // remains the proof that no other validator rule was introduced.
+    if (primary.length <= PRODUCT_CONTENT_LIMITS.seoDescription) {
+      return { ...draft, seoDescription: primary };
+    }
+
+    return shortenDescriptionDeterministically(draft);
+  }
+
+  const SAFE_FINALIZER_ISSUES = new Set([
+    "title_too_long",
+    "primary_missing_from_title",
+    "description_too_long",
+    "primary_missing_from_description",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+
   /**
    * Applies only local transformations whose validity can be proved by the
    * validator. It never changes author input, anchors, FAQ questions, or
@@ -420,7 +479,22 @@ export async function generateProductSeoDraft(
     issues: string[],
   ): ProductSeoAiRawDraft {
     let finalized = draft;
-    if (issues.includes("faq_answer_is_question")) {
+    if (
+      issues.includes("title_too_long") ||
+      issues.includes("primary_missing_from_title")
+    ) {
+      finalized = finalizeTitleDeterministically(finalized);
+    }
+    if (
+      issues.includes("description_too_long") ||
+      issues.includes("primary_missing_from_description")
+    ) {
+      finalized = finalizeDescriptionDeterministically(finalized);
+    }
+    if (
+      issues.includes("faq_answer_is_question") ||
+      issues.includes("faq_answer_repeats_question")
+    ) {
       finalized = applyDeterministicFaqAnswerFallback(finalized);
     }
     if (issues.includes("description_too_long")) {
@@ -484,11 +558,22 @@ export async function generateProductSeoDraft(
       stage: "finalizer",
       issues: finalizerValidation.issues,
     });
+    const residualNonSafeIssues = finalizerValidation.issues.filter(
+      (issue) => !SAFE_FINALIZER_ISSUES.has(issue),
+    );
+    if (residualNonSafeIssues.length === 0) {
+      return productSeoAiInvalidOutputError({
+        stage: "validation_finalizer",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+        finalizerIssues: finalizerValidation.issues,
+      });
+    }
 
     const thirdRepair = await provider.repair(
       promptInput,
       finalizedDraft,
-      finalizerValidation.issues,
+      residualNonSafeIssues,
     );
     if (!thirdRepair.ok) {
       return thirdRepair;

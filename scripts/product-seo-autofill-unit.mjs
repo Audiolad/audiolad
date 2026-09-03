@@ -1130,15 +1130,17 @@ for (const [question, expectedAnswer] of [
   });
 }
 
-// A remaining issue outside the safe finalizer's narrow scope receives one
-// generic third repair with the exact residual issue set.
+// A remaining unsafe issue receives one generic third repair with only the
+// residual unsafe code; locally finalizable metadata must not consume it.
 {
-  const missingTitleDraft = validDraft({
+  const mixedSafeAndUnsafeDraft = validDraft({
     seoTitle: "Спокойный вечер перед отдыхом",
+    seoDescription:
+      "Медитация для сна лечит бессонницу в спокойном вечернем ритме.",
   });
   const mixedResidualProvider = mockProvider([
-    { ok: true, draft: missingTitleDraft, raw: {} },
-    { ok: true, draft: missingTitleDraft, raw: {} },
+    { ok: true, draft: mixedSafeAndUnsafeDraft, raw: {} },
+    { ok: true, draft: mixedSafeAndUnsafeDraft, raw: {} },
     { ok: true, draft: validDraft(), raw: {} },
   ]);
   const mixedResidualResult = await generateProductSeoDraft(requestInput(), {
@@ -1150,13 +1152,16 @@ for (const [question, expectedAnswer] of [
   assert.equal(mixedResidualResult.ok, true);
   assert.equal(mixedResidualProvider.calls.length, 3);
   assert.deepEqual(mixedResidualProvider.calls[2].issues, [
-    "primary_missing_from_title",
+    "banned_claim:лечит",
   ]);
-  assert.deepEqual(mixedResidualProvider.calls[2].previous, missingTitleDraft);
+  assert.equal(
+    mixedResidualProvider.calls[2].previous.seoTitle,
+    requestInput().seoPrimaryQuery,
+  );
 }
 
-// If a safe finalizer still cannot make the draft valid after the generic
-// third repair, expose only category-level diagnostic codes.
+// A safe-only residual cannot consume the generic third repair. It fails
+// closed with category-only diagnostics instead.
 {
   const fallbackCollisionDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
@@ -1181,17 +1186,15 @@ for (const [question, expectedAnswer] of [
     provider: mockProvider([
       { ok: true, draft: fallbackCollisionDraft, raw: {} },
       { ok: true, draft: fallbackCollisionDraft, raw: {} },
-      { ok: true, draft: fallbackCollisionDraft, raw: {} },
     ]),
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(fallbackCollisionResult.ok, false);
   assert.deepEqual(fallbackCollisionResult.error.diagnostic, {
-    stage: "validation_third_repair",
+    stage: "validation_finalizer",
     generateIssues: ["faq_answer_is_question"],
     repairIssues: ["faq_answer_is_question"],
     finalizerIssues: ["faq_answer_is_question"],
-    thirdRepairIssues: ["faq_answer_is_question"],
   });
 }
 
@@ -1377,12 +1380,11 @@ for (const [question, expectedAnswer] of [
   );
 }
 
-// If preserving the exact primary would make shortening unsafe, the generic
-// third repair gets one chance before returning category-only diagnostics.
+// A long description whose primary is after the safe truncation point falls
+// back locally to that literal primary, without using the generic third call.
 {
   const primaryAfterLimit = `${"Спокойный вечер. ".repeat(25)}медитация для сна.`;
   const unsafeDescriptionProvider = mockProvider([
-    { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
     { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
     { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
   ]);
@@ -1391,15 +1393,12 @@ for (const [question, expectedAnswer] of [
     config,
     provider: unsafeDescriptionProvider,
   });
-  assert.equal(unsafeDescriptionResult.ok, false);
-  assert.equal(unsafeDescriptionProvider.calls.length, 3);
-  assert.deepEqual(unsafeDescriptionResult.error.diagnostic, {
-    stage: "validation_third_repair",
-    generateIssues: ["description_too_long"],
-    repairIssues: ["description_too_long"],
-    finalizerIssues: ["description_too_long"],
-    thirdRepairIssues: ["description_too_long"],
-  });
+  assert.equal(unsafeDescriptionResult.ok, true);
+  assert.equal(unsafeDescriptionProvider.calls.length, 2);
+  assert.equal(
+    unsafeDescriptionResult.data.seoDescription,
+    requestInput().seoPrimaryQuery,
+  );
 }
 
 // E2E regression: a same-product repair first corrects description-only
@@ -1527,6 +1526,59 @@ for (const [question, expectedAnswer] of [
     fourIssuePrompt,
     /Исправь другие поля только при наличии отдельной перечисленной проблемы/is,
   );
+}
+
+// All six mechanical residual issues are finalized locally after provider call
+// two. The title and description are reduced to the literal author primary;
+// only invalid FAQ answers change, and no generic third repair is consumed.
+{
+  const overlongTitleWithoutPrimary =
+    "Спокойный вечер для мягкого завершения дня и подготовки к отдыху. ".repeat(3);
+  const overlongDescriptionWithoutPrimary =
+    "Мягкая практика для спокойного завершения дня и вечернего отдыха. ".repeat(6);
+  const sixIssueDraft = validDraft({
+    seoTitle: overlongTitleWithoutPrimary,
+    seoDescription: overlongDescriptionWithoutPrimary,
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index
+        ? item
+        : {
+            ...item,
+            answer: item.question,
+          },
+    ),
+  });
+  const sixIssueProvider = mockProvider([
+    { ok: true, draft: sixIssueDraft, raw: {} },
+    { ok: true, draft: sixIssueDraft, raw: {} },
+  ]);
+  const sixIssueResult = await generateProductSeoDraft(requestInput(), {
+    userId: "six-mechanical-finalizer-issues",
+    config,
+    provider: sixIssueProvider,
+  });
+  assert.equal(sixIssueResult.ok, true);
+  assert.equal(sixIssueProvider.calls.length, 2);
+  assert.deepEqual(sixIssueProvider.calls[1].issues, [
+    "title_too_long",
+    "primary_missing_from_title",
+    "description_too_long",
+    "primary_missing_from_description",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+  assert.equal(sixIssueResult.data.seoTitle, requestInput().seoPrimaryQuery);
+  assert.equal(sixIssueResult.data.seoDescription, requestInput().seoPrimaryQuery);
+  assert.deepEqual(sixIssueResult.data.usageItems, sixIssueDraft.usageItems);
+  assert.deepEqual(
+    sixIssueResult.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+    sixIssueDraft.faqItems.map(({ question, anchor }) => ({ question, anchor })),
+  );
+  assert.notEqual(sixIssueResult.data.faqItems[0].answer, sixIssueDraft.faqItems[0].answer);
+  assert.deepEqual(validateProductSeoAiDraft(sixIssueResult.data, validationInput()), {
+    ok: true,
+    draft: sixIssueResult.data,
+  });
 }
 
 const noPrimary = await generateProductSeoDraft(
@@ -1850,15 +1902,9 @@ await withEnvAsync(yandexEnv(), async () => {
     provider: yandexProvider,
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
-  assert.equal(result.ok, false);
-  assert.equal(result.error.code, "INVALID_OUTPUT");
-  assert.deepEqual(result.error.diagnostic, {
-    stage: "validation_third_repair",
-    generateIssues: ["primary_missing_from_title"],
-    repairIssues: ["primary_missing_from_title"],
-    finalizerIssues: ["primary_missing_from_title"],
-    thirdRepairIssues: ["primary_missing_from_title"],
-  });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.seoTitle, requestInput().seoPrimaryQuery);
+  assert.equal(fetchImpl.calls.length, 2);
 });
 
 // UI helpers and no-persist API.
