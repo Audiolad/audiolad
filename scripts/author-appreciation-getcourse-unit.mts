@@ -315,6 +315,9 @@ assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?
 assert.match(checkout, /hasAcceptedCurrentAppreciationTerms/);
 assert.match(checkout, /isAuthorAppreciationRolloutEnabled\(rollout\)/);
 assert.doesNotMatch(checkout, /allowedAuthorIds|AUTHOR_ALLOWLIST/);
+assert.match(checkout, /payout_eligible/);
+assert.match(checkout, /resolve_author_commercial_terms/);
+assert.match(checkout, /canReceiveCanonicalAppreciationAccrual/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
 assert.match(webhook, /timingSafeEqual/);

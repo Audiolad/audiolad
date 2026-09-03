@@ -8,12 +8,19 @@ import {
   holdAvailableAt,
   platformShareMinor,
 } from "../src/lib/payments/author-finance/types.ts";
+import {
+  canReceiveCanonicalAppreciationAccrual,
+  isCommercialTermsFound,
+} from "../src/lib/author-appreciation/finance-eligibility.ts";
 
 const root = process.cwd();
 const read = (file) => readFileSync(path.join(root, file), "utf8");
 
-const migration = read(
+const projectionMigration = read(
   "supabase/migrations/20260917120000_author_appreciation_finance_projection.sql",
+);
+const statusMigration = read(
+  "supabase/migrations/20260918120000_author_appreciation_finance_projection_status.sql",
 );
 const intentsMigration = read(
   "supabase/migrations/20260916120000_author_appreciation_getcourse_intents.sql",
@@ -29,33 +36,40 @@ const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.t
 const visibility = read("src/lib/author-appreciation/effective-visibility.ts");
 const config = read("src/lib/author-appreciation/config.ts");
 const termsHelper = read("src/lib/author-appreciation/current-terms.ts");
+const financeEligibility = read("src/lib/author-appreciation/finance-eligibility.ts");
 
-const ensureFn = migration.slice(
-  migration.indexOf("CREATE OR REPLACE FUNCTION public.ensure_author_appreciation_sale_accrual"),
-  migration.indexOf("CREATE OR REPLACE FUNCTION public.reconcile_author_appreciation_paid_intents"),
+const ensureFn = statusMigration.slice(
+  statusMigration.indexOf("CREATE OR REPLACE FUNCTION public.ensure_author_appreciation_sale_accrual"),
+  statusMigration.indexOf("CREATE OR REPLACE FUNCTION public.reconcile_author_appreciation_paid_intents"),
 );
-const callbackFn = migration.slice(
-  migration.lastIndexOf("CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback"),
+const callbackFn = statusMigration.slice(
+  statusMigration.lastIndexOf("CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback"),
 );
-const reconcileFn = migration.slice(
-  migration.indexOf("CREATE OR REPLACE FUNCTION public.reconcile_author_appreciation_paid_intents"),
-  migration.lastIndexOf("CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback"),
+const reconcileFn = statusMigration.slice(
+  statusMigration.indexOf("CREATE OR REPLACE FUNCTION public.reconcile_author_appreciation_paid_intents"),
+  statusMigration.lastIndexOf("CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback"),
+);
+const recordFn = statusMigration.slice(
+  statusMigration.indexOf("CREATE OR REPLACE FUNCTION public.record_author_appreciation_finance_projection"),
+  statusMigration.indexOf("CREATE OR REPLACE FUNCTION public.ensure_author_appreciation_sale_accrual"),
 );
 
 function testAPaidCallbackCreatesOneAccrual() {
   assert.match(callbackFn, /SET status = 'paid', paid_at = now()/);
   assert.match(
     callbackFn,
-    /SET status = 'paid'[\s\S]*PERFORM public\.ensure_author_appreciation_sale_accrual\(v_intent\.id\)/,
+    /SET status = 'paid'[\s\S]*ensure_author_appreciation_sale_accrual\(v_intent\.id\)/,
   );
   assert.match(ensureFn, /'sale_accrual'/);
   assert.match(ensureFn, /author_appreciation_intent_id/);
+  assert.match(callbackFn, /v_projection_outcome IN \('created', 'idempotent_replay'\)/);
+  assert.match(callbackFn, /RETURN QUERY SELECT 'paid'::text, v_intent\.id;/);
 }
 
 function testBDuplicatePaidStillOneAccrual() {
   assert.match(
     callbackFn,
-    /IF v_intent\.status = 'paid' THEN[\s\S]*PERFORM public\.ensure_author_appreciation_sale_accrual\(v_intent\.id\);[\s\S]*RETURN QUERY SELECT 'already_paid'/,
+    /IF v_intent\.status = 'paid' THEN[\s\S]*ensure_author_appreciation_sale_accrual\(v_intent\.id\);[\s\S]*already_paid/,
   );
   assert.match(ensureFn, /outcome', 'idempotent_replay'/);
   assert.match(ensureFn, /result_code', 'accrual_exists'/);
@@ -63,7 +77,7 @@ function testBDuplicatePaidStillOneAccrual() {
 
 function testCConcurrentRetryOneAccrual() {
   assert.match(
-    migration,
+    projectionMigration,
     /CREATE UNIQUE INDEX IF NOT EXISTS author_ledger_entries_appreciation_sale_uidx/,
   );
   assert.match(ensureFn, /WHEN unique_violation THEN/);
@@ -72,9 +86,10 @@ function testCConcurrentRetryOneAccrual() {
 
 function testDHistoricalPaidReconciliation() {
   assert.match(reconcileFn, /WHERE i\.status = 'paid'/);
+  assert.match(reconcileFn, /finance_projection_status IS DISTINCT FROM 'projected'/);
   assert.match(reconcileFn, /NOT EXISTS/);
   assert.match(reconcileFn, /ensure_author_appreciation_sale_accrual\(v_intent\.id\)/);
-  assert.match(migration, /reconcile_author_appreciation_paid_intents\(10000\)/);
+  assert.match(statusMigration, /reconcile_author_appreciation_paid_intents\(10000\)/);
 }
 
 function testEReconciliationTwiceNoOp() {
@@ -126,25 +141,25 @@ function testLHoldEqualsCanonical() {
 }
 
 function testMBalanceProjection() {
-  assert.match(migration, /author_ledger_payment_positions/);
+  assert.match(projectionMigration, /author_ledger_payment_positions/);
   assert.match(
-    migration,
+    projectionMigration,
     /e\.payment_id IS NOT NULL OR e\.author_appreciation_intent_id IS NOT NULL/,
   );
   assert.match(
-    migration,
+    projectionMigration,
     /GROUP BY e\.author_id, e\.payment_id, e\.author_appreciation_intent_id/,
   );
   assert.match(
-    migration,
+    projectionMigration,
     /e\.payment_id IS NULL\n\s+AND e\.author_appreciation_intent_id IS NULL/,
   );
 }
 
 function testNPayoutPipeline() {
   assert.match(ensureFn, /entry_type[\s\S]*'sale_accrual'/);
-  assert.match(migration, /author_finance_p334_entries/);
-  assert.match(migration, /author_finance_p334_type_key\(e\.entry_type\)/);
+  assert.match(projectionMigration, /author_finance_p334_entries/);
+  assert.match(projectionMigration, /author_finance_p334_type_key\(e\.entry_type\)/);
 }
 
 function testOPQNoFakeCommerce() {
@@ -157,11 +172,11 @@ function testOPQNoFakeCommerce() {
 
 function testAtomicCallbackAndXorSource() {
   assert.match(
-    migration,
+    projectionMigration,
     /\(payment_id IS NOT NULL AND author_appreciation_intent_id IS NULL\)/,
   );
   assert.match(
-    migration,
+    projectionMigration,
     /\(payment_id IS NULL AND author_appreciation_intent_id IS NOT NULL\)/,
   );
   assert.match(
@@ -191,8 +206,71 @@ function testPublicRolloutAndTerms() {
 }
 
 function testNoSeparateBalance() {
-  assert.doesNotMatch(migration, /appreciation_balance|donation_balance|special_payout/);
+  assert.doesNotMatch(statusMigration, /appreciation_balance|donation_balance|special_payout/);
   assert.match(ensureFn, /'sale_accrual'/);
+}
+
+function testProviderPaidNeverRewrittenToFailed() {
+  assert.doesNotMatch(callbackFn, /status = 'failed'/);
+  assert.doesNotMatch(recordFn, /status = 'failed'/);
+  assert.doesNotMatch(ensureFn, /SET\s+status\s*=\s*'failed'/);
+  assert.match(callbackFn, /SET status = 'paid', paid_at = now()/);
+  assert.match(
+    callbackFn,
+    /v_projection_outcome IN \('created', 'idempotent_replay'\)[\s\S]*paid_needs_review/,
+  );
+}
+
+function testAccrualFailureIsExplicitNotSilent() {
+  assert.match(statusMigration, /finance_projection_status text NOT NULL DEFAULT 'pending'/);
+  assert.match(statusMigration, /CHECK \(finance_projection_status IN \('pending', 'projected', 'needs_review'\)\)/);
+  assert.match(recordFn, /finance_projection_status = 'projected'/);
+  assert.match(recordFn, /finance_projection_status = 'needs_review'/);
+  assert.match(recordFn, /requires_review', 'skipped'/);
+  assert.match(ensureFn, /record_author_appreciation_finance_projection/);
+  assert.match(ensureFn, /author_not_payout_eligible/);
+  assert.match(ensureFn, /no_active_terms|v_terms ->> 'reason'/);
+  assert.match(callbackFn, /paid_needs_review/);
+  assert.match(callbackFn, /already_paid_needs_review/);
+}
+
+function testReconciliationRetriesUnprojectedPaid() {
+  assert.match(reconcileFn, /finance_projection_status IS DISTINCT FROM 'projected'/);
+  assert.match(reconcileFn, /OR NOT EXISTS/);
+  assert.match(
+    statusMigration,
+    /author_appreciation_intents_unprojected_paid_idx[\s\S]*status = 'paid' AND finance_projection_status IS DISTINCT FROM 'projected'/,
+  );
+}
+
+function testCheckoutFailClosedWithoutCanonicalAccrual() {
+  assert.match(checkout, /payout_eligible/);
+  assert.match(checkout, /resolve_author_commercial_terms/);
+  assert.match(checkout, /canReceiveCanonicalAppreciationAccrual/);
+  assert.match(financeEligibility, /payoutEligible === true && input\.commercialTermsFound === true/);
+  assert.equal(
+    canReceiveCanonicalAppreciationAccrual({
+      payoutEligible: true,
+      commercialTermsFound: true,
+    }),
+    true,
+  );
+  assert.equal(
+    canReceiveCanonicalAppreciationAccrual({
+      payoutEligible: false,
+      commercialTermsFound: true,
+    }),
+    false,
+  );
+  assert.equal(
+    canReceiveCanonicalAppreciationAccrual({
+      payoutEligible: true,
+      commercialTermsFound: false,
+    }),
+    false,
+  );
+  assert.equal(isCommercialTermsFound({ found: true }), true);
+  assert.equal(isCommercialTermsFound({ found: false, reason: "no_active_terms" }), false);
 }
 
 testAPaidCallbackCreatesOneAccrual();
@@ -211,5 +289,9 @@ testOPQNoFakeCommerce();
 testAtomicCallbackAndXorSource();
 testPublicRolloutAndTerms();
 testNoSeparateBalance();
+testProviderPaidNeverRewrittenToFailed();
+testAccrualFailureIsExplicitNotSilent();
+testReconciliationRetriesUnprojectedPaid();
+testCheckoutFailClosedWithoutCanonicalAccrual();
 
 console.log("author-appreciation-finance-unit: ok");
