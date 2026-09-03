@@ -1,8 +1,11 @@
 import "server-only";
 
 import {
+  classifyGetCourseDealStatus,
+  classifyGetCoursePaymentCompleteness,
   extractOfferIds,
   firstString,
+  isProviderConfirmedFullyPaid,
   record,
   rublesToMinor,
 } from "@/lib/author-appreciation/getcourse/callback";
@@ -265,20 +268,37 @@ export function matchIntentToExportedDeal(input: {
   if (!input.deal) return { matched: false, reason: "not_found" };
   if (input.deal === "ambiguous") return { matched: false, reason: "ambiguous" };
   const deal = input.deal;
-  if (deal.status && deal.status !== "payed") {
-    return { matched: false, reason: "unpaid" };
-  }
   if (deal.amountMinor !== null && deal.amountMinor !== input.amountMinor) {
     return { matched: false, reason: "amount_mismatch" };
   }
   if (deal.offerIds.length > 0 && !deal.offerIds.includes(input.configuredOfferId)) {
     return { matched: false, reason: "export_offer_mismatch" };
   }
-  if (deal.payedMoneyMinor !== null && deal.payedMoneyMinor < input.amountMinor) {
+  const moneyClass = classifyGetCoursePaymentCompleteness({
+    amountMinor: input.amountMinor,
+    payedMoneyMinor: deal.payedMoneyMinor,
+    leftCostMoneyMinor: deal.leftCostMoneyMinor,
+  });
+  if (moneyClass === "partial") {
     return { matched: false, reason: "partial_payment" };
   }
-  if (deal.leftCostMoneyMinor !== null && deal.leftCostMoneyMinor > 0) {
-    return { matched: false, reason: "partial_payment" };
+  if (moneyClass === "unpaid") {
+    return { matched: false, reason: "unpaid" };
+  }
+  const statusClass = classifyGetCourseDealStatus(deal.status);
+  if (statusClass === "void") {
+    return { matched: false, reason: "unpaid" };
+  }
+  if (
+    deal.status &&
+    !isProviderConfirmedFullyPaid({
+      status: deal.status,
+      amountMinor: input.amountMinor,
+      payedMoneyMinor: deal.payedMoneyMinor,
+      leftCostMoneyMinor: deal.leftCostMoneyMinor,
+    })
+  ) {
+    return { matched: false, reason: statusClass === "partial" ? "partial_payment" : "unpaid" };
   }
   return { matched: true, deal };
 }

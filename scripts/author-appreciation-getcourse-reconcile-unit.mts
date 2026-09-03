@@ -325,6 +325,33 @@ async function run(options: {
 }
 
 {
+  // Localized / official-display export status still matches a payed export row
+  const localized = parseExportedGetCourseDeal({
+    id: DEAL_ID,
+    number: 1001,
+    status: "Завершен",
+    deal_cost: "100",
+    payed_money: "100",
+    left_cost_money: "0",
+    offers: OFFER_ID,
+  });
+  assert.ok(localized);
+  const localizedMatch = matchIntentToExportedDeal({
+    deal: localized,
+    configuredOfferId: OFFER_ID,
+    amountMinor: 10_000,
+  });
+  assert.equal(localizedMatch.matched, true);
+
+  const fetch = createExportFetch({
+    rows: [paidRow(DEAL_ID, { status: "Оплачен" })],
+  });
+  const recovered = await run({ fetch });
+  assert.equal(recovered.result.applied, 1);
+  assert.equal(recovered.applyCalls[0].status, "payed");
+}
+
+{
   const confirm = readFileSync("src/lib/author-appreciation/getcourse/confirm-deal.ts", "utf8");
   assert.match(confirm, /\/pl\/api\/account\/deals/);
   assert.match(confirm, /set\("status", "payed"\)/);
@@ -337,6 +364,16 @@ async function run(options: {
 
   const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
   assert.match(deploy, /ensure-author-appreciation-getcourse-reconcile\.sh/);
+  assert.match(deploy, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
+  const pin = readFileSync("deploy/scripts/lib/pin-target-deploy-scripts.sh", "utf8");
+  assert.match(pin, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
+  const launcher = readFileSync("deploy/scripts/run-from-target-sha.sh", "utf8");
+  assert.match(launcher, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
+  const ensure = readFileSync(
+    "deploy/scripts/ensure-author-appreciation-getcourse-reconcile.sh",
+    "utf8",
+  );
+  assert.match(ensure, /DEPLOY_TREE:-/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",

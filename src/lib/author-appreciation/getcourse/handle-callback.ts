@@ -2,7 +2,9 @@ import { timingSafeEqual } from "node:crypto";
 
 import {
   decideGetCourseCallbackApply,
+  logGetCourseCallbackApplied,
   logGetCourseCallbackIgnored,
+  logGetCourseFinanceProjectionIfNeeded,
   parseGetCourseCallback,
   readCallbackRpcOutcome,
   type GetCourseCallbackIgnoreReason,
@@ -34,6 +36,7 @@ export type HandleGetCourseCallbackResult = {
   rpcCalled: boolean;
   usedDealCorrelation: boolean;
   callback: ParsedGetCourseCallback | null;
+  rpcOutcome: string | null;
 };
 
 function safeEqual(actual: string | null, expected: string): boolean {
@@ -54,6 +57,7 @@ export function handleGetCourseAppreciationCallback(
       rpcCalled: false,
       usedDealCorrelation: false,
       callback: null,
+      rpcOutcome: null,
     };
   }
   if (!safeEqual(input.secretHeader, input.expectedSecret)) {
@@ -63,6 +67,7 @@ export function handleGetCourseAppreciationCallback(
       rpcCalled: false,
       usedDealCorrelation: false,
       callback: null,
+      rpcOutcome: null,
     };
   }
   if (!input.contentType?.toLowerCase().includes("application/json")) {
@@ -72,6 +77,7 @@ export function handleGetCourseAppreciationCallback(
       rpcCalled: false,
       usedDealCorrelation: false,
       callback: null,
+      rpcOutcome: null,
     };
   }
 
@@ -88,6 +94,7 @@ export function handleGetCourseAppreciationCallback(
       rpcCalled: false,
       usedDealCorrelation: false,
       callback,
+      rpcOutcome: null,
     };
   }
 
@@ -111,6 +118,7 @@ export function handleGetCourseAppreciationCallback(
           rpcCalled: true,
           usedDealCorrelation: decision.usedDealCorrelation,
           callback,
+          rpcOutcome: null,
         };
       }
       const outcome = readCallbackRpcOutcome(result.data);
@@ -123,14 +131,21 @@ export function handleGetCourseAppreciationCallback(
           rpcCalled: true,
           usedDealCorrelation: decision.usedDealCorrelation,
           callback,
+          rpcOutcome: outcome,
         };
       }
+      logGetCourseCallbackApplied({
+        outcome,
+        usedDealCorrelation: decision.usedDealCorrelation,
+      });
+      logGetCourseFinanceProjectionIfNeeded(outcome);
       return {
         status: 200,
         ignoredReason: null,
         rpcCalled: true,
         usedDealCorrelation: decision.usedDealCorrelation,
         callback,
+        rpcOutcome: outcome,
       };
     })
     .catch(() => ({
@@ -139,5 +154,6 @@ export function handleGetCourseAppreciationCallback(
       rpcCalled: true,
       usedDealCorrelation: decision.usedDealCorrelation,
       callback,
+      rpcOutcome: null,
     }));
 }

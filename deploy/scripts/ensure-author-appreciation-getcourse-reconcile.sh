@@ -5,7 +5,14 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-DEPLOY_TREE="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# Prefer the full release tree (git archive of the commit includes
+# deploy/systemd). The pinned deploy-scripts snapshot historically
+# extracted only deploy/scripts and therefore missed the unit files.
+if [[ -n "${DEPLOY_TREE:-}" && -d "$DEPLOY_TREE" ]]; then
+  DEPLOY_TREE="$(cd "$DEPLOY_TREE" && pwd -P)"
+else
+  DEPLOY_TREE="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+fi
 
 WRAPPER_SRC="$SCRIPT_DIR/run-author-appreciation-getcourse-reconcile.sh"
 SERVICE_SRC="$DEPLOY_TREE/systemd/audiolad-author-appreciation-getcourse-reconcile.service"

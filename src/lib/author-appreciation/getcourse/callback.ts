@@ -16,8 +16,133 @@ export type GetCourseCallbackIgnoreReason =
   | "missing_deal_identifier"
   | "missing_amount"
   | "status_not_payed"
+  | "partial_payment"
   | "unknown_deal"
   | "ambiguous_deal";
+
+export type GetCoursePaidClass = "paid" | "partial" | "unpaid" | "void" | "unknown";
+
+export const GETCOURSE_CANONICAL_PAID_STATUS = "payed";
+
+const PAID_STATUS_TOKENS = new Set([
+  "payed",
+  "paid",
+  "completed",
+  "complete",
+  "finished",
+  "done",
+  "завершен",
+  "завершён",
+  "завершено",
+  "завершена",
+  "оплачен",
+  "оплачено",
+  "оплачена",
+]);
+
+const PARTIAL_STATUS_TOKENS = new Set([
+  "part_payed",
+  "part-payed",
+  "part_paid",
+  "partial",
+  "partially_paid",
+  "частично",
+  "частично оплачен",
+  "частично оплачено",
+  "частично оплачена",
+]);
+
+const VOID_STATUS_TOKENS = new Set([
+  "cancelled",
+  "canceled",
+  "false",
+  "отменен",
+  "отменён",
+  "отменено",
+  "отменена",
+  "ложный",
+  "ложная",
+]);
+
+const UNPAID_STATUS_TOKENS = new Set([
+  "new",
+  "payment_waiting",
+  "not_confirmed",
+  "pending",
+  "in_work",
+  "waiting_for_return",
+  "новый",
+  "новая",
+  "новое",
+  "ожидает оплаты",
+  "не подтвержден",
+  "не подтверждён",
+  "в работе",
+  "ожидает возврата",
+]);
+
+function normalizeStatusToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function classifyGetCourseDealStatus(status: string | null): GetCoursePaidClass {
+  if (!status) return "unknown";
+  const token = normalizeStatusToken(status);
+  if (!token || token === "{object.status}") return "unknown";
+  if (PAID_STATUS_TOKENS.has(token)) return "paid";
+  if (PARTIAL_STATUS_TOKENS.has(token)) return "partial";
+  if (VOID_STATUS_TOKENS.has(token)) return "void";
+  if (UNPAID_STATUS_TOKENS.has(token)) return "unpaid";
+  return "unknown";
+}
+
+export function classifyGetCoursePaymentCompleteness(input: {
+  amountMinor: number | null;
+  payedMoneyMinor: number | null;
+  leftCostMoneyMinor: number | null;
+}): GetCoursePaidClass {
+  const { amountMinor, payedMoneyMinor, leftCostMoneyMinor } = input;
+  if (leftCostMoneyMinor !== null && leftCostMoneyMinor > 0) {
+    return payedMoneyMinor !== null && payedMoneyMinor > 0 ? "partial" : "unpaid";
+  }
+  if (amountMinor !== null && payedMoneyMinor !== null && payedMoneyMinor < amountMinor) {
+    return payedMoneyMinor <= 0 ? "unpaid" : "partial";
+  }
+  if (
+    amountMinor !== null &&
+    amountMinor > 0 &&
+    payedMoneyMinor !== null &&
+    payedMoneyMinor >= amountMinor &&
+    (leftCostMoneyMinor === null || leftCostMoneyMinor === 0)
+  ) {
+    return "paid";
+  }
+  if (leftCostMoneyMinor === 0 && payedMoneyMinor !== null && payedMoneyMinor > 0) {
+    return "paid";
+  }
+  return "unknown";
+}
+
+/**
+ * Canonical fully-paid only. Official API code is `payed`; Process
+ * `{object.status}` may be localized, `paid`, or `completed`. Money fields
+ * are an independent provider confirmation. Void statuses never promote.
+ * Partial / unpaid never promote.
+ */
+export function isProviderConfirmedFullyPaid(input: {
+  status: string | null;
+  amountMinor: number | null;
+  payedMoneyMinor: number | null;
+  leftCostMoneyMinor: number | null;
+}): boolean {
+  const money = classifyGetCoursePaymentCompleteness(input);
+  if (money === "partial" || money === "unpaid") return false;
+  const status = classifyGetCourseDealStatus(input.status);
+  if (status === "void") return false;
+  if (status === "partial" && money !== "paid") return false;
+  if (status === "paid") return true;
+  return money === "paid";
+}
 
 export type GetCourseCallbackApplyArgs = {
   providerDealId: string | null;
@@ -92,7 +217,13 @@ export function rublesToMinor(value: unknown): number | null {
     return null;
   }
   if (typeof value !== "string") return null;
-  const trimmed = value.trim().replace(",", ".");
+  const trimmed = value
+    .trim()
+    .replace(/[₽]/g, "")
+    .replace(/\bруб(?:лей|ля|ль)?\b/gi, "")
+    .replace(/\bRUB\b/gi, "")
+    .replace(/\s+/g, "")
+    .replace(",", ".");
   if (/^\d+$/.test(trimmed)) {
     const wholeRubles = Number(trimmed);
     return Number.isSafeInteger(wholeRubles) ? wholeRubles * 100 : null;
@@ -168,7 +299,22 @@ export function decideGetCourseCallbackApply(input: {
   if (callback.amountMinor === null) {
     return { action: "ignore", reason: "missing_amount" };
   }
-  if (callback.status !== "payed") {
+  const moneyClass = classifyGetCoursePaymentCompleteness({
+    amountMinor: callback.amountMinor,
+    payedMoneyMinor: callback.payedMoneyMinor,
+    leftCostMoneyMinor: callback.leftCostMoneyMinor,
+  });
+  if (moneyClass === "partial") {
+    return { action: "ignore", reason: "partial_payment" };
+  }
+  if (
+    !isProviderConfirmedFullyPaid({
+      status: callback.status,
+      amountMinor: callback.amountMinor,
+      payedMoneyMinor: callback.payedMoneyMinor,
+      leftCostMoneyMinor: callback.leftCostMoneyMinor,
+    })
+  ) {
     return { action: "ignore", reason: "status_not_payed" };
   }
 
@@ -187,7 +333,7 @@ export function decideGetCourseCallbackApply(input: {
       providerDealNumber: callback.dealNumber,
       offerId,
       amountMinor: callback.amountMinor,
-      status: callback.status,
+      status: GETCOURSE_CANONICAL_PAID_STATUS,
       payedMoneyMinor: callback.payedMoneyMinor,
       leftCostMoneyMinor: callback.leftCostMoneyMinor,
     },
@@ -205,6 +351,35 @@ export function logGetCourseCallbackIgnored(
     offer_field_present: callback.offerFieldPresent,
     amount_present: callback.amountMinor !== null,
     status_present: Boolean(callback.status),
+    status_class: classifyGetCourseDealStatus(callback.status),
+    money_class: classifyGetCoursePaymentCompleteness({
+      amountMinor: callback.amountMinor,
+      payedMoneyMinor: callback.payedMoneyMinor,
+      leftCostMoneyMinor: callback.leftCostMoneyMinor,
+    }),
+  });
+}
+
+export function logGetCourseCallbackApplied(input: {
+  outcome: string | null;
+  usedDealCorrelation: boolean;
+}): void {
+  console.info("author_appreciation_getcourse_callback_applied", {
+    outcome: input.outcome ?? "unknown",
+    used_deal_correlation: input.usedDealCorrelation,
+  });
+}
+
+const FINANCE_NEEDS_REVIEW_OUTCOMES = new Set([
+  "needs_review",
+  "paid_needs_review",
+  "already_paid_needs_review",
+]);
+
+export function logGetCourseFinanceProjectionIfNeeded(outcome: string | null): void {
+  if (!outcome || !FINANCE_NEEDS_REVIEW_OUTCOMES.has(outcome)) return;
+  console.info("author_appreciation_finance_projection_needs_review", {
+    reason: outcome,
   });
 }
 

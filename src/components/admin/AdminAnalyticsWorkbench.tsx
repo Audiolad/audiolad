@@ -13,6 +13,7 @@ import AdminAnalyticsMetricCards from "@/components/admin/AdminAnalyticsMetricCa
 import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalyticsTestTrafficControls";
 import AdminAnalyticsTimeseriesChart from "@/components/admin/AdminAnalyticsTimeseriesChart";
 import AdminAttributionPanel from "@/components/admin/AdminAttributionPanel";
+import AdminAppreciationPanel from "@/components/admin/AdminAppreciationPanel";
 import AdminMoneyPanel from "@/components/admin/AdminMoneyPanel";
 import AdminAuthorEconomyPanel from "@/components/admin/AdminAuthorEconomyPanel";
 import AdminRefundsPanel from "@/components/admin/AdminRefundsPanel";
@@ -251,7 +252,10 @@ export default function AdminAnalyticsWorkbench({
       </div>
 
       {view === "money" ? (
-        <AdminMoneyPanel urlState={urlState} onPatch={replaceState} />
+        <div className="space-y-5">
+          <AdminAppreciationPanel />
+          <AdminMoneyPanel urlState={urlState} onPatch={replaceState} />
+        </div>
       ) : null}
 
       {view === "refunds" ? (
@@ -259,7 +263,10 @@ export default function AdminAnalyticsWorkbench({
       ) : null}
 
       {view === "authors-economy" ? (
-        <AdminAuthorEconomyPanel urlState={urlState} onPatch={replaceState} />
+        <div className="space-y-5">
+          <AdminAppreciationPanel />
+          <AdminAuthorEconomyPanel urlState={urlState} onPatch={replaceState} />
+        </div>
       ) : null}
 
       {view === "sources" ? (

@@ -265,9 +265,24 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     if (error) {
       providerError = true;
       logReconcileSkipped("rpc_error", { deal_id_present: true });
+      console.info("author_appreciation_getcourse_reconcile_provider_error", {
+        reason: "rpc_error",
+        exports: 1,
+      });
       break;
     }
     applied += 1;
+    console.info("author_appreciation_getcourse_reconcile_applied", {
+      matched: true,
+      applied: 1,
+    });
+  }
+
+  if (!exported.ok && exported.reason === "provider_error") {
+    console.info("author_appreciation_getcourse_reconcile_provider_error", {
+      reason: "export_failed",
+      exports: 1,
+    });
   }
 
   return {

@@ -82,13 +82,18 @@ if [[ -f "$DEST/deploy/scripts/deploy.sh" && -f "$DEST/deploy/scripts/.pinned-co
   pin_log "Reusing pinned deploy scripts at ${DEST}"
 else
   TMP="$(mktemp -d "${STORE}/.tmp.${FULL_COMMIT}.XXXXXX")"
-  if ! git -C "$GIT_WORKDIR" archive "$FULL_COMMIT" deploy/scripts | tar -x -C "$TMP"; then
-    pin_error "git archive of deploy/scripts failed for ${FULL_COMMIT}"
+  if ! git -C "$GIT_WORKDIR" archive "$FULL_COMMIT" deploy/scripts deploy/systemd deploy/logrotate | tar -x -C "$TMP"; then
+    pin_error "git archive of deploy/scripts deploy/systemd deploy/logrotate failed for ${FULL_COMMIT}"
     rm -rf "$TMP"
     exit 1
   fi
   if [[ ! -f "$TMP/deploy/scripts/deploy.sh" ]]; then
     pin_error "target SHA ${FULL_COMMIT} is missing deploy/scripts/deploy.sh"
+    rm -rf "$TMP"
+    exit 1
+  fi
+  if [[ ! -f "$TMP/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]]; then
+    pin_error "target SHA ${FULL_COMMIT} is missing reconcile systemd unit"
     rm -rf "$TMP"
     exit 1
   fi

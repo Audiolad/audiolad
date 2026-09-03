@@ -322,7 +322,7 @@ main() {
   prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
   log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
   if [[ -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
-    if ! "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh"; then
+    if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh"; then
       log_warn "author_appreciation_getcourse_reconcile_ensure_nonfatal"
     fi
   fi

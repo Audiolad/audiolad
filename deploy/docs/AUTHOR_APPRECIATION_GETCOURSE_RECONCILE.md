@@ -28,8 +28,12 @@ operational poller.
 ## Schedule
 
 Every **45 minutes** via systemd timer (`OnUnitActiveSec=45min`). Canonical
-deploy installs and enables the timer, then starts one service run so an
+deploy installs and enables the timer from the **release** `deploy/` tree
+(`DEPLOY_TREE=$RELEASE_DIR/deploy`), then starts one service run so an
 already-paid pending intent can recover without a manual Timeweb command.
+Pinned deploy-scripts snapshots also include `deploy/systemd` and
+`deploy/logrotate` so ensure can still find the units if invoked from the
+pin tree.
 
 In-process / file cooldown also skips a second Export API start inside 45
 minutes.

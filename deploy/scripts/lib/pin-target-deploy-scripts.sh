@@ -82,13 +82,18 @@ extract_target_deploy_scripts() {
   fi
 
   tmp="$(mktemp -d "${store}/.tmp.${full_commit}.XXXXXX")"
-  if ! git -C "$GIT_WORKDIR" archive "$full_commit" deploy/scripts | tar -x -C "$tmp"; then
-    pin_error "git archive of deploy/scripts failed for ${full_commit}"
+  if ! git -C "$GIT_WORKDIR" archive "$full_commit" deploy/scripts deploy/systemd deploy/logrotate | tar -x -C "$tmp"; then
+    pin_error "git archive of deploy/scripts deploy/systemd deploy/logrotate failed for ${full_commit}"
     rm -rf "$tmp"
     return 1
   fi
   if [[ ! -f "$tmp/deploy/scripts/deploy.sh" ]]; then
     pin_error "target SHA ${full_commit} is missing deploy/scripts/deploy.sh"
+    rm -rf "$tmp"
+    return 1
+  fi
+  if [[ ! -f "$tmp/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]]; then
+    pin_error "target SHA ${full_commit} is missing reconcile systemd unit"
     rm -rf "$tmp"
     return 1
   fi
