@@ -528,13 +528,13 @@ export async function generateProductSeoDraft(
     validDraft: ProductSeoAutofillDraft,
     rawDraft: ProductSeoAiRawDraft,
   ): Promise<ProductSeoAiResult> {
-    // Primary overuse and missing secondary coverage are quality issues only.
-    // As soon as a hard-valid draft exists, keep it as the fallback.
-    let lastHardValidDraft = validDraft;
-    const coverage = readSecondaryCoverage(lastHardValidDraft);
-    const overuse = readPrimaryOveruse(lastHardValidDraft);
+    // Quality issues never replace the pre-repair hard-valid fallback unless
+    // the candidate is hard-valid and every active soft check also passes.
+    const fallbackHardValidDraft = validDraft;
+    const coverage = readSecondaryCoverage(fallbackHardValidDraft);
+    const overuse = readPrimaryOveruse(fallbackHardValidDraft);
     if (!hasQualityIssues(coverage, overuse) || providerCallCount >= MAX_PROVIDER_CALLS) {
-      return { ok: true, data: lastHardValidDraft };
+      return { ok: true, data: fallbackHardValidDraft };
     }
 
     const repaired = await provider.qualityRepair(
@@ -544,18 +544,24 @@ export async function generateProductSeoDraft(
     );
     providerCallCount += 1;
     if (!repaired.ok || !repaired.draft?.usageItems || !repaired.draft?.faqItems) {
-      return { ok: true, data: lastHardValidDraft };
+      return { ok: true, data: fallbackHardValidDraft };
     }
 
     const mergedDraft = normalizeGeneratedDraft(
       mergeQualityRepair(repaired.draft, rawDraft, coverage, overuse),
     );
     const repairedValidation = validateDraft(mergedDraft);
-    if (repairedValidation.ok) {
-      lastHardValidDraft = repairedValidation.draft;
+    if (!repairedValidation.ok) {
+      return { ok: true, data: fallbackHardValidDraft };
     }
 
-    return { ok: true, data: lastHardValidDraft };
+    const repairedCoverage = readSecondaryCoverage(repairedValidation.draft);
+    const repairedOveruse = readPrimaryOveruse(repairedValidation.draft);
+    if (hasQualityIssues(repairedCoverage, repairedOveruse)) {
+      return { ok: true, data: fallbackHardValidDraft };
+    }
+
+    return { ok: true, data: repairedValidation.draft };
   }
 
   function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {

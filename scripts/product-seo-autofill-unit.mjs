@@ -3471,9 +3471,34 @@ const ungroundedDraft = validDraft({
     false,
   );
 
+  const stillOverusedChangedDraft = {
+    ...keyToAbundanceNaturalDraft,
+    usageItems: [
+      keyToAbundanceNaturalDraft.usageItems[0],
+      keyToAbundanceNaturalDraft.usageItems[1],
+      { content: "Применяйте «Ключ к Изобилию» вечером в новой формулировке." },
+    ],
+  };
+  assert.notEqual(
+    stillOverusedChangedDraft.usageItems[0].content,
+    keyToAbundanceOverusedDraft.usageItems[0].content,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: stillOverusedChangedDraft.usageItems,
+      faqItems: [
+        keyToAbundanceOverusedDraft.faqItems[0],
+        stillOverusedChangedDraft.faqItems[1],
+        stillOverusedChangedDraft.faqItems[2],
+      ],
+    }).primaryOveruse,
+    true,
+  );
   const stillOverusedProvider = mockProvider([
     { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
-    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: stillOverusedChangedDraft, raw: {} },
   ]);
   const stillOverused = await generateProductSeoDraft(keyToAbundanceRequest, {
     userId: "primary-overuse-still-present-fallback",
@@ -3485,6 +3510,154 @@ const ungroundedDraft = validDraft({
   assert.equal(stillOverusedProvider.calls.length, 2);
   assert.deepEqual(stillOverused.data.usageItems, keyToAbundanceOverusedDraft.usageItems);
   assert.deepEqual(stillOverused.data.faqItems, keyToAbundanceOverusedDraft.faqItems);
+  assert.notEqual(
+    stillOverused.data.usageItems[2].content,
+    stillOverusedChangedDraft.usageItems[2].content,
+  );
+
+  const keyCoveredButOverusedDraft = {
+    seoTitle: keyToAbundanceOverusedDraft.seoTitle,
+    seoDescription: keyToAbundanceOverusedDraft.seoDescription,
+    usageItems: [
+      {
+        content:
+          "Используйте «Ключ к Изобилию», когда нужна мощная медитация изобилия.",
+      },
+      { content: "Практикуйте материал после напряжённого разговора." },
+      { content: "Возвращайтесь к записи во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
+        anchor: "komu",
+      },
+      {
+        question: "Когда лучше её слушать?",
+        answer: "Материал можно включать, когда хочется опереться на медитацию поток изобилия.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  assert.deepEqual(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: keyCoveredButOverusedDraft.usageItems,
+      faqItems: keyCoveredButOverusedDraft.faqItems,
+    }),
+    { secondary1UsageCovered: true, secondary2FaqCovered: true },
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: keyCoveredButOverusedDraft.usageItems,
+      faqItems: keyCoveredButOverusedDraft.faqItems,
+    }).primaryOveruse,
+    true,
+  );
+  const primaryFixedSecondaryLostDraft = {
+    ...keyCoveredButOverusedDraft,
+    seoTitle: "CHANGED TITLE Ключ к Изобилию не должен примениться",
+    usageItems: [
+      { content: "Используйте практику, чтобы спокойно настроиться на день." },
+      keyCoveredButOverusedDraft.usageItems[1],
+      keyCoveredButOverusedDraft.usageItems[2],
+    ],
+  };
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: primaryFixedSecondaryLostDraft.usageItems,
+      faqItems: primaryFixedSecondaryLostDraft.faqItems,
+    }).secondary1UsageCovered,
+    false,
+  );
+  const primaryFixBreaksSecondaryProvider = mockProvider([
+    { ok: true, draft: keyCoveredButOverusedDraft, raw: {} },
+    { ok: true, draft: primaryFixedSecondaryLostDraft, raw: {} },
+  ]);
+  const primaryFixBreaksSecondary = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "quality-repair-primary-fix-breaks-secondary",
+    config,
+    provider: primaryFixBreaksSecondaryProvider,
+  });
+  assert.equal(primaryFixBreaksSecondary.ok, true);
+  assert.equal(primaryFixBreaksSecondary.error, undefined);
+  assert.equal(primaryFixBreaksSecondaryProvider.calls.length, 2);
+  assert.deepEqual(
+    primaryFixBreaksSecondary.data.usageItems,
+    keyCoveredButOverusedDraft.usageItems,
+  );
+  assert.match(primaryFixBreaksSecondary.data.usageItems[0].content, /Ключ к Изобилию/);
+  assert.match(primaryFixBreaksSecondary.data.usageItems[0].content, /мощн/);
+
+  const secondariesFixedPrimaryLeftDraft = {
+    ...keyToAbundanceNaturalDraft,
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      {
+        ...keyToAbundanceNaturalDraft.faqItems[1],
+        question: "Когда слушать «Ключ к Изобилию»?",
+      },
+      keyToAbundanceNaturalDraft.faqItems[2],
+    ],
+  };
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: KEY_PRIMARY,
+        activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+        usageItems: secondariesFixedPrimaryLeftDraft.usageItems,
+        faqItems: [
+          keyToAbundanceOverusedDraft.faqItems[0],
+          secondariesFixedPrimaryLeftDraft.faqItems[1],
+          secondariesFixedPrimaryLeftDraft.faqItems[2],
+        ],
+      }),
+      2,
+    ),
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: secondariesFixedPrimaryLeftDraft.usageItems,
+      faqItems: [
+        keyToAbundanceOverusedDraft.faqItems[0],
+        secondariesFixedPrimaryLeftDraft.faqItems[1],
+        secondariesFixedPrimaryLeftDraft.faqItems[2],
+      ],
+    }).primaryOveruse,
+    true,
+  );
+  const secondaryFixLeavesPrimaryProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: secondariesFixedPrimaryLeftDraft, raw: {} },
+  ]);
+  const secondaryFixLeavesPrimary = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "quality-repair-secondary-fix-leaves-primary",
+    config,
+    provider: secondaryFixLeavesPrimaryProvider,
+  });
+  assert.equal(secondaryFixLeavesPrimary.ok, true);
+  assert.equal(secondaryFixLeavesPrimary.error, undefined);
+  assert.deepEqual(
+    secondaryFixLeavesPrimary.data.usageItems,
+    keyToAbundanceOverusedDraft.usageItems,
+  );
+  assert.deepEqual(
+    secondaryFixLeavesPrimary.data.faqItems,
+    keyToAbundanceOverusedDraft.faqItems,
+  );
 
   const malformedPrimaryOveruseProvider = mockProvider([
     { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
