@@ -1242,6 +1242,65 @@ for (const [question, expectedAnswer] of [
   });
 }
 
+// Production regression: a long description and an FAQ answer that repeats
+// its question are resolved in two calls. The repair fixes only FAQ; the
+// deterministic fallback then shortens the unchanged, case-variant primary
+// description at a word boundary without altering the remaining content.
+{
+  const longCaseVariantDescription =
+    `МЕДИТАЦИЯ ДЛЯ СНА ${"помогает мягко завершить день и уделить внимание спокойному отдыху ".repeat(6)}`.trim();
+  const firstDraft = validDraft({
+    seoDescription: longCaseVariantDescription,
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: item.question },
+    ),
+  });
+  const firstRepair = validDraft({
+    seoDescription: longCaseVariantDescription,
+    faqItems: firstDraft.faqItems.map((item, index) =>
+      index
+        ? item
+        : { ...item, answer: "Выберите тихое место и удобное положение." },
+    ),
+  });
+  const descriptionFallbackProvider = mockProvider([
+    { ok: true, draft: firstDraft, raw: {} },
+    { ok: true, draft: firstRepair, raw: {} },
+  ]);
+  const descriptionFallbackResult = await generateProductSeoDraft(requestInput(), {
+    userId: "description-fallback-after-faq-repeat",
+    config,
+    provider: descriptionFallbackProvider,
+  });
+  assert.equal(descriptionFallbackResult.ok, true);
+  assert.equal(descriptionFallbackProvider.calls.length, 2);
+  assert.deepEqual(descriptionFallbackProvider.calls[1].issues, [
+    "description_too_long",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+  assert.equal(descriptionFallbackProvider.calls[1].previous.seoDescription, longCaseVariantDescription);
+  assert.ok(descriptionFallbackResult.data.seoDescription.length <= 300);
+  assert.ok(
+    descriptionFallbackResult.data.seoDescription.endsWith("мягко"),
+    "fallback must not split a word",
+  );
+  assert.equal(
+    descriptionFallbackResult.data.seoDescription,
+    descriptionFallbackResult.data.seoDescription.trim(),
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(descriptionFallbackResult.data, validationInput()),
+    { ok: true, draft: descriptionFallbackResult.data },
+  );
+  assert.equal(descriptionFallbackResult.data.seoTitle, firstRepair.seoTitle);
+  assert.deepEqual(descriptionFallbackResult.data.usageItems, firstRepair.usageItems);
+  assert.deepEqual(
+    descriptionFallbackResult.data.faqItems,
+    firstRepair.faqItems,
+  );
+}
+
 // If preserving the exact primary would make shortening unsafe, return a
 // category-only diagnostic rather than making another provider request.
 {

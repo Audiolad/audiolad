@@ -25,6 +25,7 @@ import {
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
+import { containsSeoPhrase } from "@/lib/seo/product-metadata";
 import {
   type ProductSeoAiErrorCode,
   type ProductSeoAiRawDraft,
@@ -365,16 +366,24 @@ export async function generateProductSeoDraft(
       lastSentenceBoundary >= 0
         ? allowedPrefix.slice(0, lastSentenceBoundary + 1).trim()
         : null;
-    const shortened = shortenedAtSentenceBoundary ?? description
-      .slice(0, PRODUCT_CONTENT_LIMITS.seoDescription)
-      .trim();
+    const wordBoundary = allowedPrefix.lastIndexOf(" ");
+    const shortenedAtWordBoundary =
+      wordBoundary > 0
+        ? allowedPrefix.slice(0, wordBoundary).trim()
+        : null;
+    const shortened =
+      shortenedAtSentenceBoundary ??
+      shortenedAtWordBoundary ??
+      description.slice(0, PRODUCT_CONTENT_LIMITS.seoDescription).trim();
 
-    // Do not alter the description unless its exact primary-query spelling
-    // survives. A failed local fallback remains fail-closed with diagnostics.
+    // Match the primary exactly as the validator does. A failed local fallback
+    // remains fail-closed with diagnostics.
     if (
       !shortened ||
       shortened.length > PRODUCT_CONTENT_LIMITS.seoDescription ||
-      (primary && (!description.includes(primary) || !shortened.includes(primary)))
+      (primary &&
+        (!containsSeoPhrase(description, primary) ||
+          !containsSeoPhrase(shortened, primary)))
     ) {
       return draft;
     }
