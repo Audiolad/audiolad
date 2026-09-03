@@ -6,6 +6,9 @@ export const PRODUCT_SAVE_ERROR_FALLBACK =
 export const PRODUCT_SAVE_VALIDATION_MESSAGE =
   "Проверьте заполнение полей и исправьте ошибки.";
 
+export const PRODUCT_SAVE_APPRECIATION_NOT_ELIGIBLE_MESSAGE =
+  "Настройка «Поблагодарить автора» доступна только при коммерческом доступе и только для подходящих бесплатных продуктов.";
+
 export const PRODUCT_SAVE_PERMISSION_MESSAGE =
   "Недостаточно прав, чтобы сохранить этот аудиопродукт.";
 
@@ -54,6 +57,7 @@ const VALIDATION_CODES = new Set([
   "seo_title_too_long",
   "seo_description_too_long",
   "author_recommendations_title_too_long",
+  "appreciation_not_eligible",
 ]);
 
 const PERMISSION_CODES = new Set([
@@ -186,6 +190,9 @@ export function getProductSaveErrorMessage(input: {
 
   switch (kind) {
     case "validation":
+      if (input.error === "appreciation_not_eligible") {
+        return PRODUCT_SAVE_APPRECIATION_NOT_ELIGIBLE_MESSAGE;
+      }
       return safeMessage ?? PRODUCT_SAVE_VALIDATION_MESSAGE;
     case "permission":
       return PRODUCT_SAVE_PERMISSION_MESSAGE;

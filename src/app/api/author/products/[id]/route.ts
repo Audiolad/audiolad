@@ -7,7 +7,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
+import { resolveAppreciationOverridePatch } from "@/lib/author-products/appreciation-override";
 import {
   validateDescriptionLength,
   validateListeningNoticeTextLength,
@@ -609,28 +609,28 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.price = 0;
     }
 
-    if ("listener_appreciation_override" in body) {
-      const override = body.listener_appreciation_override;
-      const effectiveIsFree =
-        typeof updates.is_free === "boolean" ? updates.is_free : practice.is_free;
-      const isEligibleKind =
-        nextProductKind === PRODUCT_KIND.PRACTICE ||
-        nextProductKind === PRODUCT_KIND.AUDIO_POST;
+    const appreciationPatch = resolveAppreciationOverridePatch({
+      present: "listener_appreciation_override" in body,
+      override: (body as { listener_appreciation_override?: unknown })
+        .listener_appreciation_override,
+      accessStatus,
+      isFree:
+        (typeof updates.is_free === "boolean"
+          ? updates.is_free
+          : practice.is_free) === true,
+      productKind: nextProductKind,
+      publicationClass: nextPublicationClass,
+    });
 
-      if (
-        (override !== null && typeof override !== "boolean") ||
-        !authorAccessAllowsPaidProducts(accessStatus) ||
-        effectiveIsFree !== true ||
-        !isEligibleKind ||
-        nextPublicationClass === "course"
-      ) {
-        return NextResponse.json(
-          { error: "appreciation_not_eligible" },
-          { status: 400 },
-        );
-      }
+    if (appreciationPatch.action === "reject") {
+      return NextResponse.json(
+        { error: appreciationPatch.error },
+        { status: 400 },
+      );
+    }
 
-      updates.listener_appreciation_override = override;
+    if (appreciationPatch.action === "apply") {
+      updates.listener_appreciation_override = appreciationPatch.value;
     }
 
     if (

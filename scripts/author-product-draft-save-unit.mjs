@@ -12,6 +12,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  canConfigureProductAppreciation,
+  resolveAppreciationOverridePatch,
+} from "../src/lib/author-products/appreciation-override.ts";
 import { evaluatePracticeAuthorAssignment } from "../src/lib/author-products/author-assignment.ts";
 import {
   applyProductEditorSaveToDirty,
@@ -20,8 +24,12 @@ import {
   serializeProductEditorBaseline,
   shouldSubmitProductAfterSave,
 } from "../src/lib/author-products/editor-save-state.ts";
-import { buildUnlockedProductIdentityFields } from "../src/lib/author-products/save-payload.ts";
 import {
+  buildListenerAppreciationOverrideField,
+  buildUnlockedProductIdentityFields,
+} from "../src/lib/author-products/save-payload.ts";
+import {
+  PRODUCT_SAVE_APPRECIATION_NOT_ELIGIBLE_MESSAGE,
   PRODUCT_SAVE_AUDIO_RELATION_MESSAGE,
   PRODUCT_SAVE_CONFLICT_MESSAGE,
   PRODUCT_SAVE_ERROR_FALLBACK,
@@ -177,6 +185,10 @@ assert.equal(
 );
 assert.equal(classifyProductSaveError({ networkError: true }), "network");
 assert.equal(classifyProductSaveError({ error: "internal_error", status: 500 }), "server");
+assert.equal(
+  classifyProductSaveError({ error: "appreciation_not_eligible", status: 400 }),
+  "validation",
+);
 assert.equal(classifyProductSaveError({ error: "weird_unknown_code" }), "unknown");
 
 assert.equal(
@@ -210,6 +222,14 @@ assert.equal(
 assert.equal(
   getProductSaveErrorMessage({ error: "internal_error", status: 500 }),
   PRODUCT_SAVE_SERVER_MESSAGE,
+);
+assert.equal(
+  getProductSaveErrorMessage({ error: "appreciation_not_eligible", status: 400 }),
+  PRODUCT_SAVE_APPRECIATION_NOT_ELIGIBLE_MESSAGE,
+);
+assert.notEqual(
+  getProductSaveErrorMessage({ error: "appreciation_not_eligible", status: 400 }),
+  PRODUCT_SAVE_ERROR_FALLBACK,
 );
 assert.equal(
   getProductSaveErrorMessage({ error: "totally_unknown" }),
@@ -350,7 +370,29 @@ assert.doesNotMatch(
 );
 assert.match(
   formSource,
+  /async function saveDraft\(\) \{[\s\S]*?const saved = await saveProduct\(\);/,
+  "Save draft still goes through saveProduct()",
+);
+assert.match(
+  formSource,
+  /const saved = await saveProduct\(\);[\s\S]*?previewTab\?\.close\(\)/,
+  "Preview still goes through saveProduct()",
+);
+assert.match(
+  formSource,
   /const saved = await saveProduct\(\);[\s\S]*if \(!shouldSubmitProductAfterSave\(saved\)\)/,
+  "Submit for moderation still goes through saveProduct()",
+);
+assert.match(
+  formSource,
+  /buildProductSavePayload\(form, slugLocked, canConfigureAppreciation\)/,
+);
+assert.match(formSource, /buildListenerAppreciationOverrideField/);
+assert.match(formSource, /canConfigureProductAppreciation/);
+assert.doesNotMatch(
+  formSource,
+  /listener_appreciation_override:\s*form\.listenerAppreciationOverride/,
+  "payload must not always include listener_appreciation_override",
 );
 assert.match(formSource, /logProductSaveFailure/);
 assert.doesNotMatch(
@@ -447,5 +489,169 @@ for (const file of dashboardFiles) {
     `${path.relative(root, file)} must not query author_members in the browser`,
   );
 }
+
+assert.match(
+  productPatch,
+  /resolveAppreciationOverridePatch/,
+  "PATCH must use the extracted appreciation override helper",
+);
+
+const freePracticeEligible = {
+  accessStatus: "free",
+  isFree: true,
+  productKind: "practice",
+  publicationClass: "practice",
+};
+const commercialPracticeEligible = {
+  accessStatus: "commercial_active",
+  isFree: true,
+  productKind: "practice",
+  publicationClass: "practice",
+};
+
+assert.equal(canConfigureProductAppreciation(freePracticeEligible), false);
+assert.equal(canConfigureProductAppreciation(commercialPracticeEligible), true);
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    productKind: "audio_post",
+    publicationClass: "post",
+  }),
+  true,
+);
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    isFree: false,
+  }),
+  false,
+);
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    publicationClass: "course",
+  }),
+  false,
+);
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    accessStatus: "commercial_onboarding",
+  }),
+  false,
+);
+
+// A. Free author PATCH without the key → omit / no 400
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: false,
+    override: undefined,
+    ...freePracticeEligible,
+  }),
+  { action: "omit" },
+);
+
+// B. Free author PATCH with null → stale-client no-op
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: null,
+    ...freePracticeEligible,
+  }),
+  { action: "omit" },
+);
+
+// C. Free author PATCH with non-null override → reject
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: true,
+    ...freePracticeEligible,
+  }),
+  { action: "reject", error: "appreciation_not_eligible" },
+);
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: false,
+    ...freePracticeEligible,
+  }),
+  { action: "reject", error: "appreciation_not_eligible" },
+);
+
+// D. Commercial active + eligible product: existing apply behavior
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: true,
+    ...commercialPracticeEligible,
+  }),
+  { action: "apply", value: true },
+);
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: false,
+    ...commercialPracticeEligible,
+  }),
+  { action: "apply", value: false },
+);
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: null,
+    ...commercialPracticeEligible,
+  }),
+  { action: "apply", value: null },
+);
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: false,
+    override: undefined,
+    ...commercialPracticeEligible,
+  }),
+  { action: "omit" },
+);
+assert.deepEqual(
+  resolveAppreciationOverridePatch({
+    present: true,
+    override: "yes",
+    ...commercialPracticeEligible,
+  }),
+  { action: "reject", error: "appreciation_not_eligible" },
+);
+
+// E / F. Product form payload includes the key only when appreciation is configurable
+const omitted = buildListenerAppreciationOverrideField({
+  canConfigureAppreciation: false,
+  listenerAppreciationOverride: null,
+});
+assert.equal(
+  Object.prototype.hasOwnProperty.call(omitted, "listener_appreciation_override"),
+  false,
+);
+assert.deepEqual(omitted, {});
+
+assert.deepEqual(
+  buildListenerAppreciationOverrideField({
+    canConfigureAppreciation: true,
+    listenerAppreciationOverride: null,
+  }),
+  { listener_appreciation_override: null },
+);
+assert.deepEqual(
+  buildListenerAppreciationOverrideField({
+    canConfigureAppreciation: true,
+    listenerAppreciationOverride: true,
+  }),
+  { listener_appreciation_override: true },
+);
+assert.deepEqual(
+  buildListenerAppreciationOverrideField({
+    canConfigureAppreciation: true,
+    listenerAppreciationOverride: false,
+  }),
+  { listener_appreciation_override: false },
+);
 
 console.log("author-product-draft-save-unit: ok");
