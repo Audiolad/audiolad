@@ -32,6 +32,19 @@ const PRODUCTS = [
   },
 ];
 
+const PLAYBACK_VIEWPORTS = [
+  {
+    name: "desktop",
+    viewport: { width: 1440, height: 900 },
+    isMobile: false,
+  },
+  {
+    name: "mobile",
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+  },
+];
+
 function center(box) {
   assert.ok(box, "visible element must have a bounding box");
   return {
@@ -44,6 +57,18 @@ async function nativeTap(page, locator) {
   await locator.waitFor({ state: "visible" });
   const point = center(await locator.boundingBox());
   await page.touchscreen.tap(point.x, point.y);
+}
+
+async function nativeActivate(page, locator, isMobile) {
+  await locator.waitFor({ state: "visible" });
+  const point = center(await locator.boundingBox());
+
+  if (isMobile) {
+    await page.touchscreen.tap(point.x, point.y);
+    return;
+  }
+
+  await page.mouse.click(point.x, point.y);
 }
 
 async function readHitTarget(page, locator) {
@@ -168,11 +193,11 @@ async function expectConsent(page, expected) {
   );
 }
 
-async function verifySurface(browser, product, surface) {
+async function verifySurface(browser, product, surface, viewport) {
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
+    viewport: viewport.viewport,
+    isMobile: viewport.isMobile,
+    hasTouch: viewport.isMobile,
   });
   const page = await context.newPage();
   const url =
@@ -199,8 +224,32 @@ async function verifySurface(browser, product, surface) {
     `${surface} ${product.name}: unknown-consent dialog must not cover playback CTA; stack=${JSON.stringify(hit.stack)}`,
   );
 
-  await nativeTap(page, button);
+  await nativeActivate(page, button, viewport.isMobile);
   await waitForActualPlayback(page);
+  assert.equal(
+    await button.getAttribute("aria-label"),
+    "Пауза",
+    `${surface} ${product.name}: active CTA must announce pause`,
+  );
+
+  if (surface === "pdp") {
+    assert.match(
+      (await button.textContent()) ?? "",
+      /Пауза/,
+      `${product.name}: PDP CTA must visibly show pause while playing`,
+    );
+  }
+
+  await nativeActivate(page, button, viewport.isMobile);
+  await page.waitForFunction(() => {
+    const audio = document.querySelector("audio.global-audio-element");
+    return Boolean(audio?.paused);
+  }, undefined, { timeout: 5_000 });
+  assert.notEqual(
+    await button.getAttribute("aria-label"),
+    "Пауза",
+    `${surface} ${product.name}: paused CTA must return to play state`,
+  );
   await context.close();
 }
 
@@ -215,8 +264,10 @@ try {
   await verifyConsentDecisions(browser);
 
   for (const product of PRODUCTS) {
-    await verifySurface(browser, product, "pdp");
-    await verifySurface(browser, product, "catalog");
+    for (const viewport of PLAYBACK_VIEWPORTS) {
+      await verifySurface(browser, product, "pdp", viewport);
+      await verifySurface(browser, product, "catalog", viewport);
+    }
   }
 } finally {
   await browser.close();

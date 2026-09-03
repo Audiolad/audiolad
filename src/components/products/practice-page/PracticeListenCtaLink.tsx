@@ -17,6 +17,7 @@ type PracticeListenCtaLinkProps = {
   className: string;
   playAriaLabel?: string;
   children: ReactNode;
+  playingChildren: ReactNode;
 };
 
 /**
@@ -30,6 +31,7 @@ export default function PracticeListenCtaLink({
   className,
   playAriaLabel = PLAY_ACTION_LABEL,
   children,
+  playingChildren,
 }: PracticeListenCtaLinkProps) {
   const { session, loadSession, prepareSharedAudioGesture, clearPlaylistQueue } =
     useGlobalAudioPlayer();
@@ -106,6 +108,7 @@ export default function PracticeListenCtaLink({
       data-practice-primary-play
       data-practice-primary-play-active={isPlaying ? "true" : "false"}
       aria-label={isPlaying ? "Пауза" : playAriaLabel}
+      aria-pressed={isPlaying}
       aria-busy={isStarting}
       disabled={!authorSlug || !productSlug || isStarting}
       className={className}
@@ -113,7 +116,7 @@ export default function PracticeListenCtaLink({
         void handleClick(event);
       }}
     >
-      {children}
+      {isPlaying ? playingChildren : children}
     </button>
   );
 }
