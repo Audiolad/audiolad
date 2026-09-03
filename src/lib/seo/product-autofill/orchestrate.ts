@@ -25,7 +25,10 @@ import {
   normalizeProductSeoValidationIssues,
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
-import { containsSeoPhrase } from "@/lib/seo/product-metadata";
+import {
+  containsSeoPhrase,
+  PRODUCT_SEO_TITLE_SEPARATOR,
+} from "@/lib/seo/product-metadata";
 import { applyProductSeoDraftRussianTypography } from "@/lib/seo/product-autofill/typography";
 import {
   type ProductSeoAiErrorCode,
@@ -201,6 +204,106 @@ export function parseProductSeoAutofillRequest(
   return readAutofillRequest(body);
 }
 
+const LEADING_SEPARATOR_OR_ORPHAN_QUOTE = /^[\s–—:;,.!?"'«»“”‘’-]+/;
+
+/**
+ * Shortens generated copy at a sentence or word boundary. Used when the only
+ * remaining issue is length: the existing primary occurrence must stay in
+ * place instead of being reconstructed.
+ */
+export function shortenProductSeoText(value: string, limit: number): string | null {
+  const text = value.trim();
+  if (text.length <= limit) {
+    return text || null;
+  }
+
+  const allowedPrefix = text.slice(0, limit + 1);
+  const lastSentenceBoundary = Math.max(
+    allowedPrefix.lastIndexOf("."),
+    allowedPrefix.lastIndexOf("!"),
+    allowedPrefix.lastIndexOf("…"),
+  );
+  const shortenedAtSentenceBoundary =
+    lastSentenceBoundary >= 0
+      ? allowedPrefix.slice(0, lastSentenceBoundary + 1).trim()
+      : null;
+  const wordBoundary = allowedPrefix.lastIndexOf(" ");
+  const shortenedAtWordBoundary =
+    wordBoundary > 0 ? allowedPrefix.slice(0, wordBoundary).trim() : null;
+
+  return (
+    shortenedAtSentenceBoundary ??
+    shortenedAtWordBoundary ??
+    text.slice(0, limit).trim() ??
+    null
+  );
+}
+
+/**
+ * #298 missing-primary path: move the author-owned primary to the beginning
+ * and retain as much of the generated suffix as the field limit permits.
+ * If the generated value already contains the primary, only its suffix is
+ * reused, so the primary remains literal and is not duplicated. Last resort
+ * is the primary alone when no suffix fits.
+ */
+export function prependPrimaryAndShorten(
+  value: string,
+  primary: string,
+  limit: number,
+): string | null {
+  if (!primary || primary.length > limit) {
+    return null;
+  }
+
+  const text = value.trim();
+  const primaryIndex = text
+    .toLocaleLowerCase("ru-RU")
+    .indexOf(primary.toLocaleLowerCase("ru-RU"));
+  const suffix = (
+    primaryIndex >= 0 ? text.slice(primaryIndex + primary.length) : text
+  )
+    .replace(LEADING_SEPARATOR_OR_ORPHAN_QUOTE, "")
+    .trim();
+  if (!suffix) {
+    return primary;
+  }
+
+  const shortenedSuffix = shortenProductSeoText(
+    suffix,
+    limit - primary.length - PRODUCT_SEO_TITLE_SEPARATOR.length,
+  );
+  return shortenedSuffix
+    ? `${primary}${PRODUCT_SEO_TITLE_SEPARATOR}${shortenedSuffix}`
+    : primary;
+}
+
+export function finalizeProductSeoMetadataField(input: {
+  value: string;
+  primary: string;
+  limit: number;
+  missingPrimary: boolean;
+  tooLong: boolean;
+}): string | null {
+  const { value, primary, limit, missingPrimary, tooLong } = input;
+
+  if (missingPrimary) {
+    return prependPrimaryAndShorten(value, primary, limit);
+  }
+
+  if (tooLong) {
+    const shortened = shortenProductSeoText(value, limit);
+    if (!shortened) {
+      return null;
+    }
+    if (primary && !containsSeoPhrase(shortened, primary)) {
+      return prependPrimaryAndShorten(value, primary, limit);
+    }
+    return shortened;
+  }
+
+  return value.trim() || null;
+}
+
 export async function generateProductSeoDraft(
   request: ProductSeoAutofillRequest,
   options: GenerateProductSeoDraftOptions,
@@ -365,64 +468,6 @@ export async function generateProductSeoDraft(
     };
   }
 
-  function shortenTextDeterministically(value: string, limit: number): string | null {
-    const text = value.trim();
-    if (text.length <= limit) {
-      return text || null;
-    }
-
-    const allowedPrefix = text.slice(0, limit + 1);
-    const lastSentenceBoundary = Math.max(
-      allowedPrefix.lastIndexOf("."),
-      allowedPrefix.lastIndexOf("!"),
-      allowedPrefix.lastIndexOf("…"),
-    );
-    const shortenedAtSentenceBoundary =
-      lastSentenceBoundary >= 0
-        ? allowedPrefix.slice(0, lastSentenceBoundary + 1).trim()
-        : null;
-    const wordBoundary = allowedPrefix.lastIndexOf(" ");
-    const shortenedAtWordBoundary =
-      wordBoundary > 0 ? allowedPrefix.slice(0, wordBoundary).trim() : null;
-
-    return (
-      shortenedAtSentenceBoundary ??
-      shortenedAtWordBoundary ??
-      text.slice(0, limit).trim() ??
-      null
-    );
-  }
-
-  /**
-   * Moves the author-owned primary to the beginning and retains as much of the
-   * generated suffix as the field limit permits. If the generated value
-   * already contains the primary, only its suffix is reused, so the primary
-   * remains literal and is not duplicated.
-   */
-  function prependPrimaryAndShorten(value: string, limit: number): string | null {
-    if (!primary || primary.length > limit) {
-      return null;
-    }
-
-    const text = value.trim();
-    const primaryIndex = text
-      .toLocaleLowerCase("ru-RU")
-      .indexOf(primary.toLocaleLowerCase("ru-RU"));
-    const suffix = (
-      primaryIndex >= 0 ? text.slice(primaryIndex + primary.length) : text
-    ).replace(/^[\s–—:;,.!?-]+/, "").trim();
-    if (!suffix) {
-      return primary;
-    }
-
-    const separator = " – ";
-    const shortenedSuffix = shortenTextDeterministically(
-      suffix,
-      limit - primary.length - separator.length,
-    );
-    return shortenedSuffix ? `${primary}${separator}${shortenedSuffix}` : primary;
-  }
-
   const SAFE_FINALIZER_ISSUES = new Set([
     "title_too_long",
     "primary_missing_from_title",
@@ -435,7 +480,9 @@ export async function generateProductSeoDraft(
   /**
    * Applies only local transformations whose validity can be proved by the
    * validator. It never changes author input, anchors, FAQ questions, or
-   * otherwise-valid draft fields.
+   * otherwise-valid draft fields. Length-only residuals shorten the existing
+   * copy and keep an already-present primary; missing-primary residuals still
+   * use the #298 prepend-and-shorten path.
    */
   function finalizeDraftSafely(
     draft: ProductSeoAiRawDraft,
@@ -446,20 +493,26 @@ export async function generateProductSeoDraft(
       issues.includes("title_too_long") ||
       issues.includes("primary_missing_from_title")
     ) {
-      const seoTitle = prependPrimaryAndShorten(
-        finalized.seoTitle,
-        PRODUCT_CONTENT_LIMITS.seoTitle,
-      );
+      const seoTitle = finalizeProductSeoMetadataField({
+        value: finalized.seoTitle,
+        primary,
+        limit: PRODUCT_CONTENT_LIMITS.seoTitle,
+        missingPrimary: issues.includes("primary_missing_from_title"),
+        tooLong: issues.includes("title_too_long"),
+      });
       finalized = seoTitle ? { ...finalized, seoTitle } : finalized;
     }
     if (
       issues.includes("description_too_long") ||
       issues.includes("primary_missing_from_description")
     ) {
-      const seoDescription = prependPrimaryAndShorten(
-        finalized.seoDescription,
-        PRODUCT_CONTENT_LIMITS.seoDescription,
-      );
+      const seoDescription = finalizeProductSeoMetadataField({
+        value: finalized.seoDescription,
+        primary,
+        limit: PRODUCT_CONTENT_LIMITS.seoDescription,
+        missingPrimary: issues.includes("primary_missing_from_description"),
+        tooLong: issues.includes("description_too_long"),
+      });
       finalized = seoDescription ? { ...finalized, seoDescription } : finalized;
     }
     if (
