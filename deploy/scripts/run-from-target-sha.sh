@@ -85,8 +85,8 @@ pin_has_reconcile_artifacts() {
 
 mkdir -p "$STORE"
 if [[ -f "$DEST/deploy/scripts/deploy.sh" && -f "$DEST/deploy/scripts/.pinned-commit" \
-  && "$(tr -d '\n' < "$DEST/deploy/scripts/.pinned-commit")" == "$FULL_COMMIT" \
-  && pin_has_reconcile_artifacts "$DEST" ]]; then
+  && "$(tr -d '\n' < "$DEST/deploy/scripts/.pinned-commit")" == "$FULL_COMMIT" ]] \
+  && pin_has_reconcile_artifacts "$DEST"; then
   pin_log "Reusing pinned deploy scripts at ${DEST}"
 else
   TMP="$(mktemp -d "${STORE}/.tmp.${FULL_COMMIT}.XXXXXX")"

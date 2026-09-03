@@ -330,7 +330,7 @@ function writeFixtureDeployScripts(dir, { zeroDowntimeMarker, includeCaCerts, de
   runBash(
     `
       set -euo pipefail
-      mkdir -p deploy/scripts/lib
+      mkdir -p deploy/scripts/lib deploy/systemd deploy/logrotate
       cat > deploy/scripts/deploy.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -355,6 +355,9 @@ ${caLine}
 EOF
       cp "${runFromTargetShaSh}" deploy/scripts/run-from-target-sha.sh
       chmod +x deploy/scripts/run-from-target-sha.sh
+      : > deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service
+      : > deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer
+      : > deploy/logrotate/audiolad-author-appreciation-getcourse-reconcile
     `,
     { cwd: dir },
   );
@@ -384,7 +387,7 @@ function initStaleLaunchWorktree() {
   runBash(
     `
       set -euo pipefail
-      git add deploy/scripts
+      git add deploy/scripts deploy/systemd deploy/logrotate
       git commit -q -m "stale-deploy-scripts"
     `,
     { cwd: dir },
@@ -399,7 +402,7 @@ function initStaleLaunchWorktree() {
   runBash(
     `
       set -euo pipefail
-      git add deploy/scripts
+      git add deploy/scripts deploy/systemd deploy/logrotate
       git commit -q -m "target-deploy-scripts"
     `,
     { cwd: dir },
@@ -445,6 +448,10 @@ function testTargetShaDeployLogicNotLaunchWorktree() {
     assert(!result.output.includes("USING_STALE_ZERO_DOWNTIME"), result.output);
     assert(result.output.includes(`PINNED=1`), result.output);
     assert(result.output.includes(`PINNED_SHA=${mock.targetSha}`), result.output);
+    assert(
+      !result.output.includes("Reusing pinned deploy scripts"),
+      `first launch must take the fresh archive branch: ${result.output}`,
+    );
 
     const headAfter = runBash("git rev-parse HEAD", { cwd: mock.dir }).stdout.trim();
     assert(headAfter === mock.staleSha, "bootstrap must not checkout/reset GIT_WORKDIR HEAD");
@@ -465,6 +472,10 @@ function testTargetShaDeployLogicNotLaunchWorktree() {
     assert(viaShow.status === 0, `git show | bash -s should work: ${viaShow.output}`);
     assert(viaShow.output.includes("USING_TARGET_ZERO_DOWNTIME"), viaShow.output);
     assert(viaShow.output.includes("TARGET_HAS_NODE_EXTRA_CA_CERTS"), viaShow.output);
+    assert(
+      viaShow.output.includes("Reusing pinned deploy scripts"),
+      `second launch must take the reuse branch: ${viaShow.output}`,
+    );
 
     const viaDeploySh = runBash(
       `
@@ -492,6 +503,59 @@ function testTargetShaDeployLogicNotLaunchWorktree() {
     );
     assert(currentLaunch.status !== 0, "pinned exec via /current must fail");
     assert(currentLaunch.output.includes("/current"), currentLaunch.output);
+  } finally {
+    rmSync(mock.dir, { recursive: true, force: true });
+    rmSync(deployRoot, { recursive: true, force: true });
+  }
+}
+
+function testScriptsOnlyPinCacheIsRejected() {
+  const mock = initStaleLaunchWorktree();
+  const deployRoot = mkdtempSync(join(tmpdir(), "audiolad-pin-scripts-only-"));
+  try {
+    const dest = join(deployRoot, "shared/deploy-scripts", mock.targetSha);
+    runBash(
+      `
+        set -euo pipefail
+        mkdir -p "${dest}/deploy/scripts"
+        printf '%s\\n' "${mock.targetSha}" > "${dest}/deploy/scripts/.pinned-commit"
+        cat > "${dest}/deploy/scripts/deploy.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "FIXTURE_DEPLOY_ECHO=SCRIPTS_ONLY_STALE"
+exit 0
+EOF
+        chmod +x "${dest}/deploy/scripts/deploy.sh"
+        echo leftover > "${dest}/.scripts-only-marker"
+      `,
+    );
+
+    const result = runBash(
+      `
+        export GIT_WORKDIR="${mock.dir}"
+        export DEPLOY_ROOT="${deployRoot}"
+        bash "${runFromTargetShaSh}" "${mock.targetSha}"
+      `,
+    );
+    assert(result.status === 0, `scripts-only cache must re-archive: ${result.output}`);
+    assert(
+      !result.output.includes("Reusing pinned deploy scripts"),
+      `scripts-only pin must not reuse: ${result.output}`,
+    );
+    assert(result.output.includes("FIXTURE_DEPLOY_ECHO=TARGET_SHA"), result.output);
+    assert(!result.output.includes("FIXTURE_DEPLOY_ECHO=SCRIPTS_ONLY_STALE"), result.output);
+
+    const leftover = runBash(
+      `
+        if [[ -f "${dest}/.scripts-only-marker" ]]; then
+          echo leftover_present
+        fi
+        test -f "${dest}/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service"
+        test -f "${dest}/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer"
+        test -f "${dest}/deploy/logrotate/audiolad-author-appreciation-getcourse-reconcile"
+      `,
+    );
+    assert(leftover.status === 0, leftover.output);
+    assert(!leftover.stdout.includes("leftover_present"), "scripts-only dest must be replaced");
   } finally {
     rmSync(mock.dir, { recursive: true, force: true });
     rmSync(deployRoot, { recursive: true, force: true });
@@ -536,6 +600,7 @@ function main() {
     testIntegratedCandidateCanReplaceActiveProduction(mock);
     testDirtyWorkdirWarningDoesNotBlock();
     testTargetShaDeployLogicNotLaunchWorktree();
+    testScriptsOnlyPinCacheIsRejected();
     testMetadataFormatter();
     console.log("canonical-deploy-policy-unit: all tests passed");
   } finally {
