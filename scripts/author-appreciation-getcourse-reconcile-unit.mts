@@ -6,6 +6,8 @@ import {
   coveringExportDateWindow,
   GETCOURSE_EXPORT_MAX_POLLS,
   indexExportedDealsById,
+  indexExportedDealsByNumber,
+  lookupExportedDealForIntent,
   matchIntentToExportedDeal,
   parseExportedGetCourseDeal,
   readExportId,
@@ -325,6 +327,33 @@ async function run(options: {
 }
 
 {
+  // Localized / official-display export status still matches a payed export row
+  const localized = parseExportedGetCourseDeal({
+    id: DEAL_ID,
+    number: 1001,
+    status: "Завершен",
+    deal_cost: "100",
+    payed_money: "100",
+    left_cost_money: "0",
+    offers: OFFER_ID,
+  });
+  assert.ok(localized);
+  const localizedMatch = matchIntentToExportedDeal({
+    deal: localized,
+    configuredOfferId: OFFER_ID,
+    amountMinor: 10_000,
+  });
+  assert.equal(localizedMatch.matched, true);
+
+  const fetch = createExportFetch({
+    rows: [paidRow(DEAL_ID, { status: "Оплачен" })],
+  });
+  const recovered = await run({ fetch });
+  assert.equal(recovered.result.applied, 1);
+  assert.equal(recovered.applyCalls[0].status, "payed");
+}
+
+{
   const confirm = readFileSync("src/lib/author-appreciation/getcourse/confirm-deal.ts", "utf8");
   assert.match(confirm, /\/pl\/api\/account\/deals/);
   assert.match(confirm, /set\("status", "payed"\)/);
@@ -337,6 +366,22 @@ async function run(options: {
 
   const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
   assert.match(deploy, /ensure-author-appreciation-getcourse-reconcile\.sh/);
+  assert.match(deploy, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
+  assert.match(deploy, /assert_author_appreciation_reconcile_release_tree/);
+  assert.match(deploy, /author_appreciation_getcourse_reconcile_ensure_failed/);
+  assert.doesNotMatch(deploy, /ensure_nonfatal/);
+  const pin = readFileSync("deploy/scripts/lib/pin-target-deploy-scripts.sh", "utf8");
+  assert.match(pin, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
+  assert.match(pin, /pin_has_reconcile_artifacts/);
+  const launcher = readFileSync("deploy/scripts/run-from-target-sha.sh", "utf8");
+  assert.match(launcher, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
+  assert.match(launcher, /pin_has_reconcile_artifacts/);
+  const ensure = readFileSync(
+    "deploy/scripts/ensure-author-appreciation-getcourse-reconcile.sh",
+    "utf8",
+  );
+  assert.match(ensure, /DEPLOY_TREE:-/);
+  assert.doesNotMatch(ensure, /must not fail the caller deploy/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",
@@ -344,6 +389,35 @@ async function run(options: {
   assert.match(timer, /OnUnitActiveSec=45min/);
   const pkg = readFileSync("package.json", "utf8");
   assert.match(pkg, /run:author-appreciation-getcourse-reconcile/);
+}
+
+{
+  // Deal-number fallback when Export row id match is missing
+  const numberOnly = await run({
+    pending: [pendingIntent({ provider_deal_id: null, provider_deal_number: "1001" })],
+    fetch: createExportFetch({
+      rows: [paidRow("555", { number: "1001" })],
+    }),
+  });
+  assert.equal(numberOnly.result.applied, 1);
+  assert.equal(numberOnly.applyCalls[0].providerDealId, "555");
+  assert.equal(numberOnly.applyCalls[0].providerDealNumber, "1001");
+  assert.equal(numberOnly.applyCalls[0].status, "payed");
+
+  const byNumber = indexExportedDealsByNumber([
+    parseExportedGetCourseDeal(paidRow("555", { number: "1001" }))!,
+  ]);
+  const lookedUp = lookupExportedDealForIntent({
+    providerDealId: null,
+    providerDealNumber: "1001",
+    byId: indexExportedDealsById([]),
+    byNumber,
+  });
+  assert.notEqual(lookedUp, undefined);
+  assert.notEqual(lookedUp, "ambiguous");
+  if (lookedUp && lookedUp !== "ambiguous") {
+    assert.equal(lookedUp.dealId, "555");
+  }
 }
 
 console.log("author-appreciation-getcourse-reconcile-unit: ok");

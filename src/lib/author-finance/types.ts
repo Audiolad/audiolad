@@ -29,6 +29,9 @@ export const AUTHOR_FINANCE_TYPE_KEYS = [
 
 export type AuthorFinanceTypeKey = (typeof AUTHOR_FINANCE_TYPE_KEYS)[number];
 
+/** Display-only. Ledger SQL still emits `sale` for appreciation sale_accrual. */
+export type AuthorFinanceDisplayTypeKey = AuthorFinanceTypeKey | "appreciation" | "other";
+
 export const AUTHOR_FINANCE_AMOUNT_STATES = [
   "held",
   "available",
@@ -520,7 +523,7 @@ export type AuthorFinanceSummary = {
 
 export type AuthorFinanceLedgerRow = {
   entryId: string;
-  typeKey: AuthorFinanceTypeKey | "other";
+  typeKey: AuthorFinanceDisplayTypeKey;
   amountMinor: number;
   currency: string;
   effectiveAt: string | null;
@@ -570,7 +573,7 @@ export type AuthorFinancePayoutDetail = {
   };
   entries: Array<{
     entryId: string;
-    typeKey: AuthorFinanceTypeKey | "other";
+    typeKey: AuthorFinanceDisplayTypeKey;
     allocatedMinor: number;
     effectiveAt: string | null;
     productTitle: string | null;

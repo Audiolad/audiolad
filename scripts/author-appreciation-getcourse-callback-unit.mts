@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   decideGetCourseCallbackApply,
+  isProviderConfirmedFullyPaid,
   parseGetCourseCallback,
 } from "../src/lib/author-appreciation/getcourse/callback";
+import { authorShareMinor, platformShareMinor } from "../src/lib/payments/author-finance/types";
 import { handleGetCourseAppreciationCallback } from "../src/lib/author-appreciation/getcourse/handle-callback";
 
 const SECRET = "callback-secret";
@@ -74,19 +76,26 @@ function assertSafeIgnoreLog(
   logs: Array<{ label: unknown; details: Record<string, unknown> }>,
   reason: string,
 ) {
-  assert.equal(logs.length, 1);
-  assert.equal(logs[0].label, "author_appreciation_getcourse_callback_ignored");
-  assert.equal(logs[0].details.reason, reason);
+  const ignored = logs.filter(
+    (row) => row.label === "author_appreciation_getcourse_callback_ignored",
+  );
+  assert.equal(ignored.length, 1);
+  assert.equal(ignored[0].details.reason, reason);
+  const outcome = logs.filter(
+    (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+  );
+  assert.equal(outcome.length, 1);
+  assert.equal(outcome[0].details.ignored_reason, reason);
   const serialized = JSON.stringify(logs);
   assert.doesNotMatch(serialized, /callback-secret/);
   assert.doesNotMatch(serialized, /@/);
   assert.doesNotMatch(serialized, /pay\.example/);
-  assert.equal(Object.prototype.hasOwnProperty.call(logs[0].details, "payload"), false);
-  assert.ok("deal_id_present" in logs[0].details);
-  assert.ok("deal_number_present" in logs[0].details);
-  assert.ok("offer_field_present" in logs[0].details);
-  assert.ok("amount_present" in logs[0].details);
-  assert.ok("status_present" in logs[0].details);
+  assert.equal(Object.prototype.hasOwnProperty.call(ignored[0].details, "payload"), false);
+  assert.ok("deal_id_present" in ignored[0].details);
+  assert.ok("deal_number_present" in ignored[0].details);
+  assert.ok("offer_field_present" in ignored[0].details);
+  assert.ok("amount_present" in ignored[0].details);
+  assert.ok("status_present" in ignored[0].details);
 }
 
 {
@@ -166,11 +175,16 @@ function assertSafeIgnoreLog(
 }
 
 {
-  // E — amount mismatch reaches RPC (needs_review / no accrual lives in SQL)
+  // E — fully-paid amount mismatch reaches RPC (needs_review / no accrual lives in SQL)
   const { result, calls } = await handle({
     payload: {
       ...PRODUCTION_PAYLOAD,
-      deal: { ...PRODUCTION_PAYLOAD.deal, deal_cost: "999" },
+      deal: {
+        ...PRODUCTION_PAYLOAD.deal,
+        deal_cost: "999",
+        payed_money: "999",
+        left_cost_money: "0",
+      },
     },
     rpcOutcome: "needs_review",
   });
@@ -180,7 +194,7 @@ function assertSafeIgnoreLog(
 }
 
 {
-  // F — partial payment: non-payed stays pending; payed+left_cost still goes to RPC
+  // F — partial payment stays pending (no RPC, no needs_review promotion)
   const ignored = captureLogs();
   try {
     const { result, calls } = await handle({
@@ -191,9 +205,9 @@ function assertSafeIgnoreLog(
     });
     assert.equal(result.status, 200);
     assert.equal(result.rpcCalled, false);
-    assert.equal(result.ignoredReason, "status_not_payed");
+    assert.equal(result.ignoredReason, "partial_payment");
     assert.equal(calls.length, 0);
-    assertSafeIgnoreLog(ignored.logs, "status_not_payed");
+    assertSafeIgnoreLog(ignored.logs, "partial_payment");
   } finally {
     ignored.restore();
   }
@@ -203,11 +217,10 @@ function assertSafeIgnoreLog(
       ...PRODUCTION_PAYLOAD,
       deal: { ...PRODUCTION_PAYLOAD.deal, payed_money: "50", left_cost_money: "50" },
     },
-    rpcOutcome: "needs_review",
   });
-  assert.equal(payedPartial.rpcCalled, true);
-  assert.equal(payedPartialCalls[0].p_payed_money_minor, 5_000);
-  assert.equal(payedPartialCalls[0].p_left_cost_money_minor, 5_000);
+  assert.equal(payedPartial.rpcCalled, false);
+  assert.equal(payedPartial.ignoredReason, "partial_payment");
+  assert.equal(payedPartialCalls.length, 0);
 }
 
 {
@@ -335,6 +348,125 @@ function assertSafeIgnoreLog(
   if (decision.action === "apply") {
     assert.equal(decision.args.offerId, OFFER_ID);
     assert.equal(decision.usedDealCorrelation, false);
+  }
+}
+
+{
+  // Real Process `{object.status}` values that are not the API token `payed`
+  const realStatuses = ["Оплачен", "Завершен", "paid", "completed", "payed"];
+  for (const status of realStatuses) {
+    const payload = {
+      deal: {
+        id: "99887766",
+        number: "1001",
+        offers: OFFER_ID,
+        deal_cost: "100",
+        payed_money: "100",
+        left_cost_money: "0",
+        status,
+      },
+    };
+    const { result, calls } = await handle({ payload });
+    assert.equal(result.status, 200, status);
+    assert.equal(result.rpcCalled, true, status);
+    assert.equal(result.ignoredReason, null, status);
+    assert.equal(calls[0].p_status, "payed", status);
+    assert.equal(calls[0].p_amount_minor, 10_000, status);
+  }
+
+  const moneyOnly = await handle({
+    payload: {
+      deal: {
+        id: "99887766",
+        number: "1001",
+        offers: OFFER_ID,
+        deal_cost: "100",
+        payed_money: "100",
+        left_cost_money: "0",
+        status: "неизвестный-статус",
+      },
+    },
+  });
+  assert.equal(moneyOnly.result.rpcCalled, true);
+  assert.equal(moneyOnly.calls[0].p_status, "payed");
+
+  const unpaid = await handle({
+    payload: {
+      deal: {
+        ...PRODUCTION_PAYLOAD.deal,
+        status: "new",
+        payed_money: "0",
+        left_cost_money: "100",
+      },
+    },
+  });
+  assert.equal(unpaid.result.rpcCalled, false);
+  assert.equal(unpaid.result.ignoredReason, "status_not_payed");
+
+  const voided = await handle({
+    payload: {
+      deal: {
+        ...PRODUCTION_PAYLOAD.deal,
+        status: "cancelled",
+        payed_money: "100",
+        left_cost_money: "0",
+      },
+    },
+  });
+  assert.equal(voided.result.rpcCalled, false);
+  assert.equal(voided.result.ignoredReason, "status_not_payed");
+}
+
+{
+  assert.equal(authorShareMinor(10_000, 7000), 7_000);
+  assert.equal(platformShareMinor(10_000, 7000), 3_000);
+  assert.equal(
+    isProviderConfirmedFullyPaid({
+      status: "Завершен",
+      amountMinor: 10_000,
+      payedMoneyMinor: 10_000,
+      leftCostMoneyMinor: 0,
+    }),
+    true,
+  );
+}
+
+{
+  // Applied + needs_review observability (no PII)
+  const capture = captureLogs();
+  try {
+    const { result } = await handle({ rpcOutcome: "paid_needs_review" });
+    assert.equal(result.rpcCalled, true);
+    assert.equal(result.rpcOutcome, "paid_needs_review");
+    const labels = capture.logs.map((row) => row.label);
+    assert.ok(labels.includes("author_appreciation_getcourse_callback_applied"));
+    assert.ok(labels.includes("author_appreciation_getcourse_callback_outcome"));
+    assert.ok(labels.includes("author_appreciation_finance_projection_needs_review"));
+    const outcome = capture.logs.find(
+      (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+    );
+    assert.equal(outcome?.details.outcome, "paid_needs_review");
+    assert.equal(outcome?.details.rpc_called, true);
+    assert.doesNotMatch(JSON.stringify(capture.logs), /callback-secret/);
+  } finally {
+    capture.restore();
+  }
+}
+
+{
+  const capture = captureLogs();
+  try {
+    const { result } = await handle({ rpcOutcome: "unknown" });
+    assert.equal(result.status, 200);
+    assert.equal(result.rpcOutcome, "unknown");
+    const outcome = capture.logs.find(
+      (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+    );
+    assert.equal(outcome?.details.outcome, "unknown");
+    assert.equal(outcome?.details.ignored_reason, "unknown_deal");
+    assert.equal(outcome?.details.rpc_called, true);
+  } finally {
+    capture.restore();
   }
 }
 

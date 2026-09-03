@@ -1,4 +1,6 @@
+import AdminAppreciationBlock from "@/components/admin/AdminAppreciationBlock";
 import AdminSalesList from "@/components/admin/AdminSalesList";
+import { getAdminAppreciationAnalytics } from "@/lib/admin/appreciation-analytics-queries";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { listAdminSales } from "@/lib/admin/sales-queries";
 
@@ -14,11 +16,15 @@ export default async function AdminSalesPage({
   const page = Number.parseInt(params.page ?? "1", 10);
 
   let data;
+  let appreciation;
 
   try {
-    data = await listAdminSales({
-      page: Number.isFinite(page) ? page : 1,
-    });
+    [data, appreciation] = await Promise.all([
+      listAdminSales({
+        page: Number.isFinite(page) ? page : 1,
+      }),
+      getAdminAppreciationAnalytics(),
+    ]);
   } catch (error) {
     console.error("admin_sales_page_error", error);
 
@@ -37,6 +43,10 @@ export default async function AdminSalesPage({
       <p className="mt-1 text-sm text-[#796ba0]">
         Всего: {data.total.toLocaleString("ru-RU")}
       </p>
+
+      <div className="mt-5">
+        <AdminAppreciationBlock data={appreciation} />
+      </div>
 
       <div className="mt-5">
         <AdminSalesList data={data} />

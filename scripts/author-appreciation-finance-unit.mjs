@@ -131,6 +131,8 @@ function testKCommissionEqualsCanonical() {
   assert.match(ledgerMigration, /CREATE OR REPLACE FUNCTION public\.author_share_minor/);
   assert.equal(authorShareMinor(50_000, 7000), 35_000);
   assert.equal(platformShareMinor(50_000, 7000), 15_000);
+  assert.equal(authorShareMinor(10_000, 7000), 7_000);
+  assert.equal(platformShareMinor(10_000, 7000), 3_000);
   assert.equal(authorShareMinor(50_000, 7000), authorShareMinor(50_000, 7000));
 }
 

@@ -14,12 +14,12 @@
 
 import type {
   AuthorFinanceAmountState,
+  AuthorFinanceDisplayTypeKey,
   AuthorFinanceEmptyStateCode,
   AuthorFinanceIntegrityStatus,
   AuthorFinancePayoutStatusKey,
   AuthorFinancePeriod,
   AuthorFinanceTermsStatus,
-  AuthorFinanceTypeKey,
 } from "./types";
 
 export const AUTHOR_FINANCE_SECTION_TITLE = "Продажи и финансы";
@@ -42,8 +42,12 @@ export const AUTHOR_FINANCE_KPI_HINTS = {
   paid: "Переведено вам по завершённым выплатам.",
 } as const;
 
-const TYPE_LABELS: Record<AuthorFinanceTypeKey | "other", string> = {
+export const AUTHOR_APPRECIATION_FINANCE_LABEL = "Благодарность от слушателя";
+export const AUTHOR_APPRECIATION_ADMIN_LABEL = "Благодарность автору";
+
+const TYPE_LABELS: Record<AuthorFinanceDisplayTypeKey, string> = {
   sale: "Продажа",
+  appreciation: AUTHOR_APPRECIATION_FINANCE_LABEL,
   refund: "Возврат покупателю",
   adjustment_credit: "Начисление вручную",
   adjustment_debit: "Списание вручную",
@@ -55,9 +59,9 @@ const TYPE_LABELS: Record<AuthorFinanceTypeKey | "other", string> = {
 };
 
 export function getAuthorFinanceTypeLabel(
-  key: AuthorFinanceTypeKey | "other" | string,
+  key: AuthorFinanceDisplayTypeKey | string,
 ): string {
-  return TYPE_LABELS[key as AuthorFinanceTypeKey] ?? TYPE_LABELS.other;
+  return TYPE_LABELS[key as AuthorFinanceDisplayTypeKey] ?? TYPE_LABELS.other;
 }
 
 const AMOUNT_STATE_LABELS: Record<AuthorFinanceAmountState, string> = {

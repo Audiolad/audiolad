@@ -326,7 +326,7 @@ const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.t
 const webhookHandle = read("src/lib/author-appreciation/getcourse/handle-callback.ts");
 const webhookParse = read("src/lib/author-appreciation/getcourse/callback.ts");
 assert.match(webhookHandle, /timingSafeEqual/);
-assert.match(webhookParse, /callback\.status !== "payed"|status !== "payed"/);
+assert.match(webhookParse, /isProviderConfirmedFullyPaid|GETCOURSE_CANONICAL_PAID_STATUS/);
 assert.match(webhook, /x-audiolad-getcourse-secret/);
 assert.match(webhook, /apply_author_appreciation_getcourse_callback/);
 assert.match(webhook, /p_provider_deal_id/);

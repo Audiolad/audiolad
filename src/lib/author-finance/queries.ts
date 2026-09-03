@@ -14,6 +14,10 @@ import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
+  overlayAppreciationFinanceRow,
+  overlayAppreciationFinanceRows,
+} from "./appreciation";
+import {
   isAuthorFinanceAmountState,
   isAuthorFinanceIntegrityStatus,
   selectAuthorFinanceEmptyState,
@@ -51,6 +55,29 @@ function asText(value: unknown): string | null {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+async function loadAppreciationLedgerEntryIds(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  authorId: string,
+  entryIds: string[],
+): Promise<Set<string>> {
+  if (entryIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("author_ledger_entries")
+    .select("id")
+    .eq("author_id", authorId)
+    .in("id", entryIds)
+    .not("author_appreciation_intent_id", "is", null);
+  if (error) {
+    console.error("author_finance_appreciation_overlay_error", error.message);
+    return new Set();
+  }
+  return new Set(
+    (data ?? [])
+      .map((row) => (typeof row.id === "string" ? row.id : null))
+      .filter((id): id is string => id !== null),
+  );
 }
 
 function mapTermsSummary(raw: unknown): AuthorFinanceTermsSummary | null {
@@ -284,7 +311,14 @@ export async function getAuthorFinanceLedger(input: {
     total: asNumber(row.total),
     limit: asNumber(row.limit, limit),
     offset: asNumber(row.offset),
-    rows,
+    rows: overlayAppreciationFinanceRows(
+      rows,
+      await loadAppreciationLedgerEntryIds(
+        supabase,
+        input.authorId,
+        rows.map((item) => item.entryId),
+      ),
+    ),
   };
 }
 
@@ -310,8 +344,17 @@ export async function getAuthorFinanceLedgerDetail(input: {
   const row = asRecord(data);
   if (row.found !== true) return null;
 
-  const entry = mapLedgerRow(row.entry);
-  if (!entry) return null;
+  const mapped = mapLedgerRow(row.entry);
+  if (!mapped) return null;
+  const appreciationIds = await loadAppreciationLedgerEntryIds(
+    supabase,
+    input.authorId,
+    [mapped.entryId],
+  );
+  const entry = overlayAppreciationFinanceRow(
+    mapped,
+    appreciationIds.has(mapped.entryId),
+  );
 
   const formula = asRecord(row.formula);
 
