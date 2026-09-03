@@ -12,7 +12,6 @@ export type GetCourseConfig = {
 export type GetCourseDealInput = {
   email: string;
   amountMinor: number;
-  localDealNumber: string;
 };
 
 export type GetCourseDeal = {
@@ -230,7 +229,8 @@ export async function createGetCourseAppreciationDeal(
     deal: {
       offer_id: config.appreciationOfferId,
       deal_cost: input.amountMinor / 100,
-      deal_number: input.localDealNumber,
+      // GetCourse field № / deal_number must be an integer. Do not send
+      // Audiolad's local aa-<uuid> reference; let GetCourse mint its own number.
     },
   };
   const form = new URLSearchParams({
