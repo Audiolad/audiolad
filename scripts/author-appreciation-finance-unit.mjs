@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -10,7 +10,7 @@ import {
 } from "../src/lib/payments/author-finance/types.ts";
 
 const root = process.cwd();
-const read = (file: string) => readFileSync(path.join(root, file), "utf8");
+const read = (file) => readFileSync(path.join(root, file), "utf8");
 
 const migration = read(
   "supabase/migrations/20260917120000_author_appreciation_finance_projection.sql",
