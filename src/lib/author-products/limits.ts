@@ -72,6 +72,11 @@ export const PRODUCT_CONTENT_LIMITS = {
   listeningNoticeTitle: 120,
   listeningNoticeText: 1000,
   seoPrimaryQuery: 120,
+  /**
+   * Persisted / backward-compatible maximum. Authoring and generation use
+   * AUTHOR_SEO_SECONDARY_ACTIVE_MAX. Do not lower this to 2: existing products
+   * may already store 3–10 queries and must remain savable.
+   */
   seoSecondaryQueries: 10,
   seoSecondaryQuery: 120,
   seoTitle: 140,
@@ -84,6 +89,9 @@ export const PRODUCT_CONTENT_LIMITS = {
   seoFaqAnswer: 1_500,
   authorRecommendationsTitle: AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH,
 } as const;
+
+/** Authoring + generation: at most two secondary queries are active. */
+export const AUTHOR_SEO_SECONDARY_ACTIVE_MAX = 2;
 
 export type ProductFieldErrorCode =
   | "title_too_long"
@@ -279,7 +287,7 @@ export function getProductFieldErrorMessage(code: string): string | null {
     case "seo_title_too_long":
       return "Заголовок для поиска не должен превышать 140 символов.";
     case "seo_secondary_queries_invalid":
-      return "Добавьте до 10 непустых поисковых фраз, каждая не длиннее 120 символов.";
+      return "Проверьте дополнительные поисковые фразы: без пустых значений и повторов, каждая не длиннее 120 символов.";
     case "seo_description_too_long":
       return "Описание для поиска не должно превышать 300 символов.";
     case "seo_about_too_long":

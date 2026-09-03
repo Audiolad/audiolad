@@ -5,7 +5,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
+import {
+  AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
+  PRODUCT_CONTENT_LIMITS,
+} from "../src/lib/author-products/limits.ts";
 import {
   AUTHOR_DESCRIPTION_HELPER,
   AUTHOR_DESCRIPTION_LABEL,
@@ -158,20 +161,22 @@ assert.match(read("src/lib/author-products/form-merge.ts"), /seoAbout: practice\
 
 assert.deepEqual(
   parseSeoSecondaryQueryList("a, b, c").added,
-  ["a", "b", "c"],
+  ["a", "b"],
 );
+assert.equal(parseSeoSecondaryQueryList("a, b, c").skippedFull, 1);
 assert.deepEqual(
   parseSeoSecondaryQueryList("a; b; c").added,
-  ["a", "b", "c"],
+  ["a", "b"],
 );
 assert.deepEqual(
   parseSeoSecondaryQueryList("a\nb\nc").added,
-  ["a", "b", "c"],
+  ["a", "b"],
 );
 assert.deepEqual(
   parseSeoSecondaryQueryList("a, b\nc; d").added,
-  ["a", "b", "c", "d"],
+  ["a", "b"],
 );
+assert.equal(parseSeoSecondaryQueryList("a, b\nc; d").skippedFull, 2);
 assert.deepEqual(
   parseSeoSecondaryQueryList("  медитация для сна  ,   ").added,
   ["медитация для сна"],
@@ -202,6 +207,20 @@ assert.equal(
   1,
 );
 
+assert.equal(AUTHOR_SEO_SECONDARY_ACTIVE_MAX, 2);
+assert.equal(PRODUCT_CONTENT_LIMITS.seoSecondaryQueries, 10);
+
+const fromScratchOverflow = parseSeoSecondaryQueryList(
+  "одна, две, три, четыре",
+);
+assert.deepEqual(fromScratchOverflow.added, ["одна", "две"]);
+assert.deepEqual(fromScratchOverflow.next, ["одна", "две"]);
+assert.equal(fromScratchOverflow.skippedFull, 2);
+assert.equal(
+  formatSeoSecondaryQueryBulkMessage(fromScratchOverflow),
+  "Добавлено 2 фразы. Можно добавить до двух дополнительных поисковых фраз.",
+);
+
 const eightExisting = [
   "одна",
   "две",
@@ -215,12 +234,12 @@ const eightExisting = [
 const overflow = parseSeoSecondaryQueryList("девять, десять, одиннадцать, двенадцать, тринадцать", {
   existing: eightExisting,
 });
-assert.deepEqual(overflow.added, ["девять", "десять"]);
-assert.equal(overflow.next.length, 10);
-assert.equal(overflow.skippedFull, 3);
+assert.deepEqual(overflow.added, []);
+assert.deepEqual(overflow.next, eightExisting);
+assert.equal(overflow.skippedFull, 5);
 assert.equal(
   formatSeoSecondaryQueryBulkMessage(overflow),
-  "Добавлено 2 фразы. Можно использовать не больше 10.",
+  "Можно добавить до двух дополнительных поисковых фраз.",
 );
 
 assert.deepEqual(

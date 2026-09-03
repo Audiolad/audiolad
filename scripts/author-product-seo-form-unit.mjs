@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import { isProductEditorDirty, serializeProductEditorBaseline } from "../src/lib/author-products/editor-save-state.ts";
 import { mergeServerProductIntoForm, productDetailToFormSnapshot } from "../src/lib/author-products/form-merge.ts";
 import {
+  AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
+  PRODUCT_CONTENT_LIMITS,
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
   validateSeoDescriptionLength,
@@ -267,8 +269,22 @@ assert.equal(validateSeoTitleLength("а".repeat(140)), null);
 assert.equal(validateSeoTitleLength("а".repeat(141)), "seo_title_too_long");
 assert.equal(validateSeoDescriptionLength("а".repeat(300)), null);
 assert.equal(validateSeoDescriptionLength("а".repeat(301)), "seo_description_too_long");
+assert.equal(AUTHOR_SEO_SECONDARY_ACTIVE_MAX, 2);
+assert.equal(PRODUCT_CONTENT_LIMITS.seoSecondaryQueries, 10);
 assert.equal(validateSeoSecondaryQueries(["сон", "СОН"]), "seo_secondary_queries_invalid");
 assert.equal(validateSeoSecondaryQueries(["сон", "отдых"]), null);
+assert.equal(
+  validateSeoSecondaryQueries(["одна", "две", "три"]),
+  null,
+);
+assert.equal(
+  validateSeoSecondaryQueries(Array.from({ length: 10 }, (_, index) => `фраза ${index}`)),
+  null,
+);
+assert.equal(
+  validateSeoSecondaryQueries(Array.from({ length: 11 }, (_, index) => `фраза ${index}`)),
+  "seo_secondary_queries_invalid",
+);
 assert.equal(
   getProductFieldErrorMessage("seo_primary_query_too_long"),
   "Основной поисковый запрос не должен превышать 120 символов.",
@@ -308,6 +324,14 @@ assert.ok(
 );
 assert.match(read("src/lib/products/product-copy.ts"), /export const AUTHOR_DESCRIPTION_LABEL = "О продукте"/);
 assert.match(read("src/lib/author-products/limits.ts"), /description: 1000/);
+assert.match(
+  read("src/lib/author-products/limits.ts"),
+  /export const AUTHOR_SEO_SECONDARY_ACTIVE_MAX = 2/,
+);
+assert.equal(
+  getProductFieldErrorMessage("seo_secondary_queries_invalid"),
+  "Проверьте дополнительные поисковые фразы: без пустых значений и повторов, каждая не длиннее 120 символов.",
+);
 
 const section = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
 assert.match(section, /useState\(false\)/);
@@ -325,6 +349,11 @@ assert.match(section, /api\/author\/seo\/product-autofill/);
 assert.match(section, /parseSeoSecondaryQueryList/);
 assert.match(section, /Основной поисковый запрос/);
 assert.match(section, /Дополнительные поисковые фразы/);
+assert.match(section, /PRODUCT_SEO_SECONDARY_HELPER/);
+assert.match(section, /PRODUCT_SEO_SECONDARY_LIMIT_COPY/);
+assert.match(section, /PRODUCT_SEO_SECONDARY_LEGACY_HELPER/);
+assert.match(section, /AUTHOR_SEO_SECONDARY_ACTIVE_MAX/);
+assert.doesNotMatch(section, /Можно добавить не больше 10 фраз/);
 assert.match(section, /evaluateProductSeoReadiness/);
 assert.match(section, /buildProductSeoPreview/);
 assert.match(section, /preview\.title/);

@@ -58,6 +58,15 @@ export const PRODUCT_SEO_STYLE_ADVANCED_CTA = "Настроить стиль";
 
 export const PRODUCT_SEO_STYLE_VARIETY_LABEL = "Разнообразие текстов";
 
+export const PRODUCT_SEO_SECONDARY_HELPER =
+  "Можно добавить до двух дополнительных фраз. Первая помогает сформировать блок «Как использовать практику», вторая – вопросы и ответы.";
+
+export const PRODUCT_SEO_SECONDARY_LIMIT_COPY =
+  "Можно добавить до двух дополнительных поисковых фраз.";
+
+export const PRODUCT_SEO_SECONDARY_LEGACY_HELPER =
+  "Сейчас в текстах используются только две дополнительные фразы. Лишние можно удалить, если они больше не нужны.";
+
 export const PRODUCT_SEO_SECONDARY_LIMITED_COPY =
   "Яндекс нашёл мало подходящих дополнительных фраз. Вы можете добавить другие вручную.";
 

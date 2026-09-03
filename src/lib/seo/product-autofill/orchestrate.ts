@@ -34,8 +34,16 @@ import {
   type ProductSeoAiErrorCode,
   type ProductSeoAiRawDraft,
   type ProductSeoAiResult,
+  type ProductSeoAutofillDraft,
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
+import {
+  evaluateSecondaryQueryCoverage,
+  isSecondaryCoverageComplete,
+  selectActiveSecondaryQueries,
+  type ProductSeoQualityRepairInput,
+  type SecondaryQueryCoverage,
+} from "@/lib/seo/secondary-query-coverage";
 
 const BLOCKED_LOG_FIELDS = new Set([
   "token",
@@ -81,7 +89,8 @@ function logProductSeoAiValidationFailed(input: {
     | "generate"
     | "repair"
     | "finalizer"
-    | "third_repair";
+    | "third_repair"
+    | "quality_repair";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -332,6 +341,9 @@ export async function generateProductSeoDraft(
     request.seoSecondaryQueries,
     primary,
   );
+  const activeSecondaryQueries = selectActiveSecondaryQueries(
+    manualSecondaryQueries,
+  );
   const styleProfile =
     request.styleProfile ?? createDefaultProductSeoStyleProfile();
   const promptInput: ProductSeoAiPromptInput = {
@@ -342,6 +354,8 @@ export async function generateProductSeoDraft(
       styleProfile,
     },
   };
+  const MAX_PROVIDER_CALLS = 3;
+  let providerCallCount = 0;
   // The author-owned primary can be copied into generated display fields; its
   // literal spelling is protected while all other AI-generated copy is set.
   const protectedTypographyPhrases = [primary];
@@ -360,6 +374,133 @@ export async function generateProductSeoDraft(
       usageItems: request.usageItems ?? [],
       manualSecondaryQueries,
     });
+  }
+
+  function readSecondaryCoverage(draft: {
+    usageItems: ProductSeoAiRawDraft["usageItems"];
+    faqItems: ProductSeoAiRawDraft["faqItems"];
+  }): SecondaryQueryCoverage {
+    return evaluateSecondaryQueryCoverage({
+      primaryQuery: primary,
+      activeSecondaryQueries,
+      usageItems: draft.usageItems,
+      faqItems: draft.faqItems,
+    });
+  }
+
+  function qualityRepairInput(
+    coverage: SecondaryQueryCoverage,
+  ): ProductSeoQualityRepairInput {
+    return {
+      ...coverage,
+      secondary1: activeSecondaryQueries[0],
+      secondary2: activeSecondaryQueries[1],
+    };
+  }
+
+  function mergeQualityRepair(
+    candidate: ProductSeoAiRawDraft,
+    previous: ProductSeoAiRawDraft,
+    coverage: SecondaryQueryCoverage,
+  ): ProductSeoAiRawDraft {
+    const next: ProductSeoAiRawDraft = {
+      seoTitle: previous.seoTitle,
+      seoDescription: previous.seoDescription,
+      usageItems: previous.usageItems.map((item) => ({ ...item })),
+      faqItems: previous.faqItems.map((item) => ({ ...item })),
+    };
+
+    if (
+      !coverage.secondary1UsageCovered &&
+      candidate.usageItems.length === previous.usageItems.length
+    ) {
+      const changedIndex = previous.usageItems.findIndex(
+        (item, index) => item.content !== candidate.usageItems[index]?.content,
+      );
+      if (changedIndex >= 0) {
+        next.usageItems[changedIndex] = {
+          content: candidate.usageItems[changedIndex].content,
+        };
+      }
+    }
+
+    if (
+      !coverage.secondary2FaqCovered &&
+      candidate.faqItems.length === previous.faqItems.length
+    ) {
+      const changes: Array<{
+        index: number;
+        questionChanged: boolean;
+        answerChanged: boolean;
+      }> = [];
+      for (let index = 1; index < previous.faqItems.length; index += 1) {
+        const previousItem = previous.faqItems[index];
+        const candidateItem = candidate.faqItems[index];
+        if (!candidateItem) {
+          continue;
+        }
+        const questionChanged = previousItem.question !== candidateItem.question;
+        const answerChanged = previousItem.answer !== candidateItem.answer;
+        if (questionChanged || answerChanged) {
+          changes.push({ index, questionChanged, answerChanged });
+        }
+      }
+      const preferred =
+        changes.find((change) => change.answerChanged && !change.questionChanged) ??
+        changes[0];
+      if (preferred) {
+        const previousItem = previous.faqItems[preferred.index];
+        const candidateItem = candidate.faqItems[preferred.index];
+        next.faqItems[preferred.index] = {
+          question: preferred.questionChanged
+            ? candidateItem.question
+            : previousItem.question,
+          answer: preferred.answerChanged
+            ? candidateItem.answer
+            : previousItem.answer,
+          anchor: previousItem.anchor,
+        };
+      }
+    }
+
+    return next;
+  }
+
+  async function completeWithOptionalQualityRepair(
+    validDraft: ProductSeoAutofillDraft,
+    rawDraft: ProductSeoAiRawDraft,
+  ): Promise<ProductSeoAiResult> {
+    let lastValidDraft = validDraft;
+    if (
+      isSecondaryCoverageComplete(
+        readSecondaryCoverage(lastValidDraft),
+        activeSecondaryQueries.length,
+      ) ||
+      providerCallCount >= MAX_PROVIDER_CALLS
+    ) {
+      return { ok: true, data: lastValidDraft };
+    }
+
+    const coverage = readSecondaryCoverage(lastValidDraft);
+    const repaired = await provider.qualityRepair(
+      promptInput,
+      rawDraft,
+      qualityRepairInput(coverage),
+    );
+    providerCallCount += 1;
+    if (!repaired.ok || !repaired.draft?.usageItems || !repaired.draft?.faqItems) {
+      return { ok: true, data: lastValidDraft };
+    }
+
+    const mergedDraft = normalizeGeneratedDraft(
+      mergeQualityRepair(repaired.draft, rawDraft, coverage),
+    );
+    const repairedValidation = validateDraft(mergedDraft);
+    if (repairedValidation.ok) {
+      lastValidDraft = repairedValidation.draft;
+    }
+
+    return { ok: true, data: lastValidDraft };
   }
 
   function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {
@@ -526,6 +667,7 @@ export async function generateProductSeoDraft(
 
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
   const first = await provider.generate(promptInput);
+  providerCallCount += 1;
   if (!first.ok) {
     return first;
   }
@@ -534,7 +676,7 @@ export async function generateProductSeoDraft(
   const firstValidation = validateDraft(firstDraft);
 
   if (firstValidation.ok) {
-    return { ok: true, data: firstValidation.draft };
+    return completeWithOptionalQualityRepair(firstValidation.draft, firstDraft);
   }
 
   logProductSeoAiValidationFailed({
@@ -549,6 +691,7 @@ export async function generateProductSeoDraft(
     firstDraft,
     firstValidation.issues,
   );
+  providerCallCount += 1;
   if (!repaired.ok) {
     return repaired;
   }
@@ -570,7 +713,7 @@ export async function generateProductSeoDraft(
     const finalizedDraft = finalizeDraftSafely(repairedDraft, repairedValidation.issues);
     const finalizerValidation = validateDraft(finalizedDraft);
     if (finalizerValidation.ok) {
-      return { ok: true, data: finalizerValidation.draft };
+      return completeWithOptionalQualityRepair(finalizerValidation.draft, finalizedDraft);
     }
 
     logProductSeoAiValidationFailed({
@@ -596,6 +739,7 @@ export async function generateProductSeoDraft(
       finalizedDraft,
       residualNonSafeIssues,
     );
+    providerCallCount += 1;
     if (!thirdRepair.ok) {
       return thirdRepair;
     }
@@ -607,7 +751,7 @@ export async function generateProductSeoDraft(
     );
     const thirdRepairValidation = validateDraft(thirdRepairDraft);
     if (thirdRepairValidation.ok) {
-      return { ok: true, data: thirdRepairValidation.draft };
+      return completeWithOptionalQualityRepair(thirdRepairValidation.draft, thirdRepairDraft);
     }
 
     logProductSeoAiValidationFailed({
@@ -622,7 +766,7 @@ export async function generateProductSeoDraft(
     );
     const finalThirdValidation = validateDraft(finalThirdDraft);
     if (finalThirdValidation.ok) {
-      return { ok: true, data: finalThirdValidation.draft };
+      return completeWithOptionalQualityRepair(finalThirdValidation.draft, finalThirdDraft);
     }
 
     return productSeoAiInvalidOutputError({
@@ -634,5 +778,5 @@ export async function generateProductSeoDraft(
     });
   }
 
-  return { ok: true, data: repairedValidation.draft };
+  return completeWithOptionalQualityRepair(repairedValidation.draft, repairedDraft);
 }

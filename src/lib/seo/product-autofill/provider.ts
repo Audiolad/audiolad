@@ -12,6 +12,7 @@ import {
 } from "@/lib/seo/product-autofill/errors";
 import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yandex-provider";
 import {
+  buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
@@ -19,6 +20,7 @@ import {
   PRODUCT_SEO_AI_SCHEMA_NAME,
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
+import type { ProductSeoQualityRepairInput } from "@/lib/seo/secondary-query-coverage";
 import {
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_RESPONSES_URL,
@@ -39,6 +41,11 @@ export type ProductSeoAiProvider = {
     input: ProductSeoAiPromptInput,
     previous: unknown,
     issues: string[],
+  ): Promise<ProductSeoAiProviderResult>;
+  qualityRepair(
+    input: ProductSeoAiPromptInput,
+    previous: unknown,
+    coverage: ProductSeoQualityRepairInput,
   ): Promise<ProductSeoAiProviderResult>;
 };
 
@@ -180,6 +187,7 @@ function createUnknownProductSeoAiProvider(): ProductSeoAiProvider {
   return {
     generate: async () => productSeoAiError("PROVIDER_ERROR"),
     repair: async () => productSeoAiError("PROVIDER_ERROR"),
+    qualityRepair: async () => productSeoAiError("PROVIDER_ERROR"),
   };
 }
 
@@ -193,7 +201,7 @@ function createOpenAiProductSeoAiProvider(
 
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
-    kind: "generate" | "repair",
+    kind: "generate" | "repair" | "quality_repair",
     generateIssues?: string[],
   ): Promise<ProductSeoAiProviderResult> {
     const { systemPrompt, userPrompt } = prompts;
@@ -286,6 +294,15 @@ function createOpenAiProductSeoAiProvider(
         },
         "repair",
         generateIssues,
+      );
+    },
+    qualityRepair(input, previous, coverage) {
+      return callModel(
+        {
+          systemPrompt: buildProductSeoSystemPrompt(input),
+          userPrompt: buildProductSeoQualityRepairPrompt(input, previous, coverage),
+        },
+        "quality_repair",
       );
     },
   };

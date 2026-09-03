@@ -6,6 +6,7 @@ import AuthorProductSeoStyleControls from "@/components/author-dashboard/AuthorP
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import {
+  AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
   PRODUCT_CONTENT_LIMITS,
 } from "@/lib/author-products/limits";
 import {
@@ -35,6 +36,9 @@ import {
   PRODUCT_SEO_OVERWRITE_LOCKED_CONFIRM,
   PRODUCT_SEO_OVERWRITE_REPLACE,
   PRODUCT_SEO_READINESS_HINT,
+  PRODUCT_SEO_SECONDARY_HELPER,
+  PRODUCT_SEO_SECONDARY_LEGACY_HELPER,
+  PRODUCT_SEO_SECONDARY_LIMIT_COPY,
   PRODUCT_SEO_SELLING_COPY,
   getProductSeoSecondaryUsage,
   resolveProductSeoAccordionBadge,
@@ -304,7 +308,9 @@ export default function AuthorProductSeoSection({
     seoDescription,
   });
   const secondariesFull =
-    seoSecondaryQueries.length >= PRODUCT_CONTENT_LIMITS.seoSecondaryQueries;
+    seoSecondaryQueries.length >= AUTHOR_SEO_SECONDARY_ACTIVE_MAX;
+  const hasLegacyExtraSecondaries =
+    seoSecondaryQueries.length > AUTHOR_SEO_SECONDARY_ACTIVE_MAX;
   const secondaryUsage = getProductSeoSecondaryUsage({
     seoSecondaryQueries,
     productDescription: description,
@@ -579,12 +585,16 @@ export default function AuthorProductSeoSection({
           </p>
         ) : null}
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Добавьте несколько близких вариантов основного запроса. Они должны
-          описывать тот же продукт и ту же потребность человека.
+          {PRODUCT_SEO_SECONDARY_HELPER}
         </p>
         {secondariesFull ? (
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-            Можно добавить не больше 10 фраз. Удалите одну, чтобы добавить другую.
+            {PRODUCT_SEO_SECONDARY_LIMIT_COPY}
+          </p>
+        ) : null}
+        {hasLegacyExtraSecondaries ? (
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_SEO_SECONDARY_LEGACY_HELPER}
           </p>
         ) : null}
         {fieldErrors.seoSecondaryQueries ? <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.seoSecondaryQueries}</p> : null}
