@@ -10,7 +10,7 @@ import {
   getAuthorAppreciationRolloutConfig,
   isAuthorAppreciationRolloutEnabled,
 } from "../src/lib/author-appreciation/config";
-import { parseGetCourseCallback } from "../src/app/api/webhooks/getcourse/author-appreciation/route";
+import { parseGetCourseCallback } from "../src/lib/author-appreciation/getcourse/callback";
 
 const root = process.cwd();
 const read = (file: string) => readFileSync(path.join(root, file), "utf8");
@@ -222,6 +222,7 @@ assert.deepEqual(
     dealNumber: "1001",
     offerId: "offer-1",
     offerIds: ["offer-1"],
+    offerFieldPresent: true,
     amountMinor: 50_000,
     status: "payed",
     payedMoneyMinor: 50_000,
@@ -320,14 +321,20 @@ assert.match(checkout, /resolve_author_commercial_terms/);
 assert.match(checkout, /canReceiveCanonicalAppreciationAccrual/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
-assert.match(webhook, /timingSafeEqual/);
-assert.match(webhook, /callback\.status !== "payed"/);
+const webhookHandle = read("src/lib/author-appreciation/getcourse/handle-callback.ts");
+const webhookParse = read("src/lib/author-appreciation/getcourse/callback.ts");
+assert.match(webhookHandle, /timingSafeEqual/);
+assert.match(webhookParse, /callback\.status !== "payed"|status !== "payed"/);
 assert.match(webhook, /x-audiolad-getcourse-secret/);
 assert.match(webhook, /apply_author_appreciation_getcourse_callback/);
-assert.match(webhook, /p_provider_deal_id: callback\.dealId/);
-assert.match(webhook, /p_provider_deal_number: callback\.dealNumber/);
+assert.match(webhook, /p_provider_deal_id/);
+assert.match(webhook, /p_provider_deal_number/);
+assert.match(webhookParse, /deal\?\.offers/);
+assert.match(webhookParse, /offerFieldPresent/);
+assert.match(webhook, /author_appreciation_getcourse_callback_ignored|handleGetCourseAppreciationCallback/);
 assert.doesNotMatch(webhook, /local_deal_number|localDealNumber|aa-\$/);
 assert.doesNotMatch(webhook, /@\/lib\/payments|@\/lib\/author-finance/);
+assert.doesNotMatch(webhookHandle, /@\/lib\/payments|@\/lib\/author-finance/);
 
 const provider = read("src/lib/author-appreciation/getcourse/provider.ts");
 assert.match(provider, /return_deal_number: 1/);

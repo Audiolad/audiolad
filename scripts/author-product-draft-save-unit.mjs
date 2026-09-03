@@ -540,6 +540,25 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    productKind: "music",
+    publicationClass: "release",
+  }),
+  true,
+  "free published music can configure appreciation",
+);
+assert.equal(
+  canConfigureProductAppreciation({
+    ...commercialPracticeEligible,
+    productKind: "music",
+    publicationClass: "release",
+    isFree: false,
+  }),
+  false,
+  "paid music cannot configure appreciation",
+);
 
 // A. Free author PATCH without the key → omit / no 400
 assert.deepEqual(

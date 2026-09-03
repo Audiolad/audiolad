@@ -1,5 +1,5 @@
+import { isAppreciationEligibleProductKind } from "@/lib/author-appreciation/effective-visibility";
 import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
-import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
 
 export const APPRECIATION_NOT_ELIGIBLE = "appreciation_not_eligible" as const;
 
@@ -12,8 +12,7 @@ export function canConfigureProductAppreciation(input: {
   return (
     authorAccessAllowsPaidProducts(input.accessStatus) &&
     input.isFree === true &&
-    (input.productKind === PRODUCT_KIND.PRACTICE ||
-      input.productKind === PRODUCT_KIND.AUDIO_POST) &&
+    isAppreciationEligibleProductKind(input.productKind) &&
     input.publicationClass !== "course"
   );
 }

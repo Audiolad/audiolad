@@ -90,6 +90,13 @@ const practicePage = read(
 );
 assert.ok(practicePage.includes('author_appreciation_preview?: string'));
 assert.ok(practicePage.includes("resolveAuthorAppreciationVisibility"));
+assert.ok(practicePage.includes("isMusicProductKind"));
+assert.ok(practicePage.includes("showAuthorAppreciationPrototype"));
+assert.ok(
+  practicePage.includes("isAppreciationProductEligible") ||
+    practicePage.includes("resolveAuthorAppreciationVisibility"),
+  "music shares the practice PDP visibility path",
+);
 
 const practiceContent = read(
   "src/components/products/practice-page/PracticePageContent.tsx",
@@ -112,6 +119,12 @@ assert.ok(
     actionSection.indexOf("<AuthorAppreciationPrototype"),
   "Listen / Pause stays first; appreciation is immediately below",
 );
+assert.ok(
+  prototype.includes("event.stopPropagation()") &&
+    prototype.includes("event.preventDefault()"),
+  "appreciation click must not change playback",
+);
+assert.ok(prototype.includes('type="button"'));
 assert.ok(
   actionSection.indexOf("<AuthorAppreciationPrototype") <
     actionSection.indexOf("<PaymentLegalNote"),

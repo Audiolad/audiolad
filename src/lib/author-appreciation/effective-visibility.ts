@@ -60,8 +60,18 @@ export function isAppreciationProductEligible(
     return false;
   }
 
-  const kind = normalizeProductKind(product.productKind);
-  return kind === PRODUCT_KIND.PRACTICE || kind === PRODUCT_KIND.AUDIO_POST;
+  return isAppreciationEligibleProductKind(product.productKind);
+}
+
+export function isAppreciationEligibleProductKind(
+  productKind: string | null | undefined,
+): boolean {
+  const kind = normalizeProductKind(productKind);
+  return (
+    kind === PRODUCT_KIND.PRACTICE ||
+    kind === PRODUCT_KIND.AUDIO_POST ||
+    kind === PRODUCT_KIND.MUSIC
+  );
 }
 
 export function resolveAuthorAppreciationVisibility(input: {

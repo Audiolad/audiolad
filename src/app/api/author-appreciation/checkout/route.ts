@@ -19,6 +19,7 @@ import {
   createGetCourseAppreciationDeal,
   getGetCourseConfig,
 } from "@/lib/author-appreciation/getcourse/provider";
+import { scheduleGetCourseAppreciationReconcile } from "@/lib/author-appreciation/getcourse/reconcile";
 import type {
   GetCourseConfig,
   GetCourseDeal,
@@ -268,6 +269,7 @@ export async function POST(request: Request) {
       .eq("id", intentId)
       .eq("status", "pending");
     if (updateError) throw new Error("author_appreciation_intent_provider_save_failed");
+    scheduleGetCourseAppreciationReconcile();
     return NextResponse.json(
       { intent_id: intentId, status: "pending", payment_link: deal.paymentLink },
       { status: 201 },
