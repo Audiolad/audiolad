@@ -39,6 +39,16 @@ assert.match(play, /entrySurface:\s*"catalog"/, "catalog Play sets entrySurface"
 assert.match(play, /sourceType:\s*"catalog"/, "sourceType stays catalog");
 assert.match(play, /fetchCatalogPlaySession/, "Play uses catalog session loader");
 assert.match(play, /prepareSharedAudioGesture/, "Play unlocks the shared audio element");
+assert.match(
+  play,
+  /shouldToggleActiveCatalogPlay/,
+  "catalog Play does not toggle a restored session",
+);
+assert.match(
+  read("src/components/products/practice-page/PracticeListenCtaLink.tsx"),
+  /shouldToggleActiveCatalogPlay/,
+  "PDP Play does not toggle a restored session",
+);
 assert.doesNotMatch(play, /href=["']\/listen/, "Play does not navigate to /listen");
 assert.doesNotMatch(play, /router\.(push|replace)/, "Play does not change the URL");
 

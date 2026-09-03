@@ -7,6 +7,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
+import { shouldToggleActiveCatalogPlay } from "@/lib/catalog/should-toggle-active-catalog-play";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import type { CatalogCardActionTarget } from "@/lib/catalog/dto";
 import { parsePracticePublicPath } from "@/lib/products/paths";
@@ -62,7 +63,19 @@ export default function CatalogProductPlayButton({
 
       prepareSharedAudioGesture();
 
-      if (isActive && engine) {
+      if (
+        engine &&
+        shouldToggleActiveCatalogPlay({
+          sessionMatchesProduct: isActive,
+          hasEngine: true,
+          isPlaying: Boolean(engine.isPlaying),
+          forceStartAtBeginning: Boolean(
+            session &&
+              isCatalogGlobalPlayerSession(session) &&
+              session.forceStartAtBeginning,
+          ),
+        })
+      ) {
         clearPlaylistQueue();
         await engine.handlePlayPause();
         return;
@@ -105,6 +118,7 @@ export default function CatalogProductPlayButton({
       isStarting,
       loadSession,
       prepareSharedAudioGesture,
+      session,
     ],
   );
 

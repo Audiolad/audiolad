@@ -179,6 +179,14 @@ function testAutoplayBumpDoesNotRemountSameSource() {
     "documents no remount for autoplay-only bump",
   );
   assert(
+    provider.includes("resolveSameKeySessionAction"),
+    "same-key loadSession uses the shared action resolver",
+  );
+  assert(
+    provider.includes("forceStartAtBeginning on a restored session is NOT autoplay-only"),
+    "forceStart on a restored session remounts instead of keeping resume state",
+  );
+  assert(
     player.includes("const requestAutoplayIntent = useCallback"),
     "engine exposes requestAutoplayIntent",
   );
