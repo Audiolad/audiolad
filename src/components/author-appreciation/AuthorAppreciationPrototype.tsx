@@ -183,7 +183,7 @@ export default function AuthorAppreciationPrototype({
 
             <fieldset className="mt-6">
               <legend className="text-sm font-semibold text-[#25135c]">
-                Выберите сумму
+                Выберите сумму или введите вручную
               </legend>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {QUICK_AMOUNTS.map((quickAmount) => {

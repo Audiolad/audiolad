@@ -65,6 +65,11 @@ assert.ok(prototype.includes('useState("500")'));
 assert.ok(prototype.includes("setAmountInput(String(quickAmount))"));
 assert.ok(prototype.includes("selectedAmount === quickAmount"));
 assert.ok(prototype.includes("Сумма"));
+assert.ok(prototype.includes("Выберите сумму или введите вручную"));
+assert.ok(
+  !/>\s*Выберите сумму\s*</.test(prototype),
+  "old standalone amount-picker label must not remain",
+);
 assert.ok(!prototype.includes("Своя сумма"));
 assert.ok(prototype.includes("Поблагодарить на {resolveAmountLabel(selectedAmount)}"));
 assert.ok(prototype.includes("amount_minor: selectedAmount * 100"));
