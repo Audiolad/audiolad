@@ -45,7 +45,7 @@ export const AUTHOR_REWARD_CABINET_TITLE = "Вознаграждение авт�
 
 /** Compact cabinet caption. Same commercial split covers ordinary sales and appreciation. */
 export const AUTHOR_REWARD_CABINET_CAPTION =
-  "Комиссия платформы включает расходы на приём и обработку платежей, техническую инфраструктуру, размещение и хранение материалов, работу сервиса, учёт операций и организацию выплат.";
+  "Комиссия платформы включает расходы на приём и обработку платежей, техническую инфраструктуру, размещение и хранение материалов, работу и развитие онлайн-студии, работу сервиса, развитие и продвижение платформы, учёт операций и организацию выплат.";
 
 export function bpsToPercentNumber(bps: number): number {
   return bps / 100;
