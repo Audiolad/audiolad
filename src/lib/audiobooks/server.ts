@@ -1,11 +1,12 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { AuthorAccessError, requireAuthorMembership, requireAuthorMutationMembership } from "@/lib/author-products/auth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   AUDIOBOOK_FRAGMENTS_BUCKET,
+  AUDIOBOOK_RENDERS_BUCKET,
   buildAudiobookFragmentStoragePath,
   isAudiobookActiveFragmentStoragePath, isAudiobookFragmentStoragePath,
   normalizeAudiobookMimeType,
@@ -31,6 +32,13 @@ export type AudiobookFragment = {
   original_name: string; mime_type: string; size_bytes: number;
   duration_seconds: number | null; source_type: "upload" | "recording"; status: "uploading" | "active";
   created_at: string; updated_at: string;
+};
+export type AudiobookChapterRenderJob = {
+  id: string; project_id: string; chapter_id: string; author_id: string;
+  fragment_snapshot: { fragments: Array<{ id: string; storagePath: string; position: number }> };
+  snapshot_sha256: string; status: "queued" | "processing" | "completed" | "failed";
+  output_storage_path: string | null; error_code: string | null; error_message_safe: string | null;
+  created_at: string; completed_at: string | null;
 };
 
 export class AudiobookError extends Error {
@@ -349,4 +357,45 @@ export async function deleteAudiobookFragment(projectId: string, chapterId: stri
     fail(error, "audiobook_fragment_delete_error");
   }
   await removeFragmentStorage([storagePath], { projectId, chapterId, fragmentId, authorId });
+}
+
+const RENDER_SELECT = "id, project_id, chapter_id, author_id, fragment_snapshot, snapshot_sha256, status, output_storage_path, error_code, error_message_safe, created_at, completed_at";
+function snapshotHash(snapshot: object) {
+  return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+}
+
+export async function createAudiobookChapterRenderJob(projectId: string, chapterId: string, authorId: string) {
+  await mutationAccess(authorId);
+  await ownedChapter(projectId, chapterId, authorId);
+  const fragments = await listAudiobookFragments(projectId, chapterId, authorId);
+  const active = fragments.filter((fragment) => fragment.status === "active");
+  if (!active.length) throw new AudiobookError("no_active_fragments", 422);
+  const fragment_snapshot = { version: 1, fragments: active.map((fragment) => ({
+    id: fragment.id, storagePath: fragment.storage_path, position: fragment.position,
+    mimeType: fragment.mime_type, sizeBytes: fragment.size_bytes,
+  })) };
+  const { data, error } = await createServiceRoleClient().from("audiobook_chapter_render_jobs").insert({
+    project_id: projectId, chapter_id: chapterId, author_id: authorId, fragment_snapshot,
+    snapshot_sha256: snapshotHash(fragment_snapshot),
+  }).select(RENDER_SELECT).single();
+  if (error?.code === "23505") throw new AudiobookError("render_already_queued", 409);
+  if (error || !data) fail(error, "audiobook_chapter_render_create_error");
+  return data as AudiobookChapterRenderJob;
+}
+
+export async function getAudiobookChapterRenderState(projectId: string, chapterId: string, authorId: string) {
+  await ownedChapter(projectId, chapterId, authorId);
+  const { data, error } = await createServiceRoleClient().from("audiobook_chapter_render_jobs")
+    .select(RENDER_SELECT).eq("project_id", projectId).eq("chapter_id", chapterId)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) fail(error, "audiobook_chapter_render_state_error");
+  return (data ?? null) as AudiobookChapterRenderJob | null;
+}
+
+export async function downloadAudiobookChapterRender(projectId: string, chapterId: string, authorId: string) {
+  const job = await getAudiobookChapterRenderState(projectId, chapterId, authorId);
+  if (!job || job.status !== "completed" || !job.output_storage_path) throw new AudiobookError("not_found", 404);
+  const { data, error } = await createServiceRoleClient().storage.from(AUDIOBOOK_RENDERS_BUCKET).download(job.output_storage_path);
+  if (error || !data) throw new AudiobookError("not_found", 404);
+  return { data, filename: `Глава-${chapterId}.mp3`, job };
 }

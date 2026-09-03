@@ -5,7 +5,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import {
   renderStudioProjectToMp3,
@@ -13,10 +13,55 @@ import {
 } from "../src/lib/studio/render/render";
 import { renderOutputPath } from "../src/lib/studio/render/storage";
 import type { StudioRenderSnapshot } from "../src/lib/studio/render/types";
+import { renderAudiobookChapterToMp3 } from "../src/lib/audiobooks/render";
+import { AUDIOBOOK_RENDERS_BUCKET, buildAudiobookChapterRenderStoragePath } from "../src/lib/audiobooks/storage";
 
 const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
 const assetsBucket = "studio-draft-assets";
 const outputBucket = "studio-renders";
+
+async function processAudiobookChapterRender() {
+  await service.rpc("recover_stale_audiobook_chapter_render_jobs");
+  const { data, error } = await service.rpc("claim_audiobook_chapter_render_job", { p_lease_seconds: 1800 });
+  if (error) throw error;
+  const job = Array.isArray(data) ? data[0] : data;
+  if (!job || typeof job !== "object" || typeof job.id !== "string") return false;
+  const workspace = join(tmpdir(), `audiolad-audiobook-render-${randomUUID()}`);
+  try {
+    const snapshot = job.fragment_snapshot;
+    const canonical = JSON.stringify(snapshot);
+    if (!snapshot || createHash("sha256").update(canonical).digest("hex") !== job.snapshot_sha256) throw new Error("snapshot_fingerprint_mismatch");
+    const fragments = Array.isArray(snapshot.fragments) ? snapshot.fragments : [];
+    if (!fragments.length || fragments.some((fragment) => !fragment || typeof fragment.storagePath !== "string")) throw new Error("invalid_snapshot");
+    await mkdir(workspace, { recursive: true });
+    const paths: string[] = [];
+    for (const [index, fragment] of fragments.entries()) {
+      const { data: file, error: downloadError } = await service.storage.from("audiobook-fragments").download(fragment.storagePath);
+      if (downloadError || !file) throw new Error("source_unavailable");
+      const path = join(workspace, `source-${index}`);
+      await writeFile(path, Buffer.from(await file.arrayBuffer()));
+      paths.push(path);
+    }
+    const result = await renderAudiobookChapterToMp3(paths, workspace, job.id);
+    const outputPath = buildAudiobookChapterRenderStoragePath(job.author_id, job.project_id, job.chapter_id, job.id);
+    const { error: uploadError } = await service.storage.from(AUDIOBOOK_RENDERS_BUCKET)
+      .upload(outputPath, await (await import("node:fs/promises")).readFile(result.outputPath), { contentType: "audio/mpeg", upsert: true });
+    if (uploadError) throw uploadError;
+    const { data: completed, error: completeError } = await service.from("audiobook_chapter_render_jobs").update({
+      status: "completed", output_storage_path: outputPath, completed_at: new Date().toISOString(), lease_expires_at: null, updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("status", "processing").select("id").maybeSingle();
+    if (completeError || !completed) throw new Error("render_job_completion_state_lost");
+    console.log(JSON.stringify({ event: "audiobook_chapter_render_completed", jobId: job.id, bytes: result.sizeBytes }));
+  } catch (error) {
+    const code = error instanceof Error && error.message === "snapshot_fingerprint_mismatch" ? "snapshot_fingerprint_mismatch" : "render_failed";
+    await service.from("audiobook_chapter_render_jobs").update({
+      status: "failed", error_code: code, error_message_safe: "Не удалось подготовить MP3 главы. Исходные фрагменты сохранены.",
+      lease_expires_at: null, updated_at: new Date().toISOString(),
+    }).eq("id", job.id).eq("status", "processing");
+    throw error;
+  } finally { await rm(workspace, { recursive: true, force: true }); }
+  return true;
+}
 
 async function main() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("render_worker_environment_missing");
@@ -30,7 +75,11 @@ async function main() {
     typeof job.id !== "string" ||
     !job.project_snapshot ||
     typeof job.project_snapshot !== "object"
-  ) return console.log("studio-render-worker: no queued jobs");
+  ) {
+    const processedAudiobook = await processAudiobookChapterRender();
+    if (!processedAudiobook) console.log("studio-render-worker: no queued jobs");
+    return;
+  }
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
   try {
     await mkdir(workspace, { recursive: true });
@@ -98,6 +147,7 @@ async function main() {
       }
     }
     console.log(JSON.stringify({ jobId: job.id, status: "completed", bytes: result.sizeBytes }));
+    await processAudiobookChapterRender();
   } catch (error) {
     const errorCode = error instanceof StudioRenderDurationError
       ? error.code
