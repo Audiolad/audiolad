@@ -19,7 +19,53 @@ export type PrimaryQueryOveruse = {
   overusedFaqLocations: PrimaryQueryOveruseFaqLocation[];
 };
 
-function countExactNormalizedSeoPhrase(haystack: string, phrase: string): number {
+const UNICODE_LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
+
+function isUnicodeLetterOrNumber(char: string | null): boolean {
+  return Boolean(char) && UNICODE_LETTER_OR_NUMBER.test(char);
+}
+
+function codePointBefore(text: string, index: number): string | null {
+  if (index <= 0) {
+    return null;
+  }
+
+  const trailing = text.charCodeAt(index - 1);
+  const startsAt =
+    trailing >= 0xdc00 && trailing <= 0xdfff && index >= 2 ? index - 2 : index - 1;
+  const codePoint = text.codePointAt(startsAt);
+  return codePoint === undefined ? null : String.fromCodePoint(codePoint);
+}
+
+function codePointAfter(text: string, index: number): string | null {
+  if (index >= text.length) {
+    return null;
+  }
+
+  const codePoint = text.codePointAt(index);
+  return codePoint === undefined ? null : String.fromCodePoint(codePoint);
+}
+
+function hasLexicalPhraseBoundaries(
+  source: string,
+  start: number,
+  length: number,
+): boolean {
+  return (
+    !isUnicodeLetterOrNumber(codePointBefore(source, start)) &&
+    !isUnicodeLetterOrNumber(codePointAfter(source, start + length))
+  );
+}
+
+/**
+ * Count exact normalized phrase occurrences with Unicode lexical boundaries.
+ * Quotes, punctuation, spaces, parentheses and dashes are valid boundaries.
+ * A short needle inside a larger word (сон in бессонница) does not count.
+ */
+export function countExactNormalizedSeoPhrase(
+  haystack: string,
+  phrase: string,
+): number {
   const source = normalizeSeoPhrase(haystack);
   const needle = normalizeSeoPhrase(phrase);
   if (!needle || !source) {
@@ -33,8 +79,12 @@ function countExactNormalizedSeoPhrase(haystack: string, phrase: string): number
     if (index === -1) {
       return count;
     }
-    count += 1;
-    from = index + needle.length;
+    if (hasLexicalPhraseBoundaries(source, index, needle.length)) {
+      count += 1;
+      from = index + needle.length;
+    } else {
+      from = index + 1;
+    }
   }
   return count;
 }

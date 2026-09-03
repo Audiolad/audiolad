@@ -29,6 +29,7 @@ import {
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
 import {
+  countExactNormalizedSeoPhrase,
   evaluatePrimaryQueryOveruse,
 } from "../src/lib/seo/primary-query-overuse.ts";
 import {
@@ -3154,6 +3155,59 @@ const ungroundedDraft = validDraft({
   assert.equal(legacyGenerate.ok, true);
   assert.deepEqual(legacyGenerate.data.seoSecondaryQueries, storedLegacy);
   assert.equal(legacyGenerateProvider.calls.length, 1);
+
+  assert.equal(containsSeoPhrase("бессонница", "сон"), true);
+  assert.equal(countExactNormalizedSeoPhrase("Это сон.", "сон") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Материал для тех, кого беспокоит бессонница.",
+      "сон",
+    ) > 0,
+    false,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Практика помогает почувствовать умиротворение.",
+      "мир",
+    ) > 0,
+    false,
+  );
+  assert.equal(countExactNormalizedSeoPhrase("Мир и спокойствие.", "мир") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Используйте «Ключ к Изобилию» вечером.",
+      "Ключ к Изобилию",
+    ) > 0,
+    true,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("Практика про денежную энергию.", "денежная энергия") > 0,
+    false,
+  );
+  assert.equal(countExactNormalizedSeoPhrase("перед сном", "сон") > 0, false);
+  assert.equal(countExactNormalizedSeoPhrase("«сон»", "сон") > 0, true);
+  assert.equal(countExactNormalizedSeoPhrase("сон, отдых и тишина", "сон") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase("сверхденежная энергия", "денежная энергия") > 0,
+    false,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("(Ключ к Изобилию)", "Ключ к Изобилию") > 0,
+    true,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("Ключ к Изобилию,", "Ключ к Изобилию") > 0,
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: "сон",
+      productTitle: "Вечерняя практика",
+      usageItems: [{ content: "Материал подходит для спокойного вечера при бессоннице." }],
+      faqItems: [{ question: "Когда слушать?", answer: "Вечером." }],
+    }).primaryOveruse,
+    false,
+  );
 
   const KEY_PRIMARY = "Ключ к Изобилию";
   const keyToAbundanceRequest = requestInput({
