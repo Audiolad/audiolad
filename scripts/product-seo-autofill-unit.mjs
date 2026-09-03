@@ -1358,8 +1358,13 @@ for (const [question, expectedAnswer] of [
   ]);
   assert.equal(descriptionFallbackProvider.calls[1].previous.seoDescription, longCaseVariantDescription);
   assert.ok(descriptionFallbackResult.data.seoDescription.length <= 300);
+  const retainedSuffix = descriptionFallbackResult.data.seoDescription.slice(
+    `${requestInput().seoPrimaryQuery} – `.length,
+  );
+  const suffixEnd = longCaseVariantDescription.indexOf(retainedSuffix) + retainedSuffix.length;
   assert.ok(
-    descriptionFallbackResult.data.seoDescription.endsWith("мягко"),
+    suffixEnd === longCaseVariantDescription.length ||
+      longCaseVariantDescription[suffixEnd] === " ",
     "fallback must not split a word",
   );
   assert.equal(
