@@ -1,8 +1,4 @@
 import { AUTHOR_SEO_SECONDARY_ACTIVE_MAX } from "@/lib/author-products/limits";
-import {
-  containsSeoPhrase,
-  normalizeSeoPhrase,
-} from "@/lib/seo/product-metadata";
 
 const COVERAGE_STOP_WORDS = new Set([
   "в",
@@ -185,17 +181,44 @@ function textContainsNormalizedPhrase(text: string, phrase: string): boolean {
   return Boolean(needle) && source.includes(needle);
 }
 
-function distinctiveQueryStems(query: string, primaryQuery: string): string[] {
+function textHasStem(textStems: readonly string[], stem: string): boolean {
+  return textStems.some((candidate) => stemsOverlap(stem, candidate));
+}
+
+/**
+ * Stems that belong to the secondary and are not already supplied by the
+ * primary. Primary-shared stems may appear in generated copy, but they never
+ * prove secondary coverage by themselves.
+ */
+export function distinctiveQueryStems(
+  query: string,
+  primaryQuery: string,
+): string[] {
   const queryStems = coverageStems(query);
   if (!primaryQuery.trim()) {
     return queryStems;
   }
 
   const primaryStems = coverageStems(primaryQuery);
-  const distinctive = queryStems.filter(
+  return queryStems.filter(
     (stem) => !primaryStems.some((primary) => stemsOverlap(stem, primary)),
   );
-  return distinctive.length > 0 ? distinctive : queryStems;
+}
+
+function fallbackQueryCoverage(
+  queryStems: readonly string[],
+  textStems: readonly string[],
+): boolean {
+  if (!queryStems.length) {
+    return false;
+  }
+
+  const hits = queryStems.filter((stem) => textHasStem(textStems, stem));
+  if (queryStems.length <= 2) {
+    return hits.length === queryStems.length;
+  }
+
+  return hits.length >= 2 && hits.length / queryStems.length >= 0.5;
 }
 
 function textCoversQuery(
@@ -216,31 +239,12 @@ function textCoversQuery(
     return false;
   }
 
-  const overlapsPrimary =
-    Boolean(primaryQuery.trim()) &&
-    normalizeSeoPhrase(query) !== normalizeSeoPhrase(primaryQuery) &&
-    containsSeoPhrase(query, primaryQuery);
-
-  if (overlapsPrimary) {
-    const distinctive = distinctiveQueryStems(query, primaryQuery);
-    return distinctive.every((stem) =>
-      textStems.some((candidate) => stemsOverlap(stem, candidate)),
-    );
+  const distinctiveStems = distinctiveQueryStems(query, primaryQuery);
+  if (distinctiveStems.length > 0) {
+    return distinctiveStems.some((stem) => textHasStem(textStems, stem));
   }
 
-  const queryStems = coverageStems(query);
-  if (!queryStems.length) {
-    return false;
-  }
-
-  const hits = queryStems.filter((stem) =>
-    textStems.some((candidate) => stemsOverlap(stem, candidate)),
-  );
-  if (queryStems.length <= 2) {
-    return hits.length === queryStems.length;
-  }
-
-  return hits.length >= 2 && hits.length / queryStems.length >= 0.5;
+  return fallbackQueryCoverage(coverageStems(query), textStems);
 }
 
 export function evaluateSecondaryQueryCoverage(

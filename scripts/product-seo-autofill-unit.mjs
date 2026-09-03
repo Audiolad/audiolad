@@ -29,6 +29,7 @@ import {
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
 import {
+  distinctiveQueryStems,
   evaluateSecondaryQueryCoverage,
   isSecondaryCoverageComplete,
   selectActiveSecondaryQueries,
@@ -2626,6 +2627,155 @@ const ungroundedDraft = validDraft({
   });
 
   assert.deepEqual(
+    distinctiveQueryStems("денежный поток энергии", MONEY_PRIMARY),
+    ["поток"],
+  );
+  assert.deepEqual(
+    distinctiveQueryStems("энергия входа в денежный канал", MONEY_PRIMARY).sort(),
+    ["вход", "канал"].sort(),
+  );
+  assert.ok(
+    distinctiveQueryStems("вечернее расслабление", "медитация для сна").includes(
+      "расслабл",
+    ) ||
+      distinctiveQueryStems("вечернее расслабление", "медитация для сна").some(
+        (stem) => stem.startsWith("расслабл"),
+      ),
+  );
+
+  const moneyFlowPrimaryOnly = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: ["денежный поток энергии"],
+    usageItems: [
+      { content: "Практика помогает сосредоточиться на денежной энергии." },
+    ],
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.equal(moneyFlowPrimaryOnly.secondary1UsageCovered, false);
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: MONEY_PRIMARY,
+      activeSecondaryQueries: ["денежный поток энергии"],
+      usageItems: [{ content: "Практика помогает работать с денежной энергией." }],
+      faqItems: moneyUncoveredDraft.faqItems,
+    }).secondary1UsageCovered,
+    false,
+  );
+
+  const moneyFlowDistinctive = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: ["денежный поток энергии"],
+    usageItems: [
+      {
+        content:
+          "Используйте практику, когда хочется сосредоточиться на теме денежного потока.",
+      },
+    ],
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.equal(moneyFlowDistinctive.secondary1UsageCovered, true);
+
+  const moneyChannelPrimaryOnly = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: [
+      "денежный поток энергии",
+      "энергия входа в денежный канал",
+    ],
+    usageItems: moneyUncoveredDraft.usageItems,
+    faqItems: [
+      moneyUncoveredDraft.faqItems[0],
+      {
+        ...moneyUncoveredDraft.faqItems[1],
+        answer: "Материал помогает уделить внимание денежной энергии.",
+      },
+      moneyUncoveredDraft.faqItems[2],
+    ],
+  });
+  assert.equal(moneyChannelPrimaryOnly.secondary2FaqCovered, false);
+
+  const moneyChannelNatural = evaluateSecondaryQueryCoverage({
+    primaryQuery: MONEY_PRIMARY,
+    activeSecondaryQueries: [
+      "денежный поток энергии",
+      "энергия входа в денежный канал",
+    ],
+    usageItems: moneyUncoveredDraft.usageItems,
+    faqItems: [
+      moneyUncoveredDraft.faqItems[0],
+      {
+        ...moneyUncoveredDraft.faqItems[1],
+        answer: "Материал можно использовать для знакомства с темой денежного канала.",
+      },
+      moneyUncoveredDraft.faqItems[2],
+    ],
+  });
+  assert.equal(moneyChannelNatural.secondary2FaqCovered, true);
+
+  const sleepRelaxFalse = evaluateSecondaryQueryCoverage({
+    primaryQuery: "медитация для сна",
+    activeSecondaryQueries: ["вечернее расслабление"],
+    usageItems: [{ content: "Медитация помогает подготовиться ко сну." }],
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.equal(sleepRelaxFalse.secondary1UsageCovered, false);
+  const sleepRelaxTrue = evaluateSecondaryQueryCoverage({
+    primaryQuery: "медитация для сна",
+    activeSecondaryQueries: ["вечернее расслабление"],
+    usageItems: [{ content: "Подходит для вечернего расслабления." }],
+    faqItems: moneyUncoveredDraft.faqItems,
+  });
+  assert.equal(sleepRelaxTrue.secondary1UsageCovered, true);
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: "медитация для сна",
+      activeSecondaryQueries: ["вечернее расслабление"],
+      usageItems: [{ content: "Практика для мягкого вечернего расслабления." }],
+      faqItems: moneyUncoveredDraft.faqItems,
+    }).secondary1UsageCovered,
+    true,
+  );
+
+  for (const content of [
+    "Когда хочется сосредоточиться на денежном потоке.",
+    "Используйте практику для работы с денежным потоком.",
+    "Материал про денежный поток энергии.",
+  ]) {
+    assert.equal(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: MONEY_PRIMARY,
+        activeSecondaryQueries: ["денежный поток энергии"],
+        usageItems: [{ content }],
+        faqItems: moneyUncoveredDraft.faqItems,
+      }).secondary1UsageCovered,
+      true,
+      content,
+    );
+  }
+  for (const content of [
+    "Материал можно использовать для знакомства с темой денежного канала.",
+    "Подойдёт, если хотите познакомиться с денежным каналом.",
+    "Практика знакомит с работой с денежным каналом.",
+  ]) {
+    assert.equal(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: MONEY_PRIMARY,
+        activeSecondaryQueries: [
+          "денежный поток энергии",
+          "энергия входа в денежный канал",
+        ],
+        usageItems: moneyUncoveredDraft.usageItems,
+        faqItems: [
+          moneyUncoveredDraft.faqItems[0],
+          { ...moneyUncoveredDraft.faqItems[1], answer: content },
+          moneyUncoveredDraft.faqItems[2],
+        ],
+      }).secondary2FaqCovered,
+      true,
+      content,
+    );
+  }
+
+  assert.deepEqual(
     evaluateSecondaryQueryCoverage({
       primaryQuery: MONEY_PRIMARY,
       activeSecondaryQueries: ["денежный поток энергии"],
@@ -2724,6 +2874,83 @@ const ungroundedDraft = validDraft({
     ),
     true,
   );
+
+  const primaryOnlyVocabularyDraft = {
+    ...moneyUncoveredDraft,
+    usageItems: [
+      { content: "Практика помогает сосредоточиться на денежной энергии." },
+      { content: "После напряжённого дня" },
+      { content: "Во время вечернего отдыха" },
+    ],
+    faqItems: [
+      moneyUncoveredDraft.faqItems[0],
+      {
+        ...moneyUncoveredDraft.faqItems[1],
+        answer: "Материал помогает уделить внимание денежной энергии.",
+      },
+      moneyUncoveredDraft.faqItems[2],
+    ],
+  };
+  assert.deepEqual(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: MONEY_PRIMARY,
+      activeSecondaryQueries: moneyRequest.seoSecondaryQueries,
+      usageItems: primaryOnlyVocabularyDraft.usageItems,
+      faqItems: primaryOnlyVocabularyDraft.faqItems,
+    }),
+    { secondary1UsageCovered: false, secondary2FaqCovered: false },
+  );
+  const primaryOnlyRepairProvider = mockProvider([
+    { ok: true, draft: primaryOnlyVocabularyDraft, raw: {} },
+    {
+      ok: true,
+      draft: {
+        ...primaryOnlyVocabularyDraft,
+        usageItems: [
+          { content: "Используйте практику для работы с денежным потоком." },
+          primaryOnlyVocabularyDraft.usageItems[1],
+          primaryOnlyVocabularyDraft.usageItems[2],
+        ],
+        faqItems: [
+          primaryOnlyVocabularyDraft.faqItems[0],
+          {
+            ...primaryOnlyVocabularyDraft.faqItems[1],
+            answer: "Материал можно использовать для знакомства с темой денежного канала.",
+          },
+          primaryOnlyVocabularyDraft.faqItems[2],
+        ],
+      },
+      raw: {},
+    },
+  ]);
+  const primaryOnlyRepair = await generateProductSeoDraft(moneyRequest, {
+    userId: "secondary-quality-repair-primary-only-false-positive",
+    config,
+    provider: primaryOnlyRepairProvider,
+  });
+  assert.equal(primaryOnlyRepair.ok, true);
+  assert.equal(primaryOnlyRepairProvider.calls.length, 2);
+  assert.equal(primaryOnlyRepairProvider.calls[1].kind, "qualityRepair");
+  assert.deepEqual(primaryOnlyRepairProvider.calls[1].coverage, {
+    secondary1UsageCovered: false,
+    secondary2FaqCovered: false,
+    secondary1: "денежный поток энергии",
+    secondary2: "энергия входа в денежный канал",
+  });
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: MONEY_PRIMARY,
+        activeSecondaryQueries: moneyRequest.seoSecondaryQueries,
+        usageItems: primaryOnlyRepair.data.usageItems,
+        faqItems: primaryOnlyRepair.data.faqItems,
+      }),
+      2,
+    ),
+    true,
+  );
+  assert.match(primaryOnlyRepair.data.usageItems[0].content, /поток/);
+  assert.match(primaryOnlyRepair.data.faqItems[1].answer, /канал/);
 
   const oneSecondaryProvider = mockProvider([
     {
