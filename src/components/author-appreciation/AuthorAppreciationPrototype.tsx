@@ -6,7 +6,7 @@ import { FEATURED_CARD_PRIMARY_CTA_CLASS } from "@/components/home/FeaturedProdu
 import { formatRubles } from "@/lib/products/price-format";
 
 const QUICK_AMOUNTS = [100, 300, 500, 1000] as const;
-const APPRECIATION_CTA_LABEL = "🙏 Поблагодарить автора ❤️";
+const APPRECIATION_CTA_LABEL = "❤️ Поблагодарить автора";
 const APPRECIATION_CTA_HEART = "❤️";
 
 type AuthorAppreciationPrototypeProps = {
@@ -120,16 +120,16 @@ export default function AuthorAppreciationPrototype({
           }}
           className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} author-appreciation-cta max-w-full justify-center text-center hover:bg-[#6338b0] active:bg-[#5a32a3]`}
         >
-          {APPRECIATION_CTA_LABEL.slice(
-            0,
-            APPRECIATION_CTA_LABEL.indexOf(APPRECIATION_CTA_HEART),
-          ).trimEnd()}
           <span className="author-appreciation-cta__heart">
             {APPRECIATION_CTA_HEART}
           </span>
+          {APPRECIATION_CTA_LABEL.slice(
+            APPRECIATION_CTA_LABEL.indexOf(APPRECIATION_CTA_HEART) +
+              APPRECIATION_CTA_HEART.length,
+          )}
         </button>
         <p className="mt-2.5 text-sm leading-5 text-[#7d70a2]">
-          Благодарность возвращается изобилием
+          Благодарность возвращается изобилием 🙏
         </p>
       </section>
 

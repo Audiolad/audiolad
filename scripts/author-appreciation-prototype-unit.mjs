@@ -13,19 +13,40 @@ function read(relativePath) {
 const prototype = read(
   "src/components/author-appreciation/AuthorAppreciationPrototype.tsx",
 );
-assert.ok(prototype.includes("🙏 Поблагодарить автора ❤️"));
-assert.ok(prototype.includes("Благодарность возвращается изобилием"));
+assert.ok(prototype.includes("❤️ Поблагодарить автора"));
+assert.ok(prototype.includes("Благодарность возвращается изобилием 🙏"));
+assert.ok(!prototype.includes("🙏 Поблагодарить автора ❤️"));
+assert.ok(!prototype.includes("🙏 Поблагодарить автора"));
+assert.ok(!prototype.includes("Поблагодарить автора ❤️"));
 assert.ok(prototype.includes("FEATURED_CARD_PRIMARY_CTA_CLASS"));
 assert.ok(prototype.includes("author-appreciation-cta"));
 assert.ok(prototype.includes("author-appreciation-cta__heart"));
 assert.ok(
   prototype.indexOf("author-appreciation-cta__heart") <
-    prototype.indexOf("Благодарность возвращается изобилием"),
+    prototype.indexOf("APPRECIATION_CTA_LABEL.slice"),
+  "heart class must wrap the leading ❤️ before the remaining CTA text",
+);
+assert.ok(
+  prototype.indexOf("author-appreciation-cta__heart") <
+    prototype.indexOf("Благодарность возвращается изобилием 🙏"),
 );
 assert.ok(
   prototype.indexOf("</button>") <
-    prototype.indexOf("Благодарность возвращается изобилием"),
+    prototype.indexOf("Благодарность возвращается изобилием 🙏"),
   "caption must stay a separate non-clickable line under the button",
+);
+assert.ok(
+  prototype.indexOf("🙏") > prototype.indexOf("</button>"),
+  "folded-hands emoji belongs to the caption, not the CTA button",
+);
+assert.ok(
+  !prototype
+    .slice(
+      prototype.indexOf("author-appreciation-cta__heart"),
+      prototype.indexOf("</button>"),
+    )
+    .includes("🙏"),
+  "caption 🙏 must not be wrapped by the heart pulse class",
 );
 assert.ok(prototype.includes('surface: "author" | "product"'));
 assert.ok(prototype.includes('role="dialog"'));
