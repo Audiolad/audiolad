@@ -311,6 +311,13 @@ assert.equal(
   applyProductSeoRussianTypography('"Sleep ritual" — OpenAI'),
   '"Sleep ritual" – OpenAI',
 );
+assert.equal(
+  applyProductSeoRussianTypography(
+    'Практика «медитация — для сна» — спокойный ритуал.',
+    ["медитация — для сна"],
+  ),
+  'Практика «медитация — для сна» – спокойный ритуал.',
+);
 const typographyDraft = applyProductSeoDraftRussianTypography({
   seoTitle: '"Лавандовый сон" — вечерняя практика',
   seoDescription: "'Тихий вечер' — аудиоматериал",
@@ -918,9 +925,8 @@ assert.equal(
 assert.equal(repaired.data.faqItems[0].question, validDraft().faqItems[0].question);
 assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
 
-// Regression: when the first FAQ-only repair still fails, the final repair
-// receives only the remaining FAQ issues and cannot alter the same product's
-// non-FAQ content, questions, or anchors.
+// The safe finalizer resolves a residual FAQ question without another provider
+// call and preserves the same product's non-answer content.
 {
   const initialFaqFailure = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
@@ -933,18 +939,9 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
       index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
     ),
   });
-  const finalFaqRepair = validDraft({
-    seoTitle: "Ещё одна несвязанная попытка изменить продукт",
-    faqItems: validDraft().faqItems.map((item, index) =>
-      index
-        ? item
-        : { ...item, answer: 'Выберите "тихое место" — и устройтесь удобно.' },
-    ),
-  });
   const finalFaqRepairProvider = mockProvider([
     { ok: true, draft: initialFaqFailure, raw: {} },
     { ok: true, draft: firstFaqRepair, raw: {} },
-    { ok: true, draft: finalFaqRepair, raw: {} },
   ]);
   const finalFaqRepaired = await generateProductSeoDraft(requestInput(), {
     userId: "final-faq-repair-same-product",
@@ -953,16 +950,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(finalFaqRepaired.ok, true);
-  assert.equal(finalFaqRepairProvider.calls.length, 3);
-  assert.deepEqual(finalFaqRepairProvider.calls[2].issues, [
-    "faq_answer_is_question",
-  ]);
-  assert.deepEqual(finalFaqRepairProvider.calls[2].previous, {
-    ...initialFaqFailure,
-    faqItems: initialFaqFailure.faqItems.map((item, index) =>
-      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
-    ),
-  });
+  assert.equal(finalFaqRepairProvider.calls.length, 2);
   assert.equal(finalFaqRepaired.data.seoTitle, initialFaqFailure.seoTitle);
   assert.equal(finalFaqRepaired.data.seoDescription, initialFaqFailure.seoDescription);
   assert.deepEqual(finalFaqRepaired.data.usageItems, initialFaqFailure.usageItems);
@@ -972,7 +960,7 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   );
   assert.equal(
     finalFaqRepaired.data.faqItems[0].answer,
-    "Выберите «тихое место» – и устройтесь удобно.",
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.",
   );
 }
 {
@@ -996,7 +984,6 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
           raw: {},
         },
         { ok: true, draft: stillQuestion, raw: {} },
-        { ok: true, draft: stillQuestion, raw: {} },
       ]),
       aiRateLimit: createProductSeoAiRateLimitStore(),
     }),
@@ -1018,13 +1005,12 @@ assert.equal(repaired.data.faqItems[0].anchor, validDraft().faqItems[0].anchor);
   const payloads = validationFailurePayloads(captured.entries);
   assert.deepEqual(
     payloads.map((payload) => payload.stage),
-    ["generate", "repair", "final_faq_repair"],
+    ["generate", "repair"],
   );
 }
 
-// The deterministic post-third-provider fallback is constrained to the exact
-// residual faq_answer_is_question issue. It makes no fourth provider call and
-// keeps all non-answer content intact.
+// The safe finalizer resolves FAQ-answer questions immediately after the first
+// repair, without a third provider call.
 async function runDeterministicFaqFallback(question, answer, userId, requestOverride = {}) {
   const questionOnlyDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
@@ -1032,7 +1018,6 @@ async function runDeterministicFaqFallback(question, answer, userId, requestOver
     ),
   });
   const provider = mockProvider([
-    { ok: true, draft: questionOnlyDraft, raw: {} },
     { ok: true, draft: questionOnlyDraft, raw: {} },
     { ok: true, draft: questionOnlyDraft, raw: {} },
   ]);
@@ -1043,7 +1028,7 @@ async function runDeterministicFaqFallback(question, answer, userId, requestOver
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, true, userId);
-  assert.equal(provider.calls.length, 3, userId);
+  assert.equal(provider.calls.length, 2, userId);
   assert.deepEqual(validateProductSeoAiDraft(result.data, validationInput()), {
     ok: true,
     draft: result.data,
@@ -1118,7 +1103,6 @@ for (const [question, expectedAnswer] of [
   const fallbackProvider = mockProvider([
     { ok: true, draft: questionOnlyDraft, raw: {} },
     { ok: true, draft: questionOnlyDraft, raw: {} },
-    { ok: true, draft: questionOnlyDraft, raw: {} },
   ]);
   const fallbackResult = await generateProductSeoDraft(requestInput(), {
     userId: `deterministic-faq-fallback-${question}`,
@@ -1127,7 +1111,7 @@ for (const [question, expectedAnswer] of [
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(fallbackResult.ok, true, question);
-  assert.equal(fallbackProvider.calls.length, 3, question);
+  assert.equal(fallbackProvider.calls.length, 2, question);
   assert.equal(fallbackResult.data.faqItems[0].answer, expectedAnswer, question);
   assert.deepEqual(
     fallbackResult.data.faqItems.map(({ question: itemQuestion, anchor }) => ({
@@ -1146,23 +1130,16 @@ for (const [question, expectedAnswer] of [
   });
 }
 
-// A residual issue set that contains anything besides faq_answer_is_question
-// remains fail-closed after the third provider response.
+// A remaining issue outside the safe finalizer's narrow scope receives one
+// generic third repair with the exact residual issue set.
 {
-  const mixedResidualDraft = validDraft({
-    faqItems: validDraft().faqItems.map((item, index) =>
-      index ? item : { ...item, answer: item.question },
-    ),
-  });
-  const faqQuestionOnlyDraft = validDraft({
-    faqItems: validDraft().faqItems.map((item, index) =>
-      index ? item : { ...item, answer: "Можно ли слушать перед сном?" },
-    ),
+  const missingTitleDraft = validDraft({
+    seoTitle: "Спокойный вечер перед отдыхом",
   });
   const mixedResidualProvider = mockProvider([
-    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
-    { ok: true, draft: faqQuestionOnlyDraft, raw: {} },
-    { ok: true, draft: mixedResidualDraft, raw: {} },
+    { ok: true, draft: missingTitleDraft, raw: {} },
+    { ok: true, draft: missingTitleDraft, raw: {} },
+    { ok: true, draft: validDraft(), raw: {} },
   ]);
   const mixedResidualResult = await generateProductSeoDraft(requestInput(), {
     userId: "deterministic-faq-fallback-mixed-residual",
@@ -1170,21 +1147,16 @@ for (const [question, expectedAnswer] of [
     provider: mixedResidualProvider,
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
-  assert.equal(mixedResidualResult.ok, false);
+  assert.equal(mixedResidualResult.ok, true);
   assert.equal(mixedResidualProvider.calls.length, 3);
-  assert.deepEqual(mixedResidualResult.error.diagnostic, {
-    stage: "validation_final_faq_repair",
-    generateIssues: ["faq_answer_is_question"],
-    repairIssues: ["faq_answer_is_question"],
-    finalFaqRepairIssues: [
-      "faq_answer_repeats_question",
-      "faq_answer_is_question",
-    ],
-  });
+  assert.deepEqual(mixedResidualProvider.calls[2].issues, [
+    "primary_missing_from_title",
+  ]);
+  assert.deepEqual(mixedResidualProvider.calls[2].previous, missingTitleDraft);
 }
 
-// If a deterministic answer could introduce another violation, expose only
-// normalized category codes through a distinct safe diagnostic.
+// If a safe finalizer still cannot make the draft valid after the generic
+// third repair, expose only category-level diagnostic codes.
 {
   const fallbackCollisionDraft = validDraft({
     faqItems: validDraft().faqItems.map((item, index) =>
@@ -1215,11 +1187,11 @@ for (const [question, expectedAnswer] of [
   });
   assert.equal(fallbackCollisionResult.ok, false);
   assert.deepEqual(fallbackCollisionResult.error.diagnostic, {
-    stage: "validation_deterministic_faq_fallback",
+    stage: "validation_third_repair",
     generateIssues: ["faq_answer_is_question"],
     repairIssues: ["faq_answer_is_question"],
-    finalFaqRepairIssues: ["faq_answer_is_question"],
-    deterministicFaqFallbackIssues: ["faq_answer_is_question"],
+    finalizerIssues: ["faq_answer_is_question"],
+    thirdRepairIssues: ["faq_answer_is_question"],
   });
 }
 
@@ -1405,11 +1377,12 @@ for (const [question, expectedAnswer] of [
   );
 }
 
-// If preserving the exact primary would make shortening unsafe, return a
-// category-only diagnostic rather than making another provider request.
+// If preserving the exact primary would make shortening unsafe, the generic
+// third repair gets one chance before returning category-only diagnostics.
 {
   const primaryAfterLimit = `${"Спокойный вечер. ".repeat(25)}медитация для сна.`;
   const unsafeDescriptionProvider = mockProvider([
+    { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
     { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
     { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
   ]);
@@ -1419,18 +1392,19 @@ for (const [question, expectedAnswer] of [
     provider: unsafeDescriptionProvider,
   });
   assert.equal(unsafeDescriptionResult.ok, false);
-  assert.equal(unsafeDescriptionProvider.calls.length, 2);
+  assert.equal(unsafeDescriptionProvider.calls.length, 3);
   assert.deepEqual(unsafeDescriptionResult.error.diagnostic, {
-    stage: "validation_deterministic_description_shorten",
+    stage: "validation_third_repair",
     generateIssues: ["description_too_long"],
     repairIssues: ["description_too_long"],
-    deterministicDescriptionShortenIssues: ["description_too_long"],
+    finalizerIssues: ["description_too_long"],
+    thirdRepairIssues: ["description_too_long"],
   });
 }
 
 // E2E regression: a same-product repair first corrects description-only
-// metadata issues while leaving one FAQ answer invalid. The final repair must
-// receive just that remaining FAQ issue and retain every non-answer value.
+// metadata issues while leaving one FAQ answer invalid. The safe finalizer
+// resolves that answer and retains every non-answer value.
 {
   const tooLongDescriptionWithoutPrimary =
     "Мягкая практика для спокойного завершения дня и вечернего отдыха. ".repeat(6);
@@ -1446,25 +1420,9 @@ for (const [question, expectedAnswer] of [
     seoDescription: repairedDescription,
     faqItems: firstDraft.faqItems,
   });
-  const finalFaqRepair = validDraft({
-    seoTitle: "Несвязанная попытка изменить заголовок",
-    seoDescription: "Несвязанная попытка изменить описание.",
-    usageItems: [{ content: "Несвязанное использование" }],
-    faqItems: firstRepair.faqItems.map((item, index) =>
-      index
-        ? { ...item, question: "Несвязанный вопрос?", anchor: `other-${index}` }
-        : {
-            ...item,
-            question: "Несвязанный вопрос?",
-            answer: "Выберите тихое место и устройтесь удобно.",
-            anchor: "other-0",
-          },
-    ),
-  });
   const sameProductProvider = mockProvider([
     { ok: true, draft: firstDraft, raw: {} },
     { ok: true, draft: firstRepair, raw: {} },
-    { ok: true, draft: finalFaqRepair, raw: {} },
   ]);
   const result = await generateProductSeoDraft(requestInput(), {
     userId: "description-then-final-faq-same-product",
@@ -1473,13 +1431,12 @@ for (const [question, expectedAnswer] of [
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, true);
-  assert.equal(sameProductProvider.calls.length, 3);
+  assert.equal(sameProductProvider.calls.length, 2);
   assert.deepEqual(sameProductProvider.calls[1].issues, [
     "description_too_long",
     "primary_missing_from_description",
     "faq_answer_is_question",
   ]);
-  assert.deepEqual(sameProductProvider.calls[2].issues, ["faq_answer_is_question"]);
   assert.equal(result.data.seoTitle, firstRepair.seoTitle);
   assert.equal(result.data.seoDescription, repairedDescription);
   assert.deepEqual(result.data.usageItems, firstRepair.usageItems);
@@ -1489,7 +1446,7 @@ for (const [question, expectedAnswer] of [
   );
   assert.equal(
     result.data.faqItems[0].answer,
-    "Выберите тихое место и устройтесь удобно.",
+    "Выберите комфортное место и слушайте практику в удобном для себя темпе.",
   );
   assert.deepEqual(validateProductSeoAiDraft(result.data, validationInput()), {
     ok: true,
@@ -1877,6 +1834,11 @@ await withEnvAsync(yandexEnv(), async () => {
         200,
         yandexCompletion(JSON.stringify(validDraft({ seoTitle: "Вечерний ритуал без запроса" }))),
       ),
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion(JSON.stringify(validDraft({ seoTitle: "Вечерний ритуал без запроса" }))),
+      ),
   ]);
   const yandexProvider = createProductSeoAiProvider({
     fetchImpl,
@@ -1891,9 +1853,11 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_OUTPUT");
   assert.deepEqual(result.error.diagnostic, {
-    stage: "validation_repair",
+    stage: "validation_third_repair",
     generateIssues: ["primary_missing_from_title"],
     repairIssues: ["primary_missing_from_title"],
+    finalizerIssues: ["primary_missing_from_title"],
+    thirdRepairIssues: ["primary_missing_from_title"],
   });
 });
 
@@ -2026,7 +1990,11 @@ const ungroundedDraft = validDraft({
     withEnvAsync(yandexEnv(), async () =>
       generateProductSeoDraft(requestInput(), {
         userId: "validation-repair-logged",
-        provider: mockProvider([{ ok: true, draft: ungroundedDraft, raw: {} }, { ok: true, draft: ungroundedDraft, raw: {} }]),
+        provider: mockProvider([
+          { ok: true, draft: ungroundedDraft, raw: {} },
+          { ok: true, draft: ungroundedDraft, raw: {} },
+          { ok: true, draft: ungroundedDraft, raw: {} },
+        ]),
         aiRateLimit: createProductSeoAiRateLimitStore(),
       }),
     ),
@@ -2034,7 +2002,7 @@ const ungroundedDraft = validDraft({
   assert.equal(captured.result.ok, false);
   assert.equal(captured.result.error.code, "INVALID_OUTPUT");
   assert.deepEqual(captured.result.error.diagnostic, {
-    stage: "validation_repair",
+    stage: "validation_third_repair",
     generateIssues: [
       "banned_claim",
       "ungrounded:duration",
@@ -2047,11 +2015,25 @@ const ungroundedDraft = validDraft({
       "ungrounded:tracks",
       "ungrounded:price",
     ],
+    finalizerIssues: [
+      "banned_claim",
+      "ungrounded:duration",
+      "ungrounded:tracks",
+      "ungrounded:price",
+    ],
+    thirdRepairIssues: [
+      "banned_claim",
+      "ungrounded:duration",
+      "ungrounded:tracks",
+      "ungrounded:price",
+    ],
   });
   const payloads = validationFailurePayloads(captured.entries);
-  assert.equal(payloads.length, 2);
+  assert.equal(payloads.length, 4);
   assert.equal(payloads[0].stage, "generate");
   assert.equal(payloads[1].stage, "repair");
+  assert.equal(payloads[2].stage, "finalizer");
+  assert.equal(payloads[3].stage, "third_repair");
   assert.ok(payloads[0].issues.includes("ungrounded:duration"));
   assert.ok(payloads[0].issues.includes("banned_claim"));
   assert.doesNotMatch(captured.text, new RegExp(TEST_YANDEX_KEY));

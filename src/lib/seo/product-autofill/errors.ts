@@ -71,7 +71,8 @@ export function productSeoAiInvalidOutputError(
                   diagnostic.finalizerIssues,
                 ),
               }
-            : {
+            : diagnostic.stage === "validation_third_repair"
+              ? {
                 ...diagnostic,
                 generateIssues: normalizeProductSeoValidationIssues(
                   diagnostic.generateIssues,
@@ -85,7 +86,50 @@ export function productSeoAiInvalidOutputError(
                 thirdRepairIssues: normalizeProductSeoValidationIssues(
                   diagnostic.thirdRepairIssues,
                 ),
-              };
+              }
+              : diagnostic.stage === "validation_final_faq_repair"
+                ? {
+                    ...diagnostic,
+                    generateIssues: normalizeProductSeoValidationIssues(
+                      diagnostic.generateIssues,
+                    ),
+                    repairIssues: normalizeProductSeoValidationIssues(
+                      diagnostic.repairIssues,
+                    ),
+                    finalFaqRepairIssues: normalizeProductSeoValidationIssues(
+                      diagnostic.finalFaqRepairIssues,
+                    ),
+                  }
+                : diagnostic.stage === "validation_deterministic_faq_fallback"
+                  ? {
+                      ...diagnostic,
+                      generateIssues: normalizeProductSeoValidationIssues(
+                        diagnostic.generateIssues,
+                      ),
+                      repairIssues: normalizeProductSeoValidationIssues(
+                        diagnostic.repairIssues,
+                      ),
+                      finalFaqRepairIssues: normalizeProductSeoValidationIssues(
+                        diagnostic.finalFaqRepairIssues,
+                      ),
+                      deterministicFaqFallbackIssues:
+                        normalizeProductSeoValidationIssues(
+                          diagnostic.deterministicFaqFallbackIssues,
+                        ),
+                    }
+                  : {
+                      ...diagnostic,
+                      generateIssues: normalizeProductSeoValidationIssues(
+                        diagnostic.generateIssues,
+                      ),
+                      repairIssues: normalizeProductSeoValidationIssues(
+                        diagnostic.repairIssues,
+                      ),
+                      deterministicDescriptionShortenIssues:
+                        normalizeProductSeoValidationIssues(
+                          diagnostic.deterministicDescriptionShortenIssues,
+                        ),
+                    };
 
   return {
     ok: false,

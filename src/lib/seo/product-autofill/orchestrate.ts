@@ -239,7 +239,9 @@ export async function generateProductSeoDraft(
       styleProfile,
     },
   };
-  const protectedTypographyPhrases = [primary, request.title];
+  // The author-owned primary can be copied into generated display fields; its
+  // literal spelling is protected while all other AI-generated copy is set.
+  const protectedTypographyPhrases = [primary];
 
   function normalizeGeneratedDraft(draft: ProductSeoAiRawDraft): ProductSeoAiRawDraft {
     return applyProductSeoDraftRussianTypography(draft, protectedTypographyPhrases);

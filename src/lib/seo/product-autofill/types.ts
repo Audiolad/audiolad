@@ -123,6 +123,28 @@ export type ProductSeoInvalidOutputDiagnostic =
       finalizerIssues: string[];
       /** Category-only issues after the generic third provider repair and final safe pass; never generated or user-provided text. */
       thirdRepairIssues: string[];
+    }
+  | {
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
+      stage: "validation_final_faq_repair";
+      generateIssues: string[];
+      repairIssues: string[];
+      finalFaqRepairIssues: string[];
+    }
+  | {
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
+      stage: "validation_deterministic_faq_fallback";
+      generateIssues: string[];
+      repairIssues: string[];
+      finalFaqRepairIssues: string[];
+      deterministicFaqFallbackIssues: string[];
+    }
+  | {
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
+      stage: "validation_deterministic_description_shorten";
+      generateIssues: string[];
+      repairIssues: string[];
+      deterministicDescriptionShortenIssues: string[];
     };
 
 export type ProductSeoAiErrorResult = {
