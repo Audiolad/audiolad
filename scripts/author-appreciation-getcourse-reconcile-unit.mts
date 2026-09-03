@@ -374,6 +374,8 @@ async function run(options: {
   assert.match(deploy, /assert_author_appreciation_reconcile_release_tree/);
   assert.match(deploy, /author_appreciation_getcourse_reconcile_ensure_failed/);
   assert.doesNotMatch(deploy, /ensure_nonfatal/);
+  assert.match(deploy, /author_appreciation_getcourse_reconcile_log_tail/);
+  assert.match(deploy, /author_appreciation_getcourse_reconcile_summary/);
   const pin = readFileSync("deploy/scripts/lib/pin-target-deploy-scripts.sh", "utf8");
   assert.match(pin, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
   assert.match(pin, /pin_has_reconcile_artifacts/);
