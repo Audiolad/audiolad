@@ -55,7 +55,7 @@ assert.match(render, /-ar", "44100", "-ac", "2"/);
 assert.match(render, /"pcm_f32le"/);
 assert.doesNotMatch(render, /fragment-\$\{index\}\.mp3/);
 assert.match(render, /concat=n=\$\{normalized\.length\}:v=0:a=1/);
-assert.match(workspace, /Скачать главу MP3/);
+assert.match(workspace, /Скачать MP3/);
 assert.match(workspace, /isCurrent/);
 assert.match(workspace, /status === "completed" && !renderState\.isCurrent/);
 assert.match(workspace, /window\.setTimeout\(refresh, 3000\)/);
