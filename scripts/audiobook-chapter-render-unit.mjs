@@ -32,6 +32,7 @@ assert.match(server, /audiobook_chapter_render_idempotent_lookup_error/);
 assert.match(server, /createSignedUrl\(job\.output_storage_path, 300/);
 assert.match(storage, /isAudiobookChapterRenderStoragePath/);
 assert.match(worker, /processAudiobookChapterRender/);
+assert.match(worker, /processAudiobookRenderQueuePass/);
 assert.match(worker, /snapshot_fingerprint_mismatch/);
 assert.match(worker, /renderAudiobookChapterToMp3/);
 assert.match(worker, /streamStorageObjectToFile/);

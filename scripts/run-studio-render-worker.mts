@@ -72,6 +72,14 @@ async function processAudiobookChapterRender() {
   return true;
 }
 
+async function processAudiobookRenderQueuePass() {
+  try {
+    if (!await processAudiobookChapterRender()) console.log("audiobook-render-worker: no queued jobs");
+  } catch (error) {
+    console.error("audiobook-render-worker:", error);
+  }
+}
+
 async function main() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("render_worker_environment_missing");
   await service.rpc("recover_stale_studio_render_jobs");
@@ -85,8 +93,8 @@ async function main() {
     !job.project_snapshot ||
     typeof job.project_snapshot !== "object"
   ) {
-    const processedAudiobook = await processAudiobookChapterRender();
-    if (!processedAudiobook) console.log("studio-render-worker: no queued jobs");
+    console.log("studio-render-worker: no queued jobs");
+    await processAudiobookRenderQueuePass();
     return;
   }
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
@@ -155,7 +163,7 @@ async function main() {
       }
     }
     console.log(JSON.stringify({ jobId: job.id, status: "completed", bytes: result.sizeBytes }));
-    await processAudiobookChapterRender();
+    await processAudiobookRenderQueuePass();
   } catch (error) {
     const errorCode = error instanceof StudioRenderDurationError
       ? error.code
@@ -184,6 +192,7 @@ async function main() {
     if (failureUpdateError || !failedJob) {
       console.error("studio-render-worker: failure state was not persisted", failureUpdateError?.message);
     }
+    await processAudiobookRenderQueuePass();
     throw error;
   } finally { await rm(workspace, { recursive: true, force: true }); }
 }
