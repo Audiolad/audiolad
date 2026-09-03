@@ -428,7 +428,11 @@ assert.doesNotMatch(prompt, /Wordstat|secondaryQueries|кандидат/i);
 assert.doesNotMatch(prompt, /Не обязан использовать каждую фразу в черновике/);
 assert.match(
   prompt,
-  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\./,
+  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем\./,
+);
+assert.match(
+  prompt,
+  /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./,
 );
 assert.match(prompt, /Используй оба направления естественно, каждое не больше одного раза/);
 assert.match(prompt, /Максимум 3 использования дополнительных запросов во всём черновике/);
@@ -468,13 +472,25 @@ assert.match(
 
 {
   const AUTHOR_OWNED_SECONDARIES =
-    /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\./;
+    /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем\./;
+  const STORAGE_VS_PROSE =
+    /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./;
   const SECONDARY_MAX_USES =
     /Максимум 3 использования дополнительных запросов во всём черновике\. Каждую выбранную фразу — не больше одного раза/;
   const SECONDARY_NOT_FACTS =
     /Дополнительные запросы — SEO-направления, а не факты\. Не выводи из них утверждения, которых нет в описании продукта/;
   const SECONDARY_NOT_IN_TITLE_DESCRIPTION =
     /Не набивай дополнительные запросы в seoTitle и seoDescription: там уже есть основной запрос/;
+  const OVERLAP_VERBATIM =
+    /Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1/;
+  const OVERLAP_PREFER_NON_OVERLAPPING =
+    /Предпочитай другие релевантные дополнительные направления, которые не повторяют точный основной запрос/;
+  const OVERLAP_REPHRASE =
+    /Если это смысловое направление полезно или это единственный дополнительный запрос, склони или естественно перефразируй его так, чтобы точная фраза основного запроса не повторилась/;
+  const OVERLAP_EXAMPLE =
+    /Пример: не «Для настройки на канал денежная энергия\.\.\.», а «Для работы с темой денежного канала\.\.\.»/;
+  const OVERLAP_BUDGET_PRIORITY =
+    /Бюджет точного основного запроса важнее дословной формулировки дополнительного запроса/;
   const MONEY_PRIMARY = "денежная энергия";
   const MONEY_SECONDARIES = [
     "канал денежная энергия",
@@ -490,31 +506,58 @@ assert.match(
     }),
   };
 
+  function assertOverlapContract(systemPrompt, expectedOverlapPhrases) {
+    for (const phrase of expectedOverlapPhrases) {
+      assert.match(
+        systemPrompt,
+        new RegExp(`Дополнительный запрос «${phrase}» содержит точный основной запрос непрерывной фразой`),
+      );
+    }
+    assert.match(systemPrompt, OVERLAP_VERBATIM);
+    assert.match(systemPrompt, OVERLAP_PREFER_NON_OVERLAPPING);
+    assert.match(systemPrompt, OVERLAP_REPHRASE);
+    assert.match(systemPrompt, OVERLAP_EXAMPLE);
+    assert.match(systemPrompt, OVERLAP_BUDGET_PRIORITY);
+    assert.match(
+      systemPrompt,
+      /Никакой дополнительный запрос не должен создавать ещё одно точное вхождение основного запроса вне seoTitle, seoDescription и Q1/,
+    );
+    assert.match(systemPrompt, AUTHOR_OWNED_SECONDARIES);
+    assert.match(systemPrompt, STORAGE_VS_PROSE);
+    assert.match(systemPrompt, SECONDARY_MAX_USES);
+  }
+
   const zeroSecondaryPrompt = buildProductSeoSystemPrompt({
     request: { ...parsed.request, seoSecondaryQueries: [] },
   });
   assert.match(zeroSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
+  assert.doesNotMatch(zeroSecondaryPrompt, STORAGE_VS_PROSE);
   assert.doesNotMatch(zeroSecondaryPrompt, /Не обязан использовать каждую фразу в черновике/);
   assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_MAX_USES);
   assert.doesNotMatch(
     zeroSecondaryPrompt,
     /Используй это направление естественно один раз|Используй оба направления естественно|Используй 2–3 РАЗНЫХ дополнительных направления/,
   );
+  assert.doesNotMatch(zeroSecondaryPrompt, OVERLAP_VERBATIM);
 
   const oneSecondaryPrompt = buildProductSeoSystemPrompt({
     request: { ...parsed.request, seoSecondaryQueries: ["практика перед сном"] },
   });
   assert.match(oneSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
+  assert.match(oneSecondaryPrompt, STORAGE_VS_PROSE);
   assert.match(oneSecondaryPrompt, /Используй это направление естественно один раз/);
   assert.match(oneSecondaryPrompt, SECONDARY_MAX_USES);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_FACTS);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.doesNotMatch(oneSecondaryPrompt, OVERLAP_VERBATIM);
 
   const twoSecondaryPrompt = buildProductSeoSystemPrompt({
     request: parsed.request,
   });
   assert.match(twoSecondaryPrompt, /Используй оба направления естественно, каждое не больше одного раза/);
+  assert.match(twoSecondaryPrompt, STORAGE_VS_PROSE);
   assert.match(twoSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.doesNotMatch(twoSecondaryPrompt, OVERLAP_VERBATIM);
 
   const moneyPrompt = buildProductSeoSystemPrompt({ request: moneyRequest });
   assert.match(
@@ -529,6 +572,38 @@ assert.match(
     /Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, она\/её\)/,
   );
   assert.doesNotMatch(moneyPrompt, /Не обязан использовать каждую фразу в черновике/);
+  assertOverlapContract(moneyPrompt, ["канал денежная энергия"]);
+  assert.doesNotMatch(
+    moneyPrompt,
+    /Дополнительный запрос «денежный поток энергии» содержит точный основной запрос/,
+  );
+
+  const oneOverlappingPrompt = buildProductSeoSystemPrompt({
+    request: requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: ["канал денежная энергия"],
+    }),
+  });
+  assert.match(oneOverlappingPrompt, /Используй это направление естественно один раз/);
+  assertOverlapContract(oneOverlappingPrompt, ["канал денежная энергия"]);
+
+  const twoWithOverlapPrompt = buildProductSeoSystemPrompt({
+    request: requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: ["канал денежная энергия", "денежный поток энергии"],
+    }),
+  });
+  assert.match(
+    twoWithOverlapPrompt,
+    /Используй оба направления естественно, каждое не больше одного раза/,
+  );
+  assertOverlapContract(twoWithOverlapPrompt, ["канал денежная энергия"]);
+  assert.doesNotMatch(
+    twoWithOverlapPrompt,
+    /Дополнительный запрос «денежный поток энергии» содержит точный основной запрос/,
+  );
 
   const moneyGrounding = buildProductSeoGrounding({ request: moneyRequest });
   assert.match(
