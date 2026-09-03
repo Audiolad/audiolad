@@ -246,15 +246,20 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   const skipReasons = new Map<string, number>();
 
   if (exported.ok) {
-    console.info("author_appreciation_getcourse_export_observed", exported.schema ?? {
-      row_count: exported.deals.length,
-    });
+    const schema = exported.schema ?? { row_count: exported.deals.length };
+    console.info(
+      "author_appreciation_getcourse_export_observed",
+      schema.row_count === 0 && exported.envelope
+        ? { ...schema, ...exported.envelope }
+        : schema,
+    );
   } else {
     console.info("author_appreciation_getcourse_export_observed", {
       ok: false,
       reason: exported.reason,
       export_id_present: Boolean(exported.exportId),
       poll_count: exported.pollCount,
+      ...(exported.envelope ?? {}),
     });
   }
 
