@@ -96,7 +96,11 @@ import {
   getProductSaveErrorMessage,
   logProductSaveFailure,
 } from "@/lib/author-products/save-errors";
-import { buildUnlockedProductIdentityFields } from "@/lib/author-products/save-payload";
+import { canConfigureProductAppreciation } from "@/lib/author-products/appreciation-override";
+import {
+  buildListenerAppreciationOverrideField,
+  buildUnlockedProductIdentityFields,
+} from "@/lib/author-products/save-payload";
 import {
   mergeServerAudioItems,
   mergeServerProductIntoForm,
@@ -397,6 +401,7 @@ function mapArchivedTopicsForSelector(
 function buildProductSavePayload(
   form: FormState,
   slugLocked: boolean,
+  canConfigureAppreciation: boolean,
 ) {
   return {
     ...buildUnlockedProductIdentityFields({
@@ -440,7 +445,10 @@ function buildProductSavePayload(
     promo_button_text: form.promoButtonText,
     promo_url: form.promoUrl,
     promo_open_in_new_tab: form.promoOpenInNewTab,
-    listener_appreciation_override: form.listenerAppreciationOverride,
+    ...buildListenerAppreciationOverrideField({
+      canConfigureAppreciation,
+      listenerAppreciationOverride: form.listenerAppreciationOverride,
+    }),
     use_shared_cover: form.useSharedCover,
     listening_notice_enabled:
       form.productKind === PRODUCT_KIND.MUSIC
@@ -809,12 +817,12 @@ export default function AuthorProductForm({
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
   );
-  const canConfigureAppreciation =
-    canUsePaidPricing &&
-    form.isFree &&
-    !isCourse &&
-    (form.productKind === PRODUCT_KIND.PRACTICE ||
-      form.productKind === PRODUCT_KIND.AUDIO_POST);
+  const canConfigureAppreciation = canConfigureProductAppreciation({
+    accessStatus: selectedAuthorAccessStatus,
+    isFree: form.isFree,
+    productKind: form.productKind,
+    publicationClass: form.publicationClass,
+  });
   const paidPricingDisabledReason = getPaidPricingDisabledReason(
     selectedAuthorAccessStatus,
   );
@@ -1157,7 +1165,9 @@ export default function AuthorProductForm({
       const response = await fetch(`/api/author/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildProductSavePayload(form, slugLocked)),
+        body: JSON.stringify(
+          buildProductSavePayload(form, slugLocked, canConfigureAppreciation),
+        ),
       });
 
       const payload = (await response.json()) as {

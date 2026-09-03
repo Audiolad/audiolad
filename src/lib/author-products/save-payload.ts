@@ -12,3 +12,16 @@ export function buildUnlockedProductIdentityFields(input: {
     slug: input.slug,
   };
 }
+
+export function buildListenerAppreciationOverrideField(input: {
+  canConfigureAppreciation: boolean;
+  listenerAppreciationOverride: boolean | null;
+}): { listener_appreciation_override?: boolean | null } {
+  if (!input.canConfigureAppreciation) {
+    return {};
+  }
+
+  return {
+    listener_appreciation_override: input.listenerAppreciationOverride,
+  };
+}
