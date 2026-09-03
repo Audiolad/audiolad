@@ -8,6 +8,8 @@ const QUICK_AMOUNTS = [100, 300, 500, 1000] as const;
 
 type AuthorAppreciationPrototypeProps = {
   authorName: string;
+  authorId: string;
+  practiceId: string | null;
   isAuthenticated: boolean;
   surface: "author" | "product";
 };
@@ -18,6 +20,8 @@ function resolveAmountLabel(amount: number | null): string {
 
 export default function AuthorAppreciationPrototype({
   authorName,
+  authorId,
+  practiceId,
   isAuthenticated,
   surface,
 }: AuthorAppreciationPrototypeProps) {
@@ -27,13 +31,49 @@ export default function AuthorAppreciationPrototype({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number | null>(500);
   const [customAmount, setCustomAmount] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedAmount =
     customAmount.trim() === "" ? amount : Number(customAmount.replace(",", "."));
   const isValidAmount =
     typeof selectedAmount === "number" &&
     Number.isFinite(selectedAmount) &&
-    selectedAmount > 0;
+    selectedAmount > 0 &&
+    Number.isInteger(selectedAmount);
+
+  async function submitCheckout() {
+    if (!isValidAmount || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/author-appreciation/checkout", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          author_id: authorId,
+          practice_id: practiceId,
+          surface,
+          amount_minor: selectedAmount * 100,
+          guest_email: isAuthenticated ? undefined : guestEmail,
+        }),
+      });
+      const payload = (await response.json()) as {
+        payment_link?: unknown;
+      };
+      if (!response.ok || typeof payload.payment_link !== "string") {
+        throw new Error("checkout_failed");
+      }
+      window.location.assign(payload.payment_link);
+    } catch {
+      setError("Не удалось перейти к оплате. Попробуйте ещё раз.");
+      setIsSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) {
@@ -71,7 +111,10 @@ export default function AuthorAppreciationPrototype({
       >
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setError(null);
+            setOpen(true);
+          }}
           className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#c6afe6] bg-white px-4 py-2.5 text-sm font-semibold text-[#7042c5] transition-colors hover:border-[#7042c5] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
           🙏 Поблагодарить автора ❤️
@@ -155,6 +198,7 @@ export default function AuthorAppreciationPrototype({
                   id={amountId}
                   type="number"
                   min="1"
+                  step="1"
                   inputMode="numeric"
                   placeholder="Введите сумму"
                   value={customAmount}
@@ -177,6 +221,8 @@ export default function AuthorAppreciationPrototype({
                   inputMode="email"
                   autoComplete="email"
                   placeholder="mail@example.ru"
+                  value={guestEmail}
+                  onChange={(event) => setGuestEmail(event.target.value)}
                   className="mt-2 min-h-11 w-full rounded-2xl border border-[#ddcfef] bg-white px-4 text-sm text-[#25135c] outline-none placeholder:text-[#a496bd] focus:border-[#7042c5] focus:ring-2 focus:ring-[#e8ddf7]"
                 />
               </label>
@@ -184,13 +230,17 @@ export default function AuthorAppreciationPrototype({
 
             <button
               type="button"
-              disabled={!isValidAmount}
+              onClick={submitCheckout}
+              disabled={!isValidAmount || isSubmitting || (!isAuthenticated && !guestEmail.trim())}
               className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Поблагодарить на {resolveAmountLabel(selectedAmount)}
+              {isSubmitting
+                ? "Переходим к оплате…"
+                : <>Поблагодарить на {resolveAmountLabel(selectedAmount)}</>}
             </button>
+            {error ? <p role="alert" className="mt-3 text-center text-sm text-[#b42318]">{error}</p> : null}
             <p className="mt-3 text-center text-xs leading-5 text-[#8c7dab]">
-              Оплата будет подключена на следующем этапе.
+              Вы перейдёте на защищённую страницу оплаты.
             </p>
           </div>
         </div>
