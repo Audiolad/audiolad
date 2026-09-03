@@ -26,9 +26,19 @@ the service-role client. Partial unique indexes protect non-null provider deal
 IDs and numbers. `apply_author_appreciation_getcourse_callback` locks the
 matching intent and moves a matching pending GetCourse callback to `paid` only
 once; an amount, offer, status, or identifier anomaly becomes
-`needs_review`. This isolated provider fact does not create or alter orders,
-existing payments, entitlements, finance ledger entries, obligations,
-commissions, or payouts.
+`needs_review`.
+
+Migration `20260917120000_author_appreciation_finance_projection.sql` projects
+a paid intent into the existing author ledger as exactly one `sale_accrual`.
+The correlation column is nullable unique
+`author_ledger_entries.author_appreciation_intent_id`. Gross is
+`author_appreciation_payment_intents.amount_minor`; commission, net, hold and
+`available_at` reuse `resolve_author_commercial_terms` + `author_share_minor`.
+Paid transition and accrual run in one transaction. Historical paid intents
+are reconciled by `reconcile_author_appreciation_paid_intents` using the same
+ensure RPC. No ordinary `orders`, `payments`, or entitlements are created.
+GetCourse refunds are not automated
+(`REFUND_AUTOMATION=MANUAL_OR_REQUIRES_GETCOURSE_PROCESS_EXTENSION`).
 
 # DATABASE.md
 

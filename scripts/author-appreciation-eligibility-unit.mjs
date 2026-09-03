@@ -7,7 +7,7 @@ import {
 
 const base = {
   surface: "product",
-  previewActive: true,
+  currentTermsAccepted: true,
   accessStatus: "commercial_active",
   settings: { enabled: true, profileEnabled: true, freeProductsDefault: true },
   product: {
@@ -39,7 +39,7 @@ assert.equal(visible({ product: { ...base.product, publicationClass: "practice",
 assert.equal(
   resolveAuthorAppreciationVisibility({
     surface: "author",
-    previewActive: true,
+    currentTermsAccepted: true,
     accessStatus: "commercial_active",
     settings: { enabled: true, profileEnabled: true, freeProductsDefault: false },
   }),
@@ -48,12 +48,28 @@ assert.equal(
 assert.equal(
   resolveAuthorAppreciationVisibility({
     surface: "author",
-    previewActive: true,
+    currentTermsAccepted: true,
     accessStatus: "commercial_active",
     settings: { enabled: true, profileEnabled: false, freeProductsDefault: true },
   }),
   false,
 );
-assert.equal(visible({ previewActive: false }), false, "public rollout remains gated");
+assert.equal(visible({ previewActive: false }), true, "ordinary URL without preview is public");
+assert.equal(visible({ previewActive: true }), true, "preview query remains compatible");
+assert.equal(
+  visible({ currentTermsAccepted: false }),
+  false,
+  "stale or unaccepted current Author Terms hide CTA",
+);
+assert.equal(
+  resolveAuthorAppreciationVisibility({
+    surface: "author",
+    currentTermsAccepted: false,
+    accessStatus: "commercial_active",
+    settings: { enabled: true, profileEnabled: true, freeProductsDefault: true },
+  }),
+  false,
+  "commercial_active does not imply current terms",
+);
 
 console.log("author-appreciation-eligibility-unit: ok");

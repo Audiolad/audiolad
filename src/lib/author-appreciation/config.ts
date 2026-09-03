@@ -44,9 +44,12 @@ export function getAuthorAppreciationRolloutConfig(): AuthorAppreciationRolloutC
   };
 }
 
+/**
+ * Global kill switch only. AUTHOR_APPRECIATION_GETCOURSE_AUTHOR_ALLOWLIST
+ * is parsed for diagnostics but is no longer a runtime eligibility gate.
+ */
 export function isAuthorAppreciationRolloutEnabled(
   config: AuthorAppreciationRolloutConfig,
-  authorId: string,
 ): boolean {
-  return config.enabled && config.allowedAuthorIds.has(authorId.toLowerCase());
+  return config.enabled;
 }

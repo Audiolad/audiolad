@@ -15,6 +15,7 @@ type AuthorAppreciationPrototypeProps = {
   practiceId: string | null;
   isAuthenticated: boolean;
   surface: "author" | "product";
+  layout?: "card" | "hero-stack";
 };
 
 function parseAppreciationAmount(raw: string): number | null {
@@ -37,6 +38,7 @@ export default function AuthorAppreciationPrototype({
   practiceId,
   isAuthenticated,
   surface,
+  layout = "card",
 }: AuthorAppreciationPrototypeProps) {
   const titleId = useId();
   const emailId = useId();
@@ -104,21 +106,30 @@ export default function AuthorAppreciationPrototype({
     };
   }, [open]);
 
+  const isHeroStack = layout === "hero-stack";
   const isProductSurface = surface === "product";
 
   return (
     <>
       <section
+        data-author-appreciation-hero={isHeroStack ? "" : undefined}
         className={
-          isProductSurface
-            ? "rounded-[20px] border border-[#eadff8] bg-[#faf6ff] px-4 py-4"
-            : "rounded-[20px] border border-[#eadff8] bg-white px-4 py-4 shadow-sm"
+          isHeroStack
+            ? "author-appreciation-hero w-full"
+            : isProductSurface
+              ? "rounded-[20px] border border-[#eadff8] bg-[#faf6ff] px-4 py-4"
+              : "rounded-[20px] border border-[#eadff8] bg-white px-4 py-4 shadow-sm"
         }
         aria-label="Поддержка автора"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
       >
         <button
           type="button"
-          onClick={() => {
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
             setError(null);
             setOpen(true);
           }}

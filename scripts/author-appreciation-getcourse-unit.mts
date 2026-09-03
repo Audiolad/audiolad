@@ -241,14 +241,19 @@ assert.notEqual(
 process.env.AUTHOR_APPRECIATION_GETCOURSE_ROLLOUT_ENABLED = "1";
 process.env.AUTHOR_APPRECIATION_GETCOURSE_AUTHOR_ALLOWLIST = "11111111-1111-4111-8111-111111111111";
 const rollout = getAuthorAppreciationRolloutConfig();
-assert.equal(isAuthorAppreciationRolloutEnabled(rollout, "11111111-1111-4111-8111-111111111111"), true);
-assert.equal(isAuthorAppreciationRolloutEnabled(rollout, "22222222-2222-4222-8222-222222222222"), false);
+assert.equal(isAuthorAppreciationRolloutEnabled(rollout), true);
 assert.equal(
-  isAuthorAppreciationRolloutEnabled(
-    { ...rollout, enabled: false },
-    "11111111-1111-4111-8111-111111111111",
-  ),
+  isAuthorAppreciationRolloutEnabled({ ...rollout, enabled: false }),
   false,
+);
+assert.ok(
+  rollout.allowedAuthorIds.has("11111111-1111-4111-8111-111111111111"),
+  "allowlist is still parsed",
+);
+assert.equal(
+  isAuthorAppreciationRolloutEnabled(rollout),
+  true,
+  "UUID absent from the old allowlist is still enabled when the kill switch is on",
 );
 
 const migration = read("supabase/migrations/20260916120000_author_appreciation_getcourse_intents.sql");
@@ -307,6 +312,9 @@ assert.match(checkout, /return error\("checkout_unavailable", 502\)/);
   assert.doesNotMatch(providerCall, /deal_number/);
 }
 assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?:orders|payments|user_practices)"\)/);
+assert.match(checkout, /hasAcceptedCurrentAppreciationTerms/);
+assert.match(checkout, /isAuthorAppreciationRolloutEnabled\(rollout\)/);
+assert.doesNotMatch(checkout, /allowedAuthorIds|AUTHOR_ALLOWLIST/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
 assert.match(webhook, /timingSafeEqual/);
@@ -331,8 +339,21 @@ for (const page of [
   const source = read(page);
   assert.match(source, /author_appreciation_preview/);
   assert.match(source, /getAuthorAppreciationRolloutConfig/);
-  assert.match(source, /isAuthorAppreciationRolloutEnabled/);
+  assert.match(source, /isAuthorAppreciationRolloutEnabled\(rollout\)/);
   assert.match(source, /resolveAuthorAppreciationVisibility/);
+  assert.match(source, /hasAcceptedCurrentAppreciationTerms/);
+  assert.match(source, /currentTermsAccepted/);
+  assert.doesNotMatch(source, /isAuthorAppreciationPreviewActive/);
+  assert.doesNotMatch(source, /allowedAuthorIds|isAuthorAppreciationRolloutEnabled\(rollout,/);
 }
+
+const financeMigration = read(
+  "supabase/migrations/20260917120000_author_appreciation_finance_projection.sql",
+);
+assert.match(financeMigration, /ensure_author_appreciation_sale_accrual/);
+assert.match(financeMigration, /author_appreciation_intent_id/);
+assert.match(financeMigration, /author_share_minor\(v_intent\.amount_minor/);
+assert.match(financeMigration, /resolve_author_commercial_terms/);
+assert.doesNotMatch(financeMigration, /\b(?:INSERT INTO|UPDATE)\s+public\.(?:orders|payments|user_practices)\b/i);
 
 console.log("author-appreciation-getcourse-unit: ok");

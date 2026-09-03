@@ -66,12 +66,16 @@ export function isAppreciationProductEligible(
 
 export function resolveAuthorAppreciationVisibility(input: {
   surface: "author" | "product";
-  previewActive: boolean;
+  previewActive?: boolean;
+  currentTermsAccepted: boolean;
   accessStatus: AuthorAccessStatus | string | null | undefined;
   settings?: Partial<AuthorAppreciationSettings> | null;
   product?: AppreciationProductFacts;
 }): boolean {
-  if (!input.previewActive || !isAuthorCommercialActiveAccess(input.accessStatus)) {
+  if (
+    !input.currentTermsAccepted ||
+    !isAuthorCommercialActiveAccess(input.accessStatus)
+  ) {
     return false;
   }
 

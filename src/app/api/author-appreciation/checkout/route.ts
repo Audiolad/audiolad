@@ -6,6 +6,7 @@ import {
   getAuthorAppreciationRolloutConfig,
   isAuthorAppreciationRolloutEnabled,
 } from "@/lib/author-appreciation/config";
+import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
 import {
   isAppreciationProductEligible,
   resolveAuthorAppreciationSettings,
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
 
   const rollout = getAuthorAppreciationRolloutConfig();
   if (
-    !isAuthorAppreciationRolloutEnabled(rollout, authorId) ||
+    !isAuthorAppreciationRolloutEnabled(rollout) ||
     amountMinor < rollout.minAmountMinor ||
     amountMinor > rollout.maxAmountMinor ||
     amountMinor % 100 !== 0
@@ -131,6 +132,9 @@ export async function POST(request: Request) {
     .eq("id", authorId)
     .maybeSingle();
   if (authorError || !author || !isAuthorCommercialActiveAccess(author.access_status)) {
+    return error("appreciation_unavailable", 404);
+  }
+  if (!(await hasAcceptedCurrentAppreciationTerms(authorId))) {
     return error("appreciation_unavailable", 404);
   }
   const settingsRow = Array.isArray(author.author_appreciation_settings)
