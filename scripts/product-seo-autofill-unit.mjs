@@ -25,7 +25,6 @@ import {
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
-import { createProductSeoAiRateLimitStore } from "../src/lib/seo/product-autofill/rate-limit.ts";
 import {
   applyProductSeoStylePreset,
   createDefaultProductSeoStyleProfile,
@@ -62,6 +61,10 @@ const read = (relativePath) => readFileSync(path.join(root, relativePath), "utf8
 const TEST_KEY = "unit-test-openai-key-never-log";
 const TEST_YANDEX_KEY = "unit-test-yandex-ai-key-never-log";
 const TEST_YANDEX_FOLDER = "unit-test-yandex-folder";
+
+// Historical call fixtures pass this unused option. Production no longer
+// reads either user or process-local Product SEO quota stores.
+const createProductSeoAiRateLimitStore = () => undefined;
 
 async function withEnvAsync(overrides, fn) {
   const previous = {};
@@ -1200,6 +1203,127 @@ for (const [question, expectedAnswer] of [
   );
 }
 
+// Production regression: only an exact description_too_long residual after
+// the first repair gets a local shortening pass. It preserves the primary
+// verbatim and every field other than seoDescription, with no third call.
+{
+  const overlongDescription =
+    "медитация для сна помогает мягко завершить день. ".repeat(8);
+  const firstDescriptionFailure = validDraft({ seoDescription: overlongDescription });
+  const descriptionOnlyRepair = validDraft({
+    seoDescription: `${overlongDescription} Спокойный ритм помогает уделить себе внимание.`,
+  });
+  const deterministicDescriptionProvider = mockProvider([
+    { ok: true, draft: firstDescriptionFailure, raw: {} },
+    { ok: true, draft: descriptionOnlyRepair, raw: {} },
+  ]);
+  const deterministicDescriptionResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-description-shorten",
+    config,
+    provider: deterministicDescriptionProvider,
+  });
+  assert.equal(deterministicDescriptionResult.ok, true);
+  assert.equal(deterministicDescriptionProvider.calls.length, 2);
+  assert.equal(
+    deterministicDescriptionResult.data.seoDescription.includes(
+      requestInput().seoPrimaryQuery,
+    ),
+    true,
+  );
+  assert.ok(
+    deterministicDescriptionResult.data.seoDescription.length <= 300,
+  );
+  assert.equal(deterministicDescriptionResult.data.seoTitle, descriptionOnlyRepair.seoTitle);
+  assert.deepEqual(deterministicDescriptionResult.data.usageItems, descriptionOnlyRepair.usageItems);
+  assert.deepEqual(deterministicDescriptionResult.data.faqItems, descriptionOnlyRepair.faqItems);
+  assert.deepEqual(validateProductSeoAiDraft(deterministicDescriptionResult.data, validationInput()), {
+    ok: true,
+    draft: deterministicDescriptionResult.data,
+  });
+}
+
+// Production regression: a long description and an FAQ answer that repeats
+// its question are resolved in two calls. The repair fixes only FAQ; the
+// deterministic fallback then shortens the unchanged, case-variant primary
+// description at a word boundary without altering the remaining content.
+{
+  const longCaseVariantDescription =
+    `МЕДИТАЦИЯ ДЛЯ СНА ${"помогает мягко завершить день и уделить внимание спокойному отдыху ".repeat(6)}`.trim();
+  const firstDraft = validDraft({
+    seoDescription: longCaseVariantDescription,
+    faqItems: validDraft().faqItems.map((item, index) =>
+      index ? item : { ...item, answer: item.question },
+    ),
+  });
+  const firstRepair = validDraft({
+    seoDescription: longCaseVariantDescription,
+    faqItems: firstDraft.faqItems.map((item, index) =>
+      index
+        ? item
+        : { ...item, answer: "Выберите тихое место и удобное положение." },
+    ),
+  });
+  const descriptionFallbackProvider = mockProvider([
+    { ok: true, draft: firstDraft, raw: {} },
+    { ok: true, draft: firstRepair, raw: {} },
+  ]);
+  const descriptionFallbackResult = await generateProductSeoDraft(requestInput(), {
+    userId: "description-fallback-after-faq-repeat",
+    config,
+    provider: descriptionFallbackProvider,
+  });
+  assert.equal(descriptionFallbackResult.ok, true);
+  assert.equal(descriptionFallbackProvider.calls.length, 2);
+  assert.deepEqual(descriptionFallbackProvider.calls[1].issues, [
+    "description_too_long",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+  assert.equal(descriptionFallbackProvider.calls[1].previous.seoDescription, longCaseVariantDescription);
+  assert.ok(descriptionFallbackResult.data.seoDescription.length <= 300);
+  assert.ok(
+    descriptionFallbackResult.data.seoDescription.endsWith("мягко"),
+    "fallback must not split a word",
+  );
+  assert.equal(
+    descriptionFallbackResult.data.seoDescription,
+    descriptionFallbackResult.data.seoDescription.trim(),
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(descriptionFallbackResult.data, validationInput()),
+    { ok: true, draft: descriptionFallbackResult.data },
+  );
+  assert.equal(descriptionFallbackResult.data.seoTitle, firstRepair.seoTitle);
+  assert.deepEqual(descriptionFallbackResult.data.usageItems, firstRepair.usageItems);
+  assert.deepEqual(
+    descriptionFallbackResult.data.faqItems,
+    firstRepair.faqItems,
+  );
+}
+
+// If preserving the exact primary would make shortening unsafe, return a
+// category-only diagnostic rather than making another provider request.
+{
+  const primaryAfterLimit = `${"Спокойный вечер. ".repeat(25)}медитация для сна.`;
+  const unsafeDescriptionProvider = mockProvider([
+    { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
+    { ok: true, draft: validDraft({ seoDescription: primaryAfterLimit }), raw: {} },
+  ]);
+  const unsafeDescriptionResult = await generateProductSeoDraft(requestInput(), {
+    userId: "deterministic-description-shorten-safe-failure",
+    config,
+    provider: unsafeDescriptionProvider,
+  });
+  assert.equal(unsafeDescriptionResult.ok, false);
+  assert.equal(unsafeDescriptionProvider.calls.length, 2);
+  assert.deepEqual(unsafeDescriptionResult.error.diagnostic, {
+    stage: "validation_deterministic_description_shorten",
+    generateIssues: ["description_too_long"],
+    repairIssues: ["description_too_long"],
+    deterministicDescriptionShortenIssues: ["description_too_long"],
+  });
+}
+
 // E2E regression: a same-product repair first corrects description-only
 // metadata issues while leaving one FAQ answer invalid. The final repair must
 // receive just that remaining FAQ issue and retain every non-answer value.
@@ -1358,6 +1482,44 @@ const disabled = await generateProductSeoDraft(parsed.request, {
   aiRateLimit: createProductSeoAiRateLimitStore(),
 });
 assert.equal(disabled.error.code, "AI_DISABLED");
+
+// Product SEO no longer rejects requests using internal per-user quotas.
+{
+  const unboundedUserProvider = mockProvider(
+    Array.from({ length: 6 }, () => ({ ok: true, draft: validDraft(), raw: {} })),
+  );
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const result = await generateProductSeoDraft(requestInput(), {
+      userId: "no-internal-user-quota",
+      config,
+      provider: unboundedUserProvider,
+    });
+    assert.equal(result.ok, true);
+  }
+  assert.equal(unboundedUserProvider.calls.length, 6);
+}
+
+// Providers likewise make every request; their HTTP 429 responses remain the
+// sole source of RATE_LIMITED (covered by the OpenAI/Yandex HTTP tests).
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch(
+    Array.from({ length: 21 }, () => () =>
+      jsonResponse(200, { output_text: JSON.stringify(validDraft()) }),
+    ),
+  );
+  const unboundedProvider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+  });
+  for (let attempt = 0; attempt < 21; attempt += 1) {
+    const result = await generateProductSeoDraft(requestInput(), {
+      userId: `no-internal-process-quota-${attempt}`,
+      provider: unboundedProvider,
+    });
+    assert.equal(result.ok, true);
+  }
+  assert.equal(fetchImpl.calls.length, 21);
+});
 
 // Provider/config selection.
 await withEnvAsync(enabledEnv(), async () => {

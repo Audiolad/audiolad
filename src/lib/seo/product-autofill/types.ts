@@ -122,6 +122,16 @@ export type ProductSeoInvalidOutputDiagnostic =
       finalFaqRepairIssues: string[];
       /** Category-only issues from validating the local fallback; never generated or user-provided text. */
       deterministicFaqFallbackIssues: string[];
+    }
+  | {
+      /** A local, deterministic description shortening fallback was still invalid. */
+      stage: "validation_deterministic_description_shorten";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
+      repairIssues: string[];
+      /** Category-only issues from validating the local fallback; never generated or user-provided text. */
+      deterministicDescriptionShortenIssues: string[];
     };
 
 export type ProductSeoAiErrorResult = {

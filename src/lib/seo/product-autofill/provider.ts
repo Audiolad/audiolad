@@ -20,11 +20,6 @@ import {
   type ProductSeoAiPromptInput,
 } from "@/lib/seo/product-autofill/prompt";
 import {
-  consumeProductSeoAiOutboundSlot,
-  getProcessProductSeoAiRateLimit,
-  type ProductSeoAiRateLimitStore,
-} from "@/lib/seo/product-autofill/rate-limit";
-import {
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_RESPONSES_URL,
   PRODUCT_SEO_AI_STORE,
@@ -52,7 +47,6 @@ export type ProductSeoAiProviderOptions = {
   timeoutMs?: number;
   env?: NodeJS.ProcessEnv;
   config?: ProductSeoAiConfig;
-  rateLimit?: ProductSeoAiRateLimitStore;
 };
 
 const BLOCKED_LOG_FIELDS = new Set([
@@ -196,7 +190,6 @@ function createOpenAiProductSeoAiProvider(
   const config = options.config ?? getProductSeoAiConfig(env);
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? config.timeoutMs ?? PRODUCT_SEO_AI_TIMEOUT_MS;
-  const rateLimit = options.rateLimit ?? getProcessProductSeoAiRateLimit();
 
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
@@ -207,10 +200,6 @@ function createOpenAiProductSeoAiProvider(
     const apiKey = readProductSeoAiApiKey(env);
     if (!apiKey) {
       return productSeoAiError("NOT_CONFIGURED");
-    }
-
-    if (!consumeProductSeoAiOutboundSlot(rateLimit)) {
-      return productSeoAiError("RATE_LIMITED");
     }
 
     const requestBody = JSON.stringify({
