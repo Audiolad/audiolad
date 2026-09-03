@@ -41,6 +41,12 @@ export type CommercialShareBps = {
 export const PLATFORM_COMMISSION_SCOPE_TEXT =
   "Комиссия Платформы включает использование технической инфраструктуры АудиоЛада, размещение продуктов, предоставление доступа слушателям, приём платежей, работу кабинета, учёт продаж и организацию выплат.";
 
+export const AUTHOR_REWARD_CABINET_TITLE = "Вознаграждение автора";
+
+/** Compact cabinet caption. Same commercial split covers ordinary sales and appreciation. */
+export const AUTHOR_REWARD_CABINET_CAPTION =
+  "Комиссия платформы включает расходы на приём и обработку платежей, техническую инфраструктуру, размещение и хранение материалов, работу и развитие онлайн-студии, работу сервиса, развитие и продвижение платформы, учёт операций и организацию выплат.";
+
 export function bpsToPercentNumber(bps: number): number {
   return bps / 100;
 }
@@ -99,5 +105,28 @@ export function getCommercialShareDisplayLines(
     platformPercentLabel,
     authorLine: `Вознаграждение автора – ${authorPercentLabel} от стоимости продажи.`,
     platformLine: `Вознаграждение Платформы – ${platformPercentLabel} от стоимости продажи.`,
+  };
+}
+
+/**
+ * Compact cabinet economics copy. Percents come from resolved BPS
+ * (approved individual terms, else canonical AUTHOR/PLATFORM share BPS).
+ */
+export function getAuthorRewardCabinetCopy(
+  share: CommercialShareBps = DEFAULT_COMMERCIAL_SHARE,
+): {
+  title: string;
+  authorLine: string;
+  platformLine: string;
+  caption: string;
+} {
+  const { authorPercentLabel, platformPercentLabel } =
+    getCommercialShareDisplayLines(share);
+
+  return {
+    title: AUTHOR_REWARD_CABINET_TITLE,
+    authorLine: `${authorPercentLabel} – получает автор`,
+    platformLine: `${platformPercentLabel} – комиссия АудиоЛада`,
+    caption: AUTHOR_REWARD_CABINET_CAPTION,
   };
 }

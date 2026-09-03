@@ -65,6 +65,11 @@ assert.ok(prototype.includes('useState("500")'));
 assert.ok(prototype.includes("setAmountInput(String(quickAmount))"));
 assert.ok(prototype.includes("selectedAmount === quickAmount"));
 assert.ok(prototype.includes("Сумма"));
+assert.ok(prototype.includes("Выберите сумму или введите вручную"));
+assert.ok(
+  !/>\s*Выберите сумму\s*</.test(prototype),
+  "old standalone amount-picker label must not remain",
+);
 assert.ok(!prototype.includes("Своя сумма"));
 assert.ok(prototype.includes("Поблагодарить на {resolveAmountLabel(selectedAmount)}"));
 assert.ok(prototype.includes("amount_minor: selectedAmount * 100"));
@@ -90,6 +95,13 @@ const practicePage = read(
 );
 assert.ok(practicePage.includes('author_appreciation_preview?: string'));
 assert.ok(practicePage.includes("resolveAuthorAppreciationVisibility"));
+assert.ok(practicePage.includes("isMusicProductKind"));
+assert.ok(practicePage.includes("showAuthorAppreciationPrototype"));
+assert.ok(
+  practicePage.includes("isAppreciationProductEligible") ||
+    practicePage.includes("resolveAuthorAppreciationVisibility"),
+  "music shares the practice PDP visibility path",
+);
 
 const practiceContent = read(
   "src/components/products/practice-page/PracticePageContent.tsx",
@@ -112,6 +124,12 @@ assert.ok(
     actionSection.indexOf("<AuthorAppreciationPrototype"),
   "Listen / Pause stays first; appreciation is immediately below",
 );
+assert.ok(
+  prototype.includes("event.stopPropagation()") &&
+    prototype.includes("event.preventDefault()"),
+  "appreciation click must not change playback",
+);
+assert.ok(prototype.includes('type="button"'));
 assert.ok(
   actionSection.indexOf("<AuthorAppreciationPrototype") <
     actionSection.indexOf("<PaymentLegalNote"),

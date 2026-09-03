@@ -10,6 +10,7 @@ import {
   PLATFORM_COMMERCIAL_SHARE_BPS,
   PLATFORM_COMMISSION_SCOPE_TEXT,
   formatShareBpsAsPercent,
+  getAuthorRewardCabinetCopy,
   getCommercialShareDisplayLines,
   resolveDisplayCommercialShare,
 } from "../src/lib/author-commercial/economics.ts";
@@ -37,6 +38,37 @@ assert.equal(
   "Вознаграждение Платформы – 30% от стоимости продажи.",
 );
 assert.ok(PLATFORM_COMMISSION_SCOPE_TEXT.includes("технической инфраструктуры"));
+
+{
+  const defaultReward = getAuthorRewardCabinetCopy();
+  assert.equal(defaultReward.title, "Вознаграждение автора");
+  assert.equal(
+    defaultReward.authorLine,
+    `${formatShareBpsAsPercent(AUTHOR_COMMERCIAL_SHARE_BPS)} – получает автор`,
+  );
+  assert.equal(
+    defaultReward.platformLine,
+    `${formatShareBpsAsPercent(PLATFORM_COMMERCIAL_SHARE_BPS)} – комиссия АудиоЛада`,
+  );
+  assert.equal(
+    defaultReward.caption,
+    "Комиссия платформы включает расходы на приём и обработку платежей, техническую инфраструктуру, размещение и хранение материалов, работу и развитие онлайн-студии, работу сервиса, развитие и продвижение платформы, учёт операций и организацию выплат.",
+  );
+  assert.doesNotMatch(defaultReward.authorLine + defaultReward.platformLine, /86[,.]5|13[,.]5|3[,.]5/);
+
+  const individualReward = getAuthorRewardCabinetCopy({
+    authorShareBps: 8000,
+    platformShareBps: 2000,
+  });
+  assert.equal(
+    individualReward.authorLine,
+    `${formatShareBpsAsPercent(8000)} – получает автор`,
+  );
+  assert.equal(
+    individualReward.platformLine,
+    `${formatShareBpsAsPercent(2000)} – комиссия АудиоЛада`,
+  );
+}
 
 const individual = resolveDisplayCommercialShare({
   authorShareBps: 8000,
@@ -189,6 +221,9 @@ function baseInput(overrides = {}) {
   assert.equal(view.cta.disabled, false);
   assert.equal(view.share.isIndividual, true);
   assert.ok(view.shareLines.authorLine.includes("75%"));
+  const reward = getAuthorRewardCabinetCopy(view.share);
+  assert.equal(reward.authorLine, `${formatShareBpsAsPercent(7500)} – получает автор`);
+  assert.equal(reward.platformLine, `${formatShareBpsAsPercent(2500)} – комиссия АудиоЛада`);
   assert.equal(view.paidProductsLocked, false);
 }
 
@@ -246,6 +281,10 @@ const client = readFileSync(
   path.join(root, "src/components/author-dashboard/AuthorStatusClient.tsx"),
   "utf8",
 );
+assert.ok(client.includes("getAuthorRewardCabinetCopy"));
+assert.ok(client.includes("AuthorRewardCabinetCard"));
+assert.doesNotMatch(client, /86[,.]5|13[,.]5|GetCourse 3[,.]5|3,5%/);
+assert.doesNotMatch(client, /70% – получает автор|30% – комиссия АудиоЛада/);
 assert.ok(client.includes("AUTHOR_STATUS_COPY.starterTitle"));
 assert.ok(client.includes("AUTHOR_STATUS_COPY.premiumTitle"));
 assert.equal(AUTHOR_STATUS_COPY.starterTitle, "Ваш текущий статус – Стартовый");
@@ -275,5 +314,42 @@ assert.ok(
   ),
 );
 assert.ok(approved.includes('version: "1.1"'));
+assert.ok(
+  approved.includes(
+    "Коммерческие условия и индивидуальные параметры Автора применяются также к платежам слушателей со стоимостью, самостоятельно определяемой слушателем",
+  ),
+);
+assert.ok(
+  approved.includes(
+    "«Поблагодарить автора» является пользовательским обозначением такой платёжной функции и не изменяет порядок расчёта авторского вознаграждения",
+  ),
+);
+
+const economicsSrc = readFileSync(
+  path.join(root, "src/lib/author-commercial/economics.ts"),
+  "utf8",
+);
+assert.match(economicsSrc, /AUTHOR_COMMERCIAL_SHARE_BPS = 7000/);
+assert.match(economicsSrc, /PLATFORM_COMMERCIAL_SHARE_BPS = 3000/);
+assert.match(economicsSrc, /getCommercialShareDisplayLines\(share\)/);
+assert.doesNotMatch(
+  economicsSrc.slice(economicsSrc.indexOf("export function getAuthorRewardCabinetCopy")),
+  /70% – получает автор|30% – комиссия АудиоЛада/,
+);
+
+const payee = readFileSync(
+  path.join(root, "src/lib/authors/ensure-commercial-payee-setup.ts"),
+  "utf8",
+);
+assert.match(payee, /AUTHOR_COMMERCIAL_SHARE_BPS/);
+assert.doesNotMatch(payee, /8650|1350|3\.5/);
+
+const checkout = readFileSync(
+  path.join(root, "src/app/api/author-appreciation/checkout/route.ts"),
+  "utf8",
+);
+assert.match(checkout, /resolve_author_commercial_terms/);
+assert.match(checkout, /canReceiveCanonicalAppreciationAccrual/);
+assert.doesNotMatch(checkout, /86[,.]5|13[,.]5|0\.035/);
 
 console.log("author-status-page-unit: ok");
