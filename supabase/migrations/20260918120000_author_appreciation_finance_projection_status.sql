@@ -511,7 +511,6 @@ COMMENT ON TABLE public.author_appreciation_payment_intents IS
   'GetCourse appreciation intents. status/paid_at is the provider fact. finance_projection_status is the author-ledger projection. No order, payment, or entitlement is created.';
 
 -- Historical / unprojected paid intents, including production paid-after-#310.
-PERFORM 1;
 DO $$
 BEGIN
   PERFORM public.reconcile_author_appreciation_paid_intents(10000);

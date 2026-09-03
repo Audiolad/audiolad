@@ -353,6 +353,7 @@ function testHistoricalPaidBackfill() {
 }
 
 function testUnprojectedPaidSelectable() {
+  const ineligibleId = "33333333-3333-4333-8333-333333333333";
   const selectable = number(
     `SELECT count(*)::int FROM author_appreciation_payment_intents i
      WHERE i.status = 'paid'
@@ -365,7 +366,15 @@ function testUnprojectedPaidSelectable() {
          )
        );`,
   );
-  assertEqual(selectable, 0, "after suite, no leftover unprojected paid");
+  assertEqual(selectable, 1, "ineligible paid stays selectable for reconcile");
+  const row = intentRow(ineligibleId);
+  assertEqual(row.status, "paid", "ineligible provider paid preserved");
+  assertEqual(row.finance_projection_status, "needs_review", "still explicit review");
+  assertEqual(accrualCount(ineligibleId), 0, "still no accrual");
+  const again = reconcile();
+  assertEqual(again.created, 0, "retry without eligibility creates nothing");
+  assertEqual(accrualCount(ineligibleId), 0, "still no accrual after retry");
+  assertEqual(intentRow(ineligibleId).status, "paid", "paid fact still preserved");
 }
 
 bootstrap();

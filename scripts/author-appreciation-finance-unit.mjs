@@ -90,6 +90,7 @@ function testDHistoricalPaidReconciliation() {
   assert.match(reconcileFn, /NOT EXISTS/);
   assert.match(reconcileFn, /ensure_author_appreciation_sale_accrual\(v_intent\.id\)/);
   assert.match(statusMigration, /reconcile_author_appreciation_paid_intents\(10000\)/);
+  assert.doesNotMatch(statusMigration, /^PERFORM 1;/m);
 }
 
 function testEReconciliationTwiceNoOp() {
