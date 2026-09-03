@@ -220,7 +220,11 @@ export async function POST(request: Request) {
       amountMinor,
       localDealNumber,
     });
-  } catch {
+  } catch (providerError) {
+    console.error("author_appreciation_checkout_provider_failed", {
+      reason: providerError instanceof Error ? providerError.message : "unknown",
+      intent_id: intentId,
+    });
     await service
       .from("author_appreciation_payment_intents")
       .update({ status: "failed", updated_at: new Date().toISOString() })

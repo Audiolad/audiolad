@@ -17,6 +17,16 @@ type AuthorAppreciationPrototypeProps = {
   surface: "author" | "product";
 };
 
+function parseAppreciationAmount(raw: string): number | null {
+  const trimmed = raw.trim().replace(",", ".");
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
 function resolveAmountLabel(amount: number | null): string {
   return amount && amount > 0 ? formatRubles(amount) : "выбранную сумму";
 }
@@ -32,19 +42,13 @@ export default function AuthorAppreciationPrototype({
   const emailId = useId();
   const amountId = useId();
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState<number | null>(500);
-  const [customAmount, setCustomAmount] = useState("");
+  const [amountInput, setAmountInput] = useState("500");
   const [guestEmail, setGuestEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedAmount =
-    customAmount.trim() === "" ? amount : Number(customAmount.replace(",", "."));
-  const isValidAmount =
-    typeof selectedAmount === "number" &&
-    Number.isFinite(selectedAmount) &&
-    selectedAmount > 0 &&
-    Number.isInteger(selectedAmount);
+  const selectedAmount = parseAppreciationAmount(amountInput);
+  const isValidAmount = selectedAmount !== null;
 
   async function submitCheckout() {
     if (!isValidAmount || isSubmitting) return;
@@ -172,8 +176,7 @@ export default function AuthorAppreciationPrototype({
               </legend>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {QUICK_AMOUNTS.map((quickAmount) => {
-                  const selected =
-                    customAmount.trim() === "" && amount === quickAmount;
+                  const selected = selectedAmount === quickAmount;
 
                   return (
                     <button
@@ -181,8 +184,7 @@ export default function AuthorAppreciationPrototype({
                       type="button"
                       aria-pressed={selected}
                       onClick={() => {
-                        setAmount(quickAmount);
-                        setCustomAmount("");
+                        setAmountInput(String(quickAmount));
                       }}
                       className={`min-h-11 rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
                         selected
@@ -200,7 +202,7 @@ export default function AuthorAppreciationPrototype({
                 htmlFor={amountId}
                 className="mt-3 block text-sm font-semibold text-[#25135c]"
               >
-                Своя сумма
+                Сумма
               </label>
               <div className="mt-2 flex items-center rounded-2xl border border-[#ddcfef] bg-white px-4 focus-within:border-[#7042c5] focus-within:ring-2 focus-within:ring-[#e8ddf7]">
                 <input
@@ -210,8 +212,8 @@ export default function AuthorAppreciationPrototype({
                   step="1"
                   inputMode="numeric"
                   placeholder="Введите сумму"
-                  value={customAmount}
-                  onChange={(event) => setCustomAmount(event.target.value)}
+                  value={amountInput}
+                  onChange={(event) => setAmountInput(event.target.value)}
                   className="min-h-11 w-full bg-transparent text-sm text-[#25135c] outline-none placeholder:text-[#a496bd]"
                 />
                 <span className="text-sm text-[#7d70a2]">₽</span>
