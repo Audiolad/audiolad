@@ -27,6 +27,19 @@ export function disabledButtonClasses(): string {
   return "disabled:cursor-not-allowed disabled:opacity-60";
 }
 
+function PauseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M7 5.5h3.5v13H7V5.5Zm6.5 0H17v13h-3.5V5.5Z" />
+    </svg>
+  );
+}
+
 function toolbarActionClassName(
   kind: "primary" | "secondary",
   options?: { compact?: boolean },
@@ -449,6 +462,12 @@ export function PracticePrimaryActionSection({
                       practiceId={practice.id}
                       playAriaLabel={playLabel}
                       className={listenClassName}
+                      playingChildren={
+                        <>
+                          <PauseIcon />
+                          Пауза
+                        </>
+                      }
                     >
                       <PlayIcon />
                       {playLabel}
@@ -495,6 +514,12 @@ export function PracticePrimaryActionSection({
                       practiceId={practice.id}
                       playAriaLabel={playLabel}
                       className={listenClassName}
+                      playingChildren={
+                        <>
+                          <PauseIcon />
+                          Пауза
+                        </>
+                      }
                     >
                       <PlayIcon />
                       {playLabel}
@@ -516,6 +541,12 @@ export function PracticePrimaryActionSection({
             practiceId={practice.id}
             playAriaLabel={playLabel}
             className={listenClassName}
+            playingChildren={
+              <>
+                <PauseIcon />
+                Пауза
+              </>
+            }
           >
             <PlayIcon />
             {playLabel}

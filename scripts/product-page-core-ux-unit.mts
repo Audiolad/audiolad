@@ -23,10 +23,15 @@ function testPrimaryPlayStaysOnPractice() {
   assert.match(cta, /suppressListenUrlSync: true/);
   assert.match(cta, /prepareSharedAudioGesture/);
   assert.match(cta, /data-practice-primary-play/);
+  assert.match(cta, /data-practice-primary-play-active/);
+  assert.match(cta, /aria-pressed=\{isPlaying\}/);
+  assert.match(cta, /\{isPlaying \? playingChildren : children\}/);
   assert.doesNotMatch(cta, /<Link|href=/);
   assert.doesNotMatch(cta, /buildListenPath|\/listen\?autoplay/);
   assert.match(parts, /PracticeListenCtaLink/);
   assert.match(parts, /showPrimaryPlay/);
+  assert.match(parts, /playingChildren=/);
+  assert.match(parts, /Пауза/);
   assert.match(parts, /kind === "listen"/);
   assert.match(parts, /kind === "buy"/);
 }
