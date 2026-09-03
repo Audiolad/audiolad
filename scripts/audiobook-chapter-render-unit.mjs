@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const migration = readFileSync("supabase/migrations/20260916120000_audiobook_chapter_render.sql", "utf8");
+const immutableMigration = readFileSync("supabase/migrations/20260916121000_lock_audiobook_chapter_render_snapshot.sql", "utf8");
 const worker = readFileSync("scripts/run-studio-render-worker.mts", "utf8");
 const server = readFileSync("src/lib/audiobooks/server.ts", "utf8");
 const render = readFileSync("src/lib/audiobooks/render.ts", "utf8");
@@ -18,6 +19,8 @@ for (const pattern of [
   /FOR UPDATE SKIP LOCKED/,
   /recover_stale_audiobook_chapter_render_jobs/,
 ]) assert.match(migration, pattern);
+assert.match(immutableMigration, /audiobook_chapter_render_snapshot_immutable/);
+assert.match(immutableMigration, /NEW\.snapshot_sha256 IS DISTINCT FROM OLD\.snapshot_sha256/);
 assert.match(server, /createHash\("sha256"\)/);
 assert.match(worker, /processAudiobookChapterRender/);
 assert.match(worker, /snapshot_fingerprint_mismatch/);
