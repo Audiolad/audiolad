@@ -7,6 +7,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
+import { shouldToggleActiveCatalogPlay } from "@/lib/catalog/should-toggle-active-catalog-play";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
@@ -58,7 +59,19 @@ export default function PracticeListenCtaLink({
 
       prepareSharedAudioGesture();
 
-      if (isActive && engine) {
+      if (
+        engine &&
+        shouldToggleActiveCatalogPlay({
+          sessionMatchesProduct: isActive,
+          hasEngine: true,
+          isPlaying: Boolean(engine.isPlaying),
+          forceStartAtBeginning: Boolean(
+            session &&
+              isCatalogGlobalPlayerSession(session) &&
+              session.forceStartAtBeginning,
+          ),
+        })
+      ) {
         clearPlaylistQueue();
         await engine.handlePlayPause();
         return;
@@ -99,6 +112,7 @@ export default function PracticeListenCtaLink({
       loadSession,
       prepareSharedAudioGesture,
       productSlug,
+      session,
     ],
   );
 

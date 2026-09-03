@@ -45,6 +45,7 @@ import {
   isPrivateAudioSession,
   normalizeGlobalPlayerSessionContract,
 } from "@/lib/listen/global-player-types";
+import { resolveSameKeySessionAction } from "@/lib/listen/resolve-same-key-session-action";
 import { buildListenApiBase } from "@/lib/products/paths";
 import {
   clearDesktopPlayerLastSession,
@@ -692,9 +693,16 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       const trackSelectionChanged =
         Boolean(input.initialTrackId) &&
         input.initialTrackId !== current.initialTrackId;
-      const autoplayBump = requestAutoplay && !current.requestAutoplay;
+      const sameKeyAction = resolveSameKeySessionAction({
+        trackSelectionChanged,
+        requestAutoplay,
+        currentRequestAutoplay: Boolean(current.requestAutoplay),
+        preservePlayback,
+        forceStartAtBeginning: Boolean(nextSession.forceStartAtBeginning),
+        currentForceStartAtBeginning: Boolean(current.forceStartAtBeginning),
+      });
 
-      if (!trackSelectionChanged && !autoplayBump && !preservePlayback) {
+      if (sameKeyAction === "noop") {
         // Same session key, no material change — bail without setState to avoid
         // ListenPageClient effect loops (new object identity every call).
         return;
@@ -702,7 +710,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
       // Autoplay-only bump: keep the mounted engine and shared media element.
       // Remount + audio.load() on iOS drops user activation and restarts buffer.
-      if (autoplayBump && !trackSelectionChanged && !preservePlayback) {
+      // forceStartAtBeginning on a restored session is NOT autoplay-only — it
+      // must remount so leftover resume position / completed state cannot win.
+      if (sameKeyAction === "autoplay_intent_bump") {
         const merged: LoadSessionInput = {
           ...current,
           ...nextSession,
@@ -734,7 +744,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       sessionRef.current = merged;
       setSession(merged);
 
-      if (preservePlayback) {
+      if (sameKeyAction === "preserve_playback") {
         if (process.env.NODE_ENV !== "production") {
           console.info("private_audio_session_switch", {
             from: currentKey,
