@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import { getAuthorRewardCabinetCopy } from "@/lib/author-commercial/economics";
 import {
   AUTHOR_STATUS_COPY,
   type AuthorStatusCta,
@@ -99,6 +100,29 @@ function CapabilityList({ items }: { items: string[] }) {
         <li key={item}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function AuthorRewardCabinetCard({ view }: { view: AuthorStatusViewModel }) {
+  const copy = getAuthorRewardCabinetCopy(view.share);
+
+  return (
+    <StatusCard title={copy.title}>
+      <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">{copy.authorLine}</p>
+      <p className="mt-2 text-[15px] leading-6 text-[#4c3d78]">{copy.platformLine}</p>
+      {view.share.isIndividual ? (
+        <p className="mt-3 text-sm leading-6 text-[#2f7a4b]">
+          Для вашего кабинета назначены индивидуальные коммерческие
+          параметры.
+        </p>
+      ) : (
+        <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
+          Стандартные условия Платформы до назначения индивидуальных
+          параметров.
+        </p>
+      )}
+      <p className="mt-4 text-sm leading-6 text-[#8c7dab]">{copy.caption}</p>
+    </StatusCard>
   );
 }
 
@@ -206,28 +230,7 @@ export default function AuthorStatusClient({ authorId, authorSlug, view }: Props
       ) : null}
 
       {view.showStandardCommercialOffer ? (
-        <StatusCard title="Коммерческие условия">
-          <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">
-            {view.shareLines.authorLine}
-          </p>
-          <p className="mt-2 text-[15px] leading-6 text-[#4c3d78]">
-            {view.shareLines.platformLine}
-          </p>
-          {view.share.isIndividual ? (
-            <p className="mt-3 text-sm leading-6 text-[#2f7a4b]">
-              Для вашего кабинета назначены индивидуальные коммерческие
-              параметры.
-            </p>
-          ) : (
-            <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-              Стандартные условия Платформы до назначения индивидуальных
-              параметров.
-            </p>
-          )}
-          <p className="mt-4 text-sm leading-6 text-[#8c7dab]">
-            {view.platformCommissionScopeText}
-          </p>
-        </StatusCard>
+        <AuthorRewardCabinetCard view={view} />
       ) : null}
 
       <AppreciationSettingsCard authorId={authorId} view={view} />
