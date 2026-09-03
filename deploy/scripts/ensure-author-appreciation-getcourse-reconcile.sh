@@ -19,18 +19,52 @@ WRAPPER_SRC="$SCRIPT_DIR/run-author-appreciation-getcourse-reconcile.sh"
 SERVICE_SRC="$DEPLOY_TREE/systemd/audiolad-author-appreciation-getcourse-reconcile.service"
 TIMER_SRC="$DEPLOY_TREE/systemd/audiolad-author-appreciation-getcourse-reconcile.timer"
 LOGROTATE_SRC="$DEPLOY_TREE/logrotate/audiolad-author-appreciation-getcourse-reconcile"
+SERVICE_UNIT="audiolad-author-appreciation-getcourse-reconcile.service"
+TIMER_UNIT="audiolad-author-appreciation-getcourse-reconcile.timer"
 
 WRAPPER_DIR="${WRAPPER_DIR:-/usr/local/lib/audiolad}"
 SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
 LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
 LOG_DIR="${LOG_DIR:-/var/log/audiolad}"
 STATE_DIR="${STATE_DIR:-/var/lib/audiolad}"
+LOG_FILE="${LOG_FILE:-$LOG_DIR/author-appreciation-getcourse-reconcile.log}"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"
 SKIP_SYSTEMCTL="${SKIP_SYSTEMCTL:-0}"
 START_SERVICE_NOW="${START_SERVICE_NOW:-1}"
 
 log() {
   printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*"
+}
+
+log_service_result() {
+  local label="$1"
+  if ! as_root "$SYSTEMCTL" show "$SERVICE_UNIT" \
+    -p ActiveState -p Result -p ExecMainStatus -p ExecMainCode \
+    -p ExecMainStartTimestamp -p ExecMainExitTimestamp \
+    -p InvocationID; then
+    log "WARN ${label} service_show_unavailable unit=${SERVICE_UNIT}"
+  fi
+}
+
+log_reconcile_summary() {
+  if [[ ! -r "$LOG_FILE" ]]; then
+    log "WARN reconcile_log_unreadable path=${LOG_FILE}"
+    return 0
+  fi
+  local summary
+  summary="$(
+    awk '/APPRECIATION_RECONCILE / { line=$0 } END { print line }' "$LOG_FILE" \
+      | sed -E \
+        -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
+        -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
+        -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+  )"
+  if [[ -n "$summary" ]]; then
+    log "reconcile_summary ${summary}"
+  else
+    log "WARN reconcile_summary missing path=${LOG_FILE}"
+  fi
 }
 
 as_root() {
@@ -61,8 +95,8 @@ if [[ -f "$DIAGNOSE_SRC" ]]; then
     as_root install -m 0755 "$DIAGNOSE_SRC" "/usr/local/sbin/audiolad-reconcile-diagnose"
   fi
 fi
-as_root install -m 0644 "$SERVICE_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.service"
-as_root install -m 0644 "$TIMER_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.timer"
+as_root install -m 0644 "$SERVICE_SRC" "$SYSTEMD_DIR/${SERVICE_UNIT}"
+as_root install -m 0644 "$TIMER_SRC" "$SYSTEMD_DIR/${TIMER_UNIT}"
 as_root install -m 0644 "$LOGROTATE_SRC" "$LOGROTATE_DIR/audiolad-author-appreciation-getcourse-reconcile"
 
 if [[ "$SKIP_SYSTEMCTL" == "1" ]]; then
@@ -71,18 +105,28 @@ if [[ "$SKIP_SYSTEMCTL" == "1" ]]; then
 fi
 
 if ! command -v "$SYSTEMCTL" >/dev/null 2>&1; then
-  log "WARN systemctl missing; units installed but not enabled"
-  exit 0
+  log "ERROR systemctl missing; reconcile units installed but not enabled"
+  exit 1
 fi
 
 as_root "$SYSTEMCTL" daemon-reload
-as_root "$SYSTEMCTL" enable --now audiolad-author-appreciation-getcourse-reconcile.timer
+if ! as_root "$SYSTEMCTL" enable --now "$TIMER_UNIT"; then
+  log "ERROR timer enable failed unit=${TIMER_UNIT}"
+  exit 1
+fi
+
 if [[ "$START_SERVICE_NOW" == "1" ]]; then
-  if as_root "$SYSTEMCTL" start audiolad-author-appreciation-getcourse-reconcile.service; then
-    log "immediate reconcile start exit=0"
-  else
-    log "WARN immediate reconcile start failed exit=$? (timer remains enabled)"
+  local_start_exit=0
+  if ! as_root "$SYSTEMCTL" start "$SERVICE_UNIT"; then
+    local_start_exit=$?
+  fi
+  log "immediate reconcile systemd start exit=${local_start_exit}"
+  log_service_result "after_immediate_start"
+  log_reconcile_summary
+  if [[ "$local_start_exit" -ne 0 ]]; then
+    log "ERROR immediate reconcile start failed exit=${local_start_exit} unit=${SERVICE_UNIT}"
+    exit 1
   fi
 fi
 
-log "enabled timer=audiolad-author-appreciation-getcourse-reconcile.timer"
+log "enabled timer=${TIMER_UNIT}"

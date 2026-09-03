@@ -84,20 +84,36 @@ secrets.
 
 ## Как запустить
 
+### Production deploy (`confirm=DEPLOY`)
+
 1. Actions → **Production Deploy** → **Run workflow**.
-2. Branch: `main`.
+2. Branch: **`main`** (обязательно — environment `production` не отдаёт секреты PR-веткам).
 3. `commit_sha` — пусто (тогда tip свежего `origin/main`) либо
    полный 40-символьный lowercase hex SHA, который есть среди объектов origin/main.
-4. `confirm` = **DEPLOY**. Любое другое значение валит job до SSH.
+4. `confirm` = **DEPLOY**.
 5. Run workflow.
+
+### Read-only diagnostics (`confirm=DO_NOT_DEPLOY`)
+
+Тот же workflow, но `confirm=DO_NOT_DEPLOY` запускает job **Production read-only
+diagnostics**: SSH read-only `systemctl` / `journalctl` / хвост reconcile-log.
+**Не вызывает** `audiolad-deploy` и не меняет production.
+
+**Ограничение GitHub Environment:** секреты `production` доступны только с ref,
+разрешённого в настройках environment (обычно только `main`). Dispatch с PR-ветки
+может завершиться до любых steps (`steps=[]`) — это ожидаемо; ослаблять protection
+нельзя. После merge workflow в `main` повторите dispatch с branch **`main`**.
 
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
 ## Семантика ошибок
 
-- Невалидный SHA, `confirm != DEPLOY`, нет секретов, нет wrapper на сервере —
+- Невалидный SHA, нет секретов, нет wrapper на сервере —
   красный workflow, production не трогается.
+- `confirm=DO_NOT_DEPLOY` с PR-ветки при environment protection — diagnose job
+  не стартует (нет доступа к secrets); deploy job пропускается.
+- `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
   `deploy.sh` (`cleanup_failed_candidate`).

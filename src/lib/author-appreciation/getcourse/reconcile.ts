@@ -60,6 +60,7 @@ export type ReconcileDeps = {
 export type ReconcileResult = {
   attempted: number;
   correlatable: number;
+  matched: number;
   applied: number;
   skipped: number;
   provider_error: boolean;
@@ -185,6 +186,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     return {
       attempted: 0,
       correlatable: 0,
+      matched: 0,
       applied: 0,
       skipped: 0,
       provider_error: true,
@@ -217,6 +219,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     return {
       attempted: pending.length,
       correlatable: 0,
+      matched: 0,
       applied: 0,
       skipped: pending.length,
       provider_error: false,
@@ -236,6 +239,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   const exported = await exportDeals(config, window, deps.fetchImpl, deps.exportOptions);
   const byId = exported.ok ? indexExportedDealsById(exported.deals) : new Map();
   const byNumber = exported.ok ? indexExportedDealsByNumber(exported.deals) : new Map();
+  let matched = 0;
   let applied = 0;
   let skipped = pending.length - correlatable.length;
   let providerError = !exported.ok && exported.reason === "provider_error";
@@ -307,6 +311,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
       });
       continue;
     }
+    matched += 1;
 
     const { error } = await applyCallback({
       providerDealId: intent.provider_deal_id ?? match.deal.dealId,
@@ -343,6 +348,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   return {
     attempted: pending.length,
     correlatable: correlatable.length,
+    matched,
     applied,
     skipped,
     provider_error: providerError,
@@ -367,6 +373,7 @@ export async function reconcilePendingGetCourseAppreciationIntents(
       return {
         attempted: 0,
         correlatable: 0,
+        matched: 0,
         applied: 0,
         skipped: 0,
         provider_error: false,

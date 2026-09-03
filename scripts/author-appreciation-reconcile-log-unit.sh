@@ -32,7 +32,7 @@ if (result) process.stdout.write(JSON.stringify(result));
 SAMPLE="$(cat <<'EOF'
 > audiolad@0.0.0 run:author-appreciation-getcourse-reconcile
 > NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/run-author-appreciation-getcourse-reconcile.mts
-{"attempted":2,"correlatable":2,"applied":0,"skipped":2,"provider_error":false,"deferred":false,"exports":1,"polls":2,"skip_reasons_summary":"not_found:2"}
+{"attempted":2,"correlatable":2,"matched":0,"applied":0,"skipped":2,"provider_error":false,"deferred":false,"exports":1,"polls":2,"skip_reasons_summary":"not_found:2"}
 EOF
 )"
 
@@ -44,16 +44,17 @@ fi
 
 ATTEMPTED="$(printf '%s' "$PARSED" | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).attempted))')"
 CORRELATABLE="$(printf '%s' "$PARSED" | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).correlatable))')"
+MATCHED="$(printf '%s' "$PARSED" | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).matched))')"
 APPLIED="$(printf '%s' "$PARSED" | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).applied))')"
 EXPORTS="$(printf '%s' "$PARSED" | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).exports))')"
 
-if [[ "$ATTEMPTED" != "2" || "$CORRELATABLE" != "2" || "$APPLIED" != "0" || "$EXPORTS" != "1" ]]; then
-  echo "FAIL parsed fields attempted=$ATTEMPTED correlatable=$CORRELATABLE applied=$APPLIED exports=$EXPORTS" >&2
+if [[ "$ATTEMPTED" != "2" || "$CORRELATABLE" != "2" || "$MATCHED" != "0" || "$APPLIED" != "0" || "$EXPORTS" != "1" ]]; then
+  echo "FAIL parsed fields attempted=$ATTEMPTED correlatable=$CORRELATABLE matched=$MATCHED applied=$APPLIED exports=$EXPORTS" >&2
   exit 1
 fi
 
-if ! grep -q 'APPRECIATION_RECONCILE' "$WRAPPER"; then
-  echo "FAIL wrapper missing APPRECIATION_RECONCILE log line" >&2
+if ! grep -q 'matched=' "$WRAPPER"; then
+  echo "FAIL wrapper missing matched= in APPRECIATION_RECONCILE log line" >&2
   exit 1
 fi
 if grep -q "awk '/\^\\\{.*\"attempted\".*\"applied\".*\"exports\".*\\\}\$/'" "$WRAPPER"; then

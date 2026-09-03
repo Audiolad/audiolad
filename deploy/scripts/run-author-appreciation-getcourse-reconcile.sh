@@ -96,7 +96,7 @@ mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>>"$LOCK_FILE"
 if ! flock -n 9; then
   log "skip locked=1 reason=another_worker_holds_flock"
-  log "APPRECIATION_RECONCILE attempted=0 correlatable=0 applied=0 exports=0 deferred=false provider_error=false exit=0 reason=locked"
+  log "APPRECIATION_RECONCILE attempted=0 correlatable=0 matched=0 applied=0 exports=0 deferred=false provider_error=false exit=0 reason=locked"
   exit 0
 fi
 
@@ -147,6 +147,7 @@ FINISHED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 RESULT_JSON="$(extract_reconcile_json "$OUTPUT")"
 ATTEMPTED="$(json_field "$RESULT_JSON" attempted "?")"
 CORRELATABLE="$(json_field "$RESULT_JSON" correlatable "?")"
+MATCHED="$(json_field "$RESULT_JSON" matched "?")"
 APPLIED="$(json_field "$RESULT_JSON" applied "?")"
 EXPORTS="$(json_field "$RESULT_JSON" exports "?")"
 DEFERRED="$(json_field "$RESULT_JSON" deferred "?")"
@@ -174,8 +175,8 @@ elif [[ -n "$RESULT_JSON" && "$APPLIED" == "0" && "$ATTEMPTED" != "0" && "$ATTEM
 fi
 
 {
-  log "start_at=$STARTED_AT finish_at=$FINISHED_AT attempted=$ATTEMPTED correlatable=$CORRELATABLE applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE release=$(basename "$CURRENT_RELEASE")"
-  log "APPRECIATION_RECONCILE attempted=$ATTEMPTED correlatable=$CORRELATABLE applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE skip_reasons=${SKIP_REASONS:-none}"
+  log "start_at=$STARTED_AT finish_at=$FINISHED_AT attempted=$ATTEMPTED correlatable=$CORRELATABLE matched=$MATCHED applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE release=$(basename "$CURRENT_RELEASE")"
+  log "APPRECIATION_RECONCILE attempted=$ATTEMPTED correlatable=$CORRELATABLE matched=$MATCHED applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE skip_reasons=${SKIP_REASONS:-none}"
   if [[ "$SHOULD_DUMP_OUTPUT" -eq 1 ]]; then
     printf '%s\n' "$OUTPUT" | redact_stream | tail -n 60
   fi

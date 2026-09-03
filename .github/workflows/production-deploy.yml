@@ -7,6 +7,12 @@
 #
 # confirm=DO_NOT_DEPLOY runs read-only production diagnostics (systemd/journal/log).
 # confirm=DEPLOY runs the canonical deploy path only.
+#
+# Environment protection: GitHub Environment `production` typically allows only
+# refs on the default branch. DO_NOT_DEPLOY from a PR branch may fail before
+# any job steps (diagnose job steps=[]). After merge to main, dispatch
+# confirm=DO_NOT_DEPLOY from main to run read-only diagnostics. Do not weaken
+# environment protection to allow PR-branch production access.
 name: Production Deploy
 
 on:

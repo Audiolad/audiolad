@@ -177,7 +177,7 @@ export function summarizeExportSchema(rows: unknown[]): ExportSchemaObservation 
   };
 }
 
-function readExportId(payload: unknown): string | null {
+export function readExportId(payload: unknown): string | null {
   const root = record(payload);
   if (!root) return null;
   const result = record(root.result);

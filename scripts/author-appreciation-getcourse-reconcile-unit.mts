@@ -170,6 +170,7 @@ async function run(options: {
   const { result, applyCalls } = await run({ pending, fetch });
   assert.equal(result.exports, 1);
   assert.equal(result.correlatable, 20);
+  assert.equal(result.matched, 20);
   assert.equal(fetch.counts().dealsCalls, 1);
   assert.ok(fetch.counts().exportCalls <= GETCOURSE_EXPORT_MAX_POLLS);
   assert.equal(result.applied, 20);
@@ -352,6 +353,7 @@ async function run(options: {
   });
   const recovered = await run({ fetch });
   assert.equal(recovered.result.applied, 1);
+  assert.equal(recovered.result.matched, 1);
   assert.equal(recovered.applyCalls[0].status, "payed");
 }
 
@@ -384,7 +386,9 @@ async function run(options: {
   );
   assert.match(ensure, /DEPLOY_TREE:-/);
   assert.match(ensure, /audiolad-reconcile-diagnose/);
-  assert.match(ensure, /immediate reconcile start exit=/);
+  assert.match(ensure, /immediate reconcile systemd start exit=/);
+  assert.match(ensure, /reconcile_summary/);
+  assert.match(ensure, /ERROR immediate reconcile start failed/);
   const wrapper = readFileSync(
     "deploy/scripts/run-author-appreciation-getcourse-reconcile.sh",
     "utf8",
@@ -393,6 +397,7 @@ async function run(options: {
   assert.match(wrapper, /extract_reconcile_json/);
   const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
   assert.match(deploy, /author_appreciation_getcourse_reconcile_log_tail/);
+  assert.match(deploy, /author_appreciation_getcourse_reconcile_summary/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",
