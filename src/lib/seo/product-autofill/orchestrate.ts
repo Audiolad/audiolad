@@ -38,6 +38,10 @@ import {
   type ProductSeoAutofillRequest,
 } from "@/lib/seo/product-autofill/types";
 import {
+  evaluatePrimaryQueryOveruse,
+  type PrimaryQueryOveruse,
+} from "@/lib/seo/primary-query-overuse";
+import {
   evaluateSecondaryQueryCoverage,
   isSecondaryCoverageComplete,
   selectActiveSecondaryQueries,
@@ -388,11 +392,35 @@ export async function generateProductSeoDraft(
     });
   }
 
+  function readPrimaryOveruse(draft: {
+    usageItems: ProductSeoAiRawDraft["usageItems"];
+    faqItems: ProductSeoAiRawDraft["faqItems"];
+  }): PrimaryQueryOveruse {
+    return evaluatePrimaryQueryOveruse({
+      primaryQuery: primary,
+      productTitle: request.title,
+      usageItems: draft.usageItems,
+      faqItems: draft.faqItems,
+    });
+  }
+
+  function hasQualityIssues(
+    coverage: SecondaryQueryCoverage,
+    overuse: PrimaryQueryOveruse,
+  ): boolean {
+    return (
+      !isSecondaryCoverageComplete(coverage, activeSecondaryQueries.length) ||
+      overuse.primaryOveruse
+    );
+  }
+
   function qualityRepairInput(
     coverage: SecondaryQueryCoverage,
+    overuse: PrimaryQueryOveruse,
   ): ProductSeoQualityRepairInput {
     return {
       ...coverage,
+      ...overuse,
       secondary1: activeSecondaryQueries[0],
       secondary2: activeSecondaryQueries[1],
     };
@@ -402,6 +430,7 @@ export async function generateProductSeoDraft(
     candidate: ProductSeoAiRawDraft,
     previous: ProductSeoAiRawDraft,
     coverage: SecondaryQueryCoverage,
+    overuse: PrimaryQueryOveruse,
   ): ProductSeoAiRawDraft {
     const next: ProductSeoAiRawDraft = {
       seoTitle: previous.seoTitle,
@@ -410,6 +439,7 @@ export async function generateProductSeoDraft(
       faqItems: previous.faqItems.map((item) => ({ ...item })),
     };
 
+    const usageIndexes = new Set(overuse.overusedUsageIndexes);
     if (
       !coverage.secondary1UsageCovered &&
       candidate.usageItems.length === previous.usageItems.length
@@ -418,48 +448,76 @@ export async function generateProductSeoDraft(
         (item, index) => item.content !== candidate.usageItems[index]?.content,
       );
       if (changedIndex >= 0) {
-        next.usageItems[changedIndex] = {
-          content: candidate.usageItems[changedIndex].content,
-        };
+        usageIndexes.add(changedIndex);
       }
     }
 
-    if (
-      !coverage.secondary2FaqCovered &&
-      candidate.faqItems.length === previous.faqItems.length
-    ) {
-      const changes: Array<{
-        index: number;
-        questionChanged: boolean;
-        answerChanged: boolean;
-      }> = [];
-      for (let index = 1; index < previous.faqItems.length; index += 1) {
-        const previousItem = previous.faqItems[index];
-        const candidateItem = candidate.faqItems[index];
-        if (!candidateItem) {
-          continue;
-        }
-        const questionChanged = previousItem.question !== candidateItem.question;
-        const answerChanged = previousItem.answer !== candidateItem.answer;
-        if (questionChanged || answerChanged) {
-          changes.push({ index, questionChanged, answerChanged });
+    if (candidate.usageItems.length === previous.usageItems.length) {
+      for (const index of usageIndexes) {
+        const candidateItem = candidate.usageItems[index];
+        if (candidateItem) {
+          next.usageItems[index] = { content: candidateItem.content };
         }
       }
-      const preferred =
-        changes.find((change) => change.answerChanged && !change.questionChanged) ??
-        changes[0];
-      if (preferred) {
-        const previousItem = previous.faqItems[preferred.index];
-        const candidateItem = candidate.faqItems[preferred.index];
-        next.faqItems[preferred.index] = {
-          question: preferred.questionChanged
-            ? candidateItem.question
-            : previousItem.question,
-          answer: preferred.answerChanged
-            ? candidateItem.answer
-            : previousItem.answer,
+    }
+
+    if (candidate.faqItems.length === previous.faqItems.length) {
+      for (const location of overuse.overusedFaqLocations) {
+        if (location.index === 0 && location.field === "question") {
+          continue;
+        }
+        const candidateItem = candidate.faqItems[location.index];
+        const previousItem = previous.faqItems[location.index];
+        if (!candidateItem || !previousItem) {
+          continue;
+        }
+        next.faqItems[location.index] = {
+          question:
+            location.field === "question"
+              ? candidateItem.question
+              : next.faqItems[location.index].question,
+          answer:
+            location.field === "answer"
+              ? candidateItem.answer
+              : next.faqItems[location.index].answer,
           anchor: previousItem.anchor,
         };
+      }
+
+      if (!coverage.secondary2FaqCovered) {
+        const changes: Array<{
+          index: number;
+          questionChanged: boolean;
+          answerChanged: boolean;
+        }> = [];
+        for (let index = 1; index < previous.faqItems.length; index += 1) {
+          const previousItem = previous.faqItems[index];
+          const candidateItem = candidate.faqItems[index];
+          if (!candidateItem) {
+            continue;
+          }
+          const questionChanged = previousItem.question !== candidateItem.question;
+          const answerChanged = previousItem.answer !== candidateItem.answer;
+          if (questionChanged || answerChanged) {
+            changes.push({ index, questionChanged, answerChanged });
+          }
+        }
+        const preferred =
+          changes.find((change) => change.answerChanged && !change.questionChanged) ??
+          changes[0];
+        if (preferred) {
+          const previousItem = previous.faqItems[preferred.index];
+          const candidateItem = candidate.faqItems[preferred.index];
+          next.faqItems[preferred.index] = {
+            question: preferred.questionChanged
+              ? candidateItem.question
+              : next.faqItems[preferred.index].question,
+            answer: preferred.answerChanged
+              ? candidateItem.answer
+              : next.faqItems[preferred.index].answer,
+            anchor: previousItem.anchor,
+          };
+        }
       }
     }
 
@@ -470,37 +528,34 @@ export async function generateProductSeoDraft(
     validDraft: ProductSeoAutofillDraft,
     rawDraft: ProductSeoAiRawDraft,
   ): Promise<ProductSeoAiResult> {
-    let lastValidDraft = validDraft;
-    if (
-      isSecondaryCoverageComplete(
-        readSecondaryCoverage(lastValidDraft),
-        activeSecondaryQueries.length,
-      ) ||
-      providerCallCount >= MAX_PROVIDER_CALLS
-    ) {
-      return { ok: true, data: lastValidDraft };
+    // Primary overuse and missing secondary coverage are quality issues only.
+    // As soon as a hard-valid draft exists, keep it as the fallback.
+    let lastHardValidDraft = validDraft;
+    const coverage = readSecondaryCoverage(lastHardValidDraft);
+    const overuse = readPrimaryOveruse(lastHardValidDraft);
+    if (!hasQualityIssues(coverage, overuse) || providerCallCount >= MAX_PROVIDER_CALLS) {
+      return { ok: true, data: lastHardValidDraft };
     }
 
-    const coverage = readSecondaryCoverage(lastValidDraft);
     const repaired = await provider.qualityRepair(
       promptInput,
       rawDraft,
-      qualityRepairInput(coverage),
+      qualityRepairInput(coverage, overuse),
     );
     providerCallCount += 1;
     if (!repaired.ok || !repaired.draft?.usageItems || !repaired.draft?.faqItems) {
-      return { ok: true, data: lastValidDraft };
+      return { ok: true, data: lastHardValidDraft };
     }
 
     const mergedDraft = normalizeGeneratedDraft(
-      mergeQualityRepair(repaired.draft, rawDraft, coverage),
+      mergeQualityRepair(repaired.draft, rawDraft, coverage, overuse),
     );
     const repairedValidation = validateDraft(mergedDraft);
     if (repairedValidation.ok) {
-      lastValidDraft = repairedValidation.draft;
+      lastHardValidDraft = repairedValidation.draft;
     }
 
-    return { ok: true, data: lastValidDraft };
+    return { ok: true, data: lastHardValidDraft };
   }
 
   function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {

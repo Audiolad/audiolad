@@ -1,4 +1,5 @@
 import { AUTHOR_SEO_SECONDARY_ACTIVE_MAX } from "@/lib/author-products/limits";
+import type { PrimaryQueryOveruse } from "@/lib/seo/primary-query-overuse";
 
 const COVERAGE_STOP_WORDS = new Set([
   "в",
@@ -102,10 +103,11 @@ export type SecondaryQueryCoverage = {
   secondary2FaqCovered: boolean;
 };
 
-export type ProductSeoQualityRepairInput = SecondaryQueryCoverage & {
-  secondary1?: string;
-  secondary2?: string;
-};
+export type ProductSeoQualityRepairInput = SecondaryQueryCoverage &
+  PrimaryQueryOveruse & {
+    secondary1?: string;
+    secondary2?: string;
+  };
 
 export function selectActiveSecondaryQueries(
   queries: readonly string[] | null | undefined,
