@@ -1,5 +1,6 @@
 import LegalFooter from "@/components/LegalFooter";
 import AuthorLink from "@/components/authors/AuthorLink";
+import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import NextStepRecommendation from "@/components/products/NextStepRecommendation";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
 import ProductCopySections from "@/components/products/ProductCopySections";
@@ -148,6 +149,16 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           </div>
         </article>
 
+        {viewModel.showAuthorSupportPrototype && authorName ? (
+          <div className="mt-4">
+            <AuthorAppreciationPrototype
+              authorName={authorName}
+              isAuthenticated={viewModel.isAuthenticated}
+              surface="product"
+            />
+          </div>
+        ) : null}
+
         <ProductCopySections
           description={description}
         />
@@ -207,6 +218,16 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
         <div className="mt-6">
           <AudioPostPlayer {...playerProps} variant="panel" />
         </div>
+
+        {viewModel.showAuthorSupportPrototype && authorName ? (
+          <div className="mt-4">
+            <AuthorAppreciationPrototype
+              authorName={authorName}
+              isAuthenticated={viewModel.isAuthenticated}
+              surface="product"
+            />
+          </div>
+        ) : null}
 
         <ProductCopySections
           description={description}

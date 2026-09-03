@@ -9,6 +9,7 @@ import AuthorFeaturedSection, {
   AuthorProductsSection,
 } from "@/components/authors/AuthorPublicSections";
 import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
+import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
 import { collectAuthorContactSameAs } from "@/lib/authors/contacts";
 import JsonLd from "@/components/seo/JsonLd";
@@ -25,6 +26,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ author_support_preview?: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -62,8 +64,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function AuthorPublicPage({ params }: PageProps) {
+export default async function AuthorPublicPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { slug } = await params;
+  const { author_support_preview: authorSupportPreview } = await searchParams;
   const supabase = await createClient();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
@@ -92,6 +98,12 @@ export default async function AuthorPublicPage({ params }: PageProps) {
     : null;
 
   const authorPath = buildAuthorPublicPath(data.slug);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // Stage 1 design prototype only. Phase 2 will replace this explicit preview
+  // flag with commercial eligibility and persisted author/product preferences.
+  const showAuthorSupportPrototype = authorSupportPreview === "1";
 
   return (
     <>
@@ -129,6 +141,16 @@ export default async function AuthorPublicPage({ params }: PageProps) {
           bannerPositionY={data.bannerPositionY}
           publishedCount={data.publishedCount}
         />
+
+        {showAuthorSupportPrototype ? (
+          <div className="mt-4">
+            <AuthorAppreciationPrototype
+              authorName={data.name}
+              isAuthenticated={Boolean(user)}
+              surface="author"
+            />
+          </div>
+        ) : null}
 
         <AuthorFeaturedSection products={data.featuredProducts} />
 
