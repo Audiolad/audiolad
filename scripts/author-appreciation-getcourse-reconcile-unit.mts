@@ -368,14 +368,14 @@ async function run(options: {
   assert.match(provider, /return_payment_link: 1/);
   assert.doesNotMatch(provider, /deal_number:\s*input\./);
 
-  const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
-  assert.match(deploy, /ensure-author-appreciation-getcourse-reconcile\.sh/);
-  assert.match(deploy, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
-  assert.match(deploy, /assert_author_appreciation_reconcile_release_tree/);
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_ensure_failed/);
-  assert.doesNotMatch(deploy, /ensure_nonfatal/);
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_log_tail/);
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_summary/);
+  const deployScript = readFileSync("deploy/scripts/deploy.sh", "utf8");
+  assert.match(deployScript, /ensure-author-appreciation-getcourse-reconcile\.sh/);
+  assert.match(deployScript, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
+  assert.match(deployScript, /assert_author_appreciation_reconcile_release_tree/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_ensure_failed/);
+  assert.doesNotMatch(deployScript, /ensure_nonfatal/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_log_tail/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_summary/);
   const pin = readFileSync("deploy/scripts/lib/pin-target-deploy-scripts.sh", "utf8");
   assert.match(pin, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
   assert.match(pin, /pin_has_reconcile_artifacts/);
@@ -397,9 +397,6 @@ async function run(options: {
   );
   assert.match(wrapper, /APPRECIATION_RECONCILE/);
   assert.match(wrapper, /extract_reconcile_json/);
-  const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_log_tail/);
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_summary/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",
