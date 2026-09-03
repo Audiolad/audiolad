@@ -87,11 +87,7 @@ async function processAudiobookChapterRender() {
 }
 
 async function processAudiobookRenderQueuePass() {
-  try {
-    if (!await processAudiobookChapterRender()) console.log("audiobook-render-worker: no queued jobs");
-  } catch (error) {
-    console.error("audiobook-render-worker:", error);
-  }
+  if (!await processAudiobookChapterRender()) console.log("audiobook-render-worker: no queued jobs");
 }
 
 async function processStudioRenderQueuePass() {
@@ -213,6 +209,9 @@ async function main() {
     processAudiobookRenderQueuePass(),
   ]);
   const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  for (const result of results) {
+    if (result.status === "rejected") console.error("render-worker queue pass failed:", result.reason);
+  }
   if (failed) throw failed.reason;
 }
 void main().catch((error) => { console.error("studio-render-worker:", error); process.exitCode = 1; });
