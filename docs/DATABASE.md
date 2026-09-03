@@ -40,6 +40,14 @@ ensure RPC. No ordinary `orders`, `payments`, or entitlements are created.
 GetCourse refunds are not automated
 (`REFUND_AUTOMATION=MANUAL_OR_REQUIRES_GETCOURSE_PROCESS_EXTENSION`).
 
+Migration `20260918120000_author_appreciation_finance_projection_status.sql`
+adds `finance_projection_status` (`pending` | `projected` | `needs_review`),
+`finance_projected_at`, and `finance_projection_result_code` on the intent.
+Provider `status='paid'` is never rewritten to `failed`. If canonical accrual
+cannot be created, the intent stays paid and is marked `needs_review` so
+reconciliation can retry after the cause is fixed. Checkout fails closed when
+`payout_eligible` is false or `resolve_author_commercial_terms` is not found.
+
 # DATABASE.md
 
 База данных проекта «АудиоЛад».
