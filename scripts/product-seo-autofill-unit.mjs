@@ -29,6 +29,10 @@ import {
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
 import {
+  countExactNormalizedSeoPhrase,
+  evaluatePrimaryQueryOveruse,
+} from "../src/lib/seo/primary-query-overuse.ts";
+import {
   distinctiveQueryStems,
   evaluateSecondaryQueryCoverage,
   isSecondaryCoverageComplete,
@@ -463,6 +467,10 @@ assert.match(
 );
 assert.match(prompt, /Не игнорируй введённый активный дополнительный запрос/);
 assert.match(prompt, /Не набивай дополнительные запросы в seoTitle и seoDescription/);
+assert.match(
+  prompt,
+  /Дополнительные запросы должны выполнять свои задачи прежде всего в назначенных публичных блоках\. Не используй их в seoDescription только ради SEO/,
+);
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /не возвращай поле seoAbout/);
@@ -513,6 +521,8 @@ assert.match(
     /Дополнительные запросы — SEO-направления, а не факты\. Не выводи из них утверждения, которых нет в описании продукта/;
   const SECONDARY_NOT_IN_TITLE_DESCRIPTION =
     /Не набивай дополнительные запросы в seoTitle и seoDescription: там уже есть основной запрос/;
+  const SECONDARY_PUBLIC_SLOTS_FIRST =
+    /Дополнительные запросы должны выполнять свои задачи прежде всего в назначенных публичных блоках\. Не используй их в seoDescription только ради SEO/;
   const OVERLAP_VERBATIM =
     /Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1/;
   const OVERLAP_REPHRASE =
@@ -564,6 +574,7 @@ assert.match(
   assert.doesNotMatch(zeroSecondaryPrompt, /Не обязан использовать каждую фразу в черновике/);
   assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_SLOT_ONE);
   assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_SLOT_TWO_USAGE);
+  assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_PUBLIC_SLOTS_FIRST);
   assert.doesNotMatch(
     zeroSecondaryPrompt,
     /Используй это направление естественно один раз|Используй оба направления естественно|Используй 2–3 РАЗНЫХ дополнительных направления/,
@@ -580,6 +591,7 @@ assert.match(
   assert.match(oneSecondaryPrompt, SECONDARY_DO_NOT_IGNORE);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_FACTS);
   assert.match(oneSecondaryPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.match(oneSecondaryPrompt, SECONDARY_PUBLIC_SLOTS_FIRST);
   assert.doesNotMatch(oneSecondaryPrompt, SECONDARY_SLOT_TWO_FAQ);
   assert.doesNotMatch(oneSecondaryPrompt, OVERLAP_VERBATIM);
 
@@ -590,6 +602,7 @@ assert.match(
   assert.match(twoSecondaryPrompt, SECONDARY_SLOT_TWO_FAQ);
   assert.match(twoSecondaryPrompt, STORAGE_VS_PROSE);
   assert.match(twoSecondaryPrompt, SECONDARY_DO_NOT_IGNORE);
+  assert.match(twoSecondaryPrompt, SECONDARY_PUBLIC_SLOTS_FIRST);
   assert.doesNotMatch(twoSecondaryPrompt, OVERLAP_VERBATIM);
 
   const moneyPrompt = buildProductSeoSystemPrompt({ request: moneyRequest });
@@ -604,9 +617,10 @@ assert.match(
   assert.doesNotMatch(moneyPrompt, /Используй 2–3 РАЗНЫХ дополнительных направления/);
   assert.match(moneyPrompt, SECONDARY_NOT_FACTS);
   assert.match(moneyPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.match(moneyPrompt, SECONDARY_PUBLIC_SLOTS_FIRST);
   assert.match(
     moneyPrompt,
-    /Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, она\/её\)/,
+    /Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, запись, она\/её\)/,
   );
   assert.doesNotMatch(moneyPrompt, /Не обязан использовать каждую фразу в черновике/);
   assertOverlapContract(moneyPrompt, ["канал денежная энергия"]);
@@ -2836,6 +2850,10 @@ const ungroundedDraft = validDraft({
     secondary2FaqCovered: false,
     secondary1: "денежный поток энергии",
     secondary2: "энергия входа в денежный канал",
+    primaryOveruse: false,
+    titleEqualsPrimary: true,
+    overusedUsageIndexes: [],
+    overusedFaqLocations: [],
   });
   const qualityPrompt = buildProductSeoQualityRepairPrompt(
     productionRepairProvider.calls[1].input,
@@ -2936,6 +2954,10 @@ const ungroundedDraft = validDraft({
     secondary2FaqCovered: false,
     secondary1: "денежный поток энергии",
     secondary2: "энергия входа в денежный канал",
+    primaryOveruse: false,
+    titleEqualsPrimary: true,
+    overusedUsageIndexes: [],
+    overusedFaqLocations: [],
   });
   assert.equal(
     isSecondaryCoverageComplete(
@@ -3134,10 +3156,749 @@ const ungroundedDraft = validDraft({
   assert.deepEqual(legacyGenerate.data.seoSecondaryQueries, storedLegacy);
   assert.equal(legacyGenerateProvider.calls.length, 1);
 
+  assert.equal(containsSeoPhrase("бессонница", "сон"), true);
+  assert.equal(countExactNormalizedSeoPhrase("Это сон.", "сон") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Материал для тех, кого беспокоит бессонница.",
+      "сон",
+    ) > 0,
+    false,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Практика помогает почувствовать умиротворение.",
+      "мир",
+    ) > 0,
+    false,
+  );
+  assert.equal(countExactNormalizedSeoPhrase("Мир и спокойствие.", "мир") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Используйте «Ключ к Изобилию» вечером.",
+      "Ключ к Изобилию",
+    ) > 0,
+    true,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("Практика про денежную энергию.", "денежная энергия") > 0,
+    false,
+  );
+  assert.equal(countExactNormalizedSeoPhrase("перед сном", "сон") > 0, false);
+  assert.equal(countExactNormalizedSeoPhrase("«сон»", "сон") > 0, true);
+  assert.equal(countExactNormalizedSeoPhrase("сон, отдых и тишина", "сон") > 0, true);
+  assert.equal(
+    countExactNormalizedSeoPhrase("сверхденежная энергия", "денежная энергия") > 0,
+    false,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("(Ключ к Изобилию)", "Ключ к Изобилию") > 0,
+    true,
+  );
+  assert.equal(
+    countExactNormalizedSeoPhrase("Ключ к Изобилию,", "Ключ к Изобилию") > 0,
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: "сон",
+      productTitle: "Вечерняя практика",
+      usageItems: [{ content: "Материал подходит для спокойного вечера при бессоннице." }],
+      faqItems: [{ question: "Когда слушать?", answer: "Вечером." }],
+    }).primaryOveruse,
+    false,
+  );
+
+  const KEY_PRIMARY = "Ключ к Изобилию";
+  const keyToAbundanceRequest = requestInput({
+    title: "Ключ к Изобилию",
+    seoPrimaryQuery: KEY_PRIMARY,
+    seoSecondaryQueries: [
+      "мощная медитация изобилия",
+      "медитация поток изобилия",
+    ],
+  });
+  const keyToAbundanceOverusedDraft = {
+    seoTitle: "Ключ к Изобилию – аудиопрактика для мягкого настроя",
+    seoDescription:
+      "Ключ к Изобилию помогает мягко настроиться на спокойное внимание к теме достатка и внутреннему состоянию.",
+    usageItems: [
+      { content: "Используйте «Ключ к Изобилию», чтобы настроиться на спокойный день." },
+      { content: "Практикуйте «Ключ к Изобилию» после напряжённого разговора." },
+      { content: "Применяйте «Ключ к Изобилию» во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» – это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» подойдёт тем, кто хочет мягко познакомиться с темой.",
+        anchor: "komu",
+      },
+      {
+        question: "Когда лучше слушать «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» можно включать в спокойное время.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  const keyToAbundanceNaturalDraft = {
+    seoTitle: "CHANGED TITLE Ключ к Изобилию не должен примениться",
+    seoDescription:
+      "CHANGED DESC Ключ к Изобилию не должен переписать валидное описание продукта.",
+    usageItems: [
+      {
+        content:
+          "Используйте практику, чтобы настроиться на спокойный день через мощную медитацию изобилия.",
+      },
+      { content: "Включайте аудиопрактику после напряжённого разговора." },
+      { content: "Возвращайтесь к материалу во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "CHANGED Q1 Ключ к Изобилию?",
+        answer: "Это аудиопрактика для спокойной настройки на тему.",
+        anchor: "changed-q1",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
+        anchor: "changed-q2",
+      },
+      {
+        question: "Когда лучше её слушать?",
+        answer: "Материал можно включать, когда хочется опереться на медитацию поток изобилия.",
+        anchor: "changed-q3",
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: keyToAbundanceOverusedDraft.usageItems,
+      faqItems: keyToAbundanceOverusedDraft.faqItems,
+    }),
+    {
+      primaryOveruse: true,
+      titleEqualsPrimary: true,
+      overusedUsageIndexes: [0, 1, 2],
+      overusedFaqLocations: [
+        { index: 0, field: "answer" },
+        { index: 1, field: "question" },
+        { index: 1, field: "answer" },
+        { index: 2, field: "question" },
+        { index: 2, field: "answer" },
+      ],
+    },
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(
+      keyToAbundanceOverusedDraft,
+      validationInput(keyToAbundanceRequest),
+    ),
+    { ok: true, draft: { ...keyToAbundanceOverusedDraft, seoSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries } },
+  );
+  assert.deepEqual(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: [
+        { content: "Когда хочется почувствовать изобилие." },
+        { content: "Для работы с темой денег и финансового потока." },
+        { content: "Если нужен поток спокойного внимания." },
+      ],
+      faqItems: [
+        {
+          question: "Что такое «Ключ к Изобилию»?",
+          answer: "Это аудиопрактика про изобилие.",
+        },
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Она подойдёт тем, кому близок финансовый настрой.",
+        },
+        {
+          question: "Когда лучше её слушать?",
+          answer: "Материал можно включать, когда нужен поток.",
+        },
+      ],
+    }),
+    {
+      primaryOveruse: false,
+      titleEqualsPrimary: true,
+      overusedUsageIndexes: [],
+      overusedFaqLocations: [],
+    },
+  );
+
+  const keyToAbundanceProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: keyToAbundanceNaturalDraft, raw: {} },
+  ]);
+  const keyToAbundance = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "primary-overuse-key-to-abundance",
+    config,
+    provider: keyToAbundanceProvider,
+  });
+  assert.equal(keyToAbundance.ok, true);
+  assert.equal(keyToAbundanceProvider.calls.length, 2);
+  assert.equal(keyToAbundanceProvider.calls[1].kind, "qualityRepair");
+  assert.deepEqual(keyToAbundanceProvider.calls[1].coverage, {
+    secondary1UsageCovered: false,
+    secondary2FaqCovered: false,
+    secondary1: "мощная медитация изобилия",
+    secondary2: "медитация поток изобилия",
+    primaryOveruse: true,
+    titleEqualsPrimary: true,
+    overusedUsageIndexes: [0, 1, 2],
+    overusedFaqLocations: [
+      { index: 0, field: "answer" },
+      { index: 1, field: "question" },
+      { index: 1, field: "answer" },
+      { index: 2, field: "question" },
+      { index: 2, field: "answer" },
+    ],
+  });
+  const keyQualityPrompt = buildProductSeoQualityRepairPrompt(
+    keyToAbundanceProvider.calls[1].input,
+    keyToAbundanceProvider.calls[1].previous,
+    keyToAbundanceProvider.calls[1].coverage,
+  );
+  assert.match(keyQualityPrompt, /Черновик уже технически валиден/);
+  assert.match(
+    keyQualityPrompt,
+    /Измени только один подходящий usageItem так, чтобы он естественно отражал смысл дополнительного запроса «мощная медитация изобилия»/,
+  );
+  assert.match(
+    keyQualityPrompt,
+    /Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «медитация поток изобилия»/,
+  );
+  assert.match(
+    keyQualityPrompt,
+    /Убери точную фразу основного запроса из usageItems с индексами 0, 1, 2/,
+  );
+  assert.match(keyQualityPrompt, /Не удаляй слова вслепую и не оставляй обрывки/);
+  assert.match(
+    keyQualityPrompt,
+    /Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription и Q1\.question/,
+  );
+  assert.equal(keyToAbundance.data.seoTitle, keyToAbundanceOverusedDraft.seoTitle);
+  assert.equal(
+    keyToAbundance.data.seoDescription,
+    keyToAbundanceOverusedDraft.seoDescription,
+  );
+  assert.equal(
+    keyToAbundance.data.faqItems[0].question,
+    keyToAbundanceOverusedDraft.faqItems[0].question,
+  );
+  assert.deepEqual(
+    keyToAbundance.data.faqItems.map((item) => item.anchor),
+    ["chto", "komu", "kogda"],
+  );
+  assert.deepEqual(keyToAbundance.data.usageItems, keyToAbundanceNaturalDraft.usageItems);
+  assert.equal(
+    keyToAbundance.data.faqItems[0].answer,
+    keyToAbundanceNaturalDraft.faqItems[0].answer,
+  );
+  assert.equal(
+    keyToAbundance.data.faqItems[1].question,
+    keyToAbundanceNaturalDraft.faqItems[1].question,
+  );
+  assert.equal(
+    keyToAbundance.data.faqItems[1].answer,
+    keyToAbundanceNaturalDraft.faqItems[1].answer,
+  );
+  assert.equal(
+    keyToAbundance.data.faqItems[2].question,
+    keyToAbundanceNaturalDraft.faqItems[2].question,
+  );
+  assert.equal(
+    keyToAbundance.data.faqItems[2].answer,
+    keyToAbundanceNaturalDraft.faqItems[2].answer,
+  );
+  for (const item of keyToAbundance.data.usageItems) {
+    assert.equal(containsSeoPhrase(item.content, KEY_PRIMARY), false, item.content);
+  }
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[0].answer, KEY_PRIMARY),
+    false,
+  );
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[1].question, KEY_PRIMARY),
+    false,
+  );
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[1].answer, KEY_PRIMARY),
+    false,
+  );
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[2].question, KEY_PRIMARY),
+    false,
+  );
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[2].answer, KEY_PRIMARY),
+    false,
+  );
+  assert.equal(containsSeoPhrase(keyToAbundance.data.seoTitle, KEY_PRIMARY), true);
+  assert.equal(containsSeoPhrase(keyToAbundance.data.seoDescription, KEY_PRIMARY), true);
+  assert.equal(
+    containsSeoPhrase(keyToAbundance.data.faqItems[0].question, KEY_PRIMARY),
+    true,
+  );
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: KEY_PRIMARY,
+        activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+        usageItems: keyToAbundance.data.usageItems,
+        faqItems: keyToAbundance.data.faqItems,
+      }),
+      2,
+    ),
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: keyToAbundance.data.usageItems,
+      faqItems: keyToAbundance.data.faqItems,
+    }).primaryOveruse,
+    false,
+  );
+
+  const stillOverusedChangedDraft = {
+    ...keyToAbundanceNaturalDraft,
+    usageItems: [
+      keyToAbundanceNaturalDraft.usageItems[0],
+      keyToAbundanceNaturalDraft.usageItems[1],
+      { content: "Применяйте «Ключ к Изобилию» вечером в новой формулировке." },
+    ],
+  };
+  assert.notEqual(
+    stillOverusedChangedDraft.usageItems[0].content,
+    keyToAbundanceOverusedDraft.usageItems[0].content,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: stillOverusedChangedDraft.usageItems,
+      faqItems: [
+        keyToAbundanceOverusedDraft.faqItems[0],
+        stillOverusedChangedDraft.faqItems[1],
+        stillOverusedChangedDraft.faqItems[2],
+      ],
+    }).primaryOveruse,
+    true,
+  );
+  const stillOverusedProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: stillOverusedChangedDraft, raw: {} },
+  ]);
+  const stillOverused = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "primary-overuse-still-present-fallback",
+    config,
+    provider: stillOverusedProvider,
+  });
+  assert.equal(stillOverused.ok, true);
+  assert.equal(stillOverused.error, undefined);
+  assert.equal(stillOverusedProvider.calls.length, 2);
+  assert.deepEqual(stillOverused.data.usageItems, keyToAbundanceOverusedDraft.usageItems);
+  assert.deepEqual(stillOverused.data.faqItems, keyToAbundanceOverusedDraft.faqItems);
+  assert.notEqual(
+    stillOverused.data.usageItems[2].content,
+    stillOverusedChangedDraft.usageItems[2].content,
+  );
+
+  const keyCoveredButOverusedDraft = {
+    seoTitle: keyToAbundanceOverusedDraft.seoTitle,
+    seoDescription: keyToAbundanceOverusedDraft.seoDescription,
+    usageItems: [
+      {
+        content:
+          "Используйте «Ключ к Изобилию», когда нужна мощная медитация изобилия.",
+      },
+      { content: "Практикуйте материал после напряжённого разговора." },
+      { content: "Возвращайтесь к записи во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
+        anchor: "komu",
+      },
+      {
+        question: "Когда лучше её слушать?",
+        answer: "Материал можно включать, когда хочется опереться на медитацию поток изобилия.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  assert.deepEqual(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: keyCoveredButOverusedDraft.usageItems,
+      faqItems: keyCoveredButOverusedDraft.faqItems,
+    }),
+    { secondary1UsageCovered: true, secondary2FaqCovered: true },
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: keyCoveredButOverusedDraft.usageItems,
+      faqItems: keyCoveredButOverusedDraft.faqItems,
+    }).primaryOveruse,
+    true,
+  );
+  const primaryFixedSecondaryLostDraft = {
+    ...keyCoveredButOverusedDraft,
+    seoTitle: "CHANGED TITLE Ключ к Изобилию не должен примениться",
+    usageItems: [
+      { content: "Используйте практику, чтобы спокойно настроиться на день." },
+      keyCoveredButOverusedDraft.usageItems[1],
+      keyCoveredButOverusedDraft.usageItems[2],
+    ],
+  };
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: primaryFixedSecondaryLostDraft.usageItems,
+      faqItems: primaryFixedSecondaryLostDraft.faqItems,
+    }).secondary1UsageCovered,
+    false,
+  );
+  const primaryFixBreaksSecondaryProvider = mockProvider([
+    { ok: true, draft: keyCoveredButOverusedDraft, raw: {} },
+    { ok: true, draft: primaryFixedSecondaryLostDraft, raw: {} },
+  ]);
+  const primaryFixBreaksSecondary = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "quality-repair-primary-fix-breaks-secondary",
+    config,
+    provider: primaryFixBreaksSecondaryProvider,
+  });
+  assert.equal(primaryFixBreaksSecondary.ok, true);
+  assert.equal(primaryFixBreaksSecondary.error, undefined);
+  assert.equal(primaryFixBreaksSecondaryProvider.calls.length, 2);
+  assert.deepEqual(
+    primaryFixBreaksSecondary.data.usageItems,
+    keyCoveredButOverusedDraft.usageItems,
+  );
+  assert.match(primaryFixBreaksSecondary.data.usageItems[0].content, /Ключ к Изобилию/);
+  assert.match(primaryFixBreaksSecondary.data.usageItems[0].content, /мощн/);
+
+  const secondariesFixedPrimaryLeftDraft = {
+    ...keyToAbundanceNaturalDraft,
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      {
+        ...keyToAbundanceNaturalDraft.faqItems[1],
+        question: "Когда слушать «Ключ к Изобилию»?",
+      },
+      keyToAbundanceNaturalDraft.faqItems[2],
+    ],
+  };
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: KEY_PRIMARY,
+        activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+        usageItems: secondariesFixedPrimaryLeftDraft.usageItems,
+        faqItems: [
+          keyToAbundanceOverusedDraft.faqItems[0],
+          secondariesFixedPrimaryLeftDraft.faqItems[1],
+          secondariesFixedPrimaryLeftDraft.faqItems[2],
+        ],
+      }),
+      2,
+    ),
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: secondariesFixedPrimaryLeftDraft.usageItems,
+      faqItems: [
+        keyToAbundanceOverusedDraft.faqItems[0],
+        secondariesFixedPrimaryLeftDraft.faqItems[1],
+        secondariesFixedPrimaryLeftDraft.faqItems[2],
+      ],
+    }).primaryOveruse,
+    true,
+  );
+  const secondaryFixLeavesPrimaryProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: secondariesFixedPrimaryLeftDraft, raw: {} },
+  ]);
+  const secondaryFixLeavesPrimary = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "quality-repair-secondary-fix-leaves-primary",
+    config,
+    provider: secondaryFixLeavesPrimaryProvider,
+  });
+  assert.equal(secondaryFixLeavesPrimary.ok, true);
+  assert.equal(secondaryFixLeavesPrimary.error, undefined);
+  assert.deepEqual(
+    secondaryFixLeavesPrimary.data.usageItems,
+    keyToAbundanceOverusedDraft.usageItems,
+  );
+  assert.deepEqual(
+    secondaryFixLeavesPrimary.data.faqItems,
+    keyToAbundanceOverusedDraft.faqItems,
+  );
+
+  const malformedPrimaryOveruseProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    productSeoAiInvalidOutputError({ stage: "provider_repair", generateIssues: [] }),
+  ]);
+  const malformedPrimaryOveruse = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "primary-overuse-malformed-fallback",
+    config,
+    provider: malformedPrimaryOveruseProvider,
+  });
+  assert.equal(malformedPrimaryOveruse.ok, true);
+  assert.equal(malformedPrimaryOveruse.error, undefined);
+  assert.deepEqual(
+    malformedPrimaryOveruse.data.usageItems,
+    keyToAbundanceOverusedDraft.usageItems,
+  );
+
+  const invalidPrimaryOveruseProvider = mockProvider([
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    {
+      ok: true,
+      draft: {
+        ...keyToAbundanceNaturalDraft,
+        usageItems: [
+          {
+            content:
+              "Используйте практику, чтобы настроиться. Практика лечит бессонницу.",
+          },
+          keyToAbundanceNaturalDraft.usageItems[1],
+          keyToAbundanceNaturalDraft.usageItems[2],
+        ],
+      },
+      raw: {},
+    },
+  ]);
+  const invalidPrimaryOveruse = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "primary-overuse-banned-fallback",
+    config,
+    provider: invalidPrimaryOveruseProvider,
+  });
+  assert.equal(invalidPrimaryOveruse.ok, true);
+  assert.equal(invalidPrimaryOveruse.error, undefined);
+  assert.deepEqual(
+    invalidPrimaryOveruse.data.usageItems,
+    keyToAbundanceOverusedDraft.usageItems,
+  );
+
+  const hardThenQualityProvider = mockProvider([
+    {
+      ok: true,
+      draft: {
+        ...keyToAbundanceOverusedDraft,
+        faqItems: keyToAbundanceOverusedDraft.faqItems.map((item, index) =>
+          index ? item : { ...item, answer: item.question },
+        ),
+      },
+      raw: {},
+    },
+    { ok: true, draft: keyToAbundanceOverusedDraft, raw: {} },
+    { ok: true, draft: keyToAbundanceNaturalDraft, raw: {} },
+  ]);
+  const hardThenQuality = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "primary-overuse-hard-then-quality",
+    config,
+    provider: hardThenQualityProvider,
+  });
+  assert.equal(hardThenQuality.ok, true);
+  assert.equal(hardThenQualityProvider.calls.length, 3);
+  assert.equal(hardThenQualityProvider.calls[1].kind, "repair");
+  assert.equal(hardThenQualityProvider.calls[2].kind, "qualityRepair");
+  assert.equal(hardThenQuality.data.seoTitle, keyToAbundanceOverusedDraft.seoTitle);
+  assert.deepEqual(hardThenQuality.data.usageItems, keyToAbundanceNaturalDraft.usageItems);
+
+  const primaryNotTitle = "медитация на изобилие";
+  const primaryNotTitleRequest = requestInput({
+    title: "Ключ к Изобилию",
+    seoPrimaryQuery: primaryNotTitle,
+    seoSecondaryQueries: [],
+  });
+  const primaryNotTitleDraft = {
+    seoTitle: "медитация на изобилие перед вечерним настроем",
+    seoDescription:
+      "медитация на изобилие помогает мягко настроиться и уделить внимание спокойному вечеру.",
+    usageItems: [
+      { content: "Используйте «Ключ к Изобилию», чтобы настроиться на спокойный день." },
+      { content: "Практикуйте материал после напряжённого разговора." },
+      { content: "Возвращайтесь к записи во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое медитация на изобилие в этой практике?",
+        answer: "Это аудиопрактика «Ключ к Изобилию» для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кому откликается тема «Ключ к Изобилию».",
+        anchor: "komu",
+      },
+      {
+        question: "Когда лучше её слушать?",
+        answer: "Материал «Ключ к Изобилию» можно включать в спокойное время.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  assert.deepEqual(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: primaryNotTitle,
+      productTitle: "Ключ к Изобилию",
+      usageItems: primaryNotTitleDraft.usageItems,
+      faqItems: primaryNotTitleDraft.faqItems,
+    }),
+    {
+      primaryOveruse: false,
+      titleEqualsPrimary: false,
+      overusedUsageIndexes: [],
+      overusedFaqLocations: [],
+    },
+  );
+  const primaryNotTitleProvider = mockProvider([
+    { ok: true, draft: primaryNotTitleDraft, raw: {} },
+  ]);
+  const primaryNotTitleResult = await generateProductSeoDraft(primaryNotTitleRequest, {
+    userId: "primary-not-title-title-allowed",
+    config,
+    provider: primaryNotTitleProvider,
+  });
+  assert.equal(primaryNotTitleResult.ok, true);
+  assert.equal(primaryNotTitleProvider.calls.length, 1);
+  assert.equal(
+    primaryNotTitleResult.data.usageItems[0].content.includes("Ключ к Изобилию"),
+    true,
+  );
+
+  const primaryNotTitleOverusedDraft = {
+    ...primaryNotTitleDraft,
+    usageItems: [
+      { content: "Используйте медитация на изобилие, чтобы настроиться." },
+      { content: "Практикуйте медитация на изобилие после разговора." },
+      { content: "Применяйте медитация на изобилие вечером." },
+    ],
+  };
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: primaryNotTitle,
+      productTitle: "Ключ к Изобилию",
+      usageItems: primaryNotTitleOverusedDraft.usageItems,
+      faqItems: primaryNotTitleOverusedDraft.faqItems,
+    }).primaryOveruse,
+    true,
+  );
+  const primaryNotTitleOveruseProvider = mockProvider([
+    { ok: true, draft: primaryNotTitleOverusedDraft, raw: {} },
+    {
+      ok: true,
+      draft: {
+        ...primaryNotTitleOverusedDraft,
+        usageItems: primaryNotTitleDraft.usageItems,
+      },
+      raw: {},
+    },
+  ]);
+  const primaryNotTitleOveruse = await generateProductSeoDraft(primaryNotTitleRequest, {
+    userId: "primary-not-title-overuse-repair",
+    config,
+    provider: primaryNotTitleOveruseProvider,
+  });
+  assert.equal(primaryNotTitleOveruse.ok, true);
+  assert.equal(primaryNotTitleOveruseProvider.calls.length, 2);
+  assert.equal(primaryNotTitleOveruseProvider.calls[1].kind, "qualityRepair");
+  assert.equal(primaryNotTitleOveruseProvider.calls[1].coverage.titleEqualsPrimary, false);
+  assert.deepEqual(primaryNotTitleOveruse.data.usageItems, primaryNotTitleDraft.usageItems);
+
+  const noPrimaryTitleRepeatDraft = validDraft({
+    seoTitle: "Спокойный вечер для мягкого завершения дня и отдыха",
+    seoDescription:
+      "Аудиопрактика помогает мягко завершить день и настроиться на спокойный вечерний отдых без лишней спешки.",
+    usageItems: [
+      { content: "Используйте «Ключ к Изобилию», чтобы настроиться." },
+      { content: "Практикуйте «Ключ к Изобилию» вечером." },
+      { content: "Применяйте «Ключ к Изобилию» после разговора." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» – аудиоматериал.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» подойдёт тем, кому откликается тема.",
+        anchor: "komu",
+      },
+      {
+        question: "Когда слушать «Ключ к Изобилию»?",
+        answer: "«Ключ к Изобилию» можно включать вечером.",
+        anchor: "kogda",
+      },
+    ],
+  });
+  assert.deepEqual(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: "",
+      productTitle: "Ключ к Изобилию",
+      usageItems: noPrimaryTitleRepeatDraft.usageItems,
+      faqItems: noPrimaryTitleRepeatDraft.faqItems,
+    }),
+    {
+      primaryOveruse: false,
+      titleEqualsPrimary: false,
+      overusedUsageIndexes: [],
+      overusedFaqLocations: [],
+    },
+  );
+  const noPrimaryProvider = mockProvider([
+    { ok: true, draft: noPrimaryTitleRepeatDraft, raw: {} },
+  ]);
+  const noPrimaryOveruse = await generateProductSeoDraft(
+    requestInput({
+      title: "Ключ к Изобилию",
+      seoPrimaryQuery: "",
+      seoSecondaryQueries: [],
+    }),
+    {
+      userId: "no-primary-no-overuse-rules",
+      config,
+      provider: noPrimaryProvider,
+    },
+  );
+  assert.equal(noPrimaryOveruse.ok, true);
+  assert.equal(noPrimaryProvider.calls.length, 1);
+  assert.deepEqual(noPrimaryOveruse.data.usageItems, noPrimaryTitleRepeatDraft.usageItems);
+
   const validateSource = read("src/lib/seo/product-autofill/validate.ts");
   assert.doesNotMatch(validateSource, /evaluateSecondaryQueryCoverage/);
   assert.doesNotMatch(validateSource, /secondary1UsageCovered/);
   assert.doesNotMatch(validateSource, /secondary_coverage/);
+  assert.doesNotMatch(validateSource, /evaluatePrimaryQueryOveruse/);
+  assert.doesNotMatch(validateSource, /primaryOveruse/);
+  assert.doesNotMatch(validateSource, /primary_overuse/);
 }
 
 console.log("product-seo-autofill-unit: ok");
