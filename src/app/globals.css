@@ -45,17 +45,19 @@
   padding-bottom: var(--platform-bottom-content-padding);
 }
 
-/* Analytics consent sits above BottomNav + mini-player on mobile; desktop has no that chrome. */
+/*
+ * Keep the mobile consent dialog away from the primary product CTA. When
+ * consent is unknown, the dialog remains fully interactive, but the hero
+ * CTA must stay a real pointer target instead of sitting under it.
+ */
 .analytics-consent-banner {
-  bottom: calc(
-    var(--bottom-nav-main-height) + var(--global-mini-player-height, 0px) +
-      env(safe-area-inset-bottom, 0px) + var(--bottom-nav-viewport-offset, 0px) +
-      20px
-  );
+  top: max(1rem, env(safe-area-inset-top, 0px));
+  bottom: auto;
 }
 
 @media (min-width: 1280px) {
   .analytics-consent-banner {
+    top: auto;
     bottom: 1rem;
   }
 }
