@@ -103,34 +103,47 @@ export type ProductSeoInvalidOutputDiagnostic =
       repairIssues: string[];
     }
   | {
-      stage: "validation_final_faq_repair";
+      /** The safe local finalizer could not resolve all remaining issues. */
+      stage: "validation_finalizer";
       /** Category-only issues from the initial validation; never generated or user-provided text. */
       generateIssues: string[];
       /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
       repairIssues: string[];
-      /** Category-only issues from the final FAQ-answer-only repair validation; never generated or user-provided text. */
+      /** Category-only issues after safe local finalization; never generated or user-provided text. */
+      finalizerIssues: string[];
+    }
+  | {
+      /** The generic third provider repair and its final safe pass were invalid. */
+      stage: "validation_third_repair";
+      /** Category-only issues from the initial validation; never generated or user-provided text. */
+      generateIssues: string[];
+      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
+      repairIssues: string[];
+      /** Category-only issues after the first safe local finalization; never generated or user-provided text. */
+      finalizerIssues: string[];
+      /** Category-only issues after the generic third provider repair and final safe pass; never generated or user-provided text. */
+      thirdRepairIssues: string[];
+    }
+  | {
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
+      stage: "validation_final_faq_repair";
+      generateIssues: string[];
+      repairIssues: string[];
       finalFaqRepairIssues: string[];
     }
   | {
-      /** A local, deterministic FAQ answer fallback was still invalid. */
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
       stage: "validation_deterministic_faq_fallback";
-      /** Category-only issues from the initial validation; never generated or user-provided text. */
       generateIssues: string[];
-      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
       repairIssues: string[];
-      /** Category-only issues from the final FAQ-answer-only repair validation; never generated or user-provided text. */
       finalFaqRepairIssues: string[];
-      /** Category-only issues from validating the local fallback; never generated or user-provided text. */
       deterministicFaqFallbackIssues: string[];
     }
   | {
-      /** A local, deterministic description shortening fallback was still invalid. */
+      /** Legacy diagnostic retained for callers handling earlier reliability stages. */
       stage: "validation_deterministic_description_shorten";
-      /** Category-only issues from the initial validation; never generated or user-provided text. */
       generateIssues: string[];
-      /** Category-only issues from the first repaired draft validation; never generated or user-provided text. */
       repairIssues: string[];
-      /** Category-only issues from validating the local fallback; never generated or user-provided text. */
       deterministicDescriptionShortenIssues: string[];
     };
 

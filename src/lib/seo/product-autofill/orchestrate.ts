@@ -26,6 +26,7 @@ import {
   validateProductSeoAiDraft,
 } from "@/lib/seo/product-autofill/validate";
 import { containsSeoPhrase } from "@/lib/seo/product-metadata";
+import { applyProductSeoDraftRussianTypography } from "@/lib/seo/product-autofill/typography";
 import {
   type ProductSeoAiErrorCode,
   type ProductSeoAiRawDraft,
@@ -76,9 +77,8 @@ function logProductSeoAiValidationFailed(input: {
   stage:
     | "generate"
     | "repair"
-    | "final_faq_repair"
-    | "deterministic_faq_fallback"
-    | "deterministic_description_shorten";
+    | "finalizer"
+    | "third_repair";
   issues: string[];
 }): void {
   logProductSeoAiEvent("product_seo_ai_validation_failed", {
@@ -239,6 +239,25 @@ export async function generateProductSeoDraft(
       styleProfile,
     },
   };
+  // The author-owned primary can be copied into generated display fields; its
+  // literal spelling is protected while all other AI-generated copy is set.
+  const protectedTypographyPhrases = [primary];
+
+  function normalizeGeneratedDraft(draft: ProductSeoAiRawDraft): ProductSeoAiRawDraft {
+    return applyProductSeoDraftRussianTypography(draft, protectedTypographyPhrases);
+  }
+
+  function validateDraft(draft: ProductSeoAiRawDraft) {
+    return validateProductSeoAiDraft(draft, {
+      primaryQuery: primary,
+      title: request.title,
+      subtitle: request.subtitle,
+      description: request.description,
+      productKind: request.productKind,
+      usageItems: request.usageItems ?? [],
+      manualSecondaryQueries,
+    });
+  }
 
   function hasOnlyFaqAnswerRepairIssues(issues: string[]): boolean {
     return (
@@ -331,7 +350,8 @@ export async function generateProductSeoDraft(
     return {
       ...draft,
       faqItems: draft.faqItems.map((item) =>
-        faqAnswerIsQuestion(item.answer)
+        faqAnswerIsQuestion(item.answer) ||
+        faqAnswerRepeatsQuestion(item.question, item.answer)
           ? (() => {
               const answer =
                 salvageDeterministicFaqAnswer(item.question, item.answer) ??
@@ -345,18 +365,13 @@ export async function generateProductSeoDraft(
     };
   }
 
-  function shortenDescriptionDeterministically(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    const description = draft.seoDescription.trim();
-    if (description.length <= PRODUCT_CONTENT_LIMITS.seoDescription) {
-      return draft;
+  function shortenTextDeterministically(value: string, limit: number): string | null {
+    const text = value.trim();
+    if (text.length <= limit) {
+      return text || null;
     }
 
-    const allowedPrefix = description.slice(
-      0,
-      PRODUCT_CONTENT_LIMITS.seoDescription + 1,
-    );
+    const allowedPrefix = text.slice(0, limit + 1);
     const lastSentenceBoundary = Math.max(
       allowedPrefix.lastIndexOf("."),
       allowedPrefix.lastIndexOf("!"),
@@ -368,27 +383,92 @@ export async function generateProductSeoDraft(
         : null;
     const wordBoundary = allowedPrefix.lastIndexOf(" ");
     const shortenedAtWordBoundary =
-      wordBoundary > 0
-        ? allowedPrefix.slice(0, wordBoundary).trim()
-        : null;
-    const shortened =
+      wordBoundary > 0 ? allowedPrefix.slice(0, wordBoundary).trim() : null;
+
+    return (
       shortenedAtSentenceBoundary ??
       shortenedAtWordBoundary ??
-      description.slice(0, PRODUCT_CONTENT_LIMITS.seoDescription).trim();
+      text.slice(0, limit).trim() ??
+      null
+    );
+  }
 
-    // Match the primary exactly as the validator does. A failed local fallback
-    // remains fail-closed with diagnostics.
-    if (
-      !shortened ||
-      shortened.length > PRODUCT_CONTENT_LIMITS.seoDescription ||
-      (primary &&
-        (!containsSeoPhrase(description, primary) ||
-          !containsSeoPhrase(shortened, primary)))
-    ) {
-      return draft;
+  /**
+   * Moves the author-owned primary to the beginning and retains as much of the
+   * generated suffix as the field limit permits. If the generated value
+   * already contains the primary, only its suffix is reused, so the primary
+   * remains literal and is not duplicated.
+   */
+  function prependPrimaryAndShorten(value: string, limit: number): string | null {
+    if (!primary || primary.length > limit) {
+      return null;
     }
 
-    return { ...draft, seoDescription: shortened };
+    const text = value.trim();
+    const primaryIndex = text
+      .toLocaleLowerCase("ru-RU")
+      .indexOf(primary.toLocaleLowerCase("ru-RU"));
+    const suffix = (
+      primaryIndex >= 0 ? text.slice(primaryIndex + primary.length) : text
+    ).replace(/^[\s–—:;,.!?-]+/, "").trim();
+    if (!suffix) {
+      return primary;
+    }
+
+    const separator = " – ";
+    const shortenedSuffix = shortenTextDeterministically(
+      suffix,
+      limit - primary.length - separator.length,
+    );
+    return shortenedSuffix ? `${primary}${separator}${shortenedSuffix}` : primary;
+  }
+
+  const SAFE_FINALIZER_ISSUES = new Set([
+    "title_too_long",
+    "primary_missing_from_title",
+    "description_too_long",
+    "primary_missing_from_description",
+    "faq_answer_repeats_question",
+    "faq_answer_is_question",
+  ]);
+
+  /**
+   * Applies only local transformations whose validity can be proved by the
+   * validator. It never changes author input, anchors, FAQ questions, or
+   * otherwise-valid draft fields.
+   */
+  function finalizeDraftSafely(
+    draft: ProductSeoAiRawDraft,
+    issues: string[],
+  ): ProductSeoAiRawDraft {
+    let finalized = draft;
+    if (
+      issues.includes("title_too_long") ||
+      issues.includes("primary_missing_from_title")
+    ) {
+      const seoTitle = prependPrimaryAndShorten(
+        finalized.seoTitle,
+        PRODUCT_CONTENT_LIMITS.seoTitle,
+      );
+      finalized = seoTitle ? { ...finalized, seoTitle } : finalized;
+    }
+    if (
+      issues.includes("description_too_long") ||
+      issues.includes("primary_missing_from_description")
+    ) {
+      const seoDescription = prependPrimaryAndShorten(
+        finalized.seoDescription,
+        PRODUCT_CONTENT_LIMITS.seoDescription,
+      );
+      finalized = seoDescription ? { ...finalized, seoDescription } : finalized;
+    }
+    if (
+      issues.includes("faq_answer_is_question") ||
+      issues.includes("faq_answer_repeats_question")
+    ) {
+      finalized = applyDeterministicFaqAnswerFallback(finalized);
+    }
+    return normalizeGeneratedDraft(finalized);
   }
 
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
@@ -397,16 +477,8 @@ export async function generateProductSeoDraft(
     return first;
   }
 
-  const firstDraft = first.draft;
-  const firstValidation = validateProductSeoAiDraft(firstDraft, {
-    primaryQuery: primary,
-    title: request.title,
-    subtitle: request.subtitle,
-    description: request.description,
-    productKind: request.productKind,
-    usageItems: request.usageItems ?? [],
-    manualSecondaryQueries,
-  });
+  const firstDraft = normalizeGeneratedDraft(first.draft);
+  const firstValidation = validateDraft(firstDraft);
 
   if (firstValidation.ok) {
     return { ok: true, data: firstValidation.draft };
@@ -421,7 +493,7 @@ export async function generateProductSeoDraft(
 
   const repaired = await provider.repair(
     promptInput,
-    first.draft,
+    firstDraft,
     firstValidation.issues,
   );
   if (!repaired.ok) {
@@ -429,19 +501,11 @@ export async function generateProductSeoDraft(
   }
 
   const repairedDraft = mergeFaqAnswerOnlyRepair(
-    repaired.draft,
+    normalizeGeneratedDraft(repaired.draft),
     firstDraft,
     firstValidation.issues,
   );
-  const repairedValidation = validateProductSeoAiDraft(repairedDraft, {
-    primaryQuery: primary,
-    title: request.title,
-    subtitle: request.subtitle,
-    description: request.description,
-    productKind: request.productKind,
-    usageItems: request.usageItems ?? [],
-    manualSecondaryQueries,
-  });
+  const repairedValidation = validateDraft(repairedDraft);
 
   if (!repairedValidation.ok) {
     logProductSeoAiValidationFailed({
@@ -450,129 +514,71 @@ export async function generateProductSeoDraft(
       stage: "repair",
       issues: repairedValidation.issues,
     });
-    if (
-      repairedValidation.issues.length === 1 &&
-      repairedValidation.issues[0] === "description_too_long"
-    ) {
-      const shortenedDescriptionDraft = shortenDescriptionDeterministically(repairedDraft);
-      const shortenedDescriptionValidation = validateProductSeoAiDraft(
-        shortenedDescriptionDraft,
-        {
-          primaryQuery: primary,
-          title: request.title,
-          subtitle: request.subtitle,
-          description: request.description,
-          productKind: request.productKind,
-          usageItems: request.usageItems ?? [],
-          manualSecondaryQueries,
-        },
-      );
-      if (shortenedDescriptionValidation.ok) {
-        return { ok: true, data: shortenedDescriptionValidation.draft };
-      }
-
-      logProductSeoAiValidationFailed({
-        provider: config.provider,
-        model: config.model,
-        stage: "deterministic_description_shorten",
-        issues: shortenedDescriptionValidation.issues,
-      });
-      return productSeoAiInvalidOutputError({
-        stage: "validation_deterministic_description_shorten",
-        generateIssues: firstValidation.issues,
-        repairIssues: repairedValidation.issues,
-        deterministicDescriptionShortenIssues: shortenedDescriptionValidation.issues,
-      });
-    }
-    if (hasOnlyFaqAnswerRepairIssues(repairedValidation.issues)) {
-      const finalFaqRepaired = await provider.repair(
-        promptInput,
-        repairedDraft,
-        repairedValidation.issues,
-      );
-      if (!finalFaqRepaired.ok) {
-        return finalFaqRepaired;
-      }
-
-      const finalFaqRepairedDraft = mergeFaqAnswerOnlyRepair(
-        finalFaqRepaired.draft,
-        repairedDraft,
-        repairedValidation.issues,
-      );
-      const finalFaqRepairValidation = validateProductSeoAiDraft(
-        finalFaqRepairedDraft,
-        {
-          primaryQuery: primary,
-          title: request.title,
-          subtitle: request.subtitle,
-          description: request.description,
-          productKind: request.productKind,
-          usageItems: request.usageItems ?? [],
-          manualSecondaryQueries,
-        },
-      );
-      if (finalFaqRepairValidation.ok) {
-        return { ok: true, data: finalFaqRepairValidation.draft };
-      }
-
-      logProductSeoAiValidationFailed({
-        provider: config.provider,
-        model: config.model,
-        stage: "final_faq_repair",
-        issues: finalFaqRepairValidation.issues,
-      });
-      if (
-        finalFaqRepairValidation.issues.length === 1 &&
-        finalFaqRepairValidation.issues[0] === "faq_answer_is_question"
-      ) {
-        const deterministicFaqFallbackDraft = applyDeterministicFaqAnswerFallback(
-          finalFaqRepairedDraft,
-        );
-        const deterministicFaqFallbackValidation = validateProductSeoAiDraft(
-          deterministicFaqFallbackDraft,
-          {
-            primaryQuery: primary,
-            title: request.title,
-            subtitle: request.subtitle,
-            description: request.description,
-            productKind: request.productKind,
-            usageItems: request.usageItems ?? [],
-            manualSecondaryQueries,
-          },
-        );
-        if (deterministicFaqFallbackValidation.ok) {
-          return { ok: true, data: deterministicFaqFallbackValidation.draft };
-        }
-
-        logProductSeoAiValidationFailed({
-          provider: config.provider,
-          model: config.model,
-          stage: "deterministic_faq_fallback",
-          issues: deterministicFaqFallbackValidation.issues,
-        });
-        return productSeoAiInvalidOutputError({
-          stage: "validation_deterministic_faq_fallback",
-          generateIssues: firstValidation.issues,
-          repairIssues: repairedValidation.issues,
-          finalFaqRepairIssues: finalFaqRepairValidation.issues,
-          deterministicFaqFallbackIssues: deterministicFaqFallbackValidation.issues,
-        });
-      }
-      return productSeoAiInvalidOutputError({
-        stage: "validation_final_faq_repair",
-        generateIssues: firstValidation.issues,
-        repairIssues: repairedValidation.issues,
-        finalFaqRepairIssues: finalFaqRepairValidation.issues,
-      });
+    const finalizedDraft = finalizeDraftSafely(repairedDraft, repairedValidation.issues);
+    const finalizerValidation = validateDraft(finalizedDraft);
+    if (finalizerValidation.ok) {
+      return { ok: true, data: finalizerValidation.draft };
     }
 
-    return productSeoAiInvalidOutputError(
-      {
-        stage: "validation_repair",
-        generateIssues: firstValidation.issues,
-        repairIssues: repairedValidation.issues,
-      },
+    logProductSeoAiValidationFailed({
+      provider: config.provider,
+      model: config.model,
+      stage: "finalizer",
+      issues: finalizerValidation.issues,
+    });
+    const residualNonSafeIssues = finalizerValidation.issues.filter(
+      (issue) => !SAFE_FINALIZER_ISSUES.has(issue),
     );
+    if (residualNonSafeIssues.length === 0) {
+      return productSeoAiInvalidOutputError({
+        stage: "validation_finalizer",
+        generateIssues: firstValidation.issues,
+        repairIssues: repairedValidation.issues,
+        finalizerIssues: finalizerValidation.issues,
+      });
+    }
+
+    const thirdRepair = await provider.repair(
+      promptInput,
+      finalizedDraft,
+      residualNonSafeIssues,
+    );
+    if (!thirdRepair.ok) {
+      return thirdRepair;
+    }
+
+    const thirdRepairDraft = mergeFaqAnswerOnlyRepair(
+      normalizeGeneratedDraft(thirdRepair.draft),
+      finalizedDraft,
+      finalizerValidation.issues,
+    );
+    const thirdRepairValidation = validateDraft(thirdRepairDraft);
+    if (thirdRepairValidation.ok) {
+      return { ok: true, data: thirdRepairValidation.draft };
+    }
+
+    logProductSeoAiValidationFailed({
+      provider: config.provider,
+      model: config.model,
+      stage: "third_repair",
+      issues: thirdRepairValidation.issues,
+    });
+    const finalThirdDraft = finalizeDraftSafely(
+      thirdRepairDraft,
+      thirdRepairValidation.issues,
+    );
+    const finalThirdValidation = validateDraft(finalThirdDraft);
+    if (finalThirdValidation.ok) {
+      return { ok: true, data: finalThirdValidation.draft };
+    }
+
+    return productSeoAiInvalidOutputError({
+      stage: "validation_third_repair",
+      generateIssues: firstValidation.issues,
+      repairIssues: repairedValidation.issues,
+      finalizerIssues: finalizerValidation.issues,
+      thirdRepairIssues: finalThirdValidation.issues,
+    });
   }
 
   return { ok: true, data: repairedValidation.draft };
