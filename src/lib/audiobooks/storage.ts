@@ -1,6 +1,7 @@
 import { AUDIOBOOK_LIMITS } from "./limits";
 
 export const AUDIOBOOK_FRAGMENTS_BUCKET = "audiobook-fragments";
+export const AUDIOBOOK_RENDERS_BUCKET = "audiobook-renders";
 export function normalizeAudiobookMimeType(value: unknown) {
   if (typeof value !== "string") return null;
   const mime = value.split(";", 1)[0].toLowerCase().trim().replace(/^audio\/x-m4a$/, "audio/mp4");
@@ -67,4 +68,18 @@ export function isAudiobookActiveFragmentStoragePath(
   return new RegExp(
     `^audiobooks/${authorId}/${projectId}/${chapterId}/${fragmentId}/[A-Za-zА-Яа-я0-9._-]+$`,
   ).test(path);
+}
+
+export function buildAudiobookChapterRenderStoragePath(authorId: string, projectId: string, chapterId: string, jobId: string) {
+  return `audiobooks/${authorId}/${projectId}/${chapterId}/renders/${jobId}.mp3`;
+}
+
+export function isAudiobookChapterRenderStoragePath(
+  path: string,
+  authorId: string,
+  projectId: string,
+  chapterId: string,
+  jobId: string,
+) {
+  return path === buildAudiobookChapterRenderStoragePath(authorId, projectId, chapterId, jobId);
 }

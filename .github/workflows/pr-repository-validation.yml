@@ -16,6 +16,19 @@ jobs:
   pr-repository-validation:
     name: PR Repository Validation
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_migration_test
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_migration_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - name: Materialize validated PR tree without checkout
         env:
@@ -46,6 +59,8 @@ jobs:
 
       - name: Validate PR repository
         working-directory: ${{ env.PR_WORKSPACE }}
+        env:
+          AUDIOLAD_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/audiolad_migration_test
         run: |
           npm run test:database-migrations:ci
           npm run build
