@@ -22,7 +22,7 @@ export type PrimaryQueryOveruse = {
 const UNICODE_LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
 
 function isUnicodeLetterOrNumber(char: string | null): boolean {
-  return Boolean(char) && UNICODE_LETTER_OR_NUMBER.test(char);
+  return char !== null && UNICODE_LETTER_OR_NUMBER.test(char);
 }
 
 function codePointBefore(text: string, index: number): string | null {
