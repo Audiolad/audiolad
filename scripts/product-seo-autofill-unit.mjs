@@ -14,9 +14,11 @@ import {
   productSeoAiInvalidOutputError,
 } from "../src/lib/seo/product-autofill/errors.ts";
 import {
+  finalizeProductSeoMetadataField,
   generateProductSeoDraft,
   normalizeManualSecondaryQueries,
   parseProductSeoAutofillRequest,
+  prependPrimaryAndShorten,
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
 import {
@@ -36,6 +38,7 @@ import {
   hasFilledGeneratedSeoFields,
   resolveProductSeoAccordionBadgeFromInput,
 } from "../src/lib/seo/product-autofill/ui.ts";
+import { containsSeoPhrase } from "../src/lib/seo/product-metadata.ts";
 import {
   PRODUCT_SEO_AI_DEFAULT_MODEL,
   PRODUCT_SEO_AI_DEFAULT_PROVIDER,
@@ -422,10 +425,18 @@ assert.deepEqual(PRODUCT_SEO_AI_JSON_SCHEMA.required, [
 assert.equal("secondaryQueries" in PRODUCT_SEO_AI_JSON_SCHEMA.properties, false);
 const prompt = buildProductSeoSystemPrompt({ request: parsed.request });
 assert.doesNotMatch(prompt, /Wordstat|secondaryQueries|кандидат/i);
+assert.doesNotMatch(prompt, /Не обязан использовать каждую фразу в черновике/);
 assert.match(
   prompt,
-  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Используй их только как контекст для текста: не добавляй, не удаляй, не изменяй, не переставляй и не возвращай их отдельным полем\. Не обязан использовать каждую фразу в черновике\./,
+  /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем\./,
 );
+assert.match(
+  prompt,
+  /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./,
+);
+assert.match(prompt, /Используй оба направления естественно, каждое не больше одного раза/);
+assert.match(prompt, /Максимум 3 использования дополнительных запросов во всём черновике/);
+assert.match(prompt, /Не набивай дополнительные запросы в seoTitle и seoDescription/);
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /не возвращай поле seoAbout/);
@@ -439,8 +450,17 @@ assert.match(
 );
 assert.match(
   prompt,
-  /seoDescription:.*Начинается с полного основного запроса «медитация для сна» дословно и содержит его ровно один раз/i,
+  /seoDescription:.*Содержит полный основной запрос «медитация для сна» дословно ровно один раз: встрой его естественно в первое предложение, предпочтительно ближе к началу; он не обязан быть первыми символами/i,
 );
+assert.match(
+  prompt,
+  /Точный основной запрос «медитация для сна» в черновике обычно должен встретиться только в трёх обязательных местах: ровно один раз в seoTitle, ровно один раз в seoDescription и ровно один раз в одном вопросе FAQ, обычно Q1/,
+);
+assert.match(
+  prompt,
+  /Не повторяй точный основной запрос специально в usageItems, ответах FAQ, Q2 и Q3/,
+);
+assert.doesNotMatch(prompt, /Начинается с полного основного запроса/);
 assert.match(
   buildProductSeoGrounding({ request: parsed.request }),
   /Дополнительные запросы автора: практика перед сном; Вечерняя медитация/,
@@ -449,6 +469,194 @@ assert.match(
   buildProductSeoGrounding({ request: { ...parsed.request, seoSecondaryQueries: [] } }),
   /Дополнительные запросы автора: нет/,
 );
+
+{
+  const AUTHOR_OWNED_SECONDARIES =
+    /Дополнительные поисковые фразы принадлежат автору и заданы вручную\. Это SEO-ориентиры, а не факты о продукте: не используй их как источник фактов и не делай из них утверждения о продукте\. Сохранённые значения дополнительных запросов никогда не редактируй, не удаляй, не переставляй и не возвращай изменённым списком или отдельным полем\./;
+  const STORAGE_VS_PROSE =
+    /Это правило относится только к сохранённым значениям запросов, а не к прозе черновика\. В сгенерированной прозе можно грамматически склонять или естественно перефразировать смысловое направление\./;
+  const SECONDARY_MAX_USES =
+    /Максимум 3 использования дополнительных запросов во всём черновике\. Каждую выбранную фразу — не больше одного раза/;
+  const SECONDARY_NOT_FACTS =
+    /Дополнительные запросы — SEO-направления, а не факты\. Не выводи из них утверждения, которых нет в описании продукта/;
+  const SECONDARY_NOT_IN_TITLE_DESCRIPTION =
+    /Не набивай дополнительные запросы в seoTitle и seoDescription: там уже есть основной запрос/;
+  const OVERLAP_VERBATIM =
+    /Не используй такой дополнительный запрос дословно вне трёх обязательных мест основного запроса: seoTitle, seoDescription и один вопрос FAQ, обычно Q1/;
+  const OVERLAP_PREFER_NON_OVERLAPPING =
+    /Предпочитай другие релевантные дополнительные направления, которые не повторяют точный основной запрос/;
+  const OVERLAP_REPHRASE =
+    /Если это смысловое направление полезно или это единственный дополнительный запрос, склони или естественно перефразируй его так, чтобы точная фраза основного запроса не повторилась/;
+  const OVERLAP_EXAMPLE =
+    /Пример: не «Для настройки на канал денежная энергия\.\.\.», а «Для работы с темой денежного канала\.\.\.»/;
+  const OVERLAP_BUDGET_PRIORITY =
+    /Бюджет точного основного запроса важнее дословной формулировки дополнительного запроса/;
+  const MONEY_PRIMARY = "денежная энергия";
+  const MONEY_SECONDARIES = [
+    "канал денежная энергия",
+    "денежный поток энергии",
+    "энергия денежных средств",
+    "энергия входа в денежный канал",
+  ];
+  const moneyRequest = {
+    ...requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: MONEY_SECONDARIES,
+    }),
+  };
+
+  function assertOverlapContract(systemPrompt, expectedOverlapPhrases) {
+    for (const phrase of expectedOverlapPhrases) {
+      assert.match(
+        systemPrompt,
+        new RegExp(`Дополнительный запрос «${phrase}» содержит точный основной запрос непрерывной фразой`),
+      );
+    }
+    assert.match(systemPrompt, OVERLAP_VERBATIM);
+    assert.match(systemPrompt, OVERLAP_PREFER_NON_OVERLAPPING);
+    assert.match(systemPrompt, OVERLAP_REPHRASE);
+    assert.match(systemPrompt, OVERLAP_EXAMPLE);
+    assert.match(systemPrompt, OVERLAP_BUDGET_PRIORITY);
+    assert.match(
+      systemPrompt,
+      /Никакой дополнительный запрос не должен создавать ещё одно точное вхождение основного запроса вне seoTitle, seoDescription и Q1/,
+    );
+    assert.match(systemPrompt, AUTHOR_OWNED_SECONDARIES);
+    assert.match(systemPrompt, STORAGE_VS_PROSE);
+    assert.match(systemPrompt, SECONDARY_MAX_USES);
+  }
+
+  const zeroSecondaryPrompt = buildProductSeoSystemPrompt({
+    request: { ...parsed.request, seoSecondaryQueries: [] },
+  });
+  assert.match(zeroSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
+  assert.doesNotMatch(zeroSecondaryPrompt, STORAGE_VS_PROSE);
+  assert.doesNotMatch(zeroSecondaryPrompt, /Не обязан использовать каждую фразу в черновике/);
+  assert.doesNotMatch(zeroSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.doesNotMatch(
+    zeroSecondaryPrompt,
+    /Используй это направление естественно один раз|Используй оба направления естественно|Используй 2–3 РАЗНЫХ дополнительных направления/,
+  );
+  assert.doesNotMatch(zeroSecondaryPrompt, OVERLAP_VERBATIM);
+
+  const oneSecondaryPrompt = buildProductSeoSystemPrompt({
+    request: { ...parsed.request, seoSecondaryQueries: ["практика перед сном"] },
+  });
+  assert.match(oneSecondaryPrompt, AUTHOR_OWNED_SECONDARIES);
+  assert.match(oneSecondaryPrompt, STORAGE_VS_PROSE);
+  assert.match(oneSecondaryPrompt, /Используй это направление естественно один раз/);
+  assert.match(oneSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.match(oneSecondaryPrompt, SECONDARY_NOT_FACTS);
+  assert.match(oneSecondaryPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.doesNotMatch(oneSecondaryPrompt, OVERLAP_VERBATIM);
+
+  const twoSecondaryPrompt = buildProductSeoSystemPrompt({
+    request: parsed.request,
+  });
+  assert.match(twoSecondaryPrompt, /Используй оба направления естественно, каждое не больше одного раза/);
+  assert.match(twoSecondaryPrompt, STORAGE_VS_PROSE);
+  assert.match(twoSecondaryPrompt, SECONDARY_MAX_USES);
+  assert.doesNotMatch(twoSecondaryPrompt, OVERLAP_VERBATIM);
+
+  const moneyPrompt = buildProductSeoSystemPrompt({ request: moneyRequest });
+  assert.match(
+    moneyPrompt,
+    /Используй 2–3 РАЗНЫХ дополнительных направления естественно\. Приоритет выбора: \(1\) смысловая релевантность \(2\) естественный русский \(3\) порядок автора как разрешающий критерий/,
+  );
+  assert.match(moneyPrompt, SECONDARY_MAX_USES);
+  assert.match(moneyPrompt, SECONDARY_NOT_FACTS);
+  assert.match(moneyPrompt, SECONDARY_NOT_IN_TITLE_DESCRIPTION);
+  assert.match(
+    moneyPrompt,
+    /Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, она\/её\)/,
+  );
+  assert.doesNotMatch(moneyPrompt, /Не обязан использовать каждую фразу в черновике/);
+  assertOverlapContract(moneyPrompt, ["канал денежная энергия"]);
+  assert.doesNotMatch(
+    moneyPrompt,
+    /Дополнительный запрос «денежный поток энергии» содержит точный основной запрос/,
+  );
+
+  const oneOverlappingPrompt = buildProductSeoSystemPrompt({
+    request: requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: ["канал денежная энергия"],
+    }),
+  });
+  assert.match(oneOverlappingPrompt, /Используй это направление естественно один раз/);
+  assertOverlapContract(oneOverlappingPrompt, ["канал денежная энергия"]);
+
+  const twoWithOverlapPrompt = buildProductSeoSystemPrompt({
+    request: requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: ["канал денежная энергия", "денежный поток энергии"],
+    }),
+  });
+  assert.match(
+    twoWithOverlapPrompt,
+    /Используй оба направления естественно, каждое не больше одного раза/,
+  );
+  assertOverlapContract(twoWithOverlapPrompt, ["канал денежная энергия"]);
+  assert.doesNotMatch(
+    twoWithOverlapPrompt,
+    /Дополнительный запрос «денежный поток энергии» содержит точный основной запрос/,
+  );
+
+  const moneyGrounding = buildProductSeoGrounding({ request: moneyRequest });
+  assert.match(
+    moneyGrounding,
+    /Дополнительные запросы автора: канал денежная энергия; денежный поток энергии; энергия денежных средств; энергия входа в денежный канал/,
+  );
+
+  const storedSecondaries = normalizeManualSecondaryQueries(
+    [...MONEY_SECONDARIES, "  канал денежная энергия  "],
+    MONEY_PRIMARY,
+  );
+  assert.deepEqual(storedSecondaries, MONEY_SECONDARIES);
+  const moneyValidated = validateProductSeoAiDraft(
+    {
+      seoTitle: "денежная энергия перед вечерним настроем",
+      seoDescription:
+        "Практика «Денежная энергия» помогает мягко настроиться и уделить внимание спокойному вечеру.",
+      usageItems: [
+        { content: "Перед важным разговором" },
+        { content: "После напряжённого дня" },
+        { content: "Во время вечернего отдыха" },
+      ],
+      faqItems: [
+        {
+          question: "Что такое денежная энергия в этой практике?",
+          answer: "Это аудиоматериал, который помогает спокойно познакомиться с темой.",
+          anchor: "chto",
+        },
+        {
+          question: "Когда лучше слушать?",
+          answer: "В спокойное время, когда можно уделить внимание себе.",
+          anchor: "kogda",
+        },
+        {
+          question: "Нужен ли опыт?",
+          answer: "Практика подходит для спокойного знакомства с форматом.",
+          anchor: "opyt",
+        },
+      ],
+    },
+    {
+      primaryQuery: MONEY_PRIMARY,
+      title: "Денежная энергия",
+      subtitle: "Вечерняя практика",
+      description: "Аудиопрактика помогает мягко настроиться.",
+      productKind: "practice",
+      usageItems: [],
+      manualSecondaryQueries: MONEY_SECONDARIES,
+    },
+  );
+  assert.equal(moneyValidated.ok, true);
+  assert.deepEqual(moneyValidated.draft.seoSecondaryQueries, MONEY_SECONDARIES);
+}
 assert.match(
   buildProductSeoSystemPrompt({
     request: { ...parsed.request, seoPrimaryQuery: "", seoSecondaryQueries: [] },
@@ -503,7 +711,7 @@ const faqExactPrimaryInput = {
   );
   assert.match(
     repairPrimary,
-    /Начни seoDescription с полного основного запроса «музыка для сна» дословно и используй его ровно один раз/,
+    /Включи полный основной запрос «музыка для сна» дословно ровно один раз естественно в первое предложение seoDescription; он не обязан стоять с позиции 0/,
   );
   assert.equal((repairPrimary.match(/Исправление seoDescription обязательно:/g) ?? []).length, 1);
   assert.doesNotMatch(repairPrimary, /в seoTitle и seoDescription/);
@@ -521,6 +729,20 @@ assert.equal(
     "primary_missing_from_title",
   ),
   true,
+);
+assert.equal(
+  validateProductSeoAiDraft(
+    validDraft({
+      usageItems: [
+        { content: "Перед сном с медитация для сна" },
+        { content: "После напряжённого дня" },
+        { content: "Во время вечернего отдыха" },
+      ],
+    }),
+    input(),
+  ).ok,
+  true,
+  "one extra exact primary in usageItems must not fail generation",
 );
 assert.equal(
   validateProductSeoAiDraft(
@@ -1278,7 +1500,7 @@ for (const [question, expectedAnswer] of [
   );
   assert.match(
     descriptionRepairPrompt,
-    /seoDescription.*120–180 символов.*не превышала 300 символов.*Начни seoDescription с полного основного запроса «медитация для сна» дословно и используй его ровно один раз/is,
+    /seoDescription.*120–180 символов.*не превышала 300 символов.*Включи полный основной запрос «медитация для сна» дословно ровно один раз естественно в первое предложение seoDescription; он не обязан стоять с позиции 0/is,
   );
 }
 
@@ -1305,7 +1527,17 @@ for (const [question, expectedAnswer] of [
   assert.equal(deterministicDescriptionProvider.calls.length, 2);
   assert.match(
     deterministicDescriptionResult.data.seoDescription,
-    /^медитация для сна – помогает мягко завершить день\./,
+    /^медитация для сна помогает мягко завершить день\./,
+  );
+  assert.doesNotMatch(
+    deterministicDescriptionResult.data.seoDescription,
+    /медитация для сна – помогает/,
+  );
+  assert.ok(
+    containsSeoPhrase(
+      deterministicDescriptionResult.data.seoDescription,
+      requestInput().seoPrimaryQuery,
+    ),
   );
   assert.ok(
     deterministicDescriptionResult.data.seoDescription.length <= 300,
@@ -1358,14 +1590,26 @@ for (const [question, expectedAnswer] of [
   ]);
   assert.equal(descriptionFallbackProvider.calls[1].previous.seoDescription, longCaseVariantDescription);
   assert.ok(descriptionFallbackResult.data.seoDescription.length <= 300);
-  const retainedSuffix = descriptionFallbackResult.data.seoDescription.slice(
-    `${requestInput().seoPrimaryQuery} – `.length,
+  assert.match(
+    descriptionFallbackResult.data.seoDescription,
+    /^МЕДИТАЦИЯ ДЛЯ СНА /,
   );
-  const suffixEnd = longCaseVariantDescription.indexOf(retainedSuffix) + retainedSuffix.length;
+  assert.doesNotMatch(
+    descriptionFallbackResult.data.seoDescription,
+    /^медитация для сна – /,
+  );
   assert.ok(
-    suffixEnd === longCaseVariantDescription.length ||
-      longCaseVariantDescription[suffixEnd] === " ",
-    "fallback must not split a word",
+    containsSeoPhrase(
+      descriptionFallbackResult.data.seoDescription,
+      requestInput().seoPrimaryQuery,
+    ),
+  );
+  assert.ok(
+    longCaseVariantDescription.startsWith(descriptionFallbackResult.data.seoDescription) ||
+      longCaseVariantDescription[
+        descriptionFallbackResult.data.seoDescription.length
+      ] === " ",
+    "length-only shorten must keep the existing primary and not split a word",
   );
   assert.equal(
     descriptionFallbackResult.data.seoDescription,
@@ -1591,6 +1835,150 @@ for (const [question, expectedAnswer] of [
     ok: true,
     draft: sixIssueResult.data,
   });
+}
+
+{
+  const MONEY_PRIMARY = "денежная энергия";
+  const moneyInput = () =>
+    requestInput({
+      title: "Денежная энергия",
+      seoPrimaryQuery: MONEY_PRIMARY,
+      seoSecondaryQueries: [
+        "канал денежная энергия",
+        "денежный поток энергии",
+        "энергия денежных средств",
+        "энергия входа в денежный канал",
+      ],
+    });
+  const moneyValidation = () => validationInput(moneyInput());
+  const moneyDraft = (overrides = {}) => ({
+    seoTitle: "денежная энергия перед вечерним настроем",
+    seoDescription:
+      "Практика «Денежная энергия» помогает мягко настроиться и уделить внимание спокойному вечеру.",
+    usageItems: [
+      { content: "Перед важным разговором" },
+      { content: "После напряжённого дня" },
+      { content: "Во время вечернего отдыха" },
+    ],
+    faqItems: [
+      {
+        question: "Что такое денежная энергия в этой практике?",
+        answer: "Это аудиоматериал, который помогает спокойно познакомиться с темой.",
+        anchor: "chto",
+      },
+      {
+        question: "Когда лучше слушать?",
+        answer: "В спокойное время, когда можно уделить внимание себе.",
+        anchor: "kogda",
+      },
+      {
+        question: "Нужен ли опыт?",
+        answer: "Практика подходит для спокойного знакомства с форматом.",
+        anchor: "opyt",
+      },
+    ],
+    ...overrides,
+  });
+  const forbiddenOrphanFragments = [
+    "денежная энергия – » – это",
+    "« – это",
+    '" – это',
+    "– – это",
+    "– — это",
+  ];
+
+  const quotedOverlongDescription = `«Денежная энергия» – это практика, которая помогает мягко настроиться на спокойный вечер и уделить внимание себе. `.repeat(
+    5,
+  );
+  assert.ok(quotedOverlongDescription.length > 300);
+  assert.ok(containsSeoPhrase(quotedOverlongDescription, MONEY_PRIMARY));
+
+  const lengthOnlyQuoted = finalizeProductSeoMetadataField({
+    value: quotedOverlongDescription,
+    primary: MONEY_PRIMARY,
+    limit: 300,
+    missingPrimary: false,
+    tooLong: true,
+  });
+  assert.ok(lengthOnlyQuoted);
+  assert.ok(lengthOnlyQuoted.length <= 300);
+  assert.match(lengthOnlyQuoted, /^«Денежная энергия» – это практика/);
+  assert.ok(containsSeoPhrase(lengthOnlyQuoted, MONEY_PRIMARY));
+  for (const fragment of forbiddenOrphanFragments) {
+    assert.equal(lengthOnlyQuoted.includes(fragment), false, fragment);
+  }
+
+  const quotedOverlongTitle = `«Денежная энергия» – это практика для мягкого вечернего настроя и спокойного внимания к себе в привычном ритме перед отдыхом после долгого дня`;
+  assert.ok(quotedOverlongTitle.length > 140);
+  const lengthOnlyQuotedTitle = finalizeProductSeoMetadataField({
+    value: quotedOverlongTitle,
+    primary: MONEY_PRIMARY,
+    limit: 140,
+    missingPrimary: false,
+    tooLong: true,
+  });
+  assert.ok(lengthOnlyQuotedTitle);
+  assert.ok(lengthOnlyQuotedTitle.length <= 140);
+  assert.match(lengthOnlyQuotedTitle, /^«Денежная энергия»/);
+  assert.ok(containsSeoPhrase(lengthOnlyQuotedTitle, MONEY_PRIMARY));
+  for (const fragment of forbiddenOrphanFragments) {
+    assert.equal(lengthOnlyQuotedTitle.includes(fragment), false, fragment);
+  }
+
+  const quotedDescriptionProvider = mockProvider([
+    { ok: true, draft: moneyDraft({ seoDescription: quotedOverlongDescription }), raw: {} },
+    { ok: true, draft: moneyDraft({ seoDescription: quotedOverlongDescription }), raw: {} },
+  ]);
+  const quotedDescriptionResult = await generateProductSeoDraft(moneyInput(), {
+    userId: "quoted-primary-description-too-long",
+    config,
+    provider: quotedDescriptionProvider,
+  });
+  assert.equal(quotedDescriptionResult.ok, true);
+  assert.equal(quotedDescriptionProvider.calls.length, 2);
+  assert.match(
+    quotedDescriptionResult.data.seoDescription,
+    /^«Денежная энергия» – это практика/,
+  );
+  assert.doesNotMatch(
+    quotedDescriptionResult.data.seoDescription,
+    /денежная энергия – » – это|« – это|" – это|– – это|– — это/,
+  );
+  assert.deepEqual(
+    validateProductSeoAiDraft(quotedDescriptionResult.data, moneyValidation()),
+    { ok: true, draft: quotedDescriptionResult.data },
+  );
+
+  const quotedTitleProvider = mockProvider([
+    { ok: true, draft: moneyDraft({ seoTitle: quotedOverlongTitle }), raw: {} },
+    { ok: true, draft: moneyDraft({ seoTitle: quotedOverlongTitle }), raw: {} },
+  ]);
+  const quotedTitleResult = await generateProductSeoDraft(moneyInput(), {
+    userId: "quoted-primary-title-too-long",
+    config,
+    provider: quotedTitleProvider,
+  });
+  assert.equal(quotedTitleResult.ok, true);
+  assert.equal(quotedTitleProvider.calls.length, 2);
+  assert.match(quotedTitleResult.data.seoTitle, /^«Денежная энергия»/);
+  assert.doesNotMatch(
+    quotedTitleResult.data.seoTitle,
+    /денежная энергия – » – это|« – это|" – это|– – это|– — это/,
+  );
+  assert.deepEqual(validateProductSeoAiDraft(quotedTitleResult.data, moneyValidation()), {
+    ok: true,
+    draft: quotedTitleResult.data,
+  });
+
+  const prependedQuoted = prependPrimaryAndShorten(
+    quotedOverlongDescription,
+    MONEY_PRIMARY,
+    300,
+  );
+  assert.ok(prependedQuoted);
+  for (const fragment of forbiddenOrphanFragments) {
+    assert.equal(prependedQuoted.includes(fragment), false, fragment);
+  }
 }
 
 const noPrimary = await generateProductSeoDraft(
