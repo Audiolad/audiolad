@@ -260,6 +260,38 @@ export function indexExportedDealsById(
   return index;
 }
 
+export function indexExportedDealsByNumber(
+  deals: ConfirmedGetCourseDeal[],
+): Map<string, ConfirmedGetCourseDeal | "ambiguous"> {
+  const index = new Map<string, ConfirmedGetCourseDeal | "ambiguous">();
+  for (const deal of deals) {
+    if (!deal.dealNumber) continue;
+    const existing = index.get(deal.dealNumber);
+    if (existing) {
+      index.set(deal.dealNumber, "ambiguous");
+    } else {
+      index.set(deal.dealNumber, deal);
+    }
+  }
+  return index;
+}
+
+export function lookupExportedDealForIntent(input: {
+  providerDealId: string | null;
+  providerDealNumber: string | null;
+  byId: Map<string, ConfirmedGetCourseDeal | "ambiguous">;
+  byNumber: Map<string, ConfirmedGetCourseDeal | "ambiguous">;
+}): ConfirmedGetCourseDeal | "ambiguous" | undefined {
+  if (input.providerDealId) {
+    const byId = input.byId.get(input.providerDealId);
+    if (byId) return byId;
+  }
+  if (input.providerDealNumber) {
+    return input.byNumber.get(input.providerDealNumber);
+  }
+  return undefined;
+}
+
 export function matchIntentToExportedDeal(input: {
   deal: ConfirmedGetCourseDeal | "ambiguous" | undefined;
   configuredOfferId: string;

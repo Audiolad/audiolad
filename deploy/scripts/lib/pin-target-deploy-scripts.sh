@@ -64,6 +64,13 @@ resolve_pin_commit() {
   git -C "$GIT_WORKDIR" rev-parse --verify "${commit_ref}^{commit}"
 }
 
+pin_has_reconcile_artifacts() {
+  local root="$1"
+  [[ -f "$root/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]] &&
+    [[ -f "$root/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer" ]] &&
+    [[ -f "$root/deploy/logrotate/audiolad-author-appreciation-getcourse-reconcile" ]]
+}
+
 extract_target_deploy_scripts() {
   local full_commit="$1"
   local store="$AUDIOLAD_DEPLOY_SCRIPTS_STORE"
@@ -75,7 +82,7 @@ extract_target_deploy_scripts() {
 
   if [[ -f "$dest/deploy/scripts/deploy.sh" && -f "$dest/deploy/scripts/.pinned-commit" ]]; then
     marker="$(tr -d '\n' < "$dest/deploy/scripts/.pinned-commit")"
-    if [[ "$marker" == "$full_commit" ]]; then
+    if [[ "$marker" == "$full_commit" ]] && pin_has_reconcile_artifacts "$dest"; then
       printf '%s\n' "$dest"
       return 0
     fi
@@ -92,8 +99,8 @@ extract_target_deploy_scripts() {
     rm -rf "$tmp"
     return 1
   fi
-  if [[ ! -f "$tmp/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]]; then
-    pin_error "target SHA ${full_commit} is missing reconcile systemd unit"
+  if ! pin_has_reconcile_artifacts "$tmp"; then
+    pin_error "target SHA ${full_commit} is missing reconcile systemd/logrotate artifacts"
     rm -rf "$tmp"
     return 1
   fi

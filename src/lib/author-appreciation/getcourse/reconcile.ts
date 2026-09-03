@@ -7,6 +7,8 @@ import {
   coveringExportDateWindow,
   exportPaidGetCourseDealsOnce,
   indexExportedDealsById,
+  indexExportedDealsByNumber,
+  lookupExportedDealForIntent,
   matchIntentToExportedDeal,
   type ExportPaidGetCourseDealsOptions,
 } from "@/lib/author-appreciation/getcourse/confirm-deal";
@@ -135,7 +137,7 @@ async function defaultListPending(
     .select("id, amount_minor, provider_deal_id, provider_deal_number, provider_metadata, created_at, status")
     .eq("provider", "getcourse")
     .eq("status", "pending")
-    .not("provider_deal_id", "is", null)
+    .or("provider_deal_id.not.is.null,provider_deal_number.not.is.null")
     .gte("created_at", cutoff)
     .order("created_at", { ascending: true })
     .limit(RECONCILE_MAX_INTENTS);
@@ -186,7 +188,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     const offerId = metadataOfferId(intent.provider_metadata);
     return (
       intent.status === "pending" &&
-      Boolean(intent.provider_deal_id) &&
+      Boolean(intent.provider_deal_id || intent.provider_deal_number) &&
       offerId === config.appreciationOfferId
     );
   });
@@ -209,16 +211,21 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     now,
   );
   const exported = await exportDeals(config, window, deps.fetchImpl, deps.exportOptions);
-  const index = exported.ok ? indexExportedDealsById(exported.deals) : new Map();
+  const byId = exported.ok ? indexExportedDealsById(exported.deals) : new Map();
+  const byNumber = exported.ok ? indexExportedDealsByNumber(exported.deals) : new Map();
   let applied = 0;
   let skipped = pending.length - correlatable.length;
   let providerError = !exported.ok && exported.reason === "provider_error";
 
   for (const intent of correlatable) {
-    if (intent.status !== "pending" || !intent.provider_deal_id) {
+    if (
+      intent.status !== "pending" ||
+      (!intent.provider_deal_id && !intent.provider_deal_number)
+    ) {
       skipped += 1;
       logReconcileSkipped("not_pending_or_missing_deal", {
         deal_id_present: Boolean(intent.provider_deal_id),
+        deal_number_present: Boolean(intent.provider_deal_number),
       });
       continue;
     }
@@ -239,14 +246,20 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     }
 
     const match = matchIntentToExportedDeal({
-      deal: index.get(intent.provider_deal_id),
+      deal: lookupExportedDealForIntent({
+        providerDealId: intent.provider_deal_id,
+        providerDealNumber: intent.provider_deal_number,
+        byId,
+        byNumber,
+      }),
       configuredOfferId: config.appreciationOfferId,
       amountMinor: intent.amount_minor,
     });
     if (!match.matched) {
       skipped += 1;
       logReconcileSkipped(match.reason, {
-        deal_id_present: true,
+        deal_id_present: Boolean(intent.provider_deal_id),
+        deal_number_present: Boolean(intent.provider_deal_number),
         status_payed: match.reason !== "unpaid",
         amount_match: match.reason !== "amount_mismatch",
       });
@@ -254,8 +267,8 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     }
 
     const { error } = await applyCallback({
-      providerDealId: intent.provider_deal_id,
-      providerDealNumber: intent.provider_deal_number,
+      providerDealId: intent.provider_deal_id ?? match.deal.dealId,
+      providerDealNumber: intent.provider_deal_number ?? match.deal.dealNumber,
       offerId,
       amountMinor: intent.amount_minor,
       status: "payed",

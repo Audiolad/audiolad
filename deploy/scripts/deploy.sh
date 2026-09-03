@@ -71,6 +71,26 @@ Zero-downtime cutover:
 EOF
 }
 
+assert_author_appreciation_reconcile_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required=(
+    "$release_dir/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service"
+    "$release_dir/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer"
+    "$release_dir/deploy/logrotate/audiolad-author-appreciation-getcourse-reconcile"
+    "$release_dir/deploy/scripts/ensure-author-appreciation-getcourse-reconcile.sh"
+    "$release_dir/deploy/scripts/run-author-appreciation-getcourse-reconcile.sh"
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "author_appreciation_getcourse_reconcile_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 COMMIT_REF="${1:-}"
 DEPLOY_LOG_FILE="$DEPLOY_LOG_DIR/deploy-$(date -u +"%Y%m%d-%H%M%S").log"
 OLD_ACTIVE_PORT=""
@@ -155,6 +175,11 @@ main() {
   git -C "$GIT_WORKDIR" archive "$FULL_COMMIT" | tar -x -C "$RELEASE_DIR"
   ln -sfn "$DEPLOY_ROOT/shared/.env.production" "$RELEASE_DIR/.env.local"
   ln -sfn "$DEPLOY_ROOT/shared/.env.production" "$RELEASE_DIR/.env.production"
+  if ! assert_author_appreciation_reconcile_release_tree "$RELEASE_DIR"; then
+    log_error "author_appreciation_getcourse_reconcile_artifact_missing"
+    send_deploy_alert "deploy_failed" "Reconcile deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
 
   cd "$RELEASE_DIR"
   npm ci
@@ -320,12 +345,17 @@ main() {
   rm -f "$RELEASE_DIR/.deploy-inflight"
   unset CANDIDATE_RELEASE_DIR
   prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
-  log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
-  if [[ -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
-    if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh"; then
-      log_warn "author_appreciation_getcourse_reconcile_ensure_nonfatal"
-    fi
+  if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
+    log_error "author_appreciation_getcourse_reconcile_ensure_missing"
+    send_deploy_alert "deploy_failed" "Reconcile ensure script missing for $RELEASE_NAME"
+    exit 1
   fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh"; then
+    log_error "author_appreciation_getcourse_reconcile_ensure_failed"
+    send_deploy_alert "deploy_failed" "Reconcile timer ensure failed for $RELEASE_NAME"
+    exit 1
+  fi
+  log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
   log_info "Deploy completed successfully: $RELEASE_NAME"
 }
 

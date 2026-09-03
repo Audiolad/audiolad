@@ -76,19 +76,26 @@ function assertSafeIgnoreLog(
   logs: Array<{ label: unknown; details: Record<string, unknown> }>,
   reason: string,
 ) {
-  assert.equal(logs.length, 1);
-  assert.equal(logs[0].label, "author_appreciation_getcourse_callback_ignored");
-  assert.equal(logs[0].details.reason, reason);
+  const ignored = logs.filter(
+    (row) => row.label === "author_appreciation_getcourse_callback_ignored",
+  );
+  assert.equal(ignored.length, 1);
+  assert.equal(ignored[0].details.reason, reason);
+  const outcome = logs.filter(
+    (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+  );
+  assert.equal(outcome.length, 1);
+  assert.equal(outcome[0].details.ignored_reason, reason);
   const serialized = JSON.stringify(logs);
   assert.doesNotMatch(serialized, /callback-secret/);
   assert.doesNotMatch(serialized, /@/);
   assert.doesNotMatch(serialized, /pay\.example/);
-  assert.equal(Object.prototype.hasOwnProperty.call(logs[0].details, "payload"), false);
-  assert.ok("deal_id_present" in logs[0].details);
-  assert.ok("deal_number_present" in logs[0].details);
-  assert.ok("offer_field_present" in logs[0].details);
-  assert.ok("amount_present" in logs[0].details);
-  assert.ok("status_present" in logs[0].details);
+  assert.equal(Object.prototype.hasOwnProperty.call(ignored[0].details, "payload"), false);
+  assert.ok("deal_id_present" in ignored[0].details);
+  assert.ok("deal_number_present" in ignored[0].details);
+  assert.ok("offer_field_present" in ignored[0].details);
+  assert.ok("amount_present" in ignored[0].details);
+  assert.ok("status_present" in ignored[0].details);
 }
 
 {
@@ -433,8 +440,31 @@ function assertSafeIgnoreLog(
     assert.equal(result.rpcOutcome, "paid_needs_review");
     const labels = capture.logs.map((row) => row.label);
     assert.ok(labels.includes("author_appreciation_getcourse_callback_applied"));
+    assert.ok(labels.includes("author_appreciation_getcourse_callback_outcome"));
     assert.ok(labels.includes("author_appreciation_finance_projection_needs_review"));
+    const outcome = capture.logs.find(
+      (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+    );
+    assert.equal(outcome?.details.outcome, "paid_needs_review");
+    assert.equal(outcome?.details.rpc_called, true);
     assert.doesNotMatch(JSON.stringify(capture.logs), /callback-secret/);
+  } finally {
+    capture.restore();
+  }
+}
+
+{
+  const capture = captureLogs();
+  try {
+    const { result } = await handle({ rpcOutcome: "unknown" });
+    assert.equal(result.status, 200);
+    assert.equal(result.rpcOutcome, "unknown");
+    const outcome = capture.logs.find(
+      (row) => row.label === "author_appreciation_getcourse_callback_outcome",
+    );
+    assert.equal(outcome?.details.outcome, "unknown");
+    assert.equal(outcome?.details.ignored_reason, "unknown_deal");
+    assert.equal(outcome?.details.rpc_called, true);
   } finally {
     capture.restore();
   }

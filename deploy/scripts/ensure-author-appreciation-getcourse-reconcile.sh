@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install/enable the appreciation GetCourse reconcile timer from the active
-# deploy scripts tree. Best-effort: must not fail the caller deploy.
+# release deploy tree. Mandatory payment-recovery component: missing units
+# or enable failure must fail the caller deploy (not warn-and-continue).
 # Does not restart PM2 / Nginx / Docker. No new secrets.
 set -Eeuo pipefail
 
@@ -22,6 +23,8 @@ LOGROTATE_SRC="$DEPLOY_TREE/logrotate/audiolad-author-appreciation-getcourse-rec
 WRAPPER_DIR="${WRAPPER_DIR:-/usr/local/lib/audiolad}"
 SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
 LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
+LOG_DIR="${LOG_DIR:-/var/log/audiolad}"
+STATE_DIR="${STATE_DIR:-/var/lib/audiolad}"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"
 SKIP_SYSTEMCTL="${SKIP_SYSTEMCTL:-0}"
 START_SERVICE_NOW="${START_SERVICE_NOW:-1}"
@@ -31,7 +34,9 @@ log() {
 }
 
 as_root() {
-  if [[ "$(id -u)" -eq 0 ]]; then
+  if [[ "${SKIP_AS_ROOT:-0}" == "1" ]]; then
+    "$@"
+  elif [[ "$(id -u)" -eq 0 ]]; then
     "$@"
   elif command -v sudo >/dev/null 2>&1; then
     sudo "$@"
@@ -47,7 +52,7 @@ for required in "$WRAPPER_SRC" "$SERVICE_SRC" "$TIMER_SRC" "$LOGROTATE_SRC"; do
   fi
 done
 
-as_root install -d -m 0755 "$WRAPPER_DIR" /var/log/audiolad /var/lib/audiolad
+as_root install -d -m 0755 "$WRAPPER_DIR" "$LOG_DIR" "$STATE_DIR"
 as_root install -m 0755 "$WRAPPER_SRC" "$WRAPPER_DIR/run-author-appreciation-getcourse-reconcile.sh"
 as_root install -m 0644 "$SERVICE_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.service"
 as_root install -m 0644 "$TIMER_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.timer"

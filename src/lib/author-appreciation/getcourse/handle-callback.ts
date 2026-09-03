@@ -4,6 +4,7 @@ import {
   decideGetCourseCallbackApply,
   logGetCourseCallbackApplied,
   logGetCourseCallbackIgnored,
+  logGetCourseCallbackOutcome,
   logGetCourseFinanceProjectionIfNeeded,
   parseGetCourseCallback,
   readCallbackRpcOutcome,
@@ -88,6 +89,11 @@ export function handleGetCourseAppreciationCallback(
   });
   if (decision.action === "ignore") {
     logGetCourseCallbackIgnored(decision.reason, callback);
+    logGetCourseCallbackOutcome({
+      outcome: null,
+      ignoredReason: decision.reason,
+      rpcCalled: false,
+    });
     return {
       status: 200,
       ignoredReason: decision.reason,
@@ -125,6 +131,11 @@ export function handleGetCourseAppreciationCallback(
       const unknownDeal: GetCourseCallbackIgnoreReason = "unknown_deal";
       if (outcome === "unknown") {
         logGetCourseCallbackIgnored(unknownDeal, callback);
+        logGetCourseCallbackOutcome({
+          outcome,
+          ignoredReason: unknownDeal,
+          rpcCalled: true,
+        });
         return {
           status: 200,
           ignoredReason: unknownDeal,
@@ -137,6 +148,12 @@ export function handleGetCourseAppreciationCallback(
       logGetCourseCallbackApplied({
         outcome,
         usedDealCorrelation: decision.usedDealCorrelation,
+        callback,
+      });
+      logGetCourseCallbackOutcome({
+        outcome,
+        ignoredReason: null,
+        rpcCalled: true,
       });
       logGetCourseFinanceProjectionIfNeeded(outcome);
       return {

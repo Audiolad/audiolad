@@ -76,9 +76,17 @@ if [[ "$DEST" != "${STORE}/${FULL_COMMIT}" ]]; then
   exit 1
 fi
 
+pin_has_reconcile_artifacts() {
+  local root="$1"
+  [[ -f "$root/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]] &&
+    [[ -f "$root/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer" ]] &&
+    [[ -f "$root/deploy/logrotate/audiolad-author-appreciation-getcourse-reconcile" ]]
+}
+
 mkdir -p "$STORE"
 if [[ -f "$DEST/deploy/scripts/deploy.sh" && -f "$DEST/deploy/scripts/.pinned-commit" \
-  && "$(tr -d '\n' < "$DEST/deploy/scripts/.pinned-commit")" == "$FULL_COMMIT" ]]; then
+  && "$(tr -d '\n' < "$DEST/deploy/scripts/.pinned-commit")" == "$FULL_COMMIT" \
+  && pin_has_reconcile_artifacts "$DEST" ]]; then
   pin_log "Reusing pinned deploy scripts at ${DEST}"
 else
   TMP="$(mktemp -d "${STORE}/.tmp.${FULL_COMMIT}.XXXXXX")"
@@ -92,8 +100,8 @@ else
     rm -rf "$TMP"
     exit 1
   fi
-  if [[ ! -f "$TMP/deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.service" ]]; then
-    pin_error "target SHA ${FULL_COMMIT} is missing reconcile systemd unit"
+  if ! pin_has_reconcile_artifacts "$TMP"; then
+    pin_error "target SHA ${FULL_COMMIT} is missing reconcile systemd/logrotate artifacts"
     rm -rf "$TMP"
     exit 1
   fi

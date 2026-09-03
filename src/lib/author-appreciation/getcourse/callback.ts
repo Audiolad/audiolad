@@ -75,10 +75,14 @@ const UNPAID_STATUS_TOKENS = new Set([
   "новая",
   "новое",
   "ожидает оплаты",
+  "ожидаем оплаты",
   "не подтвержден",
   "не подтверждён",
   "в работе",
   "ожидает возврата",
+  "отложен",
+  "отложена",
+  "отложено",
 ]);
 
 function normalizeStatusToken(value: string): string {
@@ -363,10 +367,33 @@ export function logGetCourseCallbackIgnored(
 export function logGetCourseCallbackApplied(input: {
   outcome: string | null;
   usedDealCorrelation: boolean;
+  callback?: ParsedGetCourseCallback;
 }): void {
   console.info("author_appreciation_getcourse_callback_applied", {
     outcome: input.outcome ?? "unknown",
     used_deal_correlation: input.usedDealCorrelation,
+    ...(input.callback
+      ? {
+          status_class: classifyGetCourseDealStatus(input.callback.status),
+          money_class: classifyGetCoursePaymentCompleteness({
+            amountMinor: input.callback.amountMinor,
+            payedMoneyMinor: input.callback.payedMoneyMinor,
+            leftCostMoneyMinor: input.callback.leftCostMoneyMinor,
+          }),
+        }
+      : {}),
+  });
+}
+
+export function logGetCourseCallbackOutcome(input: {
+  outcome: string | null;
+  ignoredReason: GetCourseCallbackIgnoreReason | null;
+  rpcCalled: boolean;
+}): void {
+  console.info("author_appreciation_getcourse_callback_outcome", {
+    outcome: input.outcome ?? "none",
+    ignored_reason: input.ignoredReason,
+    rpc_called: input.rpcCalled,
   });
 }
 
