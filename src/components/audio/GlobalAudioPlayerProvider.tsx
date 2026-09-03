@@ -21,6 +21,8 @@ import {
   syncMediaSessionPlaybackState,
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
+import { ensureSharedAudioAudible } from "@/lib/audio/shared-audio-audibility";
+import { createSharedAudioWarmupController } from "@/lib/audio/shared-audio-warmup";
 import { requestStopLocalAudioPlayers } from "@/lib/audio/local-audio-coordination";
 import {
   isStudioAudioStopMessage,
@@ -206,6 +208,7 @@ async function playQueueAdvanceOnSharedAudio(
   }
 
   try {
+    ensureSharedAudioAudible(audio);
     // Shared next-track path (iOS / Android / desktop): play on the
     // persistent element first; callers must not remount or replace yet.
     await audio.play();
@@ -613,6 +616,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const requestAutoplayIntentRef = useRef<(() => void) | null>(null);
   /** Survives engine remounts so iOS keeps the unlocked media element. */
   const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sharedAudioWarmupRef = useRef(createSharedAudioWarmupController());
   const playbackHandoffRef = useRef<PlaybackHandoff | null>(null);
   const queueAdvancePrefetchRef = useRef<QueueAdvancePrefetch | null>(null);
   const queuePrefetchAbortRef = useRef<AbortController | null>(null);
@@ -648,6 +652,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     setNoticeMessage(null);
   }, []);
 
+  const invalidateSharedAudioWarmup = useCallback(() => {
+    sharedAudioWarmupRef.current.invalidate();
+  }, []);
+
   const clearPlaylistQueue = useCallback(() => {
     setActiveQueue(null);
     activeQueueRef.current = null;
@@ -665,6 +673,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     input: LoadSessionInput,
     options?: { preservePlayback?: boolean },
   ) => {
+    invalidateSharedAudioWarmup();
     setDismissedPracticeId(null);
     // Stop any page-level PersonalMaterialAudioPlayer before owning the single audio element.
     requestStopLocalAudioPlayers();
@@ -794,9 +803,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         mode: "replace",
       });
     }
-  }, []);
+  }, [invalidateSharedAudioWarmup]);
 
   const hardStop = useCallback(() => {
+    invalidateSharedAudioWarmup();
     sessionGenerationRef.current += 1;
     setSessionGeneration(sessionGenerationRef.current);
     const current = sessionRef.current;
@@ -824,7 +834,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     setSession(null);
     clearPlaylistQueue();
     setNoticeMessage(null);
-  }, [clearPlaylistQueue]);
+  }, [clearPlaylistQueue, invalidateSharedAudioWarmup]);
 
   const stopAndClear = useCallback(() => {
     hardStop();
@@ -938,30 +948,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    // Warm the shared element inside the user gesture. Keep any existing src;
-    // do not create a second <audio>.
-    const wasMuted = audio.muted;
-
-    try {
-      audio.muted = true;
-      const playAttempt = audio.play();
-
-      if (playAttempt && typeof playAttempt.then === "function") {
-        void playAttempt
-          .then(() => {
-            audio.pause();
-            audio.muted = wasMuted;
-          })
-          .catch(() => {
-            audio.muted = wasMuted;
-          });
-        return;
-      }
-
-      audio.muted = wasMuted;
-    } catch {
-      audio.muted = wasMuted;
-    }
+    sharedAudioWarmupRef.current.prepare(audio);
   }, []);
 
   const openFullPlayer = useCallback(() => {
