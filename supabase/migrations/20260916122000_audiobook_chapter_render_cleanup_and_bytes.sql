@@ -19,4 +19,19 @@ ALTER TABLE public.audiobook_chapter_render_jobs
   ADD CONSTRAINT audiobook_chapter_render_jobs_chapter_id_fkey
     FOREIGN KEY (chapter_id) REFERENCES public.audiobook_chapters(id) ON DELETE CASCADE;
 
+CREATE OR REPLACE FUNCTION public.delete_audiobook_chapter_render_jobs_for_fragment()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM public.audiobook_chapter_render_jobs
+  WHERE chapter_id = OLD.chapter_id;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audiobook_fragments_delete_render_jobs
+  ON public.audiobook_fragments;
+CREATE TRIGGER audiobook_fragments_delete_render_jobs
+AFTER DELETE ON public.audiobook_fragments
+FOR EACH ROW EXECUTE FUNCTION public.delete_audiobook_chapter_render_jobs_for_fragment();
+
 COMMIT;

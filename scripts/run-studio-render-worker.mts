@@ -3,7 +3,7 @@
  * PM2 must not start this script until an operator explicitly enables it.
  */
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -23,10 +23,6 @@ import { audiobookRenderSnapshotSha256, parseAudiobookRenderSnapshot } from "../
 const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
 const assetsBucket = "studio-draft-assets";
 const outputBucket = "studio-renders";
-
-async function streamStorageObjectToFile(file: Blob, path: string) {
-  await pipeline(Readable.fromWeb(file.stream() as import("node:stream/web").ReadableStream), createWriteStream(path));
-}
 
 async function streamAudiobookFragmentToFile(storagePath: string, path: string) {
   const { data: signed, error: signError } = await service.storage
@@ -114,7 +110,7 @@ async function processStudioRenderQueuePass() {
       const { data, error: downloadError } = await service.storage.from(assetsBucket).download(asset.storagePath);
       if (downloadError || !data) throw new Error("source_unavailable");
       const path = join(workspace, `${asset.id}.audio`);
-      await streamStorageObjectToFile(data, path);
+      await writeFile(path, Buffer.from(await data.arrayBuffer()));
       paths.set(asset.id, path);
     }
     const result = await renderStudioProjectToMp3(
@@ -137,9 +133,10 @@ async function processStudioRenderQueuePass() {
       ffmpegStderrSummary: result.stderr.slice(-1000),
     }));
     const outputPath = renderOutputPath(job.id);
+    const bytes = await readFile(result.outputPath);
     const { error: uploadError } = await service.storage
       .from(outputBucket)
-      .upload(outputPath, createReadStream(result.outputPath), { contentType: "audio/mpeg", upsert: true });
+      .upload(outputPath, bytes, { contentType: "audio/mpeg", upsert: true });
     if (uploadError) throw uploadError;
     const { data: completedJob, error: completionError } = await service
       .from("studio_render_jobs")

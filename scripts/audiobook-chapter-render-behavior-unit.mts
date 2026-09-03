@@ -45,5 +45,17 @@ assert.equal(parseAudiobookRenderSnapshot({
   version: 1,
   fragments: [{ ...canonical.fragments[0], sizeBytes: 0 }],
 }, context), null);
+assert.equal(parseAudiobookRenderSnapshot({
+  version: 1,
+  fragments: [canonical.fragments[0], { ...canonical.fragments[0], position: 2 }],
+}, context), null);
+assert.equal(parseAudiobookRenderSnapshot({
+  version: 1,
+  fragments: [canonical.fragments[0], { ...canonical.fragments[1], position: 1 }],
+}, context), null);
+assert.equal(parseAudiobookRenderSnapshot({
+  version: 1,
+  fragments: [{ ...canonical.fragments[0], mimeType: "audio/mp4" }],
+}, context), null);
 
 console.log("audiobook chapter render behavior: ok");

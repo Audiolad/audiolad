@@ -104,11 +104,21 @@ async function listChapterFragmentPaths(chapterId: string) {
   return (data ?? []).map((fragment) => fragment.storage_path).filter((path): path is string => typeof path === "string");
 }
 
-async function listChapterRenderPaths(chapterId: string) {
+async function listChapterRenderPaths(
+  chapterId: string,
+  authorId: string,
+  projectId: string,
+) {
   const { data, error } = await createServiceRoleClient().from("audiobook_chapter_render_jobs")
-    .select("output_storage_path").eq("chapter_id", chapterId).not("output_storage_path", "is", null);
+    .select("id, output_storage_path").eq("chapter_id", chapterId).not("output_storage_path", "is", null);
   if (error) fail(error, "audiobook_render_paths_list_cleanup_error");
-  return (data ?? []).map((job) => job.output_storage_path).filter((path): path is string => typeof path === "string");
+  return (data ?? []).flatMap((job) => (
+    typeof job.id === "string"
+    && typeof job.output_storage_path === "string"
+    && isAudiobookChapterRenderStoragePath(job.output_storage_path, authorId, projectId, chapterId, job.id)
+      ? [job.output_storage_path]
+      : []
+  ));
 }
 
 async function removeRenderStorage(paths: string[], context: Record<string, string>) {
@@ -174,7 +184,9 @@ export async function deleteAudiobookProject(projectId: string, authorId: string
     : { data: [], error: null };
   if (fragmentsError) fail(fragmentsError, "audiobook_project_fragments_cleanup_list_error");
   const renderPaths = chapterIds.length
-    ? await Promise.all(chapterIds.map((chapterId) => listChapterRenderPaths(chapterId))).then((paths) => paths.flat())
+    ? await Promise.all(chapterIds.map((chapterId) => (
+      listChapterRenderPaths(chapterId, authorId, projectId)
+    ))).then((paths) => paths.flat())
     : [];
   const { data, error } = await service.from("audiobook_projects").delete()
     .eq("id", projectId).eq("author_id", authorId).eq("status", "active").select("id").maybeSingle();
@@ -221,7 +233,7 @@ export async function deleteAudiobookChapter(projectId: string, chapterId: strin
   await mutationAccess(authorId); await ownedChapter(projectId, chapterId, authorId);
   const service = createServiceRoleClient();
   const fragmentPaths = await listChapterFragmentPaths(chapterId);
-  const renderPaths = await listChapterRenderPaths(chapterId);
+  const renderPaths = await listChapterRenderPaths(chapterId, authorId, projectId);
   const { error } = await service.rpc("delete_audiobook_chapter", {
     p_project_id: projectId,
     p_chapter_id: chapterId,
@@ -378,6 +390,7 @@ export async function finalizeAudiobookFragment(projectId: string, chapterId: st
 export async function deleteAudiobookFragment(projectId: string, chapterId: string, fragmentId: string, authorId: string) {
   await mutationAccess(authorId);
   await ownedChapter(projectId, chapterId, authorId);
+  const renderPaths = await listChapterRenderPaths(chapterId, authorId, projectId);
   const { data: storagePath, error } = await createServiceRoleClient().rpc("delete_audiobook_fragment", {
     p_project_id: projectId, p_chapter_id: chapterId, p_fragment_id: fragmentId,
   });
@@ -386,6 +399,7 @@ export async function deleteAudiobookFragment(projectId: string, chapterId: stri
     fail(error, "audiobook_fragment_delete_error");
   }
   await removeFragmentStorage([storagePath], { projectId, chapterId, fragmentId, authorId });
+  await removeRenderStorage(renderPaths, { projectId, chapterId, fragmentId, authorId });
 }
 
 const RENDER_SELECT = "id, project_id, chapter_id, author_id, fragment_snapshot, snapshot_sha256, status, output_storage_path, output_size_bytes, error_code, error_message_safe, created_at, completed_at";

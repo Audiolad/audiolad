@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { isAudiobookActiveFragmentStoragePath } from "./storage";
+import {
+  audiobookExtensionForMimeType,
+  isAudiobookActiveFragmentStoragePath,
+} from "./storage";
 
 export type AudiobookRenderSnapshotFragment = {
   id: string;
@@ -24,14 +27,18 @@ type SnapshotContext = {
 function validFragment(fragment: unknown, context: SnapshotContext): fragment is AudiobookRenderSnapshotFragment {
   if (!fragment || typeof fragment !== "object") return false;
   const value = fragment as Record<string, unknown>;
+  const extension = typeof value.mimeType === "string"
+    ? audiobookExtensionForMimeType(value.mimeType)
+    : null;
   return typeof value.id === "string"
     && typeof value.storagePath === "string"
     && Number.isSafeInteger(value.position) && Number(value.position) > 0
-    && typeof value.mimeType === "string"
+    && extension !== null
     && Number.isSafeInteger(value.sizeBytes) && Number(value.sizeBytes) > 0
     && isAudiobookActiveFragmentStoragePath(
       value.storagePath, context.authorId, context.projectId, context.chapterId, value.id,
-    );
+    )
+    && value.storagePath.endsWith(`.${extension}`);
 }
 
 /**
@@ -49,7 +56,12 @@ export function createAudiobookRenderSnapshot(
     mimeType: fragment.mimeType,
     sizeBytes: fragment.sizeBytes,
   })).sort((left, right) => left.position - right.position || left.id.localeCompare(right.id));
-  if (!normalized.length || normalized.some((fragment) => !validFragment(fragment, context))) {
+  if (
+    !normalized.length
+    || normalized.some((fragment) => !validFragment(fragment, context))
+    || new Set(normalized.map((fragment) => fragment.id)).size !== normalized.length
+    || new Set(normalized.map((fragment) => fragment.position)).size !== normalized.length
+  ) {
     throw new Error("invalid_audiobook_render_snapshot");
   }
   return { version: 1, fragments: normalized };
