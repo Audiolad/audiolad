@@ -117,6 +117,7 @@ export type PracticeRow = {
   seo_description: string | null;
   seo_about: string | null;
   author_recommendations_title: string | null;
+  listener_appreciation_override: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -167,6 +168,7 @@ export function coercePracticeRow(
     | "seo_description"
     | "seo_about"
     | "author_recommendations_title"
+    | "listener_appreciation_override"
   > & {
     product_kind?: string | null;
     publication_class?: string | null;
@@ -192,6 +194,7 @@ export function coercePracticeRow(
     seo_description?: string | null;
     seo_about?: string | null;
     author_recommendations_title?: string | null;
+    listener_appreciation_override?: boolean | null;
   },
 ): PracticeRow {
   return {
@@ -227,6 +230,10 @@ export function coercePracticeRow(
     seo_description: row.seo_description ?? null,
     seo_about: row.seo_about ?? null,
     author_recommendations_title: row.author_recommendations_title ?? null,
+    listener_appreciation_override:
+      typeof row.listener_appreciation_override === "boolean"
+        ? row.listener_appreciation_override
+        : null,
   };
 }
 

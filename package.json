@@ -115,6 +115,7 @@
     "test:integration:private-catalog-race": "node scripts/private-to-catalog-player-race-smoke.mjs",
     "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs",
     "test:author-appreciation-prototype": "node scripts/author-appreciation-prototype-unit.mjs",
+    "test:author-appreciation-eligibility": "npx tsx scripts/author-appreciation-eligibility-unit.mjs",
     "test:legal-free-price-docs": "npx tsx scripts/legal-free-price-documents-unit.mjs",
     "test:author-status-page": "npx tsx scripts/author-status-page-unit.mjs",
     "test:free-author-first-step": "npx tsx scripts/free-author-first-step-unit.mjs",

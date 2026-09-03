@@ -1,3 +1,17 @@
+## Author Appreciation settings
+
+`author_appreciation_settings` is an optional 1:1 table keyed by `author_id`.
+It stores `listener_appreciation_enabled`,
+`listener_appreciation_profile_enabled`, and
+`listener_appreciation_free_products_default`. For an author with active
+commercial access, an absent row means all three values default to `true`;
+no mass backfill is required.
+
+`practices.listener_appreciation_override` is nullable: `NULL` inherits the
+author free-products default, while `true` and `false` are explicit product
+overrides. These are visibility settings only; they do not create payments,
+orders, ledger entries, commissions, or payouts.
+
 # DATABASE.md
 
 База данных проекта «АудиоЛад».

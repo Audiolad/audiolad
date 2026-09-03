@@ -11,6 +11,7 @@ import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadAuthorAppreciationSettings } from "@/lib/author-appreciation/settings";
 
 async function loadPayoutProfileSummary(authorId: string): Promise<{
   status: AuthorPayoutProfileStatus | null;
@@ -45,13 +46,14 @@ export async function loadAuthorStatusView(input: {
 }): Promise<AuthorStatusViewModel> {
   const supabase = createServiceRoleClient();
 
-  const [application, payout, termsAcceptance, individualShare, hasPublishedFreeProduct] =
+  const [application, payout, termsAcceptance, individualShare, hasPublishedFreeProduct, appreciationSettings] =
     await Promise.all([
       getAuthorCommercialApplication(supabase, input.authorId).catch(() => null),
       loadPayoutProfileSummary(input.authorId),
       hasAcceptedCurrentAuthorTerms(input.authorId),
       getCurrentApprovedAuthorCommercialShare(input.authorId),
       authorHasPublishedFreeProductForCommercialGate(supabase, input.authorId),
+      loadAuthorAppreciationSettings(supabase, input.authorId),
     ]);
 
   return resolveAuthorStatusView({
@@ -72,5 +74,6 @@ export async function loadAuthorStatusView(input: {
     role: input.role,
     authorSlug: input.authorSlug,
     hasPublishedFreeProduct,
+    appreciationSettings,
   });
 }

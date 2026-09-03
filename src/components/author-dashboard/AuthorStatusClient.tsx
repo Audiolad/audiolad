@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import {
@@ -9,9 +12,85 @@ import {
 } from "@/lib/author-dashboard/author-status";
 
 type Props = {
+  authorId: string;
   authorSlug: string;
   view: AuthorStatusViewModel;
 };
+
+function AppreciationSettingsCard({
+  authorId,
+  view,
+}: Pick<Props, "authorId" | "view">) {
+  const [settings, setSettings] = useState(view.appreciationSettings);
+  const [saving, setSaving] = useState(false);
+
+  async function update(next: typeof settings) {
+    if (!view.appreciationEligible) return;
+    setSettings(next);
+    setSaving(true);
+    try {
+      const response = await fetch("/api/author/appreciation-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author_id: authorId,
+          listener_appreciation_enabled: next.enabled,
+          listener_appreciation_profile_enabled: next.profileEnabled,
+          listener_appreciation_free_products_default: next.freeProductsDefault,
+        }),
+      });
+      if (!response.ok) setSettings(view.appreciationSettings);
+    } catch {
+      setSettings(view.appreciationSettings);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const rows = [
+    {
+      key: "enabled" as const,
+      label: "Разрешить слушателям благодарить меня",
+      description:
+        "На бесплатных аудиоматериалах слушатели смогут самостоятельно выбрать сумму благодарности.",
+    },
+    {
+      key: "profileEnabled" as const,
+      label: "Показывать на моей странице автора",
+    },
+    {
+      key: "freeProductsDefault" as const,
+      label: "Показывать на бесплатных продуктах по умолчанию",
+    },
+  ];
+
+  return (
+    <StatusCard title="Поблагодарить автора" tone={view.appreciationEligible ? "default" : "muted"}>
+      {!view.appreciationEligible ? (
+        <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+          Доступно авторам с коммерческим статусом.
+        </p>
+      ) : null}
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <label key={row.key} className="flex items-start justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-[#3f3560]">{row.label}</span>
+              {row.description ? <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">{row.description}</span> : null}
+            </span>
+            <input
+              type="checkbox"
+              checked={settings[row.key]}
+              disabled={!view.appreciationEligible || saving}
+              onChange={(event) => void update({ ...settings, [row.key]: event.target.checked })}
+              className="mt-1 h-5 w-5 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8] disabled:opacity-50"
+            />
+          </label>
+        ))}
+      </div>
+    </StatusCard>
+  );
+}
 
 function CapabilityList({ items }: { items: string[] }) {
   return (
@@ -73,7 +152,7 @@ function CtaButton({ cta, primary }: { cta: AuthorStatusCta; primary?: boolean }
   );
 }
 
-export default function AuthorStatusClient({ authorSlug, view }: Props) {
+export default function AuthorStatusClient({ authorId, authorSlug, view }: Props) {
   const showStarterAsCurrent =
     view.kind === "starter" ||
     view.kind === "commercial_pending" ||
@@ -150,6 +229,8 @@ export default function AuthorStatusClient({ authorSlug, view }: Props) {
           </p>
         </StatusCard>
       ) : null}
+
+      <AppreciationSettingsCard authorId={authorId} view={view} />
 
       <StatusCard title="Что дальше">
         <div className="flex flex-wrap gap-3">

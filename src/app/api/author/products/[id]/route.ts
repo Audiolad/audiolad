@@ -7,6 +7,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
+import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
 import {
   validateDescriptionLength,
   validateListeningNoticeTextLength,
@@ -606,6 +607,30 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (nextProductKind === PRODUCT_KIND.AUDIO_POST) {
       updates.is_free = true;
       updates.price = 0;
+    }
+
+    if ("listener_appreciation_override" in body) {
+      const override = body.listener_appreciation_override;
+      const effectiveIsFree =
+        typeof updates.is_free === "boolean" ? updates.is_free : practice.is_free;
+      const isEligibleKind =
+        nextProductKind === PRODUCT_KIND.PRACTICE ||
+        nextProductKind === PRODUCT_KIND.AUDIO_POST;
+
+      if (
+        (override !== null && typeof override !== "boolean") ||
+        !authorAccessAllowsPaidProducts(accessStatus) ||
+        effectiveIsFree !== true ||
+        !isEligibleKind ||
+        nextPublicationClass === "course"
+      ) {
+        return NextResponse.json(
+          { error: "appreciation_not_eligible" },
+          { status: 400 },
+        );
+      }
+
+      updates.listener_appreciation_override = override;
     }
 
     if (

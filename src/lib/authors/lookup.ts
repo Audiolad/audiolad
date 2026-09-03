@@ -21,6 +21,12 @@ export type PublicAuthorRow = {
   full_bio?: string | null;
   avatar_url: string | null;
   banner_url?: string | null;
+  access_status?: string | null;
+  author_appreciation_settings?: Array<{
+    listener_appreciation_enabled: boolean;
+    listener_appreciation_profile_enabled: boolean;
+    listener_appreciation_free_products_default: boolean;
+  }> | null;
 };
 
 export type AuthorPublishedPractice = {
@@ -44,7 +50,7 @@ export async function getAuthorBySlug(
   const { data, error } = await supabase
     .from("authors")
     .select(
-      "id, name, slug, author_type, description, short_bio, full_bio, avatar_url, banner_url, avatar_image",
+      "id, name, slug, author_type, description, short_bio, full_bio, avatar_url, banner_url, avatar_image, access_status, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)",
     )
     .eq("slug", authorSlug)
     .maybeSingle();

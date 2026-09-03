@@ -45,7 +45,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
           <PracticeProductHero viewModel={viewModel} />
         </section>
 
-        {viewModel.showAuthorSupportPrototype && viewModel.authorName ? (
+        {viewModel.showAuthorAppreciationPrototype && viewModel.authorName ? (
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={viewModel.authorName}

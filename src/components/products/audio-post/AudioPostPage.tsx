@@ -149,7 +149,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           </div>
         </article>
 
-        {viewModel.showAuthorSupportPrototype && authorName ? (
+        {viewModel.showAuthorAppreciationPrototype && authorName ? (
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={authorName}
@@ -219,7 +219,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           <AudioPostPlayer {...playerProps} variant="panel" />
         </div>
 
-        {viewModel.showAuthorSupportPrototype && authorName ? (
+        {viewModel.showAuthorAppreciationPrototype && authorName ? (
           <div className="mt-4">
             <AuthorAppreciationPrototype
               authorName={authorName}

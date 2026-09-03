@@ -45,7 +45,11 @@ export default async function AuthorStatusPage({ searchParams }: PageProps) {
       subtitle="Текущий уровень доступа и условия коммерческого подключения"
       internalBackHref={backHref}
     >
-      <AuthorStatusClient authorSlug={workspace.slug} view={view} />
+      <AuthorStatusClient
+        authorId={workspace.id}
+        authorSlug={workspace.slug}
+        view={view}
+      />
     </AuthorShell>
   );
 }

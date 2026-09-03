@@ -40,6 +40,10 @@ import {
 } from "./profile";
 import { resolveAuthorPositioningText } from "./brand-assets";
 import { findSimilarAuthors } from "./similar-authors";
+import {
+  resolveAuthorAppreciationSettings,
+  type AuthorAppreciationSettings,
+} from "@/lib/author-appreciation/effective-visibility";
 
 export type AuthorPublicProduct = AuthorPublishedPractice &
   ProductCoverFields & {
@@ -69,6 +73,8 @@ export type AuthorPublicPageData = {
   allProducts: AuthorPublicProduct[];
   contacts: AuthorPublicContact[];
   similarAuthors: Awaited<ReturnType<typeof findSimilarAuthors>>;
+  accessStatus: string | null;
+  appreciationSettings: AuthorAppreciationSettings;
 };
 
 function mapPracticeRow(
@@ -280,6 +286,22 @@ export async function loadAuthorPublicPageData(
       allProducts: sortedProducts,
       contacts: selectVisibleAuthorContacts(profile?.contacts ?? []),
       similarAuthors,
+      accessStatus: author.access_status ?? null,
+      appreciationSettings: resolveAuthorAppreciationSettings(
+        author.author_appreciation_settings?.[0]
+          ? {
+              enabled:
+                author.author_appreciation_settings[0]
+                  .listener_appreciation_enabled,
+              profileEnabled:
+                author.author_appreciation_settings[0]
+                  .listener_appreciation_profile_enabled,
+              freeProductsDefault:
+                author.author_appreciation_settings[0]
+                  .listener_appreciation_free_products_default,
+            }
+          : null,
+      ),
     },
     error: false,
   };

@@ -181,6 +181,7 @@ type FormState = {
   promoButtonText: string;
   promoUrl: string;
   promoOpenInNewTab: boolean;
+  listenerAppreciationOverride: boolean | null;
   coverUrl: string | null;
   coverVersion: string | null;
   coverImage?: unknown;
@@ -327,6 +328,7 @@ function buildInitialForm(
     promoButtonText: "",
     promoUrl: "",
     promoOpenInNewTab: false,
+    listenerAppreciationOverride: null,
     coverUrl: null,
     coverVersion: null,
     coverImage: null,
@@ -438,6 +440,7 @@ function buildProductSavePayload(
     promo_button_text: form.promoButtonText,
     promo_url: form.promoUrl,
     promo_open_in_new_tab: form.promoOpenInNewTab,
+    listener_appreciation_override: form.listenerAppreciationOverride,
     use_shared_cover: form.useSharedCover,
     listening_notice_enabled:
       form.productKind === PRODUCT_KIND.MUSIC
@@ -806,6 +809,12 @@ export default function AuthorProductForm({
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
   );
+  const canConfigureAppreciation =
+    canUsePaidPricing &&
+    form.isFree &&
+    !isCourse &&
+    (form.productKind === PRODUCT_KIND.PRACTICE ||
+      form.productKind === PRODUCT_KIND.AUDIO_POST);
   const paidPricingDisabledReason = getPaidPricingDisabledReason(
     selectedAuthorAccessStatus,
   );
@@ -2893,6 +2902,44 @@ export default function AuthorProductForm({
                 productSlug={form.slug || null}
               />
             </div>
+          ) : null}
+
+          {canConfigureAppreciation ? (
+            <fieldset className="mt-5 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
+              <legend className="px-1 text-sm font-medium text-[#3f3560]">
+                Поблагодарить автора
+              </legend>
+              <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+                Показывать «Поблагодарить автора» для этого бесплатного продукта.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  { value: null, label: "Используется настройка автора" },
+                  { value: true, label: "Включено" },
+                  { value: false, label: "Выключено" },
+                ].map((option) => (
+                  <button
+                    key={String(option.value)}
+                    type="button"
+                    disabled={!canEditPublicFields}
+                    aria-pressed={form.listenerAppreciationOverride === option.value}
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        listenerAppreciationOverride: option.value,
+                      }))
+                    }
+                    className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                      form.listenerAppreciationOverride === option.value
+                        ? "bg-[#7042c5] text-white"
+                        : "border border-[#c6afe6] text-[#7042c5]"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           ) : null}
         </div>
         ) : null}

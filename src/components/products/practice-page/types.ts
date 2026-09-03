@@ -73,6 +73,6 @@ export type PracticePageViewModel = {
    * Phase 1 UX prototype only. Phase 2 replaces this preview state with the
    * effective commercial-author and product-visibility eligibility result.
    */
-  showAuthorSupportPrototype: boolean;
+  showAuthorAppreciationPrototype: boolean;
   publishPreview: PracticePagePublishPreview | null;
 };

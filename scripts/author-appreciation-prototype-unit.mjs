@@ -35,8 +35,8 @@ assert.ok(!prototype.includes("—"), "use en-dash, not em-dash");
 const authorPage = read(
   "src/app/(platform)/(listener)/authors/[slug]/page.tsx",
 );
-assert.ok(authorPage.includes('author_support_preview?: string'));
-assert.ok(authorPage.includes('authorSupportPreview === "1"'));
+assert.ok(authorPage.includes('author_appreciation_preview?: string'));
+assert.ok(authorPage.includes("resolveAuthorAppreciationVisibility"));
 assert.ok(
   authorPage.indexOf("<AuthorAppreciationPrototype") <
     authorPage.indexOf("<AuthorFeaturedSection"),
@@ -46,9 +46,8 @@ assert.ok(
 const practicePage = read(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
 );
-assert.ok(practicePage.includes('author_support_preview?: string'));
-assert.ok(practicePage.includes("practice.is_free === true"));
-assert.ok(practicePage.includes('practice.publication_class !== "course"'));
+assert.ok(practicePage.includes('author_appreciation_preview?: string'));
+assert.ok(practicePage.includes("resolveAuthorAppreciationVisibility"));
 
 const practiceContent = read(
   "src/components/products/practice-page/PracticePageContent.tsx",
