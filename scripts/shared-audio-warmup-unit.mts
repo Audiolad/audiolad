@@ -86,6 +86,28 @@ async function testWarmupSettlementDoesNotTouchRealPlayback(
   assert.equal(audio.pauseCalls, 0, `${name}: stale completion does not pause`);
 }
 
+async function testImmediateWarmupSettlement(
+  name: string,
+  warmupPromise: Promise<void>,
+  expectedIdlePauses: number,
+) {
+  const controller = createSharedAudioWarmupController();
+  const audio = new MockSharedAudio(warmupPromise);
+
+  controller.prepare(audio);
+  await flushPromises();
+
+  assert.equal(audio.muted, false, `${name}: mute is restored synchronously`);
+  assert.equal(
+    audio.pauseCalls,
+    expectedIdlePauses,
+    `${name}: only a resolved idle warm-up may pause`,
+  );
+
+  audio.startRealPlayback();
+  assertAudiblePlaying(audio, name);
+}
+
 async function testPendingWarmupCannotMutePlayback() {
   const pending = deferred();
   const controller = createSharedAudioWarmupController();
@@ -157,13 +179,15 @@ function testAudibleGatePreservesNonZeroVolume() {
   assert.equal(audio.volume, 0.35, "does not overwrite non-zero volume");
 }
 
-await testWarmupSettlementDoesNotTouchRealPlayback(
+await testImmediateWarmupSettlement(
   "immediate resolve",
-  ({ resolve }) => resolve(),
+  Promise.resolve(),
+  1,
 );
-await testWarmupSettlementDoesNotTouchRealPlayback(
+await testImmediateWarmupSettlement(
   "immediate reject",
-  ({ reject }) => reject(new DOMException("warm-up rejected", "AbortError")),
+  Promise.reject(new DOMException("warm-up rejected", "AbortError")),
+  0,
 );
 await testWarmupSettlementDoesNotTouchRealPlayback(
   "delayed resolve",
