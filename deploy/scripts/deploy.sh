@@ -355,6 +355,31 @@ main() {
     send_deploy_alert "deploy_failed" "Reconcile timer ensure failed for $RELEASE_NAME"
     exit 1
   fi
+  RECONCILE_LOG="/var/log/audiolad/author-appreciation-getcourse-reconcile.log"
+  if [[ -r "$RECONCILE_LOG" ]]; then
+    log_info "author_appreciation_getcourse_reconcile_log_tail"
+    tail -n 8 "$RECONCILE_LOG" \
+      | sed -E \
+        -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
+        -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
+        -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+    RECON_SUMMARY="$(
+      awk '/APPRECIATION_RECONCILE / { line=$0 } END { print line }' "$RECONCILE_LOG" \
+        | sed -E \
+          -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
+          -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
+          -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+          -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+    )"
+    if [[ -n "$RECON_SUMMARY" ]]; then
+      log_info "author_appreciation_getcourse_reconcile_summary ${RECON_SUMMARY}"
+    else
+      log_warn "author_appreciation_getcourse_reconcile_summary_missing path=${RECONCILE_LOG}"
+    fi
+  else
+    log_warn "author_appreciation_getcourse_reconcile_log_unreadable path=${RECONCILE_LOG}"
+  fi
   log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
   log_info "Deploy completed successfully: $RELEASE_NAME"
 }

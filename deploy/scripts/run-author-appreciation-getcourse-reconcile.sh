@@ -16,6 +16,14 @@ log() {
   printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*"
 }
 
+redact_stream() {
+  sed -E \
+    -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
+    -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
+    -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+    -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+}
+
 require_absolute() {
   local label="$1"
   local path="$2"
@@ -23,6 +31,58 @@ require_absolute() {
     log "ERROR ${label} must be an absolute path, got: ${path:-<empty>}"
     exit 1
   fi
+}
+
+extract_reconcile_json() {
+  printf '%s\n' "$1" | node -e '
+const fs = require("fs");
+const lines = fs.readFileSync(0, "utf8").split(/\n/);
+let result = null;
+for (const raw of lines) {
+  const line = raw.trim();
+  if (!line.startsWith("{")) continue;
+  try {
+    const value = JSON.parse(line);
+    if (
+      value &&
+      typeof value.attempted === "number" &&
+      typeof value.applied === "number" &&
+      typeof value.exports === "number"
+    ) {
+      result = value;
+    }
+  } catch {
+    // ignore non-json lines such as npm lifecycle prefixes
+  }
+}
+if (result) process.stdout.write(JSON.stringify(result));
+'
+}
+
+json_field() {
+  local json="$1"
+  local field="$2"
+  local default="${3:-?}"
+  printf '%s' "$json" | node -e '
+const fs = require("fs");
+const field = process.argv[1];
+const fallback = process.argv[2];
+const raw = fs.readFileSync(0, "utf8").trim();
+if (!raw) {
+  process.stdout.write(fallback);
+  process.exit(0);
+}
+try {
+  const value = JSON.parse(raw)[field];
+  if (typeof value === "number" || typeof value === "boolean") {
+    process.stdout.write(String(value));
+  } else {
+    process.stdout.write(fallback);
+  }
+} catch {
+  process.stdout.write(fallback);
+}
+' "$field" "$default"
 }
 
 require_absolute DEPLOY_ROOT "$DEPLOY_ROOT"
@@ -36,6 +96,7 @@ mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>>"$LOCK_FILE"
 if ! flock -n 9; then
   log "skip locked=1 reason=another_worker_holds_flock"
+  log "APPRECIATION_RECONCILE attempted=0 correlatable=0 matched=0 applied=0 exports=0 deferred=false provider_error=false exit=0 reason=locked"
   exit 0
 fi
 
@@ -83,35 +144,41 @@ set -e
 
 FINISHED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-RESULT_LINE="$(
-  printf '%s\n' "$OUTPUT" | awk '/^\{.*"attempted".*"applied".*"exports".*\}$/ { line=$0 } END { print line }'
+RESULT_JSON="$(extract_reconcile_json "$OUTPUT")"
+ATTEMPTED="$(json_field "$RESULT_JSON" attempted "?")"
+CORRELATABLE="$(json_field "$RESULT_JSON" correlatable "?")"
+MATCHED="$(json_field "$RESULT_JSON" matched "?")"
+APPLIED="$(json_field "$RESULT_JSON" applied "?")"
+EXPORTS="$(json_field "$RESULT_JSON" exports "?")"
+DEFERRED="$(json_field "$RESULT_JSON" deferred "?")"
+PROVIDER_ERROR="$(json_field "$RESULT_JSON" provider_error "?")"
+SKIP_REASONS="$(
+  if [[ -n "$RESULT_JSON" ]]; then
+    printf '%s' "$RESULT_JSON" | node -e '
+const fs = require("fs");
+const raw = fs.readFileSync(0, "utf8").trim();
+if (!raw) process.exit(0);
+try {
+  const value = JSON.parse(raw).skip_reasons_summary;
+  if (typeof value === "string" && value.trim()) process.stdout.write(value.trim());
+} catch {}
+'
+  fi
 )"
+SKIP_REASONS="${SKIP_REASONS:-none}"
 
-ATTEMPTED="?"
-APPLIED="?"
-EXPORTS="?"
-DEFERRED="?"
-if [[ -n "$RESULT_LINE" ]]; then
-  ATTEMPTED="$(printf '%s' "$RESULT_LINE" | sed -n 's/.*"attempted":\([0-9][0-9]*\).*/\1/p')"
-  APPLIED="$(printf '%s' "$RESULT_LINE" | sed -n 's/.*"applied":\([0-9][0-9]*\).*/\1/p')"
-  EXPORTS="$(printf '%s' "$RESULT_LINE" | sed -n 's/.*"exports":\([0-9][0-9]*\).*/\1/p')"
-  DEFERRED="$(printf '%s' "$RESULT_LINE" | sed -n 's/.*"deferred":\(true\|false\).*/\1/p')"
-  ATTEMPTED="${ATTEMPTED:-?}"
-  APPLIED="${APPLIED:-?}"
-  EXPORTS="${EXPORTS:-?}"
-  DEFERRED="${DEFERRED:-?}"
+SHOULD_DUMP_OUTPUT=0
+if [[ "$EXIT_CODE" -ne 0 ]]; then
+  SHOULD_DUMP_OUTPUT=1
+elif [[ -n "$RESULT_JSON" && "$APPLIED" == "0" && "$ATTEMPTED" != "0" && "$ATTEMPTED" != "?" ]]; then
+  SHOULD_DUMP_OUTPUT=1
 fi
 
 {
-  log "start_at=$STARTED_AT finish_at=$FINISHED_AT attempted=$ATTEMPTED applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED exit=$EXIT_CODE release=$(basename "$CURRENT_RELEASE")"
-  if [[ "$EXIT_CODE" -ne 0 ]]; then
-    printf '%s\n' "$OUTPUT" \
-      | sed -E \
-        -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
-        -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
-        -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
-        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
-      | tail -n 40
+  log "start_at=$STARTED_AT finish_at=$FINISHED_AT attempted=$ATTEMPTED correlatable=$CORRELATABLE matched=$MATCHED applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE release=$(basename "$CURRENT_RELEASE")"
+  log "APPRECIATION_RECONCILE attempted=$ATTEMPTED correlatable=$CORRELATABLE matched=$MATCHED applied=$APPLIED exports=$EXPORTS deferred=$DEFERRED provider_error=$PROVIDER_ERROR exit=$EXIT_CODE skip_reasons=${SKIP_REASONS:-none}"
+  if [[ "$SHOULD_DUMP_OUTPUT" -eq 1 ]]; then
+    printf '%s\n' "$OUTPUT" | redact_stream | tail -n 60
   fi
 } | tee -a "$LOG_FILE"
 

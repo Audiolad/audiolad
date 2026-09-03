@@ -169,6 +169,8 @@ async function run(options: {
   const fetch = createExportFetch({ rows });
   const { result, applyCalls } = await run({ pending, fetch });
   assert.equal(result.exports, 1);
+  assert.equal(result.correlatable, 20);
+  assert.equal(result.matched, 20);
   assert.equal(fetch.counts().dealsCalls, 1);
   assert.ok(fetch.counts().exportCalls <= GETCOURSE_EXPORT_MAX_POLLS);
   assert.equal(result.applied, 20);
@@ -317,6 +319,7 @@ async function run(options: {
 {
   const empty = await run({ pending: [] });
   assert.equal(empty.result.attempted, 0);
+  assert.equal(empty.result.correlatable, 0);
   assert.equal(empty.result.exports, 0);
   assert.equal(empty.applyCalls.length, 0);
 
@@ -350,6 +353,7 @@ async function run(options: {
   });
   const recovered = await run({ fetch });
   assert.equal(recovered.result.applied, 1);
+  assert.equal(recovered.result.matched, 1);
   assert.equal(recovered.applyCalls[0].status, "payed");
 }
 
@@ -364,12 +368,14 @@ async function run(options: {
   assert.match(provider, /return_payment_link: 1/);
   assert.doesNotMatch(provider, /deal_number:\s*input\./);
 
-  const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
-  assert.match(deploy, /ensure-author-appreciation-getcourse-reconcile\.sh/);
-  assert.match(deploy, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
-  assert.match(deploy, /assert_author_appreciation_reconcile_release_tree/);
-  assert.match(deploy, /author_appreciation_getcourse_reconcile_ensure_failed/);
-  assert.doesNotMatch(deploy, /ensure_nonfatal/);
+  const deployScript = readFileSync("deploy/scripts/deploy.sh", "utf8");
+  assert.match(deployScript, /ensure-author-appreciation-getcourse-reconcile\.sh/);
+  assert.match(deployScript, /DEPLOY_TREE="\$RELEASE_DIR\/deploy"/);
+  assert.match(deployScript, /assert_author_appreciation_reconcile_release_tree/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_ensure_failed/);
+  assert.doesNotMatch(deployScript, /ensure_nonfatal/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_log_tail/);
+  assert.match(deployScript, /author_appreciation_getcourse_reconcile_summary/);
   const pin = readFileSync("deploy/scripts/lib/pin-target-deploy-scripts.sh", "utf8");
   assert.match(pin, /deploy\/scripts deploy\/systemd deploy\/logrotate/);
   assert.match(pin, /pin_has_reconcile_artifacts/);
@@ -381,7 +387,16 @@ async function run(options: {
     "utf8",
   );
   assert.match(ensure, /DEPLOY_TREE:-/);
-  assert.doesNotMatch(ensure, /must not fail the caller deploy/);
+  assert.match(ensure, /audiolad-reconcile-diagnose/);
+  assert.match(ensure, /immediate reconcile systemd start exit=/);
+  assert.match(ensure, /reconcile_summary/);
+  assert.match(ensure, /ERROR immediate reconcile start failed/);
+  const wrapper = readFileSync(
+    "deploy/scripts/run-author-appreciation-getcourse-reconcile.sh",
+    "utf8",
+  );
+  assert.match(wrapper, /APPRECIATION_RECONCILE/);
+  assert.match(wrapper, /extract_reconcile_json/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",

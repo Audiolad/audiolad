@@ -59,12 +59,15 @@ export type ReconcileDeps = {
 
 export type ReconcileResult = {
   attempted: number;
+  correlatable: number;
+  matched: number;
   applied: number;
   skipped: number;
   provider_error: boolean;
   deferred: boolean;
   exports: number;
   polls: number;
+  skip_reasons_summary?: string;
 };
 
 let inFlight: Promise<ReconcileResult> | null = null;
@@ -81,6 +84,14 @@ function logReconcileSkipped(reason: string, extras: Record<string, boolean | nu
     reason,
     ...extras,
   });
+}
+
+function summarizeSkipReasons(counts: Map<string, number>): string | undefined {
+  if (counts.size === 0) return undefined;
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([reason, count]) => `${reason}:${count}`)
+    .join(",");
 }
 
 function defaultCooldownFilePath(): string | null {
@@ -174,6 +185,8 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   } catch {
     return {
       attempted: 0,
+      correlatable: 0,
+      matched: 0,
       applied: 0,
       skipped: 0,
       provider_error: true,
@@ -193,14 +206,27 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     );
   });
   if (correlatable.length === 0) {
+    const skipReasons = new Map<string, number>();
+    for (const intent of pending) {
+      const offerId = metadataOfferId(intent.provider_metadata);
+      let reason = "unknown";
+      if (intent.status !== "pending") reason = "not_pending";
+      else if (!intent.provider_deal_id && !intent.provider_deal_number) reason = "missing_deal_reference";
+      else if (!offerId) reason = "missing_offer_metadata";
+      else if (offerId !== config.appreciationOfferId) reason = "offer_metadata_mismatch";
+      skipReasons.set(reason, (skipReasons.get(reason) ?? 0) + 1);
+    }
     return {
       attempted: pending.length,
+      correlatable: 0,
+      matched: 0,
       applied: 0,
       skipped: pending.length,
       provider_error: false,
       deferred: false,
       exports: 0,
       polls: 0,
+      skip_reasons_summary: summarizeSkipReasons(skipReasons),
     };
   }
 
@@ -213,9 +239,24 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   const exported = await exportDeals(config, window, deps.fetchImpl, deps.exportOptions);
   const byId = exported.ok ? indexExportedDealsById(exported.deals) : new Map();
   const byNumber = exported.ok ? indexExportedDealsByNumber(exported.deals) : new Map();
+  let matched = 0;
   let applied = 0;
   let skipped = pending.length - correlatable.length;
   let providerError = !exported.ok && exported.reason === "provider_error";
+  const skipReasons = new Map<string, number>();
+
+  if (exported.ok) {
+    console.info("author_appreciation_getcourse_export_observed", exported.schema ?? {
+      row_count: exported.deals.length,
+    });
+  } else {
+    console.info("author_appreciation_getcourse_export_observed", {
+      ok: false,
+      reason: exported.reason,
+      export_id_present: Boolean(exported.exportId),
+      poll_count: exported.pollCount,
+    });
+  }
 
   for (const intent of correlatable) {
     if (
@@ -223,6 +264,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
       (!intent.provider_deal_id && !intent.provider_deal_number)
     ) {
       skipped += 1;
+      skipReasons.set("not_pending_or_missing_deal", (skipReasons.get("not_pending_or_missing_deal") ?? 0) + 1);
       logReconcileSkipped("not_pending_or_missing_deal", {
         deal_id_present: Boolean(intent.provider_deal_id),
         deal_number_present: Boolean(intent.provider_deal_number),
@@ -232,6 +274,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     const offerId = metadataOfferId(intent.provider_metadata);
     if (!offerId || offerId !== config.appreciationOfferId) {
       skipped += 1;
+      skipReasons.set("offer_metadata_mismatch", (skipReasons.get("offer_metadata_mismatch") ?? 0) + 1);
       logReconcileSkipped("offer_metadata_mismatch", {
         deal_id_present: true,
       });
@@ -239,7 +282,9 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     }
     if (!exported.ok) {
       skipped += 1;
-      logReconcileSkipped(exported.reason === "empty" ? "not_found" : "provider_error", {
+      const reason = exported.reason === "empty" ? "not_found" : "provider_error";
+      skipReasons.set(reason, (skipReasons.get(reason) ?? 0) + 1);
+      logReconcileSkipped(reason, {
         deal_id_present: true,
       });
       continue;
@@ -257,6 +302,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     });
     if (!match.matched) {
       skipped += 1;
+      skipReasons.set(match.reason, (skipReasons.get(match.reason) ?? 0) + 1);
       logReconcileSkipped(match.reason, {
         deal_id_present: Boolean(intent.provider_deal_id),
         deal_number_present: Boolean(intent.provider_deal_number),
@@ -265,6 +311,7 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
       });
       continue;
     }
+    matched += 1;
 
     const { error } = await applyCallback({
       providerDealId: intent.provider_deal_id ?? match.deal.dealId,
@@ -300,12 +347,15 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
 
   return {
     attempted: pending.length,
+    correlatable: correlatable.length,
+    matched,
     applied,
     skipped,
     provider_error: providerError,
     deferred: false,
     exports: 1,
     polls: exported.pollCount,
+    skip_reasons_summary: summarizeSkipReasons(skipReasons),
   };
 }
 
@@ -322,6 +372,8 @@ export async function reconcilePendingGetCourseAppreciationIntents(
     if (elapsed < RECONCILE_MIN_INTERVAL_MS) {
       return {
         attempted: 0,
+        correlatable: 0,
+        matched: 0,
         applied: 0,
         skipped: 0,
         provider_error: false,

@@ -21,6 +21,10 @@ type IntentRow = {
   status: string;
   paid_at: string | null;
   created_at: string;
+  provider_deal_id: string | null;
+  provider_deal_number: string | null;
+  finance_projection_status: string | null;
+  finance_projection_result_code: string | null;
   authors:
     | { name: string | null }
     | { name: string | null }[]
@@ -39,12 +43,21 @@ function asAuthorName(value: IntentRow["authors"]): string {
   return name && name.length > 0 ? name : "Автор";
 }
 
+function asFinanceProjectionStatus(
+  value: string | null,
+): AppreciationIntentFact["financeProjectionStatus"] {
+  if (value === "pending" || value === "projected" || value === "needs_review") {
+    return value;
+  }
+  return null;
+}
+
 export async function getAdminAppreciationAnalytics(): Promise<AppreciationAnalyticsProjection> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("author_appreciation_payment_intents")
     .select(
-      "id, author_id, practice_id, surface, source_title, amount_minor, status, paid_at, created_at, authors(name)",
+      "id, author_id, practice_id, surface, source_title, amount_minor, status, paid_at, created_at, provider_deal_id, provider_deal_number, finance_projection_status, finance_projection_result_code, authors(name)",
     )
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
@@ -95,6 +108,11 @@ export async function getAdminAppreciationAnalytics(): Promise<AppreciationAnaly
         createdAt: row.created_at,
         authorAccruedMinor: accrual ? Number(accrual.amount_minor) || 0 : null,
         availableAt: accrual?.available_at ?? null,
+        providerDealIdPresent: Boolean(row.provider_deal_id?.trim()),
+        providerDealNumberPresent: Boolean(row.provider_deal_number?.trim()),
+        financeProjectionStatus: asFinanceProjectionStatus(row.finance_projection_status),
+        financeProjectionResultCode: row.finance_projection_result_code?.trim() || null,
+        hasSaleAccrual: accrual !== undefined,
       },
     ];
   });

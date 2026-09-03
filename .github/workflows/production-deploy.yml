@@ -4,6 +4,15 @@
 # Smoke failure still blocks cutover. This workflow does not set
 # AUDIOLAD_DEPLOY_OVERRIDE and does not deploy by being merged.
 # SHA resolution fetches origin/main objects only; no working-tree checkout.
+#
+# confirm=DO_NOT_DEPLOY runs read-only production diagnostics (systemd/journal/log).
+# confirm=DEPLOY runs the canonical deploy path only.
+#
+# Environment protection: GitHub Environment `production` typically allows only
+# refs on the default branch. DO_NOT_DEPLOY from a PR branch may fail before
+# any job steps (diagnose job steps=[]). After merge to main, dispatch
+# confirm=DO_NOT_DEPLOY from main to run read-only diagnostics. Do not weaken
+# environment protection to allow PR-branch production access.
 name: Production Deploy
 
 on:
@@ -15,7 +24,7 @@ on:
         type: string
         default: ""
       confirm:
-        description: "Must be DEPLOY to start a production deploy."
+        description: "DEPLOY starts production deploy. DO_NOT_DEPLOY runs read-only diagnostics."
         required: true
         type: choice
         options:
@@ -30,22 +39,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to production
+  resolve:
+    name: Resolve target SHA
     runs-on: ubuntu-latest
-    environment: production
+    outputs:
+      target_sha: ${{ steps.target.outputs.target_sha }}
+      origin_main_sha: ${{ steps.target.outputs.origin_main_sha }}
     steps:
       - name: Resolve target SHA
         id: target
         env:
           INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
-          INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
-          if [[ "${INPUT_CONFIRM}" != "DEPLOY" ]]; then
-            echo "confirm must be DEPLOY" >&2
-            exit 1
-          fi
 
           OBJECT_STORE="$(mktemp -d)"
           git -C "${OBJECT_STORE}" init --quiet
@@ -76,6 +82,182 @@ jobs:
           echo "target_sha=${TARGET_SHA}" >> "${GITHUB_OUTPUT}"
           echo "origin_main_sha=${ORIGIN_MAIN_SHA}" >> "${GITHUB_OUTPUT}"
 
+  diagnose:
+    name: Production read-only diagnostics
+    needs: resolve
+    if: inputs.confirm == 'DO_NOT_DEPLOY'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH identity
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          echo "SSH_DIR=${SSH_DIR}" >> "${GITHUB_ENV}"
+          echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Read-only reconcile diagnostics via SSH
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          TARGET_SHA: ${{ needs.resolve.outputs.target_sha }}
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+        run: |
+          set -euo pipefail
+          : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
+          : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
+          : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
+
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            "bash -s" "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}" <<'REMOTE'
+          set -euo pipefail
+          TARGET_SHA="$1"
+          ORIGIN_MAIN_SHA="$2"
+          shift 2
+
+          UNIT_SERVICE="audiolad-author-appreciation-getcourse-reconcile.service"
+          UNIT_TIMER="audiolad-author-appreciation-getcourse-reconcile.timer"
+          LOG_FILE="/var/log/audiolad/author-appreciation-getcourse-reconcile.log"
+          DEPLOY_COMMIT_FILE="/var/www/audiolad-deploy/current/.deploy-commit"
+          COOLDOWN_FILE="/var/lib/audiolad/author-appreciation-getcourse-reconcile.stamp"
+
+          redact_stream() {
+            sed -E \
+              -e 's/(GETCOURSE_API_KEY=).*/\1***/g' \
+              -e 's/(GETCOURSE_CALLBACK_SECRET=).*/\1***/g' \
+              -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+              -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+          }
+
+          section() {
+            printf '\n===== %s =====\n' "$1"
+          }
+
+          try_cmd() {
+            local label="$1"
+            shift
+            section "${label}"
+            if "$@" 2>&1 | redact_stream; then
+              return 0
+            fi
+            local code=$?
+            printf 'BLOCKED exit=%s label=%s\n' "$code" "$label"
+            return 0
+          }
+
+          section "DIAGNOSTIC_MODE"
+          echo "mode=read_only"
+          echo "audiolad_deploy=NOT_INVOKED"
+
+          section "REQUESTED_SHAS"
+          echo "workflow_target_sha=${TARGET_SHA}"
+          echo "workflow_origin_main_sha=${ORIGIN_MAIN_SHA}"
+
+          section "PRODUCTION_RELEASE"
+          if [[ -r "${DEPLOY_COMMIT_FILE}" ]]; then
+            tr -d '[:space:]' < "${DEPLOY_COMMIT_FILE}"
+          else
+            echo "deploy_commit_unreadable path=${DEPLOY_COMMIT_FILE}"
+          fi
+
+          section "PUBLIC_HEALTH_BUILD"
+          curl -fsS https://audiolad.ru/api/health/build 2>&1 | redact_stream || echo "health_build_fetch_failed"
+
+          try_cmd "TIMER_IS_ACTIVE" systemctl is-active "${UNIT_TIMER}"
+          try_cmd "TIMER_IS_ENABLED" systemctl is-enabled "${UNIT_TIMER}"
+          try_cmd "TIMER_SHOW" systemctl show "${UNIT_TIMER}" \
+            -p ActiveState -p UnitFileState -p NextElapseUSecRealtime -p LastTriggerUSec \
+            -p Triggers -p Unit
+          try_cmd "TIMER_LIST" systemctl list-timers "${UNIT_TIMER}" --all --no-pager
+          try_cmd "SERVICE_SHOW" systemctl show "${UNIT_SERVICE}" \
+            -p ActiveState -p Result -p ExecMainStatus -p ExecMainCode \
+            -p ExecMainStartTimestamp -p ExecMainExitTimestamp -p ExecMainPID \
+            -p InvocationID -p StateChangeTimestamp
+          try_cmd "SERVICE_STATUS" systemctl status "${UNIT_SERVICE}" --no-pager -l
+          try_cmd "JOURNAL_SERVICE_TAIL" journalctl -u "${UNIT_SERVICE}" -n 80 --no-pager
+          try_cmd "JOURNAL_TIMER_TAIL" journalctl -u "${UNIT_TIMER}" -n 40 --no-pager
+
+          section "RECONCILE_COOLDOWN_STAMP"
+          if [[ -r "${COOLDOWN_FILE}" ]]; then
+            echo -n "cooldown_last_started_ms="
+            tr -d '[:space:]' < "${COOLDOWN_FILE}"
+            echo
+          else
+            echo "cooldown_stamp_unreadable path=${COOLDOWN_FILE}"
+          fi
+
+          section "RECONCILE_LOG_FILE"
+          if [[ -r "${LOG_FILE}" ]]; then
+            tail -n 120 "${LOG_FILE}" | redact_stream
+          else
+            echo "log_unreadable path=${LOG_FILE}"
+          fi
+
+          section "RECONCILE_LOG_SUMMARY"
+          if [[ -r "${LOG_FILE}" ]]; then
+            awk '/APPRECIATION_RECONCILE |attempted=|author_appreciation_getcourse_reconcile/' "${LOG_FILE}" \
+              | tail -n 40 \
+              | redact_stream
+          fi
+
+          section "WRAPPER_SCRIPT_HEAD"
+          WRAPPER="/usr/local/lib/audiolad/run-author-appreciation-getcourse-reconcile.sh"
+          if [[ -r "${WRAPPER}" ]]; then
+            head -n 120 "${WRAPPER}" | redact_stream
+          else
+            echo "wrapper_unreadable path=${WRAPPER}"
+          fi
+
+          section "DIAGNOSTIC_END"
+          REMOTE
+
+      - name: Remove SSH identity
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${SSH_DIR:-}" ]]; then
+            rm -rf "${SSH_DIR}"
+          fi
+
+  deploy:
+    name: Deploy to production
+    needs: resolve
+    if: inputs.confirm == 'DEPLOY'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Assert deploy confirmation
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm }}" != "DEPLOY" ]]; then
+            echo "confirm must be DEPLOY for deploy job" >&2
+            exit 1
+          fi
+          echo "target_sha=${{ needs.resolve.outputs.target_sha }}"
+          echo "origin_main_sha=${{ needs.resolve.outputs.origin_main_sha }}"
+
       - name: Prepare SSH identity
         env:
           PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
@@ -101,7 +283,7 @@ jobs:
           PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
           PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
           PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
-          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+          TARGET_SHA: ${{ needs.resolve.outputs.target_sha }}
         run: |
           set -euo pipefail
           : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
@@ -128,7 +310,7 @@ jobs:
           PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
           PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
           PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
-          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+          TARGET_SHA: ${{ needs.resolve.outputs.target_sha }}
         run: |
           set -euo pipefail
           if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
