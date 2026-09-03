@@ -15,6 +15,18 @@ const prototype = read(
 );
 assert.ok(prototype.includes("🙏 Поблагодарить автора ❤️"));
 assert.ok(prototype.includes("Благодарность возвращается изобилием"));
+assert.ok(prototype.includes("FEATURED_CARD_PRIMARY_CTA_CLASS"));
+assert.ok(prototype.includes("author-appreciation-cta"));
+assert.ok(prototype.includes("author-appreciation-cta__heart"));
+assert.ok(
+  prototype.indexOf("author-appreciation-cta__heart") <
+    prototype.indexOf("Благодарность возвращается изобилием"),
+);
+assert.ok(
+  prototype.indexOf("</button>") <
+    prototype.indexOf("Благодарность возвращается изобилием"),
+  "caption must stay a separate non-clickable line under the button",
+);
 assert.ok(prototype.includes('surface: "author" | "product"'));
 assert.ok(prototype.includes('role="dialog"'));
 assert.ok(prototype.includes('aria-modal="true"'));
@@ -63,6 +75,17 @@ assert.equal(
   (audioPost.match(/<AuthorAppreciationPrototype/g) ?? []).length,
   2,
   "audio post needs mobile and desktop placements",
+);
+
+const globalsCss = read("src/app/globals.css");
+assert.ok(globalsCss.includes(".author-appreciation-cta"));
+assert.ok(globalsCss.includes("author-appreciation-cta-breathe"));
+assert.ok(globalsCss.includes("author-appreciation-cta-heart"));
+assert.ok(globalsCss.includes("author-appreciation-cta-glow"));
+assert.ok(globalsCss.includes("author-appreciation-cta-sheen"));
+assert.match(
+  globalsCss,
+  /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.author-appreciation-cta,[\s\S]*?animation:\s*none/,
 );
 
 console.log("author-appreciation-prototype-unit: ok");
