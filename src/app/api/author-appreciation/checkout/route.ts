@@ -218,7 +218,6 @@ export async function POST(request: Request) {
     deal = await createGetCourseAppreciationDeal(getCourseConfig, {
       email,
       amountMinor,
-      localDealNumber,
     });
   } catch (providerError) {
     console.error("author_appreciation_checkout_provider_failed", {

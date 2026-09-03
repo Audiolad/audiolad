@@ -23,7 +23,6 @@ const config = {
 const dealInput = {
   email: "listener@example.test",
   amountMinor: 50_000,
-  localDealNumber: "aa-test",
 };
 let requestUrl = "";
 let requestMethod = "";
@@ -40,15 +39,16 @@ const deal = await createGetCourseAppreciationDeal(
       result: {
         success: true,
         deal_id: 42,
-        deal_number: "provider-1",
+        deal_number: 1001,
         payment_link: "https://pay.example.test/1",
       },
     }), { status: 200, headers: { "content-type": "application/json" } });
   },
 );
 assert.equal(deal.dealId, "42");
-assert.equal(deal.dealNumber, "provider-1");
+assert.equal(deal.dealNumber, "1001");
 assert.equal(deal.paymentLink, "https://pay.example.test/1");
+assert.match(deal.paymentLink, /^https:\/\//);
 assert.equal(requestMethod, "POST");
 assert.match(requestUrl, /^https:\/\/example\.getcourse\.ru\/pl\/api\/deals$/);
 const form = new URLSearchParams(requestBody);
@@ -60,11 +60,32 @@ assert.equal(params.system.return_payment_link, 1);
 assert.equal(params.system.return_deal_number, 1);
 assert.equal(params.deal.offer_id, config.appreciationOfferId);
 assert.equal(params.deal.deal_cost, 500);
-assert.equal(params.deal.deal_number, "aa-test");
+assert.equal(Object.prototype.hasOwnProperty.call(params.deal, "deal_number"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(params, "deal_number"), false);
+assert.doesNotMatch(JSON.stringify(params), /aa-/);
+assert.doesNotMatch(JSON.stringify(params), /localDealNumber|local_deal_number/);
 await assert.rejects(
-  () => createGetCourseAppreciationDeal(config, { email: "x@y.z", amountMinor: 101, localDealNumber: "x" }),
+  () => createGetCourseAppreciationDeal(config, { email: "x@y.z", amountMinor: 101 }),
   /whole_rubles/,
 );
+
+{
+  const httpDeal = await createGetCourseAppreciationDeal(
+    config,
+    dealInput,
+    async () => new Response(JSON.stringify({
+      success: true,
+      result: {
+        success: true,
+        deal_id: "deal-1",
+        deal_number: "provider-1",
+        payment_link: "http://pay.example.test/insecure",
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+  ).catch((error: unknown) => error);
+  assert.ok(httpDeal instanceof Error);
+  assert.match(httpDeal.message, /payment_link_invalid/);
+}
 
 type ProviderLog = { label: unknown; details: Record<string, unknown> };
 
@@ -141,6 +162,27 @@ function assertSafeProviderLog(logs: ProviderLog[], reason: string, httpStatus: 
 {
   const logs = await captureProviderFailure(
     async () => new Response(JSON.stringify({
+      success: true,
+      result: {
+        success: false,
+        error: true,
+        error_message: "№ должен быть целым числом.",
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+    /logical_error/,
+  );
+  assertSafeProviderLog(logs, "logical_error", 200);
+  assert.equal(logs[0].details.top_success, true);
+  assert.equal(logs[0].details.result_success, false);
+  assert.equal(logs[0].details.error_flag, true);
+  assert.equal(logs[0].details.error_message, "№ должен быть целым числом.");
+  assert.equal(logs[0].details.deal_id_present, false);
+  assert.equal(logs[0].details.payment_link_present, false);
+}
+
+{
+  const logs = await captureProviderFailure(
+    async () => new Response(JSON.stringify({
       result: { deal_id: "deal-1" },
     }), { status: 200, headers: { "content-type": "application/json" } }),
     /response_incomplete/,
@@ -162,10 +204,39 @@ function assertSafeProviderLog(logs: ProviderLog[], reason: string, httpStatus: 
 }
 
 assert.deepEqual(
-  parseGetCourseCallback({ data: { deal: { id: 42, number: "aa-test", offer_ids: ["offer-1"], deal_cost: "500", status: "payed", payed_money: "500", left_cost_money: "0" } } }),
-  { dealId: "42", dealNumber: "aa-test", offerId: "offer-1", offerIds: ["offer-1"], amountMinor: 50_000, status: "payed", payedMoneyMinor: 50_000, leftCostMoneyMinor: 0 },
+  parseGetCourseCallback({
+    data: {
+      deal: {
+        id: 42,
+        number: 1001,
+        offer_ids: ["offer-1"],
+        deal_cost: "500",
+        status: "payed",
+        payed_money: "500",
+        left_cost_money: "0",
+      },
+    },
+  }),
+  {
+    dealId: "42",
+    dealNumber: "1001",
+    offerId: "offer-1",
+    offerIds: ["offer-1"],
+    amountMinor: 50_000,
+    status: "payed",
+    payedMoneyMinor: 50_000,
+    leftCostMoneyMinor: 0,
+  },
 );
 assert.equal(parseGetCourseCallback({ deal_id: "x", amount: "500.50" }).amountMinor, null);
+assert.equal(
+  parseGetCourseCallback({ deal: { id: 99, number: "aa-11111111-1111-4111-8111-111111111111" } }).dealNumber,
+  "aa-11111111-1111-4111-8111-111111111111",
+);
+assert.notEqual(
+  parseGetCourseCallback({ deal: { id: 99, number: 1001 } }).dealNumber,
+  "aa-11111111-1111-4111-8111-111111111111",
+);
 
 process.env.AUTHOR_APPRECIATION_GETCOURSE_ROLLOUT_ENABLED = "1";
 process.env.AUTHOR_APPRECIATION_GETCOURSE_AUTHOR_ALLOWLIST = "11111111-1111-4111-8111-111111111111";
@@ -188,6 +259,15 @@ assert.match(migration, /CHECK \(status IN \('pending', 'paid', 'needs_review', 
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /GRANT ALL ON TABLE public\.author_appreciation_payment_intents TO service_role/);
 assert.match(migration, /apply_author_appreciation_getcourse_callback/);
+assert.match(migration, /local_deal_number text NOT NULL UNIQUE/);
+assert.match(migration, /provider_deal_id = p_provider_deal_id/);
+assert.match(migration, /provider_deal_number = p_provider_deal_number/);
+assert.match(migration, /IF v_count = 0 THEN[\s\S]*?RETURN QUERY SELECT 'unknown'::text, NULL::uuid;/);
+assert.match(migration, /IF v_intent\.status = 'paid' THEN[\s\S]*?RETURN QUERY SELECT 'already_paid'::text, v_intent\.id;/);
+assert.doesNotMatch(
+  migration.slice(migration.indexOf("CREATE OR REPLACE FUNCTION public.apply_author_appreciation_getcourse_callback")),
+  /INSERT INTO public\.author_appreciation_payment_intents/,
+);
 assert.doesNotMatch(migration, /\b(?:INSERT INTO|UPDATE|ALTER TABLE)\s+public\.(?:orders|payments|user_practices|finance_)/i);
 
 const checkout = read("src/app/api/author-appreciation/checkout/route.ts");
@@ -198,11 +278,34 @@ assert.ok(
   checkout.indexOf("const { error: insertError }") <
     checkout.indexOf("deal = await createGetCourseAppreciationDeal"),
 );
+assert.ok(
+  checkout.indexOf("deal = await createGetCourseAppreciationDeal") <
+    checkout.indexOf("provider_deal_id: deal.dealId"),
+);
+assert.ok(
+  checkout.indexOf("provider_deal_id: deal.dealId") <
+    checkout.indexOf("payment_link: deal.paymentLink"),
+);
+assert.ok(
+  checkout.indexOf("provider_deal_number: deal.dealNumber") <
+    checkout.indexOf("payment_link: deal.paymentLink"),
+);
 assert.match(checkout, /author_appreciation_checkout_provider_failed/);
 assert.match(checkout, /if \(user\?\.email\)/);
 assert.match(checkout, /email = user\.email/);
 assert.match(checkout, /localDealNumber = `aa-\$\{intentId\}`/);
+assert.match(checkout, /local_deal_number: localDealNumber/);
 assert.match(checkout, /return error\("checkout_unavailable", 502\)/);
+{
+  const providerCallStart = checkout.indexOf("createGetCourseAppreciationDeal(getCourseConfig");
+  const providerCallEnd = checkout.indexOf("});", providerCallStart);
+  const providerCall = checkout.slice(providerCallStart, providerCallEnd);
+  assert.match(providerCall, /email/);
+  assert.match(providerCall, /amountMinor/);
+  assert.doesNotMatch(providerCall, /localDealNumber/);
+  assert.doesNotMatch(providerCall, /local_deal_number/);
+  assert.doesNotMatch(providerCall, /deal_number/);
+}
 assert.doesNotMatch(checkout, /@\/lib\/payments|@\/lib\/author-finance|from\("(?:orders|payments|user_practices)"\)/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
@@ -210,7 +313,16 @@ assert.match(webhook, /timingSafeEqual/);
 assert.match(webhook, /callback\.status !== "payed"/);
 assert.match(webhook, /x-audiolad-getcourse-secret/);
 assert.match(webhook, /apply_author_appreciation_getcourse_callback/);
+assert.match(webhook, /p_provider_deal_id: callback\.dealId/);
+assert.match(webhook, /p_provider_deal_number: callback\.dealNumber/);
+assert.doesNotMatch(webhook, /local_deal_number|localDealNumber|aa-\$/);
 assert.doesNotMatch(webhook, /@\/lib\/payments|@\/lib\/author-finance/);
+
+const provider = read("src/lib/author-appreciation/getcourse/provider.ts");
+assert.match(provider, /return_deal_number: 1/);
+assert.match(provider, /return_payment_link: 1/);
+assert.doesNotMatch(provider, /deal_number:\s*input\./);
+assert.doesNotMatch(provider, /localDealNumber/);
 
 for (const page of [
   "src/app/(platform)/(listener)/authors/[slug]/page.tsx",
