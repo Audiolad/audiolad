@@ -8,9 +8,9 @@ import {
 } from "@/lib/author-appreciation/getcourse/callback";
 import type { GetCourseConfig } from "@/lib/author-appreciation/getcourse/provider";
 
-const GETCOURSE_CONFIRM_TIMEOUT_MS = 10_000;
-const GETCOURSE_EXPORT_POLL_MS = 400;
-const GETCOURSE_EXPORT_MAX_POLLS = 8;
+const GETCOURSE_EXPORT_TIMEOUT_MS = 25_000;
+export const GETCOURSE_EXPORT_POLL_MS = 1_500;
+export const GETCOURSE_EXPORT_MAX_POLLS = 8;
 
 export type ConfirmedGetCourseDeal = {
   dealId: string;
@@ -22,12 +22,28 @@ export type ConfirmedGetCourseDeal = {
   offerIds: string[];
 };
 
-export type ConfirmGetCourseDealResult =
-  | { confirmed: true; deal: ConfirmedGetCourseDeal }
+export type ExportPaidGetCourseDealsResult =
   | {
-      confirmed: false;
-      reason: "provider_error" | "not_found" | "unpaid" | "ambiguous";
+      ok: true;
+      exportId: string;
+      deals: ConfirmedGetCourseDeal[];
+      pollCount: number;
+    }
+  | {
+      ok: false;
+      reason: "provider_error" | "empty";
+      exportId: string | null;
+      pollCount: number;
     };
+
+export type IntentExportMatchReason =
+  | "matched"
+  | "not_found"
+  | "ambiguous"
+  | "unpaid"
+  | "amount_mismatch"
+  | "export_offer_mismatch"
+  | "partial_payment";
 
 function idField(value: unknown): string | null {
   if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
@@ -134,11 +150,17 @@ function utcDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-export function exportDateWindow(createdAtIso: string, now: Date): { from: string; to: string } {
-  const created = new Date(createdAtIso);
-  const createdMs = Number.isNaN(created.getTime()) ? now.getTime() : created.getTime();
-  const from = new Date(createdMs - 24 * 60 * 60 * 1000);
-  const to = new Date(Math.min(now.getTime() + 24 * 60 * 60 * 1000, createdMs + 2 * 24 * 60 * 60 * 1000));
+export function coveringExportDateWindow(
+  createdAtIsos: string[],
+  now: Date,
+): { from: string; to: string } {
+  const times = createdAtIsos
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+  const min = times.length > 0 ? Math.min(...times) : now.getTime();
+  const max = times.length > 0 ? Math.max(...times) : now.getTime();
+  const from = new Date(min - 24 * 60 * 60 * 1000);
+  const to = new Date(Math.max(now.getTime(), max) + 24 * 60 * 60 * 1000);
   return { from: utcDateOnly(from), to: utcDateOnly(to) };
 }
 
@@ -152,7 +174,13 @@ async function readJson(
   }
 }
 
-async function startDealExport(
+export type ExportPaidGetCourseDealsOptions = {
+  pollMs?: number;
+  maxPolls?: number;
+  timeoutMs?: number;
+};
+
+async function startPaidDealsExport(
   config: GetCourseConfig,
   window: { from: string; to: string },
   fetchImpl: typeof fetch,
@@ -185,8 +213,12 @@ async function pollDealExport(
   exportId: string,
   fetchImpl: typeof fetch,
   signal: AbortSignal,
-): Promise<{ rows: unknown[] } | { empty: true } | { error: true }> {
-  for (let attempt = 0; attempt < GETCOURSE_EXPORT_MAX_POLLS; attempt += 1) {
+  pollMs: number,
+  maxPolls: number,
+): Promise<{ rows: unknown[]; pollCount: number } | { empty: true; pollCount: number } | { error: true; pollCount: number }> {
+  let pollCount = 0;
+  for (let attempt = 0; attempt < maxPolls; attempt += 1) {
+    pollCount += 1;
     const url = `https://${config.accountName}.getcourse.ru/pl/api/account/exports/${encodeURIComponent(exportId)}?key=${encodeURIComponent(config.apiKey)}`;
     try {
       const response = await fetchImpl(url, {
@@ -195,55 +227,116 @@ async function pollDealExport(
         signal,
       });
       const payload = await readJson(response);
-      if (!response.ok) return { error: true };
-      if (isExportEmpty(payload)) return { empty: true };
-      if (isExportReady(payload) || attempt === GETCOURSE_EXPORT_MAX_POLLS - 1) {
-        return { rows: collectExportRows(payload) };
+      if (!response.ok) return { error: true, pollCount };
+      if (isExportEmpty(payload)) return { empty: true, pollCount };
+      if (isExportReady(payload) || attempt === maxPolls - 1) {
+        return { rows: collectExportRows(payload), pollCount };
       }
     } catch {
-      return { error: true };
+      return { error: true, pollCount };
     }
-    await new Promise((resolve) => setTimeout(resolve, GETCOURSE_EXPORT_POLL_MS));
+    if (pollMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
   }
-  return { error: true };
+  return { error: true, pollCount };
 }
 
-export function matchExportedDeal(
-  rows: unknown[],
-  dealId: string,
-): ConfirmGetCourseDealResult {
-  const matches = rows
-    .map((row) => parseExportedGetCourseDeal(row))
-    .filter((deal): deal is ConfirmedGetCourseDeal => deal?.dealId === dealId);
-  if (matches.length > 1) return { confirmed: false, reason: "ambiguous" };
-  if (matches.length === 0) return { confirmed: false, reason: "not_found" };
-  const deal = matches[0];
+export function indexExportedDealsById(
+  deals: ConfirmedGetCourseDeal[],
+): Map<string, ConfirmedGetCourseDeal | "ambiguous"> {
+  const index = new Map<string, ConfirmedGetCourseDeal | "ambiguous">();
+  for (const deal of deals) {
+    const existing = index.get(deal.dealId);
+    if (existing) {
+      index.set(deal.dealId, "ambiguous");
+    } else {
+      index.set(deal.dealId, deal);
+    }
+  }
+  return index;
+}
+
+export function matchIntentToExportedDeal(input: {
+  deal: ConfirmedGetCourseDeal | "ambiguous" | undefined;
+  configuredOfferId: string;
+  amountMinor: number;
+}): { matched: true; deal: ConfirmedGetCourseDeal } | { matched: false; reason: IntentExportMatchReason } {
+  if (!input.deal) return { matched: false, reason: "not_found" };
+  if (input.deal === "ambiguous") return { matched: false, reason: "ambiguous" };
+  const deal = input.deal;
   if (deal.status && deal.status !== "payed") {
-    return { confirmed: false, reason: "unpaid" };
+    return { matched: false, reason: "unpaid" };
   }
-  return { confirmed: true, deal };
+  if (deal.amountMinor !== null && deal.amountMinor !== input.amountMinor) {
+    return { matched: false, reason: "amount_mismatch" };
+  }
+  if (deal.offerIds.length > 0 && !deal.offerIds.includes(input.configuredOfferId)) {
+    return { matched: false, reason: "export_offer_mismatch" };
+  }
+  if (deal.payedMoneyMinor !== null && deal.payedMoneyMinor < input.amountMinor) {
+    return { matched: false, reason: "partial_payment" };
+  }
+  if (deal.leftCostMoneyMinor !== null && deal.leftCostMoneyMinor > 0) {
+    return { matched: false, reason: "partial_payment" };
+  }
+  return { matched: true, deal };
 }
 
-export async function confirmGetCourseDealPayment(
+export async function exportPaidGetCourseDealsOnce(
   config: GetCourseConfig,
-  input: { dealId: string; createdAtIso: string },
+  window: { from: string; to: string },
   fetchImpl: typeof fetch = fetch,
-  now: Date = new Date(),
-): Promise<ConfirmGetCourseDealResult> {
-  if (!input.dealId.trim()) return { confirmed: false, reason: "not_found" };
+  options: ExportPaidGetCourseDealsOptions = {},
+): Promise<ExportPaidGetCourseDealsResult> {
+  const pollMs = options.pollMs ?? GETCOURSE_EXPORT_POLL_MS;
+  const maxPolls = options.maxPolls ?? GETCOURSE_EXPORT_MAX_POLLS;
+  const timeoutMs = options.timeoutMs ?? GETCOURSE_EXPORT_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GETCOURSE_CONFIRM_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const window = exportDateWindow(input.createdAtIso, now);
-    const started = await startDealExport(config, window, fetchImpl, controller.signal);
-    if ("error" in started) return { confirmed: false, reason: "provider_error" };
-    if ("empty" in started) return { confirmed: false, reason: "not_found" };
-    const polled = await pollDealExport(config, started.exportId, fetchImpl, controller.signal);
-    if ("error" in polled) return { confirmed: false, reason: "provider_error" };
-    if ("empty" in polled) return { confirmed: false, reason: "not_found" };
-    return matchExportedDeal(polled.rows, input.dealId);
+    const started = await startPaidDealsExport(config, window, fetchImpl, controller.signal);
+    if ("error" in started) {
+      return { ok: false, reason: "provider_error", exportId: null, pollCount: 0 };
+    }
+    if ("empty" in started) {
+      return { ok: false, reason: "empty", exportId: null, pollCount: 0 };
+    }
+    const polled = await pollDealExport(
+      config,
+      started.exportId,
+      fetchImpl,
+      controller.signal,
+      pollMs,
+      maxPolls,
+    );
+    if ("error" in polled) {
+      return {
+        ok: false,
+        reason: "provider_error",
+        exportId: started.exportId,
+        pollCount: polled.pollCount,
+      };
+    }
+    if ("empty" in polled) {
+      return {
+        ok: false,
+        reason: "empty",
+        exportId: started.exportId,
+        pollCount: polled.pollCount,
+      };
+    }
+    const deals = polled.rows
+      .map((row) => parseExportedGetCourseDeal(row))
+      .filter((deal): deal is ConfirmedGetCourseDeal => deal !== null);
+    return {
+      ok: true,
+      exportId: started.exportId,
+      deals,
+      pollCount: polled.pollCount,
+    };
   } catch {
-    return { confirmed: false, reason: "provider_error" };
+    return { ok: false, reason: "provider_error", exportId: null, pollCount: 0 };
   } finally {
     clearTimeout(timeout);
   }

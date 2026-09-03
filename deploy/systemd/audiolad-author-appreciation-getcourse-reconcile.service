@@ -1,0 +1,20 @@
+[Unit]
+Description=Audiolad author appreciation GetCourse export recovery
+Documentation=file:/var/www/audiolad/deploy/docs/AUTHOR_APPRECIATION_GETCOURSE_RECONCILE.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/audiolad/run-author-appreciation-getcourse-reconcile.sh
+Environment=DEPLOY_ROOT=/var/www/audiolad-deploy
+Environment=LOCK_FILE=/run/audiolad-author-appreciation-getcourse-reconcile.lock
+Environment=LOG_FILE=/var/log/audiolad/author-appreciation-getcourse-reconcile.log
+Environment=TIMEOUT_SECONDS=90
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=120
+SyslogIdentifier=audiolad-author-appreciation-getcourse-reconcile
+StandardOutput=journal
+StandardError=journal

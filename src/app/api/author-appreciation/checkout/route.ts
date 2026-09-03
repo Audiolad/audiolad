@@ -7,6 +7,7 @@ import {
   isAuthorAppreciationRolloutEnabled,
 } from "@/lib/author-appreciation/config";
 import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
+import { ensureAutoCommercialAppreciationLifecycle } from "@/lib/authors/ensure-auto-commercial-lifecycle";
 import {
   canReceiveCanonicalAppreciationAccrual,
   isCommercialTermsFound,
@@ -19,7 +20,6 @@ import {
   createGetCourseAppreciationDeal,
   getGetCourseConfig,
 } from "@/lib/author-appreciation/getcourse/provider";
-import { scheduleGetCourseAppreciationReconcile } from "@/lib/author-appreciation/getcourse/reconcile";
 import type {
   GetCourseConfig,
   GetCourseDeal,
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
   const { data: author, error: authorError } = await service
     .from("authors")
-    .select("id, name, slug, access_status, payout_eligible, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
+    .select("id, name, slug, access_status, payout_eligible, can_bypass_product_moderation, author_appreciation_settings(listener_appreciation_enabled, listener_appreciation_profile_enabled, listener_appreciation_free_products_default)")
     .eq("id", authorId)
     .maybeSingle();
   if (authorError || !author || !isAuthorCommercialActiveAccess(author.access_status)) {
@@ -142,6 +142,13 @@ export async function POST(request: Request) {
   if (!(await hasAcceptedCurrentAppreciationTerms(authorId))) {
     return error("appreciation_unavailable", 404);
   }
+  const payeeSetup = await ensureAutoCommercialAppreciationLifecycle({
+    authorId,
+    accessStatus: author.access_status,
+    ownerControlled: author.can_bypass_product_moderation === true,
+  });
+  const payoutEligible =
+    payeeSetup?.payoutEligible === true || author.payout_eligible === true;
   const { data: commercialTerms, error: commercialTermsError } = await service.rpc(
     "resolve_author_commercial_terms",
     {
@@ -153,7 +160,7 @@ export async function POST(request: Request) {
   if (
     commercialTermsError ||
     !canReceiveCanonicalAppreciationAccrual({
-      payoutEligible: author.payout_eligible === true,
+      payoutEligible,
       commercialTermsFound: isCommercialTermsFound(commercialTerms),
     })
   ) {
@@ -269,7 +276,6 @@ export async function POST(request: Request) {
       .eq("id", intentId)
       .eq("status", "pending");
     if (updateError) throw new Error("author_appreciation_intent_provider_save_failed");
-    scheduleGetCourseAppreciationReconcile();
     return NextResponse.json(
       { intent_id: intentId, status: "pending", payment_link: deal.paymentLink },
       { status: 201 },

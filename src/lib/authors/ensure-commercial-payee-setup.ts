@@ -9,6 +9,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export const DEFAULT_COMMERCIAL_HOLD_DAYS = 14;
 export const COMMERCIAL_PAYEE_SETUP_NOTES =
   "default_after_author_terms_accepted";
+export const AUTO_COMMERCIAL_PAYEE_SETUP_NOTES =
+  "default_after_auto_commercial_activation";
 
 export type EnsureCommercialPayeeSetupResult = {
   payoutEligible: boolean;
@@ -24,8 +26,10 @@ export type EnsureCommercialPayeeSetupResult = {
  */
 export async function ensureCommercialPayeeSetupAfterTerms(input: {
   authorId: string;
-  actorUserId: string;
+  actorUserId: string | null;
   validFrom?: string;
+  notes?: string;
+  correlationId?: string;
 }): Promise<EnsureCommercialPayeeSetupResult> {
   const supabase = createServiceRoleClient();
 
@@ -84,9 +88,10 @@ export async function ensureCommercialPayeeSetupAfterTerms(input: {
       authorShareBps: AUTHOR_COMMERCIAL_SHARE_BPS,
       validFrom: input.validFrom ?? new Date().toISOString(),
       holdDays: DEFAULT_COMMERCIAL_HOLD_DAYS,
-      notes: COMMERCIAL_PAYEE_SETUP_NOTES,
+      notes: input.notes ?? COMMERCIAL_PAYEE_SETUP_NOTES,
       actorUserId: input.actorUserId,
-      correlationId: `author_terms_payee_setup:${input.authorId}`,
+      correlationId:
+        input.correlationId ?? `author_terms_payee_setup:${input.authorId}`,
       approveImmediately: true,
     });
     termsProvisioned = created.ok === true;

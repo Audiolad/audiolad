@@ -319,6 +319,8 @@ assert.doesNotMatch(checkout, /allowedAuthorIds|AUTHOR_ALLOWLIST/);
 assert.match(checkout, /payout_eligible/);
 assert.match(checkout, /resolve_author_commercial_terms/);
 assert.match(checkout, /canReceiveCanonicalAppreciationAccrual/);
+assert.doesNotMatch(checkout, /scheduleGetCourseAppreciationReconcile/);
+assert.match(checkout, /ensureAutoCommercialAppreciationLifecycle/);
 
 const webhook = read("src/app/api/webhooks/getcourse/author-appreciation/route.ts");
 const webhookHandle = read("src/lib/author-appreciation/getcourse/handle-callback.ts");
@@ -334,6 +336,7 @@ assert.match(webhookParse, /offerFieldPresent/);
 assert.match(webhook, /author_appreciation_getcourse_callback_ignored|handleGetCourseAppreciationCallback/);
 assert.doesNotMatch(webhook, /local_deal_number|localDealNumber|aa-\$/);
 assert.doesNotMatch(webhook, /@\/lib\/payments|@\/lib\/author-finance/);
+assert.doesNotMatch(webhook, /scheduleGetCourseAppreciationReconcile|reconcilePendingGetCourseAppreciationIntents/);
 assert.doesNotMatch(webhookHandle, /@\/lib\/payments|@\/lib\/author-finance/);
 
 const provider = read("src/lib/author-appreciation/getcourse/provider.ts");

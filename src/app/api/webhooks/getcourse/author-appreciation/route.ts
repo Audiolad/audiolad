@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { parseGetCourseCallback } from "@/lib/author-appreciation/getcourse/callback";
 import { handleGetCourseAppreciationCallback } from "@/lib/author-appreciation/getcourse/handle-callback";
 import { getGetCourseConfig } from "@/lib/author-appreciation/getcourse/provider";
-import { scheduleGetCourseAppreciationReconcile } from "@/lib/author-appreciation/getcourse/reconcile";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export { parseGetCourseCallback };
@@ -49,10 +48,6 @@ export async function POST(request: Request) {
       });
     },
   });
-
-  if (result.status === 200 && result.rpcCalled && result.ignoredReason === null) {
-    scheduleGetCourseAppreciationReconcile();
-  }
 
   return new NextResponse(null, { status: result.status });
 }

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Audiolad GetCourse appreciation recovery every 45 minutes
+
+[Timer]
+OnActiveSec=45min
+OnUnitActiveSec=45min
+AccuracySec=1min
+Persistent=true
+Unit=audiolad-author-appreciation-getcourse-reconcile.service
+
+[Install]
+WantedBy=timers.target

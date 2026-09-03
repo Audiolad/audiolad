@@ -1,15 +1,24 @@
 import "server-only";
 
-import { confirmGetCourseDealPayment } from "@/lib/author-appreciation/getcourse/confirm-deal";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+
+import {
+  coveringExportDateWindow,
+  exportPaidGetCourseDealsOnce,
+  indexExportedDealsById,
+  matchIntentToExportedDeal,
+  type ExportPaidGetCourseDealsOptions,
+} from "@/lib/author-appreciation/getcourse/confirm-deal";
 import {
   getGetCourseConfig,
   type GetCourseConfig,
 } from "@/lib/author-appreciation/getcourse/provider";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-const RECONCILE_MAX_INTENTS = 20;
-const RECONCILE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
-const RECONCILE_MIN_INTERVAL_MS = 60_000;
+export const RECONCILE_MAX_INTENTS = 20;
+export const RECONCILE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+export const RECONCILE_MIN_INTERVAL_MS = 45 * 60 * 1000;
 
 export type PendingAppreciationIntent = {
   id: string;
@@ -19,6 +28,11 @@ export type PendingAppreciationIntent = {
   provider_metadata: unknown;
   created_at: string;
   status: string;
+};
+
+export type ReconcileCooldownStore = {
+  readLastStartedAt(): number;
+  writeLastStartedAt(ms: number): void;
 };
 
 export type ReconcileDeps = {
@@ -33,10 +47,12 @@ export type ReconcileDeps = {
     payedMoneyMinor: number | null;
     leftCostMoneyMinor: number | null;
   }) => Promise<{ error: { message?: string } | null; data: unknown }>;
-  confirmDeal?: typeof confirmGetCourseDealPayment;
+  exportDeals?: typeof exportPaidGetCourseDealsOnce;
   fetchImpl?: typeof fetch;
   now?: Date;
   force?: boolean;
+  cooldown?: ReconcileCooldownStore;
+  exportOptions?: ExportPaidGetCourseDealsOptions;
 };
 
 export type ReconcileResult = {
@@ -45,6 +61,8 @@ export type ReconcileResult = {
   skipped: number;
   provider_error: boolean;
   deferred: boolean;
+  exports: number;
+  polls: number;
 };
 
 let inFlight: Promise<ReconcileResult> | null = null;
@@ -63,6 +81,50 @@ function logReconcileSkipped(reason: string, extras: Record<string, boolean | nu
   });
 }
 
+function defaultCooldownFilePath(): string | null {
+  const configured = process.env.AUDIOLAD_APPRECIATION_RECONCILE_COOLDOWN_FILE?.trim();
+  if (configured) return configured;
+  return "/var/lib/audiolad/author-appreciation-getcourse-reconcile.stamp";
+}
+
+export function createFileReconcileCooldownStore(
+  filePath: string | null = defaultCooldownFilePath(),
+): ReconcileCooldownStore {
+  return {
+    readLastStartedAt() {
+      if (!filePath) return 0;
+      try {
+        const raw = readFileSync(filePath, "utf8").trim();
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : 0;
+      } catch {
+        return 0;
+      }
+    },
+    writeLastStartedAt(ms: number) {
+      if (!filePath) return;
+      try {
+        mkdirSync(dirname(filePath), { recursive: true });
+        writeFileSync(filePath, String(ms), "utf8");
+      } catch {
+        // Best-effort cross-process cooldown. In-memory still applies.
+      }
+    },
+  };
+}
+
+function memoryAndFileCooldown(store: ReconcileCooldownStore): ReconcileCooldownStore {
+  return {
+    readLastStartedAt() {
+      return Math.max(lastStartedAt, store.readLastStartedAt());
+    },
+    writeLastStartedAt(ms: number) {
+      lastStartedAt = ms;
+      store.writeLastStartedAt(ms);
+    },
+  };
+}
+
 async function defaultListPending(
   now: Date,
 ): Promise<PendingAppreciationIntent[]> {
@@ -75,7 +137,7 @@ async function defaultListPending(
     .eq("status", "pending")
     .not("provider_deal_id", "is", null)
     .gte("created_at", cutoff)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: true })
     .limit(RECONCILE_MAX_INTENTS);
   if (error) throw new Error("author_appreciation_reconcile_list_failed");
   return (data ?? []) as PendingAppreciationIntent[];
@@ -108,17 +170,51 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
   try {
     config = deps.config ?? getGetCourseConfig();
   } catch {
-    return { attempted: 0, applied: 0, skipped: 0, provider_error: true, deferred: false };
+    return {
+      attempted: 0,
+      applied: 0,
+      skipped: 0,
+      provider_error: true,
+      deferred: false,
+      exports: 0,
+      polls: 0,
+    };
   }
 
   const pending = await (deps.listPending ?? (() => defaultListPending(now)))();
-  const confirmDeal = deps.confirmDeal ?? confirmGetCourseDealPayment;
-  const applyCallback = deps.applyCallback ?? defaultApplyCallback;
-  let applied = 0;
-  let skipped = 0;
-  let providerError = false;
+  const correlatable = pending.filter((intent) => {
+    const offerId = metadataOfferId(intent.provider_metadata);
+    return (
+      intent.status === "pending" &&
+      Boolean(intent.provider_deal_id) &&
+      offerId === config.appreciationOfferId
+    );
+  });
+  if (correlatable.length === 0) {
+    return {
+      attempted: pending.length,
+      applied: 0,
+      skipped: pending.length,
+      provider_error: false,
+      deferred: false,
+      exports: 0,
+      polls: 0,
+    };
+  }
 
-  for (const intent of pending) {
+  const exportDeals = deps.exportDeals ?? exportPaidGetCourseDealsOnce;
+  const applyCallback = deps.applyCallback ?? defaultApplyCallback;
+  const window = coveringExportDateWindow(
+    correlatable.map((intent) => intent.created_at),
+    now,
+  );
+  const exported = await exportDeals(config, window, deps.fetchImpl, deps.exportOptions);
+  const index = exported.ok ? indexExportedDealsById(exported.deals) : new Map();
+  let applied = 0;
+  let skipped = pending.length - correlatable.length;
+  let providerError = !exported.ok && exported.reason === "provider_error";
+
+  for (const intent of correlatable) {
     if (intent.status !== "pending" || !intent.provider_deal_id) {
       skipped += 1;
       logReconcileSkipped("not_pending_or_missing_deal", {
@@ -134,69 +230,25 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
       });
       continue;
     }
-
-    const confirmation = await confirmDeal(
-      config,
-      { dealId: intent.provider_deal_id, createdAtIso: intent.created_at },
-      deps.fetchImpl,
-      now,
-    );
-    if (!confirmation.confirmed) {
-      if (confirmation.reason === "provider_error") {
-        providerError = true;
-        logReconcileSkipped("provider_error", { deal_id_present: true });
-        break;
-      }
+    if (!exported.ok) {
       skipped += 1;
-      logReconcileSkipped(confirmation.reason, {
+      logReconcileSkipped(exported.reason === "empty" ? "not_found" : "provider_error", {
         deal_id_present: true,
-        status_payed: confirmation.reason !== "unpaid",
       });
       continue;
     }
 
-    const deal = confirmation.deal;
-    if (deal.status && deal.status !== "payed") {
+    const match = matchIntentToExportedDeal({
+      deal: index.get(intent.provider_deal_id),
+      configuredOfferId: config.appreciationOfferId,
+      amountMinor: intent.amount_minor,
+    });
+    if (!match.matched) {
       skipped += 1;
-      logReconcileSkipped("unpaid", { deal_id_present: true, status_payed: false });
-      continue;
-    }
-    if (deal.amountMinor !== null && deal.amountMinor !== intent.amount_minor) {
-      skipped += 1;
-      logReconcileSkipped("amount_mismatch", {
+      logReconcileSkipped(match.reason, {
         deal_id_present: true,
-        amount_match: false,
-        status_payed: true,
-      });
-      continue;
-    }
-    if (
-      deal.offerIds.length > 0 &&
-      !deal.offerIds.includes(config.appreciationOfferId)
-    ) {
-      skipped += 1;
-      logReconcileSkipped("export_offer_mismatch", {
-        deal_id_present: true,
-        amount_match: deal.amountMinor === null || deal.amountMinor === intent.amount_minor,
-        status_payed: true,
-      });
-      continue;
-    }
-    if (deal.payedMoneyMinor !== null && deal.payedMoneyMinor < intent.amount_minor) {
-      skipped += 1;
-      logReconcileSkipped("partial_payment", {
-        deal_id_present: true,
-        amount_match: true,
-        status_payed: true,
-      });
-      continue;
-    }
-    if (deal.leftCostMoneyMinor !== null && deal.leftCostMoneyMinor > 0) {
-      skipped += 1;
-      logReconcileSkipped("partial_payment", {
-        deal_id_present: true,
-        amount_match: true,
-        status_payed: true,
+        status_payed: match.reason !== "unpaid",
+        amount_match: match.reason !== "amount_mismatch",
       });
       continue;
     }
@@ -207,8 +259,8 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
       offerId,
       amountMinor: intent.amount_minor,
       status: "payed",
-      payedMoneyMinor: deal.payedMoneyMinor ?? intent.amount_minor,
-      leftCostMoneyMinor: deal.leftCostMoneyMinor ?? 0,
+      payedMoneyMinor: match.deal.payedMoneyMinor ?? intent.amount_minor,
+      leftCostMoneyMinor: match.deal.leftCostMoneyMinor ?? 0,
     });
     if (error) {
       providerError = true;
@@ -224,6 +276,8 @@ async function runReconcile(deps: ReconcileDeps = {}): Promise<ReconcileResult> 
     skipped,
     provider_error: providerError,
     deferred: false,
+    exports: 1,
+    polls: exported.pollCount,
   };
 }
 
@@ -232,17 +286,33 @@ export async function reconcilePendingGetCourseAppreciationIntents(
 ): Promise<ReconcileResult> {
   if (inFlight && !deps.force) return inFlight;
   const nowMs = (deps.now ?? new Date()).getTime();
-  if (!deps.force && lastStartedAt > 0 && nowMs - lastStartedAt < RECONCILE_MIN_INTERVAL_MS) {
-    return {
-      attempted: 0,
-      applied: 0,
-      skipped: 0,
-      provider_error: false,
-      deferred: true,
-    };
+  const cooldown = memoryAndFileCooldown(
+    deps.cooldown ?? createFileReconcileCooldownStore(),
+  );
+  if (!deps.force && cooldown.readLastStartedAt() > 0) {
+    const elapsed = nowMs - cooldown.readLastStartedAt();
+    if (elapsed < RECONCILE_MIN_INTERVAL_MS) {
+      return {
+        attempted: 0,
+        applied: 0,
+        skipped: 0,
+        provider_error: false,
+        deferred: true,
+        exports: 0,
+        polls: 0,
+      };
+    }
   }
-  lastStartedAt = nowMs;
-  inFlight = runReconcile(deps).finally(() => {
+
+  const run = (async () => {
+    const result = await runReconcile(deps);
+    if (result.exports > 0) {
+      cooldown.writeLastStartedAt(nowMs);
+    }
+    return result;
+  })();
+
+  inFlight = run.finally(() => {
     inFlight = null;
   });
   return inFlight;
@@ -251,13 +321,4 @@ export async function reconcilePendingGetCourseAppreciationIntents(
 export function resetGetCourseAppreciationReconcileForTests(): void {
   inFlight = null;
   lastStartedAt = 0;
-}
-
-export function scheduleGetCourseAppreciationReconcile(): void {
-  void reconcilePendingGetCourseAppreciationIntents().catch(() => {
-    console.info("author_appreciation_getcourse_reconcile_skipped", {
-      reason: "reconcile_failed",
-      deal_id_present: false,
-    });
-  });
 }

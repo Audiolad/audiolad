@@ -12,6 +12,7 @@ import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/typ
 import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { loadAuthorAppreciationSettings } from "@/lib/author-appreciation/settings";
+import { ensureAutoCommercialAppreciationLifecycle } from "@/lib/authors/ensure-auto-commercial-lifecycle";
 
 async function loadPayoutProfileSummary(authorId: string): Promise<{
   status: AuthorPayoutProfileStatus | null;
@@ -45,6 +46,16 @@ export async function loadAuthorStatusView(input: {
   role: "owner" | "editor";
 }): Promise<AuthorStatusViewModel> {
   const supabase = createServiceRoleClient();
+  const { data: authorFlags } = await supabase
+    .from("authors")
+    .select("can_bypass_product_moderation")
+    .eq("id", input.authorId)
+    .maybeSingle();
+  await ensureAutoCommercialAppreciationLifecycle({
+    authorId: input.authorId,
+    accessStatus: input.accessStatus,
+    ownerControlled: authorFlags?.can_bypass_product_moderation === true,
+  });
 
   const [application, payout, termsAcceptance, individualShare, hasPublishedFreeProduct, appreciationSettings] =
     await Promise.all([

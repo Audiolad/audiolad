@@ -10,6 +10,7 @@ import {
   resolveAuthorAppreciationVisibility,
 } from "../src/lib/author-appreciation/effective-visibility.ts";
 import { PRODUCT_KIND } from "../src/lib/author-products/product-kind.ts";
+import { isAppreciationCurrentTermsSatisfied } from "../src/lib/authors/owner-controlled.ts";
 
 const base = {
   surface: "product",
@@ -149,6 +150,27 @@ assert.equal(
   }),
   false,
   "commercial_active does not imply current terms",
+);
+assert.equal(
+  isAppreciationCurrentTermsSatisfied({
+    currentTermsAccepted: false,
+    ownerControlled: false,
+  }),
+  false,
+  "external commercial author has no terms bypass",
+);
+assert.equal(
+  resolveAuthorAppreciationVisibility({
+    surface: "author",
+    currentTermsAccepted: isAppreciationCurrentTermsSatisfied({
+      currentTermsAccepted: false,
+      ownerControlled: true,
+    }),
+    accessStatus: "commercial_active",
+    settings: { enabled: true, profileEnabled: true, freeProductsDefault: true },
+  }),
+  true,
+  "owner-controlled auto-commercial author-page CTA uses existing platform-owned class",
 );
 
 assert.equal(isAppreciationEligibleProductKind(PRODUCT_KIND.MUSIC), true);
