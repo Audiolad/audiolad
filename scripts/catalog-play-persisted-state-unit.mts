@@ -8,8 +8,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { shouldToggleActiveCatalogPlay } from "../src/lib/catalog/should-toggle-active-catalog-play.ts";
-import { resolveSameKeySessionAction } from "../src/lib/listen/resolve-same-key-session-action.ts";
+import { shouldToggleActiveCatalogPlay } from "../src/lib/catalog/should-toggle-active-catalog-play";
+import { resolveSameKeySessionAction } from "../src/lib/listen/resolve-same-key-session-action";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
