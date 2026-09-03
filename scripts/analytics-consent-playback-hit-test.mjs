@@ -204,7 +204,12 @@ async function verifySurface(browser, product, surface) {
   await context.close();
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath:
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+    "/usr/local/bin/google-chrome",
+});
 
 try {
   await verifyConsentDecisions(browser);
