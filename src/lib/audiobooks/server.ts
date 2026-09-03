@@ -389,28 +389,32 @@ export async function deleteAudiobookFragment(projectId: string, chapterId: stri
 }
 
 const RENDER_SELECT = "id, project_id, chapter_id, author_id, fragment_snapshot, snapshot_sha256, status, output_storage_path, output_size_bytes, error_code, error_message_safe, created_at, completed_at";
+const RENDER_ENQUEUE_ATTEMPTS = 3;
 
 export async function createAudiobookChapterRenderJob(projectId: string, chapterId: string, authorId: string) {
   await mutationAccess(authorId);
   await ownedChapter(projectId, chapterId, authorId);
-  const fragments = await listAudiobookFragments(projectId, chapterId, authorId);
-  const active = fragments.filter((fragment) => fragment.status === "active");
-  if (!active.length) throw new AudiobookError("no_active_fragments", 422);
-  const fragment_snapshot = createAudiobookRenderSnapshot(active.map((fragment) => ({
-    id: fragment.id, storagePath: fragment.storage_path, position: fragment.position,
-    mimeType: fragment.mime_type, sizeBytes: fragment.size_bytes,
-  })), { authorId, projectId, chapterId });
-  const { data, error } = await createServiceRoleClient().from("audiobook_chapter_render_jobs").insert({
-    project_id: projectId, chapter_id: chapterId, author_id: authorId, fragment_snapshot,
-    snapshot_sha256: audiobookRenderSnapshotSha256(fragment_snapshot),
-  }).select(RENDER_SELECT).single();
-  if (error?.code === "23505") {
+  for (let attempt = 0; attempt < RENDER_ENQUEUE_ATTEMPTS; attempt += 1) {
+    const fragments = await listAudiobookFragments(projectId, chapterId, authorId);
+    const active = fragments.filter((fragment) => fragment.status === "active");
+    if (!active.length) throw new AudiobookError("no_active_fragments", 422);
+    const fragment_snapshot = createAudiobookRenderSnapshot(active.map((fragment) => ({
+      id: fragment.id, storagePath: fragment.storage_path, position: fragment.position,
+      mimeType: fragment.mime_type, sizeBytes: fragment.size_bytes,
+    })), { authorId, projectId, chapterId });
+    const { data, error } = await createServiceRoleClient().from("audiobook_chapter_render_jobs").insert({
+      project_id: projectId, chapter_id: chapterId, author_id: authorId, fragment_snapshot,
+      snapshot_sha256: audiobookRenderSnapshotSha256(fragment_snapshot),
+    }).select(RENDER_SELECT).single();
+    if (!error && data) return data as AudiobookChapterRenderJob;
+    if (error?.code !== "23505") fail(error, "audiobook_chapter_render_create_error");
+
+    // A concurrent active request is idempotent. If it finished between the
+    // unique-conflict and lookup, retry the insert a bounded number of times.
     const state = await getAudiobookChapterRenderState(projectId, chapterId, authorId);
     if (state.job?.status === "queued" || state.job?.status === "processing") return state.job;
-    fail(error, "audiobook_chapter_render_idempotent_lookup_error");
   }
-  if (error || !data) fail(error, "audiobook_chapter_render_create_error");
-  return data as AudiobookChapterRenderJob;
+  throw new AudiobookError("render_enqueue_race", 409);
 }
 
 export async function getAudiobookChapterRenderState(projectId: string, chapterId: string, authorId: string) {

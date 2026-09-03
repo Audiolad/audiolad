@@ -62,6 +62,34 @@ CREATE TABLE public.studio_guest_handoffs (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),token_hash text NOT NULL UNIQUE,guest_session_id uuid NOT NULL REFERENCES public.studio_guest_sessions(id) ON DELETE CASCADE,
  project_id uuid NOT NULL REFERENCES public.studio_projects(id) ON DELETE CASCADE,created_at timestamptz NOT NULL DEFAULT now(),expires_at timestamptz NOT NULL,used_at timestamptz NULL
 );
+CREATE TABLE public.audiobook_projects (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), author_id uuid NOT NULL REFERENCES public.authors(id) ON DELETE RESTRICT,
+ title text NOT NULL, book_author_name text NULL, narrator_name text NULL, status text NOT NULL DEFAULT 'active',
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT audiobook_projects_title_check CHECK (char_length(btrim(title)) BETWEEN 1 AND 200),
+ CONSTRAINT audiobook_projects_status_check CHECK (status = 'active')
+);
+CREATE TABLE public.audiobook_chapters (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid NOT NULL REFERENCES public.audiobook_projects(id) ON DELETE CASCADE,
+ position integer NOT NULL, title text NOT NULL, status text NOT NULL DEFAULT 'draft',
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT audiobook_chapters_position_check CHECK (position >= 1),
+ CONSTRAINT audiobook_chapters_title_check CHECK (char_length(btrim(title)) BETWEEN 1 AND 200),
+ CONSTRAINT audiobook_chapters_status_check CHECK (status = 'draft'),
+ CONSTRAINT audiobook_chapters_project_position_key UNIQUE (project_id, position) DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE TABLE public.audiobook_fragments (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), chapter_id uuid NOT NULL REFERENCES public.audiobook_chapters(id) ON DELETE CASCADE,
+ position integer NOT NULL, storage_path text NOT NULL UNIQUE, original_name text NOT NULL, mime_type text NOT NULL,
+ size_bytes bigint NOT NULL, duration_seconds numeric NULL, source_type text NOT NULL, status text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT audiobook_fragments_position_check CHECK (position >= 1),
+ CONSTRAINT audiobook_fragments_size_check CHECK (size_bytes > 0 AND size_bytes <= 209715200),
+ CONSTRAINT audiobook_fragments_mime_check CHECK (mime_type IN ('audio/webm','audio/mp4','audio/mpeg','audio/wav','audio/x-wav','audio/aac')),
+ CONSTRAINT audiobook_fragments_source_check CHECK (source_type IN ('upload', 'recording')),
+ CONSTRAINT audiobook_fragments_status_check CHECK (status IN ('uploading','active')),
+ CONSTRAINT audiobook_fragments_chapter_position_key UNIQUE (chapter_id, position) DEFERRABLE INITIALLY IMMEDIATE
+);
 CREATE INDEX studio_project_assets_active_project_idx ON public.studio_project_assets(project_id,created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX studio_projects_guest_active_updated_idx ON public.studio_projects(guest_session_id,updated_at DESC) WHERE status='active' AND guest_session_id IS NOT NULL;
 ALTER TABLE public.studio_projects ENABLE ROW LEVEL SECURITY;
@@ -69,7 +97,8 @@ ALTER TABLE public.studio_project_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.studio_guest_sessions ENABLE ROW LEVEL SECURITY;
 INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types) VALUES
  ('studio-draft-assets','studio-draft-assets',false,209715200,ARRAY['audio/mpeg','audio/wav','audio/x-wav','audio/mp4','audio/aac','audio/webm']::text[]),
- ('studio-renders','studio-renders',false,536870912,ARRAY['audio/mpeg']::text[]) ON CONFLICT(id) DO NOTHING;
+ ('studio-renders','studio-renders',false,536870912,ARRAY['audio/mpeg']::text[]),
+ ('audiobook-fragments','audiobook-fragments',false,209715200,ARRAY['audio/webm','audio/mp4','audio/mpeg','audio/wav','audio/x-wav','audio/aac']::text[]) ON CONFLICT(id) DO NOTHING;
 CREATE OR REPLACE FUNCTION public.studio_author_member(p_author_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$ SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.author_members am WHERE am.author_id=p_author_id AND am.user_id=auth.uid() AND am.role IN('owner','editor')) $$;
 CREATE POLICY "Studio members can read projects" ON public.studio_projects FOR SELECT TO authenticated USING(public.studio_author_member(author_id));
 CREATE POLICY "Studio members can read project assets" ON public.studio_project_assets FOR SELECT TO authenticated USING(deleted_at IS NULL AND EXISTS(SELECT 1 FROM public.studio_projects sp WHERE sp.id=studio_project_assets.project_id AND sp.status='active' AND public.studio_author_member(sp.author_id)));

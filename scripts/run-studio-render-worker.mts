@@ -28,6 +28,19 @@ async function streamStorageObjectToFile(file: Blob, path: string) {
   await pipeline(Readable.fromWeb(file.stream() as import("node:stream/web").ReadableStream), createWriteStream(path));
 }
 
+async function streamAudiobookFragmentToFile(storagePath: string, path: string) {
+  const { data: signed, error: signError } = await service.storage
+    .from("audiobook-fragments")
+    .createSignedUrl(storagePath, 1800);
+  if (signError || !signed?.signedUrl) throw new Error("source_unavailable");
+  const response = await fetch(signed.signedUrl, { cache: "no-store" });
+  if (!response.ok || !response.body) throw new Error("source_unavailable");
+  await pipeline(
+    Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+    createWriteStream(path),
+  );
+}
+
 async function processAudiobookChapterRender() {
   await service.rpc("recover_stale_audiobook_chapter_render_jobs");
   const { data, error } = await service.rpc("claim_audiobook_chapter_render_job", { p_lease_seconds: 1800 });
@@ -44,10 +57,8 @@ async function processAudiobookChapterRender() {
     await mkdir(workspace, { recursive: true });
     const paths: string[] = [];
     for (const [index, fragment] of fragments.entries()) {
-      const { data: file, error: downloadError } = await service.storage.from("audiobook-fragments").download(fragment.storagePath);
-      if (downloadError || !file) throw new Error("source_unavailable");
       const path = join(workspace, `source-${index}`);
-      await streamStorageObjectToFile(file, path);
+      await streamAudiobookFragmentToFile(fragment.storagePath, path);
       paths.push(path);
     }
     const result = await renderAudiobookChapterToMp3(paths, workspace, job.id);
@@ -58,15 +69,18 @@ async function processAudiobookChapterRender() {
     const { data: completed, error: completeError } = await service.from("audiobook_chapter_render_jobs").update({
       status: "completed", output_storage_path: outputPath, output_size_bytes: result.sizeBytes,
       completed_at: new Date().toISOString(), lease_expires_at: null, updated_at: new Date().toISOString(),
-    }).eq("id", job.id).eq("status", "processing").select("id").maybeSingle();
-    if (completeError || !completed) throw new Error("render_job_completion_state_lost");
+    }).eq("id", job.id).eq("status", "processing").eq("attempt_count", job.attempt_count).select("id").maybeSingle();
+    if (completeError || !completed) {
+      await service.storage.from(AUDIOBOOK_RENDERS_BUCKET).remove([outputPath]);
+      throw new Error("render_job_completion_state_lost");
+    }
     console.log(JSON.stringify({ event: "audiobook_chapter_render_completed", jobId: job.id, bytes: result.sizeBytes }));
   } catch (error) {
     const code = error instanceof Error && error.message === "snapshot_fingerprint_mismatch" ? "snapshot_fingerprint_mismatch" : "render_failed";
     await service.from("audiobook_chapter_render_jobs").update({
       status: "failed", error_code: code, error_message_safe: "Не удалось подготовить MP3 главы. Исходные фрагменты сохранены.",
       lease_expires_at: null, updated_at: new Date().toISOString(),
-    }).eq("id", job.id).eq("status", "processing");
+    }).eq("id", job.id).eq("status", "processing").eq("attempt_count", job.attempt_count);
     throw error;
   } finally { await rm(workspace, { recursive: true, force: true }); }
   return true;
@@ -80,8 +94,7 @@ async function processAudiobookRenderQueuePass() {
   }
 }
 
-async function main() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("render_worker_environment_missing");
+async function processStudioRenderQueuePass() {
   await service.rpc("recover_stale_studio_render_jobs");
   const { data: claimed, error } = await service.rpc("claim_studio_render_job", { p_lease_seconds: 1800 });
   if (error) throw error;
@@ -94,7 +107,6 @@ async function main() {
     typeof job.project_snapshot !== "object"
   ) {
     console.log("studio-render-worker: no queued jobs");
-    await processAudiobookRenderQueuePass();
     return;
   }
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
@@ -163,7 +175,6 @@ async function main() {
       }
     }
     console.log(JSON.stringify({ jobId: job.id, status: "completed", bytes: result.sizeBytes }));
-    await processAudiobookRenderQueuePass();
   } catch (error) {
     const errorCode = error instanceof StudioRenderDurationError
       ? error.code
@@ -192,8 +203,16 @@ async function main() {
     if (failureUpdateError || !failedJob) {
       console.error("studio-render-worker: failure state was not persisted", failureUpdateError?.message);
     }
-    await processAudiobookRenderQueuePass();
     throw error;
   } finally { await rm(workspace, { recursive: true, force: true }); }
+}
+async function main() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("render_worker_environment_missing");
+  const results = await Promise.allSettled([
+    processStudioRenderQueuePass(),
+    processAudiobookRenderQueuePass(),
+  ]);
+  const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failed) throw failed.reason;
 }
 void main().catch((error) => { console.error("studio-render-worker:", error); process.exitCode = 1; });

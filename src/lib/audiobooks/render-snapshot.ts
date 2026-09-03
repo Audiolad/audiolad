@@ -63,8 +63,12 @@ export function parseAudiobookRenderSnapshot(
   const snapshot = value as { version?: unknown; fragments?: unknown };
   if (snapshot.version !== 1 || !Array.isArray(snapshot.fragments)) return null;
   try {
-    const canonical = createAudiobookRenderSnapshot(snapshot.fragments as AudiobookRenderSnapshotFragment[], context);
-    return JSON.stringify(canonical) === JSON.stringify(snapshot) ? canonical : null;
+    // PostgreSQL jsonb preserves values and arrays, but not object key order.
+    // Rebuild the one canonical representation before either hashing or using it.
+    return createAudiobookRenderSnapshot(
+      snapshot.fragments as AudiobookRenderSnapshotFragment[],
+      context,
+    );
   } catch {
     return null;
   }
