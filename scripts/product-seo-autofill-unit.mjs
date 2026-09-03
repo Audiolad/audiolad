@@ -1156,7 +1156,7 @@ for (const [question, expectedAnswer] of [
   ]);
   assert.equal(
     mixedResidualProvider.calls[2].previous.seoTitle,
-    requestInput().seoPrimaryQuery,
+    `${requestInput().seoPrimaryQuery} – Спокойный вечер перед отдыхом`,
   );
 }
 
@@ -1303,11 +1303,9 @@ for (const [question, expectedAnswer] of [
   });
   assert.equal(deterministicDescriptionResult.ok, true);
   assert.equal(deterministicDescriptionProvider.calls.length, 2);
-  assert.equal(
-    deterministicDescriptionResult.data.seoDescription.includes(
-      requestInput().seoPrimaryQuery,
-    ),
-    true,
+  assert.match(
+    deterministicDescriptionResult.data.seoDescription,
+    /^медитация для сна – помогает мягко завершить день\./,
   );
   assert.ok(
     deterministicDescriptionResult.data.seoDescription.length <= 300,
@@ -1529,8 +1527,9 @@ for (const [question, expectedAnswer] of [
 }
 
 // All six mechanical residual issues are finalized locally after provider call
-// two. The title and description are reduced to the literal author primary;
-// only invalid FAQ answers change, and no generic third repair is consumed.
+// two. The title and description begin with the literal author primary while
+// retaining their generated suffixes; only invalid FAQ answers change, and no
+// generic third repair is consumed.
 {
   const overlongTitleWithoutPrimary =
     "Спокойный вечер для мягкого завершения дня и подготовки к отдыху. ".repeat(3);
@@ -1567,8 +1566,16 @@ for (const [question, expectedAnswer] of [
     "faq_answer_repeats_question",
     "faq_answer_is_question",
   ]);
-  assert.equal(sixIssueResult.data.seoTitle, requestInput().seoPrimaryQuery);
-  assert.equal(sixIssueResult.data.seoDescription, requestInput().seoPrimaryQuery);
+  assert.match(
+    sixIssueResult.data.seoTitle,
+    /^медитация для сна – Спокойный вечер для мягкого завершения дня и подготовки к отдыху\./,
+  );
+  assert.match(
+    sixIssueResult.data.seoDescription,
+    /^медитация для сна – Мягкая практика для спокойного завершения дня и вечернего отдыха\./,
+  );
+  assert.ok(sixIssueResult.data.seoTitle.length <= 140);
+  assert.ok(sixIssueResult.data.seoDescription.length <= 300);
   assert.deepEqual(sixIssueResult.data.usageItems, sixIssueDraft.usageItems);
   assert.deepEqual(
     sixIssueResult.data.faqItems.map(({ question, anchor }) => ({ question, anchor })),
@@ -1903,7 +1910,10 @@ await withEnvAsync(yandexEnv(), async () => {
     aiRateLimit: createProductSeoAiRateLimitStore(),
   });
   assert.equal(result.ok, true);
-  assert.equal(result.data.seoTitle, requestInput().seoPrimaryQuery);
+  assert.equal(
+    result.data.seoTitle,
+    `${requestInput().seoPrimaryQuery} – Вечерний ритуал без запроса`,
+  );
   assert.equal(fetchImpl.calls.length, 2);
 });
 

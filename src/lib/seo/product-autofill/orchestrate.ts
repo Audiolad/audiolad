@@ -393,71 +393,34 @@ export async function generateProductSeoDraft(
     );
   }
 
-  function finalizeTitleDeterministically(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    const shortened = shortenTextDeterministically(
-      draft.seoTitle,
-      PRODUCT_CONTENT_LIMITS.seoTitle,
+  /**
+   * Moves the author-owned primary to the beginning and retains as much of the
+   * generated suffix as the field limit permits. If the generated value
+   * already contains the primary, only its suffix is reused, so the primary
+   * remains literal and is not duplicated.
+   */
+  function prependPrimaryAndShorten(value: string, limit: number): string | null {
+    if (!primary || primary.length > limit) {
+      return null;
+    }
+
+    const text = value.trim();
+    const primaryIndex = text
+      .toLocaleLowerCase("ru-RU")
+      .indexOf(primary.toLocaleLowerCase("ru-RU"));
+    const suffix = (
+      primaryIndex >= 0 ? text.slice(primaryIndex + primary.length) : text
+    ).replace(/^[\s–—:;,.!?-]+/, "").trim();
+    if (!suffix) {
+      return primary;
+    }
+
+    const separator = " – ";
+    const shortenedSuffix = shortenTextDeterministically(
+      suffix,
+      limit - primary.length - separator.length,
     );
-    if (
-      shortened &&
-      (!primary || containsSeoPhrase(shortened, primary))
-    ) {
-      return { ...draft, seoTitle: shortened };
-    }
-
-    return primary && primary.length <= PRODUCT_CONTENT_LIMITS.seoTitle
-      ? { ...draft, seoTitle: primary }
-      : draft;
-  }
-
-  function shortenDescriptionDeterministically(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    const description = draft.seoDescription.trim();
-    const shortened = shortenTextDeterministically(
-      description,
-      PRODUCT_CONTENT_LIMITS.seoDescription,
-    );
-
-    // Match the primary exactly as the validator does. A failed local fallback
-    // remains fail-closed with diagnostics.
-    if (
-      !shortened ||
-      shortened.length > PRODUCT_CONTENT_LIMITS.seoDescription ||
-      (primary &&
-        (!containsSeoPhrase(description, primary) ||
-          !containsSeoPhrase(shortened, primary)))
-    ) {
-      return draft;
-    }
-
-    return { ...draft, seoDescription: shortened };
-  }
-
-  function finalizeDescriptionDeterministically(
-    draft: ProductSeoAiRawDraft,
-  ): ProductSeoAiRawDraft {
-    if (!primary || containsSeoPhrase(draft.seoDescription, primary)) {
-      const shortened = shortenDescriptionDeterministically(draft);
-      if (
-        shortened.seoDescription.length <= PRODUCT_CONTENT_LIMITS.seoDescription &&
-        (!primary || containsSeoPhrase(shortened.seoDescription, primary))
-      ) {
-        return shortened;
-      }
-    }
-
-    // The author-owned primary is capped at 120 characters and so is always a
-    // valid, literal, length-safe metadata value. This is used only when
-    // shortening cannot retain it or when it was absent. Final validation
-    // remains the proof that no other validator rule was introduced.
-    if (primary.length <= PRODUCT_CONTENT_LIMITS.seoDescription) {
-      return { ...draft, seoDescription: primary };
-    }
-
-    return shortenDescriptionDeterministically(draft);
+    return shortenedSuffix ? `${primary}${separator}${shortenedSuffix}` : primary;
   }
 
   const SAFE_FINALIZER_ISSUES = new Set([
@@ -483,22 +446,27 @@ export async function generateProductSeoDraft(
       issues.includes("title_too_long") ||
       issues.includes("primary_missing_from_title")
     ) {
-      finalized = finalizeTitleDeterministically(finalized);
+      const seoTitle = prependPrimaryAndShorten(
+        finalized.seoTitle,
+        PRODUCT_CONTENT_LIMITS.seoTitle,
+      );
+      finalized = seoTitle ? { ...finalized, seoTitle } : finalized;
     }
     if (
       issues.includes("description_too_long") ||
       issues.includes("primary_missing_from_description")
     ) {
-      finalized = finalizeDescriptionDeterministically(finalized);
+      const seoDescription = prependPrimaryAndShorten(
+        finalized.seoDescription,
+        PRODUCT_CONTENT_LIMITS.seoDescription,
+      );
+      finalized = seoDescription ? { ...finalized, seoDescription } : finalized;
     }
     if (
       issues.includes("faq_answer_is_question") ||
       issues.includes("faq_answer_repeats_question")
     ) {
       finalized = applyDeterministicFaqAnswerFallback(finalized);
-    }
-    if (issues.includes("description_too_long")) {
-      finalized = shortenDescriptionDeterministically(finalized);
     }
     return normalizeGeneratedDraft(finalized);
   }
