@@ -21,6 +21,11 @@ export type AppreciationIntentFact = {
   createdAt: string;
   authorAccruedMinor: number | null;
   availableAt: string | null;
+  providerDealIdPresent: boolean;
+  providerDealNumberPresent: boolean;
+  financeProjectionStatus: "pending" | "projected" | "needs_review" | null;
+  financeProjectionResultCode: string | null;
+  hasSaleAccrual: boolean;
 };
 
 export type AppreciationAnalyticsSummary = {

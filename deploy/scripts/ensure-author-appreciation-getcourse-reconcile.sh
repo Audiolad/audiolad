@@ -54,6 +54,13 @@ done
 
 as_root install -d -m 0755 "$WRAPPER_DIR" "$LOG_DIR" "$STATE_DIR"
 as_root install -m 0755 "$WRAPPER_SRC" "$WRAPPER_DIR/run-author-appreciation-getcourse-reconcile.sh"
+DIAGNOSE_SRC="$SCRIPT_DIR/audiolad-reconcile-diagnose.sh"
+if [[ -f "$DIAGNOSE_SRC" ]]; then
+  as_root install -m 0755 "$DIAGNOSE_SRC" "${WRAPPER_DIR}/audiolad-reconcile-diagnose.sh"
+  if [[ "${SKIP_AS_ROOT:-0}" != "1" ]]; then
+    as_root install -m 0755 "$DIAGNOSE_SRC" "/usr/local/sbin/audiolad-reconcile-diagnose"
+  fi
+fi
 as_root install -m 0644 "$SERVICE_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.service"
 as_root install -m 0644 "$TIMER_SRC" "$SYSTEMD_DIR/audiolad-author-appreciation-getcourse-reconcile.timer"
 as_root install -m 0644 "$LOGROTATE_SRC" "$LOGROTATE_DIR/audiolad-author-appreciation-getcourse-reconcile"
@@ -71,8 +78,11 @@ fi
 as_root "$SYSTEMCTL" daemon-reload
 as_root "$SYSTEMCTL" enable --now audiolad-author-appreciation-getcourse-reconcile.timer
 if [[ "$START_SERVICE_NOW" == "1" ]]; then
-  as_root "$SYSTEMCTL" start audiolad-author-appreciation-getcourse-reconcile.service || \
-    log "WARN immediate reconcile start failed (timer remains enabled)"
+  if as_root "$SYSTEMCTL" start audiolad-author-appreciation-getcourse-reconcile.service; then
+    log "immediate reconcile start exit=0"
+  else
+    log "WARN immediate reconcile start failed exit=$? (timer remains enabled)"
+  fi
 fi
 
 log "enabled timer=audiolad-author-appreciation-getcourse-reconcile.timer"

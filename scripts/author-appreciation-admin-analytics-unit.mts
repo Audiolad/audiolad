@@ -24,6 +24,11 @@ const paid: AppreciationIntentFact = {
   createdAt: "2026-09-03T13:15:00.000Z",
   authorAccruedMinor: 7_000,
   availableAt: "2026-09-17T13:20:00.000Z",
+  providerDealIdPresent: true,
+  providerDealNumberPresent: true,
+  financeProjectionStatus: "projected",
+  financeProjectionResultCode: "accrual_created",
+  hasSaleAccrual: true,
 };
 
 const pending: AppreciationIntentFact = {
@@ -38,6 +43,11 @@ const pending: AppreciationIntentFact = {
   createdAt: "2026-09-03T08:40:00.000Z",
   authorAccruedMinor: null,
   availableAt: null,
+  providerDealIdPresent: true,
+  providerDealNumberPresent: false,
+  financeProjectionStatus: "pending",
+  financeProjectionResultCode: null,
+  hasSaleAccrual: false,
 };
 
 {
@@ -62,6 +72,8 @@ const pending: AppreciationIntentFact = {
   const queries = readFileSync("src/lib/admin/appreciation-analytics-queries.ts", "utf8");
   assert.match(queries, /author_appreciation_payment_intents/);
   assert.match(queries, /author_ledger_entries/);
+  assert.match(queries, /provider_deal_id/);
+  assert.match(queries, /finance_projection_status/);
   assert.doesNotMatch(queries, /from\("orders"\)/);
   assert.doesNotMatch(queries, /from\("payments"\)/);
   const salesQueries = readFileSync("src/lib/admin/sales-queries.ts", "utf8");

@@ -211,9 +211,9 @@ jobs:
 
           section "RECONCILE_LOG_SUMMARY"
           if [[ -r "${LOG_FILE}" ]]; then
-            grep -E 'APPRECIATION_RECONCILE |attempted=|author_appreciation_getcourse_reconcile' "${LOG_FILE}" \
+            awk '/APPRECIATION_RECONCILE |attempted=|author_appreciation_getcourse_reconcile/' "${LOG_FILE}" \
               | tail -n 40 \
-              | redact_stream || true
+              | redact_stream
           fi
 
           section "WRAPPER_SCRIPT_HEAD"

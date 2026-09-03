@@ -25,12 +25,24 @@ export type ConfirmedGetCourseDeal = {
   offerIds: string[];
 };
 
+export type ExportSchemaObservation = {
+  row_count: number;
+  field_names: string[];
+  deal_id_present: boolean;
+  deal_number_present: boolean;
+  status_present: boolean;
+  cost_present: boolean;
+  paid_amount_present: boolean;
+  offer_present: boolean;
+};
+
 export type ExportPaidGetCourseDealsResult =
   | {
       ok: true;
       exportId: string;
       deals: ConfirmedGetCourseDeal[];
       pollCount: number;
+      schema: ExportSchemaObservation;
     }
   | {
       ok: false;
@@ -117,7 +129,55 @@ function collectExportRows(payload: unknown): unknown[] {
   return [];
 }
 
-export function readExportId(payload: unknown): string | null {
+const EXPORT_DEAL_ID_KEYS = ["id", "deal_id", "ID", "Id", "ID заказа"];
+const EXPORT_DEAL_NUMBER_KEYS = ["number", "deal_number", "Номер", "номер"];
+const EXPORT_STATUS_KEYS = ["status", "deal_status", "Статус", "статус"];
+const EXPORT_COST_KEYS = ["deal_cost", "cost", "cost_money_value", "cost_money", "Стоимость", "стоимость"];
+const EXPORT_PAID_KEYS = ["payed_money", "paid_money", "payed", "Оплачено", "оплачено"];
+const EXPORT_OFFER_KEYS = ["offers", "offer_id", "offer_ids", "offer"];
+
+function rowHasAnyKey(row: Record<string, unknown>, keys: string[]): boolean {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && value !== "") return true;
+  }
+  return false;
+}
+
+export function summarizeExportSchema(rows: unknown[]): ExportSchemaObservation {
+  const fieldNames = new Set<string>();
+  let dealIdPresent = false;
+  let dealNumberPresent = false;
+  let statusPresent = false;
+  let costPresent = false;
+  let paidPresent = false;
+  let offerPresent = false;
+
+  for (const value of rows) {
+    const row = record(value);
+    if (!row) continue;
+    for (const key of Object.keys(row)) fieldNames.add(key);
+    dealIdPresent ||= rowHasAnyKey(row, EXPORT_DEAL_ID_KEYS);
+    dealNumberPresent ||= rowHasAnyKey(row, EXPORT_DEAL_NUMBER_KEYS);
+    statusPresent ||= rowHasAnyKey(row, EXPORT_STATUS_KEYS);
+    costPresent ||= rowHasAnyKey(row, EXPORT_COST_KEYS);
+    paidPresent ||= rowHasAnyKey(row, EXPORT_PAID_KEYS);
+    offerPresent ||= rowHasAnyKey(row, EXPORT_OFFER_KEYS);
+  }
+
+  return {
+    row_count: rows.length,
+    field_names: [...fieldNames].sort(),
+    deal_id_present: dealIdPresent,
+    deal_number_present: dealNumberPresent,
+    status_present: statusPresent,
+    cost_present: costPresent,
+    paid_amount_present: paidPresent,
+    offer_present: offerPresent,
+  };
+}
+
+function readExportId(payload: unknown): string | null {
   const root = record(payload);
   if (!root) return null;
   const result = record(root.result);
@@ -386,6 +446,7 @@ export async function exportPaidGetCourseDealsOnce(
       exportId: started.exportId,
       deals,
       pollCount: polled.pollCount,
+      schema: summarizeExportSchema(polled.rows),
     };
   } catch {
     return { ok: false, reason: "provider_error", exportId: null, pollCount: 0 };

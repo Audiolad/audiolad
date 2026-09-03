@@ -125,9 +125,17 @@ function main() {
   assert.equal(Object.keys(workflow.permissions).join(","), "contents");
 
   const jobs = workflow.jobs;
+  assert.ok(jobs.resolve, "job resolve must exist");
   assert.ok(jobs.deploy, "job deploy must exist");
+  assert.ok(jobs.diagnose, "job diagnose must exist");
   assert.equal(jobs.deploy.environment, "production");
+  assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
+  assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
+  assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
+  assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
 
   assert.doesNotMatch(combinedCode, /StrictHostKeyChecking=no/);
   assert.match(workflowText, /StrictHostKeyChecking=yes/);
@@ -162,6 +170,7 @@ function main() {
   assert.equal(confirm.required, true);
   assert.equal(confirm.type, "choice");
   assert.ok(confirm.options.includes("DEPLOY"), "confirm options must include DEPLOY");
+  assert.ok(confirm.options.includes("DO_NOT_DEPLOY"), "confirm options must include DO_NOT_DEPLOY");
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `wrapper bash -n failed: ${syntax.stderr}`);
@@ -224,6 +233,7 @@ function main() {
   const resolveStepOffset = workflowText.indexOf("name: Resolve target SHA");
   const workflowAncestorOffset = workflowText.indexOf("merge-base --is-ancestor");
   const sshStepOffset = workflowText.indexOf("name: Deploy via SSH wrapper");
+  const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
   assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
   assert.ok(
     workflowAncestorOffset > resolveStepOffset,
@@ -231,7 +241,11 @@ function main() {
   );
   assert.ok(
     sshStepOffset > workflowAncestorOffset,
-    "workflow must verify origin/main ancestry before SSH",
+    "workflow must verify origin/main ancestry before SSH deploy",
+  );
+  assert.ok(
+    diagnoseStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH diagnostics",
   );
 
   console.log("production-deploy-github-actions-unit: all tests passed");

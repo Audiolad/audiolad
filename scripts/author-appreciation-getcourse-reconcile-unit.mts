@@ -169,6 +169,7 @@ async function run(options: {
   const fetch = createExportFetch({ rows });
   const { result, applyCalls } = await run({ pending, fetch });
   assert.equal(result.exports, 1);
+  assert.equal(result.correlatable, 20);
   assert.equal(fetch.counts().dealsCalls, 1);
   assert.ok(fetch.counts().exportCalls <= GETCOURSE_EXPORT_MAX_POLLS);
   assert.equal(result.applied, 20);
@@ -317,6 +318,7 @@ async function run(options: {
 {
   const empty = await run({ pending: [] });
   assert.equal(empty.result.attempted, 0);
+  assert.equal(empty.result.correlatable, 0);
   assert.equal(empty.result.exports, 0);
   assert.equal(empty.applyCalls.length, 0);
 
@@ -381,7 +383,16 @@ async function run(options: {
     "utf8",
   );
   assert.match(ensure, /DEPLOY_TREE:-/);
-  assert.doesNotMatch(ensure, /must not fail the caller deploy/);
+  assert.match(ensure, /audiolad-reconcile-diagnose/);
+  assert.match(ensure, /immediate reconcile start exit=/);
+  const wrapper = readFileSync(
+    "deploy/scripts/run-author-appreciation-getcourse-reconcile.sh",
+    "utf8",
+  );
+  assert.match(wrapper, /APPRECIATION_RECONCILE/);
+  assert.match(wrapper, /extract_reconcile_json/);
+  const deploy = readFileSync("deploy/scripts/deploy.sh", "utf8");
+  assert.match(deploy, /author_appreciation_getcourse_reconcile_log_tail/);
   const timer = readFileSync(
     "deploy/systemd/audiolad-author-appreciation-getcourse-reconcile.timer",
     "utf8",
