@@ -552,7 +552,7 @@ export function matchIntentToExportedDeal(input: {
   ) {
     return {
       matched: false,
-      reason: statusClass === "partial" || moneyClass === "partial" ? "partial_payment" : "unpaid",
+      reason: statusClass === "partial" ? "partial_payment" : "unpaid",
     };
   }
   return { matched: true, deal };
