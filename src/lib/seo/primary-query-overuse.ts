@@ -95,8 +95,9 @@ function fieldHasExactPrimary(text: string, primaryQuery: string): boolean {
 
 /**
  * Soft quality signal: exact normalized primary (and the product title when
- * it normalizes equal to the primary) outside seoTitle, seoDescription and
- * Q1.question. Related words are ignored; this is not a hard validator.
+ * it normalizes equal to the primary) outside seoTitle, seoDescription,
+ * Q1.question and Q3.question when the title equals the primary.
+ * Related words are ignored; this is not a hard validator.
  */
 export function evaluatePrimaryQueryOveruse(
   input: PrimaryQueryOveruseInput,
@@ -125,7 +126,8 @@ export function evaluatePrimaryQueryOveruse(
 
   const overusedFaqLocations: PrimaryQueryOveruseFaqLocation[] = [];
   input.faqItems.forEach((item, index) => {
-    if (index !== 0 && fieldHasExactPrimary(item.question, primary)) {
+    const questionPermitted = index === 0 || (index === 2 && titleEqualsPrimary);
+    if (!questionPermitted && fieldHasExactPrimary(item.question, primary)) {
       overusedFaqLocations.push({ index, field: "question" });
     }
     if (fieldHasExactPrimary(item.answer, primary)) {

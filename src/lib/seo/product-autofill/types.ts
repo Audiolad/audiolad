@@ -52,12 +52,19 @@ export type ProductSeoAutofillDraft = {
   faqItems: ProductSeoFaqDraft[];
 };
 
+export type ProductSeoAccessMode = "free" | "paid" | "unknown";
+
 export type ProductSeoAutofillRequest = {
   title: string;
   subtitle: string;
   description: string;
   productKind: string;
   seoPrimaryQuery: string;
+  /**
+   * Authoritative product access from the author form (`isFree` / `is_free`).
+   * Missing or non-boolean values stay unknown: do not infer free access.
+   */
+  isFree?: boolean;
   /** Author-entered phrases preserved by autofill after legacy-safe normalization. */
   seoSecondaryQueries?: string[];
   usageItems?: string[];
@@ -65,6 +72,18 @@ export type ProductSeoAutofillRequest = {
   mode?: ProductSeoGenerateMode;
   fields?: ProductSeoGenerateField[];
 };
+
+export function productSeoAccessModeFromIsFree(
+  isFree: boolean | undefined,
+): ProductSeoAccessMode {
+  if (isFree === true) {
+    return "free";
+  }
+  if (isFree === false) {
+    return "paid";
+  }
+  return "unknown";
+}
 
 export type ProductSeoAiRawDraft = {
   seoTitle: string;

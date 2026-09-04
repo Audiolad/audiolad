@@ -1,4 +1,5 @@
 import { AUTHOR_SEO_SECONDARY_ACTIVE_MAX } from "@/lib/author-products/limits";
+import type { ListenOnlineFaqIntent } from "@/lib/seo/listen-online-faq-intent";
 import type { PrimaryQueryOveruse } from "@/lib/seo/primary-query-overuse";
 
 const COVERAGE_STOP_WORDS = new Set([
@@ -104,7 +105,8 @@ export type SecondaryQueryCoverage = {
 };
 
 export type ProductSeoQualityRepairInput = SecondaryQueryCoverage &
-  PrimaryQueryOveruse & {
+  PrimaryQueryOveruse &
+  ListenOnlineFaqIntent & {
     secondary1?: string;
     secondary2?: string;
   };
@@ -255,9 +257,10 @@ export function evaluateSecondaryQueryCoverage(
   const active = selectActiveSecondaryQueries(input.activeSecondaryQueries);
   const primary = input.primaryQuery.trim();
   const usageTexts = input.usageItems.map((item) => item.content);
-  const faqSlotTexts = input.faqItems
-    .slice(1, 3)
-    .flatMap((item) => [item.question, item.answer]);
+  const secondary2Slot = input.faqItems[1];
+  const faqSlotTexts = secondary2Slot
+    ? [secondary2Slot.question, secondary2Slot.answer]
+    : [];
 
   const secondary1 = active[0] ?? "";
   const secondary2 = active[1] ?? "";

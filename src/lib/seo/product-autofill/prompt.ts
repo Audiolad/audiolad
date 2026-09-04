@@ -4,7 +4,10 @@ import {
   createDefaultProductSeoStyleProfile,
   productSeoStylePromptLines,
 } from "@/lib/seo/product-autofill/style-profile";
-import type { ProductSeoAutofillRequest } from "@/lib/seo/product-autofill/types";
+import {
+  productSeoAccessModeFromIsFree,
+  type ProductSeoAutofillRequest,
+} from "@/lib/seo/product-autofill/types";
 import {
   selectActiveSecondaryQueries,
   type ProductSeoQualityRepairInput,
@@ -60,11 +63,19 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
     (item) => item.trim(),
   );
   const activeSecondaryQueries = selectActiveSecondaryQueries(storedSecondaryQueries);
+  const accessMode = productSeoAccessModeFromIsFree(input.request.isFree);
+  const accessLine =
+    accessMode === "free"
+      ? "Доступ к продукту: бесплатный"
+      : accessMode === "paid"
+        ? "Доступ к продукту: платный"
+        : "Доступ к продукту: не указан";
   return [
     `Название продукта: ${input.request.title.trim() || "—"}`,
     `Подзаголовок: ${input.request.subtitle.trim() || "—"}`,
     `${AUTHOR_DESCRIPTION_LABEL}: ${input.request.description.trim() || "—"}`,
     `Тип продукта: ${input.request.productKind.trim() || "practice"}`,
+    accessLine,
     `Заголовок блока использования: ${getPracticeSeoUsageHeading(input.request.productKind)}`,
     `Основной запрос: ${input.request.seoPrimaryQuery.trim()}`,
     storedSecondaryQueries.length > 0
@@ -96,12 +107,16 @@ function primaryKeywordBudgetInstruction(
     Boolean(productTitle) &&
     normalizeSeoPhrase(productTitle) === normalizeSeoPhrase(primaryQuery);
   const titleEqualsPrimaryNote = titleEqualsPrimary
-    ? "Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки (эта практика, аудиопрактика, материал, запись, она/её) и не повторяй название механически."
+    ? "Название продукта совпадает с основным запросом: его можно один раз естественно использовать в Q3.question для намерения «слушать онлайн». В остальных местах используй естественные отсылки (эта практика, аудиопрактика, материал, запись, она/её) и не повторяй название механически."
     : "";
 
   return [
-    `Точный основной запрос «${primaryQuery}» в черновике обычно должен встретиться только в трёх обязательных местах: ровно один раз в seoTitle, ровно один раз в seoDescription и ровно один раз в одном вопросе FAQ, обычно Q1.`,
-    "Не повторяй точный основной запрос специально в usageItems, ответах FAQ, Q2 и Q3.",
+    titleEqualsPrimary
+      ? `Точный основной запрос «${primaryQuery}» в черновике обычно должен встретиться только в обязательных местах: ровно один раз в seoTitle, ровно один раз в seoDescription, ровно один раз в Q1.question и один раз в Q3.question для намерения «слушать онлайн».`
+      : `Точный основной запрос «${primaryQuery}» в черновике обычно должен встретиться только в трёх обязательных местах: ровно один раз в seoTitle, ровно один раз в seoDescription и ровно один раз в одном вопросе FAQ, обычно Q1.`,
+    titleEqualsPrimary
+      ? "Не повторяй точный основной запрос специально в usageItems, ответах FAQ, Q2 и Q3.answer."
+      : "Не повторяй точный основной запрос специально в usageItems, ответах FAQ, Q2 и Q3.",
     titleEqualsPrimaryNote,
   ]
     .filter(Boolean)
@@ -167,7 +182,7 @@ function secondaryQuerySystemInstruction(
         ].join(" ")
       : [
           `Дополнительный запрос №1: «${active[0]}». Используй смысл ровно в одном usageItem, один раз, естественным русским языком.`,
-          `Дополнительный запрос №2: «${active[1]}». Используй смысл ровно один раз в Q2 или Q3 — в вопросе или в ответе, где звучит естественнее.`,
+          `Дополнительный запрос №2: «${active[1]}». Используй смысл ровно один раз в Q2 — в вопросе или в ответе, где звучит естественнее. Не помещай это направление в Q3 только ради SEO.`,
           "Не помещай дополнительные запросы в seoTitle, seoDescription и Q1 только ради покрытия.",
         ].join(" ");
 
@@ -187,15 +202,34 @@ function secondaryQuerySystemInstruction(
     .join(" ");
 }
 
-function faqItemsSystemInstruction(primaryQuery: string): string {
+function faqQ3AccessInstruction(
+  accessMode: ReturnType<typeof productSeoAccessModeFromIsFree>,
+): string {
+  if (accessMode === "free") {
+    return "Продукт бесплатный: естественно включи слово «бесплатно» в Q3.question.";
+  }
+  if (accessMode === "paid") {
+    return "Продукт платный: не пиши «бесплатно» в Q3.question и Q3.answer. В ответе скажи, что слушать можно на этой странице после получения доступа.";
+  }
+  return "Доступ не подтверждён: не пиши «бесплатно». В ответе скажи, что слушать можно на этой странице.";
+}
+
+function faqItemsSystemInstruction(
+  primaryQuery: string,
+  productTitle: string,
+  accessMode: ReturnType<typeof productSeoAccessModeFromIsFree>,
+): string {
+  const title = productTitle || "название продукта";
   const verbatimRequirement = primaryQuery
-    ? `Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «${primaryQuery}». Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно. Не повторяй точный основной запрос в Q2, Q3 и в ответах FAQ.`
-    : "Основной запрос не выбран: не выдумывай его и не добавляй требование включить его в FAQ.";
+    ? `Q1 — основной поисковый интент. Q1.question ОБЯЗАТЕЛЬНО должен содержать основной запрос дословно: «${primaryQuery}». Не изменяй слова запроса, их порядок и словоформу. Встрой запрос в вопрос естественно. Не повторяй точный основной запрос в Q2, Q3.answer и в ответах FAQ.`
+    : "Основной запрос не выбран: не выдумывай его и не добавляй требование включить его в FAQ. Q1 — основной пользовательский вопрос о продукте.";
 
   return [
     "faqItems: ровно 3 пары вопрос/ответ.",
     `${verbatimRequirement} Q1.question должен быть сформулирован как вопрос и заканчиваться знаком «?».`,
-    "Q2 и Q3 — другие намерения (когда слушать / как использовать / кому подойдёт), не варианты одного и того же вопроса. Ответы 1–3 коротких предложения, отвечают по существу и являются утверждениями: не повторяют или не перефразируют question, не содержат знак «?» и не начинаются с вопросительных формулировок. Основной запрос в answer не обязателен. У каждого уникальный якорь-латиница.",
+    "Q2 — практический пользовательский вопрос (когда слушать / как использовать / кому подойдёт), не вариант Q1. Если есть дополнительный запрос №2, естественно отрази его смысл в вопросе или ответе Q2. Не используй точный основной запрос в Q2 механически.",
+    `Q3 ВСЕГДА про намерение «слушать онлайн». Используй фактическое название продукта «${title}», а не дополнительный запрос. Допустимы естественные варианты вроде «Где можно послушать «${title}» онлайн?», «Где послушать «${title}» онлайн?» или «Можно ли слушать «${title}» онлайн?». ${faqQ3AccessInstruction(accessMode)} В Q3.answer скажи, что эту практику можно слушать онлайн на этой странице; не повторяй точное название продукта в ответе. Не используй дополнительный запрос №2 в Q3 только ради SEO.`,
+    "Q1, Q2 и Q3 — разные намерения, не варианты одного и того же вопроса. Ответы 1–3 коротких предложения, отвечают по существу и являются утверждениями: не повторяют или не перефразируют question, не содержат знак «?» и не начинаются с вопросительных формулировок. Основной запрос в answer не обязателен. У каждого уникальный якорь-латиница.",
   ].join(" ");
 }
 
@@ -307,7 +341,11 @@ export function buildProductSeoSystemPrompt(
     primaryQuery
       ? "usageItems: ровно 3 конкретные ситуации, которые следуют из продукта. Не вставляй точный основной запрос в usageItems специально."
       : "usageItems: ровно 3 конкретные ситуации, которые следуют из продукта.",
-    faqItemsSystemInstruction(primaryQuery),
+    faqItemsSystemInstruction(
+      primaryQuery,
+      productTitle,
+      productSeoAccessModeFromIsFree(input?.request.isFree),
+    ),
     "Не генерируй связанные продукты и URL.",
     "Не используй одну универсальную структуру для всех продуктов.",
     "Меняй первые предложения, синтаксис, длину абзацев, порядок раскрытия, переходы и конструкции FAQ.",
@@ -348,12 +386,12 @@ export function buildProductSeoQualityRepairPrompt(
 ): string {
   const primary = input.request.seoPrimaryQuery.trim();
   const instructions: string[] = [
-    "Черновик уже технически валиден. Исправь только обнаруженные качественные проблемы: недостающее покрытие дополнительных запросов и механический повтор точного основного запроса вне разрешённых мест.",
+    "Черновик уже технически валиден. Исправь только обнаруженные качественные проблемы: недостающее покрытие дополнительных запросов, механический повтор точного основного запроса вне разрешённых мест и недостающее намерение Q3 «слушать онлайн».",
     "Не ломай валидные поля. Не обещай позиций, индексацию, ТОП или трафик.",
     "Естественный русский важнее дословного повтора. Не превращай текст в SEO-копирайтинг.",
     "Сохрани seoTitle, seoDescription и Q1.question без изменений, если они уже валидны: никогда не убирай из них обязательный точный основной запрос.",
-    "Сохрани FAQ anchors и поля, которые уже закрывают покрытие дополнительных запросов и не содержат запрещённый повтор основного запроса.",
-    "Перепиши только запрещённые повторы основного запроса и недостающие слоты дополнительных запросов.",
+    "Сохрани FAQ anchors и поля, которые уже закрывают покрытие дополнительных запросов, не содержат запрещённый повтор основного запроса и не нужны для исправления Q3.",
+    "Перепиши только запрещённые повторы основного запроса, недостающие слоты дополнительных запросов и Q3, если в нём нет намерения «слушать онлайн».",
     "Дополнительные запросы должны выполнять свои задачи прежде всего в назначенных публичных блоках. Не используй их в seoDescription только ради SEO.",
     "Не помещай дополнительные запросы в seoTitle и seoDescription только ради покрытия.",
     "Сохранённые значения дополнительных запросов не редактируй.",
@@ -367,8 +405,8 @@ export function buildProductSeoQualityRepairPrompt(
 
   if (coverage.secondary2 && !coverage.secondary2FaqCovered) {
     instructions.push(
-      `Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «${coverage.secondary2}». Сохрани anchors.`,
-      "Предпочитай изменить answer, а не question. Не меняй Q1, seoTitle, seoDescription и usageItems, если они не нужны для этого направления.",
+      `Измени только Q2 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «${coverage.secondary2}». Сохрани anchors.`,
+      "Предпочитай изменить answer, а не question. Не меняй Q1, Q3, seoTitle, seoDescription и usageItems, если они не нужны для этого направления.",
     );
   }
 
@@ -376,7 +414,9 @@ export function buildProductSeoQualityRepairPrompt(
     const usageIndexes = coverage.overusedUsageIndexes ?? [];
     const faqLocations = coverage.overusedFaqLocations ?? [];
     instructions.push(
-      `Точный основной запрос «${primary}» сейчас повторён вне трёх разрешённых мест: seoTitle, seoDescription и Q1.question.`,
+      coverage.titleEqualsPrimary
+        ? `Точный основной запрос «${primary}» сейчас повторён вне разрешённых мест: seoTitle, seoDescription, Q1.question и Q3.question.`
+        : `Точный основной запрос «${primary}» сейчас повторён вне трёх разрешённых мест: seoTitle, seoDescription и Q1.question.`,
     );
     if (usageIndexes.length > 0) {
       instructions.push(
@@ -385,16 +425,33 @@ export function buildProductSeoQualityRepairPrompt(
     }
     if (faqLocations.length > 0) {
       instructions.push(
-        "Убери точную фразу основного запроса из ответов FAQ и из Q2/Q3. Q1.question оставь с точным основным запросом. Для ответов используй нейтральные отсылки: «Это аудиопрактика...», «Она подойдёт...», «Материал можно включать...».",
+        coverage.titleEqualsPrimary
+          ? "Убери точную фразу основного запроса из ответов FAQ и из Q2. Q1.question и Q3.question оставь, если там уже есть нужный точный текст. Не оставляй точную фразу в Q3.answer. Для ответов используй нейтральные отсылки: «Это аудиопрактика...», «Она подойдёт...», «Материал можно включать...», «Эту практику можно слушать онлайн на этой странице...»."
+          : "Убери точную фразу основного запроса из ответов FAQ и из Q2/Q3. Q1.question оставь с точным основным запросом. Для ответов используй нейтральные отсылки: «Это аудиопрактика...», «Она подойдёт...», «Материал можно включать...».",
       );
     }
     if (coverage.titleEqualsPrimary) {
       instructions.push(
-        "Название продукта совпадает с основным запросом: повторять название в этих полях — то же самое, что повторять основной запрос. Не вставляй название механически.",
+        "Название продукта совпадает с основным запросом: повторять название в этих полях — то же самое, что повторять основной запрос. Не вставляй название механически, кроме одного раза в Q3.question.",
       );
     }
     instructions.push(
-      "Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription и Q1.question.",
+      coverage.titleEqualsPrimary
+        ? "Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription, Q1.question и нужного Q3.question."
+        : "Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription и Q1.question.",
+    );
+  }
+
+  if (!coverage.listenOnlineIntent) {
+    const productTitle = input.request.title.trim() || "название продукта";
+    const accessHint =
+      coverage.accessMode === "free"
+        ? `Продукт бесплатный: в Q3.question естественно включи «бесплатно», например «Где можно послушать «${productTitle}» бесплатно онлайн?».`
+        : coverage.accessMode === "paid"
+          ? "Продукт платный: не пиши «бесплатно». В Q3.answer скажи, что слушать можно на этой странице после получения доступа."
+          : "Доступ не подтверждён: не пиши «бесплатно». В Q3.answer скажи, что слушать можно на этой странице.";
+    instructions.push(
+      `Измени только Q3.question и Q3.answer так, чтобы Q3 закрывал намерение «слушать онлайн». Используй фактическое название продукта «${productTitle}» один раз в вопросе. ${accessHint} В ответе скажи, что эту практику можно слушать онлайн на этой странице; не повторяй точное название продукта в ответе. Не используй дополнительный запрос №2 в Q3 только ради SEO. Сохрани Q3.anchor. Не меняй Q2, если он уже закрывает дополнительный запрос №2.`,
     );
   }
 

@@ -28,6 +28,7 @@ import {
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
+import { evaluateListenOnlineFaqIntent } from "../src/lib/seo/listen-online-faq-intent.ts";
 import {
   countExactNormalizedSeoPhrase,
   evaluatePrimaryQueryOveruse,
@@ -38,6 +39,7 @@ import {
   isSecondaryCoverageComplete,
   selectActiveSecondaryQueries,
 } from "../src/lib/seo/secondary-query-coverage.ts";
+import { productSeoAccessModeFromIsFree } from "../src/lib/seo/product-autofill/types.ts";
 import {
   AUTHOR_SEO_SECONDARY_ACTIVE_MAX,
   PRODUCT_CONTENT_LIMITS,
@@ -278,6 +280,31 @@ function validationInput(overrides = {}) {
   };
 }
 
+function listenOnlineFaq(title, { free = false, paid = false, anchor = "gde-poslushat" } = {}) {
+  const freeInQuestion = free ? " бесплатно" : "";
+  const answer = paid
+    ? "Эту практику можно слушать онлайн на этой странице после получения доступа."
+    : free
+      ? "Эту практику можно бесплатно слушать онлайн прямо на этой странице в плеере АудиоЛада."
+      : "Эту практику можно слушать онлайн на этой странице в плеере АудиоЛада.";
+  return {
+    question: `Где можно послушать «${title}»${freeInQuestion} онлайн?`,
+    answer,
+    anchor,
+  };
+}
+
+function listenOnlineCoverage(accessMode = "unknown", overrides = {}) {
+  return {
+    listenOnlineIntent: true,
+    listenOnlineQuestionOk: true,
+    listenOnlineAnswerOk: true,
+    listenOnlineFalseFreeClaim: false,
+    accessMode,
+    ...overrides,
+  };
+}
+
 const validDraft = (overrides = {}) => ({
   seoTitle: "Медитация для сна перед вечерним отдыхом",
   seoDescription:
@@ -298,11 +325,7 @@ const validDraft = (overrides = {}) => ({
       answer: "Включите её в привычное время вечернего отдыха.",
       anchor: "kogda",
     },
-    {
-      question: "Нужен ли опыт?",
-      answer: "Практика подходит для спокойного знакомства с форматом.",
-      anchor: "opyt",
-    },
+    listenOnlineFaq("Лавандовый сон"),
   ],
   ...overrides,
 });
@@ -381,7 +404,14 @@ assert.deepEqual(
 const parsed = parseProductSeoAutofillRequest({ ...request });
 assert.equal(parsed.ok, true);
 assert.deepEqual(parsed.request.seoSecondaryQueries, ["практика перед сном", "Вечерняя медитация"]);
+assert.equal("isFree" in parsed.request, false);
 assert.equal("locked" in parsed.request, false);
+assert.equal(parseProductSeoAutofillRequest({ ...request, isFree: true }).request.isFree, true);
+assert.equal(parseProductSeoAutofillRequest({ ...request, isFree: false }).request.isFree, false);
+assert.equal("isFree" in parseProductSeoAutofillRequest({ ...request, isFree: "true" }).request, false);
+assert.equal(productSeoAccessModeFromIsFree(true), "free");
+assert.equal(productSeoAccessModeFromIsFree(false), "paid");
+assert.equal(productSeoAccessModeFromIsFree(undefined), "unknown");
 assert.equal(parseProductSeoAutofillRequest({ title: "x" }).ok, false);
 assert.equal(parseProductSeoAutofillRequest({ title: "x" }).code, "INVALID_PRIMARY");
 assert.equal(
@@ -463,7 +493,7 @@ assert.match(
 );
 assert.match(
   prompt,
-  /Дополнительный запрос №2: «Вечерняя медитация»\. Используй смысл ровно один раз в Q2 или Q3/,
+  /Дополнительный запрос №2: «Вечерняя медитация»\. Используй смысл ровно один раз в Q2/,
 );
 assert.match(prompt, /Не игнорируй введённый активный дополнительный запрос/);
 assert.match(prompt, /Не набивай дополнительные запросы в seoTitle и seoDescription/);
@@ -473,6 +503,17 @@ assert.match(
 );
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
+assert.match(prompt, /Q3 ВСЕГДА про намерение «слушать онлайн»/);
+assert.match(prompt, /Доступ к продукту: не указан/);
+assert.match(prompt, /не пиши «бесплатно»/);
+assert.match(
+  buildProductSeoSystemPrompt({ request: { ...parsed.request, isFree: true } }),
+  /Продукт бесплатный: естественно включи слово «бесплатно» в Q3\.question/,
+);
+assert.match(
+  buildProductSeoSystemPrompt({ request: { ...parsed.request, isFree: false } }),
+  /Продукт платный: не пиши «бесплатно»/,
+);
 assert.match(prompt, /не возвращай поле seoAbout/);
 assert.match(
   prompt,
@@ -514,7 +555,7 @@ assert.match(
   const SECONDARY_SLOT_TWO_USAGE =
     /Дополнительный запрос №1: «[^»]+»\. Используй смысл ровно в одном usageItem, один раз, естественным русским языком/;
   const SECONDARY_SLOT_TWO_FAQ =
-    /Дополнительный запрос №2: «[^»]+»\. Используй смысл ровно один раз в Q2 или Q3 — в вопросе или в ответе, где звучит естественнее/;
+    /Дополнительный запрос №2: «[^»]+»\. Используй смысл ровно один раз в Q2 — в вопросе или в ответе, где звучит естественнее/;
   const SECONDARY_DO_NOT_IGNORE =
     /Не игнорируй введённый активный дополнительный запрос/;
   const SECONDARY_NOT_FACTS =
@@ -612,7 +653,7 @@ assert.match(
   );
   assert.match(
     moneyPrompt,
-    /Дополнительный запрос №2: «денежный поток энергии»\. Используй смысл ровно один раз в Q2 или Q3/,
+    /Дополнительный запрос №2: «денежный поток энергии»\. Используй смысл ровно один раз в Q2/
   );
   assert.doesNotMatch(moneyPrompt, /Используй 2–3 РАЗНЫХ дополнительных направления/);
   assert.match(moneyPrompt, SECONDARY_NOT_FACTS);
@@ -1100,7 +1141,7 @@ const coveredSecondaryDraft = validDraft({
       answer: "Вечерняя медитация хорошо подходит в привычное время отдыха.",
       anchor: "kogda",
     },
-    validDraft().faqItems[2],
+    listenOnlineFaq("Вечерняя практика"),
   ],
 });
 const calls = [];
@@ -1949,11 +1990,7 @@ for (const [question, expectedAnswer] of [
         answer: "Когда хочется сосредоточиться на теме денежного потока.",
         anchor: "kogda",
       },
-      {
-        question: "Нужен ли опыт?",
-        answer: "Практика подходит для спокойного знакомства с форматом.",
-        anchor: "opyt",
-      },
+      listenOnlineFaq("Денежная энергия"),
     ],
     ...overrides,
   });
@@ -2435,6 +2472,8 @@ assert.match(section, /AUTHOR_SEO_SECONDARY_ACTIVE_MAX/);
 assert.doesNotMatch(section, /Можно добавить не больше 10 фраз/);
 assert.doesNotMatch(section, /coverage|validator|quality repair/i);
 assert.match(section, /api\/author\/seo\/product-autofill/);
+assert.match(section, /isFree/);
+assert.match(section, /isFree,/);
 assert.doesNotMatch(section, /Wordstat|wordstat|Подобрать похожие|api\/author\/seo\/wordstat/);
 assert.doesNotMatch(orchestrate, /wordstat|Wordstat|candidates/i);
 assert.match(orchestrate, /product_seo_ai_validation_failed/);
@@ -2596,11 +2635,7 @@ const ungroundedDraft = validDraft({
         answer: "В спокойное время, когда можно уделить внимание себе.",
         anchor: "kogda",
       },
-      {
-        question: "Нужен ли опыт?",
-        answer: "Практика подходит для спокойного знакомства с форматом.",
-        anchor: "opyt",
-      },
+      listenOnlineFaq("Денежная энергия"),
     ],
   };
   const moneyCoveredDraft = {
@@ -2854,6 +2889,7 @@ const ungroundedDraft = validDraft({
     titleEqualsPrimary: true,
     overusedUsageIndexes: [],
     overusedFaqLocations: [],
+    ...listenOnlineCoverage("unknown"),
   });
   const qualityPrompt = buildProductSeoQualityRepairPrompt(
     productionRepairProvider.calls[1].input,
@@ -2866,7 +2902,7 @@ const ungroundedDraft = validDraft({
   );
   assert.match(
     qualityPrompt,
-    /Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «энергия входа в денежный канал»/,
+    /Измени только Q2 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «энергия входа в денежный канал»/,
   );
   assert.equal(
     productionRepair.data.usageItems[0].content,
@@ -2958,6 +2994,7 @@ const ungroundedDraft = validDraft({
     titleEqualsPrimary: true,
     overusedUsageIndexes: [],
     overusedFaqLocations: [],
+    ...listenOnlineCoverage("unknown"),
   });
   assert.equal(
     isSecondaryCoverageComplete(
@@ -3217,6 +3254,7 @@ const ungroundedDraft = validDraft({
       "мощная медитация изобилия",
       "медитация поток изобилия",
     ],
+    isFree: true,
   });
   const keyToAbundanceOverusedDraft = {
     seoTitle: "Ключ к Изобилию – аудиопрактика для мягкого настроя",
@@ -3265,14 +3303,11 @@ const ungroundedDraft = validDraft({
       },
       {
         question: "Кому подойдёт эта практика?",
-        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
-        anchor: "changed-q2",
+        answer:
+          "Она подойдёт тем, кто хочет мягко познакомиться с темой медитации поток изобилия.",
+        anchor: "komu",
       },
-      {
-        question: "Когда лучше её слушать?",
-        answer: "Материал можно включать, когда хочется опереться на медитацию поток изобилия.",
-        anchor: "changed-q3",
-      },
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "kogda" }),
     ],
   };
 
@@ -3291,7 +3326,6 @@ const ungroundedDraft = validDraft({
         { index: 0, field: "answer" },
         { index: 1, field: "question" },
         { index: 1, field: "answer" },
-        { index: 2, field: "question" },
         { index: 2, field: "answer" },
       ],
     },
@@ -3359,9 +3393,13 @@ const ungroundedDraft = validDraft({
       { index: 0, field: "answer" },
       { index: 1, field: "question" },
       { index: 1, field: "answer" },
-      { index: 2, field: "question" },
       { index: 2, field: "answer" },
     ],
+    ...listenOnlineCoverage("free", {
+      listenOnlineIntent: false,
+      listenOnlineQuestionOk: false,
+      listenOnlineAnswerOk: false,
+    }),
   });
   const keyQualityPrompt = buildProductSeoQualityRepairPrompt(
     keyToAbundanceProvider.calls[1].input,
@@ -3375,8 +3413,9 @@ const ungroundedDraft = validDraft({
   );
   assert.match(
     keyQualityPrompt,
-    /Измени только Q2 или Q3 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «медитация поток изобилия»/,
+    /Измени только Q2 либо его answer так, чтобы один раз естественно отразить смысл дополнительного запроса «медитация поток изобилия»/,
   );
+  assert.match(keyQualityPrompt, /намерение Q3 «слушать онлайн»/);
   assert.match(
     keyQualityPrompt,
     /Убери точную фразу основного запроса из usageItems с индексами 0, 1, 2/,
@@ -3437,7 +3476,7 @@ const ungroundedDraft = validDraft({
   );
   assert.equal(
     containsSeoPhrase(keyToAbundance.data.faqItems[2].question, KEY_PRIMARY),
-    false,
+    true,
   );
   assert.equal(
     containsSeoPhrase(keyToAbundance.data.faqItems[2].answer, KEY_PRIMARY),
@@ -3534,14 +3573,11 @@ const ungroundedDraft = validDraft({
       },
       {
         question: "Кому подойдёт эта практика?",
-        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
+        answer:
+          "Она подойдёт тем, кто хочет мягко познакомиться с темой медитации поток изобилия.",
         anchor: "komu",
       },
-      {
-        question: "Когда лучше её слушать?",
-        answer: "Материал можно включать, когда хочется опереться на медитацию поток изобилия.",
-        anchor: "kogda",
-      },
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "kogda" }),
     ],
   };
   assert.deepEqual(
@@ -3607,7 +3643,7 @@ const ungroundedDraft = validDraft({
         ...keyToAbundanceNaturalDraft.faqItems[1],
         question: "Когда слушать «Ключ к Изобилию»?",
       },
-      keyToAbundanceNaturalDraft.faqItems[2],
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "kogda" }),
     ],
   };
   assert.equal(
@@ -3754,14 +3790,10 @@ const ungroundedDraft = validDraft({
       },
       {
         question: "Кому подойдёт эта практика?",
-        answer: "Она подойдёт тем, кому откликается тема «Ключ к Изобилию».",
+        answer: "Она подойдёт тем, кому откликается тема спокойного настроя.",
         anchor: "komu",
       },
-      {
-        question: "Когда лучше её слушать?",
-        answer: "Материал «Ключ к Изобилию» можно включать в спокойное время.",
-        anchor: "kogda",
-      },
+      listenOnlineFaq("Ключ к Изобилию"),
     ],
   };
   assert.deepEqual(
@@ -3852,11 +3884,7 @@ const ungroundedDraft = validDraft({
         answer: "«Ключ к Изобилию» подойдёт тем, кому откликается тема.",
         anchor: "komu",
       },
-      {
-        question: "Когда слушать «Ключ к Изобилию»?",
-        answer: "«Ключ к Изобилию» можно включать вечером.",
-        anchor: "kogda",
-      },
+      listenOnlineFaq("Ключ к Изобилию"),
     ],
   });
   assert.deepEqual(
@@ -3892,6 +3920,330 @@ const ungroundedDraft = validDraft({
   assert.equal(noPrimaryProvider.calls.length, 1);
   assert.deepEqual(noPrimaryOveruse.data.usageItems, noPrimaryTitleRepeatDraft.usageItems);
 
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: [
+        { content: "Используйте практику через мощную медитацию изобилия." },
+        { content: "После разговора." },
+        { content: "Вечером." },
+      ],
+      faqItems: [
+        keyToAbundanceOverusedDraft.faqItems[0],
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Она подойдёт для спокойного знакомства с темой.",
+        },
+        {
+          question: "Где слушать медитацию поток изобилия?",
+          answer: "Материал про медитацию поток изобилия можно включать вечером.",
+        },
+      ],
+    }).secondary2FaqCovered,
+    false,
+  );
+
+  const secondaryHiddenInQ3Draft = {
+    seoTitle: keyToAbundanceOverusedDraft.seoTitle,
+    seoDescription: keyToAbundanceOverusedDraft.seoDescription,
+    usageItems: [
+      {
+        content:
+          "Используйте практику, чтобы настроиться через мощную медитацию изобилия.",
+      },
+      { content: "Включайте аудиопрактику после напряжённого разговора." },
+      { content: "Возвращайтесь к материалу во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кто хочет мягко познакомиться с темой.",
+        anchor: "komu",
+      },
+      {
+        question: "Где послушать медитацию поток изобилия онлайн?",
+        answer:
+          "Эту практику можно слушать онлайн на этой странице в плеере АудиоЛада.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: secondaryHiddenInQ3Draft.usageItems,
+      faqItems: secondaryHiddenInQ3Draft.faqItems,
+    }).secondary2FaqCovered,
+    false,
+  );
+  const secondaryHiddenInQ3Provider = mockProvider([
+    { ok: true, draft: secondaryHiddenInQ3Draft, raw: {} },
+    { ok: true, draft: keyToAbundanceNaturalDraft, raw: {} },
+  ]);
+  const secondaryHiddenInQ3 = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "secondary-2-must-not-hide-in-q3",
+    config,
+    provider: secondaryHiddenInQ3Provider,
+  });
+  assert.equal(secondaryHiddenInQ3.ok, true);
+  assert.equal(secondaryHiddenInQ3Provider.calls[1].kind, "qualityRepair");
+  assert.equal(secondaryHiddenInQ3Provider.calls[1].coverage.secondary2FaqCovered, false);
+  assert.match(secondaryHiddenInQ3.data.faqItems[1].answer, /поток изобилия/);
+  assert.equal(
+    /поток изобилия/i.test(secondaryHiddenInQ3.data.faqItems[2].question),
+    false,
+  );
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: secondaryHiddenInQ3.data.usageItems,
+      faqItems: secondaryHiddenInQ3.data.faqItems,
+    }).secondary2FaqCovered,
+    true,
+  );
+
+  const q3OnlyBrokenDraft = {
+    ...keyToAbundanceNaturalDraft,
+    seoTitle: keyToAbundanceOverusedDraft.seoTitle,
+    seoDescription: keyToAbundanceOverusedDraft.seoDescription,
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      keyToAbundanceNaturalDraft.faqItems[1],
+      {
+        question: "Нужен ли опыт?",
+        answer: "Практика подходит для спокойного знакомства с форматом.",
+        anchor: "kogda",
+      },
+    ],
+  };
+  const q2PreservedDraft = {
+    ...q3OnlyBrokenDraft,
+    seoTitle: "CHANGED TITLE must not apply",
+    faqItems: [
+      {
+        ...q3OnlyBrokenDraft.faqItems[0],
+        question: "CHANGED Q1?",
+      },
+      {
+        question: "CHANGED Q2 that must not apply?",
+        answer: "Changed Q2 answer must not overwrite coverage.",
+        anchor: "changed-q2",
+      },
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "changed-q3" }),
+    ],
+  };
+  const q3OnlyRepairProvider = mockProvider([
+    { ok: true, draft: q3OnlyBrokenDraft, raw: {} },
+    { ok: true, draft: q2PreservedDraft, raw: {} },
+  ]);
+  const q3OnlyRepair = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "q3-listen-repair-preserves-q2",
+    config,
+    provider: q3OnlyRepairProvider,
+  });
+  assert.equal(q3OnlyRepair.ok, true);
+  assert.equal(q3OnlyRepair.data.seoTitle, keyToAbundanceOverusedDraft.seoTitle);
+  assert.equal(
+    q3OnlyRepair.data.faqItems[0].question,
+    q3OnlyBrokenDraft.faqItems[0].question,
+  );
+  assert.deepEqual(q3OnlyRepair.data.faqItems[1], q3OnlyBrokenDraft.faqItems[1]);
+  assert.equal(
+    q3OnlyRepair.data.faqItems[2].question,
+    listenOnlineFaq("Ключ к Изобилию", { free: true }).question,
+  );
+  assert.equal(q3OnlyRepair.data.faqItems[2].anchor, "kogda");
+
+  const paidRequest = requestInput({
+    title: "Ключ к Изобилию",
+    seoPrimaryQuery: KEY_PRIMARY,
+    seoSecondaryQueries: [],
+    isFree: false,
+  });
+  const paidFalseFreeDraft = {
+    seoTitle: "Ключ к Изобилию – аудиопрактика для мягкого настроя",
+    seoDescription:
+      "Ключ к Изобилию помогает мягко настроиться на спокойное внимание к теме достатка и внутреннему состоянию.",
+    usageItems: validDraft().usageItems,
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer: "Она подойдёт тем, кому откликается тема.",
+        anchor: "komu",
+      },
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "kogda" }),
+    ],
+  };
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      accessMode: "paid",
+      faqItems: paidFalseFreeDraft.faqItems,
+    }).listenOnlineFalseFreeClaim,
+    true,
+  );
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      accessMode: "paid",
+      faqItems: paidFalseFreeDraft.faqItems,
+    }).listenOnlineIntent,
+    false,
+  );
+  const paidFixedDraft = {
+    ...paidFalseFreeDraft,
+    faqItems: [
+      paidFalseFreeDraft.faqItems[0],
+      paidFalseFreeDraft.faqItems[1],
+      listenOnlineFaq("Ключ к Изобилию", { paid: true, anchor: "kogda" }),
+    ],
+  };
+  const paidFalseFreeProvider = mockProvider([
+    { ok: true, draft: paidFalseFreeDraft, raw: {} },
+    { ok: true, draft: paidFixedDraft, raw: {} },
+  ]);
+  const paidFalseFree = await generateProductSeoDraft(paidRequest, {
+    userId: "paid-q3-false-free-claim",
+    config,
+    provider: paidFalseFreeProvider,
+  });
+  assert.equal(paidFalseFree.ok, true);
+  assert.equal(paidFalseFreeProvider.calls[1].kind, "qualityRepair");
+  assert.doesNotMatch(paidFalseFree.data.faqItems[2].question, /бесплатн/i);
+  assert.doesNotMatch(paidFalseFree.data.faqItems[2].answer, /бесплатн/i);
+  assert.match(paidFalseFree.data.faqItems[2].answer, /после получения доступа/);
+
+  const unknownAccessDraft = {
+    ...paidFixedDraft,
+    faqItems: [
+      paidFixedDraft.faqItems[0],
+      paidFixedDraft.faqItems[1],
+      listenOnlineFaq("Ключ к Изобилию", { anchor: "kogda" }),
+    ],
+  };
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      accessMode: "unknown",
+      faqItems: unknownAccessDraft.faqItems,
+    }).listenOnlineIntent,
+    true,
+  );
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      accessMode: "unknown",
+      faqItems: paidFalseFreeDraft.faqItems,
+    }).listenOnlineFalseFreeClaim,
+    true,
+  );
+
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: [
+        { content: "Когда хочется почувствовать изобилие." },
+        { content: "Для работы с темой денег." },
+        { content: "Если нужен поток спокойного внимания." },
+      ],
+      faqItems: [
+        {
+          question: "Что такое «Ключ к Изобилию»?",
+          answer: "Это аудиопрактика про изобилие.",
+        },
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Она подойдёт тем, кому близок финансовый настрой.",
+        },
+        listenOnlineFaq("Ключ к Изобилию", { free: true }),
+      ],
+    }).primaryOveruse,
+    false,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: [
+        { content: "Когда хочется почувствовать изобилие." },
+        { content: "Для работы с темой денег." },
+        { content: "Если нужен поток спокойного внимания." },
+      ],
+      faqItems: [
+        {
+          question: "Что такое «Ключ к Изобилию»?",
+          answer: "Это аудиопрактика про изобилие.",
+        },
+        {
+          question: "Кому подойдёт «Ключ к Изобилию»?",
+          answer: "Она подойдёт тем, кому близок финансовый настрой.",
+        },
+        listenOnlineFaq("Ключ к Изобилию", { free: true }),
+      ],
+    }).primaryOveruse,
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: KEY_PRIMARY,
+      productTitle: "Ключ к Изобилию",
+      usageItems: [
+        { content: "Когда хочется почувствовать изобилие." },
+        { content: "Для работы с темой денег." },
+        { content: "Если нужен поток спокойного внимания." },
+      ],
+      faqItems: [
+        {
+          question: "Что такое «Ключ к Изобилию»?",
+          answer: "Это аудиопрактика про изобилие.",
+        },
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Она подойдёт тем, кому близок финансовый настрой.",
+        },
+        {
+          question: listenOnlineFaq("Ключ к Изобилию", { free: true }).question,
+          answer: "«Ключ к Изобилию» можно слушать онлайн на этой странице.",
+        },
+      ],
+    }).primaryOveruse,
+    true,
+  );
+
+  const freeProductIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "Ключ к Изобилию",
+    accessMode: "free",
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      keyToAbundanceNaturalDraft.faqItems[1],
+      listenOnlineFaq("Ключ к Изобилию", { free: true }),
+    ],
+  });
+  assert.equal(freeProductIntent.listenOnlineIntent, true);
+  assert.match(keyToAbundance.data.faqItems[2].question, /Ключ к Изобилию/);
+  assert.match(keyToAbundance.data.faqItems[2].question, /онлайн/);
+  assert.match(keyToAbundance.data.faqItems[2].question, /бесплатн/);
+  assert.match(keyToAbundance.data.faqItems[2].answer, /онлайн|на этой странице/);
+  assert.doesNotMatch(keyToAbundance.data.faqItems[2].answer, /Ключ к Изобилию/);
+
   const validateSource = read("src/lib/seo/product-autofill/validate.ts");
   assert.doesNotMatch(validateSource, /evaluateSecondaryQueryCoverage/);
   assert.doesNotMatch(validateSource, /secondary1UsageCovered/);
@@ -3899,6 +4251,19 @@ const ungroundedDraft = validDraft({
   assert.doesNotMatch(validateSource, /evaluatePrimaryQueryOveruse/);
   assert.doesNotMatch(validateSource, /primaryOveruse/);
   assert.doesNotMatch(validateSource, /primary_overuse/);
+  assert.doesNotMatch(validateSource, /evaluateListenOnlineFaqIntent/);
+  assert.doesNotMatch(validateSource, /listenOnlineIntent/);
+  assert.doesNotMatch(validateSource, /listen_online/);
+  assert.match(orchestrate, /MAX_PROVIDER_CALLS = 3/);
+  assert.match(orchestrate, /evaluateListenOnlineFaqIntent/);
+  assert.match(orchestrate, /readListenOnlineIntent/);
+  const practiceJsonLd = read("src/lib/seo/json-ld/builders.ts");
+  const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+  const publicFaq = read("src/components/products/PracticeSeoContentSections.tsx");
+  assert.match(publicFaq, /content\.faqItems\.map/);
+  assert.doesNotMatch(practiceJsonLd.slice(practiceJsonLd.indexOf("export function buildPracticeJsonLd")), /FAQPage/);
+  assert.doesNotMatch(practicePage, /FAQPage/);
+  assert.doesNotMatch(section, /meta keywords|seoKeywords/i);
 }
 
 console.log("product-seo-autofill-unit: ok");

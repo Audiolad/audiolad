@@ -31,6 +31,11 @@ import {
 } from "@/lib/seo/product-metadata";
 import { applyProductSeoDraftRussianTypography } from "@/lib/seo/product-autofill/typography";
 import {
+  evaluateListenOnlineFaqIntent,
+  type ListenOnlineFaqIntent,
+} from "@/lib/seo/listen-online-faq-intent";
+import {
+  productSeoAccessModeFromIsFree,
   type ProductSeoAiErrorCode,
   type ProductSeoAiRawDraft,
   type ProductSeoAiResult,
@@ -186,6 +191,8 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
     record.seoSecondaryQueries,
     record.seoPrimaryQuery,
   );
+  const isFree =
+    record.isFree === true ? true : record.isFree === false ? false : undefined;
   return {
     ok: true,
     request: {
@@ -194,6 +201,7 @@ function readAutofillRequest(body: unknown): ParseProductSeoAutofillRequestResul
       description: record.description,
       productKind: record.productKind,
       seoPrimaryQuery: record.seoPrimaryQuery,
+      ...(isFree === undefined ? {} : { isFree }),
       seoSecondaryQueries,
       usageItems,
       styleProfile: style.profile,
@@ -404,23 +412,37 @@ export async function generateProductSeoDraft(
     });
   }
 
+  function readListenOnlineIntent(draft: {
+    faqItems: ProductSeoAiRawDraft["faqItems"];
+  }): ListenOnlineFaqIntent {
+    return evaluateListenOnlineFaqIntent({
+      productTitle: request.title,
+      accessMode: productSeoAccessModeFromIsFree(request.isFree),
+      faqItems: draft.faqItems,
+    });
+  }
+
   function hasQualityIssues(
     coverage: SecondaryQueryCoverage,
     overuse: PrimaryQueryOveruse,
+    listenIntent: ListenOnlineFaqIntent,
   ): boolean {
     return (
       !isSecondaryCoverageComplete(coverage, activeSecondaryQueries.length) ||
-      overuse.primaryOveruse
+      overuse.primaryOveruse ||
+      !listenIntent.listenOnlineIntent
     );
   }
 
   function qualityRepairInput(
     coverage: SecondaryQueryCoverage,
     overuse: PrimaryQueryOveruse,
+    listenIntent: ListenOnlineFaqIntent,
   ): ProductSeoQualityRepairInput {
     return {
       ...coverage,
       ...overuse,
+      ...listenIntent,
       secondary1: activeSecondaryQueries[0],
       secondary2: activeSecondaryQueries[1],
     };
@@ -431,6 +453,7 @@ export async function generateProductSeoDraft(
     previous: ProductSeoAiRawDraft,
     coverage: SecondaryQueryCoverage,
     overuse: PrimaryQueryOveruse,
+    listenIntent: ListenOnlineFaqIntent,
   ): ProductSeoAiRawDraft {
     const next: ProductSeoAiRawDraft = {
       seoTitle: previous.seoTitle,
@@ -485,36 +508,32 @@ export async function generateProductSeoDraft(
       }
 
       if (!coverage.secondary2FaqCovered) {
-        const changes: Array<{
-          index: number;
-          questionChanged: boolean;
-          answerChanged: boolean;
-        }> = [];
-        for (let index = 1; index < previous.faqItems.length; index += 1) {
-          const previousItem = previous.faqItems[index];
-          const candidateItem = candidate.faqItems[index];
-          if (!candidateItem) {
-            continue;
-          }
+        const previousItem = previous.faqItems[1];
+        const candidateItem = candidate.faqItems[1];
+        if (previousItem && candidateItem) {
           const questionChanged = previousItem.question !== candidateItem.question;
           const answerChanged = previousItem.answer !== candidateItem.answer;
           if (questionChanged || answerChanged) {
-            changes.push({ index, questionChanged, answerChanged });
+            next.faqItems[1] = {
+              question: questionChanged
+                ? candidateItem.question
+                : next.faqItems[1].question,
+              answer: answerChanged
+                ? candidateItem.answer
+                : next.faqItems[1].answer,
+              anchor: previousItem.anchor,
+            };
           }
         }
-        const preferred =
-          changes.find((change) => change.answerChanged && !change.questionChanged) ??
-          changes[0];
-        if (preferred) {
-          const previousItem = previous.faqItems[preferred.index];
-          const candidateItem = candidate.faqItems[preferred.index];
-          next.faqItems[preferred.index] = {
-            question: preferred.questionChanged
-              ? candidateItem.question
-              : next.faqItems[preferred.index].question,
-            answer: preferred.answerChanged
-              ? candidateItem.answer
-              : next.faqItems[preferred.index].answer,
+      }
+
+      if (!listenIntent.listenOnlineIntent) {
+        const previousItem = previous.faqItems[2];
+        const candidateItem = candidate.faqItems[2];
+        if (previousItem && candidateItem) {
+          next.faqItems[2] = {
+            question: candidateItem.question,
+            answer: candidateItem.answer,
             anchor: previousItem.anchor,
           };
         }
@@ -533,14 +552,18 @@ export async function generateProductSeoDraft(
     const fallbackHardValidDraft = validDraft;
     const coverage = readSecondaryCoverage(fallbackHardValidDraft);
     const overuse = readPrimaryOveruse(fallbackHardValidDraft);
-    if (!hasQualityIssues(coverage, overuse) || providerCallCount >= MAX_PROVIDER_CALLS) {
+    const listenIntent = readListenOnlineIntent(fallbackHardValidDraft);
+    if (
+      !hasQualityIssues(coverage, overuse, listenIntent) ||
+      providerCallCount >= MAX_PROVIDER_CALLS
+    ) {
       return { ok: true, data: fallbackHardValidDraft };
     }
 
     const repaired = await provider.qualityRepair(
       promptInput,
       rawDraft,
-      qualityRepairInput(coverage, overuse),
+      qualityRepairInput(coverage, overuse, listenIntent),
     );
     providerCallCount += 1;
     if (!repaired.ok || !repaired.draft?.usageItems || !repaired.draft?.faqItems) {
@@ -548,7 +571,7 @@ export async function generateProductSeoDraft(
     }
 
     const mergedDraft = normalizeGeneratedDraft(
-      mergeQualityRepair(repaired.draft, rawDraft, coverage, overuse),
+      mergeQualityRepair(repaired.draft, rawDraft, coverage, overuse, listenIntent),
     );
     const repairedValidation = validateDraft(mergedDraft);
     if (!repairedValidation.ok) {
@@ -557,7 +580,8 @@ export async function generateProductSeoDraft(
 
     const repairedCoverage = readSecondaryCoverage(repairedValidation.draft);
     const repairedOveruse = readPrimaryOveruse(repairedValidation.draft);
-    if (hasQualityIssues(repairedCoverage, repairedOveruse)) {
+    const repairedListenIntent = readListenOnlineIntent(repairedValidation.draft);
+    if (hasQualityIssues(repairedCoverage, repairedOveruse, repairedListenIntent)) {
       return { ok: true, data: fallbackHardValidDraft };
     }
 
