@@ -159,6 +159,7 @@ import { SHUM_FENA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/c
 import { BELYY_SHUM_FENA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-fena-slushat-onlayn.ts";
 import { SHUM_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-ventilyatora-dlya-sna-slushat-onlayn.ts";
 import { ZVUK_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-ventilyatora-dlya-sna-slushat-onlayn.ts";
+import { BELYY_SHUM_VENTILYATORA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-ventilyatora-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3571,6 +3572,20 @@ function testOneHundredThirtySecondListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/zvuk-ventilyatora-dlya-sna-slushat-onlayn"), "no /articles duplicate for one-hundred-thirty-second listen slug");
 }
 
+function testOneHundredThirtyThirdListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/belyy-shum-ventilyatora-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-thirty-third indexable listen page is listed");
+  assert(card.title === BELYY_SHUM_VENTILYATORA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-thirty-third directory title");
+  assert(card.description === BELYY_SHUM_VENTILYATORA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-thirty-third directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-ventilyatora-slushat-onlayn"), "no /articles duplicate for one-hundred-thirty-third listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3613,6 +3628,7 @@ const tests = [
   ["one-hundred-thirtieth listen page in directory", testOneHundredThirtiethListenInDirectory],
   ["one-hundred-thirty-first listen page in directory", testOneHundredThirtyFirstListenInDirectory],
   ["one-hundred-thirty-second listen page in directory", testOneHundredThirtySecondListenInDirectory],
+  ["one-hundred-thirty-third listen page in directory", testOneHundredThirtyThirdListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
