@@ -43,6 +43,27 @@ export function getStudioClipEnd(layout: StudioClipLayout): number {
   return layout.startTime + layout.duration;
 }
 
+/**
+ * Available source samples for a clip during Studio MP3 render.
+ * Clamps to asset remaining after offset without changing geometric clip.duration.
+ * Does not mutate project_data — render filter graph only.
+ */
+export function getStudioRenderClipSourceDuration(
+  clip: Pick<StudioClipLayout, "offset" | "duration">,
+  assetDurationSeconds: number,
+): number {
+  const safeAsset =
+    Number.isFinite(assetDurationSeconds) && assetDurationSeconds > 0
+      ? assetDurationSeconds
+      : 0;
+  const offset =
+    Number.isFinite(clip.offset) && clip.offset > 0 ? clip.offset : 0;
+  const available = Math.max(0, safeAsset - offset);
+  const requested =
+    Number.isFinite(clip.duration) && clip.duration > 0 ? clip.duration : 0;
+  return Math.min(requested, available);
+}
+
 export function studioClipRangesOverlap(
   left: StudioClipLayout,
   right: StudioClipLayout,

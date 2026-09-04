@@ -85,7 +85,9 @@ async function probeDuration(path: string, ffprobePath = "ffprobe"): Promise<num
   return duration;
 }
 
-const DURATION_EPSILON_SECONDS = 0.25;
+/** Keep tight: pads must fill geometry; do not raise to hide real shortfalls. */
+export const STUDIO_RENDER_DURATION_EPSILON_SECONDS = 0.25;
+const DURATION_EPSILON_SECONDS = STUDIO_RENDER_DURATION_EPSILON_SECONDS;
 
 /**
  * Renders only local, already-authorized asset files. Callers own moving the
