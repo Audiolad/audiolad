@@ -21,9 +21,19 @@
    */
   --bottom-nav-viewport-offset: 0px;
   --home-page-gutter: 1.25rem;
-  /* Fixed catalog search + matching spacer (safe-area-top + chrome padding + 52px field). */
-  --catalog-mobile-search-height: calc(
+  /*
+   * MobileTopChrome spacer fallbacks only (first paint). Live height is the
+   * measured chrome px — never apply these to the measured chrome itself.
+   */
+  --mobile-top-chrome-fallback-catalog: calc(
     max(0.75rem, env(safe-area-inset-top, 0px)) + 52px + 0.75rem
+  );
+  --mobile-top-chrome-fallback-playlists: calc(
+    max(0.25rem, env(safe-area-inset-top, 0px)) + 52px
+  );
+  --mobile-top-chrome-fallback-library: calc(
+    max(0.25rem, env(safe-area-inset-top, 0px)) + 1.5rem + 1.75rem + 0.25rem +
+      1.25rem + 0.75rem + 52px
   );
 
   /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
@@ -354,9 +364,24 @@ html.catalog-sheet-lock body {
   overflow: hidden;
 }
 
-.listener-catalog-mobile-search,
-.listener-catalog-mobile-search-spacer {
-  min-height: var(--catalog-mobile-search-height);
+.mobile-top-chrome {
+  transform: none;
+}
+
+/*
+ * Fallback min-height is spacer-only. Measurement writes an inline height
+ * onto the spacer and must never feed back into the chrome's own height.
+ */
+.mobile-top-chrome-spacer[data-mobile-top-chrome-variant="catalog"] {
+  min-height: var(--mobile-top-chrome-fallback-catalog);
+}
+
+.mobile-top-chrome-spacer[data-mobile-top-chrome-variant="playlists"] {
+  min-height: var(--mobile-top-chrome-fallback-playlists);
+}
+
+.mobile-top-chrome-spacer[data-mobile-top-chrome-variant="library"] {
+  min-height: var(--mobile-top-chrome-fallback-library);
 }
 
 @media (display-mode: standalone) {

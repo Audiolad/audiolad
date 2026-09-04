@@ -126,8 +126,10 @@ export default function PlatformSearchField({
         aria-controls={showDropdown ? listboxId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={showDropdown ? activeDescendantId : undefined}
-        className={`min-w-0 flex-1 border-0 bg-transparent text-[15px] leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none ${
-          isCompact ? "py-0" : "py-2 xl:leading-none"
+        className={`min-w-0 flex-1 border-0 bg-transparent leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none ${
+          isCompact
+            ? "py-0 text-base"
+            : "py-2 text-base xl:text-[15px] xl:leading-none"
         }`}
       />
 

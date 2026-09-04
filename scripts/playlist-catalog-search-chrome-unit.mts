@@ -75,40 +75,57 @@ assert.match(
 const searchUi = read(
   "src/components/playlists/catalog/PlaylistCatalogSearch.tsx",
 );
+const mobileTopChrome = read("src/components/listener/MobileTopChrome.tsx");
+const mobileTopChromeLib = read("src/lib/listener/mobile-top-chrome.ts");
 assert.match(
   searchUi,
-  /listener-catalog-mobile-search/,
-  "playlist catalog reuses the product catalog mobile search class",
+  /<MobileTopChrome variant=["']playlists["']/,
+  "playlist catalog uses the shared MobileTopChrome primitive",
 );
 assert.match(
-  searchUi,
-  /listener-catalog-mobile-search[^"]*fixed top-0/,
+  mobileTopChrome,
+  /fixed top-0 inset-x-0/,
   "mobile playlist search is a fixed top bar",
 );
 assert.match(
-  searchUi,
-  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  mobileTopChrome,
+  /xl:hidden/,
   "mobile playlist search chrome is xl:hidden",
 );
 assert.match(
-  searchUi,
-  /listener-catalog-mobile-search-spacer/,
+  mobileTopChrome,
+  /data-mobile-top-chrome-spacer/,
   "mobile playlist search has a matching spacer",
 );
 assert.match(
-  searchUi,
-  /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
+  mobileTopChrome,
+  /mobile-top-chrome-spacer[^"]*xl:hidden/,
   "playlist search spacer stays mobile-only",
 );
 assert.match(
-  searchUi,
+  mobileTopChrome,
   /aria-hidden/,
   "playlist search spacer is aria-hidden",
 );
 assert.match(
+  mobileTopChrome,
+  /playlists: "px-5 pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0"/,
+  "playlist chrome keeps its own padding; spacer tracks measured height",
+);
+assert.match(
+  mobileTopChrome,
+  /ResizeObserver/,
+  "playlist spacer height comes from ResizeObserver, not a shared CSS var",
+);
+assert.match(
+  mobileTopChromeLib,
+  /function spacerStyleFromChromeHeight/,
+  "measurement contract lives in one helper",
+);
+assert.match(
   searchUi,
-  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
-  "playlist mobile search uses the catalog safe-area padding",
+  /replaceListingSearch/,
+  "playlist search replace uses the shared scroll:false helper",
 );
 assert.match(
   searchUi,
@@ -121,9 +138,9 @@ assert.match(
   "sticky desktop search covers cards with the surface color",
 );
 assert.doesNotMatch(
-  searchUi,
-  /listener-catalog-mobile-search[^"]*sticky/,
-  "mobile playlist search stays fixed, not sticky",
+  mobileTopChrome,
+  /sticky/,
+  "shared mobile chrome stays fixed, not sticky",
 );
 assert.match(
   searchUi,
@@ -150,8 +167,8 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   searchUi,
-  /--catalog-mobile-search-height|--playlist-.*search-height/,
-  "playlist search reuses the existing CSS var, does not declare a new one",
+  /--catalog-mobile-search-height|--playlist-.*search-height|--mobile-top-chrome-fallback/,
+  "playlist search does not hardcode a live height contract",
 );
 assert.doesNotMatch(
   searchUi,
@@ -218,8 +235,8 @@ assert.match(
 );
 assert.match(
   catalogLayout,
-  /listener-catalog-mobile-search fixed top-0 inset-x-0 z-30/,
-  "product catalog layout keeps its fixed mobile search",
+  /<MobileTopChrome variant=["']catalog["']/,
+  "product catalog layout keeps shared MobileTopChrome",
 );
 assert.doesNotMatch(
   catalogLayout,
@@ -230,13 +247,23 @@ assert.doesNotMatch(
 const globals = read("src/app/globals.css");
 assert.match(
   globals,
-  /--catalog-mobile-search-height:\s*calc\(max\(0\.25rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\)/,
-  "playlist catalog reuses the existing 52px + safe-area height",
+  /--mobile-top-chrome-fallback-playlists:\s*calc\(\s*max\(0\.25rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\)/,
+  "playlist spacer fallback is first-paint only",
+);
+assert.doesNotMatch(
+  globals,
+  /--catalog-mobile-search-height/,
+  "shared live --catalog-mobile-search-height contract is gone",
 );
 assert.match(
   globals,
-  /\.listener-catalog-mobile-search,\s*\n\.listener-catalog-mobile-search-spacer/,
-  "search and spacer still share one min-height rule",
+  /\.mobile-top-chrome-spacer\[data-mobile-top-chrome-variant="playlists"\]/,
+  "playlist fallback min-height is spacer-only",
+);
+assert.doesNotMatch(
+  globals,
+  /\.mobile-top-chrome,\s*\n\.mobile-top-chrome-spacer \{/,
+  "chrome and spacer do not share one live min-height rule",
 );
 
 console.log("playlist-catalog-search-chrome-unit: ok");

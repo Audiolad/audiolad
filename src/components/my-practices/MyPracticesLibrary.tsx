@@ -25,6 +25,7 @@ import {
 } from "@/lib/library/unified-query";
 import { unifiedPlaylistEntryToListingItem } from "@/lib/library/unified-playlist-item";
 import type { UnifiedLibraryEntry } from "@/lib/library/unified-entry";
+import { replaceListingSearch } from "@/lib/listener/listing-search-navigation";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 /** Survives Suspense/remount so remove confirmation is not lost mid-animation. */
@@ -213,7 +214,7 @@ export default function MyPracticesLibrary({
       return;
     }
 
-    router.replace(href, { scroll: false });
+    replaceListingSearch(router, href);
   }
 
   function handleRemovedFromLibrary(

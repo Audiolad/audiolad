@@ -308,12 +308,9 @@ assert.match(searchUiSource, /data-playlist-catalog-search/);
 assert.match(searchUiSource, /Найти плейлист/);
 assert.match(
   searchUiSource,
-  /listener-catalog-mobile-search[^"]*fixed top-0/,
+  /<MobileTopChrome variant=["']playlists["']/,
 );
-assert.match(
-  searchUiSource,
-  /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
-);
+assert.match(searchUiSource, /replaceListingSearch/);
 assert.match(searchUiSource, /hidden xl:block/);
 assert.doesNotMatch(
   searchUiSource,
