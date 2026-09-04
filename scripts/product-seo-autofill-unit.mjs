@@ -35,6 +35,7 @@ import {
 } from "../src/lib/seo/primary-query-overuse.ts";
 import {
   distinctiveQueryStems,
+  distinctiveQueryStemsOutsideSources,
   evaluateSecondaryQueryCoverage,
   isSecondaryCoverageComplete,
   selectActiveSecondaryQueries,
@@ -300,6 +301,8 @@ function listenOnlineCoverage(accessMode = "unknown", overrides = {}) {
     listenOnlineQuestionOk: true,
     listenOnlineAnswerOk: true,
     listenOnlineFalseFreeClaim: false,
+    q3HasLiteralTitlePlaceholder: false,
+    q3Secondary2Contaminated: false,
     accessMode,
     ...overrides,
   };
@@ -4260,6 +4263,258 @@ const ungroundedDraft = validDraft({
   assert.match(keyToAbundance.data.faqItems[2].answer, /онлайн|на этой странице/);
   assert.doesNotMatch(keyToAbundance.data.faqItems[2].answer, /Ключ к Изобилию/);
 
+  const emptyTitleRequest = requestInput({
+    title: "",
+    seoPrimaryQuery: "медитация для сна",
+    seoSecondaryQueries: [],
+    isFree: true,
+  });
+  const emptyTitlePrompt = buildProductSeoSystemPrompt({ request: emptyTitleRequest });
+  assert.match(emptyTitlePrompt, /Где можно послушать этот материал бесплатно онлайн/);
+  assert.doesNotMatch(emptyTitlePrompt, /«название продукта»/);
+  assert.doesNotMatch(emptyTitlePrompt, /послушать «название продукта»/);
+  assert.doesNotMatch(emptyTitlePrompt, /фактическое название продукта «название продукта»/);
+  const emptyTitleRepairPrompt = buildProductSeoQualityRepairPrompt(
+    { request: emptyTitleRequest },
+    validDraft({
+      faqItems: [
+        validDraft().faqItems[0],
+        validDraft().faqItems[1],
+        {
+          question: "Когда лучше слушать?",
+          answer: "В спокойное время.",
+          anchor: "kogda",
+        },
+      ],
+    }),
+    {
+      secondary1UsageCovered: true,
+      secondary2FaqCovered: true,
+      primaryOveruse: false,
+      titleEqualsPrimary: false,
+      overusedUsageIndexes: [],
+      overusedFaqLocations: [],
+      ...listenOnlineCoverage("free", {
+        listenOnlineIntent: false,
+        listenOnlineQuestionOk: false,
+        listenOnlineAnswerOk: false,
+      }),
+    },
+  );
+  assert.match(emptyTitleRepairPrompt, /Где можно послушать этот материал бесплатно онлайн/);
+  assert.doesNotMatch(emptyTitleRepairPrompt, /«название продукта»/);
+  assert.doesNotMatch(emptyTitleRepairPrompt, /послушать «название продукта»/);
+  assert.doesNotMatch(emptyTitleRepairPrompt, /фактическое название продукта «название продукта»/);
+  const promptSource = read("src/lib/seo/product-autofill/prompt.ts");
+  assert.doesNotMatch(promptSource, /\|\|\s*["']название продукта["']/);
+  const emptyTitleGenericFaq = [
+    {
+      question: "Как слушать медитация для сна?",
+      answer: "Выберите тихое место и удобное положение.",
+      anchor: "kak-slushat",
+    },
+    {
+      question: "Когда лучше включать практику?",
+      answer: "Включите её в привычное время вечернего отдыха.",
+      anchor: "kogda",
+    },
+    {
+      question: "Где можно послушать этот материал бесплатно онлайн?",
+      answer:
+        "Эту практику можно бесплатно слушать онлайн прямо на этой странице в плеере АудиоЛада.",
+      anchor: "gde-poslushat",
+    },
+  ];
+  const emptyTitleGenericIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "",
+    primaryQuery: "медитация для сна",
+    accessMode: "free",
+    faqItems: emptyTitleGenericFaq,
+  });
+  assert.equal(emptyTitleGenericIntent.listenOnlineIntent, true);
+  assert.equal(emptyTitleGenericIntent.q3HasLiteralTitlePlaceholder, false);
+  const emptyTitlePlaceholderIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "",
+    primaryQuery: "медитация для сна",
+    accessMode: "free",
+    faqItems: [
+      emptyTitleGenericFaq[0],
+      emptyTitleGenericFaq[1],
+      {
+        question: "Где можно послушать «название продукта» бесплатно онлайн?",
+        answer: emptyTitleGenericFaq[2].answer,
+        anchor: "gde-poslushat",
+      },
+    ],
+  });
+  assert.equal(emptyTitlePlaceholderIntent.listenOnlineIntent, false);
+  assert.equal(emptyTitlePlaceholderIntent.q3HasLiteralTitlePlaceholder, true);
+
+  const stuffedQ3Question =
+    "Где можно послушать «Ключ к Изобилию», медитацию потока изобилия, бесплатно онлайн?";
+  const cleanAbundanceQ3 = listenOnlineFaq("Ключ к Изобилию", { free: true });
+  const secondaryOverlapTitleFaq = [
+    {
+      question: "Что такое денежная энергия в этой практике?",
+      answer: "Это аудиопрактика для спокойной настройки.",
+      anchor: "chto",
+    },
+    {
+      question: "Кому подойдёт эта практика?",
+      answer: "Она подойдёт тем, кому близка тема денежного потока энергии.",
+      anchor: "komu",
+    },
+    listenOnlineFaq("Медитация «Денежный поток»"),
+  ];
+  const stuffedForbiddenStems = distinctiveQueryStemsOutsideSources(
+    "медитация поток изобилия",
+    "Ключ к Изобилию",
+    "Ключ к Изобилию",
+  );
+  assert.ok(stuffedForbiddenStems.some((stem) => stem.startsWith("поток")));
+  assert.ok(
+    stuffedForbiddenStems.some(
+      (stem) => stem.startsWith("медитац") || stem.startsWith("медит"),
+    ),
+  );
+  const stuffedQ3Intent = evaluateListenOnlineFaqIntent({
+    productTitle: "Ключ к Изобилию",
+    primaryQuery: "Ключ к Изобилию",
+    secondary2: "медитация поток изобилия",
+    accessMode: "free",
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      keyToAbundanceNaturalDraft.faqItems[1],
+      {
+        question: stuffedQ3Question,
+        answer: cleanAbundanceQ3.answer,
+        anchor: "kogda",
+      },
+    ],
+  });
+  assert.equal(stuffedQ3Intent.listenOnlineIntent, true);
+  assert.equal(stuffedQ3Intent.q3Secondary2Contaminated, true);
+  const cleanQ3Intent = evaluateListenOnlineFaqIntent({
+    productTitle: "Ключ к Изобилию",
+    primaryQuery: "Ключ к Изобилию",
+    secondary2: "медитация поток изобилия",
+    accessMode: "free",
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      keyToAbundanceNaturalDraft.faqItems[1],
+      cleanAbundanceQ3,
+    ],
+  });
+  assert.equal(cleanQ3Intent.listenOnlineIntent, true);
+  assert.equal(cleanQ3Intent.q3Secondary2Contaminated, false);
+  const titleOverlapIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "Медитация «Денежный поток»",
+    primaryQuery: "денежная энергия",
+    secondary2: "денежный поток энергии",
+    accessMode: "unknown",
+    faqItems: secondaryOverlapTitleFaq,
+  });
+  assert.equal(titleOverlapIntent.listenOnlineIntent, true);
+  assert.equal(titleOverlapIntent.q3Secondary2Contaminated, false);
+
+  const stuffedQ3Draft = {
+    seoTitle: keyToAbundanceOverusedDraft.seoTitle,
+    seoDescription: keyToAbundanceOverusedDraft.seoDescription,
+    usageItems: [
+      {
+        content:
+          "Используйте практику, чтобы настроиться на спокойный день через мощную медитацию изобилия.",
+      },
+      { content: "Включайте аудиопрактику после напряжённого разговора." },
+      { content: "Возвращайтесь к материалу во время вечернего отдыха." },
+    ],
+    faqItems: [
+      {
+        question: "Что такое «Ключ к Изобилию»?",
+        answer: "Это аудиопрактика для спокойной настройки.",
+        anchor: "chto",
+      },
+      {
+        question: "Кому подойдёт эта практика?",
+        answer:
+          "Она подойдёт тем, кто хочет мягко познакомиться с темой медитации поток изобилия.",
+        anchor: "komu",
+      },
+      {
+        question: stuffedQ3Question,
+        answer: cleanAbundanceQ3.answer,
+        anchor: "kogda",
+      },
+    ],
+  };
+  const cleanedQ3Draft = {
+    ...stuffedQ3Draft,
+    faqItems: [
+      stuffedQ3Draft.faqItems[0],
+      stuffedQ3Draft.faqItems[1],
+      listenOnlineFaq("Ключ к Изобилию", { free: true, anchor: "kogda" }),
+    ],
+  };
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: stuffedQ3Draft.usageItems,
+      faqItems: stuffedQ3Draft.faqItems,
+    }).secondary2FaqCovered,
+    true,
+  );
+  const stuffedQ3Provider = mockProvider([
+    { ok: true, draft: stuffedQ3Draft, raw: {} },
+    { ok: true, draft: cleanedQ3Draft, raw: {} },
+  ]);
+  const stuffedQ3Repair = await generateProductSeoDraft(keyToAbundanceRequest, {
+    userId: "q3-secondary2-contamination-repair",
+    config,
+    provider: stuffedQ3Provider,
+  });
+  assert.equal(stuffedQ3Repair.ok, true);
+  assert.equal(stuffedQ3Provider.calls.length, 2);
+  assert.equal(stuffedQ3Provider.calls[1].kind, "qualityRepair");
+  assert.equal(stuffedQ3Provider.calls[1].coverage.q3Secondary2Contaminated, true);
+  assert.equal(stuffedQ3Provider.calls[1].coverage.listenOnlineIntent, true);
+  assert.equal(stuffedQ3Provider.calls[1].coverage.secondary2FaqCovered, true);
+  const stuffedQualityPrompt = buildProductSeoQualityRepairPrompt(
+    stuffedQ3Provider.calls[1].input,
+    stuffedQ3Provider.calls[1].previous,
+    stuffedQ3Provider.calls[1].coverage,
+  );
+  assert.match(
+    stuffedQualityPrompt,
+    /Убери из Q3 лишнее направление дополнительного запроса №2/,
+  );
+  assert.match(stuffedQualityPrompt, /Не меняй Q2, если он уже закрывает дополнительный запрос №2/);
+  assert.deepEqual(stuffedQ3Repair.data.faqItems[1], stuffedQ3Draft.faqItems[1]);
+  assert.equal(
+    stuffedQ3Repair.data.faqItems[2].question,
+    listenOnlineFaq("Ключ к Изобилию", { free: true }).question,
+  );
+  assert.equal(stuffedQ3Repair.data.faqItems[2].anchor, "kogda");
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      primaryQuery: KEY_PRIMARY,
+      secondary2: "медитация поток изобилия",
+      accessMode: "free",
+      faqItems: stuffedQ3Repair.data.faqItems,
+    }).q3Secondary2Contaminated,
+    false,
+  );
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: KEY_PRIMARY,
+      activeSecondaryQueries: keyToAbundanceRequest.seoSecondaryQueries,
+      usageItems: stuffedQ3Repair.data.usageItems,
+      faqItems: stuffedQ3Repair.data.faqItems,
+    }).secondary2FaqCovered,
+    true,
+  );
+
   const validateSource = read("src/lib/seo/product-autofill/validate.ts");
   assert.doesNotMatch(validateSource, /evaluateSecondaryQueryCoverage/);
   assert.doesNotMatch(validateSource, /secondary1UsageCovered/);
@@ -4270,6 +4525,8 @@ const ungroundedDraft = validDraft({
   assert.doesNotMatch(validateSource, /evaluateListenOnlineFaqIntent/);
   assert.doesNotMatch(validateSource, /listenOnlineIntent/);
   assert.doesNotMatch(validateSource, /listen_online/);
+  assert.doesNotMatch(validateSource, /q3Secondary2Contaminated/);
+  assert.doesNotMatch(validateSource, /q3HasLiteralTitlePlaceholder/);
   assert.match(orchestrate, /MAX_PROVIDER_CALLS = 3/);
   assert.match(orchestrate, /evaluateListenOnlineFaqIntent/);
   assert.match(orchestrate, /readListenOnlineIntent/);

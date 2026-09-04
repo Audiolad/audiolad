@@ -1,10 +1,18 @@
 import { countExactNormalizedSeoPhrase } from "@/lib/seo/primary-query-overuse";
 import type { ProductSeoAccessMode } from "@/lib/seo/product-autofill/types";
+import {
+  distinctiveQueryStemsOutsideSources,
+  textContainsAnyCoverageStem,
+} from "@/lib/seo/secondary-query-coverage";
+
+export const LITERAL_PRODUCT_TITLE_PLACEHOLDER = "название продукта";
 
 export type ListenOnlineFaqIntentInput = {
   productTitle: string;
   accessMode: ProductSeoAccessMode;
   faqItems: ReadonlyArray<{ question: string; answer: string }>;
+  primaryQuery?: string;
+  secondary2?: string;
 };
 
 export type ListenOnlineFaqIntent = {
@@ -12,6 +20,8 @@ export type ListenOnlineFaqIntent = {
   listenOnlineQuestionOk: boolean;
   listenOnlineAnswerOk: boolean;
   listenOnlineFalseFreeClaim: boolean;
+  q3HasLiteralTitlePlaceholder: boolean;
+  q3Secondary2Contaminated: boolean;
   accessMode: ProductSeoAccessMode;
 };
 
@@ -58,19 +68,32 @@ export function evaluateListenOnlineFaqIntent(
   const listenOnlineFalseFreeClaim =
     !confirmedFree && (questionFreeClaim || answerFreeClaim);
 
+  const q3HasLiteralTitlePlaceholder =
+    hasLiteralProductTitlePlaceholder(question) ||
+    hasLiteralProductTitlePlaceholder(answer);
+  const q3Secondary2Contaminated = q3HasDistinctiveSecondary2(
+    input.secondary2,
+    input.primaryQuery,
+    title,
+    question,
+    answer,
+  );
+
   const listenOnlineQuestionOk =
     Boolean(question.trim()) &&
     hasListenRoot(question) &&
     hasOnline(question) &&
     (!title || countExactNormalizedSeoPhrase(question, title) === 1) &&
-    (confirmedFree ? questionFreeClaim : !questionFreeClaim);
+    (confirmedFree ? questionFreeClaim : !questionFreeClaim) &&
+    !q3HasLiteralTitlePlaceholder;
 
   const listenOnlineAnswerOk =
     Boolean(answer.trim()) &&
     hasListenRoot(answer) &&
     hasPageAccessWording(answer) &&
     (!title || countExactNormalizedSeoPhrase(answer, title) === 0) &&
-    (confirmedFree || !answerFreeClaim);
+    (confirmedFree || !answerFreeClaim) &&
+    !q3HasLiteralTitlePlaceholder;
 
   return {
     listenOnlineIntent:
@@ -80,6 +103,31 @@ export function evaluateListenOnlineFaqIntent(
     listenOnlineQuestionOk,
     listenOnlineAnswerOk,
     listenOnlineFalseFreeClaim,
+    q3HasLiteralTitlePlaceholder,
+    q3Secondary2Contaminated,
     accessMode,
   };
+}
+
+function hasLiteralProductTitlePlaceholder(text: string): boolean {
+  return normalizeListenText(text).includes(LITERAL_PRODUCT_TITLE_PLACEHOLDER);
+}
+
+function q3HasDistinctiveSecondary2(
+  secondary2: string | undefined,
+  primaryQuery: string | undefined,
+  productTitle: string,
+  question: string,
+  answer: string,
+): boolean {
+  const forbiddenStems = distinctiveQueryStemsOutsideSources(
+    secondary2 ?? "",
+    primaryQuery ?? "",
+    productTitle,
+  );
+  if (forbiddenStems.length === 0) {
+    return false;
+  }
+
+  return textContainsAnyCoverageStem(`${question} ${answer}`, forbiddenStems);
 }

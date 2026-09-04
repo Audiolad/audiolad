@@ -419,6 +419,8 @@ export async function generateProductSeoDraft(
       productTitle: request.title,
       accessMode: productSeoAccessModeFromIsFree(request.isFree),
       faqItems: draft.faqItems,
+      primaryQuery: primary,
+      secondary2: activeSecondaryQueries[1] ?? "",
     });
   }
 
@@ -430,7 +432,8 @@ export async function generateProductSeoDraft(
     return (
       !isSecondaryCoverageComplete(coverage, activeSecondaryQueries.length) ||
       overuse.primaryOveruse ||
-      !listenIntent.listenOnlineIntent
+      !listenIntent.listenOnlineIntent ||
+      listenIntent.q3Secondary2Contaminated
     );
   }
 
@@ -527,7 +530,7 @@ export async function generateProductSeoDraft(
         }
       }
 
-      if (!listenIntent.listenOnlineIntent) {
+      if (!listenIntent.listenOnlineIntent || listenIntent.q3Secondary2Contaminated) {
         const previousItem = previous.faqItems[2];
         const candidateItem = candidate.faqItems[2];
         if (previousItem && candidateItem) {

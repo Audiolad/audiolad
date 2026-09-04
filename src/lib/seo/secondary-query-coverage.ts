@@ -190,6 +190,26 @@ function textHasStem(textStems: readonly string[], stem: string): boolean {
 }
 
 /**
+ * Stems that belong to the query and are not already supplied by any source.
+ * Shared stems may appear in generated copy, but they never prove a
+ * distinctive SEO direction by themselves.
+ */
+export function distinctiveQueryStemsOutsideSources(
+  query: string,
+  ...sources: string[]
+): string[] {
+  const queryStems = coverageStems(query);
+  const sourceStems = sources.flatMap((source) => coverageStems(source));
+  if (sourceStems.length === 0) {
+    return queryStems;
+  }
+
+  return queryStems.filter(
+    (stem) => !sourceStems.some((source) => stemsOverlap(stem, source)),
+  );
+}
+
+/**
  * Stems that belong to the secondary and are not already supplied by the
  * primary. Primary-shared stems may appear in generated copy, but they never
  * prove secondary coverage by themselves.
@@ -198,15 +218,19 @@ export function distinctiveQueryStems(
   query: string,
   primaryQuery: string,
 ): string[] {
-  const queryStems = coverageStems(query);
-  if (!primaryQuery.trim()) {
-    return queryStems;
+  return distinctiveQueryStemsOutsideSources(query, primaryQuery);
+}
+
+export function textContainsAnyCoverageStem(
+  text: string,
+  stems: readonly string[],
+): boolean {
+  if (!text.trim() || stems.length === 0) {
+    return false;
   }
 
-  const primaryStems = coverageStems(primaryQuery);
-  return queryStems.filter(
-    (stem) => !primaryStems.some((primary) => stemsOverlap(stem, primary)),
-  );
+  const textStems = coverageStems(text);
+  return stems.some((stem) => textHasStem(textStems, stem));
 }
 
 function fallbackQueryCoverage(
