@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 
 import { loadListenApiContext } from "@/lib/listen/api-context";
 import { canWritePracticeProgress } from "@/lib/listen/preview-access";
+import { listPracticeProgress } from "@/lib/listen/progress";
 import {
-  listPracticeProgress,
-  resetPracticeProgress,
-  upsertPracticeProgress,
-} from "@/lib/listen/progress";
+  resetOwnPracticeProgress,
+  writeOwnPracticeProgress,
+} from "@/lib/listen/progress-write";
 import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 
 type RouteContext = {
@@ -120,14 +120,13 @@ export async function PUT(request: Request, context: RouteContext) {
       }
     }
 
-    await upsertPracticeProgress(
-      supabase,
+    await writeOwnPracticeProgress({
       userId,
-      practice.id,
+      practiceId: practice.id,
       audioItemId,
       positionSeconds,
       completed,
-    );
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -150,7 +149,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       return loaded.response;
     }
 
-    const { supabase, userId, practice, access } = loaded.context;
+    const { userId, practice, access } = loaded.context;
 
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -160,7 +159,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    await resetPracticeProgress(supabase, userId, practice.id);
+    await resetOwnPracticeProgress(userId, practice.id);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

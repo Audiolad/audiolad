@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { writeOwnPracticeProgress } from "@/lib/listen/progress-write";
 import {
   isPromoClaimRpcResult,
   mapPromoClaimRpcErrorMessage,
@@ -77,27 +78,21 @@ export async function POST(request: Request) {
   let progressTransferred = false;
 
   if (parsed.progress) {
-    const { error: progressError } = await supabase
-      .from("practice_audio_progress")
-      .upsert(
-        {
-          user_id: user.id,
-          practice_id: data.practice_id,
-          audio_item_id: parsed.progress.audio_item_id,
-          position_seconds: parsed.progress.position_seconds,
-          completed: parsed.progress.completed,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,practice_id,audio_item_id" },
-      );
-
-    if (progressError) {
+    try {
+      await writeOwnPracticeProgress({
+        userId: user.id,
+        practiceId: data.practice_id,
+        audioItemId: parsed.progress.audio_item_id,
+        positionSeconds: parsed.progress.position_seconds,
+        completed: parsed.progress.completed,
+      });
+      progressTransferred = true;
+    } catch (error) {
       console.error("promo_complete_signup_progress_error", {
-        message: progressError.message,
+        message:
+          error instanceof Error ? error.message : "progress_upsert_failed",
         practiceId: data.practice_id,
       });
-    } else {
-      progressTransferred = true;
     }
   }
 
