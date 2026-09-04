@@ -1,4 +1,5 @@
 import { AUTHOR_SEO_SECONDARY_ACTIVE_MAX } from "@/lib/author-products/limits";
+import type { ListenOnlineFaqIntent } from "@/lib/seo/listen-online-faq-intent";
 import type { PrimaryQueryOveruse } from "@/lib/seo/primary-query-overuse";
 
 const COVERAGE_STOP_WORDS = new Set([
@@ -104,7 +105,8 @@ export type SecondaryQueryCoverage = {
 };
 
 export type ProductSeoQualityRepairInput = SecondaryQueryCoverage &
-  PrimaryQueryOveruse & {
+  PrimaryQueryOveruse &
+  ListenOnlineFaqIntent & {
     secondary1?: string;
     secondary2?: string;
   };
@@ -188,6 +190,26 @@ function textHasStem(textStems: readonly string[], stem: string): boolean {
 }
 
 /**
+ * Stems that belong to the query and are not already supplied by any source.
+ * Shared stems may appear in generated copy, but they never prove a
+ * distinctive SEO direction by themselves.
+ */
+export function distinctiveQueryStemsOutsideSources(
+  query: string,
+  ...sources: string[]
+): string[] {
+  const queryStems = coverageStems(query);
+  const sourceStems = sources.flatMap((source) => coverageStems(source));
+  if (sourceStems.length === 0) {
+    return queryStems;
+  }
+
+  return queryStems.filter(
+    (stem) => !sourceStems.some((source) => stemsOverlap(stem, source)),
+  );
+}
+
+/**
  * Stems that belong to the secondary and are not already supplied by the
  * primary. Primary-shared stems may appear in generated copy, but they never
  * prove secondary coverage by themselves.
@@ -196,15 +218,19 @@ export function distinctiveQueryStems(
   query: string,
   primaryQuery: string,
 ): string[] {
-  const queryStems = coverageStems(query);
-  if (!primaryQuery.trim()) {
-    return queryStems;
+  return distinctiveQueryStemsOutsideSources(query, primaryQuery);
+}
+
+export function textContainsAnyCoverageStem(
+  text: string,
+  stems: readonly string[],
+): boolean {
+  if (!text.trim() || stems.length === 0) {
+    return false;
   }
 
-  const primaryStems = coverageStems(primaryQuery);
-  return queryStems.filter(
-    (stem) => !primaryStems.some((primary) => stemsOverlap(stem, primary)),
-  );
+  const textStems = coverageStems(text);
+  return stems.some((stem) => textHasStem(textStems, stem));
 }
 
 function fallbackQueryCoverage(
@@ -255,9 +281,10 @@ export function evaluateSecondaryQueryCoverage(
   const active = selectActiveSecondaryQueries(input.activeSecondaryQueries);
   const primary = input.primaryQuery.trim();
   const usageTexts = input.usageItems.map((item) => item.content);
-  const faqSlotTexts = input.faqItems
-    .slice(1, 3)
-    .flatMap((item) => [item.question, item.answer]);
+  const secondary2Slot = input.faqItems[1];
+  const faqSlotTexts = secondary2Slot
+    ? [secondary2Slot.question, secondary2Slot.answer]
+    : [];
 
   const secondary1 = active[0] ?? "";
   const secondary2 = active[1] ?? "";

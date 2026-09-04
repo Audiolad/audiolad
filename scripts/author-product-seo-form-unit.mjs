@@ -346,6 +346,12 @@ assert.match(section, /hasFilledGeneratedSeoFields/);
 assert.match(section, /getProductSeoSecondaryUsage/);
 assert.match(section, /secondaryUsageByQuery/);
 assert.match(section, /api\/author\/seo\/product-autofill/);
+assert.match(section, /isFree: boolean/);
+assert.match(section, /isFree,/);
+assert.match(
+  formSource,
+  /isFree=\{form\.productKind === PRODUCT_KIND\.AUDIO_POST \? true : form\.isFree\}/,
+);
 assert.match(section, /parseSeoSecondaryQueryList/);
 assert.match(section, /Основной поисковый запрос/);
 assert.match(section, /Дополнительные поисковые фразы/);
