@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadListenApiContext } from "@/lib/listen/api-context";
+import { canWritePracticeProgress } from "@/lib/listen/preview-access";
 import {
   listPracticeProgress,
   resetPracticeProgress,
@@ -28,6 +29,7 @@ async function loadLegacyListenContext(slug: string, request: Request) {
     request,
     resolved.authorSlug,
     resolved.productSlug,
+    { purpose: "progress" },
   );
 
   if (!loaded.ok) {
@@ -105,6 +107,10 @@ export async function PUT(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
+    if (!canWritePracticeProgress(access)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
     const { data: audioItem, error: audioError } = await supabase
       .from("audio_items")
       .select("id, status")
@@ -155,10 +161,14 @@ export async function DELETE(request: Request, context: RouteContext) {
       return loaded.error;
     }
 
-    const { supabase, userId, practice } = loaded.context!;
+    const { supabase, userId, practice, access } = loaded.context!;
 
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    if (!canWritePracticeProgress(access)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
     await resetPracticeProgress(supabase, userId, practice.id);

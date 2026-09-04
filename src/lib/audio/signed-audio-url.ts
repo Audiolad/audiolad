@@ -11,6 +11,10 @@ export type FetchSignedAudioUrlResult =
   | { ok: false; aborted: true }
   | { ok: false; aborted: false; status: number | null; error?: string };
 
+export function isOriginalPracticeAudioSignedUrl(url: string): boolean {
+  return /\/(?:storage\/v1\/)?object\/sign\/practice-audio\//.test(url);
+}
+
 /**
  * Catalog: `${listenApiBase}/audio/${id}` (optional `?preview=1`).
  * Private library: `/api/my-library/private-audio/${id}/audio`.
@@ -56,6 +60,15 @@ export async function fetchSignedAudioUrl(
         aborted: false,
         status: response.status,
         error: payload.error,
+      };
+    }
+
+    if (preview && isOriginalPracticeAudioSignedUrl(payload.url)) {
+      return {
+        ok: false,
+        aborted: false,
+        status: response.status,
+        error: "preview_full_audio_blocked",
       };
     }
 

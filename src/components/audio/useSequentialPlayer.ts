@@ -49,6 +49,7 @@ function drainPendingSave(
   saver(next.audioItemId, next.positionSeconds, next.completed, { force: true });
 }
 
+import { resolvePreviewClipMediaTimeline } from "@/lib/listen/preview-player-timeline";
 import { buildListenApiBase } from "@/lib/products/paths";
 import {
   buildGuestProgressPayload,
@@ -180,20 +181,17 @@ export function useSequentialPlayer({
 }: UseSequentialPlayerOptions) {
   const isPrivateAudio = sourceType === "private_audio";
   const isPreviewMode = playbackMode === "preview";
-  const previewStartSeconds =
+  const previewTimeline =
     isPreviewMode &&
     typeof previewStartMs === "number" &&
-    Number.isFinite(previewStartMs) &&
-    previewStartMs >= 0
-      ? previewStartMs / 1000
-      : 0;
-  const previewEndSeconds =
-    isPreviewMode &&
-    typeof previewEndMs === "number" &&
-    Number.isFinite(previewEndMs) &&
-    previewEndMs > previewStartSeconds * 1000
-      ? previewEndMs / 1000
-      : 0;
+    typeof previewEndMs === "number"
+      ? resolvePreviewClipMediaTimeline({
+          previewStartMs,
+          previewEndMs,
+        })
+      : null;
+  const previewStartSeconds = previewTimeline?.mediaStartSeconds ?? 0;
+  const previewEndSeconds = previewTimeline?.mediaEndSeconds ?? 0;
   const hasPreviewWindow = isPreviewMode && previewEndSeconds > previewStartSeconds;
   const urlRequestRef = useRef(0);
   const urlAbortRef = useRef<AbortController | null>(null);

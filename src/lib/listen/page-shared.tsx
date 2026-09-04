@@ -24,7 +24,7 @@ import {
   mapLegacyPracticeToListenTrack,
   mapRowToListenTrack,
 } from "@/lib/listen/track-cover";
-import type { ListenTrack } from "@/lib/listen/types";
+import type { ListenAccessMode, ListenTrack } from "@/lib/listen/types";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 import { readListenerSidebarPinnedState } from "@/lib/navigation/listener-sidebar";
 import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
@@ -260,7 +260,7 @@ async function ListenMessageState({
 async function loadListenTracks(
   supabase: Awaited<ReturnType<typeof createClient>>,
   practice: PracticeRow,
-  accessMode: "entitled" | "author_preview",
+  accessMode: ListenAccessMode,
 ): Promise<ListenTrack[]> {
   let query = supabase
     .from("audio_items")
