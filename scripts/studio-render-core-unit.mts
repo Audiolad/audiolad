@@ -7,9 +7,13 @@ import { spawnSync } from "node:child_process";
 
 import { createStudioVoicePresetImpulseWav } from "../src/lib/studio/render/ir";
 import { buildStudioRenderTimeline } from "../src/lib/studio/render/timeline";
+import { getStudioRenderClipSourceDuration } from "../src/lib/studio/clip-math";
+import { buildStudioRenderFilterGraph } from "../src/lib/studio/render/ffmpeg";
 import {
   renderStudioProjectToMp3,
   renderStudioProjectToPcmWav,
+  StudioRenderDurationError,
+  STUDIO_RENDER_DURATION_EPSILON_SECONDS,
   withStudioRenderWorkspace,
 } from "../src/lib/studio/render/render";
 import { createStudioRenderSnapshot } from "../src/lib/studio/render/snapshot";
@@ -701,6 +705,91 @@ async function main() {
     assert.equal(sharedTimeline.tracks.length, 2);
     assert.equal(sharedTimeline.durationSeconds, 2);
     validateStudioProjectDocument(sharedMusicProject.project_data);
+
+    // --- render_duration_mismatch regressions: pad geometric slots with silence ---
+    assert.equal(STUDIO_RENDER_DURATION_EPSILON_SECONDS, 0.25, "do not raise DURATION_EPSILON");
+    assert.equal(new StudioRenderDurationError(5.4, 5).code, "render_duration_mismatch");
+    assert.equal(
+      getStudioRenderClipSourceDuration({ offset: 0, duration: 5.4 }, 5),
+      5,
+      "source trim clamps to available asset",
+    );
+    assert.equal(
+      getStudioRenderClipSourceDuration({ offset: 1, duration: 5 }, 5),
+      4,
+      "source trim respects offset",
+    );
+
+    const shortSourcePath = join(root, "short-source-5s.wav");
+    await writeFile(shortSourcePath, createConstantWav(5, 0.2));
+    // Olga-like scaled fixture: asset ~5s, clip geometry ~5.4s (497/538 ≈ 0.924).
+    const olgaLikeProject = fixtureProject([
+      { id: "olga-voice", startTime: 0, offset: 0, duration: 5.4, fadeInDuration: 0, fadeOutDuration: 0 },
+    ]);
+    const olgaLikeSnapshot = createStudioRenderSnapshot({
+      project: olgaLikeProject,
+      expectedRevision: 7,
+      assets: [asset(ASSET_VOICE, "short-source-5s.wav", 5), asset(ASSET_MUSIC, "music.wav", 3)],
+    });
+    assert.equal(buildStudioRenderTimeline(olgaLikeSnapshot).durationSeconds, 5.4);
+    const olgaGraph = buildStudioRenderFilterGraph({
+      snapshot: olgaLikeSnapshot,
+      localAssetPaths: new Map([[ASSET_VOICE, shortSourcePath], [ASSET_MUSIC, musicPath]]),
+    });
+    assert.match(olgaGraph.filterComplex, /apad,atrim=duration=5\.400000/);
+    assert.doesNotMatch(olgaGraph.filterComplex, /apad=whole_dur=/);
+    assert.match(olgaGraph.filterComplex, /atrim=start=0\.000000:duration=5\.000000/);
+    const olgaRendered = await renderFixturePcm(
+      root,
+      "olga-like-short-source",
+      olgaLikeSnapshot,
+      new Map([[ASSET_VOICE, shortSourcePath], [ASSET_MUSIC, musicPath]]),
+    );
+    assert.equal(olgaRendered.result.expectedDurationSeconds, 5.4);
+    assert(
+      Math.abs(olgaRendered.result.actualDurationSeconds - 5.4) < STUDIO_RENDER_DURATION_EPSILON_SECONDS,
+      `olga-like master must equal timeline; got ${olgaRendered.result.actualDurationSeconds}`,
+    );
+    assert.equal(olgaRendered.samples.length / 2, Math.round(5.4 * RATE));
+    // Trailing geometric overhang is silence (not stretched source).
+    assert.equal(
+      sampleRangePeak(olgaRendered.samples, Math.round(5.05 * RATE), Math.round(5.35 * RATE)),
+      0,
+      "overhang past source must be silence",
+    );
+    assert(sampleRangePeak(olgaRendered.samples, 0, Math.round(4.9 * RATE)) > 0.1, "source audio present");
+
+    // Short music track vs longer voice timeline → master equals full voice timeline.
+    const shortMusicPath = join(root, "short-music-1s.wav");
+    await writeFile(shortMusicPath, createConstantWav(1, 0.15));
+    const longVoiceShortMusic = project("none", 1, false);
+    longVoiceShortMusic.project_data.tracks[0].clips = [
+      { id: "voice-long", startTime: 0, offset: 0, duration: 2.5, fadeInDuration: 0, fadeOutDuration: 0 },
+    ];
+    longVoiceShortMusic.project_data.tracks[1].clips = [
+      { id: "music-short-geom", startTime: 0, offset: 0, duration: 2.5, fadeInDuration: 0, fadeOutDuration: 0 },
+    ];
+    const longVoiceSnapshot = createStudioRenderSnapshot({
+      project: longVoiceShortMusic,
+      expectedRevision: 7,
+      assets: [
+        asset(ASSET_VOICE, "constant.wav", 3),
+        asset(ASSET_MUSIC, "short-music-1s.wav", 1),
+      ],
+    });
+    assert.equal(buildStudioRenderTimeline(longVoiceSnapshot).durationSeconds, 2.5);
+    const mixedRendered = await renderFixturePcm(
+      root,
+      "short-music-long-voice",
+      longVoiceSnapshot,
+      new Map([[ASSET_VOICE, constantPath], [ASSET_MUSIC, shortMusicPath]]),
+    );
+    assert.equal(mixedRendered.result.expectedDurationSeconds, 2.5);
+    assert(
+      Math.abs(mixedRendered.result.actualDurationSeconds - 2.5) < STUDIO_RENDER_DURATION_EPSILON_SECONDS,
+      `mixed master must equal full timeline; got ${mixedRendered.result.actualDurationSeconds}`,
+    );
+    assert.equal(mixedRendered.samples.length / 2, Math.round(2.5 * RATE));
 
     const invalidDocument = fixtureProject([
       { id: "valid", startTime: 0, offset: 0, duration: 0.25, fadeInDuration: 0, fadeOutDuration: 0 },

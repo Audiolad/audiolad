@@ -566,6 +566,17 @@ export default function StudioEditorShell({
   const guestCompletedTrackedRef = useRef(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const failedRenderJob =
+    renderJob?.status === "failed"
+      ? renderJob
+      : entitledRenderJob?.status === "failed"
+        ? entitledRenderJob
+        : null;
+  const exportAlert =
+    renderError
+    ?? (failedRenderJob
+      ? (failedRenderJob.error_message_safe?.trim() || "Не удалось создать MP3. Попробуйте ещё раз.")
+      : null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
   const navigationInProgressRef = useRef(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
@@ -2252,7 +2263,7 @@ export default function StudioEditorShell({
               ) : null}
             </p>
           ) : null}
-          {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
+          {exportAlert ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{exportAlert}</p> : null}
           {accessMode === "guest" && (showGuestRenderGate || guestRenderConsumed || renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? (
             <div className="mb-4">
               <StudioGuestRenderGate compact />

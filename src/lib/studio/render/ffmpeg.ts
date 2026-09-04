@@ -1,3 +1,4 @@
+import { getStudioRenderClipSourceDuration } from "../clip-math";
 import { STUDIO_VOICE_PRESET_CONFIG, type StudioVoicePreset } from "../voice-preset-dsp";
 import { buildStudioRenderTimeline } from "./timeline";
 import type { StudioRenderInput } from "./types";
@@ -25,6 +26,14 @@ function eqFilter(type: string, frequency: number, q: number, gain?: number): st
 }
 
 /**
+ * Prefer `apad,atrim=duration=X` over `apad=whole_dur=X`: whole_dur can fail when
+ * atrim EOF shortens samples while duration metadata confuses the pad target.
+ */
+function padToDuration(durationSeconds: number): string {
+  return `apad,atrim=duration=${seconds(durationSeconds)}`;
+}
+
+/**
  * Produces an argument-safe filter graph.  The only semantic approximation is
  * FFmpeg's bass/treble shelf shape versus Web Audio's BiquadFilterNode shelf;
  * Q and gain are still passed explicitly and live in the canonical config.
@@ -41,6 +50,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
     return localPath;
   });
   const assetIndexes = new Map(input.snapshot.assets.map((asset, index) => [asset.id, index]));
+  const assetsById = new Map(input.snapshot.assets.map((asset) => [asset.id, asset]));
   const irPresets = [...new Set(
     timeline.tracks
       .filter(({ track }) => track.trackKind === "voice" && track.voicePreset !== "none")
@@ -76,16 +86,29 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
         timelineParts.push(`[${gapLabel}]`);
       }
       if (!assetIndexes.has(clip.assetId)) throw new Error(`Unknown asset ${clip.assetId}.`);
+      const asset = assetsById.get(clip.assetId);
+      if (!asset) throw new Error(`Unknown asset ${clip.assetId}.`);
       const splitIndex = nextAssetSplit.get(clip.assetId) ?? 0;
       const assetLabel = assetSplitLabels.get(clip.assetId)?.[splitIndex];
       if (!assetLabel) throw new Error(`Missing split source for asset ${clip.assetId}.`);
       nextAssetSplit.set(clip.assetId, splitIndex + 1);
       const label = `clip_${trackIndex}_${clipIndex}`;
-      const filterParts = [
-        `atrim=start=${seconds(clip.offset)}:duration=${seconds(clip.duration)}`,
-        "asetpts=PTS-STARTPTS",
-        "aformat=sample_rates=44100:channel_layouts=stereo",
-      ];
+      const sourceTrim = getStudioRenderClipSourceDuration(clip, asset.durationSeconds);
+      const filterParts: string[] = [];
+      if (sourceTrim > 0) {
+        filterParts.push(
+          `atrim=start=${seconds(clip.offset)}:duration=${seconds(sourceTrim)}`,
+          "asetpts=PTS-STARTPTS",
+          "aformat=sample_rates=44100:channel_layouts=stereo",
+          padToDuration(clip.duration),
+        );
+      } else {
+        // No usable source left after offset — fill geometric slot with silence.
+        filterParts.push(
+          `anullsrc=r=44100:cl=stereo,atrim=duration=${seconds(clip.duration)},asetpts=PTS-STARTPTS`,
+          "aformat=sample_rates=44100:channel_layouts=stereo",
+        );
+      }
       if (clip.fadeInDuration > 0) {
         filterParts.push(`afade=t=in:st=0:d=${seconds(clip.fadeInDuration)}:curve=tri`);
       }
@@ -94,14 +117,20 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
           `afade=t=out:st=${seconds(clip.duration - clip.fadeOutDuration)}:d=${seconds(clip.fadeOutDuration)}:curve=tri`,
         );
       }
-      filters.push(`[${assetLabel}]${filterParts.join(",")}[${label}]`);
+      if (sourceTrim > 0) {
+        filters.push(`[${assetLabel}]${filterParts.join(",")}[${label}]`);
+      } else {
+        // Still consume the split label so asplit counts stay consistent.
+        filters.push(`[${assetLabel}]anull,aformat=sample_rates=44100:channel_layouts=stereo[unused_${label}]`);
+        filters.push(`${filterParts.join(",")}[${label}]`);
+      }
       timelineParts.push(`[${label}]`);
       cursor = clip.startTime + clip.duration;
     });
 
     const timelineLabel = `track_timeline_${trackIndex}`;
     filters.push(
-      `${timelineParts.join("")}concat=n=${timelineParts.length}:v=0:a=1,asetpts=PTS-STARTPTS,apad=whole_dur=${seconds(audibleEnd)},atrim=duration=${seconds(audibleEnd)}[${timelineLabel}]`,
+      `${timelineParts.join("")}concat=n=${timelineParts.length}:v=0:a=1,asetpts=PTS-STARTPTS,${padToDuration(audibleEnd)}[${timelineLabel}]`,
     );
     let currentLabel = timelineLabel;
     if (track.trackKind === "voice" && track.voicePreset !== "none") {
@@ -127,7 +156,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
         filters.push(
           // In FFmpeg 6.1 afir's `dry` is the input gain to convolution, not
           // a bypass-output level. Zero would silence the wet signal.
-          `[${wetInputLabel}]apad=whole_dur=${seconds(wetDuration)}[wet_padded_${trackIndex}];[wet_padded_${trackIndex}]${inputLabel(irIndex)}afir=dry=1:wet=1:gtype=-1:irfmt=input:irload=init,highpass=f=${reverb.wetHighPassFrequency},lowpass=f=${reverb.wetLowPassFrequency},volume=${reverb.wetGain}[${wetLabel}]`,
+          `[${wetInputLabel}]${padToDuration(wetDuration)}[wet_padded_${trackIndex}];[wet_padded_${trackIndex}]${inputLabel(irIndex)}afir=dry=1:wet=1:gtype=-1:irfmt=input:irload=init,highpass=f=${reverb.wetHighPassFrequency},lowpass=f=${reverb.wetLowPassFrequency},volume=${reverb.wetGain}[${wetLabel}]`,
         );
         filters.push(
           `[${dryLabel}]volume=${reverb.dryGain}[dry_gain_${trackIndex}];[dry_gain_${trackIndex}][${wetLabel}]amix=inputs=2:duration=longest:normalize=0,asetpts=PTS-STARTPTS[${dspLabel}]`,
@@ -141,7 +170,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   });
 
   filters.push(
-    `${outputLabels.join("")}amix=inputs=${outputLabels.length}:duration=longest:normalize=0,atrim=duration=${seconds(timeline.durationSeconds)},asetpts=N/SR/TB,aformat=sample_rates=44100:channel_layouts=stereo[out]`,
+    `${outputLabels.join("")}amix=inputs=${outputLabels.length}:duration=longest:normalize=0,${padToDuration(timeline.durationSeconds)},asetpts=N/SR/TB,aformat=sample_rates=44100:channel_layouts=stereo[out]`,
   );
   return { filterComplex: filters.join(";"), assetInputPaths, irPresets, durationSeconds: timeline.durationSeconds };
 }
