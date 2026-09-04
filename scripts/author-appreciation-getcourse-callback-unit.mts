@@ -415,6 +415,19 @@ function assertSafeIgnoreLog(
   });
   assert.equal(voided.result.rpcCalled, false);
   assert.equal(voided.result.ignoredReason, "status_not_payed");
+
+  const returned = await handle({
+    payload: {
+      deal: {
+        ...PRODUCTION_PAYLOAD.deal,
+        status: "returned",
+        payed_money: "100",
+        left_cost_money: "0",
+      },
+    },
+  });
+  assert.equal(returned.result.rpcCalled, false);
+  assert.equal(returned.result.ignoredReason, "status_not_payed");
 }
 
 {

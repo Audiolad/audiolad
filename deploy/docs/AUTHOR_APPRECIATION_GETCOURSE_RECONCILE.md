@@ -7,9 +7,14 @@ operational poller.
 ## Semantics
 
 - Load a bounded set of local pending GetCourse intents
-- Start **one** paid-deals export for the covering `created_at` window
+- Start **one** Export API deals export for the covering `created_at`
+  window (`created_at[from]` / `created_at[to]` only; no `status=payed`)
 - Poll that export with a bounded readiness count
-- Correlate in memory by exact saved `provider_deal_id`
+- Correlate in memory by exact saved `provider_deal_id` or deal number
+- Promote only after local verification: amount, configured offer when
+  exposed, and provider-confirmed full payment (`payed_money >= amount`
+  or `left_cost_money == 0` or canonical paid status). Void / cancelled /
+  returned / partial never promote
 - Apply only through `apply_author_appreciation_getcourse_callback`
 - No-op when there are no pending intents
 - Checkout and a successful webhook never start Export recovery

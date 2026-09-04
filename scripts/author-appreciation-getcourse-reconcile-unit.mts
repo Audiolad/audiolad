@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  collectExportRows,
   coveringExportDateWindow,
   GETCOURSE_EXPORT_MAX_POLLS,
   indexExportedDealsById,
@@ -11,6 +12,7 @@ import {
   matchIntentToExportedDeal,
   parseExportedGetCourseDeal,
   readExportId,
+  summarizeExportEnvelope,
 } from "../src/lib/author-appreciation/getcourse/confirm-deal";
 import {
   reconcilePendingGetCourseAppreciationIntents,
@@ -19,6 +21,7 @@ import {
   type PendingAppreciationIntent,
   type ReconcileCooldownStore,
 } from "../src/lib/author-appreciation/getcourse/reconcile";
+import { authorShareMinor, platformShareMinor } from "../src/lib/payments/author-finance/types";
 
 const OFFER_ID = "3875235";
 const DEAL_ID = "99887766";
@@ -64,17 +67,45 @@ function paidRow(dealId: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
+function officialExportPayload(rows: Record<string, unknown>[]) {
+  const fields = [
+    ...new Set(
+      rows.flatMap((row) => Object.keys(row)).concat([
+        "id",
+        "number",
+        "status",
+        "deal_cost",
+        "payed_money",
+        "left_cost_money",
+        "offers",
+      ]),
+    ),
+  ];
+  return {
+    success: true,
+    status: "finished",
+    info: {
+      fields,
+      items: rows.map((row) => fields.map((field) => row[field] ?? "")),
+    },
+  };
+}
+
 function createExportFetch(options: {
   rows?: unknown[];
   readyAfter?: number;
   dealsError?: boolean;
+  officialContainer?: boolean;
+  finishedPayload?: unknown;
 }) {
   let dealsCalls = 0;
   let exportCalls = 0;
+  let lastDealsHref = "";
   const fetchImpl: typeof fetch = async (input) => {
     const href = String(input);
     if (href.includes("/pl/api/account/deals")) {
       dealsCalls += 1;
+      lastDealsHref = href;
       if (options.dealsError) {
         return new Response("nope", { status: 500 });
       }
@@ -85,9 +116,16 @@ function createExportFetch(options: {
       if ((options.readyAfter ?? 1) > exportCalls) {
         return Response.json({ status: "pending" });
       }
+      if (options.finishedPayload !== undefined) {
+        return Response.json(options.finishedPayload);
+      }
+      const rows = (options.rows ?? [paidRow(DEAL_ID)]) as Record<string, unknown>[];
+      if (options.officialContainer) {
+        return Response.json(officialExportPayload(rows));
+      }
       return Response.json({
         status: "finished",
-        info: options.rows ?? [paidRow(DEAL_ID)],
+        info: rows,
       });
     }
     throw new Error(`unexpected_url:${href}`);
@@ -95,6 +133,7 @@ function createExportFetch(options: {
   return {
     fetchImpl,
     counts: () => ({ dealsCalls, exportCalls }),
+    lastDealsHref: () => lastDealsHref,
   };
 }
 
@@ -360,9 +399,14 @@ async function run(options: {
 {
   const confirm = readFileSync("src/lib/author-appreciation/getcourse/confirm-deal.ts", "utf8");
   assert.match(confirm, /\/pl\/api\/account\/deals/);
-  assert.match(confirm, /set\("status", "payed"\)/);
+  assert.match(confirm, /created_at\[from\]/);
+  assert.match(confirm, /created_at\[to\]/);
+  assert.doesNotMatch(confirm, /set\("status", "payed"\)/);
+  assert.doesNotMatch(confirm, /searchParams\.set\("status"/);
   assert.doesNotMatch(confirm, /confirmGetCourseDealPayment/);
   assert.doesNotMatch(confirm, /action=add/);
+  assert.doesNotMatch(confirm, /from\("(?:orders|payments|user_practices)"\)/);
+  assert.doesNotMatch(confirm, /INSERT INTO public\.(?:orders|payments|user_practices)/);
   const provider = readFileSync("src/lib/author-appreciation/getcourse/provider.ts", "utf8");
   assert.match(provider, /return_deal_number: 1/);
   assert.match(provider, /return_payment_link: 1/);
@@ -433,6 +477,262 @@ async function run(options: {
   if (lookedUp && lookedUp !== "ambiguous") {
     assert.equal(lookedUp.dealId, "555");
   }
+}
+
+{
+  // Recovery export is created_at-bounded and never sends status=payed
+  const fetch = createExportFetch({});
+  const { result } = await run({ fetch });
+  assert.equal(result.exports, 1);
+  assert.equal(fetch.counts().dealsCalls, 1);
+  const dealsUrl = new URL(fetch.lastDealsHref());
+  assert.equal(dealsUrl.searchParams.get("status"), null);
+  assert.ok(dealsUrl.searchParams.get("created_at[from]"));
+  assert.ok(dealsUrl.searchParams.get("created_at[to]"));
+  assert.doesNotMatch(fetch.lastDealsHref(), /[?&]status=/);
+}
+
+{
+  // Official GetCourse { info: { fields, items } } container is parsed
+  const columnar = officialExportPayload([
+    paidRow(DEAL_ID, { status: "in_work", payed_money: "100", left_cost_money: "0" }),
+  ]);
+  const rows = collectExportRows(columnar);
+  assert.equal(rows.length, 1);
+  const parsed = parseExportedGetCourseDeal(rows[0]);
+  assert.equal(parsed?.dealId, DEAL_ID);
+  assert.equal(parsed?.amountMinor, 10_000);
+  assert.equal(parsed?.payedMoneyMinor, 10_000);
+  const recovered = await run({
+    fetch: createExportFetch({
+      officialContainer: true,
+      rows: [paidRow(DEAL_ID, { status: "new", payed_money: "100", left_cost_money: "0" })],
+    }),
+  });
+  assert.equal(recovered.result.applied, 1);
+  assert.equal(recovered.result.matched, 1);
+}
+
+{
+  // Zero-row envelope distinguishes empty items from an unhandled container
+  const emptyOfficial = summarizeExportEnvelope({
+    success: true,
+    status: "finished",
+    info: { fields: ["id", "status"], items: [] },
+  });
+  assert.deepEqual(emptyOfficial.top_level_keys, ["info", "status", "success"]);
+  assert.ok(emptyOfficial.info_keys.includes("fields"));
+  assert.ok(emptyOfficial.info_keys.includes("items"));
+  assert.ok(emptyOfficial.array_field_names.includes("info.fields"));
+  assert.ok(emptyOfficial.array_field_names.includes("info.items"));
+  assert.equal(emptyOfficial.array_lengths["info.items"], 0);
+  assert.equal(emptyOfficial.provider_status, "finished");
+  assert.equal(emptyOfficial.provider_message_present, false);
+  assert.equal(collectExportRows({
+    success: true,
+    status: "finished",
+    info: { fields: ["id", "status"], items: [] },
+  }).length, 0);
+
+  const unhandled = summarizeExportEnvelope({
+    success: true,
+    status: "finished",
+    result: { deals_blob: { nested: true } },
+  });
+  assert.ok(unhandled.top_level_keys.includes("result"));
+  assert.ok(unhandled.result_keys.includes("deals_blob"));
+  assert.equal(unhandled.info_keys.length, 0);
+  assert.equal(unhandled.array_field_names.length, 0);
+  assert.equal(collectExportRows({
+    success: true,
+    status: "finished",
+    result: { deals_blob: { nested: true } },
+  }).length, 0);
+}
+
+{
+  // Two pending 100 RUB intents outside status=payed recover when money proves payment.
+  // Exactly once. 70/30. No name/UUID exceptions in production code.
+  const firstId = "803348fb-59af-49bc-8127-c491b2e9c360";
+  const secondId = "96c9eb2-a0b0-4f4e-bfd7-7b17c42f7e11";
+  const pending = [
+    pendingIntent({
+      id: firstId,
+      provider_deal_id: "11111111",
+      provider_deal_number: "2001",
+      created_at: "2026-09-03T08:40:00.000Z",
+    }),
+    pendingIntent({
+      id: secondId,
+      provider_deal_id: "22222222",
+      provider_deal_number: "2002",
+      created_at: "2026-09-03T09:10:00.000Z",
+    }),
+  ];
+  const rows = [
+    paidRow("11111111", {
+      number: "2001",
+      status: "new",
+      deal_cost: "100",
+      payed_money: "100",
+      left_cost_money: "0",
+    }),
+    paidRow("22222222", {
+      number: "2002",
+      status: "in_work",
+      deal_cost: "100",
+      payed_money: "100",
+      left_cost_money: "0",
+    }),
+  ];
+  const logical = new Map<string, { gross: number; author: number; platform: number }>();
+  const applyCalls: Array<Record<string, unknown>> = [];
+  const fetch = createExportFetch({ officialContainer: true, rows });
+  resetGetCourseAppreciationReconcileForTests();
+  const apply = async (args: {
+    providerDealId: string | null;
+    providerDealNumber: string | null;
+    offerId: string;
+    amountMinor: number;
+    status: string;
+    payedMoneyMinor: number | null;
+    leftCostMoneyMinor: number | null;
+  }) => {
+    applyCalls.push(args);
+    const key = String(args.providerDealId);
+    if (logical.has(key)) {
+      return { error: null, data: [{ outcome: "already_paid" }] };
+    }
+    assert.equal(args.amountMinor, 10_000);
+    assert.equal(args.status, "payed");
+    logical.set(key, {
+      gross: args.amountMinor,
+      author: authorShareMinor(args.amountMinor, 7000),
+      platform: platformShareMinor(args.amountMinor, 7000),
+    });
+    return { error: null, data: [{ outcome: "paid" }] };
+  };
+  const first = await reconcilePendingGetCourseAppreciationIntents({
+    force: true,
+    config,
+    listPending: async () => pending,
+    fetchImpl: fetch.fetchImpl,
+    exportOptions: { pollMs: 0 },
+    cooldown: memoryCooldown(),
+    applyCallback: apply,
+  });
+  assert.equal(first.exports, 1);
+  assert.equal(fetch.counts().dealsCalls, 1);
+  assert.equal(first.correlatable, 2);
+  assert.equal(first.matched, 2);
+  assert.equal(first.applied, 2);
+  assert.equal(applyCalls.length, 2);
+  assert.deepEqual(
+    applyCalls.map((call) => call.providerDealId).sort(),
+    ["11111111", "22222222"],
+  );
+  assert.equal(logical.size, 2);
+  for (const accrual of logical.values()) {
+    assert.equal(accrual.gross, 10_000);
+    assert.equal(accrual.author, 7_000);
+    assert.equal(accrual.platform, 3_000);
+  }
+  assert.equal(authorShareMinor(10_000, 7000), 7_000);
+  assert.equal(platformShareMinor(10_000, 7000), 3_000);
+
+  const secondFetch = createExportFetch({ officialContainer: true, rows });
+  resetGetCourseAppreciationReconcileForTests();
+  const second = await reconcilePendingGetCourseAppreciationIntents({
+    force: true,
+    config,
+    listPending: async () => pending,
+    fetchImpl: secondFetch.fetchImpl,
+    exportOptions: { pollMs: 0 },
+    cooldown: memoryCooldown(),
+    applyCallback: apply,
+  });
+  assert.equal(second.applied, 2);
+  assert.equal(logical.size, 2);
+  assert.equal(applyCalls.length, 4);
+  assert.equal(applyCalls.filter((call) => call.providerDealId === "11111111").length, 2);
+  assert.equal(applyCalls.filter((call) => call.providerDealId === "22222222").length, 2);
+
+  const confirm = readFileSync("src/lib/author-appreciation/getcourse/confirm-deal.ts", "utf8");
+  const reconcile = readFileSync("src/lib/author-appreciation/getcourse/reconcile.ts", "utf8");
+  assert.doesNotMatch(confirm, /803348fb-59af-49bc-8127-c491b2e9c360|96c9eb2-a0b0-4f4e-bfd7-7b17c42f7e11|Sergey|Zoya|Сергей|Зоя/);
+  assert.doesNotMatch(reconcile, /803348fb-59af-49bc-8127-c491b2e9c360|96c9eb2-a0b0-4f4e-bfd7-7b17c42f7e11|Sergey|Zoya|Сергей|Зоя/);
+  assert.doesNotMatch(reconcile, /from\("(?:orders|payments|user_practices)"\)/);
+  assert.doesNotMatch(reconcile, /INSERT INTO public\.(?:orders|payments|user_practices)/);
+}
+
+{
+  // Money-unknown + non-paid status must not promote after the broader export
+  const unknownMoney = await run({
+    fetch: createExportFetch({
+      rows: [paidRow(DEAL_ID, { status: "new", payed_money: "", left_cost_money: "" })],
+    }),
+  });
+  assert.equal(unknownMoney.result.applied, 0);
+  assert.equal(unknownMoney.applyCalls.length, 0);
+
+  const partial = await run({
+    fetch: createExportFetch({
+      rows: [paidRow(DEAL_ID, { status: "part_payed", payed_money: "40", left_cost_money: "60" })],
+    }),
+  });
+  assert.equal(partial.result.applied, 0);
+  assert.equal(partial.applyCalls.length, 0);
+
+  const voided = await run({
+    fetch: createExportFetch({
+      rows: [paidRow(DEAL_ID, { status: "cancelled", payed_money: "100", left_cost_money: "0" })],
+    }),
+  });
+  assert.equal(voided.result.applied, 0);
+  assert.equal(voided.applyCalls.length, 0);
+
+  const returned = await run({
+    fetch: createExportFetch({
+      rows: [paidRow(DEAL_ID, { status: "returned", payed_money: "100", left_cost_money: "0" })],
+    }),
+  });
+  assert.equal(returned.result.applied, 0);
+  assert.equal(returned.applyCalls.length, 0);
+}
+
+{
+  const logs: unknown[] = [];
+  const original = console.info;
+  console.info = (...args: unknown[]) => {
+    logs.push(args);
+  };
+  try {
+    await run({
+      fetch: createExportFetch({
+        finishedPayload: {
+          success: true,
+          status: "finished",
+          info: { fields: ["id", "status"], items: [] },
+        },
+      }),
+    });
+  } finally {
+    console.info = original;
+  }
+  const observed = logs.find((entry) => Array.isArray(entry) && entry[0] === "author_appreciation_getcourse_export_observed");
+  assert.ok(observed);
+  const payload = (observed as unknown[])[1] as Record<string, unknown>;
+  assert.equal(payload.row_count, 0);
+  assert.equal(payload.provider_status, "finished");
+  assert.equal(payload.provider_message_present, false);
+  assert.ok(Array.isArray(payload.top_level_keys));
+  assert.ok(Array.isArray(payload.info_keys));
+  assert.ok(Array.isArray(payload.array_field_names));
+  assert.equal(typeof payload.array_lengths, "object");
+  assert.equal(
+    JSON.stringify(payload).includes("@") || JSON.stringify(payload).includes("secret-not-logged"),
+    false,
+  );
 }
 
 console.log("author-appreciation-getcourse-reconcile-unit: ok");

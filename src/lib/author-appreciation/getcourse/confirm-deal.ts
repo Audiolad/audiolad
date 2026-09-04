@@ -36,6 +36,16 @@ export type ExportSchemaObservation = {
   offer_present: boolean;
 };
 
+export type ExportEnvelopeObservation = {
+  top_level_keys: string[];
+  result_keys: string[];
+  info_keys: string[];
+  array_field_names: string[];
+  array_lengths: Record<string, number>;
+  provider_status: string | null;
+  provider_message_present: boolean;
+};
+
 export type ExportPaidGetCourseDealsResult =
   | {
       ok: true;
@@ -43,12 +53,14 @@ export type ExportPaidGetCourseDealsResult =
       deals: ConfirmedGetCourseDeal[];
       pollCount: number;
       schema: ExportSchemaObservation;
+      envelope?: ExportEnvelopeObservation;
     }
   | {
       ok: false;
       reason: "provider_error" | "empty";
       exportId: string | null;
       pollCount: number;
+      envelope?: ExportEnvelopeObservation;
     };
 
 export type IntentExportMatchReason =
@@ -92,7 +104,16 @@ export function parseExportedGetCourseDeal(value: unknown): ConfirmedGetCourseDe
       pick(row, "status", "deal_status", "Статус", "статус"),
     ),
     amountMinor: rublesToMinor(
-      pick(row, "deal_cost", "cost", "cost_money_value", "cost_money", "Стоимость", "стоимость"),
+      pick(
+        row,
+        "deal_cost",
+        "cost",
+        "cost_money_value",
+        "cost_money",
+        "Стоимость",
+        "стоимость",
+        "Стоимость, RUB",
+      ),
     ),
     payedMoneyMinor: rublesToMinor(
       pick(row, "payed_money", "paid_money", "payed", "Оплачено", "оплачено"),
@@ -104,37 +125,173 @@ export function parseExportedGetCourseDeal(value: unknown): ConfirmedGetCourseDe
         "left_cost",
         "Осталось",
         "осталось",
+        "Осталось оплатить",
       ),
     ),
     offerIds: extractOfferIds(
-      pick(row, "offers", "offer_id", "offer_ids", "offer"),
+      pick(row, "offers", "offer_id", "offer_ids", "offer", "Состав заказа"),
     ),
   };
 }
 
-function collectExportRows(payload: unknown): unknown[] {
+const ROW_CONTAINER_KEYS = ["info", "items", "deals", "data", "rows", "result"] as const;
+const NESTED_ROW_KEYS = ["info", "items", "deals", "data", "rows"] as const;
+const MAX_ENVELOPE_KEYS = 40;
+
+function readFieldNames(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const names: string[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string" && entry.trim()) {
+      names.push(entry.trim());
+      continue;
+    }
+    if (typeof entry === "number" && Number.isFinite(entry)) {
+      names.push(String(entry));
+      continue;
+    }
+    return null;
+  }
+  return names;
+}
+
+function zipColumnarExportRows(
+  fields: string[],
+  items: unknown[],
+): Record<string, unknown>[] {
+  return items.map((item) => {
+    const existing = record(item);
+    if (existing) return existing;
+    const row: Record<string, unknown> = {};
+    if (Array.isArray(item)) {
+      fields.forEach((name, index) => {
+        row[name] = item[index];
+      });
+    }
+    return row;
+  });
+}
+
+function rowsFromFieldsItems(container: Record<string, unknown> | null): unknown[] | null {
+  if (!container) return null;
+  const fields = readFieldNames(container.fields);
+  if (!fields || !Array.isArray(container.items)) return null;
+  return zipColumnarExportRows(fields, container.items);
+}
+
+/**
+ * Official GetCourse Export result is `{ info: { fields, items } }` where
+ * `items` is an array of columnar value arrays. Also accepts the older
+ * object-row containers already used by local tests (`info: Deal[]`).
+ */
+export function collectExportRows(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   const root = record(payload);
   if (!root) return [];
-  for (const key of ["info", "items", "deals", "data", "rows", "result"]) {
+  const official =
+    rowsFromFieldsItems(record(root.info)) ??
+    rowsFromFieldsItems(record(root.result)) ??
+    rowsFromFieldsItems(record(record(root.result)?.info)) ??
+    rowsFromFieldsItems(record(root.data)) ??
+    rowsFromFieldsItems(root);
+  if (official) return official;
+
+  for (const key of ROW_CONTAINER_KEYS) {
     const value = root[key];
     if (Array.isArray(value)) return value;
     const nested = record(value);
-    if (nested) {
-      for (const nestedKey of ["info", "items", "deals", "data", "rows"]) {
-        if (Array.isArray(nested[nestedKey])) return nested[nestedKey] as unknown[];
-      }
+    if (!nested) continue;
+    const nestedOfficial = rowsFromFieldsItems(nested);
+    if (nestedOfficial) return nestedOfficial;
+    for (const nestedKey of NESTED_ROW_KEYS) {
+      if (!Array.isArray(nested[nestedKey])) continue;
+      return nested[nestedKey] as unknown[];
     }
   }
   return [];
 }
 
+function objectKeys(value: unknown): string[] {
+  const obj = record(value);
+  return obj ? Object.keys(obj).sort().slice(0, MAX_ENVELOPE_KEYS) : [];
+}
+
+function safeProviderStatus(value: string | null): string | null {
+  if (!value) return null;
+  if (value.length > 40) return null;
+  if (/@|https?:|[?&]key=/i.test(value)) return null;
+  return value;
+}
+
+function collectArrayFacts(
+  value: unknown,
+  prefix: string,
+  into: { names: string[]; lengths: Record<string, number> },
+  depth = 0,
+): void {
+  if (depth > 2) return;
+  if (Array.isArray(value)) {
+    const name = prefix || "root";
+    into.names.push(name);
+    into.lengths[name] = value.length;
+    return;
+  }
+  const obj = record(value);
+  if (!obj) return;
+  for (const [key, child] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (Array.isArray(child)) {
+      into.names.push(path);
+      into.lengths[path] = child.length;
+    } else if (record(child)) {
+      collectArrayFacts(child, path, into, depth + 1);
+    }
+  }
+}
+
+export function summarizeExportEnvelope(payload: unknown): ExportEnvelopeObservation {
+  const root = record(payload);
+  const result = record(root?.result);
+  const infoObject = record(root?.info) ?? record(result?.info);
+  const arrays = { names: [] as string[], lengths: {} as Record<string, number> };
+  collectArrayFacts(payload, "", arrays);
+  return {
+    top_level_keys: objectKeys(payload),
+    result_keys: objectKeys(result),
+    info_keys: objectKeys(root?.info) || objectKeys(infoObject),
+    array_field_names: [...new Set(arrays.names)].sort().slice(0, MAX_ENVELOPE_KEYS),
+    array_lengths: Object.fromEntries(
+      Object.entries(arrays.lengths).slice(0, MAX_ENVELOPE_KEYS),
+    ),
+    provider_status: safeProviderStatus(
+      firstString(root?.status, result?.status, infoObject?.status),
+    ),
+    provider_message_present: Boolean(
+      firstString(
+        root?.error_message,
+        root?.message,
+        result?.error_message,
+        result?.message,
+        infoObject?.error_message,
+      ),
+    ),
+  };
+}
+
 const EXPORT_DEAL_ID_KEYS = ["id", "deal_id", "ID", "Id", "ID заказа"];
 const EXPORT_DEAL_NUMBER_KEYS = ["number", "deal_number", "Номер", "номер"];
 const EXPORT_STATUS_KEYS = ["status", "deal_status", "Статус", "статус"];
-const EXPORT_COST_KEYS = ["deal_cost", "cost", "cost_money_value", "cost_money", "Стоимость", "стоимость"];
+const EXPORT_COST_KEYS = [
+  "deal_cost",
+  "cost",
+  "cost_money_value",
+  "cost_money",
+  "Стоимость",
+  "стоимость",
+  "Стоимость, RUB",
+];
 const EXPORT_PAID_KEYS = ["payed_money", "paid_money", "payed", "Оплачено", "оплачено"];
-const EXPORT_OFFER_KEYS = ["offers", "offer_id", "offer_ids", "offer"];
+const EXPORT_OFFER_KEYS = ["offers", "offer_id", "offer_ids", "offer", "Состав заказа"];
 
 function rowHasAnyKey(row: Record<string, unknown>, keys: string[]): boolean {
   for (const key of keys) {
@@ -243,15 +400,18 @@ export type ExportPaidGetCourseDealsOptions = {
   timeoutMs?: number;
 };
 
-async function startPaidDealsExport(
+async function startCreatedAtDealsExport(
   config: GetCourseConfig,
   window: { from: string; to: string },
   fetchImpl: typeof fetch,
   signal: AbortSignal,
-): Promise<{ exportId: string } | { empty: true } | { error: true }> {
+): Promise<
+  | { exportId: string; payload: unknown }
+  | { empty: true; payload: unknown }
+  | { error: true; payload?: unknown }
+> {
   const url = new URL(`https://${config.accountName}.getcourse.ru/pl/api/account/deals`);
   url.searchParams.set("key", config.apiKey);
-  url.searchParams.set("status", "payed");
   url.searchParams.set("created_at[from]", window.from);
   url.searchParams.set("created_at[to]", window.to);
   try {
@@ -261,11 +421,11 @@ async function startPaidDealsExport(
       signal,
     });
     const payload = await readJson(response);
-    if (!response.ok) return { error: true };
-    if (isExportEmpty(payload)) return { empty: true };
+    if (!response.ok) return { error: true, payload };
+    if (isExportEmpty(payload)) return { empty: true, payload };
     const exportId = readExportId(payload);
-    if (!exportId) return { error: true };
-    return { exportId };
+    if (!exportId) return { error: true, payload };
+    return { exportId, payload };
   } catch {
     return { error: true };
   }
@@ -278,7 +438,11 @@ async function pollDealExport(
   signal: AbortSignal,
   pollMs: number,
   maxPolls: number,
-): Promise<{ rows: unknown[]; pollCount: number } | { empty: true; pollCount: number } | { error: true; pollCount: number }> {
+): Promise<
+  | { rows: unknown[]; pollCount: number; payload: unknown }
+  | { empty: true; pollCount: number; payload: unknown }
+  | { error: true; pollCount: number; payload?: unknown }
+> {
   let pollCount = 0;
   for (let attempt = 0; attempt < maxPolls; attempt += 1) {
     pollCount += 1;
@@ -290,10 +454,10 @@ async function pollDealExport(
         signal,
       });
       const payload = await readJson(response);
-      if (!response.ok) return { error: true, pollCount };
-      if (isExportEmpty(payload)) return { empty: true, pollCount };
+      if (!response.ok) return { error: true, pollCount, payload };
+      if (isExportEmpty(payload)) return { empty: true, pollCount, payload };
       if (isExportReady(payload) || attempt === maxPolls - 1) {
-        return { rows: collectExportRows(payload), pollCount };
+        return { rows: collectExportRows(payload), pollCount, payload };
       }
     } catch {
       return { error: true, pollCount };
@@ -371,18 +535,14 @@ export function matchIntentToExportedDeal(input: {
     payedMoneyMinor: deal.payedMoneyMinor,
     leftCostMoneyMinor: deal.leftCostMoneyMinor,
   });
-  if (moneyClass === "partial") {
-    return { matched: false, reason: "partial_payment" };
-  }
-  if (moneyClass === "unpaid") {
-    return { matched: false, reason: "unpaid" };
-  }
   const statusClass = classifyGetCourseDealStatus(deal.status);
   if (statusClass === "void") {
     return { matched: false, reason: "unpaid" };
   }
+  if (moneyClass === "partial") {
+    return { matched: false, reason: "partial_payment" };
+  }
   if (
-    deal.status &&
     !isProviderConfirmedFullyPaid({
       status: deal.status,
       amountMinor: input.amountMinor,
@@ -390,7 +550,10 @@ export function matchIntentToExportedDeal(input: {
       leftCostMoneyMinor: deal.leftCostMoneyMinor,
     })
   ) {
-    return { matched: false, reason: statusClass === "partial" ? "partial_payment" : "unpaid" };
+    return {
+      matched: false,
+      reason: statusClass === "partial" ? "partial_payment" : "unpaid",
+    };
   }
   return { matched: true, deal };
 }
@@ -407,12 +570,24 @@ export async function exportPaidGetCourseDealsOnce(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const started = await startPaidDealsExport(config, window, fetchImpl, controller.signal);
+    const started = await startCreatedAtDealsExport(config, window, fetchImpl, controller.signal);
     if ("error" in started) {
-      return { ok: false, reason: "provider_error", exportId: null, pollCount: 0 };
+      return {
+        ok: false,
+        reason: "provider_error",
+        exportId: null,
+        pollCount: 0,
+        envelope: started.payload !== undefined ? summarizeExportEnvelope(started.payload) : undefined,
+      };
     }
     if ("empty" in started) {
-      return { ok: false, reason: "empty", exportId: null, pollCount: 0 };
+      return {
+        ok: false,
+        reason: "empty",
+        exportId: null,
+        pollCount: 0,
+        envelope: summarizeExportEnvelope(started.payload),
+      };
     }
     const polled = await pollDealExport(
       config,
@@ -428,6 +603,7 @@ export async function exportPaidGetCourseDealsOnce(
         reason: "provider_error",
         exportId: started.exportId,
         pollCount: polled.pollCount,
+        envelope: polled.payload !== undefined ? summarizeExportEnvelope(polled.payload) : undefined,
       };
     }
     if ("empty" in polled) {
@@ -436,17 +612,20 @@ export async function exportPaidGetCourseDealsOnce(
         reason: "empty",
         exportId: started.exportId,
         pollCount: polled.pollCount,
+        envelope: summarizeExportEnvelope(polled.payload),
       };
     }
     const deals = polled.rows
       .map((row) => parseExportedGetCourseDeal(row))
       .filter((deal): deal is ConfirmedGetCourseDeal => deal !== null);
+    const schema = summarizeExportSchema(polled.rows);
     return {
       ok: true,
       exportId: started.exportId,
       deals,
       pollCount: polled.pollCount,
-      schema: summarizeExportSchema(polled.rows),
+      schema,
+      envelope: schema.row_count === 0 ? summarizeExportEnvelope(polled.payload) : undefined,
     };
   } catch {
     return { ok: false, reason: "provider_error", exportId: null, pollCount: 0 };
