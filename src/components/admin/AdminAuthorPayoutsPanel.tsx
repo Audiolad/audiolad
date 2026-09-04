@@ -597,8 +597,8 @@ function CandidatesTable({
         <p className="text-xs text-[#796ba0]">
           Кандидатов: {bundle?.total ?? 0} из {bundle?.payoutEligibleAuthors ?? 0}{" "}
           авторов с правом на выплату. Период {bundle?.periodLabel ?? "—"},
-          отсечка {formatDateTime(bundle?.cutoffAt ?? null)}. Удержанные суммы в
-          доступное не входят.
+          отсечка {formatDateTime(bundle?.cutoffAt ?? null)}. Сохранённые
+          начисления в доступное не входят.
         </p>
         <button
           type="button"
@@ -620,7 +620,7 @@ function CandidatesTable({
               <tr>
                 <th className="px-3 py-2">Автор</th>
                 <th className="px-3 py-2 text-right">Доступно</th>
-                <th className="px-3 py-2 text-right">Удержано</th>
+                <th className="px-3 py-2 text-right">Сохраняется</th>
                 <th className="px-3 py-2 text-right">В резерве</th>
                 <th className="px-3 py-2 text-right">Минус-остаток</th>
                 <th className="px-3 py-2 text-right">К выплате</th>

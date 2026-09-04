@@ -108,7 +108,7 @@ export function getAuthorAppreciationFinanceStatusLabel(
     case "processing":
       return "Обрабатывается";
     case "held":
-      return "Удерживается";
+      return "Сохраняется";
     case "available":
       return "Доступно к выплате";
     case "reserved":

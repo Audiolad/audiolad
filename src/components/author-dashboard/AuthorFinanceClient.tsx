@@ -10,8 +10,11 @@ import AuthorSalesSection from "@/components/author-dashboard/AuthorSalesSection
 import { formatRubFromMinor } from "@/lib/admin/analytics-money-format";
 import {
   AUTHOR_FINANCE_BALANCE_AS_OF_TEXT,
+  AUTHOR_FINANCE_HOLD_DAYS_LABEL,
   AUTHOR_FINANCE_KPI_HINTS,
   AUTHOR_FINANCE_KPI_LABELS,
+  AUTHOR_FINANCE_NEXT_AVAILABLE_PREFIX,
+  formatAuthorFinanceHoldDays,
   AUTHOR_FINANCE_METHODOLOGY,
   AUTHOR_FINANCE_MINIMUM_PAYOUT_TEXT,
   AUTHOR_FINANCE_NEGATIVE_WARNING,
@@ -68,19 +71,6 @@ function formatDate(value: string | null): string {
 function formatShare(bps: number | null): string {
   if (bps === null || !Number.isFinite(bps)) return "—";
   return `${(bps / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })}%`;
-}
-
-function formatHoldDays(days: number | null): string {
-  if (days === null || !Number.isFinite(days)) return "—";
-  const value = Math.trunc(days);
-  const remainder10 = value % 10;
-  const remainder100 = value % 100;
-
-  if (remainder10 === 1 && remainder100 !== 11) return `${value} день`;
-  if (remainder10 >= 2 && remainder10 <= 4 && (remainder100 < 12 || remainder100 > 14)) {
-    return `${value} дня`;
-  }
-  return `${value} дней`;
 }
 
 function Card({
@@ -429,7 +419,7 @@ export default function AuthorFinanceClient({
               value={formatRubFromMinor(summary.heldMinor)}
               hint={
                 summary.nextHoldReleaseAt
-                  ? `Ближайшее освобождение: ${formatDate(summary.nextHoldReleaseAt)}`
+                  ? `${AUTHOR_FINANCE_NEXT_AVAILABLE_PREFIX}: ${formatDate(summary.nextHoldReleaseAt)}`
                   : AUTHOR_FINANCE_KPI_HINTS.held
               }
             />
@@ -502,11 +492,11 @@ export default function AuthorFinanceClient({
                   value={formatShareBpsAsPercent(displayShareBps)}
                 />
                 <Card
-                  label="Срок удержания"
+                  label={AUTHOR_FINANCE_HOLD_DAYS_LABEL}
                   value={
                     displayHoldDays === null
                       ? "По условиям платформы"
-                      : formatHoldDays(displayHoldDays)
+                      : formatAuthorFinanceHoldDays(displayHoldDays)
                   }
                 />
                 <Card
@@ -534,7 +524,7 @@ export default function AuthorFinanceClient({
                       </span>
                       <span>
                         {formatShare(row.authorShareBps)} ·{" "}
-                        {formatHoldDays(row.holdDays)}
+                        {formatAuthorFinanceHoldDays(row.holdDays)}
                       </span>
                     </li>
                   ))}
@@ -705,8 +695,8 @@ export default function AuthorFinanceClient({
                               <dd>{formatShare(entryDetail.formula.authorShareBps)}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt>Удержание</dt>
-                              <dd>{formatHoldDays(entryDetail.formula.holdDays)}</dd>
+                              <dt>{AUTHOR_FINANCE_HOLD_DAYS_LABEL}</dt>
+                              <dd>{formatAuthorFinanceHoldDays(entryDetail.formula.holdDays)}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
                               <dt>Доступно с</dt>

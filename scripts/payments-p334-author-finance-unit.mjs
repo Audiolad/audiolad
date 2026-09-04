@@ -8,7 +8,7 @@
  * No database, no network. Anything that needs one lives in
  * payments-p334-author-finance-sql-unit.mjs.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,10 +16,14 @@ import { escapeCsvCell } from "../src/lib/admin/analytics-csv.ts";
 
 import {
   AUTHOR_FINANCE_CSV_COLUMNS,
+  AUTHOR_FINANCE_HOLD_DAYS_LABEL,
+  AUTHOR_FINANCE_KPI_HINTS,
   AUTHOR_FINANCE_KPI_LABELS,
   AUTHOR_FINANCE_METHODOLOGY,
   AUTHOR_FINANCE_MINIMUM_PAYOUT_TEXT,
   AUTHOR_FINANCE_NEGATIVE_WARNING,
+  AUTHOR_FINANCE_NEXT_AVAILABLE_PREFIX,
+  formatAuthorFinanceHoldDays,
   getAuthorFinanceAmountStateLabel,
   getAuthorFinanceEligibilityMessage,
   getAuthorFinanceEmptyStateCopy,
@@ -137,7 +141,64 @@ function testLabelsAreComplete() {
     assert(CYRILLIC.test(label), `kpi ${kpi} has a Russian label`);
   }
   assertEqual(AUTHOR_FINANCE_KPI_LABELS.accrued, "Начислено", "kpi accrued");
-  assertEqual(AUTHOR_FINANCE_KPI_LABELS.held, "Удерживается", "kpi held");
+  assertEqual(AUTHOR_FINANCE_KPI_LABELS.held, "Сохраняется", "kpi held");
+  assertEqual(
+    AUTHOR_FINANCE_KPI_HINTS.accrued,
+    "Все начисления за всё время.",
+    "accrued hint is not sale-only",
+  );
+  assertEqual(
+    AUTHOR_FINANCE_KPI_HINTS.held,
+    "Деньги уже ваши, но ещё идёт период сохранения.",
+    "held hint uses preservation wording",
+  );
+  assertEqual(
+    getAuthorFinanceAmountStateLabel("held"),
+    "Сохраняется",
+    "amount state held maps to preservation copy",
+  );
+  assertEqual(
+    AUTHOR_FINANCE_HOLD_DAYS_LABEL,
+    "Срок до доступности",
+    "hold days label",
+  );
+  assertEqual(
+    AUTHOR_FINANCE_NEXT_AVAILABLE_PREFIX,
+    "Станет доступно",
+    "next available prefix",
+  );
+  const payeeSetup = readFileSync(
+    join(ROOT, "src/lib/authors/ensure-commercial-payee-setup.ts"),
+    "utf8",
+  );
+  assert(
+    /export const DEFAULT_COMMERCIAL_HOLD_DAYS = 14;/.test(payeeSetup),
+    "14-day period unchanged",
+  );
+  assertEqual(
+    formatAuthorFinanceHoldDays(14),
+    "14 дней",
+    "Срок до доступности shows 14 days",
+  );
+  assertEqual(
+    `${AUTHOR_FINANCE_HOLD_DAYS_LABEL}: ${formatAuthorFinanceHoldDays(14)}`,
+    "Срок до доступности: 14 дней",
+    "composed hold-days copy",
+  );
+
+  const heldOnly = getAuthorFinanceEmptyStateCopy("held_only");
+  assertEqual(heldOnly.title, "Сохранённые начисления", "held_only title");
+  assertEqual(
+    heldOnly.body,
+    "Начисления уже сохранены за вами. После завершения периода сохранения сумма станет доступна к выплате.",
+    "held_only body",
+  );
+  assert(
+    !AUTHOR_FINANCE_METHODOLOGY.some((item) =>
+      `${item.title} ${item.body}`.includes("удерж"),
+    ),
+    "methodology has no удерж wording",
+  );
   assertEqual(
     AUTHOR_FINANCE_KPI_LABELS.payable,
     "Доступно к будущей выплате",
@@ -665,6 +726,19 @@ function testCsvOutput() {
       payoutSafeRef: null,
       publicComment: null,
     },
+    {
+      entryId: "44444444-4444-4444-4444-444444444444",
+      typeKey: "appreciation",
+      amountMinor: 7000,
+      currency: "RUB",
+      effectiveAt: "2026-09-04T03:37:54Z",
+      availableAt: "2026-09-18T03:37:54Z",
+      isHeld: true,
+      amountState: "held",
+      productTitle: "Благодарность от слушателя",
+      payoutSafeRef: null,
+      publicComment: null,
+    },
   ]);
 
   // "Сумма, ₽" contains a comma, so a correct writer must quote it.
@@ -693,6 +767,19 @@ function testCsvOutput() {
     !ledgerCsv.includes("sale_accrual"),
     "the raw entry type never reaches the file",
   );
+  assert(
+    ledgerCsv.includes("Сохраняется"),
+    "held amountState exports as Сохраняется",
+  );
+  assert(
+    !ledgerCsv.includes("Удерживается") && !ledgerCsv.includes("На удержании"),
+    "ledger CSV has no old hold wording",
+  );
+  assert(
+    ledgerCsv.includes("2026-09-18"),
+    "payout availability date is unchanged in CSV",
+  );
+  assert(ledgerCsv.includes("70.00"), "appreciation 100 ₽ still accrues 70 ₽");
 
   const payoutsCsv = buildAuthorFinancePayoutsCsv([
     {
@@ -795,6 +882,123 @@ function testPeriodResolution() {
  * The vocabulary exists twice — once in SQL, once here. These checks fail the
  * build if the two copies drift.
  */
+const FORBIDDEN_FINANCE_COPY = [
+  "Удерживается",
+  "удерживается",
+  "Деньги на удержании",
+  "Срок удержания",
+  "период удержания",
+  "Ближайшее освобождение",
+  "Ваша доля со всех продаж",
+  "На удержании",
+  "на удержании",
+  "Что такое удержание",
+  "Удержано",
+  "Удержанные",
+];
+
+const FINANCE_UI_SCAN_ROOTS = [
+  "src/lib/author-finance",
+  "src/lib/author-sales",
+  "src/lib/admin/analytics-author-finance-dictionary.ts",
+  "src/components/author-dashboard/AuthorFinanceClient.tsx",
+  "src/components/author-dashboard/AuthorAppreciationSection.tsx",
+  "src/components/author-dashboard/AuthorSalesSection.tsx",
+  "src/components/admin/AdminAuthorEconomyPanel.tsx",
+  "src/components/admin/AdminAuthorPayoutsPanel.tsx",
+];
+
+function listSourceFiles(relativePath) {
+  const absolute = join(ROOT, relativePath);
+  const stat = statSync(absolute);
+  if (stat.isFile()) return [relativePath];
+  const found = [];
+  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    const next = `${relativePath}/${entry.name}`;
+    if (entry.isDirectory()) {
+      found.push(...listSourceFiles(next));
+      continue;
+    }
+    if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) found.push(next);
+  }
+  return found;
+}
+
+function testHeldCopyAndTechnicalSemantics() {
+  const hits = [];
+  for (const root of FINANCE_UI_SCAN_ROOTS) {
+    for (const file of listSourceFiles(root)) {
+      const source = readFileSync(join(ROOT, file), "utf8");
+      for (const phrase of FORBIDDEN_FINANCE_COPY) {
+        if (source.includes(phrase)) {
+          hits.push(`${file}: ${phrase}`);
+        }
+      }
+      if (/(?<![A-Za-z_])удерж/i.test(source)) {
+        hits.push(`${file}: удерж…`);
+      }
+    }
+  }
+  assertEqual(hits.length, 0, `user-facing удерж copy remaining: ${hits.join("; ")}`);
+
+  const globalForbidden = [
+    "Удерживается",
+    "удерживается",
+    "Деньги на удержании",
+    "Срок удержания",
+    "период удержания",
+    "Ближайшее освобождение",
+    "Ваша доля со всех продаж",
+  ];
+  const globalHits = [];
+  for (const file of listSourceFiles("src")) {
+    if (file.includes("/seo/")) continue;
+    if (file.includes("/author-terms/approved-content")) continue;
+    if (file.includes("AuthorPayoutProfileForm")) continue;
+    const source = readFileSync(join(ROOT, file), "utf8");
+    for (const phrase of globalForbidden) {
+      if (source.includes(phrase)) globalHits.push(`${file}: ${phrase}`);
+    }
+  }
+  assertEqual(
+    globalHits.length,
+    0,
+    `global forbidden finance copy remaining: ${globalHits.join("; ")}`,
+  );
+
+  const client = readFileSync(
+    join(ROOT, "src/components/author-dashboard/AuthorFinanceClient.tsx"),
+    "utf8",
+  );
+  assert(
+    client.includes("AUTHOR_FINANCE_NEXT_AVAILABLE_PREFIX"),
+    "nearest release uses the new prefix",
+  );
+  assert(
+    !client.includes("Ближайшее освобождение"),
+    "old nearest-release copy is gone",
+  );
+  assert(
+    client.includes("AUTHOR_FINANCE_HOLD_DAYS_LABEL"),
+    "terms card uses Срок до доступности",
+  );
+  assert(
+    client.includes("summary.nextHoldReleaseAt"),
+    "availableAt-driven nearest date is unchanged",
+  );
+
+  const types = readFileSync(
+    join(ROOT, "src/lib/author-finance/types.ts"),
+    "utf8",
+  );
+  assert(types.includes('"held"'), "technical amount state held remains");
+  assert(
+    client.includes("row.amountState") &&
+      client.includes("getAuthorFinanceAmountStateLabel"),
+    "UI still maps amountState through the label helper",
+  );
+}
+
 function testSourceContracts() {
   const sql = [MIGRATION, EMPTY_STATE_MIGRATION, AUTHOR_TERMS_EMPTY_STATE_MIGRATION]
     .map((file) => readFileSync(file, "utf8"))
@@ -919,7 +1123,8 @@ function testSourceContracts() {
   ]) {
     const src = readFileSync(join(ROOT, route), "utf8");
     assert(
-      src.includes("requireAuthorFinanceAccess"),
+      src.includes("requireAuthorFinanceAccess") ||
+        src.includes("createAuthorFinanceExportHandler"),
       `${route} gates on the selected author_id`,
     );
   }
@@ -949,6 +1154,7 @@ function testSourceContracts() {
 
 function main() {
   testLabelsAreComplete();
+  testHeldCopyAndTechnicalSemantics();
   testPublicSafeMessages();
   testTypeAndStatusMapping();
   testEmptyStateMatrix();

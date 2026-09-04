@@ -76,7 +76,7 @@ function testLabels() {
   );
   assertEqual(
     getAuthorSalePayoutStatusLabel("held"),
-    "Удерживается",
+    "Сохраняется",
     "held label",
   );
   assertEqual(
@@ -121,7 +121,7 @@ function testIndependentStatusDisplay() {
     payoutStatus: "held",
   });
   assertEqual(held.accrualLabel, "Начислено", "held accrual");
-  assertEqual(held.payoutLabel, "Удерживается", "held payout");
+  assertEqual(held.payoutLabel, "Сохраняется", "held payout");
 
   const paid = getAuthorSaleStatusDisplay({
     accrualStatus: "accrued",
@@ -157,7 +157,7 @@ function testIndependentStatusDisplay() {
   });
   assertEqual(partial.refundLabel, "Частичный возврат", "partial refund chip");
   assertEqual(partial.accrualLabel, "Начислено", "partial keeps accrual");
-  assertEqual(partial.payoutLabel, "Удерживается", "partial keeps payout");
+  assertEqual(partial.payoutLabel, "Сохраняется", "partial keeps payout");
 
   const sectionSource = readFileSync(
     join(ROOT, "src/components/author-dashboard/AuthorSalesSection.tsx"),
