@@ -403,8 +403,10 @@ function testSourceContracts() {
   assert.match(apiContext, /purpose \?\? "full_audio"/);
   assert.match(progress, /purpose:\s*"progress"/);
   assert.match(progress, /canWritePracticeProgress/);
+  assert.match(progress, /writeOwnPracticeProgress/);
   assert.match(legacyProgress, /purpose:\s*"progress"/);
   assert.match(legacyProgress, /canWritePracticeProgress/);
+  assert.match(legacyProgress, /writeOwnPracticeProgress/);
   assert.match(player, /resolvePreviewClipMediaTimeline/);
   assert.match(player, /isPreviewModeRef\.current/);
   assert.match(fetchUrl, /preview_full_audio_blocked/);

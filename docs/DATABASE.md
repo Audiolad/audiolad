@@ -629,6 +629,41 @@ RLS: существующие политики author members на `practices/{p
 - Чтение `platform_user_roles` — свои строки или при наличии `team.view`.
 - Мутации назначений — через `service_role` / SQL (UI назначения ролей пока нет).
 
+## practice_audio_progress (resume cursor)
+
+Миграции:
+
+- `supabase/migrations/20260715200000_practice_audio_progress.sql` — таблица;
+- `supabase/migrations/20260919120000_harden_practice_audio_progress_rls.sql` — hardening RLS.
+
+Пер-пользовательский курсор возобновления прослушивания трека внутри практики. `position_seconds` — **только resume cursor**, не рейтинг и не listen-stats. Колонок `real_listened_ms` / `rating_eligible` нет.
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `user_id` | uuid | слушатель (`auth.users`), CASCADE |
+| `practice_id` | uuid | практика, CASCADE |
+| `audio_item_id` | uuid | трек, CASCADE |
+| `position_seconds` | integer ≥ 0 | позиция resume |
+| `completed` | boolean | трек отмечен прослушанным |
+| `updated_at` | timestamptz | последнее обновление |
+
+UNIQUE `(user_id, practice_id, audio_item_id)`.
+
+### RLS
+
+- RLS **включён**.
+- `authenticated`: **SELECT только своих строк** (`user_id = auth.uid()`). Прямые INSERT / UPDATE / DELETE **запрещены** (нет политик, GRANT только SELECT).
+- `anon` / `PUBLIC`: нет доступа.
+- `service_role`: ALL. Мутации идут через server API после access check (`purpose=progress`, `canWritePracticeProgress`): free / entitled / author / зарегистрированный `guest_promo` — запись разрешена; preview-only — 403, REST write тоже DENY.
+
+Чтение в приложении: SSR / API с user-JWT (`listPracticeProgress`, главная, история, профиль, resume-session). Браузер таблицу не читает и не пишет — player ходит в `/progress`. Гостевой прогресс без сессии остаётся в localStorage.
+
+### Запись
+
+`src/lib/listen/progress-write.ts` — service-role upsert/reset после серверной проверки доступа. Product и legacy `/progress` плюс `POST /api/promo/complete-signup` (перенос guest localStorage после claim). `user_id` берётся из сессии, не из тела запроса.
+
+Admin test-user-reset считает и удаляет строки через service-role / CASCADE `auth.users`.
+
 ## private_audio_items (MVP, 2026-07-29)
 
 Миграция: `supabase/migrations/20260729190000_private_audio_items.sql`.
