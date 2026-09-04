@@ -20,6 +20,7 @@ import {
   buildAuthorAppreciationCsv,
   isAuthorFinanceExportKind,
 } from "@/lib/author-finance/csv";
+import { AUTHOR_APPRECIATION_SUMMARY_LABELS } from "@/lib/author-finance/labels";
 import {
   createAuthorFinanceAppreciationListHandler,
   createAuthorFinanceExportHandler,
@@ -434,6 +435,7 @@ function test8FailedAbandonedNotEarnings() {
   assert.ok(processingRow);
   assert.equal(processingRow.financeStatus, "processing");
   assert.equal(getAuthorAppreciationFinanceStatusLabel("processing"), "Обрабатывается");
+  assert.equal(getAuthorAppreciationFinanceStatusLabel("held"), "Сохраняется");
   assert.equal(processingRow.authorAccruedMinor, null);
 }
 
@@ -470,6 +472,10 @@ function test9CsvNoPiiOrProviderIds() {
   ]);
   assert.doesNotMatch(salesCsv, /Благодарность/);
   assert.doesNotMatch(csv, /Продажа/);
+  assert.match(csv, /Сохраняется/);
+  assert.doesNotMatch(csv, /Удерживается/);
+  assert.match(salesCsv, /Сохраняется/);
+  assert.doesNotMatch(salesCsv, /Удерживается/);
 }
 
 function test10Share70Author30Platform() {
@@ -589,7 +595,13 @@ function testCopyAndRoutes() {
   assert.match(cabinet, /Благодарность от слушателя/);
   assert.match(cabinet, /Обрабатывается/);
   assert.match(labels, /Начислено вам/);
-  assert.match(labels, /Удерживается/);
+  assert.match(labels, /Сохраняется/);
+  assert.doesNotMatch(labels, /Удерживается/);
+  assert.doesNotMatch(labels, /Деньги на удержании/);
+  assert.doesNotMatch(labels, /Ваша доля со всех продаж/);
+  assert.match(labels, /Все начисления за всё время/);
+  assert.equal(AUTHOR_APPRECIATION_SUMMARY_LABELS.held, "Сохраняется");
+  assert.equal(getAuthorAppreciationFinanceStatusLabel("held"), "Сохраняется");
   assert.match(labels, /Доступно к выплате/);
   assert.match(statsUi, /AUTHOR_STATS_APPRECIATION_SECTION_TITLE/);
   assert.equal(AUTHOR_APPRECIATION_SECTION_TITLE, "Благодарности от слушателей");

@@ -69,7 +69,7 @@ const API_ERROR_MESSAGES: Record<string, string> = {
   author_not_found: "Автор не найден.",
   terms_not_found: "Условия не найдены.",
   invalid_author_share_bps: "Доля автора указывается в базисных пунктах, от 0 до 10000.",
-  invalid_hold_days: "Срок удержания — целое число дней от 0 до 365.",
+  invalid_hold_days: "Срок до доступности — целое число дней от 0 до 365.",
   invalid_validity_window: "Дата окончания должна быть позже даты начала.",
   author_commercial_terms_overlap:
     "Период пересекается с уже утверждёнными условиями. Сначала закройте текущие.",
@@ -694,7 +694,7 @@ function AuthorsTable({
               <th className="px-3 py-2 text-right">Начислено</th>
               <th className="px-3 py-2 text-right">Сторно</th>
               <th className="px-3 py-2 text-right">Обязательство</th>
-              <th className="px-3 py-2 text-right">На удержании</th>
+              <th className="px-3 py-2 text-right">Сохраняется</th>
               <th className="px-3 py-2 text-right">К выплате</th>
             </tr>
           </thead>
@@ -883,7 +883,7 @@ function LedgerTable({
                   </td>
                   <td className="px-3 py-2 text-xs text-[#796ba0]">
                     {row.isHeld
-                      ? `на удержании до ${formatDate(row.availableAt)}`
+                      ? `сохраняется до ${formatDate(row.availableAt)}`
                       : formatDate(row.availableAt)}
                   </td>
                 </tr>
@@ -921,7 +921,7 @@ function TermsTable({
             <tr>
               <th className="px-3 py-2">Автор</th>
               <th className="px-3 py-2">Ставка</th>
-              <th className="px-3 py-2">Удержание</th>
+              <th className="px-3 py-2">Срок до доступности</th>
               <th className="px-3 py-2">Период</th>
               <th className="px-3 py-2">Статус</th>
               <th className="px-3 py-2">Действия</th>
@@ -1220,7 +1220,7 @@ function TermsDialog({
             />
           </label>
           <label className="block text-sm text-[#25135c]">
-            Удержание, дней
+            Срок до доступности, дней
             <input
               type="number"
               min={0}

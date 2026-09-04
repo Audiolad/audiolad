@@ -41,7 +41,7 @@ export function getAuthorSalePayoutStatusLabel(
 ): string {
   switch (status) {
     case "held":
-      return "Удерживается";
+      return "Сохраняется";
     case "available":
       return "Доступно к выплате";
     case "reserved":
