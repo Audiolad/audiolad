@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import MobileTopChrome from "@/components/listener/MobileTopChrome";
+import { replaceListingSearch } from "@/lib/listener/listing-search-navigation";
 import {
   PLAYLIST_CATALOG_SEARCH_DEBOUNCE_MS,
   buildPlaylistCatalogHref,
@@ -52,7 +54,7 @@ export default function PlaylistCatalogSearch({
     }
 
     skipSyncRef.current = true;
-    router.replace(href);
+    replaceListingSearch(router, href);
   }
 
   function scheduleReplace(nextQuery: string) {
@@ -89,7 +91,7 @@ export default function PlaylistCatalogSearch({
 
   return (
     <>
-      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface px-5 pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
+      <MobileTopChrome variant="playlists">
         <div className="min-h-[52px] min-w-0">
           <PlaylistCatalogSearchForm
             id="playlist-catalog-search-mobile"
@@ -98,11 +100,7 @@ export default function PlaylistCatalogSearch({
             onSubmit={handleSubmit}
           />
         </div>
-      </div>
-      <div
-        className="listener-catalog-mobile-search-spacer xl:hidden"
-        aria-hidden="true"
-      />
+      </MobileTopChrome>
       <div className="sticky top-0 z-20 hidden xl:block bg-platform-surface pb-3">
         <PlaylistCatalogSearchForm
           id="playlist-catalog-search"

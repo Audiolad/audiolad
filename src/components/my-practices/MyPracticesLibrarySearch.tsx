@@ -60,7 +60,7 @@ export default function MyPracticesLibrarySearch({
         autoComplete="off"
         enterKeyHint="search"
         maxLength={100}
-        className="min-w-0 flex-1 border-0 bg-transparent py-0 text-[15px] leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
+        className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
       />
     </form>
   );

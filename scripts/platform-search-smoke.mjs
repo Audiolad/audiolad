@@ -119,7 +119,9 @@ async function assertCatalogMobileChrome(page, contextLabel) {
         );
       },
     );
-    const searchWrap = document.querySelector(".listener-catalog-mobile-search");
+    const searchWrap =
+      document.querySelector("[data-mobile-top-chrome]") ||
+      document.querySelector(".listener-catalog-mobile-search");
     const searchStyle = searchWrap ? window.getComputedStyle(searchWrap) : null;
 
     return {
@@ -143,8 +145,12 @@ async function assertCatalogMobileChrome(page, contextLabel) {
 
 async function catalogChromeMetrics(page) {
   return page.evaluate(() => {
-    const search = document.querySelector(".listener-catalog-mobile-search");
-    const spacer = document.querySelector(".listener-catalog-mobile-search-spacer");
+    const search =
+      document.querySelector("[data-mobile-top-chrome]") ||
+      document.querySelector(".listener-catalog-mobile-search");
+    const spacer =
+      document.querySelector("[data-mobile-top-chrome-spacer]") ||
+      document.querySelector(".listener-catalog-mobile-search-spacer");
     const bottomNav = document.querySelector(".bottom-nav");
     const searchRect = search?.getBoundingClientRect();
     const spacerRect = spacer?.getBoundingClientRect();
@@ -175,8 +181,8 @@ function assertCatalogChromeStable(before, after, contextLabel) {
     if (metrics.searchPosition !== "fixed" || Math.abs(metrics.searchTop ?? Infinity) > 1) {
       throw new Error(`${contextLabel} ${label}: catalog search is not fixed at viewport top`);
     }
-    if (Math.abs((metrics.searchHeight ?? 0) - 76) > 1) {
-      throw new Error(`${contextLabel} ${label}: catalog search height is not 76px`);
+    if ((metrics.searchHeight ?? 0) < 52) {
+      throw new Error(`${contextLabel} ${label}: catalog search height is below the 52px field`);
     }
     if (Math.abs((metrics.spacerHeight ?? 0) - (metrics.searchHeight ?? 0)) > 1) {
       throw new Error(`${contextLabel} ${label}: catalog spacer does not match fixed search height`);

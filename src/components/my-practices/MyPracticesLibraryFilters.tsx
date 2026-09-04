@@ -7,29 +7,7 @@ import {
   LIBRARY_COLLECTION_FILTERS,
   type LibraryFilterId,
 } from "@/lib/library/filters";
-
-const CATALOG_SHEET_LOCK_CLASS = "catalog-sheet-lock";
-
-let catalogSheetLockCount = 0;
-
-function acquireCatalogSheetLock() {
-  catalogSheetLockCount += 1;
-  if (catalogSheetLockCount === 1) {
-    document.documentElement.classList.add(CATALOG_SHEET_LOCK_CLASS);
-  }
-}
-
-function releaseCatalogSheetLock() {
-  if (catalogSheetLockCount <= 0) {
-    catalogSheetLockCount = 0;
-    return;
-  }
-
-  catalogSheetLockCount -= 1;
-  if (catalogSheetLockCount === 0) {
-    document.documentElement.classList.remove(CATALOG_SHEET_LOCK_CLASS);
-  }
-}
+import { useSheetScrollLock } from "@/lib/listener/use-sheet-scroll-lock";
 
 function FilterChip({
   label,
@@ -71,17 +49,12 @@ export default function MyPracticesLibraryFilters({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [draftFilter, setDraftFilter] = useState<LibraryFilterId>(filter);
-  const holdsSheetLockRef = useRef(false);
   const activeFilterCount = filter === "all" ? 0 : 1;
+  useSheetScrollLock(open, "library-filters");
 
   useEffect(() => {
     if (!open) {
       return;
-    }
-
-    if (!holdsSheetLockRef.current) {
-      acquireCatalogSheetLock();
-      holdsSheetLockRef.current = true;
     }
 
     const panel = panelRef.current;
@@ -134,22 +107,9 @@ export default function MyPracticesLibraryFilters({
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
-      if (holdsSheetLockRef.current) {
-        releaseCatalogSheetLock();
-        holdsSheetLockRef.current = false;
-      }
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (holdsSheetLockRef.current) {
-        releaseCatalogSheetLock();
-        holdsSheetLockRef.current = false;
-      }
-    };
-  }, []);
 
   function close() {
     setOpen(false);

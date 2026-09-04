@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import LibraryMobileHeader from "@/components/listener/LibraryMobileHeader";
+import MobileTopChrome from "@/components/listener/MobileTopChrome";
 import MyPracticesLibraryFilters from "@/components/my-practices/MyPracticesLibraryFilters";
 import MyPracticesLibrarySearch from "@/components/my-practices/MyPracticesLibrarySearch";
 import type { LibraryFilterId } from "@/lib/library/filters";
@@ -14,6 +15,7 @@ import {
   parseLibrarySearchQuery,
   parseLibrarySort,
 } from "@/lib/library/unified-query";
+import { replaceListingSearch } from "@/lib/listener/listing-search-navigation";
 
 function SearchFiltersRow({
   searchId,
@@ -51,17 +53,18 @@ function SearchFiltersRow({
   );
 }
 
-type MyPracticesLibraryChromeProps = {
-  /** `mobile` stays in the route layout. `desktop` mounts in DesktopShellSearch. */
-  surface?: "mobile" | "desktop";
-};
+function SearchFiltersRowSkeleton() {
+  return (
+    <div className="flex items-start gap-2" aria-hidden="true">
+      <div className="min-h-[52px] min-w-0 flex-1 rounded-[18px] border border-[#ded1f1] bg-white" />
+      <div className="h-[52px] w-[88px] shrink-0 rounded-[18px] border border-[#ded1f1] bg-white" />
+    </div>
+  );
+}
 
-export default function MyPracticesLibraryChrome({
-  surface = "mobile",
-}: MyPracticesLibraryChromeProps) {
+function LibrarySearchFiltersConnected({ searchId }: { searchId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchId = useId();
   const activeFilter = parseLibraryFilter(searchParams.get("filter"));
   const activeSort = parseLibrarySort(searchParams.get("sort"));
   const queryFromUrl = parseLibrarySearchQuery(searchParams.get("q"));
@@ -112,7 +115,7 @@ export default function MyPracticesLibraryChrome({
       skipSearchSyncRef.current = true;
     }
 
-    router.replace(href, { scroll: false });
+    replaceListingSearch(router, href);
   }
 
   function flushSearch(nextQuery = searchValue) {
@@ -141,14 +144,28 @@ export default function MyPracticesLibraryChrome({
     replaceLibraryQuery({ filter, q: searchValue });
   }
 
-  const rowProps = {
-    searchValue,
-    filter: activeFilter,
-    onSearchChange: handleSearchChange,
-    onSearchSubmit: () => flushSearch(),
-    onApplyFilter: selectFilter,
-    onResetFilter: () => selectFilter("all"),
-  };
+  return (
+    <SearchFiltersRow
+      searchId={searchId}
+      searchValue={searchValue}
+      filter={activeFilter}
+      onSearchChange={handleSearchChange}
+      onSearchSubmit={() => flushSearch()}
+      onApplyFilter={selectFilter}
+      onResetFilter={() => selectFilter("all")}
+    />
+  );
+}
+
+type MyPracticesLibraryChromeProps = {
+  /** `mobile` stays in the route layout. `desktop` mounts in DesktopShellSearch. */
+  surface?: "mobile" | "desktop";
+};
+
+export default function MyPracticesLibraryChrome({
+  surface = "mobile",
+}: MyPracticesLibraryChromeProps) {
+  const searchId = useId();
 
   if (surface === "desktop") {
     return (
@@ -158,29 +175,22 @@ export default function MyPracticesLibraryChrome({
           Всё, что вы сохранили, купили, добавили.
         </p>
         <div className="mt-3">
-          <SearchFiltersRow searchId={searchId} {...rowProps} />
+          <Suspense fallback={<SearchFiltersRowSkeleton />}>
+            <LibrarySearchFiltersConnected searchId={searchId} />
+          </Suspense>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
-        <LibraryMobileHeader />
-        <div className="mt-3 px-5">
-          <SearchFiltersRow searchId={searchId} {...rowProps} />
-        </div>
+    <MobileTopChrome variant="library">
+      <LibraryMobileHeader />
+      <div className="mt-3 px-5">
+        <Suspense fallback={<SearchFiltersRowSkeleton />}>
+          <LibrarySearchFiltersConnected searchId={searchId} />
+        </Suspense>
       </div>
-      <div
-        className="listener-catalog-mobile-search-spacer invisible pointer-events-none pt-[max(0.25rem,env(safe-area-inset-top,0px))] xl:hidden"
-        aria-hidden="true"
-      >
-        <LibraryMobileHeader />
-        <div className="mt-3 px-5">
-          <div className="h-[52px]" />
-        </div>
-      </div>
-    </>
+    </MobileTopChrome>
   );
 }
