@@ -44,13 +44,47 @@ import { authorShareMinor, platformShareMinor } from "@/lib/payments/author-fina
 const root = process.cwd();
 const read = (file: string) => readFileSync(path.join(root, file), "utf8");
 
-const SERGEY_AUTHOR_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const ZOYA_AUTHOR_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+/**
+ * Verified production recovery after 2026-09-04T03:37:55Z reconcile
+ * (applied=2). Do not re-diagnose these paid rows as broken.
+ */
+const PRODUCTION_SERGEY = {
+  intentId: "803348fb-59af-49bc-8127-c491b2e9c360",
+  authorId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  status: "paid" as const,
+  paidAt: "2026-09-04T03:37:54.942152+00:00",
+  authorAccruedMinor: 7_000,
+  availableAt: "2026-09-18T03:37:54.942152+00:00",
+  financeProjectionStatus: "projected" as const,
+  financeProjectionResultCode: "accrual_created",
+  hasSaleAccrual: true,
+  amountMinor: 10_000,
+  surface: "author" as const,
+};
+
+const PRODUCTION_ZOYA = {
+  intentId: "96cc9eb2-a0b0-4f4e-bfd7-7b17c42f7e11",
+  authorId: "8e4b0d23-5c9f-4e32-ad7b-2f35e7c9b1d0",
+  status: "paid" as const,
+  paidAt: "2026-09-04T03:37:54.961382+00:00",
+  authorAccruedMinor: 7_000,
+  availableAt: "2026-09-18T03:37:54.961382+00:00",
+  financeProjectionStatus: "projected" as const,
+  financeProjectionResultCode: "accrual_created",
+  hasSaleAccrual: true,
+  amountMinor: 10_000,
+  surface: "product" as const,
+  productTitle: "Прогноз от Высшего Я на сентябрь 2026",
+};
+
+const SERGEY_AUTHOR_ID = PRODUCTION_SERGEY.authorId;
+const ZOYA_AUTHOR_ID = PRODUCTION_ZOYA.authorId;
 const OTHER_AUTHOR_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const NOW = new Date("2026-09-04T04:00:00.000Z");
 
-const SERGEY_INTENT_ID = "803348fb-59af-49bc-8127-c491b2e9c360";
-const ZOYA_INTENT_ID = "96c9eb2-a0b0-4f4e-bfd7-7b17c42f7e11";
+const SERGEY_INTENT_ID = PRODUCTION_SERGEY.intentId;
+const ZOYA_INTENT_ID = PRODUCTION_ZOYA.intentId;
+const TRUNCATED_ZOYA_INTENT_ID = "96c9eb2-a0b0-4f4e-bfd7-7b17c42f7e11";
 
 function paidFact(
   overrides: Partial<AuthorAppreciationCabinetFact> &
@@ -63,30 +97,40 @@ function paidFact(
     practiceSlug: overrides.surface === "product" ? "product-slug" : null,
     amountMinor: 10_000,
     createdAt: "2026-09-04T03:20:00.000Z",
-    paidAt: "2026-09-04T03:37:55.000Z",
+    paidAt: PRODUCTION_SERGEY.paidAt,
     currency: "RUB",
     hasSaleAccrual: true,
     authorAccruedMinor: 7_000,
-    availableAt: "2026-09-18T03:37:55.000Z",
+    availableAt: PRODUCTION_SERGEY.availableAt,
     payoutAllocationStatus: null,
     ...overrides,
   };
 }
 
 const sergey = paidFact({
-  intentId: SERGEY_INTENT_ID,
-  authorId: SERGEY_AUTHOR_ID,
-  surface: "author",
+  intentId: PRODUCTION_SERGEY.intentId,
+  authorId: PRODUCTION_SERGEY.authorId,
+  surface: PRODUCTION_SERGEY.surface,
   sourceTitle: "Сергей",
+  paidAt: PRODUCTION_SERGEY.paidAt,
+  availableAt: PRODUCTION_SERGEY.availableAt,
+  authorAccruedMinor: PRODUCTION_SERGEY.authorAccruedMinor,
+  amountMinor: PRODUCTION_SERGEY.amountMinor,
+  hasSaleAccrual: PRODUCTION_SERGEY.hasSaleAccrual,
 });
 
 const zoya = paidFact({
-  intentId: ZOYA_INTENT_ID,
-  authorId: ZOYA_AUTHOR_ID,
-  surface: "product",
-  sourceTitle: "Прогноз от Высшего Я на сентябрь 2026",
+  intentId: PRODUCTION_ZOYA.intentId,
+  authorId: PRODUCTION_ZOYA.authorId,
+  surface: PRODUCTION_ZOYA.surface,
+  sourceTitle: PRODUCTION_ZOYA.productTitle,
   practiceId: "practice-zoya",
   practiceSlug: "prognoz-vysshee-ya-sentyabr-2026",
+  paidAt: PRODUCTION_ZOYA.paidAt,
+  availableAt: PRODUCTION_ZOYA.availableAt,
+  authorAccruedMinor: PRODUCTION_ZOYA.authorAccruedMinor,
+  amountMinor: PRODUCTION_ZOYA.amountMinor,
+  hasSaleAccrual: PRODUCTION_ZOYA.hasSaleAccrual,
 });
 
 function emptySummary(): AuthorStatsSummary {
@@ -206,12 +250,17 @@ function test2AppreciationInAuthorList() {
   const zoyaRow = rows.find((row) => row.id === ZOYA_INTENT_ID);
   assert.ok(sergeyRow);
   assert.ok(zoyaRow);
+  assert.equal(zoyaRow.id, "96cc9eb2-a0b0-4f4e-bfd7-7b17c42f7e11");
   assert.equal(sergeyRow.sourceTitle, AUTHOR_APPRECIATION_SURFACE_AUTHOR_LABEL);
   assert.equal(zoyaRow.sourceTitle, "Прогноз от Высшего Я на сентябрь 2026");
   assert.equal(sergeyRow.grossAmountMinor, 10_000);
   assert.equal(sergeyRow.authorAccruedMinor, 7_000);
   assert.equal(zoyaRow.grossAmountMinor, 10_000);
   assert.equal(zoyaRow.authorAccruedMinor, 7_000);
+  assert.equal(sergeyRow.paidAt, PRODUCTION_SERGEY.paidAt);
+  assert.equal(zoyaRow.paidAt, PRODUCTION_ZOYA.paidAt);
+  assert.equal(sergeyRow.availableAt, PRODUCTION_SERGEY.availableAt);
+  assert.equal(zoyaRow.availableAt, PRODUCTION_ZOYA.availableAt);
   assert.equal(sergeyRow.financeStatus, "held");
   assert.equal(zoyaRow.financeStatus, "held");
 }
@@ -397,6 +446,7 @@ function test9CsvNoPiiOrProviderIds() {
   assert.match(csv, /Страница автора/);
   assert.match(csv, /Прогноз от Высшего Я на сентябрь 2026/);
   assert.doesNotMatch(csv, /803348fb/);
+  assert.doesNotMatch(csv, /96cc9eb2/);
   assert.doesNotMatch(csv, /email|phone|provider|getcourse|deal/i);
   assert.equal(isAuthorFinanceExportKind("appreciation"), true);
   assert.equal(isAuthorFinanceExportKind("sales"), true);
@@ -433,56 +483,90 @@ function test10Share70Author30Platform() {
 }
 
 function testSergeyZoyaAdminAndAuthorVisibility() {
+  assert.notEqual(ZOYA_INTENT_ID, TRUNCATED_ZOYA_INTENT_ID);
+  assert.equal(ZOYA_INTENT_ID, "96cc9eb2-a0b0-4f4e-bfd7-7b17c42f7e11");
+
+  const failedFacts = [1, 2, 3, 4].map((index) => ({
+    intentId: `failed-${index}`,
+    authorId: OTHER_AUTHOR_ID,
+    authorName: "Другой",
+    surface: "author" as const,
+    productTitle: null,
+    amountMinor: 10_000,
+    status: "failed" as const,
+    paidAt: null,
+    createdAt: "2026-09-03T12:00:00.000Z",
+    authorAccruedMinor: null,
+    availableAt: null,
+    providerDealIdPresent: false,
+    providerDealNumberPresent: false,
+    financeProjectionStatus: null,
+    financeProjectionResultCode: null,
+    hasSaleAccrual: false,
+  }));
+
   const admin = projectAppreciationAnalytics([
     {
-      intentId: SERGEY_INTENT_ID,
-      authorId: SERGEY_AUTHOR_ID,
+      intentId: PRODUCTION_SERGEY.intentId,
+      authorId: PRODUCTION_SERGEY.authorId,
       authorName: "Сергей",
-      surface: "author",
+      surface: PRODUCTION_SERGEY.surface,
       productTitle: null,
-      amountMinor: 10_000,
-      status: "paid",
-      paidAt: "2026-09-04T03:37:55.000Z",
+      amountMinor: PRODUCTION_SERGEY.amountMinor,
+      status: PRODUCTION_SERGEY.status,
+      paidAt: PRODUCTION_SERGEY.paidAt,
       createdAt: "2026-09-04T03:20:00.000Z",
-      authorAccruedMinor: 7_000,
-      availableAt: "2026-09-18T03:37:55.000Z",
+      authorAccruedMinor: PRODUCTION_SERGEY.authorAccruedMinor,
+      availableAt: PRODUCTION_SERGEY.availableAt,
       providerDealIdPresent: true,
       providerDealNumberPresent: true,
-      financeProjectionStatus: "projected",
-      financeProjectionResultCode: "accrual_created",
-      hasSaleAccrual: true,
+      financeProjectionStatus: PRODUCTION_SERGEY.financeProjectionStatus,
+      financeProjectionResultCode: PRODUCTION_SERGEY.financeProjectionResultCode,
+      hasSaleAccrual: PRODUCTION_SERGEY.hasSaleAccrual,
     },
     {
-      intentId: ZOYA_INTENT_ID,
-      authorId: ZOYA_AUTHOR_ID,
+      intentId: PRODUCTION_ZOYA.intentId,
+      authorId: PRODUCTION_ZOYA.authorId,
       authorName: "Зоя",
-      surface: "product",
-      productTitle: "Прогноз от Высшего Я на сентябрь 2026",
-      amountMinor: 10_000,
-      status: "paid",
-      paidAt: "2026-09-04T03:37:55.000Z",
+      surface: PRODUCTION_ZOYA.surface,
+      productTitle: PRODUCTION_ZOYA.productTitle,
+      amountMinor: PRODUCTION_ZOYA.amountMinor,
+      status: PRODUCTION_ZOYA.status,
+      paidAt: PRODUCTION_ZOYA.paidAt,
       createdAt: "2026-09-04T03:20:00.000Z",
-      authorAccruedMinor: 7_000,
-      availableAt: "2026-09-18T03:37:55.000Z",
+      authorAccruedMinor: PRODUCTION_ZOYA.authorAccruedMinor,
+      availableAt: PRODUCTION_ZOYA.availableAt,
       providerDealIdPresent: true,
       providerDealNumberPresent: true,
-      financeProjectionStatus: "projected",
-      financeProjectionResultCode: "accrual_created",
-      hasSaleAccrual: true,
+      financeProjectionStatus: PRODUCTION_ZOYA.financeProjectionStatus,
+      financeProjectionResultCode: PRODUCTION_ZOYA.financeProjectionResultCode,
+      hasSaleAccrual: PRODUCTION_ZOYA.hasSaleAccrual,
     },
+    ...failedFacts,
   ]);
   assert.equal(admin.summary.paidCount, 2);
+  assert.equal(admin.summary.pendingCount, 0);
+  assert.equal(admin.summary.failedCount, 4);
   assert.equal(admin.summary.grossMinor, 20_000);
   assert.equal(admin.summary.authorAccruedMinor, 14_000);
+  assert.equal(admin.summary.platformShareMinor, 6_000);
 
   const authorSergey = projectAuthorAppreciationCabinet([sergey], NOW);
   const authorZoya = projectAuthorAppreciationCabinet([zoya], NOW);
   assert.equal(authorSergey.rows.length, 1);
   assert.equal(authorZoya.rows.length, 1);
+  assert.equal(authorSergey.rows[0].id, PRODUCTION_SERGEY.intentId);
+  assert.equal(authorZoya.rows[0].id, PRODUCTION_ZOYA.intentId);
+  assert.equal(authorSergey.rows[0].financeStatus, "held");
+  assert.equal(authorZoya.rows[0].financeStatus, "held");
+  assert.equal(authorSergey.rows[0].sourceTitle, AUTHOR_APPRECIATION_SURFACE_AUTHOR_LABEL);
+  assert.equal(authorZoya.rows[0].sourceTitle, PRODUCTION_ZOYA.productTitle);
   assert.equal(authorSergey.summary.grossAmountMinor, 10_000);
   assert.equal(authorSergey.summary.authorAccruedMinor, 7_000);
   assert.equal(authorZoya.summary.grossAmountMinor, 10_000);
   assert.equal(authorZoya.summary.authorAccruedMinor, 7_000);
+  assert.equal(authorSergey.summary.heldMinor, 7_000);
+  assert.equal(authorZoya.summary.heldMinor, 7_000);
 }
 
 function testCopyAndRoutes() {
@@ -529,6 +613,10 @@ function testCopyAndRoutes() {
   const statsSummary = read("src/app/api/author/stats/summary/route.ts");
   assert.match(statsSummary, /attachAppreciationToSummary/);
   assert.match(statsSummary, /requireAuthorStatsAccess/);
+
+  const cabinetTest = read("scripts/author-appreciation-cabinet-unit.mts");
+  assert.match(cabinetTest, /96cc9eb2-a0b0-4f4e-bfd7-7b17c42f7e11/);
+  assert.match(cabinetTest, /8e4b0d23-5c9f-4e32-ad7b-2f35e7c9b1d0/);
 }
 
 async function testExportUsesVerifiedAuthorAndSeparateKind() {
