@@ -504,8 +504,19 @@ assert.match(
 assert.match(prompt, /usageItems: ровно 3/);
 assert.match(prompt, /faqItems: ровно 3/);
 assert.match(prompt, /Q3 ВСЕГДА про намерение «слушать онлайн»/);
-assert.match(prompt, /Доступ к продукту: не указан/);
-assert.match(prompt, /не пиши «бесплатно»/);
+assert.match(prompt, /Доступ не подтверждён: не пиши «бесплатно»/);
+assert.match(
+  buildProductSeoGrounding({ request: parsed.request }),
+  /Доступ к продукту: не указан/,
+);
+assert.match(
+  buildProductSeoGrounding({ request: { ...parsed.request, isFree: true } }),
+  /Доступ к продукту: бесплатный/,
+);
+assert.match(
+  buildProductSeoGrounding({ request: { ...parsed.request, isFree: false } }),
+  /Доступ к продукту: платный/,
+);
 assert.match(
   buildProductSeoSystemPrompt({ request: { ...parsed.request, isFree: true } }),
   /Продукт бесплатный: естественно включи слово «бесплатно» в Q3\.question/,
@@ -661,7 +672,7 @@ assert.match(
   assert.match(moneyPrompt, SECONDARY_PUBLIC_SLOTS_FIRST);
   assert.match(
     moneyPrompt,
-    /Название продукта совпадает с основным запросом: в остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, запись, она\/её\)/,
+    /Название продукта совпадает с основным запросом: его можно один раз естественно использовать в Q3\.question для намерения «слушать онлайн»\. В остальных местах используй естественные отсылки \(эта практика, аудиопрактика, материал, запись, она\/её\)/,
   );
   assert.doesNotMatch(moneyPrompt, /Не обязан использовать каждую фразу в черновике/);
   assertOverlapContract(moneyPrompt, ["канал денежная энергия"]);
@@ -1141,7 +1152,7 @@ const coveredSecondaryDraft = validDraft({
       answer: "Вечерняя медитация хорошо подходит в привычное время отдыха.",
       anchor: "kogda",
     },
-    listenOnlineFaq("Вечерняя практика"),
+    validDraft().faqItems[2],
   ],
 });
 const calls = [];
@@ -1173,12 +1184,17 @@ const provider = {
     throw new Error("quality repair must not run when secondaries are already covered");
   },
 };
-const generated = await generateProductSeoDraft(parsed.request, {
+const generated = await generateProductSeoDraft(
+  requestInput({
+    seoSecondaryQueries: ["практика перед сном", "Вечерняя медитация"],
+  }),
+  {
   userId: "author",
   config,
   provider,
   aiRateLimit: createProductSeoAiRateLimitStore(),
-});
+},
+);
 assert.equal(generated.ok, true);
 assert.deepEqual(generated.data.seoSecondaryQueries, ["практика перед сном", "Вечерняя медитация"]);
 assert.equal(calls.length, 1);
@@ -2097,7 +2113,7 @@ for (const [question, expectedAnswer] of [
 }
 
 const noPrimary = await generateProductSeoDraft(
-  { ...parsed.request, seoPrimaryQuery: "", seoSecondaryQueries: [] },
+  requestInput({ seoPrimaryQuery: "", seoSecondaryQueries: [] }),
   { userId: "author-no-primary", config, provider, aiRateLimit: createProductSeoAiRateLimitStore() },
 );
 assert.equal(noPrimary.ok, true);
@@ -3423,7 +3439,7 @@ const ungroundedDraft = validDraft({
   assert.match(keyQualityPrompt, /Не удаляй слова вслепую и не оставляй обрывки/);
   assert.match(
     keyQualityPrompt,
-    /Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription и Q1\.question/,
+    /Никогда не убирай обязательный точный основной запрос из seoTitle, seoDescription, Q1\.question и нужного Q3\.question/,
   );
   assert.equal(keyToAbundance.data.seoTitle, keyToAbundanceOverusedDraft.seoTitle);
   assert.equal(
