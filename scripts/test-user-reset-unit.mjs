@@ -80,6 +80,7 @@ function testPolicy() {
     counts: {
       userPractices: 0,
       practiceAudioProgress: 0,
+      practiceListenStats: 0,
       playlists: 0,
       playlistItems: 0,
       emailContacts: 0,
@@ -112,6 +113,7 @@ function testPolicy() {
     counts: {
       userPractices: 0,
       practiceAudioProgress: 0,
+      practiceListenStats: 0,
       playlists: 0,
       playlistItems: 0,
       emailContacts: 0,
@@ -154,6 +156,8 @@ function testStaticWiring() {
   assert(panel.includes("TEST_USER_RESET_CONFIRMATION_PHRASE"), "panel phrase constant");
   assert(panel.includes("Очистить локальные тестовые данные"), "local clear button");
   assert(reset.includes("auth.admin.deleteUser"), "auth admin delete used");
+  const preflightSource = readRepoFile("src", "lib", "admin", "test-user-reset", "preflight.ts");
+  assert(preflightSource.includes("practice_listen_stats"), "listen-stats counted in reset");
   assert(!reset.includes("DELETE FROM auth.users"), "no direct auth sql delete");
   assert(page.includes("TestUserResetPanel"), "panel on users page");
   assert(page.includes("getPlatformOwnerSessionIfOwner"), "owner-only render gate");

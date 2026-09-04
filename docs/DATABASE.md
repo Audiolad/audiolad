@@ -662,7 +662,56 @@ UNIQUE `(user_id, practice_id, audio_item_id)`.
 
 `src/lib/listen/progress-write.ts` — service-role upsert/reset после серверной проверки доступа. Product и legacy `/progress` плюс `POST /api/promo/complete-signup` (перенос guest localStorage после claim). `user_id` берётся из сессии, не из тела запроса.
 
-Admin test-user-reset считает и удаляет строки через service-role / CASCADE `auth.users`.
+Admin test-user-reset считает и удаляет строки через service-role / CASCADE `auth.users`. Сброс прогресса слушателем (`DELETE /progress`) **не** трогает `practice_listen_stats`.
+
+## practice_listen_stats (trusted MEDIA-TIME / eligibility)
+
+Миграция: `supabase/migrations/20260920120000_practice_listen_stats.sql`.
+
+Это **не** resume cursor. `practice_audio_progress` остаётся только позицией воспроизведения. Сюда пишется накопленное реальное прослушивание (продвижение `currentTime`, не wall-clock) и одноразовый порог рейтинга.
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `user_id` | uuid | слушатель (`auth.users`), CASCADE |
+| `practice_id` | uuid | продукт, CASCADE |
+| `real_listened_ms` | bigint ≥ 0 | сумма принятого MEDIA-TIME по всем трекам практики |
+| `rating_eligible_at` | timestamptz NULL | ставится один раз при ≥ 30000 ms; rewind/reset прогресса не сбрасывает |
+| `last_audio_item_id` | uuid NULL | последний трек heartbeat, SET NULL при удалении трека |
+| `last_position_ms` | bigint ≥ 0 | baseline для следующего тика |
+| `last_reported_at` | timestamptz NULL | время последнего принятого тика |
+| `created_at` / `updated_at` | timestamptz | создание / обновление строки |
+
+PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
+
+Константа приложения: `RATING_ELIGIBILITY_LISTEN_MS = 30000` в `src/lib/listen/listen-stats-constants.ts`.
+
+### Семантика
+
+- Суммируется на уровне user+practice: паузы, визиты, дни, несколько треков одного `practice_id`.
+- Seek / существенный jump относительно `last_position_ms` → +0, новая позиция становится baseline.
+- Pause / замороженный `currentTime` → +0. Фон с двигающимся `currentTime` считается.
+- Честный rewind и повтор того же сегмента в v1 может начислиться снова (уникальные сегменты не считаются).
+- После порога `real_listened_ms` продолжает расти.
+- Аноним без `user_id` — строки нет.
+- Preview-only — никогда не начисляется (даже 60–90 с clip).
+- Автор (`author_preview`) может копить `real_listened_ms`, но `rating_eligible_at` не ставится.
+- Курсы (`publication_class=course`) в Stage 1 не начисляются (FOLLOW-UP); access/clip/progress курса не меняются.
+
+### RLS / RPC
+
+- RLS **включён**.
+- `authenticated`: SELECT только своих строк. Прямые INSERT / UPDATE / DELETE запрещены.
+- `anon` / `PUBLIC`: нет доступа.
+- `service_role`: ALL.
+- Мутация только через `apply_practice_listen_stats_heartbeat` (`SECURITY DEFINER`). `EXECUTE` отозван у `anon` / `authenticated` / `PUBLIC`. RPC **не** принимает произвольные секунды — считает accepted ms из хранимого `last_position_ms` и капает тик. Маршрут `PUT .../listen-stats` сначала проверяет полный доступ.
+
+### API
+
+- `GET /api/listen/product/{author}/{product}/listen-stats` — own-state (`realListenedMs`, `ratingEligible`, `ratingEligibleAt`). 401 без сессии. Чужие строки не отдаются.
+- `PUT` того же пути — heartbeat. Legacy-маршрут зеркалит product.
+- Session payload (`loadListenSessionPayload`) включает own `listenStats`.
+- `DELETE /progress` и rewind **не** чистят эту таблицу.
+- Admin test-user-reset считает `practice_listen_stats`; полное удаление тестового `auth.users` снимает строки через CASCADE.
 
 ## private_audio_items (MVP, 2026-07-29)
 

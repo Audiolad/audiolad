@@ -70,6 +70,11 @@ import {
   fetchSignedAudioUrl,
   playErrorName,
 } from "@/lib/audio/signed-audio-url";
+import {
+  LISTEN_STATS_HEARTBEAT_MS,
+  reportListenStatsHeartbeat,
+  shouldReportListenStatsHeartbeat,
+} from "@/lib/listen/listen-stats-client";
 
 type TracksExhaustedResult = "advanced" | "completed" | "none";
 
@@ -228,7 +233,10 @@ export function useSequentialPlayer({
   const guestProgressMetaRef = useRef(guestProgressMeta);
   const practiceIdRef = useRef(practiceId);
   const lastIntervalSavedPositionRef = useRef(-1);
+  const lastListenStatsPositionMsRef = useRef<number | null>(null);
+  const lastListenStatsTrackIdRef = useRef<string | null>(null);
   const flushProgressRef = useRef<() => Promise<void>>(async () => {});
+  const flushListenStatsRef = useRef<(keepalive?: boolean) => void>(() => {});
   const loadSignedUrlRef = useRef<(audioItemId: string) => Promise<void>>(
     async () => {},
   );
@@ -640,6 +648,52 @@ export function useSequentialPlayer({
   useEffect(() => {
     flushProgressRef.current = flushProgress;
   }, [flushProgress]);
+
+  const reportListenStats = useCallback(
+    (options?: { keepalive?: boolean; positionSeconds?: number }) => {
+      const track = currentTrackRef.current;
+
+      if (
+        !track ||
+        !shouldReportListenStatsHeartbeat({
+          isPrivateAudio: isPrivateAudioRef.current,
+          isPreviewMode: isPreviewModeRef.current,
+          guestProgressMode: guestProgressModeRef.current,
+          audioItemId: track.id,
+        })
+      ) {
+        return;
+      }
+
+      const audio = audioRef.current;
+      const positionSeconds =
+        options?.positionSeconds ?? audio?.currentTime ?? currentTimeRef.current;
+      const positionMs = Math.max(0, Math.floor(positionSeconds * 1000));
+      const sameTrack = lastListenStatsTrackIdRef.current === track.id;
+      const priorPositionMs = sameTrack
+        ? lastListenStatsPositionMsRef.current
+        : null;
+
+      reportListenStatsHeartbeat({
+        apiBase: listenApiBaseRef.current,
+        audioItemId: track.id,
+        positionMs,
+        priorPositionMs,
+        playbackRate: PLAYBACK_RATES[playbackRateIndex],
+        keepalive: options?.keepalive === true,
+      });
+
+      lastListenStatsTrackIdRef.current = track.id;
+      lastListenStatsPositionMsRef.current = positionMs;
+    },
+    [playbackRateIndex],
+  );
+
+  useEffect(() => {
+    flushListenStatsRef.current = (keepalive?: boolean) => {
+      reportListenStats({ keepalive });
+    };
+  }, [reportListenStats]);
 
   const loadSignedUrl = useCallback(
     async (audioItemId: string) => {
@@ -1473,14 +1527,35 @@ export function useSequentialPlayer({
   }, [currentTrack?.id, isPlaying, practiceId, runIntervalProgressSave]);
 
   useEffect(() => {
+    if (!isPlaying || !currentTrack?.id) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      flushListenStatsRef.current();
+    }, LISTEN_STATS_HEARTBEAT_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [currentTrack?.id, isPlaying, practiceId]);
+
+  useEffect(() => {
+    lastListenStatsPositionMsRef.current = null;
+    lastListenStatsTrackIdRef.current = null;
+  }, [practiceId]);
+
+  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         void flushProgressRef.current();
+        flushListenStatsRef.current(true);
       }
     };
 
     const handlePageHide = () => {
       void flushProgressRef.current();
+      flushListenStatsRef.current(true);
     };
 
     window.addEventListener("visibilitychange", handleVisibilityChange);

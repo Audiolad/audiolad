@@ -1,3 +1,4 @@
+import type { PracticeListenStatsOwnState } from "@/lib/listen/listen-stats";
 import type { ListenProgressEntry, ListenTrack } from "@/lib/listen/types";
 
 export type GlobalPlayerSourceType = "catalog" | "private_audio";
@@ -29,6 +30,8 @@ type GlobalPlayerSessionBase = {
   format: string | null;
   tracks: ListenTrack[];
   initialProgress: ListenProgressEntry[];
+  /** Own listen-stats only. Never another user's row. */
+  listenStats?: PracticeListenStatsOwnState;
   coverSymbol: string;
   coverGradient: string;
   coverImageUrl: string | null;

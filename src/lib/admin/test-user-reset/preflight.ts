@@ -25,6 +25,7 @@ function emptyCounts(): TestUserResetPreflightCounts {
   return {
     userPractices: 0,
     practiceAudioProgress: 0,
+    practiceListenStats: 0,
     playlists: 0,
     playlistItems: 0,
     emailContacts: 0,
@@ -278,6 +279,12 @@ export async function getTestUserResetPreflight(
     counts.practiceAudioProgress = await countRows(
       service,
       "practice_audio_progress",
+      "user_id",
+      authUserId,
+    );
+    counts.practiceListenStats = await countRows(
+      service,
+      "practice_listen_stats",
       "user_id",
       authUserId,
     );

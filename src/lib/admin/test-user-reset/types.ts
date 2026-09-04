@@ -25,6 +25,7 @@ export type TestUserResetBlocker = {
 export type TestUserResetPreflightCounts = {
   userPractices: number;
   practiceAudioProgress: number;
+  practiceListenStats: number;
   playlists: number;
   playlistItems: number;
   emailContacts: number;

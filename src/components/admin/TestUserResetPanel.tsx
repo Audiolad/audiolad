@@ -38,6 +38,7 @@ function PreflightList({ preflight }: { preflight: TestUserResetPreflight }) {
       </li>
       <li>Практик в аудиотеке: {formatCount(counts.userPractices)}</li>
       <li>Прогресс прослушивания: {formatCount(counts.practiceAudioProgress)}</li>
+      <li>Listen-stats / eligibility: {formatCount(counts.practiceListenStats)}</li>
       <li>
         Плейлисты / элементы: {formatCount(counts.playlists)} /{" "}
         {formatCount(counts.playlistItems)}
