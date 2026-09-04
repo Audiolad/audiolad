@@ -4417,6 +4417,103 @@ const ungroundedDraft = validDraft({
   assert.equal(titleOverlapIntent.listenOnlineIntent, true);
   assert.equal(titleOverlapIntent.q3Secondary2Contaminated, false);
 
+  const genericMeditationQ3 = {
+    question: listenOnlineFaq("Ключ к Изобилию", { free: true }).question,
+    answer:
+      "Эту медитацию можно бесплатно слушать онлайн прямо на этой странице.",
+    anchor: "gde-poslushat",
+  };
+  const genericMeditationIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "Ключ к Изобилию",
+    primaryQuery: "Ключ к Изобилию",
+    secondary2: "медитация поток изобилия",
+    accessMode: "free",
+    faqItems: [
+      keyToAbundanceNaturalDraft.faqItems[0],
+      keyToAbundanceNaturalDraft.faqItems[1],
+      genericMeditationQ3,
+    ],
+  });
+  assert.equal(genericMeditationIntent.listenOnlineIntent, true);
+  assert.equal(genericMeditationIntent.q3Secondary2Contaminated, false);
+
+  const channelSecondaryFaq = [
+    {
+      question: "Что такое денежная энергия в этой практике?",
+      answer: "Это аудиоматериал для спокойной настройки.",
+      anchor: "chto",
+    },
+    {
+      question: "Кому подойдёт эта практика?",
+      answer: "Она подойдёт тем, кому близка тема денежного канала.",
+      anchor: "komu",
+    },
+    {
+      question: "Где можно послушать «Название» онлайн?",
+      answer: "Эту практику можно слушать онлайн на этой странице.",
+      anchor: "gde-poslushat",
+    },
+  ];
+  const genericPracticeIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "Название",
+    primaryQuery: "денежная энергия",
+    secondary2: "практика денежного канала",
+    accessMode: "unknown",
+    faqItems: channelSecondaryFaq,
+  });
+  assert.equal(genericPracticeIntent.q3Secondary2Contaminated, false);
+  const channelStuffingIntent = evaluateListenOnlineFaqIntent({
+    productTitle: "Название",
+    primaryQuery: "денежная энергия",
+    secondary2: "практика денежного канала",
+    accessMode: "unknown",
+    faqItems: [
+      channelSecondaryFaq[0],
+      channelSecondaryFaq[1],
+      {
+        question: "Где можно послушать «Название» онлайн?",
+        answer:
+          "Эту практику можно слушать онлайн на этой странице для работы с денежным каналом.",
+        anchor: "gde-poslushat",
+      },
+    ],
+  });
+  assert.equal(channelStuffingIntent.q3Secondary2Contaminated, true);
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "Ключ к Изобилию",
+      primaryQuery: "Ключ к Изобилию",
+      secondary2: "медитация поток изобилия",
+      accessMode: "free",
+      faqItems: [
+        keyToAbundanceNaturalDraft.faqItems[0],
+        keyToAbundanceNaturalDraft.faqItems[1],
+        {
+          question: stuffedQ3Question,
+          answer: genericMeditationQ3.answer,
+          anchor: "kogda",
+        },
+      ],
+    }).q3Secondary2Contaminated,
+    true,
+  );
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: "денежная энергия",
+      activeSecondaryQueries: ["денежный поток энергии"],
+      usageItems: [{ content: "Перед важным разговором." }],
+      faqItems: [
+        { question: "Что такое денежная энергия?", answer: "Аудиоматериал." },
+        {
+          question: "Кому подойдёт эта практика?",
+          answer: "Она подойдёт тем, кому близок денежный поток.",
+        },
+        genericMeditationQ3,
+      ],
+    }).secondary2FaqCovered,
+    true,
+  );
+
   const stuffedQ3Draft = {
     seoTitle: keyToAbundanceOverusedDraft.seoTitle,
     seoDescription: keyToAbundanceOverusedDraft.seoDescription,
@@ -4527,6 +4624,13 @@ const ungroundedDraft = validDraft({
   assert.doesNotMatch(validateSource, /listen_online/);
   assert.doesNotMatch(validateSource, /q3Secondary2Contaminated/);
   assert.doesNotMatch(validateSource, /q3HasLiteralTitlePlaceholder/);
+  assert.doesNotMatch(validateSource, /Q3_NEUTRAL_REFERENCE_VOCABULARY/);
+  const coverageSource = read("src/lib/seo/secondary-query-coverage.ts");
+  assert.doesNotMatch(coverageSource, /Q3_NEUTRAL_REFERENCE_VOCABULARY/);
+  assert.match(
+    read("src/lib/seo/listen-online-faq-intent.ts"),
+    /Q3_NEUTRAL_REFERENCE_VOCABULARY/,
+  );
   assert.match(orchestrate, /MAX_PROVIDER_CALLS = 3/);
   assert.match(orchestrate, /evaluateListenOnlineFaqIntent/);
   assert.match(orchestrate, /readListenOnlineIntent/);

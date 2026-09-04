@@ -31,6 +31,14 @@ const FREE_CLAIM = /бесплатн/u;
 const PAGE_ACCESS =
   /на этой странице|в плеере|после получения доступа/u;
 
+/**
+ * Neutral product/reference nouns. They may appear in Q3 as ordinary copy
+ * and must not prove secondary #2 stuffing by themselves. Used only by the
+ * Q3 contamination check — never by secondary coverage.
+ */
+export const Q3_NEUTRAL_REFERENCE_VOCABULARY =
+  "медитация практика аудиопрактика аудио материал запись сеанс трек продукт";
+
 function normalizeListenText(value: string): string {
   return value.toLocaleLowerCase("ru-RU").replace(/ё/g, "е");
 }
@@ -124,6 +132,7 @@ function q3HasDistinctiveSecondary2(
     secondary2 ?? "",
     primaryQuery ?? "",
     productTitle,
+    Q3_NEUTRAL_REFERENCE_VOCABULARY,
   );
   if (forbiddenStems.length === 0) {
     return false;
