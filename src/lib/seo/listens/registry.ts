@@ -129,6 +129,7 @@ import { ZVUK_FENA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-fena-dlya
 import { SHUM_FENA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/shum-fena-dlya-sna-slushat-onlayn";
 import { BELYY_SHUM_FENA_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-fena-slushat-onlayn";
 import { SHUM_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/shum-ventilyatora-dlya-sna-slushat-onlayn";
+import { ZVUK_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-ventilyatora-dlya-sna-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -267,6 +268,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   SHUM_FENA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   BELYY_SHUM_FENA_SLUSHAT_ONLAYN_PAGE,
   SHUM_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  ZVUK_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
