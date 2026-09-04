@@ -82,6 +82,8 @@ export type AuthorProductSeoSectionProps = {
   subtitle: string;
   description: string;
   productKind: string;
+  /** Authoritative form access flag (`isFree` / `is_free`). */
+  isFree: boolean;
   seoPrimaryQuery: string;
   seoSecondaryQueries: string[];
   seoTitle: string;
@@ -116,6 +118,7 @@ export default function AuthorProductSeoSection({
   subtitle,
   description,
   productKind,
+  isFree,
   seoPrimaryQuery,
   seoSecondaryQueries,
   seoTitle,
@@ -383,6 +386,7 @@ export default function AuthorProductSeoSection({
           subtitle,
           description,
           productKind,
+          isFree,
           seoPrimaryQuery,
           seoSecondaryQueries,
           usageItems: seoContent.usageItems.map((item) => item.content),

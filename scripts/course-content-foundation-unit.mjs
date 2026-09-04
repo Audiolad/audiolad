@@ -556,9 +556,11 @@ assert.match(listenAccess, /isCoursePublication/);
 const listenApi = read("src/lib/listen/api-context.ts");
 assert.match(listenApi, /canAccessCourseContent/);
 assert.match(listenApi, /isCoursePublication/);
+assert.match(listenApi, /resolveListenApiDecision/);
+const previewAccess = read("src/lib/listen/preview-access.ts");
 assert.match(
-  listenApi,
-  /if \(!isCourse && !productAccess\.canListen\)/,
+  previewAccess,
+  /Course lesson audio is never opened by catalog preview/,
   "catalog preview=1 must not bypass course access",
 );
 
@@ -575,9 +577,13 @@ assert.match(sessionLoader, /canAccessCourseContent/);
 
 const catalogPlay = read("src/lib/catalog/catalog-playback.ts");
 assert.match(catalogPlay, /resolvePublicationClass/);
-assert.match(catalogPlay, /isConfiguredStorefrontPreviewWindow/);
+assert.match(catalogPlay, /chooseCatalogPreviewAudioRow/);
+const catalogPreviewChoice = read(
+  "src/lib/catalog/catalog-preview-audio-choice.ts",
+);
+assert.match(catalogPreviewChoice, /isConfiguredStorefrontPreviewWindow/);
 assert.match(
-  catalogPlay,
+  catalogPreviewChoice,
   /isCourse && !chosen/,
   "course catalog play without entitlement does not fall back to first lesson track",
 );

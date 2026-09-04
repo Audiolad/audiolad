@@ -5,9 +5,13 @@ import { isCoursePublication } from "@/lib/course-content/validators";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { ListenAccess } from "@/lib/listen/types";
 import {
+  isCatalogStorefrontPreviewEligible,
+  resolveListenApiDecision,
+  shouldUseServiceRoleStorageForReason,
+  type ListenApiPurpose,
+} from "@/lib/listen/preview-access";
+import {
   canAccessCourseContent,
-  isPracticeCatalogListed,
-  isPracticePublished,
   resolveProductAccess,
   type ProductAccessReason,
 } from "@/lib/products/access";
@@ -41,17 +45,24 @@ export type ListenApiLoadResult =
   | { ok: true; context: ListenApiContext }
   | { ok: false; response: NextResponse };
 
+export type LoadListenApiContextOptions = {
+  purpose?: ListenApiPurpose;
+};
+
+/** @deprecated Use shouldUseServiceRoleStorageForReason. */
 export function shouldUseServiceRoleStorageForProductAccess(
   reason: ProductAccessReason,
 ): boolean {
-  return reason === "free" || reason === "guest_promo";
+  return shouldUseServiceRoleStorageForReason(reason);
 }
 
 export async function loadListenApiContext(
   request: Request,
   authorSlug: string,
   productSlug: string,
+  options?: LoadListenApiContextOptions,
 ): Promise<ListenApiLoadResult> {
+  const purpose = options?.purpose ?? "full_audio";
   const supabase = await createClientFromRequest(request);
 
   const {
@@ -104,16 +115,13 @@ export async function loadListenApiContext(
     };
   }
 
-  const wantsCatalogPreview =
-    new URL(request.url).searchParams.get("preview") === "1";
   const isCourse = isCoursePublication(
     practice.publication_class,
     practice.product_kind,
   );
+  let courseAllowed = false;
 
   if (isCourse) {
-    let courseAllowed = false;
-
     try {
       courseAllowed = await canAccessCourseContent(
         supabase,
@@ -127,62 +135,38 @@ export async function loadListenApiContext(
         response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
       };
     }
+  }
 
-    if (!courseAllowed) {
+  const needsListenAccess =
+    (isCourse && courseAllowed) || (!isCourse && productAccess.canListen);
+  let listenAccess: ListenAccess | null = null;
+
+  if (needsListenAccess) {
+    try {
+      listenAccess = await resolveListenAccess(
+        supabase,
+        user?.id ?? null,
+        practice,
+      );
+    } catch {
       return {
         ok: false,
-        response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
+        response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
       };
     }
   }
 
-  if (!isCourse && !productAccess.canListen) {
-    if (
-      wantsCatalogPreview &&
-      isPracticePublished(practice.status) &&
-      isPracticeCatalogListed(practice)
-    ) {
-      let storageClient = supabase;
+  const decision = resolveListenApiDecision({
+    purpose,
+    isCourse,
+    courseAllowed,
+    canListen: productAccess.canListen,
+    accessReason: productAccess.reason,
+    catalogPreviewEligible: isCatalogStorefrontPreviewEligible(practice),
+    listenAccess,
+  });
 
-      try {
-        storageClient = createServiceRoleClient();
-      } catch {
-        return {
-          ok: false,
-          response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
-        };
-      }
-
-      return {
-        ok: true,
-        context: {
-          supabase,
-          storageClient,
-          userId: user?.id ?? null,
-          practice,
-          access: { mode: "entitled" },
-        },
-      };
-    }
-
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
-    };
-  }
-
-  let access: ListenAccess | null;
-
-  try {
-    access = await resolveListenAccess(supabase, user?.id ?? null, practice);
-  } catch {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
-    };
-  }
-
-  if (!access) {
+  if (!decision.ok) {
     return {
       ok: false,
       response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
@@ -191,7 +175,7 @@ export async function loadListenApiContext(
 
   let storageClient = supabase;
 
-  if (shouldUseServiceRoleStorageForProductAccess(productAccess.reason)) {
+  if (decision.useServiceRoleStorage) {
     try {
       storageClient = createServiceRoleClient();
     } catch {
@@ -209,7 +193,7 @@ export async function loadListenApiContext(
       storageClient,
       userId: user?.id ?? null,
       practice,
-      access,
+      access: decision.access,
     },
   };
 }

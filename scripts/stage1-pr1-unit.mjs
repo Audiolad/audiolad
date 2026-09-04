@@ -297,8 +297,8 @@ function testSourceFiles() {
     "guest-only service role condition removed",
   );
   assert(
-    apiContext.includes("shouldUseServiceRoleStorageForProductAccess(productAccess.reason)"),
-    "service role selected from resolved product access reason",
+    apiContext.includes("decision.useServiceRoleStorage"),
+    "service role selected from resolved listen API decision",
   );
 
   const routes = readFileSync("/var/www/audiolad/src/lib/auth/routes.ts", "utf8");

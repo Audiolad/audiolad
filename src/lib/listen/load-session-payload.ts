@@ -10,7 +10,7 @@ import {
   mapLegacyPracticeToListenTrack,
   mapRowToListenTrack,
 } from "@/lib/listen/track-cover";
-import type { ListenTrack } from "@/lib/listen/types";
+import type { ListenAccessMode, ListenTrack } from "@/lib/listen/types";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import {
   canAccessCourseContent,
@@ -99,7 +99,7 @@ function getAuthorName(authors: PracticeRow["authors"]): string {
 async function loadListenTracks(
   supabase: SupabaseClient,
   practice: PracticeRow,
-  accessMode: "entitled" | "author_preview",
+  accessMode: ListenAccessMode,
 ): Promise<ListenTrack[]> {
   let query = supabase
     .from("audio_items")

@@ -15,7 +15,7 @@ export type ListenProgressEntry = {
   completed: boolean;
 };
 
-export type ListenAccessMode = "entitled" | "author_preview";
+export type ListenAccessMode = "entitled" | "author_preview" | "catalog_preview";
 
 export type ListenAccess = {
   mode: ListenAccessMode;
