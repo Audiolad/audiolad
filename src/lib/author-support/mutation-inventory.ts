@@ -264,6 +264,7 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/finance/summary/route.ts",
         "src/app/api/author/finance/sales/route.ts",
         "src/app/api/author/finance/sales/[id]/route.ts",
+        "src/app/api/author/finance/appreciation/route.ts",
         "src/app/api/author/finance/payouts/route.ts",
         "src/app/api/author/finance/payouts/[id]/route.ts",
         "src/app/api/author/finance/ledger/route.ts",

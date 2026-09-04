@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  buildAuthorAppreciationCsv,
   buildAuthorFinanceExportFilename,
   buildAuthorFinanceLedgerCsv,
   buildAuthorFinancePayoutsCsv,
@@ -41,9 +42,35 @@ const EXPORT_ROW_LIMIT = 5000;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type AppreciationListFn = (input: {
+  authorId: string;
+  from?: string | null;
+  to?: string | null;
+  limit?: number;
+  offset?: number;
+}) => Promise<{
+  summary: unknown;
+  total: number;
+  limit: number;
+  offset: number;
+  rows: Array<{
+    id: string;
+    createdAt: string;
+    paidAt: string | null;
+    surface: "author" | "product";
+    sourceTitle: string;
+    grossAmountMinor: number;
+    authorAccruedMinor: number | null;
+    currency: string;
+    financeStatus: "processing" | "held" | "available" | "reserved" | "paid";
+    availableAt: string | null;
+  }>;
+}>;
+
 type SalesExportDependencies = {
   requireAccess: typeof requireAuthorFinanceAccess;
   getSalesList: typeof getAuthorSalesList;
+  getAppreciationList?: AppreciationListFn;
 };
 
 type SalesListDependencies = {
@@ -60,6 +87,18 @@ type SalesDetailDependencies = {
   requireAccess: typeof requireAuthorFinanceAccess;
   getSaleDetail: typeof getAuthorSaleDetail;
 };
+
+type AppreciationListDependencies = {
+  requireAccess: typeof requireAuthorFinanceAccess;
+  getAppreciationList: AppreciationListFn;
+};
+
+async function loadAuthorAppreciationFinanceList() {
+  const { getAuthorAppreciationFinanceList } = await import(
+    "@/lib/author-finance/appreciation-queries"
+  );
+  return getAuthorAppreciationFinanceList;
+}
 
 export function createAuthorFinanceExportHandler(
   dependencies: SalesExportDependencies = {
@@ -108,6 +147,19 @@ export function createAuthorFinanceExportHandler(
         });
         body = buildAuthorSalesCsv(list.rows);
         filename = buildAuthorSalesExportFilename();
+      } else if (kindParam === "appreciation") {
+        const getAppreciationList =
+          dependencies.getAppreciationList ??
+          (await loadAuthorAppreciationFinanceList());
+        const list = await getAppreciationList({
+          authorId,
+          from: range.from,
+          to: range.to,
+          limit: EXPORT_ROW_LIMIT,
+          offset: 0,
+        });
+        body = `\uFEFF${buildAuthorAppreciationCsv(list.rows)}`;
+        filename = buildAuthorFinanceExportFilename(kindParam);
       } else if (kindParam === "ledger") {
         body = `\uFEFF${buildAuthorFinanceLedgerCsv(
           (
@@ -144,6 +196,47 @@ export function createAuthorFinanceExportHandler(
           "Content-Disposition": `attachment; filename="${filename}"`,
           "Cache-Control": "no-store",
         },
+      });
+    } catch (error) {
+      return handleAuthorRouteError(error);
+    }
+  };
+}
+
+export function createAuthorFinanceAppreciationListHandler(
+  dependencies: Partial<AppreciationListDependencies> = {},
+) {
+  return async function GET(request: Request) {
+    try {
+      const requireAccess =
+        dependencies.requireAccess ?? requireAuthorFinanceAccess;
+      const { authorId } = await requireAccess(request);
+      const url = new URL(request.url);
+      const periodRaw = url.searchParams.get("period") ?? "all";
+      const period = isAuthorFinancePeriod(periodRaw) ? periodRaw : "all";
+      const range = resolveAuthorFinancePeriodRange(period, {
+        from: url.searchParams.get("from"),
+        to: url.searchParams.get("to"),
+      });
+
+      const getAppreciationList =
+        dependencies.getAppreciationList ??
+        (await loadAuthorAppreciationFinanceList());
+      const list = await getAppreciationList({
+        authorId,
+        from: range.from,
+        to: range.to,
+        limit: parsePositiveInt(url.searchParams.get("limit"), 100, 200),
+        offset: parseOffset(url.searchParams.get("offset")),
+      });
+
+      return NextResponse.json({
+        summary: list.summary,
+        total: list.total,
+        limit: list.limit,
+        offset: list.offset,
+        rows: list.rows,
+        period,
       });
     } catch (error) {
       return handleAuthorRouteError(error);

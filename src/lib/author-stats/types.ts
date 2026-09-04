@@ -24,6 +24,12 @@ export type AuthorStatsSummary = {
   playToCompleteRate: number | null;
   viewToSaveRate: number | null;
   viewToPurchaseRate: number | null;
+  /** Confirmed paid appreciation intents in the period. Not a purchase. */
+  appreciationCount: number;
+  /** Gross listener appreciation in kopeks. Separate from grossRevenueMinor. */
+  appreciationGrossMinor: number;
+  /** Author share from appreciation sale_accrual. Separate from netRevenueMinor. */
+  appreciationAuthorAccruedMinor: number;
 };
 
 export type AuthorStatsTimeseriesPoint = {
@@ -41,6 +47,9 @@ export type AuthorStatsTimeseriesPoint = {
   netSales: number;
   authorPageViews: number;
   authorPageUniqueVisitors: number;
+  appreciationCount: number;
+  appreciationGrossMinor: number;
+  appreciationAuthorAccruedMinor: number;
 };
 
 export type AuthorStatsTimeseries = {
@@ -72,6 +81,9 @@ export type AuthorStatsProductRow = {
   netRevenueMinor: number;
   viewToPlayRate: number | null;
   playToCompleteRate: number | null;
+  appreciationCount: number;
+  appreciationGrossMinor: number;
+  appreciationAuthorAccruedMinor: number;
 };
 
 export type AuthorStatsSourceBucket =
@@ -101,4 +113,7 @@ export type AuthorStatsChartMetric =
   | "refund_sales"
   | "net_sales"
   | "author_page_views"
-  | "author_page_unique_visitors";
+  | "author_page_unique_visitors"
+  | "appreciation_count"
+  | "appreciation_gross"
+  | "appreciation_author_accrued";

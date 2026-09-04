@@ -77,6 +77,9 @@ function mapSummary(raw: unknown): AuthorStatsSummary | null {
     playToCompleteRate: asNullableNumber(row.play_to_complete_rate),
     viewToSaveRate: asNullableNumber(row.view_to_save_rate),
     viewToPurchaseRate: asNullableNumber(row.view_to_purchase_rate),
+    appreciationCount: 0,
+    appreciationGrossMinor: 0,
+    appreciationAuthorAccruedMinor: 0,
   };
 }
 
@@ -100,6 +103,9 @@ function mapPoint(raw: unknown): AuthorStatsTimeseriesPoint | null {
     netSales: asNumber(row.net_sales),
     authorPageViews: asNumber(row.author_page_views),
     authorPageUniqueVisitors: asNumber(row.author_page_unique_visitors),
+    appreciationCount: 0,
+    appreciationGrossMinor: 0,
+    appreciationAuthorAccruedMinor: 0,
   };
 }
 
@@ -134,6 +140,9 @@ function mapProduct(raw: unknown): AuthorStatsProductRow | null {
     netRevenueMinor: asNumber(row.net_revenue_minor),
     viewToPlayRate: asNullableNumber(row.view_to_play_rate),
     playToCompleteRate: asNullableNumber(row.play_to_complete_rate),
+    appreciationCount: 0,
+    appreciationGrossMinor: 0,
+    appreciationAuthorAccruedMinor: 0,
   };
 }
 

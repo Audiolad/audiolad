@@ -44,6 +44,13 @@ export const AUTHOR_FINANCE_KPI_HINTS = {
 
 export const AUTHOR_APPRECIATION_FINANCE_LABEL = "Благодарность от слушателя";
 export const AUTHOR_APPRECIATION_ADMIN_LABEL = "Благодарность автору";
+export const AUTHOR_APPRECIATION_SUMMARY_LABELS = {
+  confirmedCount: "Количество подтверждённых",
+  gross: "Общая сумма",
+  authorAccrued: "Начислено вам",
+  held: "Удерживается",
+  available: "Доступно к выплате",
+} as const;
 
 const TYPE_LABELS: Record<AuthorFinanceDisplayTypeKey, string> = {
   sale: "Продажа",
@@ -320,5 +327,13 @@ export const AUTHOR_FINANCE_CSV_COLUMNS = {
     "Статус",
     "Дата выплаты",
     "Референс",
+  ],
+  appreciation: [
+    "Дата",
+    "Источник",
+    "Сумма благодарности, ₽",
+    "Начислено вам, ₽",
+    "Статус",
+    "Доступно с",
   ],
 } as const;

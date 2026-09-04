@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import AuthorAppreciationSection from "@/components/author-dashboard/AuthorAppreciationSection";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorSalesSection from "@/components/author-dashboard/AuthorSalesSection";
 import { formatRubFromMinor } from "@/lib/admin/analytics-money-format";
@@ -543,6 +544,15 @@ export default function AuthorFinanceClient({
 
           {selectedAuthor ? (
             <AuthorSalesSection
+              authorId={selectedAuthor.id}
+              period={period}
+              customFrom={customFrom}
+              customTo={customTo}
+            />
+          ) : null}
+
+          {selectedAuthor ? (
+            <AuthorAppreciationSection
               authorId={selectedAuthor.id}
               period={period}
               customFrom={customFrom}

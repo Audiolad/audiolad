@@ -15,6 +15,7 @@ export const AUTHOR_STATS_METHOD_NOTES = [
   "Статистика страницы автора собирается с даты запуска этого раздела.",
   "Показатели могут отличаться от Яндекс.Метрики из-за другой методики.",
   "«Покупки» — исходные подтверждённые оплаты с доступом. «Возвраты» — продажи с хотя бы одним возвратом. «Чистые продажи» исключают только полностью возвращённые продажи.",
+  "«Благодарности от слушателей» считаются отдельно и не входят в покупки и выручку от продаж.",
 ] as const;
 
 export const AUTHOR_STATS_SOURCE_LABELS: Record<AuthorStatsSourceBucket, string> =
@@ -43,6 +44,9 @@ export const AUTHOR_STATS_CHART_METRIC_LABELS: Record<
   net_sales: "Чистые продажи",
   author_page_views: "Просмотры страницы автора",
   author_page_unique_visitors: "Посетители страницы автора",
+  appreciation_count: "Благодарности",
+  appreciation_gross: "Сумма благодарностей",
+  appreciation_author_accrued: "Начислено вам",
 };
 
 export function formatAuthorStatsCount(value: number): string {
