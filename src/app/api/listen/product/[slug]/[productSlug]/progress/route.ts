@@ -149,7 +149,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       return loaded.response;
     }
 
-    const { supabase, userId, practice, access } = loaded.context;
+    const { userId, practice, access } = loaded.context;
 
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
