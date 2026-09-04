@@ -29,12 +29,18 @@ assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
 assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
 assert.match(
   layout,
-  /listener-catalog-mobile-search[^"]*fixed/,
+  /<MobileTopChrome variant=["']catalog["']/,
+  "catalog layout uses the shared MobileTopChrome primitive",
+);
+const mobileTopChrome = read("src/components/listener/MobileTopChrome.tsx");
+assert.match(
+  mobileTopChrome,
+  /fixed top-0 inset-x-0/,
   "mobile search stays a fixed top layer",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  mobileTopChrome,
+  /xl:hidden/,
   "layout search+filters stay mobile-only",
 );
 assert.doesNotMatch(layout, /xl:sticky/, "catalog layout does not use xl:sticky");
@@ -175,12 +181,12 @@ assert.match(
 );
 assert.match(
   filters,
-  /function resetFilters\(\) \{[\s\S]*close\(\);[\s\S]*router\.replace/,
+  /function resetFilters\(\) \{[\s\S]*close\(\);[\s\S]*replaceListingSearch/,
   "reset closes the sheet before the query replace",
 );
 assert.match(
   filters,
-  /function applyDraft\(\) \{[\s\S]*close\(\);[\s\S]*router\.replace/,
+  /function applyDraft\(\) \{[\s\S]*close\(\);[\s\S]*replaceListingSearch/,
   "Apply closes the sheet before the query replace",
 );
 assert.match(filters, /countCatalogFilterGroups/, "badge still counts groups");
@@ -191,18 +197,13 @@ assert.match(filters, /overflow-x-auto/, "topics scroll horizontally");
 assert.match(filters, /Применить/, "Apply button exists");
 assert.match(
   filters,
-  /router\.replace\(\s*buildCatalogHref/,
+  /replaceListingSearch\(\s*router,\s*buildCatalogHref/,
   "Apply uses buildCatalogHref in one replace",
 );
 assert.match(
   filters,
-  /function applyDraft\(\) \{[\s\S]*scroll:\s*false/,
-  "Apply replace does not scroll the document",
-);
-assert.match(
-  filters,
-  /function resetFilters\(\) \{[\s\S]*scroll:\s*false/,
-  "reset replace does not scroll the document",
+  /from ["']@\/lib\/listener\/listing-search-navigation["']/,
+  "catalog filters use the shared listing replace helper",
 );
 assert.doesNotMatch(
   filters,
@@ -216,41 +217,50 @@ assert.doesNotMatch(
 );
 assert.match(
   filters,
-  /catalog-sheet-lock/,
-  "sheet lock uses an html class",
+  /useSheetScrollLock/,
+  "sheet lock uses the shared hook",
 );
 assert.match(
   filters,
-  /catalogSheetLockCount/,
-  "sheet lock is ref-counted across mounted instances",
+  /from ["']@\/lib\/listener\/use-sheet-scroll-lock["']/,
+  "catalog filters do not keep a private lock counter",
+);
+assert.doesNotMatch(
+  filters,
+  /let catalogSheetLockCount/,
+  "duplicate module-level lock counter is gone",
 );
 assert.match(
   filters,
-  /releaseCatalogSheetLock/,
-  "sheet lock has a matching release",
-);
-assert.match(
-  filters,
-  /holdsSheetLockRef/,
-  "sheet lock release is instance-safe on cleanup and unmount",
+  /createPortal\(sheet, document\.body\)/,
+  "catalog filter sheet portals to document.body",
 );
 
 const inlineSearch = read("src/components/listener/PlatformCatalogInlineSearch.tsx");
+const listingNav = read("src/lib/listener/listing-search-navigation.ts");
+assert.match(
+  listingNav,
+  /router\.replace\(nextHref, \{ scroll: false \}\)/,
+  "shared listing replace never scrolls the document",
+);
 const catalogQueryNavCalls = [
-  ...inlineSearch.matchAll(/router\.(replace|push)\(([\s\S]*?)\);/g),
-  ...filters.matchAll(/router\.(replace|push)\(([\s\S]*?)\);/g),
+  ...inlineSearch.matchAll(/replaceListingSearch\(([\s\S]*?)\);/g),
+  ...filters.matchAll(/replaceListingSearch\(([\s\S]*?)\);/g),
 ];
 assert.ok(
   catalogQueryNavCalls.length >= 4,
   "catalog query nav sites are the inline search + filter replaces",
 );
-for (const call of catalogQueryNavCalls) {
-  assert.match(
-    call[0],
-    /scroll:\s*false/,
-    "catalog query router.replace/push includes scroll: false",
-  );
-}
+assert.doesNotMatch(
+  inlineSearch,
+  /router\.(replace|push)\(/,
+  "inline catalog search goes through replaceListingSearch",
+);
+assert.doesNotMatch(
+  filters,
+  /router\.(replace|push)\(/,
+  "catalog filters go through replaceListingSearch",
+);
 assert.match(
   filters,
   /function close\(\) \{\s*setOpen\(false\);\s*\}/,

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import MobileChromeDebugOverlay from "@/components/listener/MobileChromeDebugOverlay";
 import {
   writeListenerSidebarPinnedCookie,
   type ListenerSidebarPinnedState,
@@ -50,6 +51,7 @@ export function ListenerAppShellRoot({
       <div className={className} data-sidebar-pinned={pinned}>
         {children}
       </div>
+      <MobileChromeDebugOverlay />
     </ListenerSidebarPinnedContext.Provider>
   );
 }

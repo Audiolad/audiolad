@@ -18,6 +18,8 @@ const layout = read(
 );
 const page = read("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx");
 const globals = read("src/app/globals.css");
+const mobileTopChrome = read("src/components/listener/MobileTopChrome.tsx");
+const mobileTopChromeLib = read("src/lib/listener/mobile-top-chrome.ts");
 
 assert.doesNotMatch(
   layout,
@@ -28,22 +30,30 @@ assert.doesNotMatch(layout, /Назад/, "mobile catalog chrome has no back con
 assert.match(layout, /MobileCatalogSearch/, "mobile catalog still mounts search");
 assert.match(
   layout,
-  /listener-catalog-mobile-search/,
-  "mobile search keeps its layout hook",
+  /<MobileTopChrome variant=["']catalog["']/,
+  "catalog layout uses the shared MobileTopChrome primitive",
 );
-assert.match(layout, /fixed top-0 inset-x-0/, "mobile search is a fixed top layer");
 assert.doesNotMatch(layout, /sticky/, "mobile search is no longer sticky");
 assert.doesNotMatch(layout, /xl:sticky/, "catalog layout does not use xl:sticky");
-assert.match(layout, /z-30/, "fixed search keeps the chrome stacking layer");
 assert.match(
-  layout,
-  /listener-catalog-mobile-search[^"]*xl:hidden/,
-  "catalog layout search is mobile-only at xl",
+  mobileTopChrome,
+  /fixed top-0 inset-x-0/,
+  "shared chrome is a fixed top layer",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search[^"]*px-5/,
-  "mobile search chrome stays px-5",
+  mobileTopChrome,
+  /z-30/,
+  "fixed search keeps the chrome stacking layer",
+);
+assert.match(
+  mobileTopChrome,
+  /xl:hidden/,
+  "shared chrome is mobile-only at xl",
+);
+assert.match(
+  mobileTopChrome,
+  /catalog: "px-5 /,
+  "catalog chrome stays px-5",
 );
 const contentClassMatch = layout.match(
   /className="listener-catalog-content[^"]*"/,
@@ -80,19 +90,39 @@ assert.doesNotMatch(
   "xl search is not in-flow inside catalog children",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search-spacer/,
+  mobileTopChrome,
+  /data-mobile-top-chrome-spacer/,
   "fixed search has a matching-height spacer",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search-spacer[\s\S]*xl:hidden/,
+  mobileTopChrome,
+  /mobile-top-chrome-spacer[^"]*xl:hidden/,
   "search spacer stays mobile-only",
 );
 assert.match(
-  layout,
+  mobileTopChrome,
   /safe-area-inset-top/,
   "fixed search respects the top safe-area",
+);
+assert.match(
+  mobileTopChrome,
+  /ResizeObserver/,
+  "spacer height is measured from the rendered chrome",
+);
+assert.match(
+  mobileTopChromeLib,
+  /function spacerStyleFromChromeHeight/,
+  "measurement writes px onto the spacer only",
+);
+assert.match(
+  mobileTopChrome,
+  /data-mobile-top-chrome-spacer[\s\S]*style=\{spacerStyleFromChromeHeight\(spacerHeightPx\)\}/,
+  "measured px is applied to the spacer, not the chrome",
+);
+assert.doesNotMatch(
+  mobileTopChrome,
+  /data-mobile-top-chrome=\{variant\}[\s\S]{0,180}style=/,
+  "chrome node does not take the measured spacer style",
 );
 assert.match(
   layout,
@@ -103,34 +133,39 @@ const search = read("src/components/listener/PlatformSearchField.tsx");
 assert.match(search, /isCompact \? null/, "compact catalog search has no Найти button");
 assert.match(search, />\s*Найти\s*</, "shell search still has Найти");
 assert.match(
-  globals,
-  /--catalog-mobile-search-height:\s*calc\(\s*max\(0\.75rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\+\s*0\.75rem\s*\)/,
-  "search spacer reserves the full fixed search chrome height",
+  search,
+  /isCompact[\s\S]{0,40}text-base/,
+  "compact catalog search input is at least 16px on mobile",
+);
+assert.match(
+  search,
+  /text-base xl:text-\[15px\]/,
+  "desktop shell search may stay 15px at xl",
 );
 assert.match(
   globals,
-  /--catalog-mobile-search-height:[\s\S]*52px\s*\+\s*0\.75rem/,
-  "search spacer includes the matching bottom chrome padding",
+  /--mobile-top-chrome-fallback-catalog:\s*calc\(\s*max\(0\.75rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\+\s*0\.75rem\s*\)/,
+  "catalog spacer fallback matches the catalog chrome padding + 52px field",
+);
+assert.doesNotMatch(
+  globals,
+  /--catalog-mobile-search-height/,
+  "shared live --catalog-mobile-search-height contract is gone",
 );
 assert.match(
-  layout,
-  /pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\]/,
-  "search padding-top floor keeps mobile chrome clear of the viewport edge",
-);
-assert.match(
-  layout,
-  /pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\] pb-3/,
-  "search chrome and spacer use the restored matching padding",
-);
-assert.match(
-  layout,
-  /listener-catalog-mobile-search[\s\S]*pb-3(?:\s|"|')/,
-  "search retains bottom padding below the 52px field",
+  mobileTopChrome,
+  /catalog: "px-5 pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\] pb-3"/,
+  "catalog chrome keeps the accepted 0.75rem / pb-3 padding",
 );
 assert.match(
   globals,
-  /\.listener-catalog-mobile-search,\s*\n\.listener-catalog-mobile-search-spacer/,
-  "search and spacer use the same min-height rule",
+  /\.mobile-top-chrome-spacer\[data-mobile-top-chrome-variant="catalog"\] \{\s*\n\s*min-height:\s*var\(--mobile-top-chrome-fallback-catalog\);/,
+  "catalog fallback min-height is spacer-only",
+);
+assert.doesNotMatch(
+  globals,
+  /\.mobile-top-chrome,\s*\n\.mobile-top-chrome-spacer/,
+  "measured chrome does not share a min-height rule with the spacer",
 );
 
 assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1");
@@ -374,19 +409,19 @@ assert.doesNotMatch(
   "catalog page has no nested cards scroller",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search[^"]*fixed/,
+  mobileTopChrome,
+  /mobile-top-chrome[^"]*fixed top-0 inset-x-0 z-30/,
   "mobile search stays a fixed top layer",
 );
 assert.match(
-  layout,
-  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  mobileTopChrome,
+  /xl:hidden/,
   "mobile search stays hidden at xl so shell chrome owns desktop",
 );
 assert.doesNotMatch(
-  layout,
-  /listener-catalog-mobile-search[^"]*(?:xl:static|xl:sticky|xl:inset-auto|xl:z-auto)/,
-  "catalog layout search has no desktop in-flow overrides",
+  mobileTopChrome,
+  /xl:static|xl:sticky|xl:inset-auto|xl:z-auto/,
+  "shared chrome has no desktop in-flow overrides",
 );
 
 assert.doesNotMatch(

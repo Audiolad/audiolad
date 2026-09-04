@@ -22,6 +22,7 @@ import {
   resolvePlatformSearchEnterAction,
 } from "@/lib/catalog/platform-search";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
+import { replaceListingSearch } from "@/lib/listener/listing-search-navigation";
 
 type PlatformCatalogInlineSearchProps = {
   density?: PlatformSearchFieldDensity;
@@ -73,7 +74,7 @@ export default function PlatformCatalogInlineSearch({
     }
 
     isInternalCatalogNavRef.current = true;
-    router.replace(nextHref, { scroll: false });
+    replaceListingSearch(router, nextHref);
   }
 
   function scheduleCatalogUrlUpdate(rawQuery: string) {
@@ -121,9 +122,10 @@ export default function PlatformCatalogInlineSearch({
       window.clearTimeout(catalogUrlDebounceRef.current);
     }
     isInternalCatalogNavRef.current = true;
-    router.replace(buildPlatformSearchClearHref(activeTopicKey, listingState), {
-      scroll: false,
-    });
+    replaceListingSearch(
+      router,
+      buildPlatformSearchClearHref(activeTopicKey, listingState),
+    );
   }
 
   const normalizedInput = normalizeCatalogSearchQuery(inputValue);
