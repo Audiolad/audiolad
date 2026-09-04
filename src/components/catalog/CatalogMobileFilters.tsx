@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   CATALOG_ACCESS_FILTER_OPTIONS,
@@ -27,33 +28,12 @@ import {
   serializeCatalogTopicParam,
   toggleCatalogDraftTopics,
 } from "@/lib/catalog/topic-filter";
+import { replaceListingSearch } from "@/lib/listener/listing-search-navigation";
+import { useSheetScrollLock } from "@/lib/listener/use-sheet-scroll-lock";
 
 type CatalogMobileFiltersProps = {
   topics: readonly CatalogFilterTopicOption[];
 };
-
-const CATALOG_SHEET_LOCK_CLASS = "catalog-sheet-lock";
-
-let catalogSheetLockCount = 0;
-
-function acquireCatalogSheetLock() {
-  catalogSheetLockCount += 1;
-  if (catalogSheetLockCount === 1) {
-    document.documentElement.classList.add(CATALOG_SHEET_LOCK_CLASS);
-  }
-}
-
-function releaseCatalogSheetLock() {
-  if (catalogSheetLockCount <= 0) {
-    catalogSheetLockCount = 0;
-    return;
-  }
-
-  catalogSheetLockCount -= 1;
-  if (catalogSheetLockCount === 0) {
-    document.documentElement.classList.remove(CATALOG_SHEET_LOCK_CLASS);
-  }
-}
 
 function FilterChip({
   label,
@@ -91,7 +71,7 @@ export default function CatalogMobileFilters({
   const [draftClass, setDraftClass] = useState<CatalogClassFilter>("all");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const holdsSheetLockRef = useRef(false);
+  useSheetScrollLock(open, "catalog-filters");
 
   const searchQuery = readPlatformSearchQueryFromParams(searchParams);
   const topicFromUrl = readPlatformSearchTopicFromParams(searchParams);
@@ -112,11 +92,6 @@ export default function CatalogMobileFilters({
   useEffect(() => {
     if (!open) {
       return;
-    }
-
-    if (!holdsSheetLockRef.current) {
-      acquireCatalogSheetLock();
-      holdsSheetLockRef.current = true;
     }
 
     const panel = panelRef.current;
@@ -169,22 +144,9 @@ export default function CatalogMobileFilters({
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
-      if (holdsSheetLockRef.current) {
-        releaseCatalogSheetLock();
-        holdsSheetLockRef.current = false;
-      }
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (holdsSheetLockRef.current) {
-        releaseCatalogSheetLock();
-        holdsSheetLockRef.current = false;
-      }
-    };
-  }, []);
 
   function close() {
     setOpen(false);
@@ -199,7 +161,8 @@ export default function CatalogMobileFilters({
 
   function applyDraft() {
     close();
-    router.replace(
+    replaceListingSearch(
+      router,
       buildCatalogHref({
         q: searchQuery || null,
         topic: serializeCatalogTopicParam(draftTopics),
@@ -207,7 +170,6 @@ export default function CatalogMobileFilters({
         class: draftClass,
         sort,
       }),
-      { scroll: false },
     );
   }
 
@@ -216,7 +178,8 @@ export default function CatalogMobileFilters({
     setDraftAccess("all");
     setDraftClass("all");
     close();
-    router.replace(
+    replaceListingSearch(
+      router,
       buildCatalogHref({
         q: searchQuery || null,
         topic: null,
@@ -224,9 +187,119 @@ export default function CatalogMobileFilters({
         class: "all",
         sort,
       }),
-      { scroll: false },
     );
   }
+
+  const sheet = open ? (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          close();
+        }
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        data-catalog-mobile-filters-sheet
+        className="flex max-h-[min(92vh,720px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[28px] border border-[#eadff8] bg-white shadow-[0_-12px_40px_rgba(91,62,145,0.18)]"
+      >
+        <div className="shrink-0 border-b border-[#f0e7fa] px-5 pb-4 pt-5">
+          <div className="flex items-start justify-between gap-3">
+            <h2 id={titleId} className="text-[22px] font-semibold">
+              Фильтры
+            </h2>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                data-catalog-mobile-filters-reset
+                onClick={resetFilters}
+                className="rounded-full px-2 py-1 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc]"
+              >
+                Сбросить
+              </button>
+              <button
+                type="button"
+                onClick={close}
+                className="rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc]"
+                aria-label="Закрыть"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          <section aria-label="Тематика">
+            <h3 className="text-sm font-semibold text-[#25135c]">Тематика</h3>
+            <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
+              <FilterChip
+                label="Все"
+                isActive={draftTopics.length === 0}
+                onSelect={() => setDraftTopics([])}
+              />
+              {topics.map((topic) => (
+                <FilterChip
+                  key={topic.key}
+                  label={topic.title}
+                  isActive={draftTopics.includes(topic.key)}
+                  onSelect={() =>
+                    setDraftTopics((current) =>
+                      toggleCatalogDraftTopics(current, topic.key),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6" aria-label="Доступ">
+            <h3 className="text-sm font-semibold text-[#25135c]">Доступ</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATALOG_ACCESS_FILTER_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  label={option.label}
+                  isActive={option.value === draftAccess}
+                  onSelect={() => setDraftAccess(option.value)}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6" aria-label="Тип">
+            <h3 className="text-sm font-semibold text-[#25135c]">Тип</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATALOG_CLASS_FILTER_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  label={option.label}
+                  isActive={option.value === draftClass}
+                  onSelect={() => setDraftClass(option.value)}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="shrink-0 border-t border-[#f0e7fa] bg-white px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            data-catalog-mobile-filters-apply
+            onClick={applyDraft}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Применить
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -248,117 +321,7 @@ export default function CatalogMobileFilters({
           </span>
         ) : null}
       </button>
-
-      {open ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              close();
-            }
-          }}
-        >
-          <div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            data-catalog-mobile-filters-sheet
-            className="flex max-h-[min(92vh,720px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[28px] border border-[#eadff8] bg-white shadow-[0_-12px_40px_rgba(91,62,145,0.18)]"
-          >
-            <div className="shrink-0 border-b border-[#f0e7fa] px-5 pb-4 pt-5">
-              <div className="flex items-start justify-between gap-3">
-                <h2 id={titleId} className="text-[22px] font-semibold">
-                  Фильтры
-                </h2>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    data-catalog-mobile-filters-reset
-                    onClick={resetFilters}
-                    className="rounded-full px-2 py-1 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc]"
-                  >
-                    Сбросить
-                  </button>
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc]"
-                    aria-label="Закрыть"
-                  >
-                    Закрыть
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-              <section aria-label="Тематика">
-                <h3 className="text-sm font-semibold text-[#25135c]">Тематика</h3>
-                <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
-                  <FilterChip
-                    label="Все"
-                    isActive={draftTopics.length === 0}
-                    onSelect={() => setDraftTopics([])}
-                  />
-                  {topics.map((topic) => (
-                    <FilterChip
-                      key={topic.key}
-                      label={topic.title}
-                      isActive={draftTopics.includes(topic.key)}
-                      onSelect={() =>
-                        setDraftTopics((current) =>
-                          toggleCatalogDraftTopics(current, topic.key),
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="mt-6" aria-label="Доступ">
-                <h3 className="text-sm font-semibold text-[#25135c]">Доступ</h3>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CATALOG_ACCESS_FILTER_OPTIONS.map((option) => (
-                    <FilterChip
-                      key={option.value}
-                      label={option.label}
-                      isActive={option.value === draftAccess}
-                      onSelect={() => setDraftAccess(option.value)}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="mt-6" aria-label="Тип">
-                <h3 className="text-sm font-semibold text-[#25135c]">Тип</h3>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CATALOG_CLASS_FILTER_OPTIONS.map((option) => (
-                    <FilterChip
-                      key={option.value}
-                      label={option.label}
-                      isActive={option.value === draftClass}
-                      onSelect={() => setDraftClass(option.value)}
-                    />
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            <div className="shrink-0 border-t border-[#f0e7fa] bg-white px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button
-                type="button"
-                data-catalog-mobile-filters-apply
-                onClick={applyDraft}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-              >
-                Применить
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {sheet ? createPortal(sheet, document.body) : null}
     </>
   );
 }

@@ -210,8 +210,8 @@ function testCollectionFilters() {
   assert.match(library, /MyPracticesLibrarySort/);
   assert.match(library, /buildMyPracticesHref/);
   assert.match(chrome, /buildMyPracticesHref/);
-  assert.match(library, /scroll:\s*false/);
-  assert.match(chrome, /scroll:\s*false/);
+  assert.match(library, /replaceListingSearch/);
+  assert.match(chrome, /replaceListingSearch/);
   assert.doesNotMatch(library, /Мои записи/);
   assert.doesNotMatch(library, /В библиотеке/);
   assert.doesNotMatch(library, /overflow-x-auto px-5 pb-2/);
@@ -221,11 +221,14 @@ function testCollectionFilters() {
   assert.match(library, /formatLibraryMaterialsCount/);
 
   assert.match(search, /Поиск по аудиотеке/);
+  assert.match(search, /text-base/);
+  assert.doesNotMatch(search, /text-\[15px\]/);
   assert.match(filters, /Коллекция/);
   assert.match(filters, /Фильтры/);
   assert.match(filters, /LIBRARY_COLLECTION_FILTERS/);
   assert.match(filters, /createPortal/);
-  assert.match(filters, /catalog-sheet-lock/);
+  assert.match(filters, /useSheetScrollLock/);
+  assert.match(filters, /@\/lib\/listener\/use-sheet-scroll-lock/);
   assert.doesNotMatch(filters, /document\.body\.style\.overflow/);
   assert.doesNotMatch(filters, /topic=|access=/);
   assert.doesNotMatch(filters, /CatalogMobileFilters|buildCatalogHref/);
@@ -242,13 +245,13 @@ function testCollectionFilters() {
   );
   assert.match(
     chrome,
-    /listener-catalog-mobile-search[\s\S]*className="mt-3 px-5"/,
+    /<MobileTopChrome variant=["']library["']>[\s\S]*className="mt-3 px-5"/,
     "mobile search row gap under subtitle is mt-3 (12px)",
   );
-  assert.match(
+  assert.doesNotMatch(
     chrome,
-    /listener-catalog-mobile-search-spacer[\s\S]*className="mt-3 px-5"/,
-    "invisible spacer clones the same mt-3 search-row gap",
+    /listener-catalog-mobile-search-spacer[\s\S]*LibraryMobileHeader/,
+    "library spacer is measured, not a cloned in-flow header",
   );
   assert.match(
     chrome,
@@ -631,17 +634,20 @@ function testLibrarySearchScrollRoot() {
   const css = read("src/app/globals.css");
 
   const replaceCalls = [
-    ...chrome.matchAll(/router\.replace\(([\s\S]*?)\);/g),
-    ...library.matchAll(/router\.replace\(([\s\S]*?)\);/g),
+    ...chrome.matchAll(/replaceListingSearch\(([\s\S]*?)\);/g),
+    ...library.matchAll(/replaceListingSearch\(([\s\S]*?)\);/g),
   ];
   assert.ok(replaceCalls.length >= 2, "library chrome and grid both replace query");
-  for (const match of replaceCalls) {
-    assert.match(
-      match[1] ?? "",
-      /scroll:\s*false/,
-      "every library router.replace for q/filter/sort keeps scroll: false",
-    );
-  }
+  assert.match(
+    chrome,
+    /from ["']@\/lib\/listener\/listing-search-navigation["']/,
+    "library chrome uses the shared scroll:false helper",
+  );
+  assert.match(
+    library,
+    /from ["']@\/lib\/listener\/listing-search-navigation["']/,
+    "library grid uses the shared scroll:false helper",
+  );
   assert.doesNotMatch(chrome, /router\.push/);
   assert.doesNotMatch(library, /router\.push/);
 
@@ -650,8 +656,9 @@ function testLibrarySearchScrollRoot() {
   assert.doesNotMatch(filters, /body\.style\.overflow/);
   assert.doesNotMatch(search, /body\.style\.overflow/);
   assert.doesNotMatch(layout, /body\.style\.overflow/);
-  assert.match(filters, /catalog-sheet-lock/);
+  assert.match(filters, /useSheetScrollLock/);
   assert.doesNotMatch(filters, /document\.body\.style\.overflow/);
+  assert.doesNotMatch(filters, /let catalogSheetLockCount/);
 
   assert.match(
     layout,
@@ -670,29 +677,45 @@ function testLibrarySearchScrollRoot() {
   );
   assert.match(
     chrome,
-    /listener-catalog-mobile-search[^"]*fixed top-0 inset-x-0 z-30/,
-    "mobile search+filters reuse catalog fixed top-0 chrome",
+    /<MobileTopChrome variant=["']library["']/,
+    "mobile search+filters reuse shared MobileTopChrome",
+  );
+  const mobileTopChrome = read("src/components/listener/MobileTopChrome.tsx");
+  assert.match(
+    mobileTopChrome,
+    /fixed top-0 inset-x-0 z-30/,
+    "shared chrome is fixed top-0",
   );
   assert.match(
-    chrome,
-    /listener-catalog-mobile-search[^"]*xl:hidden/,
+    mobileTopChrome,
+    /xl:hidden/,
     "fixed library search chrome stays mobile-only",
   );
   assert.match(
-    chrome,
-    /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
-    "fixed library search has the catalog spacer",
+    mobileTopChrome,
+    /data-mobile-top-chrome-spacer/,
+    "fixed library search has the measured spacer",
   );
   assert.match(chrome, /LibraryMobileHeader/, "fixed stack keeps the Аудиотека title");
   assert.match(
-    chrome,
-    /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
-    "fixed library chrome reuses catalog safe-area padding",
+    mobileTopChrome,
+    /library: "pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0"/,
+    "library chrome owns its safe-area padding; spacer tracks measured height",
   );
   assert.doesNotMatch(
-    chrome,
-    /listener-catalog-mobile-search[^"]*sticky/,
+    mobileTopChrome,
+    /sticky/,
     "mobile library search stays fixed, not sticky",
+  );
+  assert.match(
+    chrome,
+    /<Suspense fallback=\{<SearchFiltersRowSkeleton/,
+    "Suspense wraps only the searchParams row, not the fixed chrome host",
+  );
+  assert.doesNotMatch(
+    layout,
+    /LibraryChromeFallback|Suspense/,
+    "layout no longer remounts fixed chrome through an in-flow Suspense fallback",
   );
   assert.doesNotMatch(
     chrome,
@@ -792,13 +815,13 @@ function testLibraryDesktopChromePinnedInShell() {
   );
   assert.match(
     chrome,
-    /listener-catalog-mobile-search[^"]*fixed top-0 inset-x-0 z-30/,
+    /<MobileTopChrome variant=["']library["']/,
     "mobile search+filters stay in the route-layout chrome",
   );
   assert.match(
     chrome,
-    /listener-catalog-mobile-search[^"]*xl:hidden/,
-    "fixed library search chrome stays mobile-only",
+    /xl:hidden|MobileTopChrome/,
+    "fixed library search chrome stays mobile-only via MobileTopChrome",
   );
 
   assert.match(library, /В аудиотеке:/);
