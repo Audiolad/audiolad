@@ -116,6 +116,9 @@ function testUi() {
   assert(!client.includes("user_id"), "no user_id in UI");
   assert(!client.includes("anonymous_id"), "no anonymous_id in UI");
   assert(!client.includes("email"), "no email in UI");
+  assert(client.includes("Благодарности от слушателей") || labels.includes("Благодарности"), "appreciation group");
+  assert(client.includes("appreciationCount") || client.includes("appreciationGrossMinor"), "separate appreciation fields");
+  assert(!client.includes("донат") && !client.includes("Донат"), "no donate wording");
 }
 
 function testDates() {

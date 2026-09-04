@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { loadAuthorAppreciationCabinetFacts } from "@/lib/author-finance/appreciation-queries";
+import {
+  attachAppreciationToSummary,
+  summarizeAppreciationStats,
+} from "@/lib/author-stats/appreciation";
 import { getAuthorStatsSummary } from "@/lib/author-stats/queries";
 import { requireAuthorStatsAccess } from "@/lib/author-stats/route-guard";
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
@@ -11,11 +16,14 @@ export async function GET(request: Request) {
     const { authorId, period, dateFrom, dateTo } =
       await requireAuthorStatsAccess(request);
 
-    const summary = await getAuthorStatsSummary({
-      authorId,
-      dateFrom,
-      dateTo,
-    });
+    const [summary, facts] = await Promise.all([
+      getAuthorStatsSummary({
+        authorId,
+        dateFrom,
+        dateTo,
+      }),
+      loadAuthorAppreciationCabinetFacts({ authorId }),
+    ]);
 
     if (!summary) {
       return NextResponse.json(
@@ -28,7 +36,13 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { period, summary },
+      {
+        period,
+        summary: attachAppreciationToSummary(
+          summary,
+          summarizeAppreciationStats(facts, { from: dateFrom, to: dateTo }),
+        ),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

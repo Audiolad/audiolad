@@ -10,6 +10,10 @@ import {
   parseAuthorStatsPeriod,
 } from "@/lib/author-stats/dates";
 import {
+  AUTHOR_STATS_APPRECIATION_SECTION_TITLE,
+  averageAppreciationGrossMinor,
+} from "@/lib/author-stats/appreciation";
+import {
   AUTHOR_STATS_CHART_METRIC_LABELS,
   AUTHOR_STATS_METHOD_NOTES,
   AUTHOR_STATS_PROMOTION_LINK_LABEL,
@@ -94,6 +98,12 @@ function pointValue(
       return point.authorPageViews;
     case "author_page_unique_visitors":
       return point.authorPageUniqueVisitors;
+    case "appreciation_count":
+      return point.appreciationCount;
+    case "appreciation_gross":
+      return point.appreciationGrossMinor;
+    case "appreciation_author_accrued":
+      return point.appreciationAuthorAccruedMinor;
     default:
       return 0;
   }
@@ -184,7 +194,12 @@ function StatsSparkline({
             onBlur={() => setActive(null)}
             tabIndex={0}
             role="img"
-            aria-label={`${c.date}: ${formatAuthorStatsCount(c.value)}`}
+            aria-label={`${c.date}: ${
+              metric === "appreciation_gross" ||
+              metric === "appreciation_author_accrued"
+                ? formatRubMinor(c.value)
+                : formatAuthorStatsCount(c.value)
+            }`}
           />
         ))}
       </svg>
@@ -192,7 +207,10 @@ function StatsSparkline({
         <p className="mt-2 text-sm text-[#2b2145]">
           {coords[active].date}:{" "}
           <span className="font-semibold">
-            {formatAuthorStatsCount(coords[active].value)}
+            {metric === "appreciation_gross" ||
+            metric === "appreciation_author_accrued"
+              ? formatRubMinor(coords[active].value)
+              : formatAuthorStatsCount(coords[active].value)}
           </span>
         </p>
       ) : (
@@ -216,7 +234,12 @@ function StatsSparkline({
             {coords.map((c) => (
               <tr key={c.date} className="border-b border-[#f4eefb]">
                 <td className="py-1 pr-3">{c.date}</td>
-                <td className="py-1">{formatAuthorStatsCount(c.value)}</td>
+                <td className="py-1">
+                  {metric === "appreciation_gross" ||
+                  metric === "appreciation_author_accrued"
+                    ? formatRubMinor(c.value)
+                    : formatAuthorStatsCount(c.value)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -366,7 +389,8 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
       summary.practiceViews > 0 ||
       summary.plays > 0 ||
       summary.librarySaves > 0 ||
-      summary.grossPurchases > 0);
+      summary.grossPurchases > 0 ||
+      summary.appreciationCount > 0);
 
   const anyError =
     summaryState === "error" ||
@@ -501,6 +525,31 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
             </div>
           </Section>
 
+          <Section title={AUTHOR_STATS_APPRECIATION_SECTION_TITLE}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Благодарности"
+                value={formatAuthorStatsCount(summary.appreciationCount)}
+              />
+              <MetricCard
+                label="Сумма благодарностей"
+                value={formatRubMinor(summary.appreciationGrossMinor)}
+              />
+              <MetricCard
+                label="Начислено вам"
+                value={formatRubMinor(summary.appreciationAuthorAccruedMinor)}
+              />
+              <MetricCard
+                label="Средняя благодарность"
+                value={
+                  averageAppreciationGrossMinor(summary) === null
+                    ? "—"
+                    : formatRubMinor(averageAppreciationGrossMinor(summary) ?? 0)
+                }
+              />
+            </div>
+          </Section>
+
           <Section title="Конверсии">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
@@ -576,6 +625,9 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                     <th className="px-3 py-3 font-medium">Покупки</th>
                     <th className="px-3 py-3 font-medium">Возвраты</th>
                     <th className="px-3 py-3 font-medium">Чистые продажи</th>
+                    <th className="px-3 py-3 font-medium">Благодарности</th>
+                    <th className="px-3 py-3 font-medium">Сумма благодарностей</th>
+                    <th className="px-3 py-3 font-medium">Начислено вам</th>
                     <th className="px-3 py-3 font-medium">Просмотр → запуск</th>
                   </tr>
                 </thead>
@@ -617,6 +669,15 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                       </td>
                       <td className="px-3 py-3">
                         {formatAuthorStatsCount(product.netSales)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatAuthorStatsCount(product.appreciationCount)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatRubMinor(product.appreciationGrossMinor)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatRubMinor(product.appreciationAuthorAccruedMinor)}
                       </td>
                       <td className="px-3 py-3">
                         {formatAuthorStatsRate(product.viewToPlayRate)}
@@ -693,6 +754,24 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                       <dt className="text-[#9a8bb8]">Чистые продажи</dt>
                       <dd className="font-semibold">
                         {formatAuthorStatsCount(product.netSales)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Благодарности</dt>
+                      <dd className="font-semibold">
+                        {formatAuthorStatsCount(product.appreciationCount)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Сумма благодарностей</dt>
+                      <dd className="font-semibold">
+                        {formatRubMinor(product.appreciationGrossMinor)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Начислено вам</dt>
+                      <dd className="font-semibold">
+                        {formatRubMinor(product.appreciationAuthorAccruedMinor)}
                       </dd>
                     </div>
                     <div>

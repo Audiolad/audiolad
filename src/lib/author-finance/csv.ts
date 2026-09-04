@@ -10,6 +10,11 @@
 import { buildCsv } from "@/lib/admin/analytics-csv";
 
 import {
+  AUTHOR_APPRECIATION_FORBIDDEN_FIELDS,
+  getAuthorAppreciationFinanceStatusLabel,
+  type AuthorAppreciationFinanceRow,
+} from "./appreciation-cabinet";
+import {
   getAuthorFinancePayoutStatusLabel,
   getAuthorFinanceTypeLabel,
   getAuthorFinanceAmountStateLabel,
@@ -112,10 +117,49 @@ export function buildAuthorFinancePayoutsCsv(
   );
 }
 
+export function assertAppreciationCsvHasNoSensitiveText(csv: string): void {
+  const normalized = csv.toLowerCase();
+  for (const field of AUTHOR_APPRECIATION_FORBIDDEN_FIELDS) {
+    if (normalized.includes(field)) {
+      throw new AuthorFinanceExportError(
+        `author_appreciation_export_forbidden_text:${field}`,
+      );
+    }
+  }
+}
+
+export function buildAuthorAppreciationCsv(
+  rows: readonly AuthorAppreciationFinanceRow[],
+): string {
+  assertNoForbiddenExportFields([
+    "paid_at",
+    "source_title",
+    "gross_amount_minor",
+    "author_accrued_minor",
+    "finance_status",
+    "available_at",
+  ]);
+
+  const csv = buildCsv(
+    [...AUTHOR_FINANCE_CSV_COLUMNS.appreciation],
+    rows.map((row) => [
+      formatDateForCsv(row.paidAt ?? row.createdAt),
+      row.sourceTitle,
+      formatMinorForCsv(row.grossAmountMinor),
+      row.authorAccruedMinor === null ? "" : formatMinorForCsv(row.authorAccruedMinor),
+      getAuthorAppreciationFinanceStatusLabel(row.financeStatus),
+      formatDateForCsv(row.availableAt),
+    ]),
+  );
+  assertAppreciationCsvHasNoSensitiveText(csv);
+  return csv;
+}
+
 export const AUTHOR_FINANCE_EXPORT_KINDS = [
   "ledger",
   "payouts",
   "sales",
+  "appreciation",
 ] as const;
 
 export type AuthorFinanceExportKind =
