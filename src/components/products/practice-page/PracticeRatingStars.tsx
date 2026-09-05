@@ -114,7 +114,7 @@ export default function PracticeRatingStars({
       data-practice-rating-eligible={ui.ratingEligible ? "true" : "false"}
       data-practice-rating-value={displayStars ?? ""}
     >
-      <p className="text-sm font-medium text-[#25135c]">Оценка</p>
+      <p className="text-sm font-medium text-[#25135c]">Насколько вам откликнулось?</p>
       <div className="mt-2 flex items-center gap-1" role="group" aria-label="Оценка от 1 до 5">
         {Array.from({ length: MAX_PRACTICE_RATING_STARS }, (_, index) => {
           const value = index + 1;

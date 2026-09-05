@@ -7,7 +7,7 @@ import type {
 export const RATING_NOT_ELIGIBLE_COPY =
   "Послушайте аудио хотя бы 30 секунд, чтобы поставить оценку.";
 
-export const RATING_THANKS_COPY = "Спасибо! Ваша оценка учтена.";
+export const RATING_THANKS_COPY = "Спасибо за ваш отклик 🙏";
 
 export const RATING_AUTHOR_DENIED_COPY = "Нельзя оценить свой продукт.";
 

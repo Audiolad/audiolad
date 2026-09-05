@@ -366,7 +366,7 @@ function testClientContracts() {
     "Послушайте аудио хотя бы 30 секунд, чтобы поставить оценку.",
   );
   assert.doesNotMatch(RATING_NOT_ELIGIBLE_COPY, /практик/i);
-  assert.equal(RATING_THANKS_COPY, "Спасибо! Ваша оценка учтена.");
+  assert.equal(RATING_THANKS_COPY, "Спасибо за ваш отклик 🙏");
 
   const body = buildPracticeRatingPutBody(4);
   assert.equal(body.stars, 4);
@@ -457,6 +457,7 @@ function testSourceContracts() {
     starClick,
     /ratingEligible === false|!ratingEligible && stars/,
   );
+  assert.match(ui, /Насколько вам откликнулось\?/);
   assert.match(ui, /resolvePracticeRatingStarClick/);
   assert.match(ui, /runAuthenticatedPracticeRatingClick/);
   assert.match(ui, /RATING_THANKS_COPY/);
