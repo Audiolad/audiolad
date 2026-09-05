@@ -741,7 +741,7 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 | `device_id_hmac` | text NULL | HMAC first-party `audiolad_anonymous_id`; не fingerprint |
 
 HMAC считается только из `RATINGS_SIGNAL_HMAC_SECRET` (префикс `v1:`). Если секрета нет — колонки остаются NULL, оценка всё равно принимается. Не использовать `SUPABASE_SERVICE_ROLE_KEY` как запасной ключ: ротация service-role не должна менять смысл `v1:`. Для будущей ротации HMAC — поднять `RATING_SIGNAL_HMAC_VERSION`; старые строки сохраняют прежний префикс.
-| `excluded_at` / `excluded_reason` / `excluded_by` | moderation | скрыть из публичного агрегата; UI админки — Stage 3 |
+| `excluded_at` / `excluded_reason` / `excluded_by` | moderation | скрыть из публичного агрегата; Stage 3 админка показывает active vs excluded (read-only) |
 
 UNIQUE `(user_id, practice_id)`.
 
@@ -765,11 +765,14 @@ UNIQUE `(user_id, practice_id)`.
 
 Пример: оценки 5, 3, 4 → `12 / 3`. Если 5→2 → `9 / 3`.
 
-### Временная семантика (для будущего «Популярное сейчас»)
+### Временная семантика (admin Stage 3 и будущее «Популярное сейчас»)
 
-- All-time: сумма и счётчик **текущих** активных строк.
-- Окно 30 дней: участник, если `practice_ratings.created_at >= now()-30d`; вклад = **текущие** `stars`, не дельты событий.
-- Дельты `practice_rating_events` не являются первичным источником рейтинга по времени.
+Членство в окне 7/30 дней — по `practice_ratings.created_at` (**время первой оценки**), не по `practice_rating_events.occurred_at`.
+
+- Example A: создана вчера, сейчас `stars=5` → входит в 7d и 30d со вкладом 5.
+- Example B: создана год назад, сегодня правка на 5 → all-time 5; **не** в когорте 7d/30d.
+- All-time: сумма и счётчик **текущих** активных строк (`excluded_at IS NULL`).
+- Дельты `practice_rating_events` не являются первичным источником рейтинга по времени. Журнал админки — только audit.
 
 ### RLS / RPC
 
@@ -786,6 +789,7 @@ UNIQUE `(user_id, practice_id)`.
 - Ошибки: `unauthorized` (401), `rating_not_eligible` (403), `author_cannot_rate_own_product` (403), `invalid_stars` (400), `not_found` (404).
 - UI на PDP за флагом `RATINGS_UI_ENABLED` (явное включение, как `PAYOUT_PROFILES_ENABLED`). Схема и API от флага не зависят.
 - Клиентский GET `ratingEligible` только для начального UI. Клик авторизованного пользователя всегда шлёт PUT; сервер заново проверяет eligibility. После 30 с прослушивания на уже открытой PDP оценка ставится без перезагрузки.
+- Известный UX-backlog (не дыра в безопасности): paid preview корректно отвечает 403 `rating_not_eligible`, а PDP показывает общее «Не удалось сохранить оценку…». UI оценки в Stage 3 не меняем.
 
 Admin test-user-reset считает `practice_ratings` и `practice_rating_events`; удаление тестового `auth.users` снимает строки через CASCADE.
 
@@ -802,6 +806,28 @@ Admin test-user-reset считает `practice_ratings` и `practice_rating_even
 | `occurred_at` | timestamptz | момент записи |
 
 Append-only. Клиент не читает и не пишет. Идентичный повтор оценки события не создаёт.
+
+## Admin Ratings analytics (Stage 3)
+
+Миграция: `supabase/migrations/20260922120000_admin_ratings_analytics.sql`.
+
+Вкладка **Оценки** внутри существующего `AdminAnalyticsWorkbench` (`view=ratings`). Отдельного admin-приложения нет.
+
+RPC (все `SECURITY DEFINER`, `EXECUTE` только `service_role`; HTTP-слой требует `admin_panel.access` + `analytics.view`):
+
+- `admin_ratings_summary(p_from, p_to)`
+- `admin_ratings_products(...)` / `admin_ratings_authors(...)`
+- `admin_ratings_events(...)` — журнал, newest first, `occurred_at DESC, id DESC`, страница 50
+- `admin_ratings_diagnostics(p_now)` — observe-only
+- `admin_ratings_excluded(...)` — список исключённых, без мутаций
+
+Обычный authenticated listener **не** может вызвать admin RPC, читать чужие `practice_ratings`, события или HMAC. Агрегация тысяч строк на клиенте запрещена.
+
+Индексы только под admin-запросы: `practice_ratings(created_at) WHERE excluded_at IS NULL` и `practice_rating_events(occurred_at DESC, id DESC)`.
+
+Диагностика использует `vote_ip_hmac` / `device_id_hmac` только для группировки. В ответ не попадают сырой IP и значения HMAC. Формулировки нейтральные («совпадающий IP-сигнал», «совпадающий device-сигнал», «повышенная активность»). Автоисключения нет.
+
+Exclude/Restore в этом этапе нет: `analytics.view` — право чтения; колонки `excluded_*` хранят только актуальное состояние, истории циклов exclude/restore в схеме нет. Follow-up — отдельное право записи + аудит, не фейковая таблица истории.
 
 ## private_audio_items (MVP, 2026-07-29)
 

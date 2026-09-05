@@ -17,6 +17,7 @@ import AdminAppreciationPanel from "@/components/admin/AdminAppreciationPanel";
 import AdminMoneyPanel from "@/components/admin/AdminMoneyPanel";
 import AdminAuthorEconomyPanel from "@/components/admin/AdminAuthorEconomyPanel";
 import AdminRefundsPanel from "@/components/admin/AdminRefundsPanel";
+import AdminRatingsPanel from "@/components/admin/AdminRatingsPanel";
 import { ADMIN_ANALYTICS_PERIOD_OPTIONS } from "@/lib/admin/analytics-period";
 import type {
   AdminAnalyticsBreakdownBundle,
@@ -232,6 +233,7 @@ export default function AdminAnalyticsWorkbench({
             { id: "refunds", label: "Возвраты" },
             { id: "authors-economy", label: "Экономика авторов" },
             { id: "sources", label: "Источники" },
+            { id: "ratings", label: "Оценки" },
           ] as const satisfies ReadonlyArray<{ id: AdminAnalyticsView; label: string }>
         ).map((item) => (
           <button
@@ -271,6 +273,10 @@ export default function AdminAnalyticsWorkbench({
 
       {view === "sources" ? (
         <AdminAttributionPanel urlState={urlState} onPatch={replaceState} />
+      ) : null}
+
+      {view === "ratings" ? (
+        <AdminRatingsPanel urlState={urlState} onPatch={replaceState} />
       ) : null}
 
       {view === "product" ? (
