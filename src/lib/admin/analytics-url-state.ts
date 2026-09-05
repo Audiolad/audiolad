@@ -1,4 +1,15 @@
 import {
+  parseAdminRatingsAuthorSort,
+  parseAdminRatingsPeriod,
+  parseAdminRatingsProductSort,
+  type AdminRatingsAuthorSort,
+  type AdminRatingsEventKind,
+  type AdminRatingsExcludedFilter,
+  type AdminRatingsPeriod,
+  type AdminRatingsProductSort,
+  type AdminRatingsTab,
+} from "@/lib/admin/analytics-ratings";
+import {
   parseAdminAnalyticsPeriod,
   type AdminAnalyticsPeriod,
 } from "@/lib/admin/analytics-period";
@@ -9,7 +20,17 @@ export type AdminAnalyticsView =
   | "money"
   | "sources"
   | "refunds"
-  | "authors-economy";
+  | "authors-economy"
+  | "ratings";
+
+export type {
+  AdminRatingsAuthorSort,
+  AdminRatingsEventKind,
+  AdminRatingsExcludedFilter,
+  AdminRatingsPeriod,
+  AdminRatingsProductSort,
+  AdminRatingsTab,
+};
 export type AdminAuthorEconomyTab =
   | "authors"
   | "ledger"
@@ -112,6 +133,19 @@ export type AdminAnalyticsUrlState = {
   attributionSort: string;
   attributionSortDir: "asc" | "desc";
   attributionSection: string | null;
+  /** Ratings analytics (Stage 3) — independent of product/money period. */
+  ratingsPeriod: AdminRatingsPeriod;
+  ratingsTab: AdminRatingsTab;
+  ratingsQ: string;
+  ratingsProductsSort: AdminRatingsProductSort;
+  ratingsProductsSortDir: "asc" | "desc";
+  ratingsAuthorsSort: AdminRatingsAuthorSort;
+  ratingsAuthorsSortDir: "asc" | "desc";
+  ratingsEventKind: AdminRatingsEventKind | "all";
+  ratingsExcludedFilter: AdminRatingsExcludedFilter;
+  ratingsJournalPracticeId: string | null;
+  ratingsJournalAuthorId: string | null;
+  ratingsJournalOffset: number;
 };
 
 function parseTab(value: string | null): AdminAnalyticsTab {
@@ -157,11 +191,43 @@ function parseView(value: string | null): AdminAnalyticsView {
     value === "money" ||
     value === "sources" ||
     value === "refunds" ||
-    value === "authors-economy"
+    value === "authors-economy" ||
+    value === "ratings"
   ) {
     return value;
   }
   return "product";
+}
+
+function parseRatingsTab(value: string | null): AdminRatingsTab {
+  if (value === "authors" || value === "journal") {
+    return value;
+  }
+  return "products";
+}
+
+function parseRatingsEventKind(
+  value: string | null,
+): AdminRatingsEventKind | "all" {
+  if (value === "first" || value === "changed") {
+    return value;
+  }
+  return "all";
+}
+
+function parseRatingsExcludedFilter(
+  value: string | null,
+): AdminRatingsExcludedFilter {
+  if (value === "included" || value === "excluded") {
+    return value;
+  }
+  return "all";
+}
+
+function parseNonNegativeInt(value: string | null, fallback = 0): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parseAuthorEconomyTab(value: string | null): AdminAuthorEconomyTab {
@@ -362,6 +428,20 @@ export function parseAdminAnalyticsUrlState(
     attributionSort: get("attributionSort")?.trim() || "gross_minor",
     attributionSortDir: parseDir(get("attributionSortDir")),
     attributionSection: get("attributionSection"),
+    ratingsPeriod: parseAdminRatingsPeriod(get("ratingsPeriod")),
+    ratingsTab: parseRatingsTab(get("ratingsTab")),
+    ratingsQ: (get("ratingsQ") ?? "").trim(),
+    ratingsProductsSort: parseAdminRatingsProductSort(get("ratingsProductsSort")),
+    ratingsProductsSortDir: parseDir(get("ratingsProductsSortDir")),
+    ratingsAuthorsSort: parseAdminRatingsAuthorSort(get("ratingsAuthorsSort")),
+    ratingsAuthorsSortDir: parseDir(get("ratingsAuthorsSortDir")),
+    ratingsEventKind: parseRatingsEventKind(get("ratingsEventKind")),
+    ratingsExcludedFilter: parseRatingsExcludedFilter(
+      get("ratingsExcludedFilter"),
+    ),
+    ratingsJournalPracticeId: get("ratingsJournalPracticeId"),
+    ratingsJournalAuthorId: get("ratingsJournalAuthorId"),
+    ratingsJournalOffset: parseNonNegativeInt(get("ratingsJournalOffset")),
   };
 }
 
@@ -465,6 +545,52 @@ export function buildAdminAnalyticsSearchParams(
       state.attributionSortDir === "desc" ? null : state.attributionSortDir,
     ],
     ["attributionSection", state.attributionSection],
+    [
+      "ratingsPeriod",
+      state.ratingsPeriod === "all" ? null : state.ratingsPeriod,
+    ],
+    ["ratingsTab", state.ratingsTab === "products" ? null : state.ratingsTab],
+    ["ratingsQ", state.ratingsQ || null],
+    [
+      "ratingsProductsSort",
+      state.ratingsProductsSort === "total_stars"
+        ? null
+        : state.ratingsProductsSort,
+    ],
+    [
+      "ratingsProductsSortDir",
+      state.ratingsProductsSortDir === "desc"
+        ? null
+        : state.ratingsProductsSortDir,
+    ],
+    [
+      "ratingsAuthorsSort",
+      state.ratingsAuthorsSort === "total_stars"
+        ? null
+        : state.ratingsAuthorsSort,
+    ],
+    [
+      "ratingsAuthorsSortDir",
+      state.ratingsAuthorsSortDir === "desc" ? null : state.ratingsAuthorsSortDir,
+    ],
+    [
+      "ratingsEventKind",
+      state.ratingsEventKind === "all" ? null : state.ratingsEventKind,
+    ],
+    [
+      "ratingsExcludedFilter",
+      state.ratingsExcludedFilter === "all"
+        ? null
+        : state.ratingsExcludedFilter,
+    ],
+    ["ratingsJournalPracticeId", state.ratingsJournalPracticeId],
+    ["ratingsJournalAuthorId", state.ratingsJournalAuthorId],
+    [
+      "ratingsJournalOffset",
+      state.ratingsJournalOffset > 0
+        ? String(state.ratingsJournalOffset)
+        : null,
+    ],
   ];
 
   for (const [key, value] of optional) {
