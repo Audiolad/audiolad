@@ -92,7 +92,11 @@ export const ZVUK_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Ровное механическое звучание вентилятора в бытовом поиске иногда связывают с white noise." },
           { kind: "paragraph", text: "Такое употребление понятно, поскольку пользователь ищет достаточно постоянный фон без речи и музыкального содержания." },
           { kind: "paragraph", text: "Но технический белый шум – отдельное акустическое понятие. Реальный вентилятор создаёт собственный сложный бытовой звук и не обязательно является точным генератором классического white noise." },
-          { kind: "paragraph", text: "Отдельный white-noise intent вентилятора будет раскрыт на самостоятельной странице." },
+          { kind: "rich_paragraph", segments: [
+            { text: "Отдельный white-noise сценарий вентилятора раскрыт на странице " },
+            { href: "/listens/belyy-shum-ventilyatora-slushat-onlayn", label: "белый шум вентилятора" },
+            { text: "." },
+          ]},
         ],
       },
       {

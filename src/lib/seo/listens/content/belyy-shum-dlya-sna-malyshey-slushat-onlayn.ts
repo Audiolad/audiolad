@@ -111,7 +111,11 @@ export const BELYY_SHUM_DLYA_SNA_MALYSHEY_SLUSHAT_ONLAYN_PAGE =
             { text: "." },
           ]},
           { kind: "paragraph", text: "Текущая статья не объединяет эти возрастные intent." },
-          { kind: "paragraph", text: "Также она не должна закрывать будущий запрос про сон младенца – для него будет отдельная страница." },
+          { kind: "rich_paragraph", segments: [
+            { text: "Для более узкого возрастного запроса есть отдельная страница " },
+            { href: "/listens/belyy-shum-dlya-sna-mladenca-slushat-onlayn", label: "белый шум для сна младенца" },
+            { text: "." },
+          ]},
         ],
       },
       {

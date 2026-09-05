@@ -71,7 +71,11 @@ export const BELYY_SHUM_DLYA_SNA_2_CHASA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Текущая страница ориентирована примерно на два часа." },
           { kind: "paragraph", text: "Разница здесь именно во времени, а не в обязательном типе шума." },
           { kind: "paragraph", text: "В обоих случаях пользователь может выбирать разные бытовые фоновые звуки и при необходимости переключаться между ними." },
-          { kind: "paragraph", text: "Семантика более длительного трёхчасового прослушивания в этой статье не раскрывается." },
+          { kind: "rich_paragraph", segments: [
+            { text: "Более длительный сценарий раскрыт на странице " },
+            { href: "/listens/belyy-shum-dlya-sna-3-chasa-slushat-onlayn", label: "белый шум для сна 3 часа" },
+            { text: "." },
+          ]},
         ],
       },
       {

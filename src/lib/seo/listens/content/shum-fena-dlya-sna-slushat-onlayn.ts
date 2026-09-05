@@ -92,7 +92,12 @@ export const SHUM_FENA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         blocks: [
           { kind: "paragraph", text: "Ровное звучание фена в бытовой речи иногда связывают с белым шумом." },
           { kind: "paragraph", text: "Однако технический white noise – отдельное акустическое понятие. Реальный фен не следует автоматически считать точным генератором классического белого шума." },
-          { kind: "paragraph", text: "Поэтому текущая страница посвящена именно шуму работающего фена, а не отдельному white-noise intent." },
+          { kind: "rich_paragraph", segments: [
+            { text: "Отдельный white-noise сценарий фена раскрыт на странице " },
+            { href: "/listens/belyy-shum-fena-slushat-onlayn", label: "белый шум фена" },
+            { text: "." },
+          ]},
+          { kind: "paragraph", text: "Поэтому текущая страница посвящена именно шуму работающего фена." },
         ],
       },
       {
