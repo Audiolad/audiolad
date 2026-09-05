@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  LISTEN_STATS_MAX_HEARTBEAT_GAP_MS,
   LISTEN_STATS_MAX_PLAYBACK_RATE,
   LISTEN_STATS_MAX_TICK_MS,
   LISTEN_STATS_MIN_PLAYBACK_RATE,
@@ -106,8 +107,14 @@ export function evaluateListenStatsTick(
 
   let acceptedMs = 0;
   const sameItem = state.lastAudioItemId === input.audioItemId;
+  const elapsedSinceLastMs = state.lastReportedAt
+    ? Math.max(0, input.nowMs - Date.parse(state.lastReportedAt))
+    : 0;
+  const heartbeatGapExceeded =
+    state.lastReportedAt != null &&
+    elapsedSinceLastMs > LISTEN_STATS_MAX_HEARTBEAT_GAP_MS;
 
-  if (sameItem) {
+  if (sameItem && !heartbeatGapExceeded) {
     const positionDelta = positionMs - state.lastPositionMs;
 
     if (positionDelta > 0 && positionDelta <= LISTEN_STATS_SEEK_JUMP_MS) {
@@ -129,13 +136,9 @@ export function evaluateListenStatsTick(
       // Security budget uses the server-known max legal rate only.
       // Client playback_rate is telemetry and must not expand the cap.
       if (state.lastReportedAt) {
-        const elapsedMs = Math.max(
-          0,
-          input.nowMs - Date.parse(state.lastReportedAt),
-        );
         acceptedMs = Math.min(
           acceptedMs,
-          Math.floor(elapsedMs * LISTEN_STATS_MAX_PLAYBACK_RATE),
+          Math.floor(elapsedSinceLastMs * LISTEN_STATS_MAX_PLAYBACK_RATE),
         );
       }
 

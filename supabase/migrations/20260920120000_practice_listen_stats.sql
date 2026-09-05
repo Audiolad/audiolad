@@ -77,7 +77,9 @@ DECLARE
   v_accepted bigint := 0;
   v_row public.practice_listen_stats%ROWTYPE;
   v_max_rate numeric := 1.5;
-  v_elapsed numeric;
+  v_max_gap bigint := 20000;
+  v_elapsed numeric := 0;
+  v_gap_ok boolean := true;
   v_wall_cap bigint;
   v_life_elapsed numeric;
   v_lifetime_cap bigint;
@@ -119,7 +121,18 @@ BEGIN
     AND practice_id = p_practice_id
   FOR UPDATE;
 
-  IF v_row.last_audio_item_id IS NOT DISTINCT FROM p_audio_item_id THEN
+  IF v_row.last_reported_at IS NOT NULL THEN
+    v_elapsed := GREATEST(
+      0,
+      EXTRACT(EPOCH FROM (v_now - v_row.last_reported_at)) * 1000
+    );
+    -- Idle / session hole: do not catch up unconfirmed media-time.
+    IF v_elapsed > v_max_gap THEN
+      v_gap_ok := false;
+    END IF;
+  END IF;
+
+  IF v_gap_ok AND v_row.last_audio_item_id IS NOT DISTINCT FROM p_audio_item_id THEN
     v_delta := v_position - v_row.last_position_ms;
 
     IF v_delta > 0 AND v_delta <= 20000 THEN
@@ -133,10 +146,6 @@ BEGIN
 
       -- Client p_playback_rate is telemetry only and must not expand caps.
       IF v_row.last_reported_at IS NOT NULL THEN
-        v_elapsed := GREATEST(
-          0,
-          EXTRACT(EPOCH FROM (v_now - v_row.last_reported_at)) * 1000
-        );
         v_wall_cap := FLOOR(v_elapsed * v_max_rate);
         v_accepted := LEAST(v_accepted, v_wall_cap);
       END IF;
@@ -190,7 +199,7 @@ $$;
 COMMENT ON FUNCTION public.apply_practice_listen_stats_heartbeat(
   uuid, uuid, uuid, bigint, boolean, bigint, numeric, timestamptz
 ) IS
-  'Atomic MEDIA-TIME heartbeat. service_role only. Computes accepted ms from stored last_position; does not take an arbitrary increment. Lifetime cap is floor((now-created_at)*1.5). Client playback_rate is telemetry and cannot raise the 1.5x budget. rating_eligible_at is set once when allow_eligibility and total >= 30000.';
+  'Atomic MEDIA-TIME heartbeat. service_role only. Computes accepted ms from stored last_position; does not take an arbitrary increment. Lifetime cap is floor((now-created_at)*1.5). Gaps longer than 20000ms since last_reported_at accept +0 and adopt a new baseline. Client playback_rate is telemetry and cannot raise the 1.5x budget. rating_eligible_at is set once when allow_eligibility and total >= 30000.';
 
 REVOKE ALL ON FUNCTION public.apply_practice_listen_stats_heartbeat(
   uuid, uuid, uuid, bigint, boolean, bigint, numeric, timestamptz

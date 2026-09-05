@@ -15,6 +15,7 @@ import {
 } from "../src/lib/listen/listen-stats-access";
 import {
   LISTEN_STATS_HEARTBEAT_MS,
+  LISTEN_STATS_MAX_HEARTBEAT_GAP_MS,
   LISTEN_STATS_MAX_PLAYBACK_RATE,
   LISTEN_STATS_MAX_TICK_MS,
   LISTEN_STATS_SEEK_JUMP_MS,
@@ -91,6 +92,8 @@ function testConstants() {
   assert.equal(LISTEN_STATS_HEARTBEAT_MS, 5_000);
   assert.equal(LISTEN_STATS_MAX_PLAYBACK_RATE, 1.5);
   assert.equal(LISTEN_STATS_WALL_CLOCK_SLACK_MS, 0);
+  assert.equal(LISTEN_STATS_MAX_HEARTBEAT_GAP_MS, 20_000);
+  assert.ok(LISTEN_STATS_MAX_HEARTBEAT_GAP_MS > LISTEN_STATS_HEARTBEAT_MS * 2);
   assert.ok(LISTEN_STATS_SEEK_JUMP_MS > LISTEN_STATS_MAX_TICK_MS);
 
   const constants = read("src/lib/listen/listen-stats-constants.ts");
@@ -101,6 +104,10 @@ function testConstants() {
   assert.match(constants, /export const RATING_ELIGIBILITY_LISTEN_MS = 30_000/);
   assert.match(constants, /export const LISTEN_STATS_MAX_PLAYBACK_RATE = 1\.5/);
   assert.match(constants, /export const LISTEN_STATS_WALL_CLOCK_SLACK_MS = 0/);
+  assert.match(
+    constants,
+    /export const LISTEN_STATS_MAX_HEARTBEAT_GAP_MS = 20_000/,
+  );
   assert.doesNotMatch(constants, /LISTEN_STATS_BOOTSTRAP_MS/);
   assert.match(player, /const PLAYBACK_RATES = \[0\.75, 1, 1\.25, 1\.5\]/);
   assert.match(migration, /v_total >= 30000/);
@@ -109,6 +116,8 @@ function testConstants() {
   assert.match(migration, /v_max_rate numeric := 1\.5/);
   assert.match(migration, /v_lifetime_cap := FLOOR\(v_life_elapsed \* 1\.5\)/);
   assert.match(migration, /v_wall_cap := FLOOR\(v_elapsed \* v_max_rate\)/);
+  assert.match(migration, /v_max_gap bigint := 20000/);
+  assert.match(migration, /v_elapsed > v_max_gap/);
   assert.doesNotMatch(migration, /v_life_elapsed \* 2 \+ 8000/);
   assert.doesNotMatch(migration, /v_rate > 2/);
   assert.doesNotMatch(migration, /v_slack := 2000/);
@@ -388,6 +397,114 @@ function testAdversarialInflation() {
   assert.equal(tooEarlyAtMaxRate.ratingEligibleAt, null);
 }
 
+function testIdleHeartbeatGap() {
+  const hourMs = 3_600_000;
+
+  const idle = playTicks({
+    ticks: [{ positionMs: 15_000, nowMs: hourMs }],
+  });
+  assert.equal(idle.acceptedMs, 0, "1h idle with +15000 must accept 0");
+  assert.equal(idle.realListenedMs, 0);
+  assert.equal(idle.lastPositionMs, 15_000, "idle tick adopts the new baseline");
+  assert.equal(idle.ratingEligibleAt, null);
+
+  const resume = evaluateListenStatsTick(asState(idle), {
+    audioItemId: "track-a",
+    positionMs: 22_500,
+    nowMs: hourMs + 5_000,
+    allowEligibility: true,
+    playbackRate: 1.5,
+  });
+  assert.ok(resume.acceptedMs <= 7_500, "post-gap 5s at 1.5× ≤ 7500");
+  assert.equal(resume.acceptedMs, 7_500);
+  assert.equal(resume.realListenedMs, 7_500);
+
+  const storedIdle = playTicks({
+    playbackRate: 100,
+    ticks: [
+      { positionMs: 15_000, nowMs: hourMs },
+      { positionMs: 30_000, nowMs: hourMs + 10_000 },
+    ],
+  });
+  assert.equal(storedIdle.realListenedMs, 15_000, "10s after idle resume caps at 15000");
+  assert.equal(storedIdle.ratingEligibleAt, null, "cannot reach eligibility from stored idle");
+
+  const afterResume = playTicks({
+    playbackRate: 1.5,
+    ticks: [
+      { positionMs: 15_000, nowMs: hourMs },
+      { positionMs: 22_500, nowMs: hourMs + 5_000 },
+      { positionMs: 30_000, nowMs: hourMs + 10_000 },
+      { positionMs: 37_500, nowMs: hourMs + 15_000 },
+      { positionMs: 45_000, nowMs: hourMs + 20_000 },
+    ],
+  });
+  assert.equal(afterResume.realListenedMs, 30_000);
+  assert.ok(
+    afterResume.ratingEligibleAt,
+    "eligibility only after enough NEW wall after the resume baseline",
+  );
+
+  const lateButInside = playTicks({
+    ticks: [{ positionMs: 8_000, nowMs: 8_000 }],
+  });
+  assert.equal(lateButInside.acceptedMs, 8_000, "8s network delay inside 20s must accrue");
+  assert.equal(lateButInside.realListenedMs, 8_000);
+
+  const exactlyAtGap = playTicks({
+    ticks: [{ positionMs: 10_000, nowMs: LISTEN_STATS_MAX_HEARTBEAT_GAP_MS }],
+  });
+  assert.equal(
+    exactlyAtGap.acceptedMs,
+    10_000,
+    "elapsed == 20s is still inside the trusted gap",
+  );
+
+  const justOverGap = playTicks({
+    ticks: [{ positionMs: 10_000, nowMs: LISTEN_STATS_MAX_HEARTBEAT_GAP_MS + 1 }],
+  });
+  assert.equal(justOverGap.acceptedMs, 0, "elapsed > 20s resets the session");
+  assert.equal(justOverGap.realListenedMs, 0);
+
+  const session1 = playTicks({
+    ticks: [
+      { positionMs: 4_000, nowMs: 4_000 },
+      { positionMs: 8_000, nowMs: 8_000 },
+      { positionMs: 12_000, nowMs: 12_000 },
+    ],
+  });
+  assert.equal(session1.realListenedMs, 12_000);
+
+  const nextDayFirst = evaluateListenStatsTick(asState(session1), {
+    audioItemId: "track-a",
+    positionMs: 20_000,
+    nowMs: 86_400_000,
+    allowEligibility: true,
+    playbackRate: 1,
+  });
+  assert.equal(nextDayFirst.acceptedMs, 0, "next-day first heartbeat is a new baseline");
+  assert.equal(nextDayFirst.realListenedMs, 12_000, "accumulated ms persist across idle");
+
+  const afterNine = evaluateListenStatsTick(asState(nextDayFirst), {
+    audioItemId: "track-a",
+    positionMs: 29_000,
+    nowMs: 86_409_000,
+    allowEligibility: true,
+    playbackRate: 1,
+  });
+  assert.equal(afterNine.acceptedMs, 9_000);
+  const afterEighteen = evaluateListenStatsTick(asState(afterNine), {
+    audioItemId: "track-a",
+    positionMs: 38_000,
+    nowMs: 86_418_000,
+    allowEligibility: true,
+    playbackRate: 1,
+  });
+  assert.equal(afterEighteen.acceptedMs, 9_000);
+  assert.equal(afterEighteen.realListenedMs, 30_000);
+  assert.ok(afterEighteen.ratingEligibleAt, "12s + 18s honest after resume is eligible");
+}
+
 function testRaceNoDoubleNoLoss() {
   const baseline = playTicks({
     ticks: [{ positionMs: 10_000, nowMs: 10_000 }],
@@ -646,6 +763,7 @@ function testSourceContracts() {
   assert.match(database, /practice_listen_stats \(trusted MEDIA-TIME/);
   assert.match(database, /practice_audio_progress \(resume cursor\)/);
   assert.match(database, /real_listened_ms <= floor\(\(now - created_at\) \* 1\.5\)/);
+  assert.match(database, /LISTEN_STATS_MAX_HEARTBEAT_GAP_MS/);
   assert.match(database, /Client `playback_rate` — только телеметрия/);
   assert.match(preflight, /"practice_listen_stats"/);
 
@@ -660,6 +778,7 @@ testAccumulateAcrossSessionsAndTracks();
 testSeekPauseRewind();
 testMediaTimeRates();
 testAdversarialInflation();
+testIdleHeartbeatGap();
 testRaceNoDoubleNoLoss();
 testAccessMatrix();
 testOwnStateShape();

@@ -9,6 +9,16 @@ export const RATING_ELIGIBILITY_LISTEN_MS = 30_000;
 /** Client heartbeat cadence. Server caps each tick; this is not a wall-clock quota. */
 export const LISTEN_STATS_HEARTBEAT_MS = 5_000;
 
+/**
+ * Max trusted gap since last_reported_at. Longer idle/session holes
+ * accept +0 and adopt a new position baseline — no catch-up without
+ * heartbeats. 20s is the smallest value that still covers two missed
+ * 5s ticks plus pagehide/visibility/Safari/network jitter, so a routine
+ * late heartbeat is not a false reset. Prefer undercounting after
+ * background/resume over awarding unconfirmed time.
+ */
+export const LISTEN_STATS_MAX_HEARTBEAT_GAP_MS = 20_000;
+
 /** Hard per-tick cap on accepted media-time (covers delayed ticks at 1.5×). */
 export const LISTEN_STATS_MAX_TICK_MS = 15_000;
 

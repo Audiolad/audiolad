@@ -301,6 +301,96 @@ BEGIN
     RAISE EXCEPTION 'cannot reach 30000 before 20000ms wall, got % eligible %', listened, eligible;
   END IF;
 
+  -- idle / session gap: long hole accepts +0 and does not catch up
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 1, t0
+  );
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 15000, true, NULL, 1, t0 + interval '1 hour'
+  );
+  IF accepted <> 0 OR listened <> 0 OR eligible IS NOT NULL THEN
+    RAISE EXCEPTION '1h idle +15000 must accept 0, accepted % listened % eligible %', accepted, listened, eligible;
+  END IF;
+
+  SELECT last_position_ms INTO accepted
+  FROM public.practice_listen_stats
+  WHERE user_id = user_b AND practice_id = v_practice;
+  IF accepted <> 15000 THEN
+    RAISE EXCEPTION 'idle tick must adopt new position baseline, got %', accepted;
+  END IF;
+
+  SELECT accepted_ms, real_listened_ms
+  INTO accepted, listened
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 22500, true, NULL, 1.5,
+    t0 + interval '1 hour 5 seconds'
+  );
+  IF accepted <> 7500 OR listened <> 7500 THEN
+    RAISE EXCEPTION 'resume after gap 5s/1.5x should accept 7500, accepted % listened %', accepted, listened;
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 100, t0
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 15000, true, NULL, 100, t0 + interval '1 hour'
+  );
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 30000, true, NULL, 100,
+    t0 + interval '1 hour 10 seconds'
+  );
+  IF listened <> 15000 OR eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'stored idle plus 10s must stay 15000 ineligible, got % eligible %', listened, eligible;
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 1, t0
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 4000, true, NULL, 1, t0 + interval '4 seconds'
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 8000, true, NULL, 1, t0 + interval '8 seconds'
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 12000, true, NULL, 1, t0 + interval '12 seconds'
+  );
+  SELECT accepted_ms, real_listened_ms
+  INTO accepted, listened
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 20000, true, NULL, 1, t0 + interval '1 day'
+  );
+  IF accepted <> 0 OR listened <> 12000 THEN
+    RAISE EXCEPTION 'next-day first tick +0 and persist 12000, accepted % listened %', accepted, listened;
+  END IF;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 29000, true, NULL, 1, t0 + interval '1 day 9 seconds'
+  );
+  SELECT real_listened_ms, rating_eligible_at
+  INTO listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 38000, true, NULL, 1, t0 + interval '1 day 18 seconds'
+  );
+  IF listened <> 30000 OR eligible IS NULL THEN
+    RAISE EXCEPTION '12s persist + 18s after resume should be eligible, got %', listened;
+  END IF;
+
+  SELECT accepted_ms INTO accepted
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 40000, true, NULL, 1,
+    t0 + interval '1 day 26 seconds'
+  );
+  IF accepted <> 2000 THEN
+    RAISE EXCEPTION 'slight delay inside gap must still accrue, got %', accepted;
+  END IF;
+
   -- race: overlapping ticks serialize, no double
   DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
   PERFORM public.apply_practice_listen_stats_heartbeat(

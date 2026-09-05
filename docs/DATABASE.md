@@ -688,7 +688,8 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 Анти-накрутка (серверная граница доверия):  
 `real_listened_ms <= floor((now - created_at) * 1.5)`.  
 `created_at` первой строки — trusted baseline (первый heartbeat = +0).  
-`1.5` — максимум каталожного плеера (`PLAYBACK_RATES`). Client `playback_rate` — только телеметрия, бюджет не поднимает. Постоянного bootstrap (+8000) и повторяющегося per-tick slack нет.
+`1.5` — максимум каталожного плеера (`PLAYBACK_RATES`). Client `playback_rate` — только телеметрия, бюджет не поднимает. Постоянного bootstrap (+8000) и повторяющегося per-tick slack нет.  
+Если `now - last_reported_at > LISTEN_STATS_MAX_HEARTBEAT_GAP_MS` (20000): тик +0, новая позиция становится baseline, `last_reported_at` обновляется. Простой / фон без heartbeat не догоняется.
 
 ### Семантика
 
