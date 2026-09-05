@@ -214,7 +214,7 @@ BEGIN
   SELECT accepted_ms, real_listened_ms, rating_eligible_at
   INTO accepted, listened, eligible
   FROM public.apply_practice_listen_stats_heartbeat(
-    user_b, v_practice, audio_a, 30000, true, NULL, 2, t0 + interval '5 seconds'
+    user_b, v_practice, audio_a, 15000, true, NULL, 2, t0 + interval '5 seconds'
   );
   IF accepted <> 7500 OR listened <> 7500 THEN
     RAISE EXCEPTION 'forged rate 2 must cap at 1.5× wall, accepted % listened %', accepted, listened;
@@ -226,12 +226,21 @@ BEGIN
   SELECT accepted_ms, real_listened_ms
   INTO accepted, listened
   FROM public.apply_practice_listen_stats_heartbeat(
-    user_b, v_practice, audio_a, 60000, true, NULL, 10, t0 + interval '10 seconds'
+    user_b, v_practice, audio_a, 30000, true, NULL, 10, t0 + interval '10 seconds'
+  );
+  IF accepted <> 7500 OR listened <> 15000 THEN
+    RAISE EXCEPTION 'forged rate 10 must still cap at 1.5× wall, accepted % listened %', accepted, listened;
+  END IF;
+
+  SELECT accepted_ms, real_listened_ms
+  INTO accepted, listened
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 90000, true, NULL, 100, t0 + interval '11 seconds'
   );
   IF accepted <> 0 THEN
     RAISE EXCEPTION 'huge forged position must be seek +0, got %', accepted;
   END IF;
-  IF listened <> 7500 THEN
+  IF listened <> 15000 THEN
     RAISE EXCEPTION 'seek must not add media, got %', listened;
   END IF;
 
