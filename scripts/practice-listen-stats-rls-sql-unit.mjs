@@ -51,6 +51,13 @@ assert.doesNotMatch(
   migration,
   /ALTER TABLE public\.practice_audio_progress/,
 );
+assert.match(migration, /v_max_rate numeric := 1\.5/);
+assert.match(migration, /v_lifetime_cap := FLOOR\(v_life_elapsed \* 1\.5\)/);
+assert.match(migration, /v_wall_cap := FLOOR\(v_elapsed \* v_max_rate\)/);
+assert.match(migration, /Client p_playback_rate is telemetry only/);
+assert.doesNotMatch(migration, /v_life_elapsed \* 2 \+ 8000/);
+assert.doesNotMatch(migration, /v_rate > 2/);
+assert.doesNotMatch(migration, /v_slack := 2000/);
 
 function dockerAvailable() {
   try {

@@ -1,13 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  LISTEN_STATS_BOOTSTRAP_MS,
-  LISTEN_STATS_HEARTBEAT_MS,
   LISTEN_STATS_MAX_PLAYBACK_RATE,
   LISTEN_STATS_MAX_TICK_MS,
   LISTEN_STATS_MIN_PLAYBACK_RATE,
   LISTEN_STATS_SEEK_JUMP_MS,
-  LISTEN_STATS_WALL_CLOCK_SLACK_MS,
   RATING_ELIGIBILITY_LISTEN_MS,
 } from "@/lib/listen/listen-stats-constants";
 
@@ -129,17 +126,17 @@ export function evaluateListenStatsTick(
 
       acceptedMs = Math.min(acceptedMs, LISTEN_STATS_MAX_TICK_MS);
 
+      // Security budget uses the server-known max legal rate only.
+      // Client playback_rate is telemetry and must not expand the cap.
       if (state.lastReportedAt) {
         const elapsedMs = Math.max(
           0,
           input.nowMs - Date.parse(state.lastReportedAt),
         );
-        const rate = clampListenStatsPlaybackRate(input.playbackRate);
-        const slack =
-          elapsedMs >= LISTEN_STATS_HEARTBEAT_MS / 2
-            ? LISTEN_STATS_WALL_CLOCK_SLACK_MS
-            : 0;
-        acceptedMs = Math.min(acceptedMs, Math.floor(elapsedMs * rate + slack));
+        acceptedMs = Math.min(
+          acceptedMs,
+          Math.floor(elapsedMs * LISTEN_STATS_MAX_PLAYBACK_RATE),
+        );
       }
 
       if (state.createdAt) {
@@ -147,11 +144,10 @@ export function evaluateListenStatsTick(
           0,
           input.nowMs - Date.parse(state.createdAt),
         );
-        const budget = Math.floor(
-          lifeElapsedMs * LISTEN_STATS_MAX_PLAYBACK_RATE +
-            LISTEN_STATS_BOOTSTRAP_MS -
-            state.realListenedMs,
+        const lifetimeCap = Math.floor(
+          lifeElapsedMs * LISTEN_STATS_MAX_PLAYBACK_RATE,
         );
+        const budget = lifetimeCap - state.realListenedMs;
         acceptedMs = Math.min(acceptedMs, Math.max(0, budget));
       }
     }

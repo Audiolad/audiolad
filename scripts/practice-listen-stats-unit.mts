@@ -15,8 +15,10 @@ import {
 } from "../src/lib/listen/listen-stats-access";
 import {
   LISTEN_STATS_HEARTBEAT_MS,
+  LISTEN_STATS_MAX_PLAYBACK_RATE,
   LISTEN_STATS_MAX_TICK_MS,
   LISTEN_STATS_SEEK_JUMP_MS,
+  LISTEN_STATS_WALL_CLOCK_SLACK_MS,
   RATING_ELIGIBILITY_LISTEN_MS,
 } from "../src/lib/listen/listen-stats-constants";
 import {
@@ -87,16 +89,29 @@ function playTicks(input: {
 function testConstants() {
   assert.equal(RATING_ELIGIBILITY_LISTEN_MS, 30_000);
   assert.equal(LISTEN_STATS_HEARTBEAT_MS, 5_000);
+  assert.equal(LISTEN_STATS_MAX_PLAYBACK_RATE, 1.5);
+  assert.equal(LISTEN_STATS_WALL_CLOCK_SLACK_MS, 0);
   assert.ok(LISTEN_STATS_SEEK_JUMP_MS > LISTEN_STATS_MAX_TICK_MS);
 
   const constants = read("src/lib/listen/listen-stats-constants.ts");
+  const player = read("src/components/audio/useSequentialPlayer.ts");
   const migration = read(
     "supabase/migrations/20260920120000_practice_listen_stats.sql",
   );
   assert.match(constants, /export const RATING_ELIGIBILITY_LISTEN_MS = 30_000/);
+  assert.match(constants, /export const LISTEN_STATS_MAX_PLAYBACK_RATE = 1\.5/);
+  assert.match(constants, /export const LISTEN_STATS_WALL_CLOCK_SLACK_MS = 0/);
+  assert.doesNotMatch(constants, /LISTEN_STATS_BOOTSTRAP_MS/);
+  assert.match(player, /const PLAYBACK_RATES = \[0\.75, 1, 1\.25, 1\.5\]/);
   assert.match(migration, /v_total >= 30000/);
   assert.match(migration, /v_delta <= 20000/);
   assert.match(migration, /LEAST\(v_accepted, 15000\)/);
+  assert.match(migration, /v_max_rate numeric := 1\.5/);
+  assert.match(migration, /v_lifetime_cap := FLOOR\(v_life_elapsed \* 1\.5\)/);
+  assert.match(migration, /v_wall_cap := FLOOR\(v_elapsed \* v_max_rate\)/);
+  assert.doesNotMatch(migration, /v_life_elapsed \* 2 \+ 8000/);
+  assert.doesNotMatch(migration, /v_rate > 2/);
+  assert.doesNotMatch(migration, /v_slack := 2000/);
   assert.doesNotMatch(migration, /practice_ratings|practice_rating_events/);
   assert.doesNotMatch(
     read("supabase/migrations/20260919120000_harden_practice_audio_progress_rls.sql"),
@@ -238,6 +253,139 @@ function testMediaTimeRates() {
     threeQuarter.ratingEligibleAt,
     "0.75× eligible at 30s media / ~40s wall",
   );
+}
+
+function testAdversarialInflation() {
+  const lifetimeCap = (wallMs: number) =>
+    Math.floor(wallMs * LISTEN_STATS_MAX_PLAYBACK_RATE);
+
+  for (const forgedRate of [2, 10, 100]) {
+    const early = playTicks({
+      playbackRate: forgedRate,
+      ticks: [
+        { positionMs: 7_500, nowMs: 5_000 },
+        { positionMs: 15_000, nowMs: 10_000 },
+      ],
+    });
+    assert.equal(
+      early.realListenedMs,
+      lifetimeCap(10_000),
+      `forged rate ${forgedRate} at 10s wall must equal 1.5× budget`,
+    );
+    assert.equal(early.ratingEligibleAt, null);
+
+    const forged = playTicks({
+      playbackRate: forgedRate,
+      ticks: [
+        { positionMs: 7_500, nowMs: 5_000 },
+        { positionMs: 15_000, nowMs: 10_000 },
+        { positionMs: 22_500, nowMs: 15_000 },
+        { positionMs: 30_000, nowMs: 20_000 },
+      ],
+    });
+    assert.equal(forged.realListenedMs, 30_000);
+    assert.ok(forged.ratingEligibleAt);
+    assert.ok(
+      forged.realListenedMs <= lifetimeCap(20_000),
+      `forged rate ${forgedRate} must stay ≤ 1.5× wall`,
+    );
+  }
+
+  const spamBeforeEligible = [];
+  for (let index = 1; index <= 7; index += 1) {
+    spamBeforeEligible.push({
+      positionMs: index * 19_999,
+      nowMs: index * 2_500,
+    });
+  }
+  const spam = playTicks({ playbackRate: 100, ticks: spamBeforeEligible });
+  assert.equal(
+    spam.realListenedMs,
+    lifetimeCap(17_500),
+    "2.5s spam with forged forward positions cannot beat lifetime 1.5×",
+  );
+  assert.equal(spam.ratingEligibleAt, null, "spam at 17.5s wall is not eligible");
+
+  const spamAtFloor = playTicks({
+    playbackRate: 100,
+    ticks: [
+      ...spamBeforeEligible,
+      { positionMs: 8 * 19_999, nowMs: 20_000 },
+    ],
+  });
+  assert.equal(spamAtFloor.realListenedMs, lifetimeCap(20_000));
+  assert.ok(
+    spamAtFloor.ratingEligibleAt,
+    "earliest spam eligibility is 20s wall, not sooner via slack",
+  );
+
+  const huge = playTicks({
+    playbackRate: 100,
+    ticks: [
+      { positionMs: 60_000, nowMs: 1_000 },
+      { positionMs: 120_000, nowMs: 2_000 },
+    ],
+  });
+  assert.equal(huge.acceptedMs, 0, "huge forged seek is +0");
+  assert.equal(huge.realListenedMs, 0);
+  assert.equal(huge.ratingEligibleAt, null);
+
+  const firstShot30 = evaluateListenStatsTick(null, {
+    audioItemId: "track-a",
+    positionMs: 30_000,
+    nowMs: 0,
+    allowEligibility: true,
+    playbackRate: 100,
+  });
+  assert.equal(firstShot30.acceptedMs, 0);
+  assert.equal(firstShot30.realListenedMs, 0);
+  assert.equal(firstShot30.ratingEligibleAt, null);
+
+  const firstShot60 = evaluateListenStatsTick(null, {
+    audioItemId: "track-a",
+    positionMs: 60_000,
+    nowMs: 0,
+    allowEligibility: true,
+    playbackRate: 100,
+  });
+  assert.equal(firstShot60.acceptedMs, 0);
+  assert.equal(firstShot60.realListenedMs, 0);
+  assert.equal(firstShot60.ratingEligibleAt, null);
+
+  const justUnder = playTicks({
+    playbackRate: 100,
+    ticks: [{ positionMs: 19_999, nowMs: 19_999 }],
+  });
+  assert.ok(
+    justUnder.realListenedMs <= lifetimeCap(19_999),
+    "cannot reach 30000 accepted media before 20000ms wall",
+  );
+  assert.ok(justUnder.realListenedMs < RATING_ELIGIBILITY_LISTEN_MS);
+  assert.equal(justUnder.ratingEligibleAt, null);
+
+  const earliest = playTicks({
+    playbackRate: 1.5,
+    ticks: [
+      { positionMs: 7_500, nowMs: 5_000 },
+      { positionMs: 15_000, nowMs: 10_000 },
+      { positionMs: 22_500, nowMs: 15_000 },
+      { positionMs: 30_000, nowMs: 20_000 },
+    ],
+  });
+  assert.equal(earliest.realListenedMs, 30_000);
+  assert.ok(earliest.ratingEligibleAt, "honest 1.5× becomes eligible at 20s wall");
+
+  const tooEarlyAtMaxRate = playTicks({
+    playbackRate: 1.5,
+    ticks: [
+      { positionMs: 7_500, nowMs: 5_000 },
+      { positionMs: 15_000, nowMs: 10_000 },
+      { positionMs: 22_500, nowMs: 15_000 },
+      { positionMs: 29_999, nowMs: 19_999 },
+    ],
+  });
+  assert.ok(tooEarlyAtMaxRate.realListenedMs < 30_000);
+  assert.equal(tooEarlyAtMaxRate.ratingEligibleAt, null);
 }
 
 function testRaceNoDoubleNoLoss() {
@@ -497,6 +645,8 @@ function testSourceContracts() {
   assert.match(sessionLoad, /listenStats/);
   assert.match(database, /practice_listen_stats \(trusted MEDIA-TIME/);
   assert.match(database, /practice_audio_progress \(resume cursor\)/);
+  assert.match(database, /real_listened_ms <= floor\(\(now - created_at\) \* 1\.5\)/);
+  assert.match(database, /Client `playback_rate` — только телеметрия/);
   assert.match(preflight, /"practice_listen_stats"/);
 
   const catalogPlayback = read("src/lib/catalog/catalog-playback-contract.ts");
@@ -509,6 +659,7 @@ testConstants();
 testAccumulateAcrossSessionsAndTracks();
 testSeekPauseRewind();
 testMediaTimeRates();
+testAdversarialInflation();
 testRaceNoDoubleNoLoss();
 testAccessMatrix();
 testOwnStateShape();

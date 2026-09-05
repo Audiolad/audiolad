@@ -76,11 +76,11 @@ DECLARE
   v_position bigint := GREATEST(COALESCE(p_position_ms, 0), 0);
   v_accepted bigint := 0;
   v_row public.practice_listen_stats%ROWTYPE;
-  v_rate numeric;
+  v_max_rate numeric := 1.5;
   v_elapsed numeric;
-  v_slack bigint;
   v_wall_cap bigint;
   v_life_elapsed numeric;
+  v_lifetime_cap bigint;
   v_budget bigint;
   v_delta bigint;
   v_total bigint;
@@ -131,24 +131,13 @@ BEGIN
 
       v_accepted := LEAST(v_accepted, 15000);
 
+      -- Client p_playback_rate is telemetry only and must not expand caps.
       IF v_row.last_reported_at IS NOT NULL THEN
         v_elapsed := GREATEST(
           0,
           EXTRACT(EPOCH FROM (v_now - v_row.last_reported_at)) * 1000
         );
-        v_rate := COALESCE(p_playback_rate, 1);
-        IF v_rate < 0.5 THEN
-          v_rate := 0.5;
-        END IF;
-        IF v_rate > 2 THEN
-          v_rate := 2;
-        END IF;
-        IF v_elapsed >= 2500 THEN
-          v_slack := 2000;
-        ELSE
-          v_slack := 0;
-        END IF;
-        v_wall_cap := FLOOR(v_elapsed * v_rate + v_slack);
+        v_wall_cap := FLOOR(v_elapsed * v_max_rate);
         v_accepted := LEAST(v_accepted, v_wall_cap);
       END IF;
 
@@ -156,7 +145,8 @@ BEGIN
         0,
         EXTRACT(EPOCH FROM (v_now - v_row.created_at)) * 1000
       );
-      v_budget := FLOOR(v_life_elapsed * 2 + 8000 - v_row.real_listened_ms);
+      v_lifetime_cap := FLOOR(v_life_elapsed * 1.5);
+      v_budget := v_lifetime_cap - v_row.real_listened_ms;
       IF v_budget < 0 THEN
         v_budget := 0;
       END IF;
@@ -200,7 +190,7 @@ $$;
 COMMENT ON FUNCTION public.apply_practice_listen_stats_heartbeat(
   uuid, uuid, uuid, bigint, boolean, bigint, numeric, timestamptz
 ) IS
-  'Atomic MEDIA-TIME heartbeat. service_role only. Computes accepted ms from stored last_position; does not take an arbitrary increment. rating_eligible_at is set once when allow_eligibility and total >= 30000.';
+  'Atomic MEDIA-TIME heartbeat. service_role only. Computes accepted ms from stored last_position; does not take an arbitrary increment. Lifetime cap is floor((now-created_at)*1.5). Client playback_rate is telemetry and cannot raise the 1.5x budget. rating_eligible_at is set once when allow_eligibility and total >= 30000.';
 
 REVOKE ALL ON FUNCTION public.apply_practice_listen_stats_heartbeat(
   uuid, uuid, uuid, bigint, boolean, bigint, numeric, timestamptz

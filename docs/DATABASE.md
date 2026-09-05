@@ -685,6 +685,11 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 
 Константа приложения: `RATING_ELIGIBILITY_LISTEN_MS = 30000` в `src/lib/listen/listen-stats-constants.ts`.
 
+Анти-накрутка (серверная граница доверия):  
+`real_listened_ms <= floor((now - created_at) * 1.5)`.  
+`created_at` первой строки — trusted baseline (первый heartbeat = +0).  
+`1.5` — максимум каталожного плеера (`PLAYBACK_RATES`). Client `playback_rate` — только телеметрия, бюджет не поднимает. Постоянного bootstrap (+8000) и повторяющегося per-tick slack нет.
+
 ### Семантика
 
 - Суммируется на уровне user+practice: паузы, визиты, дни, несколько треков одного `practice_id`.

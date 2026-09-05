@@ -18,6 +18,7 @@ DECLARE
   eligible timestamptz;
   accepted bigint;
   t0 timestamptz := timestamptz '2026-09-20 00:00:00+00';
+  i integer;
 BEGIN
   SELECT count(*) INTO policy_select
   FROM pg_policies
@@ -181,6 +182,114 @@ BEGIN
   END IF;
   IF eligible IS NULL THEN
     RAISE EXCEPTION '0.75x should be eligible';
+  END IF;
+
+  -- -------------------------------------------------------------------------
+  -- anti-inflation: forged rate / spam / first-shot cannot beat 1.5× lifetime
+  -- -------------------------------------------------------------------------
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 30000, true, NULL, 100, t0
+  );
+  IF accepted <> 0 OR listened <> 0 OR eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'first heartbeat position_ms=30000 must accept 0, got accepted % listened % eligible %', accepted, listened, eligible;
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 60000, true, NULL, 100, t0
+  );
+  IF accepted <> 0 OR listened <> 0 OR eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'first heartbeat position_ms=60000 must accept 0, got accepted % listened % eligible %', accepted, listened, eligible;
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 100, t0
+  );
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 30000, true, NULL, 2, t0 + interval '5 seconds'
+  );
+  IF accepted <> 7500 OR listened <> 7500 THEN
+    RAISE EXCEPTION 'forged rate 2 must cap at 1.5× wall, accepted % listened %', accepted, listened;
+  END IF;
+  IF eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'forged rate 2 must not become eligible in 5s';
+  END IF;
+
+  SELECT accepted_ms, real_listened_ms
+  INTO accepted, listened
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 60000, true, NULL, 10, t0 + interval '10 seconds'
+  );
+  IF accepted <> 0 THEN
+    RAISE EXCEPTION 'huge forged position must be seek +0, got %', accepted;
+  END IF;
+  IF listened <> 7500 THEN
+    RAISE EXCEPTION 'seek must not add media, got %', listened;
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 100, t0
+  );
+  FOR i IN 1..8 LOOP
+    SELECT accepted_ms, real_listened_ms, rating_eligible_at
+    INTO accepted, listened, eligible
+    FROM public.apply_practice_listen_stats_heartbeat(
+      user_b, v_practice, audio_a, i * 19999, true, NULL, 100,
+      t0 + (i * interval '2.5 seconds')
+    );
+  END LOOP;
+  IF listened > floor(20000 * 1.5) THEN
+    RAISE EXCEPTION '2.5s spam exceeded lifetime 1.5× at 20s, got %', listened;
+  END IF;
+  IF listened <> 30000 THEN
+    RAISE EXCEPTION 'max-legal 1.5× spam at 20s wall should be 30000, got %', listened;
+  END IF;
+  IF eligible IS NULL THEN
+    RAISE EXCEPTION 'max-legal 1.5× should become eligible at 20s wall, not earlier budget';
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 100, t0
+  );
+  FOR i IN 1..7 LOOP
+    PERFORM public.apply_practice_listen_stats_heartbeat(
+      user_b, v_practice, audio_a, i * 19999, true, NULL, 100,
+      t0 + (i * interval '2.5 seconds')
+    );
+  END LOOP;
+  SELECT real_listened_ms, rating_eligible_at
+  INTO listened, eligible
+  FROM public.practice_listen_stats
+  WHERE user_id = user_b AND practice_id = v_practice;
+  IF listened <> floor(17500 * 1.5) THEN
+    RAISE EXCEPTION 'spam at 17.5s wall must equal lifetime cap %, got %', floor(17500 * 1.5), listened;
+  END IF;
+  IF eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'cannot be eligible before 20s wall at 1.5×';
+  END IF;
+
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 100, t0
+  );
+  SELECT accepted_ms, real_listened_ms, rating_eligible_at
+  INTO accepted, listened, eligible
+  FROM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 19999, true, NULL, 100,
+    t0 + interval '19999 milliseconds'
+  );
+  IF listened > floor(19999 * 1.5) OR listened >= 30000 OR eligible IS NOT NULL THEN
+    RAISE EXCEPTION 'cannot reach 30000 before 20000ms wall, got % eligible %', listened, eligible;
   END IF;
 
   -- race: overlapping ticks serialize, no double
