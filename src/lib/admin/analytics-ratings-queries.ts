@@ -14,6 +14,7 @@ import {
   parseAdminRatingsAuthorSort,
   parseAdminRatingsPeriod,
   parseAdminRatingsProductSort,
+  throwIfAdminRatingsRpcFailed,
   type AdminRatingsAuthorRow,
   type AdminRatingsBreakdownBundle,
   type AdminRatingsDiagnosticObservation,
@@ -89,6 +90,7 @@ export async function getAdminRatingsSummaryBundle(input: {
 
   if (error) {
     console.error("admin_ratings_summary_error", error.message);
+    throwIfAdminRatingsRpcFailed(error);
   }
 
   const raw = (data ?? {}) as Record<string, unknown>;
@@ -161,6 +163,15 @@ export async function getAdminRatingsBreakdownBundle(input: {
     }),
   ]);
 
+  if (productsResult.error) {
+    console.error("admin_ratings_products_error", productsResult.error.message);
+    throwIfAdminRatingsRpcFailed(productsResult.error);
+  }
+  if (authorsResult.error) {
+    console.error("admin_ratings_authors_error", authorsResult.error.message);
+    throwIfAdminRatingsRpcFailed(authorsResult.error);
+  }
+
   const productsRaw = (productsResult.data ?? {}) as Record<string, unknown>;
   const authorsRaw = (authorsResult.data ?? {}) as Record<string, unknown>;
 
@@ -228,14 +239,14 @@ export async function getAdminRatingsBreakdownBundle(input: {
       rows: productRows,
       sort: parseAdminRatingsProductSort(asText(productsRaw.sort)),
       sortDir: productsRaw.sort_dir === "asc" ? "asc" : "desc",
-      error: productsResult.error ? productsResult.error.message : null,
+      error: null,
     },
     authors: {
       total: asNumber(authorsRaw.total),
       rows: authorRows,
       sort: parseAdminRatingsAuthorSort(asText(authorsRaw.sort)),
       sortDir: authorsRaw.sort_dir === "asc" ? "asc" : "desc",
-      error: authorsResult.error ? authorsResult.error.message : null,
+      error: null,
     },
   };
 }
@@ -278,13 +289,7 @@ export async function getAdminRatingsEventsBundle(input: {
 
   if (error) {
     console.error("admin_ratings_events_error", error.message);
-    return {
-      total: 0,
-      limit: ADMIN_RATINGS_JOURNAL_PAGE_SIZE,
-      offset,
-      rows: [],
-      error: error.message,
-    };
+    throwIfAdminRatingsRpcFailed(error);
   }
 
   const raw = (data ?? {}) as Record<string, unknown>;
@@ -331,9 +336,11 @@ export async function getAdminRatingsDiagnosticsBundle(): Promise<AdminRatingsDi
 
   if (diagResult.error) {
     console.error("admin_ratings_diagnostics_error", diagResult.error.message);
+    throwIfAdminRatingsRpcFailed(diagResult.error);
   }
   if (excludedResult.error) {
     console.error("admin_ratings_excluded_error", excludedResult.error.message);
+    throwIfAdminRatingsRpcFailed(excludedResult.error);
   }
 
   const diagRaw = (diagResult.data ?? {}) as Record<string, unknown>;

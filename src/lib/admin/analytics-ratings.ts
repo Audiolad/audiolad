@@ -15,6 +15,31 @@
 
 export const ADMIN_RATINGS_JOURNAL_PAGE_SIZE = 50;
 
+/** Thrown by query helpers when a ratings admin RPC fails. Not a DB message. */
+export const ADMIN_RATINGS_RPC_FAILED = "admin_ratings_rpc_failed";
+
+export function throwIfAdminRatingsRpcFailed(
+  error: { message?: string } | null | undefined,
+): void {
+  if (!error) return;
+  throw new Error(ADMIN_RATINGS_RPC_FAILED);
+}
+
+export function adminRatingsInternalErrorBody(): { error: "internal_error" } {
+  return { error: "internal_error" };
+}
+
+export function simulateAdminRatingsRouteFromHelper(
+  helper: () => unknown,
+): { status: 200 | 500; body: { error?: "internal_error" } } {
+  try {
+    helper();
+    return { status: 200, body: {} };
+  } catch {
+    return { status: 500, body: adminRatingsInternalErrorBody() };
+  }
+}
+
 export type AdminRatingsPeriod = "7d" | "30d" | "all";
 export type AdminRatingsTab = "products" | "authors" | "journal";
 export type AdminRatingsEventKind = "first" | "changed";

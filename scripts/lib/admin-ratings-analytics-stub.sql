@@ -63,3 +63,9 @@ CREATE TABLE IF NOT EXISTS public.practice_listen_stats (
   rating_eligible_at timestamptz,
   PRIMARY KEY (user_id, practice_id)
 );
+
+GRANT ALL ON TABLE public.authors TO service_role;
+GRANT ALL ON TABLE public.practices TO service_role;
+GRANT ALL ON TABLE public.profiles TO service_role;
+GRANT ALL ON TABLE public.practice_listen_stats TO service_role;
+GRANT ALL ON TABLE auth.users TO service_role;

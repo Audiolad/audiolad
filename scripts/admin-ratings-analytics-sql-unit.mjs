@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Parse-only (+ optional isolated Postgres) tests for admin Ratings RPCs.
- * Scratch database only. Never writes to production postgres.
+ * Isolated scratch-Postgres smoke for admin Ratings RPCs.
+ * Never writes to production postgres. Parse-only is not a pass.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -149,13 +149,17 @@ function runIsolatedSql() {
 
 const skipIsolatedSql = process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1";
 
-if (!skipIsolatedSql && (dockerAvailable() || localPostgresAvailable())) {
-  runIsolatedSql();
-  console.log("admin-ratings-analytics-sql-unit: parse + isolated RPC/RLS ok");
-} else {
+if (skipIsolatedSql) {
   console.log(
-    skipIsolatedSql
-      ? "admin-ratings-analytics-sql-unit: parse-only ok (isolated SQL disabled)"
-      : "admin-ratings-analytics-sql-unit: parse-only ok (no local postgres)",
+    "admin-ratings-analytics-sql-unit: isolated smoke skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)",
   );
+} else if (dockerAvailable() || localPostgresAvailable()) {
+  runIsolatedSql();
+  console.log("ISOLATED_POSTGRES_SMOKE = PASS");
+  console.log("admin-ratings-analytics-sql-unit: isolated RPC/RLS ok");
+} else {
+  console.error(
+    "ISOLATED_POSTGRES_SMOKE = NOT_AVAILABLE: no Docker supabase-db and no local `sudo -n -u postgres psql`",
+  );
+  process.exit(1);
 }

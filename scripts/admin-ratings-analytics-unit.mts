@@ -10,6 +10,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ADMIN_RATINGS_RPC_FAILED,
+  adminRatingsInternalErrorBody,
   aggregateAdminRatingsByAuthor,
   aggregateAdminRatingsByProduct,
   adminAverageStars,
@@ -20,7 +22,9 @@ import {
   observeAdminRatingDiagnostics,
   paginateStable,
   parseAdminRatingsPeriod,
+  simulateAdminRatingsRouteFromHelper,
   summarizeAdminRatings,
+  throwIfAdminRatingsRpcFailed,
   type AdminEligibleFact,
   type AdminRatingEventFact,
   type AdminRatingFact,
@@ -381,6 +385,7 @@ function testSourceContracts() {
     migration,
     /jsonb_agg\(row_json ORDER BY occurred_at DESC, id DESC\)/,
   );
+  assert.match(migration, /INTO v_total, v_rows/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.admin_ratings_summary/);
   assert.doesNotMatch(
     migration,
@@ -409,9 +414,19 @@ function testSourceContracts() {
 
   assert.match(url, /value === "ratings"/);
   assert.match(queries, /createServiceRoleClient/);
+  assert.match(queries, /throwIfAdminRatingsRpcFailed/);
+  assert.doesNotMatch(
+    queries,
+    /return \{\s*total: 0,\s*limit: ADMIN_RATINGS_JOURNAL_PAGE_SIZE/,
+  );
+  assert.doesNotMatch(queries, /error: productsResult\.error \? productsResult\.error\.message/);
+  assert.doesNotMatch(queries, /error: authorsResult\.error \? authorsResult\.error\.message/);
+  assert.doesNotMatch(queries, /error: error\.message/);
   assert.match(guard, /analytics\.view/);
   assert.match(summaryRoute, /requireRatingsAnalyticsViewActor/);
+  assert.match(summaryRoute, /adminRatingsInternalErrorBody/);
   assert.match(eventsRoute, /requireRatingsAnalyticsViewActor/);
+  assert.match(eventsRoute, /adminRatingsInternalErrorBody/);
 
   assert.match(starClick, /Не удалось сохранить оценку/);
   assert.match(stars, /resolvePracticeRatingStarClick/);
@@ -437,5 +452,93 @@ testJournalOrderAndPagination();
 testDiagnosticsNeutralWording();
 testUrlState();
 testSourceContracts();
+testRpcFailureSemantics();
 
 console.log("admin-ratings-analytics-unit: ok");
+
+function testRpcFailureSemantics() {
+  const leaked =
+    'relation "practice_ratings" does not exist — permission denied PGRST204 supabase';
+
+  assert.doesNotThrow(() => throwIfAdminRatingsRpcFailed(null));
+  assert.doesNotThrow(() => throwIfAdminRatingsRpcFailed(undefined));
+
+  assert.throws(
+    () => throwIfAdminRatingsRpcFailed({ message: leaked }),
+    (error: unknown) =>
+      error instanceof Error && error.message === ADMIN_RATINGS_RPC_FAILED,
+  );
+
+  try {
+    throwIfAdminRatingsRpcFailed({ message: leaked });
+    assert.fail("summary helper must reject on RPC error");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.equal(message, ADMIN_RATINGS_RPC_FAILED);
+    assert.doesNotMatch(message, /relation|postgres|supabase|PGRST|permission denied/i);
+  }
+
+  const cases = [
+    "summary",
+    "products",
+    "authors",
+    "events",
+    "diagnostics",
+    "excluded",
+  ] as const;
+
+  for (const name of cases) {
+    const result = simulateAdminRatingsRouteFromHelper(() => {
+      throwIfAdminRatingsRpcFailed({ message: `${name}: ${leaked}` });
+    });
+    assert.equal(result.status, 500, `${name} route must be 500`);
+    assert.deepEqual(result.body, { error: "internal_error" });
+    assert.doesNotMatch(
+      JSON.stringify(result.body),
+      /relation|postgres|supabase|PGRST|permission denied|practice_ratings/i,
+      `${name} must not leak raw DB text`,
+    );
+    assert.notEqual(result.status, 200);
+    assert.notDeepEqual(result.body, {
+      ratingCount: 0,
+      totalStars: 0,
+    });
+  }
+
+  const eventsFakeSuccess = { total: 0, rows: [], error: leaked };
+  const routeInstead = simulateAdminRatingsRouteFromHelper(() => {
+    throwIfAdminRatingsRpcFailed({ message: leaked });
+    return eventsFakeSuccess;
+  });
+  assert.equal(routeInstead.status, 500);
+  assert.notDeepEqual(routeInstead.body, eventsFakeSuccess);
+
+  const diagnosticsFakeSuccess = {
+    attention: false,
+    excluded: { total: 0, rows: [] },
+  };
+  const diagRoute = simulateAdminRatingsRouteFromHelper(() => {
+    throwIfAdminRatingsRpcFailed({ message: leaked });
+    return diagnosticsFakeSuccess;
+  });
+  assert.equal(diagRoute.status, 500);
+  assert.notDeepEqual(diagRoute.body, diagnosticsFakeSuccess);
+
+  const clientBody = adminRatingsInternalErrorBody();
+  assert.deepEqual(clientBody, { error: "internal_error" });
+  assert.doesNotMatch(
+    JSON.stringify(clientBody),
+    /relation|postgres|supabase|PGRST|permission denied/i,
+  );
+
+  const breakdownRoute = read(
+    "src/app/api/admin/analytics/ratings/breakdown/route.ts",
+  );
+  const diagnosticsRoute = read(
+    "src/app/api/admin/analytics/ratings/diagnostics/route.ts",
+  );
+  assert.match(breakdownRoute, /adminRatingsInternalErrorBody/);
+  assert.match(diagnosticsRoute, /adminRatingsInternalErrorBody/);
+  assert.match(breakdownRoute, /status: 500/);
+  assert.match(diagnosticsRoute, /status: 500/);
+}

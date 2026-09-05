@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { adminRatingsInternalErrorBody } from "@/lib/admin/analytics-ratings";
 import { getAdminRatingsSummaryBundle } from "@/lib/admin/analytics-ratings-queries";
 import { requireRatingsAnalyticsViewActor } from "@/lib/admin/analytics-ratings-route-guard";
 import { parseAdminAnalyticsUrlState } from "@/lib/admin/analytics-url-state";
@@ -25,6 +26,6 @@ export async function GET(request: Request) {
       "admin_ratings_summary_route_error",
       error instanceof Error ? error.message : "unknown",
     );
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return NextResponse.json(adminRatingsInternalErrorBody(), { status: 500 });
   }
 }

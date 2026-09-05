@@ -257,89 +257,89 @@ BEGIN
       OR coalesce(p.slug, '') ILIKE '%' || v_q || '%'
       OR coalesce(a.slug, '') ILIKE '%' || v_q || '%'
   )
-  SELECT count(*)::integer
-  INTO v_total
-  FROM scored;
-
-  SELECT coalesce(
-    jsonb_agg(
-      row_json
-      ORDER BY sort_asc ASC NULLS LAST, sort_desc DESC NULLS LAST, practice_id ASC
-    ),
-    '[]'::jsonb
-  )
-  INTO v_rows
-  FROM (
-    SELECT
-      s.practice_id,
-      jsonb_build_object(
-        'practice_id', s.practice_id,
-        'title', s.title,
-        'practice_slug', s.practice_slug,
-        'product_kind', s.product_kind,
-        'author_id', s.author_id,
-        'author_name', s.author_name,
-        'author_slug', s.author_slug,
-        'href', s.href,
-        'total_stars', s.total_stars,
-        'rating_count', s.rating_count,
-        'average', s.average,
-        'stars_7d', s.stars_7d,
-        'count_7d', s.count_7d,
-        'stars_30d', s.stars_30d,
-        'count_30d', s.count_30d,
-        'eligible_listeners', s.eligible_listeners,
-        'rated_eligible', s.rated_eligible,
-        'conversion', s.conversion
-      ) AS row_json,
-      CASE
-        WHEN v_dir = 'asc' THEN
-          CASE v_sort
-            WHEN 'rating_count' THEN s.rating_count::numeric
-            WHEN 'stars_30d' THEN s.stars_30d::numeric
-            WHEN 'stars_7d' THEN s.stars_7d::numeric
-            WHEN 'conversion' THEN coalesce(s.conversion, -1)
-            ELSE s.total_stars::numeric
-          END
-        ELSE NULL
-      END AS sort_asc,
-      CASE
-        WHEN v_dir = 'desc' THEN
-          CASE v_sort
-            WHEN 'rating_count' THEN s.rating_count::numeric
-            WHEN 'stars_30d' THEN s.stars_30d::numeric
-            WHEN 'stars_7d' THEN s.stars_7d::numeric
-            WHEN 'conversion' THEN coalesce(s.conversion, -1)
-            ELSE s.total_stars::numeric
-          END
-        ELSE NULL
-      END AS sort_desc
-    FROM scored AS s
-    ORDER BY
-      CASE
-        WHEN v_dir = 'asc' THEN
-          CASE v_sort
-            WHEN 'rating_count' THEN s.rating_count::numeric
-            WHEN 'stars_30d' THEN s.stars_30d::numeric
-            WHEN 'stars_7d' THEN s.stars_7d::numeric
-            WHEN 'conversion' THEN coalesce(s.conversion, -1)
-            ELSE s.total_stars::numeric
-          END
-      END ASC NULLS LAST,
-      CASE
-        WHEN v_dir = 'desc' THEN
-          CASE v_sort
-            WHEN 'rating_count' THEN s.rating_count::numeric
-            WHEN 'stars_30d' THEN s.stars_30d::numeric
-            WHEN 'stars_7d' THEN s.stars_7d::numeric
-            WHEN 'conversion' THEN coalesce(s.conversion, -1)
-            ELSE s.total_stars::numeric
-          END
-      END DESC NULLS LAST,
-      s.total_stars DESC,
-      s.practice_id ASC
-    LIMIT v_limit OFFSET v_offset
-  ) AS page;
+  SELECT
+    (SELECT count(*)::integer FROM scored),
+    coalesce(
+      (
+        SELECT jsonb_agg(
+          row_json
+          ORDER BY sort_asc ASC NULLS LAST, sort_desc DESC NULLS LAST, practice_id ASC
+        )
+        FROM (
+          SELECT
+            s.practice_id,
+            jsonb_build_object(
+              'practice_id', s.practice_id,
+              'title', s.title,
+              'practice_slug', s.practice_slug,
+              'product_kind', s.product_kind,
+              'author_id', s.author_id,
+              'author_name', s.author_name,
+              'author_slug', s.author_slug,
+              'href', s.href,
+              'total_stars', s.total_stars,
+              'rating_count', s.rating_count,
+              'average', s.average,
+              'stars_7d', s.stars_7d,
+              'count_7d', s.count_7d,
+              'stars_30d', s.stars_30d,
+              'count_30d', s.count_30d,
+              'eligible_listeners', s.eligible_listeners,
+              'rated_eligible', s.rated_eligible,
+              'conversion', s.conversion
+            ) AS row_json,
+            CASE
+              WHEN v_dir = 'asc' THEN
+                CASE v_sort
+                  WHEN 'rating_count' THEN s.rating_count::numeric
+                  WHEN 'stars_30d' THEN s.stars_30d::numeric
+                  WHEN 'stars_7d' THEN s.stars_7d::numeric
+                  WHEN 'conversion' THEN coalesce(s.conversion, -1)
+                  ELSE s.total_stars::numeric
+                END
+              ELSE NULL
+            END AS sort_asc,
+            CASE
+              WHEN v_dir = 'desc' THEN
+                CASE v_sort
+                  WHEN 'rating_count' THEN s.rating_count::numeric
+                  WHEN 'stars_30d' THEN s.stars_30d::numeric
+                  WHEN 'stars_7d' THEN s.stars_7d::numeric
+                  WHEN 'conversion' THEN coalesce(s.conversion, -1)
+                  ELSE s.total_stars::numeric
+                END
+              ELSE NULL
+            END AS sort_desc
+          FROM scored AS s
+          ORDER BY
+            CASE
+              WHEN v_dir = 'asc' THEN
+                CASE v_sort
+                  WHEN 'rating_count' THEN s.rating_count::numeric
+                  WHEN 'stars_30d' THEN s.stars_30d::numeric
+                  WHEN 'stars_7d' THEN s.stars_7d::numeric
+                  WHEN 'conversion' THEN coalesce(s.conversion, -1)
+                  ELSE s.total_stars::numeric
+                END
+            END ASC NULLS LAST,
+            CASE
+              WHEN v_dir = 'desc' THEN
+                CASE v_sort
+                  WHEN 'rating_count' THEN s.rating_count::numeric
+                  WHEN 'stars_30d' THEN s.stars_30d::numeric
+                  WHEN 'stars_7d' THEN s.stars_7d::numeric
+                  WHEN 'conversion' THEN coalesce(s.conversion, -1)
+                  ELSE s.total_stars::numeric
+                END
+            END DESC NULLS LAST,
+            s.total_stars DESC,
+            s.practice_id ASC
+          LIMIT v_limit OFFSET v_offset
+        ) AS page
+      ),
+      '[]'::jsonb
+    )
+  INTO v_total, v_rows;
 
   RETURN jsonb_build_object(
     'total', coalesce(v_total, 0),
@@ -444,78 +444,81 @@ BEGIN
       OR coalesce(au.slug, '') ILIKE '%' || v_q || '%'
     GROUP BY a.author_id, au.name, au.slug
   )
-  SELECT count(*)::integer
-  INTO v_total
-  FROM scored;
-
-  SELECT coalesce(
-    jsonb_agg(row_json ORDER BY sort_asc ASC NULLS LAST, sort_desc DESC NULLS LAST, author_id ASC),
-    '[]'::jsonb
-  )
-  INTO v_rows
-  FROM (
-    SELECT
-      s.author_id,
-      jsonb_build_object(
-        'author_id', s.author_id,
-        'author_name', s.author_name,
-        'author_slug', s.author_slug,
-        'href', s.href,
-        'total_stars', s.total_stars,
-        'rating_count', s.rating_count,
-        'average', CASE
-          WHEN s.rating_count <= 0 THEN NULL
-          ELSE (s.total_stars::numeric / s.rating_count::numeric)
-        END,
-        'unique_raters', s.unique_raters,
-        'stars_7d', s.stars_7d,
-        'count_7d', s.count_7d,
-        'stars_30d', s.stars_30d,
-        'count_30d', s.count_30d,
-        'rating_bearing_products', s.rating_bearing_products
-      ) AS row_json,
-      CASE WHEN v_dir = 'asc' THEN
-        CASE v_sort
-          WHEN 'rating_count' THEN s.rating_count::numeric
-          WHEN 'stars_30d' THEN s.stars_30d::numeric
-          WHEN 'stars_7d' THEN s.stars_7d::numeric
-          WHEN 'unique_raters' THEN s.unique_raters::numeric
-          ELSE s.total_stars::numeric
-        END
-      END AS sort_asc,
-      CASE WHEN v_dir = 'desc' THEN
-        CASE v_sort
-          WHEN 'rating_count' THEN s.rating_count::numeric
-          WHEN 'stars_30d' THEN s.stars_30d::numeric
-          WHEN 'stars_7d' THEN s.stars_7d::numeric
-          WHEN 'unique_raters' THEN s.unique_raters::numeric
-          ELSE s.total_stars::numeric
-        END
-      END AS sort_desc
-    FROM scored AS s
-    ORDER BY
-      CASE WHEN v_dir = 'asc' THEN
-        CASE v_sort
-          WHEN 'rating_count' THEN s.rating_count::numeric
-          WHEN 'stars_30d' THEN s.stars_30d::numeric
-          WHEN 'stars_7d' THEN s.stars_7d::numeric
-          WHEN 'unique_raters' THEN s.unique_raters::numeric
-          ELSE s.total_stars::numeric
-        END
-      END ASC NULLS LAST,
-      CASE WHEN v_dir = 'desc' THEN
-        CASE v_sort
-          WHEN 'rating_count' THEN s.rating_count::numeric
-          WHEN 'stars_30d' THEN s.stars_30d::numeric
-          WHEN 'stars_7d' THEN s.stars_7d::numeric
-          WHEN 'unique_raters' THEN s.unique_raters::numeric
-          ELSE s.total_stars::numeric
-        END
-      END DESC NULLS LAST,
-      s.total_stars DESC,
-      s.author_id ASC
-    LIMIT v_limit OFFSET v_offset
-  ) AS page;
+  SELECT
+    (SELECT count(*)::integer FROM scored),
+    coalesce(
+      (
+        SELECT jsonb_agg(
+          row_json
+          ORDER BY sort_asc ASC NULLS LAST, sort_desc DESC NULLS LAST, author_id ASC
+        )
+        FROM (
+          SELECT
+            s.author_id,
+            jsonb_build_object(
+              'author_id', s.author_id,
+              'author_name', s.author_name,
+              'author_slug', s.author_slug,
+              'href', s.href,
+              'total_stars', s.total_stars,
+              'rating_count', s.rating_count,
+              'average', CASE
+                WHEN s.rating_count <= 0 THEN NULL
+                ELSE (s.total_stars::numeric / s.rating_count::numeric)
+              END,
+              'unique_raters', s.unique_raters,
+              'stars_7d', s.stars_7d,
+              'count_7d', s.count_7d,
+              'stars_30d', s.stars_30d,
+              'count_30d', s.count_30d,
+              'rating_bearing_products', s.rating_bearing_products
+            ) AS row_json,
+            CASE WHEN v_dir = 'asc' THEN
+              CASE v_sort
+                WHEN 'rating_count' THEN s.rating_count::numeric
+                WHEN 'stars_30d' THEN s.stars_30d::numeric
+                WHEN 'stars_7d' THEN s.stars_7d::numeric
+                WHEN 'unique_raters' THEN s.unique_raters::numeric
+                ELSE s.total_stars::numeric
+              END
+            END AS sort_asc,
+            CASE WHEN v_dir = 'desc' THEN
+              CASE v_sort
+                WHEN 'rating_count' THEN s.rating_count::numeric
+                WHEN 'stars_30d' THEN s.stars_30d::numeric
+                WHEN 'stars_7d' THEN s.stars_7d::numeric
+                WHEN 'unique_raters' THEN s.unique_raters::numeric
+                ELSE s.total_stars::numeric
+              END
+            END AS sort_desc
+          FROM scored AS s
+          ORDER BY
+            CASE WHEN v_dir = 'asc' THEN
+              CASE v_sort
+                WHEN 'rating_count' THEN s.rating_count::numeric
+                WHEN 'stars_30d' THEN s.stars_30d::numeric
+                WHEN 'stars_7d' THEN s.stars_7d::numeric
+                WHEN 'unique_raters' THEN s.unique_raters::numeric
+                ELSE s.total_stars::numeric
+              END
+            END ASC NULLS LAST,
+            CASE WHEN v_dir = 'desc' THEN
+              CASE v_sort
+                WHEN 'rating_count' THEN s.rating_count::numeric
+                WHEN 'stars_30d' THEN s.stars_30d::numeric
+                WHEN 'stars_7d' THEN s.stars_7d::numeric
+                WHEN 'unique_raters' THEN s.unique_raters::numeric
+                ELSE s.total_stars::numeric
+              END
+            END DESC NULLS LAST,
+            s.total_stars DESC,
+            s.author_id ASC
+          LIMIT v_limit OFFSET v_offset
+        ) AS page
+      ),
+      '[]'::jsonb
+    )
+  INTO v_total, v_rows;
 
   RETURN jsonb_build_object(
     'total', coalesce(v_total, 0),
@@ -626,39 +629,39 @@ BEGIN
         OR (v_excluded = 'excluded' AND r.excluded_at IS NOT NULL)
       )
   )
-  SELECT count(*)::integer
-  INTO v_total
-  FROM filtered;
-
-  SELECT coalesce(
-    jsonb_agg(row_json ORDER BY occurred_at DESC, id DESC),
-    '[]'::jsonb
-  )
-  INTO v_rows
-  FROM (
-    SELECT
-      f.id,
-      f.occurred_at,
-      jsonb_build_object(
-        'id', f.id,
-        'occurred_at', f.occurred_at,
-        'old_stars', f.old_stars,
-        'new_stars', f.new_stars,
-        'event_kind', f.event_kind,
-        'user_id', f.user_id,
-        'listener_label', f.listener_label,
-        'practice_id', f.practice_id,
-        'title', coalesce(nullif(btrim(f.title), ''), 'Практика'),
-        'href', f.href,
-        'author_id', f.author_id,
-        'author_name', coalesce(nullif(btrim(f.author_name), ''), 'Автор'),
-        'excluded', f.excluded_at IS NOT NULL,
-        'excluded_reason', f.excluded_reason
-      ) AS row_json
-    FROM filtered AS f
-    ORDER BY f.occurred_at DESC, f.id DESC
-    LIMIT v_limit OFFSET v_offset
-  ) AS page;
+  SELECT
+    (SELECT count(*)::integer FROM filtered),
+    coalesce(
+      (
+        SELECT jsonb_agg(row_json ORDER BY occurred_at DESC, id DESC)
+        FROM (
+          SELECT
+            f.id,
+            f.occurred_at,
+            jsonb_build_object(
+              'id', f.id,
+              'occurred_at', f.occurred_at,
+              'old_stars', f.old_stars,
+              'new_stars', f.new_stars,
+              'event_kind', f.event_kind,
+              'user_id', f.user_id,
+              'listener_label', f.listener_label,
+              'practice_id', f.practice_id,
+              'title', coalesce(nullif(btrim(f.title), ''), 'Практика'),
+              'href', f.href,
+              'author_id', f.author_id,
+              'author_name', coalesce(nullif(btrim(f.author_name), ''), 'Автор'),
+              'excluded', f.excluded_at IS NOT NULL,
+              'excluded_reason', f.excluded_reason
+            ) AS row_json
+          FROM filtered AS f
+          ORDER BY f.occurred_at DESC, f.id DESC
+          LIMIT v_limit OFFSET v_offset
+        ) AS page
+      ),
+      '[]'::jsonb
+    )
+  INTO v_total, v_rows;
 
   RETURN jsonb_build_object(
     'total', coalesce(v_total, 0),
