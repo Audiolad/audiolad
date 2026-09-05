@@ -719,6 +719,90 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 - `DELETE /progress` и rewind **не** чистят эту таблицу.
 - Admin test-user-reset считает `practice_listen_stats`; полное удаление тестового `auth.users` снимает строки через CASCADE.
 
+## practice_ratings (current active rating)
+
+Миграция: `supabase/migrations/20260921120000_practice_ratings.sql`.
+
+Это **не** resume cursor и **не** trusted listening.  
+`practice_audio_progress` — только позиция воспроизведения.  
+`practice_listen_stats` — накопленный MEDIA-TIME и одноразовый порог `rating_eligible_at`.  
+`practice_ratings` — **текущая активная** оценка пользователя (одна строка на user×practice).  
+`practice_rating_events` — неизменяемая история смен оценки.
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `id` | uuid PK | суррогатный ключ |
+| `user_id` | uuid | слушатель (`auth.users`), CASCADE |
+| `practice_id` | uuid | продукт, CASCADE |
+| `stars` | smallint 1..5 | текущие звёзды |
+| `created_at` | timestamptz | **время первой оценки**; не меняется при редактировании |
+| `updated_at` | timestamptz | меняется только когда `stars` реально изменились |
+| `vote_ip_hmac` | text NULL | HMAC доверенного IP при первой оценке; сырой IP не хранится |
+| `device_id_hmac` | text NULL | HMAC first-party `audiolad_anonymous_id`; не fingerprint |
+
+HMAC считается только из `RATINGS_SIGNAL_HMAC_SECRET` (префикс `v1:`). Если секрета нет — колонки остаются NULL, оценка всё равно принимается. Не использовать `SUPABASE_SERVICE_ROLE_KEY` как запасной ключ: ротация service-role не должна менять смысл `v1:`. Для будущей ротации HMAC — поднять `RATING_SIGNAL_HMAC_VERSION`; старые строки сохраняют прежний префикс.
+| `excluded_at` / `excluded_reason` / `excluded_by` | moderation | скрыть из публичного агрегата; UI админки — Stage 3 |
+
+UNIQUE `(user_id, practice_id)`.
+
+### Семантика
+
+- Первая оценка: INSERT + событие `NULL → N`. `created_at = updated_at = now()`.
+- Смена (например 3→5): та же строка, `created_at` неизменен, `updated_at` обновляется, событие `3 → 5`.
+- Повтор той же оценки: no-op — строка не обновляется (`updated_at` не трогаем), нового события нет.
+- Удаление оценки пользователем в v1 нет.
+- IP — только сигнал. Один IP ≠ один пользователь.
+
+### Кто может оценить (только сервер)
+
+- Зарегистрированный пользователь.
+- `practice_listen_stats.rating_eligible_at IS NOT NULL` для этого продукта (Stage 1, ≥ 30000 ms MEDIA-TIME).
+- Полный listen-доступ того же духа, что `PUT .../listen-stats` (не preview-only).
+- Не автор/владелец продукта (даже если историческая строка listen-stats есть).
+- Аноним — никогда. Preview — никогда.
+
+Публичный агрегат: **`totalStars` = SUM(stars)**, **`ratingCount` = COUNT(*)** по строкам с `excluded_at IS NULL`. Среднее — не публичная метрика.
+
+Пример: оценки 5, 3, 4 → `12 / 3`. Если 5→2 → `9 / 3`.
+
+### Временная семантика (для будущего «Популярное сейчас»)
+
+- All-time: сумма и счётчик **текущих** активных строк.
+- Окно 30 дней: участник, если `practice_ratings.created_at >= now()-30d`; вклад = **текущие** `stars`, не дельты событий.
+- Дельты `practice_rating_events` не являются первичным источником рейтинга по времени.
+
+### RLS / RPC
+
+- RLS **включён**.
+- `practice_ratings`: `authenticated` SELECT только своих строк. Прямые INSERT / UPDATE / DELETE запрещены.
+- `practice_rating_events`: клиентского доступа нет (anon / authenticated / PUBLIC отозваны).
+- Мутация только через `set_practice_rating` (`SECURITY DEFINER`). `EXECUTE` только у `service_role`.
+- Маршрут `PUT .../rating` сначала проверяет сессию, доступ, eligibility и «не автор», затем считает HMAC на сервере и вызывает RPC.
+
+### API
+
+- `GET /api/listen/product/{author}/{product}/rating` — own-state (`stars`, `createdAt`, `updatedAt`, `ratingEligible`) + `aggregate.totalStars` / `aggregate.ratingCount`. 401 без сессии.
+- `PUT` того же пути — тело `{ stars: 1..5 }`. Legacy-маршрут зеркалит product, как listen-stats.
+- Ошибки: `unauthorized` (401), `rating_not_eligible` (403), `author_cannot_rate_own_product` (403), `invalid_stars` (400), `not_found` (404).
+- UI на PDP за флагом `RATINGS_UI_ENABLED` (явное включение, как `PAYOUT_PROFILES_ENABLED`). Схема и API от флага не зависят.
+- Клиентский GET `ratingEligible` только для начального UI. Клик авторизованного пользователя всегда шлёт PUT; сервер заново проверяет eligibility. После 30 с прослушивания на уже открытой PDP оценка ставится без перезагрузки.
+
+Admin test-user-reset считает `practice_ratings` и `practice_rating_events`; удаление тестового `auth.users` снимает строки через CASCADE.
+
+## practice_rating_events (immutable audit / change history)
+
+Та же миграция `20260921120000_practice_ratings.sql`.
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `id` | uuid PK | суррогатный ключ |
+| `user_id` / `practice_id` | uuid | CASCADE с пользователем / продуктом |
+| `old_stars` | smallint NULL | `NULL` на первой оценке |
+| `new_stars` | smallint 1..5 | новое значение |
+| `occurred_at` | timestamptz | момент записи |
+
+Append-only. Клиент не читает и не пишет. Идентичный повтор оценки события не создаёт.
+
 ## private_audio_items (MVP, 2026-07-29)
 
 Миграция: `supabase/migrations/20260729190000_private_audio_items.sql`.

@@ -26,6 +26,8 @@ export type TestUserResetPreflightCounts = {
   userPractices: number;
   practiceAudioProgress: number;
   practiceListenStats: number;
+  practiceRatings: number;
+  practiceRatingEvents: number;
   playlists: number;
   playlistItems: number;
   emailContacts: number;

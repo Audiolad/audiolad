@@ -12,6 +12,7 @@ import {
   PracticeProductCover,
   toPracticeHeartProduct,
 } from "@/components/products/practice-page/PracticePageParts";
+import PracticeRatingStars from "@/components/products/practice-page/PracticeRatingStars";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import {
   AUDIO_POST_KIND_LABEL,
@@ -143,6 +144,16 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
             <AudioPostPlayer {...playerProps} variant="embedded" />
 
+            {viewModel.ratingsUiEnabled ? (
+              <PracticeRatingStars
+                authorSlug={resolvedAuthorSlug}
+                productSlug={practice.slug}
+                signInReturnPath={viewModel.practicePagePath}
+                isAuthenticated={viewModel.isAuthenticated}
+                isAuthorOwner={viewModel.isAuthorOwner}
+              />
+            ) : null}
+
             {subtitle ? (
               <p className="mt-3 text-sm leading-6 text-[#65577f]">{subtitle}</p>
             ) : null}
@@ -220,6 +231,16 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
         <div className="mt-6">
           <AudioPostPlayer {...playerProps} variant="panel" />
         </div>
+
+        {viewModel.ratingsUiEnabled ? (
+          <PracticeRatingStars
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+            signInReturnPath={viewModel.practicePagePath}
+            isAuthenticated={viewModel.isAuthenticated}
+            isAuthorOwner={viewModel.isAuthorOwner}
+          />
+        ) : null}
 
         {viewModel.showAuthorAppreciationPrototype && authorName ? (
           <div className="mt-4">
