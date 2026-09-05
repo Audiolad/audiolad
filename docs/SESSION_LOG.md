@@ -4,6 +4,21 @@
 
 ---
 
+## Сессия — 5 сентября 2026 (Admin Ratings analytics, Stage 3)
+
+**Сделано:**
+
+- Вкладка «Оценки» в существующем `AdminAnalyticsWorkbench` (`view=ratings`).
+- Server-side RPC `admin_ratings_*` (service_role only) + API под `analytics.view`.
+- Сводка, продукты, авторы, журнал с пагинацией, observe-only диагностика, список excluded.
+- Окна 7/30d по `practice_ratings.created_at` (первая оценка), не по `occurred_at`.
+- Exclude/Restore не добавлялись (read-only): нет права записи и аудита циклов.
+- Stage 1/2 rating/listen/HMAC/PDP/eligibility/feature flag не менялись.
+
+**Следующий шаг:** review PR, не merge и не deploy без подтверждения. Миграция `20260922120000_admin_ratings_analytics.sql` только после отдельного разрешения.
+
+---
+
 ## Сессия — 28 августа 2026 (analytics heavy RPC protection)
 
 **Сделано:**
