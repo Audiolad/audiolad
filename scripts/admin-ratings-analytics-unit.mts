@@ -24,11 +24,11 @@ import {
   type AdminEligibleFact,
   type AdminRatingEventFact,
   type AdminRatingFact,
-} from "../src/lib/admin/analytics-ratings.ts";
+} from "../src/lib/admin/analytics-ratings";
 import {
   buildAdminAnalyticsSearchParams,
   parseAdminAnalyticsUrlState,
-} from "../src/lib/admin/analytics-url-state.ts";
+} from "../src/lib/admin/analytics-url-state";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 

@@ -15,18 +15,15 @@ import {
   parseAdminRatingsPeriod,
   parseAdminRatingsProductSort,
   type AdminRatingsAuthorRow,
-  type AdminRatingsAuthorSort,
   type AdminRatingsBreakdownBundle,
   type AdminRatingsDiagnosticObservation,
   type AdminRatingsDiagnosticsBundle,
-  type AdminRatingsEventKind,
   type AdminRatingsEventRow,
   type AdminRatingsEventsBundle,
   type AdminRatingsExcludedFilter,
   type AdminRatingsExcludedRow,
   type AdminRatingsPeriod,
   type AdminRatingsProductRow,
-  type AdminRatingsProductSort,
   type AdminRatingsSummaryBundle,
 } from "@/lib/admin/analytics-ratings";
 import { resolveAdminAnalyticsPeriodRange } from "@/lib/admin/analytics-period";
