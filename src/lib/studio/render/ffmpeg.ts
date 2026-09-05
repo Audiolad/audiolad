@@ -37,6 +37,10 @@ function padToDuration(durationSeconds: number): string {
  * Produces an argument-safe filter graph.  The only semantic approximation is
  * FFmpeg's bass/treble shelf shape versus Web Audio's BiquadFilterNode shelf;
  * Q and gain are still passed explicitly and live in the canonical config.
+ *
+ * Each clip gets its own FFmpeg `-i` (same path may repeat). Do not fan one
+ * asset input through `asplit` for multiple clips: that desyncs `amix` and can
+ * drop a longer music tail after a shorter voice track ends.
  */
 export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGraph {
   const timeline = buildStudioRenderTimeline(input.snapshot);
@@ -44,13 +48,26 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
     throw new Error("Studio project has no audible clips to render.");
   }
 
-  const assetInputPaths = input.snapshot.assets.map((asset) => {
-    const localPath = input.localAssetPaths.get(asset.id);
-    if (!localPath) throw new Error(`Missing local file for persisted asset ${asset.id}.`);
-    return localPath;
-  });
-  const assetIndexes = new Map(input.snapshot.assets.map((asset, index) => [asset.id, index]));
   const assetsById = new Map(input.snapshot.assets.map((asset) => [asset.id, asset]));
+  const assetInputPaths: string[] = [];
+  const clipInputIndexes: number[][] = timeline.tracks.map(() => []);
+
+  timeline.tracks.forEach(({ track }, trackIndex) => {
+    track.clips.forEach((clip) => {
+      const asset = assetsById.get(clip.assetId);
+      if (!asset) throw new Error(`Unknown asset ${clip.assetId}.`);
+      const sourceTrim = getStudioRenderClipSourceDuration(clip, asset.durationSeconds);
+      if (sourceTrim <= 0) {
+        clipInputIndexes[trackIndex].push(-1);
+        return;
+      }
+      const localPath = input.localAssetPaths.get(asset.id);
+      if (!localPath) throw new Error(`Missing local file for persisted asset ${asset.id}.`);
+      clipInputIndexes[trackIndex].push(assetInputPaths.length);
+      assetInputPaths.push(localPath);
+    });
+  });
+
   const irPresets = [...new Set(
     timeline.tracks
       .filter(({ track }) => track.trackKind === "voice" && track.voicePreset !== "none")
@@ -59,19 +76,6 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   const irIndexes = new Map(irPresets.map((preset, index) => [preset, assetInputPaths.length + index]));
   const filters: string[] = [];
   const outputLabels: string[] = [];
-  const clipsByAsset = new Map<string, number>();
-  timeline.tracks.forEach(({ track }) => track.clips.forEach((clip) => {
-    clipsByAsset.set(clip.assetId, (clipsByAsset.get(clip.assetId) ?? 0) + 1);
-  }));
-  const assetSplitLabels = new Map<string, string[]>();
-  input.snapshot.assets.forEach((asset, assetIndex) => {
-    const count = clipsByAsset.get(asset.id) ?? 0;
-    if (count === 0) return;
-    const labels = Array.from({ length: count }, (_, index) => `asset_${assetIndex}_${index}`);
-    filters.push(`${inputLabel(assetIndex)}asplit=${count}${labels.map((label) => `[${label}]`).join("")}`);
-    assetSplitLabels.set(asset.id, labels);
-  });
-  const nextAssetSplit = new Map<string, number>();
 
   timeline.tracks.forEach(({ track, audibleEnd }, trackIndex) => {
     let cursor = 0;
@@ -85,17 +89,13 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
         );
         timelineParts.push(`[${gapLabel}]`);
       }
-      if (!assetIndexes.has(clip.assetId)) throw new Error(`Unknown asset ${clip.assetId}.`);
       const asset = assetsById.get(clip.assetId);
       if (!asset) throw new Error(`Unknown asset ${clip.assetId}.`);
-      const splitIndex = nextAssetSplit.get(clip.assetId) ?? 0;
-      const assetLabel = assetSplitLabels.get(clip.assetId)?.[splitIndex];
-      if (!assetLabel) throw new Error(`Missing split source for asset ${clip.assetId}.`);
-      nextAssetSplit.set(clip.assetId, splitIndex + 1);
+      const inputIndex = clipInputIndexes[trackIndex][clipIndex];
       const label = `clip_${trackIndex}_${clipIndex}`;
       const sourceTrim = getStudioRenderClipSourceDuration(clip, asset.durationSeconds);
       const filterParts: string[] = [];
-      if (sourceTrim > 0) {
+      if (sourceTrim > 0 && inputIndex >= 0) {
         filterParts.push(
           `atrim=start=${seconds(clip.offset)}:duration=${seconds(sourceTrim)}`,
           "asetpts=PTS-STARTPTS",
@@ -103,7 +103,6 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
           padToDuration(clip.duration),
         );
       } else {
-        // No usable source left after offset — fill geometric slot with silence.
         filterParts.push(
           `anullsrc=r=44100:cl=stereo,atrim=duration=${seconds(clip.duration)},asetpts=PTS-STARTPTS`,
           "aformat=sample_rates=44100:channel_layouts=stereo",
@@ -117,11 +116,9 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
           `afade=t=out:st=${seconds(clip.duration - clip.fadeOutDuration)}:d=${seconds(clip.fadeOutDuration)}:curve=tri`,
         );
       }
-      if (sourceTrim > 0) {
-        filters.push(`[${assetLabel}]${filterParts.join(",")}[${label}]`);
+      if (sourceTrim > 0 && inputIndex >= 0) {
+        filters.push(`${inputLabel(inputIndex)}${filterParts.join(",")}[${label}]`);
       } else {
-        // Still consume the split label so asplit counts stay consistent.
-        filters.push(`[${assetLabel}]anull,aformat=sample_rates=44100:channel_layouts=stereo[unused_${label}]`);
         filters.push(`${filterParts.join(",")}[${label}]`);
       }
       timelineParts.push(`[${label}]`);
