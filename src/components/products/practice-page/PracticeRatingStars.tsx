@@ -7,11 +7,14 @@ import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   buildPracticeRatingApiPath,
   fetchOwnPracticeRating,
-  putOwnPracticeRating,
-  RATING_AUTHOR_DENIED_COPY,
-  RATING_NOT_ELIGIBLE_COPY,
   RATING_THANKS_COPY,
 } from "@/lib/ratings/client";
+import {
+  applyOptimisticPracticeRating,
+  resolvePracticeRatingStarClick,
+  runAuthenticatedPracticeRatingClick,
+  type PracticeRatingUiState,
+} from "@/lib/ratings/star-click";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
 
 type PracticeRatingStarsProps = {
@@ -22,17 +25,12 @@ type PracticeRatingStarsProps = {
   isAuthorOwner: boolean;
 };
 
-function messageForRatingError(error: string | undefined): string {
-  if (error === "rating_not_eligible") {
-    return RATING_NOT_ELIGIBLE_COPY;
-  }
-
-  if (error === "author_cannot_rate_own_product") {
-    return RATING_AUTHOR_DENIED_COPY;
-  }
-
-  return "Не удалось сохранить оценку. Попробуйте ещё раз.";
-}
+const EMPTY_RATING_UI: PracticeRatingUiState = {
+  stars: null,
+  ratingEligible: false,
+  message: null,
+  pendingStars: null,
+};
 
 export default function PracticeRatingStars({
   authorSlug,
@@ -43,10 +41,7 @@ export default function PracticeRatingStars({
 }: PracticeRatingStarsProps) {
   const router = useRouter();
   const apiPath = buildPracticeRatingApiPath(authorSlug, productSlug);
-  const [stars, setStars] = useState<number | null>(null);
-  const [ratingEligible, setRatingEligible] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pendingStars, setPendingStars] = useState<number | null>(null);
+  const [ui, setUi] = useState<PracticeRatingUiState>(EMPTY_RATING_UI);
 
   useEffect(() => {
     if (!isAuthenticated || isAuthorOwner) {
@@ -61,11 +56,12 @@ export default function PracticeRatingStars({
           return;
         }
 
-        setStars(state.stars);
-        setRatingEligible(state.ratingEligible);
-        if (state.stars != null) {
-          setMessage(RATING_THANKS_COPY);
-        }
+        setUi({
+          stars: state.stars,
+          ratingEligible: state.ratingEligible,
+          message: state.stars != null ? RATING_THANKS_COPY : null,
+          pendingStars: null,
+        });
       })
       .catch(() => {
         // GET is advisory for UI; PUT re-checks eligibility on the server.
@@ -80,51 +76,42 @@ export default function PracticeRatingStars({
     return null;
   }
 
-  const displayStars = pendingStars ?? stars;
-  const isPending = pendingStars != null;
+  const displayStars = ui.pendingStars ?? ui.stars;
+  const isPending = ui.pendingStars != null;
 
   async function onSelectStar(nextStars: number) {
-    if (isPending) {
+    const action = resolvePracticeRatingStarClick({
+      isAuthenticated,
+      isPending,
+    });
+
+    if (action === "ignore") {
       return;
     }
 
-    if (!isAuthenticated) {
+    if (action === "sign_in") {
       router.push(buildAuthRouteHref("/auth/sign-in", signInReturnPath));
       return;
     }
 
-    if (!ratingEligible && stars == null) {
-      setMessage(RATING_NOT_ELIGIBLE_COPY);
-      return;
-    }
+    const previousStars = ui.stars;
+    const previousEligible = ui.ratingEligible;
+    setUi(applyOptimisticPracticeRating(ui, nextStars));
 
-    const previous = stars;
-    setPendingStars(nextStars);
-    setStars(nextStars);
-    setMessage(null);
-
-    try {
-      const result = await putOwnPracticeRating(apiPath, nextStars);
-      setStars(result.stars);
-      setRatingEligible(true);
-      setMessage(RATING_THANKS_COPY);
-    } catch (error) {
-      setStars(previous);
-      const code =
-        error && typeof error === "object" && "error" in error
-          ? String((error as { error?: string }).error)
-          : undefined;
-      setMessage(messageForRatingError(code));
-    } finally {
-      setPendingStars(null);
-    }
+    const next = await runAuthenticatedPracticeRatingClick({
+      apiPath,
+      currentStars: previousStars,
+      ratingEligible: previousEligible,
+      nextStars,
+    });
+    setUi(next);
   }
 
   return (
     <section
       className="mt-5"
       data-practice-rating
-      data-practice-rating-eligible={ratingEligible ? "true" : "false"}
+      data-practice-rating-eligible={ui.ratingEligible ? "true" : "false"}
       data-practice-rating-value={displayStars ?? ""}
     >
       <p className="text-sm font-medium text-[#25135c]">Оценка</p>
@@ -153,14 +140,14 @@ export default function PracticeRatingStars({
           );
         })}
       </div>
-      {message ? (
+      {ui.message ? (
         <p
           className="mt-2 text-sm leading-5 text-[#65577f]"
           role="status"
           aria-live="polite"
           data-practice-rating-message=""
         >
-          {message}
+          {ui.message}
         </p>
       ) : null}
     </section>

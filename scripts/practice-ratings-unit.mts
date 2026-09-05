@@ -25,6 +25,13 @@ import {
   RATING_NOT_ELIGIBLE_COPY,
   RATING_THANKS_COPY,
 } from "../src/lib/ratings/client";
+import {
+  applyOptimisticPracticeRating,
+  resolvePracticeRatingStarClick,
+  runAuthenticatedPracticeRatingClick,
+  type PracticeRatingUiState,
+} from "../src/lib/ratings/star-click";
+import type { PracticeRatingPutState } from "../src/lib/ratings/types";
 import { getTrustedClientIp } from "../src/lib/http/trusted-client-ip";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -160,16 +167,55 @@ function testHmacAndTrustedIp() {
   const hashed = hmacRatingSignal("ip", "203.0.113.9", env);
   assert.match(hashed ?? "", /^v1:[0-9a-f]{64}$/);
   assert.doesNotMatch(hashed ?? "", /203\.0\.113\.9/);
+  assert.doesNotMatch(hashed ?? "", /anon-from-body|audiolad_anonymous_id/);
   assert.equal(hmacRatingSignal("ip", "unknown", env), null);
   assert.equal(hmacRatingSignal("device", "", env), null);
   assert.equal(
     hmacRatingSignal("ip", "203.0.113.9", env),
     hmacRatingSignal("ip", "203.0.113.9", env),
+    "same signal + same secret is deterministic",
   );
   assert.notEqual(
     hmacRatingSignal("ip", "203.0.113.9", env),
     hmacRatingSignal("device", "203.0.113.9", env),
+    "ip and device kinds differ",
   );
+  assert.notEqual(
+    hmacRatingSignal("ip", "203.0.113.9", env),
+    hmacRatingSignal("ip", "203.0.113.10", env),
+    "different values differ",
+  );
+  assert.notEqual(
+    hmacRatingSignal("device", "anon-aaa", env),
+    hmacRatingSignal("device", "anon-bbb", env),
+  );
+
+  assert.equal(hmacRatingSignal("ip", "203.0.113.9", {}), null);
+  assert.equal(
+    hmacRatingSignal("ip", "203.0.113.9", {
+      RATINGS_SIGNAL_HMAC_SECRET: "   ",
+    }),
+    null,
+  );
+  assert.equal(
+    hmacRatingSignal("ip", "203.0.113.9", {
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-must-not-be-used",
+    }),
+    null,
+    "service-role key is not a fallback",
+  );
+  assert.equal(
+    hmacRatingSignal("ip", "203.0.113.9", env),
+    hmacRatingSignal("ip", "203.0.113.9", {
+      ...env,
+      SUPABASE_SERVICE_ROLE_KEY: "changed-service-role",
+    }),
+    "changing SUPABASE_SERVICE_ROLE_KEY must not change HMAC",
+  );
+
+  const device = hmacRatingSignal("device", "anon-from-body", env);
+  assert.match(device ?? "", /^v1:[0-9a-f]{64}$/);
+  assert.doesNotMatch(device ?? "", /anon-from-body/);
 
   const spoofed = new Request("https://audiolad.ru/api", {
     headers: {
@@ -188,6 +234,98 @@ function testHmacAndTrustedIp() {
     }),
   );
   assert.equal(fromCookie, "anon-cookie-1");
+}
+
+function successPut(stars: number): PracticeRatingPutState {
+  return {
+    stars,
+    createdAt: "2026-09-05T12:00:00.000Z",
+    updatedAt: "2026-09-05T12:00:00.000Z",
+    changed: true,
+    aggregate: { totalStars: stars, ratingCount: 1 },
+  };
+}
+
+function testStaleEligibilityDoesNotBlockPut() {
+  assert.equal(
+    resolvePracticeRatingStarClick({
+      isAuthenticated: false,
+      isPending: false,
+    }),
+    "sign_in",
+  );
+  assert.equal(
+    resolvePracticeRatingStarClick({
+      isAuthenticated: true,
+      isPending: true,
+    }),
+    "ignore",
+  );
+  assert.equal(
+    resolvePracticeRatingStarClick({
+      isAuthenticated: true,
+      isPending: false,
+    }),
+    "put",
+    "authenticated click always PUTs; local ratingEligible is not consulted",
+  );
+
+  const initial: PracticeRatingUiState = {
+    stars: null,
+    ratingEligible: false,
+    message: null,
+    pendingStars: null,
+  };
+  const optimistic = applyOptimisticPracticeRating(initial, 4);
+  assert.deepEqual(optimistic, {
+    stars: 4,
+    ratingEligible: false,
+    message: null,
+    pendingStars: 4,
+  });
+}
+
+async function testEligibleAfterListenWithoutReload() {
+  const puts: number[] = [];
+  const next = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: null,
+    ratingEligible: false,
+    nextStars: 4,
+    put: async (_path, stars) => {
+      puts.push(stars);
+      return successPut(stars);
+    },
+  });
+
+  assert.deepEqual(puts, [4], "A: PUT is called even when GET said not eligible");
+  assert.equal(next.stars, 4);
+  assert.equal(next.message, RATING_THANKS_COPY);
+  assert.equal(next.pendingStars, null);
+  assert.equal(next.ratingEligible, true);
+}
+
+async function testNotEligiblePutRevertsOptimistic() {
+  const puts: number[] = [];
+  const next = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: null,
+    ratingEligible: false,
+    nextStars: 4,
+    put: async (_path, stars) => {
+      puts.push(stars);
+      throw Object.assign(new Error("rating_not_eligible"), {
+        status: 403,
+        error: "rating_not_eligible",
+      });
+    },
+  });
+
+  assert.deepEqual(puts, [4], "B: PUT is still sent when server is not eligible");
+  assert.equal(next.stars, null, "optimistic 4★ is rolled back");
+  assert.equal(next.message, RATING_NOT_ELIGIBLE_COPY);
+  assert.equal(next.pendingStars, null);
+  assert.equal(next.ratingEligible, false);
 }
 
 function testAggregateNoDoubleCount() {
@@ -247,6 +385,7 @@ function testSourceContracts() {
   const write = read("src/lib/ratings/write.ts");
   const eligibility = read("src/lib/ratings/eligibility.ts");
   const hmac = read("src/lib/ratings/signal-hmac.ts");
+  const starClick = read("src/lib/ratings/star-click.ts");
   const ui = read(
     "src/components/products/practice-page/PracticeRatingStars.tsx",
   );
@@ -294,7 +433,13 @@ function testSourceContracts() {
 
   assert.match(hmac, /createHmac/);
   assert.match(hmac, /RATINGS_SIGNAL_HMAC_SECRET/);
+  assert.match(hmac, /Uses ONLY `RATINGS_SIGNAL_HMAC_SECRET`/);
+  assert.match(hmac, /RATING_SIGNAL_HMAC_VERSION/);
+  assert.match(hmac, /do not fall back to `SUPABASE_SERVICE_ROLE_KEY`/);
+  assert.doesNotMatch(hmac, /env\.SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(hmac, /console\.(log|info|debug).*SECRET/);
+  assert.match(database, /RATINGS_SIGNAL_HMAC_SECRET/);
+  assert.match(database, /Не использовать `SUPABASE_SERVICE_ROLE_KEY`/);
 
   assert.match(productRoute, /handlePracticeRatingGet/);
   assert.match(productRoute, /handlePracticeRatingPut/);
@@ -306,12 +451,20 @@ function testSourceContracts() {
   assert.match(pdp, /PracticeRatingStars/);
   assert.match(pdp, /ratingsUiEnabled/);
   assert.match(audioPost, /PracticeRatingStars/);
-  assert.match(ui, /RATING_NOT_ELIGIBLE_COPY/);
+  assert.match(starClick, /return "put"/);
+  assert.match(starClick, /Local GET `ratingEligible` is advisory only/);
+  assert.doesNotMatch(
+    starClick,
+    /ratingEligible === false|!ratingEligible && stars/,
+  );
+  assert.match(ui, /resolvePracticeRatingStarClick/);
+  assert.match(ui, /runAuthenticatedPracticeRatingClick/);
   assert.match(ui, /RATING_THANKS_COPY/);
   assert.match(ui, /buildAuthRouteHref\("\/auth\/sign-in"/);
-  assert.match(ui, /putOwnPracticeRating/);
+  assert.doesNotMatch(ui, /!ratingEligible && stars == null/);
   assert.doesNotMatch(ui, /window\.alert|confirm\(/);
   assert.doesNotMatch(ui, /modal|dialog|popup/i);
+  assert.match(database, /всегда шлёт PUT/);
 
   assert.match(database, /practice_audio_progress \(resume cursor\)/);
   assert.match(database, /practice_listen_stats \(trusted MEDIA-TIME/);
@@ -333,6 +486,9 @@ testEligibilityReusesStage1();
 testAccessDecisionPreviewDenied();
 testFeatureFlag();
 testHmacAndTrustedIp();
+testStaleEligibilityDoesNotBlockPut();
+await testEligibleAfterListenWithoutReload();
+await testNotEligiblePutRevertsOptimistic();
 testAggregateNoDoubleCount();
 testClientContracts();
 testSourceContracts();

@@ -739,6 +739,8 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 | `updated_at` | timestamptz | меняется только когда `stars` реально изменились |
 | `vote_ip_hmac` | text NULL | HMAC доверенного IP при первой оценке; сырой IP не хранится |
 | `device_id_hmac` | text NULL | HMAC first-party `audiolad_anonymous_id`; не fingerprint |
+
+HMAC считается только из `RATINGS_SIGNAL_HMAC_SECRET` (префикс `v1:`). Если секрета нет — колонки остаются NULL, оценка всё равно принимается. Не использовать `SUPABASE_SERVICE_ROLE_KEY` как запасной ключ: ротация service-role не должна менять смысл `v1:`. Для будущей ротации HMAC — поднять `RATING_SIGNAL_HMAC_VERSION`; старые строки сохраняют прежний префикс.
 | `excluded_at` / `excluded_reason` / `excluded_by` | moderation | скрыть из публичного агрегата; UI админки — Stage 3 |
 
 UNIQUE `(user_id, practice_id)`.
@@ -783,6 +785,7 @@ UNIQUE `(user_id, practice_id)`.
 - `PUT` того же пути — тело `{ stars: 1..5 }`. Legacy-маршрут зеркалит product, как listen-stats.
 - Ошибки: `unauthorized` (401), `rating_not_eligible` (403), `author_cannot_rate_own_product` (403), `invalid_stars` (400), `not_found` (404).
 - UI на PDP за флагом `RATINGS_UI_ENABLED` (явное включение, как `PAYOUT_PROFILES_ENABLED`). Схема и API от флага не зависят.
+- Клиентский GET `ratingEligible` только для начального UI. Клик авторизованного пользователя всегда шлёт PUT; сервер заново проверяет eligibility. После 30 с прослушивания на уже открытой PDP оценка ставится без перезагрузки.
 
 Admin test-user-reset считает `practice_ratings` и `practice_rating_events`; удаление тестового `auth.users` снимает строки через CASCADE.
 
