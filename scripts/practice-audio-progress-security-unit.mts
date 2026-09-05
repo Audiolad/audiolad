@@ -315,7 +315,7 @@ function testSourceContracts() {
   assert.match(apiContext, /purpose \?\? "full_audio"/);
   assert.match(
     previewAccess,
-    /Client `preview=1` \/ playbackMode never grant full audio or progress writes/,
+    /Client `preview=1` \/ playbackMode never grant full audio, progress writes/,
   );
 
   const preflight = read("src/lib/admin/test-user-reset/preflight.ts");

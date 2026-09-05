@@ -132,6 +132,21 @@ function testAccessDecisions() {
   });
   assert.equal(previewProgress.ok, false, "preview-only cannot write progress");
 
+  const previewListenStats = resolveListenApiDecision({
+    purpose: "listen_stats",
+    isCourse: false,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: catalogEligible,
+    listenAccess: null,
+  });
+  assert.equal(
+    previewListenStats.ok,
+    false,
+    "preview-only cannot accrue listen-stats",
+  );
+
   const previewFullAudio = resolveListenApiDecision({
     purpose: "full_audio",
     isCourse: false,

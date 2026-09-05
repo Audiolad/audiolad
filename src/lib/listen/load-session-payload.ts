@@ -5,6 +5,10 @@ import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { resolvePlaybackNavigationPolicy } from "@/lib/listen/playback-navigation";
+import {
+  EMPTY_LISTEN_STATS_OWN_STATE,
+  getOwnPracticeListenStats,
+} from "@/lib/listen/listen-stats";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import {
   mapLegacyPracticeToListenTrack,
@@ -249,6 +253,7 @@ export async function loadListenSessionPayload(
     }
 
     let initialProgress: Awaited<ReturnType<typeof listPracticeProgress>> = [];
+    let listenStats = EMPTY_LISTEN_STATS_OWN_STATE;
 
     if (userId && !options?.forceStartAtBeginning) {
       try {
@@ -259,6 +264,18 @@ export async function loadListenSessionPayload(
         );
       } catch {
         initialProgress = [];
+      }
+    }
+
+    if (userId) {
+      try {
+        listenStats = await getOwnPracticeListenStats(
+          supabase,
+          userId,
+          practiceRow.id,
+        );
+      } catch {
+        listenStats = EMPTY_LISTEN_STATS_OWN_STATE;
       }
     }
 
@@ -277,6 +294,7 @@ export async function loadListenSessionPayload(
         format: getDisplayFormat(practiceRow.format),
         tracks,
         initialProgress,
+        listenStats,
         coverSymbol: getCoverSymbol(practiceRow.slug),
         coverGradient: getCoverGradient(practiceRow.slug),
         coverImageUrl: resolveProductCoverUrl(

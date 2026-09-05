@@ -5,7 +5,11 @@ import {
 } from "@/lib/products/access";
 import type { ListenAccess, ListenAccessMode } from "@/lib/listen/types";
 
-export type ListenApiPurpose = "full_audio" | "preview_audio" | "progress";
+export type ListenApiPurpose =
+  | "full_audio"
+  | "preview_audio"
+  | "progress"
+  | "listen_stats";
 
 export type ListenApiDecision =
   | { ok: true; access: ListenAccess; useServiceRoleStorage: boolean }
@@ -36,9 +40,9 @@ export function shouldUseServiceRoleStorageForReason(
 }
 
 /**
- * Server source of truth for listen API audio vs progress.
- * Client `preview=1` / playbackMode never grant full audio or progress writes.
- * Course lesson audio is never opened by catalog preview.
+ * Server source of truth for listen API audio vs progress vs listen-stats.
+ * Client `preview=1` / playbackMode never grant full audio, progress writes,
+ * or listen-stats accrual. Course lesson audio is never opened by catalog preview.
  */
 export function resolveListenApiDecision(input: {
   purpose: ListenApiPurpose;

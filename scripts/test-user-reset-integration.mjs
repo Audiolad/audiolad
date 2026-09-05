@@ -212,6 +212,7 @@ function testBlockersPolicyWithSyntheticCounts() {
     counts: {
       userPractices: 0,
       practiceAudioProgress: 0,
+      practiceListenStats: 0,
       playlists: 0,
       playlistItems: 0,
       emailContacts: 0,
@@ -246,6 +247,7 @@ function testBlockersPolicyWithSyntheticCounts() {
     counts: {
       userPractices: 0,
       practiceAudioProgress: 0,
+      practiceListenStats: 0,
       playlists: 0,
       playlistItems: 0,
       emailContacts: 0,
