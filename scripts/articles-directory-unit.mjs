@@ -160,6 +160,7 @@ import { BELYY_SHUM_FENA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/cont
 import { SHUM_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-ventilyatora-dlya-sna-slushat-onlayn.ts";
 import { ZVUK_VENTILYATORA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-ventilyatora-dlya-sna-slushat-onlayn.ts";
 import { BELYY_SHUM_VENTILYATORA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-ventilyatora-slushat-onlayn.ts";
+import { ZVUK_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-vody-iz-krana-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -3586,6 +3587,20 @@ function testOneHundredThirtyThirdListenInDirectory() {
   assert(!data.articles.some((item) => item.href === "/articles/belyy-shum-ventilyatora-slushat-onlayn"), "no /articles duplicate for one-hundred-thirty-third listen slug");
 }
 
+function testOneHundredThirtyFourthListenInDirectory() {
+  const data = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    listIndexableListenPageDefinitions(),
+  );
+  const href = "/listens/zvuk-vody-iz-krana-slushat-onlayn";
+  const card = data.articles.find((item) => item.href === href);
+  assert(card, "one-hundred-thirty-fourth indexable listen page is listed");
+  assert(card.title === ZVUK_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.title, "one-hundred-thirty-fourth directory title");
+  assert(card.description === ZVUK_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.description, "one-hundred-thirty-fourth directory description");
+  assert(!data.articles.some((item) => item.href === "/articles/zvuk-vody-iz-krana-slushat-onlayn"), "no /articles duplicate for one-hundred-thirty-fourth listen slug");
+}
+
 const tests = [
   ["route exists", testRouteExists],
   ["H1 and copy", testH1AndCopy],
@@ -3629,6 +3644,7 @@ const tests = [
   ["one-hundred-thirty-first listen page in directory", testOneHundredThirtyFirstListenInDirectory],
   ["one-hundred-thirty-second listen page in directory", testOneHundredThirtySecondListenInDirectory],
   ["one-hundred-thirty-third listen page in directory", testOneHundredThirtyThirdListenInDirectory],
+  ["one-hundred-thirty-fourth listen page in directory", testOneHundredThirtyFourthListenInDirectory],
   ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["listen rain sleep cluster internal links", testListenRainSleepClusterInternalLinks],
   ["empty state", testEmptyState],
