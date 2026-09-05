@@ -9,7 +9,8 @@ export type ListenApiPurpose =
   | "full_audio"
   | "preview_audio"
   | "progress"
-  | "listen_stats";
+  | "listen_stats"
+  | "rating";
 
 export type ListenApiDecision =
   | { ok: true; access: ListenAccess; useServiceRoleStorage: boolean }
@@ -43,6 +44,7 @@ export function shouldUseServiceRoleStorageForReason(
  * Server source of truth for listen API audio vs progress vs listen-stats.
  * Client `preview=1` / playbackMode never grant full audio, progress writes,
  * or listen-stats accrual. Course lesson audio is never opened by catalog preview.
+ * Rating PUT uses the same full-access decision as listen-stats.
  */
 export function resolveListenApiDecision(input: {
   purpose: ListenApiPurpose;

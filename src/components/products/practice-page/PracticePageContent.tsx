@@ -11,6 +11,7 @@ import {
   PracticeBackLink,
 } from "./PracticePageParts";
 import PracticeProductHero from "./PracticeProductHero";
+import PracticeRatingStars from "./PracticeRatingStars";
 import type { PracticePageViewModel } from "./types";
 
 type PracticePageContentProps = {
@@ -62,6 +63,16 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
             productSlug: practice.slug,
           }}
         />
+
+        {viewModel.ratingsUiEnabled ? (
+          <PracticeRatingStars
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+            signInReturnPath={viewModel.practicePagePath}
+            isAuthenticated={viewModel.isAuthenticated}
+            isAuthorOwner={viewModel.isAuthorOwner}
+          />
+        ) : null}
 
         <ProductCopySections description={description} />
         <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />

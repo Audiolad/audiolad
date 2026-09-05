@@ -76,4 +76,6 @@ export type PracticePageViewModel = {
    */
   showAuthorAppreciationPrototype: boolean;
   publishPreview: PracticePagePublishPreview | null;
+  ratingsUiEnabled: boolean;
+  isAuthorOwner: boolean;
 };

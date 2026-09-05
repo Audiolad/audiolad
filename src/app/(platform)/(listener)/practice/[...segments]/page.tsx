@@ -108,6 +108,8 @@ import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
 import { loadPricePromotionsForPractice } from "@/lib/pricing/queries";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
+import { isCoursePublication } from "@/lib/course-content/validators";
+import { isRatingsUiEnabled } from "@/lib/ratings/feature";
 
 export const dynamic = "force-dynamic";
 
@@ -710,6 +712,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     promoStartToken,
     promoStartPending,
     showAuthorAppreciationPrototype,
+    ratingsUiEnabled:
+      isRatingsUiEnabled() &&
+      !isCoursePublication(practice.publication_class, practice.product_kind),
+    isAuthorOwner: Boolean(user?.id) && user?.id === practice.author_id,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {
