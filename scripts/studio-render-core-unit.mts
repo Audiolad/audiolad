@@ -791,6 +791,110 @@ async function main() {
     );
     assert.equal(mixedRendered.samples.length / 2, Math.round(2.5 * RATE));
 
+
+    // --- asplit music-tail regression: short asset, 3 sequential clips, music after voice ---
+    const loopMusicPath = join(root, "loop-music-1s.wav");
+    await writeFile(loopMusicPath, createConstantWav(1, 0.35));
+    const longVoicePath = join(root, "voice-2s.wav");
+    await writeFile(longVoicePath, createConstantWav(2, 0.5));
+    const musicAfterVoice = project("none", 1, false);
+    musicAfterVoice.project_data.tracks[0].clips = [
+      { id: "voice-early-end", startTime: 0, offset: 0, duration: 2, fadeInDuration: 0, fadeOutDuration: 0 },
+    ];
+    musicAfterVoice.project_data.tracks[1].volume = 1;
+    musicAfterVoice.project_data.tracks[1].clips = [
+      { id: "music-loop-0", startTime: 0, offset: 0, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
+      { id: "music-loop-1", startTime: 1, offset: 0, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
+      { id: "music-loop-2", startTime: 2, offset: 0, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
+    ];
+    // Empty third track must not affect timeline/render.
+    musicAfterVoice.project_data.tracks.push({
+      id: "empty-voice-track",
+      assetId: ASSET_VOICE,
+      name: "Empty",
+      volume: 1,
+      muted: false,
+      trackKind: "voice" as const,
+      voicePreset: "none" as const,
+      clips: [],
+    });
+    musicAfterVoice.project_data.slots.push({
+      id: "empty-slot",
+      name: "Empty",
+      audioTrackId: "empty-voice-track",
+      trackKind: "voice" as const,
+    });
+    const musicAfterVoiceSnapshot = createStudioRenderSnapshot({
+      project: musicAfterVoice,
+      expectedRevision: 7,
+      assets: [
+        asset(ASSET_VOICE, "voice-2s.wav", 2),
+        asset(ASSET_MUSIC, "loop-music-1s.wav", 1),
+      ],
+    });
+    assert.equal(musicAfterVoiceSnapshot.tracks.length, 3);
+    assert.equal(musicAfterVoiceSnapshot.tracks[2].clips.length, 0);
+    assert.equal(buildStudioRenderTimeline(musicAfterVoiceSnapshot).durationSeconds, 3);
+    assert.equal(buildStudioRenderTimeline(musicAfterVoiceSnapshot).tracks.length, 2, "empty clip track is non-audible");
+    const musicAfterVoiceGraph = buildStudioRenderFilterGraph({
+      snapshot: musicAfterVoiceSnapshot,
+      localAssetPaths: new Map([[ASSET_VOICE, longVoicePath], [ASSET_MUSIC, loopMusicPath]]),
+    });
+    assert.equal(
+      musicAfterVoiceGraph.assetInputPaths.filter((path) => path === loopMusicPath).length,
+      3,
+      "each music clip must get its own -i (same path repeated)",
+    );
+    assert.equal(
+      musicAfterVoiceGraph.assetInputPaths.filter((path) => path === longVoicePath).length,
+      1,
+      "single voice clip uses one -i",
+    );
+    assert.doesNotMatch(
+      musicAfterVoiceGraph.filterComplex,
+      /asplit=/,
+      "asset fan-out must not use asplit (reverb asplit absent with preset none)",
+    );
+    const musicTailRendered = await renderFixturePcm(
+      root,
+      "music-tail-after-voice",
+      musicAfterVoiceSnapshot,
+      new Map([[ASSET_VOICE, longVoicePath], [ASSET_MUSIC, loopMusicPath]]),
+    );
+    assert.equal(musicTailRendered.result.expectedDurationSeconds, 3);
+    assert(
+      Math.abs(musicTailRendered.result.actualDurationSeconds - 3) < STUDIO_RENDER_DURATION_EPSILON_SECONDS,
+      `music-after-voice master duration; got ${musicTailRendered.result.actualDurationSeconds}`,
+    );
+    // After voice ends at 2s, only music remains — must be real signal, not padded silence.
+    const tailPeak = sampleRangePeak(
+      musicTailRendered.samples,
+      Math.round(2.15 * RATE),
+      Math.round(2.85 * RATE),
+    );
+    assert(
+      tailPeak > 0.1,
+      `music tail after voice must carry signal, got peak ${tailPeak}`,
+    );
+    const midPeak = sampleRangePeak(
+      musicTailRendered.samples,
+      Math.round(0.2 * RATE),
+      Math.round(1.8 * RATE),
+    );
+    assert(midPeak > 0.1, "voice+music region must have signal");
+
+    // One asset → one clip still works (single -i).
+    const singleClipGraph = buildStudioRenderFilterGraph({
+      snapshot: createStudioRenderSnapshot({
+        project: project("none", 1, false),
+        expectedRevision: 7,
+        assets: [asset(ASSET_VOICE, "constant.wav", 3), asset(ASSET_MUSIC, "music.wav", 3)],
+      }),
+      localAssetPaths: new Map([[ASSET_VOICE, constantPath], [ASSET_MUSIC, musicPath]]),
+    });
+    assert.equal(singleClipGraph.assetInputPaths.filter((path) => path === musicPath).length, 1);
+    assert.doesNotMatch(singleClipGraph.filterComplex, /asplit=/);
+
     const invalidDocument = fixtureProject([
       { id: "valid", startTime: 0, offset: 0, duration: 0.25, fadeInDuration: 0, fadeOutDuration: 0 },
     ]).project_data;
