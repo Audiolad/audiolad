@@ -112,8 +112,8 @@ const accessLevelsUi = read(
   "src/components/author-dashboard/AuthorCourseAccessLevels.tsx",
 );
 assert.match(accessLevelsUi, /data-author-course-access-levels/);
-assert.match(accessLevelsUi, /Добавить второй уровень/);
-assert.match(accessLevelsUi, /Добавить следующий уровень/);
+assert.match(accessLevelsUi, /COURSE_ACCESS_LEVELS_ADD_SECOND_LABEL/);
+assert.match(accessLevelsUi, /COURSE_ACCESS_LEVELS_ADD_NEXT_LABEL/);
 assert.doesNotMatch(accessLevelsUi, /checkout|tochka|order_kind/i);
 assert.match(builder, /COURSE_BUILDER_SECTION_TITLE/);
 assert.match(builder, /COURSE_BUILDER_EMPTY_TITLE/);

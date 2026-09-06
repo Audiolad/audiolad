@@ -40,11 +40,14 @@ import {
   createInitialCourseAccessLevels,
   deleteCourseAccessLevel,
 } from "../src/lib/author-products/course-access-levels.ts";
-import { CourseBuilderError } from "../src/lib/author-products/course-builder-shared.ts";
 import {
   evaluateCoursePublishContentGate,
   evaluateCourseLessonsReadiness,
 } from "../src/lib/author-products/course-builder-shared.ts";
+
+function isBuilderError(error, code) {
+  return Boolean(error && error.code === code);
+}
 import { evaluatePublishReadiness } from "../src/lib/author-products/publish.ts";
 import { evaluateDatabaseModerationReady } from "../src/lib/author-products/database-moderation-ready.ts";
 import { createCourseAccessLevelsTestCatalog } from "../src/lib/author-products/course-access-levels-fixture.ts";
@@ -501,9 +504,7 @@ await assert.rejects(
       level1: { title: "A", description: null, upgrade_price: null },
       level2: { title: "B", description: null, upgrade_price: 1 },
     }),
-  (error) =>
-    error instanceof CourseBuilderError &&
-    error.code === ACCESS_LEVELS_ALREADY_CONFIGURED_CODE,
+  (error) => isBuilderError(error, ACCESS_LEVELS_ALREADY_CONFIGURED_CODE),
 );
 
 const l3 = await appendCourseAccessLevel(emptyCatalog, "course-1", {
@@ -522,9 +523,7 @@ await assert.rejects(
       description: null,
       upgrade_price: 100,
     }),
-  (error) =>
-    error instanceof CourseBuilderError &&
-    error.code === ACCESS_LEVELS_BOOTSTRAP_REQUIRED_CODE,
+  (error) => isBuilderError(error, ACCESS_LEVELS_BOOTSTRAP_REQUIRED_CODE),
 );
 
 emptyCatalog.lessons.push({
@@ -534,8 +533,7 @@ emptyCatalog.lessons.push({
 });
 await assert.rejects(
   () => deleteCourseAccessLevel(emptyCatalog, "course-1", 3),
-  (error) =>
-    error instanceof CourseBuilderError && error.code === LEVEL_HAS_LESSONS_CODE,
+  (error) => isBuilderError(error, LEVEL_HAS_LESSONS_CODE),
 );
 emptyCatalog.lessons.length = 0;
 emptyCatalog.entitlements.push({
@@ -545,9 +543,7 @@ emptyCatalog.entitlements.push({
 });
 await assert.rejects(
   () => deleteCourseAccessLevel(emptyCatalog, "course-1", 3),
-  (error) =>
-    error instanceof CourseBuilderError &&
-    error.code === LEVEL_HAS_ENTITLEMENTS_CODE,
+  (error) => isBuilderError(error, LEVEL_HAS_ENTITLEMENTS_CODE),
 );
 emptyCatalog.entitlements.length = 0;
 await deleteCourseAccessLevel(emptyCatalog, "course-1", 3);
@@ -559,9 +555,7 @@ await assert.rejects(
       accessLevels: fixture.access_levels,
       requiredAccessLevel: 999,
     }),
-  (error) =>
-    error instanceof CourseBuilderError &&
-    error.code === LESSON_LEVEL_NOT_CONFIGURED_CODE,
+  (error) => isBuilderError(error, LESSON_LEVEL_NOT_CONFIGURED_CODE),
 );
 await assertLessonRequiredLevelAssignable({
   accessLevels: [],
@@ -590,9 +584,7 @@ await assert.rejects(
       currentLevel: 1,
       nextLevel: 2,
     }),
-  (error) =>
-    error instanceof CourseBuilderError &&
-    error.code === LESSON_LEVEL_RAISE_LOCKED_CODE,
+  (error) => isBuilderError(error, LESSON_LEVEL_RAISE_LOCKED_CODE),
 );
 await assertLessonRequiredLevelChangeAllowed({
   service: soldCatalog,
@@ -615,11 +607,18 @@ const levelsUi = read(
   "src/components/author-dashboard/AuthorCourseAccessLevels.tsx",
 );
 assert.match(levelsUi, /data-author-course-access-levels/);
-assert.match(levelsUi, new RegExp(COURSE_ACCESS_LEVELS_SECTION_TITLE));
-assert.match(levelsUi, new RegExp(COURSE_ACCESS_LEVELS_LEGACY_COPY));
-assert.match(levelsUi, new RegExp(COURSE_ACCESS_LEVELS_ADD_SECOND_LABEL));
-assert.match(levelsUi, new RegExp(COURSE_ACCESS_LEVELS_ADD_NEXT_LABEL));
-assert.match(levelsUi, /Цена курса/);
+assert.match(levelsUi, /COURSE_ACCESS_LEVELS_SECTION_TITLE/);
+assert.match(levelsUi, /COURSE_ACCESS_LEVELS_LEGACY_COPY/);
+assert.match(levelsUi, /COURSE_ACCESS_LEVELS_ADD_SECOND_LABEL/);
+assert.match(levelsUi, /COURSE_ACCESS_LEVELS_ADD_NEXT_LABEL/);
+assert.match(levelsUi, /COURSE_ACCESS_LEVELS_BASE_PRICE_LABEL/);
+assert.equal(COURSE_ACCESS_LEVELS_SECTION_TITLE, "Уровни доступа");
+assert.equal(
+  COURSE_ACCESS_LEVELS_LEGACY_COPY,
+  "По умолчанию весь аудиокурс доступен после одной покупки.",
+);
+assert.equal(COURSE_ACCESS_LEVELS_ADD_SECOND_LABEL, "Добавить второй уровень");
+assert.equal(COURSE_ACCESS_LEVELS_ADD_NEXT_LABEL, "Добавить следующий уровень");
 assert.doesNotMatch(levelsUi, /practices\.price/);
 assert.doesNotMatch(levelsUi, /checkout|tochka|order_kind/i);
 

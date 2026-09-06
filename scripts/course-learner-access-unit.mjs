@@ -1128,10 +1128,8 @@ assert.equal(
 );
 const authorFixtureMarkup = renderLearnerCourse(authorFixtureCourse);
 assert.equal(countOccurrences(authorFixtureMarkup, "Доплата"), 1);
-assert.match(
-  authorFixtureMarkup,
-  new RegExp(String(COURSE_ACCESS_LEVELS_TEST_L2_UPGRADE_PRICE)),
-);
+assert.match(authorFixtureMarkup, /2\s222/);
+assert.equal(COURSE_ACCESS_LEVELS_TEST_L2_UPGRADE_PRICE, 2222);
 
 const implicitL1Course = sampleCourse({
   accessLevel: 1,

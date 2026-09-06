@@ -720,7 +720,7 @@ const sqlMirror = readFileSync(
   join(root, "src/lib/author-products/database-moderation-ready.ts"),
   "utf8",
 );
-assert.match(sqlMirror, /20260902120000_course_moderation_readiness/);
+assert.match(sqlMirror, /20260913120000_minimal_product_moderation_readiness/);
 assert.match(sqlMirror, /evaluateCourseLessonsReadiness/);
 assert.doesNotMatch(
   sqlMirror,
