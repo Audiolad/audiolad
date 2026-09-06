@@ -217,15 +217,21 @@ function testProviderEngineLifecycle() {
   }
 
   assert.match(provider, /new AudioContext\(\)/);
-  assert.match(provider, /decodeAudioData\(await file\.arrayBuffer\(\)\)/);
-  assert.match(provider, /context\.createBufferSource\(\)/);
+  assert.doesNotMatch(provider, /decodeAudioData/);
+  assert.doesNotMatch(provider, /file\.arrayBuffer\(|blob\.arrayBuffer\(/);
+  assert.doesNotMatch(provider, /createBufferSource/);
+  assert.match(provider, /createMediaElementSource/);
+  assert.match(provider, /createLocalStudioPlaybackAsset/);
+  assert.match(provider, /revokeStudioObjectUrl/);
+  assert.match(provider, /syncTrackMediaPlayback/);
   assert.match(provider, /MAX_LOCAL_TRACKS = 5/);
   assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = 750 \* 1024 \* 1024/);
   assert.match(provider, /context\.createGain\(\)/);
-  assert.match(provider, /for \(const clip of track\.clips\)/);
-  assert.match(provider, /clip\.startTime \+ clip\.duration/);
+  assert.match(provider, /findActiveStudioClip\(track\.clips, position\)/);
+  assert.match(provider, /clip\.startTime/);
+  assert.match(provider, /clip\.duration/);
   assert.match(provider, /clip\.offset \+ elapsedClipTime/);
-  assert.match(provider, /source\.start\(/);
+  assert.match(provider, /getStudioClipMediaTime/);
   assert.match(provider, /trackRuntimesRef/);
   assert.match(provider, /getStudioProjectDurationFromClips/);
   assert.match(provider, /setClipLayout/);
@@ -252,7 +258,7 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /getTrackBuffer/);
   assert.match(
     provider,
-    /trackRuntimesRef\.current\.get\(trackId\)\?\.buffer \?\? null/,
+    /trackRuntimesRef\.current\.get\(trackId\)\?\.duration/,
   );
   assert.match(provider, /replaceTrackAudio/);
   assert.match(provider, /getHydratedTrackLoadState/);
@@ -291,7 +297,7 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /updateRetainedAssets/);
   assert.match(provider, /pasteClips/);
   assert.match(provider, /duplicateTrack/);
-  assert.match(provider, /assetVaultRef\.current\.set\(snapshot\.id, asset\)/);
+  assert.match(provider, /assetVaultRef\.current\.set\(snapshot\.id, duplicateAsset\)/);
   assert.match(provider, /getSharedAssetTrackIds/);
   assert.match(provider, /bindSharedAssetState/);
   assert.match(provider, /sharedWithLiveTrack/);
@@ -394,7 +400,7 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(
     studioWorkspace,
-    /scrollToEnd\(\);[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
+    /scrollToEnd\(\);[\s\S]*className="h-10 rounded-lg border border-white\/15 px-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:px-3"/,
   );
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
   assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
@@ -590,7 +596,8 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /onSeek=\{\(clipX\)/);
   assert.doesNotMatch(timeline, /onToggleMuted|onVolumeChange/);
   assert.doesNotMatch(timeline, /wavesurfer|<audio(?:\s|>)/i);
-  assert.match(waveformCanvas, /getCachedWaveformPeaks/);
+  assert.match(waveformCanvas, /getFallbackWaveformPeaks/);
+  assert.doesNotMatch(waveformCanvas, /getCachedWaveformPeaks/);
   assert.match(waveformCanvas, /sourceOffset/);
   assert.match(waveformCanvas, /sourceDuration/);
   assert.match(waveformCanvas, /viewportWidth/);

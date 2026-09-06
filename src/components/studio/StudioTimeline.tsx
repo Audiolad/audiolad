@@ -38,13 +38,17 @@ import {
   type StudioClipFades,
 } from "@/lib/studio/fade-math";
 
+export type StudioTrackPlaybackSource = {
+  duration: number;
+};
+
 export type StudioTimelineTrack = {
   id: string;
   slotId: string;
   name: string;
   fileName?: string;
   hasAudio: boolean;
-  buffer: AudioBuffer | null;
+  buffer: StudioTrackPlaybackSource | null;
   clips: StudioClip[];
   accent: string;
 };
@@ -474,7 +478,7 @@ function StudioTimeline({
                       return (
                         <div key={clip.id}>
                     {clipRenderWidth > 0 ? <div className="absolute top-0 overflow-hidden" data-studio-clip={clip.id} style={{ left: clipLeft + clipRenderStartX, width: clipRenderWidth }}>
-                      <StudioWaveformCanvas buffer={track.buffer!} sourceOffset={layout.offset} sourceDuration={layout.duration} timelineWidth={clipWidth} viewportWidth={clipRenderWidth} renderStartX={clipRenderStartX} accent={track.accent} onSeek={(clipX) => { onSelectClip(clip.id); onSeek(layout.startTime + timelineXToTime(clipX, pixelsPerSecond)); }} />
+                      <StudioWaveformCanvas duration={track.buffer!.duration} sourceOffset={layout.offset} sourceDuration={layout.duration} timelineWidth={clipWidth} viewportWidth={clipRenderWidth} renderStartX={clipRenderStartX} accent={track.accent} onSeek={(clipX) => { onSelectClip(clip.id); onSeek(layout.startTime + timelineXToTime(clipX, pixelsPerSecond)); }} />
                     </div> : null}
                       <div
                         className={`absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border ${

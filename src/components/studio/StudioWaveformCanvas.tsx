@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getCachedWaveformPeaks } from "@/lib/studio/waveform-peaks";
+import { getFallbackWaveformPeaks } from "@/lib/studio/fallback-waveform";
+import type { WaveformPeaks } from "@/lib/studio/waveform-peaks";
 
 type StudioWaveformCanvasProps = {
-  buffer: AudioBuffer | null;
+  duration: number;
+  peaks?: WaveformPeaks | null;
   sourceOffset: number;
   sourceDuration: number;
   timelineWidth: number;
@@ -17,7 +19,8 @@ type StudioWaveformCanvasProps = {
 };
 
 export function StudioWaveformCanvas({
-  buffer,
+  duration,
+  peaks: providedPeaks = null,
   sourceOffset,
   sourceDuration,
   timelineWidth,
@@ -55,12 +58,12 @@ export function StudioWaveformCanvas({
     context.lineTo(renderWidth, height / 2);
     context.stroke();
 
-    if (!buffer) {
+    const safeBufferDuration = Math.max(duration, 0.000_001);
+    if (safeBufferDuration <= 0.000_001) {
       return;
     }
 
-    const peaks = getCachedWaveformPeaks(buffer, 8192);
-    const safeBufferDuration = Math.max(buffer.duration, 0.000_001);
+    const peaks = providedPeaks ?? getFallbackWaveformPeaks(safeBufferDuration, 8192);
     const startRatio = Math.min(
       Math.max(sourceOffset / safeBufferDuration, 0),
       1,
@@ -101,8 +104,9 @@ export function StudioWaveformCanvas({
     context.stroke();
   }, [
     accent,
-    buffer,
+    duration,
     height,
+    providedPeaks,
     renderStartX,
     renderWidth,
     sourceDuration,

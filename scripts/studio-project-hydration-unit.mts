@@ -11,6 +11,7 @@ import {
   STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE,
   STUDIO_PROJECT_HYDRATION_TIMEOUT_MS,
 } from "../src/lib/studio/hydration";
+import type { StudioProjectAssetMetadata } from "../src/lib/studio/persistence-client";
 
 if (!globalThis.File) {
   globalThis.File = class File extends Blob {
@@ -48,37 +49,45 @@ const metadata = {
   id: assetId, projectId, originalName: "recording.webm", mimeType: "audio/webm",
   sizeBytes: 5, durationSeconds: 8, sourceType: "recording" as const, createdAt: "2026-08-09T00:00:00.000Z",
 };
-let downloads = 0;
-let decodes = 0;
+function signedPlayback(asset: StudioProjectAssetMetadata, expiresAt = Date.now() + 14_400_000) {
+  return {
+    url: `https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/${asset.id}?token=test`,
+    expiresAt,
+    durationSeconds: asset.durationSeconds,
+  };
+}
+
+let signs = 0;
+const decodes = 0;
 const result = await hydrateStudioProject({
   project,
   assets: [metadata],
-  download: async () => {
-    downloads += 1;
-    return new Blob(["audio"], { type: "audio/webm" });
-  },
-  decode: async () => {
-    decodes += 1;
-    return { duration: 8 } as AudioBuffer;
+  signPlayback: async (asset) => {
+    signs += 1;
+    return signedPlayback(asset);
   },
 });
-assert.equal(downloads, 1);
-assert.equal(decodes, 1);
-assert.equal(result.assets.get(assetId)?.file.type, "audio/webm");
+assert.equal(signs, 1);
+assert.equal(decodes, 0);
+assert.equal(
+  result.assets.get(assetId)?.playbackUrl,
+  `https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/${assetId}?token=test`,
+);
+assert.equal(result.assets.get(assetId)?.duration, 8);
 assert.equal(result.assets.get(assetId)?.metadata.sourceType, "recording");
 assert.equal(result.state.currentTime, 42);
 assert.equal(result.state.tracks[0].voicePreset, "trance");
 assert.deepEqual(result.state.tracks[0].clips.map((clip) => clip.startTime), [3, 9]);
-assert.equal(result.assets.get(assetId)?.buffer, result.assets.get(assetId)?.buffer);
+assert.equal(result.assets.get(assetId)?.playbackUrl, result.assets.get(assetId)?.playbackUrl);
 
 const mp4Hydration = await hydrateStudioProject({
   project,
   assets: [{ ...metadata, originalName: "recording.m4a", mimeType: "audio/mp4" }],
-  download: async () => new Blob(["audio"], { type: "audio/mp4" }),
-  decode: async () => ({ duration: 8 } as AudioBuffer),
+  signPlayback: async (asset) => signedPlayback(asset),
 });
-assert.equal(mp4Hydration.assets.get(assetId)?.file.type, "audio/mp4");
+assert.equal(mp4Hydration.assets.get(assetId)?.metadata.mimeType, "audio/mp4");
 assert.equal(mp4Hydration.assets.get(assetId)?.metadata.sourceType, "recording");
+assert.equal(mp4Hydration.assets.get(assetId)?.duration, 8);
 
 const provider = await readFile(
   new URL("../src/components/studio/StudioAudioProvider.tsx", import.meta.url), "utf8",
@@ -96,7 +105,12 @@ const route = await readFile(
   new URL("../src/app/(studio)/studio/project/[projectId]/page.tsx", import.meta.url), "utf8",
 );
 assert.match(provider, /hydratePersistedProject/);
-assert.match(provider, /decodePersistedAsset/);
+assert.doesNotMatch(provider, /decodePersistedAsset/);
+assert.doesNotMatch(provider, /decodeAudioData/);
+assert.doesNotMatch(provider, /file\.arrayBuffer\(|blob\.arrayBuffer\(/);
+assert.match(provider, /createMediaElementSource/);
+assert.match(provider, /createLocalStudioPlaybackAsset/);
+assert.match(provider, /getStudioAssetPlaybackUrl/);
 assert.match(provider, /assetPersistenceStatus: "saved"/);
 assert.match(shell, /controller\.abort/);
 assert.match(shell, /Загрузка аудио: \$\{progress\.completed\}\/\$\{progress\.total\}/);
@@ -111,7 +125,10 @@ assert.doesNotMatch(shell, /30_000/);
 assert.equal(STUDIO_PROJECT_HYDRATION_TIMEOUT_MS, 120_000);
 assert.match(provider, /getHydratedTrackLoadState/);
 assert.match(provider, /ensurePersistedTrackAsset/);
-assert.match(provider, /downloadStudioProjectAsset/);
+assert.match(provider, /getStudioAssetPlaybackUrl/);
+assert.doesNotMatch(shell, /downloadStudioProjectAsset/);
+assert.match(shell, /signPlayback/);
+assert.match(shell, /getStudioAssetPlaybackUrl/);
 assert.match(provider, /item\.clips\.length === 0/);
 assert.match(provider, /if \(!track \|\| track\.isReplacing\)/);
 assert.doesNotMatch(provider, /if \(!track \|\| !runtime \|\| track\.isReplacing\)/);
@@ -141,20 +158,19 @@ const sharedProject = {
     ],
   },
 };
-let sharedDownloads = 0;
+let sharedSigns = 0;
 const sharedHydration = await hydrateStudioProject({
   project: sharedProject,
   assets: [metadata],
-  download: async () => {
-    sharedDownloads += 1;
-    return new Blob(["audio"], { type: "audio/webm" });
+  signPlayback: async (asset) => {
+    sharedSigns += 1;
+    return signedPlayback(asset);
   },
-  decode: async () => ({ duration: 8 } as AudioBuffer),
 });
 assert.equal(sharedHydration.state.tracks.length, 2);
 assert.equal(sharedHydration.state.tracks[0].assetId, assetId);
 assert.equal(sharedHydration.state.tracks[1].assetId, assetId);
-assert.equal(sharedDownloads, 1);
+assert.equal(sharedSigns, 1);
 assert.equal(sharedHydration.assets.size, 1);
 
 const emptyAssetId = "33333333-3333-4333-8333-333333333333";
@@ -226,21 +242,20 @@ const olgaLikeProject = {
     ],
   },
 };
-const downloadedAssetIds: string[] = [];
+const signedAssetIds: string[] = [];
 const olgaHydration = await hydrateStudioProject({
   project: olgaLikeProject,
   assets: [emptyMetadata, musicMetadata, voiceMetadata],
-  download: async (asset) => {
-    downloadedAssetIds.push(asset.id);
-    return new Blob(["audio"], { type: asset.mimeType });
+  signPlayback: async (asset) => {
+    signedAssetIds.push(asset.id);
+    return signedPlayback(asset);
   },
-  decode: async () => ({ duration: 8 } as AudioBuffer),
 });
 assert.deepEqual(
   collectInitialHydrationAssetIds(olgaLikeProject.projectData.tracks).sort(),
   [musicAssetId, voiceAssetId].sort(),
 );
-assert.deepEqual(downloadedAssetIds.sort(), [musicAssetId, voiceAssetId].sort());
+assert.deepEqual(signedAssetIds.sort(), [musicAssetId, voiceAssetId].sort());
 assert.equal(olgaHydration.assets.has(emptyAssetId), false);
 assert.equal(olgaHydration.assets.has(musicAssetId), true);
 assert.equal(olgaHydration.assets.has(voiceAssetId), true);
@@ -261,28 +276,27 @@ assert.deepEqual(
 
 const lazyAsset = await loadPersistedStudioAsset({
   metadata: emptyMetadata,
-  download: async () => new Blob(["lazy"], { type: "audio/webm" }),
-  decode: async () => ({ duration: 505 } as AudioBuffer),
+  signPlayback: async (asset) => signedPlayback(asset),
 });
 assert.equal(lazyAsset.metadata.id, emptyAssetId);
-assert.equal(lazyAsset.buffer.duration, 505);
+assert.equal(lazyAsset.duration, 505);
+assert.match(lazyAsset.playbackUrl, /studio-draft-assets/);
 
-let abortedDownloads = 0;
+let abortedSigns = 0;
 const abortController = new AbortController();
 abortController.abort();
 await assert.rejects(
   () => loadPersistedStudioAsset({
     metadata: emptyMetadata,
     signal: abortController.signal,
-    download: async () => {
-      abortedDownloads += 1;
-      return new Blob(["audio"]);
+    signPlayback: async (asset) => {
+      abortedSigns += 1;
+      return signedPlayback(asset);
     },
-    decode: async () => ({ duration: 8 } as AudioBuffer),
   }),
   (error: unknown) => error instanceof DOMException && error.name === "AbortError",
 );
-assert.equal(abortedDownloads, 0);
+assert.equal(abortedSigns, 0);
 
 const scheduled: Array<{ fn: () => void; ms: number }> = [];
 let timeoutAborted = false;
@@ -352,5 +366,29 @@ assert.equal(
   "unmount",
 );
 assert.match(STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE, /Загрузка аудио заняла слишком много времени/);
+
+await assert.rejects(
+  () => loadPersistedStudioAsset({
+    metadata: { ...emptyMetadata, durationSeconds: null },
+    signPlayback: async (asset) => ({
+      url: `https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/${asset.id}?token=test`,
+      expiresAt: Date.now() + 14_400_000,
+      durationSeconds: null,
+    }),
+  }),
+  (error: unknown) => error instanceof Error && /повреждён/.test(error.message),
+);
+
+const missingDurationHydration = await hydrateStudioProject({
+  project,
+  assets: [{ ...metadata, durationSeconds: null }],
+  signPlayback: async (asset) => ({
+    url: `https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/${asset.id}?token=test`,
+    expiresAt: Date.now() + 14_400_000,
+    durationSeconds: null,
+  }),
+});
+assert.equal(missingDurationHydration.assets.size, 0);
+assert.equal(missingDurationHydration.failures.size, 1);
 
 console.log("studio project hydration checks passed");

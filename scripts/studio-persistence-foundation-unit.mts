@@ -338,10 +338,22 @@ for (const route of [
   "../src/app/api/studio/projects/[projectId]/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/playback/route.ts",
 ]) {
   const source = await readFile(new URL(route, import.meta.url), "utf8");
   assert.match(source, /studioRouteError/);
 }
+
+const playbackRoute = await readFile(
+  new URL(
+    "../src/app/api/studio/projects/[projectId]/assets/[assetId]/playback/route.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+assert.match(playbackRoute, /createStudioAssetPlaybackUrl/);
+assert.doesNotMatch(playbackRoute, /downloadStudioProjectAsset/);
+assert.doesNotMatch(playbackRoute, /arrayBuffer|\.blob\(/);
 
 await assert.rejects(
   access(
