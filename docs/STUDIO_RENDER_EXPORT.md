@@ -10,13 +10,39 @@ practice or audio item.
 
 1. Review and apply `20260812180000_studio_render_export_v2.sql` in the intended
    non-production/production change process. This task does not apply it.
-2. Verify `ffmpeg`, `tsx`, `NEXT_PUBLIC_SUPABASE_URL`, and
+2. Review and apply `20260923120000_studio_render_job_lease_heartbeat.sql`
+   **before** starting the long-lived worker (adds `lease_token`,
+   `renew_studio_render_job_lease`, and `release_studio_render_job`).
+3. Verify `ffmpeg`, `tsx`, `NEXT_PUBLIC_SUPABASE_URL`, and
    `SUPABASE_SERVICE_ROLE_KEY` in the worker environment.
-3. Run `npm run run:studio-render-worker` once against a controlled queued job.
-4. After observing a successful download, explicitly start the prepared but
-   inactive `deploy/studio-render-worker.ecosystem.config.cjs` PM2 process.
-5. Monitor failed jobs and expired leases; do not enable multiple workers
+4. Confirm with `pm2 describe audiolad-studio-render-worker` that the running
+   process is the long-lived consumer (`autorestart: true`, **no**
+   `cron_restart`). Do not run the former one-shot cron worker alongside it.
+5. After observing a successful download, start or restart
+   `deploy/studio-render-worker.ecosystem.config.cjs` only with explicit
+   production approval. This document does not start or restart PM2.
+6. Monitor failed jobs and expired leases; do not enable multiple workers
    without revisiting queue throughput and lease policy.
+
+## Worker lifecycle (long-form)
+
+The worker is a single long-lived queue consumer: it recovers stale leases,
+claims at most one job, renders it, then keeps polling. Idle interval is 5s
+(`STUDIO_RENDER_IDLE_INTERVAL_MS`). It does not busy-loop and does not exit
+after a job.
+
+Lease: **1800s** on claim, renewed every **5 minutes** by
+`renew_studio_render_job_lease` only while this process still owns
+`lease_token`. Do not replace the heartbeat with a one-shot 5400s lease.
+Complete/fail updates also require the current token; a worker that lost the
+lease must not mark the job completed.
+
+Graceful shutdown (SIGTERM/SIGINT): stop claiming; wait up to **90s**
+(`STUDIO_RENDER_SHUTDOWN_DRAIN_MS`) for the in-flight FFmpeg job; if it is
+still running, `release_studio_render_job` requeues it (attempt_count is
+decremented) and the process exits. PM2 `kill_timeout` is **120s**. Deploy
+during a multi-hour render will interrupt FFmpeg after the drain window;
+prefer waiting until the worker is idle. Waiting hours for drain is unsafe.
 
 ## Shared Studio audio sources and project duplication
 
