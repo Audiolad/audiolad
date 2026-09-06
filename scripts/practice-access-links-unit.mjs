@@ -1,0 +1,260 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+
+import {
+  ACCESS_LINK_SECTION_COPY,
+  ACCESS_LINK_SECTION_TITLE,
+  ACCESS_LINK_TOKEN_BYTE_LENGTH,
+  buildAccessLinkPath,
+  buildAccessLinkUrl,
+  deriveAccessLinkDisplayStatus,
+  isAccessLinkPath,
+  isValidPracticeAccessTokenFormat,
+  parseAccessLinkExpiryOption,
+  parseAccessLinkTargetLevel,
+  resolveAccessLinkExpiry,
+  validateAccessLinkTargetLevel,
+} from "../src/lib/products/access-links.ts";
+import {
+  generatePracticeAccessToken,
+  hashPracticeAccessToken,
+} from "../src/lib/products/access-links-crypto.ts";
+import { grantAccess } from "../src/lib/products/grant-access.ts";
+import { resolveValidatedNextPath } from "../src/lib/auth/routes.ts";
+import {
+  ACCESS_LINK_SIGN_IN_INTRO,
+  isAccessLinkSignInNext,
+  resolveSignInIntroCopy,
+} from "../src/lib/auth/buy-sign-in.ts";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+function read(relativePath) {
+  return readFileSync(join(root, relativePath), "utf8");
+}
+
+const token = generatePracticeAccessToken();
+assert.equal(token.rawToken.length >= 40, true);
+assert.equal(isValidPracticeAccessTokenFormat(token.rawToken), true);
+assert.equal(token.tokenHash.length, 64);
+assert.equal(
+  token.tokenHash,
+  createHash("sha256").update(token.rawToken, "utf8").digest("hex"),
+);
+assert.equal(hashPracticeAccessToken(token.rawToken), token.tokenHash);
+assert.equal(ACCESS_LINK_TOKEN_BYTE_LENGTH, 32);
+assert.doesNotMatch(token.tokenHash, /[A-F]/);
+
+const second = generatePracticeAccessToken();
+assert.notEqual(token.rawToken, second.rawToken);
+assert.notEqual(token.tokenHash, second.tokenHash);
+
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "practice",
+    configuredLevels: [],
+    targetLevel: 1,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "practice",
+    configuredLevels: [],
+    targetLevel: 2,
+  }).code,
+  "access_level_not_available",
+);
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "course",
+    configuredLevels: [],
+    targetLevel: 1,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "course",
+    configuredLevels: [],
+    targetLevel: 2,
+  }).code,
+  "target_level_not_configured",
+);
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "course",
+    configuredLevels: [{ level: 1 }, { level: 2 }],
+    targetLevel: 2,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateAccessLinkTargetLevel({
+    publicationClass: "course",
+    configuredLevels: [{ level: 1 }, { level: 2 }],
+    targetLevel: 999,
+  }).code,
+  "target_level_not_configured",
+);
+
+assert.equal(parseAccessLinkTargetLevel(2), 2);
+assert.equal(parseAccessLinkTargetLevel("2"), 2);
+assert.equal(parseAccessLinkTargetLevel(1.5), null);
+assert.equal(parseAccessLinkExpiryOption("7d"), "7d");
+assert.equal(parseAccessLinkExpiryOption("hidden"), null);
+
+const now = new Date("2026-09-06T12:00:00.000Z");
+assert.equal(resolveAccessLinkExpiry("none", now), null);
+assert.equal(
+  resolveAccessLinkExpiry("24h", now)?.toISOString(),
+  "2026-09-07T12:00:00.000Z",
+);
+assert.equal(
+  resolveAccessLinkExpiry("7d", now)?.toISOString(),
+  "2026-09-13T12:00:00.000Z",
+);
+
+assert.equal(
+  deriveAccessLinkDisplayStatus({
+    status: "active",
+    expiresAt: "2026-09-05T12:00:00.000Z",
+    now,
+  }),
+  "expired",
+);
+assert.equal(
+  deriveAccessLinkDisplayStatus({
+    status: "redeemed",
+    expiresAt: "2026-09-05T12:00:00.000Z",
+    now,
+  }),
+  "redeemed",
+);
+
+assert.equal(buildAccessLinkPath(token.rawToken), `/access/${token.rawToken}`);
+assert.equal(
+  buildAccessLinkUrl(token.rawToken, "https://audiolad.ru"),
+  `https://audiolad.ru/access/${token.rawToken}`,
+);
+assert.equal(isAccessLinkPath(`/access/${token.rawToken}`), true);
+assert.equal(
+  resolveValidatedNextPath(`/access/${token.rawToken}`),
+  `/access/${token.rawToken}`,
+);
+assert.equal(isAccessLinkSignInNext(`/access/${token.rawToken}`), true);
+assert.equal(
+  resolveSignInIntroCopy(`/access/${token.rawToken}`),
+  ACCESS_LINK_SIGN_IN_INTRO,
+);
+
+const granted = await grantAccess(
+  {
+    rpc(name, args) {
+      assert.equal(name, "grant_practice_access");
+      assert.equal(args.p_access_source, "external_manual");
+      assert.equal(args.p_metadata.granted_via, "external_access_link");
+      return Promise.resolve({
+        data: {
+          user_id: args.p_user_id,
+          practice_id: args.p_practice_id,
+          access_level: 2,
+          previous_access_level: null,
+          inserted: true,
+          raised: true,
+        },
+        error: null,
+      });
+    },
+  },
+  {
+    userId: "user-1",
+    practiceId: "course-1",
+    targetLevel: 2,
+    accessSource: "external_manual",
+    metadata: { access_link_id: "link-1", granted_via: "external_access_link" },
+  },
+);
+assert.equal(granted.access_level, 2);
+assert.equal(granted.raised, true);
+
+const migration = read("supabase/migrations/20260926120000_practice_access_links.sql");
+assert.match(migration, /practice_access_links/);
+assert.match(migration, /redeem_practice_access_link/);
+assert.match(migration, /preview_practice_access_link/);
+assert.doesNotMatch(migration, /raw_token|token text NOT NULL/);
+assert.match(read("src/lib/products/access-links-server.ts"), /import "server-only"/);
+assert.match(
+  read("src/lib/products/access-links-server.ts"),
+  /createServiceRoleClient/,
+);
+assert.doesNotMatch(
+  read("src/lib/products/access-links-server.ts"),
+  /SUPABASE_SERVICE_ROLE_KEY/,
+);
+
+const authorRoute = read("src/app/api/author/products/[id]/access-links/route.ts");
+assert.match(authorRoute, /requirePracticeMutationAccess/);
+assert.match(authorRoute, /createPracticeAccessLink/);
+assert.doesNotMatch(authorRoute, /from\("practice_access_links"\)\.insert/);
+
+const adminRoute = read("src/app/api/admin/products/[id]/access-links/route.ts");
+assert.match(adminRoute, /requirePlatformAdminAccessLinkActor/);
+
+const redeemRoute = read("src/app/api/access/[token]/redeem/route.ts");
+assert.match(redeemRoute, /export async function POST/);
+assert.doesNotMatch(redeemRoute, /export async function GET/);
+assert.match(read("src/lib/products/access-links-server.ts"), /already_redeemed_by_you/);
+
+const landing = read("src/app/(platform)/access/[token]/page.tsx");
+assert.match(landing, /previewPracticeAccessLink/);
+assert.doesNotMatch(landing, /redeemPracticeAccessLink/);
+assert.match(landing, /robots/);
+
+const landingUi = read("src/components/access/AccessLinkLanding.tsx");
+assert.match(landingUi, /Вам предоставлен доступ к:/);
+assert.match(landingUi, /Войти/);
+assert.match(landingUi, /Зарегистрироваться/);
+assert.match(landingUi, /Открыть доступ/);
+assert.match(landingUi, /Перейти к продукту/);
+assert.match(landingUi, /buildAuthRouteHref\("\/auth\/sign-in", returnPath\)/);
+
+const authorUi = read("src/components/author-dashboard/AuthorPracticeAccessLinks.tsx");
+assert.match(authorUi, /ACCESS_LINK_SECTION_TITLE/);
+assert.match(authorUi, /ACCESS_LINK_SECTION_COPY/);
+assert.match(authorUi, /ACCESS_LINK_CREATE_ORDINARY_LABEL/);
+assert.match(authorUi, /ACCESS_LINK_CREATE_COURSE_LABEL/);
+assert.match(authorUi, /expiresIn/);
+assert.doesNotMatch(authorUi, /token_hash|rawToken/);
+
+const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(form, /AuthorPracticeAccessLinks/);
+
+const deleteGuard = read("src/lib/author-products/course-access-levels.ts");
+assert.match(deleteGuard, /practice_access_links/);
+assert.match(deleteGuard, /activeAccessLinkCount/);
+
+const phase4Checkout = read("src/lib/course-content/course-upgrade-order-api.ts");
+assert.match(phase4Checkout, /course_upgrade/);
+assert.doesNotMatch(phase4Checkout, /practice_access_links/);
+
+const fulfill = read(
+  "supabase/migrations/20260925120200_fulfill_tochka_course_upgrade.sql",
+);
+assert.match(fulfill, /grant_practice_access/);
+assert.doesNotMatch(fulfill, /practice_access_links/);
+
+const grantTs = read("src/lib/products/grant-access.ts");
+assert.match(grantTs, /external_manual/);
+
+assert.equal(ACCESS_LINK_SECTION_TITLE, "Доступ по ссылке");
+assert.match(
+  ACCESS_LINK_SECTION_COPY,
+  /оплатил продукт вне Audiolad/,
+);
+
+console.log("practice-access-links-unit: ok");

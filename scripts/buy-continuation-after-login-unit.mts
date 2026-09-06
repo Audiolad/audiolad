@@ -4,8 +4,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ACCESS_LINK_SIGN_IN_INTRO,
   PRACTICE_BUY_SIGN_IN_INTRO,
   buildBuySignInHref,
+  isAccessLinkSignInNext,
   isPracticeProductSignInNext,
   resolveBuySignInReturnPath,
   resolveSignInIntroCopy,
@@ -74,6 +76,12 @@ function testPracticeLoginCopy() {
 
   const signIn = read("src/app/(platform)/auth/sign-in/page.tsx");
   assert.match(signIn, /resolveSignInIntroCopy\(searchParams\.get\("next"\)\)/);
+
+  const tokenNext =
+    "/access/abcdefghijklmnopqrstuvwxyz0123456789ABCD";
+  assert.equal(isAccessLinkSignInNext(tokenNext), true);
+  assert.equal(resolveSignInIntroCopy(tokenNext), ACCESS_LINK_SIGN_IN_INTRO);
+  assert.equal(getSafeNextPath(tokenNext), tokenNext);
 }
 
 function testBoundaries() {

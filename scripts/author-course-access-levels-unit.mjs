@@ -20,6 +20,7 @@ import {
   COURSE_PUBLISH_LESSON_LEVEL_NOT_IN_CATALOG_CODE,
   COURSE_PUBLISH_MISSING_ACCESS_LEVEL_1_CODE,
   COURSE_PUBLISH_PAID_LEVEL_MISSING_LESSONS_CODE,
+  LEVEL_HAS_ACTIVE_ACCESS_LINKS_CODE,
   LEVEL_HAS_ENTITLEMENTS_CODE,
   LEVEL_HAS_LESSONS_CODE,
   LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE,
@@ -338,6 +339,28 @@ assert.equal(
   }).code,
   LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE,
 );
+assert.equal(
+  evaluateAccessLevelDelete({
+    level: 2,
+    maxLevel: 2,
+    lessonCountAtLevel: 0,
+    entitlementCountAtOrAbove: 0,
+    liveUpgradeOrderCount: 0,
+    activeAccessLinkCount: 1,
+  }).code,
+  LEVEL_HAS_ACTIVE_ACCESS_LINKS_CODE,
+);
+assert.equal(
+  evaluateAccessLevelDelete({
+    level: 2,
+    maxLevel: 2,
+    lessonCountAtLevel: 0,
+    entitlementCountAtOrAbove: 0,
+    liveUpgradeOrderCount: 0,
+    activeAccessLinkCount: 0,
+  }).ok,
+  true,
+);
 
 assert.equal(
   evaluateCourseAccessLevelsReadiness({ accessLevels: [], lessons: [] }).ok,
@@ -530,6 +553,7 @@ function createCatalogClient(initialRows = []) {
   const rows = [...initialRows];
   const lessons = [];
   const entitlements = [];
+  const accessLinks = [];
   let lastInsert = [];
 
   function matches(row, filters) {
@@ -556,6 +580,9 @@ function createCatalogClient(initialRows = []) {
       in(column, values) {
         const allowed = Array.isArray(values) ? values : [];
         filters.push((row) => allowed.includes(row[column]));
+        return api;
+      },
+      or() {
         return api;
       },
       order() {
@@ -624,6 +651,8 @@ function createCatalogClient(initialRows = []) {
               ? lessons
               : table === "user_practices"
                 ? entitlements
+                : table === "practice_access_links"
+                  ? accessLinks
                 : [];
         const data = source.filter((row) => matches(row, filters));
         if (countHead) {
@@ -647,6 +676,7 @@ function createCatalogClient(initialRows = []) {
     rows,
     lessons,
     entitlements,
+    accessLinks,
     from(table) {
       return tableApi(table);
     },
@@ -720,6 +750,18 @@ await assert.rejects(
   (error) => isBuilderError(error, LEVEL_HAS_ENTITLEMENTS_CODE),
 );
 emptyCatalog.entitlements.length = 0;
+emptyCatalog.accessLinks.push({
+  id: "link-1",
+  practice_id: "course-1",
+  target_access_level: 3,
+  status: "active",
+  expires_at: null,
+});
+await assert.rejects(
+  () => deleteCourseAccessLevel(emptyCatalog, "course-1", 3),
+  (error) => isBuilderError(error, LEVEL_HAS_ACTIVE_ACCESS_LINKS_CODE),
+);
+emptyCatalog.accessLinks.length = 0;
 await deleteCourseAccessLevel(emptyCatalog, "course-1", 3);
 assert.equal(emptyCatalog.rows.some((row) => row.level === 3), false);
 
