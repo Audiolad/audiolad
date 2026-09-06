@@ -200,6 +200,26 @@ admin). Будущий learner API обязан сначала резолвит�
 затем helper, затем читать. GET-by-lesson-id без parent check запрещён;
 эндпоинта в этом PR нет.
 
+#### Course access levels foundation (Phase 1)
+
+Миграция: `20260923120100_course_access_levels_foundation.sql`. Additive only.
+No mass INSERT of Level 1 catalog rows. No finance / checkout changes.
+
+| Объект | Назначение |
+|--------|------------|
+| `practice_access_levels` | Optional catalog of paid tiers for one `practices.id`. Columns: `level >= 1`, `title`, `description` NULL, `upgrade_price` NULL/`>= 0`, `currency='RUB'`. UNIQUE `(practice_id, level)`. FK CASCADE. Empty catalog = legacy single Level 1. Ordering uses `level`. Not a second public Product. |
+| `course_lessons.required_access_level` | `integer NOT NULL DEFAULT 1`, CHECK `>= 1`. Existing lessons stay available to ordinary owners. No learner filtering in this phase. |
+| `user_practices.access_level` | `integer NOT NULL DEFAULT 1`, CHECK `>= 1`. One entitlement row per `(user, practice)`. Higher includes lower. Existing purchases become Level 1 via DEFAULT, without a backfill UPDATE. |
+| `user_practices.access_source` | Existing values plus `external_manual` (future external payment / one-time link). No `upgrade` source — native upgrade stays `purchase`. |
+| `grant_practice_access(user_id, practice_id, target_level, access_source, metadata)` | Canonical SECURITY DEFINER grant. Monotonic only here: `INSERT … ON CONFLICT DO UPDATE SET access_level = GREATEST(current, target)`. No table-wide anti-downgrade trigger — trusted service_role UPDATE may lower (future refund/revoke). |
+| `grant_practice_purchase_access(order_id)` | Backward-compatible Level-1 wrapper for paid Tochka orders. Same call shape; does not lower a higher entitlement. `EXECUTE` granted to `service_role` only (PUBLIC / anon / authenticated revoked). |
+
+**Target validation:** Level 1 is always grantable (implicit baseline). Level 2+ requires a matching `practice_access_levels` row. Products with no catalog rows accept only Level 1.
+
+**Course-only public path:** `grant_practice_access` rejects `target_level > 1` unless `practices.publication_class = 'course'`. This is not a table CHECK, so future product types can grow without a schema rewrite. Ordinary audio practices cannot receive L2 through the grant RPC.
+
+**Security:** `authenticated` / `anon` cannot EXECUTE `grant_practice_access` or `grant_practice_purchase_access`. `service_role` has EXECUTE on both. Clients cannot INSERT/UPDATE/DELETE `user_practices` or `practice_access_levels`. Users may SELECT their own `user_practices` (including `access_level`). Authors cannot client-side grant paid levels. Writes go through service_role / SECURITY DEFINER only.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из
