@@ -28,6 +28,7 @@ import {
 } from "./model";
 import {
   buildStudioAssetPath,
+  isStudioStoragePath,
   parseStudioProjectData,
   StudioApiError,
 } from "./validation";
@@ -400,7 +401,7 @@ export async function listStudioAssets(projectId: string) {
   return (data ?? []) as StudioProjectAssetRow[];
 }
 
-/** replaceStudioProjectAsset uses signed reserve/finalize in direct-upload.ts */
+/** replaceStudioProjectAsset / studio_asset_replaced uses signed reserve/finalize in direct-upload.ts */
 
 export async function reserveStudioAssetUpload(input: {
   projectId: string;
@@ -424,6 +425,9 @@ export async function reserveStudioAssetUpload(input: {
     input.filename,
     ownerKind,
   );
+  if (!isStudioStoragePath(storagePath, ownerId, input.projectId, assetId, ownerKind)) {
+    throw new StudioApiError("invalid_asset", 500);
+  }
   const { data, error } = await service.rpc("studio_reserve_project_asset", {
     p_project_id: input.projectId,
     p_asset_id: assetId,

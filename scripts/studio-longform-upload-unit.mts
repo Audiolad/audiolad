@@ -12,23 +12,23 @@ import {
   isStudioAssetSizeAllowed,
   isStudioDurationAllowed,
   studioPeaksColumnCount,
-} from "../src/lib/studio/limits.ts";
+} from "../src/lib/studio/limits";
 import {
   validateStudioLocalDuration,
   validateStudioLocalFile,
-} from "../src/lib/studio/local-file-validation.ts";
+} from "../src/lib/studio/local-file-validation";
 import {
   decodeStudioPeaksV1,
   encodeStudioPeaksV1,
-} from "../src/lib/studio/peaks-v1.ts";
+} from "../src/lib/studio/peaks-v1";
 import {
   assertStudioDurationAllowed,
   StudioApiError,
   validateStudioUpload,
   validateStudioUploadMeta,
-} from "../src/lib/studio/server/validation.ts";
-import { generateStudioPeaksV1FromInt16 } from "../src/lib/studio/server/peaks.ts";
-import { STUDIO_LIMITS } from "../src/lib/studio/server/model.ts";
+} from "../src/lib/studio/server/validation";
+import { generateStudioPeaksV1FromInt16 } from "../src/lib/studio/server/peaks";
+import { STUDIO_LIMITS } from "../src/lib/studio/server/model";
 
 assert.equal(MAX_STUDIO_AUDIO_DURATION_SECONDS, 10800);
 assert.equal(MAX_STUDIO_ASSET_BYTES, 314572800);
