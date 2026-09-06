@@ -456,6 +456,24 @@ function testRepoOneFileOneVersion() {
         "20260924120000_course_access_levels_moderation_readiness.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260925120000_course_upgrade_order_kind.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260925120100_create_course_upgrade_order.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260925120200_fulfill_tochka_course_upgrade.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -543,8 +561,11 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260923120000",
     "20260923120100",
     "20260924120000",
+    "20260925120000",
+    "20260925120100",
+    "20260925120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 55);
+  assert.equal(plan.database_migrations_pending, 58);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -611,8 +632,11 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260923120000",
     "20260923120100",
     "20260924120000",
+    "20260925120000",
+    "20260925120100",
+    "20260925120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 49);
+  assert.equal(plan.database_migrations_pending, 52);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -686,8 +710,11 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260923120000",
     "20260923120100",
     "20260924120000",
+    "20260925120000",
+    "20260925120100",
+    "20260925120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 40);
+  assert.equal(plan.database_migrations_pending, 43);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
