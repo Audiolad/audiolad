@@ -17,11 +17,7 @@ import {
   type AuthorType,
 } from "@/lib/authors/constants";
 import type { AuthorProfileDetail } from "@/lib/authors/profile";
-import {
-  getAudioPostDisplayLabel,
-  getDisplayFormat,
-} from "@/lib/author-products/format";
-import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
+import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
@@ -462,10 +458,7 @@ export default function AuthorProfileClient({
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-                          {isAudioPostProductKind(product.product_kind)
-                            ? getAudioPostDisplayLabel(product.format)
-                            : (getDisplayFormat(product.format) ??
-                              "Аудиопрактика")}
+                          {getDisplayFormat(product.format) ?? "Аудиопрактика"}
                         </p>
                         <p className="mt-1 text-sm font-semibold">{product.title}</p>
                         <p className="mt-1 text-xs text-[#7d70a2]">
