@@ -169,15 +169,25 @@ BEGIN
     RAISE EXCEPTION 'repeat grant must not duplicate rows, got %', v_count;
   END IF;
 
-  -- Raw UPDATE cannot lower (monotonic trigger)
+  -- Trusted service_role/admin UPDATE may lower (no table-wide trigger).
+  -- grantAccess(..., 1) on L2 must still keep 2.
   UPDATE public.user_practices
   SET access_level = 1
   WHERE user_id = buyer AND practice_id = course_id;
   SELECT access_level INTO v_level
   FROM public.user_practices
   WHERE user_id = buyer AND practice_id = course_id;
-  IF v_level IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'raw UPDATE must not lower access_level, got %', v_level;
+  IF v_level IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'trusted UPDATE 2→1 must be possible, got %', v_level;
+  END IF;
+
+  v_result := public.grant_practice_access(buyer, course_id, 2, 'admin');
+  IF (v_result ->> 'access_level')::integer IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 're-grant L2 after trusted lower failed: %', v_result;
+  END IF;
+  v_result := public.grant_practice_access(buyer, course_id, 1, 'purchase');
+  IF (v_result ->> 'access_level')::integer IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'grantAccess L1 on L2 must keep 2, got %', v_result;
   END IF;
 
   -- 1→2 raise for a fresh user
@@ -347,12 +357,12 @@ BEGIN
 
   v_raised := false;
   BEGIN
-    UPDATE public.user_practices SET access_level = 9 WHERE user_id = buyer;
+    UPDATE public.user_practices SET access_level = 1 WHERE user_id = buyer;
   EXCEPTION WHEN insufficient_privilege THEN
     v_raised := true;
   END;
   IF NOT v_raised THEN
-    RAISE EXCEPTION 'authenticated UPDATE user_practices must fail';
+    RAISE EXCEPTION 'authenticated UPDATE L2→L1 must fail';
   END IF;
 
   v_raised := false;
@@ -374,6 +384,16 @@ BEGIN
   END;
   IF NOT v_raised THEN
     RAISE EXCEPTION 'authenticated must not EXECUTE grant_practice_access';
+  END IF;
+
+  v_raised := false;
+  BEGIN
+    PERFORM public.grant_practice_purchase_access(order_id);
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_raised := true;
+  END;
+  IF NOT v_raised THEN
+    RAISE EXCEPTION 'authenticated must not EXECUTE grant_practice_purchase_access';
   END IF;
 
   RESET ROLE;
@@ -408,6 +428,123 @@ BEGIN
   WHERE user_id = buyer AND practice_id = course_id;
   IF v_level IS DISTINCT FROM 2 THEN
     RAISE EXCEPTION 'entitlement must still be 2 after RLS probes, got %', v_level;
+  END IF;
+
+  -- -----------------------------------------------------------------------
+  -- access_source: existing values + external_manual; no upgrade source
+  -- -----------------------------------------------------------------------
+  INSERT INTO auth.users (id) VALUES ('66666666-6666-4666-8666-666666666666');
+
+  FOREACH v_detail IN ARRAY ARRAY[
+    'starter',
+    'free_claim',
+    'purchase',
+    'gift',
+    'subscription',
+    'program',
+    'admin',
+    'external_manual'
+  ]
+  LOOP
+    INSERT INTO public.user_practices (
+      user_id, practice_id, access_source
+    ) VALUES (
+      '66666666-6666-4666-8666-666666666666',
+      legacy_practice,
+      v_detail
+    );
+    DELETE FROM public.user_practices
+    WHERE user_id = '66666666-6666-4666-8666-666666666666';
+  END LOOP;
+
+  v_raised := false;
+  BEGIN
+    INSERT INTO public.user_practices (user_id, practice_id, access_source)
+    VALUES (
+      '66666666-6666-4666-8666-666666666666',
+      legacy_practice,
+      'upgrade'
+    );
+  EXCEPTION WHEN check_violation THEN
+    v_raised := true;
+  END;
+  IF NOT v_raised THEN
+    RAISE EXCEPTION 'access_source=upgrade must be rejected';
+  END IF;
+
+  v_result := public.grant_practice_access(
+    '66666666-6666-4666-8666-666666666666',
+    course_id,
+    2,
+    'external_manual'
+  );
+  IF (v_result ->> 'access_level')::integer IS DISTINCT FROM 2
+     OR (v_result ->> 'inserted')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'external_manual none→2 failed: %', v_result;
+  END IF;
+
+  SELECT access_source INTO v_detail
+  FROM public.user_practices
+  WHERE user_id = '66666666-6666-4666-8666-666666666666'
+    AND practice_id = course_id;
+  IF v_detail IS DISTINCT FROM 'external_manual' THEN
+    RAISE EXCEPTION 'external_manual source not stored, got %', v_detail;
+  END IF;
+
+  v_result := public.grant_practice_access(
+    '66666666-6666-4666-8666-666666666666',
+    course_legacy,
+    1,
+    'gift'
+  );
+  IF (v_result ->> 'access_level')::integer IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'legacy gift grant failed: %', v_result;
+  END IF;
+
+  v_raised := false;
+  v_detail := NULL;
+  BEGIN
+    PERFORM public.grant_practice_access(
+      '66666666-6666-4666-8666-666666666666',
+      course_legacy,
+      1,
+      'upgrade'
+    );
+  EXCEPTION WHEN others THEN
+    v_raised := true;
+    GET STACKED DIAGNOSTICS v_detail = PG_EXCEPTION_DETAIL;
+  END;
+  IF NOT v_raised OR v_detail IS DISTINCT FROM 'invalid_access_source' THEN
+    RAISE EXCEPTION 'grant upgrade source must be rejected, got %', v_detail;
+  END IF;
+
+  IF has_function_privilege(
+    'service_role',
+    'public.grant_practice_access(uuid, uuid, integer, text, jsonb)',
+    'EXECUTE'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'service_role must EXECUTE grant_practice_access';
+  END IF;
+  IF has_function_privilege(
+    'service_role',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'service_role must EXECUTE grant_practice_purchase_access';
+  END IF;
+  IF has_function_privilege(
+    'authenticated',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'authenticated must not EXECUTE grant_practice_purchase_access';
+  END IF;
+  IF has_function_privilege(
+    'anon',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'anon must not EXECUTE grant_practice_purchase_access';
   END IF;
 
   RAISE NOTICE 'course-access-levels-foundation smoke passed';

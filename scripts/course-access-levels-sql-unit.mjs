@@ -61,9 +61,15 @@ assert(/DETAIL = 'level_not_in_catalog'/.test(sql));
 assert(/CREATE OR REPLACE FUNCTION public\.grant_practice_purchase_access/.test(sql));
 assert(/grant_practice_access\(\s*locked_order\.user_id/.test(sql));
 assert(/REVOKE ALL ON FUNCTION public\.grant_practice_access/.test(sql));
+assert(/GRANT EXECUTE ON FUNCTION public\.grant_practice_purchase_access\(uuid\)/.test(sql));
 assert(/FROM authenticated/.test(sql));
+assert(/external_manual/.test(sql));
+assert(/service_role must EXECUTE grant_practice_access/.test(sql));
+assert(/service_role must EXECUTE grant_practice_purchase_access/.test(sql));
 assert(/REVOKE INSERT, UPDATE, DELETE ON TABLE public\.user_practices/.test(sql));
 assert(/ENABLE ROW LEVEL SECURITY/.test(sql));
+assert(!/user_practices_keep_highest_access_level/.test(sql));
+assert(!/user_practices_access_level_monotonic/.test(sql));
 assert(!/INSERT INTO public\.practice_access_levels/.test(sql));
 assert(!/UPDATE\s+public\.user_practices/i.test(sql));
 assert(!/order_kind/.test(sql));
@@ -261,13 +267,7 @@ INSERT INTO auth.users (id) VALUES ('${userA}'), ('${userB}');
 
   await Promise.all([
     spawnPsql(dbName, grantSql(userB, 2)),
-    spawnPsql(
-      dbName,
-      `INSERT INTO public.user_practices (user_id, practice_id, access_source, access_level)
-       VALUES ('${userB}', '${courseId}', 'purchase', 1)
-       ON CONFLICT (user_id, practice_id) DO UPDATE
-       SET access_level = EXCLUDED.access_level;`,
-    ),
+    spawnPsql(dbName, grantSql(userB, 1)),
   ]);
 
   const levelB = runPsql(
@@ -275,7 +275,7 @@ INSERT INTO auth.users (id) VALUES ('${userA}'), ('${userB}');
     `SELECT access_level FROM public.user_practices WHERE user_id = '${userB}' AND practice_id = '${courseId}';`,
     ["-At"],
   ).trim();
-  assert(levelB === "2", `concurrent upsert must not lower L2, got ${levelB}`);
+  assert(levelB === "2", `concurrent grant 2+1 must settle at 2, got ${levelB}`);
 }
 
 const skipIsolatedSql = process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1";

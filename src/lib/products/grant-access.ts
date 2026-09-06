@@ -11,7 +11,8 @@ export type GrantAccessSource =
   | "gift"
   | "subscription"
   | "program"
-  | "admin";
+  | "admin"
+  | "external_manual";
 
 export type GrantAccessInput = {
   userId: string;

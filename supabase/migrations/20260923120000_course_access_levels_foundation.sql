@@ -15,6 +15,9 @@ BEGIN;
 -- grant RPC is the public path that must not give L2 to ordinary audio
 -- practices. Higher entitlement always includes lower levels: one
 -- user_practices.access_level = N means access to everything <= N.
+-- Monotonic GREATEST lives only inside grant_practice_access. There is
+-- no table-wide anti-downgrade trigger so a future trusted refund/revoke
+-- can set L2→L1. access_source adds external_manual (not upgrade).
 -- ---------------------------------------------------------------------------
 
 -- ===========================================================================
@@ -125,29 +128,30 @@ ALTER TABLE public.user_practices
   CHECK (access_level >= 1);
 
 COMMENT ON COLUMN public.user_practices.access_level IS
-  'Canonical entitlement tier. One row per (user, practice). Higher includes lower. DEFAULT 1 = existing purchases stay Level 1 without backfill. Never lowered by grant_practice_access.';
+  'Canonical entitlement tier. One row per (user, practice). Higher includes lower. DEFAULT 1 = existing purchases stay Level 1 without backfill. grant_practice_access never lowers; trusted service_role UPDATE may lower (future refund/revoke). No table-wide anti-downgrade trigger.';
 
-CREATE OR REPLACE FUNCTION public.user_practices_keep_highest_access_level()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF TG_OP = 'UPDATE' AND NEW.access_level < OLD.access_level THEN
-    NEW.access_level := OLD.access_level;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+ALTER TABLE public.user_practices
+  DROP CONSTRAINT IF EXISTS user_practices_access_source_check;
 
-DROP TRIGGER IF EXISTS user_practices_access_level_monotonic
-  ON public.user_practices;
-CREATE TRIGGER user_practices_access_level_monotonic
-  BEFORE UPDATE OF access_level ON public.user_practices
-  FOR EACH ROW
-  EXECUTE FUNCTION public.user_practices_keep_highest_access_level();
+ALTER TABLE public.user_practices
+  ADD CONSTRAINT user_practices_access_source_check
+  CHECK (
+    access_source = ANY (
+      ARRAY[
+        'starter'::text,
+        'free_claim'::text,
+        'purchase'::text,
+        'gift'::text,
+        'subscription'::text,
+        'program'::text,
+        'admin'::text,
+        'external_manual'::text
+      ]
+    )
+  );
 
-COMMENT ON FUNCTION public.user_practices_keep_highest_access_level() IS
-  'audiolad:access-grant:v1; clamps access_level so even raw UPDATE cannot downgrade.';
+COMMENT ON COLUMN public.user_practices.access_source IS
+  'How access was granted: starter, free_claim, purchase, gift, subscription, program, admin, or external_manual (future external payment / one-time link). Not upgrade — native upgrade stays purchase.';
 
 -- Table privileges stay SELECT-only for authenticated (library read).
 -- Re-assert so a later GRANT UPDATE cannot be assumed:
@@ -204,7 +208,8 @@ BEGIN
     'gift',
     'subscription',
     'program',
-    'admin'
+    'admin',
+    'external_manual'
   ) THEN
     RAISE EXCEPTION 'invalid_access_source'
       USING ERRCODE = '22023', DETAIL = 'invalid_access_source';
@@ -311,7 +316,7 @@ GRANT EXECUTE ON FUNCTION public.grant_practice_access(uuid, uuid, integer, text
   TO service_role;
 
 COMMENT ON FUNCTION public.grant_practice_access(uuid, uuid, integer, text, jsonb) IS
-  'audiolad:access-grant:v1; canonical monotonic entitlement grant. access_level = GREATEST(current, target). Atomic upsert, never downgrades. L1 always allowed (implicit baseline). L2+ requires publication_class=course and a matching practice_access_levels row. Not executable by anon/authenticated.';
+  'audiolad:access-grant:v1; canonical monotonic entitlement grant. access_level = GREATEST(current, target) on INSERT … ON CONFLICT only. Does not install a table-wide anti-downgrade trigger. L1 always allowed (implicit baseline). L2+ requires publication_class=course and a matching practice_access_levels row. Accepts access_source including external_manual. Not executable by anon/authenticated.';
 
 -- ===========================================================================
 -- 5. Backward-compatible purchase wrapper (Level 1 only)
@@ -379,9 +384,11 @@ $$;
 REVOKE ALL ON FUNCTION public.grant_practice_purchase_access(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.grant_practice_purchase_access(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.grant_practice_purchase_access(uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_practice_purchase_access(uuid)
+  TO service_role;
 
 COMMENT ON FUNCTION public.grant_practice_purchase_access(uuid) IS
-  'audiolad:purchase-grant:v2; Level-1 wrapper around grant_practice_access for paid orders. Same call shape as v1 for Tochka fulfill. Idempotent; never lowers an existing higher access_level.';
+  'audiolad:purchase-grant:v2; Level-1 wrapper around grant_practice_access for paid orders. Same call shape as v1 for Tochka fulfill. Idempotent; never lowers an existing higher access_level. EXECUTE: service_role only.';
 
 -- ===========================================================================
 -- 6. Post-checks
@@ -402,6 +409,22 @@ BEGIN
   END IF;
 
   IF has_function_privilege(
+    'service_role',
+    'public.grant_practice_access(uuid, uuid, integer, text, jsonb)',
+    'EXECUTE'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Post-check failed: service_role must EXECUTE grant_practice_access';
+  END IF;
+
+  IF has_function_privilege(
+    'service_role',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Post-check failed: service_role must EXECUTE grant_practice_purchase_access';
+  END IF;
+
+  IF has_function_privilege(
     'authenticated',
     'public.grant_practice_access(uuid, uuid, integer, text, jsonb)',
     'EXECUTE'
@@ -410,11 +433,27 @@ BEGIN
   END IF;
 
   IF has_function_privilege(
+    'authenticated',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'Post-check failed: authenticated must not EXECUTE grant_practice_purchase_access';
+  END IF;
+
+  IF has_function_privilege(
     'anon',
     'public.grant_practice_access(uuid, uuid, integer, text, jsonb)',
     'EXECUTE'
   ) IS TRUE THEN
     RAISE EXCEPTION 'Post-check failed: anon must not EXECUTE grant_practice_access';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'public.grant_practice_purchase_access(uuid)',
+    'EXECUTE'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'Post-check failed: anon must not EXECUTE grant_practice_purchase_access';
   END IF;
 
   IF has_table_privilege('authenticated', 'public.user_practices', 'UPDATE') IS TRUE THEN
