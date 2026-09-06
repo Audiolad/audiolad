@@ -202,7 +202,7 @@ admin). Будущий learner API обязан сначала резолвит�
 
 #### Course access levels foundation (Phase 1)
 
-Миграция: `20260923120000_course_access_levels_foundation.sql`. Additive only.
+Миграция: `20260923120100_course_access_levels_foundation.sql`. Additive only.
 No mass INSERT of Level 1 catalog rows. No finance / checkout changes.
 
 | Объект | Назначение |

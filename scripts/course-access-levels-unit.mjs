@@ -11,7 +11,7 @@ import { grantAccess } from "../src/lib/products/grant-access.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = readFileSync(
-  join(root, "supabase/migrations/20260923120000_course_access_levels_foundation.sql"),
+  join(root, "supabase/migrations/20260923120100_course_access_levels_foundation.sql"),
   "utf8",
 );
 const accessTs = readFileSync(join(root, "src/lib/products/access.ts"), "utf8");

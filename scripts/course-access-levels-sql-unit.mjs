@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
-const migrationName = "20260923120000_course_access_levels_foundation.sql";
-const previousName = "20260922120000_admin_ratings_analytics.sql";
+const migrationName = "20260923120100_course_access_levels_foundation.sql";
+const previousName = "20260923120000_studio_render_job_lease_heartbeat.sql";
 const migrationPath = join(migrationsDir, migrationName);
 const stubPath = join(repoRoot, "scripts/lib/course-access-levels-sql-stub.sql");
 const seedPath = join(repoRoot, "scripts/lib/course-access-levels-pre-migration-seed.sql");
@@ -37,8 +37,8 @@ const names = readdirSync(migrationsDir).filter((name) =>
 );
 const versions = names.map((name) => name.match(/^(\d{8,})_/)?.[1]);
 assert(new Set(versions).size === versions.length, "no duplicate timestamps");
-assert(versions.includes("20260923120000"), "new stamp is listed");
-assert(versions.includes("20260922120000"), "admin_ratings_analytics stamp remains");
+assert(versions.includes("20260923120100"), "new stamp is listed");
+assert(versions.includes("20260923120000"), "studio heartbeat stamp remains");
 
 assert(/CREATE TABLE IF NOT EXISTS public\.practice_access_levels/.test(sql));
 assert(/REFERENCES public\.practices \(id\)/.test(sql));
