@@ -138,6 +138,129 @@ export function parseAccessLinkExpiryOption(
   return null;
 }
 
+export const ACCESS_LINK_CREATE_TARGET_KEYS = [
+  "targetAccessLevel",
+  "target_access_level",
+] as const;
+
+export const ACCESS_LINK_CREATE_EXPIRY_KEYS = ["expiresIn", "expiry"] as const;
+
+export type AccessLinkCreateFieldPick =
+  | { present: false }
+  | { present: true; key: string; value: unknown };
+
+export function pickFirstPresentCreateField(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): AccessLinkCreateFieldPick {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      return { present: true, key, value: record[key] };
+    }
+  }
+
+  return { present: false };
+}
+
+export function resolveAccessLinkCreateTargetLevel(
+  record: Record<string, unknown>,
+):
+  | { ok: true; targetLevel: number }
+  | { ok: false; code: "invalid_access_level" } {
+  const picked = pickFirstPresentCreateField(
+    record,
+    ACCESS_LINK_CREATE_TARGET_KEYS,
+  );
+
+  if (!picked.present) {
+    return { ok: true, targetLevel: 1 };
+  }
+
+  const parsed = parseAccessLinkTargetLevel(picked.value);
+
+  if (parsed === null) {
+    return { ok: false, code: "invalid_access_level" };
+  }
+
+  return { ok: true, targetLevel: parsed };
+}
+
+export function resolveAccessLinkCreateExpiry(
+  record: Record<string, unknown>,
+):
+  | { ok: true; expiry: AccessLinkExpiryOption }
+  | { ok: false; code: "invalid_access_link_expiry" } {
+  const picked = pickFirstPresentCreateField(
+    record,
+    ACCESS_LINK_CREATE_EXPIRY_KEYS,
+  );
+
+  if (!picked.present) {
+    return { ok: true, expiry: "none" };
+  }
+
+  const parsed = parseAccessLinkExpiryOption(picked.value);
+
+  if (parsed === null) {
+    return { ok: false, code: "invalid_access_link_expiry" };
+  }
+
+  return { ok: true, expiry: parsed };
+}
+
+export function redactAccessTokenFromPath(pathname: string): string {
+  return pathname
+    .replace(/^(\/access\/)[^/?#]+/i, "$1[redacted]")
+    .replace(/^(\/api\/access\/)[^/?#]+/i, "$1[redacted]");
+}
+
+export function redactAccessTokenFromHref(href: string): string {
+  const raw = href.trim();
+
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const url = new URL(raw);
+      url.pathname = redactAccessTokenFromPath(url.pathname);
+      const next = url.searchParams.get("next");
+      if (next) {
+        url.searchParams.set("next", redactAccessTokenFromPath(next));
+      }
+      return `${url.origin}${url.pathname}${url.search}`;
+    }
+  } catch {
+    // Fall through to path-only redaction.
+  }
+
+  const [path, query] = raw.split("?");
+  const redactedPath = redactAccessTokenFromPath(path ?? "");
+
+  if (!query) {
+    return redactedPath;
+  }
+
+  const params = new URLSearchParams(query);
+  const next = params.get("next");
+  if (next) {
+    params.set("next", redactAccessTokenFromPath(next));
+  }
+
+  const nextQuery = params.toString();
+  return nextQuery ? `${redactedPath}?${nextQuery}` : redactedPath;
+}
+
+export function isAccessTokenAnalyticsRoute(
+  pathname: string | null | undefined,
+): boolean {
+  const normalized = (pathname ?? "").trim();
+
+  return (
+    normalized === "/access" ||
+    normalized.startsWith("/access/") ||
+    normalized === "/api/access" ||
+    normalized.startsWith("/api/access/")
+  );
+}
+
 export function parseAccessLinkTargetLevel(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
     return value;
@@ -275,6 +398,8 @@ export function accessLinkAuthorErrorMessage(code: string | undefined): string {
       return "Выберите один из настроенных уровней доступа.";
     case "invalid_access_level":
       return "Укажите уровень доступа целым числом от 1.";
+    case "invalid_access_link_expiry":
+      return "Укажите срок действия ссылки: без срока, 24 часа или 7 дней.";
     case "link_not_active":
       return "Отозвать можно только активную ссылку.";
     case "forbidden":

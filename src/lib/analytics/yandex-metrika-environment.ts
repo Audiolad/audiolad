@@ -1,3 +1,5 @@
+import { isAccessTokenAnalyticsRoute } from "@/lib/products/access-links";
+
 const NON_PRODUCTION_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -50,6 +52,10 @@ export function shouldEnableYandexMetrika(input?: {
   }
 
   if (isAdminAnalyticsRoute(input?.pathname)) {
+    return false;
+  }
+
+  if (isAccessTokenAnalyticsRoute(input?.pathname)) {
     return false;
   }
 

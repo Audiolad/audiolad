@@ -16,6 +16,10 @@ import {
   isValidPracticeAccessTokenFormat,
   parseAccessLinkExpiryOption,
   parseAccessLinkTargetLevel,
+  redactAccessTokenFromHref,
+  redactAccessTokenFromPath,
+  resolveAccessLinkCreateExpiry,
+  resolveAccessLinkCreateTargetLevel,
   resolveAccessLinkExpiry,
   validateAccessLinkTargetLevel,
 } from "../src/lib/products/access-links.ts";
@@ -107,6 +111,41 @@ assert.equal(parseAccessLinkTargetLevel("2"), 2);
 assert.equal(parseAccessLinkTargetLevel(1.5), null);
 assert.equal(parseAccessLinkExpiryOption("7d"), "7d");
 assert.equal(parseAccessLinkExpiryOption("hidden"), null);
+
+assert.equal(resolveAccessLinkCreateTargetLevel({}).ok && resolveAccessLinkCreateTargetLevel({}).targetLevel, 1);
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: 0 }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: "abc" }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: null }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: {} }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: [] }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: 1.5 }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: -1 }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: "" }).code, "invalid_access_level");
+assert.equal(resolveAccessLinkCreateTargetLevel({ targetAccessLevel: 2 }).targetLevel, 2);
+
+assert.equal(resolveAccessLinkCreateExpiry({}).expiry, "none");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "24h" }).expiry, "24h");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "7d" }).expiry, "7d");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "none" }).expiry, "none");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "1d" }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "7days" }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "forever" }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: "" }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: null }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: {} }).code, "invalid_access_link_expiry");
+assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: [] }).code, "invalid_access_link_expiry");
+
+assert.equal(redactAccessTokenFromPath(`/access/${token.rawToken}`), "/access/[redacted]");
+assert.equal(
+  redactAccessTokenFromPath(`/api/access/${token.rawToken}/redeem`),
+  "/api/access/[redacted]/redeem",
+);
+const redactedSignIn = redactAccessTokenFromHref(
+  `https://audiolad.ru/auth/sign-in?next=/access/${token.rawToken}`,
+);
+assert.match(redactedSignIn, /\/auth\/sign-in\?next=/);
+assert.match(decodeURIComponent(redactedSignIn), /\/access\/\[redacted\]/);
+assert.equal(redactedSignIn.includes(token.rawToken), false);
 
 const now = new Date("2026-09-06T12:00:00.000Z");
 assert.equal(resolveAccessLinkExpiry("none", now), null);
@@ -200,10 +239,47 @@ assert.doesNotMatch(
 const authorRoute = read("src/app/api/author/products/[id]/access-links/route.ts");
 assert.match(authorRoute, /requirePracticeMutationAccess/);
 assert.match(authorRoute, /createPracticeAccessLink/);
+assert.match(authorRoute, /body: record/);
+assert.doesNotMatch(authorRoute, /\?\? 1/);
+assert.doesNotMatch(authorRoute, /\?\? "none"/);
 assert.doesNotMatch(authorRoute, /from\("practice_access_links"\)\.insert/);
 
 const adminRoute = read("src/app/api/admin/products/[id]/access-links/route.ts");
 assert.match(adminRoute, /requirePlatformAdminAccessLinkActor/);
+assert.match(adminRoute, /body: record/);
+assert.doesNotMatch(adminRoute, /\?\? 1/);
+assert.doesNotMatch(adminRoute, /\?\? "none"/);
+
+const createHelper = read("src/lib/products/access-links-server.ts");
+assert.match(createHelper, /resolveAccessLinkCreateTargetLevel/);
+assert.match(createHelper, /resolveAccessLinkCreateExpiry/);
+assert.doesNotMatch(createHelper, /parseAccessLinkTargetLevel\(input\.targetLevel\) \?\? 1/);
+assert.doesNotMatch(createHelper, /parseAccessLinkExpiryOption\(input\.expiry\) \?\?/);
+
+const reactivate = read(
+  "supabase/migrations/20260927120000_practice_access_link_permanent_entitlement.sql",
+);
+assert.match(reactivate, /activate_permanent_practice_access/);
+assert.match(reactivate, /expires_at = NULL/);
+assert.match(reactivate, /entitlement_still_expired/);
+assert.match(reactivate, /grant_practice_access\(/);
+assert.doesNotMatch(
+  read("supabase/migrations/20260923120100_course_access_levels_foundation.sql"),
+  /expires_at =/,
+);
+
+assert.match(
+  read("src/lib/analytics/yandex-metrika-url.ts"),
+  /redactAccessTokenFromPath/,
+);
+assert.match(
+  read("src/lib/analytics/yandex-metrika-environment.ts"),
+  /isAccessTokenAnalyticsRoute/,
+);
+assert.match(
+  read("src/lib/client-errors/sanitize.ts"),
+  /redactAccessTokenFromPath/,
+);
 
 const redeemRoute = read("src/app/api/access/[token]/redeem/route.ts");
 assert.match(redeemRoute, /export async function POST/);

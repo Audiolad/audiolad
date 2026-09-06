@@ -36,6 +36,8 @@ assert.equal(accessLinkPublicErrorMessage("already_redeemed_by_you"), "Дост�
 assert.equal(accessLinkPublicErrorMessage("link_already_used"), "Эта ссылка уже использована.");
 assert.doesNotMatch(accessLinkPublicErrorMessage("link_already_used"), /@|email|user/);
 assert.match(accessLinkAuthorErrorMessage("target_level_not_configured"), /уровн/i);
+assert.match(accessLinkAuthorErrorMessage("invalid_access_link_expiry"), /срок/i);
+assert.match(accessLinkAuthorErrorMessage("invalid_access_level"), /уровен/i);
 
 const ui = read("src/components/author-dashboard/AuthorPracticeAccessLinks.tsx");
 assert.match(ui, /ACCESS_LINK_COPY_LABEL/);

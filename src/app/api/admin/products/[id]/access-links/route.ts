@@ -71,8 +71,7 @@ export async function POST(request: Request, context: RouteContext) {
       practiceId: id,
       createdByUserId: user.id,
       createdByAuthorId: practice.author_id,
-      targetLevel: record.targetAccessLevel ?? record.target_access_level ?? 1,
-      expiry: record.expiresIn ?? record.expiry ?? "none",
+      body: record,
     });
 
     return NextResponse.json(created, { status: 201 });

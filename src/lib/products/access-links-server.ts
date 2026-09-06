@@ -9,7 +9,6 @@ import {
   hashPracticeAccessToken,
 } from "@/lib/products/access-links-crypto";
 import {
-  type AccessLinkExpiryOption,
   type PracticeAccessLinkAllowedTarget,
   type PracticeAccessLinkListItem,
   type PracticeAccessLinkPreview,
@@ -18,8 +17,8 @@ import {
   isValidPracticeAccessTokenFormat,
   isValidPracticeAccessTokenHash,
   mapAccessLinkListItem,
-  parseAccessLinkExpiryOption,
-  parseAccessLinkTargetLevel,
+  resolveAccessLinkCreateExpiry,
+  resolveAccessLinkCreateTargetLevel,
   resolveAccessLinkExpiry,
   validateAccessLinkTargetLevel,
 } from "@/lib/products/access-links";
@@ -65,6 +64,7 @@ export function mapAccessLinkSqlError(error: {
     "target_level_not_configured",
     "access_level_not_available",
     "invalid_access_level",
+    "invalid_access_link_expiry",
     "invalid_token_hash",
     "link_not_found",
     "link_not_active",
@@ -101,6 +101,7 @@ export function statusForAccessLinkCode(code: string): number {
     case "access_level_not_available":
       return 409;
     case "invalid_access_level":
+    case "invalid_access_link_expiry":
     case "invalid_token_hash":
     case "user_id_required":
       return 400;
@@ -208,8 +209,7 @@ export async function createPracticeAccessLink(input: {
   practiceId: string;
   createdByUserId: string;
   createdByAuthorId: string | null;
-  targetLevel: unknown;
-  expiry: unknown;
+  body?: Record<string, unknown>;
 }): Promise<{
   accessUrl: string;
   link: PracticeAccessLinkListItem;
@@ -217,20 +217,36 @@ export async function createPracticeAccessLink(input: {
   const service = createServiceRoleClient();
   const practice = await loadPracticeForAccessLinks(service, input.practiceId);
   const configured = await loadConfiguredAccessLevels(service, practice.id);
-  const targetLevel = parseAccessLinkTargetLevel(input.targetLevel) ?? 1;
+  const body = input.body ?? {};
+  const resolvedTarget = resolveAccessLinkCreateTargetLevel(body);
+
+  if (!resolvedTarget.ok) {
+    throw new AccessLinkError(
+      resolvedTarget.code,
+      statusForAccessLinkCode(resolvedTarget.code),
+    );
+  }
+
   const validated = validateAccessLinkTargetLevel({
     publicationClass: practice.publication_class,
     configuredLevels: configured,
-    targetLevel,
+    targetLevel: resolvedTarget.targetLevel,
   });
 
   if (!validated.ok) {
     throw new AccessLinkError(validated.code, statusForAccessLinkCode(validated.code));
   }
 
-  const expiryOption =
-    parseAccessLinkExpiryOption(input.expiry) ?? ("none" as AccessLinkExpiryOption);
-  const expiresAt = resolveAccessLinkExpiry(expiryOption);
+  const resolvedExpiry = resolveAccessLinkCreateExpiry(body);
+
+  if (!resolvedExpiry.ok) {
+    throw new AccessLinkError(
+      resolvedExpiry.code,
+      statusForAccessLinkCode(resolvedExpiry.code),
+    );
+  }
+
+  const expiresAt = resolveAccessLinkExpiry(resolvedExpiry.expiry);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const token = generatePracticeAccessToken();

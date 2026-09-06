@@ -12,6 +12,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
 const previousName = "20260925120600_course_upgrade_canonical_sales_amount_match.sql";
 const migrationName = "20260926120000_practice_access_links.sql";
+const reactivateName = "20260927120000_practice_access_link_permanent_entitlement.sql";
 const foundationName = "20260923120100_course_access_levels_foundation.sql";
 const stubPath = join(repoRoot, "scripts/lib/course-access-levels-sql-stub.sql");
 const extraStubPath = join(repoRoot, "scripts/lib/practice-access-links-sql-stub.sql");
@@ -30,6 +31,7 @@ const sql = readFileSync(join(migrationsDir, migrationName), "utf8");
 
 assert(existsSync(join(migrationsDir, previousName)), "previous latest migration stays intact");
 assert(existsSync(join(migrationsDir, migrationName)), "access links migration exists");
+assert(existsSync(join(migrationsDir, reactivateName)), "permanent entitlement follow-up exists");
 
 const names = readdirSync(migrationsDir).filter((name) =>
   name.toLowerCase().endsWith(".sql"),
@@ -37,6 +39,7 @@ const names = readdirSync(migrationsDir).filter((name) =>
 const versions = names.map((name) => name.match(/^(\d{8,})_/)?.[1]);
 assert(new Set(versions).size === versions.length, "no duplicate timestamps");
 assert(versions.includes("20260926120000"), "new stamp is listed");
+assert(versions.includes("20260927120000"), "reactivate stamp is listed");
 assert(versions.includes("20260925120600"), "phase 4 stamp remains");
 
 assert(/CREATE TABLE IF NOT EXISTS public\.practice_access_links/.test(sql));
@@ -61,6 +64,15 @@ assert(/GRANT EXECUTE ON FUNCTION public\.redeem_practice_access_link\(text, uui
 assert(!/DROP TABLE/.test(sql));
 assert(!/TRUNCATE/.test(sql));
 assert(!/tochka|orders|payment|finance/i.test(sql.replace(/COMMENT[\s\S]*?;/g, "")));
+
+const reactivateSql = readFileSync(join(migrationsDir, reactivateName), "utf8");
+assert(/CREATE OR REPLACE FUNCTION public\.activate_permanent_practice_access/.test(reactivateSql));
+assert(/SET expires_at = NULL/.test(reactivateSql));
+assert(/entitlement_still_expired/.test(reactivateSql));
+assert(/PERFORM public\.activate_permanent_practice_access/.test(reactivateSql));
+assert(/grant_practice_access\(/.test(reactivateSql));
+assert(!/DROP TABLE/.test(reactivateSql));
+assert(!/ALTER FUNCTION public\.grant_practice_access/.test(reactivateSql));
 
 function dockerAvailable() {
   try {
@@ -232,6 +244,7 @@ async function runIsolatedSql(targetDb) {
     !existsSync(stubPath) ||
     !existsSync(extraStubPath) ||
     !existsSync(seedPath) ||
+    !existsSync(join(migrationsDir, reactivateName)) ||
     !existsSync(smokePath)
   ) {
     throw new Error("access links SQL stub, seed, or smoke file is missing");
@@ -248,6 +261,7 @@ async function runIsolatedSql(targetDb) {
     readFileSync(seedPath, "utf8"),
     readFileSync(join(migrationsDir, foundationName), "utf8"),
     readFileSync(join(migrationsDir, migrationName), "utf8"),
+    readFileSync(join(migrationsDir, reactivateName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 

@@ -6,6 +6,11 @@ DECLARE
   buyer_a uuid := '44444444-4444-4444-8444-444444444444';
   buyer_b uuid := '55555555-5555-4555-8555-555555555555';
   buyer_c uuid := '66666666-6666-4666-8666-666666666666';
+  buyer_d uuid := '12121212-1212-4121-8121-121212121212';
+  buyer_e uuid := '13131313-1313-4131-8131-131313131313';
+  buyer_f uuid := '14141414-1414-4141-8141-141414141414';
+  buyer_g uuid := '15151515-1515-4151-8151-151515151515';
+  buyer_h uuid := '16161616-1616-4161-8161-161616161616';
   ordinary_id uuid := 'c1111111-1111-4111-8111-111111111111';
   course_id uuid := 'c2222222-2222-4222-8222-222222222222';
   tok_l1 text := 'ordinaryL1Token00000000000000000000000001';
@@ -29,6 +34,7 @@ DECLARE
   v_level integer;
   v_source text;
   v_status text;
+  v_expires timestamptz;
   v_count integer;
   v_raw_in_db integer;
   v_order_count integer;
@@ -36,7 +42,12 @@ BEGIN
   INSERT INTO auth.users (id) VALUES
     (buyer_a),
     (buyer_b),
-    (buyer_c)
+    (buyer_c),
+    (buyer_d),
+    (buyer_e),
+    (buyer_f),
+    (buyer_g),
+    (buyer_h)
   ON CONFLICT DO NOTHING;
 
   UPDATE public.practices
@@ -268,29 +279,115 @@ BEGIN
     RAISE EXCEPTION 'E: must stay L3, got %', v_level;
   END IF;
 
-  -- 10. F: expired entitlement follows grant_practice_access
+  -- 10. Expired L1 + L1 → ACTIVE, expires_at NULL, link redeemed
   INSERT INTO public.user_practices (
-    user_id, practice_id, access_source, access_level, expires_at
+    user_id, practice_id, access_source, access_level, granted_at, expires_at
   ) VALUES (
-    buyer_c, ordinary_id, 'purchase', 1, now() - interval '1 day'
-  )
-  ON CONFLICT (user_id, practice_id) DO UPDATE
-  SET expires_at = now() - interval '1 day', access_level = 1;
+    buyer_d, ordinary_id, 'purchase', 1,
+    now() - interval '2 days', now() - interval '1 day'
+  );
 
   PERFORM public.create_practice_access_link(
     ordinary_id, 1,
-    encode(digest('expiredEntitlementTok000000000000000013', 'sha256'), 'hex'),
+    encode(digest('expiredL1plusL1Token000000000000000013', 'sha256'), 'hex'),
     author_user, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   );
   PERFORM public.redeem_practice_access_link(
-    encode(digest('expiredEntitlementTok000000000000000013', 'sha256'), 'hex'),
-    buyer_c
+    encode(digest('expiredL1plusL1Token000000000000000013', 'sha256'), 'hex'),
+    buyer_d
   );
-  SELECT access_level INTO v_level
+  SELECT access_level, expires_at INTO v_level, v_expires
   FROM public.user_practices
-  WHERE user_id = buyer_c AND practice_id = ordinary_id;
-  IF v_level IS DISTINCT FROM 1 THEN
-    RAISE EXCEPTION 'F: grant must keep/set L1, got %', v_level;
+  WHERE user_id = buyer_d AND practice_id = ordinary_id;
+  IF v_level IS DISTINCT FROM 1 OR v_expires IS NOT NULL THEN
+    RAISE EXCEPTION 'expired L1+L1: expected L1/NULL, got % %', v_level, v_expires;
+  END IF;
+  SELECT status INTO v_status
+  FROM public.practice_access_links
+  WHERE token_hash = encode(digest('expiredL1plusL1Token000000000000000013', 'sha256'), 'hex');
+  IF v_status IS DISTINCT FROM 'redeemed' THEN
+    RAISE EXCEPTION 'expired L1+L1: link must be redeemed';
+  END IF;
+
+  BEGIN
+    PERFORM public.redeem_practice_access_link(
+      encode(digest('expiredL1plusL1Token000000000000000013', 'sha256'), 'hex'),
+      buyer_d
+    );
+    RAISE EXCEPTION 'replay after reactivation must be already_redeemed_by_you';
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF SQLERRM NOT LIKE '%already_redeemed_by_you%' THEN
+        RAISE EXCEPTION 'expected already_redeemed_by_you, got %', SQLERRM;
+      END IF;
+  END;
+
+  -- 10b. Expired L1 + L2 → L2 + expires_at NULL
+  INSERT INTO public.user_practices (
+    user_id, practice_id, access_source, access_level, granted_at, expires_at
+  ) VALUES (
+    buyer_e, course_id, 'purchase', 1,
+    now() - interval '2 days', now() - interval '1 day'
+  );
+  PERFORM public.create_practice_access_link(
+    course_id, 2,
+    encode(digest('expiredL1plusL2Token000000000000000017', 'sha256'), 'hex'),
+    author_user, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  );
+  PERFORM public.redeem_practice_access_link(
+    encode(digest('expiredL1plusL2Token000000000000000017', 'sha256'), 'hex'),
+    buyer_e
+  );
+  SELECT access_level, expires_at INTO v_level, v_expires
+  FROM public.user_practices
+  WHERE user_id = buyer_e AND practice_id = course_id;
+  IF v_level IS DISTINCT FROM 2 OR v_expires IS NOT NULL THEN
+    RAISE EXCEPTION 'expired L1+L2: expected L2/NULL, got % %', v_level, v_expires;
+  END IF;
+
+  -- 10c. Expired L3 + L2 → stay L3, expires_at NULL
+  INSERT INTO public.user_practices (
+    user_id, practice_id, access_source, access_level, granted_at, expires_at
+  ) VALUES (
+    buyer_f, course_id, 'admin', 3,
+    now() - interval '2 days', now() - interval '1 day'
+  );
+  PERFORM public.create_practice_access_link(
+    course_id, 2,
+    encode(digest('expiredL3plusL2Token000000000000000018', 'sha256'), 'hex'),
+    author_user, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  );
+  PERFORM public.redeem_practice_access_link(
+    encode(digest('expiredL3plusL2Token000000000000000018', 'sha256'), 'hex'),
+    buyer_f
+  );
+  SELECT access_level, expires_at INTO v_level, v_expires
+  FROM public.user_practices
+  WHERE user_id = buyer_f AND practice_id = course_id;
+  IF v_level IS DISTINCT FROM 3 OR v_expires IS NOT NULL THEN
+    RAISE EXCEPTION 'expired L3+L2: expected L3/NULL, got % %', v_level, v_expires;
+  END IF;
+
+  -- 10d. Active temporary L1 + permanent L2 → L2, expires_at NULL
+  INSERT INTO public.user_practices (
+    user_id, practice_id, access_source, access_level, expires_at
+  ) VALUES (
+    buyer_g, course_id, 'subscription', 1, now() + interval '1 day'
+  );
+  PERFORM public.create_practice_access_link(
+    course_id, 2,
+    encode(digest('tempL1plusL2Token00000000000000000019', 'sha256'), 'hex'),
+    author_user, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  );
+  PERFORM public.redeem_practice_access_link(
+    encode(digest('tempL1plusL2Token00000000000000000019', 'sha256'), 'hex'),
+    buyer_g
+  );
+  SELECT access_level, expires_at INTO v_level, v_expires
+  FROM public.user_practices
+  WHERE user_id = buyer_g AND practice_id = course_id;
+  IF v_level IS DISTINCT FROM 2 OR v_expires IS NOT NULL THEN
+    RAISE EXCEPTION 'temp L1+L2: expected L2/NULL, got % %', v_level, v_expires;
   END IF;
 
   -- 11. Same user retry → already_redeemed_by_you
@@ -329,10 +426,18 @@ BEGIN
   );
   DELETE FROM public.practice_access_levels
   WHERE practice_id = course_id AND level = 3;
+
+  INSERT INTO public.user_practices (
+    user_id, practice_id, access_source, access_level, granted_at, expires_at
+  ) VALUES (
+    buyer_h, course_id, 'purchase', 1,
+    now() - interval '2 days', now() - interval '1 day'
+  );
+
   BEGIN
     PERFORM public.redeem_practice_access_link(
       encode(digest('deletedLevelToken0000000000000000000014', 'sha256'), 'hex'),
-      buyer_c
+      buyer_h
     );
     RAISE EXCEPTION 'deleted target must fail redeem';
   EXCEPTION
@@ -349,6 +454,15 @@ BEGIN
     AND status = 'active';
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'failed redeem must not consume the link';
+  END IF;
+
+  SELECT access_level, expires_at INTO v_level, v_expires
+  FROM public.user_practices
+  WHERE user_id = buyer_h AND practice_id = course_id;
+  IF v_level IS DISTINCT FROM 1
+     OR v_expires IS NULL
+     OR v_expires > clock_timestamp() THEN
+    RAISE EXCEPTION 'failed redeem must not reactivate leftover expiry, got % %', v_level, v_expires;
   END IF;
 
   -- 14. External link is not a sale
