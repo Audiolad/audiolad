@@ -28,6 +28,10 @@ import {
   generatePracticeAccessToken,
   hashPracticeAccessToken,
 } from "../src/lib/products/access-links-crypto.ts";
+import {
+  AccessLinkError,
+  readAccessLinkCreateRequestBody,
+} from "../src/lib/products/access-links-server.ts";
 import { grantAccess } from "../src/lib/products/grant-access.ts";
 import { resolveValidatedNextPath } from "../src/lib/auth/routes.ts";
 import {
@@ -143,8 +147,41 @@ assert.equal(parseAccessLinkCreateRequestBody([]).code, "invalid_access_link_req
 assert.equal(parseAccessLinkCreateRequestBody("abc").code, "invalid_access_link_request");
 assert.equal(parseAccessLinkCreateRequestBody(123).code, "invalid_access_link_request");
 assert.equal(parseAccessLinkCreateRequestBody(true).code, "invalid_access_link_request");
+assert.equal(parseAccessLinkCreateRequestBody(false).code, "invalid_access_link_request");
 assert.equal(resolveAccessLinkCreateTargetLevel({}).targetLevel, 1);
 assert.equal(resolveAccessLinkCreateExpiry({}).expiry, "none");
+
+function jsonRequest(body) {
+  return new Request("https://audiolad.ru/api/author/products/p1/access-links", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+}
+
+async function assertInvalidCreateBody(body) {
+  await assert.rejects(
+    () => readAccessLinkCreateRequestBody(jsonRequest(body)),
+    (error) =>
+      error instanceof AccessLinkError &&
+      error.code === "invalid_access_link_request" &&
+      error.status === 400,
+  );
+}
+
+const emptyObjectBody = await readAccessLinkCreateRequestBody(jsonRequest("{}"));
+assert.deepEqual(emptyObjectBody, {});
+assert.equal(resolveAccessLinkCreateTargetLevel(emptyObjectBody).targetLevel, 1);
+assert.equal(resolveAccessLinkCreateExpiry(emptyObjectBody).expiry, "none");
+
+await assertInvalidCreateBody("{");
+await assertInvalidCreateBody("not-json");
+await assertInvalidCreateBody("[]");
+await assertInvalidCreateBody("null");
+await assertInvalidCreateBody('"abc"');
+await assertInvalidCreateBody("123");
+await assertInvalidCreateBody("true");
+await assertInvalidCreateBody("false");
 
 assert.equal(redactAccessTokenFromPath(`/access/${token.rawToken}`), "/access/[redacted]");
 assert.equal(
