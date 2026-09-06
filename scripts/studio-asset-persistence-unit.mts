@@ -4,13 +4,16 @@ import { readFile } from "node:fs/promises";
 import {
   StudioPersistenceClientError,
   getStudioAssetPlaybackUrl,
+  replaceStudioProjectAsset,
+  retryStudioProjectAssetUpload,
+  studioSignedUploadUrl,
   uploadStudioProjectAsset,
 } from "../src/lib/studio/persistence-client";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const assetId = "22222222-2222-4222-8222-222222222222";
 const originalFetch = globalThis.fetch;
-const file = new Blob(["audio"], { type: "audio/mpeg" }) as File;
+const file = new File(["audio"], "voice.mp3", { type: "audio/mpeg" });
 const recordingFile = new File(["opus"], "Запись 1.webm", {
   type: "audio/webm;codecs=opus",
 });
@@ -38,6 +41,8 @@ function assetResponse(
   };
 }
 
+const signedUpload = { path: "studio/a/b/c/voice.mp3", token: "signed-token" };
+
 async function withFetch(
   implementation: typeof fetch,
   test: () => Promise<void>,
@@ -50,33 +55,71 @@ async function withFetch(
   }
 }
 
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://storage.audiolad.test";
+const signedUploadHref = studioSignedUploadUrl(signedUpload);
+let uploadedToSignedUrl = 0;
+
 await withFetch(async (url, init) => {
-  assert.equal(url, `/api/studio/projects/${projectId}/assets`);
-  assert.equal(init?.method, "POST");
-  assert(init?.body instanceof FormData);
-  assert(init.body.get("file") instanceof Blob);
-  assert.equal(init.body.get("sourceType"), "upload");
-  return Response.json(assetResponse(), { status: 201 });
+  const href = String(url);
+  if (href === `/api/studio/projects/${projectId}/assets`) {
+    assert.equal(init?.method, "POST");
+    assert.equal(
+      (init?.headers as Record<string, string> | undefined)?.["Content-Type"],
+      "application/json",
+    );
+    const payload = JSON.parse(String(init?.body));
+    assert.equal(payload.sourceType, "upload");
+    assert.equal(payload.sizeBytes, file.size);
+    assert(!String(init?.body).includes("FormData"));
+    return Response.json({ ...assetResponse(), signedUpload }, { status: 201 });
+  }
+  if (href === signedUploadHref) {
+    assert.equal(init?.method, "PUT");
+    assert.equal(init?.body, file);
+    uploadedToSignedUrl += 1;
+    return new Response(null, { status: 200 });
+  }
+  if (href.endsWith("/finalize")) {
+    assert.equal(init?.method, "POST");
+    return Response.json(assetResponse(), { status: 200 });
+  }
+  throw new Error(`unexpected fetch ${href}`);
 }, async () => {
+  uploadedToSignedUrl = 0;
   const asset = await uploadStudioProjectAsset({
     projectId,
     file,
     sourceType: "upload",
   });
   assert.equal(asset.id, assetId);
+  assert.equal(uploadedToSignedUrl, 1);
 });
 
-await withFetch(async (_url, init) => {
-  assert(init?.body instanceof FormData);
-  const uploadedRecording = init.body.get("file");
-  assert(uploadedRecording instanceof File);
-  assert.equal(uploadedRecording.type, "audio/webm;codecs=opus");
-  assert.equal(init.body.get("sourceType"), "recording");
-  return Response.json(assetResponse(assetId, {
-    originalName: "recording.webm",
-    mimeType: "audio/webm",
-    sourceType: "recording",
-  }), { status: 201 });
+await withFetch(async (url, init) => {
+  const href = String(url);
+  if (href.endsWith("/assets")) {
+    const payload = JSON.parse(String(init?.body));
+    assert.equal(payload.sourceType, "recording");
+    return Response.json({
+      ...assetResponse(assetId, {
+        originalName: "recording.webm",
+        mimeType: "audio/webm",
+        sourceType: "recording",
+      }),
+      signedUpload,
+    }, { status: 201 });
+  }
+  if (href === signedUploadHref) {
+    return new Response(null, { status: 200 });
+  }
+  if (href.endsWith("/finalize")) {
+    return Response.json(assetResponse(assetId, {
+      originalName: "recording.webm",
+      mimeType: "audio/webm",
+      sourceType: "recording",
+    }));
+  }
+  throw new Error(`unexpected fetch ${href}`);
 }, async () => {
   const asset = await uploadStudioProjectAsset({
     projectId,
@@ -88,11 +131,19 @@ await withFetch(async (_url, init) => {
 });
 
 let independentUploads = 0;
-await withFetch(async () => {
-  independentUploads += 1;
-  return Response.json(assetResponse(
-    `22222222-2222-4222-8222-22222222222${independentUploads}`,
-  ), { status: 201 });
+await withFetch(async (url) => {
+  const href = String(url);
+  if (href.endsWith("/assets")) {
+    independentUploads += 1;
+    return Response.json({
+      ...assetResponse(`22222222-2222-4222-8222-22222222222${independentUploads}`),
+      signedUpload,
+    }, { status: 201 });
+  }
+  if (href === signedUploadHref) {
+    return new Response(null, { status: 200 });
+  }
+  return Response.json(assetResponse());
 }, async () => {
   const assets = await Promise.all([
     uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
@@ -142,6 +193,30 @@ await withFetch(
       (error: unknown) =>
         error instanceof StudioPersistenceClientError &&
         error.code === "invalid_audio_duration",
+    );
+  },
+);
+
+await withFetch(
+  async () => Response.json({ error: "audio_too_long" }, { status: 422 }),
+  async () => {
+    await assert.rejects(
+      uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "audio_too_long",
+    );
+  },
+);
+
+await withFetch(
+  async () => Response.json({ error: "project_asset_quota_exceeded" }, { status: 413 }),
+  async () => {
+    await assert.rejects(
+      uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "project_asset_quota_exceeded",
     );
   },
 );
@@ -208,6 +283,10 @@ assert.match(provider, /assetId: uploadedAsset\.id/);
 assert.match(provider, /assetPersistenceStatus: "saved"/);
 assert.match(provider, /assetId: null,\s+assetPersistenceStatus: "pending"/);
 assert.match(provider, /retryTrackAssetUpload/);
+assert.match(provider, /pendingReserveAssetIdsRef/);
+assert.match(provider, /onReserved/);
+assert.match(provider, /retryStudioProjectAssetUpload/);
+assert.match(provider, /abandonStudioProjectAssetUpload/);
 assert.match(provider, /assetPersistenceStatus: "error"/);
 assert.match(
   provider,
@@ -217,9 +296,12 @@ assert.doesNotMatch(
   provider,
   /assetPersistenceStatus: "uploading"[\s\S]{0,80}assetUploadControllersRef\.current\.delete\(trackId\);/,
 );
-assert.match(provider, /if \(track\?\.assetPersistenceStatus === "error"\) \{\s+startTrackAssetUpload\(trackId\);/);
+assert.match(provider, /assetPersistenceStatus !== "error"/);
 assert.match(provider, /sourceType: "upload"/);
 assert.match(provider, /assetId: track\.assetId/);
+assert.match(provider, /validateStudioLocalDuration/);
+assert.doesNotMatch(provider, /decodeAudioData/);
+assert.doesNotMatch(provider, /file\.arrayBuffer\(|blob\.arrayBuffer\(/);
 assert.match(history, /assetPersistenceStatus/);
 assert.match(editor, /hasPersistenceProject && track/);
 assert.match(editor, /Повторить/);
@@ -230,7 +312,216 @@ const assetRoute = await readFile(
   new URL("../src/app/api/studio/projects/[projectId]/assets/route.ts", import.meta.url),
   "utf8",
 );
-assert.match(assetRoute, /probeStudioAudioDuration/);
-assert.match(assetRoute, /invalid_audio_duration/);
+assert.match(assetRoute, /reserveStudioDirectUpload/);
+assert.doesNotMatch(assetRoute, /probeStudioAudioDuration/);
+assert.doesNotMatch(assetRoute, /formData/);
+const client = await readFile(
+  new URL("../src/lib/studio/persistence-client.ts", import.meta.url),
+  "utf8",
+);
+assert.match(client, /object\/upload\/sign/);
+assert.match(client, /\/finalize/);
+assert.match(client, /reconcileAfterAmbiguousPut/);
+assert.match(client, /alreadyUploaded/);
+assert.match(client, /abandonStudioProjectAssetReplacement/);
+assert.doesNotMatch(client, /formData\.set\("file"/);
+assert.doesNotMatch(client, /createClient\(/);
+
+// PUT committed, response lost: Storage accepted the File, browser saw a
+// network error. Client must finalize the same reservation — no second
+// reserve, no abandon of a good object.
+{
+  let reserveCount = 0;
+  let putCount = 0;
+  let finalizeCount = 0;
+  let abandonCount = 0;
+  await withFetch(async (url, init) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets`) {
+      reserveCount += 1;
+      return Response.json({ ...assetResponse(), signedUpload }, { status: 201 });
+    }
+    if (href === signedUploadHref) {
+      putCount += 1;
+      throw new TypeError("Failed to fetch");
+    }
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}/finalize`) {
+      finalizeCount += 1;
+      return Response.json(assetResponse(), { status: 200 });
+    }
+    if (href.endsWith("/abandon")) {
+      abandonCount += 1;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected fetch ${href} ${init?.method}`);
+  }, async () => {
+    const asset = await uploadStudioProjectAsset({
+      projectId,
+      file,
+      sourceType: "upload",
+    });
+    assert.equal(asset.id, assetId);
+    assert.equal(reserveCount, 1);
+    assert.equal(putCount, 1);
+    assert.equal(finalizeCount, 1);
+    assert.equal(abandonCount, 0);
+  });
+}
+
+// Missing/partial object after ambiguous PUT: keep reservation, do not
+// create a duplicate, do not treat as fatal finalize.
+{
+  let reserveCount = 0;
+  let abandonCount = 0;
+  await withFetch(async (url) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets`) {
+      reserveCount += 1;
+      return Response.json({ ...assetResponse(), signedUpload }, { status: 201 });
+    }
+    if (href === signedUploadHref) {
+      throw new TypeError("connection reset");
+    }
+    if (href.endsWith("/finalize")) {
+      return Response.json({ error: "upload_not_complete" }, { status: 409 });
+    }
+    if (href.endsWith("/abandon")) {
+      abandonCount += 1;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  }, async () => {
+    await assert.rejects(
+      uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError && error.code === "network_error",
+    );
+    assert.equal(reserveCount, 1);
+    assert.equal(abandonCount, 0);
+  });
+}
+
+{
+  let retryPuts = 0;
+  let finalizeCount = 0;
+  await withFetch(async (url, init) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}/retry`) {
+      assert.equal(init?.method, "POST");
+      return Response.json({
+        ...assetResponse(),
+        signedUpload: null,
+        alreadyUploaded: true,
+      });
+    }
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}/finalize`) {
+      finalizeCount += 1;
+      return Response.json(assetResponse(), { status: 200 });
+    }
+    if (href === signedUploadHref) {
+      retryPuts += 1;
+      return new Response(null, { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  }, async () => {
+    const asset = await retryStudioProjectAssetUpload({
+      projectId,
+      assetId,
+      file,
+    });
+    assert.equal(asset.id, assetId);
+    assert.equal(retryPuts, 0);
+    assert.equal(finalizeCount, 1);
+  });
+}
+
+// Replacement: PUT response lost, finalize finds the pending object →
+// SUCCESS. Old ready asset id is unchanged. No abandon.
+{
+  let replaceReserve = 0;
+  let abandonCount = 0;
+  await withFetch(async (url) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}`) {
+      replaceReserve += 1;
+      return Response.json({ ...assetResponse(), signedUpload });
+    }
+    if (href === signedUploadHref) {
+      throw new TypeError("Failed to fetch");
+    }
+    if (href.endsWith("/replace/finalize")) {
+      return Response.json(assetResponse(), { status: 200 });
+    }
+    if (href.endsWith("/replace/abandon")) {
+      abandonCount += 1;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  }, async () => {
+    const asset = await replaceStudioProjectAsset({ projectId, assetId, file });
+    assert.equal(asset.id, assetId);
+    assert.equal(replaceReserve, 1);
+    assert.equal(abandonCount, 0);
+  });
+}
+
+// Replacement PUT failed and object is missing/partial → abandon pending,
+// do not return a replaced asset.
+{
+  let abandonCount = 0;
+  await withFetch(async (url) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}`) {
+      return Response.json({ ...assetResponse(), signedUpload });
+    }
+    if (href === signedUploadHref) {
+      throw new TypeError("connection reset");
+    }
+    if (href.endsWith("/replace/finalize")) {
+      return Response.json({ error: "upload_not_complete" }, { status: 409 });
+    }
+    if (href.endsWith("/replace/abandon")) {
+      abandonCount += 1;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  }, async () => {
+    await assert.rejects(
+      replaceStudioProjectAsset({ projectId, assetId, file }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError && error.code === "network_error",
+    );
+    assert.equal(abandonCount, 1);
+  });
+}
+
+{
+  let abandonCount = 0;
+  await withFetch(async (url) => {
+    const href = String(url);
+    if (href === `/api/studio/projects/${projectId}/assets/${assetId}`) {
+      return Response.json({ ...assetResponse(), signedUpload });
+    }
+    if (href === signedUploadHref) {
+      return new Response(null, { status: 200 });
+    }
+    if (href.endsWith("/replace/finalize")) {
+      return Response.json({ error: "invalid_audio_duration" }, { status: 422 });
+    }
+    if (href.endsWith("/replace/abandon")) {
+      abandonCount += 1;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  }, async () => {
+    await assert.rejects(
+      replaceStudioProjectAsset({ projectId, assetId, file }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "invalid_audio_duration",
+    );
+    assert.equal(abandonCount, 1);
+  });
+}
 
 console.log("studio asset persistence checks passed");

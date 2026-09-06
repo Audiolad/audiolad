@@ -20,6 +20,7 @@ const URL = "http://127.0.0.1:54321";
 const BUCKET = "studio-draft-assets";
 const PASSWORD = "StudioSharedAssets-2026!";
 const migration = path.join(process.cwd(), "supabase/migrations/20260912120000_studio_shared_asset_sources_and_duplicate_project.sql");
+const longformMigration = path.join(process.cwd(), "supabase/migrations/20260928120000_studio_longform_asset_limits.sql");
 
 function required(name: string) {
   const value = process.env[name];
@@ -34,6 +35,7 @@ function assertSafety() {
   assert(!/(^|\/)(var\/www|opt\/supabase)(\/|$)/.test(stack), "production stack paths are forbidden");
   assert(existsSync(path.join(stack, "docker-compose.yml")), "test stack docker-compose.yml is required");
   assert(existsSync(migration), "shared asset migration is required from this checkout");
+  assert(existsSync(longformMigration), "studio long-form migration is required from this checkout");
   return stack;
 }
 function sqlLiteral(value: string) { return `'${value.replaceAll("'", "''")}'`; }
@@ -105,8 +107,41 @@ function wavFile(label: string) {
   bytes.set([100, 97, 116, 97], 36); view.setUint32(40, bytes.length - 44, true);
   return new File([bytes], `${label}.wav`, { type: "audio/wav" });
 }
-function replacementForm(label: string) {
-  const form = new FormData(); form.append("file", wavFile(label)); return form;
+async function replaceStudioAsset(
+  baseUrl: string,
+  token: string,
+  projectId: string,
+  assetId: string,
+  label: string,
+) {
+  const file = wavFile(label);
+  const reserve = await fetch(`${baseUrl}/api/studio/projects/${projectId}/assets/${assetId}`, {
+    method: "PUT",
+    headers: headers(token),
+    body: JSON.stringify({
+      originalName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    }),
+  });
+  assert.equal(reserve.status, 200, "replace reserve uses the application HTTP contract");
+  const reserved = await reserve.json() as { signedUpload?: { path: string; token: string } };
+  assert(reserved.signedUpload?.path && reserved.signedUpload.token, "replace reserve returns a signed upload");
+  const put = await fetch(
+    `${URL}/storage/v1/object/upload/sign/${BUCKET}/${reserved.signedUpload.path}?token=${encodeURIComponent(reserved.signedUpload.token)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "audio/wav", "x-upsert": "false" },
+      body: file,
+    },
+  );
+  assert.ok(put.ok, `direct storage replace upload must succeed, got ${put.status}`);
+  const finalize = await fetch(
+    `${baseUrl}/api/studio/projects/${projectId}/assets/${assetId}/replace/finalize`,
+    { method: "POST", headers: headers(token) },
+  );
+  assert.equal(finalize.status, 200, "replace finalize uses the application HTTP contract");
+  return finalize;
 }
 async function main() {
   const stack = assertSafety();
@@ -132,6 +167,7 @@ async function main() {
       assert.ifError((await service.storage.from(BUCKET).upload(storage_path, new Uint8Array([1,2,3,4]), { contentType: "audio/wav" })).error);
     }
     sql(stack, readFileSync(migration, "utf8"));
+    sql(stack, readFileSync(longformMigration, "utf8"));
     const refs = await service.from("studio_project_assets").select("id,source_id,storage_path").eq("project_id", projectId);
     assert.ifError(refs.error); assert.equal(refs.data?.length, 2); assert(refs.data?.every((row) => row.source_id === row.id));
     const integrity = sql(stack, "SELECT count(*) FROM studio_project_assets r LEFT JOIN studio_asset_sources s ON s.id=r.source_id WHERE s.id IS NULL OR r.source_id IS NULL;");
@@ -202,10 +238,13 @@ async function main() {
       assert.equal((await autosave.json()).project.revision, 2, "B: duplicate autosave owns its revision");
       // C: replacement is copy-on-write: the duplicate gets a new source while
       // the source project continues to resolve the original object.
-      const replace = await fetch(`${next.value}/api/studio/projects/${duplicateId}/assets/${copied.data![0]!.id}`, {
-        method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: replacementForm(`replacement-${run}`),
-      });
-      assert.equal(replace.status, 200, "replace uses the application HTTP contract");
+      await replaceStudioAsset(
+        next.value,
+        token,
+        duplicateId,
+        copied.data![0]!.id,
+        `replacement-${run}`,
+      );
       const afterReplace = await assertSources(service, duplicateId, 2);
       assert.notEqual(afterReplace.find((asset) => asset.id === copied.data![0]!.id)?.source_id, copied.data![0]!.source_id);
       assert(!((await service.storage.from(BUCKET).download(voicePath)).error), "original physical object survives replacement");

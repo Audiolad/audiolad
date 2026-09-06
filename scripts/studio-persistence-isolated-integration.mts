@@ -245,11 +245,67 @@ function authHeaders(accessToken?: string): Headers {
   return headers;
 }
 
-function studioUploadForm() {
-  const form = new FormData();
-  form.append("sourceType", "upload");
-  form.append("file", new Blob(["minimal studio audio"], { type: "audio/wav" }), "minimal.wav");
-  return form;
+function minimalWavBytes() {
+  const bytes = new Uint8Array(44 + 8_000);
+  const view = new DataView(bytes.buffer);
+  bytes.set([82, 73, 70, 70], 0);
+  view.setUint32(4, bytes.length - 8, true);
+  bytes.set([87, 65, 86, 69, 102, 109, 116, 32], 8);
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 8_000, true);
+  view.setUint32(28, 8_000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  bytes.set([100, 97, 116, 97], 36);
+  view.setUint32(40, bytes.length - 44, true);
+  return bytes;
+}
+
+const MINIMAL_AUDIO_BYTES = minimalWavBytes();
+
+function studioUploadMeta() {
+  return {
+    originalName: "minimal.wav",
+    mimeType: "audio/wav",
+    sizeBytes: MINIMAL_AUDIO_BYTES.byteLength,
+    sourceType: "upload",
+  };
+}
+
+async function uploadStudioAsset(
+  baseUrl: string,
+  accessToken: string,
+  projectId: string,
+) {
+  const reserve = await fetch(`${baseUrl}/api/studio/projects/${projectId}/assets`, {
+    method: "POST",
+    headers: jsonHeaders(accessToken),
+    body: JSON.stringify(studioUploadMeta()),
+  });
+  assert.equal(reserve.status, 201, "owner reserve is allowed");
+  const reserved = await reserve.json() as {
+    asset: { id: string; mimeType: string };
+    signedUpload: { path: string; token: string };
+  };
+  assert(reserved.asset?.id, "reserve returns an asset id");
+  assert(reserved.signedUpload?.token, "reserve returns a signed upload token");
+  const supabaseUrl = required("NEXT_PUBLIC_SUPABASE_URL").replace(/\/$/, "");
+  const put = await fetch(
+    `${supabaseUrl}/storage/v1/object/upload/sign/${ASSETS_BUCKET}/${reserved.signedUpload.path}?token=${encodeURIComponent(reserved.signedUpload.token)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": reserved.asset.mimeType, "x-upsert": "false" },
+      body: MINIMAL_AUDIO_BYTES,
+    },
+  );
+  assert.ok(put.ok, `direct storage upload must succeed, got ${put.status}`);
+  const finalize = await fetch(
+    `${baseUrl}/api/studio/projects/${projectId}/assets/${reserved.asset.id}/finalize`,
+    { method: "POST", headers: authHeaders(accessToken) },
+  );
+  return { reserve, finalize, assetId: reserved.asset.id };
 }
 
 function emptyProjectData() {
@@ -410,7 +466,8 @@ async function main() {
 
     const anonymousUpload = await fetch(`${baseUrl}/api/studio/projects/${randomUUID()}/assets`, {
       method: "POST",
-      body: studioUploadForm(),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(studioUploadMeta()),
     });
     assert.equal(anonymousUpload.status, 401, "anonymous upload is denied");
 
@@ -501,37 +558,32 @@ async function main() {
       assert.equal(put.status, 404, `${label} project PUT is hidden`);
     }
 
-    const upload = await fetch(`${baseUrl}/api/studio/projects/${projectId}/assets`, {
-      method: "POST",
-      headers: authHeaders(owner.accessToken),
-      body: studioUploadForm(),
-    });
-    assert.equal(upload.status, 201, "owner upload is allowed");
-    const uploadBody = await upload.json() as { asset: { id: string } };
-    registry.register({ type: "studio_asset", id: uploadBody.asset.id });
+    const uploaded = await uploadStudioAsset(baseUrl, owner.accessToken, projectId);
+    assert.equal(uploaded.finalize.status, 200, "owner finalize is allowed");
+    registry.register({ type: "studio_asset", id: uploaded.assetId });
 
     const ownerDownload = await fetch(
-      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploadBody.asset.id}`,
+      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploaded.assetId}`,
       { headers: authHeaders(owner.accessToken) },
     );
     assert.equal(ownerDownload.status, 200, "owner download is allowed");
     assert.deepEqual(
       new Uint8Array(await ownerDownload.arrayBuffer()),
-      new TextEncoder().encode("minimal studio audio"),
+      MINIMAL_AUDIO_BYTES,
       "downloaded bytes match upload",
     );
     const editorDownload = await fetch(
-      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploadBody.asset.id}`,
+      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploaded.assetId}`,
       { headers: authHeaders(editor.accessToken) },
     );
     assert.equal(editorDownload.status, 200, "editor asset download is allowed");
     assert.deepEqual(
       new Uint8Array(await editorDownload.arrayBuffer()),
-      new TextEncoder().encode("minimal studio audio"),
+      MINIMAL_AUDIO_BYTES,
       "editor receives bytes identical to owner upload",
     );
     const anonymousDownload = await fetch(
-      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploadBody.asset.id}`,
+      `${baseUrl}/api/studio/projects/${projectId}/assets/${uploaded.assetId}`,
     );
     assert.equal(anonymousDownload.status, 401, "anonymous download is denied");
     for (const [label, actor] of [
@@ -539,7 +591,7 @@ async function main() {
       ["second workspace owner", secondWorkspaceOwner],
     ] as const) {
       const download = await fetch(
-        `${baseUrl}/api/studio/projects/${projectId}/assets/${uploadBody.asset.id}`,
+        `${baseUrl}/api/studio/projects/${projectId}/assets/${uploaded.assetId}`,
         { headers: authHeaders(actor.accessToken) },
       );
       assert.equal(download.status, 404, `${label} asset download is hidden`);

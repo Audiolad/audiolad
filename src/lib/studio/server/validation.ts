@@ -1,7 +1,7 @@
 import "server-only";
 
+import { STUDIO_LIMITS } from "../limits";
 import {
-  STUDIO_LIMITS,
   STUDIO_SCHEMA_VERSION,
   STUDIO_TECHNICAL_VERSION,
   type StudioProjectDataV2,
@@ -263,26 +263,54 @@ export function parseStudioSourceType(value: unknown): "upload" | "recording" {
   throw new StudioApiError("invalid_source_type", 422);
 }
 
-export function validateStudioUpload(file: File): {
+export function validateStudioUploadMeta(input: {
+  name: unknown;
+  type: unknown;
+  size: unknown;
+}): {
   filename: string;
   mimeType: string;
   byteSize: number;
 } {
-  const filename = sanitizeStudioFilename(file.name);
+  const filename = sanitizeStudioFilename(input.name);
   const mimeType = canonicalizeStudioUploadMimeType({
-    name: file.name,
-    type: file.type,
+    name: typeof input.name === "string" ? input.name : filename,
+    type: typeof input.type === "string" ? input.type : "",
   });
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new StudioApiError("unsupported_mime_type", 422);
   }
-  if (!Number.isSafeInteger(file.size) || file.size <= 0) {
+  const byteSize = typeof input.size === "number" ? input.size : Number(input.size);
+  if (!Number.isSafeInteger(byteSize) || byteSize <= 0) {
     throw new StudioApiError("empty_file", 422);
   }
-  if (file.size > STUDIO_LIMITS.maxAssetBytes) {
+  if (byteSize > STUDIO_LIMITS.maxAssetBytes) {
     throw new StudioApiError("asset_too_large", 413);
   }
-  return { filename, mimeType, byteSize: file.size };
+  return { filename, mimeType, byteSize };
+}
+
+export function validateStudioUpload(file: Pick<File, "name" | "type" | "size">): {
+  filename: string;
+  mimeType: string;
+  byteSize: number;
+} {
+  return validateStudioUploadMeta({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  });
+}
+
+export function assertStudioDurationAllowed(durationSeconds: number): number {
+  if (
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds <= 0 ||
+    durationSeconds > STUDIO_LIMITS.maxAudioDurationSeconds
+  ) {
+    throw new StudioApiError("audio_too_long", 422);
+  }
+  return durationSeconds;
 }
 
 export function parseDurationSeconds(value: unknown): number | null {

@@ -42,8 +42,10 @@ import {
   getStudioFadeEnvelope,
   type StudioClipFades,
 } from "@/lib/studio/fade-math";
+import { MAX_STUDIO_PROJECT_BYTES } from "@/lib/studio/limits";
 import {
   MAX_LOCAL_FILE_SIZE_BYTES,
+  validateStudioLocalDuration,
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
 import { validateStudioRecordedFile } from "@/lib/studio/recorder";
@@ -57,7 +59,9 @@ import {
 } from "@/lib/studio/history";
 import {
   StudioPersistenceClientError,
+  abandonStudioProjectAssetUpload,
   getStudioAssetPlaybackUrl,
+  retryStudioProjectAssetUpload,
   uploadStudioProjectAsset,
   type StudioAssetSourceType,
 } from "@/lib/studio/persistence-client";
@@ -81,7 +85,7 @@ import {
 import type { StudioTrackPlaybackSource } from "@/components/studio/StudioTimeline";
 
 const MAX_LOCAL_TRACKS = 5;
-const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
+const MAX_LOCAL_PROJECT_SIZE_BYTES = MAX_STUDIO_PROJECT_BYTES;
 
 const STUDIO_FX_CROSSFADE_SECONDS = 0.04;
 const STUDIO_FX_CLEANUP_GRACE_MS = 80;
@@ -423,6 +427,7 @@ export function StudioAudioProvider({
   const replacementGenerationRef = useRef(new Map<string, number>());
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
+  const pendingReserveAssetIdsRef = useRef(new Map<string, string>());
   const debugEnabledRef = useRef(debugEnabled);
 
   useEffect(() => {
@@ -797,7 +802,15 @@ export function StudioAudioProvider({
     );
     assetUploadControllersRef.current.get(trackId)?.abort();
     assetUploadControllersRef.current.delete(trackId);
-  }, []);
+    const reservedId = pendingReserveAssetIdsRef.current.get(trackId);
+    if (reservedId && persistenceProjectId) {
+      pendingReserveAssetIdsRef.current.delete(trackId);
+      void abandonStudioProjectAssetUpload({
+        projectId: persistenceProjectId,
+        assetId: reservedId,
+      });
+    }
+  }, [persistenceProjectId]);
 
   const getTrackAsset = useCallback((trackId: string): TrackAsset | null => {
     const vault = assetVaultRef.current.get(trackId);
@@ -886,6 +899,9 @@ export function StudioAudioProvider({
       file: asset.file,
       sourceType: asset.sourceType,
       signal: controller.signal,
+      onReserved: (assetId) => {
+        pendingReserveAssetIdsRef.current.set(trackId, assetId);
+      },
     }).then(
       (uploadedAsset) => {
         if (
@@ -894,6 +910,7 @@ export function StudioAudioProvider({
         ) {
           return;
         }
+        pendingReserveAssetIdsRef.current.delete(trackId);
         assetUploadControllersRef.current.delete(trackId);
         bindSharedAssetState(trackId, (item) => ({
           ...item,
@@ -925,10 +942,71 @@ export function StudioAudioProvider({
 
   const retryTrackAssetUpload = useCallback((trackId: string) => {
     const track = tracksRef.current.find((item) => item.id === trackId);
-    if (track?.assetPersistenceStatus === "error") {
-      startTrackAssetUpload(trackId);
+    if (track?.assetPersistenceStatus !== "error") {
+      return;
     }
-  }, [startTrackAssetUpload]);
+    const reservedId = pendingReserveAssetIdsRef.current.get(trackId);
+    const asset = assetVaultRef.current.get(trackId);
+    if (!reservedId || !asset?.file || !persistenceProjectId) {
+      startTrackAssetUpload(trackId);
+      return;
+    }
+
+    assetUploadGenerationRef.current.set(
+      trackId,
+      (assetUploadGenerationRef.current.get(trackId) ?? 0) + 1,
+    );
+    const generation = assetUploadGenerationRef.current.get(trackId) ?? 0;
+    const controller = new AbortController();
+    assetUploadControllersRef.current.set(trackId, controller);
+    bindSharedAssetState(trackId, (item) => ({
+      ...item,
+      assetPersistenceStatus: "uploading",
+      replacementError: null,
+    }));
+
+    void retryStudioProjectAssetUpload({
+      projectId: persistenceProjectId,
+      assetId: reservedId,
+      file: asset.file,
+      signal: controller.signal,
+    }).then(
+      (uploadedAsset) => {
+        if (
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        pendingReserveAssetIdsRef.current.delete(trackId);
+        assetUploadControllersRef.current.delete(trackId);
+        bindSharedAssetState(trackId, (item) => ({
+          ...item,
+          assetId: uploadedAsset.id,
+          assetPersistenceStatus: "saved",
+          replacementError: null,
+        }));
+      },
+      (error) => {
+        if (
+          controller.signal.aborted ||
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        assetUploadControllersRef.current.delete(trackId);
+        const message = error instanceof StudioPersistenceClientError
+          ? error.message
+          : null;
+        bindSharedAssetState(trackId, (item) => ({
+          ...item,
+          assetPersistenceStatus: "error",
+          replacementError: message,
+        }));
+      },
+    );
+  }, [bindSharedAssetState, persistenceProjectId, startTrackAssetUpload]);
 
   const hydratePersistedProject = useCallback(
     (hydration: StudioProjectHydration) => {
@@ -1186,6 +1264,11 @@ export function StudioAudioProvider({
             revokeStudioObjectUrl(local.playbackUrl);
             throw new Error(`Некорректная длительность файла «${file.name}».`);
           }
+          const durationError = validateStudioLocalDuration(local.duration);
+          if (durationError) {
+            revokeStudioObjectUrl(local.playbackUrl);
+            throw new Error(durationError);
+          }
           preparedTracks.push({
             file,
             asset: {
@@ -1317,6 +1400,11 @@ export function StudioAudioProvider({
           revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid recorded audio duration");
         }
+        const durationError = validateStudioLocalDuration(local.duration);
+        if (durationError) {
+          revokeStudioObjectUrl(local.playbackUrl);
+          throw new Error(durationError);
+        }
         const asset: TrackAsset = {
           file,
           playbackUrl: local.playbackUrl,
@@ -1437,6 +1525,11 @@ export function StudioAudioProvider({
         if (!Number.isFinite(local.duration) || local.duration <= 0) {
           revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid audio duration");
+        }
+        const durationError = validateStudioLocalDuration(local.duration);
+        if (durationError) {
+          revokeStudioObjectUrl(local.playbackUrl);
+          throw new Error(durationError);
         }
 
         if (replacementGenerationRef.current.get(trackId) !== generation) {
@@ -2170,18 +2263,26 @@ export function StudioAudioProvider({
 
   useEffect(() => {
     const uploadControllers = assetUploadControllersRef.current;
+    const pendingReserves = pendingReserveAssetIdsRef.current;
+    const projectId = persistenceProjectId;
     const assetVault = assetVaultRef.current;
     return () => {
       for (const controller of uploadControllers.values()) {
         controller.abort();
       }
+      if (projectId) {
+        for (const assetId of pendingReserves.values()) {
+          void abandonStudioProjectAssetUpload({ projectId, assetId });
+        }
+      }
+      pendingReserves.clear();
       disposeResources();
       for (const [trackId, asset] of assetVault) {
         maybeRevokePlaybackUrl(asset, trackId);
       }
       assetVault.clear();
     };
-  }, [disposeResources, maybeRevokePlaybackUrl]);
+  }, [disposeResources, maybeRevokePlaybackUrl, persistenceProjectId]);
 
   useEffect(() => {
     if (!persistenceProjectId) {

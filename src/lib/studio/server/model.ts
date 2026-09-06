@@ -1,14 +1,27 @@
 import "server-only";
 
+import {
+  STUDIO_ASSETS_BUCKET,
+  STUDIO_LIMITS,
+} from "../limits";
 import type { StudioVoicePreset } from "../voice-preset-dsp";
+
+export { STUDIO_ASSETS_BUCKET, STUDIO_LIMITS };
+export {
+  MAX_STUDIO_ASSET_BYTES,
+  MAX_STUDIO_AUDIO_DURATION_SECONDS,
+  MAX_STUDIO_PROJECT_BYTES,
+} from "../limits";
 
 export const STUDIO_SCHEMA_VERSION = 2 as const;
 export const STUDIO_TECHNICAL_VERSION = 1 as const;
-export const STUDIO_ASSETS_BUCKET = "studio-draft-assets" as const;
-export const STUDIO_LIMITS = {
-  maxAssetBytes: 200 * 1024 * 1024,
-  maxProjectAssetBytes: 750 * 1024 * 1024,
-} as const;
+
+export type StudioAssetUploadState =
+  | "reserved"
+  | "uploading"
+  | "processing"
+  | "ready"
+  | "failed";
 
 export type StudioProjectDataV2 = {
   schemaVersion: typeof STUDIO_SCHEMA_VERSION;
@@ -74,14 +87,29 @@ export type StudioProjectRow = {
 export type StudioProjectAssetRow = {
   id: string;
   project_id: string;
+  source_id?: string | null;
   storage_path: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
   duration_seconds: number | null;
   source_type: "upload" | "recording";
+  upload_state?: StudioAssetUploadState;
+  pending_source_id?: string | null;
+  pending_storage_path?: string | null;
+  pending_size_bytes?: number | null;
+  pending_original_name?: string | null;
+  pending_mime_type?: string | null;
+  pending_reserved_at?: string | null;
+  upload_state_changed_at?: string;
   created_at: string;
   deleted_at: string | null;
+};
+
+export type StudioAssetPeaksDto = {
+  version: 1;
+  columns: number;
+  dataBase64: string;
 };
 
 export type StudioProjectListItem = Pick<
@@ -114,7 +142,10 @@ export function toStudioProjectListItemDto(project: StudioProjectListItem) {
   };
 }
 
-export function toStudioAssetDto(asset: StudioProjectAssetRow) {
+export function toStudioAssetDto(
+  asset: StudioProjectAssetRow,
+  peaks?: StudioAssetPeaksDto | null,
+) {
   return {
     id: asset.id,
     projectId: asset.project_id,
@@ -123,6 +154,8 @@ export function toStudioAssetDto(asset: StudioProjectAssetRow) {
     sizeBytes: Number(asset.size_bytes),
     durationSeconds: asset.duration_seconds,
     sourceType: asset.source_type,
+    uploadState: asset.upload_state ?? "ready",
     createdAt: asset.created_at,
+    peaks: peaks ?? null,
   };
 }

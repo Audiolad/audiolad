@@ -191,6 +191,72 @@ upload → finalize путь с `source_type='recording'`. Для уже зар�
 загружает только если объект отсутствует. Локальные черновики не являются
 данными БД: отдельных таблиц и миграций для них нет.
 
+### Studio draft projects (long-form user audio)
+
+Миграция `20260928120000_studio_longform_asset_limits.sql` поднимает **только**
+bucket `studio-draft-assets` до `file_size_limit = 314572800` (300 MiB) и
+лимиты строк `studio_project_assets` / `studio_asset_sources`. Другие bucket
+(practice-audio, publication-files, user-avatars, audiobook-fragments) не
+меняются. Аудиокнижный лимит фрагмента 200 MiB остаётся.
+
+Канонические константы приложения (`src/lib/studio/limits.ts`):
+
+| Лимит | Значение |
+|-------|----------|
+| `MAX_STUDIO_AUDIO_DURATION_SECONDS` | 10800 (3 часа) |
+| `MAX_STUDIO_ASSET_BYTES` | 314572800 (300 MiB) |
+| `MAX_STUDIO_PROJECT_BYTES` | 786432000 (750 MiB) — без изменения |
+
+`upload_state` на `studio_project_assets`: `reserved` → `uploading` →
+`processing` → `ready` | `failed`. Существующие строки backfill в `ready`.
+`upload_state_changed_at` обновляется на каждом переходе состояния; stale
+cleanup смотрит на него, не на `created_at`. Квота проекта считает
+`reserved` + `uploading` + `processing` + `ready`; `failed` не занимает
+квоту. Playback, download, list и ссылки в `project_data` принимают только
+`ready`.
+
+Загрузка: JSON reserve (метаданные) → браузерный signed PUT напрямую на
+Storage host (`NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/upload/sign/...`) →
+finalize. Тело файла не проходит через Next.js. Клиентская длительность
+(HTMLAudioElement `preload=metadata`) — только preflight; authority на
+finalize — размер объекта в Storage + `ffprobe`. Если PUT принят Storage,
+а браузер потерял ответ, клиент не создаёт новый reserve и вызывает
+finalize той же строки; совпадение размера + успешный probe → `ready`.
+Неполный/отсутствующий объект даёт `upload_not_complete` без снятия
+reservation, retry переиспользует её. Сверх 300 MiB, 10800 с или
+невалидное аудио отклоняется, объект удаляется, reservation снимается.
+
+Замена готового ассета (`replaceStudioProjectAsset`) пишет
+`pending_source_id` / `pending_storage_path` / `pending_reserved_at`, не
+трогая ready-поля. Ошибка PUT/abort/finalize чистит pending и Storage
+orphan; старый ready-актив остаётся. Stale pending старше 8 часов
+снимается cleanup без `release` ready-строки.
+
+Orphan cleanup: `studio_cleanup_stale_asset_uploads` (лениво из reserve).
+`p_max_age` игнорируется. State-aware TTL от `upload_state_changed_at`:
+reserved 30 мин, uploading 8 ч (медленный 300 MiB PUT), processing
+45 мин, failed 15 мин. `ready` никогда не release-ится этим RPC.
+
+Peaks V1 схема и хелперы сохранены, но finalize **не** вызывает FFmpeg
+peaks. Готовность ассета не зависит от peaks. Timeline/playback используют
+fallback waveform. Peaks generation — отдельный шаг (PR3b), не worker.
+
+Новые/изменённые SECURITY DEFINER RPC этой миграции: `EXECUTE` только у
+`service_role`. `REVOKE ALL` у `PUBLIC` / `anon` / `authenticated`. Клиент
+не вызывает privileged RPC напрямую — только Next.js API + service role.
+
+**Ручная приёмка после merge/deploy (не в этом PR):**
+
+- A: реальный файл 70–90 мин — reserve → PUT → finalize → play/save/export
+- B: синтетический ~3 ч — accept
+- C: >3 ч — reject с текстом «Максимальная продолжительность одной аудиодорожки — 3 часа.»
+- D: >300 MiB — reject с текстом про 300 МБ
+- E: сумма дорожек проекта >750 MiB — reject
+
+Production DB mutation этой миграции — только после отдельного merge/deploy
+gate. Старые объекты `studio-draft-assets` продолжают открываться через
+signed Range playback без повторной загрузки.
+
 **Доступ:** наличие строки урока / блока / файла / CTA **никогда** не даёт
 чтение. Learner SELECT policy нет. RLS: ENABLE, REVOKE PUBLIC/anon, нет
 public SELECT, author members (`owner`/`editor`) CRUD, `service_role` ALL.

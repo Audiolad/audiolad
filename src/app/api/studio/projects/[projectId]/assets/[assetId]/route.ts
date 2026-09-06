@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { reserveStudioDirectReplacement } from "@/lib/studio/server/direct-upload";
 import {
   deleteStudioProjectAsset,
   downloadStudioProjectAsset,
-  replaceStudioProjectAsset,
 } from "@/lib/studio/server/repository";
 import { toStudioAssetDto } from "@/lib/studio/server/model";
 import {
   parseUuid,
   sanitizeStudioFilename,
   StudioApiError,
-  validateStudioUpload,
+  validateStudioUploadMeta,
 } from "@/lib/studio/server/validation";
 import { studioRouteError } from "@/lib/studio/server/route-errors";
-import { probeStudioAudioDuration } from "@/lib/studio/server/audio-duration";
 
 type RouteContext = {
   params: Promise<{ projectId: string; assetId: string }>;
@@ -52,27 +51,28 @@ export async function PUT(request: Request, context: RouteContext) {
     const { projectId: rawProjectId, assetId: rawAssetId } = await context.params;
     const projectId = parseUuid(rawProjectId, "not_found");
     const assetId = parseUuid(rawAssetId, "not_found");
-    const formData = await request.formData();
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      throw new StudioApiError("invalid_file", 422);
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("multipart/form-data")) {
+      throw new StudioApiError("invalid_upload", 422);
     }
-    const upload = validateStudioUpload(file);
-    const durationSeconds = await probeStudioAudioDuration(file, upload.mimeType);
-    if (durationSeconds === null) {
-      throw new StudioApiError("invalid_audio_duration", 422);
-    }
-    const asset = await replaceStudioProjectAsset({
+    const body = await request.json();
+    const upload = validateStudioUploadMeta({
+      name: body?.originalName ?? body?.filename ?? body?.name,
+      type: body?.mimeType ?? body?.type,
+      size: body?.sizeBytes ?? body?.byteSize ?? body?.size,
+    });
+    const reserved = await reserveStudioDirectReplacement({
       projectId,
       assetId,
-      file,
       filename: upload.filename,
       mimeType: upload.mimeType,
       byteSize: upload.byteSize,
-      durationSeconds,
     });
     return NextResponse.json(
-      { asset: toStudioAssetDto(asset) },
+      {
+        asset: toStudioAssetDto(reserved.asset),
+        signedUpload: reserved.signedUpload,
+      },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {

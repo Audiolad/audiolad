@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const assets = await listStudioAssets(projectId);
     return NextResponse.json({
       project: toStudioProjectDto(project),
-      assets: assets.map(toStudioAssetDto),
+      assets: assets.map((asset) => toStudioAssetDto(asset)),
     }, {
       headers: {
         "Cache-Control": "private, no-store",

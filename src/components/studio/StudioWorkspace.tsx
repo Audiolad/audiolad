@@ -151,8 +151,8 @@ export default function StudioWorkspace() {
                 Добавьте локальные аудиодорожки
               </p>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#70618e]">
-                Поддерживаются MP3, WAV и файлы M4A/AAC, которые может
-                декодировать ваш браузер. Временный лимит — 200 МБ.
+                Поддерживаются MP3, WAV и файлы M4A/AAC. Лимит одной
+                дорожки — 3 часа и 300 МБ.
               </p>
             </div>
           ) : null}

@@ -1,4 +1,11 @@
-const MAX_LOCAL_FILE_SIZE_BYTES = 200 * 1024 * 1024;
+import {
+  MAX_STUDIO_ASSET_BYTES,
+  STUDIO_ASSET_TOO_LARGE_MESSAGE,
+  STUDIO_AUDIO_TOO_LONG_MESSAGE,
+  isStudioDurationAllowed,
+} from "./limits";
+
+const MAX_LOCAL_FILE_SIZE_BYTES = MAX_STUDIO_ASSET_BYTES;
 const SUPPORTED_FILE_EXTENSIONS = /\.(mp3|wav|m4a|aac)$/i;
 
 export function validateStudioLocalFile(
@@ -14,9 +21,25 @@ export function validateStudioLocalFile(
     return "Выбранный файл пуст.";
   }
   if (file.size > MAX_LOCAL_FILE_SIZE_BYTES) {
-    return "Размер одной дорожки превышает лимит Studio — 200 МБ.";
+    return STUDIO_ASSET_TOO_LARGE_MESSAGE;
   }
   return null;
 }
 
-export { MAX_LOCAL_FILE_SIZE_BYTES, SUPPORTED_FILE_EXTENSIONS };
+export function validateStudioLocalDuration(durationSeconds: number): string | null {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return "Некорректная длительность файла.";
+  }
+  if (!isStudioDurationAllowed(durationSeconds)) {
+    return STUDIO_AUDIO_TOO_LONG_MESSAGE;
+  }
+  return null;
+}
+
+export {
+  MAX_LOCAL_FILE_SIZE_BYTES,
+  MAX_STUDIO_ASSET_BYTES,
+  STUDIO_ASSET_TOO_LARGE_MESSAGE,
+  STUDIO_AUDIO_TOO_LONG_MESSAGE,
+  SUPPORTED_FILE_EXTENSIONS,
+};
