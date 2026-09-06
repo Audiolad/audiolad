@@ -82,6 +82,15 @@ export class StudioRenderAbandonedError extends Error {
   }
 }
 
+export function isStudioRenderAbort(error: unknown): boolean {
+  if (error instanceof StudioRenderAbandonedError) return true;
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: string }).code;
+  return error.name === "StudioRenderChildAbortedError"
+    || code === "studio_render_aborted"
+    || code === "studio_render_abandoned";
+}
+
 export type StudioRenderWorker = {
   run: () => Promise<void>;
   requestShutdown: () => void;
@@ -295,7 +304,7 @@ export function createStudioRenderWorker(
         result = await port.executeJob(job, jobAbort.signal);
       } catch (error) {
         if (
-          error instanceof StudioRenderAbandonedError
+          isStudioRenderAbort(error)
           || abandon.current
           || lostOwnership
         ) {
@@ -371,6 +380,7 @@ export function createStudioRenderWorker(
         if (drained === "timeout") {
           abandon.current = true;
           if (!jobAbort.signal.aborted) jobAbort.abort();
+          await jobRun;
           await port.releaseJob(job);
           logger.info(
             JSON.stringify({

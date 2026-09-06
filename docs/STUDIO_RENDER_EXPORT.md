@@ -42,11 +42,14 @@ the current token; a worker that lost the lease must not mark the job
 completed or overwrite the output object.
 
 Graceful shutdown (SIGTERM/SIGINT): stop claiming; wait up to **90s**
-(`STUDIO_RENDER_SHUTDOWN_DRAIN_MS`) for the in-flight FFmpeg job; if it is
-still running, `release_studio_render_job` requeues it (attempt_count is
-decremented) and the process exits. PM2 `kill_timeout` is **120s**. Deploy
-during a multi-hour render will interrupt FFmpeg after the drain window;
-prefer waiting until the worker is idle. Waiting hours for drain is unsafe.
+(`STUDIO_RENDER_SHUTDOWN_DRAIN_MS`) for the in-flight FFmpeg job. After the
+drain window the worker aborts the render signal (SIGTERM, then SIGKILL after
+2s if needed), **awaits the child `close`**, cleans the workspace, and only
+then calls `release_studio_render_job` (attempt_count decremented). Confirmed
+lease loss uses the same abort path. A transient heartbeat error does not
+cancel FFmpeg. PM2 `kill_timeout` is **120s**. Deploy during a multi-hour
+render will interrupt FFmpeg after the drain window; prefer waiting until the
+worker is idle. Waiting hours for drain is unsafe.
 
 ## Shared Studio audio sources and project duplication
 

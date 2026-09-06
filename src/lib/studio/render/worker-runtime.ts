@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   renderStudioProjectToMp3,
+  StudioRenderChildAbortedError,
   StudioRenderDurationError,
 } from "./render";
 import { renderOutputPath } from "./storage";
@@ -100,10 +101,18 @@ export async function executeClaimedStudioRenderJob(
       await writeFile(path, Buffer.from(await data.arrayBuffer()));
       paths.set(asset.id, path);
     }
-    const result = await renderStudioProjectToMp3(
-      { snapshot, localAssetPaths: paths },
-      { renderId: job.id, outputDirectory: workspace },
-    );
+    let result;
+    try {
+      result = await renderStudioProjectToMp3(
+        { snapshot, localAssetPaths: paths },
+        { renderId: job.id, outputDirectory: workspace, signal },
+      );
+    } catch (error) {
+      if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
+        throw new StudioRenderAbandonedError();
+      }
+      throw error;
+    }
     console.log(JSON.stringify({
       event: "studio_render_completed",
       jobId: job.id,
@@ -202,6 +211,9 @@ export async function failClaimedStudioRenderJob(
   job: ClaimedStudioRenderJob,
   error: unknown,
 ): Promise<boolean> {
+  if (error instanceof StudioRenderAbandonedError || error instanceof StudioRenderChildAbortedError) {
+    return false;
+  }
   const errorCode = error instanceof StudioRenderDurationError
     ? error.code
     : "render_failed";

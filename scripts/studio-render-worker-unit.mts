@@ -3,6 +3,14 @@ import { getEventListeners } from "node:events";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import {
+  runStudioRenderChild,
+  StudioRenderChildAbortedError,
+} from "../src/lib/studio/render/render";
 import {
   allowStudioRenderOutputUpload,
   createStudioRenderWorker,
@@ -441,9 +449,10 @@ async function testDrainTimeoutReleasesLease() {
   const started = createDeferred();
   const port = createPort({
     claimQueue: [job("slow")],
-    async executeJob() {
+    async executeJob(_claimed, signal) {
       started.resolve();
-      await delay(400);
+      await sleep(400, signal);
+      if (signal.aborted) throw new StudioRenderAbandonedError();
       return { sizeBytes: 1 };
     },
   });
@@ -459,6 +468,109 @@ async function testDrainTimeoutReleasesLease() {
   await running;
   assert.deepEqual(port.released, ["slow"]);
   assert.deepEqual(port.completed, []);
+}
+
+async function testAbortStopsSpawnedFfmpegChild() {
+  const workspace = await mkdtemp(join(tmpdir(), "audiolad-ffmpeg-abort-"));
+  const output = join(workspace, "long.mp3");
+  const controller = new AbortController();
+  const started = Date.now();
+  const running = runStudioRenderChild("ffmpeg", [
+    "-hide_banner", "-nostdin",
+    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+    "-t", "120",
+    "-c:a", "libmp3lame", "-b:a", "192k",
+    "-y", output,
+  ], { signal: controller.signal, termGraceMs: 200 });
+  await delay(200);
+  controller.abort();
+  await assert.rejects(running, (error: unknown) => error instanceof StudioRenderChildAbortedError);
+  assert.ok(Date.now() - started < 5_000, "aborted FFmpeg must exit without running the full encode");
+  await rm(workspace, { recursive: true, force: true });
+}
+
+async function testConfirmedLeaseLossCancelsFfmpeg() {
+  const started = createDeferred();
+  let childClosedAt = 0;
+  let uploaded = false;
+  const port = createPort({
+    claimQueue: [job("lost-ffmpeg")],
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      try {
+        await runStudioRenderChild("sleep", ["30"], { signal, termGraceMs: 50 });
+        uploaded = true;
+        return { sizeBytes: 1 };
+      } catch (error) {
+        childClosedAt = Date.now();
+        if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
+          throw new StudioRenderAbandonedError();
+        }
+        throw error;
+      }
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 25,
+    heartbeatRetryMs: 20,
+    leaseHoldMs: 10_000,
+    shutdownDrainMs: 2_000,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  await started.promise;
+  await delay(120);
+  worker.requestShutdown();
+  await running;
+  assert.ok(childClosedAt > 0, "confirmed lease loss must terminate the child");
+  assert.equal(uploaded, false);
+  assert.deepEqual(port.completed, []);
+  assert.deepEqual(port.failed, []);
+}
+
+async function testDrainTerminatesChildBeforeRelease() {
+  const started = createDeferred();
+  let childClosedAt = 0;
+  let releasedAt = 0;
+  const port = createPort({
+    claimQueue: [job("drain-ffmpeg")],
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      try {
+        await runStudioRenderChild("sleep", ["30"], { signal, termGraceMs: 50 });
+        return { sizeBytes: 1 };
+      } catch (error) {
+        childClosedAt = Date.now();
+        if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
+          throw new StudioRenderAbandonedError();
+        }
+        throw error;
+      }
+    },
+    async releaseJob() {
+      releasedAt = Date.now();
+      return true;
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 40,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  await started.promise;
+  worker.requestShutdown();
+  await running;
+  assert.ok(childClosedAt > 0, "drain abort must stop the child");
+  assert.ok(releasedAt >= childClosedAt, "release must wait until the child has exited");
+  assert.deepEqual(port.released, ["drain-ffmpeg"]);
+  assert.deepEqual(port.completed, []);
+  assert.deepEqual(port.failed, []);
 }
 
 function testPm2ConfigHasNoCronRestart() {
@@ -486,6 +598,14 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(runtime, /release_studio_render_job/);
   assert.match(runtime, /allowStudioRenderOutputUpload/);
   assert.match(runtime, /StudioRenderAbandonedError/);
+  assert.match(runtime, /signal/);
+  const render = readFileSync(
+    new URL("../src/lib/studio/render/render.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(render, /runStudioRenderChild/);
+  assert.match(render, /SIGTERM/);
+  assert.match(render, /SIGKILL/);
   const script = readFileSync(
     new URL("../scripts/run-studio-render-worker.mts", import.meta.url),
     "utf8",
@@ -508,6 +628,9 @@ async function main() {
   await testStaleWorkerSkipsOutputUpload();
   await testGracefulShutdownDoesNotClaimNewJob();
   await testDrainTimeoutReleasesLease();
+  await testAbortStopsSpawnedFfmpegChild();
+  await testConfirmedLeaseLossCancelsFfmpeg();
+  await testDrainTerminatesChildBeforeRelease();
   testPm2ConfigHasNoCronRestart();
   testStreamingUploadAndLeaseTokenComplete();
   console.log("studio-render-worker-unit: PASS");
