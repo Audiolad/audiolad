@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import { usePointerReorder } from "@/components/author-dashboard/usePointerReorder";
+import { AuthorCourseAccessLevels } from "@/components/author-dashboard/AuthorCourseAccessLevels";
 import {
+  COURSE_ACCESS_LEVEL_SELECT_LABEL,
   COURSE_BUILDER_ADD_LESSON_LABEL,
   COURSE_BUILDER_AUDIO_HINT,
   COURSE_BUILDER_COMPLETION_CTA_TITLE,
@@ -13,12 +15,15 @@ import {
   COURSE_BUILDER_PDF_HINT,
   COURSE_BUILDER_SECTION_TITLE,
   countCoursePublishContentFromLessons,
+  formatAccessLevelBadge,
+  formatAccessLevelOption,
   getCourseBuilderAudioUploadError,
   getCourseBuilderErrorMessage,
   getCourseBuilderPdfErrorMessage,
   resolveCourseBuilderPanes,
   validateCourseBuilderAudioFile,
   validateCourseBuilderPdfFile,
+  type CourseBuilderAccessLevelDto,
   type CourseBuilderBlockDto,
   type CourseBuilderLessonDto,
   type CourseBuilderSnapshot,
@@ -30,6 +35,8 @@ type AuthorCourseBuilderProps = {
   practiceId: string | null;
   getPracticeId: () => Promise<string | null>;
   disabled?: boolean;
+  basePrice?: number;
+  isFree?: boolean;
   onContentSnapshotChange?: (snapshot: CoursePublishContentSnapshot) => void;
 };
 
@@ -75,9 +82,15 @@ export default function AuthorCourseBuilder({
   practiceId,
   getPracticeId,
   disabled = false,
+  basePrice = 0,
+  isFree = false,
   onContentSnapshotChange,
 }: AuthorCourseBuilderProps) {
   const [lessons, setLessons] = useState<CourseBuilderLessonDto[]>([]);
+  const [accessLevels, setAccessLevels] = useState<CourseBuilderAccessLevelDto[]>(
+    [],
+  );
+  const [addLessonLevel, setAddLessonLevel] = useState(1);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
   const [cta, setCta] = useState<CourseCompletionCtaDto | null>(null);
@@ -86,6 +99,7 @@ export default function AuthorCourseBuilder({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadedForIdRef = useRef<string | null>(null);
+  const multiLevel = accessLevels.length > 0;
 
   const selectedLesson = useMemo(
     () => lessons.find((lesson) => lesson.id === selectedLessonId) ?? null,
@@ -93,18 +107,30 @@ export default function AuthorCourseBuilder({
   );
 
   const emitSnapshot = useCallback(
-    (nextLessons: CourseBuilderLessonDto[]) => {
-      onContentSnapshotChange?.(countCoursePublishContentFromLessons(nextLessons));
+    (
+      nextLessons: CourseBuilderLessonDto[],
+      nextLevels: CourseBuilderAccessLevelDto[] = accessLevels,
+    ) => {
+      onContentSnapshotChange?.(
+        countCoursePublishContentFromLessons(nextLessons, nextLevels),
+      );
     },
-    [onContentSnapshotChange],
+    [accessLevels, onContentSnapshotChange],
   );
 
   const applySnapshot = useCallback(
     (snapshot: CourseBuilderSnapshot) => {
+      const nextLevels = snapshot.access_levels ?? [];
       setLessons(snapshot.lessons);
+      setAccessLevels(nextLevels);
       setCta(snapshot.completion_cta);
       setOrphanAudioCount(snapshot.orphan_audio_item_count);
-      emitSnapshot(snapshot.lessons);
+      emitSnapshot(snapshot.lessons, nextLevels);
+      setAddLessonLevel((current) =>
+        nextLevels.some((level) => level.level === current)
+          ? current
+          : nextLevels[0]?.level ?? 1,
+      );
       setSelectedLessonId((current) => {
         if (current && snapshot.lessons.some((lesson) => lesson.id === current)) {
           return current;
@@ -226,7 +252,9 @@ export default function AuthorCourseBuilder({
       const response = await fetch(`/api/author/products/${id}/course/lessons`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          requiredAccessLevel: multiLevel ? addLessonLevel : 1,
+        }),
       });
       const payload = (await response.json()) as {
         lesson?: CourseBuilderLessonDto;
@@ -251,14 +279,28 @@ export default function AuthorCourseBuilder({
     }
   }
 
-  async function renameLesson(lessonId: string, title: string) {
+  async function patchLesson(
+    lessonId: string,
+    body: { title?: string; requiredAccessLevel?: number },
+  ) {
     if (!practiceId || disabled) {
       return;
     }
 
     const current = lessons.find((lesson) => lesson.id === lessonId);
 
-    if (!current || current.title === title.trim()) {
+    if (!current) {
+      return;
+    }
+
+    const nextTitle = body.title?.trim();
+    const titleUnchanged =
+      body.title == null || current.title === nextTitle;
+    const levelUnchanged =
+      body.requiredAccessLevel == null ||
+      current.required_access_level === body.requiredAccessLevel;
+
+    if (titleUnchanged && levelUnchanged) {
       return;
     }
 
@@ -267,7 +309,7 @@ export default function AuthorCourseBuilder({
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(body),
       },
     );
     const payload = (await response.json()) as {
@@ -281,11 +323,15 @@ export default function AuthorCourseBuilder({
       return;
     }
 
-    setLessons((currentLessons) =>
-      currentLessons.map((lesson) =>
-        lesson.id === lessonId ? { ...lesson, ...payload.lesson, blocks: lesson.blocks } : lesson,
-      ),
-    );
+    setLessons((currentLessons) => {
+      const next = currentLessons.map((lesson) =>
+        lesson.id === lessonId
+          ? { ...lesson, ...payload.lesson, blocks: lesson.blocks }
+          : lesson,
+      );
+      emitSnapshot(next);
+      return next;
+    });
   }
 
   async function deleteLesson(lesson: CourseBuilderLessonDto) {
@@ -345,6 +391,16 @@ export default function AuthorCourseBuilder({
       data-author-course-builder
       className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5"
     >
+      <AuthorCourseAccessLevels
+        practiceId={practiceId}
+        levels={accessLevels}
+        basePrice={basePrice}
+        isFree={isFree}
+        disabled={disabled || busy}
+        onSnapshot={applySnapshot}
+        onError={setError}
+      />
+
       <h2 className="text-[20px] font-semibold">{COURSE_BUILDER_SECTION_TITLE}</h2>
 
       {orphanAudioCount > 0 ? (
@@ -366,6 +422,25 @@ export default function AuthorCourseBuilder({
           <p className="text-sm font-medium text-[#3f3560]">
             {COURSE_BUILDER_EMPTY_TITLE}
           </p>
+          {multiLevel ? (
+            <label className="mt-4 inline-flex items-center gap-2 text-sm text-[#5c5278]">
+              <span>{COURSE_ACCESS_LEVEL_SELECT_LABEL}</span>
+              <select
+                value={addLessonLevel}
+                disabled={disabled || busy}
+                onChange={(event) =>
+                  setAddLessonLevel(Number(event.target.value))
+                }
+                className="rounded-full border border-[#e4d7f4] bg-white px-3 py-2 text-sm text-[#3f3560]"
+              >
+                {accessLevels.map((level) => (
+                  <option key={level.id} value={level.level}>
+                    {formatAccessLevelOption(level.level, level.title)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <button
             type="button"
             disabled={disabled || busy}
@@ -413,6 +488,11 @@ export default function AuthorCourseBuilder({
                     <span className="text-sm font-medium text-[#3f3560]">
                       {lesson.title}
                     </span>
+                    {multiLevel ? (
+                      <span className="ml-2 rounded-full bg-[#efe6fb] px-2 py-0.5 text-[11px] font-semibold text-[#7042c5]">
+                        {formatAccessLevelBadge(lesson.required_access_level)}
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     type="button"
@@ -425,14 +505,35 @@ export default function AuthorCourseBuilder({
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              disabled={disabled || busy}
-              onClick={() => void addLesson()}
-              className="mt-3 rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
-            >
-              {COURSE_BUILDER_ADD_LESSON_LABEL}
-            </button>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {multiLevel ? (
+                <label className="flex items-center gap-2 text-sm text-[#5c5278]">
+                  <span>{COURSE_ACCESS_LEVEL_SELECT_LABEL}</span>
+                  <select
+                    value={addLessonLevel}
+                    disabled={disabled || busy}
+                    onChange={(event) =>
+                      setAddLessonLevel(Number(event.target.value))
+                    }
+                    className="rounded-full border border-[#e4d7f4] bg-white px-3 py-2 text-sm text-[#3f3560] outline-none focus:border-[#9a74d8]"
+                  >
+                    {accessLevels.map((level) => (
+                      <option key={level.id} value={level.level}>
+                        {formatAccessLevelOption(level.level, level.title)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                disabled={disabled || busy}
+                onClick={() => void addLesson()}
+                className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+              >
+                {COURSE_BUILDER_ADD_LESSON_LABEL}
+              </button>
+            </div>
           </div>
 
           <div className={showEditor ? "block" : "hidden lg:block"}>
@@ -441,9 +542,15 @@ export default function AuthorCourseBuilder({
                 key={selectedLesson.id}
                 practiceId={practiceId}
                 lesson={selectedLesson}
+                accessLevels={accessLevels}
                 disabled={disabled || busy}
                 onBack={() => setMobileEditorOpen(false)}
-                onRename={(title) => void renameLesson(selectedLesson.id, title)}
+                onRename={(title) =>
+                  void patchLesson(selectedLesson.id, { title })
+                }
+                onRequiredLevelChange={(requiredAccessLevel) =>
+                  void patchLesson(selectedLesson.id, { requiredAccessLevel })
+                }
                 onLessonChange={(nextLesson) => {
                   setLessons((current) => {
                     const next = current.map((lesson) =>
@@ -479,18 +586,22 @@ export default function AuthorCourseBuilder({
 function AuthorCourseLessonEditor({
   practiceId,
   lesson,
+  accessLevels,
   disabled,
   onBack,
   onRename,
+  onRequiredLevelChange,
   onLessonChange,
   onSnapshot,
   onError,
 }: {
   practiceId: string | null;
   lesson: CourseBuilderLessonDto;
+  accessLevels: CourseBuilderAccessLevelDto[];
   disabled: boolean;
   onBack: () => void;
   onRename: (title: string) => void;
+  onRequiredLevelChange: (level: number) => void;
   onLessonChange: (lesson: CourseBuilderLessonDto) => void;
   onSnapshot: (snapshot: CourseBuilderSnapshot) => void;
   onError: (message: string | null) => void;
@@ -773,6 +884,28 @@ function AuthorCourseLessonEditor({
           className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
         />
       </label>
+
+      {accessLevels.length > 0 ? (
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium">
+            {COURSE_ACCESS_LEVEL_SELECT_LABEL}
+          </span>
+          <select
+            value={lesson.required_access_level}
+            disabled={disabled}
+            onChange={(event) =>
+              onRequiredLevelChange(Number(event.target.value))
+            }
+            className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
+          >
+            {accessLevels.map((level) => (
+              <option key={level.id} value={level.level}>
+                {formatAccessLevelOption(level.level, level.title)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <div className="space-y-3">
         {lesson.blocks.map((block, index) => (

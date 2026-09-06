@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { handleCourseBuilderRouteError } from "@/app/api/author/products/[id]/course/route-utils";
+import { resolveLessonRequiredAccessLevelInput } from "@/lib/author-products/course-access-levels";
 import {
   deleteCourseLesson,
   requireCourseLessonMutationAccess,
-  updateCourseLessonTitle,
+  updateCourseLesson,
 } from "@/lib/author-products/course-builder";
 
 type RouteContext = {
@@ -24,16 +25,29 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const title =
-      body && typeof body === "object" && "title" in body && typeof body.title === "string"
-        ? body.title
+    const record =
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
         : null;
 
-    if (title == null) {
+    if (!record) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const lesson = await updateCourseLessonTitle(supabase, id, lessonId, title);
+    const title = typeof record.title === "string" ? record.title : null;
+    const hasLevel =
+      "requiredAccessLevel" in record || "required_access_level" in record;
+
+    if (title == null && !hasLevel) {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const lesson = await updateCourseLesson(supabase, id, lessonId, {
+      title,
+      requiredAccessLevel: hasLevel
+        ? resolveLessonRequiredAccessLevelInput(record)
+        : null,
+    });
 
     return NextResponse.json({ lesson });
   } catch (error) {

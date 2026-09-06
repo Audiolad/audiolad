@@ -220,6 +220,20 @@ No mass INSERT of Level 1 catalog rows. No finance / checkout changes.
 
 **Security:** `authenticated` / `anon` cannot EXECUTE `grant_practice_access` or `grant_practice_purchase_access`. `service_role` has EXECUTE on both. Clients cannot INSERT/UPDATE/DELETE `user_practices` or `practice_access_levels`. Users may SELECT their own `user_practices` (including `access_level`). Authors cannot client-side grant paid levels. Writes go through service_role / SECURITY DEFINER only.
 
+#### Course access levels author editor (Phase 3)
+
+No new tables. Author catalog writes stay on `practice_access_levels` via
+`/api/author/products/[id]/course/access-levels` after
+`requireCourseBuilderReadAccess` / `requireCourseBuilderMutationAccess`.
+The browser never receives the service-role key. Preferred: no new
+authenticated INSERT/UPDATE/DELETE RLS on `practice_access_levels`.
+`course_lessons.required_access_level` is assigned in the existing lesson
+PATCH/POST. Raising a lesson level after `getPracticeSaleLock` is
+forbidden; lowering is allowed. Deleting a level is only the highest
+non-L1 row, and only when no lessons and no `user_practices.access_level >= level`.
+`practices.price` is not written by this editor. Checkout / order_kind
+are out of scope.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из

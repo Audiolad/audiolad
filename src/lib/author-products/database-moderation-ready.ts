@@ -12,6 +12,7 @@ import {
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import {
+  evaluateCourseAccessLevelsReadiness,
   evaluateCourseLessonsReadiness,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
@@ -81,9 +82,18 @@ export function evaluateDatabaseModerationReady(
   const practice = input.practice;
   const isCourse = practice.publication_class === "course";
   const audioCount = input.audioItems.length;
-  const courseContentCheck = isCourse
+  const courseLessonsCheck = isCourse
     ? evaluateCourseLessonsReadiness(input.courseContent?.lessons)
     : ({ ok: true } as const);
+  const courseLevelsCheck = isCourse
+    ? evaluateCourseAccessLevelsReadiness({
+        accessLevels: input.courseContent?.access_levels,
+        lessons: input.courseContent?.lessons,
+      })
+    : ({ ok: true } as const);
+  const courseContentCheck = !courseLessonsCheck.ok
+    ? courseLessonsCheck
+    : courseLevelsCheck;
 
   const checks: DatabaseModerationReadyCheck[] = [
     check(

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleCourseBuilderRouteError } from "@/app/api/author/products/[id]/course/route-utils";
+import { resolveLessonRequiredAccessLevelInput } from "@/lib/author-products/course-access-levels";
 import {
   createCourseLesson,
   loadCourseBuilderSnapshot,
@@ -30,17 +31,25 @@ export async function POST(request: Request, context: RouteContext) {
     const { supabase } = await requireCourseBuilderMutationAccess(id);
 
     let title: string | null = null;
+    let requiredAccessLevel: number | null = null;
 
     try {
-      const body = (await request.json()) as { title?: unknown };
+      const body = (await request.json()) as Record<string, unknown>;
       if (typeof body?.title === "string") {
         title = body.title;
       }
+      requiredAccessLevel = resolveLessonRequiredAccessLevelInput(body, 1);
     } catch {
       title = null;
+      requiredAccessLevel = 1;
     }
 
-    const lesson = await createCourseLesson(supabase, id, title);
+    const lesson = await createCourseLesson(
+      supabase,
+      id,
+      title,
+      requiredAccessLevel,
+    );
 
     return NextResponse.json({ lesson }, { status: 201 });
   } catch (error) {

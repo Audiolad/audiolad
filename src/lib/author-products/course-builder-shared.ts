@@ -10,10 +10,38 @@ import {
 import { isCoursePublication } from "@/lib/author-products/publication-class";
 import { shouldShowListeningNoticeForPublication } from "@/lib/products/listening-notice";
 import {
+  evaluateCourseAccessLevelsReadiness,
+  getCourseAccessLevelErrorMessage,
+  type CourseBuilderAccessLevelDto,
+} from "@/lib/author-products/course-access-levels-shared";
+import {
   PUBLICATION_FILE_MAX_PDF_BYTES,
   PUBLICATION_FILE_PDF_MIME,
   type CourseLessonBlockType,
 } from "@/lib/course-content/types";
+
+export type { CourseBuilderAccessLevelDto };
+export {
+  ACCESS_LEVEL_DESCRIPTION_MAX,
+  ACCESS_LEVEL_TITLE_MAX,
+  COURSE_ACCESS_LEVELS_ADD_NEXT_LABEL,
+  COURSE_ACCESS_LEVELS_ADD_SECOND_LABEL,
+  COURSE_ACCESS_LEVELS_BASE_PRICE_LABEL,
+  COURSE_ACCESS_LEVELS_LEGACY_COPY,
+  COURSE_ACCESS_LEVELS_SECTION_TITLE,
+  COURSE_ACCESS_LEVEL_SELECT_LABEL,
+  COURSE_PUBLISH_ACCESS_LEVELS_NOT_CONTIGUOUS_CODE,
+  COURSE_PUBLISH_INVALID_LEVEL_1_UPGRADE_CODE,
+  COURSE_PUBLISH_INVALID_PAID_UPGRADE_CODE,
+  COURSE_PUBLISH_LESSON_LEVEL_NOT_IN_CATALOG_CODE,
+  COURSE_PUBLISH_MISSING_ACCESS_LEVEL_1_CODE,
+  COURSE_PUBLISH_PAID_LEVEL_MISSING_LESSONS_CODE,
+  evaluateCourseAccessLevelsReadiness,
+  formatAccessLevelBadge,
+  formatAccessLevelOption,
+  isConfiguredAccessLevel,
+  normalizeRequiredAccessLevel,
+} from "@/lib/author-products/course-access-levels-shared";
 
 export { MAX_AUDIO_BYTES, PUBLICATION_FILE_MAX_PDF_BYTES };
 
@@ -140,6 +168,7 @@ export type CourseBuilderLessonDto = {
   publication_id: string;
   title: string;
   position: number;
+  required_access_level: number;
   created_at: string;
   updated_at: string;
   blocks: CourseBuilderBlockDto[];
@@ -158,6 +187,7 @@ export type CourseCompletionCtaDto = {
 
 export type CourseBuilderSnapshot = {
   lessons: CourseBuilderLessonDto[];
+  access_levels: CourseBuilderAccessLevelDto[];
   completion_cta: CourseCompletionCtaDto | null;
   orphan_audio_item_count: number;
 };
@@ -165,6 +195,8 @@ export type CourseBuilderSnapshot = {
 export type CoursePublishLessonInput = {
   id?: string | null;
   title?: string | null;
+  required_access_level?: number | null;
+  requiredAccessLevel?: number | null;
   blocks?: ReadonlyArray<{
     type?: string | null;
     asset_id?: string | null;
@@ -178,6 +210,7 @@ export type CoursePublishContentSnapshot = {
   lessonCount: number;
   blockCount: number;
   lessons?: readonly CoursePublishLessonInput[];
+  access_levels?: readonly CourseBuilderAccessLevelDto[];
 };
 
 export type CourseLessonReadinessFailure = {
@@ -404,6 +437,7 @@ export function evaluateCoursePublishContentGate(input: {
   lessonCount?: number;
   blockCount?: number;
   lessons?: ReadonlyArray<CoursePublishLessonInput> | null;
+  accessLevels?: ReadonlyArray<CourseBuilderAccessLevelDto> | null;
 }): { ok: true } | { ok: false; code: string; message: string } {
   void input.publishedAt;
   void input.lessonCount;
@@ -415,15 +449,28 @@ export function evaluateCoursePublishContentGate(input: {
 
   const semantic = evaluateCourseLessonsReadiness(input.lessons);
 
-  if (semantic.ok) {
-    return { ok: true };
+  if (!semantic.ok) {
+    return {
+      ok: false,
+      code: semantic.code,
+      message: semantic.message,
+    };
   }
 
-  return {
-    ok: false,
-    code: semantic.code,
-    message: semantic.message,
-  };
+  const levels = evaluateCourseAccessLevelsReadiness({
+    accessLevels: input.accessLevels,
+    lessons: input.lessons,
+  });
+
+  if (!levels.ok) {
+    return {
+      ok: false,
+      code: levels.code,
+      message: levels.message,
+    };
+  }
+
+  return { ok: true };
 }
 
 export function shouldSkipFlatAudioPublishRequirement(input: {
@@ -481,6 +528,7 @@ export function resolveCourseBuilderPanes(input: {
 
 export function countCoursePublishContentFromLessons(
   lessons: ReadonlyArray<CoursePublishLessonInput>,
+  accessLevels: ReadonlyArray<CourseBuilderAccessLevelDto> = [],
 ): CoursePublishContentSnapshot {
   return {
     lessonCount: lessons.length,
@@ -489,6 +537,7 @@ export function countCoursePublishContentFromLessons(
       0,
     ),
     lessons,
+    access_levels: accessLevels,
   };
 }
 
@@ -555,6 +604,12 @@ export function validateCourseCompletionCtaInput(
 }
 
 export function getCourseBuilderErrorMessage(code: string | undefined): string {
+  const accessLevelMessage = getCourseAccessLevelErrorMessage(code);
+
+  if (accessLevelMessage) {
+    return accessLevelMessage;
+  }
+
   switch (code) {
     case "course_content_parent_must_be_course":
       return "Конструктор курса доступен только для публикации с типом «Курс».";
@@ -588,3 +643,21 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
 }
 
 export { isCoursePublication };
+
+export class CourseBuilderError extends Error {
+  code: string;
+  status: number;
+
+  constructor(code: string, status = 400, message?: string) {
+    super(message ?? code);
+    this.name = "CourseBuilderError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+export function isCourseBuilderError(
+  error: unknown,
+): error is CourseBuilderError {
+  return error instanceof CourseBuilderError;
+}

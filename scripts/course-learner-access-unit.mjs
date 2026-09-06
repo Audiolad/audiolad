@@ -25,6 +25,12 @@ import {
 } from "../src/lib/course-content/index.ts";
 import { loadCourseLearnerContent } from "../src/lib/course-content/learner-content.ts";
 import { signLearnerPublicationFile } from "../src/lib/course-content/learner-file-sign.ts";
+import {
+  COURSE_ACCESS_LEVELS_TEST_L1_TITLE,
+  COURSE_ACCESS_LEVELS_TEST_L2_TITLE,
+  COURSE_ACCESS_LEVELS_TEST_L2_UPGRADE_PRICE,
+  createCourseAccessLevelsTestCatalog,
+} from "../src/lib/author-products/course-access-levels-fixture.ts";
 import CourseLearnerContentModule from "../src/components/products/course-learner/CourseLearnerContent.tsx";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
@@ -1078,6 +1084,54 @@ assert.equal(countOccurrences(bothLevelsMarkup, "Уровень 1. Работа 
 assert.equal(countOccurrences(bothLevelsMarkup, "Уровень 2. Работа с другими людьми"), 1);
 assert.equal(countOccurrences(bothLevelsMarkup, 'data-learner-level="1"'), 1);
 assert.equal(countOccurrences(bothLevelsMarkup, 'data-learner-level="2"'), 1);
+
+const authorFixture = createCourseAccessLevelsTestCatalog();
+const authorFixtureCourse = sampleCourse({
+  accessLevel: 1,
+  levels: authorFixture.access_levels.map((row) =>
+    levelRow(row.level, row.title, {
+      description: row.description,
+      upgradePrice: row.upgrade_price,
+      upgradeAction:
+        row.level === 2 ? { href: "/future-upgrade-l2" } : undefined,
+    }),
+  ),
+  lessons: authorFixture.lessons.map((lesson) =>
+    lesson.required_access_level === 1
+      ? unlockedTextLesson(
+          lesson.id,
+          lesson.title,
+          1,
+          lesson.position,
+          `L1 open ${lesson.title}`,
+        )
+      : lockedLesson(
+          lesson.id,
+          lesson.title,
+          2,
+          lesson.position,
+        ),
+  ),
+});
+const authorFixtureView = groupLearnerCourse(authorFixtureCourse);
+assert.equal(authorFixtureView.kind, "grouped");
+assert.equal(authorFixtureView.groups.length, 2);
+assert.equal(authorFixtureView.groups[0].lessons.length, 3);
+assert.equal(authorFixtureView.groups[1].lessons.length, 3);
+assert.equal(
+  authorFixtureView.groups[0].chrome?.heading,
+  `Уровень 1. ${COURSE_ACCESS_LEVELS_TEST_L1_TITLE}`,
+);
+assert.equal(
+  authorFixtureView.groups[1].chrome?.heading,
+  `Уровень 2. ${COURSE_ACCESS_LEVELS_TEST_L2_TITLE}`,
+);
+const authorFixtureMarkup = renderLearnerCourse(authorFixtureCourse);
+assert.equal(countOccurrences(authorFixtureMarkup, "Доплата"), 1);
+assert.match(
+  authorFixtureMarkup,
+  new RegExp(String(COURSE_ACCESS_LEVELS_TEST_L2_UPGRADE_PRICE)),
+);
 
 const implicitL1Course = sampleCourse({
   accessLevel: 1,

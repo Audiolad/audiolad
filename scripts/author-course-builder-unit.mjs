@@ -104,6 +104,17 @@ assert.doesNotMatch(
 
 const builder = read("src/components/author-dashboard/AuthorCourseBuilder.tsx");
 assert.match(builder, /data-author-course-builder/);
+assert.match(builder, /AuthorCourseAccessLevels/);
+assert.match(builder, /COURSE_ACCESS_LEVEL_SELECT_LABEL/);
+assert.match(builder, /requiredAccessLevel/);
+assert.match(builder, /formatAccessLevelBadge/);
+const accessLevelsUi = read(
+  "src/components/author-dashboard/AuthorCourseAccessLevels.tsx",
+);
+assert.match(accessLevelsUi, /data-author-course-access-levels/);
+assert.match(accessLevelsUi, /Добавить второй уровень/);
+assert.match(accessLevelsUi, /Добавить следующий уровень/);
+assert.doesNotMatch(accessLevelsUi, /checkout|tochka|order_kind/i);
 assert.match(builder, /COURSE_BUILDER_SECTION_TITLE/);
 assert.match(builder, /COURSE_BUILDER_EMPTY_TITLE/);
 assert.match(builder, /COURSE_BUILDER_ADD_LESSON_LABEL/);
@@ -260,6 +271,7 @@ assert.deepEqual(countCoursePublishContentFromLessons(countedLessons), {
   lessonCount: 2,
   blockCount: 3,
   lessons: countedLessons,
+  access_levels: [],
 });
 
 assert.equal(
@@ -583,6 +595,10 @@ assert.equal(practiceDraft.ok, false);
 assert.notEqual(practiceDraft.firstFailure?.code, COURSE_PUBLISH_MISSING_CONTENT_CODE);
 
 const server = read("src/lib/author-products/course-builder.ts");
+assert.match(server, /required_access_level/);
+assert.match(server, /access_levels/);
+assert.match(server, /loadPracticeAccessLevels/);
+assert.match(server, /createServiceRoleClient/);
 assert.match(server, /requirePracticeMutationAccess/);
 assert.match(server, /assertPracticePublicContentEditableForActor/);
 assert.match(server, /validateCourseParentClass/);
@@ -606,6 +622,8 @@ const lessonRoutes = [
   "src/app/api/author/products/[id]/course/lessons/[lessonId]/blocks/[blockId]/route.ts",
   "src/app/api/author/products/[id]/course/completion-cta/route.ts",
   "src/app/api/author/products/[id]/course/files/[fileId]/route.ts",
+  "src/app/api/author/products/[id]/course/access-levels/route.ts",
+  "src/app/api/author/products/[id]/course/access-levels/[level]/route.ts",
 ];
 
 for (const relativePath of lessonRoutes) {

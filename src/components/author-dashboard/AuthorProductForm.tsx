@@ -1569,6 +1569,7 @@ export default function AuthorProductForm({
       lessonCount: courseContentSnapshot.lessonCount,
       blockCount: courseContentSnapshot.blockCount,
       lessons: courseContentSnapshot.lessons,
+      accessLevels: courseContentSnapshot.access_levels,
     });
 
     if (!courseContentCheck.ok) {
@@ -1765,6 +1766,7 @@ export default function AuthorProductForm({
       lessonCount: courseContentSnapshot.lessonCount,
       blockCount: courseContentSnapshot.blockCount,
       lessons: courseContentSnapshot.lessons,
+      accessLevels: courseContentSnapshot.access_levels,
     });
 
     if (!courseContentCheck.ok) {
@@ -3264,6 +3266,8 @@ export default function AuthorProductForm({
           practiceId={practiceId || null}
           getPracticeId={getPracticeIdForCoverUpload}
           disabled={!canMutateContent || busy}
+          basePrice={form.price}
+          isFree={form.isFree}
           onContentSnapshotChange={setCourseContentSnapshot}
         />
       ) : null}

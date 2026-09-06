@@ -241,6 +241,7 @@ function buildCorePublishRequirements(
     lessonCount: courseContent?.lessonCount ?? 0,
     blockCount,
     lessons: courseContent?.lessons,
+    accessLevels: courseContent?.access_levels,
   });
   const courseContentFailure = courseContentCheck.ok
     ? null
