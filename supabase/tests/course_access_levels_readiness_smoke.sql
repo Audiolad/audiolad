@@ -93,10 +93,10 @@ SELECT public._seed_ready_course(
   ARRAY[1, 2], ARRAY[NULL, 0]::integer[], ARRAY[1, 2]
 );
 SELECT public._seed_ready_course(
-  'g0000000-0000-4000-8000-00000000000g'::uuid,
+  'aa000000-0000-4000-8000-00000000000a'::uuid,
   ARRAY[1, 2], ARRAY[NULL, 2222]::integer[], ARRAY[1, 2, 3]
 );
 SELECT public._seed_ready_course(
-  'h0000000-0000-4000-8000-00000000000h'::uuid,
+  'bb000000-0000-4000-8000-00000000000b'::uuid,
   ARRAY[1, 2], ARRAY[NULL, 2222]::integer[], ARRAY[1]
 );
