@@ -212,7 +212,12 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       group: "studio",
       disposition: "allowed_audited",
       action: "studio_asset_uploaded",
-      routePatterns: ["src/app/api/studio/projects/[projectId]/assets/route.ts"],
+      routePatterns: [
+        "src/app/api/studio/projects/[projectId]/assets/route.ts",
+        "src/app/api/studio/projects/[projectId]/assets/[assetId]/finalize/route.ts",
+        "src/app/api/studio/projects/[projectId]/assets/[assetId]/retry/route.ts",
+        "src/app/api/studio/projects/[projectId]/assets/[assetId]/abandon/route.ts",
+      ],
     },
     {
       key: "studio_asset_replace_delete",
@@ -221,6 +226,8 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       action: "studio_asset_replaced",
       routePatterns: [
         "src/app/api/studio/projects/[projectId]/assets/[assetId]/route.ts",
+        "src/app/api/studio/projects/[projectId]/assets/[assetId]/replace/finalize/route.ts",
+        "src/app/api/studio/projects/[projectId]/assets/[assetId]/replace/abandon/route.ts",
       ],
     },
     {
