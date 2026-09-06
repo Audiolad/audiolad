@@ -50,6 +50,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
+  const customerEmail = user.email?.trim() ?? "";
+
+  if (!customerEmail) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
   const idempotencyKey = resolveIdempotencyKey(
     request.headers.get("Idempotency-Key"),
   );
@@ -76,11 +82,6 @@ export async function POST(request: Request) {
   if (!orderRow) {
     console.error("course_upgrade_order_invalid_row");
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-  const customerEmail = user.email?.trim() ?? "";
-
-  if (!customerEmail) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   let serviceRoleClient;

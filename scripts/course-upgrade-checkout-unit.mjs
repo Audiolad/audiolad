@@ -154,6 +154,10 @@ assert.match(route, /startTochkaCheckoutForPendingOrder/);
 assert.match(route, /Idempotency-Key/);
 assert.doesNotMatch(route, /p_expected_amount/);
 assert.doesNotMatch(route, /already_owned/);
+assert.ok(
+  route.indexOf("customerEmail") < route.indexOf("create_course_upgrade_order"),
+  "usable Tochka email must be checked before creating a pending upgrade order",
+);
 
 const button = read(
   "src/components/products/course-learner/CourseLevelUpgradeButton.tsx",
@@ -189,6 +193,32 @@ assert.match(rpc, /v_target := v_current \+ 1/);
 assert.match(rpc, /upgrade_price::bigint\) \* 100/);
 assert.doesNotMatch(rpc, /RAISE EXCEPTION 'already_owned'/);
 assert.match(rpc, /viewer_can_commercially_access_practice/);
+
+const idempotency = read(
+  "supabase/migrations/20260925120300_create_course_upgrade_order_idempotency.sql",
+);
+assert.ok(
+  idempotency.indexOf("idempotency_key = v_idempotency_key") <
+    idempotency.indexOf("v_target := v_current + 1"),
+  "replay must look up the original key before recomputing current+1",
+);
+assert.match(idempotency, /True idempotency/);
+assert.doesNotMatch(idempotency, /RAISE EXCEPTION 'already_owned'/);
+
+const canonical = read(
+  "supabase/migrations/20260925120400_course_upgrade_canonical_sale.sql",
+);
+assert.match(canonical, /canonical_sale_has_paid_access/);
+assert.match(canonical, /canonical_sale_qualifies/);
+assert.match(canonical, /course_upgrade' THEN/);
+assert.match(canonical, /access_source = 'purchase'/);
+
+const projection = read(
+  "supabase/migrations/20260925120500_course_upgrade_canonical_sales_projection.sql",
+);
+assert.match(projection, /canonical_sale_has_paid_access\(/);
+assert.match(projection, /canonical_sale_qualifies/);
+assert.doesNotMatch(projection, /SET access_source/);
 
 const createOrder = read(
   "supabase/migrations/20260901120200_create_practice_order_visibility.sql",

@@ -7,7 +7,7 @@ DECLARE
   buyer uuid := 'b1111111-1111-4111-8111-111111111111';
   other uuid := 'c1111111-1111-4111-8111-111111111111';
   course_id uuid := 'd1111111-1111-4111-8111-111111111111';
-  practice_id uuid := 'e1111111-1111-4111-8111-111111111111';
+  plain_practice_id uuid := 'e1111111-1111-4111-8111-111111111111';
   key1 uuid := 'f1111111-1111-4111-8111-111111111111';
   key2 uuid := 'f2222222-2222-4222-8222-222222222222';
   key3 uuid := 'f3333333-3333-4333-8333-333333333333';
@@ -31,7 +31,7 @@ BEGIN
     id, author_id, title, slug, status, price, is_free, currency, publication_class
   ) VALUES
     (course_id, author, 'Course', 'course-upgrade', 'published', 3333, false, 'RUB', 'course'),
-    (practice_id, author, 'Practice', 'plain-practice', 'published', 3333, false, 'RUB', 'practice');
+    (plain_practice_id, author, 'Practice', 'plain-practice', 'published', 3333, false, 'RUB', 'practice');
 
   INSERT INTO public.practice_access_levels (
     practice_id, level, title, upgrade_price, currency
@@ -77,8 +77,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO v_count
-  FROM public.orders
-  WHERE user_id = buyer AND practice_id = course_id AND status = 'pending';
+  FROM public.orders AS o
+  WHERE o.user_id = buyer AND o.practice_id = course_id AND o.status = 'pending';
 
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'C: expected one pending upgrade, got %', v_count;
@@ -95,7 +95,7 @@ BEGIN
   END;
 
   BEGIN
-    PERFORM public.create_course_upgrade_order(practice_id, key3, NULL);
+    PERFORM public.create_course_upgrade_order(plain_practice_id, key3, NULL);
     RAISE EXCEPTION 'E: non-course must fail';
   EXCEPTION
     WHEN OTHERS THEN
@@ -196,6 +196,16 @@ BEGIN
 
   IF v_source IS DISTINCT FROM 'purchase' THEN
     RAISE EXCEPTION 'F: access_source must stay purchase';
+  END IF;
+
+  SELECT order_id, amount_minor, target_access_level
+  INTO v_id2, v_amount, v_target
+  FROM public.create_course_upgrade_order(course_id, key1, NULL);
+
+  IF v_id2 IS DISTINCT FROM v_id
+     OR v_target IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'H: replay of completed/failed L2 key must return original target 2, got % %',
+      v_id2, v_target;
   END IF;
 
   SELECT order_id, amount_minor, target_access_level
