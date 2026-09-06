@@ -41,6 +41,7 @@ export {
   formatAccessLevelOption,
   isConfiguredAccessLevel,
   normalizeRequiredAccessLevel,
+  parseRequiredAccessLevelWrite,
 } from "@/lib/author-products/course-access-levels-shared";
 
 export { MAX_AUDIO_BYTES, PUBLICATION_FILE_MAX_PDF_BYTES };

@@ -30,15 +30,25 @@ import {
   evaluateLessonLevelChange,
   isConfiguredAccessLevel,
   nextAccessLevel,
+  ACCESS_LEVEL_DESCRIPTION_MAX,
+  ACCESS_LEVEL_TITLE_MAX,
+  INVALID_ACCESS_LEVEL_DESCRIPTION_CODE,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+  INVALID_REQUIRED_ACCESS_LEVEL_CODE,
+  parseAccessLevelDescription,
+  parseAccessLevelTitle,
   parseAppendAccessLevelInput,
   parseBootstrapAccessLevelsInput,
+  parseRequiredAccessLevelWrite,
 } from "../src/lib/author-products/course-access-levels-shared.ts";
+import { ACCESS_LEVEL_READINESS_CASES } from "./lib/course-access-levels-readiness-cases.mjs";
 import {
   appendCourseAccessLevel,
   assertLessonRequiredLevelAssignable,
   assertLessonRequiredLevelChangeAllowed,
   createInitialCourseAccessLevels,
   deleteCourseAccessLevel,
+  resolveLessonRequiredAccessLevelInput,
 } from "../src/lib/author-products/course-access-levels.ts";
 import {
   evaluateCoursePublishContentGate,
@@ -162,6 +172,86 @@ if (append.ok) {
 assert.equal(
   parseAppendAccessLevelInput({ title: "Без цены" }).ok,
   false,
+);
+
+assert.equal(parseRequiredAccessLevelWrite(1).ok, true);
+assert.equal(parseRequiredAccessLevelWrite(2).value, 2);
+assert.equal(parseRequiredAccessLevelWrite("3").value, 3);
+assert.equal(parseRequiredAccessLevelWrite(" 12 ").value, 12);
+for (const invalid of [0, -1, 1.5, Number.NaN, "", "abc", "1.5", null, {}, []]) {
+  assert.equal(
+    parseRequiredAccessLevelWrite(invalid).reason,
+    INVALID_REQUIRED_ACCESS_LEVEL_CODE,
+    `write parser must reject ${String(invalid)}`,
+  );
+}
+
+assert.equal(resolveLessonRequiredAccessLevelInput({}, 1), 1);
+assert.equal(resolveLessonRequiredAccessLevelInput({ title: "Урок" }, 1), 1);
+assert.equal(
+  resolveLessonRequiredAccessLevelInput({ requiredAccessLevel: 2 }, 1),
+  2,
+);
+assert.equal(
+  resolveLessonRequiredAccessLevelInput({ required_access_level: "4" }, 1),
+  4,
+);
+assert.throws(
+  () => resolveLessonRequiredAccessLevelInput({ requiredAccessLevel: 0 }, 1),
+  (error) => isBuilderError(error, INVALID_REQUIRED_ACCESS_LEVEL_CODE),
+);
+assert.throws(
+  () => resolveLessonRequiredAccessLevelInput({ requiredAccessLevel: null }, 1),
+  (error) => isBuilderError(error, INVALID_REQUIRED_ACCESS_LEVEL_CODE),
+);
+assert.throws(
+  () =>
+    resolveLessonRequiredAccessLevelInput({ required_access_level: "abc" }, 1),
+  (error) => isBuilderError(error, INVALID_REQUIRED_ACCESS_LEVEL_CODE),
+);
+
+assert.equal(parseAccessLevelTitle("Работа с собой").value, "Работа с собой");
+assert.equal(
+  parseAccessLevelTitle("Как выстраивать контакт!").ok,
+  true,
+);
+assert.equal(
+  parseAccessLevelTitle("").reason,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+);
+assert.equal(
+  parseAccessLevelTitle("   ").reason,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+);
+assert.equal(
+  parseAccessLevelTitle("я".repeat(ACCESS_LEVEL_TITLE_MAX + 1)).reason,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+);
+assert.equal(
+  parseAccessLevelTitle("<b>Работа с собой</b>").reason,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+);
+assert.equal(
+  parseAccessLevelTitle("<script>alert(1)</script>").reason,
+  INVALID_ACCESS_LEVEL_TITLE_CODE,
+);
+assert.equal(parseAccessLevelDescription(null).value, null);
+assert.equal(
+  parseAccessLevelDescription("Как выстраивать контакт.").value,
+  "Как выстраивать контакт.",
+);
+assert.equal(
+  parseAccessLevelDescription("я".repeat(ACCESS_LEVEL_DESCRIPTION_MAX + 1))
+    .reason,
+  INVALID_ACCESS_LEVEL_DESCRIPTION_CODE,
+);
+assert.equal(
+  parseAccessLevelDescription("<b>Описание</b>").reason,
+  INVALID_ACCESS_LEVEL_DESCRIPTION_CODE,
+);
+assert.equal(
+  parseAccessLevelDescription("<script>alert(1)</script>Текст").reason,
+  INVALID_ACCESS_LEVEL_DESCRIPTION_CODE,
 );
 
 assert.equal(
@@ -358,6 +448,72 @@ const dbReady = evaluateDatabaseModerationReady({
   },
 });
 assert.equal(dbReady.ok, true);
+
+for (const testCase of ACCESS_LEVEL_READINESS_CASES) {
+  const levels = testCase.accessLevels;
+  const lessons = testCase.lessonLevels.map((level, index) =>
+    readyLesson(`case-${testCase.id}-${index}`, `Урок ${index + 1}`, level, "Текст"),
+  );
+  const levelReady = evaluateCourseAccessLevelsReadiness({
+    accessLevels: levels,
+    lessons,
+  });
+  const publish = evaluatePublishReadiness(coursePractice(), [], {
+    activeTopicCount: 1,
+    courseContent: {
+      lessonCount: lessons.length,
+      blockCount: lessons.length,
+      lessons,
+      access_levels: levels,
+    },
+  });
+  const dbMirror = evaluateDatabaseModerationReady({
+    practice: coursePractice(),
+    audioItems: [],
+    accessStatus: "approved",
+    activeTopicCount: 1,
+    courseContent: {
+      lessonCount: lessons.length,
+      blockCount: lessons.length,
+      lessons,
+      access_levels: levels,
+    },
+  });
+
+  assert.equal(
+    levelReady.ok,
+    testCase.expected.ok,
+    `TS levels ${testCase.id} ${testCase.label}`,
+  );
+  assert.equal(
+    publish.ok,
+    testCase.expected.ok,
+    `publish ${testCase.id} ${testCase.label}`,
+  );
+  assert.equal(
+    dbMirror.ok,
+    testCase.expected.ok,
+    `db mirror ${testCase.id} ${testCase.label}`,
+  );
+
+  if (!testCase.expected.ok) {
+    assert.equal(
+      levelReady.code,
+      testCase.expected.code,
+      `TS levels code ${testCase.id}`,
+    );
+    assert.equal(
+      publish.firstFailure?.code,
+      testCase.expected.code,
+      `publish code ${testCase.id}`,
+    );
+    assert.equal(
+      dbMirror.firstFailure?.code,
+      testCase.expected.code,
+      `db mirror code ${testCase.id}`,
+    );
+  }
+}
 
 function createCatalogClient(initialRows = []) {
   const rows = [...initialRows];
@@ -666,20 +822,56 @@ assert.match(accessLevelRoute, /updateCourseAccessLevel/);
 assert.match(accessLevelRoute, /deleteCourseAccessLevel/);
 assert.match(lessonRoute, /requiredAccessLevel/);
 assert.match(lessonIdRoute, /requiredAccessLevel/);
+assert.match(lessonRoute, /resolveLessonRequiredAccessLevelInput\(body, 1\)/);
+assert.match(lessonIdRoute, /hasLevel/);
+assert.match(
+  lessonIdRoute,
+  /requiredAccessLevel: hasLevel\s*\?\s*resolveLessonRequiredAccessLevelInput\(record\)\s*:\s*null/,
+);
+assert.match(
+  read("src/lib/author-products/course-access-levels.ts"),
+  /parseRequiredAccessLevelWrite/,
+);
+assert.match(
+  read("src/lib/author-products/course-access-levels.ts"),
+  /"requiredAccessLevel" in record \|\| "required_access_level" in record/,
+);
+assert.doesNotMatch(
+  lessonRoute,
+  /requiredAccessLevel = 1;\s*\}/,
+  "POST must not swallow a present invalid requiredAccessLevel into default 1",
+);
+assert.match(
+  read("src/lib/author-products/course-access-levels-shared.ts"),
+  /sanitizeStoredFormatLabel/,
+);
 
 const migration = read(
+  "supabase/migrations/20260924120000_course_access_levels_moderation_readiness.sql",
+);
+assert.match(
+  migration,
+  /DETAIL = 'missing_access_level_1'/,
+);
+assert.match(migration, /internal-moderation-readiness:v6/);
+assert.doesNotMatch(
+  read("supabase/migrations/20260913120000_minimal_product_moderation_readiness.sql"),
+  /DETAIL = 'missing_access_level_1'/,
+);
+
+const foundationMigration = read(
   "supabase/migrations/20260923120100_course_access_levels_foundation.sql",
 );
 assert.match(
-  migration,
+  foundationMigration,
   /authenticated must not INSERT practice_access_levels/,
 );
 assert.match(
-  migration,
+  foundationMigration,
   /authenticated must not UPDATE practice_access_levels/,
 );
 assert.doesNotMatch(
-  migration,
+  foundationMigration,
   /CREATE POLICY[\s\S]*practice_access_levels[\s\S]*INSERT/,
 );
 assert.doesNotMatch(accessRoute, /createPolicy|ENABLE ROW LEVEL SECURITY/);

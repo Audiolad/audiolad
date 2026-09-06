@@ -222,6 +222,8 @@ No mass INSERT of Level 1 catalog rows. No finance / checkout changes.
 
 #### Course access levels author editor (Phase 3)
 
+SQL readiness for a non-empty catalog is additive in
+`20260924120000_course_access_levels_moderation_readiness.sql` (v6).
 No new tables. Author catalog writes stay on `practice_access_levels` via
 `/api/author/products/[id]/course/access-levels` after
 `requireCourseBuilderReadAccess` / `requireCourseBuilderMutationAccess`.
@@ -232,7 +234,10 @@ PATCH/POST. Raising a lesson level after `getPracticeSaleLock` is
 forbidden; lowering is allowed. Deleting a level is only the highest
 non-L1 row, and only when no lessons and no `user_practices.access_level >= level`.
 `practices.price` is not written by this editor. Checkout / order_kind
-are out of scope.
+are out of scope. SQL `assert_practice_moderation_ready` now uses the same
+access-level DETAIL codes as TS when catalog rows exist; empty catalog stays
+legacy. Author lesson POST/PATCH parse `requiredAccessLevel` strictly when
+the field is present. Level title/description reject HTML markup.
 
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
@@ -261,7 +266,7 @@ Eligibility только в приложении через `isProductGalleryEli
 
 Для отправки обычного аудиопродукта на модерацию `assert_practice_moderation_ready` требует только непустое название и хотя бы один `audio_item` с загруженным файлом и определённой длительностью. Описание продукта и треков, обложка, формат, темы, SEO, цена и рекомендации не участвуют в readiness. Для `audio_post` сохраняется ограничение ровно на один `audio_item` на уровне readiness / UX (не CHECK на число треков). Миграция: `20260913120000_minimal_product_moderation_readiness.sql`.
 
-Для `publication_class='course'` `assert_practice_moderation_ready` не требует плоских `audio_items`. Готовность курса — семантическая: ≥1 `course_lessons` и у каждого урока ≥1 валидный блок (`text` с непустым `payload.text`, `audio` с загруженным `audio_items`, либо `file` с `publication_files`). Остаточные плоские треки курс не валят. `published_at` не освобождает от этой проверки: TS-gate и SQL совпадают на первом publish и на republish / start-editing. Миграция: `20260913120000_minimal_product_moderation_readiness.sql`.
+Для `publication_class='course'` `assert_practice_moderation_ready` не требует плоских `audio_items`. Готовность курса — семантическая: ≥1 `course_lessons` и у каждого урока ≥1 валидный блок (`text` с непустым `payload.text`, `audio` с загруженным `audio_items`, либо `file` с `publication_files`). Остаточные плоские треки курс не валят. `published_at` не освобождает от этой проверки: TS-gate и SQL совпадают на первом publish и на republish / start-editing. Если в `practice_access_levels` нет строк, каталог уровней не проверяется (legacy, в том числе «25 готовых решений…»). Если строки есть, те же коды, что и в TS: `missing_access_level_1`, `access_levels_not_contiguous`, `invalid_level_1_upgrade_price`, `invalid_paid_upgrade_price`, `lesson_level_not_in_catalog`, `paid_level_missing_lessons`. Миграция функции: `20260924120000_course_access_levels_moderation_readiness.sql` (v6; предыдущая v5: `20260913120000_minimal_product_moderation_readiness.sql`).
 
 #### promo_* — универсальная внутренняя рекомендация (2026-08-05)
 

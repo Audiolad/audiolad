@@ -245,6 +245,8 @@ Timeweb Cloud
   INSERT/UPDATE/DELETE на `practice_access_levels` не добавляется.
   Checkout, Tochka, `orders.order_kind` / `target_access_level` и
   реальный продукт «Код женской притягательности» в этом этапе нет.
+  SQL `assert_practice_moderation_ready` (v6) повторяет TS-коды готовности
+  уровней, только если в каталоге есть строки; пустой каталог — legacy.
 
 ## MAX Mini App (этапы 1–3B)
 

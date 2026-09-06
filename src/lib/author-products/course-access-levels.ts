@@ -10,10 +10,11 @@ import {
   evaluateAccessLevelDelete,
   evaluateLessonLevelChange,
   isConfiguredAccessLevel,
+  INVALID_REQUIRED_ACCESS_LEVEL_MESSAGE,
   LESSON_LEVEL_NOT_CONFIGURED_CODE,
   LESSON_LEVEL_NOT_CONFIGURED_MESSAGE,
   nextAccessLevel,
-  normalizeRequiredAccessLevel,
+  parseRequiredAccessLevelWrite,
   type AccessLevelWriteInput,
   type CourseBuilderAccessLevelDto,
 } from "@/lib/author-products/course-access-levels-shared";
@@ -269,14 +270,26 @@ export function resolveLessonRequiredAccessLevelInput(
   }
 
   const record = body as Record<string, unknown>;
-  const raw =
-    "requiredAccessLevel" in record
-      ? record.requiredAccessLevel
-      : record.required_access_level;
+  const present =
+    "requiredAccessLevel" in record || "required_access_level" in record;
 
-  if (raw == null) {
+  if (!present) {
     return fallback;
   }
 
-  return normalizeRequiredAccessLevel(raw);
+  const parsed = parseRequiredAccessLevelWrite(
+    "requiredAccessLevel" in record
+      ? record.requiredAccessLevel
+      : record.required_access_level,
+  );
+
+  if (!parsed.ok) {
+    throw new CourseBuilderError(
+      parsed.reason,
+      400,
+      INVALID_REQUIRED_ACCESS_LEVEL_MESSAGE,
+    );
+  }
+
+  return parsed.value;
 }

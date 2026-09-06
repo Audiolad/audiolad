@@ -21,6 +21,7 @@ import {
   isCourseBuilderError,
   nextCoursePosition,
   normalizeRequiredAccessLevel,
+  parseRequiredAccessLevelWrite,
   validateCourseCompletionCtaInput,
   type CourseBuilderAudioAsset,
   type CourseBuilderBlockDto,
@@ -402,7 +403,16 @@ export async function createCourseLesson(
     throw new CourseBuilderError("missing_title", 400);
   }
 
-  const required = normalizeRequiredAccessLevel(requiredAccessLevel);
+  const parsedLevel =
+    requiredAccessLevel == null
+      ? { ok: true as const, value: 1 }
+      : parseRequiredAccessLevelWrite(requiredAccessLevel);
+
+  if (!parsedLevel.ok) {
+    throw new CourseBuilderError(parsedLevel.reason, 400);
+  }
+
+  const required = parsedLevel.value;
   await assertLessonRequiredLevelAssignable({
     accessLevels: snapshot.access_levels,
     requiredAccessLevel: required,
@@ -464,7 +474,11 @@ export async function updateCourseLesson(
   }
 
   if (input.requiredAccessLevel != null) {
-    const nextLevel = normalizeRequiredAccessLevel(input.requiredAccessLevel);
+    const parsedLevel = parseRequiredAccessLevelWrite(input.requiredAccessLevel);
+    if (!parsedLevel.ok) {
+      throw new CourseBuilderError(parsedLevel.reason, 400);
+    }
+    const nextLevel = parsedLevel.value;
     await assertLessonRequiredLevelAssignable({
       accessLevels: snapshot.access_levels,
       requiredAccessLevel: nextLevel,

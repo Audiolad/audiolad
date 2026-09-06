@@ -4,6 +4,8 @@
  * Author writes must keep contiguous 1..N with L1 present.
  */
 
+import { sanitizeStoredFormatLabel } from "@/lib/author-products/format";
+
 export const ACCESS_LEVEL_TITLE_MAX = 100;
 export const ACCESS_LEVEL_DESCRIPTION_MAX = 1000;
 
@@ -76,6 +78,10 @@ export const INVALID_ACCESS_LEVEL_DESCRIPTION_CODE =
   "invalid_access_level_description";
 export const INVALID_ACCESS_LEVEL_DESCRIPTION_MESSAGE =
   "Описание уровня должно быть обычным текстом до 1000 символов.";
+export const INVALID_REQUIRED_ACCESS_LEVEL_CODE =
+  "invalid_required_access_level";
+export const INVALID_REQUIRED_ACCESS_LEVEL_MESSAGE =
+  "Укажите уровень доступа целым числом от 1.";
 export const INVALID_UPGRADE_PRICE_CODE = "invalid_upgrade_price";
 export const INVALID_UPGRADE_PRICE_MESSAGE =
   "Укажите доплату целым числом больше 0 ₽.";
@@ -136,6 +142,42 @@ export function normalizeRequiredAccessLevel(value: unknown): number {
   }
 
   return 1;
+}
+
+/**
+ * Strict author-write parser. Absent values are handled by the caller.
+ * Present invalid values must not fall back to 1.
+ */
+export function parseRequiredAccessLevelWrite(
+  value: unknown,
+):
+  | { ok: true; value: number }
+  | { ok: false; reason: typeof INVALID_REQUIRED_ACCESS_LEVEL_CODE } {
+  if (typeof value === "number") {
+    if (Number.isInteger(value) && value >= 1) {
+      return { ok: true, value };
+    }
+
+    return { ok: false, reason: INVALID_REQUIRED_ACCESS_LEVEL_CODE };
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || !/^[0-9]+$/.test(trimmed)) {
+      return { ok: false, reason: INVALID_REQUIRED_ACCESS_LEVEL_CODE };
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isInteger(parsed) && parsed >= 1) {
+      return { ok: true, value: parsed };
+    }
+  }
+
+  return { ok: false, reason: INVALID_REQUIRED_ACCESS_LEVEL_CODE };
+}
+
+function isPlainAccessLevelText(value: string): boolean {
+  return sanitizeStoredFormatLabel(value) === value.replace(/\s+/g, " ").trim();
 }
 
 export function readRequiredAccessLevelField(
@@ -212,6 +254,10 @@ export function parseAccessLevelTitle(
     return { ok: false, reason: INVALID_ACCESS_LEVEL_TITLE_CODE };
   }
 
+  if (!isPlainAccessLevelText(trimmed)) {
+    return { ok: false, reason: INVALID_ACCESS_LEVEL_TITLE_CODE };
+  }
+
   return { ok: true, value: trimmed };
 }
 
@@ -231,6 +277,10 @@ export function parseAccessLevelDescription(
   const trimmed = value.trim();
 
   if (trimmed.length > ACCESS_LEVEL_DESCRIPTION_MAX) {
+    return { ok: false, reason: INVALID_ACCESS_LEVEL_DESCRIPTION_CODE };
+  }
+
+  if (trimmed && !isPlainAccessLevelText(trimmed)) {
     return { ok: false, reason: INVALID_ACCESS_LEVEL_DESCRIPTION_CODE };
   }
 
@@ -587,6 +637,8 @@ export function getCourseAccessLevelErrorMessage(code: string | undefined): stri
       return INVALID_ACCESS_LEVEL_TITLE_MESSAGE;
     case INVALID_ACCESS_LEVEL_DESCRIPTION_CODE:
       return INVALID_ACCESS_LEVEL_DESCRIPTION_MESSAGE;
+    case INVALID_REQUIRED_ACCESS_LEVEL_CODE:
+      return INVALID_REQUIRED_ACCESS_LEVEL_MESSAGE;
     case INVALID_UPGRADE_PRICE_CODE:
       return INVALID_UPGRADE_PRICE_MESSAGE;
     case LEVEL_1_UPGRADE_MUST_BE_NULL_CODE:

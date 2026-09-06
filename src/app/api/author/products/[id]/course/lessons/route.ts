@@ -31,18 +31,22 @@ export async function POST(request: Request, context: RouteContext) {
     const { supabase } = await requireCourseBuilderMutationAccess(id);
 
     let title: string | null = null;
-    let requiredAccessLevel: number | null = null;
+    let body: unknown = {};
 
     try {
-      const body = (await request.json()) as Record<string, unknown>;
-      if (typeof body?.title === "string") {
-        title = body.title;
-      }
-      requiredAccessLevel = resolveLessonRequiredAccessLevelInput(body, 1);
+      body = await request.json();
     } catch {
-      title = null;
-      requiredAccessLevel = 1;
+      body = {};
     }
+
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const record = body as Record<string, unknown>;
+      if (typeof record.title === "string") {
+        title = record.title;
+      }
+    }
+
+    const requiredAccessLevel = resolveLessonRequiredAccessLevelInput(body, 1);
 
     const lesson = await createCourseLesson(
       supabase,
