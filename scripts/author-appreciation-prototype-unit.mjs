@@ -159,6 +159,11 @@ assert.ok(
 const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
 assert.equal(
   (audioPost.match(/<AuthorAppreciationPrototype/g) ?? []).length,
+  1,
+  "audio post appreciation is defined once in the shared after-hero stack",
+);
+assert.equal(
+  (audioPost.match(/<AudioPostTrailingSections/g) ?? []).length,
   2,
   "audio post needs mobile and desktop placements",
 );

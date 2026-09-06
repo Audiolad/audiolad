@@ -185,6 +185,15 @@ const audioPostPage = read("src/components/products/audio-post/AudioPostPage.tsx
 assert.match(audioPostPage, /featured-card/);
 assert.match(audioPostPage, /NextStepRecommendation/);
 assert.match(audioPostPage, /productTypeLabel \?\? AUDIO_POST_KIND_LABEL/);
+assert.match(
+  audioPostPage,
+  /min-w-0 \$\{platformBottomContentPaddingClass\}/,
+);
+assert.match(
+  audioPostPage,
+  /pt-6 xl:box-border xl:min-w-0 xl:max-w-full xl:px-6 xl:pt-3/,
+);
+assert.doesNotMatch(audioPostPage, /max-w-3xl/);
 assert.doesNotMatch(audioPostPage, /\/listen\//);
 
 const authorPage = read("src/lib/authors/public-page.ts");
