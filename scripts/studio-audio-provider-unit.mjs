@@ -17,7 +17,10 @@ import {
   STUDIO_MUSIC_VOLUME_MAX_DB,
   STUDIO_MUSIC_VOLUME_MIN_DB,
 } from "../src/lib/studio/audio-engine-math.ts";
-import { validateStudioLocalFile } from "../src/lib/studio/local-file-validation.ts";
+import {
+  validateStudioLocalDuration,
+  validateStudioLocalFile,
+} from "../src/lib/studio/local-file-validation.ts";
 import {
   parseStudioVoicePreset,
   STUDIO_VOICE_PRESET_CONFIG,
@@ -195,10 +198,21 @@ function testLocalFileValidation() {
     validateStudioLocalFile({
       name: "large.mp3",
       type: "audio/mpeg",
-      size: 201 * 1024 * 1024,
+      size: 314572800 + 1,
     }),
-    /200 МБ/i,
+    /300 МБ/i,
   );
+  assert.equal(
+    validateStudioLocalFile({
+      name: "almost-limit.mp3",
+      type: "audio/mpeg",
+      size: 314572800,
+    }),
+    null,
+  );
+  assert.equal(validateStudioLocalDuration(10800), null);
+  assert.match(validateStudioLocalDuration(10800.01), /3 часа/);
+  assert.match(validateStudioLocalDuration(0), /длительность/i);
 }
 
 function testProviderEngineLifecycle() {
@@ -230,7 +244,7 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /studioTrackHasOverlappingClips/);
   assert.match(provider, /appendStudioClipsIfNoOverlap/);
   assert.match(provider, /MAX_LOCAL_TRACKS = 5/);
-  assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = 750 \* 1024 \* 1024/);
+  assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = MAX_STUDIO_PROJECT_BYTES/);
   assert.match(provider, /context\.createGain\(\)/);
   assert.match(provider, /findActiveStudioClip\(track\.clips, position\)/);
   assert.match(provider, /clip\.startTime/);
@@ -243,7 +257,9 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /getStudioClipLayout/);
   assert.match(provider, /getStudioTrackGain/);
   assert.match(provider, /startSourcesAtPosition\(nextPosition\)/);
-  assert.match(fileValidation, /MAX_LOCAL_FILE_SIZE_BYTES = 200 \* 1024 \* 1024/);
+  assert.match(fileValidation, /MAX_LOCAL_FILE_SIZE_BYTES = MAX_STUDIO_ASSET_BYTES/);
+  assert.match(fileValidation, /STUDIO_AUDIO_TOO_LONG_MESSAGE/);
+  assert.match(fileValidation, /validateStudioLocalDuration/);
   assert.match(fileValidation, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /local-file-validation/);
   assert.match(provider, /export \{ validateStudioLocalFile \}/);

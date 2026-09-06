@@ -42,8 +42,10 @@ import {
   getStudioFadeEnvelope,
   type StudioClipFades,
 } from "@/lib/studio/fade-math";
+import { MAX_STUDIO_PROJECT_BYTES } from "@/lib/studio/limits";
 import {
   MAX_LOCAL_FILE_SIZE_BYTES,
+  validateStudioLocalDuration,
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
 import { validateStudioRecordedFile } from "@/lib/studio/recorder";
@@ -81,7 +83,7 @@ import {
 import type { StudioTrackPlaybackSource } from "@/components/studio/StudioTimeline";
 
 const MAX_LOCAL_TRACKS = 5;
-const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
+const MAX_LOCAL_PROJECT_SIZE_BYTES = MAX_STUDIO_PROJECT_BYTES;
 
 const STUDIO_FX_CROSSFADE_SECONDS = 0.04;
 const STUDIO_FX_CLEANUP_GRACE_MS = 80;
@@ -1186,6 +1188,11 @@ export function StudioAudioProvider({
             revokeStudioObjectUrl(local.playbackUrl);
             throw new Error(`Некорректная длительность файла «${file.name}».`);
           }
+          const durationError = validateStudioLocalDuration(local.duration);
+          if (durationError) {
+            revokeStudioObjectUrl(local.playbackUrl);
+            throw new Error(durationError);
+          }
           preparedTracks.push({
             file,
             asset: {
@@ -1317,6 +1324,11 @@ export function StudioAudioProvider({
           revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid recorded audio duration");
         }
+        const durationError = validateStudioLocalDuration(local.duration);
+        if (durationError) {
+          revokeStudioObjectUrl(local.playbackUrl);
+          throw new Error(durationError);
+        }
         const asset: TrackAsset = {
           file,
           playbackUrl: local.playbackUrl,
@@ -1437,6 +1449,11 @@ export function StudioAudioProvider({
         if (!Number.isFinite(local.duration) || local.duration <= 0) {
           revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid audio duration");
+        }
+        const durationError = validateStudioLocalDuration(local.duration);
+        if (durationError) {
+          revokeStudioObjectUrl(local.playbackUrl);
+          throw new Error(durationError);
         }
 
         if (replacementGenerationRef.current.get(trackId) !== generation) {

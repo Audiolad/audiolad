@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { cleanupStaleStudioUploads } from "./direct-upload";
 import { STUDIO_ASSETS_BUCKET } from "./model";
 import { STUDIO_RENDER_BUCKET } from "./render-jobs";
 import { planGuestSessionCleanup } from "../guest-policy";
@@ -17,6 +18,7 @@ export type GuestCleanupResult = {
 export async function cleanupExpiredGuestSessions(
   now = new Date(),
 ): Promise<GuestCleanupResult> {
+  await cleanupStaleStudioUploads();
   const service = createServiceRoleClient();
   const { data: sessions, error: sessionError } = await service
     .from("studio_guest_sessions")

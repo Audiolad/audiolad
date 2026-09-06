@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 
-import {
-  cleanupStudioAssetReservation,
-  listStudioAssets,
-  reserveStudioAssetUpload,
-  uploadReservedStudioAsset,
-} from "@/lib/studio/server/repository";
+import { reserveStudioDirectUpload } from "@/lib/studio/server/direct-upload";
+import { listStudioAssets } from "@/lib/studio/server/repository";
 import { toStudioAssetDto } from "@/lib/studio/server/model";
 import {
   parseUuid,
   parseStudioSourceType,
   StudioApiError,
-  validateStudioUpload,
+  validateStudioUploadMeta,
 } from "@/lib/studio/server/validation";
 import { studioRouteError } from "@/lib/studio/server/route-errors";
-import { probeStudioAudioDuration } from "@/lib/studio/server/audio-duration";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -34,7 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const projectId = parseUuid((await context.params).projectId, "not_found");
     const assets = await listStudioAssets(projectId);
-    return noStoreJson({ assets: assets.map(toStudioAssetDto) });
+    return noStoreJson({ assets: assets.map((asset) => toStudioAssetDto(asset)) });
   } catch (error) {
     return await handleError(error);
   }
@@ -42,38 +37,29 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      throw new StudioApiError("invalid_file", 422);
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("multipart/form-data")) {
+      throw new StudioApiError("invalid_upload", 422);
     }
-
+    const body = await request.json();
     const projectId = parseUuid((await context.params).projectId, "not_found");
-    const upload = validateStudioUpload(file);
-    const durationSeconds = await probeStudioAudioDuration(file, upload.mimeType);
-    if (durationSeconds === null) {
-      throw new StudioApiError("invalid_audio_duration", 422);
-    }
-    const reserved = await reserveStudioAssetUpload({
+    const upload = validateStudioUploadMeta({
+      name: body?.originalName ?? body?.filename ?? body?.name,
+      type: body?.mimeType ?? body?.type,
+      size: body?.sizeBytes ?? body?.byteSize ?? body?.size,
+    });
+    const reserved = await reserveStudioDirectUpload({
       projectId,
       ...upload,
-      sourceType: parseStudioSourceType(formData.get("sourceType")),
-      durationSeconds,
+      sourceType: parseStudioSourceType(body?.sourceType),
     });
-
-    try {
-      await uploadReservedStudioAsset(
-        reserved.asset,
-        reserved.ownerId,
-        file,
-        reserved.ownerKind,
-      );
-    } catch (error) {
-      await cleanupStudioAssetReservation(reserved.asset);
-      throw error;
-    }
-
-    return noStoreJson({ asset: toStudioAssetDto(reserved.asset) }, { status: 201 });
+    return noStoreJson(
+      {
+        asset: toStudioAssetDto(reserved.asset),
+        signedUpload: reserved.signedUpload,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     return await handleError(error);
   }

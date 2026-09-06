@@ -20,6 +20,7 @@ import { getGuestSession } from "./guest-session";
 import {
   EMPTY_STUDIO_PROJECT_DATA,
   STUDIO_ASSETS_BUCKET,
+  type StudioAssetUploadState,
   type StudioProjectAssetRow,
   type StudioProjectDataV2,
   type StudioProjectListItem,
@@ -27,7 +28,6 @@ import {
 } from "./model";
 import {
   buildStudioAssetPath,
-  isStudioStoragePath,
   parseStudioProjectData,
   StudioApiError,
 } from "./validation";
@@ -36,7 +36,7 @@ const PROJECT_SELECT =
   "id, author_id, guest_session_id, name, project_data, schema_version, revision, status, created_at, updated_at, last_opened_at, deleted_at";
 const PROJECT_LIST_SELECT = "id, name, updated_at, last_opened_at, revision";
 const ASSET_SELECT =
-  "id, project_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, created_at, deleted_at";
+  "id, project_id, source_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, upload_state, pending_source_id, pending_storage_path, pending_size_bytes, pending_original_name, pending_mime_type, created_at, deleted_at";
 
 export type StudioProjectAccess = {
   ownerKind: "author" | "guest";
@@ -315,6 +315,7 @@ export async function validateStudioProjectAssetReferences(
     .select("id")
     .eq("project_id", projectId)
     .is("deleted_at", null)
+    .eq("upload_state", "ready")
     .in("id", ids);
   if (error) {
     mapServiceError(error);
@@ -391,6 +392,7 @@ export async function listStudioAssets(projectId: string) {
     .select(ASSET_SELECT)
     .eq("project_id", projectId)
     .is("deleted_at", null)
+    .eq("upload_state", "ready")
     .order("created_at", { ascending: false });
   if (error) {
     mapServiceError(error);
@@ -398,13 +400,14 @@ export async function listStudioAssets(projectId: string) {
   return (data ?? []) as StudioProjectAssetRow[];
 }
 
+/** replaceStudioProjectAsset uses signed reserve/finalize in direct-upload.ts */
+
 export async function reserveStudioAssetUpload(input: {
   projectId: string;
   filename: string;
   mimeType: string;
   byteSize: number;
   sourceType: "upload" | "recording";
-  durationSeconds: number | null;
 }) {
   const { ownerId, ownerKind, service } = await requireStudioProjectAccess(input.projectId);
   const assetId = randomUUID();
@@ -429,7 +432,7 @@ export async function reserveStudioAssetUpload(input: {
     p_mime_type: input.mimeType,
     p_size_bytes: input.byteSize,
     p_source_type: input.sourceType,
-    p_duration_seconds: input.durationSeconds,
+    p_duration_seconds: null,
   });
   if (error) {
     mapServiceError(error);
@@ -439,100 +442,6 @@ export async function reserveStudioAssetUpload(input: {
 
 export async function cleanupStudioAssetReservation(asset: StudioProjectAssetRow) {
   await deleteStudioProjectAsset(asset.project_id, asset.id);
-}
-
-export async function uploadReservedStudioAsset(
-  asset: StudioProjectAssetRow,
-  ownerId: string,
-  file: File,
-  ownerKind: "author" | "guest" = "author",
-) {
-  if (
-    !isStudioStoragePath(
-      asset.storage_path,
-      ownerId,
-      asset.project_id,
-      asset.id,
-      ownerKind,
-    )
-  ) {
-    throw new StudioApiError("invalid_asset", 500);
-  }
-  const service = createServiceRoleClient();
-  const { error } = await service.storage
-    .from(STUDIO_ASSETS_BUCKET)
-    .upload(asset.storage_path, Buffer.from(await file.arrayBuffer()), {
-      contentType: asset.mime_type,
-      upsert: false,
-    });
-  if (error) {
-    console.error("studio_asset_upload_error", error.message);
-    throw new StudioApiError("storage_upload_failed", 502);
-  }
-}
-
-export async function replaceStudioProjectAsset(input: {
-  projectId: string;
-  assetId: string;
-  file: File;
-  filename: string;
-  mimeType: string;
-  byteSize: number;
-  durationSeconds: number | null;
-}) {
-  const { asset, service, ownerId, ownerKind } = await getStudioProjectAsset(
-    input.projectId,
-    input.assetId,
-  );
-  await recordAuthorSupportAudit({
-    action: "studio_asset_replaced",
-    resourceType: "studio_project_asset",
-    resourceId: input.assetId,
-    metadata: { project_id: input.projectId },
-  });
-
-  const sourceId = randomUUID();
-  const storagePath = buildStudioAssetPath(
-    ownerId,
-    input.projectId,
-    sourceId,
-    input.filename,
-    ownerKind,
-  );
-  const { error: uploadError } = await service.storage
-    .from(STUDIO_ASSETS_BUCKET)
-    .upload(storagePath, Buffer.from(await input.file.arrayBuffer()), {
-      contentType: input.mimeType,
-      upsert: false,
-    });
-  if (uploadError) {
-    console.error("studio_asset_replace_error", uploadError.message);
-    throw new StudioApiError("storage_upload_failed", 502);
-  }
-
-  const { data: released, error } = await service.rpc("replace_studio_project_asset", {
-    p_project_id: input.projectId,
-    p_asset_id: input.assetId,
-    p_source_id: sourceId,
-    p_storage_path: storagePath,
-    p_original_name: input.filename,
-    p_mime_type: input.mimeType,
-    p_size_bytes: input.byteSize,
-    p_duration_seconds: input.durationSeconds,
-  });
-  if (error) {
-    await removeStudioStoragePaths([storagePath]);
-    mapServiceError(error);
-  }
-  await removeStudioStoragePaths((released ?? []).map((row: { storage_path: string }) => row.storage_path));
-  return {
-    ...asset,
-    storage_path: storagePath,
-    original_name: input.filename,
-    mime_type: input.mimeType,
-    size_bytes: input.byteSize,
-    duration_seconds: input.durationSeconds,
-  };
 }
 
 export async function deleteStudioProjectAsset(projectId: string, assetId: string) {
@@ -555,6 +464,7 @@ export async function deleteStudioProjectAsset(projectId: string, assetId: strin
 export async function getStudioProjectAsset(
   projectId: string,
   assetId: string,
+  options: { allowedStates?: readonly StudioAssetUploadState[] } = {},
 ) {
   const { service } = await requireStudioProjectAccess(projectId);
   const { data, error } = await service
@@ -571,6 +481,11 @@ export async function getStudioProjectAsset(
     throw new StudioApiError("not_found", 404);
   }
   const asset = data as StudioProjectAssetRow;
+  const state = asset.upload_state ?? "ready";
+  const allowed = options.allowedStates ?? ["ready"];
+  if (!allowed.includes(state)) {
+    throw new StudioApiError("not_found", 404);
+  }
   const access = await requireStudioProjectAccess(projectId);
   return { asset, service, ownerId: access.ownerId, ownerKind: access.ownerKind };
 }

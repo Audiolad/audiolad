@@ -252,7 +252,7 @@ assert.throws(
   () => validateStudioUpload({
     name: "voice.mp3",
     type: "audio/mpeg",
-    size: 200 * 1024 * 1024 + 1,
+    size: 314572800 + 1,
   } as File),
   (error: unknown) =>
     error instanceof StudioApiError &&
@@ -306,6 +306,22 @@ assert.match(repository, /soft_delete_studio_project/);
 assert.match(repository, /release_studio_project_asset/);
 assert.doesNotMatch(repository, /last_opened_at: lastOpenedAt/);
 assert.doesNotMatch(repository, /createSignedUrl|normalizeStorageSignedUrl/);
+assert.doesNotMatch(repository, /file\.arrayBuffer\(/);
+
+const longformMigration = await readFile(
+  new URL(
+    "../supabase/migrations/20260928120000_studio_longform_asset_limits.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+assert.match(longformMigration, /314572800/);
+assert.match(longformMigration, /10800/);
+assert.match(longformMigration, /upload_state/);
+assert.match(longformMigration, /studio_finalize_project_asset/);
+assert.match(longformMigration, /studio_cleanup_stale_asset_uploads/);
+assert.match(longformMigration, /WHERE id = 'studio-draft-assets'/);
+assert.doesNotMatch(longformMigration, /practice-audio|publication-files|audiobook-fragments/);
 
 const projectsRoute = await readFile(
   new URL("../src/app/api/studio/projects/route.ts", import.meta.url),
@@ -338,11 +354,22 @@ for (const route of [
   "../src/app/api/studio/projects/[projectId]/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/finalize/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/retry/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/replace/finalize/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/playback/route.ts",
 ]) {
   const source = await readFile(new URL(route, import.meta.url), "utf8");
   assert.match(source, /studioRouteError/);
 }
+
+const assetsRoute = await readFile(
+  new URL("../src/app/api/studio/projects/[projectId]/assets/route.ts", import.meta.url),
+  "utf8",
+);
+assert.match(assetsRoute, /reserveStudioDirectUpload/);
+assert.match(assetsRoute, /validateStudioUploadMeta/);
+assert.doesNotMatch(assetsRoute, /formData|probeStudioAudioDuration|arrayBuffer/);
 
 const playbackRoute = await readFile(
   new URL(

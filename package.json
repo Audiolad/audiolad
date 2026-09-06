@@ -36,6 +36,7 @@
     "test:studio-music-persist-mime": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-music-persist-mime-unit.mts",
     "test:studio-persistence-serialization": "npx tsx scripts/studio-persistence-serialization-unit.mts",
     "test:studio-asset-persistence": "npx tsx scripts/studio-asset-persistence-unit.mts",
+    "test:studio-longform-upload": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-longform-upload-unit.mts",
     "test:studio-project-hydration": "npx tsx scripts/studio-project-hydration-unit.mts",
     "test:studio-media-element-playback": "npx tsx scripts/studio-media-element-playback-unit.mts",
     "test:studio-project-integrity-audit": "npx tsx scripts/studio-project-integrity-audit-unit.mts",

@@ -191,6 +191,54 @@ upload → finalize путь с `source_type='recording'`. Для уже зар�
 загружает только если объект отсутствует. Локальные черновики не являются
 данными БД: отдельных таблиц и миграций для них нет.
 
+### Studio draft projects (long-form user audio)
+
+Миграция `20260928120000_studio_longform_asset_limits.sql` поднимает **только**
+bucket `studio-draft-assets` до `file_size_limit = 314572800` (300 MiB) и
+лимиты строк `studio_project_assets` / `studio_asset_sources`. Другие bucket
+(practice-audio, publication-files, user-avatars, audiobook-fragments) не
+меняются. Аудиокнижный лимит фрагмента 200 MiB остаётся.
+
+Канонические константы приложения (`src/lib/studio/limits.ts`):
+
+| Лимит | Значение |
+|-------|----------|
+| `MAX_STUDIO_AUDIO_DURATION_SECONDS` | 10800 (3 часа) |
+| `MAX_STUDIO_ASSET_BYTES` | 314572800 (300 MiB) |
+| `MAX_STUDIO_PROJECT_BYTES` | 786432000 (750 MiB) — без изменения |
+
+`upload_state` на `studio_project_assets`: `reserved` → `uploading` →
+`processing` → `ready` | `failed`. Существующие строки backfill в `ready`.
+Квота проекта считает `reserved` + `uploading` + `processing` + `ready`;
+`failed` не занимает квоту. Playback, download, list и ссылки в
+`project_data` принимают только `ready`.
+
+Загрузка: JSON reserve (метаданные) → браузерный signed PUT напрямую на
+Storage host (`NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/upload/sign/...`) →
+finalize. Тело файла не проходит через Next.js. Клиентская длительность
+(HTMLAudioElement `preload=metadata`) — только preflight; authority на
+finalize — `ffprobe` по объекту в Storage. Сверх 300 MiB, 10800 с или
+невалидное аудио отклоняется, объект удаляется, reservation снимается.
+Orphan cleanup: `studio_cleanup_stale_asset_uploads` (2 часа), вызывается
+лениво из reserve и guest cleanup.
+
+Peaks V1 (опционально после finalize): `peaks_version=1`,
+`peaks_columns = min(32768, max(8192, ceil(duration_seconds * 10)))`,
+interleaved int16 min/max, не больше ~128 KiB. Timeline/playback не зависят
+от peaks; fallback waveform остаётся.
+
+**Ручная приёмка после merge/deploy (не в этом PR):**
+
+- A: реальный файл 70–90 мин — reserve → PUT → finalize → play/save/export
+- B: синтетический ~3 ч — accept
+- C: >3 ч — reject с текстом «Максимальная продолжительность одной аудиодорожки — 3 часа.»
+- D: >300 MiB — reject с текстом про 300 МБ
+- E: сумма дорожек проекта >750 MiB — reject
+
+Production DB mutation этой миграции — только после отдельного merge/deploy
+gate. Старые объекты `studio-draft-assets` продолжают открываться через
+signed Range playback без повторной загрузки.
+
 **Доступ:** наличие строки урока / блока / файла / CTA **никогда** не даёт
 чтение. Learner SELECT policy нет. RLS: ENABLE, REVOKE PUBLIC/anon, нет
 public SELECT, author members (`owner`/`editor`) CRUD, `service_role` ALL.

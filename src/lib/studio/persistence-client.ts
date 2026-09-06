@@ -1,5 +1,7 @@
 "use client";
 
+import { STUDIO_ASSETS_BUCKET } from "@/lib/studio/limits";
+
 export type StudioAssetSourceType = "upload" | "recording";
 
 export type StudioUploadedAsset = {
@@ -15,6 +17,9 @@ export type StudioUploadedAsset = {
 
 export type StudioPersistenceClientErrorCode =
   | "asset_too_large"
+  | "audio_too_long"
+  | "project_asset_quota_exceeded"
+  | "upload_not_complete"
   | "invalid_upload"
   | "invalid_audio_duration"
   | "unauthenticated"
@@ -34,7 +39,10 @@ export type StudioPersistenceClientErrorCode =
   | "network_error";
 
 const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
-  asset_too_large: "Файл слишком большой для сохранения в проекте.",
+  asset_too_large: "Размер одной дорожки превышает лимит Studio — 300 МБ.",
+  audio_too_long: "Максимальная продолжительность одной аудиодорожки — 3 часа.",
+  project_asset_quota_exceeded: "Общий размер дорожек не может превышать 750 МБ.",
+  upload_not_complete: "Загрузка аудио не завершена. Повторите попытку.",
   invalid_upload: "Не удалось сохранить этот аудиофайл.",
   invalid_audio_duration: "Не удалось определить длительность аудиофайла. Выберите другой файл.",
   unauthenticated: "Войдите в аккаунт, чтобы сохранить аудио.",
@@ -312,6 +320,9 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
           serverCode === "no_active_tracks" ||
           serverCode === "invalid_project_asset" ||
           serverCode === "invalid_audio_duration" ||
+          serverCode === "audio_too_long" ||
+          serverCode === "project_asset_quota_exceeded" ||
+          serverCode === "upload_not_complete" ||
           serverCode === "guest_project_limit" ||
           serverCode === "guest_render_entitlement" ||
           serverCode === "rate_limited"
@@ -509,30 +520,20 @@ function isUploadedAsset(value: unknown): value is StudioUploadedAsset {
   );
 }
 
-export async function uploadStudioProjectAsset({
-  projectId,
-  file,
-  sourceType,
-  signal,
-}: {
-  projectId: string;
-  file: File;
-  sourceType: StudioAssetSourceType;
-  signal?: AbortSignal;
-}): Promise<StudioUploadedAsset> {
-  const formData = new FormData();
-  formData.set("file", file);
-  formData.set("sourceType", sourceType);
+export type StudioSignedUpload = { path: string; token: string };
 
-  const response = await studioFetch(
-    `/api/studio/projects/${encodeURIComponent(projectId)}/assets`,
-    { method: "POST", body: formData, signal },
+function isSignedUpload(value: unknown): value is StudioSignedUpload {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "path" in value &&
+      typeof value.path === "string" &&
+      "token" in value &&
+      typeof value.token === "string",
   );
+}
 
-  if (!response.ok) {
-    throw await toStudioFetchError(response);
-  }
-
+async function readAssetResponse(response: Response): Promise<StudioUploadedAsset> {
   let body: unknown;
   try {
     body = await response.json();
@@ -547,8 +548,101 @@ export async function uploadStudioProjectAsset({
   ) {
     throw new StudioPersistenceClientError("server_error", response.status);
   }
-
   return body.asset;
+}
+
+export function studioSignedUploadUrl(signedUpload: StudioSignedUpload): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  if (!base) {
+    throw new StudioPersistenceClientError("server_error");
+  }
+  const path = signedUpload.path.replace(/^\/+/, "");
+  return `${base}/storage/v1/object/upload/sign/${STUDIO_ASSETS_BUCKET}/${path}?token=${encodeURIComponent(signedUpload.token)}`;
+}
+
+async function putFileToSignedUpload(
+  signedUpload: StudioSignedUpload,
+  file: Blob,
+  contentType: string,
+  signal?: AbortSignal,
+) {
+  const response = await studioFetch(studioSignedUploadUrl(signedUpload), {
+    method: "PUT",
+    body: file,
+    headers: {
+      "Content-Type": contentType,
+      "x-upsert": "false",
+    },
+    signal,
+  });
+  if (!response.ok) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+}
+
+export async function uploadStudioProjectAsset({
+  projectId,
+  file,
+  sourceType,
+  signal,
+}: {
+  projectId: string;
+  file: File;
+  sourceType: StudioAssetSourceType;
+  signal?: AbortSignal;
+}): Promise<StudioUploadedAsset> {
+  const reserveResponse = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        sourceType,
+      }),
+      signal,
+    },
+  );
+  if (!reserveResponse.ok) {
+    throw await toStudioFetchError(reserveResponse);
+  }
+  let reserved: unknown;
+  try {
+    reserved = await reserveResponse.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", reserveResponse.status);
+  }
+  if (
+    !reserved ||
+    typeof reserved !== "object" ||
+    !("asset" in reserved) ||
+    !isUploadedAsset(reserved.asset) ||
+    !("signedUpload" in reserved) ||
+    !isSignedUpload(reserved.signedUpload)
+  ) {
+    throw new StudioPersistenceClientError("server_error", reserveResponse.status);
+  }
+
+  const assetId = reserved.asset.id;
+  try {
+    await putFileToSignedUpload(reserved.signedUpload, file, reserved.asset.mimeType, signal);
+    const finalizeResponse = await studioFetch(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
+      { method: "POST", signal },
+    );
+    if (!finalizeResponse.ok) {
+      throw await toStudioFetchError(finalizeResponse);
+    }
+    return await readAssetResponse(finalizeResponse);
+  } catch (error) {
+    await studioFetch(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
+      { method: "POST" },
+    ).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function replaceStudioProjectAsset({
@@ -562,30 +656,45 @@ export async function replaceStudioProjectAsset({
   file: File;
   signal?: AbortSignal;
 }): Promise<StudioUploadedAsset> {
-  const formData = new FormData();
-  formData.set("file", file);
-  const response = await studioFetch(
+  const reserveResponse = await studioFetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
-    { method: "PUT", body: formData, signal },
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      }),
+      signal,
+    },
   );
-  if (!response.ok) {
-    throw await toStudioFetchError(response);
+  if (!reserveResponse.ok) {
+    throw await toStudioFetchError(reserveResponse);
   }
-  let body: unknown;
+  let reserved: unknown;
   try {
-    body = await response.json();
+    reserved = await reserveResponse.json();
   } catch {
-    throw new StudioPersistenceClientError("server_error", response.status);
+    throw new StudioPersistenceClientError("server_error", reserveResponse.status);
   }
   if (
-    !body ||
-    typeof body !== "object" ||
-    !("asset" in body) ||
-    !isUploadedAsset(body.asset)
+    !reserved ||
+    typeof reserved !== "object" ||
+    !("signedUpload" in reserved) ||
+    !isSignedUpload(reserved.signedUpload)
   ) {
-    throw new StudioPersistenceClientError("server_error", response.status);
+    throw new StudioPersistenceClientError("server_error", reserveResponse.status);
   }
-  return body.asset;
+  await putFileToSignedUpload(reserved.signedUpload, file, file.type || "audio/mpeg", signal);
+  const finalizeResponse = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
+    { method: "POST", signal },
+  );
+  if (!finalizeResponse.ok) {
+    throw await toStudioFetchError(finalizeResponse);
+  }
+  return await readAssetResponse(finalizeResponse);
 }
 
 export async function deleteStudioProjectAsset({
