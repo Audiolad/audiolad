@@ -220,6 +220,14 @@ assert.match(projection, /canonical_sale_has_paid_access\(/);
 assert.match(projection, /canonical_sale_qualifies/);
 assert.doesNotMatch(projection, /SET access_source/);
 
+const amountMatch = read(
+  "supabase/migrations/20260925120600_course_upgrade_canonical_sales_amount_match.sql",
+);
+assert.match(amountMatch, /p\.amount_minor = o\.amount_minor/);
+assert.match(amountMatch, /p\.currency = o\.currency/);
+assert.match(amountMatch, /p\.currency = 'RUB'/);
+assert.doesNotMatch(amountMatch, /SET access_source/);
+
 const createOrder = read(
   "supabase/migrations/20260901120200_create_practice_order_visibility.sql",
 );

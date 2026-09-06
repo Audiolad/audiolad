@@ -21,15 +21,21 @@ const fulfillName = "20260925120200_fulfill_tochka_course_upgrade.sql";
 const idempotencyName = "20260925120300_create_course_upgrade_order_idempotency.sql";
 const canonicalName = "20260925120400_course_upgrade_canonical_sale.sql";
 const projectionName = "20260925120500_course_upgrade_canonical_sales_projection.sql";
+const amountMatchName = "20260925120600_course_upgrade_canonical_sales_amount_match.sql";
 const foundationName = "20260923120100_course_access_levels_foundation.sql";
 const originalFulfillName = "20260725190000_payments_p30_transactional_fulfill.sql";
 const stubPath = join(repoRoot, "scripts/lib/course-access-levels-sql-stub.sql");
 const extraStubPath = join(repoRoot, "scripts/lib/course-upgrade-checkout-sql-stub.sql");
 const fulfillStubPath = join(repoRoot, "scripts/lib/course-upgrade-fulfill-sql-stub.sql");
 const canonicalStubPath = join(repoRoot, "scripts/lib/course-upgrade-canonical-sql-stub.sql");
+const projectionStubPath = join(repoRoot, "scripts/lib/course-upgrade-projection-sql-stub.sql");
 const seedPath = join(repoRoot, "scripts/lib/course-access-levels-pre-migration-seed.sql");
 const smokePath = join(repoRoot, "supabase/tests/course_upgrade_checkout_smoke.sql");
 const fulfillSmokePath = join(repoRoot, "supabase/tests/course_upgrade_fulfill_smoke.sql");
+const projectionSmokePath = join(
+  repoRoot,
+  "supabase/tests/course_upgrade_canonical_projection_smoke.sql",
+);
 const dbName = "audiolad_course_upgrade_checkout_test";
 const isolatedDbName = "audiolad_course_upgrade_isolated";
 
@@ -45,6 +51,7 @@ const fulfill = readFileSync(join(migrationsDir, fulfillName), "utf8");
 const idempotency = readFileSync(join(migrationsDir, idempotencyName), "utf8");
 const canonical = readFileSync(join(migrationsDir, canonicalName), "utf8");
 const projection = readFileSync(join(migrationsDir, projectionName), "utf8");
+const amountMatch = readFileSync(join(migrationsDir, amountMatchName), "utf8");
 const originalFulfill = readFileSync(join(migrationsDir, originalFulfillName), "utf8");
 
 assert(existsSync(join(migrationsDir, previousName)), "previous latest migration stays intact");
@@ -54,6 +61,7 @@ assert(existsSync(join(migrationsDir, fulfillName)), "fulfill replacement exists
 assert(existsSync(join(migrationsDir, idempotencyName)), "idempotency replay replacement exists");
 assert(existsSync(join(migrationsDir, canonicalName)), "canonical sale helpers exist");
 assert(existsSync(join(migrationsDir, projectionName)), "canonical projection replacement exists");
+assert(existsSync(join(migrationsDir, amountMatchName)), "amount-match projection exists");
 
 const names = readdirSync(migrationsDir).filter((name) =>
   name.toLowerCase().endsWith(".sql"),
@@ -66,6 +74,7 @@ assert(versions.includes("20260925120200"), "fulfill stamp is listed");
 assert(versions.includes("20260925120300"), "idempotency stamp is listed");
 assert(versions.includes("20260925120400"), "canonical helper stamp is listed");
 assert(versions.includes("20260925120500"), "projection stamp is listed");
+assert(versions.includes("20260925120600"), "amount-match stamp is listed");
 assert(versions.includes("20260924120000"), "readiness stamp remains");
 
 assert(/ADD COLUMN IF NOT EXISTS order_kind text NOT NULL DEFAULT 'product_purchase'/.test(schema));
@@ -106,12 +115,22 @@ assert(/canonical_sale_qualifies/.test(canonical));
 assert(/canonical_sale_has_paid_access\(/.test(projection));
 assert(/order_kind/.test(projection));
 assert(/canonical_sale/.test(projection));
+assert(/p\.amount_minor = o\.amount_minor/.test(amountMatch));
+assert(/p\.currency = o\.currency/.test(amountMatch));
+assert(/p\.currency = 'RUB'/.test(amountMatch));
+assert(!/admin_canonical_sale_diagnostic/.test(amountMatch));
 
 const fulfillSmoke = readFileSync(fulfillSmokePath, "utf8");
 assert(/fulfill_tochka_payment_transactional\(/.test(fulfillSmoke));
 assert(/external_manual/.test(fulfillSmoke));
 assert(/access_source IS DISTINCT FROM 'admin'/.test(fulfillSmoke) || /stay admin/.test(fulfillSmoke));
 assert(/amount_or_currency_mismatch/.test(fulfillSmoke));
+
+const projectionSmoke = readFileSync(projectionSmokePath, "utf8");
+assert(/author_canonical_sales_base\(/.test(projectionSmoke));
+assert(/amount mismatch must be absent/.test(projectionSmoke));
+assert(/currency mismatch must be absent/.test(projectionSmoke));
+assert(/matching sale must appear once at 222200/.test(projectionSmoke));
 
 function dockerAvailable() {
   try {
@@ -167,8 +186,12 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, idempotencyName), "utf8"),
     readFileSync(join(migrationsDir, canonicalName), "utf8"),
     readFileSync(canonicalStubPath, "utf8"),
+    readFileSync(projectionStubPath, "utf8"),
+    readFileSync(join(migrationsDir, projectionName), "utf8"),
+    readFileSync(join(migrationsDir, amountMatchName), "utf8"),
     readFileSync(smokePath, "utf8"),
     readFileSync(fulfillSmokePath, "utf8"),
+    readFileSync(projectionSmokePath, "utf8"),
   ].join("\n");
 }
 
@@ -181,12 +204,16 @@ function requiredFilesExist() {
     seedPath,
     smokePath,
     fulfillSmokePath,
+    projectionStubPath,
+    projectionSmokePath,
     join(migrationsDir, foundationName),
     join(migrationsDir, schemaName),
     join(migrationsDir, rpcName),
     join(migrationsDir, fulfillName),
     join(migrationsDir, idempotencyName),
     join(migrationsDir, canonicalName),
+    join(migrationsDir, projectionName),
+    join(migrationsDir, amountMatchName),
   ].every(existsSync);
 }
 

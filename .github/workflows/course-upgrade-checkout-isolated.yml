@@ -11,6 +11,7 @@ on:
       - "scripts/lib/course-upgrade-checkout-sql-stub.sql"
       - "scripts/lib/course-upgrade-fulfill-sql-stub.sql"
       - "scripts/lib/course-upgrade-canonical-sql-stub.sql"
+      - "scripts/lib/course-upgrade-projection-sql-stub.sql"
       - "supabase/migrations/20260923120100_course_access_levels_foundation.sql"
       - "supabase/migrations/20260925120000_course_upgrade_order_kind.sql"
       - "supabase/migrations/20260925120100_create_course_upgrade_order.sql"
@@ -18,8 +19,10 @@ on:
       - "supabase/migrations/20260925120300_create_course_upgrade_order_idempotency.sql"
       - "supabase/migrations/20260925120400_course_upgrade_canonical_sale.sql"
       - "supabase/migrations/20260925120500_course_upgrade_canonical_sales_projection.sql"
+      - "supabase/migrations/20260925120600_course_upgrade_canonical_sales_amount_match.sql"
       - "supabase/tests/course_upgrade_checkout_smoke.sql"
       - "supabase/tests/course_upgrade_fulfill_smoke.sql"
+      - "supabase/tests/course_upgrade_canonical_projection_smoke.sql"
 
 permissions:
   contents: read
