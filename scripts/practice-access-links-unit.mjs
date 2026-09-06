@@ -14,6 +14,7 @@ import {
   deriveAccessLinkDisplayStatus,
   isAccessLinkPath,
   isValidPracticeAccessTokenFormat,
+  parseAccessLinkCreateRequestBody,
   parseAccessLinkExpiryOption,
   parseAccessLinkTargetLevel,
   redactAccessTokenFromHref,
@@ -135,6 +136,16 @@ assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: null }).code, "invalid_a
 assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: {} }).code, "invalid_access_link_expiry");
 assert.equal(resolveAccessLinkCreateExpiry({ expiresIn: [] }).code, "invalid_access_link_expiry");
 
+assert.equal(parseAccessLinkCreateRequestBody({}).ok, true);
+assert.deepEqual(parseAccessLinkCreateRequestBody({}).body, {});
+assert.equal(parseAccessLinkCreateRequestBody(null).code, "invalid_access_link_request");
+assert.equal(parseAccessLinkCreateRequestBody([]).code, "invalid_access_link_request");
+assert.equal(parseAccessLinkCreateRequestBody("abc").code, "invalid_access_link_request");
+assert.equal(parseAccessLinkCreateRequestBody(123).code, "invalid_access_link_request");
+assert.equal(parseAccessLinkCreateRequestBody(true).code, "invalid_access_link_request");
+assert.equal(resolveAccessLinkCreateTargetLevel({}).targetLevel, 1);
+assert.equal(resolveAccessLinkCreateExpiry({}).expiry, "none");
+
 assert.equal(redactAccessTokenFromPath(`/access/${token.rawToken}`), "/access/[redacted]");
 assert.equal(
   redactAccessTokenFromPath(`/api/access/${token.rawToken}/redeem`),
@@ -239,18 +250,24 @@ assert.doesNotMatch(
 const authorRoute = read("src/app/api/author/products/[id]/access-links/route.ts");
 assert.match(authorRoute, /requirePracticeMutationAccess/);
 assert.match(authorRoute, /createPracticeAccessLink/);
-assert.match(authorRoute, /body: record/);
+assert.match(authorRoute, /readAccessLinkCreateRequestBody/);
+assert.doesNotMatch(authorRoute, /body = \{\}/);
+assert.doesNotMatch(authorRoute, /as Record<string, unknown>/);
 assert.doesNotMatch(authorRoute, /\?\? 1/);
 assert.doesNotMatch(authorRoute, /\?\? "none"/);
 assert.doesNotMatch(authorRoute, /from\("practice_access_links"\)\.insert/);
 
 const adminRoute = read("src/app/api/admin/products/[id]/access-links/route.ts");
 assert.match(adminRoute, /requirePlatformAdminAccessLinkActor/);
-assert.match(adminRoute, /body: record/);
+assert.match(adminRoute, /readAccessLinkCreateRequestBody/);
+assert.doesNotMatch(adminRoute, /body = \{\}/);
+assert.doesNotMatch(adminRoute, /as Record<string, unknown>/);
 assert.doesNotMatch(adminRoute, /\?\? 1/);
 assert.doesNotMatch(adminRoute, /\?\? "none"/);
 
 const createHelper = read("src/lib/products/access-links-server.ts");
+assert.match(createHelper, /readAccessLinkCreateRequestBody/);
+assert.match(createHelper, /invalid_access_link_request/);
 assert.match(createHelper, /resolveAccessLinkCreateTargetLevel/);
 assert.match(createHelper, /resolveAccessLinkCreateExpiry/);
 assert.doesNotMatch(createHelper, /parseAccessLinkTargetLevel\(input\.targetLevel\) \?\? 1/);

@@ -38,6 +38,7 @@ assert.doesNotMatch(accessLinkPublicErrorMessage("link_already_used"), /@|email|
 assert.match(accessLinkAuthorErrorMessage("target_level_not_configured"), /уровн/i);
 assert.match(accessLinkAuthorErrorMessage("invalid_access_link_expiry"), /срок/i);
 assert.match(accessLinkAuthorErrorMessage("invalid_access_level"), /уровен/i);
+assert.match(accessLinkAuthorErrorMessage("invalid_access_link_request"), /JSON/i);
 
 const ui = read("src/components/author-dashboard/AuthorPracticeAccessLinks.tsx");
 assert.match(ui, /ACCESS_LINK_COPY_LABEL/);

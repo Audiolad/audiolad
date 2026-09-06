@@ -17,6 +17,7 @@ import {
   isValidPracticeAccessTokenFormat,
   isValidPracticeAccessTokenHash,
   mapAccessLinkListItem,
+  parseAccessLinkCreateRequestBody,
   resolveAccessLinkCreateExpiry,
   resolveAccessLinkCreateTargetLevel,
   resolveAccessLinkExpiry,
@@ -65,6 +66,7 @@ export function mapAccessLinkSqlError(error: {
     "access_level_not_available",
     "invalid_access_level",
     "invalid_access_link_expiry",
+    "invalid_access_link_request",
     "invalid_token_hash",
     "link_not_found",
     "link_not_active",
@@ -102,6 +104,7 @@ export function statusForAccessLinkCode(code: string): number {
       return 409;
     case "invalid_access_level":
     case "invalid_access_link_expiry":
+    case "invalid_access_link_request":
     case "invalid_token_hash":
     case "user_id_required":
       return 400;
@@ -203,6 +206,26 @@ export async function listPracticeAccessLinks(
       revoked_at: (row.revoked_at as string | null) ?? null,
     }),
   );
+}
+
+export async function readAccessLinkCreateRequestBody(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  let parsed: unknown;
+
+  try {
+    parsed = await request.json();
+  } catch {
+    throw new AccessLinkError("invalid_access_link_request", 400);
+  }
+
+  const body = parseAccessLinkCreateRequestBody(parsed);
+
+  if (!body.ok) {
+    throw new AccessLinkError(body.code, statusForAccessLinkCode(body.code));
+  }
+
+  return body.body;
 }
 
 export async function createPracticeAccessLink(input: {

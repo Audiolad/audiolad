@@ -185,6 +185,18 @@ export function resolveAccessLinkCreateTargetLevel(
   return { ok: true, targetLevel: parsed };
 }
 
+export function parseAccessLinkCreateRequestBody(
+  value: unknown,
+):
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; code: "invalid_access_link_request" } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, code: "invalid_access_link_request" };
+  }
+
+  return { ok: true, body: value as Record<string, unknown> };
+}
+
 export function resolveAccessLinkCreateExpiry(
   record: Record<string, unknown>,
 ):
@@ -400,6 +412,8 @@ export function accessLinkAuthorErrorMessage(code: string | undefined): string {
       return "Укажите уровень доступа целым числом от 1.";
     case "invalid_access_link_expiry":
       return "Укажите срок действия ссылки: без срока, 24 часа или 7 дней.";
+    case "invalid_access_link_request":
+      return "Отправьте JSON-объект с параметрами ссылки.";
     case "link_not_active":
       return "Отозвать можно только активную ссылку.";
     case "forbidden":

@@ -9,6 +9,7 @@ import {
   AccessLinkError,
   createPracticeAccessLink,
   listPracticeAccessLinks,
+  readAccessLinkCreateRequestBody,
   loadConfiguredAccessLevels,
   loadPracticeForAccessLinks,
   resolveAllowedAccessLinkTargets,
@@ -60,22 +61,13 @@ export async function POST(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { user, practice } = await requirePracticeMutationAccess(id);
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      body = {};
-    }
-
-    const record = body && typeof body === "object" && !Array.isArray(body)
-      ? (body as Record<string, unknown>)
-      : {};
+    const body = await readAccessLinkCreateRequestBody(request);
 
     const created = await createPracticeAccessLink({
       practiceId: id,
       createdByUserId: user.id,
       createdByAuthorId: practice.author_id,
-      body: record,
+      body,
     });
 
     return NextResponse.json(created, { status: 201 });
