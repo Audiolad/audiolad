@@ -501,6 +501,19 @@ function testRepoOneFileOneVersion() {
         "20260925120600_course_upgrade_canonical_sales_amount_match.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260926120000_practice_access_links.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260927120000_practice_access_link_permanent_entitlement.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -595,8 +608,10 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260925120400",
     "20260925120500",
     "20260925120600",
+    "20260926120000",
+    "20260927120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 62);
+  assert.equal(plan.database_migrations_pending, 64);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -670,8 +685,10 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260925120400",
     "20260925120500",
     "20260925120600",
+    "20260926120000",
+    "20260927120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 56);
+  assert.equal(plan.database_migrations_pending, 58);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -752,8 +769,10 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260925120400",
     "20260925120500",
     "20260925120600",
+    "20260926120000",
+    "20260927120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 47);
+  assert.equal(plan.database_migrations_pending, 49);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {

@@ -1,0 +1,53 @@
+name: Practice Access Links Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/practice-access-links-isolated.yml"
+      - "scripts/practice-access-links-sql-unit.mjs"
+      - "scripts/lib/course-access-levels-sql-stub.sql"
+      - "scripts/lib/course-access-levels-pre-migration-seed.sql"
+      - "scripts/lib/practice-access-links-sql-stub.sql"
+      - "supabase/migrations/20260923120100_course_access_levels_foundation.sql"
+      - "supabase/migrations/20260926120000_practice_access_links.sql"
+      - "supabase/migrations/20260927120000_practice_access_link_permanent_entitlement.sql"
+      - "supabase/tests/practice_access_links_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  practice-access-links-isolated:
+    name: Practice Access Links Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_practice_access_links_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_practice_access_links_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_practice_access_links_isolated
+      - name: Execute access-link redeem RPC
+        env:
+          AUDIOLAD_PRACTICE_ACCESS_LINKS_ISOLATED: "1"
+          AUDIOLAD_PRACTICE_ACCESS_LINKS_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_practice_access_links_isolated
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:practice-access-links:isolated

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import AuthorCourseBuilder from "@/components/author-dashboard/AuthorCourseBuilder";
+import { AuthorPracticeAccessLinks } from "@/components/author-dashboard/AuthorPracticeAccessLinks";
 import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGallery";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
@@ -3269,6 +3270,19 @@ export default function AuthorProductForm({
           basePrice={form.price}
           isFree={form.isFree}
           onContentSnapshotChange={setCourseContentSnapshot}
+        />
+      ) : null}
+
+      {practiceId ? (
+        <AuthorPracticeAccessLinks
+          practiceId={practiceId}
+          publicationClass={form.publicationClass}
+          levels={(courseContentSnapshot.access_levels ?? []).map((level) => ({
+            level: level.level,
+            title: level.title,
+            description: level.description,
+          }))}
+          disabled={!canMutateContent || busy}
         />
       ) : null}
 

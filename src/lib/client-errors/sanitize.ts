@@ -3,6 +3,10 @@ import {
   type ClientErrorReport,
   type ClientErrorType,
 } from "@/lib/client-errors/types";
+import {
+  redactAccessTokenFromHref,
+  redactAccessTokenFromPath,
+} from "@/lib/products/access-links";
 
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_STACK_LENGTH = 2000;
@@ -96,8 +100,8 @@ export function sanitizeClientErrorReport(
     message,
     stack,
     source,
-    pathname: pathname ?? "/",
-    href: href ?? "/",
+    pathname: redactAccessTokenFromPath(pathname ?? "/"),
+    href: redactAccessTokenFromHref(href ?? "/"),
     userAgent: userAgent ?? "unknown",
     online,
     buildId,
