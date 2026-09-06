@@ -560,6 +560,10 @@ export function studioSignedUploadUrl(signedUpload: StudioSignedUpload): string 
   return `${base}/storage/v1/object/upload/sign/${STUDIO_ASSETS_BUCKET}/${path}?token=${encodeURIComponent(signedUpload.token)}`;
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function putFileToSignedUpload(
   signedUpload: StudioSignedUpload,
   file: Blob,
@@ -580,16 +584,77 @@ async function putFileToSignedUpload(
   }
 }
 
+async function finalizeStudioAsset(
+  projectId: string,
+  assetId: string,
+  signal?: AbortSignal,
+): Promise<StudioUploadedAsset> {
+  const finalizeResponse = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
+    { method: "POST", signal },
+  );
+  if (!finalizeResponse.ok) {
+    throw await toStudioFetchError(finalizeResponse);
+  }
+  return await readAssetResponse(finalizeResponse);
+}
+
+async function reconcileAfterAmbiguousPut(
+  projectId: string,
+  assetId: string,
+): Promise<StudioUploadedAsset | null> {
+  const finalizeResponse = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
+    { method: "POST" },
+  );
+  if (finalizeResponse.ok) {
+    return await readAssetResponse(finalizeResponse);
+  }
+  const error = await toStudioFetchError(finalizeResponse);
+  if (error.code === "upload_not_complete") {
+    return null;
+  }
+  throw error;
+}
+
+export async function abandonStudioProjectAssetUpload({
+  projectId,
+  assetId,
+}: {
+  projectId: string;
+  assetId: string;
+}): Promise<void> {
+  await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/abandon`,
+    { method: "POST" },
+  ).catch(() => undefined);
+}
+
+export async function abandonStudioProjectAssetReplacement({
+  projectId,
+  assetId,
+}: {
+  projectId: string;
+  assetId: string;
+}): Promise<void> {
+  await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/abandon`,
+    { method: "POST" },
+  ).catch(() => undefined);
+}
+
 export async function uploadStudioProjectAsset({
   projectId,
   file,
   sourceType,
   signal,
+  onReserved,
 }: {
   projectId: string;
   file: File;
   sourceType: StudioAssetSourceType;
   signal?: AbortSignal;
+  onReserved?: (assetId: string) => void;
 }): Promise<StudioUploadedAsset> {
   const reserveResponse = await studioFetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}/assets`,
@@ -626,23 +691,66 @@ export async function uploadStudioProjectAsset({
   }
 
   const assetId = reserved.asset.id;
+  onReserved?.(assetId);
   try {
     await putFileToSignedUpload(reserved.signedUpload, file, reserved.asset.mimeType, signal);
-    const finalizeResponse = await studioFetch(
-      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
-      { method: "POST", signal },
-    );
-    if (!finalizeResponse.ok) {
-      throw await toStudioFetchError(finalizeResponse);
-    }
-    return await readAssetResponse(finalizeResponse);
   } catch (error) {
-    await studioFetch(
-      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
-      { method: "POST" },
-    ).catch(() => undefined);
+    if (isAbortError(error) || signal?.aborted) {
+      await abandonStudioProjectAssetUpload({ projectId, assetId });
+      throw error;
+    }
+    const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+    if (ready) return ready;
     throw error;
   }
+  return await finalizeStudioAsset(projectId, assetId, signal);
+}
+
+export async function retryStudioProjectAssetUpload({
+  projectId,
+  assetId,
+  file,
+  signal,
+}: {
+  projectId: string;
+  assetId: string;
+  file: File;
+  signal?: AbortSignal;
+}): Promise<StudioUploadedAsset> {
+  const retryResponse = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/retry`,
+    { method: "POST", signal },
+  );
+  if (!retryResponse.ok) {
+    throw await toStudioFetchError(retryResponse);
+  }
+  let retried: unknown;
+  try {
+    retried = await retryResponse.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", retryResponse.status);
+  }
+  if (!retried || typeof retried !== "object") {
+    throw new StudioPersistenceClientError("server_error", retryResponse.status);
+  }
+  if ("alreadyUploaded" in retried && retried.alreadyUploaded === true) {
+    return await finalizeStudioAsset(projectId, assetId, signal);
+  }
+  if (!("signedUpload" in retried) || !isSignedUpload(retried.signedUpload)) {
+    throw new StudioPersistenceClientError("server_error", retryResponse.status);
+  }
+  try {
+    await putFileToSignedUpload(retried.signedUpload, file, file.type || "audio/mpeg", signal);
+  } catch (error) {
+    if (isAbortError(error) || signal?.aborted) {
+      await abandonStudioProjectAssetUpload({ projectId, assetId });
+      throw error;
+    }
+    const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+    if (ready) return ready;
+    throw error;
+  }
+  return await finalizeStudioAsset(projectId, assetId, signal);
 }
 
 export async function replaceStudioProjectAsset({
@@ -686,15 +794,34 @@ export async function replaceStudioProjectAsset({
   ) {
     throw new StudioPersistenceClientError("server_error", reserveResponse.status);
   }
-  await putFileToSignedUpload(reserved.signedUpload, file, file.type || "audio/mpeg", signal);
-  const finalizeResponse = await studioFetch(
-    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
-    { method: "POST", signal },
-  );
-  if (!finalizeResponse.ok) {
-    throw await toStudioFetchError(finalizeResponse);
+  try {
+    await putFileToSignedUpload(reserved.signedUpload, file, file.type || "audio/mpeg", signal);
+    const finalizeResponse = await studioFetch(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
+      { method: "POST", signal },
+    );
+    if (!finalizeResponse.ok) {
+      throw await toStudioFetchError(finalizeResponse);
+    }
+    return await readAssetResponse(finalizeResponse);
+  } catch (error) {
+    if (!isAbortError(error) && !signal?.aborted) {
+      const finalizeResponse = await studioFetch(
+        `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
+        { method: "POST" },
+      );
+      if (finalizeResponse.ok) {
+        return await readAssetResponse(finalizeResponse);
+      }
+      const finalizeError = await toStudioFetchError(finalizeResponse);
+      if (finalizeError.code !== "upload_not_complete") {
+        await abandonStudioProjectAssetReplacement({ projectId, assetId });
+        throw finalizeError;
+      }
+    }
+    await abandonStudioProjectAssetReplacement({ projectId, assetId });
+    throw error;
   }
-  return await readAssetResponse(finalizeResponse);
 }
 
 export async function deleteStudioProjectAsset({

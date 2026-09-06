@@ -19,6 +19,22 @@ export const STUDIO_ASSET_TOO_LARGE_MESSAGE =
 export const STUDIO_PROJECT_TOO_LARGE_MESSAGE =
   "Общий размер дорожек не может превышать 750 МБ.";
 
+/** Abandoned reserve that never started a PUT. */
+export const STUDIO_STALE_RESERVED_INTERVAL = "30 minutes";
+/** Active PUT of a 300 MiB file can be slow; do not use created_at. */
+export const STUDIO_STALE_UPLOADING_INTERVAL = "8 hours";
+/** Finalize download + ffprobe should finish well before this. */
+export const STUDIO_STALE_PROCESSING_INTERVAL = "45 minutes";
+export const STUDIO_STALE_FAILED_INTERVAL = "15 minutes";
+/** Pending replacement PUT can be a full 300 MiB file. */
+export const STUDIO_STALE_PENDING_REPLACEMENT_INTERVAL = "8 hours";
+
+export const STUDIO_STALE_RESERVED_MS = 30 * 60 * 1000;
+export const STUDIO_STALE_UPLOADING_MS = 8 * 60 * 60 * 1000;
+export const STUDIO_STALE_PROCESSING_MS = 45 * 60 * 1000;
+export const STUDIO_STALE_FAILED_MS = 15 * 60 * 1000;
+export const STUDIO_STALE_PENDING_REPLACEMENT_MS = 8 * 60 * 60 * 1000;
+
 export function studioPeaksColumnCount(durationSeconds: number): number {
   const safeDuration =
     Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0;

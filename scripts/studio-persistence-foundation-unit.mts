@@ -356,7 +356,9 @@ for (const route of [
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/finalize/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/retry/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/abandon/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/replace/finalize/route.ts",
+  "../src/app/api/studio/projects/[projectId]/assets/[assetId]/replace/abandon/route.ts",
   "../src/app/api/studio/projects/[projectId]/assets/[assetId]/playback/route.ts",
 ]) {
   const source = await readFile(new URL(route, import.meta.url), "utf8");

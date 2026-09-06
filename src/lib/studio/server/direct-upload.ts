@@ -11,7 +11,6 @@ import {
   MAX_STUDIO_AUDIO_DURATION_SECONDS,
   STUDIO_ASSETS_BUCKET,
 } from "../limits";
-import { STUDIO_PEAKS_VERSION } from "../peaks-v1";
 import {
   probeStudioAudioFile,
   removeTempFile,
@@ -19,7 +18,6 @@ import {
   writeStreamToTempFile,
 } from "./audio-duration";
 import type { StudioAssetPeaksDto, StudioProjectAssetRow } from "./model";
-import { generateStudioPeaksV1FromFile } from "./peaks";
 import {
   getStudioProjectAsset,
   requireStudioProjectAccess,
@@ -92,13 +90,24 @@ export async function readStudioStorageObjectInfo(
     .list(directory, { limit: 20, search: filename });
   if (error) {
     console.error("studio_storage_list_error", error.message);
-    return null;
   }
   const object = data?.find((entry) => entry.name === filename);
   const metadata = object?.metadata as { size?: number | string; mimetype?: string } | undefined;
-  const size = Number(metadata?.size);
-  if (!object || !Number.isFinite(size) || size <= 0) return null;
-  return { size, mimetype: metadata?.mimetype };
+  const listedSize = Number(metadata?.size);
+  if (object && Number.isFinite(listedSize) && listedSize > 0) {
+    return { size: listedSize, mimetype: metadata?.mimetype };
+  }
+
+  const signed = await service.storage.from(STUDIO_ASSETS_BUCKET).createSignedUrl(storagePath, 60);
+  if (!signed.data?.signedUrl) return null;
+  const head = await fetch(signed.data.signedUrl, { method: "HEAD" });
+  const length = Number(head.headers.get("content-length"));
+  if (!head.ok || !Number.isFinite(length) || length <= 0) return null;
+  return { size: length };
+}
+
+function isIncompleteUploadError(error: unknown): boolean {
+  return error instanceof StudioApiError && error.code === "upload_not_complete";
 }
 
 async function materializeStorageObject(
@@ -143,6 +152,7 @@ async function inspectUploadedAudio(input: {
     throw new StudioApiError("asset_too_large", 413);
   }
   if (object.size !== input.reservedBytes) {
+    await deleteStoragePaths([input.storagePath]);
     throw new StudioApiError("upload_not_complete", 409);
   }
 
@@ -159,17 +169,11 @@ async function inspectUploadedAudio(input: {
     if (durationSeconds > MAX_STUDIO_AUDIO_DURATION_SECONDS) {
       throw new StudioApiError("audio_too_long", 422);
     }
-    const peaks = await generateStudioPeaksV1FromFile(tempPath, durationSeconds);
+    // Peaks V1 generation is optional and must never block ready. PR3b.
     return {
       sizeBytes: object.size,
       durationSeconds,
-      peaks: peaks
-        ? {
-            version: STUDIO_PEAKS_VERSION,
-            columns: peaks.columns,
-            dataBase64: Buffer.from(peaks.bytes).toString("base64"),
-          }
-        : null,
+      peaks: null,
     };
   } finally {
     await removeTempFile(tempPath);
@@ -234,7 +238,11 @@ export async function reserveStudioDirectUpload(input: {
 export async function retryStudioDirectUpload(
   projectId: string,
   assetId: string,
-): Promise<{ asset: StudioProjectAssetRow; signedUpload: StudioSignedUpload }> {
+): Promise<{
+  asset: StudioProjectAssetRow;
+  signedUpload: StudioSignedUpload | null;
+  alreadyUploaded: boolean;
+}> {
   const { asset, ownerId, ownerKind } = await getStudioProjectAsset(projectId, assetId, {
     allowedStates: ["reserved", "uploading", "failed"],
   });
@@ -243,10 +251,16 @@ export async function retryStudioDirectUpload(
   ) {
     throw new StudioApiError("invalid_asset", 500);
   }
-  await deleteStoragePaths([asset.storage_path]);
+  const object = await readStudioStorageObjectInfo(asset.storage_path);
+  if (object && object.size === Number(asset.size_bytes)) {
+    return { asset, signedUpload: null, alreadyUploaded: true };
+  }
+  if (object) {
+    await deleteStoragePaths([asset.storage_path]);
+  }
   const signedUpload = await createSignedUpload(asset.storage_path);
   await setUploadState(projectId, assetId, "uploading");
-  return { asset: { ...asset, upload_state: "uploading" }, signedUpload };
+  return { asset: { ...asset, upload_state: "uploading" }, signedUpload, alreadyUploaded: false };
 }
 
 export async function finalizeStudioDirectUpload(
@@ -282,6 +296,10 @@ export async function finalizeStudioDirectUpload(
     if (error) mapServiceError(error);
     return { asset: data as StudioProjectAssetRow, peaks: inspected.peaks };
   } catch (error) {
+    if (isIncompleteUploadError(error)) {
+      await setUploadState(projectId, assetId, "uploading").catch(() => undefined);
+      throw error;
+    }
     await failAndReleaseStudioUpload(projectId, assetId, asset.storage_path);
     throw error;
   }
@@ -296,6 +314,12 @@ export async function reserveStudioDirectReplacement(input: {
 }): Promise<{ asset: StudioProjectAssetRow; signedUpload: StudioSignedUpload }> {
   const { ownerId, ownerKind, service } = await requireStudioProjectAccess(input.projectId);
   await cleanupStaleStudioUploads();
+  const existing = await getStudioProjectAsset(input.projectId, input.assetId, {
+    allowedStates: ["ready"],
+  });
+  if (existing.asset.pending_storage_path) {
+    await abandonStudioDirectReplacement(input.projectId, input.assetId);
+  }
   await recordAuthorSupportAudit({
     action: "studio_asset_replaced",
     resourceType: "studio_project_asset",
@@ -400,14 +424,31 @@ export async function finalizeStudioDirectReplacement(
       peaks: inspected.peaks,
     };
   } catch (error) {
-    const pendingPath = asset.pending_storage_path;
-    await service.rpc("studio_clear_project_asset_replacement", {
-      p_project_id: projectId,
-      p_asset_id: assetId,
-    });
-    await deleteStoragePaths([pendingPath]);
+    if (isIncompleteUploadError(error)) {
+      throw error;
+    }
+    await abandonStudioDirectReplacement(projectId, assetId);
     throw error;
   }
+}
+
+export async function abandonStudioDirectUpload(projectId: string, assetId: string) {
+  const { asset } = await getStudioProjectAsset(projectId, assetId, {
+    allowedStates: ["reserved", "uploading", "processing", "failed"],
+  });
+  await failAndReleaseStudioUpload(projectId, assetId, asset.storage_path);
+}
+
+export async function abandonStudioDirectReplacement(projectId: string, assetId: string) {
+  const { asset, service } = await getStudioProjectAsset(projectId, assetId, {
+    allowedStates: ["ready"],
+  });
+  const pendingPath = asset.pending_storage_path;
+  await service.rpc("studio_clear_project_asset_replacement", {
+    p_project_id: projectId,
+    p_asset_id: assetId,
+  });
+  if (pendingPath) await deleteStoragePaths([pendingPath]);
 }
 
 export async function failAndReleaseStudioUpload(

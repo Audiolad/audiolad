@@ -55,11 +55,23 @@ ALTER TABLE public.studio_project_assets
     CHECK (upload_state IN ('reserved', 'uploading', 'processing', 'ready', 'failed'));
 
 ALTER TABLE public.studio_project_assets
+  ADD COLUMN IF NOT EXISTS upload_state_changed_at timestamptz;
+
+UPDATE public.studio_project_assets
+SET upload_state_changed_at = coalesce(created_at, now())
+WHERE upload_state_changed_at IS NULL;
+
+ALTER TABLE public.studio_project_assets
+  ALTER COLUMN upload_state_changed_at SET DEFAULT now(),
+  ALTER COLUMN upload_state_changed_at SET NOT NULL;
+
+ALTER TABLE public.studio_project_assets
   ADD COLUMN IF NOT EXISTS pending_source_id uuid,
   ADD COLUMN IF NOT EXISTS pending_storage_path text,
   ADD COLUMN IF NOT EXISTS pending_size_bytes bigint,
   ADD COLUMN IF NOT EXISTS pending_original_name text,
-  ADD COLUMN IF NOT EXISTS pending_mime_type text;
+  ADD COLUMN IF NOT EXISTS pending_mime_type text,
+  ADD COLUMN IF NOT EXISTS pending_reserved_at timestamptz;
 
 ALTER TABLE public.studio_project_assets
   DROP CONSTRAINT IF EXISTS studio_project_assets_pending_replacement_check;
@@ -72,6 +84,7 @@ ALTER TABLE public.studio_project_assets
         AND pending_size_bytes IS NULL
         AND pending_original_name IS NULL
         AND pending_mime_type IS NULL
+        AND pending_reserved_at IS NULL
       )
       OR (
         pending_source_id IS NOT NULL
@@ -80,6 +93,7 @@ ALTER TABLE public.studio_project_assets
         AND pending_size_bytes <= 314572800
         AND pending_original_name IS NOT NULL
         AND pending_mime_type IS NOT NULL
+        AND pending_reserved_at IS NOT NULL
       )
     );
 
@@ -103,9 +117,14 @@ ALTER TABLE public.studio_asset_sources
     );
 
 CREATE INDEX IF NOT EXISTS studio_project_assets_stale_upload_idx
-  ON public.studio_project_assets (created_at)
+  ON public.studio_project_assets (upload_state, upload_state_changed_at)
   WHERE deleted_at IS NULL
     AND upload_state IN ('reserved', 'uploading', 'processing', 'failed');
+
+CREATE INDEX IF NOT EXISTS studio_project_assets_stale_pending_idx
+  ON public.studio_project_assets (pending_reserved_at)
+  WHERE deleted_at IS NULL
+    AND pending_source_id IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.studio_reserve_project_asset(
   p_project_id uuid,
@@ -181,7 +200,8 @@ BEGIN
     RAISE EXCEPTION 'invalid_asset' USING ERRCODE = '22023';
   END IF;
   UPDATE public.studio_project_assets
-  SET upload_state = p_upload_state
+  SET upload_state = p_upload_state,
+      upload_state_changed_at = now()
   WHERE id = p_asset_id
     AND project_id = p_project_id
     AND deleted_at IS NULL
@@ -237,7 +257,8 @@ BEGIN
   UPDATE public.studio_project_assets
   SET size_bytes = p_size_bytes,
       duration_seconds = p_duration_seconds,
-      upload_state = 'ready'
+      upload_state = 'ready',
+      upload_state_changed_at = now()
   WHERE id = p_asset_id AND project_id = p_project_id
   RETURNING * INTO v_asset;
   RETURN v_asset;
@@ -296,7 +317,8 @@ BEGIN
       pending_storage_path = p_storage_path,
       pending_size_bytes = p_size_bytes,
       pending_original_name = p_original_name,
-      pending_mime_type = p_mime_type
+      pending_mime_type = p_mime_type,
+      pending_reserved_at = now()
   WHERE id = p_asset_id AND project_id = p_project_id
   RETURNING * INTO v_asset;
   RETURN v_asset;
@@ -320,7 +342,8 @@ BEGIN
       pending_storage_path = NULL,
       pending_size_bytes = NULL,
       pending_original_name = NULL,
-      pending_mime_type = NULL
+      pending_mime_type = NULL,
+      pending_reserved_at = NULL
   WHERE id = p_asset_id AND project_id = p_project_id AND deleted_at IS NULL
   RETURNING * INTO v_asset;
   IF NOT FOUND THEN RAISE EXCEPTION 'project_not_found' USING ERRCODE = 'P0002'; END IF;
@@ -341,7 +364,8 @@ DECLARE
   v_asset public.studio_project_assets;
 BEGIN
   UPDATE public.studio_project_assets
-  SET upload_state = 'failed'
+  SET upload_state = 'failed',
+      upload_state_changed_at = now()
   WHERE id = p_asset_id
     AND project_id = p_project_id
     AND deleted_at IS NULL
@@ -363,17 +387,41 @@ AS $$
 DECLARE
   v_asset record;
 BEGIN
+  -- State-aware TTLs. p_max_age is ignored: created_at would kill a slow
+  -- 300 MiB PUT still in uploading. Ready rows are never released here.
   FOR v_asset IN
     SELECT id, project_id
     FROM public.studio_project_assets
     WHERE deleted_at IS NULL
-      AND upload_state IN ('reserved', 'uploading', 'processing', 'failed')
-      AND created_at < now() - p_max_age
+      AND upload_state <> 'ready'
+      AND (
+        (upload_state = 'reserved' AND upload_state_changed_at < now() - interval '30 minutes')
+        OR (upload_state = 'uploading' AND upload_state_changed_at < now() - interval '8 hours')
+        OR (upload_state = 'processing' AND upload_state_changed_at < now() - interval '45 minutes')
+        OR (upload_state = 'failed' AND upload_state_changed_at < now() - interval '15 minutes')
+      )
     FOR UPDATE SKIP LOCKED
   LOOP
     RETURN QUERY
     SELECT released.storage_path
     FROM public.release_studio_project_asset(v_asset.project_id, v_asset.id) AS released;
+  END LOOP;
+
+  FOR v_asset IN
+    SELECT id, project_id, pending_storage_path
+    FROM public.studio_project_assets
+    WHERE deleted_at IS NULL
+      AND upload_state = 'ready'
+      AND pending_source_id IS NOT NULL
+      AND pending_reserved_at IS NOT NULL
+      AND pending_reserved_at < now() - interval '8 hours'
+    FOR UPDATE SKIP LOCKED
+  LOOP
+    IF v_asset.pending_storage_path IS NOT NULL THEN
+      storage_path := v_asset.pending_storage_path;
+      RETURN NEXT;
+    END IF;
+    PERFORM public.studio_clear_project_asset_replacement(v_asset.project_id, v_asset.id);
   END LOOP;
 END;
 $$;
@@ -430,17 +478,21 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.studio_set_project_asset_upload_state(uuid, uuid, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.studio_finalize_project_asset(uuid, uuid, bigint, numeric, smallint, integer, bytea) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.studio_fail_project_asset(uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.studio_cleanup_stale_asset_uploads(interval) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.studio_reserve_project_asset_replacement(uuid, uuid, uuid, text, text, text, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.studio_clear_project_asset_replacement(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.studio_reserve_project_asset(uuid, uuid, text, text, text, bigint, text, numeric) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_set_project_asset_upload_state(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_finalize_project_asset(uuid, uuid, bigint, numeric, smallint, integer, bytea) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_fail_project_asset(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_cleanup_stale_asset_uploads(interval) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_reserve_project_asset_replacement(uuid, uuid, uuid, text, text, text, bigint) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.studio_clear_project_asset_replacement(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.replace_studio_project_asset(uuid, uuid, uuid, text, text, text, bigint, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.studio_reserve_project_asset(uuid, uuid, text, text, text, bigint, text, numeric) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_set_project_asset_upload_state(uuid, uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_finalize_project_asset(uuid, uuid, bigint, numeric, smallint, integer, bytea) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_fail_project_asset(uuid, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_cleanup_stale_asset_uploads(interval) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_reserve_project_asset_replacement(uuid, uuid, uuid, text, text, text, bigint) TO service_role;
 GRANT EXECUTE ON FUNCTION public.studio_clear_project_asset_replacement(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.replace_studio_project_asset(uuid, uuid, uuid, text, text, text, bigint, numeric) TO service_role;
 
 COMMIT;

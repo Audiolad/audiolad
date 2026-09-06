@@ -100,6 +100,8 @@ export type StudioProjectAssetRow = {
   pending_size_bytes?: number | null;
   pending_original_name?: string | null;
   pending_mime_type?: string | null;
+  pending_reserved_at?: string | null;
+  upload_state_changed_at?: string;
   created_at: string;
   deleted_at: string | null;
 };

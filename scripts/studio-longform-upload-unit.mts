@@ -29,6 +29,10 @@ import {
 } from "../src/lib/studio/server/validation";
 import { generateStudioPeaksV1FromInt16 } from "../src/lib/studio/server/peaks";
 import { STUDIO_LIMITS } from "../src/lib/studio/server/model";
+import {
+  isStudioPendingReplacementStale,
+  isStudioUploadStale,
+} from "../src/lib/studio/upload-stale";
 
 assert.equal(MAX_STUDIO_AUDIO_DURATION_SECONDS, 10800);
 assert.equal(MAX_STUDIO_ASSET_BYTES, 314572800);
@@ -164,6 +168,143 @@ assert.match(directUpload, /audio_too_long/);
 assert.match(directUpload, /asset_too_large/);
 assert.match(directUpload, /failAndReleaseStudioUpload/);
 assert.match(directUpload, /cleanupStaleStudioUploads/);
+assert.match(directUpload, /alreadyUploaded: true/);
+assert.match(directUpload, /abandonStudioDirectReplacement/);
+assert.match(directUpload, /readStudioStorageObjectInfo/);
 assert.doesNotMatch(directUpload, /file\.arrayBuffer\(/);
+assert.doesNotMatch(directUpload, /generateStudioPeaksV1FromFile/);
+assert.match(directUpload, /peaks: null/);
+
+const inspectBlock = directUpload.slice(
+  directUpload.indexOf("async function inspectUploadedAudio"),
+  directUpload.indexOf("async function deleteStoragePaths"),
+);
+assert.match(inspectBlock, /upload_not_complete/);
+assert.doesNotMatch(inspectBlock, /generateStudioPeaks/);
+
+assert.match(migration, /upload_state_changed_at/);
+assert.match(migration, /pending_reserved_at/);
+assert.match(migration, /interval '8 hours'/);
+assert.match(migration, /interval '30 minutes'/);
+assert.match(migration, /interval '45 minutes'/);
+assert.match(migration, /interval '15 minutes'/);
+assert.match(migration, /upload_state <> 'ready'/);
+assert.match(migration, /p_max_age is ignored/);
+assert.doesNotMatch(migration, /created_at < now\(\)/);
+assert.match(
+  migration,
+  /REVOKE ALL ON FUNCTION public\.studio_reserve_project_asset\([\s\S]*FROM PUBLIC, anon, authenticated/,
+);
+assert.match(
+  migration,
+  /REVOKE ALL ON FUNCTION public\.studio_cleanup_stale_asset_uploads\(interval\) FROM PUBLIC, anon, authenticated/,
+);
+assert.match(
+  migration,
+  /REVOKE ALL ON FUNCTION public\.replace_studio_project_asset\([\s\S]*FROM PUBLIC, anon, authenticated/,
+);
+assert.match(
+  migration,
+  /GRANT EXECUTE ON FUNCTION public\.studio_finalize_project_asset\([\s\S]*TO service_role/,
+);
+assert.doesNotMatch(migration, /GRANT EXECUTE[\s\S]*TO (PUBLIC|anon|authenticated)/);
+assert.match(migration, /AND upload_state <> 'ready'/);
+
+const cleanupSql = migration.slice(
+  migration.indexOf("studio_cleanup_stale_asset_uploads"),
+  migration.indexOf("CREATE OR REPLACE FUNCTION public.replace_studio_project_asset"),
+);
+assert.match(cleanupSql, /upload_state = 'reserved' AND upload_state_changed_at < now\(\) - interval '30 minutes'/);
+assert.match(cleanupSql, /upload_state = 'uploading' AND upload_state_changed_at < now\(\) - interval '8 hours'/);
+assert.match(cleanupSql, /upload_state = 'processing' AND upload_state_changed_at < now\(\) - interval '45 minutes'/);
+assert.match(cleanupSql, /upload_state = 'failed' AND upload_state_changed_at < now\(\) - interval '15 minutes'/);
+assert.match(cleanupSql, /pending_reserved_at < now\(\) - interval '8 hours'/);
+assert.match(cleanupSql, /studio_clear_project_asset_replacement/);
+assert.match(cleanupSql, /upload_state <> 'ready'/);
+assert.doesNotMatch(
+  cleanupSql,
+  /release_studio_project_asset\([^)]+\)[\s\S]{0,80}upload_state = 'ready'/,
+);
+
+const failSql = migration.slice(
+  migration.indexOf("studio_fail_project_asset"),
+  migration.indexOf("studio_cleanup_stale_asset_uploads"),
+);
+assert.match(failSql, /upload_state <> 'ready'/);
+
+const now = new Date("2026-09-06T18:00:00.000Z");
+const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "reserved",
+    stateChangedAt: hoursAgo(0.6),
+    now,
+  }),
+  true,
+  "old abandoned reserve is stale",
+);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "uploading",
+    stateChangedAt: hoursAgo(2),
+    now,
+  }),
+  false,
+  "active long-form 300 MiB PUT at 2h is not stale",
+);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "uploading",
+    stateChangedAt: hoursAgo(3),
+    now,
+  }),
+  false,
+  "active long-form upload at 3h is not stale",
+);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "uploading",
+    stateChangedAt: hoursAgo(8.1),
+    now,
+  }),
+  true,
+  "upload abandoned after 8h is stale",
+);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "failed",
+    stateChangedAt: hoursAgo(0.3),
+    now,
+  }),
+  true,
+  "failed upload is cleaned",
+);
+assert.equal(
+  isStudioUploadStale({
+    uploadState: "ready",
+    stateChangedAt: hoursAgo(48),
+    now,
+  }),
+  false,
+  "ready asset is never cleaned",
+);
+assert.equal(
+  isStudioPendingReplacementStale({
+    pendingReservedAt: hoursAgo(2),
+    now,
+  }),
+  false,
+);
+assert.equal(
+  isStudioPendingReplacementStale({
+    pendingReservedAt: hoursAgo(8.1),
+    now,
+  }),
+  true,
+);
+
+assert.match(provider, /retryStudioProjectAssetUpload/);
+assert.match(provider, /abandonStudioProjectAssetUpload/);
+assert.match(provider, /pendingReserveAssetIdsRef/);
 
 console.log("studio longform upload checks passed");

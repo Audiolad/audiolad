@@ -209,23 +209,41 @@ bucket `studio-draft-assets` до `file_size_limit = 314572800` (300 MiB) и
 
 `upload_state` на `studio_project_assets`: `reserved` → `uploading` →
 `processing` → `ready` | `failed`. Существующие строки backfill в `ready`.
-Квота проекта считает `reserved` + `uploading` + `processing` + `ready`;
-`failed` не занимает квоту. Playback, download, list и ссылки в
-`project_data` принимают только `ready`.
+`upload_state_changed_at` обновляется на каждом переходе состояния; stale
+cleanup смотрит на него, не на `created_at`. Квота проекта считает
+`reserved` + `uploading` + `processing` + `ready`; `failed` не занимает
+квоту. Playback, download, list и ссылки в `project_data` принимают только
+`ready`.
 
 Загрузка: JSON reserve (метаданные) → браузерный signed PUT напрямую на
 Storage host (`NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/upload/sign/...`) →
 finalize. Тело файла не проходит через Next.js. Клиентская длительность
 (HTMLAudioElement `preload=metadata`) — только preflight; authority на
-finalize — `ffprobe` по объекту в Storage. Сверх 300 MiB, 10800 с или
+finalize — размер объекта в Storage + `ffprobe`. Если PUT принят Storage,
+а браузер потерял ответ, клиент не создаёт новый reserve и вызывает
+finalize той же строки; совпадение размера + успешный probe → `ready`.
+Неполный/отсутствующий объект даёт `upload_not_complete` без снятия
+reservation, retry переиспользует её. Сверх 300 MiB, 10800 с или
 невалидное аудио отклоняется, объект удаляется, reservation снимается.
-Orphan cleanup: `studio_cleanup_stale_asset_uploads` (2 часа), вызывается
-лениво из reserve и guest cleanup.
 
-Peaks V1 (опционально после finalize): `peaks_version=1`,
-`peaks_columns = min(32768, max(8192, ceil(duration_seconds * 10)))`,
-interleaved int16 min/max, не больше ~128 KiB. Timeline/playback не зависят
-от peaks; fallback waveform остаётся.
+Замена готового ассета (`replaceStudioProjectAsset`) пишет
+`pending_source_id` / `pending_storage_path` / `pending_reserved_at`, не
+трогая ready-поля. Ошибка PUT/abort/finalize чистит pending и Storage
+orphan; старый ready-актив остаётся. Stale pending старше 8 часов
+снимается cleanup без `release` ready-строки.
+
+Orphan cleanup: `studio_cleanup_stale_asset_uploads` (лениво из reserve).
+`p_max_age` игнорируется. State-aware TTL от `upload_state_changed_at`:
+reserved 30 мин, uploading 8 ч (медленный 300 MiB PUT), processing
+45 мин, failed 15 мин. `ready` никогда не release-ится этим RPC.
+
+Peaks V1 схема и хелперы сохранены, но finalize **не** вызывает FFmpeg
+peaks. Готовность ассета не зависит от peaks. Timeline/playback используют
+fallback waveform. Peaks generation — отдельный шаг (PR3b), не worker.
+
+Новые/изменённые SECURITY DEFINER RPC этой миграции: `EXECUTE` только у
+`service_role`. `REVOKE ALL` у `PUBLIC` / `anon` / `authenticated`. Клиент
+не вызывает privileged RPC напрямую — только Next.js API + service role.
 
 **Ручная приёмка после merge/deploy (не в этом PR):**
 
