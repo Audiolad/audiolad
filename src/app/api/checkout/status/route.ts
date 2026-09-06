@@ -53,7 +53,9 @@ export async function GET(request: Request) {
 
   const { data: order, error: orderError } = await serviceRoleClient
     .from("orders")
-    .select("id, status, practice_slug_snapshot, practice_title_snapshot")
+    .select(
+      "id, status, practice_slug_snapshot, practice_title_snapshot, order_kind, target_access_level",
+    )
     .eq("id", orderId)
     .maybeSingle();
 
@@ -102,6 +104,15 @@ export async function GET(request: Request) {
         : null,
     authorSlug,
     authenticated: Boolean(user),
+    orderKind:
+      typeof (order as { order_kind?: unknown }).order_kind === "string"
+        ? (order as { order_kind: string }).order_kind
+        : null,
+    targetAccessLevel:
+      typeof (order as { target_access_level?: unknown }).target_access_level ===
+      "number"
+        ? (order as { target_access_level: number }).target_access_level
+        : null,
   });
 
   logCheckoutEvent("checkout_status_resolved", {

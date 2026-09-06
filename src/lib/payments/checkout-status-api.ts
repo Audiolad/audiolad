@@ -11,6 +11,8 @@ export type CheckoutStatusResponseBody = {
   practiceTitle: string | null;
   authorSlug: string | null;
   authenticated: boolean;
+  orderKind?: string | null;
+  targetAccessLevel?: number | null;
 };
 
 export type CheckoutStatusErrorCode = "invalid_request" | "invalid_token";
@@ -45,6 +47,8 @@ export function toCheckoutStatusBody(input: {
   practiceTitle: string | null;
   authorSlug?: string | null;
   authenticated: boolean;
+  orderKind?: string | null;
+  targetAccessLevel?: number | null;
 }): CheckoutStatusResponseBody {
   const normalizedStatus = normalizeCheckoutOrderStatus(input.status);
 
@@ -58,6 +62,12 @@ export function toCheckoutStatusBody(input: {
     practiceTitle: input.practiceTitle,
     authorSlug: input.authorSlug?.trim() || null,
     authenticated: input.authenticated,
+    orderKind: input.orderKind?.trim() || null,
+    targetAccessLevel:
+      typeof input.targetAccessLevel === "number" &&
+      Number.isInteger(input.targetAccessLevel)
+        ? input.targetAccessLevel
+        : null,
   };
 }
 

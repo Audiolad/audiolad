@@ -1,3 +1,4 @@
+import { attachNativeUpgradeAction } from "./attach-upgrade-action";
 import { canAccessRequiredLevel, type CourseLearnerAccessSnapshot } from "./learner-access";
 import type {
   LearnerCourse,
@@ -218,7 +219,12 @@ export function toLearnerCourse(input: {
     publicationId: input.publicationId,
     accessLevel: input.access.accessLevel,
     privileged: input.access.privileged,
-    levels: mapPracticeAccessLevels(input.levels),
+    levels: attachNativeUpgradeAction({
+      levels: mapPracticeAccessLevels(input.levels),
+      accessLevel: input.access.accessLevel,
+      practiceId: input.publicationId,
+      privileged: input.access.privileged,
+    }),
     lessons,
   };
 }

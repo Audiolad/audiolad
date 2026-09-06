@@ -4,13 +4,14 @@ import type {
   LearnerCourse,
   LearnerCourseLesson,
   LearnerCourseLevel,
+  LearnerCourseUpgradeAction,
 } from "./learner-types";
 
 export type LearnerCourseLevelChrome = {
   heading: string;
   description: string | null;
   upgradePriceLabel: string | null;
-  upgradeAction: { href: string; label: string } | null;
+  upgradeAction: (LearnerCourseUpgradeAction & { label: string; href: string }) | null;
 };
 
 export type LearnerCourseLevelGroup = {
@@ -54,7 +55,9 @@ function buildChrome(
     return null;
   }
 
-  const href = catalog.upgradeAction?.href?.trim() || "";
+  const action = catalog.upgradeAction;
+  const href = action?.href?.trim() || "";
+  const isNativeUpgrade = action?.kind === "course_upgrade";
 
   return {
     heading: formatLearnerLevelHeading(catalog.level, catalog.title),
@@ -64,8 +67,14 @@ function buildChrome(
         ? `Доплата ${formatRubles(catalog.upgradePrice)}`
         : null,
     upgradeAction:
-      groupLocked && href
-        ? { href, label: learnerLevelUpgradeLabel(catalog.level) }
+      groupLocked && (href || isNativeUpgrade)
+        ? {
+            href,
+            label: learnerLevelUpgradeLabel(catalog.level),
+            kind: action?.kind,
+            practiceId: action?.practiceId,
+            targetAccessLevel: action?.targetAccessLevel,
+          }
         : null,
   };
 }

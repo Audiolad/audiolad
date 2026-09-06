@@ -61,6 +61,10 @@ export const LEVEL_HAS_LESSONS_MESSAGE =
 export const LEVEL_HAS_ENTITLEMENTS_CODE = "level_has_entitlements";
 export const LEVEL_HAS_ENTITLEMENTS_MESSAGE =
   "Нельзя удалить уровень: у слушателей уже есть доступ этого уровня или выше.";
+export const LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE =
+  "level_has_live_upgrade_orders";
+export const LEVEL_HAS_LIVE_UPGRADE_ORDERS_MESSAGE =
+  "Нельзя удалить уровень, пока есть незавершённый или оплаченный заказ на этот уровень.";
 export const ACCESS_LEVELS_BOOTSTRAP_REQUIRED_CODE =
   "access_levels_bootstrap_required";
 export const ACCESS_LEVELS_BOOTSTRAP_REQUIRED_MESSAGE =
@@ -496,6 +500,7 @@ export function evaluateAccessLevelDelete(input: {
   maxLevel: number;
   lessonCountAtLevel: number;
   entitlementCountAtOrAbove: number;
+  liveUpgradeOrderCount?: number;
 }):
   | { ok: true }
   | { ok: false; code: string; status: 409; message: string } {
@@ -532,6 +537,15 @@ export function evaluateAccessLevelDelete(input: {
       code: LEVEL_HAS_ENTITLEMENTS_CODE,
       status: 409,
       message: LEVEL_HAS_ENTITLEMENTS_MESSAGE,
+    };
+  }
+
+  if ((input.liveUpgradeOrderCount ?? 0) > 0) {
+    return {
+      ok: false,
+      code: LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE,
+      status: 409,
+      message: LEVEL_HAS_LIVE_UPGRADE_ORDERS_MESSAGE,
     };
   }
 
@@ -657,6 +671,8 @@ export function getCourseAccessLevelErrorMessage(code: string | undefined): stri
       return LEVEL_HAS_LESSONS_MESSAGE;
     case LEVEL_HAS_ENTITLEMENTS_CODE:
       return LEVEL_HAS_ENTITLEMENTS_MESSAGE;
+    case LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE:
+      return LEVEL_HAS_LIVE_UPGRADE_ORDERS_MESSAGE;
     case LESSON_LEVEL_NOT_CONFIGURED_CODE:
       return LESSON_LEVEL_NOT_CONFIGURED_MESSAGE;
     case LESSON_LEVEL_RAISE_LOCKED_CODE:

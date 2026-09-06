@@ -23,6 +23,7 @@ import {
   serializeLearnerCourse,
   toLearnerCourse,
 } from "../src/lib/course-content/index.ts";
+import { attachNativeUpgradeAction } from "../src/lib/course-content/attach-upgrade-action.ts";
 import { loadCourseLearnerContent } from "../src/lib/course-content/learner-content.ts";
 import { signLearnerPublicationFile } from "../src/lib/course-content/learner-file-sign.ts";
 import {
@@ -1256,13 +1257,15 @@ assert.match(ui, /chrome\.upgradeAction/);
 assert.match(ui, /upgradePriceLabel/);
 assert.doesNotMatch(ui, /showLevelChrome/);
 assert.doesNotMatch(ui, /levelForLesson/);
-assert.doesNotMatch(ui, /checkout|tochka|order_kind/i);
+assert.match(ui, /CourseLevelUpgradeButton/);
+assert.doesNotMatch(ui, /tochka|order_kind/i);
 
 const groupsSource = read("src/lib/course-content/learner-groups.ts");
 assert.match(groupsSource, /Доплата/);
 assert.match(groupsSource, /Открыть второй уровень/);
 assert.match(groupsSource, /kind: "flat"/);
-assert.doesNotMatch(groupsSource, /checkout|tochka|order_kind/i);
+assert.match(groupsSource, /course_upgrade/);
+assert.doesNotMatch(groupsSource, /tochka|order_kind/i);
 
 const page = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(page, /loadCourseLearnerContent/);
@@ -1306,5 +1309,33 @@ for (const relative of migrations) {
 
 assert.equal(typeof loadCourseLearnerContent, "function");
 assert.equal(typeof signLearnerPublicationFile, "function");
+
+const threeLevels = attachNativeUpgradeAction({
+  levels: [
+    { level: 1, title: "L1", description: null, upgradePrice: null, currency: "RUB" },
+    { level: 2, title: "L2", description: null, upgradePrice: 2222, currency: "RUB" },
+    { level: 3, title: "L3", description: null, upgradePrice: 1500, currency: "RUB" },
+  ],
+  accessLevel: 1,
+  practiceId: "11111111-1111-4111-8111-111111111111",
+  privileged: false,
+});
+assert.equal(threeLevels[1].upgradeAction?.kind, "course_upgrade");
+assert.equal(threeLevels[2].upgradeAction, undefined);
+const afterL2 = attachNativeUpgradeAction({
+  levels: threeLevels,
+  accessLevel: 2,
+  practiceId: "11111111-1111-4111-8111-111111111111",
+  privileged: false,
+});
+assert.equal(afterL2[1].upgradeAction, undefined);
+assert.equal(afterL2[2].upgradeAction?.targetAccessLevel, 3);
+const atMax = attachNativeUpgradeAction({
+  levels: afterL2,
+  accessLevel: 3,
+  practiceId: "11111111-1111-4111-8111-111111111111",
+  privileged: false,
+});
+assert.ok(atMax.every((row) => !row.upgradeAction));
 
 console.log("course-learner-access-unit: ok");

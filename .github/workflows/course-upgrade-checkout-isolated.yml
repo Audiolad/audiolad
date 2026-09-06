@@ -1,0 +1,63 @@
+name: Course Upgrade Checkout Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/course-upgrade-checkout-isolated.yml"
+      - "scripts/course-upgrade-checkout-sql-unit.mjs"
+      - "scripts/lib/course-access-levels-sql-stub.sql"
+      - "scripts/lib/course-access-levels-pre-migration-seed.sql"
+      - "scripts/lib/course-upgrade-checkout-sql-stub.sql"
+      - "scripts/lib/course-upgrade-fulfill-sql-stub.sql"
+      - "scripts/lib/course-upgrade-canonical-sql-stub.sql"
+      - "scripts/lib/course-upgrade-projection-sql-stub.sql"
+      - "supabase/migrations/20260923120100_course_access_levels_foundation.sql"
+      - "supabase/migrations/20260925120000_course_upgrade_order_kind.sql"
+      - "supabase/migrations/20260925120100_create_course_upgrade_order.sql"
+      - "supabase/migrations/20260925120200_fulfill_tochka_course_upgrade.sql"
+      - "supabase/migrations/20260925120300_create_course_upgrade_order_idempotency.sql"
+      - "supabase/migrations/20260925120400_course_upgrade_canonical_sale.sql"
+      - "supabase/migrations/20260925120500_course_upgrade_canonical_sales_projection.sql"
+      - "supabase/migrations/20260925120600_course_upgrade_canonical_sales_amount_match.sql"
+      - "supabase/tests/course_upgrade_checkout_smoke.sql"
+      - "supabase/tests/course_upgrade_fulfill_smoke.sql"
+      - "supabase/tests/course_upgrade_canonical_projection_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  course-upgrade-checkout-isolated:
+    name: Course Upgrade Checkout Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_course_upgrade_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_course_upgrade_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_course_upgrade_isolated
+      - name: Execute fulfill_tochka_payment_transactional
+        env:
+          AUDIOLAD_COURSE_UPGRADE_ISOLATED: "1"
+          AUDIOLAD_COURSE_UPGRADE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_course_upgrade_isolated
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:course-upgrade-checkout:isolated

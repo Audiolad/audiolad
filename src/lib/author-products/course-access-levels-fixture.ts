@@ -11,6 +11,9 @@ export const COURSE_ACCESS_LEVELS_TEST_L2_TITLE = "Работа с другим�
 export const COURSE_ACCESS_LEVELS_TEST_L2_DESCRIPTION =
   "Как выстраивать контакт";
 export const COURSE_ACCESS_LEVELS_TEST_L2_UPGRADE_PRICE = 2222;
+export const COURSE_ACCESS_LEVELS_TEST_L3_TITLE = "Третий уровень";
+export const COURSE_ACCESS_LEVELS_TEST_L3_DESCRIPTION = "Расширенный контур";
+export const COURSE_ACCESS_LEVELS_TEST_L3_UPGRADE_PRICE = 1500;
 
 export const COURSE_ACCESS_LEVELS_TEST_L1_LESSON_TITLES = [
   "Материал 1.1",
@@ -23,6 +26,31 @@ export const COURSE_ACCESS_LEVELS_TEST_L2_LESSON_TITLES = [
   "Материал 2.2",
   "Материал 2.3",
 ] as const;
+
+export function createCourseAccessLevelsThreeLevelTestCatalog(
+  practiceId = "course-1",
+) {
+  const two = createCourseAccessLevelsTestCatalog(practiceId);
+  const now = "2026-09-06T12:00:00.000Z";
+
+  return {
+    ...two,
+    access_levels: [
+      ...two.access_levels,
+      {
+        id: "level-3",
+        practice_id: practiceId,
+        level: 3,
+        title: COURSE_ACCESS_LEVELS_TEST_L3_TITLE,
+        description: COURSE_ACCESS_LEVELS_TEST_L3_DESCRIPTION,
+        upgrade_price: COURSE_ACCESS_LEVELS_TEST_L3_UPGRADE_PRICE,
+        currency: "RUB",
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+  };
+}
 
 export function createCourseAccessLevelsTestCatalog(practiceId = "course-1") {
   const now = "2026-09-06T12:00:00.000Z";

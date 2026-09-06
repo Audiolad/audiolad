@@ -243,10 +243,25 @@ Timeweb Cloud
   `max(level)+1`. Запись каталога — author API →
   `requireCourseBuilder*Access` → `service_role`. Authenticated RLS
   INSERT/UPDATE/DELETE на `practice_access_levels` не добавляется.
-  Checkout, Tochka, `orders.order_kind` / `target_access_level` и
-  реальный продукт «Код женской притягательности» в этом этапе нет.
   SQL `assert_practice_moderation_ready` (v6) повторяет TS-коды готовности
   уровней, только если в каталоге есть строки; пустой каталог — legacy.
+- Phase 4 Native course upgrade checkout: one public audiocourse. Learner
+  CTA on the immediate next locked level posts to
+  `POST /api/checkout/course-upgrade` (`{ practiceId }`; optional
+  `targetAccessLevel` must equal `current+1`). Usable customer email is
+  validated before a new pending upgrade order is created. Server creates
+  `orders.order_kind=course_upgrade` with snapshot `amount_minor` from
+  `upgrade_price`, then the existing Tochka payment + webhook +
+  `fulfill_tochka_payment_transactional` path. Upgrade grant happens
+  inside that SQL transaction via `grant_practice_access`; `access_source`
+  is not rewritten. A paid `course_upgrade` is a canonical author sale from
+  the paid transaction (paid order + succeeded real payment + valid amount),
+  not from historical `user_practices.access_source`. `product_purchase`
+  still requires `access_source='purchase'`. Idempotent replay of the same
+  key returns the original upgrade snapshot and does not recompute
+  `current+1`. Not a second Product, finance system, or payment provider.
+  Product «Код женской притягательности», one-time links, email binding,
+  and automatic refund downgrade stay out of scope.
 
 ## MAX Mini App (этапы 1–3B)
 
