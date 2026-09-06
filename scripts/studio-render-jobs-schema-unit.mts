@@ -34,4 +34,24 @@ for (const pattern of [
 }
 
 assert.doesNotMatch(sql, /20260808163000_studio_render_export_v1/);
+
+const heartbeat = await readFile(
+  new URL("../supabase/migrations/20260923120000_studio_render_job_lease_heartbeat.sql", import.meta.url),
+  "utf8",
+);
+for (const pattern of [
+  /ADD COLUMN IF NOT EXISTS lease_token uuid NULL/,
+  /lease_token = gen_random_uuid\(\)/,
+  /CREATE OR REPLACE FUNCTION public\.renew_studio_render_job_lease/,
+  /lease_token = p_lease_token/,
+  /CREATE OR REPLACE FUNCTION public\.release_studio_render_job/,
+  /attempt_count = GREATEST\(0, attempt_count - 1\)/,
+  /lease_token = NULL/,
+  /GRANT EXECUTE ON FUNCTION public\.renew_studio_render_job_lease\(uuid, uuid, integer\) TO service_role/,
+  /GRANT EXECUTE ON FUNCTION public\.release_studio_render_job\(uuid, uuid\) TO service_role/,
+]) {
+  assert.match(heartbeat, pattern);
+}
+assert.doesNotMatch(heartbeat, /p_lease_seconds integer DEFAULT 5400/);
+
 console.log("studio render jobs schema contract: ok");
