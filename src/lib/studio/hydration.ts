@@ -7,6 +7,11 @@ import type {
   StudioPersistedProject,
 } from "./persistence-client";
 
+export const STUDIO_PROJECT_HYDRATION_TIMEOUT_MS = 120_000;
+
+export const STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE =
+  "Загрузка аудио заняла слишком много времени. Проверьте соединение и повторите попытку.";
+
 export type StudioHydratedAsset = {
   metadata: StudioProjectAssetMetadata;
   blob: Blob;
@@ -23,6 +28,14 @@ export type StudioProjectHydration = {
   state: StudioPersistedProjectState;
   assets: Map<string, StudioHydratedAsset>;
   failures: Map<string, Error>;
+  assetMetadata: ReadonlyMap<string, StudioProjectAssetMetadata>;
+};
+
+export type StudioHydrationFailureKind = "unmount" | "timeout" | "aborted";
+
+export type StudioHydratedTrackLoadState = {
+  status: "ready" | "error";
+  replacementError: string | null;
 };
 
 function abortIfNeeded(signal?: AbortSignal) {
@@ -30,8 +43,123 @@ function abortIfNeeded(signal?: AbortSignal) {
 }
 
 /**
- * Fetches each referenced asset once. Decoding is injected so the caller can
- * use the audio provider's existing AudioContext rather than creating another.
+ * Initial open only needs assets that already appear on the timeline.
+ * Empty tracks keep their assetId for a later lazy load.
+ */
+export function collectInitialHydrationAssetIds(
+  tracks: readonly unknown[],
+): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const track of tracks) {
+    if (!track || typeof track !== "object") continue;
+    const assetId = (track as { assetId?: unknown }).assetId;
+    const clips = (track as { clips?: unknown }).clips;
+    if (typeof assetId !== "string" || assetId.length === 0) continue;
+    if (!Array.isArray(clips) || clips.length === 0) continue;
+    if (seen.has(assetId)) continue;
+    seen.add(assetId);
+    ids.push(assetId);
+  }
+  return ids;
+}
+
+export function classifyStudioHydrationFailure({
+  unmounted,
+  timedOut,
+  aborted = false,
+}: {
+  unmounted: boolean;
+  timedOut: boolean;
+  aborted?: boolean;
+}): StudioHydrationFailureKind | null {
+  if (unmounted) return "unmount";
+  if (timedOut) return "timeout";
+  if (aborted) return "aborted";
+  return null;
+}
+
+export function createStudioHydrationTimeout({
+  abort,
+  timeoutMs = STUDIO_PROJECT_HYDRATION_TIMEOUT_MS,
+  setTimeoutFn = (handler, timeout) => setTimeout(handler, timeout),
+  clearTimeoutFn = (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+}: {
+  abort: () => void;
+  timeoutMs?: number;
+  setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
+  clearTimeoutFn?: (id: unknown) => void;
+}): {
+  didTimeOut: () => boolean;
+  cancel: () => void;
+} {
+  let timedOut = false;
+  const id = setTimeoutFn(() => {
+    timedOut = true;
+    abort();
+  }, timeoutMs);
+  return {
+    didTimeOut: () => timedOut,
+    cancel: () => {
+      clearTimeoutFn(id);
+    },
+  };
+}
+
+export function getHydratedTrackLoadState({
+  clipsLength,
+  hasAsset,
+  failureMessage = null,
+}: {
+  clipsLength: number;
+  hasAsset: boolean;
+  failureMessage?: string | null;
+}): StudioHydratedTrackLoadState {
+  if (hasAsset) {
+    return { status: "ready", replacementError: null };
+  }
+  if (clipsLength === 0 && !failureMessage) {
+    return { status: "ready", replacementError: null };
+  }
+  return {
+    status: "error",
+    replacementError: failureMessage ?? "Не удалось загрузить аудио дорожки.",
+  };
+}
+
+export async function loadPersistedStudioAsset({
+  metadata,
+  download,
+  decode,
+  signal,
+}: {
+  metadata: StudioProjectAssetMetadata;
+  download: (asset: StudioProjectAssetMetadata, signal?: AbortSignal) => Promise<Blob>;
+  decode: (blob: Blob, metadata: StudioProjectAssetMetadata) => Promise<AudioBuffer>;
+  signal?: AbortSignal;
+}): Promise<StudioHydratedAsset> {
+  abortIfNeeded(signal);
+  const blob = await download(metadata, signal);
+  abortIfNeeded(signal);
+  const buffer = await decode(blob, metadata);
+  abortIfNeeded(signal);
+  if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+    throw new Error("Аудиофайл проекта повреждён.");
+  }
+  return {
+    metadata,
+    blob,
+    file: new File([blob], metadata.originalName, {
+      type: metadata.mimeType || blob.type,
+    }),
+    buffer,
+  };
+}
+
+/**
+ * Fetches each referenced (non-empty) asset once. Decoding is injected so the
+ * caller can use the audio provider's existing AudioContext rather than
+ * creating another.
  */
 export async function hydrateStudioProject({
   project,
@@ -49,7 +177,7 @@ export async function hydrateStudioProject({
   abortIfNeeded(signal);
   const state = parseStudioProjectDocument(project.projectData);
   const metadataById = new Map(assets.map((asset) => [asset.id, asset]));
-  const assetIds = [...new Set(state.tracks.map((track) => track.assetId))];
+  const assetIds = collectInitialHydrationAssetIds(state.tracks);
   const results = await Promise.all(
     assetIds.map(async (assetId): Promise<StudioHydrationAssetResult> => {
       const metadata = metadataById.get(assetId);
@@ -57,17 +185,13 @@ export async function hydrateStudioProject({
         return { assetId, error: new Error("Аудиофайл проекта не найден.") };
       }
       try {
-        const blob = await download(metadata, signal);
-        abortIfNeeded(signal);
-        const buffer = await decode(blob, metadata);
-        abortIfNeeded(signal);
-        if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
-          throw new Error("Аудиофайл проекта повреждён.");
-        }
-        const file = new File([blob], metadata.originalName, {
-          type: metadata.mimeType || blob.type,
+        const asset = await loadPersistedStudioAsset({
+          metadata,
+          download,
+          decode,
+          signal,
         });
-        return { assetId, asset: { metadata, blob, file, buffer } };
+        return { assetId, asset };
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
         return {
@@ -83,5 +207,5 @@ export async function hydrateStudioProject({
     if ("asset" in result) hydratedAssets.set(result.assetId, result.asset);
     else failures.set(result.assetId, result.error);
   }
-  return { project, state, assets: hydratedAssets, failures };
+  return { project, state, assets: hydratedAssets, failures, assetMetadata: metadataById };
 }

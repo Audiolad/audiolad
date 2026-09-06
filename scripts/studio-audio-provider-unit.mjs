@@ -255,6 +255,10 @@ function testProviderEngineLifecycle() {
     /trackRuntimesRef\.current\.get\(trackId\)\?\.buffer \?\? null/,
   );
   assert.match(provider, /replaceTrackAudio/);
+  assert.match(provider, /getHydratedTrackLoadState/);
+  assert.match(provider, /ensurePersistedTrackAsset/);
+  assert.match(provider, /if \(!track \|\| track\.isReplacing\)/);
+  assert.doesNotMatch(provider, /if \(!track \|\| !runtime \|\| track\.isReplacing\)/);
   assert.match(provider, /ingestRecordedFile/);
   assert.match(provider, /validateStudioRecordedFile/);
   assert.match(provider, /clips: \[\{/);

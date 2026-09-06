@@ -2639,6 +2639,17 @@ export default function StudioEditorShell({
               if (!slotId || !file) {
                 return;
               }
+              const existingTrackId = slotsRef.current.find((item) => item.id === slotId)?.audioTrackId;
+              if (existingTrackId) {
+                void replaceTrackAudio(existingTrackId, file).then((replaced) => {
+                  if (!replaced) return;
+                  const slot = slotsRef.current.find((item) => item.id === slotId);
+                  if (slot && renameDefaultSlotFromSource(slot.id, file.name)) {
+                    markSavedChange();
+                  }
+                });
+                return;
+              }
               void loadLocalFiles([file], trackKind ?? "music").then(([track]) => {
                 if (track) {
                   setSlots((currentSlots) =>
