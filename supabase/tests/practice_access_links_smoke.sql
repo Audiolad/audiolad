@@ -343,11 +343,11 @@ BEGIN
       END IF;
   END;
 
-  SELECT count(*) INTO v_status
+  SELECT count(*) INTO v_count
   FROM public.practice_access_links
   WHERE token_hash = encode(digest('deletedLevelToken0000000000000000000014', 'sha256'), 'hex')
     AND status = 'active';
-  IF v_status <> 1 THEN
+  IF v_count <> 1 THEN
     RAISE EXCEPTION 'failed redeem must not consume the link';
   END IF;
 
