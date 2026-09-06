@@ -82,13 +82,13 @@ export function classifyStudioHydrationFailure({
 export function createStudioHydrationTimeout({
   abort,
   timeoutMs = STUDIO_PROJECT_HYDRATION_TIMEOUT_MS,
-  setTimeoutFn = setTimeout,
-  clearTimeoutFn = clearTimeout,
+  setTimeoutFn = (handler, timeout) => setTimeout(handler, timeout),
+  clearTimeoutFn = (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
 }: {
   abort: () => void;
   timeoutMs?: number;
-  setTimeoutFn?: (handler: () => void, timeout: number) => ReturnType<typeof setTimeout>;
-  clearTimeoutFn?: (id: ReturnType<typeof setTimeout>) => void;
+  setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
+  clearTimeoutFn?: (id: unknown) => void;
 }): {
   didTimeOut: () => boolean;
   cancel: () => void;

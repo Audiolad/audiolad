@@ -293,7 +293,7 @@ const hydrationTimeout = createStudioHydrationTimeout({
   },
   setTimeoutFn: (fn, ms) => {
     scheduled.push({ fn, ms });
-    return 1 as ReturnType<typeof setTimeout>;
+    return 1;
   },
   clearTimeoutFn: () => {
     cleared = true;
@@ -326,7 +326,7 @@ const hardLimitTimeout = createStudioHydrationTimeout({
   },
   setTimeoutFn: (fn, ms) => {
     scheduled.push({ fn, ms });
-    return 2 as ReturnType<typeof setTimeout>;
+    return 2;
   },
   clearTimeoutFn: () => {},
 });
