@@ -95,6 +95,10 @@ function runTests() {
   assert.equal(signInParams.get("reset"), "1");
   assert.equal(signInParams.get("next"), checkoutNext);
 
+  const accessNext =
+    "/access/abcdefghijklmnopqrstuvwxyz0123456789ABCD";
+  assert.equal(resolveValidatedNextPath(accessNext), accessNext);
+
   // Auth entry routes cannot be used as ultimate destination
   assert.equal(resolveValidatedNextPath("/auth/sign-in"), null);
   assert.equal(

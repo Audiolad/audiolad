@@ -186,10 +186,12 @@ export async function deleteCourseAccessLevel(
 
   const maxLevel = Math.max(...existing.map((item) => item.level));
 
+  const nowIso = new Date().toISOString();
   const [
     { count: lessonCount, error: lessonError },
     { count: entitlementCount, error: entitlementError },
     { count: liveUpgradeCount, error: liveUpgradeError },
+    { count: activeAccessLinkCount, error: accessLinkError },
   ] = await Promise.all([
     service
       .from("course_lessons")
@@ -208,9 +210,16 @@ export async function deleteCourseAccessLevel(
       .eq("order_kind", "course_upgrade")
       .eq("target_access_level", level)
       .in("status", ["pending", "paid"]),
+    service
+      .from("practice_access_links")
+      .select("id", { count: "exact", head: true })
+      .eq("practice_id", practiceId)
+      .eq("target_access_level", level)
+      .eq("status", "active")
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`),
   ]);
 
-  if (lessonError || entitlementError || liveUpgradeError) {
+  if (lessonError || entitlementError || liveUpgradeError || accessLinkError) {
     throw new CourseBuilderError("internal_error", 500);
   }
 
@@ -220,6 +229,7 @@ export async function deleteCourseAccessLevel(
     lessonCountAtLevel: lessonCount ?? 0,
     entitlementCountAtOrAbove: entitlementCount ?? 0,
     liveUpgradeOrderCount: liveUpgradeCount ?? 0,
+    activeAccessLinkCount: activeAccessLinkCount ?? 0,
   });
 
   if (!allowed.ok) {

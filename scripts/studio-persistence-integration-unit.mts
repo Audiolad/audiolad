@@ -104,6 +104,7 @@ class FakeStudioStore {
   readonly assets = new Map<string, { metadata: StudioProjectAssetMetadata; blob: Blob }>();
   putCount = 0;
   downloadCount = 0;
+  signCount = 0;
   decodeCount = 0;
   deleteCount = 0;
 
@@ -159,6 +160,17 @@ class FakeStudioStore {
     const stored = this.assets.get(asset.id);
     if (!stored) throw new Error("missing asset");
     return stored.blob;
+  }
+
+  async signPlayback(asset: StudioProjectAssetMetadata) {
+    this.signCount += 1;
+    const stored = this.assets.get(asset.id);
+    if (!stored) throw new Error("missing asset");
+    return {
+      url: `https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/${asset.id}?token=test`,
+      expiresAt: Date.now() + 14_400_000,
+      durationSeconds: stored.metadata.durationSeconds,
+    };
   }
 
   async decode(_blob?: Blob, _metadata?: StudioProjectAssetMetadata): Promise<AudioBuffer> {
@@ -259,8 +271,7 @@ function historyDocument(snapshot: {
   const hydrated = await hydrateStudioProject({
     project: store.project,
     assets: [...store.assets.values()].map(({ metadata }) => metadata),
-    download: (asset) => store.download(asset),
-    decode: (blob, metadata) => store.decode(blob, metadata),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydrated.failures.size, 0);
   assert.equal(hydrated.assets.size, 2);
@@ -280,12 +291,12 @@ function historyDocument(snapshot: {
   const hydrated = await hydrateStudioProject({
     project: { ...store.project, projectData: savedDocument },
     assets: [metadata],
-    download: (asset) => store.download(asset),
-    decode: (blob, asset) => store.decode(blob, asset),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydrated.state.tracks[0].clips.length, 2);
-  assert.equal(store.downloadCount, 1);
-  assert.equal(store.decodeCount, 1);
+  assert.equal(store.signCount, 1);
+  assert.equal(store.decodeCount, 0);
+  assert.equal(store.downloadCount, 0);
 }
 
 // Paste retains a trailing gap and persists the manual transport position.
@@ -434,13 +445,13 @@ function historyDocument(snapshot: {
   const hydrated = await hydrateStudioProject({
     project: store.project,
     assets: [metadata],
-    download: (asset) => store.download(asset),
-    decode: (blob, asset) => store.decode(blob, asset),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydrated.state.tracks.length, 2);
   assert.equal(hydrated.state.tracks[0].assetId, hydrated.state.tracks[1].assetId);
-  assert.equal(store.downloadCount, 1);
-  assert.equal(store.decodeCount, 1);
+  assert.equal(store.signCount, 1);
+  assert.equal(store.decodeCount, 0);
+  assert.equal(store.downloadCount, 0);
   assert.equal(store.deleteCount, 0);
   assert.equal(store.assets.size, 1);
 }
@@ -471,12 +482,12 @@ function historyDocument(snapshot: {
   const hydrated = await hydrateStudioProject({
     project: { ...store.project, projectData: document(0, tracks) },
     assets: [...store.assets.values()].map(({ metadata }) => metadata),
-    download: (asset) => store.download(asset),
-    decode: (blob, asset) => store.decode(blob, asset),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydrated.assets.size, 5);
-  assert.equal(store.downloadCount, 5);
-  assert.equal(store.decodeCount, 5);
+  assert.equal(store.signCount, 5);
+  assert.equal(store.decodeCount, 0);
+  assert.equal(store.downloadCount, 0);
 }
 
 // More than ten clips may share one asset without duplicate downloads or decodes.
@@ -493,12 +504,12 @@ function historyDocument(snapshot: {
       projectData: document(0, [track("fragments", metadata.id, { clips })]),
     },
     assets: [metadata],
-    download: (asset) => store.download(asset),
-    decode: (blob, asset) => store.decode(blob, asset),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydrated.state.tracks[0].clips.length, 12);
-  assert.equal(store.downloadCount, 1);
-  assert.equal(store.decodeCount, 1);
+  assert.equal(store.signCount, 1);
+  assert.equal(store.decodeCount, 0);
+  assert.equal(store.downloadCount, 0);
 }
 
 // Pending/error uploads block saves, then binding an asset and retrying releases one PUT.
@@ -579,8 +590,7 @@ function historyDocument(snapshot: {
   const hydration = await hydrateStudioProject({
     project: { ...store.project, projectData: missingAssetDocument },
     assets: [],
-    download: (asset) => store.download(asset),
-    decode: (blob, asset) => store.decode(blob, asset),
+    signPlayback: (asset) => store.signPlayback(asset),
   });
   assert.equal(hydration.failures.size, 1);
   const partial = createController(store, () => ({

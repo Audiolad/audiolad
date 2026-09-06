@@ -434,6 +434,70 @@ export async function downloadStudioProjectAsset({
   return response.blob();
 }
 
+export type StudioAssetPlaybackUrl = {
+  url: string;
+  expiresAt: number;
+  durationSeconds: number | null;
+};
+
+export async function getStudioAssetPlaybackUrl({
+  projectId,
+  assetId,
+  signal,
+}: {
+  projectId: string;
+  assetId: string;
+  signal?: AbortSignal;
+}): Promise<StudioAssetPlaybackUrl> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/playback`,
+    { cache: "no-store", signal },
+  );
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new StudioPersistenceClientError("asset_not_found", response.status);
+    }
+    throw await toStudioFetchError(response);
+  }
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("url" in body) ||
+    typeof body.url !== "string" ||
+    body.url.trim().length === 0 ||
+    !("expiresAt" in body)
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  const expiresAt =
+    typeof body.expiresAt === "number"
+      ? body.expiresAt
+      : typeof body.expiresAt === "string"
+        ? Date.parse(body.expiresAt)
+        : Number.NaN;
+  if (!Number.isFinite(expiresAt)) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  const durationSeconds =
+    "durationSeconds" in body &&
+    typeof body.durationSeconds === "number" &&
+    Number.isFinite(body.durationSeconds) &&
+    body.durationSeconds > 0
+      ? body.durationSeconds
+      : null;
+  return {
+    url: body.url.trim(),
+    expiresAt,
+    durationSeconds,
+  };
+}
+
 function isUploadedAsset(value: unknown): value is StudioUploadedAsset {
   return Boolean(
     value &&

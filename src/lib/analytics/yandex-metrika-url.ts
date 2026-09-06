@@ -1,3 +1,5 @@
+import { redactAccessTokenFromPath } from "@/lib/products/access-links";
+
 const SENSITIVE_QUERY_KEYS = new Set([
   "token",
   "access_token",
@@ -29,7 +31,7 @@ export function sanitizeMetrikaPageUrl(
   pathname: string,
   searchParams?: URLSearchParams | string | null,
 ): string {
-  const normalizedPath = pathname.trim() || "/";
+  const normalizedPath = redactAccessTokenFromPath(pathname.trim() || "/");
   const params =
     typeof searchParams === "string"
       ? new URLSearchParams(searchParams)

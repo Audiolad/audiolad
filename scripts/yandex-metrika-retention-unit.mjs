@@ -110,6 +110,11 @@ assert.equal(
   "/checkout/result?registered=1",
   "sensitive query params removed from page url",
 );
+assert.equal(
+  sanitizeMetrikaPageUrl("/access/abcdefghijklmnopqrstuvwxyz0123456789ABCD"),
+  "/access/[redacted]",
+  "access-link token is stripped from metrika pathname",
+);
 
 globalThis.process.env.NODE_ENV = "development";
 resetState();
@@ -127,6 +132,14 @@ assert.equal(
   "admin route disabled",
 );
 assert.equal(isAdminAnalyticsRoute("/admin/users"), true);
+assert.equal(
+  shouldEnableYandexMetrika({
+    pathname: "/access/abcdefghijklmnopqrstuvwxyz0123456789ABCD",
+    hostname: "audiolad.ru",
+  }),
+  false,
+  "access-link landing does not send metrika",
+);
 
 const dedupeKey = "session:accepted:banner";
 markPwaAnalyticsEventRecorded(dedupeKey);

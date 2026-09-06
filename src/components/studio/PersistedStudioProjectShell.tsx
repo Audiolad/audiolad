@@ -8,7 +8,7 @@ import {
 } from "@/components/studio/StudioAudioProvider";
 import StudioEditorShell from "@/components/studio/StudioEditorShell";
 import {
-  downloadStudioProjectAsset,
+  getStudioAssetPlaybackUrl,
   getStudioProjectForHydration,
   StudioPersistenceClientError,
 } from "@/lib/studio/persistence-client";
@@ -54,7 +54,7 @@ function Hydrator({
   recorderDebug: boolean;
   audioDebug: boolean;
 }) {
-  const { decodePersistedAsset, hydratePersistedProject } = useStudioAudio();
+  const { hydratePersistedProject } = useStudioAudio();
   const [hydration, setHydration] = useState<StudioProjectHydration | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,8 +83,8 @@ function Hydrator({
           project: response.project,
           assets: response.assets,
           signal: controller.signal,
-          download: async (asset, signal) => {
-            const blob = await downloadStudioProjectAsset({
+          signPlayback: async (asset, signal) => {
+            const signed = await getStudioAssetPlaybackUrl({
               projectId,
               assetId: asset.id,
               signal,
@@ -94,9 +94,8 @@ function Hydrator({
                 current ? { ...current, completed: current.completed + 1 } : current,
               );
             }
-            return blob;
+            return signed;
           },
-          decode: decodePersistedAsset,
         });
         if (!active) return;
         hydratePersistedProject(result);
@@ -133,7 +132,7 @@ function Hydrator({
       hydrationTimeout.cancel();
       controller.abort();
     };
-  }, [decodePersistedAsset, hydratePersistedProject, projectId, retryCount]);
+  }, [hydratePersistedProject, projectId, retryCount]);
 
   if (error) {
     return (
