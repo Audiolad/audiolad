@@ -78,6 +78,7 @@ function deniedAccess(overrides = {}) {
     isAuthorMember: false,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
     ...overrides,
   };
 }
@@ -275,6 +276,7 @@ const anonFreePractice = await resolveProductAccess(
 assert.equal(anonFreePractice.canListen, true, "7. practice free-by-link canListen");
 assert.equal(anonFreePractice.reason, "free");
 assert.equal(anonFreePractice.hasEntitlement, false);
+assert.equal(anonFreePractice.accessLevel, null);
 
 const practiceCourseAccess = await canAccessCourseContent(
   { from() { throw new Error("unused"); } },
@@ -300,6 +302,7 @@ assert.equal(
 );
 assert.equal(anonFreeCourse.reason, "free");
 assert.equal(anonFreeCourse.hasEntitlement, false);
+assert.equal(anonFreeCourse.accessLevel, null);
 
 const courseWithoutGrant = await canAccessCourseContent(
   mockSupabase(),
@@ -595,7 +598,7 @@ assert.equal(existsSync(join(root, "src/app/learn")), false);
 assert.equal(existsSync(join(root, "src/app/api/learn")), false);
 assert.match(
   read("src/lib/course-content/storage.ts"),
-  /No public learner download route/,
+  /Learner downloads go through signLearnerPublicationFile/,
 );
 assert.doesNotMatch(accessSrc, /app\/api\/learn/);
 

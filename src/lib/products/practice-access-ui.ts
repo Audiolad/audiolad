@@ -226,6 +226,7 @@ export function resolvePublishPreviewListenerAccess(
       isAuthorMember: access.isAuthorMember,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
     };
   }
 
@@ -237,6 +238,7 @@ export function resolvePublishPreviewListenerAccess(
     isAuthorMember: access.isAuthorMember,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
   };
 }
 
@@ -305,6 +307,7 @@ function resolveCommercialAccess(
         isAuthorMember: false,
         accessSource: null,
         hasEntitlement: false,
+        accessLevel: null,
       };
     }
 
@@ -320,6 +323,7 @@ function resolveCommercialAccess(
         isAuthorMember: false,
         accessSource: null,
         hasEntitlement: false,
+        accessLevel: null,
       };
     }
 
@@ -331,6 +335,7 @@ function resolveCommercialAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
     };
   }
 
@@ -344,6 +349,7 @@ function resolveCommercialAccess(
         isAuthorMember: true,
         accessSource: null,
         hasEntitlement: false,
+        accessLevel: null,
       };
     }
 
@@ -355,6 +361,7 @@ function resolveCommercialAccess(
       isAuthorMember: true,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
     };
   }
 

@@ -32,11 +32,14 @@ import type { ListenAccessMode, ListenTrack } from "@/lib/listen/types";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 import { readListenerSidebarPinnedState } from "@/lib/navigation/listener-sidebar";
 import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
+import { listAccessibleCourseAudioItemIds } from "@/lib/course-content/learner-assets";
+import { resolveCourseLearnerAccess } from "@/lib/course-content/learner-access";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import {
   canAccessCourseContent,
   resolveProductAccess,
 } from "@/lib/products/access";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import {
   getPracticeAuthorSlug,
@@ -265,6 +268,7 @@ async function loadListenTracks(
   supabase: Awaited<ReturnType<typeof createClient>>,
   practice: PracticeRow,
   accessMode: ListenAccessMode,
+  userId: string | null,
 ): Promise<ListenTrack[]> {
   let query = supabase
     .from("audio_items")
@@ -273,6 +277,25 @@ async function loadListenTracks(
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    const learnerAccess = await resolveCourseLearnerAccess(
+      supabase,
+      practice,
+      userId,
+    );
+    const accessibleIds = await listAccessibleCourseAudioItemIds({
+      serviceRole: createServiceRoleClient(),
+      publicationId: practice.id,
+      access: learnerAccess,
+    });
+
+    if (accessibleIds.size === 0) {
+      return [];
+    }
+
+    query = query.in("id", [...accessibleIds]);
+  }
 
   if (accessMode === "entitled") {
     query = query.eq("status", "published");
@@ -296,6 +319,10 @@ async function loadListenTracks(
 
   if (tracks.length > 0) {
     return tracks;
+  }
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    return [];
   }
 
   const legacyPath =
@@ -490,7 +517,12 @@ export async function renderListenPage(
   let tracks: ListenTrack[] = [];
 
   try {
-    tracks = await loadListenTracks(supabase, practiceRow, access.mode);
+    tracks = await loadListenTracks(
+      supabase,
+      practiceRow,
+      access.mode,
+      user?.id ?? null,
+    );
   } catch {
     return (
       <ListenMessageState

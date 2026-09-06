@@ -108,8 +108,11 @@ import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
 import { loadPricePromotionsForPractice } from "@/lib/pricing/queries";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
+import { loadCourseLearnerContent } from "@/lib/course-content/learner-content";
 import { isCoursePublication } from "@/lib/course-content/validators";
+import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import { isRatingsUiEnabled } from "@/lib/ratings/feature";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
@@ -404,6 +407,32 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     buyerPreviewMode: buyerPreviewActivated,
     canUseBuyerPreview: canUseBuyerPreviewMode(access),
   });
+
+  let learnerCourse: LearnerCourse | null = null;
+  const skipPrivateCourseOutline =
+    buyerPreviewMode || publishListenerViewMode || !user?.id;
+
+  if (
+    !skipPrivateCourseOutline &&
+    isCoursePublication(practice.publication_class, practice.product_kind)
+  ) {
+    try {
+      const loaded = await loadCourseLearnerContent({
+        supabase,
+        serviceRole: createServiceRoleClient(),
+        userId: user.id,
+        practice,
+        options: { access },
+      });
+
+      if (loaded.ok) {
+        learnerCourse = loaded.course;
+      }
+    } catch {
+      learnerCourse = null;
+    }
+  }
+
   const practicePagePath = buildPracticePublicPath(
     resolvedAuthorSlug,
     practice.slug,
@@ -688,6 +717,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listenDeniedMessage: publishPreviewMode ? null : listenDeniedMessage,
     practiceTopics,
     publicAudioItems,
+    learnerCourse,
     listeningNotice,
     mobileCover: {
       displayUrl: mobileCoverDisplayUrl,

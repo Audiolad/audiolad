@@ -43,7 +43,13 @@ assert.match(migration, /authenticated must not EXECUTE grant_practice_purchase_
 assert.doesNotMatch(migration, /user_practices_keep_highest_access_level/);
 assert.doesNotMatch(migration, /user_practices_access_level_monotonic/);
 assert.doesNotMatch(migration, /order_kind|target_access_level/);
-assert.doesNotMatch(accessTs, /access_level/, "learner filtering stays out of access.ts");
+assert.match(accessTs, /accessLevel/);
+assert.match(accessTs, /access_level/);
+assert.doesNotMatch(
+  accessTs,
+  /required_access_level/,
+  "lesson filtering stays out of access.ts",
+);
 
 function mockRpc(handler) {
   return {

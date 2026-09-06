@@ -1,4 +1,5 @@
 import LegalFooter from "@/components/LegalFooter";
+import CourseLearnerContent from "@/components/products/course-learner/CourseLearnerContent";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
@@ -24,6 +25,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
     description,
     seoContent,
     publicAudioItems,
+    learnerCourse,
     listeningNotice,
     presentation,
     resolvedAuthorSlug,
@@ -47,22 +49,30 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
 
-        <ProductContentsSection
-          items={publicAudioItems}
-          durationMinutesFallback={practice.duration_minutes}
-          productTitle={practice.title}
-          practiceCover={{
-            cover_url: practice.cover_url,
-            cover_image: practice.cover_image,
-            updated_at: practice.updated_at,
-            use_shared_cover: practice.use_shared_cover ?? true,
-          }}
-          playback={{
-            enabled: presentation.primaryAction.kind === "listen",
-            authorSlug: resolvedAuthorSlug,
-            productSlug: practice.slug,
-          }}
-        />
+        {learnerCourse ? (
+          <CourseLearnerContent
+            course={learnerCourse}
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+          />
+        ) : (
+          <ProductContentsSection
+            items={publicAudioItems}
+            durationMinutesFallback={practice.duration_minutes}
+            productTitle={practice.title}
+            practiceCover={{
+              cover_url: practice.cover_url,
+              cover_image: practice.cover_image,
+              updated_at: practice.updated_at,
+              use_shared_cover: practice.use_shared_cover ?? true,
+            }}
+            playback={{
+              enabled: presentation.primaryAction.kind === "listen",
+              authorSlug: resolvedAuthorSlug,
+              productSlug: practice.slug,
+            }}
+          />
+        )}
 
         {viewModel.ratingsUiEnabled ? (
           <PracticeRatingStars

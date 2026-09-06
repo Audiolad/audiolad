@@ -49,6 +49,13 @@ export type ProductAccessResult = {
   isAuthorMember: boolean;
   accessSource: string | null;
   hasEntitlement: boolean;
+  /**
+   * Active `user_practices.access_level`, or `1` for a legacy entitled row.
+   * `null` when there is no active entitlement. Author members and platform
+   * admins are a privileged bypass — they must not receive a fake level.
+   * `access_source=admin` with `access_level=1` is Level 1, not unlimited.
+   */
+  accessLevel: number | null;
   canSeeSelectedUsers?: boolean;
   catalogVisibility?: CatalogVisibility;
 };
@@ -108,6 +115,14 @@ export function canAcquirePractice(
   }
 
   return true;
+}
+
+export function normalizeEntitlementAccessLevel(value: unknown): number {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
+    return value;
+  }
+
+  return 1;
 }
 
 function isEntitlementActive(expiresAt: string | null): boolean {
@@ -209,6 +224,7 @@ export async function resolveProductAccess(
         isAuthorMember: true,
         accessSource: null,
         hasEntitlement: false,
+        accessLevel: null,
         canSeeSelectedUsers: true,
         catalogVisibility,
       };
@@ -216,7 +232,7 @@ export async function resolveProductAccess(
 
     const { data: entitlement, error: entitlementError } = await supabase
       .from("user_practices")
-      .select("access_source, expires_at")
+      .select("access_source, expires_at, access_level")
       .eq("user_id", userId)
       .eq("practice_id", practice.id)
       .maybeSingle();
@@ -242,6 +258,7 @@ export async function resolveProductAccess(
         isAuthorMember: false,
         accessSource,
         hasEntitlement: true,
+        accessLevel: normalizeEntitlementAccessLevel(entitlement.access_level),
         canSeeSelectedUsers: true,
         catalogVisibility,
       };
@@ -275,6 +292,7 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
       canSeeSelectedUsers,
       catalogVisibility,
     };
@@ -293,6 +311,7 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
       canSeeSelectedUsers,
       catalogVisibility,
     };
@@ -307,6 +326,7 @@ export async function resolveProductAccess(
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,
+      accessLevel: null,
       canSeeSelectedUsers,
       catalogVisibility,
     };
@@ -320,6 +340,7 @@ export async function resolveProductAccess(
     isAuthorMember: false,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
     canSeeSelectedUsers,
     catalogVisibility,
   };

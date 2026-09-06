@@ -38,6 +38,7 @@ function memberAccess(
     isAuthorMember: true,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
     ...overrides,
   };
 }
@@ -51,6 +52,7 @@ function strangerAccess(): ProductAccessResult {
     isAuthorMember: false,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
   };
 }
 
@@ -63,6 +65,7 @@ function entitledAccess(): ProductAccessResult {
     isAuthorMember: false,
     accessSource: "purchase",
     hasEntitlement: true,
+    accessLevel: 1,
   };
 }
 
@@ -81,7 +84,7 @@ function testPreviewUrlStaysOnPublicPdp() {
     form.indexOf("async function publishProduct"),
   );
   assert.match(openFn, /buildPracticePublishPreviewPath\(authorSlug, productSlug\)/);
-  assert.doesNotMatch(openFn, /\/learn/);
+  assert.doesNotMatch(openFn, /\/learn\b/);
 }
 
 function testCourseIsNotTreatedAsLegacyPractice() {
@@ -272,10 +275,12 @@ function testPageLoaderContracts() {
     /publicationClass: practice\.publication_class/,
     "PDP passes publication_class into the audio-item loader",
   );
-  assert.doesNotMatch(page, /\/learn/);
+  assert.doesNotMatch(page, /\/learn\b/);
   assert.doesNotMatch(page, /course_lessons/);
   assert.doesNotMatch(page, /publication_files/);
   assert.doesNotMatch(page, /canAccessCourseContent/);
+  assert.match(page, /loadCourseLearnerContent/);
+  assert.match(page, /skipPrivateCourseOutline/);
 
   assert.match(
     lookup,

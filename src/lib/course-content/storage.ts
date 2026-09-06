@@ -9,8 +9,9 @@ import { PUBLICATION_FILE_LIMITS } from "./validators";
 
 /**
  * Private publication-files bucket. Not personal-materials, not
- * practice-audio, not public. Signed URLs are server-only after
- * canAccessCourseContent. This module does not add a public learner route.
+ * practice-audio, not public. Low-level sign helper only — it does not
+ * decide access. Learner downloads go through signLearnerPublicationFile
+ * after parent course + lesson-level association checks.
  */
 export const PUBLICATION_FILES_BUCKET = "publication-files" as const;
 
