@@ -15,11 +15,14 @@ import {
   mapRowToListenTrack,
 } from "@/lib/listen/track-cover";
 import type { ListenAccessMode, ListenTrack } from "@/lib/listen/types";
+import { listAccessibleCourseAudioItemIds } from "@/lib/course-content/learner-assets";
+import { resolveCourseLearnerAccess } from "@/lib/course-content/learner-access";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import {
   canAccessCourseContent,
   resolveProductAccess,
 } from "@/lib/products/access";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   getPracticeAuthorSlug,
   type PublicPracticeRow,
@@ -104,6 +107,7 @@ async function loadListenTracks(
   supabase: SupabaseClient,
   practice: PracticeRow,
   accessMode: ListenAccessMode,
+  userId: string | null,
 ): Promise<ListenTrack[]> {
   let query = supabase
     .from("audio_items")
@@ -112,6 +116,25 @@ async function loadListenTracks(
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    const learnerAccess = await resolveCourseLearnerAccess(
+      supabase,
+      practice,
+      userId,
+    );
+    const accessibleIds = await listAccessibleCourseAudioItemIds({
+      serviceRole: createServiceRoleClient(),
+      publicationId: practice.id,
+      access: learnerAccess,
+    });
+
+    if (accessibleIds.size === 0) {
+      return [];
+    }
+
+    query = query.in("id", [...accessibleIds]);
+  }
 
   if (accessMode === "entitled") {
     query = query.eq("status", "published");
@@ -136,6 +159,10 @@ async function loadListenTracks(
 
   if (tracks.length > 0) {
     return tracks;
+  }
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    return [];
   }
 
   const legacyPath =
@@ -246,7 +273,12 @@ export async function loadListenSessionPayload(
       return { ok: false, reason: "unavailable" };
     }
 
-    const tracks = await loadListenTracks(supabase, practiceRow, access.mode);
+    const tracks = await loadListenTracks(
+      supabase,
+      practiceRow,
+      access.mode,
+      userId,
+    );
 
     if (tracks.length === 0) {
       return { ok: false, reason: "no_audio" };

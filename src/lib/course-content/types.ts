@@ -4,8 +4,8 @@
  * Course → Lesson → LessonBlock. No Section.
  *
  * Access invariant: the presence of a lesson / block / file / CTA row
- * never grants read. Future learner API must resolve the parent course,
- * then canAccessCourseContent, then read via server + service role.
+ * never grants read. Learner API must resolve the parent course, then
+ * resolveCourseLearnerAccess, then read via server + service role.
  * Do not add GET-by-lesson-id without a parent check.
  */
 
@@ -43,6 +43,7 @@ export type CourseLesson = {
   publicationId: string;
   title: string;
   position: number;
+  requiredAccessLevel: number;
   createdAt: string;
   updatedAt: string;
 };

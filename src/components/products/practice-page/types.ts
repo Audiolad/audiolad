@@ -3,6 +3,7 @@ import type { CatalogSlide } from "@/lib/catalog/dto";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 import type { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
+import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import type { PublicAudioItem } from "@/lib/products/public-audio-items";
 import type { PublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
@@ -55,6 +56,7 @@ export type PracticePageViewModel = {
   listenDeniedMessage: string | null;
   practiceTopics: ProductTopicLinkItem[];
   publicAudioItems: PublicAudioItem[];
+  learnerCourse: LearnerCourse | null;
   listeningNotice: ResolvedListeningNotice | null;
   mobileCover: PracticePageCoverData;
   desktopCover: PracticePageCoverData;

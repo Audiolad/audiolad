@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { canPlayCourseAudioItem } from "@/lib/course-content/learner-assets";
+import { isCoursePublication } from "@/lib/course-content/validators";
 import { loadListenApiContext } from "@/lib/listen/api-context";
 import { buildListenPreviewClipPath } from "@/lib/listen/preview-clip-http";
 import { resolvePreviewClipWindow } from "@/lib/listen/serve-preview-clip";
@@ -9,6 +11,7 @@ import {
 } from "@/lib/listen/signed-url";
 import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 import { buildListenApiBase } from "@/lib/products/paths";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 function listenApiBaseFromRequest(
   request: Request,
@@ -48,7 +51,7 @@ export async function serveListenSignedAudio(
     return loaded.response;
   }
 
-  const { storageClient, practice, access } = loaded.context;
+  const { storageClient, supabase, practice, access, userId } = loaded.context;
 
   const { data: audioItem, error: audioLookupError } = await storageClient
     .from("audio_items")
@@ -71,7 +74,10 @@ export async function serveListenSignedAudio(
   if (audioItem?.id) {
     audioPath = audioItem.audio_path?.trim() ?? null;
     audioStatus = audioItem.status;
-  } else if (audioId === `legacy-${practice.id}`) {
+  } else if (
+    audioId === `legacy-${practice.id}` &&
+    !isCoursePublication(practice.publication_class, practice.product_kind)
+  ) {
     const { data: legacyPractice, error: legacyError } = await storageClient
       .from("practices")
       .select("audio_url")
@@ -100,6 +106,26 @@ export async function serveListenSignedAudio(
 
   if (!audioPath) {
     return NextResponse.json({ error: "audio_missing" }, { status: 404 });
+  }
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    try {
+      const serviceRole = createServiceRoleClient();
+      const playable = await canPlayCourseAudioItem({
+        supabase,
+        serviceRole,
+        practice,
+        userId,
+        audioItemId: audioId,
+      });
+
+      if (!playable) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    } catch (error) {
+      console.error("listen_course_audio_access_error", error);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
   }
 
   if (access.mode === "catalog_preview") {

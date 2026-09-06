@@ -528,6 +528,7 @@ function ownerAccess() {
     isAuthorMember: true,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
   };
 }
 
@@ -540,6 +541,7 @@ function guestBuyerAccess() {
     isAuthorMember: false,
     accessSource: null,
     hasEntitlement: false,
+    accessLevel: null,
   };
 }
 
