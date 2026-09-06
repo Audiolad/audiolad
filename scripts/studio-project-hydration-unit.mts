@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import { hydrateStudioProject } from "../src/lib/studio/hydration";
+import {
+  classifyStudioHydrationFailure,
+  collectInitialHydrationAssetIds,
+  createStudioHydrationTimeout,
+  getHydratedTrackLoadState,
+  hydrateStudioProject,
+  loadPersistedStudioAsset,
+  STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE,
+  STUDIO_PROJECT_HYDRATION_TIMEOUT_MS,
+} from "../src/lib/studio/hydration";
 
 if (!globalThis.File) {
   globalThis.File = class File extends Blob {
@@ -77,6 +86,12 @@ const provider = await readFile(
 const shell = await readFile(
   new URL("../src/components/studio/PersistedStudioProjectShell.tsx", import.meta.url), "utf8",
 );
+const editor = await readFile(
+  new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url), "utf8",
+);
+const timeline = await readFile(
+  new URL("../src/components/studio/StudioTimeline.tsx", import.meta.url), "utf8",
+);
 const route = await readFile(
   new URL("../src/app/(studio)/studio/project/[projectId]/page.tsx", import.meta.url), "utf8",
 );
@@ -88,6 +103,22 @@ assert.match(shell, /Загрузка аудио: \$\{progress\.completed\}\/\$\
 assert.match(shell, /persistenceProjectId=\{projectId\}/);
 assert.match(route, /requireStudioEditorAccess\(`\/studio\/project\/\$\{projectId\}`\)/);
 assert.match(shell, /persistedHydration=\{hydration\}/);
+assert.match(shell, /createStudioHydrationTimeout/);
+assert.match(shell, /classifyStudioHydrationFailure/);
+assert.match(shell, /STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE/);
+assert.match(shell, /collectInitialHydrationAssetIds/);
+assert.doesNotMatch(shell, /30_000/);
+assert.equal(STUDIO_PROJECT_HYDRATION_TIMEOUT_MS, 120_000);
+assert.match(provider, /getHydratedTrackLoadState/);
+assert.match(provider, /ensurePersistedTrackAsset/);
+assert.match(provider, /downloadStudioProjectAsset/);
+assert.match(provider, /item\.clips\.length === 0/);
+assert.match(provider, /if \(!track \|\| track\.isReplacing\)/);
+assert.doesNotMatch(provider, /if \(!track \|\| !runtime \|\| track\.isReplacing\)/);
+assert.match(editor, /existingTrackId/);
+assert.match(editor, /replaceTrackAudio\(existingTrackId, file\)/);
+assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty/);
+assert.match(timeline, /track\.hasAudio && track\.buffer/);
 
 const sharedProject = {
   ...project,
@@ -125,5 +156,201 @@ assert.equal(sharedHydration.state.tracks[0].assetId, assetId);
 assert.equal(sharedHydration.state.tracks[1].assetId, assetId);
 assert.equal(sharedDownloads, 1);
 assert.equal(sharedHydration.assets.size, 1);
+
+const emptyAssetId = "33333333-3333-4333-8333-333333333333";
+const musicAssetId = "44444444-4444-4444-8444-444444444444";
+const voiceAssetId = "55555555-5555-4555-8555-555555555555";
+const emptyMetadata = {
+  ...metadata,
+  id: emptyAssetId,
+  originalName: "empty-voice.webm",
+  sizeBytes: 8_000_000,
+  durationSeconds: 505,
+};
+const musicMetadata = {
+  ...metadata,
+  id: musicAssetId,
+  originalName: "music.mp3",
+  mimeType: "audio/mpeg",
+  sourceType: "upload" as const,
+};
+const voiceMetadata = {
+  ...metadata,
+  id: voiceAssetId,
+  originalName: "voice.webm",
+};
+const olgaLikeProject = {
+  ...project,
+  projectData: {
+    ...project.projectData,
+    slots: [
+      { id: "slot-empty", name: "Голос", audioTrackId: "track-empty", trackKind: "voice" as const },
+      { id: "slot-music", name: "Музыка", audioTrackId: "track-music", trackKind: "music" as const },
+      { id: "slot-voice", name: "Голос 2", audioTrackId: "track-voice", trackKind: "voice" as const },
+    ],
+    tracks: [
+      {
+        id: "track-empty",
+        assetId: emptyAssetId,
+        name: "Голос",
+        volume: 1,
+        muted: false,
+        trackKind: "voice" as const,
+        voicePreset: "none",
+        clips: [],
+      },
+      {
+        id: "track-music",
+        assetId: musicAssetId,
+        name: "Музыка",
+        volume: 0.4,
+        muted: false,
+        trackKind: "music" as const,
+        voicePreset: "none",
+        clips: [
+          { id: "clip-music", startTime: 0, offset: 0, duration: 4, fadeInDuration: 0, fadeOutDuration: 0 },
+        ],
+      },
+      {
+        id: "track-voice",
+        assetId: voiceAssetId,
+        name: "Голос 2",
+        volume: 1,
+        muted: false,
+        trackKind: "voice" as const,
+        voicePreset: "none",
+        clips: [
+          { id: "clip-voice", startTime: 1, offset: 0, duration: 3, fadeInDuration: 0, fadeOutDuration: 0 },
+        ],
+      },
+    ],
+  },
+};
+const downloadedAssetIds: string[] = [];
+const olgaHydration = await hydrateStudioProject({
+  project: olgaLikeProject,
+  assets: [emptyMetadata, musicMetadata, voiceMetadata],
+  download: async (asset) => {
+    downloadedAssetIds.push(asset.id);
+    return new Blob(["audio"], { type: asset.mimeType });
+  },
+  decode: async () => ({ duration: 8 } as AudioBuffer),
+});
+assert.deepEqual(
+  collectInitialHydrationAssetIds(olgaLikeProject.projectData.tracks).sort(),
+  [musicAssetId, voiceAssetId].sort(),
+);
+assert.deepEqual(downloadedAssetIds.sort(), [musicAssetId, voiceAssetId].sort());
+assert.equal(olgaHydration.assets.has(emptyAssetId), false);
+assert.equal(olgaHydration.assets.has(musicAssetId), true);
+assert.equal(olgaHydration.assets.has(voiceAssetId), true);
+assert.equal(olgaHydration.failures.size, 0);
+assert.equal(olgaHydration.assetMetadata.get(emptyAssetId)?.originalName, "empty-voice.webm");
+assert.deepEqual(
+  getHydratedTrackLoadState({ clipsLength: 0, hasAsset: false }),
+  { status: "ready", replacementError: null },
+);
+assert.deepEqual(
+  getHydratedTrackLoadState({ clipsLength: 1, hasAsset: true }),
+  { status: "ready", replacementError: null },
+);
+assert.deepEqual(
+  getHydratedTrackLoadState({ clipsLength: 1, hasAsset: false }),
+  { status: "error", replacementError: "Не удалось загрузить аудио дорожки." },
+);
+
+const lazyAsset = await loadPersistedStudioAsset({
+  metadata: emptyMetadata,
+  download: async () => new Blob(["lazy"], { type: "audio/webm" }),
+  decode: async () => ({ duration: 505 } as AudioBuffer),
+});
+assert.equal(lazyAsset.metadata.id, emptyAssetId);
+assert.equal(lazyAsset.buffer.duration, 505);
+
+let abortedDownloads = 0;
+const abortController = new AbortController();
+abortController.abort();
+await assert.rejects(
+  () => loadPersistedStudioAsset({
+    metadata: emptyMetadata,
+    signal: abortController.signal,
+    download: async () => {
+      abortedDownloads += 1;
+      return new Blob(["audio"]);
+    },
+    decode: async () => ({ duration: 8 } as AudioBuffer),
+  }),
+  (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+);
+assert.equal(abortedDownloads, 0);
+
+const scheduled: Array<{ fn: () => void; ms: number }> = [];
+let timeoutAborted = false;
+let cleared = false;
+const hydrationTimeout = createStudioHydrationTimeout({
+  abort: () => {
+    timeoutAborted = true;
+  },
+  setTimeoutFn: (fn, ms) => {
+    scheduled.push({ fn, ms });
+    return 1 as ReturnType<typeof setTimeout>;
+  },
+  clearTimeoutFn: () => {
+    cleared = true;
+  },
+});
+assert.equal(scheduled.length, 1);
+assert.equal(scheduled[0].ms, 120_000);
+assert.equal(hydrationTimeout.didTimeOut(), false);
+assert.equal(timeoutAborted, false);
+assert.equal(
+  classifyStudioHydrationFailure({ unmounted: false, timedOut: false }),
+  null,
+);
+hydrationTimeout.cancel();
+assert.equal(cleared, true);
+assert.equal(hydrationTimeout.didTimeOut(), false);
+assert.equal(
+  classifyStudioHydrationFailure({
+    unmounted: true,
+    timedOut: hydrationTimeout.didTimeOut(),
+    aborted: true,
+  }),
+  "unmount",
+);
+
+let hardLimitAborted = false;
+const hardLimitTimeout = createStudioHydrationTimeout({
+  abort: () => {
+    hardLimitAborted = true;
+  },
+  setTimeoutFn: (fn, ms) => {
+    scheduled.push({ fn, ms });
+    return 2 as ReturnType<typeof setTimeout>;
+  },
+  clearTimeoutFn: () => {},
+});
+assert.equal(scheduled[1].ms, STUDIO_PROJECT_HYDRATION_TIMEOUT_MS);
+assert.equal(hardLimitAborted, false);
+scheduled[1].fn();
+assert.equal(hardLimitTimeout.didTimeOut(), true);
+assert.equal(hardLimitAborted, true);
+assert.equal(
+  classifyStudioHydrationFailure({
+    unmounted: false,
+    timedOut: hardLimitTimeout.didTimeOut(),
+    aborted: true,
+  }),
+  "timeout",
+);
+assert.equal(
+  classifyStudioHydrationFailure({
+    unmounted: true,
+    timedOut: true,
+    aborted: true,
+  }),
+  "unmount",
+);
+assert.match(STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE, /Загрузка аудио заняла слишком много времени/);
 
 console.log("studio project hydration checks passed");

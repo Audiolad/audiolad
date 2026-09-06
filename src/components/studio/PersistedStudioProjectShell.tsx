@@ -13,7 +13,11 @@ import {
   StudioPersistenceClientError,
 } from "@/lib/studio/persistence-client";
 import {
+  classifyStudioHydrationFailure,
+  collectInitialHydrationAssetIds,
+  createStudioHydrationTimeout,
   hydrateStudioProject,
+  STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE,
   type StudioProjectHydration,
 } from "@/lib/studio/hydration";
 import { StudioPersistenceError } from "@/lib/studio/persistence";
@@ -59,30 +63,20 @@ function Hydrator({
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    let timedOut = false;
-    const timeout = window.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, 30_000);
+    const hydrationTimeout = createStudioHydrationTimeout({
+      abort: () => controller.abort(),
+    });
     void (async () => {
       try {
         const response = await getStudioProjectForHydration({
           projectId,
           signal: controller.signal,
         });
-        const referenced = new Set(
-          (() => {
-            if (!response.project.projectData || typeof response.project.projectData !== "object") return [];
-            const tracks = (response.project.projectData as { tracks?: unknown }).tracks;
-            return Array.isArray(tracks)
-              ? tracks.flatMap((track) =>
-                  track && typeof track === "object" && typeof (track as { assetId?: unknown }).assetId === "string"
-                    ? [(track as { assetId: string }).assetId]
-                    : [],
-                )
-              : [];
-          })(),
-        );
+        const tracks =
+          response.project.projectData && typeof response.project.projectData === "object"
+            ? (response.project.projectData as { tracks?: unknown }).tracks
+            : undefined;
+        const referenced = new Set(collectInitialHydrationAssetIds(Array.isArray(tracks) ? tracks : []));
         if (!active) return;
         setProgress({ completed: 0, total: referenced.size });
         const result = await hydrateStudioProject({
@@ -108,15 +102,19 @@ function Hydrator({
         hydratePersistedProject(result);
         setHydration(result);
       } catch (caught) {
-        if (!active) return;
-        if (controller.signal.aborted && !timedOut) return;
+        const failure = classifyStudioHydrationFailure({
+          unmounted: !active,
+          timedOut: hydrationTimeout.didTimeOut(),
+          aborted: controller.signal.aborted,
+        });
+        if (failure === "unmount" || failure === "aborted") return;
         console.error("studio_project_hydration_error", {
           projectId,
-          timedOut,
+          timedOut: hydrationTimeout.didTimeOut(),
           error: caught instanceof Error ? caught.message : "unknown_error",
         });
-        if (timedOut) {
-          setError("Загрузка аудио заняла слишком много времени. Проверьте соединение и повторите попытку.");
+        if (failure === "timeout") {
+          setError(STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE);
           return;
         }
         if (caught instanceof StudioPersistenceError) {
@@ -127,12 +125,12 @@ function Hydrator({
           setError("Не удалось открыть проект. Попробуйте ещё раз.");
         }
       } finally {
-        window.clearTimeout(timeout);
+        hydrationTimeout.cancel();
       }
     })();
     return () => {
       active = false;
-      window.clearTimeout(timeout);
+      hydrationTimeout.cancel();
       controller.abort();
     };
   }, [decodePersistedAsset, hydratePersistedProject, projectId, retryCount]);
