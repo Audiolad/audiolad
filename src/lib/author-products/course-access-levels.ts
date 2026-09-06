@@ -186,21 +186,31 @@ export async function deleteCourseAccessLevel(
 
   const maxLevel = Math.max(...existing.map((item) => item.level));
 
-  const [{ count: lessonCount, error: lessonError }, { count: entitlementCount, error: entitlementError }] =
-    await Promise.all([
-      service
-        .from("course_lessons")
-        .select("id", { count: "exact", head: true })
-        .eq("publication_id", practiceId)
-        .eq("required_access_level", level),
-      service
-        .from("user_practices")
-        .select("id", { count: "exact", head: true })
-        .eq("practice_id", practiceId)
-        .gte("access_level", level),
-    ]);
+  const [
+    { count: lessonCount, error: lessonError },
+    { count: entitlementCount, error: entitlementError },
+    { count: liveUpgradeCount, error: liveUpgradeError },
+  ] = await Promise.all([
+    service
+      .from("course_lessons")
+      .select("id", { count: "exact", head: true })
+      .eq("publication_id", practiceId)
+      .eq("required_access_level", level),
+    service
+      .from("user_practices")
+      .select("id", { count: "exact", head: true })
+      .eq("practice_id", practiceId)
+      .gte("access_level", level),
+    service
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("practice_id", practiceId)
+      .eq("order_kind", "course_upgrade")
+      .eq("target_access_level", level)
+      .in("status", ["pending", "paid"]),
+  ]);
 
-  if (lessonError || entitlementError) {
+  if (lessonError || entitlementError || liveUpgradeError) {
     throw new CourseBuilderError("internal_error", 500);
   }
 
@@ -209,6 +219,7 @@ export async function deleteCourseAccessLevel(
     maxLevel,
     lessonCountAtLevel: lessonCount ?? 0,
     entitlementCountAtOrAbove: entitlementCount ?? 0,
+    liveUpgradeOrderCount: liveUpgradeCount ?? 0,
   });
 
   if (!allowed.ok) {

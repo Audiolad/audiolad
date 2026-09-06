@@ -1,5 +1,12 @@
 import type { CourseLessonBlockType } from "./types";
 
+export type LearnerCourseUpgradeAction = {
+  href?: string;
+  kind?: "course_upgrade";
+  practiceId?: string;
+  targetAccessLevel?: number;
+};
+
 export type LearnerCourseLevel = {
   level: number;
   title: string;
@@ -7,10 +14,10 @@ export type LearnerCourseLevel = {
   upgradePrice: number | null;
   currency: string | null;
   /**
-   * Future upgrade checkout. Omitted until a later PR supplies an action.
+   * Native sequential upgrade checkout, or a legacy href for tests.
    * The locked UI must not render a dead button when this is absent.
    */
-  upgradeAction?: { href: string } | null;
+  upgradeAction?: LearnerCourseUpgradeAction | null;
 };
 
 export type LearnerCourseTextBlock = {

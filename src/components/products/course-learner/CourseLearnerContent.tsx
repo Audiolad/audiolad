@@ -7,6 +7,7 @@ import type { LearnerCourse, LearnerCourseLesson } from "@/lib/course-content/le
 
 import CourseLearnerAudioBlock from "./CourseLearnerAudioBlock";
 import CourseLearnerFileDownload from "./CourseLearnerFileDownload";
+import CourseLevelUpgradeButton from "./CourseLevelUpgradeButton";
 
 type CourseLearnerContentProps = {
   course: LearnerCourse;
@@ -111,7 +112,15 @@ function LevelUpgrade({ chrome }: { chrome: LearnerCourseLevelChrome }) {
       {chrome.upgradePriceLabel ? (
         <p className="text-sm font-semibold text-[#7042c5]">{chrome.upgradePriceLabel}</p>
       ) : null}
-      {chrome.upgradeAction ? (
+      {chrome.upgradeAction?.kind === "course_upgrade" &&
+      chrome.upgradeAction.practiceId &&
+      chrome.upgradeAction.targetAccessLevel ? (
+        <CourseLevelUpgradeButton
+          practiceId={chrome.upgradeAction.practiceId}
+          targetAccessLevel={chrome.upgradeAction.targetAccessLevel}
+          label={chrome.upgradeAction.label}
+        />
+      ) : chrome.upgradeAction?.href ? (
         <a
           href={chrome.upgradeAction.href}
           className="inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"

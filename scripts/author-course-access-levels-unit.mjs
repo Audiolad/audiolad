@@ -22,6 +22,7 @@ import {
   COURSE_PUBLISH_PAID_LEVEL_MISSING_LESSONS_CODE,
   LEVEL_HAS_ENTITLEMENTS_CODE,
   LEVEL_HAS_LESSONS_CODE,
+  LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE,
   LESSON_LEVEL_NOT_CONFIGURED_CODE,
   LESSON_LEVEL_RAISE_LOCKED_CODE,
   areAccessLevelsContiguous,
@@ -327,6 +328,16 @@ assert.equal(
   }).ok,
   true,
 );
+assert.equal(
+  evaluateAccessLevelDelete({
+    level: 2,
+    maxLevel: 2,
+    lessonCountAtLevel: 0,
+    entitlementCountAtOrAbove: 0,
+    liveUpgradeOrderCount: 1,
+  }).code,
+  LEVEL_HAS_LIVE_UPGRADE_ORDERS_CODE,
+);
 
 assert.equal(
   evaluateCourseAccessLevelsReadiness({ accessLevels: [], lessons: [] }).ok,
@@ -542,6 +553,11 @@ function createCatalogClient(initialRows = []) {
         filters.push((row) => row[column] >= value);
         return api;
       },
+      in(column, values) {
+        const allowed = Array.isArray(values) ? values : [];
+        filters.push((row) => allowed.includes(row[column]));
+        return api;
+      },
       order() {
         return api;
       },
@@ -606,7 +622,9 @@ function createCatalogClient(initialRows = []) {
             ? rows
             : table === "course_lessons"
               ? lessons
-              : entitlements;
+              : table === "user_practices"
+                ? entitlements
+                : [];
         const data = source.filter((row) => matches(row, filters));
         if (countHead) {
           return Promise.resolve({
