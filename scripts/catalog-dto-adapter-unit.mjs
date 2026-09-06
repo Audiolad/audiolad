@@ -117,6 +117,26 @@ const storedPostFormat = adaptLegacyCatalogSourceToCard(
 );
 assertStorefrontDisplayLabel(storedPostFormat, "Аудиопост");
 
+const storedPostEther = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "audio_post",
+    isFree: true,
+    price: 0,
+    format: "Аудиоэфир",
+  }),
+);
+assertStorefrontDisplayLabel(storedPostEther, "Аудиоэфир");
+
+const storedPostCustom = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "audio_post",
+    isFree: true,
+    price: 0,
+    format: "Мастер-класс",
+  }),
+);
+assertStorefrontDisplayLabel(storedPostCustom, "Мастер-класс");
+
 const legacyNullClass = adaptLegacyCatalogSourceToCard(
   source({ publicationClass: null, productKind: "practice" }),
 );

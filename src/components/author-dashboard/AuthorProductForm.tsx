@@ -40,10 +40,15 @@ import {
   getVisibleAuthorProductStatus,
 } from "@/lib/author-products/moderation";
 import {
+  AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
+  AUDIO_POST_CUSTOM_TYPE_LABEL,
+  AUDIO_POST_CUSTOM_TYPE_PLACEHOLDER,
+  AUDIO_POST_PRESET_FORMATS,
   CUSTOM_FORMAT_LABEL,
   CUSTOM_FORMAT_VALUE,
   PRODUCT_PRESET_FORMATS,
   isCustomFormatSelection,
+  resolveAudioPostFormatForStorage,
   resolveFormatForStorage,
 } from "@/lib/author-products/format";
 import { PRODUCT_LANGUAGE_GUIDELINES } from "@/lib/author-products/language-guidelines";
@@ -52,6 +57,7 @@ import {
   AUTHOR_DESCRIPTION_LABEL,
 } from "@/lib/products/product-copy";
 import {
+  AUDIO_POST_KIND_LABEL,
   MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
   MUSIC_USAGE_PERMISSION_INTRO,
@@ -151,6 +157,104 @@ function CharCounter({ value, max }: { value: string; max: number }) {
     <p className="mt-1 text-right text-xs text-[#7d70a2]">
       {value.length} / {max}
     </p>
+  );
+}
+
+function AudioPostTypePicker({
+  formatPreset,
+  customFormat,
+  disabled,
+  formatCustomError,
+  onPresetChange,
+  onCustomChange,
+}: {
+  formatPreset: string;
+  customFormat: string;
+  disabled: boolean;
+  formatCustomError?: string;
+  onPresetChange: (preset: string) => void;
+  onCustomChange: (value: string) => void;
+}) {
+  const selected = formatPreset || AUDIO_POST_KIND_LABEL;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {AUDIO_POST_PRESET_FORMATS.map((option) => (
+          <label
+            key={option}
+            className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+              selected === option
+                ? "border-[#9a74d8] bg-[#f8f4ff]"
+                : "border-[#e4d7f4] bg-white"
+            } ${disabled ? "opacity-70" : ""}`}
+          >
+            <input
+              type="radio"
+              name="audio_post_display_type"
+              className="mt-1"
+              checked={selected === option}
+              disabled={disabled}
+              onChange={() => onPresetChange(option)}
+            />
+            <span className="text-sm font-medium text-[#3f3560]">{option}</span>
+          </label>
+        ))}
+        <label
+          className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+            isCustomFormatSelection(selected)
+              ? "border-[#9a74d8] bg-[#f8f4ff]"
+              : "border-[#e4d7f4] bg-white"
+          } ${disabled ? "opacity-70" : ""}`}
+        >
+          <input
+            type="radio"
+            name="audio_post_display_type"
+            className="mt-1"
+            checked={isCustomFormatSelection(selected)}
+            disabled={disabled}
+            onChange={() => onPresetChange(CUSTOM_FORMAT_VALUE)}
+          />
+          <span className="text-sm font-medium text-[#3f3560]">
+            {AUDIO_POST_CUSTOM_TYPE_LABEL}
+          </span>
+        </label>
+      </div>
+
+      <div
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
+          isCustomFormatSelection(selected)
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <label
+            className="block"
+            data-submit-issue={formatCustomError ? "" : undefined}
+          >
+            <span className="mb-2 block text-sm font-medium">
+              {AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL}
+            </span>
+            <input
+              value={customFormat}
+              maxLength={PRODUCT_CONTENT_LIMITS.customFormat}
+              disabled={disabled}
+              onChange={(event) => onCustomChange(event.target.value)}
+              placeholder={AUDIO_POST_CUSTOM_TYPE_PLACEHOLDER}
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+            />
+            <CharCounter
+              value={customFormat}
+              max={PRODUCT_CONTENT_LIMITS.customFormat}
+            />
+            {formatCustomError ? (
+              <p className="mt-2 text-sm text-[#9b3d3d]">{formatCustomError}</p>
+            ) : null}
+          </label>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -319,7 +423,10 @@ function buildInitialForm(
       created.productKind === PRODUCT_KIND.MUSIC
         ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
         : null,
-    formatPreset: "",
+    formatPreset:
+      created.productKind === PRODUCT_KIND.AUDIO_POST
+        ? AUDIO_POST_KIND_LABEL
+        : "",
     customFormat: "",
     slug: "",
     isFree: true,
@@ -398,6 +505,32 @@ function mapArchivedTopicsForSelector(
   }));
 }
 
+function getAudioPostFormatFieldError(
+  preset: string,
+  customFormat: string,
+): string | undefined {
+  const result = resolveAudioPostFormatForStorage(preset, customFormat);
+
+  if (result.ok) {
+    return undefined;
+  }
+
+  if (result.error === "missing_custom_format") {
+    return "Укажите название типа продукта";
+  }
+
+  return getProductFieldErrorMessage(result.error) ?? undefined;
+}
+
+function resolveAudioPostFormatForSave(
+  preset: string,
+  customFormat: string,
+): string {
+  const result = resolveAudioPostFormatForStorage(preset, customFormat);
+
+  return result.ok ? result.format : AUDIO_POST_KIND_LABEL;
+}
+
 function buildProductSavePayload(
   form: FormState,
   slugLocked: boolean,
@@ -429,7 +562,7 @@ function buildProductSavePayload(
       form.productKind === PRODUCT_KIND.MUSIC
         ? MUSIC_KIND_LABEL
         : form.productKind === PRODUCT_KIND.AUDIO_POST
-          ? "Аудиопост"
+          ? resolveAudioPostFormatForSave(form.formatPreset, form.customFormat)
           : resolveFormatForStorage(form.formatPreset, form.customFormat),
     is_free:
       form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree,
@@ -1153,6 +1286,19 @@ export default function AuthorProductForm({
     setFieldErrors({});
     setTopicError(undefined);
 
+    if (form.productKind === PRODUCT_KIND.AUDIO_POST) {
+      const formatCustomError = getAudioPostFormatFieldError(
+        form.formatPreset,
+        form.customFormat,
+      );
+
+      if (formatCustomError) {
+        setFieldErrors({ formatCustom: formatCustomError });
+        setBusy(false);
+        return false;
+      }
+    }
+
     try {
       const ensured = await ensurePracticeId();
 
@@ -1394,6 +1540,21 @@ export default function AuthorProductForm({
         setFieldErrors({
           formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
         });
+        publishInFlightRef.current = false;
+        setPublishing(false);
+        setBusy(false);
+        return;
+      }
+    }
+
+    if (form.productKind === PRODUCT_KIND.AUDIO_POST) {
+      const formatCustomError = getAudioPostFormatFieldError(
+        form.formatPreset,
+        form.customFormat,
+      );
+
+      if (formatCustomError) {
+        setFieldErrors({ formatCustom: formatCustomError });
         publishInFlightRef.current = false;
         setPublishing(false);
         setBusy(false);
@@ -2380,6 +2541,36 @@ export default function AuthorProductForm({
                   </label>
                 ))}
               </div>
+            ) : publicationClassToCabinetBranch(form.publicationClass) ===
+              "post" ? (
+              <AudioPostTypePicker
+                formatPreset={form.formatPreset}
+                customFormat={form.customFormat}
+                disabled={busy}
+                formatCustomError={fieldErrors.formatCustom}
+                onPresetChange={(value) => {
+                  setFieldErrors((current) => ({
+                    ...current,
+                    formatCustom: undefined,
+                  }));
+                  setForm((current) => ({
+                    ...current,
+                    formatPreset: value,
+                    customFormat:
+                      value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
+                  }));
+                }}
+                onCustomChange={(value) => {
+                  setFieldErrors((current) => ({
+                    ...current,
+                    formatCustom: undefined,
+                  }));
+                  setForm((current) => ({
+                    ...current,
+                    customFormat: value,
+                  }));
+                }}
+              />
             ) : (
               <p className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
                 {AUTHOR_PUBLICATION_CLASS_LABELS[form.publicationClass]}
@@ -2460,7 +2651,7 @@ export default function AuthorProductForm({
                     productKind: PRODUCT_KIND.AUDIO_POST,
                     publicationClass: null,
                     musicUsagePermission: null,
-                    formatPreset: "",
+                    formatPreset: AUDIO_POST_KIND_LABEL,
                     customFormat: "",
                     isFree: true,
                     price: 0,
@@ -2655,13 +2846,42 @@ export default function AuthorProductForm({
         </>
         ) : null}
 
-        {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
-          <div>
-            <span className="mb-2 block text-sm font-medium">Формат</span>
-            <p className="rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] px-4 py-3 text-sm text-[#5f5484]">
-              Аудиопост
-            </p>
-          </div>
+        {form.productKind === PRODUCT_KIND.AUDIO_POST &&
+        publicationClassToCabinetBranch(form.publicationClass ?? "practice") !==
+          "post" ? (
+          <fieldset className="block">
+            <legend className="mb-2 block text-sm font-medium">
+              Тип продукта
+            </legend>
+            <AudioPostTypePicker
+              formatPreset={form.formatPreset}
+              customFormat={form.customFormat}
+              disabled={busy}
+              formatCustomError={fieldErrors.formatCustom}
+              onPresetChange={(value) => {
+                setFieldErrors((current) => ({
+                  ...current,
+                  formatCustom: undefined,
+                }));
+                setForm((current) => ({
+                  ...current,
+                  formatPreset: value,
+                  customFormat:
+                    value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
+                }));
+              }}
+              onCustomChange={(value) => {
+                setFieldErrors((current) => ({
+                  ...current,
+                  formatCustom: undefined,
+                }));
+                setForm((current) => ({
+                  ...current,
+                  customFormat: value,
+                }));
+              }}
+            />
+          </fieldset>
         ) : null}
 
         {form.productKind === PRODUCT_KIND.MUSIC ? (

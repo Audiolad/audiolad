@@ -169,6 +169,7 @@ export function validateAudioItemsStructure(
 /**
  * Effective format for publish.
  * Music always stores/shows the system label «Музыка» (no author format picker).
+ * Audio posts keep the author-chosen display label; empty/legacy → «Аудиопост».
  */
 export function resolveFormatForPublish(
   practice: Pick<PracticeRow, "format" | "product_kind">,
@@ -181,6 +182,12 @@ export function resolveFormatForPublish(
   }
 
   if (isAudioPostProductKind(practice.product_kind)) {
+    const format = practice.format?.trim() || null;
+
+    if (format && format !== LEGACY_OTHER_FORMAT) {
+      return format;
+    }
+
     return AUDIO_POST_KIND_LABEL;
   }
 

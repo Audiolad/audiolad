@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getAudioPostDisplayLabel,
+  getDisplayFormat,
+} from "@/lib/author-products/format";
 import {
   getProductKindLabel,
   isAudioPostProductKind,
@@ -313,7 +316,7 @@ export function getAuthorProductTypeLabel(
   audioCount = 1,
 ): string {
   if (isAudioPostProductKind(productKind)) {
-    return getProductKindLabel(productKind);
+    return getAudioPostDisplayLabel(format);
   }
 
   if (isMusicProductKind(productKind)) {

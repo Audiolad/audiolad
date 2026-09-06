@@ -27,13 +27,13 @@ import {
   isAuthorAppreciationRolloutEnabled,
 } from "@/lib/author-appreciation/config";
 import {
-  AUDIO_POST_KIND_LABEL,
   getMusicProductTypeLabel,
   isAudioPostProductKind,
   isMusicProductKind,
   normalizeProductKind,
   PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
+import { getAudioPostDisplayLabel } from "@/lib/author-products/format";
 import { resolvePublicPromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
@@ -523,7 +523,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     ? getMusicProductTypeLabel()
     : null;
   const typeLabel = isAudioPost
-    ? AUDIO_POST_KIND_LABEL
+    ? getAudioPostDisplayLabel(practice.format)
     : (musicTypeLabel ?? practice.format);
   const formatMeta = formatProductMeta({
     format: typeLabel,

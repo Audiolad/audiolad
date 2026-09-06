@@ -312,7 +312,11 @@ assert.equal(
     activeTopicCount: 1,
   });
   const formatCheck = ready.checks.find((item) => item.code === "invalid_format");
-  assert.equal(formatCheck?.ok, true, formatCheck?.message ?? "format check missing");
+  assert.equal(
+    formatCheck == null || formatCheck.ok,
+    true,
+    formatCheck?.message ?? "optional format must not block moderation",
+  );
 }
 
 {
@@ -329,7 +333,11 @@ assert.equal(
   const formatCheck = musicReady.checks.find(
     (item) => item.code === "invalid_format",
   );
-  assert.equal(formatCheck?.ok, true, formatCheck?.message ?? "music format check missing");
+  assert.equal(
+    formatCheck == null || formatCheck.ok,
+    true,
+    formatCheck?.message ?? "music format must not block moderation",
+  );
 }
 
 const formatModule = read("src/lib/author-products/format.ts");

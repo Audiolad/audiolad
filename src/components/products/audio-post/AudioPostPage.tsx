@@ -123,7 +123,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
           <div className="featured-card__content">
             <span className="inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
-              {AUDIO_POST_KIND_LABEL}
+              {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
             </span>
 
             <h1 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">
@@ -204,7 +204,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9485b4]">
-              {AUDIO_POST_KIND_LABEL}
+              {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
             </p>
             <h1 className="mt-2 text-[30px] font-semibold leading-[1.15] text-[#25135c] sm:text-[34px]">
               {practice.title}

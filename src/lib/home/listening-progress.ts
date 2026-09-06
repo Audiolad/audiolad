@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getAudioPostDisplayLabel } from "@/lib/author-products/format";
 import {
   getMusicProductTypeLabel,
   isAudioPostProductKind,
@@ -156,7 +157,7 @@ function mapPracticeToHomeProduct(
     productTypeLabel: isMusicProductKind(productKind)
       ? getMusicProductTypeLabel()
       : isAudioPostProductKind(productKind)
-        ? "Аудиопост"
+        ? getAudioPostDisplayLabel(practice.format)
         : audioCount >= 2
           ? "Программа аудиопрактик"
           : "Аудиопрактика",

@@ -84,6 +84,18 @@ assert.equal(normalizeProductKind("audio_post"), PRODUCT_KIND.AUDIO_POST);
 assert.equal(isAudioPostProductKind("audio_post"), true);
 assert.equal(getProductKindLabel("audio_post"), AUDIO_POST_KIND_LABEL);
 assert.equal(resolveFormatForPublish(basePractice()), AUDIO_POST_KIND_LABEL);
+assert.equal(
+  resolveFormatForPublish(basePractice({ format: "Аудиоэфир" })),
+  "Аудиоэфир",
+);
+assert.equal(
+  resolveFormatForPublish(basePractice({ format: "Мастер-класс" })),
+  "Мастер-класс",
+);
+assert.equal(
+  resolveFormatForPublish(basePractice({ format: null })),
+  AUDIO_POST_KIND_LABEL,
+);
 
 const usage = assertMusicUsagePermissionForKind(
   PRODUCT_KIND.AUDIO_POST,
