@@ -6,6 +6,7 @@ import type {
   StudioProjectAssetMetadata,
   StudioPersistedProject,
 } from "./persistence-client";
+import { parseStudioPlaybackExpiry } from "./signed-playback";
 
 export const STUDIO_PROJECT_HYDRATION_TIMEOUT_MS = 120_000;
 
@@ -14,9 +15,9 @@ export const STUDIO_PROJECT_HYDRATION_TIMEOUT_MESSAGE =
 
 export type StudioHydratedAsset = {
   metadata: StudioProjectAssetMetadata;
-  blob: Blob;
-  file: File;
-  buffer: AudioBuffer;
+  playbackUrl: string;
+  expiresAt: number;
+  duration: number;
 };
 
 export type StudioHydrationAssetResult =
@@ -38,8 +39,27 @@ export type StudioHydratedTrackLoadState = {
   replacementError: string | null;
 };
 
+export type StudioSignedPlaybackResult = {
+  url: string;
+  expiresAt: string | number;
+  durationSeconds?: number | null;
+};
+
 function abortIfNeeded(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
+function resolveHydratedDuration(
+  metadata: StudioProjectAssetMetadata,
+  signed?: Pick<StudioSignedPlaybackResult, "durationSeconds">,
+): number | null {
+  const candidates = [signed?.durationSeconds, metadata.durationSeconds];
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+  return null;
 }
 
 /**
@@ -129,49 +149,55 @@ export function getHydratedTrackLoadState({
 
 export async function loadPersistedStudioAsset({
   metadata,
-  download,
-  decode,
+  signPlayback,
   signal,
 }: {
   metadata: StudioProjectAssetMetadata;
-  download: (asset: StudioProjectAssetMetadata, signal?: AbortSignal) => Promise<Blob>;
-  decode: (blob: Blob, metadata: StudioProjectAssetMetadata) => Promise<AudioBuffer>;
+  signPlayback: (
+    asset: StudioProjectAssetMetadata,
+    signal?: AbortSignal,
+  ) => Promise<StudioSignedPlaybackResult>;
   signal?: AbortSignal;
 }): Promise<StudioHydratedAsset> {
   abortIfNeeded(signal);
-  const blob = await download(metadata, signal);
+  const signed = await signPlayback(metadata, signal);
   abortIfNeeded(signal);
-  const buffer = await decode(blob, metadata);
-  abortIfNeeded(signal);
-  if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+  const playbackUrl = typeof signed.url === "string" ? signed.url.trim() : "";
+  if (!playbackUrl) {
+    throw new Error("Не удалось получить ссылку на аудио.");
+  }
+  const expiresAt = parseStudioPlaybackExpiry(signed.expiresAt);
+  if (expiresAt == null) {
+    throw new Error("Не удалось получить ссылку на аудио.");
+  }
+  const duration = resolveHydratedDuration(metadata, signed);
+  if (duration == null) {
     throw new Error("Аудиофайл проекта повреждён.");
   }
   return {
     metadata,
-    blob,
-    file: new File([blob], metadata.originalName, {
-      type: metadata.mimeType || blob.type,
-    }),
-    buffer,
+    playbackUrl,
+    expiresAt,
+    duration,
   };
 }
 
 /**
- * Fetches each referenced (non-empty) asset once. Decoding is injected so the
- * caller can use the audio provider's existing AudioContext rather than
- * creating another.
+ * Signs each referenced (non-empty) asset once. Playback stays on a private
+ * signed URL; the browser streams it instead of downloading/decoding PCM.
  */
 export async function hydrateStudioProject({
   project,
   assets,
-  download,
-  decode,
+  signPlayback,
   signal,
 }: {
   project: StudioPersistedProject;
   assets: readonly StudioProjectAssetMetadata[];
-  download: (asset: StudioProjectAssetMetadata, signal?: AbortSignal) => Promise<Blob>;
-  decode: (blob: Blob, metadata: StudioProjectAssetMetadata) => Promise<AudioBuffer>;
+  signPlayback: (
+    asset: StudioProjectAssetMetadata,
+    signal?: AbortSignal,
+  ) => Promise<StudioSignedPlaybackResult>;
   signal?: AbortSignal;
 }): Promise<StudioProjectHydration> {
   abortIfNeeded(signal);
@@ -187,8 +213,7 @@ export async function hydrateStudioProject({
       try {
         const asset = await loadPersistedStudioAsset({
           metadata,
-          download,
-          decode,
+          signPlayback,
           signal,
         });
         return { assetId, asset };

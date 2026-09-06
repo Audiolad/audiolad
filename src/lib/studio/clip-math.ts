@@ -81,6 +81,58 @@ export function studioClipOverlapsAny(
   return false;
 }
 
+export function sortStudioClipsByStart<T extends StudioClipLayout>(
+  clips: readonly T[],
+): T[] {
+  return [...clips].sort((left, right) => left.startTime - right.startTime);
+}
+
+/**
+ * Same-track clips are a non-overlapping half-open layout: [start, end).
+ * Touching at an endpoint is allowed. This is why one HTMLMediaElement per
+ * track is sufficient — at most one clip is active at any timeline time.
+ */
+export function studioTrackHasOverlappingClips(
+  clips: Iterable<StudioClipLayout>,
+): boolean {
+  const sorted = sortStudioClipsByStart([...clips]);
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (sorted[index].startTime < getStudioClipEnd(sorted[index - 1])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function applyStudioClipLayoutIfNoOverlap<
+  T extends StudioClipLayout & { id: string },
+>(
+  clips: readonly T[],
+  clipId: string,
+  nextLayout: StudioClipLayout,
+): T[] | null {
+  const next = clips.map((clip) =>
+    clip.id === clipId ? { ...clip, ...nextLayout } : clip,
+  );
+  return studioTrackHasOverlappingClips(next) ? null : next;
+}
+
+export function appendStudioClipsIfNoOverlap<T extends StudioClipLayout>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): T[] {
+  const accepted: T[] = [];
+  for (const clip of incoming) {
+    if (
+      !studioClipOverlapsAny(clip, existing) &&
+      !studioClipOverlapsAny(clip, accepted)
+    ) {
+      accepted.push(clip);
+    }
+  }
+  return accepted;
+}
+
 export function getStudioProjectDurationFromClips(
   tracks: Iterable<{ clips: Iterable<StudioClipLayout> }>,
 ): number {

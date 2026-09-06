@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   StudioPersistenceClientError,
+  getStudioAssetPlaybackUrl,
   uploadStudioProjectAsset,
 } from "../src/lib/studio/persistence-client";
 
@@ -154,6 +155,38 @@ await withFetch(async () => {
       error instanceof StudioPersistenceClientError && error.code === "network_error",
   );
 });
+
+await withFetch(async (url, init) => {
+  assert.equal(
+    url,
+    `/api/studio/projects/${projectId}/assets/${assetId}/playback`,
+  );
+  assert.equal(init?.cache, "no-store");
+  return Response.json({
+    url: "https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/a?token=t",
+    expiresAt: "2026-09-06T20:00:00.000Z",
+    durationSeconds: 4281.44,
+  });
+}, async () => {
+  const signed = await getStudioAssetPlaybackUrl({ projectId, assetId });
+  assert.equal(
+    signed.url,
+    "https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/a?token=t",
+  );
+  assert.equal(signed.expiresAt, Date.parse("2026-09-06T20:00:00.000Z"));
+  assert.equal(signed.durationSeconds, 4281.44);
+});
+
+await withFetch(
+  async () => Response.json({ error: "not_found" }, { status: 404 }),
+  async () => {
+    await assert.rejects(
+      getStudioAssetPlaybackUrl({ projectId, assetId }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError && error.code === "asset_not_found",
+    );
+  },
+);
 
 const provider = await readFile(
   new URL("../src/components/studio/StudioAudioProvider.tsx", import.meta.url),

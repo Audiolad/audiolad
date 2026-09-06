@@ -17,6 +17,10 @@ import {
   splitStudioClip,
   studioClipOverlapsAny,
   studioClipRangesOverlap,
+  studioTrackHasOverlappingClips,
+  applyStudioClipLayoutIfNoOverlap,
+  appendStudioClipsIfNoOverlap,
+  sortStudioClipsByStart,
 } from "../src/lib/studio/clip-math.ts";
 
 assert.deepEqual(getStudioClipLayout({}, 12), {
@@ -207,6 +211,76 @@ assert.equal(
     [{ startTime: 0, offset: 0, duration: 3 }, { startTime: 5, offset: 0, duration: 3 }],
   ),
   true,
+);
+
+const sameTrack = [
+  { id: "a", startTime: 0, offset: 0, duration: 4, fadeInDuration: 0, fadeOutDuration: 0 },
+  { id: "b", startTime: 8, offset: 1, duration: 3, fadeInDuration: 0, fadeOutDuration: 0 },
+];
+assert.equal(studioTrackHasOverlappingClips(sameTrack), false);
+assert.equal(
+  studioTrackHasOverlappingClips([
+    ...sameTrack,
+    { id: "overlap", startTime: 2, offset: 0, duration: 3, fadeInDuration: 0, fadeOutDuration: 0 },
+  ]),
+  true,
+);
+assert.deepEqual(
+  sortStudioClipsByStart([sameTrack[1], sameTrack[0]]).map((clip) => clip.id),
+  ["a", "b"],
+);
+
+const moved = getStudioClipMoveLayout({
+  layout: sameTrack[0],
+  bufferDuration: 20,
+  requestedStartTime: 7,
+  snapTargets: [],
+  pixelsPerSecond: 100,
+  collisionBounds: getStudioSameTrackBounds(sameTrack[0], sameTrack),
+});
+assert.equal(studioClipOverlapsAny(moved, [sameTrack[1]]), false);
+assert.equal(moved.startTime + moved.duration <= sameTrack[1].startTime, true);
+
+const trimmed = getStudioClipTrimEndLayout({
+  layout: sameTrack[0],
+  bufferDuration: 20,
+  requestedEndTime: 12,
+  snapTargets: [],
+  pixelsPerSecond: 100,
+  collisionBounds: getStudioSameTrackBounds(sameTrack[0], sameTrack),
+});
+assert.equal(trimmed.startTime + trimmed.duration, 8);
+
+assert.equal(
+  applyStudioClipLayoutIfNoOverlap(sameTrack, "a", {
+    startTime: 7,
+    offset: 0,
+    duration: 4,
+  }),
+  null,
+);
+assert.ok(
+  applyStudioClipLayoutIfNoOverlap(sameTrack, "a", {
+    startTime: 1,
+    offset: 0,
+    duration: 4,
+  }),
+);
+
+const splitPair = splitStudioClip(sameTrack[1], 9.5, "b-right");
+assert.ok(splitPair);
+assert.equal(
+  studioTrackHasOverlappingClips([sameTrack[0], splitPair.left, splitPair.right]),
+  false,
+);
+assert.equal(splitPair.left.startTime + splitPair.left.duration, splitPair.right.startTime);
+
+assert.deepEqual(
+  appendStudioClipsIfNoOverlap(sameTrack, [
+    { id: "paste-overlap", startTime: 2, offset: 0, duration: 3, fadeInDuration: 0, fadeOutDuration: 0 },
+    { id: "paste-ok", startTime: 12, offset: 0, duration: 2, fadeInDuration: 0, fadeOutDuration: 0 },
+  ]).map((clip) => clip.id),
+  ["paste-ok"],
 );
 
 console.log("studio-clip-math-unit: ok");
