@@ -33,9 +33,13 @@ after a job.
 
 Lease: **1800s** on claim, renewed every **5 minutes** by
 `renew_studio_render_job_lease` only while this process still owns
-`lease_token`. Do not replace the heartbeat with a one-shot 5400s lease.
-Complete/fail updates also require the current token; a worker that lost the
-lease must not mark the job completed.
+`lease_token`. Authoritative `false` is immediate ownership loss. A transient
+RPC/network error is logged and retried after **15s** (`STUDIO_RENDER_HEARTBEAT_RETRY_MS`);
+the job is abandoned only after confirmed loss or when the lease can no longer
+be considered safely held (1800s minus a 60s safety margin). Do not replace
+the heartbeat with a one-shot 5400s lease. Complete/fail updates also require
+the current token; a worker that lost the lease must not mark the job
+completed or overwrite the output object.
 
 Graceful shutdown (SIGTERM/SIGINT): stop claiming; wait up to **90s**
 (`STUDIO_RENDER_SHUTDOWN_DRAIN_MS`) for the in-flight FFmpeg job; if it is

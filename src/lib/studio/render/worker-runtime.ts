@@ -12,7 +12,9 @@ import {
 import { renderOutputPath } from "./storage";
 import type { StudioRenderSnapshot } from "./types";
 import {
+  allowStudioRenderOutputUpload,
   parseClaimedStudioRenderJob,
+  StudioRenderAbandonedError,
   STUDIO_RENDER_LEASE_SECONDS,
   type ClaimedStudioRenderJob,
   type StudioRenderExecuteResult,
@@ -52,8 +54,8 @@ export function createStudioRenderWorkerPort(
       return data === true;
     },
 
-    async executeJob(job) {
-      return executeClaimedStudioRenderJob(service, job);
+    async executeJob(job, signal) {
+      return executeClaimedStudioRenderJob(service, job, signal, leaseSeconds);
     },
 
     async completeJob(job, result) {
@@ -81,6 +83,8 @@ export function createStudioRenderWorkerPort(
 export async function executeClaimedStudioRenderJob(
   service: SupabaseClient,
   job: ClaimedStudioRenderJob,
+  signal: AbortSignal = new AbortController().signal,
+  leaseSeconds = STUDIO_RENDER_LEASE_SECONDS,
 ): Promise<StudioRenderExecuteResult> {
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
   try {
@@ -116,8 +120,21 @@ export async function executeClaimedStudioRenderJob(
       ffmpegStderrSummary: result.stderr.slice(-1000),
     }));
     const outputPath = renderOutputPath(job.id);
+    const mayUpload = await allowStudioRenderOutputUpload(signal, async () => {
+      const { data, error } = await service.rpc("renew_studio_render_job_lease", {
+        p_job_id: job.id,
+        p_lease_token: job.lease_token,
+        p_lease_seconds: leaseSeconds,
+      });
+      if (error) throw error;
+      return data === true;
+    });
+    if (!mayUpload) throw new StudioRenderAbandonedError();
     const stream = createReadStream(result.outputPath);
+    const onAbort = () => stream.destroy();
+    signal.addEventListener("abort", onAbort);
     try {
+      if (signal.aborted) throw new StudioRenderAbandonedError();
       const { error: uploadError } = await service.storage
         .from(outputBucket)
         .upload(outputPath, stream, {
@@ -125,8 +142,10 @@ export async function executeClaimedStudioRenderJob(
           upsert: true,
           duplex: "half",
         });
+      if (signal.aborted) throw new StudioRenderAbandonedError();
       if (uploadError) throw uploadError;
     } finally {
+      signal.removeEventListener("abort", onAbort);
       stream.destroy();
     }
     return { sizeBytes: result.sizeBytes };

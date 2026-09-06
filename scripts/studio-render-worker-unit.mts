@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { getEventListeners } from "node:events";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
+  allowStudioRenderOutputUpload,
   createStudioRenderWorker,
   parseClaimedStudioRenderJob,
+  raceWithAbort,
+  sleep,
+  StudioRenderAbandonedError,
   type ClaimedStudioRenderJob,
   type StudioRenderWorkerPort,
 } from "../src/lib/studio/render/worker";
@@ -68,9 +73,9 @@ function createPort(overrides: Partial<StudioRenderWorkerPort> & {
       if (overrides.renewLease) return overrides.renewLease(claimed);
       return true;
     },
-    async executeJob(claimed) {
+    async executeJob(claimed, signal) {
       recorded.executed.push(claimed.id);
-      if (overrides.executeJob) return overrides.executeJob(claimed);
+      if (overrides.executeJob) return overrides.executeJob(claimed, signal);
       return { sizeBytes: 8 };
     },
     async completeJob(claimed, result) {
@@ -190,6 +195,71 @@ async function testIdleWorkerNotBusyLoop() {
   assert.ok(times.length < 12, `too many idle claims (${times.length}) for the wait window`);
 }
 
+async function testSleepCleansAbortListener() {
+  const warnings: Error[] = [];
+  const onWarning = (warning: Error) => {
+    warnings.push(warning);
+  };
+  process.on("warning", onWarning);
+  const controller = new AbortController();
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(2, controller.signal);
+  }
+  assert.equal(
+    getEventListeners(controller.signal, "abort").length,
+    0,
+    "timeout completion must remove the abort listener",
+  );
+  const pending = sleep(5_000, controller.signal);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 1);
+  controller.abort();
+  await pending;
+  assert.equal(
+    getEventListeners(controller.signal, "abort").length,
+    0,
+    "abort completion must remove the abort listener",
+  );
+  const raced = raceWithAbort(delay(2), new AbortController().signal);
+  const raceSignal = new AbortController();
+  await raceWithAbort(delay(2), raceSignal.signal);
+  assert.equal(getEventListeners(raceSignal.signal, "abort").length, 0);
+  await raced;
+  process.off("warning", onWarning);
+  assert.equal(
+    warnings.filter((warning) => warning.name === "MaxListenersExceededWarning").length,
+    0,
+    "sequential sleeps must not accumulate MaxListenersExceededWarning",
+  );
+}
+
+async function testIdlePollsDoNotAccumulateAbortListeners() {
+  const warnings: Error[] = [];
+  const onWarning = (warning: Error) => {
+    warnings.push(warning);
+  };
+  process.on("warning", onWarning);
+  const times: number[] = [];
+  const port = createPort({
+    async claimJob() {
+      times.push(Date.now());
+      return null;
+    },
+  });
+  await runUntil(
+    port,
+    { idleIntervalMs: 8, heartbeatIntervalMs: 10_000 },
+    () => times.length >= 20,
+    2000,
+  );
+  process.off("warning", onWarning);
+  assert.ok(times.length >= 20);
+  assert.equal(
+    warnings.filter((warning) => warning.name === "MaxListenersExceededWarning").length,
+    0,
+    "idle polls must not leak abort listeners",
+  );
+}
+
 async function testHeartbeatRenewDuringLongRender() {
   const started = createDeferred();
   const finish = createDeferred();
@@ -216,6 +286,43 @@ async function testHeartbeatRenewDuringLongRender() {
   worker.requestShutdown();
   await running;
   assert.deepEqual(port.completed, ["long"]);
+}
+
+async function testTransientHeartbeatErrorDoesNotAbandon() {
+  const started = createDeferred();
+  const finish = createDeferred();
+  let renewCalls = 0;
+  const port = createPort({
+    claimQueue: [job("hiccup")],
+    async renewLease() {
+      renewCalls += 1;
+      if (renewCalls === 1) throw new Error("supabase_temporarily_unavailable");
+      return true;
+    },
+    async executeJob() {
+      started.resolve();
+      await finish.promise;
+      return { sizeBytes: 1 };
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 30,
+    heartbeatRetryMs: 20,
+    leaseHoldMs: 10_000,
+    shutdownDrainMs: 500,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  await started.promise;
+  await delay(120);
+  assert.ok(renewCalls >= 2, `expected a retry after the transient error, got ${renewCalls}`);
+  finish.resolve();
+  await delay(30);
+  worker.requestShutdown();
+  await running;
+  assert.deepEqual(port.completed, ["hiccup"]);
+  assert.deepEqual(port.failed, []);
 }
 
 async function testLostOwnershipDoesNotComplete() {
@@ -248,6 +355,57 @@ async function testLostOwnershipDoesNotComplete() {
   assert.deepEqual(port.completed, []);
   assert.deepEqual(port.failed, []);
   assert.ok(port.renewals.length >= 1);
+}
+
+async function testStaleWorkerSkipsOutputUpload() {
+  const live = new AbortController();
+  const lost = new AbortController();
+  lost.abort();
+  assert.equal(await allowStudioRenderOutputUpload(lost.signal, async () => true), false);
+  assert.equal(await allowStudioRenderOutputUpload(live.signal, async () => false), false);
+  assert.equal(await allowStudioRenderOutputUpload(live.signal, async () => true), true);
+  assert.equal(
+    await allowStudioRenderOutputUpload(live.signal, async () => {
+      throw new Error("renew_rpc_timeout");
+    }),
+    true,
+    "transient pre-upload renew error must not skip an owned upload",
+  );
+
+  const started = createDeferred();
+  const finish = createDeferred();
+  let uploaded = false;
+  const port = createPort({
+    claimQueue: [job("stale")],
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      await finish.promise;
+      uploaded = await allowStudioRenderOutputUpload(signal, async () => true);
+      if (!uploaded) throw new StudioRenderAbandonedError();
+      return { sizeBytes: 1 };
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 25,
+    heartbeatRetryMs: 20,
+    leaseHoldMs: 10_000,
+    shutdownDrainMs: 500,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  await started.promise;
+  await delay(80);
+  finish.resolve();
+  await delay(40);
+  worker.requestShutdown();
+  await running;
+  assert.equal(uploaded, false, "stale worker must not upload after confirmed lease loss");
+  assert.deepEqual(port.completed, []);
+  assert.deepEqual(port.failed, []);
 }
 
 async function testGracefulShutdownDoesNotClaimNewJob() {
@@ -326,6 +484,8 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(runtime, /\.eq\("lease_token", job\.lease_token\)/);
   assert.match(runtime, /renew_studio_render_job_lease/);
   assert.match(runtime, /release_studio_render_job/);
+  assert.match(runtime, /allowStudioRenderOutputUpload/);
+  assert.match(runtime, /StudioRenderAbandonedError/);
   const script = readFileSync(
     new URL("../scripts/run-studio-render-worker.mts", import.meta.url),
     "utf8",
@@ -337,11 +497,15 @@ function testStreamingUploadAndLeaseTokenComplete() {
 
 async function main() {
   testParseClaimedJob();
+  await testSleepCleansAbortListener();
   await testQueuedClaimedCompletedAndLoopContinues();
   await testFailedJobWorkerStaysAlive();
   await testIdleWorkerNotBusyLoop();
+  await testIdlePollsDoNotAccumulateAbortListeners();
   await testHeartbeatRenewDuringLongRender();
+  await testTransientHeartbeatErrorDoesNotAbandon();
   await testLostOwnershipDoesNotComplete();
+  await testStaleWorkerSkipsOutputUpload();
   await testGracefulShutdownDoesNotClaimNewJob();
   await testDrainTimeoutReleasesLease();
   testPm2ConfigHasNoCronRestart();

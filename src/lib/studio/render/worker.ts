@@ -15,6 +15,14 @@ export const STUDIO_RENDER_LEASE_SECONDS = 1800;
 export const STUDIO_RENDER_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 /** Idle poll after an empty claim. Faster than the former 2-minute cron, not a spin loop. */
 export const STUDIO_RENDER_IDLE_INTERVAL_MS = 5_000;
+/** After a transient renew error, retry well before the next 5-minute tick. */
+export const STUDIO_RENDER_HEARTBEAT_RETRY_MS = 15_000;
+/**
+ * Stop treating the lease as safely held this long before the 1800s expiry.
+ * recover_stale uses `lease_expires_at < now()`, so we abandon with a minute of
+ * margin instead of racing a reclaim.
+ */
+export const STUDIO_RENDER_LEASE_HOLD_SAFETY_MS = 60_000;
 /**
  * After SIGTERM/SIGINT, finish the current job if it ends within this window.
  * Waiting hours on deploy is unsafe; past this the worker releases the lease
@@ -43,7 +51,10 @@ export type StudioRenderWorkerPort = {
   recoverStaleJobs: () => Promise<void>;
   claimJob: () => Promise<ClaimedStudioRenderJob | null>;
   renewLease: (job: ClaimedStudioRenderJob) => Promise<boolean>;
-  executeJob: (job: ClaimedStudioRenderJob) => Promise<StudioRenderExecuteResult>;
+  executeJob: (
+    job: ClaimedStudioRenderJob,
+    signal: AbortSignal,
+  ) => Promise<StudioRenderExecuteResult>;
   completeJob: (
     job: ClaimedStudioRenderJob,
     result: StudioRenderExecuteResult,
@@ -55,9 +66,21 @@ export type StudioRenderWorkerPort = {
 export type StudioRenderWorkerOptions = {
   idleIntervalMs?: number;
   heartbeatIntervalMs?: number;
+  heartbeatRetryMs?: number;
+  leaseHoldMs?: number;
   shutdownDrainMs?: number;
+  now?: () => number;
   logger?: StudioRenderWorkerLogger;
 };
+
+export class StudioRenderAbandonedError extends Error {
+  readonly code = "studio_render_abandoned";
+
+  constructor() {
+    super("studio_render_abandoned");
+    this.name = "StudioRenderAbandonedError";
+  }
+}
 
 export type StudioRenderWorker = {
   run: () => Promise<void>;
@@ -101,49 +124,125 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       resolve();
       return;
     }
-    const timer = setTimeout(resolve, ms);
-    const onAbort = () => {
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       resolve();
     };
-    signal?.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(settle, ms);
+    const onAbort = () => settle();
+    signal?.addEventListener("abort", onAbort);
   });
 }
 
-function waitForAbort(signal: AbortSignal): Promise<void> {
-  if (signal.aborted) return Promise.resolve();
-  return new Promise((resolve) => {
-    signal.addEventListener("abort", () => resolve(), { once: true });
+export function raceWithAbort<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<{ status: "ok"; value: T } | { status: "aborted" }> {
+  if (signal.aborted) return Promise.resolve({ status: "aborted" });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const onAbort = () => finish({ status: "aborted" });
+    const finish = (result: { status: "ok"; value: T } | { status: "aborted" }) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      resolve(result);
+    };
+    signal.addEventListener("abort", onAbort);
+    promise.then(
+      (value) => finish({ status: "ok", value }),
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
   });
+}
+
+/**
+ * Pre-upload ownership gate. Confirmed loss (`false` or aborted signal) skips
+ * the write. A transient assertOwns error does not skip: another worker cannot
+ * claim while this lease is still valid.
+ */
+export async function allowStudioRenderOutputUpload(
+  signal: AbortSignal,
+  assertOwns: () => Promise<boolean>,
+): Promise<boolean> {
+  if (signal.aborted) return false;
+  try {
+    const owned = await assertOwns();
+    if (signal.aborted) return false;
+    return owned === true;
+  } catch {
+    return !signal.aborted;
+  }
 }
 
 function startLeaseHeartbeat(
   job: ClaimedStudioRenderJob,
   port: StudioRenderWorkerPort,
-  intervalMs: number,
-  onLost: () => void,
+  options: {
+    intervalMs: number;
+    retryMs: number;
+    leaseHoldMs: number;
+    now: () => number;
+    logger: StudioRenderWorkerLogger;
+    onLost: () => void;
+  },
 ): () => void {
-  let renewing = false;
   let stopped = false;
-  const tick = () => {
-    if (stopped || renewing) return;
-    renewing = true;
-    void port
-      .renewLease(job)
-      .then((owned) => {
-        if (!owned && !stopped) onLost();
-      })
-      .catch(() => {
-        if (!stopped) onLost();
-      })
-      .finally(() => {
-        renewing = false;
-      });
+  let inFlight = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let lastSuccessAt = options.now();
+
+  const schedule = (delayMs: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      void tick();
+    }, delayMs);
   };
-  const timer = setInterval(tick, intervalMs);
+
+  const tick = async () => {
+    if (stopped || inFlight) return;
+    inFlight = true;
+    try {
+      const owned = await port.renewLease(job);
+      if (stopped) return;
+      if (owned === false) {
+        options.onLost();
+        return;
+      }
+      lastSuccessAt = options.now();
+      schedule(options.intervalMs);
+    } catch (error) {
+      if (stopped) return;
+      options.logger.error(
+        JSON.stringify({
+          event: "studio_render_lease_renew_retry",
+          jobId: job.id,
+          error: error instanceof Error ? error.message : "unknown_error",
+        }),
+      );
+      if (options.now() - lastSuccessAt >= options.leaseHoldMs) {
+        options.onLost();
+        return;
+      }
+      schedule(options.retryMs);
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  schedule(options.intervalMs);
   return () => {
     stopped = true;
-    clearInterval(timer);
+    clearTimeout(timer);
   };
 }
 
@@ -153,7 +252,11 @@ export function createStudioRenderWorker(
 ): StudioRenderWorker {
   const idleIntervalMs = options.idleIntervalMs ?? STUDIO_RENDER_IDLE_INTERVAL_MS;
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? STUDIO_RENDER_HEARTBEAT_INTERVAL_MS;
+  const heartbeatRetryMs = options.heartbeatRetryMs ?? STUDIO_RENDER_HEARTBEAT_RETRY_MS;
+  const leaseHoldMs = options.leaseHoldMs
+    ?? (STUDIO_RENDER_LEASE_SECONDS * 1000 - STUDIO_RENDER_LEASE_HOLD_SAFETY_MS);
   const shutdownDrainMs = options.shutdownDrainMs ?? STUDIO_RENDER_SHUTDOWN_DRAIN_MS;
+  const now = options.now ?? Date.now;
   const logger = options.logger ?? {
     info: (message: string) => console.log(message),
     error: (message: string) => console.error(message),
@@ -168,22 +271,34 @@ export function createStudioRenderWorker(
     shutdown.abort();
   };
 
-  async function handleJob(job: ClaimedStudioRenderJob, abandon: { current: boolean }): Promise<void> {
+  async function handleJob(
+    job: ClaimedStudioRenderJob,
+    abandon: { current: boolean },
+    jobAbort: AbortController,
+  ): Promise<void> {
     let lostOwnership = false;
-    const stopHeartbeat = startLeaseHeartbeat(
-      job,
-      port,
-      heartbeatIntervalMs,
-      () => {
-        lostOwnership = true;
-      },
-    );
+    const markLost = () => {
+      lostOwnership = true;
+      if (!jobAbort.signal.aborted) jobAbort.abort();
+    };
+    const stopHeartbeat = startLeaseHeartbeat(job, port, {
+      intervalMs: heartbeatIntervalMs,
+      retryMs: heartbeatRetryMs,
+      leaseHoldMs,
+      now,
+      logger,
+      onLost: markLost,
+    });
     try {
       let result: StudioRenderExecuteResult;
       try {
-        result = await port.executeJob(job);
+        result = await port.executeJob(job, jobAbort.signal);
       } catch (error) {
-        if (abandon.current || lostOwnership) {
+        if (
+          error instanceof StudioRenderAbandonedError
+          || abandon.current
+          || lostOwnership
+        ) {
           logger.error(
             JSON.stringify({
               event: "studio_render_abandoned",
@@ -205,7 +320,7 @@ export function createStudioRenderWorker(
         }
         return;
       }
-      if (abandon.current || lostOwnership) {
+      if (abandon.current || lostOwnership || jobAbort.signal.aborted) {
         logger.info(
           JSON.stringify({
             event: "studio_render_abandoned",
@@ -245,18 +360,17 @@ export function createStudioRenderWorker(
           continue;
         }
         const abandon = { current: false };
-        const jobRun = handleJob(job, abandon);
-        const outcome = await Promise.race([
-          jobRun.then(() => "finished" as const),
-          waitForAbort(shutdown.signal).then(() => "stopping" as const),
-        ]);
-        if (outcome === "finished") continue;
+        const jobAbort = new AbortController();
+        const jobRun = handleJob(job, abandon, jobAbort);
+        const outcome = await raceWithAbort(jobRun, shutdown.signal);
+        if (outcome.status === "ok") continue;
         const drained = await Promise.race([
           jobRun.then(() => "finished" as const),
           sleep(shutdownDrainMs).then(() => "timeout" as const),
         ]);
         if (drained === "timeout") {
           abandon.current = true;
+          if (!jobAbort.signal.aborted) jobAbort.abort();
           await port.releaseJob(job);
           logger.info(
             JSON.stringify({
