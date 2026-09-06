@@ -19,11 +19,18 @@ import {
   canPlayCourseAudioItem,
   evaluateCourseLearnerAccess,
   resolveCourseLearnerAccess,
+  groupLearnerCourse,
   serializeLearnerCourse,
   toLearnerCourse,
 } from "../src/lib/course-content/index.ts";
 import { loadCourseLearnerContent } from "../src/lib/course-content/learner-content.ts";
 import { signLearnerPublicationFile } from "../src/lib/course-content/learner-file-sign.ts";
+import CourseLearnerContentModule from "../src/components/products/course-learner/CourseLearnerContent.tsx";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
+
+const CourseLearnerContent =
+  CourseLearnerContentModule.default ?? CourseLearnerContentModule;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -920,11 +927,290 @@ const signedExpired = await signLearnerPublicationFile({
 });
 assert.equal(signedExpired.ok, false);
 
+function lockedLesson(id, title, requiredAccessLevel, position = 0) {
+  return {
+    id,
+    title,
+    position,
+    requiredAccessLevel,
+    locked: true,
+  };
+}
+
+function unlockedTextLesson(id, title, requiredAccessLevel, position, text) {
+  return {
+    id,
+    title,
+    position,
+    requiredAccessLevel,
+    locked: false,
+    blocks: [{ id: `${id}-text`, type: "text", position: 0, text }],
+  };
+}
+
+function levelRow(level, title, overrides = {}) {
+  return {
+    level,
+    title,
+    description: overrides.description ?? null,
+    upgradePrice: overrides.upgradePrice ?? null,
+    currency: overrides.currency ?? "RUB",
+    upgradeAction: overrides.upgradeAction,
+  };
+}
+
+function sampleCourse({ levels, lessons, accessLevel = 1, privileged = false }) {
+  return {
+    publicationId: "course-ui",
+    accessLevel,
+    privileged,
+    levels,
+    lessons,
+  };
+}
+
+function countOccurrences(haystack, needle) {
+  if (!needle) {
+    return 0;
+  }
+  return haystack.split(needle).length - 1;
+}
+
+function renderLearnerCourse(course) {
+  return renderToStaticMarkup(
+    createElement(CourseLearnerContent, {
+      course,
+      authorSlug: "anna",
+      productSlug: "course",
+    }),
+  );
+}
+
+const l2Level = levelRow(2, "Работа с другими людьми", {
+  description: "Как выстраивать контакт",
+  upgradePrice: 2222,
+  upgradeAction: { href: "/future-upgrade-l2" },
+});
+const l1Level = levelRow(1, "Работа с собой", {
+  description: "Базовый контур",
+});
+
+const threeLockedL2 = sampleCourse({
+  accessLevel: 1,
+  levels: [l2Level],
+  lessons: [
+    lockedLesson("l2-a", "Материал 2.1", 2, 0),
+    lockedLesson("l2-b", "Материал 2.2", 2, 1),
+    lockedLesson("l2-c", "Материал 2.3", 2, 2),
+  ],
+});
+
+const lockedL2View = groupLearnerCourse(threeLockedL2);
+assert.equal(lockedL2View.kind, "grouped");
+assert.equal(lockedL2View.groups.length, 1);
+assert.equal(lockedL2View.groups[0].chrome?.heading, "Уровень 2. Работа с другими людьми");
+assert.equal(lockedL2View.groups[0].chrome?.description, "Как выстраивать контакт");
+assert.match(lockedL2View.groups[0].chrome?.upgradePriceLabel ?? "", /Доплата/);
+assert.match(lockedL2View.groups[0].chrome?.upgradePriceLabel ?? "", /2/);
+assert.equal(lockedL2View.groups[0].chrome?.upgradeAction?.href, "/future-upgrade-l2");
+assert.equal(lockedL2View.groups[0].chrome?.upgradeAction?.label, "Открыть второй уровень");
+assert.equal(lockedL2View.groups[0].lessons.length, 3);
+
+const lockedL2Markup = renderLearnerCourse(threeLockedL2);
+assert.equal(countOccurrences(lockedL2Markup, "Уровень 2. Работа с другими людьми"), 1);
+assert.equal(countOccurrences(lockedL2Markup, "Как выстраивать контакт"), 1);
+assert.equal(countOccurrences(lockedL2Markup, "Доплата"), 1);
+assert.equal(countOccurrences(lockedL2Markup, "Открыть второй уровень"), 1);
+assert.equal(countOccurrences(lockedL2Markup, "/future-upgrade-l2"), 1);
+assert.match(lockedL2Markup, /Материал 2\.1/);
+assert.match(lockedL2Markup, /Материал 2\.2/);
+assert.match(lockedL2Markup, /Материал 2\.3/);
+assert.doesNotMatch(lockedL2Markup, /L2_SECRET|audioItemId|fileId|signedUrl|storage_path/);
+
+const threeUnlockedL2 = sampleCourse({
+  accessLevel: 2,
+  privileged: true,
+  levels: [l2Level],
+  lessons: [
+    unlockedTextLesson("l2-a", "Материал 2.1", 2, 0, "L2 open A"),
+    unlockedTextLesson("l2-b", "Материал 2.2", 2, 1, "L2 open B"),
+    unlockedTextLesson("l2-c", "Материал 2.3", 2, 2, "L2 open C"),
+  ],
+});
+const unlockedL2View = groupLearnerCourse(threeUnlockedL2);
+assert.equal(unlockedL2View.kind, "grouped");
+assert.equal(unlockedL2View.groups.length, 1);
+assert.equal(unlockedL2View.groups[0].chrome?.heading, "Уровень 2. Работа с другими людьми");
+assert.equal(unlockedL2View.groups[0].chrome?.upgradePriceLabel, null);
+assert.equal(unlockedL2View.groups[0].chrome?.upgradeAction, null);
+assert.equal(
+  unlockedL2View.groups[0].lessons.every((lesson) => lesson.locked === false),
+  true,
+);
+
+const unlockedL2Markup = renderLearnerCourse(threeUnlockedL2);
+assert.equal(countOccurrences(unlockedL2Markup, "Уровень 2. Работа с другими людьми"), 1);
+assert.equal(countOccurrences(unlockedL2Markup, "Доплата"), 0);
+assert.equal(countOccurrences(unlockedL2Markup, "Открыть второй уровень"), 0);
+assert.match(unlockedL2Markup, /L2 open A/);
+assert.match(unlockedL2Markup, /L2 open B/);
+assert.match(unlockedL2Markup, /L2 open C/);
+
+const bothLevelsCourse = sampleCourse({
+  accessLevel: 1,
+  levels: [l1Level, l2Level],
+  lessons: [
+    unlockedTextLesson("l1-a", "Материал 1.1", 1, 0, "L1 open"),
+    lockedLesson("l2-a", "Материал 2.1", 2, 1),
+    lockedLesson("l2-b", "Материал 2.2", 2, 2),
+  ],
+});
+const bothLevelsView = groupLearnerCourse(bothLevelsCourse);
+assert.equal(bothLevelsView.kind, "grouped");
+assert.equal(bothLevelsView.groups.length, 2);
+assert.equal(bothLevelsView.groups[0].requiredAccessLevel, 1);
+assert.equal(bothLevelsView.groups[1].requiredAccessLevel, 2);
+assert.equal(bothLevelsView.groups[0].chrome?.heading, "Уровень 1. Работа с собой");
+assert.equal(bothLevelsView.groups[1].chrome?.heading, "Уровень 2. Работа с другими людьми");
+
+const bothLevelsMarkup = renderLearnerCourse(bothLevelsCourse);
+assert.equal(countOccurrences(bothLevelsMarkup, "Уровень 1. Работа с собой"), 1);
+assert.equal(countOccurrences(bothLevelsMarkup, "Уровень 2. Работа с другими людьми"), 1);
+assert.equal(countOccurrences(bothLevelsMarkup, 'data-learner-level="1"'), 1);
+assert.equal(countOccurrences(bothLevelsMarkup, 'data-learner-level="2"'), 1);
+
+const implicitL1Course = sampleCourse({
+  accessLevel: 1,
+  levels: [l2Level],
+  lessons: [
+    unlockedTextLesson("l1-a", "Материал 1.1", 1, 0, "Implicit L1 body"),
+    lockedLesson("l2-a", "Материал 2.1", 2, 1),
+  ],
+});
+const implicitL1View = groupLearnerCourse(implicitL1Course);
+assert.equal(implicitL1View.kind, "grouped");
+assert.equal(implicitL1View.groups.length, 2);
+assert.equal(implicitL1View.groups[0].catalog, null);
+assert.equal(implicitL1View.groups[0].chrome, null);
+assert.equal(implicitL1View.groups[1].chrome?.heading, "Уровень 2. Работа с другими людьми");
+
+const implicitL1Markup = renderLearnerCourse(implicitL1Course);
+assert.doesNotMatch(implicitL1Markup, /Уровень 1/);
+assert.equal(countOccurrences(implicitL1Markup, "Уровень 2. Работа с другими людьми"), 1);
+assert.match(implicitL1Markup, /Implicit L1 body/);
+assert.equal(countOccurrences(implicitL1Markup, "Доплата"), 1);
+
+const legacyCourse = sampleCourse({
+  accessLevel: 1,
+  levels: [],
+  lessons: [
+    unlockedTextLesson("legacy-1", "Первый урок", 1, 0, "Legacy body"),
+    unlockedTextLesson("legacy-2", "Второй урок", 1, 1, "Legacy body 2"),
+  ],
+});
+const legacyView = groupLearnerCourse(legacyCourse);
+assert.equal(legacyView.kind, "flat");
+assert.equal("groups" in legacyView, false);
+
+const legacyMarkup = renderLearnerCourse(legacyCourse);
+assert.doesNotMatch(legacyMarkup, /Уровень/);
+assert.doesNotMatch(legacyMarkup, /Доплата/);
+assert.doesNotMatch(legacyMarkup, /Открыть второй уровень|Открыть уровень/);
+assert.doesNotMatch(legacyMarkup, /data-learner-level/);
+assert.match(legacyMarkup, /Первый урок/);
+assert.match(legacyMarkup, /Legacy body/);
+
+const noHrefLocked = sampleCourse({
+  accessLevel: 1,
+  levels: [levelRow(2, "Работа с другими людьми", { upgradePrice: 2222 })],
+  lessons: [lockedLesson("l2-a", "Материал 2.1", 2, 0)],
+});
+const noHrefMarkup = renderLearnerCourse(noHrefLocked);
+assert.match(noHrefMarkup, /Доплата/);
+assert.doesNotMatch(noHrefMarkup, /<a /);
+assert.doesNotMatch(noHrefMarkup, /Открыть второй уровень/);
+
+const lockedGroupSource = toLearnerCourse({
+  publicationId: "course-1",
+  access: l1,
+  lessons: [
+    {
+      id: "group-l2-a",
+      publication_id: "course-1",
+      title: "Locked A",
+      position: 0,
+      required_access_level: 2,
+    },
+    {
+      id: "group-l2-b",
+      publication_id: "course-1",
+      title: "Locked B",
+      position: 1,
+      required_access_level: 2,
+    },
+    {
+      id: "group-l2-c",
+      publication_id: "course-1",
+      title: "Locked C",
+      position: 2,
+      required_access_level: 2,
+    },
+  ],
+  blocks: [
+    {
+      id: "group-l2-text",
+      lesson_id: "group-l2-a",
+      type: "text",
+      position: 0,
+      asset_id: null,
+      payload: { text: SECRET_L2_TEXT },
+    },
+    {
+      id: "group-l2-audio",
+      lesson_id: "group-l2-b",
+      type: "audio",
+      position: 0,
+      asset_id: AUDIO_B,
+      payload: {},
+    },
+    {
+      id: "group-l2-file",
+      lesson_id: "group-l2-c",
+      type: "file",
+      position: 0,
+      asset_id: FILE_L2,
+      payload: { filename: "l2.pdf" },
+    },
+  ],
+  audioAssets: new Map(rows.audioItems.map((item) => [item.id, item])),
+  fileAssets: new Map(rows.files.map((file) => [file.id, file])),
+  levels: rows.levels,
+});
+const serializedLockedGroup = JSON.stringify(serializeLearnerCourse(lockedGroupSource));
+assert.equal(lockedGroupSource.lessons.every((lesson) => lesson.locked), true);
+assert.ok(lockedGroupSource.lessons.every((lesson) => !("blocks" in lesson)));
+assert.doesNotMatch(serializedLockedGroup, new RegExp(SECRET_L2_TEXT));
+assert.doesNotMatch(serializedLockedGroup, /"text"\s*:/);
+assert.doesNotMatch(serializedLockedGroup, /"audioItemId"\s*:/);
+assert.doesNotMatch(serializedLockedGroup, /"fileId"\s*:/);
+assert.doesNotMatch(serializedLockedGroup, /storage_path|storagePath|signedUrl|signed_url|audio_path/);
+assert.doesNotMatch(serializedLockedGroup, new RegExp(AUDIO_B));
+assert.doesNotMatch(serializedLockedGroup, new RegExp(FILE_L2));
+assert.doesNotMatch(serializedLockedGroup, new RegExp(SECRET_L2_PATH));
+
 const ui = read("src/components/products/course-learner/CourseLearnerContent.tsx");
-assert.match(ui, /Доплата/);
-assert.match(ui, /upgradeAction/);
-assert.match(ui, /showLevelChrome/);
+assert.match(ui, /groupLearnerCourse/);
+assert.match(ui, /chrome\.upgradeAction/);
+assert.match(ui, /upgradePriceLabel/);
+assert.doesNotMatch(ui, /showLevelChrome/);
+assert.doesNotMatch(ui, /levelForLesson/);
 assert.doesNotMatch(ui, /checkout|tochka|order_kind/i);
+
+const groupsSource = read("src/lib/course-content/learner-groups.ts");
+assert.match(groupsSource, /Доплата/);
+assert.match(groupsSource, /Открыть второй уровень/);
+assert.match(groupsSource, /kind: "flat"/);
+assert.doesNotMatch(groupsSource, /checkout|tochka|order_kind/i);
 
 const page = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(page, /loadCourseLearnerContent/);

@@ -36,6 +36,15 @@ export {
 } from "./learner-dto";
 
 export {
+  formatLearnerLevelHeading,
+  groupLearnerCourse,
+  learnerLevelUpgradeLabel,
+  type LearnerCourseLevelChrome,
+  type LearnerCourseLevelGroup,
+  type LearnerCourseView,
+} from "./learner-groups";
+
+export {
   canAccessCourseAssetAssociation,
   canDownloadCoursePublicationFile,
   canPlayCourseAudioItem,
