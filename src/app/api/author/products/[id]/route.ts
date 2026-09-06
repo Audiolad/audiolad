@@ -52,6 +52,7 @@ import {
   getAuthorProductDetail,
   isPracticeSlugTaken,
 } from "@/lib/author-products/products";
+import { normalizeAudioPostStoredFormat } from "@/lib/author-products/format";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import {
   isClearableTextFieldProvided,
@@ -607,6 +608,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (nextProductKind === PRODUCT_KIND.AUDIO_POST) {
       updates.is_free = true;
       updates.price = 0;
+
+      if ("format" in updates) {
+        const formatResult = normalizeAudioPostStoredFormat(
+          typeof updates.format === "string" || updates.format === null
+            ? updates.format
+            : null,
+        );
+
+        if (!formatResult.ok) {
+          return NextResponse.json(
+            { error: formatResult.error },
+            { status: 400 },
+          );
+        }
+
+        updates.format = formatResult.format;
+      }
     }
 
     const appreciationPatch = resolveAppreciationOverridePatch({

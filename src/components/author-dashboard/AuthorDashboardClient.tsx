@@ -15,7 +15,11 @@ import {
   FREE_AUTHOR_PRODUCTS_EMPTY_STATE,
 } from "@/lib/author-dashboard/free-author-first-step";
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getAudioPostDisplayLabel,
+  getDisplayFormat,
+} from "@/lib/author-products/format";
+import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
 import {
   getVisibleAuthorProductStatus,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
@@ -86,7 +90,9 @@ function ProductCard({
                 {product.title}
               </h3>
               <p className="mt-1 text-sm text-[#7d70a2]">
-                {getDisplayFormat(product.format) || "Формат не указан"}
+                {isAudioPostProductKind(product.product_kind)
+                  ? getAudioPostDisplayLabel(product.format)
+                  : getDisplayFormat(product.format) || "Формат не указан"}
               </p>
             </div>
 

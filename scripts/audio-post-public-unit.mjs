@@ -184,6 +184,7 @@ assert.match(pageSource, /practice\.catalog_visibility/);
 const audioPostPage = read("src/components/products/audio-post/AudioPostPage.tsx");
 assert.match(audioPostPage, /featured-card/);
 assert.match(audioPostPage, /NextStepRecommendation/);
+assert.match(audioPostPage, /productTypeLabel \?\? AUDIO_POST_KIND_LABEL/);
 assert.doesNotMatch(audioPostPage, /\/listen\//);
 
 const authorPage = read("src/lib/authors/public-page.ts");

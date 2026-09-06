@@ -420,6 +420,16 @@ assertStorefrontDisplayLabel(
   "Аудиопост",
   "empty audio_post format falls back to Аудиопост",
 );
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "audio_post", format: "Аудиоэфир" }),
+  "Аудиоэфир",
+  "audio_post stores Аудиоэфир as a display label",
+);
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "audio_post", format: "Мастер-класс" }),
+  "Мастер-класс",
+  "audio_post custom display label is preserved",
+);
 
 const mapped = mapCatalogProductToListingItem(
   product({

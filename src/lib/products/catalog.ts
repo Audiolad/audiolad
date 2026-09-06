@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
-import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getAudioPostDisplayLabel,
+  getDisplayFormat,
+} from "@/lib/author-products/format";
 import {
   getProductKindLabel,
   isAudioPostProductKind,
@@ -215,7 +218,7 @@ function getProductTypeLabel(
   productKind?: string | null,
 ): string {
   if (isAudioPostProductKind(productKind)) {
-    return getProductKindLabel(productKind);
+    return getAudioPostDisplayLabel(format);
   }
 
   if (isMusicProductKind(productKind)) {
@@ -424,7 +427,7 @@ export async function mapPracticeRowsToCatalogProducts(
           format: isMusicProductKind(practice.product_kind)
             ? getProductKindLabel(practice.product_kind)
             : isAudioPostProductKind(practice.product_kind)
-              ? getProductKindLabel(practice.product_kind)
+              ? getAudioPostDisplayLabel(practice.format)
             : practice.format,
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
@@ -435,12 +438,16 @@ export async function mapPracticeRowsToCatalogProducts(
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
         }),
-        productTypeLabel:
-          isMusicProductKind(practice.product_kind) ||
-          isAudioPostProductKind(practice.product_kind)
+        productTypeLabel: isMusicProductKind(practice.product_kind)
           ? getProductKindLabel(practice.product_kind)
-          : (getDisplayFormat(practice.format) ??
-            getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
+          : isAudioPostProductKind(practice.product_kind)
+            ? getAudioPostDisplayLabel(practice.format)
+            : (getDisplayFormat(practice.format) ??
+              getProductTypeLabel(
+                audioCount,
+                practice.format,
+                practice.product_kind,
+              )),
         priceLabel: listingPrice.priceLabel,
         compareAtPriceLabel: listingPrice.compareAtPriceLabel,
         promotionEndsAt: listingPrice.promotionEndsAt,

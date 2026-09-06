@@ -1,4 +1,5 @@
 import {
+  parseAudioPostFormat,
   parsePracticeFormat,
 } from "@/lib/author-products/format";
 import {
@@ -73,10 +74,12 @@ export function productDetailToFormSnapshot(
   product: AuthorProductDetail,
 ): ProductFormSnapshot {
   const practice = product.practice;
-  const { preset, customFormat } = parsePracticeFormat(practice.format);
   const listeningDefaults = createDefaultListeningNoticeFormState();
-
   const productKind = normalizeProductKind(practice.product_kind);
+  const { preset, customFormat } =
+    productKind === "audio_post"
+      ? parseAudioPostFormat(practice.format)
+      : parsePracticeFormat(practice.format);
 
   return {
     authorId: practice.author_id,
