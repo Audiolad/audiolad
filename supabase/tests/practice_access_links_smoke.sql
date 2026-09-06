@@ -241,8 +241,17 @@ BEGIN
     RAISE EXCEPTION 'D: expected raised=false';
   END IF;
 
-  -- 9. E: existing L3 + L2 stay L3
-  PERFORM public.grant_practice_access(buyer_a, course_id, 3, 'admin');
+  -- 9. E: existing L3 + L2 stay L3.
+  -- Seed the leftover L3 row directly: grant_practice_access rejects
+  -- target=3 unless L3 is currently in the catalog, and this fixture
+  -- only publishes L1/L2.
+  INSERT INTO public.user_practices (
+    user_id, practice_id, access_source, access_level
+  ) VALUES (
+    buyer_a, course_id, 'admin', 3
+  )
+  ON CONFLICT (user_id, practice_id) DO UPDATE
+  SET access_level = 3, access_source = 'admin';
   PERFORM public.create_practice_access_link(
     course_id, 2,
     encode(digest('l3keepToken0000000000000000000000000012', 'sha256'), 'hex'),

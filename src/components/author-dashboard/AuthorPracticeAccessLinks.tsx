@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   ACCESS_LINK_COPY_LABEL,
@@ -15,6 +15,29 @@ import {
   type PracticeAccessLinkAllowedTarget,
   type PracticeAccessLinkListItem,
 } from "@/lib/products/access-links";
+
+type AccessLinksPayload = {
+  links: PracticeAccessLinkListItem[];
+  allowedTargets: PracticeAccessLinkAllowedTarget[];
+};
+
+async function fetchAccessLinks(practiceId: string): Promise<AccessLinksPayload> {
+  const response = await fetch(`/api/author/products/${practiceId}/access-links`);
+  const payload = (await response.json()) as {
+    links?: PracticeAccessLinkListItem[];
+    allowed_targets?: PracticeAccessLinkAllowedTarget[];
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(accessLinkAuthorErrorMessage(payload.error));
+  }
+
+  return {
+    links: payload.links ?? [],
+    allowedTargets: payload.allowed_targets ?? [],
+  };
+}
 
 type CreatedLink = {
   accessUrl: string;
@@ -64,57 +87,70 @@ export function AuthorPracticeAccessLinks({
   disabled: boolean;
 }) {
   const [links, setLinks] = useState<PracticeAccessLinkListItem[]>([]);
-  const [allowedTargets, setAllowedTargets] = useState<
-    PracticeAccessLinkAllowedTarget[]
-  >(levels);
-  const [targetLevel, setTargetLevel] = useState(1);
+  const [apiTargets, setApiTargets] = useState<PracticeAccessLinkAllowedTarget[]>(
+    [],
+  );
+  const [targetLevelDraft, setTargetLevelDraft] = useState<number | null>(null);
   const [expiry, setExpiry] = useState<AccessLinkExpiryOption>("none");
   const [created, setCreated] = useState<CreatedLink | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const allowedTargets = levels.length > 0 ? levels : apiTargets;
+  const resolvedTargets =
+    allowedTargets.length > 0
+      ? allowedTargets
+      : [{ level: 1, title: null, description: null }];
+  const targetLevel =
+    targetLevelDraft != null &&
+    resolvedTargets.some((item) => item.level === targetLevelDraft)
+      ? targetLevelDraft
+      : (resolvedTargets[0]?.level ?? 1);
   const isCourse = publicationClass === "course";
-  const multiLevel = isCourse && allowedTargets.length > 1;
+  const multiLevel = isCourse && resolvedTargets.length > 1;
 
-  const loadLinks = useCallback(async () => {
+  useEffect(() => {
     if (!practiceId) {
       return;
     }
 
-    const response = await fetch(
-      `/api/author/products/${practiceId}/access-links`,
-    );
-    const payload = (await response.json()) as {
-      links?: PracticeAccessLinkListItem[];
-      allowed_targets?: PracticeAccessLinkAllowedTarget[];
-      error?: string;
-    };
+    let cancelled = false;
 
-    if (!response.ok) {
-      setError(accessLinkAuthorErrorMessage(payload.error));
+    fetchAccessLinks(practiceId)
+      .then((payload) => {
+        if (!cancelled) {
+          setLinks(payload.links);
+          if (payload.allowedTargets.length > 0) {
+            setApiTargets(payload.allowedTargets);
+          }
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : accessLinkAuthorErrorMessage("internal_error"),
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [practiceId]);
+
+  async function reloadLinks() {
+    if (!practiceId) {
       return;
     }
 
-    setLinks(payload.links ?? []);
-    if (payload.allowed_targets?.length) {
-      setAllowedTargets(payload.allowed_targets);
-      setTargetLevel((current) =>
-        payload.allowed_targets?.some((item) => item.level === current)
-          ? current
-          : payload.allowed_targets[0]?.level ?? 1,
-      );
+    const payload = await fetchAccessLinks(practiceId);
+    setLinks(payload.links);
+    if (payload.allowedTargets.length > 0) {
+      setApiTargets(payload.allowedTargets);
     }
-  }, [practiceId]);
-
-  useEffect(() => {
-    void loadLinks();
-  }, [loadLinks]);
-
-  useEffect(() => {
-    if (levels.length > 0) {
-      setAllowedTargets((current) => (current.length > 1 ? current : levels));
-    }
-  }, [levels]);
+  }
 
   async function createLink() {
     if (!practiceId) {
@@ -148,7 +184,7 @@ export function AuthorPracticeAccessLinks({
       }
 
       setCreated({ accessUrl: payload.accessUrl, link: payload.link });
-      await loadLinks();
+      await reloadLinks();
     } catch {
       setError(accessLinkAuthorErrorMessage("internal_error"));
     } finally {
@@ -189,7 +225,7 @@ export function AuthorPracticeAccessLinks({
         return;
       }
 
-      await loadLinks();
+      await reloadLinks();
     } catch {
       setError(accessLinkAuthorErrorMessage("internal_error"));
     } finally {
@@ -220,10 +256,12 @@ export function AuthorPracticeAccessLinks({
             <select
               value={targetLevel}
               disabled={disabled || busy || !practiceId}
-              onChange={(event) => setTargetLevel(Number(event.target.value))}
+              onChange={(event) =>
+                setTargetLevelDraft(Number(event.target.value))
+              }
               className="w-full rounded-[16px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm"
             >
-              {allowedTargets.map((target) => (
+              {resolvedTargets.map((target) => (
                 <option key={target.level} value={target.level}>
                   {target.title
                     ? `Уровень ${target.level}: ${target.title}`
