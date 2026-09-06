@@ -62,10 +62,44 @@ function AudioPostRecommendation({
   );
 }
 
+/** Shared after-hero stack so mobile and desktop keep one Next Step and the same order. */
+function AudioPostTrailingSections({
+  viewModel,
+}: {
+  viewModel: AudioPostPageViewModel;
+}) {
+  const { practice, description, authorName } = viewModel;
+
+  return (
+    <>
+      {viewModel.showAuthorAppreciationPrototype && authorName ? (
+        <div className="mt-4">
+          <AuthorAppreciationPrototype
+            authorName={authorName}
+            authorId={viewModel.authorId}
+            practiceId={practice.id}
+            isAuthenticated={viewModel.isAuthenticated}
+            surface="product"
+          />
+        </div>
+      ) : null}
+
+      <AudioPostRecommendation viewModel={viewModel} />
+
+      <ProductCopySections description={description} />
+      <PracticeSeoContentSections
+        content={viewModel.seoContent}
+        productKind={viewModel.productKind}
+      />
+
+      <LegalFooter className="mt-8" />
+    </>
+  );
+}
+
 export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
   const {
     practice,
-    description,
     subtitle,
     authorName,
     resolvedAuthorSlug,
@@ -89,179 +123,141 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
   } as const;
 
   return (
-    <div
-      className={`mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6 ${platformBottomContentPaddingClass}`}
-    >
-      <AudioPostListenAnalytics
-        practiceId={practice.id}
-        authorSlug={resolvedAuthorSlug}
-        productSlug={practice.slug}
-        path={viewModel.practicePagePath}
-      />
-
-      {/* Mobile: featured-card layout (home large-card language) */}
-      <div className="xl:hidden">
-        <AudioPostBackLink />
-
-        <PracticeAccessBanners
-          presentation={viewModel.presentation}
-          listenDeniedMessage={viewModel.listenDeniedMessage}
-          publishPreview={viewModel.publishPreview}
+    <div className={`min-w-0 ${platformBottomContentPaddingClass}`}>
+      <div className="pt-6 xl:box-border xl:min-w-0 xl:max-w-full xl:px-6 xl:pt-3">
+        <AudioPostListenAnalytics
+          practiceId={practice.id}
+          authorSlug={resolvedAuthorSlug}
+          productSlug={practice.slug}
+          path={viewModel.practicePagePath}
         />
 
-        <article className="featured-card mt-6 overflow-hidden rounded-[28px]">
-          <div className="featured-card__cover">
+        {/* Mobile: featured-card layout (home large-card language) */}
+        <div className="xl:hidden">
+          <AudioPostBackLink />
+
+          <PracticeAccessBanners
+            presentation={viewModel.presentation}
+            listenDeniedMessage={viewModel.listenDeniedMessage}
+            publishPreview={viewModel.publishPreview}
+          />
+
+          <article className="featured-card mt-6 overflow-hidden rounded-[28px]">
+            <div className="featured-card__cover">
+              <PracticeProductCover
+                cover={viewModel.mobileCover}
+                priority
+                className="!aspect-auto h-full w-full rounded-none shadow-none"
+                heartProduct={toPracticeHeartProduct(viewModel)}
+                isAuthenticated={viewModel.isAuthenticated}
+                signInReturnPath={viewModel.practicePagePath}
+              />
+            </div>
+
+            <div className="featured-card__content">
+              <span className="inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
+                {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
+              </span>
+
+              <h1 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">
+                {practice.title}
+              </h1>
+
+              {authorName ? (
+                <AuthorLink
+                  authorSlug={resolvedAuthorSlug}
+                  authorName={authorName}
+                  className="mt-2 text-sm font-medium text-[#7042c5]"
+                />
+              ) : null}
+
+              {durationLabel ? (
+                <p className="mt-2 text-sm text-[#7d70a2]">{durationLabel}</p>
+              ) : null}
+
+              <AudioPostPlayer {...playerProps} variant="embedded" />
+
+              {viewModel.ratingsUiEnabled ? (
+                <PracticeRatingStars
+                  authorSlug={resolvedAuthorSlug}
+                  productSlug={practice.slug}
+                  signInReturnPath={viewModel.practicePagePath}
+                  isAuthenticated={viewModel.isAuthenticated}
+                  isAuthorOwner={viewModel.isAuthorOwner}
+                />
+              ) : null}
+
+              {subtitle ? (
+                <p className="mt-3 text-sm leading-6 text-[#65577f]">{subtitle}</p>
+              ) : null}
+            </div>
+          </article>
+
+          <AudioPostTrailingSections viewModel={viewModel} />
+        </div>
+
+        {/* Desktop: existing layout (panel player, no /listen navigation) */}
+        <div className="hidden xl:block">
+          <AudioPostBackLink />
+
+          <PracticeAccessBanners
+            presentation={viewModel.presentation}
+            listenDeniedMessage={viewModel.listenDeniedMessage}
+            publishPreview={viewModel.publishPreview}
+          />
+
+          <div className="mt-6 grid gap-6 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)] sm:items-start">
             <PracticeProductCover
-              cover={viewModel.mobileCover}
+              cover={viewModel.desktopCover}
               priority
-              className="!aspect-auto h-full w-full rounded-none shadow-none"
+              className="mx-auto w-full max-w-[220px] sm:mx-0"
               heartProduct={toPracticeHeartProduct(viewModel)}
               isAuthenticated={viewModel.isAuthenticated}
               signInReturnPath={viewModel.practicePagePath}
             />
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9485b4]">
+                {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
+              </p>
+              <h1 className="mt-2 text-[30px] font-semibold leading-[1.15] text-[#25135c] sm:text-[34px]">
+                {practice.title}
+              </h1>
+
+              {subtitle ? (
+                <p className="mt-3 text-[16px] leading-7 text-[#65577f]">{subtitle}</p>
+              ) : null}
+
+              {authorName ? (
+                <AuthorLink
+                  authorSlug={resolvedAuthorSlug}
+                  authorName={authorName}
+                  className="mt-4 inline-flex text-sm font-medium text-[#7042c5]"
+                />
+              ) : null}
+
+              {viewModel.meta ? (
+                <p className="mt-2 text-sm text-[#7d70a2]">{viewModel.meta}</p>
+              ) : null}
+            </div>
           </div>
 
-          <div className="featured-card__content">
-            <span className="inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
-              {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
-            </span>
-
-            <h1 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">
-              {practice.title}
-            </h1>
-
-            {authorName ? (
-              <AuthorLink
-                authorSlug={resolvedAuthorSlug}
-                authorName={authorName}
-                className="mt-2 text-sm font-medium text-[#7042c5]"
-              />
-            ) : null}
-
-            {durationLabel ? (
-              <p className="mt-2 text-sm text-[#7d70a2]">{durationLabel}</p>
-            ) : null}
-
-            <AudioPostPlayer {...playerProps} variant="embedded" />
-
-            {viewModel.ratingsUiEnabled ? (
-              <PracticeRatingStars
-                authorSlug={resolvedAuthorSlug}
-                productSlug={practice.slug}
-                signInReturnPath={viewModel.practicePagePath}
-                isAuthenticated={viewModel.isAuthenticated}
-                isAuthorOwner={viewModel.isAuthorOwner}
-              />
-            ) : null}
-
-            {subtitle ? (
-              <p className="mt-3 text-sm leading-6 text-[#65577f]">{subtitle}</p>
-            ) : null}
+          <div className="mt-6">
+            <AudioPostPlayer {...playerProps} variant="panel" />
           </div>
-        </article>
 
-        {viewModel.showAuthorAppreciationPrototype && authorName ? (
-          <div className="mt-4">
-            <AuthorAppreciationPrototype
-              authorName={authorName}
-              authorId={viewModel.authorId}
-              practiceId={practice.id}
+          {viewModel.ratingsUiEnabled ? (
+            <PracticeRatingStars
+              authorSlug={resolvedAuthorSlug}
+              productSlug={practice.slug}
+              signInReturnPath={viewModel.practicePagePath}
               isAuthenticated={viewModel.isAuthenticated}
-              surface="product"
+              isAuthorOwner={viewModel.isAuthorOwner}
             />
-          </div>
-        ) : null}
+          ) : null}
 
-        <ProductCopySections
-          description={description}
-        />
-        <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
-
-        <AudioPostRecommendation viewModel={viewModel} />
-
-        <LegalFooter className="mt-8" />
-      </div>
-
-      {/* Desktop: existing layout (panel player, no /listen navigation) */}
-      <div className="hidden xl:block">
-        <AudioPostBackLink />
-
-        <PracticeAccessBanners
-          presentation={viewModel.presentation}
-          listenDeniedMessage={viewModel.listenDeniedMessage}
-          publishPreview={viewModel.publishPreview}
-        />
-
-        <div className="mt-6 grid gap-6 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)] sm:items-start">
-          <PracticeProductCover
-            cover={viewModel.desktopCover}
-            priority
-            className="mx-auto w-full max-w-[220px] sm:mx-0"
-            heartProduct={toPracticeHeartProduct(viewModel)}
-            isAuthenticated={viewModel.isAuthenticated}
-            signInReturnPath={viewModel.practicePagePath}
-          />
-
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9485b4]">
-              {viewModel.productTypeLabel ?? AUDIO_POST_KIND_LABEL}
-            </p>
-            <h1 className="mt-2 text-[30px] font-semibold leading-[1.15] text-[#25135c] sm:text-[34px]">
-              {practice.title}
-            </h1>
-
-            {subtitle ? (
-              <p className="mt-3 text-[16px] leading-7 text-[#65577f]">{subtitle}</p>
-            ) : null}
-
-            {authorName ? (
-              <AuthorLink
-                authorSlug={resolvedAuthorSlug}
-                authorName={authorName}
-                className="mt-4 inline-flex text-sm font-medium text-[#7042c5]"
-              />
-            ) : null}
-
-            {viewModel.meta ? (
-              <p className="mt-2 text-sm text-[#7d70a2]">{viewModel.meta}</p>
-            ) : null}
-          </div>
+          <AudioPostTrailingSections viewModel={viewModel} />
         </div>
-
-        <div className="mt-6">
-          <AudioPostPlayer {...playerProps} variant="panel" />
-        </div>
-
-        {viewModel.ratingsUiEnabled ? (
-          <PracticeRatingStars
-            authorSlug={resolvedAuthorSlug}
-            productSlug={practice.slug}
-            signInReturnPath={viewModel.practicePagePath}
-            isAuthenticated={viewModel.isAuthenticated}
-            isAuthorOwner={viewModel.isAuthorOwner}
-          />
-        ) : null}
-
-        {viewModel.showAuthorAppreciationPrototype && authorName ? (
-          <div className="mt-4">
-            <AuthorAppreciationPrototype
-              authorName={authorName}
-              authorId={viewModel.authorId}
-              practiceId={practice.id}
-              isAuthenticated={viewModel.isAuthenticated}
-              surface="product"
-            />
-          </div>
-        ) : null}
-
-        <ProductCopySections
-          description={description}
-        />
-        <PracticeSeoContentSections content={viewModel.seoContent} productKind={viewModel.productKind} />
-
-        <AudioPostRecommendation viewModel={viewModel} />
-
-        <LegalFooter className="mt-8" />
       </div>
     </div>
   );
