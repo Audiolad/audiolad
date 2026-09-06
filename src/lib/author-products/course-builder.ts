@@ -8,11 +8,20 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import {
+  assertLessonRequiredLevelAssignable,
+  assertLessonRequiredLevelChangeAllowed,
+  loadPracticeAccessLevels,
+} from "@/lib/author-products/course-access-levels";
+import {
   assertBlockBelongsToLesson,
   assertLessonBelongsToCourse,
   countCoursePublishContentFromLessons,
+  CourseBuilderError,
   defaultCourseLessonTitle,
+  isCourseBuilderError,
   nextCoursePosition,
+  normalizeRequiredAccessLevel,
+  parseRequiredAccessLevelWrite,
   validateCourseCompletionCtaInput,
   type CourseBuilderAudioAsset,
   type CourseBuilderBlockDto,
@@ -42,7 +51,7 @@ import {
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const LESSON_SELECT =
-  "id, publication_id, title, position, created_at, updated_at";
+  "id, publication_id, title, position, required_access_level, created_at, updated_at";
 const BLOCK_SELECT =
   "id, lesson_id, type, position, asset_id, payload, created_at, updated_at";
 const FILE_SELECT =
@@ -52,23 +61,7 @@ const CTA_SELECT =
 const AUDIO_ASSET_SELECT =
   "id, title, duration_seconds, original_file_name, audio_path";
 
-export class CourseBuilderError extends Error {
-  code: string;
-  status: number;
-
-  constructor(code: string, status = 400, message?: string) {
-    super(message ?? code);
-    this.name = "CourseBuilderError";
-    this.code = code;
-    this.status = status;
-  }
-}
-
-export function isCourseBuilderError(
-  error: unknown,
-): error is CourseBuilderError {
-  return error instanceof CourseBuilderError;
-}
+export { CourseBuilderError, isCourseBuilderError };
 
 export async function requireCourseBuilderReadAccess(practiceId: string) {
   const context = await requirePracticeAccess(practiceId);
@@ -139,6 +132,7 @@ type LessonRow = {
   publication_id: string;
   title: string;
   position: number;
+  required_access_level: number;
   created_at: string;
   updated_at: string;
 };
@@ -202,14 +196,36 @@ async function loadCourseBlockRow(
 export async function countCoursePublishContent(
   supabase: SupabaseClient,
   publicationId: string,
+  options?: { accessLevelsClient?: SupabaseClient },
 ): Promise<CoursePublishContentSnapshot> {
-  const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
-  return countCoursePublishContentFromLessons(snapshot.lessons);
+  const snapshot = await loadCourseBuilderSnapshot(
+    supabase,
+    publicationId,
+    options,
+  );
+  return countCoursePublishContentFromLessons(
+    snapshot.lessons,
+    snapshot.access_levels,
+  );
+}
+
+function toLessonDto(
+  lesson: LessonRow,
+  blocks: CourseBuilderLessonDto["blocks"] = [],
+): CourseBuilderLessonDto {
+  return {
+    ...lesson,
+    required_access_level: normalizeRequiredAccessLevel(
+      lesson.required_access_level,
+    ),
+    blocks,
+  };
 }
 
 export async function loadCourseBuilderSnapshot(
   supabase: SupabaseClient,
   publicationId: string,
+  options?: { accessLevelsClient?: SupabaseClient },
 ): Promise<CourseBuilderSnapshot> {
   const { data: lessonRows, error: lessonError } = await supabase
     .from("course_lessons")
@@ -246,12 +262,16 @@ export async function loadCourseBuilderSnapshot(
     .filter((block) => block.type === "file" && block.asset_id)
     .map((block) => block.asset_id as string);
 
-  const [audioAssets, fileAssets, cta, orphanCount] = await Promise.all([
-    loadAudioAssets(supabase, publicationId, audioIds),
-    loadFileAssets(supabase, publicationId, fileIds),
-    loadCourseCompletionCta(supabase, publicationId),
-    countOrphanAudioItems(supabase, publicationId, blocks),
-  ]);
+  const catalogClient = options?.accessLevelsClient ?? createServiceRoleClient();
+
+  const [audioAssets, fileAssets, cta, orphanCount, accessLevels] =
+    await Promise.all([
+      loadAudioAssets(supabase, publicationId, audioIds),
+      loadFileAssets(supabase, publicationId, fileIds),
+      loadCourseCompletionCta(supabase, publicationId),
+      countOrphanAudioItems(supabase, publicationId, blocks),
+      loadPracticeAccessLevels(catalogClient, publicationId),
+    ]);
 
   const blocksByLesson = new Map<string, CourseBuilderBlockDto[]>();
 
@@ -263,10 +283,10 @@ export async function loadCourseBuilderSnapshot(
   }
 
   return {
-    lessons: lessons.map((lesson) => ({
-      ...lesson,
-      blocks: blocksByLesson.get(lesson.id) ?? [],
-    })),
+    lessons: lessons.map((lesson) =>
+      toLessonDto(lesson, blocksByLesson.get(lesson.id) ?? []),
+    ),
+    access_levels: accessLevels,
     completion_cta: cta,
     orphan_audio_item_count: orphanCount,
   };
@@ -373,6 +393,7 @@ export async function createCourseLesson(
   supabase: SupabaseClient,
   publicationId: string,
   title?: string | null,
+  requiredAccessLevel?: number | null,
 ): Promise<CourseBuilderLessonDto> {
   const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
   const resolvedTitle =
@@ -382,12 +403,28 @@ export async function createCourseLesson(
     throw new CourseBuilderError("missing_title", 400);
   }
 
+  const parsedLevel =
+    requiredAccessLevel == null
+      ? { ok: true as const, value: 1 }
+      : parseRequiredAccessLevelWrite(requiredAccessLevel);
+
+  if (!parsedLevel.ok) {
+    throw new CourseBuilderError(parsedLevel.reason, 400);
+  }
+
+  const required = parsedLevel.value;
+  await assertLessonRequiredLevelAssignable({
+    accessLevels: snapshot.access_levels,
+    requiredAccessLevel: required,
+  });
+
   const { data, error } = await supabase
     .from("course_lessons")
     .insert({
       publication_id: publicationId,
       title: resolvedTitle,
       position: nextCoursePosition(snapshot.lessons),
+      required_access_level: required,
     })
     .select(LESSON_SELECT)
     .single();
@@ -397,7 +434,7 @@ export async function createCourseLesson(
     throw new CourseBuilderError("internal_error", 500);
   }
 
-  return { ...(data as LessonRow), blocks: [] };
+  return toLessonDto(data as LessonRow);
 }
 
 export async function updateCourseLessonTitle(
@@ -406,15 +443,62 @@ export async function updateCourseLessonTitle(
   lessonId: string,
   title: string,
 ): Promise<CourseBuilderLessonDto> {
-  const trimmed = title.trim();
+  return updateCourseLesson(supabase, publicationId, lessonId, { title });
+}
 
-  if (!trimmed) {
-    throw new CourseBuilderError("missing_title", 400);
+export async function updateCourseLesson(
+  supabase: SupabaseClient,
+  publicationId: string,
+  lessonId: string,
+  input: { title?: string | null; requiredAccessLevel?: number | null },
+): Promise<CourseBuilderLessonDto> {
+  const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
+  const current = snapshot.lessons.find((item) => item.id === lessonId);
+
+  if (!current) {
+    throw new AuthorAccessError("not_found", 404);
+  }
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.title != null) {
+    const trimmed = input.title.trim();
+
+    if (!trimmed) {
+      throw new CourseBuilderError("missing_title", 400);
+    }
+
+    updates.title = trimmed;
+  }
+
+  if (input.requiredAccessLevel != null) {
+    const parsedLevel = parseRequiredAccessLevelWrite(input.requiredAccessLevel);
+    if (!parsedLevel.ok) {
+      throw new CourseBuilderError(parsedLevel.reason, 400);
+    }
+    const nextLevel = parsedLevel.value;
+    await assertLessonRequiredLevelAssignable({
+      accessLevels: snapshot.access_levels,
+      requiredAccessLevel: nextLevel,
+    });
+    await assertLessonRequiredLevelChangeAllowed({
+      service: createServiceRoleClient(),
+      practiceId: publicationId,
+      currentLevel: current.required_access_level,
+      nextLevel,
+    });
+    updates.required_access_level = nextLevel;
+  }
+
+  if (updates.title == null && updates.required_access_level == null) {
+    throw new CourseBuilderError("invalid_request", 400);
   }
 
   const { data, error } = await supabase
     .from("course_lessons")
-    .update({ title: trimmed, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq("id", lessonId)
     .eq("publication_id", publicationId)
     .select(LESSON_SELECT)
@@ -428,8 +512,8 @@ export async function updateCourseLessonTitle(
     throw new AuthorAccessError("not_found", 404);
   }
 
-  const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
-  const lesson = snapshot.lessons.find((item) => item.id === lessonId);
+  const next = await loadCourseBuilderSnapshot(supabase, publicationId);
+  const lesson = next.lessons.find((item) => item.id === lessonId);
 
   if (!lesson) {
     throw new AuthorAccessError("not_found", 404);

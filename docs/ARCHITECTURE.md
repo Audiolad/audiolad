@@ -236,6 +236,17 @@ Timeweb Cloud
   `course_completion_ctas` не пишет `practices.promo_*`. Публикация
   неопубликованного курса требует ≥1 урок и ≥1 блок; уже
   опубликованные курсы без уроков новым правилом не блокируются.
+- Phase 3 Author Course Level Editor: кабинет `AuthorCourseBuilder`
+  показывает блок «Уровни доступа» только для `publication_class=course`.
+  Пустой `practice_access_levels` = одна покупка на весь курс (legacy L1).
+  Автор создаёт L1+L2 одной серверной операцией; дальше только
+  `max(level)+1`. Запись каталога — author API →
+  `requireCourseBuilder*Access` → `service_role`. Authenticated RLS
+  INSERT/UPDATE/DELETE на `practice_access_levels` не добавляется.
+  Checkout, Tochka, `orders.order_kind` / `target_access_level` и
+  реальный продукт «Код женской притягательности» в этом этапе нет.
+  SQL `assert_practice_moderation_ready` (v6) повторяет TS-коды готовности
+  уровней, только если в каталоге есть строки; пустой каталог — legacy.
 
 ## MAX Mini App (этапы 1–3B)
 

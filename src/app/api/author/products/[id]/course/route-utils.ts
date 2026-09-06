@@ -8,10 +8,13 @@ import { getCourseBuilderErrorMessage } from "@/lib/author-products/course-build
 
 export function handleCourseBuilderRouteError(error: unknown) {
   if (isCourseBuilderError(error)) {
+    const customMessage =
+      error.message && error.message !== error.code ? error.message : null;
+
     return NextResponse.json(
       {
         error: error.code,
-        message: getCourseBuilderErrorMessage(error.code),
+        message: customMessage ?? getCourseBuilderErrorMessage(error.code),
       },
       { status: error.status },
     );
