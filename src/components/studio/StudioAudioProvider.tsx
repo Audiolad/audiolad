@@ -19,10 +19,13 @@ import {
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 import {
+  appendStudioClipsIfNoOverlap,
   getStudioClipLayout,
   getStudioProjectDurationFromClips,
   getStudioRippleDeleteResult,
+  sortStudioClipsByStart,
   splitStudioClip,
+  studioTrackHasOverlappingClips,
   type StudioClip,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
@@ -54,7 +57,7 @@ import {
 } from "@/lib/studio/history";
 import {
   StudioPersistenceClientError,
-  downloadStudioProjectAsset,
+  getStudioAssetPlaybackUrl,
   uploadStudioProjectAsset,
   type StudioAssetSourceType,
 } from "@/lib/studio/persistence-client";
@@ -62,6 +65,20 @@ import {
   getHydratedTrackLoadState,
   type StudioProjectHydration,
 } from "@/lib/studio/hydration";
+import {
+  createLocalStudioPlaybackAsset,
+  releaseStudioMediaElement,
+  revokeStudioObjectUrl,
+} from "@/lib/studio/local-playback-asset";
+import {
+  findActiveStudioClip,
+  planStudioMediaElementSync,
+} from "@/lib/studio/media-element-sync";
+import {
+  applyStudioMediaElementSrcRefresh,
+  shouldRefreshStudioPlaybackUrl,
+} from "@/lib/studio/signed-playback";
+import type { StudioTrackPlaybackSource } from "@/components/studio/StudioTimeline";
 
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
@@ -131,7 +148,6 @@ type StudioAudioContextValue = {
   ) => Promise<StudioLocalTrack | null>;
   replaceTrackAudio: (trackId: string, file: File) => Promise<boolean>;
   retryTrackAssetUpload: (trackId: string) => void;
-  decodePersistedAsset: (blob: Blob) => Promise<AudioBuffer>;
   hydratePersistedProject: (
     hydration: StudioProjectHydration,
   ) => { failedAssetIds: string[] };
@@ -162,7 +178,7 @@ type StudioAudioContextValue = {
     startTime: number,
   ) => string[];
   duplicateTrack: (trackId: string) => StudioLocalTrack | null;
-  getTrackBuffer: (trackId: string) => AudioBuffer | null;
+  getTrackBuffer: (trackId: string) => StudioTrackPlaybackSource | null;
   exportEditingState: () => StudioEditingSnapshot;
   restoreEditingState: (
     snapshot: StudioEditingSnapshot,
@@ -178,10 +194,17 @@ type StudioAudioContextValue = {
 
 const StudioAudioContext = createContext<StudioAudioContextValue | null>(null);
 
-type TrackRuntime = {
-  file: File;
-  buffer: AudioBuffer;
+type TrackAsset = {
+  file: File | null;
+  playbackUrl: string;
+  duration: number;
   sourceType: StudioAssetSourceType;
+  ownsObjectUrl: boolean;
+  expiresAt: number | null;
+  persistedAssetId: string | null;
+};
+
+type TrackRuntime = TrackAsset & {
   outputGain: GainNode;
   fxInput: GainNode;
   fxNodes: AudioNode[];
@@ -189,10 +212,157 @@ type TrackRuntime = {
   fxCleanupTimers: Set<number>;
   retiredFxNodes: Set<AudioNode>;
   voicePreset: StudioVoicePreset;
-  sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
+  mediaElement: HTMLAudioElement;
+  mediaSource: MediaElementAudioSourceNode;
+  envelopeGain: GainNode;
+  sources: Map<string, { envelopeGain: GainNode }>;
+  activeClipId: string | null;
 };
 
-type TrackAsset = Pick<TrackRuntime, "file" | "buffer" | "sourceType">;
+function toTrackAsset(asset: TrackAsset): TrackAsset {
+  return {
+    file: asset.file,
+    playbackUrl: asset.playbackUrl,
+    duration: asset.duration,
+    sourceType: asset.sourceType,
+    ownsObjectUrl: asset.ownsObjectUrl,
+    expiresAt: asset.expiresAt,
+    persistedAssetId: asset.persistedAssetId,
+  };
+}
+
+function assetsShareSource(left: TrackAsset, right: TrackAsset): boolean {
+  if (left.persistedAssetId && left.persistedAssetId === right.persistedAssetId) {
+    return true;
+  }
+  if (left.file && right.file && left.file === right.file) {
+    return true;
+  }
+  return Boolean(left.playbackUrl) && left.playbackUrl === right.playbackUrl;
+}
+
+function createStudioMediaElement(playbackUrl: string): HTMLAudioElement {
+  const media = new Audio();
+  media.preload = "metadata";
+  if (/^https?:/i.test(playbackUrl)) {
+    media.crossOrigin = "anonymous";
+  }
+  media.src = playbackUrl;
+  return media;
+}
+
+function seekStudioMediaElement(media: HTMLAudioElement, time: number) {
+  if (!Number.isFinite(time) || time < 0) {
+    return;
+  }
+  try {
+    media.currentTime = time;
+  } catch {
+    // Metadata may not be ready yet; the next sync tick retries.
+  }
+}
+
+function scheduleClipEnvelope(
+  envelopeGain: GainNode,
+  clip: StudioClip,
+  elapsedClipTime: number,
+  startAt: number,
+) {
+  const fades = clampStudioClipFades(clip, clip.duration);
+  const fadeGain = envelopeGain.gain;
+  fadeGain.cancelScheduledValues(startAt);
+  fadeGain.setValueAtTime(
+    getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades),
+    startAt,
+  );
+  if (fades.fadeInDuration > elapsedClipTime) {
+    fadeGain.linearRampToValueAtTime(
+      1,
+      startAt + (fades.fadeInDuration - elapsedClipTime),
+    );
+  }
+  const fadeOutStart = clip.duration - fades.fadeOutDuration;
+  if (fadeOutStart > elapsedClipTime) {
+    fadeGain.setValueAtTime(1, startAt + (fadeOutStart - elapsedClipTime));
+  }
+  if (fades.fadeOutDuration > 0) {
+    fadeGain.linearRampToValueAtTime(
+      0,
+      startAt + (clip.duration - elapsedClipTime),
+    );
+  }
+}
+
+function syncTrackMediaPlayback(
+  runtime: TrackRuntime,
+  track: StudioLocalTrack,
+  position: number,
+  playing: boolean,
+  contextTime: number,
+) {
+  const media = runtime.mediaElement;
+  const plan = planStudioMediaElementSync({
+    clips: track.clips,
+    timelineTime: position,
+    playing,
+    activeClipId: runtime.activeClipId,
+    mediaCurrentTime: media.currentTime,
+    mediaEnded: media.ended,
+  });
+  media.loop = plan.loop;
+
+  if (plan.envelope === "silence") {
+    runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
+    runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+    runtime.sources.clear();
+    runtime.activeClipId = null;
+  } else if (plan.enteredClip) {
+    const clip = findActiveStudioClip(track.clips, position);
+    if (clip) {
+      runtime.sources.clear();
+      runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
+      scheduleClipEnvelope(
+        runtime.envelopeGain,
+        clip,
+        plan.elapsedClipTime,
+        contextTime,
+      );
+      runtime.activeClipId = clip.id;
+    }
+  }
+
+  if (plan.seekTo != null) {
+    seekStudioMediaElement(media, plan.seekTo);
+  }
+  if (plan.wantPlaying) {
+    if (media.paused) {
+      void media.play().catch(() => {
+        // Transport Play already consumed the user gesture; we never pause
+        // during gaps, so this retry is only for the initial start / ended loop.
+      });
+    }
+  } else if (!media.paused) {
+    media.pause();
+  }
+}
+
+function disconnectTrackGraph(runtime: TrackRuntime) {
+  runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+  runtime.fxCleanupTimers.clear();
+  if (!runtime.mediaElement.paused) {
+    runtime.mediaElement.pause();
+  }
+  releaseStudioMediaElement(runtime.mediaElement);
+  runtime.mediaSource.disconnect();
+  runtime.envelopeGain.disconnect();
+  runtime.fxInput.disconnect();
+  runtime.fxNodes.forEach((node) => node.disconnect());
+  runtime.retiredFxNodes.forEach((node) => node.disconnect());
+  runtime.retiredFxNodes.clear();
+  runtime.outputGain.disconnect();
+  runtime.sources.clear();
+  runtime.activeClipId = null;
+}
 
 export { validateStudioLocalFile };
 
@@ -300,8 +470,14 @@ export function StudioAudioProvider({
       const context = getAudioContext();
       const outputGain = context.createGain();
       const fxInput = context.createGain();
+      const envelopeGain = context.createGain();
+      envelopeGain.gain.value = 0;
       fxInput.connect(outputGain);
       outputGain.connect(context.destination);
+      const mediaElement = createStudioMediaElement(asset.playbackUrl);
+      const mediaSource = context.createMediaElementSource(mediaElement);
+      mediaSource.connect(envelopeGain);
+      envelopeGain.connect(fxInput);
       return {
         ...asset,
         outputGain,
@@ -311,7 +487,11 @@ export function StudioAudioProvider({
         fxCleanupTimers: new Set(),
         retiredFxNodes: new Set(),
         voicePreset: "none",
+        mediaElement,
+        mediaSource,
+        envelopeGain,
         sources: new Map(),
+        activeClipId: null,
       };
     },
     [getAudioContext],
@@ -470,18 +650,15 @@ export function StudioAudioProvider({
   }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
+    const contextTime = audioContextRef.current?.currentTime ?? 0;
     for (const runtime of trackRuntimesRef.current.values()) {
-      for (const { source, envelopeGain } of runtime.sources.values()) {
-        source.onended = null;
-        try {
-          source.stop();
-        } catch {
-          // A source may already have reached its end.
-        }
-        source.disconnect();
-        envelopeGain.disconnect();
+      if (!runtime.mediaElement.paused) {
+        runtime.mediaElement.pause();
       }
+      runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
+      runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
       runtime.sources.clear();
+      runtime.activeClipId = null;
     }
   }, []);
 
@@ -528,6 +705,14 @@ export function StudioAudioProvider({
         finishPlayback();
         return;
       }
+      const context = audioContextRef.current;
+      if (context) {
+        for (const track of tracksRef.current) {
+          const runtime = trackRuntimesRef.current.get(track.id);
+          if (!runtime) continue;
+          syncTrackMediaPlayback(runtime, track, position, true, context.currentTime);
+        }
+      }
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
@@ -551,47 +736,7 @@ export function StudioAudioProvider({
         if (!runtime) {
           continue;
         }
-        for (const clip of track.clips) {
-          if (position >= clip.startTime + clip.duration) continue;
-          const elapsedClipTime = Math.max(position - clip.startTime, 0);
-          const remaining = clip.duration - elapsedClipTime;
-          if (remaining <= 0) continue;
-          const source = context.createBufferSource();
-          const envelopeGain = context.createGain();
-          source.buffer = runtime.buffer;
-          source.connect(envelopeGain);
-          envelopeGain.connect(runtime.fxInput);
-          const sourceStartAt = startAt + Math.max(clip.startTime - position, 0);
-          const fades = clampStudioClipFades(clip, clip.duration);
-          const fadeGain = envelopeGain.gain;
-          fadeGain.setValueAtTime(
-            getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades),
-            sourceStartAt,
-          );
-          if (fades.fadeInDuration > elapsedClipTime) {
-            fadeGain.linearRampToValueAtTime(1, sourceStartAt + (fades.fadeInDuration - elapsedClipTime));
-          }
-          const fadeOutStart = clip.duration - fades.fadeOutDuration;
-          if (fadeOutStart > elapsedClipTime) {
-            fadeGain.setValueAtTime(1, sourceStartAt + (fadeOutStart - elapsedClipTime));
-          }
-          if (fades.fadeOutDuration > 0) {
-            fadeGain.linearRampToValueAtTime(0, sourceStartAt + (clip.duration - elapsedClipTime));
-          }
-          runtime.sources.set(clip.id, { source, envelopeGain });
-          source.onended = () => {
-            if (runtime.sources.get(clip.id)?.source === source) {
-              runtime.sources.delete(clip.id);
-            }
-            source.disconnect();
-            envelopeGain.disconnect();
-          };
-          source.start(
-            sourceStartAt,
-            clip.offset + elapsedClipTime,
-            remaining,
-          );
-        }
+        syncTrackMediaPlayback(runtime, track, position, true, startAt);
       }
 
       startedAtContextTimeRef.current = startAt;
@@ -604,17 +749,36 @@ export function StudioAudioProvider({
     [setStatusValue, startProgressLoop],
   );
 
+  const playbackUrlStillReferenced = useCallback((
+    url: string,
+    exceptTrackId?: string,
+  ) => {
+    for (const [trackId, asset] of assetVaultRef.current) {
+      if (trackId !== exceptTrackId && asset.playbackUrl === url) return true;
+    }
+    for (const [trackId, runtime] of trackRuntimesRef.current) {
+      if (trackId !== exceptTrackId && runtime.playbackUrl === url) return true;
+    }
+    return false;
+  }, []);
+
+  const maybeRevokePlaybackUrl = useCallback((
+    asset: TrackAsset,
+    exceptTrackId?: string,
+  ) => {
+    if (
+      asset.ownsObjectUrl &&
+      !playbackUrlStillReferenced(asset.playbackUrl, exceptTrackId)
+    ) {
+      revokeStudioObjectUrl(asset.playbackUrl);
+    }
+  }, [playbackUrlStillReferenced]);
+
   const disposeResources = useCallback(() => {
     cancelProgressLoop();
     stopSources();
     for (const runtime of trackRuntimesRef.current.values()) {
-      runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
-      runtime.fxCleanupTimers.clear();
-      runtime.fxInput.disconnect();
-      runtime.fxNodes.forEach((node) => node.disconnect());
-      runtime.retiredFxNodes.forEach((node) => node.disconnect());
-      runtime.retiredFxNodes.clear();
-      runtime.outputGain.disconnect();
+      disconnectTrackGraph(runtime);
     }
     trackRuntimesRef.current.clear();
     const context = audioContextRef.current;
@@ -639,13 +803,7 @@ export function StudioAudioProvider({
     const vault = assetVaultRef.current.get(trackId);
     if (vault) return vault;
     const runtime = trackRuntimesRef.current.get(trackId);
-    return runtime
-      ? {
-          file: runtime.file,
-          buffer: runtime.buffer,
-          sourceType: runtime.sourceType,
-        }
-      : null;
+    return runtime ? toTrackAsset(runtime) : null;
   }, []);
 
   const getSharedAssetTrackIds = useCallback((trackId: string): string[] => {
@@ -653,12 +811,12 @@ export function StudioAudioProvider({
     const ids = new Set<string>([trackId]);
     if (!asset) return [...ids];
     for (const [id, candidate] of assetVaultRef.current) {
-      if (candidate.file === asset.file && candidate.buffer === asset.buffer) {
+      if (assetsShareSource(candidate, asset)) {
         ids.add(id);
       }
     }
     for (const [id, runtime] of trackRuntimesRef.current) {
-      if (runtime.file === asset.file && runtime.buffer === asset.buffer) {
+      if (assetsShareSource(runtime, asset)) {
         ids.add(id);
       }
     }
@@ -684,11 +842,7 @@ export function StudioAudioProvider({
       cancelTrackAssetUpload(trackId);
     }
     for (const [trackId, runtime] of trackRuntimesRef.current) {
-      assetVaultRef.current.set(trackId, {
-        file: runtime.file,
-        buffer: runtime.buffer,
-        sourceType: runtime.sourceType,
-      });
+      assetVaultRef.current.set(trackId, toTrackAsset(runtime));
     }
     disposeResources();
     replaceTracks([]);
@@ -715,7 +869,7 @@ export function StudioAudioProvider({
     if (!persistenceProjectId) return;
     const asset = assetVaultRef.current.get(trackId);
     const track = tracksRef.current.find((item) => item.id === trackId);
-    if (!asset || !track) return;
+    if (!asset?.file || !track) return;
 
     cancelTrackAssetUpload(trackId);
     const generation = assetUploadGenerationRef.current.get(trackId) ?? 0;
@@ -776,30 +930,16 @@ export function StudioAudioProvider({
     }
   }, [startTrackAssetUpload]);
 
-  const decodePersistedAsset = useCallback(
-    async (blob: Blob) => {
-      const buffer = await getAudioContext().decodeAudioData(await blob.arrayBuffer());
-      if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
-        throw new Error("invalid persisted audio duration");
-      }
-      return buffer;
-    },
-    [getAudioContext],
-  );
-
   const hydratePersistedProject = useCallback(
     (hydration: StudioProjectHydration) => {
       loadGenerationRef.current += 1;
       cancelProgressLoop();
       stopSources();
       for (const runtime of trackRuntimesRef.current.values()) {
-        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
-        runtime.fxCleanupTimers.clear();
-        runtime.fxInput.disconnect();
-        runtime.fxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.clear();
-        runtime.outputGain.disconnect();
+        disconnectTrackGraph(runtime);
+      }
+      for (const [trackId, asset] of assetVaultRef.current) {
+        maybeRevokePlaybackUrl(asset, trackId);
       }
       trackRuntimesRef.current.clear();
       assetVaultRef.current.clear();
@@ -808,22 +948,23 @@ export function StudioAudioProvider({
         const asset = hydration.assets.get(track.assetId);
         const failure = hydration.failures.get(track.assetId);
         if (asset) {
-          const runtime = createTrackRuntime({
-            file: asset.file,
-            buffer: asset.buffer,
+          const playbackAsset: TrackAsset = {
+            file: null,
+            playbackUrl: asset.playbackUrl,
+            duration: asset.duration,
             sourceType: asset.metadata.sourceType,
-          });
+            ownsObjectUrl: false,
+            expiresAt: asset.expiresAt,
+            persistedAssetId: asset.metadata.id,
+          };
+          const runtime = createTrackRuntime(playbackAsset);
           trackRuntimesRef.current.set(track.id, runtime);
           applyVoicePreset(
             runtime,
             track.voicePreset ?? "none",
             (track.trackKind ?? (asset.metadata.sourceType === "recording" ? "voice" : "music")) === "voice",
           );
-          assetVaultRef.current.set(track.id, {
-            file: asset.file,
-            buffer: asset.buffer,
-            sourceType: asset.metadata.sourceType,
-          });
+          assetVaultRef.current.set(track.id, playbackAsset);
         }
         const metadata = asset?.metadata ?? hydration.assetMetadata.get(track.assetId);
         const loadState = getHydratedTrackLoadState({
@@ -879,6 +1020,7 @@ export function StudioAudioProvider({
       applyVoicePreset,
       cancelProgressLoop,
       createTrackRuntime,
+      maybeRevokePlaybackUrl,
       replaceTracks,
       setStatusValue,
       stopSources,
@@ -898,24 +1040,32 @@ export function StudioAudioProvider({
         replacementError: null,
       }));
       try {
-        const blob = await downloadStudioProjectAsset({
+        const signed = await getStudioAssetPlaybackUrl({
           projectId: persistenceProjectId,
           assetId: track.assetId,
         });
-        const buffer = await decodePersistedAsset(blob);
-        const file = new File([blob], track.fileName, {
-          type: blob.type || "application/octet-stream",
-        });
+        const duration = signed.durationSeconds;
+        if (duration == null) {
+          throw new Error("Аудиофайл проекта повреждён.");
+        }
         const sourceType: StudioAssetSourceType =
           track.trackKind === "voice" ? "recording" : "upload";
-        const asset = { file, buffer, sourceType };
+        const asset: TrackAsset = {
+          file: null,
+          playbackUrl: signed.url,
+          duration,
+          sourceType,
+          ownsObjectUrl: false,
+          expiresAt: signed.expiresAt,
+          persistedAssetId: track.assetId,
+        };
         const runtime = createTrackRuntime(asset);
         applyVoicePreset(runtime, track.voicePreset, track.trackKind === "voice");
         trackRuntimesRef.current.set(trackId, runtime);
         assetVaultRef.current.set(trackId, asset);
         updateTrack(trackId, (item) => ({
           ...item,
-          fileSize: file.size,
+          fileSize: item.fileSize,
           status: "ready",
           replacementError: null,
         }));
@@ -937,12 +1087,55 @@ export function StudioAudioProvider({
       applyTrackGains,
       applyVoicePreset,
       createTrackRuntime,
-      decodePersistedAsset,
       getTrackAsset,
       persistenceProjectId,
       updateTrack,
     ],
   );
+
+  const refreshPersistedPlaybackUrls = useCallback(async ({
+    force = false,
+  }: {
+    force?: boolean;
+  } = {}) => {
+    if (!persistenceProjectId || statusRef.current === "playing") {
+      return;
+    }
+    const seen = new Map<string, { url: string; expiresAt: number }>();
+    for (const [trackId, runtime] of trackRuntimesRef.current) {
+      if (!runtime.persistedAssetId) continue;
+      if (!force && !shouldRefreshStudioPlaybackUrl(runtime.expiresAt)) continue;
+      let signed = seen.get(runtime.persistedAssetId);
+      if (!signed) {
+        const next = await getStudioAssetPlaybackUrl({
+          projectId: persistenceProjectId,
+          assetId: runtime.persistedAssetId,
+        });
+        signed = { url: next.url, expiresAt: next.expiresAt };
+        seen.set(runtime.persistedAssetId, signed);
+      }
+      if (runtime.playbackUrl === signed.url) {
+        runtime.expiresAt = signed.expiresAt;
+        const vault = assetVaultRef.current.get(trackId);
+        if (vault) vault.expiresAt = signed.expiresAt;
+        continue;
+      }
+      const refresh = applyStudioMediaElementSrcRefresh(
+        runtime.mediaElement,
+        signed.url,
+      );
+      runtime.playbackUrl = signed.url;
+      runtime.expiresAt = signed.expiresAt;
+      if (refresh.srcChanged) {
+        seekStudioMediaElement(runtime.mediaElement, refresh.preservedTime);
+      }
+      const vault = assetVaultRef.current.get(trackId);
+      if (vault) {
+        vault.playbackUrl = signed.url;
+        vault.expiresAt = signed.expiresAt;
+      }
+    }
+  }, [persistenceProjectId]);
 
   const loadLocalFiles = useCallback(
     async (
@@ -984,32 +1177,42 @@ export function StudioAudioProvider({
       }
       setProjectError(null);
 
-      const context = getAudioContext();
-      const decodedTracks: Array<{ file: File; buffer: AudioBuffer }> = [];
+      const preparedTracks: Array<{ file: File; asset: TrackAsset }> = [];
 
       try {
         for (const file of files) {
-          const decoded = await context.decodeAudioData(await file.arrayBuffer());
-          if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
+          const local = await createLocalStudioPlaybackAsset(file);
+          if (!Number.isFinite(local.duration) || local.duration <= 0) {
+            revokeStudioObjectUrl(local.playbackUrl);
             throw new Error(`Некорректная длительность файла «${file.name}».`);
           }
-          decodedTracks.push({ file, buffer: decoded });
+          preparedTracks.push({
+            file,
+            asset: {
+              file,
+              playbackUrl: local.playbackUrl,
+              duration: local.duration,
+              sourceType: "upload",
+              ownsObjectUrl: true,
+              expiresAt: null,
+              persistedAssetId: null,
+            },
+          });
         }
 
         if (generation !== loadGenerationRef.current) {
+          for (const { asset } of preparedTracks) {
+            maybeRevokePlaybackUrl(asset);
+          }
           return [];
         }
 
         const nextTracks = [...tracksRef.current];
         const createdTracks: StudioLocalTrack[] = [];
-        for (const [index, { file, buffer }] of decodedTracks.entries()) {
+        for (const [index, { file, asset }] of preparedTracks.entries()) {
           const id = getTrackId(file, index);
-          trackRuntimesRef.current.set(id, createTrackRuntime({
-            file,
-            buffer,
-            sourceType: "upload",
-          }));
-          assetVaultRef.current.set(id, { file, buffer, sourceType: "upload" });
+          trackRuntimesRef.current.set(id, createTrackRuntime(asset));
+          assetVaultRef.current.set(id, asset);
           const createdTrack: StudioLocalTrack = {
             id,
             fileName: file.name,
@@ -1020,7 +1223,7 @@ export function StudioAudioProvider({
               id: crypto.randomUUID(),
               startTime: 0,
               offset: 0,
-              duration: buffer.duration,
+              duration: asset.duration,
               fadeInDuration: 0,
               fadeOutDuration: 0,
             }],
@@ -1052,6 +1255,9 @@ export function StudioAudioProvider({
         }
         return createdTracks;
       } catch (decodeError) {
+        for (const { asset } of preparedTracks) {
+          maybeRevokePlaybackUrl(asset);
+        }
         if (generation !== loadGenerationRef.current) {
           return [];
         }
@@ -1069,8 +1275,8 @@ export function StudioAudioProvider({
       applyTrackGains,
       cancelProgressLoop,
       createTrackRuntime,
-      getAudioContext,
       getPlaybackPosition,
+      maybeRevokePlaybackUrl,
       persistenceProjectId,
       replaceTracks,
       setStatusValue,
@@ -1104,13 +1310,22 @@ export function StudioAudioProvider({
         setStatusValue("loading");
       }
       setProjectError(null);
-      const context = getAudioContext();
 
       try {
-        const buffer = await context.decodeAudioData(await file.arrayBuffer());
-        if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+        const local = await createLocalStudioPlaybackAsset(file);
+        if (!Number.isFinite(local.duration) || local.duration <= 0) {
+          revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid recorded audio duration");
         }
+        const asset: TrackAsset = {
+          file,
+          playbackUrl: local.playbackUrl,
+          duration: local.duration,
+          sourceType: "recording",
+          ownsObjectUrl: true,
+          expiresAt: null,
+          persistedAssetId: null,
+        };
         const track: StudioLocalTrack = {
           id: getTrackId(file, tracksRef.current.length),
           fileName: file.name,
@@ -1121,7 +1336,7 @@ export function StudioAudioProvider({
             id: crypto.randomUUID(),
             startTime: Number.isFinite(startTime) && startTime >= 0 ? startTime : 0,
             offset: 0,
-            duration: buffer.duration,
+            duration: asset.duration,
             fadeInDuration: 0,
             fadeOutDuration: 0,
           }],
@@ -1133,9 +1348,9 @@ export function StudioAudioProvider({
           isReplacing: false,
           replacementError: null,
         };
-        const runtime = createTrackRuntime({ file, buffer, sourceType: "recording" });
+        const runtime = createTrackRuntime(asset);
         trackRuntimesRef.current.set(track.id, runtime);
-        assetVaultRef.current.set(track.id, { file, buffer, sourceType: "recording" });
+        assetVaultRef.current.set(track.id, asset);
         replaceTracks([...tracksRef.current, track]);
         applyTrackGains();
         if (persistenceProjectId) {
@@ -1160,7 +1375,6 @@ export function StudioAudioProvider({
     [
       applyTrackGains,
       createTrackRuntime,
-      getAudioContext,
       persistenceProjectId,
       replaceTracks,
       setStatusValue,
@@ -1218,42 +1432,42 @@ export function StudioAudioProvider({
         replacementError: null,
       }));
 
-      const context = getAudioContext();
-
       try {
-        const buffer = await context.decodeAudioData(await file.arrayBuffer());
-        if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+        const local = await createLocalStudioPlaybackAsset(file);
+        if (!Number.isFinite(local.duration) || local.duration <= 0) {
+          revokeStudioObjectUrl(local.playbackUrl);
           throw new Error("invalid audio duration");
         }
 
         if (replacementGenerationRef.current.get(trackId) !== generation) {
+          revokeStudioObjectUrl(local.playbackUrl);
           return false;
         }
 
         const currentTrack = tracksRef.current.find((item) => item.id === trackId);
         if (!currentTrack) {
+          revokeStudioObjectUrl(local.playbackUrl);
           return false;
         }
 
         const oldRuntime = trackRuntimesRef.current.get(trackId);
         if (oldRuntime) {
-          for (const { source, envelopeGain } of oldRuntime.sources.values()) {
-            source.stop();
-            source.disconnect();
-            envelopeGain.disconnect();
-          }
-          oldRuntime.fxInput.disconnect();
-          oldRuntime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
-          oldRuntime.fxCleanupTimers.clear();
-          oldRuntime.fxNodes.forEach((node) => node.disconnect());
-          oldRuntime.retiredFxNodes.forEach((node) => node.disconnect());
-          oldRuntime.retiredFxNodes.clear();
-          oldRuntime.outputGain.disconnect();
+          disconnectTrackGraph(oldRuntime);
+          maybeRevokePlaybackUrl(oldRuntime, trackId);
         }
-        const nextRuntime = createTrackRuntime({ file, buffer, sourceType: "upload" });
+        const nextAsset: TrackAsset = {
+          file,
+          playbackUrl: local.playbackUrl,
+          duration: local.duration,
+          sourceType: "upload",
+          ownsObjectUrl: true,
+          expiresAt: null,
+          persistedAssetId: null,
+        };
+        const nextRuntime = createTrackRuntime(nextAsset);
         applyVoicePreset(nextRuntime, currentTrack.voicePreset, currentTrack.trackKind === "voice");
         trackRuntimesRef.current.set(trackId, nextRuntime);
-        assetVaultRef.current.set(trackId, { file, buffer, sourceType: "upload" });
+        assetVaultRef.current.set(trackId, nextAsset);
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
             ? (() => {
@@ -1263,12 +1477,12 @@ export function StudioAudioProvider({
                         id: crypto.randomUUID(),
                         startTime: 0,
                         offset: 0,
-                        duration: buffer.duration,
+                        duration: nextAsset.duration,
                         fadeInDuration: 0,
                         fadeOutDuration: 0,
                       }]
                     : item.clips.map((clip) => {
-                        const layout = getStudioClipLayout(clip, buffer.duration);
+                        const layout = getStudioClipLayout(clip, nextAsset.duration);
                         return {
                           ...clip,
                           ...layout,
@@ -1323,8 +1537,8 @@ export function StudioAudioProvider({
       cancelProgressLoop,
       cancelTrackAssetUpload,
       createTrackRuntime,
-      getAudioContext,
       getPlaybackPosition,
+      maybeRevokePlaybackUrl,
       persistenceProjectId,
       replaceTracks,
       setStatusValue,
@@ -1377,6 +1591,7 @@ export function StudioAudioProvider({
 
       cancelProgressLoop();
       stopSources();
+      await refreshPersistedPlaybackUrls({ force: false });
       const restartPosition =
         positionRef.current >= projectDurationRef.current ? 0 : positionRef.current;
       startSourcesAtPosition(restartPosition);
@@ -1390,6 +1605,7 @@ export function StudioAudioProvider({
   }, [
     cancelProgressLoop,
     getAudioDebugSnapshot,
+    refreshPersistedPlaybackUrls,
     setStatusValue,
     startSourcesAtPosition,
     stopSources,
@@ -1438,6 +1654,21 @@ export function StudioAudioProvider({
       } else {
         positionRef.current = nextPosition;
         setCurrentTime(nextPosition);
+        const context = audioContextRef.current;
+        if (context) {
+          for (const track of tracksRef.current) {
+            const runtime = trackRuntimesRef.current.get(track.id);
+            if (runtime) {
+              syncTrackMediaPlayback(
+                runtime,
+                track,
+                nextPosition,
+                false,
+                context.currentTime,
+              );
+            }
+          }
+        }
         if (nextPosition >= projectDurationRef.current) {
           setStatusValue("ready");
         }
@@ -1495,24 +1726,28 @@ export function StudioAudioProvider({
         pause();
       }
       updateTrack(trackId, (track) => {
+        const clips = track.clips.map((clip) => {
+          if (clip.id !== clipId) return clip;
+          const nextLayout = getStudioClipLayout(
+            {
+              startTime: layout.startTime ?? clip.startTime,
+              offset: layout.offset ?? clip.offset,
+              duration: layout.duration ?? clip.duration,
+            },
+            runtime.duration,
+          );
+          return {
+            ...clip,
+            ...nextLayout,
+            ...clampStudioClipFades(clip, nextLayout.duration),
+          };
+        });
+        if (studioTrackHasOverlappingClips(clips)) {
+          return track;
+        }
         return {
           ...track,
-          clips: track.clips.map((clip) => {
-            if (clip.id !== clipId) return clip;
-            const nextLayout = getStudioClipLayout(
-              {
-                startTime: layout.startTime ?? clip.startTime,
-                offset: layout.offset ?? clip.offset,
-                duration: layout.duration ?? clip.duration,
-              },
-              runtime.buffer.duration,
-            );
-            return {
-              ...clip,
-              ...nextLayout,
-              ...clampStudioClipFades(clip, nextLayout.duration),
-            };
-          }),
+          clips,
         };
       });
       const nextPosition = clampStudioAudioPosition(
@@ -1631,19 +1866,27 @@ export function StudioAudioProvider({
       const clips = getStudioPasteClips({
         clipboard,
         targetStartTime: startTime,
-        targetBufferDuration: runtime.buffer.duration,
+        targetBufferDuration: runtime.duration,
         createClipId: () => crypto.randomUUID(),
       });
       if (clips.length === 0) {
         return [];
       }
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      if (!track) {
+        return [];
+      }
+      const accepted = appendStudioClipsIfNoOverlap(track.clips, clips);
+      if (accepted.length === 0) {
+        return [];
+      }
 
       pause();
-      updateTrack(trackId, (track) => ({
-        ...track,
-        clips: [...track.clips, ...clips],
+      updateTrack(trackId, (item) => ({
+        ...item,
+        clips: [...item.clips, ...accepted],
       }));
-      return clips.map((clip) => clip.id);
+      return accepted.map((clip) => clip.id);
     },
     [pause, updateTrack],
   );
@@ -1657,6 +1900,10 @@ export function StudioAudioProvider({
     if (!asset) {
       return null;
     }
+    const duplicateAsset: TrackAsset = {
+      ...toTrackAsset(asset),
+      ownsObjectUrl: false,
+    };
 
     const snapshot = createStudioDuplicatedTrackSnapshot(
       {
@@ -1676,8 +1923,8 @@ export function StudioAudioProvider({
         createClipId: () => crypto.randomUUID(),
       },
     );
-    assetVaultRef.current.set(snapshot.id, asset);
-    const runtime = createTrackRuntime(asset);
+    assetVaultRef.current.set(snapshot.id, duplicateAsset);
+    const runtime = createTrackRuntime(duplicateAsset);
     applyVoicePreset(
       runtime,
       snapshot.voicePreset ?? "none",
@@ -1706,8 +1953,14 @@ export function StudioAudioProvider({
     return created;
   }, [applyTrackGains, applyVoicePreset, createTrackRuntime, getTrackAsset, pause, replaceTracks]);
 
-  const getTrackBuffer = useCallback((trackId: string): AudioBuffer | null => {
-    return trackRuntimesRef.current.get(trackId)?.buffer ?? null;
+  const getTrackBuffer = useCallback((trackId: string): StudioTrackPlaybackSource | null => {
+    const duration =
+      trackRuntimesRef.current.get(trackId)?.duration ??
+      assetVaultRef.current.get(trackId)?.duration ??
+      null;
+    return duration && Number.isFinite(duration) && duration > 0
+      ? { duration }
+      : null;
   }, []);
 
   const removeTrack = useCallback(
@@ -1725,27 +1978,15 @@ export function StudioAudioProvider({
         if (track.id === trackId) return false;
         const other = getTrackAsset(track.id);
         const mine = getTrackAsset(trackId);
-        return Boolean(
-          other && mine && other.file === mine.file && other.buffer === mine.buffer,
-        );
+        return Boolean(other && mine && assetsShareSource(other, mine));
       });
       if (!sharedWithLiveTrack) {
         cancelTrackAssetUpload(trackId);
       }
       if (runtime) {
-        assetVaultRef.current.set(trackId, {
-          file: runtime.file,
-          buffer: runtime.buffer,
-          sourceType: runtime.sourceType,
-        });
-        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
-        runtime.fxCleanupTimers.clear();
-        runtime.fxInput.disconnect();
-        runtime.fxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.clear();
+        assetVaultRef.current.set(trackId, toTrackAsset(runtime));
+        disconnectTrackGraph(runtime);
       }
-      runtime?.outputGain.disconnect();
       trackRuntimesRef.current.delete(trackId);
       replaceTracks(tracksRef.current.filter((track) => track.id !== trackId));
       const nextPosition = clampStudioAudioPosition(
@@ -1807,13 +2048,7 @@ export function StudioAudioProvider({
       cancelProgressLoop();
       stopSources();
       for (const runtime of trackRuntimesRef.current.values()) {
-        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
-        runtime.fxCleanupTimers.clear();
-        runtime.fxInput.disconnect();
-        runtime.fxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.forEach((node) => node.disconnect());
-        runtime.retiredFxNodes.clear();
-        runtime.outputGain.disconnect();
+        disconnectTrackGraph(runtime);
       }
       trackRuntimesRef.current.clear();
 
@@ -1838,7 +2073,7 @@ export function StudioAudioProvider({
           if (track.assetId && persistenceProjectId) {
             restoredTracks.push({
               ...track,
-              clips: track.clips.map((clip) => ({ ...clip })),
+              clips: sortStudioClipsByStart(track.clips.map((clip) => ({ ...clip }))),
               status: "loading",
               isReplacing: false,
               replacementError: null,
@@ -1858,7 +2093,7 @@ export function StudioAudioProvider({
         trackRuntimesRef.current.set(track.id, runtime);
         restoredTracks.push({
           ...track,
-          clips: track.clips.map((clip) => ({ ...clip })),
+          clips: sortStudioClipsByStart(track.clips.map((clip) => ({ ...clip }))),
           status: "ready",
           isReplacing: false,
           replacementError: null,
@@ -1907,13 +2142,14 @@ export function StudioAudioProvider({
       for (const track of tracksRef.current) {
         retained.add(track.id);
       }
-      for (const trackId of assetVaultRef.current.keys()) {
+      for (const [trackId, asset] of [...assetVaultRef.current]) {
         if (!retained.has(trackId)) {
           assetVaultRef.current.delete(trackId);
+          maybeRevokePlaybackUrl(asset, trackId);
         }
       }
     },
-    [],
+    [maybeRevokePlaybackUrl],
   );
 
   const restoreTracks = useCallback(
@@ -1934,13 +2170,29 @@ export function StudioAudioProvider({
 
   useEffect(() => {
     const uploadControllers = assetUploadControllersRef.current;
+    const assetVault = assetVaultRef.current;
     return () => {
       for (const controller of uploadControllers.values()) {
         controller.abort();
       }
       disposeResources();
+      for (const [trackId, asset] of assetVault) {
+        maybeRevokePlaybackUrl(asset, trackId);
+      }
+      assetVault.clear();
     };
-  }, [disposeResources]);
+  }, [disposeResources, maybeRevokePlaybackUrl]);
+
+  useEffect(() => {
+    if (!persistenceProjectId) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      if (statusRef.current === "playing") return;
+      void refreshPersistedPlaybackUrls();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [persistenceProjectId, refreshPersistedPlaybackUrls]);
 
   const value = useMemo<StudioAudioContextValue>(
     () => ({
@@ -1958,7 +2210,6 @@ export function StudioAudioProvider({
       ingestRecordedFile,
       replaceTrackAudio,
       retryTrackAssetUpload,
-      decodePersistedAsset,
       hydratePersistedProject,
       play,
       pause,
@@ -1986,7 +2237,6 @@ export function StudioAudioProvider({
     [
       currentTime,
       createMicrophoneAnalyser,
-      decodePersistedAsset,
       getTrackBuffer,
       exportEditingState,
       ingestRecordedFile,
