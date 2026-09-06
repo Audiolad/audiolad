@@ -143,7 +143,7 @@ export default function AuthorAppreciationPrototype({
               APPRECIATION_CTA_HEART.length,
           )}
         </button>
-        <p className="mt-2.5 text-sm leading-5 text-[#7d70a2]">
+        <p className="author-appreciation-caption mt-2.5 text-sm leading-5 text-[#7d70a2]">
           Благодарность возвращается изобилием 🙏
         </p>
       </section>

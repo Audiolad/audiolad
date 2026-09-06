@@ -1403,6 +1403,18 @@ html.catalog-sheet-lock body {
   transform-origin: center;
 }
 
+/*
+ * Caption under «Поблагодарить автора» stays text-sm (14px) on tablet/desktop.
+ * Mobile only: 13px so the full line including 🙏 fits typical Android widths
+ * without nowrap overflow on very narrow screens.
+ */
+@media (max-width: 767px) {
+  .author-appreciation-caption {
+    font-size: 13px;
+    line-height: 1.25rem;
+  }
+}
+
 .author-appreciation-cta:hover {
   box-shadow: 0 10px 22px rgba(112, 66, 197, 0.28);
 }

@@ -13,11 +13,25 @@ function read(relativePath) {
 const prototype = read(
   "src/components/author-appreciation/AuthorAppreciationPrototype.tsx",
 );
-assert.ok(prototype.includes("❤️ Поблагодарить автора"));
-assert.ok(prototype.includes("Благодарность возвращается изобилием 🙏"));
+const APPRECIATION_CTA = "❤️ Поблагодарить автора";
+const APPRECIATION_CAPTION = "Благодарность возвращается изобилием 🙏";
+const DESKTOP_CAPTION_FONT_PX = 14; // Tailwind text-sm
+const MOBILE_CAPTION_FONT_PX = DESKTOP_CAPTION_FONT_PX - 1;
+
+assert.ok(prototype.includes(APPRECIATION_CTA));
+assert.ok(prototype.includes(APPRECIATION_CAPTION));
 assert.ok(!prototype.includes("🙏 Поблагодарить автора ❤️"));
 assert.ok(!prototype.includes("🙏 Поблагодарить автора"));
 assert.ok(!prototype.includes("Поблагодарить автора ❤️"));
+assert.match(
+  prototype,
+  /<p className="author-appreciation-caption mt-2\.5 text-sm leading-5 text-\[#7d70a2\]">/,
+  "desktop/tablet caption keeps text-sm; only the dedicated class is added",
+);
+assert.ok(
+  !/author-appreciation-caption[^>]*(whitespace-nowrap|nowrap)/.test(prototype),
+  "caption must wrap on very narrow screens instead of overflowing",
+);
 assert.ok(prototype.includes("FEATURED_CARD_PRIMARY_CTA_CLASS"));
 assert.ok(prototype.includes("author-appreciation-cta"));
 assert.ok(prototype.includes("author-appreciation-cta__heart"));
@@ -158,6 +172,29 @@ assert.ok(globalsCss.includes("author-appreciation-cta-sheen"));
 assert.match(
   globalsCss,
   /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.author-appreciation-cta,[\s\S]*?animation:\s*none/,
+);
+const mobileCaptionBlock =
+  /@media \(max-width: 767px\) \{\s*\.author-appreciation-caption\s*\{([^}]+)\}/;
+const mobileCaptionRule = globalsCss.match(mobileCaptionBlock);
+assert.ok(mobileCaptionRule, "mobile caption font rule must use the 767px breakpoint");
+assert.match(
+  mobileCaptionRule[1],
+  new RegExp(`font-size:\\s*${MOBILE_CAPTION_FONT_PX}px`),
+  `mobile caption must be exactly ${MOBILE_CAPTION_FONT_PX}px (text-sm ${DESKTOP_CAPTION_FONT_PX}px minus 1px)`,
+);
+assert.match(
+  mobileCaptionRule[1],
+  /line-height:\s*1\.25rem/,
+  "mobile caption keeps leading-5 so the line stays visually neat",
+);
+assert.ok(
+  !/white-space:\s*nowrap/.test(mobileCaptionRule[1]),
+  "mobile caption must not force nowrap",
+);
+const captionCssOutsideMobile = globalsCss.replace(mobileCaptionBlock, "");
+assert.ok(
+  !/\.author-appreciation-caption\s*\{[^}]*font-size:/.test(captionCssOutsideMobile),
+  "tablet/desktop caption font-size stays Tailwind text-sm",
 );
 
 console.log("author-appreciation-prototype-unit: ok");
