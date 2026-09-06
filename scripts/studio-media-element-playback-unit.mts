@@ -11,13 +11,16 @@ import {
   waitForStudioMediaMetadata,
 } from "../src/lib/studio/local-playback-asset";
 import {
+  countActiveStudioClips,
   findActiveStudioClip,
   findNextStudioClip,
   getStudioClipMediaTime,
+  planStudioMediaElementSync,
   shouldCorrectStudioMediaDrift,
   STUDIO_MEDIA_DRIFT_SEEK_SECONDS,
 } from "../src/lib/studio/media-element-sync";
 import {
+  applyStudioMediaElementSrcRefresh,
   createStudioPlaybackRangeRequestInit,
   getStudioPlaybackExpiryMs,
   isPartialContentStatus,
@@ -26,6 +29,12 @@ import {
   STUDIO_PLAYBACK_URL_REFRESH_MARGIN_MS,
   STUDIO_PLAYBACK_URL_TTL_SECONDS,
 } from "../src/lib/studio/signed-playback";
+import {
+  getStudioClipMoveLayout,
+  getStudioSameTrackBounds,
+  splitStudioClip,
+  studioTrackHasOverlappingClips,
+} from "../src/lib/studio/clip-math";
 
 function testClipSyncMath() {
   const clip = { startTime: 10, offset: 30, duration: 20 };
@@ -157,6 +166,106 @@ async function testMetadataWaitAbortAndErrors() {
   );
 }
 
+function testSameTrackOverlapImpossibleAndAtMostOneActive() {
+  const clips = [
+    { id: "a", startTime: 0, offset: 0, duration: 10 },
+    { id: "b", startTime: 14, offset: 30, duration: 8 },
+  ];
+  const moved = getStudioClipMoveLayout({
+    layout: clips[0],
+    bufferDuration: 120,
+    requestedStartTime: 12,
+    snapTargets: [],
+    pixelsPerSecond: 40,
+    collisionBounds: getStudioSameTrackBounds(clips[0], clips),
+  });
+  assert.equal(studioTrackHasOverlappingClips([moved, clips[1]]), false);
+  const split = splitStudioClip(
+    { ...clips[1], fadeInDuration: 0, fadeOutDuration: 0 },
+    18,
+    "b-right",
+  );
+  assert.ok(split);
+  const afterSplit = [clips[0], split.left, split.right];
+  assert.equal(studioTrackHasOverlappingClips(afterSplit), false);
+  for (let time = 0; time <= 22; time += 0.25) {
+    assert.ok(countActiveStudioClips(afterSplit, time) <= 1);
+  }
+}
+
+function testGapPlaybackKeepsUserGesture() {
+  const clips = [
+    { id: "a", startTime: 0, offset: 0, duration: 5 },
+    { id: "b", startTime: 10, offset: 20, duration: 5 },
+  ];
+  const afterA = planStudioMediaElementSync({
+    clips,
+    timelineTime: 5,
+    playing: true,
+    activeClipId: "a",
+    mediaCurrentTime: 5,
+    mediaEnded: false,
+  });
+  assert.equal(afterA.envelope, "silence");
+  assert.equal(afterA.wantPlaying, true);
+  assert.equal(afterA.loop, true);
+  assert.equal(afterA.activeClipId, null);
+
+  const endedInGap = planStudioMediaElementSync({
+    clips,
+    timelineTime: 7,
+    playing: true,
+    activeClipId: null,
+    mediaCurrentTime: 71,
+    mediaEnded: true,
+  });
+  assert.equal(endedInGap.seekTo, 0);
+  assert.equal(endedInGap.wantPlaying, true);
+
+  const enterB = planStudioMediaElementSync({
+    clips,
+    timelineTime: 10,
+    playing: true,
+    activeClipId: null,
+    mediaCurrentTime: 0,
+  });
+  assert.equal(enterB.activeClipId, "b");
+  assert.equal(enterB.wantPlaying, true);
+  assert.equal(enterB.loop, false);
+  assert.equal(enterB.enteredClip, true);
+  assert.equal(enterB.seekTo, 20);
+
+  const pausedGap = planStudioMediaElementSync({
+    clips,
+    timelineTime: 7,
+    playing: false,
+    activeClipId: null,
+    mediaCurrentTime: 0,
+  });
+  assert.equal(pausedGap.wantPlaying, false);
+  assert.equal(pausedGap.loop, false);
+}
+
+function testSignedUrlRefreshDoesNotRecreateSource() {
+  const media = {
+    src: "https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/a?token=old",
+    currentTime: 1800.5,
+  };
+  const same = applyStudioMediaElementSrcRefresh(media, media.src);
+  assert.equal(same.srcChanged, false);
+  assert.equal(same.recreateMediaElementSource, false);
+  assert.equal(same.preservedTime, 1800.5);
+
+  const next =
+    "https://audiolad.ru/storage/v1/object/sign/studio-draft-assets/a?token=new";
+  const refreshed = applyStudioMediaElementSrcRefresh(media, next);
+  assert.equal(refreshed.srcChanged, true);
+  assert.equal(refreshed.recreateMediaElementSource, false);
+  assert.equal(refreshed.preservedTime, 1800.5);
+  assert.equal(media.src, next);
+  assert.equal(STUDIO_PLAYBACK_URL_TTL_SECONDS, 4 * 60 * 60);
+}
+
 function testFallbackWaveform() {
   const peaks = getFallbackWaveformPeaks(4281.44, 16, 7);
   assert.equal(peaks.minimums.length, 16);
@@ -197,9 +306,16 @@ async function testProviderAndHydrationContracts() {
 
   assert.doesNotMatch(provider, /decodeAudioData|arrayBuffer\(/);
   assert.match(provider, /createMediaElementSource/);
+  assert.equal([...provider.matchAll(/createMediaElementSource/g)].length, 1);
   assert.match(provider, /preload = "metadata"/);
   assert.match(provider, /revokeStudioObjectUrl/);
   assert.match(provider, /shouldRefreshStudioPlaybackUrl/);
+  assert.match(provider, /planStudioMediaElementSync/);
+  assert.match(provider, /applyStudioMediaElementSrcRefresh/);
+  assert.match(provider, /studioTrackHasOverlappingClips/);
+  assert.match(provider, /appendStudioClipsIfNoOverlap/);
+  assert.match(provider, /media\.loop = plan\.loop/);
+  assert.match(provider, /statusRef\.current === "playing"/);
   assert.match(hydration, /signPlayback/);
   assert.doesNotMatch(hydration, /downloadStudio|decodeAudioData|AudioBuffer/);
   assert.match(shell, /getStudioAssetPlaybackUrl/);
@@ -215,6 +331,9 @@ testSignedPlaybackHelpers();
 testObjectUrlDisposal();
 await testLocalAssetUsesMetadataNotDecode();
 await testMetadataWaitAbortAndErrors();
+testSameTrackOverlapImpossibleAndAtMostOneActive();
+testGapPlaybackKeepsUserGesture();
+testSignedUrlRefreshDoesNotRecreateSource();
 testFallbackWaveform();
 await testProviderAndHydrationContracts();
 

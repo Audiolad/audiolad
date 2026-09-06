@@ -80,6 +80,22 @@ assert.equal(result.state.tracks[0].voicePreset, "trance");
 assert.deepEqual(result.state.tracks[0].clips.map((clip) => clip.startTime), [3, 9]);
 assert.equal(result.assets.get(assetId)?.playbackUrl, result.assets.get(assetId)?.playbackUrl);
 
+const reopened = await hydrateStudioProject({
+  project,
+  assets: [metadata],
+  signPlayback: async (asset) => signedPlayback(asset, Date.now() + 14_400_000),
+});
+assert.match(
+  reopened.assets.get(assetId)?.playbackUrl ?? "",
+  /\/storage\/v1\/object\/sign\/studio-draft-assets\//,
+);
+assert.notEqual(reopened.assets.get(assetId)?.playbackUrl, undefined);
+assert.equal(
+  typeof reopened.assets.get(assetId)?.expiresAt === "number" &&
+    (reopened.assets.get(assetId)?.expiresAt ?? 0) > Date.now(),
+  true,
+);
+
 const mp4Hydration = await hydrateStudioProject({
   project,
   assets: [{ ...metadata, originalName: "recording.m4a", mimeType: "audio/mp4" }],

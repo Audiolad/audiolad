@@ -19,10 +19,13 @@ import {
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 import {
+  appendStudioClipsIfNoOverlap,
   getStudioClipLayout,
   getStudioProjectDurationFromClips,
   getStudioRippleDeleteResult,
+  sortStudioClipsByStart,
   splitStudioClip,
+  studioTrackHasOverlappingClips,
   type StudioClip,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
@@ -69,10 +72,10 @@ import {
 } from "@/lib/studio/local-playback-asset";
 import {
   findActiveStudioClip,
-  getStudioClipMediaTime,
-  shouldCorrectStudioMediaDrift,
+  planStudioMediaElementSync,
 } from "@/lib/studio/media-element-sync";
 import {
+  applyStudioMediaElementSrcRefresh,
   shouldRefreshStudioPlaybackUrl,
 } from "@/lib/studio/signed-playback";
 import type { StudioTrackPlaybackSource } from "@/components/studio/StudioTimeline";
@@ -297,35 +300,45 @@ function syncTrackMediaPlayback(
   playing: boolean,
   contextTime: number,
 ) {
-  const clip = findActiveStudioClip(track.clips, position);
   const media = runtime.mediaElement;
-  if (!clip) {
-    if (!media.paused) {
-      media.pause();
-    }
+  const plan = planStudioMediaElementSync({
+    clips: track.clips,
+    timelineTime: position,
+    playing,
+    activeClipId: runtime.activeClipId,
+    mediaCurrentTime: media.currentTime,
+    mediaEnded: media.ended,
+  });
+  media.loop = plan.loop;
+
+  if (plan.envelope === "silence") {
     runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
     runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
     runtime.sources.clear();
     runtime.activeClipId = null;
-    return;
+  } else if (plan.enteredClip) {
+    const clip = findActiveStudioClip(track.clips, position);
+    if (clip) {
+      runtime.sources.clear();
+      runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
+      scheduleClipEnvelope(
+        runtime.envelopeGain,
+        clip,
+        plan.elapsedClipTime,
+        contextTime,
+      );
+      runtime.activeClipId = clip.id;
+    }
   }
 
-  const elapsedClipTime = Math.max(position - clip.startTime, 0);
-  const mediaTime = getStudioClipMediaTime(clip, position);
-  const entered = runtime.activeClipId !== clip.id;
-  if (entered || shouldCorrectStudioMediaDrift(media.currentTime, mediaTime)) {
-    seekStudioMediaElement(media, clip.offset + elapsedClipTime);
+  if (plan.seekTo != null) {
+    seekStudioMediaElement(media, plan.seekTo);
   }
-  if (entered) {
-    runtime.sources.clear();
-    runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
-    scheduleClipEnvelope(runtime.envelopeGain, clip, elapsedClipTime, contextTime);
-    runtime.activeClipId = clip.id;
-  }
-  if (playing) {
+  if (plan.wantPlaying) {
     if (media.paused) {
       void media.play().catch(() => {
-        // Autoplay can reject if the user gesture was lost; transport stays in control.
+        // Transport Play already consumed the user gesture; we never pause
+        // during gaps, so this retry is only for the initial start / ended loop.
       });
     }
   } else if (!media.paused) {
@@ -1107,11 +1120,15 @@ export function StudioAudioProvider({
         if (vault) vault.expiresAt = signed.expiresAt;
         continue;
       }
-      const pausedAt = runtime.mediaElement.currentTime;
-      runtime.mediaElement.src = signed.url;
+      const refresh = applyStudioMediaElementSrcRefresh(
+        runtime.mediaElement,
+        signed.url,
+      );
       runtime.playbackUrl = signed.url;
       runtime.expiresAt = signed.expiresAt;
-      seekStudioMediaElement(runtime.mediaElement, pausedAt);
+      if (refresh.srcChanged) {
+        seekStudioMediaElement(runtime.mediaElement, refresh.preservedTime);
+      }
       const vault = assetVaultRef.current.get(trackId);
       if (vault) {
         vault.playbackUrl = signed.url;
@@ -1709,24 +1726,28 @@ export function StudioAudioProvider({
         pause();
       }
       updateTrack(trackId, (track) => {
+        const clips = track.clips.map((clip) => {
+          if (clip.id !== clipId) return clip;
+          const nextLayout = getStudioClipLayout(
+            {
+              startTime: layout.startTime ?? clip.startTime,
+              offset: layout.offset ?? clip.offset,
+              duration: layout.duration ?? clip.duration,
+            },
+            runtime.duration,
+          );
+          return {
+            ...clip,
+            ...nextLayout,
+            ...clampStudioClipFades(clip, nextLayout.duration),
+          };
+        });
+        if (studioTrackHasOverlappingClips(clips)) {
+          return track;
+        }
         return {
           ...track,
-          clips: track.clips.map((clip) => {
-            if (clip.id !== clipId) return clip;
-            const nextLayout = getStudioClipLayout(
-              {
-                startTime: layout.startTime ?? clip.startTime,
-                offset: layout.offset ?? clip.offset,
-                duration: layout.duration ?? clip.duration,
-              },
-              runtime.duration,
-            );
-            return {
-              ...clip,
-              ...nextLayout,
-              ...clampStudioClipFades(clip, nextLayout.duration),
-            };
-          }),
+          clips,
         };
       });
       const nextPosition = clampStudioAudioPosition(
@@ -1851,13 +1872,21 @@ export function StudioAudioProvider({
       if (clips.length === 0) {
         return [];
       }
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      if (!track) {
+        return [];
+      }
+      const accepted = appendStudioClipsIfNoOverlap(track.clips, clips);
+      if (accepted.length === 0) {
+        return [];
+      }
 
       pause();
-      updateTrack(trackId, (track) => ({
-        ...track,
-        clips: [...track.clips, ...clips],
+      updateTrack(trackId, (item) => ({
+        ...item,
+        clips: [...item.clips, ...accepted],
       }));
-      return clips.map((clip) => clip.id);
+      return accepted.map((clip) => clip.id);
     },
     [pause, updateTrack],
   );
@@ -2044,7 +2073,7 @@ export function StudioAudioProvider({
           if (track.assetId && persistenceProjectId) {
             restoredTracks.push({
               ...track,
-              clips: track.clips.map((clip) => ({ ...clip })),
+              clips: sortStudioClipsByStart(track.clips.map((clip) => ({ ...clip }))),
               status: "loading",
               isReplacing: false,
               replacementError: null,
@@ -2064,7 +2093,7 @@ export function StudioAudioProvider({
         trackRuntimesRef.current.set(track.id, runtime);
         restoredTracks.push({
           ...track,
-          clips: track.clips.map((clip) => ({ ...clip })),
+          clips: sortStudioClipsByStart(track.clips.map((clip) => ({ ...clip }))),
           status: "ready",
           isReplacing: false,
           replacementError: null,

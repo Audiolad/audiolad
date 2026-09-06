@@ -60,3 +60,31 @@ export function createStudioPlaybackRangeRequestInit(
 export function isPartialContentStatus(status: number): boolean {
   return status === 206;
 }
+
+export function applyStudioMediaElementSrcRefresh<
+  T extends { src: string; currentTime: number },
+>(
+  media: T,
+  nextUrl: string,
+): {
+  srcChanged: boolean;
+  preservedTime: number;
+  recreateMediaElementSource: false;
+} {
+  const preservedTime = Number.isFinite(media.currentTime)
+    ? media.currentTime
+    : 0;
+  if (!nextUrl || media.src === nextUrl) {
+    return {
+      srcChanged: false,
+      preservedTime,
+      recreateMediaElementSource: false,
+    };
+  }
+  media.src = nextUrl;
+  return {
+    srcChanged: true,
+    preservedTime,
+    recreateMediaElementSource: false,
+  };
+}

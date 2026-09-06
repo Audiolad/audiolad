@@ -279,6 +279,8 @@ assert.match(shell, /className="studio-editor-feedback pointer-events-none (abso
 assert.match(shell, /aria-live/);
 assert.doesNotMatch(shell, /editingNotice \? \(\s*<p role="status" className="mb-4/);
 assert.match(provider, /duplicateTrack/);
+assert.match(provider, /appendStudioClipsIfNoOverlap/);
+assert.match(provider, /studioTrackHasOverlappingClips/);
 assert.match(provider, /assetVaultRef\.current\.set\(snapshot\.id, duplicateAsset\)/);
 assert.match(provider, /createTrackRuntime\(asset\)/);
 assert.match(provider, /bindSharedAssetState/);
