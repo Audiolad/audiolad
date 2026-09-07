@@ -117,10 +117,18 @@ function testEligibilityReusesStage1() {
   assert.deepEqual(
     entitledGate({
       access: { mode: "catalog_preview" },
-      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+      ratingEligibleAt: null,
     }),
     { ok: false, status: 403, error: "rating_not_eligible" },
-    "preview cannot rate even with a historical eligible stamp",
+    "A: paid preview before 30s is rating_not_eligible",
+  );
+  assert.equal(
+    entitledGate({
+      access: { mode: "catalog_preview" },
+      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+    }).ok,
+    true,
+    "B: legal catalog_preview may rate after rating_eligible_at",
   );
 
   assert.deepEqual(
@@ -133,7 +141,7 @@ function testEligibilityReusesStage1() {
   }
 }
 
-function testAccessDecisionPreviewDenied() {
+function testAccessDecisionPreviewRatingAllowed() {
   const preview = resolveListenApiDecision({
     purpose: "rating",
     isCourse: false,
@@ -143,7 +151,37 @@ function testAccessDecisionPreviewDenied() {
     catalogPreviewEligible: true,
     listenAccess: null,
   });
-  assert.equal(preview.ok, false, "preview never opens rating API");
+  assert.equal(preview.ok, true, "legal catalog_preview opens rating API");
+  if (preview.ok) {
+    assert.equal(preview.access.mode, "catalog_preview");
+    assert.equal(preview.useServiceRoleStorage, false);
+  }
+
+  const unpublished = resolveListenApiDecision({
+    purpose: "rating",
+    isCourse: false,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: false,
+    listenAccess: { mode: "catalog_preview" },
+  });
+  assert.equal(
+    unpublished.ok,
+    false,
+    "client catalog_preview flag cannot open rating without server preview contract",
+  );
+
+  const course = resolveListenApiDecision({
+    purpose: "rating",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(course.ok, false, "course stays out of catalog preview rating");
 
   const entitled = resolveListenApiDecision({
     purpose: "rating",
@@ -594,6 +632,8 @@ function testSourceContracts() {
   assert.match(productRoute, /handlePracticeRatingPut/);
   assert.match(legacyRoute, /handlePracticeRatingGet/);
   assert.match(previewAccess, /"rating"/);
+  assert.match(previewAccess, /isRatingListenAccessMode/);
+  assert.match(previewAccess, /isCatalogPreviewApiPurpose/);
 
   assert.match(feature, /RATINGS_UI_ENABLED/);
   assert.match(page, /isRatingsUiEnabled/);
@@ -662,11 +702,140 @@ function testSourceContracts() {
   assert.doesNotMatch(progressRoute, /practice_ratings|set_practice_rating/);
   assert.doesNotMatch(clipServe, /practice_ratings|set_practice_rating/);
   assert.doesNotMatch(player, /practice_ratings|\/rating/);
+  assert.match(eligibility, /canBecomeRatingEligible/);
+  assert.doesNotMatch(eligibility, /isFullListenAccessMode/);
+}
+
+function testPaidPreviewRatingMatrix() {
+  const before30s = entitledGate({
+    access: { mode: "catalog_preview" },
+    ratingEligibleAt: null,
+  });
+  assert.deepEqual(
+    before30s,
+    { ok: false, status: 403, error: "rating_not_eligible" },
+    "A: paid non-buyer before 30s → 403 rating_not_eligible",
+  );
+
+  const after30s = entitledGate({
+    access: { mode: "catalog_preview" },
+    ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+  });
+  assert.equal(after30s.ok, true, "B: ≥30s legal preview → rating gate open");
+
+  assert.deepEqual(
+    entitledGate({
+      userId: null,
+      access: { mode: "catalog_preview" },
+      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+    }),
+    { ok: false, status: 401, error: "unauthorized" },
+    "D: anonymous never rates",
+  );
+
+  assert.equal(
+    entitledGate({
+      access: { mode: "entitled" },
+      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+    }).ok,
+    true,
+    "E: purchased entitled path unchanged",
+  );
+  assert.equal(
+    entitledGate({
+      access: { mode: "author_preview" },
+      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+    }).ok,
+    true,
+    "F: author_preview unchanged",
+  );
+  assert.equal(
+    entitledGate({
+      access: { mode: "entitled" },
+      productKind: "practice",
+      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+    }).ok,
+    true,
+    "G: free/full-listen entitled unchanged",
+  );
+
+  const firstAggregate = applyOptimisticPracticeRating(
+    {
+      stars: null,
+      ratingEligible: true,
+      message: null,
+      pendingStars: null,
+      aggregate: { totalStars: 0, ratingCount: 0 },
+    },
+    5,
+  );
+  assert.deepEqual(
+    firstAggregate.aggregate,
+    { totalStars: 5, ratingCount: 1 },
+    "B/H: first preview-derived 5★ updates aggregate 0★0 → 5★1",
+  );
+
+  const edited = applyOptimisticPracticeRating(
+    {
+      stars: 5,
+      ratingEligible: true,
+      message: RATING_THANKS_COPY,
+      pendingStars: null,
+      aggregate: { totalStars: 5, ratingCount: 1 },
+    },
+    4,
+  );
+  assert.deepEqual(
+    edited.aggregate,
+    { totalStars: 4, ratingCount: 1 },
+    "H: edit of preview-derived rating keeps one row / count",
+  );
+
+  const same = applyOptimisticPracticeRating(
+    {
+      stars: 4,
+      ratingEligible: true,
+      message: RATING_THANKS_COPY,
+      pendingStars: null,
+      aggregate: { totalStars: 4, ratingCount: 1 },
+    },
+    4,
+  );
+  assert.deepEqual(
+    same.aggregate,
+    { totalStars: 4, ratingCount: 1 },
+    "H: same stars is not a new vote",
+  );
+
+  const afterPurchaseEdit = applyOptimisticPracticeRating(
+    {
+      stars: 4,
+      ratingEligible: true,
+      message: RATING_THANKS_COPY,
+      pendingStars: null,
+      aggregate: { totalStars: 4, ratingCount: 1 },
+    },
+    5,
+  );
+  assert.deepEqual(
+    afterPurchaseEdit.aggregate,
+    { totalStars: 5, ratingCount: 1 },
+    "I: preview→purchase re-rate edits the same row",
+  );
+
+  assert.equal(
+    resolvePracticeRatingStarClick({
+      isAuthenticated: false,
+      isPending: false,
+    }),
+    "sign_in",
+    "D: anonymous star click → sign-in",
+  );
 }
 
 testStarsBounds();
 testEligibilityReusesStage1();
-testAccessDecisionPreviewDenied();
+testAccessDecisionPreviewRatingAllowed();
 testFeatureFlag();
 testHmacAndTrustedIp();
 testStaleEligibilityDoesNotBlockPut();
@@ -678,5 +847,6 @@ await testOptimisticPutSuccessUsesServerAggregate();
 testAggregateNoDoubleCount();
 testClientContracts();
 testSourceContracts();
+testPaidPreviewRatingMatrix();
 
 console.log("practice-ratings-unit: ok");

@@ -2,7 +2,6 @@ import {
   canBecomeRatingEligible,
   isListenStatsProductKind,
 } from "@/lib/listen/listen-stats-access";
-import { isFullListenAccessMode } from "@/lib/listen/preview-access";
 import type { ListenAccess } from "@/lib/listen/types";
 
 export type RatingGateError = "unauthorized" | "rating_not_eligible";
@@ -13,8 +12,8 @@ export type RatingGateResult =
 
 /**
  * Server-only rating gate. Never trust client eligibility, preview, or stars.
- * Eligibility is Stage 1 `rating_eligible_at IS NOT NULL`.
- * Author owners of a rateable product use the same rule as listeners.
+ * Eligibility is `rating_eligible_at IS NOT NULL` after trusted MEDIA-TIME.
+ * Access must be entitled, author_preview, or legal catalog_preview.
  */
 export function evaluatePracticeRatingGate(input: {
   userId: string | null | undefined;
@@ -31,11 +30,7 @@ export function evaluatePracticeRatingGate(input: {
     return { ok: false, status: 403, error: "rating_not_eligible" };
   }
 
-  if (!input.access || !isFullListenAccessMode(input.access.mode)) {
-    return { ok: false, status: 403, error: "rating_not_eligible" };
-  }
-
-  if (!canBecomeRatingEligible(input.access)) {
+  if (!input.access || !canBecomeRatingEligible(input.access)) {
     return { ok: false, status: 403, error: "rating_not_eligible" };
   }
 

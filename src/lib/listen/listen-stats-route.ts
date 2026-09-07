@@ -189,6 +189,13 @@ export async function handleListenStatsPut(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  if (
+    access.mode === "catalog_preview" &&
+    audioItem.status !== "published"
+  ) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const derivedClientDelta =
     clientMediaDeltaMs ??
     (priorPositionMs !== null ? Math.max(0, positionMs - priorPositionMs) : null);
