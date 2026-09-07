@@ -7,16 +7,22 @@ import assert from "node:assert/strict";
 
 import {
   captureRecoveryPosition,
-  createSignedUrlRecoveryState,
   decideMediaErrorRecovery,
   FORMAT_AUDIO_ERROR,
   LOAD_AUDIO_ERROR,
   MEDIA_ERR_NETWORK,
   MEDIA_ERR_SRC_NOT_SUPPORTED,
-  reduceSignedUrlRecovery,
+  messageForSignedUrlHttpStatus,
   settleSignedUrlRecoveryFailure,
   shouldApplySignedUrlRecovery,
+  visibleErrorForSignedUrlRecoveryFailure,
+  visibleListenPlayerError,
 } from "../src/lib/audio/signed-url-media-error-recovery";
+import {
+  createSignedUrlRecoveryState,
+  reduceSignedUrlRecovery,
+  visibleRecoveryError,
+} from "./lib/signed-url-ttl-expiry-recovery-harness";
 
 function playableState() {
   const started = createSignedUrlRecoveryState({
@@ -328,11 +334,28 @@ function testLoadSignedUrlFailureSettles() {
   assert.equal(stale.showError, false);
   assert.equal(stale.allowAnotherResign, false);
 
-  for (const [status, message] of [
-    [403, "Доступ к прослушиванию не открыт."],
-    [404, "Аудиофайл не найден."],
-    [500, LOAD_AUDIO_ERROR],
-  ] as const) {
+  for (const status of [403, 404, 500] as const) {
+    const expected = messageForSignedUrlHttpStatus(status);
+    const result = {
+      ok: false as const,
+      reason: "failed" as const,
+      status,
+    };
+    const playerError = visibleErrorForSignedUrlRecoveryFailure(result);
+    const urlError = messageForSignedUrlHttpStatus(status);
+
+    assert.equal(playerError, expected, `${status} helper text`);
+    assert.equal(
+      visibleListenPlayerError(playerError, urlError),
+      expected,
+      `${status} visible playerError ?? urlError must not be masked`,
+    );
+    assert.equal(
+      visibleListenPlayerError(LOAD_AUDIO_ERROR, expected),
+      LOAD_AUDIO_ERROR,
+      "hook composition playerError ?? urlError lets a generic playerError win",
+    );
+
     let state = playableState();
     state = reduceSignedUrlRecovery(state, {
       type: "media_error",
@@ -348,7 +371,7 @@ function testLoadSignedUrlFailureSettles() {
     assert.equal(state.isLoading, false, `${status} must end loading`);
     assert.equal(state.isUrlLoading, false, `${status} must end url loading`);
     assert.equal(state.src, null, `${status} must not leave a half-state src`);
-    assert.equal(state.playerError, message, `${status} shows a clear error`);
+    assert.equal(visibleRecoveryError(state), expected, `${status} visible error`);
     assert.equal(state.recoveryUrlAttempted, true);
 
     const fetches = state.fetchCalls.length;
