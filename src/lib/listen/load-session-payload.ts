@@ -237,7 +237,7 @@ export async function loadListenSessionPayload(
       guest_access_enabled,
       product_kind,
       publication_class,
-      authors!practices_author_id_fkey (
+      authors!practices_author_id_fkey!inner (
         id,
         name,
         slug
