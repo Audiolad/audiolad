@@ -3,6 +3,11 @@
 // `pm2 start deploy/studio-render-worker.ecosystem.config.cjs`
 // or `pm2 restart audiolad-studio-render-worker --update-env` after deploy.
 // Do not run this alongside the former one-shot cron worker.
+//
+// Env: PM2 only sets NODE_ENV. The process loads authoritative
+// `.env.production` from cwd via Next.js `@next/env` (deploy already links
+// `shared/.env.production` into the release). Do not rely on a once-saved
+// shell env or `pm2 save` for secrets. Never put secrets in this file.
 module.exports = {
   apps: [{
     name: "audiolad-studio-render-worker",
