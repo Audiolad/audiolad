@@ -50,7 +50,7 @@ export function formatStudioRenderWorkerEnvLog(
 
 export function redactStudioRenderWorkerSecrets(
   text: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.Dict<string> = process.env,
 ): string {
   let redacted = text;
   for (const key of STUDIO_RENDER_WORKER_REQUIRED_ENV) {

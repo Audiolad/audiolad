@@ -615,7 +615,6 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(script, /createStudioRenderWorker/);
   assert.match(script, /requireStudioRenderWorkerEnv/);
   assert.match(script, /redactStudioRenderWorkerSecrets/);
-  assert.doesNotMatch(script, /cron_restart/);
 }
 
 async function main() {

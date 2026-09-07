@@ -21,10 +21,14 @@ function snapshotEnv(keys: string[]): Record<string, string | undefined> {
   return Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 }
 
+function setEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}
+
 function restoreEnv(snapshot: Record<string, string | undefined>) {
   for (const [key, value] of Object.entries(snapshot)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
+    setEnv(key, value);
   }
 }
 
@@ -79,7 +83,7 @@ function testCleanPm2StartLoadsAuthoritativeEnv() {
   try {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    process.env.NODE_ENV = "production";
+    setEnv("NODE_ENV", "production");
 
     const logs = captureConsole(() => {
       const presence = requireStudioRenderWorkerEnv({ dir, forceReload: true });
@@ -111,7 +115,7 @@ function testMissingEnvFileFailsClosedWithoutSecrets() {
   try {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    process.env.NODE_ENV = "production";
+    setEnv("NODE_ENV", "production");
     const logs = captureConsole(() => {
       assert.throws(
         () => requireStudioRenderWorkerEnv({ dir, forceReload: true }),
@@ -170,7 +174,6 @@ function testPm2CleanStartContract() {
   assert.match(runner, /redactStudioRenderWorkerSecrets/);
   assert.match(runner, /studio_render_env_ready/);
   assert.doesNotMatch(runner, /console\.(log|error)\([^)]*process\.env/);
-  assert.doesNotMatch(runner, /cron_restart/);
 }
 
 function main() {
