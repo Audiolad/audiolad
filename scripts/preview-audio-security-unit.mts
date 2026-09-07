@@ -12,6 +12,8 @@ import { isOriginalPracticeAudioSignedUrl } from "../src/lib/audio/signed-audio-
 import {
   canWritePracticeProgress,
   isCatalogStorefrontPreviewEligible,
+  isFullListenAccessMode,
+  isRatingListenAccessMode,
   resolveListenApiDecision,
 } from "../src/lib/listen/preview-access";
 import {
@@ -143,9 +145,39 @@ function testAccessDecisions() {
   });
   assert.equal(
     previewListenStats.ok,
-    false,
-    "preview-only cannot accrue listen-stats",
+    true,
+    "legal catalog_preview may accrue listen-stats for rating",
   );
+  if (previewListenStats.ok) {
+    assert.equal(previewListenStats.access.mode, "catalog_preview");
+    assert.equal(canWritePracticeProgress(previewListenStats.access), false);
+  }
+
+  const previewListenStatsEscape = resolveListenApiDecision({
+    purpose: "listen_stats",
+    isCourse: false,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: false,
+    listenAccess: { mode: "catalog_preview" },
+  });
+  assert.equal(
+    previewListenStatsEscape.ok,
+    false,
+    "C: listen-stats cannot escape the server preview contract",
+  );
+
+  const previewRating = resolveListenApiDecision({
+    purpose: "rating",
+    isCourse: false,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: catalogEligible,
+    listenAccess: null,
+  });
+  assert.equal(previewRating.ok, true, "legal catalog_preview may rate after eligibility");
 
   const previewFullAudio = resolveListenApiDecision({
     purpose: "full_audio",
@@ -157,6 +189,14 @@ function testAccessDecisions() {
     listenAccess: null,
   });
   assert.equal(previewFullAudio.ok, false, "preview query does not grant full audio");
+  assert.equal(
+    isFullListenAccessMode("catalog_preview"),
+    false,
+    "C: catalog_preview is not full listen access",
+  );
+  assert.equal(isRatingListenAccessMode("catalog_preview"), true);
+  assert.equal(isRatingListenAccessMode("entitled"), true);
+  assert.equal(isRatingListenAccessMode("author_preview"), true);
 
   for (const reason of ["purchased", "granted", "admin"] as const) {
     const entitledDecision = resolveListenApiDecision({
@@ -424,7 +464,16 @@ function testSourceContracts() {
   assert.match(legacyProgress, /writeOwnPracticeProgress/);
   assert.match(player, /resolvePreviewClipMediaTimeline/);
   assert.match(player, /isPreviewModeRef\.current/);
+  assert.match(player, /readListenStatsClientAuthenticated/);
+  assert.match(player, /if \(isPreviewModeRef\.current\) \{\n        return;/);
   assert.match(fetchUrl, /preview_full_audio_blocked/);
+  assert.match(apiContext, /resolveListenApiDecision/);
+  const previewAccess = read("src/lib/listen/preview-access.ts");
+  assert.match(previewAccess, /isRatingListenAccessMode/);
+  assert.match(
+    previewAccess,
+    /export function isFullListenAccessMode\(mode: ListenAccessMode\): boolean \{\n  return mode === "entitled" \|\| mode === "author_preview";\n\}/,
+  );
 
   assert.equal(
     existsSync(

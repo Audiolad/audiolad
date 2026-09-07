@@ -1,7 +1,5 @@
 import { isCoursePublication } from "@/lib/course-content/validators";
-import {
-  isFullListenAccessMode,
-} from "@/lib/listen/preview-access";
+import { isRatingListenAccessMode } from "@/lib/listen/preview-access";
 import type { ListenAccess } from "@/lib/listen/types";
 
 /**
@@ -37,7 +35,7 @@ export function canAccrueListenStats(input: {
     return false;
   }
 
-  if (!input.access || !isFullListenAccessMode(input.access.mode)) {
+  if (!input.access || !isRatingListenAccessMode(input.access.mode)) {
     return false;
   }
 
@@ -45,12 +43,12 @@ export function canAccrueListenStats(input: {
 }
 
 /**
- * Rating eligibility stamp is allowed on full legal listen access only.
- * Author owners use `author_preview` and now follow the same 30s MEDIA-TIME
- * rule as listeners. catalog_preview / clip never become eligible.
+ * Rating eligibility stamp: entitled, author_preview, or legal catalog_preview.
+ * catalog_preview still never grants full audio or progress. Courses remain
+ * Stage 1 follow-up. Short preview does not invent a separate eligibility path.
  */
 export function canBecomeRatingEligible(access: ListenAccess): boolean {
-  return isFullListenAccessMode(access.mode);
+  return isRatingListenAccessMode(access.mode);
 }
 
 export function isCourseListenStatsFollowUp(

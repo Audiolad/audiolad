@@ -30,9 +30,14 @@ import {
 } from "../src/lib/listen/listen-stats";
 import {
   buildListenStatsHeartbeatBody,
+  readListenStatsClientAuthenticated,
   shouldReportListenStatsHeartbeat,
 } from "../src/lib/listen/listen-stats-client";
-import { resolveListenApiDecision } from "../src/lib/listen/preview-access";
+import {
+  isFullListenAccessMode,
+  isRatingListenAccessMode,
+  resolveListenApiDecision,
+} from "../src/lib/listen/preview-access";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -542,7 +547,11 @@ function testAccessMatrix() {
     catalogPreviewEligible: true,
     listenAccess: null,
   });
-  assert.equal(preview.ok, false, "preview never accrues");
+  assert.equal(preview.ok, true, "legal catalog_preview may accrue listen-stats");
+  if (preview.ok) {
+    assert.equal(preview.access.mode, "catalog_preview");
+    assert.equal(preview.useServiceRoleStorage, false);
+  }
   assert.equal(
     canAccrueListenStats({
       userId: "user",
@@ -550,7 +559,55 @@ function testAccessMatrix() {
       isCourse: false,
       productKind: "practice",
     }),
+    true,
+    "authenticated legal preview accrues trusted MEDIA-TIME",
+  );
+
+  const previewDenied = resolveListenApiDecision({
+    purpose: "listen_stats",
+    isCourse: false,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: false,
+    listenAccess: { mode: "catalog_preview" },
+  });
+  assert.equal(
+    previewDenied.ok,
     false,
+    "C: listen-stats cannot escape the server preview contract",
+  );
+  assert.equal(
+    isFullListenAccessMode("catalog_preview"),
+    false,
+    "C: catalog_preview stays outside full-listen access",
+  );
+  assert.equal(isRatingListenAccessMode("catalog_preview"), true);
+  assert.equal(
+    resolveListenApiDecision({
+      purpose: "full_audio",
+      isCourse: false,
+      courseAllowed: false,
+      canListen: false,
+      accessReason: "payment_required",
+      catalogPreviewEligible: true,
+      listenAccess: null,
+    }).ok,
+    false,
+    "C: catalog_preview full_audio DENY",
+  );
+  assert.equal(
+    resolveListenApiDecision({
+      purpose: "progress",
+      isCourse: false,
+      courseAllowed: false,
+      canListen: false,
+      accessReason: "payment_required",
+      catalogPreviewEligible: true,
+      listenAccess: null,
+    }).ok,
+    false,
+    "C: catalog_preview progress DENY",
   );
 
   for (const reason of ["free", "purchased", "granted", "admin", "guest_promo"] as const) {
@@ -607,8 +664,22 @@ function testAccessMatrix() {
   );
   assert.equal(
     canBecomeRatingEligible({ mode: "catalog_preview" }),
-    false,
-    "catalog preview never becomes rating-eligible",
+    true,
+    "legal catalog_preview may become rating-eligible after 30s",
+  );
+
+  const previewEligibleTick = playTicks({
+    allowEligibility: true,
+    ticks: [
+      { positionMs: 10_000, nowMs: 10_000 },
+      { positionMs: 20_000, nowMs: 20_000 },
+      { positionMs: 30_000, nowMs: 30_000 },
+    ],
+  });
+  assert.equal(previewEligibleTick.realListenedMs, 30_000);
+  assert.ok(
+    previewEligibleTick.ratingEligibleAt,
+    "B: preview MEDIA-TIME stamps rating_eligible_at at 30s",
   );
 
   const authorTick = playTicks({
@@ -668,7 +739,18 @@ function testAccessMatrix() {
       audioItemId: "track-a",
     }),
     false,
-    "player skips preview heartbeat",
+    "anonymous preview does not heartbeat",
+  );
+  assert.equal(
+    shouldReportListenStatsHeartbeat({
+      isPrivateAudio: false,
+      isPreviewMode: true,
+      guestProgressMode: false,
+      audioItemId: "track-a",
+      isAuthenticated: true,
+    }),
+    true,
+    "authenticated paid preview sends trusted listen-stats heartbeat",
   );
   assert.equal(
     shouldReportListenStatsHeartbeat({
@@ -679,6 +761,41 @@ function testAccessMatrix() {
     }),
     false,
     "anonymous guest progress does not heartbeat",
+  );
+}
+
+/**
+ * Client-side preview heartbeat gate only. Server getUser() remains truth.
+ * Cookie presence is not a security boundary.
+ */
+function testReadListenStatsClientAuthenticated() {
+  const supabaseUrl = "https://abc123.supabase.co";
+
+  assert.equal(
+    readListenStatsClientAuthenticated(
+      "sb-abc123-auth-token=base64-session",
+      supabaseUrl,
+    ),
+    true,
+    "valid auth cookie is treated as signed-in for heartbeat gating",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated(
+      "theme=dark; sb-abc123-auth-token.0=chunk-a; locale=ru",
+      supabaseUrl,
+    ),
+    true,
+    "chunked auth cookie (.0) is treated as signed-in for heartbeat gating",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated("foo=1; bar=2", supabaseUrl),
+    false,
+    "unrelated cookies do not enable preview heartbeat",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated("", supabaseUrl),
+    false,
+    "empty cookie does not enable preview heartbeat",
   );
 }
 
@@ -762,6 +879,12 @@ function testSourceContracts() {
   assert.match(listenStatsRoute, /purpose:\s*"listen_stats"/);
   assert.match(listenStatsRoute, /canAccrueListenStats/);
   assert.match(listenStatsRoute, /applyOwnPracticeListenStatsHeartbeat/);
+  const listenStatsClient = read("src/lib/listen/listen-stats-client.ts");
+  assert.match(listenStatsClient, /readListenStatsClientAuthenticated/);
+  assert.match(listenStatsClient, /Not a security boundary/);
+  assert.match(listenStatsClient, /getUser\(\) remains source of truth/);
+  assert.match(listenStatsRoute, /access\.mode === "catalog_preview"/);
+  assert.match(listenStatsRoute, /audioItem\.status !== "published"/);
   assert.doesNotMatch(listenStatsRoute, /body\.user_id/);
   assert.doesNotMatch(listenStatsRoute, /practice_ratings/);
 
@@ -792,8 +915,18 @@ function testSourceContracts() {
   const listenStatsAccess = read("src/lib/listen/listen-stats-access.ts");
   assert.match(catalogPlayback, /preview/);
   assert.match(playlistPreview, /preview/);
-  assert.match(listenStatsAccess, /isFullListenAccessMode\(access\.mode\)/);
+  assert.match(listenStatsAccess, /isRatingListenAccessMode\(access\.mode\)/);
+  assert.doesNotMatch(
+    listenStatsAccess,
+    /isFullListenAccessMode\(access\.mode\)/,
+  );
   assert.match(database, /получает `rating_eligible_at` по тому же порогу/);
+  assert.match(database, /авторизованный легальный paid `catalog_preview`/i);
+  assert.match(previewAccess, /isRatingListenAccessMode/);
+  assert.doesNotMatch(
+    previewAccess,
+    /mode === "catalog_preview" \|\| mode === "entitled"/,
+  );
 }
 
 testConstants();
@@ -804,6 +937,7 @@ testAdversarialInflation();
 testIdleHeartbeatGap();
 testRaceNoDoubleNoLoss();
 testAccessMatrix();
+testReadListenStatsClientAuthenticated();
 testOwnStateShape();
 testClientBodyDoesNotTrustDeltaAlone();
 testSourceContracts();

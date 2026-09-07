@@ -72,6 +72,7 @@ import {
 } from "@/lib/audio/signed-audio-url";
 import {
   LISTEN_STATS_HEARTBEAT_MS,
+  readListenStatsClientAuthenticated,
   reportListenStatsHeartbeat,
   shouldReportListenStatsHeartbeat,
 } from "@/lib/listen/listen-stats-client";
@@ -660,6 +661,7 @@ export function useSequentialPlayer({
           isPreviewMode: isPreviewModeRef.current,
           guestProgressMode: guestProgressModeRef.current,
           audioItemId: track.id,
+          isAuthenticated: readListenStatsClientAuthenticated(),
         })
       ) {
         return;

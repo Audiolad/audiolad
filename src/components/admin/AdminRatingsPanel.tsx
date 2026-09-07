@@ -213,7 +213,7 @@ export default function AdminRatingsPanel({
         key: "eligible",
         label: "Eligible listeners",
         value: summary.eligibleListeners.toLocaleString("ru-RU"),
-        hint: "Пары user×practice с rating_eligible_at",
+        hint: "Пары user×practice с rating_eligible_at, включая авторизованных preview-слушателей",
       },
       {
         key: "unrated",
