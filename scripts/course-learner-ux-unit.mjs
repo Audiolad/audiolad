@@ -18,7 +18,9 @@ import {
 import {
   COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
   buildCourseLearnerFileReturnHref,
+  buildCourseLearnerFileEmbedSrc,
   buildCourseLearnerFileViewerPath,
+  COURSE_LEARNER_PDF_EMBED_FRAGMENT,
   resolveCourseLearnerFileHttpMode,
   resolvePracticeFileViewerRoute,
   wantsProtectedFileDocumentOpen,
@@ -43,6 +45,11 @@ import {
 import { PUBLIC_PRODUCT_DESCRIPTION_HEADING } from "../src/lib/products/product-copy.ts";
 import CourseLearnerContentModule from "../src/components/products/course-learner/CourseLearnerContent.tsx";
 import CourseLearnerFileDownloadModule from "../src/components/products/course-learner/CourseLearnerFileDownload.tsx";
+import {
+  COURSE_LEARNER_AUDIO_ITEM_LABEL,
+  COURSE_LEARNER_FILE_ITEM_LABEL,
+} from "../src/components/products/course-learner/CourseLearnerItemTypeIcon.tsx";
+import { collectLockedLessonItemKinds } from "../src/lib/course-content/learner-dto.ts";
 
 const CourseLearnerContent =
   CourseLearnerContentModule.default ?? CourseLearnerContentModule;
@@ -193,7 +200,37 @@ function testListenApiDecisionKeepsLevelEnforcement() {
     catalogPreviewEligible: true,
     listenAccess: null,
   });
-  assert.equal(preview.ok, false, "catalog preview still cannot open course audio");
+  assert.equal(preview.ok, true, "published listed course may mint catalog_preview");
+  if (preview.ok) {
+    assert.equal(preview.access.mode, "catalog_preview");
+    assert.equal(preview.useServiceRoleStorage, true);
+  }
+
+  const unpublishedPreview = resolveListenApiDecision({
+    purpose: "preview_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: false,
+    listenAccess: null,
+  });
+  assert.equal(
+    unpublishedPreview.ok,
+    false,
+    "unpublished course has no public storefront preview",
+  );
+
+  const previewFull = resolveListenApiDecision({
+    purpose: "full_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(previewFull.ok, false, "catalog preview still cannot open full course audio");
 }
 
 const FILE_ID = "55555555-5555-4555-8555-555555555555";
@@ -286,6 +323,8 @@ function testPdfOpensInAppViewer() {
   assert.match(markup, /break-all/);
   assert.match(markup, /min-w-0/);
   assert.match(markup, /max-w-full/);
+  assert.match(markup, /data-course-item-kind="file"/);
+  assert.match(markup, new RegExp(COURSE_LEARNER_FILE_ITEM_LABEL));
   assert.match(markup, new RegExp(LONG_PDF_NAME));
 
   const source = read(
@@ -313,11 +352,21 @@ function testPdfOpensInAppViewer() {
   );
   assert.match(viewer, /data-course-learner-file-viewer="ready"/);
   assert.match(viewer, /<iframe/);
+  assert.match(viewer, /data-course-learner-pdf-frame="true"/);
+  assert.match(viewer, /absolute inset-0/);
+  assert.match(viewer, /max-w-full/);
+  assert.match(viewer, /min-w-0/);
+  assert.match(viewer, /overflow-hidden/);
+  assert.match(viewer, /overflow-x-clip/);
   assert.match(
     viewer,
     new RegExp(
-      `src="/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}"`,
+      `src="/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}"`,
     ),
+  );
+  assert.equal(
+    buildCourseLearnerFileEmbedSrc(AUTHOR_SLUG, PRODUCT_SLUG, FILE_ID),
+    `/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}`,
   );
   assert.doesNotMatch(viewer, /<a[^>]+href="[^"]*\/api\/listen\/product\//);
   assert.doesNotMatch(viewer, /[?&]raw=1/);
@@ -424,6 +473,121 @@ function testLongFilenameDoesNotEscapeCard() {
   );
   assert.match(content, /min-w-0 max-w-full/);
   assert.doesNotMatch(content, /overflow-x-hidden/);
+}
+
+function testItemTypeAffordances() {
+  const course = {
+    publicationId: "course-ui",
+    accessLevel: 1,
+    privileged: false,
+    levels: [
+      {
+        level: 1,
+        title: "Работа с собой",
+        description: null,
+        upgradePrice: null,
+        currency: "RUB",
+      },
+      {
+        level: 2,
+        title: "Работа с другими людьми",
+        description: "Как выстраивать контакт",
+        upgradePrice: 2222,
+        currency: "RUB",
+        upgradeAction: {
+          kind: "course_upgrade",
+          practiceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          targetAccessLevel: 2,
+        },
+      },
+    ],
+    lessons: [
+      {
+        id: "l1",
+        title: "Материал 1.1",
+        position: 0,
+        requiredAccessLevel: 1,
+        locked: false,
+        blocks: [
+          {
+            id: "pdf-1",
+            type: "file",
+            position: 0,
+            fileId: FILE_ID,
+            filename: LONG_PDF_NAME,
+            mime: "application/pdf",
+            sizeBytes: 1,
+          },
+        ],
+      },
+      {
+        id: "l2",
+        title: "Материал 2.1",
+        position: 1,
+        requiredAccessLevel: 2,
+        locked: true,
+        itemKinds: ["audio", "file"],
+      },
+    ],
+  };
+
+  const markup = renderToStaticMarkup(
+    createElement(CourseLearnerContent, {
+      course,
+      authorSlug: AUTHOR_SLUG,
+      productSlug: PRODUCT_SLUG,
+    }),
+  );
+
+  assert.match(markup, /data-course-item-kind="audio"/);
+  assert.match(markup, /data-course-item-kind="file"/);
+  assert.match(markup, new RegExp(`${COURSE_LEARNER_FILE_ITEM_LABEL}:`));
+  assert.match(markup, />Аудио</);
+  assert.match(markup, />Документ</);
+  assert.match(markup, new RegExp(LONG_PDF_NAME));
+  assert.match(markup, /break-all/);
+  assert.doesNotMatch(markup, /audioItemId|signedUrl|storage_path/);
+
+  const audioSource = read(
+    "src/components/products/course-learner/CourseLearnerAudioBlock.tsx",
+  );
+  const iconSource = read(
+    "src/components/products/course-learner/CourseLearnerItemTypeIcon.tsx",
+  );
+  assert.match(audioSource, /CourseLearnerItemTypeIcon/);
+  assert.match(audioSource, /kind="audio"/);
+  assert.match(audioSource, /COURSE_LEARNER_AUDIO_ITEM_LABEL/);
+  assert.match(iconSource, new RegExp(COURSE_LEARNER_AUDIO_ITEM_LABEL));
+
+  assert.deepEqual(
+    collectLockedLessonItemKinds([
+      {
+        id: "t",
+        lesson_id: "l2",
+        type: "text",
+        position: 0,
+        asset_id: null,
+        payload: { text: "secret" },
+      },
+      {
+        id: "a",
+        lesson_id: "l2",
+        type: "audio",
+        position: 1,
+        asset_id: "secret-audio",
+        payload: {},
+      },
+      {
+        id: "f",
+        lesson_id: "l2",
+        type: "file",
+        position: 2,
+        asset_id: "secret-file",
+        payload: {},
+      },
+    ]),
+    ["audio", "file"],
+  );
 }
 
 function testEntitledCoursePresentationMatrix() {
@@ -627,6 +791,7 @@ function testCourseAudioTitlePresentation() {
 testPdfOpensInAppViewer();
 testCourseAudioTitlePresentation();
 testLongFilenameDoesNotEscapeCard();
+testItemTypeAffordances();
 testEntitledCoursePresentationMatrix();
 testLockedLevelStillRedactedInUi();
 testAssetHelpersStayImported();

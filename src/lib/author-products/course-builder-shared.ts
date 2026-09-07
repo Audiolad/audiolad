@@ -140,6 +140,9 @@ export type CourseBuilderAudioAsset = {
   duration_seconds: number | null;
   original_file_name: string | null;
   audio_path: string | null;
+  preview_start_ms?: number | null;
+  preview_end_ms?: number | null;
+  status?: string | null;
 };
 
 export type CourseBuilderFileAsset = {
@@ -640,6 +643,19 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
       return COURSE_BUILDER_PDF_WRONG_TYPE;
     case "invalid_file_size":
       return COURSE_BUILDER_PDF_TOO_LARGE;
+    case "storefront_preview_not_level_1":
+    case "storefront_preview_not_playable":
+      return "Фрагмент можно выбрать только из опубликованного аудио первого уровня.";
+    case "preview_window_incomplete":
+      return "Укажите начало и конец фрагмента.";
+    case "preview_window_not_integer_ms":
+      return "Границы фрагмента должны быть целыми миллисекундами.";
+    case "preview_start_negative":
+      return "Начало фрагмента не может быть отрицательным.";
+    case "preview_end_not_after_start":
+      return "Конец фрагмента должен быть позже начала.";
+    case "preview_duration_out_of_range":
+      return "Фрагмент должен длиться от 30 до 90 секунд.";
     default:
       return "Не удалось сохранить содержимое курса.";
   }

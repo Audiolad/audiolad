@@ -65,7 +65,9 @@ export function shouldUseServiceRoleStorageForReason(
  * Client `preview=1` / playbackMode never grant full audio, progress writes,
  * or listen-stats accrual. Legal catalog_preview is minted only when the
  * backend already authorizes storefront preview — never from client flags.
- * Course lesson audio is never opened by catalog preview.
+ * Course lesson audio is never opened as full audio by catalog preview.
+ * A published listed course may mint catalog_preview only for preview_audio;
+ * the clip layer still requires a configured L1 30–90s window and fails closed.
  * Rating PUT and listen-stats use rating-listen access, not full-listen access.
  */
 export function resolveListenApiDecision(input: {
@@ -78,21 +80,29 @@ export function resolveListenApiDecision(input: {
   listenAccess: ListenAccess | null;
 }): ListenApiDecision {
   if (input.isCourse) {
-    if (!input.courseAllowed) {
-      return { ok: false, error: "forbidden" };
+    if (input.courseAllowed) {
+      if (!input.listenAccess || !isFullListenAccessMode(input.listenAccess.mode)) {
+        return { ok: false, error: "forbidden" };
+      }
+
+      return {
+        ok: true,
+        access: input.listenAccess,
+        // Course lesson assets stay private and may still be draft while the
+        // entitled buyer already has canonical course access.
+        useServiceRoleStorage: true,
+      };
     }
 
-    if (!input.listenAccess || !isFullListenAccessMode(input.listenAccess.mode)) {
-      return { ok: false, error: "forbidden" };
+    if (input.purpose === "preview_audio" && input.catalogPreviewEligible) {
+      return {
+        ok: true,
+        access: { mode: "catalog_preview" },
+        useServiceRoleStorage: true,
+      };
     }
 
-    return {
-      ok: true,
-      access: input.listenAccess,
-      // Course lesson assets stay private and may still be draft while the
-      // entitled buyer already has canonical course access.
-      useServiceRoleStorage: true,
-    };
+    return { ok: false, error: "forbidden" };
   }
 
   if (input.canListen) {

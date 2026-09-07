@@ -165,6 +165,7 @@ const button = read(
 assert.match(button, /disabled=\{isLoading\}/);
 assert.match(button, /\/api\/checkout\/course-upgrade/);
 assert.match(button, /Idempotency-Key/);
+assert.match(button, /credentials: "same-origin"/);
 
 // D / E — grant + fulfill contracts (latest function, not the 20260725 original only)
 const fulfill = read(
@@ -227,6 +228,25 @@ assert.match(amountMatch, /p\.amount_minor = o\.amount_minor/);
 assert.match(amountMatch, /p\.currency = o\.currency/);
 assert.match(amountMatch, /p\.currency = 'RUB'/);
 assert.doesNotMatch(amountMatch, /SET access_source/);
+
+const entitledUnpublished = read(
+  "supabase/migrations/20261001120000_course_upgrade_entitled_unpublished.sql",
+);
+assert.match(entitledUnpublished, /CREATE OR REPLACE FUNCTION public\.create_course_upgrade_order/);
+assert.match(entitledUnpublished, /v_entitled/);
+assert.match(entitledUnpublished, /already-entitled learner/);
+assert.ok(
+  entitledUnpublished.indexOf("v_entitled") <
+    entitledUnpublished.indexOf("RAISE EXCEPTION 'practice_not_published'"),
+  "published gate must run only after entitlement is known",
+);
+assert.match(entitledUnpublished, /viewer_can_commercially_access_practice/);
+assert.match(entitledUnpublished, /RAISE EXCEPTION 'not_entitled'/);
+assert.doesNotMatch(entitledUnpublished, /DROP TABLE|TRUNCATE/);
+assert.match(
+  read("supabase/tests/course_upgrade_checkout_smoke.sql"),
+  /unpublished entitled upgrade mismatch/,
+);
 
 const createOrder = read(
   "supabase/migrations/20260901120200_create_practice_order_visibility.sql",

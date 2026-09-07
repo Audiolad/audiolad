@@ -57,6 +57,12 @@ export type PracticePageViewModel = {
   listenDeniedMessage: string | null;
   practiceTopics: ProductTopicLinkItem[];
   publicAudioItems: PublicAudioItem[];
+  /**
+   * Course buy-CTA only. `null` = not a course (ordinary paid preview
+   * unchanged). `true` only when a published L1 30–90s clip is configured.
+   * Never carries lesson ids, titles, or storage paths.
+   */
+  courseStorefrontPreviewAvailable: boolean | null;
   learnerCourse: LearnerCourse | null;
   listeningNotice: ResolvedListeningNotice | null;
   mobileCover: PracticePageCoverData;

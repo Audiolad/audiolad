@@ -142,6 +142,7 @@ export async function buildPracticePreviewClip(input: {
   storageClient: SupabaseClient;
   practiceId: string;
   audioItem: PreviewAudioItemRow;
+  requireConfiguredWindow?: boolean;
 }): Promise<{
   bytes: Uint8Array;
   startMs: number;
@@ -155,6 +156,13 @@ export async function buildPracticePreviewClip(input: {
   }
 
   const window = resolvePreviewClipWindow(input.audioItem);
+
+  if (
+    input.requireConfiguredWindow &&
+    (window.needsSetup || window.source !== "configured")
+  ) {
+    throw new Error("preview_window_invalid");
+  }
   const key = clipCacheKey(
     input.practiceId,
     input.audioItem.id,

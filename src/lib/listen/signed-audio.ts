@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { canPlayCourseAudioItem } from "@/lib/course-content/learner-assets";
+import {
+  canPlayCourseAudioItem,
+  listCourseStorefrontPreviewAudioItemIds,
+} from "@/lib/course-content/learner-assets";
+import { isCourseStorefrontPreviewClipEligible } from "@/lib/course-content/storefront-preview";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import { loadListenApiContext } from "@/lib/listen/api-context";
 import { shouldEnforcePublishedAudioItemForEntitledSignedUrl } from "@/lib/listen/course-audio-status";
@@ -57,6 +61,61 @@ export async function serveListenSignedAudio(
     practice.publication_class,
     practice.product_kind,
   );
+
+  if (isCourse && access.mode === "catalog_preview") {
+    try {
+      const serviceRole = createServiceRoleClient();
+      const level1Ids = await listCourseStorefrontPreviewAudioItemIds({
+        serviceRole,
+        publicationId: practice.id,
+      });
+      const { data: courseAudio, error: courseAudioError } = await serviceRole
+        .from("audio_items")
+        .select(
+          "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms",
+        )
+        .eq("id", audioId)
+        .eq("practice_id", practice.id)
+        .maybeSingle();
+
+      if (courseAudioError) {
+        console.error("listen_course_preview_item_error", courseAudioError.message);
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      const audioPath = courseAudio?.audio_path?.trim() ?? null;
+      if (!courseAudio?.id || !audioPath || courseAudio.status !== "published") {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      if (
+        !isCourseStorefrontPreviewClipEligible(audioId, courseAudio, level1Ids)
+      ) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      const window = resolvePreviewClipWindow(courseAudio);
+      if (window.needsSetup || window.source !== "configured") {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      const clipUrl = buildListenPreviewClipPath(
+        listenApiBaseFromRequest(request, authorSlug, productSlug),
+        audioId,
+      );
+
+      return NextResponse.json({
+        url: clipUrl,
+        expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
+        preview_clip: true,
+        preview_start_ms: window.startMs,
+        preview_end_ms: window.endMs,
+      });
+    } catch (error) {
+      console.error("listen_course_preview_access_error", error);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+  }
 
   if (isCourse) {
     try {

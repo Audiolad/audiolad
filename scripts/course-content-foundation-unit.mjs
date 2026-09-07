@@ -563,8 +563,13 @@ assert.match(listenApi, /resolveListenApiDecision/);
 const previewAccess = read("src/lib/listen/preview-access.ts");
 assert.match(
   previewAccess,
-  /Course lesson audio is never opened by catalog preview/,
-  "catalog preview=1 must not bypass course access",
+  /Course lesson audio is never opened as full audio by catalog preview/,
+  "catalog preview=1 must not open full course lesson audio",
+);
+assert.match(
+  previewAccess,
+  /configured L1 30–90s window/,
+  "course catalog preview stays clip-only and L1-gated",
 );
 
 const signedAudio = read("src/lib/listen/signed-audio.ts");
@@ -581,6 +586,12 @@ assert.match(sessionLoader, /canAccessCourseContent/);
 const catalogPlay = read("src/lib/catalog/catalog-playback.ts");
 assert.match(catalogPlay, /resolvePublicationClass/);
 assert.match(catalogPlay, /chooseCatalogPreviewAudioRow/);
+assert.match(catalogPlay, /listCourseStorefrontPreviewAudioItemIds/);
+assert.match(
+  catalogPlay,
+  /previewWindow\.source !== "configured"/,
+  "course catalog play never uses the 60s compatibility fallback",
+);
 const catalogPreviewChoice = read(
   "src/lib/catalog/catalog-preview-audio-choice.ts",
 );
@@ -589,6 +600,20 @@ assert.match(
   catalogPreviewChoice,
   /isCourse && !chosen/,
   "course catalog play without entitlement does not fall back to first lesson track",
+);
+assert.match(
+  catalogPreviewChoice,
+  /allowedAudioItemIds/,
+  "course preview rows are scoped to an explicit Level 1 allow-list",
+);
+assert.match(
+  read("src/lib/listen/signed-audio.ts"),
+  /isCourseStorefrontPreviewClipEligible/,
+  "course catalog preview signs a clip, not a full lesson URL",
+);
+assert.match(
+  read("src/lib/listen/signed-audio.ts"),
+  /preview_clip: true/,
 );
 
 const lookup = read("src/lib/products/lookup.ts");

@@ -6,6 +6,7 @@ import type {
   LearnerCourseAudioBlock,
   LearnerCourseBlock,
   LearnerCourseFileBlock,
+  LearnerCourseItemKind,
   LearnerCourseLesson,
   LearnerCourseLevel,
   LearnerCourseTextBlock,
@@ -154,6 +155,30 @@ function mapUnlockedBlock(
   return null;
 }
 
+export function collectLockedLessonItemKinds(
+  blocks: readonly LearnerBlockSource[],
+): LearnerCourseItemKind[] {
+  const seen = new Set<LearnerCourseItemKind>();
+  const kinds: LearnerCourseItemKind[] = [];
+
+  for (const block of [...blocks].sort(
+    (left, right) => left.position - right.position || left.id.localeCompare(right.id),
+  )) {
+    if (block.type !== "audio" && block.type !== "file") {
+      continue;
+    }
+
+    if (seen.has(block.type)) {
+      continue;
+    }
+
+    seen.add(block.type);
+    kinds.push(block.type);
+  }
+
+  return kinds;
+}
+
 /**
  * Redact a lesson BEFORE client serialization.
  * Locked lessons keep safe metadata only — never text, asset ids, paths, or URLs.
@@ -171,12 +196,18 @@ export function toLearnerCourseLesson(input: {
   const locked = !canAccessRequiredLevel(input.access, requiredAccessLevel);
 
   if (locked) {
+    const lessonBlocks = input.blocks.filter(
+      (block) => block.lesson_id === input.lesson.id,
+    );
+    const itemKinds = collectLockedLessonItemKinds(lessonBlocks);
+
     return {
       id: input.lesson.id,
       title: input.lesson.title,
       position: input.lesson.position,
       requiredAccessLevel,
       locked: true,
+      ...(itemKinds.length > 0 ? { itemKinds } : {}),
     };
   }
 

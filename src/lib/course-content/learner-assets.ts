@@ -9,6 +9,7 @@ import {
   type CourseLearnerAccessOptions,
 } from "./learner-access";
 import { normalizeRequiredAccessLevel } from "./learner-dto";
+import { isCourseLessonEligibleForStorefrontPreview } from "./storefront-preview";
 
 export type CourseBlockAssociation = {
   blockId: string;
@@ -139,6 +140,55 @@ export async function listAccessibleCourseAudioItemIds(input: {
     .select("asset_id, lesson_id, type")
     .eq("type", "audio")
     .in("lesson_id", accessibleLessonIds);
+
+  if (blockError) {
+    throw new Error("course_audio_block_lookup_failed");
+  }
+
+  const ids = new Set<string>();
+  for (const block of (blocks ?? []) as Array<{ asset_id: string | null }>) {
+    const assetId = block.asset_id?.trim();
+    if (assetId) {
+      ids.add(assetId);
+    }
+  }
+
+  return ids;
+}
+
+/**
+ * Audio items attached to Level 1 lessons only.
+ * Locked L2 / required_access_level > 1 never enter this set, even if an
+ * audio_item is accidentally marked is_preview or has a preview window.
+ */
+export async function listCourseStorefrontPreviewAudioItemIds(input: {
+  serviceRole: SupabaseClient;
+  publicationId: string;
+}): Promise<Set<string>> {
+  const { data: lessons, error: lessonError } = await input.serviceRole
+    .from("course_lessons")
+    .select("id, required_access_level")
+    .eq("publication_id", input.publicationId);
+
+  if (lessonError) {
+    throw new Error("course_lessons_lookup_failed");
+  }
+
+  const level1LessonIds = ((lessons ?? []) as LessonLevelRow[])
+    .filter((lesson) =>
+      isCourseLessonEligibleForStorefrontPreview(lesson.required_access_level),
+    )
+    .map((lesson) => lesson.id);
+
+  if (level1LessonIds.length === 0) {
+    return new Set();
+  }
+
+  const { data: blocks, error: blockError } = await input.serviceRole
+    .from("course_lesson_blocks")
+    .select("asset_id, lesson_id, type")
+    .eq("type", "audio")
+    .in("lesson_id", level1LessonIds);
 
   if (blockError) {
     throw new Error("course_audio_block_lookup_failed");

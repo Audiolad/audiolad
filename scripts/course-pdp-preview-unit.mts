@@ -281,6 +281,22 @@ function testPageLoaderContracts() {
   assert.doesNotMatch(page, /canAccessCourseContent/);
   assert.match(page, /loadCourseLearnerContent/);
   assert.match(page, /skipPrivateCourseOutline/);
+  assert.match(page, /loadCourseStorefrontPreviewAvailable/);
+  assert.match(
+    read("src/components/products/practice-page/PracticePageParts.tsx"),
+    /shouldShowPaidBuyPreviewCta/,
+    "paid course preview CTA is gated by server-side availability",
+  );
+  assert.match(
+    read("src/components/products/practice-page/PracticePageParts.tsx"),
+    /PREVIEW_ACTION_LABEL/,
+    "configured paid preview still uses Прослушать фрагмент",
+  );
+  assert.equal(
+    shouldLoadPublicAudioItemsOnProductPage("course", "practice"),
+    false,
+    "configured course preview does not flatten lessons onto the PDP",
+  );
 
   assert.match(
     lookup,

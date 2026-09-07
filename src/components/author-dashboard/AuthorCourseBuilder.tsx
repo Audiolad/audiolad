@@ -30,6 +30,18 @@ import {
   type CourseCompletionCtaDto,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
+import {
+  COURSE_STOREFRONT_PREVIEW_AUDIO_LABEL,
+  COURSE_STOREFRONT_PREVIEW_CLEAR_LABEL,
+  COURSE_STOREFRONT_PREVIEW_EMPTY,
+  COURSE_STOREFRONT_PREVIEW_END_LABEL,
+  COURSE_STOREFRONT_PREVIEW_HINT,
+  COURSE_STOREFRONT_PREVIEW_NONE_LABEL,
+  COURSE_STOREFRONT_PREVIEW_SAVE_LABEL,
+  COURSE_STOREFRONT_PREVIEW_SECTION_TITLE,
+  COURSE_STOREFRONT_PREVIEW_START_LABEL,
+  resolveCourseStorefrontPreviewDto,
+} from "@/lib/author-products/course-storefront-preview";
 
 type AuthorCourseBuilderProps = {
   practiceId: string | null;
@@ -571,6 +583,14 @@ export default function AuthorCourseBuilder({
           </div>
         </div>
       )}
+
+      <AuthorCourseStorefrontPreview
+        practiceId={practiceId}
+        lessons={lessons}
+        disabled={disabled || busy}
+        onSnapshot={applySnapshot}
+        onError={setError}
+      />
 
       <AuthorCourseCompletionCta
         practiceId={practiceId}
@@ -1123,6 +1143,223 @@ function CourseAudioTitleField({
       placeholder="Название аудио"
       className="w-full rounded-[16px] border border-[#e4d7f4] px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
     />
+  );
+}
+
+function msToSecondsInput(value: number | null): string {
+  if (value == null) {
+    return "";
+  }
+
+  return String(Math.round(value / 1000));
+}
+
+function AuthorCourseStorefrontPreview({
+  practiceId,
+  lessons,
+  disabled,
+  onSnapshot,
+  onError,
+}: {
+  practiceId: string | null;
+  lessons: CourseBuilderLessonDto[];
+  disabled: boolean;
+  onSnapshot: (snapshot: CourseBuilderSnapshot) => void;
+  onError: (message: string | null) => void;
+}) {
+  const resolved = resolveCourseStorefrontPreviewDto(lessons);
+  const formKey = [
+    resolved.audio_item_id ?? "",
+    resolved.preview_start_ms ?? "",
+    resolved.preview_end_ms ?? "",
+    resolved.candidates.map((item) => item.audioItemId).join(","),
+  ].join(":");
+
+  return (
+    <AuthorCourseStorefrontPreviewForm
+      key={formKey}
+      practiceId={practiceId}
+      resolved={resolved}
+      disabled={disabled}
+      onSnapshot={onSnapshot}
+      onError={onError}
+    />
+  );
+}
+
+function AuthorCourseStorefrontPreviewForm({
+  practiceId,
+  resolved,
+  disabled,
+  onSnapshot,
+  onError,
+}: {
+  practiceId: string | null;
+  resolved: ReturnType<typeof resolveCourseStorefrontPreviewDto>;
+  disabled: boolean;
+  onSnapshot: (snapshot: CourseBuilderSnapshot) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [audioItemId, setAudioItemId] = useState(resolved.audio_item_id ?? "");
+  const [startSeconds, setStartSeconds] = useState(
+    msToSecondsInput(resolved.preview_start_ms),
+  );
+  const [endSeconds, setEndSeconds] = useState(
+    msToSecondsInput(resolved.preview_end_ms),
+  );
+  const [saving, setSaving] = useState(false);
+
+  async function persist(next: {
+    audio_item_id: string | null;
+    preview_start_ms: number | null;
+    preview_end_ms: number | null;
+  }) {
+    if (!practiceId) {
+      return;
+    }
+
+    setSaving(true);
+    onError(null);
+
+    try {
+      const response = await fetch(
+        `/api/author/products/${practiceId}/course/storefront-preview`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(next),
+        },
+      );
+      const payload = (await response.json()) as CourseBuilderSnapshot & {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        onError(payload.message ?? getCourseBuilderErrorMessage(payload.error));
+        return;
+      }
+
+      onSnapshot(payload);
+    } catch {
+      onError("Не удалось сохранить фрагмент.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function saveSelected() {
+    if (!audioItemId) {
+      void persist({
+        audio_item_id: null,
+        preview_start_ms: null,
+        preview_end_ms: null,
+      });
+      return;
+    }
+
+    const start = Number(startSeconds);
+    const end = Number(endSeconds);
+
+    void persist({
+      audio_item_id: audioItemId,
+      preview_start_ms: Number.isFinite(start) ? Math.round(start * 1000) : null,
+      preview_end_ms: Number.isFinite(end) ? Math.round(end * 1000) : null,
+    });
+  }
+
+  return (
+    <div
+      data-author-course-storefront-preview
+      className="space-y-4 border-t border-[#eee6f7] pt-5"
+    >
+      <h3 className="text-[18px] font-semibold">
+        {COURSE_STOREFRONT_PREVIEW_SECTION_TITLE}
+      </h3>
+      <p className="text-sm leading-5 text-[#7d70a2]">
+        {COURSE_STOREFRONT_PREVIEW_HINT}
+      </p>
+      {resolved.candidates.length === 0 ? (
+        <p className="rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3 text-sm text-[#7d70a2]">
+          {COURSE_STOREFRONT_PREVIEW_EMPTY}
+        </p>
+      ) : (
+        <>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium">
+              {COURSE_STOREFRONT_PREVIEW_AUDIO_LABEL}
+            </span>
+            <select
+              value={audioItemId}
+              disabled={disabled || saving}
+              onChange={(event) => setAudioItemId(event.target.value)}
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-sm outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+            >
+              <option value="">{COURSE_STOREFRONT_PREVIEW_NONE_LABEL}</option>
+              {resolved.candidates.map((candidate) => (
+                <option key={candidate.audioItemId} value={candidate.audioItemId}>
+                  {candidate.lessonTitle}: {candidate.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">
+                {COURSE_STOREFRONT_PREVIEW_START_LABEL}
+              </span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={startSeconds}
+                disabled={disabled || saving || !audioItemId}
+                onChange={(event) => setStartSeconds(event.target.value)}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">
+                {COURSE_STOREFRONT_PREVIEW_END_LABEL}
+              </span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={endSeconds}
+                disabled={disabled || saving || !audioItemId}
+                onChange={(event) => setEndSeconds(event.target.value)}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={disabled || saving}
+              onClick={saveSelected}
+              className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {COURSE_STOREFRONT_PREVIEW_SAVE_LABEL}
+            </button>
+            <button
+              type="button"
+              disabled={disabled || saving || !resolved.audio_item_id}
+              onClick={() =>
+                void persist({
+                  audio_item_id: null,
+                  preview_start_ms: null,
+                  preview_end_ms: null,
+                })
+              }
+              className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              {COURSE_STOREFRONT_PREVIEW_CLEAR_LABEL}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
