@@ -884,7 +884,7 @@ UNIQUE `(user_id, practice_id)`.
 - Зарегистрированный пользователь.
 - `practice_listen_stats.rating_eligible_at IS NOT NULL` для этого продукта (Stage 1, ≥ 30000 ms MEDIA-TIME).
 - Полный listen-доступ того же духа, что `PUT .../listen-stats` (не preview-only).
-- Автор/владелец своего опубликованного rateable продукта — те же правила, что у слушателя; отдельной author-оценки нет.
+- Автор/владелец своего rateable продукта (`author_preview` на practice/music/audio_post) — те же правила, что у слушателя: полный listen-доступ и `rating_eligible_at` после 30000 ms. Отдельной author-оценки нет. Публикация не является gate: автор может оценить в author preview до публикации; после публикации строка входит в публичный агрегат как обычный голос.
 - Аноним — никогда. Preview — никогда.
 
 Публичный агрегат: **`totalStars` = SUM(stars)**, **`ratingCount` = COUNT(*)** по строкам с `excluded_at IS NULL`. Среднее — не публичная метрика.

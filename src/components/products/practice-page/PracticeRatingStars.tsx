@@ -7,6 +7,8 @@ import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   buildPracticeRatingApiPath,
   fetchOwnPracticeRating,
+  formatPracticeRatingAggregateCountSr,
+  formatPracticeRatingAggregateStarsSr,
   RATING_THANKS_COPY,
 } from "@/lib/ratings/client";
 import {
@@ -175,19 +177,30 @@ export default function PracticeRatingStars({
         })}
       </div>
       <div
-        className="mt-2 flex items-center gap-4 text-sm leading-5 text-[#65577f]"
+        className="mt-2"
         data-practice-rating-public-aggregate=""
         data-practice-rating-total-stars={ui.aggregate.totalStars}
         data-practice-rating-count={ui.aggregate.ratingCount}
       >
-        <span className="inline-flex items-center gap-1">
-          <span>{ui.aggregate.totalStars}</span>
-          <RatingAggregateStarIcon />
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span>{ui.aggregate.ratingCount}</span>
-          <RatingAggregateUserIcon />
-        </span>
+        <p className="sr-only">
+          {formatPracticeRatingAggregateStarsSr(ui.aggregate.totalStars)}
+        </p>
+        <p className="sr-only">
+          {formatPracticeRatingAggregateCountSr(ui.aggregate.ratingCount)}
+        </p>
+        <div
+          aria-hidden="true"
+          className="flex items-center gap-4 text-sm leading-5 text-[#65577f]"
+        >
+          <span className="inline-flex items-center gap-1">
+            <span>{ui.aggregate.totalStars}</span>
+            <RatingAggregateStarIcon />
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span>{ui.aggregate.ratingCount}</span>
+            <RatingAggregateUserIcon />
+          </span>
+        </div>
       </div>
       {ui.message ? (
         <p

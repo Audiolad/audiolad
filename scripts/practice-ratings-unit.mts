@@ -25,6 +25,8 @@ import { parsePracticeRatingStars } from "../src/lib/ratings/stars";
 import {
   buildPracticeRatingApiPath,
   buildPracticeRatingPutBody,
+  formatPracticeRatingAggregateCountSr,
+  formatPracticeRatingAggregateStarsSr,
   RATING_NOT_ELIGIBLE_COPY,
   RATING_THANKS_COPY,
 } from "../src/lib/ratings/client";
@@ -505,6 +507,14 @@ function testClientContracts() {
   );
   assert.doesNotMatch(RATING_NOT_ELIGIBLE_COPY, /практик/i);
   assert.equal(RATING_THANKS_COPY, "Спасибо за ваш отклик 🙏");
+  assert.equal(
+    formatPracticeRatingAggregateStarsSr(24),
+    "Накоплено звёзд: 24",
+  );
+  assert.equal(
+    formatPracticeRatingAggregateCountSr(5),
+    "Поставили оценку: 5",
+  );
 
   const body = buildPracticeRatingPutBody(4);
   assert.equal(body.stars, 4);
@@ -606,6 +616,10 @@ function testSourceContracts() {
   assert.match(ui, /data-practice-rating-count/);
   assert.match(ui, /gap-4/);
   assert.match(ui, /inline-flex items-center gap-1/);
+  assert.match(ui, /formatPracticeRatingAggregateStarsSr/);
+  assert.match(ui, /formatPracticeRatingAggregateCountSr/);
+  assert.match(ui, /className="sr-only"/);
+  assert.match(ui, /aria-hidden="true"/);
   assert.doesNotMatch(ui, /isAuthorOwner/);
   assert.doesNotMatch(ui, /author_cannot_rate_own_product/);
   assert.doesNotMatch(ui, /Пока нет оценок/);
@@ -626,7 +640,12 @@ function testSourceContracts() {
   assert.match(readModule, /Public-safe totals only/);
   assert.match(readModule, /\.select\("stars"\)/);
   assert.match(readModule, /excluded_at/);
-  assert.match(database, /Автор\/владелец своего опубликованного rateable/);
+  assert.match(database, /Автор\/владелец своего rateable продукта/);
+  assert.match(database, /Публикация не является gate/);
+  assert.doesNotMatch(
+    database,
+    /Автор\/владелец своего опубликованного rateable/,
+  );
   assert.doesNotMatch(database, /author_cannot_rate_own_product/);
   assert.match(database, /Анонимный GET не открывается/);
 
