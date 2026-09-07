@@ -45,12 +45,12 @@ export function canAccrueListenStats(input: {
 }
 
 /**
- * Author owners may accrue MEDIA-TIME for diagnostics but must not become
- * eligible to rate their own product. author_preview is the listen mode for
- * author_owner (see resolveListenAccess).
+ * Rating eligibility stamp is allowed on full legal listen access only.
+ * Author owners use `author_preview` and now follow the same 30s MEDIA-TIME
+ * rule as listeners. catalog_preview / clip never become eligible.
  */
 export function canBecomeRatingEligible(access: ListenAccess): boolean {
-  return access.mode !== "author_preview" && access.mode !== "catalog_preview";
+  return isFullListenAccessMode(access.mode);
 }
 
 export function isCourseListenStatsFollowUp(

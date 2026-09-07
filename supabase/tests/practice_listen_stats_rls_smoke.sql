@@ -123,7 +123,7 @@ BEGIN
     RAISE EXCEPTION 're-listen after rewind should count, got %', accepted;
   END IF;
 
-  -- author: accrue but no eligibility
+  -- allow_eligibility=false (catalog preview): accrue but no eligibility
   PERFORM public.apply_practice_listen_stats_heartbeat(
     user_b, v_practice, audio_a, 0, false, NULL, 1, t0
   );
@@ -138,10 +138,32 @@ BEGIN
   FROM public.practice_listen_stats
   WHERE user_id = user_b AND practice_id = v_practice;
   IF listened < 15000 THEN
-    RAISE EXCEPTION 'author should accrue media-time, got %', listened;
+    RAISE EXCEPTION 'preview should still accrue media-time, got %', listened;
   END IF;
   IF eligible IS NOT NULL THEN
-    RAISE EXCEPTION 'author must not become eligible';
+    RAISE EXCEPTION 'allow_eligibility=false must not become eligible';
+  END IF;
+
+  -- author owner (allow_eligibility=true): same 30s stamp as listener
+  DELETE FROM public.practice_listen_stats WHERE user_id = user_b;
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 0, true, NULL, 1, t0
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 15000, true, NULL, 1, t0 + interval '15 seconds'
+  );
+  PERFORM public.apply_practice_listen_stats_heartbeat(
+    user_b, v_practice, audio_a, 30000, true, NULL, 1, t0 + interval '30 seconds'
+  );
+  SELECT real_listened_ms, rating_eligible_at
+  INTO listened, eligible
+  FROM public.practice_listen_stats
+  WHERE user_id = user_b AND practice_id = v_practice;
+  IF listened < 30000 THEN
+    RAISE EXCEPTION 'author owner should accrue to 30000, got %', listened;
+  END IF;
+  IF eligible IS NULL THEN
+    RAISE EXCEPTION 'author owner should become eligible at 30000';
   END IF;
 
   -- 1.5x media-time: 20s wall / 30s media

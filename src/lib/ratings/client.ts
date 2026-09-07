@@ -9,8 +9,6 @@ export const RATING_NOT_ELIGIBLE_COPY =
 
 export const RATING_THANKS_COPY = "Спасибо за ваш отклик 🙏";
 
-export const RATING_AUTHOR_DENIED_COPY = "Нельзя оценить свой продукт.";
-
 export function buildPracticeRatingApiPath(
   authorSlug: string,
   productSlug: string,

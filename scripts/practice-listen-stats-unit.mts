@@ -602,12 +602,17 @@ function testAccessMatrix() {
   );
   assert.equal(
     canBecomeRatingEligible({ mode: "author_preview" }),
+    true,
+    "author owner follows the same 30s eligibility rule",
+  );
+  assert.equal(
+    canBecomeRatingEligible({ mode: "catalog_preview" }),
     false,
-    "author owner is not rating-eligible",
+    "catalog preview never becomes rating-eligible",
   );
 
   const authorTick = playTicks({
-    allowEligibility: false,
+    allowEligibility: true,
     ticks: [
       { positionMs: 10_000, nowMs: 10_000 },
       { positionMs: 20_000, nowMs: 20_000 },
@@ -615,7 +620,22 @@ function testAccessMatrix() {
     ],
   });
   assert.equal(authorTick.realListenedMs, 30_000);
-  assert.equal(authorTick.ratingEligibleAt, null, "author never gets eligible_at");
+  assert.ok(authorTick.ratingEligibleAt, "author owner gets eligible_at at 30s");
+
+  const previewDeniedTick = playTicks({
+    allowEligibility: false,
+    ticks: [
+      { positionMs: 10_000, nowMs: 10_000 },
+      { positionMs: 20_000, nowMs: 20_000 },
+      { positionMs: 30_000, nowMs: 30_000 },
+    ],
+  });
+  assert.equal(previewDeniedTick.realListenedMs, 30_000);
+  assert.equal(
+    previewDeniedTick.ratingEligibleAt,
+    null,
+    "allow_eligibility=false never stamps eligible_at",
+  );
 
   assert.equal(
     canAccrueListenStats({
@@ -769,8 +789,11 @@ function testSourceContracts() {
 
   const catalogPlayback = read("src/lib/catalog/catalog-playback-contract.ts");
   const playlistPreview = read("src/lib/playlists/public-content.ts");
+  const listenStatsAccess = read("src/lib/listen/listen-stats-access.ts");
   assert.match(catalogPlayback, /preview/);
   assert.match(playlistPreview, /preview/);
+  assert.match(listenStatsAccess, /isFullListenAccessMode\(access\.mode\)/);
+  assert.match(database, /получает `rating_eligible_at` по тому же порогу/);
 }
 
 testConstants();

@@ -10,7 +10,10 @@ import { fileURLToPath } from "node:url";
 
 import { resolveListenApiDecision } from "../src/lib/listen/preview-access";
 import { RATING_ELIGIBILITY_LISTEN_MS } from "../src/lib/listen/listen-stats-constants";
-import { aggregateActivePracticeRatings } from "../src/lib/ratings/aggregate";
+import {
+  aggregateActivePracticeRatings,
+  applyOptimisticPracticeRatingAggregate,
+} from "../src/lib/ratings/aggregate";
 import { readAnonymousIdFromRequest } from "../src/lib/ratings/anonymous-id";
 import {
   evaluatePracticeRatingGate,
@@ -48,7 +51,6 @@ function entitledGate(
     access: { mode: "entitled" },
     isCourse: false,
     productKind: "practice",
-    isAuthorOwner: false,
     ratingEligibleAt: "2026-09-05T00:00:30.000Z",
     ...overrides,
   });
@@ -93,20 +95,21 @@ function testEligibilityReusesStage1() {
     error: "unauthorized",
   });
 
-  assert.deepEqual(
+  assert.equal(
     entitledGate({
-      isAuthorOwner: true,
+      access: { mode: "author_preview" },
       ratingEligibleAt: "2026-09-05T00:00:30.000Z",
-    }),
-    { ok: false, status: 403, error: "author_cannot_rate_own_product" },
+    }).ok,
+    true,
+    "author owner may rate after the same 30s eligibility stamp",
   );
   assert.deepEqual(
     entitledGate({
       access: { mode: "author_preview" },
-      isAuthorOwner: false,
-      ratingEligibleAt: "2026-09-05T00:00:30.000Z",
+      ratingEligibleAt: null,
     }),
-    { ok: false, status: 403, error: "author_cannot_rate_own_product" },
+    { ok: false, status: 403, error: "rating_not_eligible" },
+    "author owner before 30s is the same not-eligible gate",
   );
 
   assert.deepEqual(
@@ -275,6 +278,7 @@ function testStaleEligibilityDoesNotBlockPut() {
     ratingEligible: false,
     message: null,
     pendingStars: null,
+    aggregate: { totalStars: 20, ratingCount: 4 },
   };
   const optimistic = applyOptimisticPracticeRating(initial, 4);
   assert.deepEqual(optimistic, {
@@ -282,6 +286,7 @@ function testStaleEligibilityDoesNotBlockPut() {
     ratingEligible: false,
     message: null,
     pendingStars: 4,
+    aggregate: { totalStars: 24, ratingCount: 5 },
   });
 }
 
@@ -303,14 +308,17 @@ async function testEligibleAfterListenWithoutReload() {
   assert.equal(next.message, RATING_THANKS_COPY);
   assert.equal(next.pendingStars, null);
   assert.equal(next.ratingEligible, true);
+  assert.deepEqual(next.aggregate, { totalStars: 4, ratingCount: 1 });
 }
 
 async function testNotEligiblePutRevertsOptimistic() {
   const puts: number[] = [];
+  const previousAggregate = { totalStars: 20, ratingCount: 4 };
   const next = await runAuthenticatedPracticeRatingClick({
     apiPath: "/api/listen/product/anna/morning/rating",
     currentStars: null,
     ratingEligible: false,
+    currentAggregate: previousAggregate,
     nextStars: 4,
     put: async (_path, stars) => {
       puts.push(stars);
@@ -326,6 +334,11 @@ async function testNotEligiblePutRevertsOptimistic() {
   assert.equal(next.message, RATING_NOT_ELIGIBLE_COPY);
   assert.equal(next.pendingStars, null);
   assert.equal(next.ratingEligible, false);
+  assert.deepEqual(
+    next.aggregate,
+    previousAggregate,
+    "failed PUT rolls aggregate back",
+  );
 }
 
 function testAggregateNoDoubleCount() {
@@ -354,6 +367,131 @@ function testAggregateNoDoubleCount() {
     ]),
     { totalStars: 9, ratingCount: 2 },
   );
+}
+
+function testOptimisticAggregateCases() {
+  const start = { totalStars: 20, ratingCount: 4 };
+  assert.deepEqual(
+    applyOptimisticPracticeRatingAggregate(start, null, 5),
+    { totalStars: 25, ratingCount: 5 },
+    "first 5★: +5 / +1",
+  );
+  assert.deepEqual(
+    applyOptimisticPracticeRatingAggregate(start, 4, 5),
+    { totalStars: 21, ratingCount: 4 },
+    "edit 4→5: delta stars, count unchanged",
+  );
+  assert.deepEqual(
+    applyOptimisticPracticeRatingAggregate({ totalStars: 21, ratingCount: 4 }, 5, 3),
+    { totalStars: 19, ratingCount: 4 },
+    "downgrade 5→3: -2 stars, count unchanged",
+  );
+  assert.deepEqual(
+    applyOptimisticPracticeRatingAggregate({ totalStars: 21, ratingCount: 4 }, 5, 5),
+    { totalStars: 21, ratingCount: 4 },
+    "same 5→5: no change",
+  );
+
+  const authorFirst = applyOptimisticPracticeRating(
+    {
+      stars: null,
+      ratingEligible: true,
+      message: null,
+      pendingStars: null,
+      aggregate: start,
+    },
+    5,
+  );
+  assert.deepEqual(authorFirst.aggregate, { totalStars: 25, ratingCount: 5 });
+  assert.equal(authorFirst.stars, 5);
+}
+
+async function testAuthorBeforeAndAfter30s() {
+  const before = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: null,
+    ratingEligible: false,
+    currentAggregate: { totalStars: 20, ratingCount: 4 },
+    nextStars: 5,
+    put: async (_path, stars) => {
+      assert.equal(stars, 5);
+      throw Object.assign(new Error("rating_not_eligible"), {
+        status: 403,
+        error: "rating_not_eligible",
+      });
+    },
+  });
+  assert.equal(before.stars, null);
+  assert.equal(before.message, RATING_NOT_ELIGIBLE_COPY);
+  assert.deepEqual(before.aggregate, { totalStars: 20, ratingCount: 4 });
+
+  const after = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: null,
+    ratingEligible: true,
+    currentAggregate: { totalStars: 20, ratingCount: 4 },
+    nextStars: 5,
+    put: async (_path, stars) => ({
+      stars,
+      createdAt: "2026-09-05T12:00:00.000Z",
+      updatedAt: "2026-09-05T12:00:00.000Z",
+      changed: true,
+      aggregate: { totalStars: 25, ratingCount: 5 },
+    }),
+  });
+  assert.equal(after.stars, 5);
+  assert.equal(after.message, RATING_THANKS_COPY);
+  assert.deepEqual(after.aggregate, { totalStars: 25, ratingCount: 5 });
+
+  const edited = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: 5,
+    ratingEligible: true,
+    currentAggregate: { totalStars: 25, ratingCount: 5 },
+    nextStars: 4,
+    put: async (_path, stars) => ({
+      stars,
+      createdAt: "2026-09-05T12:00:00.000Z",
+      updatedAt: "2026-09-05T12:01:00.000Z",
+      changed: true,
+      aggregate: { totalStars: 24, ratingCount: 5 },
+    }),
+  });
+  assert.equal(edited.stars, 4);
+  assert.deepEqual(edited.aggregate, { totalStars: 24, ratingCount: 5 });
+
+  const same = applyOptimisticPracticeRating(
+    {
+      stars: 4,
+      ratingEligible: true,
+      message: RATING_THANKS_COPY,
+      pendingStars: null,
+      aggregate: { totalStars: 24, ratingCount: 5 },
+    },
+    4,
+  );
+  assert.deepEqual(same.aggregate, { totalStars: 24, ratingCount: 5 });
+  assert.equal(same.stars, 4);
+}
+
+async function testOptimisticPutSuccessUsesServerAggregate() {
+  const next = await runAuthenticatedPracticeRatingClick({
+    apiPath: "/api/listen/product/anna/morning/rating",
+    currentStars: 4,
+    ratingEligible: true,
+    currentAggregate: { totalStars: 20, ratingCount: 4 },
+    nextStars: 5,
+    put: async () => ({
+      stars: 5,
+      createdAt: "2026-09-05T12:00:00.000Z",
+      updatedAt: "2026-09-05T12:01:00.000Z",
+      changed: true,
+      aggregate: { totalStars: 21, ratingCount: 4 },
+    }),
+  });
+  assert.deepEqual(next.aggregate, { totalStars: 21, ratingCount: 4 });
+  assert.equal(next.stars, 5);
+  assert.equal(next.message, RATING_THANKS_COPY);
 }
 
 function testClientContracts() {
@@ -386,6 +524,7 @@ function testSourceContracts() {
   const eligibility = read("src/lib/ratings/eligibility.ts");
   const hmac = read("src/lib/ratings/signal-hmac.ts");
   const starClick = read("src/lib/ratings/star-click.ts");
+  const readModule = read("src/lib/ratings/read.ts");
   const ui = read(
     "src/components/products/practice-page/PracticeRatingStars.tsx",
   );
@@ -462,10 +601,34 @@ function testSourceContracts() {
   assert.match(ui, /runAuthenticatedPracticeRatingClick/);
   assert.match(ui, /RATING_THANKS_COPY/);
   assert.match(ui, /buildAuthRouteHref\("\/auth\/sign-in"/);
+  assert.match(ui, /data-practice-rating-public-aggregate/);
+  assert.match(ui, /data-practice-rating-total-stars/);
+  assert.match(ui, /data-practice-rating-count/);
+  assert.match(ui, /gap-4/);
+  assert.match(ui, /inline-flex items-center gap-1/);
+  assert.doesNotMatch(ui, /isAuthorOwner/);
+  assert.doesNotMatch(ui, /author_cannot_rate_own_product/);
+  assert.doesNotMatch(ui, /Пока нет оценок/);
+  assert.doesNotMatch(ui, /звёзды|голоса/);
   assert.doesNotMatch(ui, /!ratingEligible && stars == null/);
   assert.doesNotMatch(ui, /window\.alert|confirm\(/);
   assert.doesNotMatch(ui, /modal|dialog|popup/i);
   assert.match(database, /всегда шлёт PUT/);
+  assert.match(page, /getPracticeRatingAggregate/);
+  assert.match(page, /ratingAggregate/);
+  assert.doesNotMatch(page, /isAuthorOwner/);
+  assert.doesNotMatch(route, /isAuthorOwner/);
+  assert.doesNotMatch(route, /author_cannot_rate_own_product/);
+  assert.doesNotMatch(eligibility, /author_cannot_rate_own_product/);
+  assert.doesNotMatch(eligibility, /isAuthorOwner/);
+  assert.doesNotMatch(starClick, /author_cannot_rate_own_product/);
+  assert.match(starClick, /result\.aggregate/);
+  assert.match(readModule, /Public-safe totals only/);
+  assert.match(readModule, /\.select\("stars"\)/);
+  assert.match(readModule, /excluded_at/);
+  assert.match(database, /Автор\/владелец своего опубликованного rateable/);
+  assert.doesNotMatch(database, /author_cannot_rate_own_product/);
+  assert.match(database, /Анонимный GET не открывается/);
 
   assert.match(database, /practice_audio_progress \(resume cursor\)/);
   assert.match(database, /practice_listen_stats \(trusted MEDIA-TIME/);
@@ -490,6 +653,9 @@ testHmacAndTrustedIp();
 testStaleEligibilityDoesNotBlockPut();
 await testEligibleAfterListenWithoutReload();
 await testNotEligiblePutRevertsOptimistic();
+testOptimisticAggregateCases();
+await testAuthorBeforeAndAfter30s();
+await testOptimisticPutSuccessUsesServerAggregate();
 testAggregateNoDoubleCount();
 testClientContracts();
 testSourceContracts();

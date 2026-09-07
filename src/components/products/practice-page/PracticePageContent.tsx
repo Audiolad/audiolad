@@ -62,7 +62,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
             productSlug={practice.slug}
             signInReturnPath={viewModel.practicePagePath}
             isAuthenticated={viewModel.isAuthenticated}
-            isAuthorOwner={viewModel.isAuthorOwner}
+            initialAggregate={viewModel.ratingAggregate}
           />
         ) : null}
 

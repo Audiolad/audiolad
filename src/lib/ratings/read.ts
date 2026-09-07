@@ -45,6 +45,7 @@ function parseStars(value: number | string | null | undefined): number | null {
   return parsed;
 }
 
+/** Public-safe totals only: active stars sum + count. No user_id or HMAC. */
 export async function getPracticeRatingAggregate(
   practiceId: string,
   client: SupabaseClient = createServiceRoleClient(),

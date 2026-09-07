@@ -5,10 +5,7 @@ import {
 import { isFullListenAccessMode } from "@/lib/listen/preview-access";
 import type { ListenAccess } from "@/lib/listen/types";
 
-export type RatingGateError =
-  | "unauthorized"
-  | "rating_not_eligible"
-  | "author_cannot_rate_own_product";
+export type RatingGateError = "unauthorized" | "rating_not_eligible";
 
 export type RatingGateResult =
   | { ok: true }
@@ -17,25 +14,17 @@ export type RatingGateResult =
 /**
  * Server-only rating gate. Never trust client eligibility, preview, or stars.
  * Eligibility is Stage 1 `rating_eligible_at IS NOT NULL`.
+ * Author owners of a rateable product use the same rule as listeners.
  */
 export function evaluatePracticeRatingGate(input: {
   userId: string | null | undefined;
   access: ListenAccess | null;
   isCourse: boolean;
   productKind?: string | null;
-  isAuthorOwner: boolean;
   ratingEligibleAt: string | null | undefined;
 }): RatingGateResult {
   if (!input.userId) {
     return { ok: false, status: 401, error: "unauthorized" };
-  }
-
-  if (input.isAuthorOwner || input.access?.mode === "author_preview") {
-    return {
-      ok: false,
-      status: 403,
-      error: "author_cannot_rate_own_product",
-    };
   }
 
   if (input.isCourse || !isListenStatsProductKind(input.productKind)) {

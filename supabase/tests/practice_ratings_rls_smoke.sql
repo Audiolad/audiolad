@@ -8,6 +8,7 @@ DECLARE
   user_a uuid := '11111111-1111-4111-8111-111111111111';
   user_b uuid := '22222222-2222-4222-8222-222222222222';
   user_c uuid := '33333333-3333-4333-8333-333333333333';
+  user_author uuid := '44444444-4444-4444-8444-444444444444';
   v_practice uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   v_other uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   cnt integer;
@@ -215,6 +216,26 @@ BEGIN
     AND excluded_at IS NULL;
   IF total_stars <> 5 OR rating_count <> 1 THEN
     RAISE EXCEPTION 'excluded row must drop from aggregate, got % / %', total_stars, rating_count;
+  END IF;
+
+  -- Author self-rating is a normal active row (no author_rating column)
+  PERFORM public.set_practice_rating(user_author, v_practice, 5, NULL, NULL, t0);
+  SELECT COALESCE(SUM(stars), 0), COUNT(*)
+  INTO total_stars, rating_count
+  FROM public.practice_ratings
+  WHERE practice_id = v_practice
+    AND excluded_at IS NULL;
+  IF total_stars <> 10 OR rating_count <> 2 THEN
+    RAISE EXCEPTION 'author self-rating must count in active aggregate, got % / %', total_stars, rating_count;
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'practice_ratings'
+      AND column_name IN ('author_rating', 'self_rating', 'bonus')
+  ) THEN
+    RAISE EXCEPTION 'no author_rating / self_rating / bonus column';
   END IF;
 
   -- HMAC metadata stored on first insert only
