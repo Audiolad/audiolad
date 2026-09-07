@@ -51,6 +51,8 @@ export type LearnerCourseBlock =
   | LearnerCourseAudioBlock
   | LearnerCourseFileBlock;
 
+export type LearnerCourseItemKind = "audio" | "file";
+
 export type LearnerCourseLesson = {
   id: string;
   title: string;
@@ -58,6 +60,11 @@ export type LearnerCourseLesson = {
   requiredAccessLevel: number;
   locked: boolean;
   blocks?: LearnerCourseBlock[];
+  /**
+   * Safe type cues for locked lessons (audio / file only).
+   * Never includes ids, titles, paths, or text payloads.
+   */
+  itemKinds?: LearnerCourseItemKind[];
 };
 
 export type LearnerCourse = {

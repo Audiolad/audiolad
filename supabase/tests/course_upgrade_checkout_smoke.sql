@@ -216,6 +216,57 @@ BEGIN
     RAISE EXCEPTION 'I: L2→L3 must charge 150000, got % %', v_target, v_amount;
   END IF;
 
+  -- Entitled L1 on an unpublished course can start L2 checkout.
+  -- A stranger still cannot (practice_not_published).
+  DECLARE
+    unpublished_buyer uuid := 'b9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9';
+    unpublished_id uuid := 'd9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9';
+    key5 uuid := 'f9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e1';
+    key6 uuid := 'f9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e2';
+  BEGIN
+    INSERT INTO auth.users (id) VALUES (unpublished_buyer);
+    INSERT INTO public.practices (
+      id, author_id, title, slug, status, price, is_free, currency, publication_class
+    ) VALUES (
+      unpublished_id, author, 'Unpublished Course', 'course-upgrade-draft',
+      'unpublished', 4900, false, 'RUB', 'course'
+    );
+    INSERT INTO public.practice_access_levels (
+      practice_id, level, title, upgrade_price, currency
+    ) VALUES
+      (unpublished_id, 1, 'L1', NULL, 'RUB'),
+      (unpublished_id, 2, 'L2', 2222, 'RUB');
+
+    PERFORM public.grant_practice_access(unpublished_buyer, unpublished_id, 1, 'purchase');
+    PERFORM set_config('request.jwt.claim.sub', unpublished_buyer::text, true);
+
+    SELECT order_id, amount_minor, target_access_level, order_kind, currency
+    INTO v_id, v_amount, v_target, v_kind, v_currency
+    FROM public.create_course_upgrade_order(unpublished_id, key5, 2);
+
+    IF v_kind IS DISTINCT FROM 'course_upgrade'
+       OR v_target IS DISTINCT FROM 2
+       OR v_amount IS DISTINCT FROM 222200
+       OR v_currency IS DISTINCT FROM 'RUB' THEN
+      RAISE EXCEPTION 'K: unpublished entitled upgrade mismatch % % % %',
+        v_kind, v_target, v_amount, v_currency;
+    END IF;
+
+    PERFORM set_config('request.jwt.claim.sub', other::text, true);
+    BEGIN
+      PERFORM public.create_course_upgrade_order(unpublished_id, key6, 2);
+      RAISE EXCEPTION 'K: stranger must not start unpublished upgrade';
+    EXCEPTION
+      WHEN OTHERS THEN
+        IF SQLERRM LIKE '%stranger must not start unpublished upgrade%' THEN
+          RAISE;
+        END IF;
+        IF SQLERRM NOT LIKE '%practice_not_published%' THEN
+          RAISE EXCEPTION 'K: expected practice_not_published, got %', SQLERRM;
+        END IF;
+    END;
+  END;
+
   RAISE NOTICE 'course_upgrade_checkout_smoke: ok';
 END
 $$;

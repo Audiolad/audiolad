@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolvePublicationClass } from "@/lib/author-products/publication-class";
+import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/learner-assets";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { chooseCatalogPreviewAudioRow } from "@/lib/catalog/catalog-preview-audio-choice";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   fromAudioPreviewWindowColumns,
   resolvePlaybackPreviewWindow,
@@ -119,9 +121,23 @@ async function loadCatalogPreviewSession(
     resolvePublicationClass(practice.publication_class, practice.product_kind) ===
     "course";
 
+  let allowedAudioItemIds: Set<string> | undefined;
+
+  if (isCourse) {
+    try {
+      allowedAudioItemIds = await listCourseStorefrontPreviewAudioItemIds({
+        serviceRole: createServiceRoleClient(),
+        publicationId: practice.id,
+      });
+    } catch {
+      return { ok: false, reason: "unavailable" };
+    }
+  }
+
   const chosenResult = chooseCatalogPreviewAudioRow(rows, {
     isCourse,
     audioItemId,
+    allowedAudioItemIds,
   });
 
   if (!chosenResult.ok) {
@@ -158,6 +174,13 @@ async function loadCatalogPreviewSession(
     fromAudioPreviewWindowColumns(chosen ?? null),
     track.durationSeconds != null ? track.durationSeconds * 1000 : null,
   );
+
+  if (
+    isCourse &&
+    (previewWindow.needsSetup || previewWindow.source !== "configured")
+  ) {
+    return { ok: false, reason: "unavailable" };
+  }
   const href = buildPracticePublicPath(resolvedAuthorSlug, practice.slug);
   const price =
     typeof practice.price === "number" && Number.isFinite(practice.price)

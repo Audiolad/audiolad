@@ -21,6 +21,7 @@ export type {
   LearnerCourseAudioBlock,
   LearnerCourseBlock,
   LearnerCourseFileBlock,
+  LearnerCourseItemKind,
   LearnerCourseLesson,
   LearnerCourseLevel,
   LearnerCourseTextBlock,
@@ -28,6 +29,7 @@ export type {
 
 export {
   assertLearnerLessonRedacted,
+  collectLockedLessonItemKinds,
   mapPracticeAccessLevels,
   normalizeRequiredAccessLevel,
   serializeLearnerCourse,
@@ -49,8 +51,20 @@ export {
   canDownloadCoursePublicationFile,
   canPlayCourseAudioItem,
   listAccessibleCourseAudioItemIds,
+  listCourseStorefrontPreviewAudioItemIds,
   loadCourseBlockAssociations,
 } from "./learner-assets";
+
+export {
+  COURSE_STOREFRONT_PREVIEW_MAX_ACCESS_LEVEL,
+  collectCourseLevel1AudioItemIds,
+  isCourseLessonEligibleForStorefrontPreview,
+  isCourseStorefrontPreviewAudioReady,
+  isCourseStorefrontPreviewClipEligible,
+  resolveCourseStorefrontPreviewAvailable,
+  shouldShowPaidBuyPreviewCta,
+} from "./storefront-preview";
+export { loadCourseStorefrontPreviewAvailable } from "./storefront-preview-availability";
 
 export {
   COURSE_LESSON_BLOCK_TYPES,

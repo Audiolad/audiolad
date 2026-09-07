@@ -313,13 +313,14 @@ Additive migrations: `20260925120000_course_upgrade_order_kind.sql`,
 `20260925120300_create_course_upgrade_order_idempotency.sql`,
 `20260925120400_course_upgrade_canonical_sale.sql`,
 `20260925120500_course_upgrade_canonical_sales_projection.sql`,
-`20260925120600_course_upgrade_canonical_sales_amount_match.sql`.
+`20260925120600_course_upgrade_canonical_sales_amount_match.sql`,
+`20261001120000_course_upgrade_entitled_unpublished.sql`.
 
 | Объект | Назначение |
 |--------|------------|
 | `orders.order_kind` | `TEXT NOT NULL DEFAULT 'product_purchase'`. Existing rows stay base purchases via DEFAULT. `course_upgrade` is a sequential access-level upgrade for the same `practices.id`. Not a second public Product. |
 | `orders.target_access_level` | `INTEGER NULL`, CHECK NULL or `>= 1`. `course_upgrade` requires `>= 2`. Immutable snapshot. Not duplicated on `payments`. |
-| `create_course_upgrade_order` | Authenticated RPC. For a new key, server derives `current+1` and `practice_access_levels.upgrade_price` (integer RUB → kopecks). Ignores client amount. Requires an ACTIVE entitlement. Does **not** use `already_owned`. Reuses pending `(user, practice)` via existing unique index. Replay of an existing key for the same user/practice/`course_upgrade` returns the original snapshot before recomputing `current+1`. |
+| `create_course_upgrade_order` | Authenticated RPC. For a new key, server derives `current+1` and `practice_access_levels.upgrade_price` (integer RUB → kopecks). Ignores client amount. Requires an ACTIVE entitlement. An already-entitled learner may start the next sequential upgrade even when the course is unpublished; strangers still hit `practice_not_published` / commercial catalog gates. Does **not** use `already_owned`. Reuses pending `(user, practice)` via existing unique index. Replay of an existing key for the same user/practice/`course_upgrade` returns the original snapshot before recomputing `current+1`. |
 | `fulfill_tochka_payment_transactional` | Same function, latest body replaced. `product_purchase` still calls `grant_practice_purchase_access`. `course_upgrade` calls `grant_practice_access(..., target, 'purchase', {granted_via:'course_upgrade'})` inside the same transaction. Success is not `access_inserted`. Entitlement `access_source` is not rewritten. |
 | Canonical sale (`course_upgrade`) | Paid order + succeeded real payment + valid amount/currency (`p.amount_minor = o.amount_minor`, `p.currency = o.currency`, `p.currency = 'RUB'`). Defined by the paid transaction, not by historical `user_practices.access_source`. Helpers: `canonical_sale_has_paid_access`, `canonical_sale_qualifies`. `author_canonical_sales_base` uses the same payment/order money invariant. `product_purchase` still requires `access_source='purchase'`. |
 | Delete guard | Cannot DELETE a `practice_access_levels` row while a pending/paid `course_upgrade` targets that level. Failed/cancelled/refunded do not block; a later attempt uses the live catalog price. Fulfill charges the order snapshot, not live `upgrade_price`. |
@@ -1028,7 +1029,7 @@ RLS: пользователь видит / создаёт / удаляет то�
 | `preview_start_ms` | integer NULL | миллисекунды; вместе с `preview_end_ms` или оба NULL |
 | `preview_end_ms` | integer NULL | длительность окна 30 000–90 000 мс включительно |
 
-Существующие строки не ломаются: оба поля NULL. UI выбора preview в этом этапе нет.
+Существующие строки не ломаются: оба поля NULL. Для обычных платных практик окно читает catalog preview. Для `publication_class='course'` витринный фрагмент выбирается только из **опубликованного** аудио уроков Level 1 (`audio_items.status='published'` после `publish_audio_product`) с явно заданным окном 30–90 с; L2 / `required_access_level > 1` и draft-ассеты в preview не входят. Автор задаёт одно L1-аудио и границы в кабинете курса (`/api/author/products/[id]/course/storefront-preview`), в том числе у уже опубликованного курса — это витринная метаданных, не замена файлов урока. Авторский список кандидатов совпадает с runtime-гейтом, чтобы нельзя было сохранить фрагмент, который витрина затем отклонит. Публичная PDP показывает «Прослушать фрагмент» у платного курса только если тот же гейт истинен (опубликованный/в каталоге курс + опубликованное L1-аудио + окно 30–90 с); без настройки и после «Убрать фрагмент» кнопки нет. Обычные платные практики не зависят от этого флага.
 
 ## external_identities (MAX Mini App, этап 2)
 

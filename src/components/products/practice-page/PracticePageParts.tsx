@@ -17,6 +17,7 @@ import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
+import { shouldShowPaidBuyPreviewCta } from "@/lib/course-content/storefront-preview";
 import { PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 import PracticeListenCtaLink from "./PracticeListenCtaLink";
@@ -398,7 +399,8 @@ export function PracticePrimaryActionSection({
     viewModel;
   const showPrimaryPlay =
     presentation.primaryAction.kind === "listen" ||
-    presentation.primaryAction.kind === "buy";
+    (presentation.primaryAction.kind === "buy" &&
+      shouldShowPaidBuyPreviewCta(viewModel.courseStorefrontPreviewAvailable));
   const openCourseAction =
     presentation.primaryAction.kind === "open_course"
       ? presentation.primaryAction

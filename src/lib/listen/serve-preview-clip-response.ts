@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/learner-assets";
+import { isCourseStorefrontPreviewClipEligible } from "@/lib/course-content/storefront-preview";
+import { isCoursePublication } from "@/lib/course-content/validators";
 import { loadListenApiContext } from "@/lib/listen/api-context";
 import {
   previewClipResponseHeaders,
@@ -90,11 +93,33 @@ export async function serveListenPreviewClip(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const isCourse = isCoursePublication(
+    practice.publication_class,
+    practice.product_kind,
+  );
+
+  if (isCourse) {
+    try {
+      const level1Ids = await listCourseStorefrontPreviewAudioItemIds({
+        serviceRole: storageClient,
+        publicationId: practice.id,
+      });
+
+      if (!isCourseStorefrontPreviewClipEligible(audioId, item, level1Ids)) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+    } catch (error) {
+      console.error("listen_course_preview_clip_access_error", error);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+  }
+
   try {
     const clip = await buildPracticePreviewClip({
       storageClient,
       practiceId: practice.id,
       audioItem: item,
+      requireConfiguredWindow: isCourse,
     });
     const rangeHeader = request.headers.get("range");
     const ranged = sliceBytesForRange(clip.bytes, rangeHeader);

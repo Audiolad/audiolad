@@ -8,6 +8,9 @@ import { COURSE_LEARNER_CONTENTS_ANCHOR_ID } from "@/lib/products/practice-acces
 
 import CourseLearnerAudioBlock from "./CourseLearnerAudioBlock";
 import CourseLearnerFileDownload from "./CourseLearnerFileDownload";
+import CourseLearnerItemTypeIcon, {
+  courseLearnerItemKindLabel,
+} from "./CourseLearnerItemTypeIcon";
 import CourseLevelUpgradeButton from "./CourseLevelUpgradeButton";
 
 type CourseLearnerContentProps = {
@@ -88,6 +91,22 @@ function LockedLessonTitle({
       <Heading className="min-w-0 break-words text-[16px] font-semibold text-[#3f3560]">
         {lesson.title}
       </Heading>
+      {lesson.itemKinds && lesson.itemKinds.length > 0 ? (
+        <ul className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+          {lesson.itemKinds.map((kind) => {
+            const label = courseLearnerItemKindLabel(kind, true);
+            return (
+              <li
+                key={kind}
+                className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-[#8a7ca9]"
+              >
+                <CourseLearnerItemTypeIcon kind={kind} className="text-[#8a7ca9]" />
+                <span>{label}</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </article>
   );
 }
