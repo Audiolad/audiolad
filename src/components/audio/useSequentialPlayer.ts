@@ -71,6 +71,16 @@ import {
   playErrorName,
 } from "@/lib/audio/signed-audio-url";
 import {
+  captureRecoveryPosition,
+  decideMediaErrorRecovery,
+  failedSignedUrlLoadResult,
+  isAdoptedAudioAlreadyPlaying,
+  LOAD_AUDIO_ERROR,
+  shouldApplySignedUrlRecovery,
+  visibleErrorForSignedUrlRecoveryFailure,
+  type LoadSignedUrlRecoveryResult,
+} from "@/lib/audio/signed-url-media-error-recovery";
+import {
   LISTEN_STATS_HEARTBEAT_MS,
   readListenStatsClientAuthenticated,
   reportListenStatsHeartbeat,
@@ -219,6 +229,7 @@ export function useSequentialPlayer({
   const userInitiatedPauseRef = useRef(false);
   const lastRecoveryAttemptRef = useRef(0);
   const recoveryUrlAttemptedRef = useRef(false);
+  const hadSuccessfulPlayingRef = useRef(false);
   const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
   const recoveryAttemptIdRef = useRef(0);
   const resumePositionRef = useRef(0);
@@ -238,9 +249,9 @@ export function useSequentialPlayer({
   const lastListenStatsTrackIdRef = useRef<string | null>(null);
   const flushProgressRef = useRef<() => Promise<void>>(async () => {});
   const flushListenStatsRef = useRef<(keepalive?: boolean) => void>(() => {});
-  const loadSignedUrlRef = useRef<(audioItemId: string) => Promise<void>>(
-    async () => {},
-  );
+  const loadSignedUrlRef = useRef<
+    (audioItemId: string) => Promise<LoadSignedUrlRecoveryResult>
+  >(async () => ({ ok: false, reason: "failed", status: null }));
   const prefetchedNextSourceRef = useRef<PrefetchedSource | null>(null);
   const prefetchAbortRef = useRef<AbortController | null>(null);
   const skipUrlLoadForTrackRef = useRef<string | null>(null);
@@ -698,7 +709,7 @@ export function useSequentialPlayer({
   }, [reportListenStats]);
 
   const loadSignedUrl = useCallback(
-    async (audioItemId: string) => {
+    async (audioItemId: string): Promise<LoadSignedUrlRecoveryResult> => {
       const requestId = urlRequestRef.current + 1;
       const capturedGeneration = getSessionGenerationRef.current?.() ?? 0;
       urlRequestRef.current = requestId;
@@ -720,6 +731,11 @@ export function useSequentialPlayer({
       setStatusMessage(PREPARE_AUDIO_MESSAGE);
 
       let settled = false;
+      let outcome: LoadSignedUrlRecoveryResult = {
+        ok: false,
+        reason: "failed",
+        status: null,
+      };
 
       const result = await fetchSignedAudioUrl({
         audioItemId,
@@ -736,12 +752,14 @@ export function useSequentialPlayer({
             generation: capturedGeneration,
             private: fetchAsPrivate,
           });
-          return;
+          outcome = { ok: false, reason: "stale" };
+          return outcome;
         }
 
         if (!result.ok) {
           if (result.aborted) {
-            return;
+            outcome = { ok: false, reason: "aborted" };
+            return outcome;
           }
 
           console.error("private_audio_session_switch", {
@@ -755,36 +773,29 @@ export function useSequentialPlayer({
             retries: urlRetryCountRef.current,
           });
 
-          if (result.status === 401 || result.status === 403) {
-            setUrlError(
-              fetchAsPrivate
-                ? "Нет доступа к этому аудиоматериалу."
-                : "Доступ к прослушиванию не открыт.",
-            );
-          } else if (result.status === 404) {
-            setUrlError("Аудиофайл не найден.");
-          } else {
-            setUrlError(PREPARE_AUDIO_ERROR);
-          }
+          const failed = failedSignedUrlLoadResult({
+            status: result.status,
+            sourceType: fetchAsPrivate ? "private_audio" : "catalog",
+          });
+          setUrlError(failed.visibleError ?? PREPARE_AUDIO_ERROR);
 
           prefetchedNextSourceRef.current = null;
           setSrc(null);
           setIsLoading(false);
           settled = true;
-          return;
+          outcome = failed;
+          return outcome;
         }
 
         urlRetryCountRef.current = 0;
         setSrc(result.url);
         settled = true;
+        outcome = { ok: true, url: result.url };
+        return outcome;
       } finally {
         // Never auto-retry after generation change — that poisoned catalog loads
         // when a private→catalog remount invalidated an in-flight fetch.
-        if (isStale()) {
-          return;
-        }
-
-        if (settled) {
+        if (!isStale() && settled) {
           setIsUrlLoading(false);
         }
       }
@@ -821,6 +832,15 @@ export function useSequentialPlayer({
       wasPlayingBeforeSwitchRef.current = false;
       ensureSharedAudioAudible(audio);
 
+      if (
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+      }
+
       // Shared next-track path (iOS / Android / desktop). play() stays in this
       // turn so lock-screen / screen-off Media Session can continue.
       void audio.play().catch((error: unknown) => {
@@ -854,6 +874,10 @@ export function useSequentialPlayer({
       if (nextIndex < 0 || nextIndex >= tracks.length) {
         return;
       }
+
+      recoveryUrlAttemptedRef.current = false;
+      hadSuccessfulPlayingRef.current = false;
+      recoveryPromiseRef.current = null;
 
       const previousTrack = tracks[currentTrackIndex];
 
@@ -931,6 +955,10 @@ export function useSequentialPlayer({
       return;
     }
 
+    recoveryUrlAttemptedRef.current = false;
+    hadSuccessfulPlayingRef.current = false;
+    recoveryPromiseRef.current = null;
+
     const trackId = currentTrack.id;
     const handoff = handoffSourceRef?.current;
 
@@ -944,7 +972,14 @@ export function useSequentialPlayer({
 
       const audio = audioRef.current;
 
-      if (audio && !audio.paused && !audio.ended) {
+      if (
+        audio &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
         setPlayingState(true);
         userWantsPlaybackRef.current = true;
       }
@@ -960,6 +995,20 @@ export function useSequentialPlayer({
 
     if (skipUrlLoadForTrackRef.current === trackId) {
       skipUrlLoadForTrackRef.current = null;
+      const audio = audioRef.current;
+
+      if (
+        audio &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+        setPlayingState(true);
+        userWantsPlaybackRef.current = true;
+      }
+
       return;
     }
 
@@ -993,8 +1042,21 @@ export function useSequentialPlayer({
     // element. Calling load() here would cancel that play() on iOS.
     if (
       skipSrcReloadRef.current === src ||
-      (alreadyHasSrc && !audio.paused && !audio.ended)
+      (alreadyHasSrc &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        }))
     ) {
+      if (
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+      }
+
       skipSrcReloadRef.current = null;
       setIsLoading(false);
       setStatusMessage("");
@@ -1205,6 +1267,7 @@ export function useSequentialPlayer({
       setPlayerError(null);
       setStatusMessage("");
       setAutoplayHint(null);
+      hadSuccessfulPlayingRef.current = true;
       recoveryUrlAttemptedRef.current = false;
       initialPlaybackBufferingRef.current = false;
 
@@ -1389,15 +1452,6 @@ export function useSequentialPlayer({
         return;
       }
 
-      setPlayingState(false);
-      setIsRecovering(false);
-
-      if (!userInitiatedPauseRef.current) {
-        // Keep user intent — they may want to retry after foreground recovery.
-      }
-
-      setIsLoading(false);
-
       const mediaError = audio.error;
 
       console.error("private_audio_session_switch", {
@@ -1406,15 +1460,93 @@ export function useSequentialPlayer({
         code: mediaError?.code ?? null,
       });
 
-      if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-        setPlayerError("Формат аудио не поддерживается на этом устройстве.");
-      } else {
-        setPlayerError(
-          "Не удалось загрузить аудио. Проверьте соединение и попробуйте ещё раз.",
-        );
+      const decision = decideMediaErrorRecovery({
+        isHandlerCurrent: true,
+        hasSrc: true,
+        currentTrackId: currentTrack?.id ?? null,
+        mediaErrorCode: mediaError?.code ?? null,
+        hadSuccessfulPlaying: hadSuccessfulPlayingRef.current,
+        recoveryUrlAttempted: recoveryUrlAttemptedRef.current,
+        foregroundRecoveryInFlight: Boolean(recoveryPromiseRef.current),
+      });
+
+      if (decision.action === "ignore") {
+        return;
       }
 
-      setStatusMessage("");
+      if (decision.action === "format_error" || decision.action === "load_error") {
+        setPlayingState(false);
+        setIsRecovering(false);
+        setIsLoading(false);
+        setPlayerError(decision.errorMessage ?? LOAD_AUDIO_ERROR);
+        setStatusMessage("");
+        return;
+      }
+
+      const recoveredTrackId = currentTrack?.id;
+
+      if (!recoveredTrackId) {
+        setPlayingState(false);
+        setIsRecovering(false);
+        setIsLoading(false);
+        setPlayerError(LOAD_AUDIO_ERROR);
+        setStatusMessage("");
+        return;
+      }
+
+      recoveryUrlAttemptedRef.current = true;
+
+      const capturedPosition = captureRecoveryPosition(
+        pendingStartPosition,
+        audio.currentTime,
+      );
+      const wantsPlayback = userWantsPlaybackRef.current;
+      const recoveredGeneration = getSessionGenerationRef.current?.() ?? 0;
+
+      resumePositionRef.current = capturedPosition;
+      setPendingStartPosition(capturedPosition);
+      wasPlayingBeforeSwitchRef.current = wantsPlayback;
+      setPlayingState(false);
+      setIsRecovering(false);
+      setPlayerError(null);
+      setIsLoading(true);
+      debugSnapshot("media-error-recovery", "refresh-signed-url", {
+        trackId: recoveredTrackId,
+        position: capturedPosition,
+        wantsPlayback,
+        mediaErrorCode: mediaError?.code ?? null,
+      });
+
+      const resignPromise = (async (): Promise<boolean> => {
+        const result = await loadSignedUrlRef.current(recoveredTrackId);
+        const apply = shouldApplySignedUrlRecovery({
+          recoveredTrackId,
+          recoveredGeneration,
+          currentTrackId: currentTrackRef.current?.id ?? null,
+          currentGeneration: getSessionGenerationRef.current?.() ?? 0,
+        });
+
+        if (!apply) {
+          return false;
+        }
+
+        const visibleError = visibleErrorForSignedUrlRecoveryFailure(result);
+
+        if (visibleError) {
+          setIsLoading(false);
+          setIsUrlLoading(false);
+          setIsRecovering(false);
+          setPlayerError(visibleError);
+          setStatusMessage("");
+        }
+
+        return false;
+      })().finally(() => {
+        if (recoveryPromiseRef.current === resignPromise) {
+          recoveryPromiseRef.current = null;
+        }
+      });
+      recoveryPromiseRef.current = resignPromise;
     };
 
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -1843,6 +1975,9 @@ export function useSequentialPlayer({
       return;
     }
 
+    recoveryUrlAttemptedRef.current = false;
+    hadSuccessfulPlayingRef.current = false;
+    recoveryPromiseRef.current = null;
     setPlayerError(null);
     setUrlError(null);
     setIsLoading(true);
@@ -1948,6 +2083,7 @@ export function useSequentialPlayer({
     recoveryPromiseRef.current = null;
     lastRecoveryAttemptRef.current = 0;
     recoveryUrlAttemptedRef.current = false;
+    hadSuccessfulPlayingRef.current = false;
     userWantsPlaybackRef.current = false;
     initialAutoplayPendingRef.current = false;
     initialAutoplayAttemptedRef.current = false;
