@@ -243,6 +243,9 @@ export function imageProcessErrorMessage(
       }
       return "Минимальный размер изображения — 400 × 400 пикселей.";
     case "image_too_large":
+      if (profile === "author-avatar" || profile === "user-avatar") {
+        return AVATAR_ERROR_MESSAGES.resolutionTooLarge;
+      }
       return "Изображение слишком большое. Выберите файл меньшего разрешения.";
     case "corrupt_image":
       if (profile === "author-avatar" || profile === "user-avatar") {

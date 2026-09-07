@@ -92,7 +92,7 @@ export function avatarProcessErrorMessage(code: AvatarProcessErrorCode): string 
     case "corrupt_image":
       return AVATAR_ERROR_MESSAGES.processFailed;
     case "image_too_large":
-      return AVATAR_ERROR_MESSAGES.processFailed;
+      return AVATAR_ERROR_MESSAGES.resolutionTooLarge;
     default:
       return AVATAR_ERROR_MESSAGES.saveFailed;
   }

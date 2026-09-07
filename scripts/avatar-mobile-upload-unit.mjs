@@ -14,9 +14,11 @@ import {
   AVATAR_INPUT_ACCEPT,
   AVATAR_MAX_INPUT_PIXELS,
   AVATAR_MAX_SOURCE_BYTES,
+  AVATAR_MAX_SOURCE_DIMENSION,
   AVATAR_UPLOAD_HINT,
 } from "../src/lib/images/avatar-constants.ts";
 import {
+  avatarSourceBoundsError,
   peekAvatarSourceKind,
   validateAvatarSourceFile,
   validateAvatarSourceFileMeta,
@@ -26,10 +28,12 @@ import { convertHeicToJpegBuffer } from "../src/lib/images/heic-fallback.ts";
 import { getImageProfileConfig } from "../src/lib/images/image-profiles.ts";
 import { detectImageKindFromBytes } from "../src/lib/images/image-magic.ts";
 import { processImageForProfile } from "../src/lib/images/process-image.ts";
+import { avatarProcessErrorMessage } from "../src/lib/images/process-avatar-image.ts";
 import { processAndUploadImageSet } from "../src/lib/images/upload-image-set.ts";
 import {
   detectMimeFromMagic,
   validateImageBufferForProfile,
+  validateImageSourceBounds,
 } from "../src/lib/images/validate-image.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -193,6 +197,24 @@ async function testPickerAndMessages() {
   assert(!("heicUnsupported" in AVATAR_ERROR_MESSAGES), "no HEIC unsupported string");
   assert(AVATAR_MAX_SOURCE_BYTES === 20 * 1024 * 1024, "source ceiling is 20 MiB");
   assert(AVATAR_MAX_INPUT_PIXELS >= 48_000_000, "pixel cap must allow 48MP phones");
+  assert(AVATAR_MAX_INPUT_PIXELS === 64_000_000, "pixel cap stays at 64e6");
+  assert(AVATAR_MAX_SOURCE_DIMENSION === 12_000, "side cap stays at 12000");
+  assert(
+    AVATAR_ERROR_MESSAGES.resolutionTooLarge ===
+      "Фото слишком большого разрешения. Выберите другое изображение.",
+    "108/200MP copy",
+  );
+  assert(
+    avatarProcessErrorMessage("image_too_large") ===
+      AVATAR_ERROR_MESSAGES.resolutionTooLarge,
+    "avatar image_too_large uses resolution copy",
+  );
+  const hook = readFileSync(join(root, "src/components/images/useAvatarCropUpload.tsx"), "utf8");
+  assert(
+    hook.includes("if (!url?.trim()) {\n    return null;"),
+    "appendAvatarCacheBuster returns null for blank URLs",
+  );
+  assert(!hook.includes("return url ?? null"), "must not return whitespace URL");
 }
 
 async function testClientMetaAndMagic() {
@@ -271,7 +293,10 @@ async function testSourceSizesAndProcess() {
 
   const square31 = await sharp(jpeg31).resize(1000, 1000, { fit: "cover" }).jpeg().toBuffer();
   const processed31 = await processImageForProfile(square31, "", "user-avatar");
-  assert(processed31.ok, "3.1 MB cropped jpeg should persist");
+  assert(
+    processed31.ok,
+    `3.1 MB cropped jpeg should persist${processed31.ok ? "" : `: ${processed31.code}`}`,
+  );
 
   const jpeg15 = await createNoisyJpeg(4200, 3200, 98);
   assert(jpeg15.length > 10 * 1024 * 1024, `large jpeg fixture too small: ${jpeg15.length}`);
@@ -332,23 +357,18 @@ async function testWebpOnlyPersistence() {
   const avif = await sharp(jpeg).avif({ quality: 40 }).toBuffer();
   const heic = readFileSync(heicPath);
   const heicJpeg = await convertHeicToJpegBuffer(heic);
-  const heicSquare = await sharp(heicJpeg).resize(1000, 1000, { fit: "cover" }).jpeg().toBuffer();
 
   const jpegUser = await processImageForProfile(jpeg, "image/jpeg", "user-avatar");
   const jpegAuthor = await processImageForProfile(jpeg, "", "author-avatar");
   const pngUser = await processImageForProfile(png, "image/png", "user-avatar");
   const webpUser = await processImageForProfile(webp, "image/webp", "user-avatar");
   const avifUser = await processImageForProfile(avif, "image/avif", "user-avatar");
-  const heicPrepared = await processImageForProfile(heicSquare, "image/jpeg", "author-avatar");
-  const heicDirect = await processImageForProfile(heicSquare, null, "user-avatar");
 
   assertPersistentWebp(jpegUser, "user jpeg");
   assertPersistentWebp(jpegAuthor, "author jpeg");
   assertPersistentWebp(pngUser, "user png");
   assertPersistentWebp(webpUser, "user webp re-normalized");
   assertPersistentWebp(avifUser, "user avif");
-  assertPersistentWebp(heicPrepared, "heic fallback jpeg");
-  assertPersistentWebp(heicDirect, "heic via sharp then jpeg");
 
   const jpegMeta = await sharp(jpegUser.data.variants[0].buffer).metadata();
   assert(jpegMeta.format === "webp", "sharp must read persisted bytes as webp");
@@ -357,17 +377,6 @@ async function testWebpOnlyPersistence() {
   assert(detectMimeFromMagic(heic) === "image/heif" || detectMimeFromMagic(heic) === "image/heic", "HEIC magic");
   assert(detectImageKindFromBytes(avif) === "image/avif", "AVIF magic");
   assert(heicJpeg[0] === 0xff && heicJpeg[1] === 0xd8, "HEIC fallback must emit JPEG");
-
-  const heicSharp = await processImageForProfile(
-    await sharp({
-      create: { width: 1000, height: 1000, channels: 3, background: { r: 10, g: 20, b: 30 } },
-    })
-      .jpeg()
-      .toBuffer(),
-    "image/heic",
-    "user-avatar",
-  );
-  assertPersistentWebp(heicSharp, "declared heic on jpeg bytes");
 }
 
 async function testHeicFallbackAndPreviewBounds() {
@@ -431,47 +440,92 @@ async function testStorageUploadIsWebp() {
   })
     .jpeg()
     .toBuffer();
-  const heic = readFileSync(heicPath);
-  const heicSquare = await sharp(await convertHeicToJpegBuffer(heic))
-    .resize(1000, 1000, { fit: "cover" })
-    .jpeg()
-    .toBuffer();
+  const rawHeic = readFileSync(heicPath);
 
-  for (const [label, buffer, profile, context] of [
-    [
-      "jpeg-user",
-      jpeg,
-      "user-avatar",
-      { userId: "11111111-1111-4111-8111-111111111111" },
-    ],
-    [
-      "heic-author",
-      heicSquare,
-      "author-avatar",
-      { authorId: "22222222-2222-4222-8222-222222222222", authorKind: "avatar" },
-    ],
-  ]) {
-    const storage = createMemoryStorage();
-    const uploaded = await processAndUploadImageSet({
-      profile,
-      bucket: profile === "user-avatar" ? "user-avatars" : "author-assets",
-      buffer,
-      declaredMime: "image/jpeg",
-      storage,
-      context,
-    });
+  const jpegStorage = createMemoryStorage();
+  const jpegUploaded = await processAndUploadImageSet({
+    profile: "user-avatar",
+    bucket: "user-avatars",
+    buffer: jpeg,
+    declaredMime: "image/jpeg",
+    storage: jpegStorage,
+    context: { userId: "11111111-1111-4111-8111-111111111111" },
+  });
 
-    assert(uploaded.ok, `${label} upload should succeed`);
-    assert(storage.objects.length > 0, `${label} stored objects`);
-    for (const object of storage.objects) {
-      assert(object.path.endsWith(".webp"), `${label} ${object.path} must end with .webp`);
-      assert(
-        object.contentType === "image/webp",
-        `${label} ${object.path} Content-Type must be image/webp`,
-      );
-      assertWebpObject(object.bytes, `${label} ${object.path}`);
-    }
+  assert(jpegUploaded.ok, "jpeg-user upload should succeed");
+  assert(jpegStorage.objects.length > 0, "jpeg-user stored objects");
+  for (const object of jpegStorage.objects) {
+    assert(object.path.endsWith(".webp"), `${object.path} must end with .webp`);
+    assert(object.contentType === "image/webp", `${object.path} Content-Type must be image/webp`);
+    assertWebpObject(object.bytes, object.path);
+    const meta = await sharp(object.bytes).metadata();
+    assert(meta.format === "webp", `${object.path} sharp format must be webp`);
   }
+
+  const heicStorage = createMemoryStorage();
+  const heicUploaded = await processAndUploadImageSet({
+    profile: "author-avatar",
+    bucket: "author-assets",
+    buffer: rawHeic,
+    declaredMime: "",
+    storage: heicStorage,
+    context: { authorId: "22222222-2222-4222-8222-222222222222", authorKind: "avatar" },
+  });
+
+  assert(heicUploaded.ok, `raw HEIC full pipeline should succeed, got ${heicUploaded.code}`);
+  assert(heicStorage.objects.length > 0, "raw HEIC stored objects");
+  for (const object of heicStorage.objects) {
+    assert(object.path.endsWith(".webp"), `raw HEIC ${object.path} must end with .webp`);
+    assert(
+      object.contentType === "image/webp",
+      `raw HEIC ${object.path} Content-Type must be image/webp`,
+    );
+    assertWebpObject(object.bytes, `raw HEIC ${object.path}`);
+    const meta = await sharp(object.bytes).metadata();
+    assert(meta.format === "webp", `raw HEIC ${object.path} sharp format must be webp`);
+    const kind = detectImageKindFromBytes(object.bytes);
+    assert(kind !== "image/heic" && kind !== "image/heif", "HEIC must not persist");
+  }
+}
+
+async function testHeicTimeoutKillsWorker() {
+  const heic = readFileSync(heicPath);
+  const fallbackSource = readFileSync(join(root, "src/lib/images/heic-fallback.ts"), "utf8");
+  assert(fallbackSource.includes("node:child_process"), "HEIC convert uses a child process");
+  assert(fallbackSource.includes('kill("SIGKILL")'), "timeout must SIGKILL the child");
+
+  const started = Date.now();
+  let timedOut = false;
+
+  try {
+    await convertHeicToJpegBuffer(heic, 80, { hangForTest: true });
+  } catch (error) {
+    timedOut = error instanceof Error && error.message === "heic_convert_timeout";
+  }
+
+  const elapsed = Date.now() - started;
+  assert(timedOut, "hanging worker must reject with heic_convert_timeout");
+  assert(elapsed < 2000, `terminate must abort hang quickly, took ${elapsed}ms`);
+}
+
+async function testHighResolutionBounds() {
+  assert(validateImageSourceBounds(8000, 6000, "user-avatar") === null, "48MP passes");
+  assert(
+    validateImageSourceBounds(12_000, 9_000, "user-avatar") === "image_too_large",
+    "108MP is rejected",
+  );
+  assert(
+    validateImageSourceBounds(16_384, 12_288, "author-avatar") === "image_too_large",
+    "200MP is rejected",
+  );
+  assert(
+    avatarSourceBoundsError(12_000, 9_000) === AVATAR_ERROR_MESSAGES.resolutionTooLarge,
+    "client 108MP uses resolution copy",
+  );
+  assert(
+    avatarSourceBoundsError(16_384, 12_288) === AVATAR_ERROR_MESSAGES.resolutionTooLarge,
+    "client 200MP uses resolution copy",
+  );
 }
 
 async function testAuthorApiMessageContract() {
@@ -489,6 +543,8 @@ async function main() {
   await testSourceSizesAndProcess();
   await testWebpOnlyPersistence();
   await testHeicFallbackAndPreviewBounds();
+  await testHeicTimeoutKillsWorker();
+  await testHighResolutionBounds();
   await testExifOrientation();
   await testStorageUploadIsWebp();
   await testAuthorApiMessageContract();

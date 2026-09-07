@@ -4,7 +4,11 @@ export const AVATAR_MAX_BYTES = AVATAR_MAX_SOURCE_BYTES;
 export const AVATAR_OUTPUT_SIZE = 1000;
 export const AVATAR_WEBP_QUALITY = 90;
 export const AVATAR_JPEG_QUALITY = 0.9;
-/** Decompression-bomb cap. 25e6 was unused and too low for 48MP phone photos. */
+/**
+ * Decompression-bomb cap. Not raised automatically for 108MP/200MP phones.
+ * 48MP (e.g. 8000×6000) passes. 108MP (≈12000×9000 = 108e6) and 200MP
+ * (side typically > 12000) reject with resolutionTooLarge.
+ */
 export const AVATAR_MAX_INPUT_PIXELS = 64_000_000;
 export const AVATAR_MAX_SOURCE_DIMENSION = 12_000;
 export const AVATAR_SQUARE_TOLERANCE_PX = 2;
@@ -35,6 +39,8 @@ export const AVATAR_ERROR_MESSAGES = {
   notImage: "Не удалось распознать файл как изображение. Выберите другую фотографию.",
   processFailed:
     "Не удалось обработать фотографию. Попробуйте выбрать другое изображение.",
+  resolutionTooLarge:
+    "Фото слишком большого разрешения. Выберите другое изображение.",
   choosePhoto: "Выберите фотографию из галереи",
   readFailed:
     "Не удалось обработать фотографию. Попробуйте выбрать другое изображение.",

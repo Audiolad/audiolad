@@ -193,7 +193,7 @@ export function appendAvatarCacheBuster(
   avatarUrl: string | null | undefined,
   cacheBuster: string | number,
 ): string | null {
-  if (!avatarUrl) {
+  if (!avatarUrl?.trim()) {
     return null;
   }
 

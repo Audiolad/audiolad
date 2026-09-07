@@ -35,10 +35,28 @@ function buildSharpInput(input: Buffer) {
   });
 }
 
-async function trySharpDecode(input: Buffer) {
+async function readSharpMetadata(input: Buffer) {
+  try {
+    return { ok: true as const, meta: await buildSharpInput(input).metadata() };
+  } catch {
+    return { ok: false as const };
+  }
+}
+
+async function trySharpDecode(input: Buffer, profile: ImageProfile) {
   try {
     const pipeline = buildSharpInput(input).rotate();
     const meta = await pipeline.clone().metadata();
+    const boundError = validateImageSourceBounds(
+      meta.width ?? 0,
+      meta.height ?? 0,
+      profile,
+    );
+
+    if (boundError) {
+      return { ok: false as const, code: boundError };
+    }
+
     await pipeline.clone().jpeg({ quality: 90 }).toBuffer();
     return { ok: true as const, meta };
   } catch {
@@ -62,7 +80,25 @@ export async function prepareAvatarSourceBuffer(
   }
 
   let working = input;
-  let sharpMeta = await trySharpDecode(working);
+  const headerMeta = await readSharpMetadata(working);
+
+  if (headerMeta.ok) {
+    const boundError = validateImageSourceBounds(
+      headerMeta.meta.width ?? 0,
+      headerMeta.meta.height ?? 0,
+      profile,
+    );
+
+    if (boundError) {
+      return { ok: false, code: boundError };
+    }
+  }
+
+  let sharpMeta = await trySharpDecode(working, profile);
+
+  if (sharpMeta.ok === false && sharpMeta.code) {
+    return { ok: false, code: sharpMeta.code };
+  }
 
   if (
     !sharpMeta.ok &&
@@ -72,14 +108,14 @@ export async function prepareAvatarSourceBuffer(
   ) {
     try {
       working = await convertHeicToJpegBuffer(input, AVATAR_HEIC_CONVERT_TIMEOUT_MS);
-      sharpMeta = await trySharpDecode(working);
+      sharpMeta = await trySharpDecode(working, profile);
     } catch {
       return { ok: false, code: "corrupt_image" };
     }
   }
 
   if (!sharpMeta.ok) {
-    return { ok: false, code: "corrupt_image" };
+    return { ok: false, code: sharpMeta.code ?? "corrupt_image" };
   }
 
   const format = sharpMeta.meta.format ?? "";

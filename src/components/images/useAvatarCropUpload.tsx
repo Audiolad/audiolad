@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AvatarCropperModal from "@/components/images/AvatarCropperModal";
 import { AVATAR_ERROR_MESSAGES } from "@/lib/images/avatar-constants";
 import {
+  AvatarSourceResolutionError,
   createOrientedPreviewUrl,
   validateAvatarSourceFile,
 } from "@/lib/images/avatar-source-validation";
@@ -118,7 +119,11 @@ export function useAvatarCropUpload({
           setCropImageSrc(previewUrl);
           setIsCropOpen(true);
           return;
-        } catch {
+        } catch (previewError) {
+          if (previewError instanceof AvatarSourceResolutionError) {
+            throw previewError;
+          }
+
           previewSource = await requestServerAvatarPreview(file);
         }
 
@@ -188,7 +193,7 @@ export function appendAvatarCacheBuster(
   cacheBuster?: string | number,
 ): string | null {
   if (!url?.trim()) {
-    return url ?? null;
+    return null;
   }
 
   if (cacheBuster === undefined) {

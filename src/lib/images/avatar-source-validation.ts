@@ -1,6 +1,8 @@
 import {
   AVATAR_ERROR_MESSAGES,
+  AVATAR_MAX_INPUT_PIXELS,
   AVATAR_MAX_SOURCE_BYTES,
+  AVATAR_MAX_SOURCE_DIMENSION,
   AVATAR_SOURCE_MIME_TYPES,
 } from "@/lib/images/avatar-constants";
 import {
@@ -160,6 +162,32 @@ export async function validateAvatarSourceFile(file: File): Promise<string | nul
   return null;
 }
 
+export class AvatarSourceResolutionError extends Error {
+  constructor() {
+    super(AVATAR_ERROR_MESSAGES.resolutionTooLarge);
+    this.name = "AvatarSourceResolutionError";
+  }
+}
+
+export function avatarSourceBoundsError(
+  width: number,
+  height: number,
+): string | null {
+  if (width <= 0 || height <= 0) {
+    return AVATAR_ERROR_MESSAGES.notImage;
+  }
+
+  if (
+    width > AVATAR_MAX_SOURCE_DIMENSION ||
+    height > AVATAR_MAX_SOURCE_DIMENSION ||
+    width * height > AVATAR_MAX_INPUT_PIXELS
+  ) {
+    return AVATAR_ERROR_MESSAGES.resolutionTooLarge;
+  }
+
+  return null;
+}
+
 export async function loadAvatarSourceDimensions(
   file: File,
 ): Promise<{ width: number; height: number }> {
@@ -218,6 +246,12 @@ export async function createOrientedPreviewUrl(source: Blob): Promise<string> {
   const bitmap = await loadOrientedImageBitmap(source);
 
   try {
+    const boundsError = avatarSourceBoundsError(bitmap.width, bitmap.height);
+
+    if (boundsError) {
+      throw new AvatarSourceResolutionError();
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;

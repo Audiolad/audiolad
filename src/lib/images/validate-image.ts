@@ -166,6 +166,7 @@ export function validateImageDimensions(
   profile: ImageProfile,
 ): ImageProcessErrorCode | null {
   const config = getImageProfileConfig(profile);
+  const avatarProfile = isAvatarImageProfile(profile);
   const boundError = validateImageSourceBounds(width, height, profile);
 
   if (boundError) {
@@ -179,7 +180,8 @@ export function validateImageDimensions(
     return "invalid_aspect_ratio";
   }
 
-  if (config.requireSquare) {
+  // Avatar sources may be raw phone photos; variants use fit:cover to square.
+  if (config.requireSquare && !avatarProfile) {
     const tolerance = 2;
     if (Math.abs(width - height) > tolerance) {
       return "invalid_aspect_ratio";
