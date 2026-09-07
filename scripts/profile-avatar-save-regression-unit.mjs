@@ -15,9 +15,7 @@ async function testMobileMimeInference() {
   const {
     resolveAvatarSourceMime,
     validateAvatarSourceFileMeta,
-    isHeicLikeFile,
   } = await import("../src/lib/images/avatar-source-validation.ts");
-  const { AVATAR_ERROR_MESSAGES } = await import("../src/lib/images/avatar-constants.ts");
   assert(
     resolveAvatarSourceMime({
       name: "фото.jpg",
@@ -61,8 +59,12 @@ async function testHeicHandling() {
     "HEIC should defer to decode validation instead of hard unsupported error",
   );
   assert(
-    AVATAR_ERROR_MESSAGES.heicUnsupported.includes("HEIC"),
-    "HEIC unsupported message should mention HEIC explicitly",
+    !("heicUnsupported" in AVATAR_ERROR_MESSAGES),
+    "HEIC must not show a technical unsupported-format message",
+  );
+  assert(
+    AVATAR_ERROR_MESSAGES.processFailed.includes("обработать"),
+    "decode failure should use a non-technical process message",
   );
 }
 

@@ -1,26 +1,44 @@
-export const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+export const AVATAR_MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+/** @deprecated Use AVATAR_MAX_SOURCE_BYTES. Kept as an alias for persist callers. */
+export const AVATAR_MAX_BYTES = AVATAR_MAX_SOURCE_BYTES;
 export const AVATAR_OUTPUT_SIZE = 1000;
 export const AVATAR_WEBP_QUALITY = 90;
 export const AVATAR_JPEG_QUALITY = 0.9;
-export const AVATAR_MAX_INPUT_PIXELS = 25_000_000;
+/** Decompression-bomb cap. 25e6 was unused and too low for 48MP phone photos. */
+export const AVATAR_MAX_INPUT_PIXELS = 64_000_000;
+export const AVATAR_MAX_SOURCE_DIMENSION = 12_000;
 export const AVATAR_SQUARE_TOLERANCE_PX = 2;
+export const AVATAR_HEIC_CONVERT_TIMEOUT_MS = 15_000;
+export const AVATAR_PREVIEW_MAX_EDGE = 4096;
 
-export const AVATAR_ALLOWED_MIME_TYPES = new Set([
+export const AVATAR_SOURCE_MIME_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
   "image/png",
   "image/webp",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
 ]);
 
+export const AVATAR_INPUT_ACCEPT =
+  "image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif";
+
 export const AVATAR_UPLOAD_HINT =
-  "JPG, PNG или WebP до 3 МБ. После загрузки вы сможете выбрать нужную область изображения.";
+  "Выберите фотографию. После загрузки вы сможете выбрать нужную область изображения.";
 
 export const AVATAR_ERROR_MESSAGES = {
-  unsupportedFormat: "Выберите изображение JPG, PNG или WebP",
-  fileTooLarge: "Размер изображения не должен превышать 3 МБ",
-  readFailed: "Не удалось открыть изображение. Попробуйте выбрать другой файл",
+  fileTooLarge: "Фото слишком большое. Выберите изображение размером до 20 МБ.",
+  notImage: "Не удалось распознать файл как изображение. Выберите другую фотографию.",
+  processFailed:
+    "Не удалось обработать фотографию. Попробуйте выбрать другое изображение.",
+  choosePhoto: "Выберите фотографию из галереи",
+  readFailed:
+    "Не удалось обработать фотографию. Попробуйте выбрать другое изображение.",
   saveFailed: "Не удалось сохранить фотографию. Попробуйте ещё раз",
-  heicUnsupported:
-    "Формат HEIC/HEIF не поддерживается. Выберите JPG или PNG либо сделайте снимок в формате «Наиболее совместимый» в настройках камеры iPhone.",
   saveIncomplete:
     "Фотография загружена, но не удалось получить ссылку. Обновите страницу или попробуйте ещё раз.",
 } as const;

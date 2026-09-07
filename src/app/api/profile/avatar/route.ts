@@ -6,7 +6,6 @@ import {
   uploadOptimizedImageSet,
 } from "@/lib/images/image-upload-service";
 import { parseImageManifest } from "@/lib/images/image-manifest";
-import { imageProcessErrorMessage } from "@/lib/images/process-image";
 import { avatarProcessErrorMessage } from "@/lib/images/process-avatar-image";
 import {
   assertUserAvatarPathForOwner,
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "invalid_request",
-        message: imageProcessErrorMessage("missing_file", "user-avatar"),
+        message: avatarProcessErrorMessage("missing_file"),
       },
       { status: 400 },
     );
@@ -86,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "invalid_file_size",
-        message: imageProcessErrorMessage("invalid_file_size", "user-avatar"),
+        message: avatarProcessErrorMessage("invalid_file_size"),
       },
       { status: 400 },
     );

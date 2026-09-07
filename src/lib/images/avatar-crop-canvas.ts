@@ -37,21 +37,6 @@ function detectAlphaChannel(
   return false;
 }
 
-function chooseOutputMimeType(
-  sourceMime: string,
-  hasAlpha: boolean,
-): AvatarCropOutput["mimeType"] {
-  if (hasAlpha) {
-    return "image/png";
-  }
-
-  if (sourceMime === "image/png") {
-    return "image/webp";
-  }
-
-  return "image/jpeg";
-}
-
 function buildOutputFileName(mimeType: AvatarCropOutput["mimeType"]): string {
   switch (mimeType) {
     case "image/png":
@@ -118,8 +103,7 @@ export async function cropAvatarToBlob(
     const hasAlpha =
       sourceMime === "image/png" &&
       detectAlphaChannel(context, outputSize, outputSize);
-    const mimeType = chooseOutputMimeType(sourceMime, hasAlpha);
-    const blob = await canvasToAvatarBlob(canvas, mimeType);
+    const blob = await canvasToAvatarBlob(canvas);
 
     return {
       blob,
@@ -134,24 +118,12 @@ export async function cropAvatarToBlob(
   }
 }
 
-async function canvasToAvatarBlob(
-  canvas: HTMLCanvasElement,
-  preferredMime: AvatarCropOutput["mimeType"],
-): Promise<Blob> {
-  const attempts: Array<{ type: AvatarCropOutput["mimeType"]; quality?: number }> =
-    preferredMime === "image/jpeg"
-      ? [
-          { type: "image/jpeg", quality: AVATAR_JPEG_QUALITY },
-          { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 },
-          { type: "image/png" },
-        ]
-      : preferredMime === "image/png"
-        ? [{ type: "image/png" }, { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 }]
-        : [
-            { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 },
-            { type: "image/jpeg", quality: AVATAR_JPEG_QUALITY },
-            { type: "image/png" },
-          ];
+async function canvasToAvatarBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  const attempts: Array<{ type: AvatarCropOutput["mimeType"]; quality?: number }> = [
+    { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 },
+    { type: "image/jpeg", quality: AVATAR_JPEG_QUALITY },
+    { type: "image/png" },
+  ];
 
   for (const attempt of attempts) {
     const blob = await tryCanvasToBlob(canvas, attempt.type, attempt.quality);

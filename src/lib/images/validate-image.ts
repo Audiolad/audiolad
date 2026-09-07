@@ -3,55 +3,49 @@ import {
   IMAGE_MAX_INPUT_PIXELS,
   IMAGE_MAX_SOURCE_DIMENSION,
 } from "@/lib/images/image-constants";
+import {
+  AVATAR_MAX_INPUT_PIXELS,
+  AVATAR_MAX_SOURCE_DIMENSION,
+} from "@/lib/images/avatar-constants";
 import type { ImageProcessErrorCode } from "@/lib/images/image-types";
 import { getImageProfileConfig } from "@/lib/images/image-profiles";
 import type { ImageProfile } from "@/lib/images/image-types";
-
-const MAGIC_JPEG = Buffer.from([0xff, 0xd8, 0xff]);
-const MAGIC_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-const MAGIC_WEBP_RIFF = Buffer.from("RIFF", "ascii");
-const MAGIC_WEBP_WEBP = Buffer.from("WEBP", "ascii");
-const MAGIC_GIF = Buffer.from("GIF8", "ascii");
-const MAGIC_SVG_HINTS = ["<svg", "<?xml"];
+import {
+  detectImageKindFromBytes,
+  type DetectedImageKind,
+} from "@/lib/images/image-magic";
 
 export type DetectedImageMime =
   | "image/jpeg"
   | "image/png"
   | "image/webp"
   | "image/gif"
-  | "image/svg+xml";
+  | "image/svg+xml"
+  | "image/avif"
+  | "image/heic"
+  | "image/heif"
+  | "video";
+
+const AVATAR_SOURCE_PROFILES = new Set<ImageProfile>([
+  "author-avatar",
+  "user-avatar",
+]);
+
+const AVATAR_SOURCE_MAGIC = new Set<DetectedImageKind>([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+]);
+
+export function isAvatarImageProfile(profile: ImageProfile): boolean {
+  return AVATAR_SOURCE_PROFILES.has(profile);
+}
 
 export function detectMimeFromMagic(buffer: Buffer): DetectedImageMime | null {
-  if (buffer.length >= 3 && buffer.subarray(0, 3).equals(MAGIC_JPEG)) {
-    return "image/jpeg";
-  }
-
-  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(MAGIC_PNG)) {
-    return "image/png";
-  }
-
-  if (
-    buffer.length >= 12 &&
-    buffer.subarray(0, 4).equals(MAGIC_WEBP_RIFF) &&
-    buffer.subarray(8, 12).equals(MAGIC_WEBP_WEBP)
-  ) {
-    return "image/webp";
-  }
-
-  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(MAGIC_GIF)) {
-    return "image/gif";
-  }
-
-  const head = buffer
-    .subarray(0, Math.min(buffer.length, 256))
-    .toString("utf8")
-    .toLowerCase();
-
-  if (MAGIC_SVG_HINTS.some((hint) => head.includes(hint))) {
-    return "image/svg+xml";
-  }
-
-  return null;
+  return detectImageKindFromBytes(buffer);
 }
 
 export function mimeToExtension(
@@ -63,6 +57,9 @@ export function mimeToExtension(
     case "image/png":
       return "png";
     case "image/webp":
+    case "image/avif":
+    case "image/heic":
+    case "image/heif":
       return "webp";
     default:
       return null;
@@ -70,7 +67,13 @@ export function mimeToExtension(
 }
 
 export type ValidatedImageInput = {
-  magicMime: "image/jpeg" | "image/png" | "image/webp";
+  magicMime:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp"
+    | "image/avif"
+    | "image/heic"
+    | "image/heif";
   originalExtension: "jpg" | "png" | "webp";
 };
 
@@ -80,6 +83,7 @@ export function validateImageBufferForProfile(
   profile: ImageProfile,
 ): { ok: true; data: ValidatedImageInput } | { ok: false; code: ImageProcessErrorCode } {
   const config = getImageProfileConfig(profile);
+  const avatarProfile = isAvatarImageProfile(profile);
 
   if (!input || input.length === 0) {
     return { ok: false, code: "missing_file" };
@@ -95,17 +99,19 @@ export function validateImageBufferForProfile(
   if (
     magicMime === "image/gif" ||
     magicMime === "image/svg+xml" ||
-    normalizedDeclared === "image/gif" ||
-    normalizedDeclared === "image/svg+xml"
+    magicMime === "video"
   ) {
     return { ok: false, code: "invalid_file_type" };
   }
 
-  if (!magicMime || !IMAGE_ALLOWED_MIME_TYPES.has(magicMime)) {
+  const allowedMagic = avatarProfile ? AVATAR_SOURCE_MAGIC : IMAGE_ALLOWED_MIME_TYPES;
+
+  if (!magicMime || !allowedMagic.has(magicMime)) {
     return { ok: false, code: "invalid_file_type" };
   }
 
   if (
+    !avatarProfile &&
     normalizedDeclared &&
     IMAGE_ALLOWED_MIME_TYPES.has(normalizedDeclared) &&
     normalizedDeclared !== magicMime
@@ -128,23 +134,42 @@ export function validateImageBufferForProfile(
   };
 }
 
+export function validateImageSourceBounds(
+  width: number,
+  height: number,
+  profile: ImageProfile,
+): ImageProcessErrorCode | null {
+  const avatarProfile = isAvatarImageProfile(profile);
+  const maxDimension = avatarProfile
+    ? AVATAR_MAX_SOURCE_DIMENSION
+    : IMAGE_MAX_SOURCE_DIMENSION;
+  const maxPixels = avatarProfile ? AVATAR_MAX_INPUT_PIXELS : IMAGE_MAX_INPUT_PIXELS;
+
+  if (width <= 0 || height <= 0) {
+    return "corrupt_image";
+  }
+
+  if (width > maxDimension || height > maxDimension) {
+    return "image_too_large";
+  }
+
+  if (width * height > maxPixels) {
+    return "image_too_large";
+  }
+
+  return null;
+}
+
 export function validateImageDimensions(
   width: number,
   height: number,
   profile: ImageProfile,
 ): ImageProcessErrorCode | null {
   const config = getImageProfileConfig(profile);
+  const boundError = validateImageSourceBounds(width, height, profile);
 
-  if (width <= 0 || height <= 0) {
-    return "corrupt_image";
-  }
-
-  if (width > IMAGE_MAX_SOURCE_DIMENSION || height > IMAGE_MAX_SOURCE_DIMENSION) {
-    return "image_too_large";
-  }
-
-  if (width * height > IMAGE_MAX_INPUT_PIXELS) {
-    return "image_too_large";
+  if (boundError) {
+    return boundError;
   }
 
   if (

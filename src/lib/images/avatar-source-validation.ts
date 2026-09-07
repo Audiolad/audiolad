@@ -1,23 +1,27 @@
 import {
-  AVATAR_ALLOWED_MIME_TYPES,
   AVATAR_ERROR_MESSAGES,
-  AVATAR_MAX_BYTES,
+  AVATAR_MAX_SOURCE_BYTES,
+  AVATAR_SOURCE_MIME_TYPES,
 } from "@/lib/images/avatar-constants";
+import {
+  detectImageKindFromBytes,
+  isAvatarSourceImageKind,
+  isBannedAvatarImageKind,
+} from "@/lib/images/image-magic";
 
-const HEIC_MIME_TYPES = new Set([
-  "image/heic",
-  "image/heif",
-  "image/heic-sequence",
-  "image/heif-sequence",
-]);
+const VIDEO_EXTENSIONS = [".mov", ".mp4", ".m4v", ".webm", ".avi", ".mkv"];
+const VIDEO_MIME_PREFIXES = ["video/"];
+const GIF_EXTENSIONS = [".gif"];
+const SVG_EXTENSIONS = [".svg", ".svgz"];
 
-function inferMimeFromFileName(fileName: string): string | null {
+function inferKindFromFileName(fileName: string): string | null {
   const normalized = fileName.trim().toLowerCase();
 
   if (
     normalized.endsWith(".jpg") ||
     normalized.endsWith(".jpeg") ||
-    normalized.endsWith(".jpe")
+    normalized.endsWith(".jpe") ||
+    normalized.endsWith(".jfif")
   ) {
     return "image/jpeg";
   }
@@ -30,6 +34,10 @@ function inferMimeFromFileName(fileName: string): string | null {
     return "image/webp";
   }
 
+  if (normalized.endsWith(".avif")) {
+    return "image/avif";
+  }
+
   if (normalized.endsWith(".heic")) {
     return "image/heic";
   }
@@ -38,15 +46,40 @@ function inferMimeFromFileName(fileName: string): string | null {
     return "image/heif";
   }
 
+  if (GIF_EXTENSIONS.some((ext) => normalized.endsWith(ext))) {
+    return "image/gif";
+  }
+
+  if (SVG_EXTENSIONS.some((ext) => normalized.endsWith(ext))) {
+    return "image/svg+xml";
+  }
+
+  if (VIDEO_EXTENSIONS.some((ext) => normalized.endsWith(ext))) {
+    return "video";
+  }
+
   return null;
+}
+
+function isVideoLikeFile(file: Pick<File, "name" | "type">): boolean {
+  const mime = file.type.trim().toLowerCase();
+  const inferred = inferKindFromFileName(file.name);
+
+  return (
+    VIDEO_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix)) ||
+    inferred === "video"
+  );
 }
 
 export function isHeicLikeFile(file: Pick<File, "name" | "type">): boolean {
   const mime = file.type.trim().toLowerCase();
-  const inferred = inferMimeFromFileName(file.name);
+  const inferred = inferKindFromFileName(file.name);
 
   return (
-    HEIC_MIME_TYPES.has(mime) ||
+    mime === "image/heic" ||
+    mime === "image/heif" ||
+    mime === "image/heic-sequence" ||
+    mime === "image/heif-sequence" ||
     inferred === "image/heic" ||
     inferred === "image/heif"
   );
@@ -55,33 +88,46 @@ export function isHeicLikeFile(file: Pick<File, "name" | "type">): boolean {
 export function resolveAvatarSourceMime(file: Pick<File, "name" | "type">): string | null {
   const mime = file.type.trim().toLowerCase();
 
-  if (AVATAR_ALLOWED_MIME_TYPES.has(mime)) {
-    return mime;
+  if (AVATAR_SOURCE_MIME_TYPES.has(mime)) {
+    return mime === "image/jpg" || mime === "image/pjpeg" ? "image/jpeg" : mime;
   }
 
-  const inferred = inferMimeFromFileName(file.name);
+  const inferred = inferKindFromFileName(file.name);
 
-  if (inferred && AVATAR_ALLOWED_MIME_TYPES.has(inferred)) {
+  if (inferred && inferred !== "video" && inferred !== "image/gif" && inferred !== "image/svg+xml") {
     return inferred;
   }
 
   return null;
 }
 
-export function validateAvatarSourceFileMeta(file: File): string | null {
-  if (file.size <= 0 || file.size > AVATAR_MAX_BYTES) {
+export function validateAvatarSourceFileMeta(file: Pick<File, "name" | "type" | "size">): string | null {
+  if (file.size <= 0) {
+    return AVATAR_ERROR_MESSAGES.notImage;
+  }
+
+  if (file.size > AVATAR_MAX_SOURCE_BYTES) {
     return AVATAR_ERROR_MESSAGES.fileTooLarge;
   }
 
-  if (resolveAvatarSourceMime(file)) {
-    return null;
+  if (isVideoLikeFile(file)) {
+    return AVATAR_ERROR_MESSAGES.choosePhoto;
   }
 
-  if (isHeicLikeFile(file)) {
-    return null;
+  const inferred = inferKindFromFileName(file.name);
+
+  if (inferred === "image/gif" || inferred === "image/svg+xml") {
+    return AVATAR_ERROR_MESSAGES.notImage;
   }
 
-  return AVATAR_ERROR_MESSAGES.unsupportedFormat;
+  return null;
+}
+
+export async function peekAvatarSourceKind(
+  file: File,
+): Promise<ReturnType<typeof detectImageKindFromBytes>> {
+  const header = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+  return detectImageKindFromBytes(header);
 }
 
 export async function validateAvatarSourceFile(file: File): Promise<string | null> {
@@ -92,15 +138,26 @@ export async function validateAvatarSourceFile(file: File): Promise<string | nul
   }
 
   try {
-    await loadAvatarSourceDimensions(file);
-    return null;
-  } catch {
-    if (isHeicLikeFile(file)) {
-      return AVATAR_ERROR_MESSAGES.heicUnsupported;
+    const kind = await peekAvatarSourceKind(file);
+
+    if (isBannedAvatarImageKind(kind)) {
+      return kind === "video"
+        ? AVATAR_ERROR_MESSAGES.choosePhoto
+        : AVATAR_ERROR_MESSAGES.notImage;
     }
 
-    return AVATAR_ERROR_MESSAGES.readFailed;
+    if (!kind) {
+      return AVATAR_ERROR_MESSAGES.notImage;
+    }
+
+    if (!isAvatarSourceImageKind(kind)) {
+      return AVATAR_ERROR_MESSAGES.notImage;
+    }
+  } catch {
+    return AVATAR_ERROR_MESSAGES.notImage;
   }
+
+  return null;
 }
 
 export async function loadAvatarSourceDimensions(
@@ -183,9 +240,9 @@ export async function createOrientedPreviewUrl(source: Blob): Promise<string> {
 
 async function canvasToPreviewBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   const attempts: Array<{ type: string; quality?: number }> = [
-    { type: "image/png" },
     { type: "image/jpeg", quality: 0.92 },
     { type: "image/webp", quality: 0.9 },
+    { type: "image/png" },
   ];
 
   for (const attempt of attempts) {

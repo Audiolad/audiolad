@@ -5,6 +5,7 @@ import {
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
+import { AVATAR_ERROR_MESSAGES, AVATAR_MAX_SOURCE_BYTES } from "@/lib/images/avatar-constants";
 import { AUTHOR_BANNER_ERROR_MESSAGES } from "@/lib/authors/banner-validation-client";
 import {
   DEFAULT_BANNER_POSITION_X,
@@ -165,8 +166,19 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    if (file.size <= 0 || file.size > MAX_COVER_BYTES) {
-      return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
+    const maxBytes = kind === "avatar" ? AVATAR_MAX_SOURCE_BYTES : MAX_COVER_BYTES;
+
+    if (file.size <= 0 || file.size > maxBytes) {
+      return NextResponse.json(
+        {
+          error: "invalid_file_size",
+          message:
+            kind === "avatar"
+              ? AVATAR_ERROR_MESSAGES.fileTooLarge
+              : "Размер изображения не должен превышать 3 МБ.",
+        },
+        { status: 400 },
+      );
     }
 
     const { supabase } = await requireAuthorMutationMembership(authorId, {
