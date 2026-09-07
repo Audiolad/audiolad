@@ -346,6 +346,10 @@ function main() {
     "MODE = allowlist_cleanup",
     "CUTOVER = NO",
     "CLEANUP =",
+    "RELEASES_CLEANUP =",
+    "ASSETS_CLEANUP =",
+    "permission_denied_root_owned",
+    "rm_denied_count=",
   ]) {
     assert.match(
       helperText,

@@ -216,10 +216,21 @@ TEST STORAGE OBJECTS REMOVED =
 TEST DB ROWS CLEANED =
 WORKER STATUS =
 PUBLIC HEALTH =
-CLEANUP = SUCCESS/FAILED
+RELEASES_CLEANUP = OK/DEFERRED/FAILED
+ASSETS_CLEANUP = OK/FAILED/UNAVAILABLE
+CLEANUP = SUCCESS/PARTIAL/FAILED
 CUTOVER = NO
 MODE = allowlist_cleanup
 ```
+
+Allowlisted release dirs under `/var/www/audiolad-deploy/releases/` may be
+root-owned. The deploy SSH user then gets `Permission denied` on `rm -rf`.
+The job must **not** abort: it records
+`NEEDS_REVIEW kind=release reason=permission_denied_root_owned`, prints
+`rm_denied_count=N` instead of thousands of `rm: cannot remove` lines, sets
+`RELEASES_CLEANUP=DEFERRED`, and **continues** the Storage/DB asset allowlist.
+`CLEANUP=PARTIAL` means assets succeeded and releases still need root.
+`CLEANUP=SUCCESS` requires both releases and assets cleaned. No cutover.
 
 Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
 делает checkout):

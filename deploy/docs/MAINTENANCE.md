@@ -88,7 +88,10 @@ equivalent: `bash deploy/scripts/audiolad-disk-storage-audit.sh`.
 GitHub Actions `confirm=OPS_DISK_STORAGE_CLEANUP` is a separate one-shot
 hardcoded allowlist of the 13 `SAFE TO DELETE` items from audit run
 34113627251. It is **not** this maintenance prune, does not call
-`audiolad-deploy`, and does not cut over. Operator equivalent:
+`audiolad-deploy`, and does not cut over. Allowlisted release dirs may be
+root-owned; the deploy user then defers those deletes
+(`RELEASES_CLEANUP=DEFERRED`, `CLEANUP=PARTIAL` if assets succeed) and
+continues Storage/DB cleanup. Release `rm` needs root. Operator equivalent:
 `bash deploy/scripts/audiolad-disk-storage-cleanup.sh`.
 
 ## Tests
