@@ -127,20 +127,24 @@ const rating = read(
 );
 const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
 
+const renderStart = practiceContent.indexOf("return (");
+assert.ok(renderStart >= 0, "practice content must have a render tree");
+const renderTree = practiceContent.slice(renderStart);
+
 const markers = [
   ["hero", 'data-practice-section="hero"'],
-  ["rating", "PracticeRatingStars"],
+  ["rating", "<PracticeRatingStars"],
   ["thank-author", 'data-practice-section="thank-author"'],
-  ["topics", "ProductTopicLinks"],
-  ["author-recommendations", "AuthorRecommendationsSection"],
-  ["about", "ProductCopySections"],
-  ["seo-usage-faq", "PracticeSeoContentSections"],
-  ["listening-notice", "ListeningNoticeCard"],
-  ["footer", "LegalFooter"],
+  ["topics", "<ProductTopicLinks"],
+  ["author-recommendations", "<AuthorRecommendationsSection"],
+  ["about", "<ProductCopySections"],
+  ["seo-usage-faq", "<PracticeSeoContentSections"],
+  ["listening-notice", "<ListeningNoticeCard"],
+  ["footer", "<LegalFooter"],
 ];
 
 const markerIndexes = markers.map(([key, token]) => {
-  const index = practiceContent.indexOf(token);
+  const index = renderTree.indexOf(token);
   assert.ok(index >= 0, `practice tree must include ${key} (${token})`);
   return { key, token, index };
 });

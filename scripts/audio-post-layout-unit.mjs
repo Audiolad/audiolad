@@ -182,13 +182,14 @@ assert.match(
   "audio post default still includes related products after FAQ",
 );
 
-const faqBranch = seoSections.indexOf("content.faqItems.length");
-const recommendationsBranch = seoSections.indexOf(
-  "AuthorRecommendationsSection",
+const seoRender = seoSections.slice(seoSections.indexOf("return ("));
+const faqBranch = seoRender.indexOf("content.faqItems.length");
+const recommendationsBranch = seoRender.indexOf(
+  "<AuthorRecommendationsSection",
 );
 assert.ok(faqBranch >= 0 && recommendationsBranch > faqBranch);
 
-const faqHeading = seoSections.indexOf("Вопросы и ответы");
+const faqHeading = seoRender.indexOf("Вопросы и ответы");
 if (faqHeading >= 0) {
   assert.ok(
     faqHeading < recommendationsBranch,
