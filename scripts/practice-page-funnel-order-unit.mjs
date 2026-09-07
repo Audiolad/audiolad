@@ -329,8 +329,9 @@ assert.doesNotMatch(
 assert.match(topics, /data-practice-section="topics"/);
 assert.match(topics, /min-h-11/);
 assert.match(topics, /rounded-full/);
-assert.match(topics, /text-xs/);
-assert.match(topics, /px-3 py-1\.5/);
+assert.match(topics, /text-\[10px\]/);
+assert.match(topics, /px-2\.5 py-1/);
+assert.doesNotMatch(topics, /px-3 py-1\.5 text-xs/);
 assert.doesNotMatch(
   topics,
   /px-4 py-2 text-sm/,

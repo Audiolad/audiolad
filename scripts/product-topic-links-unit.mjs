@@ -119,8 +119,18 @@ assert(
 );
 assert(component.includes("min-h-11"), "topic chips keep a 44px tap area");
 assert(component.includes("rounded-full"), "topic chips stay pills");
-assert(component.includes("text-xs"), "topic chips use a compact type size");
-assert(component.includes("px-3 py-1.5"), "topic chips use compact padding");
+assert(component.includes("text-[10px]"), "topic chips use 10px type");
+assert(component.includes("px-2.5 py-1"), "topic chips use tighter compact padding");
+assert(
+  !component.includes("px-3 py-1.5"),
+  "topic chips no longer use the previous 12px compact padding",
+);
+assert(
+  !component.includes("whitespace-nowrap"),
+  "long topic titles can wrap instead of overflowing",
+);
+assert(component.includes("whitespace-normal"), "long topic titles wrap inside the pill");
+assert(component.includes("max-w-full"), "chips stay within the 390px container");
 assert(
   practiceTopics.includes("getActivePracticeTopics"),
   "safe loader uses active-only query",
