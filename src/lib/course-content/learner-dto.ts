@@ -1,3 +1,4 @@
+import { presentCourseAudioTitle } from "./course-audio-title";
 import { attachNativeUpgradeAction } from "./attach-upgrade-action";
 import { canAccessRequiredLevel, type CourseLearnerAccessSnapshot } from "./learner-access";
 import type {
@@ -96,6 +97,7 @@ function mapUnlockedBlock(
   block: LearnerBlockSource,
   audioAssets: ReadonlyMap<string, LearnerAudioAssetSource>,
   fileAssets: ReadonlyMap<string, LearnerFileAssetSource>,
+  audioOrdinal: number,
 ): LearnerCourseBlock | null {
   if (block.type === "text") {
     const text = readTextPayload(block.payload);
@@ -124,7 +126,7 @@ function mapUnlockedBlock(
       type: "audio",
       position: block.position,
       audioItemId,
-      title: asset?.title?.trim() || "Аудио",
+      title: presentCourseAudioTitle(asset?.title, audioOrdinal),
       durationSeconds: asset?.duration_seconds ?? null,
     };
     return mapped;
@@ -178,10 +180,21 @@ export function toLearnerCourseLesson(input: {
     };
   }
 
+  let audioOrdinal = 0;
   const blocks = [...input.blocks]
     .filter((block) => block.lesson_id === input.lesson.id)
     .sort((left, right) => left.position - right.position || left.id.localeCompare(right.id))
-    .map((block) => mapUnlockedBlock(block, input.audioAssets, input.fileAssets))
+    .map((block) => {
+      if (block.type === "audio") {
+        audioOrdinal += 1;
+      }
+      return mapUnlockedBlock(
+        block,
+        input.audioAssets,
+        input.fileAssets,
+        audioOrdinal,
+      );
+    })
     .filter((block): block is LearnerCourseBlock => block != null);
 
   return {

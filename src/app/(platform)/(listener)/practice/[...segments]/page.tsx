@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import AudioPostPage from "@/components/products/audio-post/AudioPostPage";
+import CourseLearnerFileViewerPage from "@/components/products/course-learner/CourseLearnerFileViewerPage";
 import PracticePageContent from "@/components/products/practice-page/PracticePageContent";
 import PracticePageErrorState from "@/components/products/practice-page/PracticePageErrorState";
 import { BuyerPreviewExitControl } from "@/components/products/practice-page/PracticePageParts";
@@ -109,6 +110,7 @@ import { loadPricePromotionsForPractice } from "@/lib/pricing/queries";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { loadCourseLearnerContent } from "@/lib/course-content/learner-content";
+import { resolvePracticeFileViewerRoute } from "@/lib/course-content/learner-file-http";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import { isRatingsUiEnabled } from "@/lib/ratings/feature";
@@ -180,6 +182,12 @@ async function resolvePracticeRoute(segments: string[]) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { segments } = await params;
+
+  if (resolvePracticeFileViewerRoute(segments)) {
+    return {
+      robots: { index: false, follow: false },
+    };
+  }
 
   if (segments.length === 1) {
     const supabase = await createClient();
@@ -294,6 +302,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
+  const fileViewerRoute = resolvePracticeFileViewerRoute(segments);
+
+  if (fileViewerRoute) {
+    return <CourseLearnerFileViewerPage route={fileViewerRoute} />;
+  }
+
   const {
     listen: listenParam,
     preview: previewParam,

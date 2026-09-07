@@ -1151,6 +1151,10 @@ export default function AuthorProductForm({
     targetPracticeId: string,
     items: AudioItemRow[],
   ): Promise<{ ok: true } | { ok: false; message: string; audioId?: string }> {
+    if (isCourse) {
+      return { ok: true };
+    }
+
     for (const item of items) {
       if (item.id.startsWith("temp-")) {
         continue;

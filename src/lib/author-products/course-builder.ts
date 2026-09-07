@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { parseAuthorAudioTitle } from "@/lib/author-products/audio-title";
 import {
   AuthorAccessError,
   requirePracticeAccess,
@@ -819,20 +820,30 @@ export async function updateCourseLessonBlock(
   }
 
   if (block.type === "audio" && typeof input.title === "string") {
-    const title = input.title.trim();
-
-    if (!title || !block.asset_id) {
+    if (!block.asset_id) {
       throw new CourseBuilderError("invalid_request", 400);
     }
 
-    const { error } = await supabase
+    const parsed = parseAuthorAudioTitle(input.title);
+
+    if (!parsed.ok) {
+      throw new CourseBuilderError(parsed.reason, 400);
+    }
+
+    const { data: updatedAudio, error } = await supabase
       .from("audio_items")
-      .update({ title, updated_at: new Date().toISOString() })
+      .update({ title: parsed.value, updated_at: new Date().toISOString() })
       .eq("id", block.asset_id)
-      .eq("practice_id", publicationId);
+      .eq("practice_id", publicationId)
+      .select(AUDIO_ASSET_SELECT)
+      .maybeSingle();
 
     if (error) {
       throw new CourseBuilderError("internal_error", 500);
+    }
+
+    if (!updatedAudio?.id || updatedAudio.title !== parsed.value) {
+      throw new CourseBuilderError("update_failed", 500);
     }
 
     const next = await loadCourseBuilderSnapshot(supabase, publicationId);
@@ -844,7 +855,12 @@ export async function updateCourseLessonBlock(
       throw new AuthorAccessError("not_found", 404);
     }
 
-    return updated;
+    return {
+      ...updated,
+      audio: updated.audio
+        ? { ...updated.audio, title: parsed.value }
+        : (updatedAudio as CourseBuilderAudioAsset),
+    };
   }
 
   if (block.type === "file" && input.file instanceof File) {

@@ -658,6 +658,7 @@ assert.doesNotMatch(serializedL1, new RegExp(FILE_L2));
 assert.doesNotMatch(serializedL1, /L2_SECRET|l2-secret|signedUrl|storage_path|audio_path/);
 assert.match(serializedL1, new RegExp(AUDIO_A));
 assert.match(serializedL1, /L1 open text/);
+assert.match(serializedL1, /"title":"Audio A"/);
 assert.equal(l1Course.levels.length, 2);
 assert.equal(l1Course.levels[0].upgradePrice, 1500);
 
@@ -681,6 +682,22 @@ const l2Course = toLearnerCourse({
   fileAssets: new Map(rows.files.map((file) => [file.id, file])),
   levels: rows.levels,
 });
+const untitledAudioCourse = toLearnerCourse({
+  publicationId: "course-1",
+  access: l1,
+  lessons: [rows.lessons[0]],
+  blocks: rows.blocks.filter((block) => block.lesson_id === LESSON_L1),
+  audioAssets: new Map([
+    [AUDIO_A, { id: AUDIO_A, title: "   ", duration_seconds: 12 }],
+  ]),
+  fileAssets: new Map(),
+  levels: [],
+});
+const untitledAudio = untitledAudioCourse.lessons[0].blocks?.find(
+  (block) => block.type === "audio",
+);
+assert.equal(untitledAudio?.title, "Аудио 1");
+
 assert.equal(l2Course.lessons[1].locked, false);
 assert.match(JSON.stringify(l2Course), new RegExp(SECRET_L2_TEXT));
 assert.equal(l2Course.lessons[2].locked, true);
@@ -1304,6 +1321,8 @@ assert.doesNotMatch(groupsSource, /tochka|order_kind/i);
 const page = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(page, /loadCourseLearnerContent/);
 assert.match(page, /skipPrivateCourseOutline/);
+assert.match(page, /resolvePracticeFileViewerRoute/);
+assert.match(page, /CourseLearnerFileViewerPage/);
 assert.doesNotMatch(page, /from\("course_lessons"\)/);
 assert.doesNotMatch(page, /app\/api\/learn/);
 
@@ -1325,15 +1344,19 @@ const fileRoute = read(
 );
 assert.match(fileRoute, /signLearnerPublicationFile/);
 assert.match(fileRoute, /getPracticeByAuthorAndSlug/);
-assert.match(fileRoute, /wantsProtectedFileDocumentOpen/);
+assert.match(fileRoute, /resolveCourseLearnerFileHttpMode/);
+assert.match(fileRoute, /buildCourseLearnerFileViewerPath/);
+assert.match(fileRoute, /createInlinePdfProxyResponse/);
 assert.doesNotMatch(fileRoute, /canAccessCourseContent\(/);
+assert.doesNotMatch(fileRoute, /NextResponse\.redirect\(signed\.url/);
 
 const fileDownload = read(
   "src/components/products/course-learner/CourseLearnerFileDownload.tsx",
 );
-assert.match(fileDownload, /target="_blank"/);
-assert.match(fileDownload, /noopener noreferrer/);
+assert.match(fileDownload, /buildCourseLearnerFileViewerPath/);
+assert.doesNotMatch(fileDownload, /target="_blank"/);
 assert.doesNotMatch(fileDownload, /window\.open/);
+assert.doesNotMatch(fileDownload, /buildCourseLearnerFilePath\(/);
 
 assert.equal(existsSync(join(root, "src/app/learn")), false);
 assert.equal(existsSync(join(root, "src/app/api/learn")), false);
