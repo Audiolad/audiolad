@@ -39,6 +39,7 @@ import {
   VISIBLE_AUTHOR_PRODUCT_STATUS,
   canWithdrawPracticeFromModeration,
   getVisibleAuthorProductStatus,
+  shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
@@ -1460,15 +1461,23 @@ export default function AuthorProductForm({
         return false;
       }
 
-      const saved = await saveProduct();
+      const saveBeforePreview = shouldSaveProductBeforePublish({
+        status: form.status,
+        moderationStatus: form.moderationStatus,
+        canBypassProductModeration,
+      });
 
-      if (!saved) {
-        previewTab?.close();
-        return false;
+      if (saveBeforePreview) {
+        const saved = await saveProduct();
+
+        if (!saved) {
+          previewTab?.close();
+          return false;
+        }
+
+        // saveProduct clears busy in its finally; keep the editor busy until the tab opens.
+        setBusy(true);
       }
-
-      // saveProduct clears busy in its finally; keep the editor busy until the tab opens.
-      setBusy(true);
 
       const productResponse = await fetch(
         `/api/author/products/${ensured.practiceId}`,
@@ -1589,16 +1598,23 @@ export default function AuthorProductForm({
       }
 
       const id = ensured.practiceId;
+      const saveBeforePublish = shouldSaveProductBeforePublish({
+        status: form.status,
+        moderationStatus: form.moderationStatus,
+        canBypassProductModeration,
+      });
 
-      const saved = await saveProduct();
+      if (saveBeforePublish) {
+        const saved = await saveProduct();
 
-      if (!saved) {
-        return;
+        if (!saved) {
+          return;
+        }
+
+        // saveProduct clears busy in its finally; keep publishing until redirect/error.
+        setBusy(true);
+        setPublishing(true);
       }
-
-      // saveProduct clears busy in its finally; keep publishing until redirect/error.
-      setBusy(true);
-      setPublishing(true);
 
       const response = await fetch(`/api/author/products/${id}/publish`, {
         method: "POST",

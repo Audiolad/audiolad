@@ -6,13 +6,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  PRODUCT_APPROVED_UNPUBLISHED_IMMUTABLE_MESSAGE,
   PRODUCT_UNDER_MODERATION_MESSAGE,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
   assertPracticeNotUnderModeration,
+  assertPracticePublicContentEditable,
   canSubmitPracticeForModeration,
   canWithdrawPracticeFromModeration,
   getVisibleAuthorProductStatus,
   getVisibleAuthorProductStatusLabel,
+  isPracticePublishedImmutableError,
   isPracticeUnderModerationError,
 } from "../src/lib/author-products/moderation.ts";
 
@@ -125,6 +128,35 @@ assert.throws(
     error.userMessage === PRODUCT_UNDER_MODERATION_MESSAGE,
 );
 assert.doesNotThrow(() => assertPracticeNotUnderModeration("not_submitted"));
+
+assert.throws(
+  () =>
+    assertPracticePublicContentEditable({
+      status: "unpublished",
+      moderation_status: "approved",
+    }),
+  (error) =>
+    isPracticePublishedImmutableError(error) &&
+    error.status === 409 &&
+    error.code === "published_content_immutable" &&
+    error.userMessage === PRODUCT_APPROVED_UNPUBLISHED_IMMUTABLE_MESSAGE,
+  "immutable PATCH still 409 for approved unpublished snapshot",
+);
+assert.doesNotThrow(() =>
+  assertPracticePublicContentEditable(
+    {
+      status: "unpublished",
+      moderation_status: "approved",
+    },
+    { canBypass: true },
+  ),
+);
+assert.doesNotThrow(() =>
+  assertPracticePublicContentEditable({
+    status: "draft",
+    moderation_status: "not_submitted",
+  }),
+);
 
 // 4. Source guards — UI / API / RPC
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");

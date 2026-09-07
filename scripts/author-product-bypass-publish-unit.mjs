@@ -9,6 +9,7 @@ import {
   requiresPublishPreviewBeforePublish,
   shouldOpenPublishPreviewFromForm,
 } from "../src/lib/products/publish-preview.ts";
+import { shouldSaveProductBeforePublish } from "../src/lib/author-products/moderation.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -111,8 +112,13 @@ function testPublishProductDirectFlow() {
   );
   assert.match(
     publishFn,
-    /const saved = await saveProduct\(\);/,
-    "publish saves current form first",
+    /shouldSaveProductBeforePublish\(\{\s*status: form\.status,\s*moderationStatus: form\.moderationStatus,\s*canBypassProductModeration,/,
+    "publish gates save-before-publish on approved unpublished snapshots",
+  );
+  assert.match(
+    publishFn,
+    /if \(saveBeforePublish\) \{[\s\S]*const saved = await saveProduct\(\);/,
+    "editable draft/bypass still saves current form first",
   );
   assert.match(
     publishFn,
@@ -120,13 +126,18 @@ function testPublishProductDirectFlow() {
     "failed save does not call publish API",
   );
 
+  const saveGateIdx = publishFn.indexOf("shouldSaveProductBeforePublish");
   const saveIdx = publishFn.indexOf("const saved = await saveProduct()");
   const publishFetchIdx = publishFn.indexOf(
     "`/api/author/products/${id}/publish`",
   );
   assert.ok(
-    saveIdx >= 0 && publishFetchIdx > saveIdx,
-    "publish API is called only after save",
+    saveGateIdx >= 0 && saveIdx > saveGateIdx && publishFetchIdx > saveIdx,
+    "save-before-publish is gated and, when required, runs before POST /publish",
+  );
+  assert.ok(
+    publishFn.indexOf("if (saveBeforePublish)") < saveIdx,
+    "approved unpublished republish can skip PATCH/save",
   );
 
   assert.match(
@@ -176,10 +187,68 @@ function testPublishProductDirectFlow() {
   );
 
   assert.match(openPreviewFn, /buildPracticePublishPreviewPath/);
+  assert.match(
+    openPreviewFn,
+    /shouldSaveProductBeforePublish\(\{\s*status: form\.status,\s*moderationStatus: form\.moderationStatus,\s*canBypassProductModeration,/,
+    "preview uses the same save gate as republish",
+  );
+  assert.match(
+    openPreviewFn,
+    /if \(saveBeforePreview\) \{[\s\S]*const saved = await saveProduct\(\);/,
+    "preview still saves for editable draft/bypass",
+  );
   assert.doesNotMatch(
     openPreviewFn,
     /\/publish`,/,
     "Preview button path does not call publish API",
+  );
+}
+
+function testSaveBeforePublishHelper() {
+  assert.equal(
+    shouldSaveProductBeforePublish({
+      status: "unpublished",
+      moderationStatus: "approved",
+      canBypassProductModeration: false,
+    }),
+    false,
+    "ordinary unpublished+approved skips save before republish",
+  );
+  assert.equal(
+    shouldSaveProductBeforePublish({
+      status: "unpublished",
+      moderationStatus: "approved",
+      canBypassProductModeration: true,
+    }),
+    true,
+    "bypass unpublished+approved still saves before publish",
+  );
+  assert.equal(
+    shouldSaveProductBeforePublish({
+      status: "draft",
+      moderationStatus: "not_submitted",
+      canBypassProductModeration: true,
+    }),
+    true,
+    "bypass draft keeps save-before-publish",
+  );
+  assert.equal(
+    shouldSaveProductBeforePublish({
+      status: "draft",
+      moderationStatus: "not_submitted",
+      canBypassProductModeration: false,
+    }),
+    true,
+    "ordinary draft keeps save-before-publish when that path is used",
+  );
+  assert.equal(
+    shouldSaveProductBeforePublish({
+      status: "unpublished",
+      moderationStatus: "not_submitted",
+      canBypassProductModeration: false,
+    }),
+    true,
+    "editable unpublished draft still saves before publish",
   );
 }
 
@@ -243,9 +312,41 @@ function testFormCtaWiring() {
     "published product has no first-publish button",
   );
   assert.doesNotMatch(publishedBlock, /void publishProduct\(\)/);
+
+  const unpublishedBlock = extractBlock(
+    form,
+    "{isUnpublished ? (",
+    "{isDraft && canBypassProductModeration ? (",
+  );
+  assert.match(
+    unpublishedBlock,
+    /Опубликовать снова/,
+    "unpublished approved CTA is republish, not first publish",
+  );
+  assert.match(
+    unpublishedBlock,
+    /onClick=\{\(\) => void publishProduct\(\)\}/,
+    "«Опубликовать снова» calls publishProduct, not saveProduct",
+  );
+  assert.doesNotMatch(
+    unpublishedBlock,
+    /void saveProduct\(\)/,
+    "republish CTA does not depend on an extra save click",
+  );
+  assert.doesNotMatch(
+    unpublishedBlock,
+    /submitForModeration/,
+    "plain republish does not re-submit moderation",
+  );
+  assert.doesNotMatch(
+    unpublishedBlock,
+    /approve_and_publish_practice/,
+    "form republish does not call approve_and_publish_practice",
+  );
 }
 
 testBypassPreviewRoutingHelper();
+testSaveBeforePublishHelper();
 testPublishProductDirectFlow();
 testFormCtaWiring();
 
