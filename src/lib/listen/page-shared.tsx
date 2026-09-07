@@ -401,7 +401,7 @@ export async function renderListenPage(
       listening_notice_enabled,
       listening_notice_title,
       listening_notice_text,
-      authors!practices_author_id_fkey (
+      authors!practices_author_id_fkey!inner (
         id,
         name,
         slug
