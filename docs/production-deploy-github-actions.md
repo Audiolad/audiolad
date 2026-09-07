@@ -117,6 +117,31 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 может завершиться до любых steps (`steps=[]`) — это ожидаемо; ослаблять protection
 нельзя. После merge workflow в `main` повторите dispatch с branch **`main`**.
 
+### Ops-only Studio worker recover (`confirm=OPS_STUDIO_WORKER_RECOVER`)
+
+Тот же workflow, но `confirm=OPS_STUDIO_WORKER_RECOVER` запускает job
+**Ops Studio worker recover**: SSH как `deploy`, фиксированная remote-последовательность
+(metadata `shared/.env.production`, count `studio_render_jobs` queued/processing,
+`pm2 delete audiolad-studio-render-worker || true` + stock
+`pm2 start deploy/studio-render-worker.ecosystem.config.cjs` из
+`/var/www/audiolad-deploy/current`, wait online, `studio_render_env_ready`,
+survival >150s, safe render smoke PASS, `pm2 save` только если
+`#353 PRODUCTION ACCEPTANCE = SUCCESS`). **Не вызывает**
+`audiolad-deploy`, не запускает `deploy.sh`, не делает nginx / symlink cutover.
+Произвольных remote-command inputs нет. Содержимое env-файлов и значения
+секретов не печатаются. Worker сам читает env через `#353` `loadEnvConfig`.
+
+Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
+делает checkout):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-studio-render-worker-recover.sh
+```
+
+**Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
+branch **`main`**. Ослаблять protection нельзя.
+
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
@@ -126,6 +151,10 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
   красный workflow, production не трогается.
 - `confirm=DO_NOT_DEPLOY` с PR-ветки при environment protection — diagnose job
   не стартует (нет доступа к secrets); deploy job пропускается.
+- `confirm=OPS_STUDIO_WORKER_RECOVER` с PR-ветки при environment protection —
+  recover job не стартует; deploy job пропускается.
+- `confirm=OPS_STUDIO_WORKER_RECOVER` с `main` — только clean-restart Studio
+  render worker, без cutover.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
