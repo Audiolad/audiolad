@@ -110,6 +110,7 @@ export default function PracticeRatingStars({
   return (
     <section
       className="mt-5"
+      data-practice-section="rating"
       data-practice-rating
       data-practice-rating-eligible={ui.ratingEligible ? "true" : "false"}
       data-practice-rating-value={displayStars ?? ""}

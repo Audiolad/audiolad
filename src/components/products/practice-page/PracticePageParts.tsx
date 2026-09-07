@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import AuthorLink from "@/components/authors/AuthorLink";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
 import { PlayIcon } from "@/components/home/HomeIcons";
@@ -411,17 +410,9 @@ export function PracticePrimaryActionSection({
   const listenClassName = buyAction
     ? FEATURED_CARD_SECONDARY_CTA_CLASS
     : FEATURED_CARD_PRIMARY_CTA_CLASS;
-  const showAppreciation =
-    viewModel.showAuthorAppreciationPrototype && Boolean(viewModel.authorName);
 
   return (
-    <section
-      className={
-        showAppreciation
-          ? `${className} practice-product-hero__cta--with-appreciation`
-          : className
-      }
-    >
+    <section className={className}>
       {buyAction ? (
         <div data-practice-hero-sell>
           <div className="min-w-0">
@@ -572,17 +563,6 @@ export function PracticePrimaryActionSection({
           {presentation.primaryAction.label}
         </button>
       )}
-
-      {showAppreciation ? (
-        <AuthorAppreciationPrototype
-          authorName={viewModel.authorName ?? ""}
-          authorId={viewModel.authorId}
-          practiceId={viewModel.practice.id}
-          isAuthenticated={viewModel.isAuthenticated}
-          surface="product"
-          layout="hero-stack"
-        />
-      ) : null}
 
       {buyAction && presentation.showPaymentLegalNote ? (
         <PaymentLegalNote />

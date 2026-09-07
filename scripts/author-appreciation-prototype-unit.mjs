@@ -121,8 +121,27 @@ const practiceContent = read(
   "src/components/products/practice-page/PracticePageContent.tsx",
 );
 assert.ok(
-  !practiceContent.includes("<AuthorAppreciationPrototype"),
-  "practice appreciation lives in the hero action stack, not below the hero",
+  practiceContent.includes("<AuthorAppreciationPrototype"),
+  "practice appreciation is a separate card on the ordinary product page",
+);
+assert.ok(
+  !practiceContent.includes('layout="hero-stack"'),
+  "practice thank-author uses the default rounded card, not the hero-stack variant",
+);
+assert.ok(
+  practiceContent.indexOf("<PracticeRatingStars") <
+    practiceContent.indexOf("<AuthorAppreciationPrototype"),
+  "thank-author card sits after rating",
+);
+assert.ok(
+  practiceContent.indexOf("<AuthorAppreciationPrototype") <
+    practiceContent.indexOf("<ProductTopicLinks"),
+  "thank-author card sits before topics",
+);
+assert.equal(
+  (practiceContent.match(/<AuthorAppreciationPrototype/g) ?? []).length,
+  1,
+  "exactly one thank-author mount on the ordinary product page",
 );
 
 const practiceParts = read(
@@ -131,13 +150,9 @@ const practiceParts = read(
 const actionSection = practiceParts.slice(
   practiceParts.indexOf("export function PracticePrimaryActionSection"),
 );
-assert.ok(actionSection.includes("<AuthorAppreciationPrototype"));
-assert.ok(actionSection.includes('layout="hero-stack"'));
-assert.ok(
-  actionSection.indexOf("<PracticeListenCtaLink") <
-    actionSection.indexOf("<AuthorAppreciationPrototype"),
-  "Listen / Pause stays first; appreciation is immediately below",
-);
+assert.ok(!actionSection.includes("<AuthorAppreciationPrototype"));
+assert.ok(!actionSection.includes('layout="hero-stack"'));
+assert.ok(!actionSection.includes("practice-product-hero__cta--with-appreciation"));
 assert.ok(
   prototype.includes("event.stopPropagation()") &&
     prototype.includes("event.preventDefault()"),
@@ -145,15 +160,9 @@ assert.ok(
 );
 assert.ok(prototype.includes('type="button"'));
 assert.ok(
-  actionSection.indexOf("<AuthorAppreciationPrototype") <
-    actionSection.indexOf("<PaymentLegalNote"),
-  "appreciation stays in the hero CTA stack, not after legal notes",
-);
-assert.ok(actionSection.includes("practice-product-hero__cta--with-appreciation"));
-assert.ok(
   !actionSection.includes("flex-row") &&
     actionSection.includes("PracticeListenCtaLink"),
-  "hero stack remains a vertical CTA column when appreciation is present",
+  "hero CTA column stays vertical after appreciation leaves the hero",
 );
 
 const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");

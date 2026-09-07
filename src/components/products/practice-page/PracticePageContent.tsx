@@ -1,10 +1,13 @@
 import LegalFooter from "@/components/LegalFooter";
+import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import CourseLearnerContent from "@/components/products/course-learner/CourseLearnerContent";
+import AuthorRecommendationsSection from "@/components/products/AuthorRecommendationsSection";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
 import ProductCopySections from "@/components/products/ProductCopySections";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
+import { isMultiAudioProduct } from "@/lib/products/duration";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
@@ -30,7 +33,13 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
     presentation,
     resolvedAuthorSlug,
     practiceTopics,
+    authorName,
   } = viewModel;
+
+  const showThankAuthor =
+    viewModel.showAuthorAppreciationPrototype && Boolean(authorName);
+  const hasTrackContents =
+    !learnerCourse && isMultiAudioProduct(publicAudioItems.length);
 
   return (
     <div className={`min-w-0 ${platformBottomContentPaddingClass}`}>
@@ -43,9 +52,31 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
           publishPreview={viewModel.publishPreview}
         />
 
-        <section className="mt-6 min-w-0">
+        <section className="mt-6 min-w-0" data-practice-section="hero">
           <PracticeProductHero viewModel={viewModel} />
         </section>
+
+        {viewModel.ratingsUiEnabled ? (
+          <PracticeRatingStars
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+            signInReturnPath={viewModel.practicePagePath}
+            isAuthenticated={viewModel.isAuthenticated}
+            isAuthorOwner={viewModel.isAuthorOwner}
+          />
+        ) : null}
+
+        {showThankAuthor ? (
+          <div className="mt-4" data-practice-section="thank-author">
+            <AuthorAppreciationPrototype
+              authorName={authorName ?? ""}
+              authorId={viewModel.authorId}
+              practiceId={practice.id}
+              isAuthenticated={viewModel.isAuthenticated}
+              surface="product"
+            />
+          </div>
+        ) : null}
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
 
@@ -55,7 +86,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
             authorSlug={resolvedAuthorSlug}
             productSlug={practice.slug}
           />
-        ) : (
+        ) : hasTrackContents ? (
           <ProductContentsSection
             items={publicAudioItems}
             durationMinutesFallback={practice.duration_minutes}
@@ -72,26 +103,26 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
               productSlug: practice.slug,
             }}
           />
-        )}
-
-        {viewModel.ratingsUiEnabled ? (
-          <PracticeRatingStars
-            authorSlug={resolvedAuthorSlug}
-            productSlug={practice.slug}
-            signInReturnPath={viewModel.practicePagePath}
-            isAuthenticated={viewModel.isAuthenticated}
-            isAuthorOwner={viewModel.isAuthorOwner}
-          />
         ) : null}
+
+        <AuthorRecommendationsSection content={seoContent} className="mt-6" />
 
         <ProductCopySections description={description} />
-        <PracticeSeoContentSections content={seoContent} productKind={viewModel.productKind} />
+        <PracticeSeoContentSections
+          content={seoContent}
+          productKind={viewModel.productKind}
+          includeRelatedProducts={false}
+        />
 
         {listeningNotice ? (
-          <ListeningNoticeCard notice={listeningNotice} variant="light" />
+          <div data-practice-section="listening-notice">
+            <ListeningNoticeCard notice={listeningNotice} variant="light" />
+          </div>
         ) : null}
 
-        <LegalFooter className="mt-8 xl:mt-10" />
+        <div data-practice-section="footer">
+          <LegalFooter className="mt-8 xl:mt-10" />
+        </div>
       </div>
     </div>
   );

@@ -239,11 +239,16 @@ assert.doesNotMatch(page, /FAQPage|QAPage/);
 const seoContent = read("src/components/products/PracticeSeoContentSections.tsx");
 assert.match(seoContent, /getPracticeSeoUsageHeading/);
 assert.match(seoContent, /Вопросы и ответы/);
-assert.match(seoContent, /RelatedProductLinkCard/);
-assert.match(seoContent, /authorRecommendationsTitle/);
+assert.match(seoContent, /AuthorRecommendationsSection/);
 assert.doesNotMatch(seoContent, /Связанные продукты/);
 assert.doesNotMatch(seoContent, /relatedListens|Связанные страницы/);
 assert.doesNotMatch(seoContent, /FAQPage|QAPage/);
+const publicRecommendations = read(
+  "src/components/products/AuthorRecommendationsSection.tsx",
+);
+assert.match(publicRecommendations, /RelatedProductLinkCard/);
+assert.match(publicRecommendations, /authorRecommendationsTitle/);
+assert.doesNotMatch(publicRecommendations, /Связанные продукты/);
 assert.equal(
   readiness.checks.find((check) => check.id === "related")?.label,
   "Добавлены связанные продукты",

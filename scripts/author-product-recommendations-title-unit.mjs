@@ -308,16 +308,35 @@ assert.deepEqual(
 );
 
 const publicSections = read("src/components/products/PracticeSeoContentSections.tsx");
-assert.match(publicSections, /content\.relatedProducts\.length \?/);
-assert.match(publicSections, /content\.authorRecommendationsTitle/);
+assert.match(publicSections, /AuthorRecommendationsSection/);
+assert.match(publicSections, /includeRelatedProducts = true/);
 assert.doesNotMatch(
   publicSections,
   /Связанные продукты/,
   "PUBLIC_DEFAULT_HEADING_NO_LONGER_CONNECTED_PRODUCTS",
 );
+const publicRecommendations = read(
+  "src/components/products/AuthorRecommendationsSection.tsx",
+);
+assert.match(publicRecommendations, /content\.relatedProducts\.length/);
+assert.match(publicRecommendations, /content\.authorRecommendationsTitle/);
+assert.doesNotMatch(
+  publicRecommendations,
+  /Связанные продукты/,
+  "PUBLIC_DEFAULT_HEADING_NO_LONGER_CONNECTED_PRODUCTS",
+);
 assert.match(
   read("src/components/products/practice-page/PracticePageContent.tsx"),
-  /PracticeSeoContentSections content=\{seoContent\}/,
+  /PracticeSeoContentSections[\s\S]*content=\{seoContent\}/,
+);
+assert.equal(
+  (
+    read("src/components/products/practice-page/PracticePageContent.tsx").match(
+      /<AuthorRecommendationsSection/g,
+    ) || []
+  ).length,
+  1,
+  "ONE public recommendations path",
 );
 assert.equal(
   (
@@ -326,7 +345,7 @@ assert.equal(
     ) || []
   ).length,
   1,
-  "ONE public recommendations path",
+  "ONE public usage/FAQ SEO path",
 );
 
 const loader = read("src/lib/products/practice-seo-content.ts");
