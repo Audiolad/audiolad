@@ -12,6 +12,7 @@ import {
   decideMediaErrorRecovery,
   failedSignedUrlLoadResult,
   FORMAT_AUDIO_ERROR,
+  isAdoptedAudioAlreadyPlaying,
   LOAD_AUDIO_ERROR,
   MEDIA_ERR_ABORTED,
   MEDIA_ERR_DECODE,
@@ -461,6 +462,82 @@ function testLoadSignedUrlFailureSettles() {
   }
 }
 
+function testAdoptAlreadyPlayingCode4Resigns() {
+  assert.equal(
+    isAdoptedAudioAlreadyPlaying({ paused: false, ended: false }),
+    true,
+  );
+  assert.equal(
+    isAdoptedAudioAlreadyPlaying({ paused: true, ended: false }),
+    false,
+  );
+  assert.equal(
+    isAdoptedAudioAlreadyPlaying({ paused: false, ended: true }),
+    false,
+  );
+
+  for (const kind of ["handoff", "prefetch"] as const) {
+    let state = createSignedUrlRecoveryState({
+      trackId: "old-track",
+      src: "https://cdn.example/old.mp3",
+      hadSuccessfulPlaying: true,
+      sessionGeneration: 1,
+    });
+    state = reduceSignedUrlRecovery(state, {
+      type: "adopt_playing_src",
+      kind,
+      trackId: "track-b",
+      url: "https://cdn.example/expired-handoff.mp3",
+      paused: false,
+      ended: false,
+    });
+    assert.equal(state.hadSuccessfulPlaying, true, `${kind} keeps playing`);
+    assert.equal(state.trackId, "track-b");
+    assert.equal(state.recoveryUrlAttempted, false);
+
+    state = reduceSignedUrlRecovery(state, {
+      type: "media_error",
+      code: MEDIA_ERR_SRC_NOT_SUPPORTED,
+      currentTime: 12,
+    });
+    assert.equal(state.fetchCalls.length, 1, `${kind} code 4 re-signs`);
+    assert.equal(state.playerError, null, `${kind} must not format_error`);
+  }
+}
+
+function testPrimaryLoadCode4StillFormatError() {
+  let pausedHandoff = createSignedUrlRecoveryState({
+    hadSuccessfulPlaying: false,
+    src: null,
+  });
+  pausedHandoff = reduceSignedUrlRecovery(pausedHandoff, {
+    type: "adopt_playing_src",
+    kind: "handoff",
+    trackId: "track-b",
+    url: "https://cdn.example/fresh.mp3",
+    paused: true,
+    ended: false,
+  });
+  assert.equal(pausedHandoff.hadSuccessfulPlaying, false);
+  pausedHandoff = reduceSignedUrlRecovery(pausedHandoff, {
+    type: "media_error",
+    code: MEDIA_ERR_SRC_NOT_SUPPORTED,
+  });
+  assert.equal(pausedHandoff.fetchCalls.length, 0);
+  assert.equal(pausedHandoff.playerError, FORMAT_AUDIO_ERROR);
+
+  let primary = createSignedUrlRecoveryState({
+    hadSuccessfulPlaying: false,
+    src: "https://cdn.example/bad.mp3",
+  });
+  primary = reduceSignedUrlRecovery(primary, {
+    type: "media_error",
+    code: MEDIA_ERR_SRC_NOT_SUPPORTED,
+  });
+  assert.equal(primary.fetchCalls.length, 0);
+  assert.equal(primary.playerError, FORMAT_AUDIO_ERROR);
+}
+
 function main() {
   testCode4Policy();
   testNonResignableMediaCodes();
@@ -473,6 +550,8 @@ function main() {
   testForegroundDoesNotDoubleFetch();
   testCode2AndCode4ChosenPolicy();
   testLoadSignedUrlFailureSettles();
+  testAdoptAlreadyPlayingCode4Resigns();
+  testPrimaryLoadCode4StillFormatError();
   console.log("signed-url-ttl-expiry-recovery-unit: ok");
 }
 

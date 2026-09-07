@@ -74,6 +74,7 @@ import {
   captureRecoveryPosition,
   decideMediaErrorRecovery,
   failedSignedUrlLoadResult,
+  isAdoptedAudioAlreadyPlaying,
   LOAD_AUDIO_ERROR,
   shouldApplySignedUrlRecovery,
   visibleErrorForSignedUrlRecoveryFailure,
@@ -831,6 +832,15 @@ export function useSequentialPlayer({
       wasPlayingBeforeSwitchRef.current = false;
       ensureSharedAudioAudible(audio);
 
+      if (
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+      }
+
       // Shared next-track path (iOS / Android / desktop). play() stays in this
       // turn so lock-screen / screen-off Media Session can continue.
       void audio.play().catch((error: unknown) => {
@@ -962,7 +972,14 @@ export function useSequentialPlayer({
 
       const audio = audioRef.current;
 
-      if (audio && !audio.paused && !audio.ended) {
+      if (
+        audio &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
         setPlayingState(true);
         userWantsPlaybackRef.current = true;
       }
@@ -978,6 +995,20 @@ export function useSequentialPlayer({
 
     if (skipUrlLoadForTrackRef.current === trackId) {
       skipUrlLoadForTrackRef.current = null;
+      const audio = audioRef.current;
+
+      if (
+        audio &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+        setPlayingState(true);
+        userWantsPlaybackRef.current = true;
+      }
+
       return;
     }
 
@@ -1011,8 +1042,21 @@ export function useSequentialPlayer({
     // element. Calling load() here would cancel that play() on iOS.
     if (
       skipSrcReloadRef.current === src ||
-      (alreadyHasSrc && !audio.paused && !audio.ended)
+      (alreadyHasSrc &&
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        }))
     ) {
+      if (
+        isAdoptedAudioAlreadyPlaying({
+          paused: audio.paused,
+          ended: audio.ended,
+        })
+      ) {
+        hadSuccessfulPlayingRef.current = true;
+      }
+
       skipSrcReloadRef.current = null;
       setIsLoading(false);
       setStatusMessage("");

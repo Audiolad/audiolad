@@ -23,6 +23,9 @@
  * - code 1 (aborted), code 3 (decode), unknown/null → ordinary final error,
  *   no automatic re-sign. Decode/abort are not treated as expired-URL.
  * - After that re-sign, any later media error → final player error, no loop.
+ * - Adopting already-playing shared audio (queue handoff after play() +
+ *   waitForPlayingEvent, or same-session prefetch already !paused) counts as
+ *   successful playing even if this engine instance never saw the event.
  */
 
 export const MEDIA_ERR_ABORTED = 1;
@@ -89,6 +92,18 @@ export function decideMediaErrorRecovery(
   }
 
   return { action: "load_error", errorMessage: LOAD_AUDIO_ERROR };
+}
+
+/**
+ * Shared audio already in a live playing state. Queue handoff is created
+ * after play() + waitForPlayingEvent(); prefetch may already be playing
+ * before this engine instance attaches listeners.
+ */
+export function isAdoptedAudioAlreadyPlaying(input: {
+  paused: boolean;
+  ended: boolean;
+}): boolean {
+  return !input.paused && !input.ended;
 }
 
 export function captureRecoveryPosition(

@@ -6,6 +6,7 @@ import {
   captureRecoveryPosition,
   decideMediaErrorRecovery,
   failedSignedUrlLoadResult,
+  isAdoptedAudioAlreadyPlaying,
   settleSignedUrlRecoveryFailure,
   shouldApplySignedUrlRecovery,
   visibleErrorForSignedUrlRecoveryFailure,
@@ -72,7 +73,15 @@ export type SignedUrlRecoveryEvent =
   | { type: "foreground_resign_attempt" }
   | { type: "seek_target"; position: number }
   | { type: "set_play_intent"; wantsPlayback: boolean }
-  | { type: "retry" };
+  | { type: "retry" }
+  | {
+      type: "adopt_playing_src";
+      kind: "handoff" | "prefetch";
+      trackId: string;
+      url: string;
+      paused: boolean;
+      ended: boolean;
+    };
 
 export function createSignedUrlRecoveryState(
   partial?: Partial<SignedUrlRecoveryState>,
@@ -324,6 +333,30 @@ export function reduceSignedUrlRecovery(
         isLoading: true,
         isUrlLoading: true,
       };
+
+    case "adopt_playing_src": {
+      const adopted = isAdoptedAudioAlreadyPlaying({
+        paused: event.paused,
+        ended: event.ended,
+      });
+
+      return {
+        ...state,
+        ...resetCycleGuards(),
+        trackId: event.trackId,
+        src: event.url,
+        sessionGeneration:
+          event.kind === "handoff"
+            ? state.sessionGeneration + 1
+            : state.sessionGeneration,
+        hadSuccessfulPlaying: adopted,
+        userWantsPlayback: adopted ? true : state.userWantsPlayback,
+        isLoading: false,
+        isUrlLoading: false,
+        playerError: null,
+        urlError: null,
+      };
+    }
 
     default:
       return state;
