@@ -142,6 +142,7 @@ export type CourseBuilderAudioAsset = {
   audio_path: string | null;
   preview_start_ms?: number | null;
   preview_end_ms?: number | null;
+  status?: string | null;
 };
 
 export type CourseBuilderFileAsset = {
@@ -643,7 +644,8 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
     case "invalid_file_size":
       return COURSE_BUILDER_PDF_TOO_LARGE;
     case "storefront_preview_not_level_1":
-      return "Фрагмент можно выбрать только из аудио первого уровня.";
+    case "storefront_preview_not_playable":
+      return "Фрагмент можно выбрать только из опубликованного аудио первого уровня.";
     case "preview_window_incomplete":
       return "Укажите начало и конец фрагмента.";
     case "preview_window_not_integer_ms":

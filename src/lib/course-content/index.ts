@@ -59,6 +59,7 @@ export {
   COURSE_STOREFRONT_PREVIEW_MAX_ACCESS_LEVEL,
   collectCourseLevel1AudioItemIds,
   isCourseLessonEligibleForStorefrontPreview,
+  isCourseStorefrontPreviewAudioReady,
   isCourseStorefrontPreviewClipEligible,
 } from "./storefront-preview";
 

@@ -12,12 +12,14 @@ import { chooseCatalogPreviewAudioRow } from "../src/lib/catalog/catalog-preview
 import {
   collectCourseLevel1AudioItemIds,
   isCourseLessonEligibleForStorefrontPreview,
+  isCourseStorefrontPreviewAudioReady,
   isCourseStorefrontPreviewClipEligible,
 } from "../src/lib/course-content/storefront-preview";
 import {
   parseCourseStorefrontPreviewWrite,
   resolveCourseStorefrontPreviewDto,
 } from "../src/lib/author-products/course-storefront-preview";
+import type { CourseBuilderLessonDto } from "../src/lib/author-products/course-builder-shared";
 import { resolveListenApiDecision } from "../src/lib/listen/preview-access";
 import {
   COMPATIBILITY_FALLBACK_PREVIEW_DURATION_MS,
@@ -306,70 +308,69 @@ function testListenApiDecisions() {
   }
 }
 
+function lessonWithAudio(input: {
+  lessonId: string;
+  title: string;
+  requiredAccessLevel: number;
+  audioId: string;
+  status: string;
+  previewStartMs?: number | null;
+  previewEndMs?: number | null;
+}): CourseBuilderLessonDto {
+  return {
+    id: input.lessonId,
+    publication_id: "course-1",
+    title: input.title,
+    position: 0,
+    required_access_level: input.requiredAccessLevel,
+    created_at: "",
+    updated_at: "",
+    blocks: [
+      {
+        id: `block-${input.audioId}`,
+        lesson_id: input.lessonId,
+        type: "audio",
+        position: 0,
+        asset_id: input.audioId,
+        payload: null,
+        created_at: "",
+        updated_at: "",
+        audio: {
+          id: input.audioId,
+          title: input.title,
+          duration_seconds: 180,
+          original_file_name: "a.mp3",
+          audio_path: "practices/c/a.mp3",
+          preview_start_ms: input.previewStartMs ?? null,
+          preview_end_ms: input.previewEndMs ?? null,
+          status: input.status,
+        },
+        file: null,
+      },
+    ],
+  };
+}
+
 function testAuthorConfigAndPdp() {
   const dto = resolveCourseStorefrontPreviewDto([
-    {
-      id: "lesson-1",
-      publication_id: "course-1",
+    lessonWithAudio({
+      lessonId: "lesson-1",
       title: "Работа с собой",
-      position: 0,
-      required_access_level: 1,
-      created_at: "",
-      updated_at: "",
-      blocks: [
-        {
-          id: "block-1",
-          lesson_id: "lesson-1",
-          type: "audio",
-          position: 0,
-          asset_id: L1_AUDIO,
-          payload: null,
-          created_at: "",
-          updated_at: "",
-          audio: {
-            id: L1_AUDIO,
-            title: "Активация",
-            duration_seconds: 180,
-            original_file_name: "a.mp3",
-            audio_path: "practices/c/a.mp3",
-            preview_start_ms: 0,
-            preview_end_ms: 60_000,
-          },
-          file: null,
-        },
-      ],
-    },
-    {
-      id: "lesson-2",
-      publication_id: "course-1",
+      requiredAccessLevel: 1,
+      audioId: L1_AUDIO,
+      status: "published",
+      previewStartMs: 0,
+      previewEndMs: 60_000,
+    }),
+    lessonWithAudio({
+      lessonId: "lesson-2",
       title: "Работа с другими",
-      position: 1,
-      required_access_level: 2,
-      created_at: "",
-      updated_at: "",
-      blocks: [
-        {
-          id: "block-2",
-          lesson_id: "lesson-2",
-          type: "audio",
-          position: 0,
-          asset_id: L2_AUDIO,
-          payload: null,
-          created_at: "",
-          updated_at: "",
-          audio: {
-            id: L2_AUDIO,
-            title: "L2",
-            duration_seconds: 180,
-            original_file_name: "b.mp3",
-            audio_path: "practices/c/b.mp3",
-            preview_start_ms: 0,
-            preview_end_ms: 60_000,
-          },
-          file: null,
-        },
-      ],
-    },
+      requiredAccessLevel: 2,
+      audioId: L2_AUDIO,
+      status: "published",
+      previewStartMs: 0,
+      previewEndMs: 60_000,
+    }),
   ]);
 
   assert.equal(dto.candidates.length, 1);
@@ -386,7 +387,7 @@ function testAuthorConfigAndPdp() {
   );
   assert.equal(rejectL2.ok, false);
   if (!rejectL2.ok) {
-    assert.equal(rejectL2.reason, "storefront_preview_not_level_1");
+    assert.equal(rejectL2.reason, "storefront_preview_not_playable");
   }
 
   assert.equal(PREVIEW_ACTION_LABEL, "Прослушать фрагмент");
@@ -395,6 +396,138 @@ function testAuthorConfigAndPdp() {
     false,
     "course PDP still does not flatten lessons into publicAudioItems",
   );
+}
+
+function testPublishedLifecyclePreviewSucceeds() {
+  assert.equal(
+    isCourseStorefrontPreviewAudioReady({
+      audio_path: "practices/c/a.mp3",
+      status: "published",
+    }),
+    true,
+    "real post-publish course audio is published",
+  );
+
+  const dto = resolveCourseStorefrontPreviewDto([
+    lessonWithAudio({
+      lessonId: "lesson-1",
+      title: "Активация",
+      requiredAccessLevel: 1,
+      audioId: L1_AUDIO,
+      status: "published",
+      previewStartMs: 0,
+      previewEndMs: 60_000,
+    }),
+  ]);
+  assert.equal(dto.candidates.length, 1);
+  assert.equal(dto.audio_item_id, L1_AUDIO);
+
+  const chosen = chooseCatalogPreviewAudioRow(
+    [
+      {
+        id: L1_AUDIO,
+        status: "published",
+        is_preview: true,
+        preview_start_ms: 0,
+        preview_end_ms: 60_000,
+      },
+    ],
+    {
+      isCourse: true,
+      allowedAudioItemIds: new Set([L1_AUDIO]),
+    },
+  );
+  assert.equal(chosen.ok, true);
+  if (chosen.ok) {
+    assert.equal(chosen.row?.id, L1_AUDIO);
+  }
+
+  const window = resolvePlaybackPreviewWindow({
+    previewStartMs: 0,
+    previewEndMs: 60_000,
+  });
+  assert.equal(window.source, "configured");
+  assert.equal(window.startMs, 0);
+  assert.equal(window.endMs, 60_000);
+
+  const anonymous = resolveListenApiDecision({
+    purpose: "preview_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(anonymous.ok, true);
+  if (anonymous.ok) {
+    assert.equal(anonymous.access.mode, "catalog_preview");
+    assert.notEqual(anonymous.access.mode, "entitled");
+  }
+}
+
+function testDraftL1CannotBeSaved() {
+  assert.equal(
+    isCourseStorefrontPreviewAudioReady({
+      audio_path: "practices/c/a.mp3",
+      status: "draft",
+    }),
+    false,
+  );
+
+  const dto = resolveCourseStorefrontPreviewDto([
+    lessonWithAudio({
+      lessonId: "lesson-1",
+      title: "Черновик L1",
+      requiredAccessLevel: 1,
+      audioId: L1_AUDIO,
+      status: "draft",
+      previewStartMs: 0,
+      previewEndMs: 60_000,
+    }),
+  ]);
+  assert.equal(dto.candidates.length, 0);
+  assert.equal(dto.audio_item_id, null);
+
+  const saved = parseCourseStorefrontPreviewWrite(
+    {
+      audio_item_id: L1_AUDIO,
+      preview_start_ms: 0,
+      preview_end_ms: 60_000,
+    },
+    new Set(dto.candidates.map((item) => item.audioItemId)),
+  );
+  assert.equal(saved.ok, false, "draft L1 cannot be saved as storefront preview");
+  if (!saved.ok) {
+    assert.equal(saved.reason, "storefront_preview_not_playable");
+  }
+}
+
+function testPreviewWriteParser() {
+  const candidates = new Set([L1_AUDIO]);
+
+  for (const body of [null, "x", 1, [], [{ audio_item_id: L1_AUDIO }]]) {
+    const parsed = parseCourseStorefrontPreviewWrite(body, candidates);
+    assert.equal(parsed.ok, false, `${JSON.stringify(body)} is invalid_request`);
+    if (!parsed.ok) {
+      assert.equal(parsed.reason, "invalid_request");
+    }
+  }
+
+  const clear = parseCourseStorefrontPreviewWrite(
+    { audio_item_id: null, preview_start_ms: null, preview_end_ms: null },
+    candidates,
+  );
+  assert.equal(clear.ok, true);
+  if (clear.ok) {
+    assert.equal(clear.clear, true);
+  }
+
+  const emptyClear = parseCourseStorefrontPreviewWrite({ audio_item_id: "" }, candidates);
+  assert.equal(emptyClear.ok, true);
+  if (emptyClear.ok) {
+    assert.equal(emptyClear.clear, true);
+  }
 }
 
 function testSourceContracts() {
@@ -412,6 +545,35 @@ function testSourceContracts() {
 
   assert.match(playLoader, /listCourseStorefrontPreviewAudioItemIds/);
   assert.match(playLoader, /allowedAudioItemIds/);
+  assert.match(
+    playLoader,
+    /\.eq\("status", "published"\)/,
+    "catalog preview still reads only published audio_items",
+  );
+  assert.match(
+    signedAudio,
+    /courseAudio\.status !== "published"/,
+    "course signed preview still forbids unpublished lesson audio",
+  );
+  assert.match(
+    read("src/lib/author-products/course-storefront-preview.ts"),
+    /isCourseStorefrontPreviewAudioReady/,
+  );
+  assert.match(
+    read("src/lib/author-products/course-storefront-preview.ts"),
+    /Array\.isArray\(body\)/,
+    "top-level arrays are invalid_request, not an implicit clear",
+  );
+  assert.match(
+    read("src/lib/author-products/course-builder.ts"),
+    /status: "draft"/,
+    "new course lesson audio is created as draft",
+  );
+  assert.match(
+    read("supabase/migrations/20260902120200_author_support_mode.sql"),
+    /UPDATE public\.audio_items[\s\S]+SET status = 'published'/,
+    "publish_audio_product publishes every audio_item of the practice",
+  );
   assert.match(signedAudio, /isCourse && access.mode === "catalog_preview"/);
   assert.match(signedAudio, /isCourseStorefrontPreviewClipEligible/);
   assert.match(signedAudio, /canPlayCourseAudioItem/);
@@ -441,6 +603,9 @@ testAccidentalL2PreviewMarkIgnored();
 testMissingConfigFailsClosed();
 testListenApiDecisions();
 testAuthorConfigAndPdp();
+testPublishedLifecyclePreviewSucceeds();
+testDraftL1CannotBeSaved();
+testPreviewWriteParser();
 testSourceContracts();
 
 console.log("course-storefront-preview-unit: ok");

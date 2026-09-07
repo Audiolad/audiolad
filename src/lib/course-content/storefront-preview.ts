@@ -48,6 +48,18 @@ export function collectCourseLevel1AudioItemIds(
   return ids;
 }
 
+/**
+ * After `publish_audio_product`, every course lesson audio_item is
+ * `published`. Catalog preview and author candidates share this gate so
+ * the cabinet cannot save a fragment the storefront then rejects.
+ */
+export function isCourseStorefrontPreviewAudioReady(audio: {
+  audio_path?: string | null;
+  status?: string | null;
+}): boolean {
+  return Boolean(audio.audio_path?.trim()) && audio.status === "published";
+}
+
 export function isCourseStorefrontPreviewClipEligible(
   audioItemId: string,
   row: Partial<AudioPreviewWindowColumns> | null | undefined,

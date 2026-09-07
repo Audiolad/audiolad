@@ -64,7 +64,7 @@ const FILE_SELECT =
 const CTA_SELECT =
   "publication_id, title, description, button_text, url, enabled, created_at, updated_at";
 const AUDIO_ASSET_SELECT =
-  "id, title, duration_seconds, original_file_name, audio_path, preview_start_ms, preview_end_ms";
+  "id, title, duration_seconds, original_file_name, audio_path, preview_start_ms, preview_end_ms, status";
 
 export { CourseBuilderError, isCourseBuilderError };
 

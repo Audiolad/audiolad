@@ -1,6 +1,7 @@
 import {
   collectCourseLevel1AudioItemIds,
   isCourseLessonEligibleForStorefrontPreview,
+  isCourseStorefrontPreviewAudioReady,
 } from "@/lib/course-content/storefront-preview";
 import {
   fromAudioPreviewWindowColumns,
@@ -15,7 +16,7 @@ export const COURSE_STOREFRONT_PREVIEW_SECTION_TITLE = "Прослушать ф�
 export const COURSE_STOREFRONT_PREVIEW_HINT =
   "Короткий фрагмент (30–90 секунд) на публичной странице курса. Можно выбрать только аудио первого уровня. Полные уроки и материалы второго уровня не открываются.";
 export const COURSE_STOREFRONT_PREVIEW_EMPTY =
-  "Добавьте аудио в урок первого уровня, чтобы настроить фрагмент.";
+  "Добавьте опубликованное аудио в урок первого уровня, чтобы настроить фрагмент.";
 export const COURSE_STOREFRONT_PREVIEW_AUDIO_LABEL = "Аудио первого уровня";
 export const COURSE_STOREFRONT_PREVIEW_START_LABEL = "Начало, сек";
 export const COURSE_STOREFRONT_PREVIEW_END_LABEL = "Конец, сек";
@@ -62,7 +63,11 @@ export function listCourseStorefrontPreviewCandidates(
       const audio = block.type === "audio" ? block.audio : null;
       const audioItemId = audio?.id?.trim() || block.asset_id?.trim() || "";
 
-      if (!audioItemId || !audio?.audio_path?.trim()) {
+      if (
+        !audioItemId ||
+        !audio ||
+        !isCourseStorefrontPreviewAudioReady(audio)
+      ) {
         continue;
       }
 
@@ -142,7 +147,7 @@ export function parseCourseStorefrontPreviewWrite(
   body: unknown,
   candidateIds: ReadonlySet<string>,
 ): CourseStorefrontPreviewWrite {
-  if (!body || typeof body !== "object") {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { ok: false, reason: "invalid_request" };
   }
 
@@ -155,7 +160,7 @@ export function parseCourseStorefrontPreviewWrite(
   }
 
   if (!candidateIds.has(audioItemId)) {
-    return { ok: false, reason: "storefront_preview_not_level_1" };
+    return { ok: false, reason: "storefront_preview_not_playable" };
   }
 
   const startMs = parseOptionalInteger(
