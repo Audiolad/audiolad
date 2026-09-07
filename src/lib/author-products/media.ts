@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { MAX_AUDIO_BYTES, MAX_COVER_BYTES } from "./limits";
+import { isAllowedProductMp3Type } from "./mp3-upload-contract";
 
 const execFileAsync = promisify(execFile);
 
@@ -39,27 +40,8 @@ export async function getMp3DurationSeconds(buffer: Buffer): Promise<number | nu
   }
 }
 
-const ALLOWED_MP3_MIME_TYPES = new Set([
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/x-mpeg",
-  "audio/x-mp3",
-  "application/octet-stream",
-]);
-
 export function isAllowedMp3File(file: File): boolean {
-  const mime = file.type.trim().toLowerCase();
-  const name = file.name.trim().toLowerCase();
-
-  if (!name.endsWith(".mp3")) {
-    return false;
-  }
-
-  if (!mime) {
-    return true;
-  }
-
-  return ALLOWED_MP3_MIME_TYPES.has(mime);
+  return isAllowedProductMp3Type(file.name, file.type);
 }
 
 export { MAX_AUDIO_BYTES, MAX_COVER_BYTES };

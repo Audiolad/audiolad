@@ -84,7 +84,9 @@ import {
   PROMO_RECOMMENDATION_TEXT_MAX_LENGTH,
   PROMO_RECOMMENDATION_TITLE_MAX_LENGTH,
 } from "@/lib/products/promo-recommendation";
+import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
 import {
+  PRODUCT_AUDIO_SIZE_HINT,
   PRODUCT_CONTENT_LIMITS,
   getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
@@ -2213,53 +2215,25 @@ export default function AuthorProductForm({
         ensured.audioItems,
       );
 
-      const formData = new FormData();
-      formData.set("file", file);
+      const result = await uploadAuthorProductAudioDirect({
+        practiceId: id,
+        audioId: targetAudioId,
+        file,
+      });
 
-      const response = await fetch(
-        `/api/author/products/${id}/audio/${targetAudioId}/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
-
-      const text = await response.text();
-      let payload: {
-        product?: AuthorProductDetail;
-        error?: string;
-        message?: string;
-      } | null = null;
-
-      if (text) {
-        try {
-          payload = JSON.parse(text) as {
-            product?: AuthorProductDetail;
-            error?: string;
-            message?: string;
-          };
-        } catch {
-          setAudioUploadErrors((current) => ({
-            ...current,
-            [audioId]: getAudioUploadErrorMessage(undefined, response.status),
-          }));
-          return;
-        }
-      }
-
-      if (!response.ok || !payload?.product) {
+      if (!result.ok) {
         setAudioUploadErrors((current) => ({
           ...current,
           [audioId]: getAudioUploadErrorMessage(
-            payload?.error,
-            response.status,
-            payload?.message,
+            result.error,
+            result.status,
+            result.message,
           ),
         }));
         return;
       }
 
-      applyServerProductPreservingDraft(payload.product);
+      applyServerProductPreservingDraft(result.product);
       setAudioPreviewVersions((current) => ({
         ...current,
         [targetAudioId]: (current[targetAudioId] ?? 0) + 1,
@@ -3740,7 +3714,7 @@ export default function AuthorProductForm({
                   ) : null}
                 </div>
 
-                <p className="text-sm leading-5 text-[#7d70a2]">MP3 · до 50 МБ</p>
+                <p className="text-sm leading-5 text-[#7d70a2]">{PRODUCT_AUDIO_SIZE_HINT}</p>
 
                 {audioItem.audio_path && practiceId && !audioItem.id.startsWith("temp-") ? (
                   <div className="mt-3">

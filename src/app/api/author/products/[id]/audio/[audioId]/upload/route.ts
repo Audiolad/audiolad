@@ -69,6 +69,8 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_file_type" }, { status: 400 });
     }
 
+    // Legacy multipart path stays on the safe Next.js proxy cap (50 MiB).
+    // The author cabinet uses /upload/start + Storage signed upload + /finalize.
     if (file.size <= 0 || file.size > MAX_AUDIO_BYTES) {
       return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
     }

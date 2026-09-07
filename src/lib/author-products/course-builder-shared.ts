@@ -1,8 +1,8 @@
 import {
   MAX_AUDIO_BYTES,
   getAudioUploadErrorMessage,
-  validateMp3FileClient,
 } from "@/lib/author-products/limits";
+import { isAllowedProductMp3Type } from "@/lib/author-products/mp3-upload-contract";
 import {
   PRODUCT_KIND,
   normalizeProductKind,
@@ -82,17 +82,15 @@ export function getCourseBuilderPdfErrorMessage(
 }
 
 export function validateCourseBuilderAudioFile(file: File): string | null {
-  const sharedError = validateMp3FileClient(file);
-
-  if (!sharedError) {
-    return null;
+  if (!isAllowedProductMp3Type(file.name, file.type)) {
+    return COURSE_BUILDER_AUDIO_WRONG_TYPE;
   }
 
-  if (file.size > MAX_AUDIO_BYTES) {
+  if (file.size <= 0 || file.size > MAX_AUDIO_BYTES) {
     return COURSE_BUILDER_AUDIO_TOO_LARGE;
   }
 
-  return COURSE_BUILDER_AUDIO_WRONG_TYPE;
+  return null;
 }
 
 export function getCourseBuilderAudioUploadError(

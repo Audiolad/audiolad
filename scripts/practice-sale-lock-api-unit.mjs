@@ -56,6 +56,23 @@ function testRoutesGuardSaleLock() {
     assert.match(source, /status: 409/);
   }
 
+  const directUpload = read(
+    "src/lib/author-products/server/direct-audio-upload.ts",
+  );
+  assert.match(directUpload, /getPracticeSaleLock/);
+  assert.match(directUpload, /PRODUCT_CONTENT_LOCKED_AFTER_SALE/);
+  assert.match(directUpload, /409/);
+  assert.match(
+    read("src/app/api/author/products/[id]/audio/[audioId]/upload/start/route.ts"),
+    /startProductAudioDirectUpload/,
+  );
+  assert.match(
+    read(
+      "src/app/api/author/products/[id]/audio/[audioId]/upload/finalize/route.ts",
+    ),
+    /finalizeProductAudioDirectUpload/,
+  );
+
   const productRoute = read("src/app/api/author/products/[id]/route.ts");
   assert.match(
     productRoute,

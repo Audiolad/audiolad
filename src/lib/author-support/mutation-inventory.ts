@@ -50,6 +50,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: [
         "src/app/api/author/products/[id]/audio/route.ts",
         "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/upload/start/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/upload/finalize/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/upload/abandon/route.ts",
       ],
     },
     {

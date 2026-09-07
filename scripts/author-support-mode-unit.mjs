@@ -471,6 +471,14 @@ assert.match(submitRoute, /product_submitted_for_moderation/);
 const audioUpload = read("src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts");
 assert.match(audioUpload, /product_track_updated/);
 assert.match(audioUpload, /buildAudioItemStoragePath/);
+assert.match(
+  read("src/lib/author-products/server/direct-audio-upload.ts"),
+  /product_track_updated/,
+);
+assert.match(
+  read("src/app/api/author/products/[id]/audio/[audioId]/upload/finalize/route.ts"),
+  /finalizeProductAudioDirectUpload/,
+);
 
 const studioRepo = read("src/lib/studio/server/repository.ts");
 assert.match(studioRepo, /studio_project_updated/);

@@ -527,6 +527,12 @@ function testRepoOneFileOneVersion() {
         "20260929120000_preserve_catalog_visibility_on_unpublish.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260930120000_practice_audio_bucket_300mib.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -625,8 +631,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260927120000",
     "20260928120000",
     "20260929120000",
+    "20260930120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 66);
+  assert.equal(plan.database_migrations_pending, 67);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -704,8 +711,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260927120000",
     "20260928120000",
     "20260929120000",
+    "20260930120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 60);
+  assert.equal(plan.database_migrations_pending, 61);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -790,8 +798,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260927120000",
     "20260928120000",
     "20260929120000",
+    "20260930120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 51);
+  assert.equal(plan.database_migrations_pending, 52);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {

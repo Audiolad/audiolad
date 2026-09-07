@@ -204,6 +204,12 @@ function testSourceWiring() {
   const uploadRoute = read(
     "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
   );
+  const uploadStartRoute = read(
+    "src/app/api/author/products/[id]/audio/[audioId]/upload/start/route.ts",
+  );
+  const uploadFinalizeRoute = read(
+    "src/app/api/author/products/[id]/audio/[audioId]/upload/finalize/route.ts",
+  );
   const audioRoute = read(
     "src/app/api/author/products/[id]/audio/[audioId]/route.ts",
   );
@@ -217,6 +223,12 @@ function testSourceWiring() {
   assert.match(lifecycleSource, /softDeletePractice|soft_delete_practice/);
   assert.match(fileRoute, /assertPracticeContentMutable/);
   assert.match(uploadRoute, /getPracticeSaleLock/);
+  assert.match(uploadStartRoute, /startProductAudioDirectUpload/);
+  assert.match(uploadFinalizeRoute, /finalizeProductAudioDirectUpload/);
+  assert.match(
+    read("src/lib/author-products/server/direct-audio-upload.ts"),
+    /getPracticeSaleLock/,
+  );
   assert.match(audioRoute, /assertPracticeContentMutable/);
   assert.match(migration, /ON DELETE RESTRICT/);
   assert.match(migration, /guard_audio_items_content_sale_lock/);

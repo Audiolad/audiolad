@@ -1,24 +1,23 @@
+import {
+  PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
+  PRODUCT_AUDIO_WRONG_TYPE_MESSAGE,
+  validateProductMp3FileClient,
+} from "@/lib/author-products/mp3-upload-contract";
 import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 import { AUTHOR_RECOMMENDATIONS_TITLE_MAX_LENGTH } from "@/lib/products/author-recommendations-title";
 
 export const MAX_COVER_BYTES = 3 * 1024 * 1024;
+/** Safe Next.js multipart cap for the legacy upload route and course builder. */
 export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 
-const ALLOWED_MP3_MIME_TYPES = new Set(["audio/mpeg", "audio/mp3"]);
+export {
+  MAX_PRODUCT_AUDIO_BYTES,
+  PRODUCT_AUDIO_SIZE_HINT,
+  PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
+} from "@/lib/author-products/mp3-upload-contract";
 
 export function validateMp3FileClient(file: File): string | null {
-  const fileName = file.name.trim().toLowerCase();
-  const mime = file.type.trim().toLowerCase();
-
-  if (!fileName.endsWith(".mp3") || !ALLOWED_MP3_MIME_TYPES.has(mime)) {
-    return "Загрузите аудиофайл в формате MP3.";
-  }
-
-  if (file.size > MAX_AUDIO_BYTES) {
-    return "Размер аудиофайла не должен превышать 50 МБ.";
-  }
-
-  return null;
+  return validateProductMp3FileClient(file);
 }
 
 export function getAudioUploadErrorMessage(
@@ -28,9 +27,11 @@ export function getAudioUploadErrorMessage(
 ): string {
   switch (code) {
     case "invalid_file_type":
-      return "Загрузите аудиофайл в формате MP3.";
+      return PRODUCT_AUDIO_WRONG_TYPE_MESSAGE;
     case "invalid_file_size":
-      return "Размер аудиофайла не должен превышать 50 МБ.";
+      return PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
+    case "upload_not_complete":
+      return "Загрузка аудио не завершена. Попробуйте ещё раз.";
     case "invalid_audio_duration":
       return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
     case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":
@@ -40,7 +41,7 @@ export function getAudioUploadErrorMessage(
       );
     default:
       if (status === 413) {
-        return "Размер аудиофайла не должен превышать 50 МБ.";
+        return PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
       }
 
       if (message?.trim()) {
