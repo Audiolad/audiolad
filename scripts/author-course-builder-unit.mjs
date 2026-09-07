@@ -843,13 +843,21 @@ const studioProvider = read("src/components/studio/StudioAudioProvider.tsx");
 const authorForm = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const authorAudioLimits = read("src/lib/author-products/limits.ts");
 const personalLimits = read("src/lib/personal-materials/types.ts");
-assert.match(studioProvider, /750 \* 1024 \* 1024/);
+assert.match(studioProvider, /MAX_STUDIO_PROJECT_BYTES/);
 assert.doesNotMatch(studioEditor, /COURSE_BUILDER_AUDIO_TOO_LARGE/);
 assert.match(authorForm, /validateMp3FileClient/);
 assert.match(authorForm, /getAudioUploadErrorMessage/);
+assert.match(authorForm, /uploadAuthorProductAudioDirect/);
 assert.doesNotMatch(authorForm, /validateCourseBuilderAudioFile/);
 assert.doesNotMatch(authorForm, /Аудиофайл должен быть не больше 50 МБ/);
-assert.match(authorAudioLimits, /Размер аудиофайла не должен превышать 50 МБ/);
+assert.match(
+  authorAudioLimits,
+  /PRODUCT_AUDIO_TOO_LARGE_MESSAGE|Размер аудиофайла не должен превышать 300 МБ/,
+);
+assert.match(
+  read("src/lib/author-products/mp3-upload-contract.ts"),
+  /Размер аудиофайла не должен превышать 300 МБ/,
+);
 assert.match(personalLimits, /maxPdfBytes: 20 \* 1024 \* 1024/);
 
 const blocksCreateRoute = read(
