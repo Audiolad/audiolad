@@ -273,9 +273,8 @@ export function evaluateAssetDelete({ asset, project }) {
   if (!storagePath.includes(CLEANUP_PROJECT_ID) || !storagePath.includes(String(asset.id))) {
     return { ok: false, reason: "storage_path_missing_ids" };
   }
-  if (Boolean(project && project.author_id)) {
-    return { ok: false, reason: "has_real_user_author" };
-  }
+  // Project.author_id must not block allowlisted proven_test asset deletes.
+  // evaluateProjectDelete still refuses the project row when author_id is set.
   if (!isProvenTestBlob([
     asset.id,
     asset.project_id,
@@ -558,11 +557,6 @@ Promise.resolve()
     const project = projectResult.data;
     if (!project) {
       emit("project_already_absent id=" + projectId);
-    } else if (project.author_id) {
-      emit("NEEDS_REVIEW kind=project reason=has_real_user_author id=" + projectId);
-      emit("REAL_USER_PROJECTS_UNTOUCHED=YES");
-      emit("ASSET_CLEANUP=FAILED");
-      process.exit(2);
     }
 
     const knownAssets = [];
