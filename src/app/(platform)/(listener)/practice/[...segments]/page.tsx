@@ -110,6 +110,7 @@ import { loadPricePromotionsForPractice } from "@/lib/pricing/queries";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { loadCourseLearnerContent } from "@/lib/course-content/learner-content";
+import { loadCourseStorefrontPreviewAvailable } from "@/lib/course-content/storefront-preview-availability";
 import { resolvePracticeFileViewerRoute } from "@/lib/course-content/learner-file-http";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
@@ -503,6 +504,24 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         )
       : false;
 
+  let courseStorefrontPreviewAvailable: boolean | null = null;
+
+  if (
+    isCoursePublication(practice.publication_class, practice.product_kind)
+  ) {
+    try {
+      courseStorefrontPreviewAvailable = await loadCourseStorefrontPreviewAvailable(
+        {
+          supabase,
+          serviceRole: createServiceRoleClient(),
+          practice,
+        },
+      );
+    } catch {
+      courseStorefrontPreviewAvailable = false;
+    }
+  }
+
   const presentation = buildPracticeAccessPresentation({
     access,
     practice: {
@@ -750,6 +769,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listenDeniedMessage: publishPreviewMode ? null : listenDeniedMessage,
     practiceTopics,
     publicAudioItems,
+    courseStorefrontPreviewAvailable,
     learnerCourse,
     listeningNotice,
     mobileCover: {

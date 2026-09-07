@@ -152,8 +152,22 @@ export function parseCourseStorefrontPreviewWrite(
   }
 
   const record = body as Record<string, unknown>;
-  const audioItemId =
-    typeof record.audio_item_id === "string" ? record.audio_item_id.trim() : "";
+
+  if (!Object.prototype.hasOwnProperty.call(record, "audio_item_id")) {
+    return { ok: false, reason: "invalid_request" };
+  }
+
+  const rawAudioItemId = record.audio_item_id;
+
+  if (rawAudioItemId === null) {
+    return { ok: true, clear: true };
+  }
+
+  if (typeof rawAudioItemId !== "string") {
+    return { ok: false, reason: "invalid_request" };
+  }
+
+  const audioItemId = rawAudioItemId.trim();
 
   if (!audioItemId) {
     return { ok: true, clear: true };

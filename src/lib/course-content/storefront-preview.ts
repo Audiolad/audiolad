@@ -73,3 +73,46 @@ export function isCourseStorefrontPreviewClipEligible(
     isConfiguredStorefrontPreviewWindow(fromAudioPreviewWindowColumns(row))
   );
 }
+
+export type CourseStorefrontPreviewAvailabilityAudio = {
+  id: string;
+  audio_path?: string | null;
+  status?: string | null;
+  preview_start_ms?: number | null;
+  preview_end_ms?: number | null;
+};
+
+/**
+ * Public PDP / buy-CTA gate. True only when catalog preview would
+ * actually serve a configured L1 clip. Exposes no lesson ids or paths.
+ */
+export function resolveCourseStorefrontPreviewAvailable(input: {
+  published: boolean;
+  catalogListed: boolean;
+  audioRows: readonly CourseStorefrontPreviewAvailabilityAudio[];
+  level1AudioItemIds: ReadonlySet<string>;
+}): boolean {
+  if (!input.published || !input.catalogListed) {
+    return false;
+  }
+
+  return input.audioRows.some(
+    (row) =>
+      isCourseStorefrontPreviewAudioReady(row) &&
+      isCourseStorefrontPreviewClipEligible(
+        row.id,
+        row,
+        input.level1AudioItemIds,
+      ),
+  );
+}
+
+/**
+ * `null` = not a course, keep ordinary paid-practice preview CTA.
+ * `false` = course without a playable storefront clip — hide the button.
+ */
+export function shouldShowPaidBuyPreviewCta(
+  courseStorefrontPreviewAvailable: boolean | null,
+): boolean {
+  return courseStorefrontPreviewAvailable !== false;
+}

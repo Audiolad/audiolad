@@ -61,7 +61,10 @@ export {
   isCourseLessonEligibleForStorefrontPreview,
   isCourseStorefrontPreviewAudioReady,
   isCourseStorefrontPreviewClipEligible,
+  resolveCourseStorefrontPreviewAvailable,
+  shouldShowPaidBuyPreviewCta,
 } from "./storefront-preview";
+export { loadCourseStorefrontPreviewAvailable } from "./storefront-preview-availability";
 
 export {
   COURSE_LESSON_BLOCK_TYPES,

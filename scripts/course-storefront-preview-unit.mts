@@ -14,6 +14,8 @@ import {
   isCourseLessonEligibleForStorefrontPreview,
   isCourseStorefrontPreviewAudioReady,
   isCourseStorefrontPreviewClipEligible,
+  resolveCourseStorefrontPreviewAvailable,
+  shouldShowPaidBuyPreviewCta,
 } from "../src/lib/course-content/storefront-preview";
 import {
   parseCourseStorefrontPreviewWrite,
@@ -506,7 +508,16 @@ function testDraftL1CannotBeSaved() {
 function testPreviewWriteParser() {
   const candidates = new Set([L1_AUDIO]);
 
-  for (const body of [null, "x", 1, [], [{ audio_item_id: L1_AUDIO }]]) {
+  for (const body of [
+    null,
+    "x",
+    1,
+    [],
+    [{ audio_item_id: L1_AUDIO }],
+    {},
+    { preview_start_ms: 0, preview_end_ms: 60_000 },
+    { audio_item_id: 123 },
+  ]) {
     const parsed = parseCourseStorefrontPreviewWrite(body, candidates);
     assert.equal(parsed.ok, false, `${JSON.stringify(body)} is invalid_request`);
     if (!parsed.ok) {
@@ -528,6 +539,138 @@ function testPreviewWriteParser() {
   if (emptyClear.ok) {
     assert.equal(emptyClear.clear, true);
   }
+}
+
+function publishedL1Row(overrides: {
+  id?: string;
+  status?: string;
+  preview_start_ms?: number | null;
+  preview_end_ms?: number | null;
+} = {}) {
+  return {
+    id: overrides.id ?? L1_AUDIO,
+    audio_path: "practices/c/a.mp3",
+    status: overrides.status ?? "published",
+    preview_start_ms: overrides.preview_start_ms === undefined ? 0 : overrides.preview_start_ms,
+    preview_end_ms: overrides.preview_end_ms === undefined ? 60_000 : overrides.preview_end_ms,
+  };
+}
+
+function testPdpPreviewCtaMatrix() {
+  const level1 = new Set([L1_AUDIO]);
+
+  const configured = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [publishedL1Row()],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(configured, true, "published course + configured L1 preview");
+  assert.equal(shouldShowPaidBuyPreviewCta(configured), true);
+  assert.equal(shouldShowPaidBuyPreviewCta(true), true);
+
+  const missing = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [publishedL1Row({ preview_start_ms: null, preview_end_ms: null })],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(missing, false, "published course + no preview window");
+  assert.equal(shouldShowPaidBuyPreviewCta(missing), false);
+
+  const cleared = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [publishedL1Row({ preview_start_ms: null, preview_end_ms: null })],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(cleared, false, "after explicit clear the CTA is absent");
+  assert.equal(shouldShowPaidBuyPreviewCta(false), false);
+
+  const l2Only = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [
+      publishedL1Row({
+        id: L2_AUDIO,
+        preview_start_ms: 0,
+        preview_end_ms: 60_000,
+      }),
+    ],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(l2Only, false, "L2-only configured window does not show CTA");
+
+  const tooShort = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [publishedL1Row({ preview_start_ms: 0, preview_end_ms: 20_000 })],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(tooShort, false, "20s course window hides CTA");
+
+  const tooLong = resolveCourseStorefrontPreviewAvailable({
+    published: true,
+    catalogListed: true,
+    audioRows: [publishedL1Row({ preview_start_ms: 0, preview_end_ms: 120_000 })],
+    level1AudioItemIds: level1,
+  });
+  assert.equal(tooLong, false, "120s course window hides CTA");
+
+  assert.equal(
+    shouldShowPaidBuyPreviewCta(null),
+    true,
+    "ordinary paid single-audio practice keeps the preview CTA",
+  );
+
+  assert.equal(
+    resolveCourseStorefrontPreviewAvailable({
+      published: false,
+      catalogListed: true,
+      audioRows: [publishedL1Row()],
+      level1AudioItemIds: level1,
+    }),
+    false,
+  );
+  assert.equal(
+    resolveCourseStorefrontPreviewAvailable({
+      published: true,
+      catalogListed: false,
+      audioRows: [publishedL1Row()],
+      level1AudioItemIds: level1,
+    }),
+    false,
+  );
+
+  const anonymous = resolveListenApiDecision({
+    purpose: "preview_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(anonymous.ok, true);
+  if (anonymous.ok) {
+    assert.equal(anonymous.access.mode, "catalog_preview");
+  }
+
+  const chosen = chooseCatalogPreviewAudioRow(
+    [
+      {
+        id: L1_AUDIO,
+        is_preview: true,
+        preview_start_ms: 0,
+        preview_end_ms: 60_000,
+      },
+    ],
+    {
+      isCourse: true,
+      allowedAudioItemIds: level1,
+    },
+  );
+  assert.equal(chosen.ok, true);
 }
 
 function testSourceContracts() {
@@ -563,6 +706,24 @@ function testSourceContracts() {
     read("src/lib/author-products/course-storefront-preview.ts"),
     /Array\.isArray\(body\)/,
     "top-level arrays are invalid_request, not an implicit clear",
+  );
+  assert.match(
+    read("src/lib/author-products/course-storefront-preview.ts"),
+    /hasOwnProperty\.call\(record, "audio_item_id"\)/,
+    "clear requires an explicit audio_item_id field",
+  );
+  assert.match(
+    read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx"),
+    /loadCourseStorefrontPreviewAvailable/,
+  );
+  assert.match(
+    read("src/components/products/practice-page/PracticePageParts.tsx"),
+    /shouldShowPaidBuyPreviewCta/,
+  );
+  assert.doesNotMatch(
+    read("src/components/products/practice-page/PracticePageParts.tsx"),
+    /\/api\/catalog\/play/,
+    "PDP does not trial-play to decide the preview CTA",
   );
   assert.match(
     read("src/lib/author-products/course-builder.ts"),
@@ -606,6 +767,7 @@ testAuthorConfigAndPdp();
 testPublishedLifecyclePreviewSucceeds();
 testDraftL1CannotBeSaved();
 testPreviewWriteParser();
+testPdpPreviewCtaMatrix();
 testSourceContracts();
 
 console.log("course-storefront-preview-unit: ok");
