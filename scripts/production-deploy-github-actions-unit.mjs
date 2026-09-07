@@ -333,7 +333,7 @@ function main() {
   assertDiskAuditHelper();
   assertDiskStorageCleanup(workflowText, docsText);
   assertRemoteDiskCleanupScriptSyntax(workflowText);
-  assertDiskCleanupHelper();
+  assertDiskCleanupHelper(workflowText);
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -1368,6 +1368,10 @@ function assertDiskStorageCleanup(workflowText, docsText) {
     "CUTOVER=NO",
     "audiolad_deploy=NOT_INVOKED",
     "confirm=OPS_DISK_STORAGE_CLEANUP",
+    "mktemp /tmp/audiolad-disk-cleanup-allowlist.XXXXXX.mjs",
+    "temp_path_missing_mjs",
+    "RELEASE_GATE=NO reason=allowlist_import_failed",
+    "ASSET_CLEANUP_ERROR=",
   ];
   for (const needle of required) {
     assert.match(
@@ -1423,6 +1427,40 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   assert.match(docsText, /OPS_DISK_STORAGE_CLEANUP/);
   assert.match(docsText, /audiolad-disk-storage-cleanup\.sh/);
   assert.match(docsText, /34113627251/);
+  assert.match(
+    cleanupJob,
+    /mktemp \/tmp\/audiolad-disk-cleanup-allowlist\.XXXXXX\.mjs/,
+    "workflow embedded allowlist temp must end with .mjs",
+  );
+  assert.match(
+    cleanupJob,
+    /gate_release "\$\{name\}" "\$\{current\}" "\$\{previous\}" "\$\{path\}" 2>&1/,
+    "workflow must keep gate_release stderr visible",
+  );
+  assert.match(
+    cleanupJob,
+    /node "\$\{probe\}" "\$\{dir\}" "\$\{ALLOWLIST_MODULE\}" 2>&1/,
+    "workflow must keep asset probe stderr visible",
+  );
+  assert.doesNotMatch(
+    cleanupJob,
+    /gate_release[^\n]*2>\/dev\/null/,
+    "workflow must not swallow gate_release stderr",
+  );
+  assert.doesNotMatch(
+    cleanupJob,
+    /node "\$\{probe\}" "\$\{dir\}" "\$\{ALLOWLIST_MODULE\}" 2>\/dev\/null/,
+    "workflow must not swallow asset probe stderr",
+  );
+  const resolveStart = cleanupJob.indexOf("resolve_allowlist_module() {");
+  const resolveEnd = cleanupJob.indexOf("df_root_avail_kb()", resolveStart);
+  assert.ok(resolveStart >= 0 && resolveEnd > resolveStart, "workflow must define resolve_allowlist_module");
+  const resolveFn = cleanupJob.slice(resolveStart, resolveEnd);
+  assert.doesNotMatch(
+    resolveFn,
+    /tmp="\$\(mktemp\)"/,
+    "workflow resolve_allowlist_module must not use suffix-less mktemp",
+  );
 }
 
 function assertRemoteDiskCleanupScriptSyntax(workflowText) {
@@ -1704,7 +1742,22 @@ function runDiskCleanupHelper(root, fixture) {
   });
 }
 
-function assertDiskCleanupHelper() {
+function runDiskCleanupViaStdin(scriptText, fixture) {
+  return spawnSync("bash", ["-s"], {
+    encoding: "utf8",
+    timeout: 20000,
+    input: scriptText,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: fixture.deployRoot,
+      PATH: `${fixture.binDir}:${process.env.PATH ?? ""}`,
+      AUDIOLAD_CLEANUP_MOCK_STATE: fixture.statePath,
+      AUDIOLAD_DOCKER_BIN: join(fixture.binDir, "docker"),
+    },
+  });
+}
+
+function assertDiskCleanupHelper(workflowText) {
   const helperText = readFileSync(diskCleanupPath, "utf8");
   const syntax = spawnSync("bash", ["-n", diskCleanupPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `disk cleanup helper bash -n failed: ${syntax.stderr}`);
@@ -1713,6 +1766,8 @@ function assertDiskCleanupHelper() {
   assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
   assert.match(helperText, /20260906-113101-2acc27e1/);
   assert.match(helperText, /4fc1d620-aaff-44fe-9893-8ca27e29/);
+  assert.match(helperText, /mktemp \/tmp\/audiolad-disk-cleanup-allowlist\.XXXXXX\.mjs/);
+  assert.match(helperText, /temp_path_missing_mjs/);
   assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
   assert.doesNotMatch(helperText, /pm2 delete/);
   const helperCode = helperText
@@ -1730,6 +1785,8 @@ function assertDiskCleanupHelper() {
     const result = runDiskCleanupHelper(root, fixture);
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 0, `disk cleanup helper failed: ${output}`);
+    assert.match(output, /allowlist_module=.*\.mjs/);
+    assert.match(output, /RELEASE_GATE=YES reason=allowlisted_release/);
     assert.match(output, /MODE = allowlist_cleanup/);
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /CLEANUP = SUCCESS/);
@@ -1766,6 +1823,7 @@ function assertDiskCleanupHelper() {
     const result = runDiskCleanupHelper(blockedRoot, fixture);
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.notEqual(result.status, 0, "cleanup must fail when CURRENT is allowlisted");
+    assert.match(output, /RELEASE_GATE=NO reason=current_is_allowlisted/);
     assert.match(output, /NEEDS_REVIEW kind=release reason=gate_failed/);
     assert.match(output, /CLEANUP = FAILED/);
     assert.equal(existsSync(join(fixture.deployRoot, "releases", "20260906-113101-2acc27e1")), true);
@@ -1803,6 +1861,42 @@ function assertDiskCleanupHelper() {
     );
   } finally {
     rmSync(foreignRoot, { recursive: true, force: true });
+  }
+
+  const stdinRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-stdin-"));
+  try {
+    const fixture = writeDiskCleanupFixture(stdinRoot, { secretUrl, secretKey });
+    const helperResult = runDiskCleanupViaStdin(helperText, fixture);
+    const helperOutput = `${helperResult.stdout ?? ""}${helperResult.stderr ?? ""}`;
+    assert.equal(helperResult.status, 0, `disk cleanup helper via bash -s failed: ${helperOutput}`);
+    assert.match(
+      helperOutput,
+      /allowlist_module=\/tmp\/audiolad-disk-cleanup-allowlist\.[A-Za-z0-9]+\.mjs/,
+      "helper bash -s must write an .mjs allowlist temp",
+    );
+    assert.match(helperOutput, /CLEANUP = SUCCESS/);
+    assert.match(helperOutput, /RELEASE_GATE=YES reason=allowlisted_release/);
+  } finally {
+    rmSync(stdinRoot, { recursive: true, force: true });
+  }
+
+  const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-remote-stdin-"));
+  try {
+    const fixture = writeDiskCleanupFixture(remoteRoot, { secretUrl, secretKey });
+    const remote = extractRemoteDiskCleanupScript(workflowText);
+    const remoteResult = runDiskCleanupViaStdin(remote, fixture);
+    const remoteOutput = `${remoteResult.stdout ?? ""}${remoteResult.stderr ?? ""}`;
+    assert.equal(remoteResult.status, 0, `workflow bash -s cleanup failed: ${remoteOutput}`);
+    assert.match(
+      remoteOutput,
+      /allowlist_module=\/tmp\/audiolad-disk-cleanup-allowlist\.[A-Za-z0-9]+\.mjs/,
+      "workflow bash -s must write an .mjs allowlist temp",
+    );
+    assert.match(remoteOutput, /CLEANUP = SUCCESS/);
+    assert.match(remoteOutput, /confirm=OPS_DISK_STORAGE_CLEANUP/);
+    assert.doesNotMatch(remoteOutput, /ASSET_CLEANUP=UNAVAILABLE reason=error/);
+  } finally {
+    rmSync(remoteRoot, { recursive: true, force: true });
   }
 }
 
