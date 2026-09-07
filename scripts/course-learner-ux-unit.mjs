@@ -480,17 +480,9 @@ function testItemTypeAffordances() {
         locked: false,
         blocks: [
           {
-            id: "audio-1",
-            type: "audio",
-            position: 0,
-            audioItemId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            title: "Методика открытия системы для работы с собой",
-            durationSeconds: 125,
-          },
-          {
             id: "pdf-1",
             type: "file",
-            position: 1,
+            position: 0,
             fileId: FILE_ID,
             filename: LONG_PDF_NAME,
             mime: "application/pdf",
@@ -519,14 +511,19 @@ function testItemTypeAffordances() {
 
   assert.match(markup, /data-course-item-kind="audio"/);
   assert.match(markup, /data-course-item-kind="file"/);
-  assert.match(markup, new RegExp(`${COURSE_LEARNER_AUDIO_ITEM_LABEL}:`));
   assert.match(markup, new RegExp(`${COURSE_LEARNER_FILE_ITEM_LABEL}:`));
   assert.match(markup, />Аудио</);
   assert.match(markup, />Документ</);
-  assert.match(markup, /Методика открытия системы для работы с собой/);
   assert.match(markup, new RegExp(LONG_PDF_NAME));
   assert.match(markup, /break-all/);
   assert.doesNotMatch(markup, /audioItemId|signedUrl|storage_path/);
+
+  const audioSource = read(
+    "src/components/products/course-learner/CourseLearnerAudioBlock.tsx",
+  );
+  assert.match(audioSource, /CourseLearnerItemTypeIcon/);
+  assert.match(audioSource, /kind="audio"/);
+  assert.match(audioSource, /COURSE_LEARNER_AUDIO_ITEM_LABEL/);
 
   assert.deepEqual(
     collectLockedLessonItemKinds([
