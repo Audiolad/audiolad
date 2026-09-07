@@ -28,6 +28,8 @@ CUTOVER="NO"
 AUDIOLAD_DEPLOY="NOT_INVOKED"
 MODE="allowlist_cleanup"
 CLEANUP="PENDING"
+RELEASES_CLEANUP="PENDING"
+ASSETS_CLEANUP="PENDING"
 CURRENT_RELEASE_INTACT="NO"
 PREVIOUS_RELEASE_INTACT="NO"
 REAL_USER_PROJECTS_UNTOUCHED="YES"
@@ -73,6 +75,17 @@ fi
 add_needs_review() {
   NEEDS_REVIEW_LINES+=("$1")
   printf '%s\n' "$1"
+}
+
+mark_releases_cleanup() {
+  local next="$1"
+  case "${RELEASES_CLEANUP}:${next}" in
+    FAILED:*) ;;
+    *:FAILED) RELEASES_CLEANUP="FAILED" ;;
+    DEFERRED:OK|DEFERRED:DEFERRED|OK:DEFERRED|PENDING:DEFERRED) RELEASES_CLEANUP="DEFERRED" ;;
+    PENDING:OK|OK:OK) RELEASES_CLEANUP="OK" ;;
+    *) RELEASES_CLEANUP="${next}" ;;
+  esac
 }
 
 cleanup_temps() {
@@ -430,6 +443,7 @@ delete_allowlisted_release() {
   echo "release_candidate=${name} path=${path}"
   if [[ ! -d "${path}" ]]; then
     echo "release_already_absent name=${name}"
+    mark_releases_cleanup "OK"
     return 0
   fi
   set +e
@@ -439,27 +453,47 @@ delete_allowlisted_release() {
   printf '%s\n' "${gate}" | redact_studio_stream
   if [[ "${code}" -ne 0 ]]; then
     add_needs_review "NEEDS_REVIEW kind=release reason=gate_failed name=${name}"
-    CLEANUP="FAILED"
+    mark_releases_cleanup "FAILED"
     return 0
   fi
   if [[ "${path}" != "${RELEASES_DIR}/${name}" || "${name}" == *'/'* || "${name}" == *'..'* ]]; then
     add_needs_review "NEEDS_REVIEW kind=release reason=unsafe_path name=${name}"
-    CLEANUP="FAILED"
+    mark_releases_cleanup "FAILED"
     return 0
   fi
   if [[ "${path}" == "${SAVED_CURRENT_REAL}" || "${path}" == "${SAVED_PREVIOUS_REAL}" ]]; then
     add_needs_review "NEEDS_REVIEW kind=release reason=points_at_current_or_previous name=${name}"
-    CLEANUP="FAILED"
+    mark_releases_cleanup "FAILED"
     return 0
   fi
   echo "rm -rf allowlisted release dir only name=${name}"
-  rm -rf -- "${path}"
-  if [[ -e "${path}" ]]; then
-    add_needs_review "NEEDS_REVIEW kind=release reason=rm_failed name=${name}"
-    CLEANUP="FAILED"
+  local rm_log=""
+  local rm_code=0
+  local denied_count=0
+  rm_log="$(mktemp)"
+  CLEANUP_TEMP_FILES+=("${rm_log}")
+  set +e
+  rm -rf -- "${path}" >"${rm_log}" 2>&1
+  rm_code=$?
+  set -e
+  set +e
+  denied_count="$(grep -cE 'Permission denied|cannot remove' "${rm_log}")"
+  set -e
+  denied_count="${denied_count:-0}"
+  echo "rm_status=${rm_code} rm_denied_count=${denied_count}"
+  if [[ ! -e "${path}" ]]; then
+    echo "release_deleted name=${name}"
+    mark_releases_cleanup "OK"
     return 0
   fi
-  echo "release_deleted name=${name}"
+  if grep -qE 'Permission denied' "${rm_log}"; then
+    add_needs_review "NEEDS_REVIEW kind=release reason=permission_denied_root_owned name=${name}"
+    echo "note=release_left_in_place name=${name} needs=root"
+    mark_releases_cleanup "DEFERRED"
+    return 0
+  fi
+  add_needs_review "NEEDS_REVIEW kind=release reason=rm_failed name=${name}"
+  mark_releases_cleanup "FAILED"
 }
 
 run_asset_cleanup_probe() {
@@ -753,13 +787,23 @@ JS
       NEEDS_REVIEW\ *)
         NEEDS_REVIEW_LINES+=("${line}")
         ;;
-      ASSET_CLEANUP=FAILED|ASSET_CLEANUP=UNAVAILABLE*)
-        CLEANUP="FAILED"
+      ASSET_CLEANUP=OK)
+        ASSETS_CLEANUP="OK"
+        ;;
+      ASSET_CLEANUP=FAILED)
+        ASSETS_CLEANUP="FAILED"
+        ;;
+      ASSET_CLEANUP=UNAVAILABLE*)
+        ASSETS_CLEANUP="UNAVAILABLE"
         ;;
     esac
   done <<< "${output}"
-  if [[ "${code}" -ne 0 ]]; then
-    CLEANUP="FAILED"
+  if [[ "${code}" -ne 0 && "${ASSETS_CLEANUP}" != "FAILED" ]]; then
+    if [[ "${ASSETS_CLEANUP}" == "OK" ]]; then
+      ASSETS_CLEANUP="FAILED"
+    elif [[ "${ASSETS_CLEANUP}" == "PENDING" ]]; then
+      ASSETS_CLEANUP="UNAVAILABLE"
+    fi
   fi
   return 0
 }
@@ -852,6 +896,8 @@ print_final_flags() {
   echo "TEST DB ROWS CLEANED = ${TEST_DB_ROWS_CLEANED}"
   echo "WORKER STATUS = ${WORKER_STATUS}"
   echo "PUBLIC HEALTH = ${PUBLIC_HEALTH}"
+  echo "RELEASES_CLEANUP = ${RELEASES_CLEANUP}"
+  echo "ASSETS_CLEANUP = ${ASSETS_CLEANUP}"
   echo "CLEANUP = ${CLEANUP}"
   echo "CUTOVER = NO"
   echo "MODE = allowlist_cleanup"
@@ -867,6 +913,8 @@ run_disk_storage_cleanup() {
   echo "allowlist_module=${ALLOWLIST_MODULE}"
   if [[ "${ALLOWLIST_MODULE}" != *.mjs ]]; then
     echo "NEEDS_REVIEW kind=allowlist reason=temp_path_missing_mjs path=${ALLOWLIST_MODULE}"
+    RELEASES_CLEANUP="FAILED"
+    ASSETS_CLEANUP="UNAVAILABLE"
     CLEANUP="FAILED"
     print_final_flags
     return 1
@@ -920,18 +968,22 @@ run_disk_storage_cleanup() {
 
   section "ALLOWLIST RELEASES"
   echo "allowlist=${ALLOWLIST_RELEASE_A} ${ALLOWLIST_RELEASE_B}"
+  echo "note=allowlisted_releases_may_be_root_owned_and_need_root_rm"
   delete_allowlisted_release "${ALLOWLIST_RELEASE_A}" "${SAVED_CURRENT_NAME}" "${SAVED_PREVIOUS_NAME}"
   delete_allowlisted_release "${ALLOWLIST_RELEASE_B}" "${SAVED_CURRENT_NAME}" "${SAVED_PREVIOUS_NAME}"
 
   section "ALLOWLIST ASSETS"
   echo "project_id=${CLEANUP_PROJECT_ID}"
   echo "bucket=studio-draft-assets"
+  echo "note=asset_cleanup_continues_after_release_rm_failures"
   set +e
   run_asset_cleanup_probe
   asset_ok=$?
   set -e
-  if [[ "${asset_ok}" -ne 0 ]]; then
-    CLEANUP="FAILED"
+  if [[ "${asset_ok}" -ne 0 && "${ASSETS_CLEANUP}" == "PENDING" ]]; then
+    ASSETS_CLEANUP="UNAVAILABLE"
+  elif [[ "${asset_ok}" -ne 0 && "${ASSETS_CLEANUP}" == "OK" ]]; then
+    ASSETS_CLEANUP="FAILED"
   fi
 
   section "POST CHECKS"
@@ -954,14 +1006,12 @@ run_disk_storage_cleanup() {
     echo "shared_env_intact=YES"
   else
     echo "shared_env_intact=NO"
-    CLEANUP="FAILED"
     REAL_USER_PROJECTS_UNTOUCHED="NO"
   fi
   if [[ -d "${RELEASES_DIR}/${SAVED_CURRENT_NAME}" && -d "${RELEASES_DIR}/${SAVED_PREVIOUS_NAME}" ]]; then
     echo "current_previous_dirs_present=YES"
   else
     echo "current_previous_dirs_present=NO"
-    CLEANUP="FAILED"
   fi
 
   section "WORKER STATUS"
@@ -971,25 +1021,48 @@ run_disk_storage_cleanup() {
   read_public_health
 
   section "NEEDS REVIEW"
+  local review=""
+  local other_review=0
+  local root_deferred_review=0
   if ((${#NEEDS_REVIEW_LINES[@]} == 0)); then
     echo "(none)"
   else
-    local review=""
     for review in "${NEEDS_REVIEW_LINES[@]}"; do
       printf '%s\n' "${review}"
+      if [[ "${review}" == *"reason=permission_denied_root_owned"* ]]; then
+        root_deferred_review=1
+      else
+        other_review=1
+      fi
     done
-    CLEANUP="FAILED"
+  fi
+  if (( root_deferred_review == 1 )); then
+    echo "note=allowlisted_releases_need_root_rm RELEASES_CLEANUP=${RELEASES_CLEANUP}"
   fi
 
-  if [[ "${CURRENT_RELEASE_INTACT}" == "YES" && "${PREVIOUS_RELEASE_INTACT}" == "YES" && "${REAL_USER_PROJECTS_UNTOUCHED}" == "YES" && "${#NEEDS_REVIEW_LINES[@]}" -eq 0 && "${CLEANUP}" != "FAILED" ]]; then
+  if [[ "${RELEASES_CLEANUP}" == "PENDING" ]]; then
+    RELEASES_CLEANUP="FAILED"
+  fi
+  if [[ "${ASSETS_CLEANUP}" == "PENDING" ]]; then
+    ASSETS_CLEANUP="UNAVAILABLE"
+  fi
+
+  local safety_ok=0
+  if [[ "${CURRENT_RELEASE_INTACT}" == "YES" && "${PREVIOUS_RELEASE_INTACT}" == "YES" && "${REAL_USER_PROJECTS_UNTOUCHED}" == "YES" && -e "${SHARED_ENV_PRODUCTION}" && -d "${RELEASES_DIR}/${SAVED_CURRENT_NAME}" && -d "${RELEASES_DIR}/${SAVED_PREVIOUS_NAME}" ]]; then
+    safety_ok=1
+  fi
+
+  if [[ "${safety_ok}" -eq 1 && "${other_review}" -eq 0 && "${ASSETS_CLEANUP}" == "OK" && "${RELEASES_CLEANUP}" == "OK" ]]; then
     CLEANUP="SUCCESS"
+  elif [[ "${safety_ok}" -eq 1 && "${other_review}" -eq 0 && "${ASSETS_CLEANUP}" == "OK" && "${RELEASES_CLEANUP}" == "DEFERRED" ]]; then
+    CLEANUP="PARTIAL"
   else
     CLEANUP="FAILED"
   fi
 
   section "DISK_STORAGE_CLEANUP_END"
   print_final_flags
-  if [[ "${CLEANUP}" != "SUCCESS" ]]; then
+  if [[ "${CLEANUP}" == "FAILED" ]]; then
     return 1
   fi
   return 0

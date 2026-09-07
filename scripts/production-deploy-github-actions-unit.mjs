@@ -1355,7 +1355,11 @@ function assertDiskStorageCleanup(workflowText, docsText) {
     "TEST DB ROWS CLEANED =",
     "WORKER STATUS =",
     "PUBLIC HEALTH =",
+    "RELEASES_CLEANUP =",
+    "ASSETS_CLEANUP =",
     "CLEANUP =",
+    "permission_denied_root_owned",
+    "rm_denied_count=",
     "CUTOVER = NO",
     "MODE = allowlist_cleanup",
     "20260906-113101-2acc27e1",
@@ -1372,6 +1376,8 @@ function assertDiskStorageCleanup(workflowText, docsText) {
     "temp_path_missing_mjs",
     "RELEASE_GATE=NO reason=allowlist_import_failed",
     "ASSET_CLEANUP_ERROR=",
+    "note=allowlisted_releases_may_be_root_owned_and_need_root_rm",
+    "note=asset_cleanup_continues_after_release_rm_failures",
   ];
   for (const needle of required) {
     assert.match(
@@ -1601,7 +1607,10 @@ function writeCleanupMockModules(currentDir, { secretUrl, secretKey, assets, pro
   return statePath;
 }
 
-function writeDiskCleanupFixture(root, { secretUrl, secretKey, currentIsAllowlisted = false, extraAssets = [] }) {
+function writeDiskCleanupFixture(
+  root,
+  { secretUrl, secretKey, currentIsAllowlisted = false, extraAssets = [], denyReleaseRm = false },
+) {
   const releaseCurrent = currentIsAllowlisted
     ? "20260906-113101-2acc27e1"
     : "20260907-120000-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -1712,6 +1721,29 @@ function writeDiskCleanupFixture(root, { secretUrl, secretKey, currentIsAllowlis
     join(binDir, "docker"),
     ["#!/usr/bin/env bash", "echo 'permission denied' >&2", "exit 1", ""].join("\n"),
   );
+  if (denyReleaseRm) {
+    writeFileSync(
+      join(binDir, "rm"),
+      [
+        "#!/usr/bin/env bash",
+        "for arg in \"$@\"; do",
+        "  case \"${arg}\" in",
+        "    *releases/20260906-113101-2acc27e1*|*releases/20260907-064414-b85c870a*)",
+        "      i=0",
+        "      while [[ \"${i}\" -lt 80 ]]; do",
+        "        echo \"rm: cannot remove '${arg}/nested-${i}': Permission denied\" >&2",
+        "        i=$((i + 1))",
+        "      done",
+        "      exit 1",
+        "      ;;",
+        "  esac",
+        "done",
+        'exec /bin/rm "$@"',
+        "",
+      ].join("\n"),
+    );
+    chmodSync(join(binDir, "rm"), 0o755);
+  }
   chmodSync(join(binDir, "pm2"), 0o755);
   chmodSync(join(binDir, "curl"), 0o755);
   chmodSync(join(binDir, "docker"), 0o755);
@@ -1790,6 +1822,8 @@ function assertDiskCleanupHelper(workflowText) {
     assert.match(output, /MODE = allowlist_cleanup/);
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /CLEANUP = SUCCESS/);
+    assert.match(output, /RELEASES_CLEANUP = OK/);
+    assert.match(output, /ASSETS_CLEANUP = OK/);
     assert.match(output, /CURRENT RELEASE INTACT = YES/);
     assert.match(output, /PREVIOUS RELEASE INTACT = YES/);
     assert.match(output, /REAL USER PROJECTS UNTOUCHED = YES/);
@@ -1825,7 +1859,10 @@ function assertDiskCleanupHelper(workflowText) {
     assert.notEqual(result.status, 0, "cleanup must fail when CURRENT is allowlisted");
     assert.match(output, /RELEASE_GATE=NO reason=current_is_allowlisted/);
     assert.match(output, /NEEDS_REVIEW kind=release reason=gate_failed/);
+    assert.match(output, /RELEASES_CLEANUP = FAILED/);
+    assert.match(output, /ASSETS_CLEANUP = OK/);
     assert.match(output, /CLEANUP = FAILED/);
+    assert.match(output, /storage_removed/);
     assert.equal(existsSync(join(fixture.deployRoot, "releases", "20260906-113101-2acc27e1")), true);
     assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseCurrent)), true);
     assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releasePrevious)), true);
@@ -1852,6 +1889,8 @@ function assertDiskCleanupHelper(workflowText) {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.notEqual(result.status, 0, "cleanup must fail when storage is shared with another project");
     assert.match(output, /NEEDS_REVIEW kind=asset reason=shared_with_other_project/);
+    assert.match(output, /RELEASES_CLEANUP = OK/);
+    assert.match(output, /ASSETS_CLEANUP = FAILED/);
     assert.match(output, /CLEANUP = FAILED/);
     const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
     assert.equal(
@@ -1897,6 +1936,36 @@ function assertDiskCleanupHelper(workflowText) {
     assert.doesNotMatch(remoteOutput, /ASSET_CLEANUP=UNAVAILABLE reason=error/);
   } finally {
     rmSync(remoteRoot, { recursive: true, force: true });
+  }
+
+  const deniedRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-denied-"));
+  try {
+    const fixture = writeDiskCleanupFixture(deniedRoot, {
+      secretUrl,
+      secretKey,
+      denyReleaseRm: true,
+    });
+    const result = runDiskCleanupHelper(deniedRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `root-owned release deferral should not abort: ${output}`);
+    assert.match(output, /NEEDS_REVIEW kind=release reason=permission_denied_root_owned/);
+    assert.match(output, /rm_denied_count=/);
+    assert.match(output, /RELEASES_CLEANUP = DEFERRED/);
+    assert.match(output, /ASSETS_CLEANUP = OK/);
+    assert.match(output, /CLEANUP = PARTIAL/);
+    assert.match(output, /storage_removed/);
+    assert.match(output, /note=allowlisted_releases_need_root_rm/);
+    assert.doesNotMatch(output, /rm: cannot remove/);
+    const cannotRemoveCount = (output.match(/cannot remove/g) || []).length;
+    assert.equal(cannotRemoveCount, 0, "must summarize rm permission errors instead of flooding");
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", "20260906-113101-2acc27e1")), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseAllowB)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseCurrent)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releasePrevious)), true);
+    const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+    assert.ok(state.removedStorage.length >= 1, "assets must still be deleted when release rm is denied");
+  } finally {
+    rmSync(deniedRoot, { recursive: true, force: true });
   }
 }
 
