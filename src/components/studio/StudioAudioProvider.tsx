@@ -45,7 +45,8 @@ import {
 import { MAX_STUDIO_PROJECT_BYTES } from "@/lib/studio/limits";
 import {
   MAX_LOCAL_FILE_SIZE_BYTES,
-  validateStudioLocalDuration,
+  createStudioLocalDurationError,
+  formatStudioLocalIngestError,
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
 import { validateStudioRecordedFile } from "@/lib/studio/recorder";
@@ -369,11 +370,6 @@ function disconnectTrackGraph(runtime: TrackRuntime) {
 }
 
 export { validateStudioLocalFile };
-
-function formatDecodeError(error: unknown): string {
-  void error;
-  return "Браузеру не удалось открыть выбранное аудио.";
-}
 
 function getTrackId(file: File, index: number): string {
   return `${file.name}:${file.size}:${file.lastModified}:${index}:${crypto.randomUUID()}`;
@@ -1260,14 +1256,10 @@ export function StudioAudioProvider({
       try {
         for (const file of files) {
           const local = await createLocalStudioPlaybackAsset(file);
-          if (!Number.isFinite(local.duration) || local.duration <= 0) {
-            revokeStudioObjectUrl(local.playbackUrl);
-            throw new Error(`Некорректная длительность файла «${file.name}».`);
-          }
-          const durationError = validateStudioLocalDuration(local.duration);
+          const durationError = createStudioLocalDurationError(local.duration);
           if (durationError) {
             revokeStudioObjectUrl(local.playbackUrl);
-            throw new Error(durationError);
+            throw durationError;
           }
           preparedTracks.push({
             file,
@@ -1345,7 +1337,7 @@ export function StudioAudioProvider({
           return [];
         }
 
-        setProjectError(formatDecodeError(decodeError));
+        setProjectError(formatStudioLocalIngestError(decodeError));
         if (tracksRef.current.length === 0) {
           setStatusValue("error");
         } else if (statusBeforeLoad !== "playing") {
@@ -1396,14 +1388,10 @@ export function StudioAudioProvider({
 
       try {
         const local = await createLocalStudioPlaybackAsset(file);
-        if (!Number.isFinite(local.duration) || local.duration <= 0) {
-          revokeStudioObjectUrl(local.playbackUrl);
-          throw new Error("invalid recorded audio duration");
-        }
-        const durationError = validateStudioLocalDuration(local.duration);
+        const durationError = createStudioLocalDurationError(local.duration);
         if (durationError) {
           revokeStudioObjectUrl(local.playbackUrl);
-          throw new Error(durationError);
+          throw durationError;
         }
         const asset: TrackAsset = {
           file,
@@ -1450,7 +1438,7 @@ export function StudioAudioProvider({
         return track;
       } catch (decodeError) {
         setProjectError(
-          `Не удалось обработать запись. ${formatDecodeError(decodeError)}`,
+          `Не удалось обработать запись. ${formatStudioLocalIngestError(decodeError)}`,
         );
         if (tracksRef.current.length === 0) {
           setStatusValue("error");
@@ -1522,14 +1510,10 @@ export function StudioAudioProvider({
 
       try {
         const local = await createLocalStudioPlaybackAsset(file);
-        if (!Number.isFinite(local.duration) || local.duration <= 0) {
-          revokeStudioObjectUrl(local.playbackUrl);
-          throw new Error("invalid audio duration");
-        }
-        const durationError = validateStudioLocalDuration(local.duration);
+        const durationError = createStudioLocalDurationError(local.duration);
         if (durationError) {
           revokeStudioObjectUrl(local.playbackUrl);
-          throw new Error(durationError);
+          throw durationError;
         }
 
         if (replacementGenerationRef.current.get(trackId) !== generation) {
@@ -1619,7 +1603,7 @@ export function StudioAudioProvider({
         updateTrack(trackId, (item) => ({
           ...item,
           isReplacing: false,
-          replacementError: `Не удалось заменить аудио. ${formatDecodeError(error)}`,
+          replacementError: `Не удалось заменить аудио. ${formatStudioLocalIngestError(error)}`,
         }));
         return false;
       }
@@ -1692,7 +1676,7 @@ export function StudioAudioProvider({
     } catch (playError) {
       stopSources();
       cancelProgressLoop();
-      setProjectError(formatDecodeError(playError));
+      setProjectError(formatStudioLocalIngestError(playError));
       setStatusValue("error");
     }
   }, [

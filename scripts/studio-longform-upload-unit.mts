@@ -14,6 +14,10 @@ import {
   studioPeaksColumnCount,
 } from "../src/lib/studio/limits";
 import {
+  STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  StudioLocalValidationError,
+  createStudioLocalDurationError,
+  formatStudioLocalIngestError,
   validateStudioLocalDuration,
   validateStudioLocalFile,
 } from "../src/lib/studio/local-file-validation";
@@ -52,7 +56,23 @@ assert.equal(
   STUDIO_ASSET_TOO_LARGE_MESSAGE,
 );
 assert.equal(validateStudioLocalDuration(10800), null);
+assert.equal(validateStudioLocalDuration(10799), null);
+assert.equal(createStudioLocalDurationError(10799), null);
 assert.equal(validateStudioLocalDuration(10800.01), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+const clientTooLong = createStudioLocalDurationError(10802);
+assert.ok(clientTooLong instanceof StudioLocalValidationError);
+assert.equal(clientTooLong.code, "audio_too_long");
+assert.equal(clientTooLong.message, STUDIO_AUDIO_TOO_LONG_MESSAGE);
+assert.equal(validateStudioLocalDuration(10802), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+assert.equal(formatStudioLocalIngestError(clientTooLong), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+assert.equal(
+  formatStudioLocalIngestError(new Error("media_metadata_error")),
+  STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+);
+assert.equal(
+  formatStudioLocalIngestError(new Error(STUDIO_AUDIO_TOO_LONG_MESSAGE)),
+  STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+);
 assert.ok(isStudioDurationAllowed(1));
 assert.equal(isStudioDurationAllowed(10801), false);
 assert.equal(isStudioAssetSizeAllowed(MAX_STUDIO_ASSET_BYTES), true);
@@ -138,8 +158,18 @@ const provider = await readFile(
   new URL("../src/components/studio/StudioAudioProvider.tsx", import.meta.url),
   "utf8",
 );
-assert.match(provider, /validateStudioLocalDuration/);
+assert.match(provider, /createStudioLocalDurationError/);
+assert.match(provider, /formatStudioLocalIngestError/);
+assert.doesNotMatch(provider, /formatDecodeError/);
 assert.match(provider, /MAX_STUDIO_PROJECT_BYTES/);
+const loadLocalFiles = provider.slice(
+  provider.indexOf("const loadLocalFiles"),
+  provider.indexOf("const ingestRecordedFile"),
+);
+assert.ok(
+  loadLocalFiles.indexOf("createStudioLocalDurationError") <
+    loadLocalFiles.indexOf("startTrackAssetUpload"),
+);
 assert.doesNotMatch(provider, /decodeAudioData|file\.arrayBuffer/);
 
 const workspace = await readFile(
