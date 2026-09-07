@@ -73,9 +73,9 @@ import {
 import {
   captureRecoveryPosition,
   decideMediaErrorRecovery,
+  failedSignedUrlLoadResult,
   LOAD_AUDIO_ERROR,
   shouldApplySignedUrlRecovery,
-  messageForSignedUrlHttpStatus,
   visibleErrorForSignedUrlRecoveryFailure,
   type LoadSignedUrlRecoveryResult,
 } from "@/lib/audio/signed-url-media-error-recovery";
@@ -772,27 +772,17 @@ export function useSequentialPlayer({
             retries: urlRetryCountRef.current,
           });
 
-          if (result.status === 401 || result.status === 403) {
-            setUrlError(
-              fetchAsPrivate
-                ? "Нет доступа к этому аудиоматериалу."
-                : messageForSignedUrlHttpStatus(result.status),
-            );
-          } else if (result.status === 404) {
-            setUrlError(messageForSignedUrlHttpStatus(result.status));
-          } else {
-            setUrlError(PREPARE_AUDIO_ERROR);
-          }
+          const failed = failedSignedUrlLoadResult({
+            status: result.status,
+            sourceType: fetchAsPrivate ? "private_audio" : "catalog",
+          });
+          setUrlError(failed.visibleError ?? PREPARE_AUDIO_ERROR);
 
           prefetchedNextSourceRef.current = null;
           setSrc(null);
           setIsLoading(false);
           settled = true;
-          outcome = {
-            ok: false,
-            reason: "failed",
-            status: result.status,
-          };
+          outcome = failed;
           return outcome;
         }
 

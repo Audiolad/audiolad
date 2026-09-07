@@ -6,17 +6,24 @@
 import assert from "node:assert/strict";
 
 import {
+  AUDIO_NOT_FOUND_ERROR,
+  CATALOG_ACCESS_ERROR,
   captureRecoveryPosition,
   decideMediaErrorRecovery,
+  failedSignedUrlLoadResult,
   FORMAT_AUDIO_ERROR,
   LOAD_AUDIO_ERROR,
+  MEDIA_ERR_ABORTED,
+  MEDIA_ERR_DECODE,
   MEDIA_ERR_NETWORK,
   MEDIA_ERR_SRC_NOT_SUPPORTED,
-  messageForSignedUrlHttpStatus,
+  messageForSignedUrlLoadFailure,
+  PRIVATE_ACCESS_ERROR,
   settleSignedUrlRecoveryFailure,
   shouldApplySignedUrlRecovery,
   visibleErrorForSignedUrlRecoveryFailure,
   visibleListenPlayerError,
+  type SignedUrlSourceType,
 } from "../src/lib/audio/signed-url-media-error-recovery";
 import {
   createSignedUrlRecoveryState,
@@ -93,6 +100,47 @@ function testCode4Policy() {
   });
   assert.equal(secondCode2.action, "load_error");
   assert.equal(secondCode2.errorMessage, LOAD_AUDIO_ERROR);
+
+  const primaryCode2 = decideMediaErrorRecovery({
+    isHandlerCurrent: true,
+    hasSrc: true,
+    currentTrackId: "track-a",
+    mediaErrorCode: MEDIA_ERR_NETWORK,
+    hadSuccessfulPlaying: false,
+    recoveryUrlAttempted: false,
+    foregroundRecoveryInFlight: false,
+  });
+  assert.equal(primaryCode2.action, "resign");
+}
+
+function recoveryDecision(code: number | null) {
+  return decideMediaErrorRecovery({
+    isHandlerCurrent: true,
+    hasSrc: true,
+    currentTrackId: "track-a",
+    mediaErrorCode: code,
+    hadSuccessfulPlaying: true,
+    recoveryUrlAttempted: false,
+    foregroundRecoveryInFlight: false,
+  });
+}
+
+function testNonResignableMediaCodes() {
+  for (const code of [MEDIA_ERR_ABORTED, MEDIA_ERR_DECODE, null, 0, 99] as const) {
+    const decision = recoveryDecision(code);
+    assert.equal(decision.action, "load_error", `code ${code} must not re-sign`);
+    assert.equal(decision.errorMessage, LOAD_AUDIO_ERROR);
+
+    let state = playableState();
+    state = reduceSignedUrlRecovery(state, {
+      type: "media_error",
+      code,
+      currentTime: 3650,
+    });
+    assert.equal(state.fetchCalls.length, 0, `code ${code} must not fetch`);
+    assert.equal(state.playerError, LOAD_AUDIO_ERROR, `code ${code} final error`);
+    assert.equal(state.recoveryUrlAttempted, false);
+  }
 }
 
 function testPlayingResumeAt3650() {
@@ -334,21 +382,49 @@ function testLoadSignedUrlFailureSettles() {
   assert.equal(stale.showError, false);
   assert.equal(stale.allowAnotherResign, false);
 
-  for (const status of [403, 404, 500] as const) {
-    const expected = messageForSignedUrlHttpStatus(status);
-    const result = {
-      ok: false as const,
-      reason: "failed" as const,
-      status,
-    };
-    const playerError = visibleErrorForSignedUrlRecoveryFailure(result);
-    const urlError = messageForSignedUrlHttpStatus(status);
+  assert.equal(
+    messageForSignedUrlLoadFailure({
+      status: 403,
+      sourceType: "private_audio",
+    }),
+    PRIVATE_ACCESS_ERROR,
+  );
+  assert.equal(
+    messageForSignedUrlLoadFailure({ status: 403, sourceType: "catalog" }),
+    CATALOG_ACCESS_ERROR,
+  );
+  assert.equal(
+    messageForSignedUrlLoadFailure({ status: 404, sourceType: "catalog" }),
+    AUDIO_NOT_FOUND_ERROR,
+  );
+  assert.equal(
+    messageForSignedUrlLoadFailure({ status: 500, sourceType: "catalog" }),
+    LOAD_AUDIO_ERROR,
+  );
 
-    assert.equal(playerError, expected, `${status} helper text`);
+  const cases: Array<{
+    status: number;
+    sourceType: SignedUrlSourceType;
+  }> = [
+    { status: 403, sourceType: "private_audio" },
+    { status: 403, sourceType: "catalog" },
+    { status: 404, sourceType: "catalog" },
+    { status: 500, sourceType: "catalog" },
+  ];
+
+  for (const { status, sourceType } of cases) {
+    const label = `${sourceType} ${status}`;
+    const result = failedSignedUrlLoadResult({ status, sourceType });
+    const expected = messageForSignedUrlLoadFailure({ status, sourceType });
+    const urlError = result.visibleError ?? expected;
+    const playerError = visibleErrorForSignedUrlRecoveryFailure(result);
+
+    assert.equal(result.visibleError, expected, `${label} factory visibleError`);
+    assert.equal(playerError, expected, `${label} recovery uses loadSignedUrl text`);
     assert.equal(
       visibleListenPlayerError(playerError, urlError),
       expected,
-      `${status} visible playerError ?? urlError must not be masked`,
+      `${label} visible playerError ?? urlError must not be masked`,
     );
     assert.equal(
       visibleListenPlayerError(LOAD_AUDIO_ERROR, expected),
@@ -367,11 +443,12 @@ function testLoadSignedUrlFailureSettles() {
       trackId: "track-a",
       generation: 1,
       status,
+      sourceType,
     });
-    assert.equal(state.isLoading, false, `${status} must end loading`);
-    assert.equal(state.isUrlLoading, false, `${status} must end url loading`);
-    assert.equal(state.src, null, `${status} must not leave a half-state src`);
-    assert.equal(visibleRecoveryError(state), expected, `${status} visible error`);
+    assert.equal(state.isLoading, false, `${label} must end loading`);
+    assert.equal(state.isUrlLoading, false, `${label} must end url loading`);
+    assert.equal(state.src, null, `${label} must not leave a half-state src`);
+    assert.equal(visibleRecoveryError(state), expected, `${label} visible error`);
     assert.equal(state.recoveryUrlAttempted, true);
 
     const fetches = state.fetchCalls.length;
@@ -380,12 +457,13 @@ function testLoadSignedUrlFailureSettles() {
       type: "media_error",
       code: MEDIA_ERR_NETWORK,
     });
-    assert.equal(state.fetchCalls.length, fetches, `${status} must not auto-refresh again`);
+    assert.equal(state.fetchCalls.length, fetches, `${label} must not auto-refresh again`);
   }
 }
 
 function main() {
   testCode4Policy();
+  testNonResignableMediaCodes();
   testPlayingResumeAt3650();
   testPausedDoesNotPlay();
   testSecondFailureNoLoop();

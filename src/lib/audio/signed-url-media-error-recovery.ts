@@ -15,11 +15,13 @@
  * unsupported codec. Chromium maps failed-to-load / unresolvable URLs to
  * code 4. Safari/WebKit commonly surfaces HTTP media failures as code 4.
  *
- * Policy:
- * - After a successful `playing` event in this cycle: code 2 or 4 → one
- *   transparent re-sign.
+ * Policy A (codes are not interchangeable):
+ * - code 2 (MEDIA_ERR_NETWORK) → one transparent re-sign.
+ * - code 4 AFTER a successful `playing` event → one transparent re-sign.
  * - Primary load, no successful playing yet: code 4 → format/source error,
- *   no re-sign. Code 2 may still re-sign once (network flake).
+ *   no re-sign.
+ * - code 1 (aborted), code 3 (decode), unknown/null → ordinary final error,
+ *   no automatic re-sign. Decode/abort are not treated as expired-URL.
  * - After that re-sign, any later media error → final player error, no loop.
  */
 
@@ -65,14 +67,20 @@ export function decideMediaErrorRecovery(
     return { action: "ignore", errorMessage: null };
   }
 
-  const isCode4 = input.mediaErrorCode === MEDIA_ERR_SRC_NOT_SUPPORTED;
-  const firstSrcFormatFailure = isCode4 && !input.hadSuccessfulPlaying;
+  const code = input.mediaErrorCode;
+  const isCode2 = code === MEDIA_ERR_NETWORK;
+  const isCode4 = code === MEDIA_ERR_SRC_NOT_SUPPORTED;
+  const canResign = Boolean(input.currentTrackId) && !input.recoveryUrlAttempted;
 
-  if (firstSrcFormatFailure) {
+  if (isCode4 && !input.hadSuccessfulPlaying) {
     return { action: "format_error", errorMessage: FORMAT_AUDIO_ERROR };
   }
 
-  if (input.currentTrackId && !input.recoveryUrlAttempted) {
+  if (isCode2 && canResign) {
+    return { action: "resign", errorMessage: null };
+  }
+
+  if (isCode4 && input.hadSuccessfulPlaying && canResign) {
     return { action: "resign", errorMessage: null };
   }
 
@@ -108,22 +116,55 @@ export function shouldApplySignedUrlRecovery(input: {
   );
 }
 
+export type SignedUrlSourceType = "catalog" | "private_audio";
+
+export const PRIVATE_ACCESS_ERROR = "Нет доступа к этому аудиоматериалу.";
+export const CATALOG_ACCESS_ERROR = "Доступ к прослушиванию не открыт.";
+export const AUDIO_NOT_FOUND_ERROR = "Аудиофайл не найден.";
+
 export type LoadSignedUrlRecoveryResult =
   | { ok: true; url: string }
-  | { ok: false; reason: "stale" | "aborted" | "failed"; status?: number | null };
+  | { ok: false; reason: "stale" | "aborted" }
+  | {
+      ok: false;
+      reason: "failed";
+      status?: number | null;
+      sourceType?: SignedUrlSourceType;
+      visibleError?: string | null;
+    };
 
-export function messageForSignedUrlHttpStatus(
-  status?: number | null,
-): string {
-  if (status === 401 || status === 403) {
-    return "Доступ к прослушиванию не открыт.";
+/**
+ * Single source of truth for signed-URL HTTP failure copy.
+ * loadSignedUrl attaches this as `visibleError`; recovery must reuse it.
+ */
+export function messageForSignedUrlLoadFailure(input: {
+  status?: number | null;
+  sourceType?: SignedUrlSourceType | null;
+}): string {
+  if (input.status === 401 || input.status === 403) {
+    return input.sourceType === "private_audio"
+      ? PRIVATE_ACCESS_ERROR
+      : CATALOG_ACCESS_ERROR;
   }
 
-  if (status === 404) {
-    return "Аудиофайл не найден.";
+  if (input.status === 404) {
+    return AUDIO_NOT_FOUND_ERROR;
   }
 
   return LOAD_AUDIO_ERROR;
+}
+
+export function failedSignedUrlLoadResult(input: {
+  status?: number | null;
+  sourceType: SignedUrlSourceType;
+}): Extract<LoadSignedUrlRecoveryResult, { reason: "failed" }> {
+  return {
+    ok: false,
+    reason: "failed",
+    status: input.status ?? null,
+    sourceType: input.sourceType,
+    visibleError: messageForSignedUrlLoadFailure(input),
+  };
 }
 
 export function settleSignedUrlRecoveryFailure(result: {
@@ -172,9 +213,16 @@ export function visibleErrorForSignedUrlRecoveryFailure(
 ): string | null {
   const settled = settleSignedUrlRecoveryFailure(result);
 
-  if (!settled.showError || result.ok) {
+  if (!settled.showError || result.ok || result.reason !== "failed") {
     return null;
   }
 
-  return messageForSignedUrlHttpStatus(result.status);
+  if (typeof result.visibleError === "string" && result.visibleError.length > 0) {
+    return result.visibleError;
+  }
+
+  return messageForSignedUrlLoadFailure({
+    status: result.status,
+    sourceType: result.sourceType,
+  });
 }

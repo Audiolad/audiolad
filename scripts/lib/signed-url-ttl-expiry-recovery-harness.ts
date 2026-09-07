@@ -5,11 +5,12 @@
 import {
   captureRecoveryPosition,
   decideMediaErrorRecovery,
+  failedSignedUrlLoadResult,
   settleSignedUrlRecoveryFailure,
   shouldApplySignedUrlRecovery,
   visibleErrorForSignedUrlRecoveryFailure,
   visibleListenPlayerError,
-  type LoadSignedUrlRecoveryResult,
+  type SignedUrlSourceType,
 } from "../../src/lib/audio/signed-url-media-error-recovery";
 
 function applyRecoveredStart(input: {
@@ -53,7 +54,7 @@ export type SignedUrlRecoveryState = {
 };
 
 export type SignedUrlRecoveryEvent =
-  | { type: "media_error"; code: number; currentTime?: number }
+  | { type: "media_error"; code: number | null; currentTime?: number }
   | { type: "loadedmetadata"; duration: number }
   | { type: "playing" }
   | { type: "canplay"; duration: number }
@@ -63,6 +64,7 @@ export type SignedUrlRecoveryEvent =
       trackId: string;
       generation: number;
       status?: number | null;
+      sourceType?: SignedUrlSourceType;
     }
   | { type: "track_switch"; trackId: string; startPosition?: number }
   | { type: "session_generation"; generation: number }
@@ -245,11 +247,10 @@ export function reduceSignedUrlRecovery(
         return state;
       }
 
-      const result: LoadSignedUrlRecoveryResult = {
-        ok: false,
-        reason: "failed",
+      const result = failedSignedUrlLoadResult({
         status: event.status ?? null,
-      };
+        sourceType: event.sourceType ?? "catalog",
+      });
       const settled = settleSignedUrlRecoveryFailure(result);
       const playerError = visibleErrorForSignedUrlRecoveryFailure(result);
 
