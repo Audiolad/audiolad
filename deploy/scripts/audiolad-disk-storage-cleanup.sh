@@ -353,7 +353,7 @@ resolve_allowlist_module() {
       return 0
     fi
   fi
-  tmp="$(mktemp)"
+  tmp="$(mktemp /tmp/audiolad-disk-cleanup-allowlist.XXXXXX.mjs)"
   CLEANUP_TEMP_FILES+=("${tmp}")
   write_embedded_allowlist "${tmp}"
   printf '%s\n' "${tmp}"
@@ -400,16 +400,24 @@ gate_release() {
   ALLOWLIST_MODULE="${ALLOWLIST_MODULE}" \
   node --input-type=module -e '
 import { pathToFileURL } from "node:url";
-const mod = await import(pathToFileURL(process.env.ALLOWLIST_MODULE).href);
-const r = mod.evaluateReleaseDelete({
-  basename: process.env.REL_NAME,
-  currentBasename: process.env.REL_CURRENT,
-  previousBasename: process.env.REL_PREVIOUS,
-  absolutePath: process.env.REL_PATH,
-  releasesDir: process.env.REL_RELEASES_DIR,
-});
-console.log("RELEASE_GATE=" + (r.ok ? "YES" : "NO") + " reason=" + r.reason);
-process.exit(r.ok ? 0 : 1);
+try {
+  const href = pathToFileURL(process.env.ALLOWLIST_MODULE).href;
+  const mod = await import(href);
+  const r = mod.evaluateReleaseDelete({
+    basename: process.env.REL_NAME,
+    currentBasename: process.env.REL_CURRENT,
+    previousBasename: process.env.REL_PREVIOUS,
+    absolutePath: process.env.REL_PATH,
+    releasesDir: process.env.REL_RELEASES_DIR,
+  });
+  console.log("RELEASE_GATE=" + (r.ok ? "YES" : "NO") + " reason=" + r.reason);
+  process.exit(r.ok ? 0 : 1);
+} catch (err) {
+  const message = err && err.message ? String(err.message) : String(err);
+  console.log("RELEASE_GATE=NO reason=allowlist_import_failed");
+  console.error(message.slice(0, 400));
+  process.exit(1);
+}
 '
 }
 
@@ -425,7 +433,7 @@ delete_allowlisted_release() {
     return 0
   fi
   set +e
-  gate="$(gate_release "${name}" "${current}" "${previous}" "${path}" 2>/dev/null)"
+  gate="$(gate_release "${name}" "${current}" "${previous}" "${path}" 2>&1)"
   local code=$?
   set -e
   printf '%s\n' "${gate}" | redact_studio_stream
@@ -711,8 +719,10 @@ Promise.resolve()
     emit("ASSET_CLEANUP=" + (failed ? "FAILED" : "OK"));
     if (failed) process.exit(2);
   })
-  .catch(() => {
+  .catch((err) => {
+    const message = err && err.message ? String(err.message) : String(err);
     console.log("ASSET_CLEANUP=UNAVAILABLE reason=error");
+    console.log("ASSET_CLEANUP_ERROR=" + message.replace(/\s+/g, " ").slice(0, 400));
     process.exit(2);
   });
 JS
@@ -722,7 +732,7 @@ JS
     export NODE_ENV=production
     export NODE_PATH="${dir}/node_modules${NODE_PATH:+:${NODE_PATH}}"
     cd "${dir}"
-    node "${probe}" "${dir}" "${ALLOWLIST_MODULE}" 2>/dev/null
+    node "${probe}" "${dir}" "${ALLOWLIST_MODULE}" 2>&1
   )"
   code=$?
   set -e
@@ -854,6 +864,13 @@ run_disk_storage_cleanup() {
   local previous_real=""
   local asset_ok=0
   ALLOWLIST_MODULE="$(resolve_allowlist_module)"
+  echo "allowlist_module=${ALLOWLIST_MODULE}"
+  if [[ "${ALLOWLIST_MODULE}" != *.mjs ]]; then
+    echo "NEEDS_REVIEW kind=allowlist reason=temp_path_missing_mjs path=${ALLOWLIST_MODULE}"
+    CLEANUP="FAILED"
+    print_final_flags
+    return 1
+  fi
 
   section "DISK_STORAGE_CLEANUP"
   echo "mode=allowlist_cleanup"

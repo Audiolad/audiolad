@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -331,6 +333,9 @@ function main() {
 
   const helperText = readFileSync(helperPath, "utf8");
   const workflowText = readFileSync(workflowPath, "utf8");
+  assertEmbeddedAllowlistTempIsMjs(helperText, "helper");
+  assertEmbeddedAllowlistTempIsMjs(workflowText, "workflow");
+  assertEmbeddedAllowlistResolveImports(helperText);
   for (const needle of [
     "OPS_DISK_STORAGE_CLEANUP",
     CLEANUP_PROJECT_ID,
@@ -355,6 +360,66 @@ function main() {
   }
 
   console.log("disk-storage-cleanup-allowlist-unit: all tests passed");
+}
+
+function extractResolveAllowlistModule(source, label) {
+  const start = source.indexOf("resolve_allowlist_module() {");
+  assert.ok(start >= 0, `${label} must define resolve_allowlist_module`);
+  const end = source.indexOf("df_root_avail_kb()", start);
+  assert.ok(end > start, `${label} resolve_allowlist_module must precede df_root_avail_kb`);
+  return source.slice(start, end);
+}
+
+function assertEmbeddedAllowlistTempIsMjs(source, label) {
+  const resolveFn = extractResolveAllowlistModule(source, label);
+  assert.match(
+    resolveFn,
+    /mktemp \/tmp\/audiolad-disk-cleanup-allowlist\.XXXXXX\.mjs/,
+    `${label} embedded allowlist temp must use an .mjs mktemp template`,
+  );
+  assert.doesNotMatch(
+    resolveFn,
+    /tmp="\$\(mktemp\)"/,
+    `${label} embedded allowlist temp must not use suffix-less mktemp`,
+  );
+  assert.match(
+    source,
+    /if \[\[ "\$\{ALLOWLIST_MODULE\}" != \*\.mjs \]\]/,
+    `${label} must fail closed when allowlist path lacks .mjs`,
+  );
+}
+
+function assertEmbeddedAllowlistResolveImports(helperText) {
+  const resolveFn = extractResolveAllowlistModule(helperText, "helper");
+  const root = mkdtempSync(join(tmpdir(), "audiolad-allowlist-mjs-"));
+  const scriptPath = join(root, "resolve.sh");
+  writeFileSync(
+    scriptPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "CLEANUP_TEMP_FILES=()",
+      "write_embedded_allowlist() {",
+      "  printf '%s\\n' 'export const PING = \"ok\";' >\"$1\"",
+      "}",
+      resolveFn,
+      "path=\"$(resolve_allowlist_module)\"",
+      "printf 'RESOLVED=%s\\n' \"${path}\"",
+      "case \"${path}\" in",
+      "  *.mjs) ;;",
+      "  *) echo 'FAIL suffix-less allowlist temp'; exit 2 ;;",
+      "esac",
+      "node --input-type=module -e 'import { pathToFileURL } from \"node:url\"; const m = await import(pathToFileURL(process.argv[1]).href); if (m.PING !== \"ok\") process.exit(3); console.log(\"IMPORT_OK\");' \"${path}\"",
+      "",
+    ].join("\n"),
+  );
+  const result = spawnSync("bash", [scriptPath], { encoding: "utf8", timeout: 10000 });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  rmSync(root, { recursive: true, force: true });
+  assert.equal(result.status, 0, `embedded allowlist resolve/import failed: ${output}`);
+  assert.match(output, /RESOLVED=\/tmp\/audiolad-disk-cleanup-allowlist\.[A-Za-z0-9]+\.mjs/);
+  assert.match(output, /IMPORT_OK/);
+  assert.doesNotMatch(output, /RESOLVED=\/tmp\/tmp\./);
 }
 
 main();
