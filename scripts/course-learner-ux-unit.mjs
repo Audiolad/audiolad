@@ -521,9 +521,13 @@ function testItemTypeAffordances() {
   const audioSource = read(
     "src/components/products/course-learner/CourseLearnerAudioBlock.tsx",
   );
+  const iconSource = read(
+    "src/components/products/course-learner/CourseLearnerItemTypeIcon.tsx",
+  );
   assert.match(audioSource, /CourseLearnerItemTypeIcon/);
   assert.match(audioSource, /kind="audio"/);
   assert.match(audioSource, /COURSE_LEARNER_AUDIO_ITEM_LABEL/);
+  assert.match(iconSource, new RegExp(COURSE_LEARNER_AUDIO_ITEM_LABEL));
 
   assert.deepEqual(
     collectLockedLessonItemKinds([
