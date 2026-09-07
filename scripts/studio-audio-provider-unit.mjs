@@ -18,6 +18,11 @@ import {
   STUDIO_MUSIC_VOLUME_MIN_DB,
 } from "../src/lib/studio/audio-engine-math.ts";
 import {
+  STUDIO_AUDIO_TOO_LONG_MESSAGE,
+  STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  StudioLocalValidationError,
+  createStudioLocalDurationError,
+  formatStudioLocalIngestError,
   validateStudioLocalDuration,
   validateStudioLocalFile,
 } from "../src/lib/studio/local-file-validation.ts";
@@ -211,8 +216,39 @@ function testLocalFileValidation() {
     null,
   );
   assert.equal(validateStudioLocalDuration(10800), null);
+  assert.equal(validateStudioLocalDuration(10799), null);
+  assert.equal(createStudioLocalDurationError(10799), null);
+  assert.equal(createStudioLocalDurationError(10800), null);
   assert.match(validateStudioLocalDuration(10800.01), /3 часа/);
   assert.match(validateStudioLocalDuration(0), /длительность/i);
+
+  const tooLong = createStudioLocalDurationError(10802);
+  assert.ok(tooLong instanceof StudioLocalValidationError);
+  assert.equal(tooLong.code, "audio_too_long");
+  assert.equal(tooLong.message, STUDIO_AUDIO_TOO_LONG_MESSAGE);
+  assert.equal(validateStudioLocalDuration(10802), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+  assert.equal(formatStudioLocalIngestError(tooLong), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+
+  const invalidDuration = createStudioLocalDurationError(0);
+  assert.ok(invalidDuration instanceof StudioLocalValidationError);
+  assert.equal(invalidDuration.code, "invalid_duration");
+  assert.equal(
+    formatStudioLocalIngestError(invalidDuration),
+    STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  );
+
+  assert.equal(
+    formatStudioLocalIngestError(new Error("media_metadata_error")),
+    STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  );
+  assert.equal(
+    formatStudioLocalIngestError(new Error(STUDIO_AUDIO_TOO_LONG_MESSAGE)),
+    STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  );
+  assert.equal(
+    formatStudioLocalIngestError(new Error("Некорректная длительность файла.")),
+    STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+  );
 }
 
 function testProviderEngineLifecycle() {
@@ -259,10 +295,57 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /startSourcesAtPosition\(nextPosition\)/);
   assert.match(fileValidation, /MAX_LOCAL_FILE_SIZE_BYTES = MAX_STUDIO_ASSET_BYTES/);
   assert.match(fileValidation, /STUDIO_AUDIO_TOO_LONG_MESSAGE/);
+  assert.match(fileValidation, /STUDIO_MEDIA_OPEN_FAILED_MESSAGE/);
   assert.match(fileValidation, /validateStudioLocalDuration/);
+  assert.match(fileValidation, /createStudioLocalDurationError/);
+  assert.match(fileValidation, /formatStudioLocalIngestError/);
+  assert.match(fileValidation, /StudioLocalValidationError/);
   assert.match(fileValidation, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /local-file-validation/);
+  assert.match(provider, /createStudioLocalDurationError/);
+  assert.match(provider, /formatStudioLocalIngestError/);
+  assert.doesNotMatch(provider, /formatDecodeError/);
+  assert.doesNotMatch(provider, /validateStudioLocalDuration/);
+  assert.equal(
+    [...provider.matchAll(/formatStudioLocalIngestError/g)].length,
+    5,
+    "load, ingest, replace, play, and import all use typed ingest error mapping",
+  );
+  assert.doesNotMatch(
+    provider,
+    /setProjectError\([^)]*error\.message/,
+    "unknown ingest errors must not leak error.message",
+  );
   assert.match(provider, /export \{ validateStudioLocalFile \}/);
+
+  const loadLocalFiles = provider.slice(
+    provider.indexOf("const loadLocalFiles"),
+    provider.indexOf("const ingestRecordedFile"),
+  );
+  const ingestRecordedFile = provider.slice(
+    provider.indexOf("const ingestRecordedFile"),
+    provider.indexOf("const replaceTrackAudio"),
+  );
+  const replaceTrackAudio = provider.slice(
+    provider.indexOf("const replaceTrackAudio"),
+    provider.indexOf("const play = useCallback"),
+  );
+  for (const [name, source] of [
+    ["loadLocalFiles", loadLocalFiles],
+    ["ingestRecordedFile", ingestRecordedFile],
+    ["replaceTrackAudio", replaceTrackAudio],
+  ]) {
+    const durationGate = source.indexOf("createStudioLocalDurationError");
+    const uploadStart = source.indexOf("startTrackAssetUpload");
+    assert.ok(durationGate >= 0, `${name} validates local duration`);
+    assert.ok(uploadStart >= 0, `${name} can start upload after a valid file`);
+    assert.ok(
+      durationGate < uploadStart,
+      `${name} rejects overlong audio before reserve/upload`,
+    );
+    assert.match(source, /formatStudioLocalIngestError/);
+    assert.match(source, /throw durationError/);
+  }
   assert.match(provider, /fxInput\.connect\(outputGain\)/);
   assert.match(provider, /setTrackVoicePreset/);
   assert.match(provider, /STUDIO_VOICE_PRESET_CONFIG/);
