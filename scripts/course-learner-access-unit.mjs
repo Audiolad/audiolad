@@ -1358,6 +1358,15 @@ assert.doesNotMatch(fileDownload, /target="_blank"/);
 assert.doesNotMatch(fileDownload, /window\.open/);
 assert.doesNotMatch(fileDownload, /buildCourseLearnerFilePath\(/);
 
+const fileViewer = read(
+  "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
+);
+assert.match(fileViewer, /COURSE_LEARNER_FILE_VIEWER_BACK_LABEL/);
+assert.match(fileViewer, /<iframe/);
+assert.doesNotMatch(fileViewer, /Открыть PDF отдельно/);
+assert.doesNotMatch(fileViewer, /openSeparately|[?&]raw=1|raw:\s*true/);
+assert.doesNotMatch(fileViewer, /target="_blank"/);
+
 assert.equal(existsSync(join(root, "src/app/learn")), false);
 assert.equal(existsSync(join(root, "src/app/api/learn")), false);
 

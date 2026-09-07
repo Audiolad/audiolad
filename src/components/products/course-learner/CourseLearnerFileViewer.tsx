@@ -1,5 +1,4 @@
 import {
-  COURSE_LEARNER_FILE_OPEN_SEPARATELY_LABEL,
   COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
   buildCourseLearnerFilePath,
   buildCourseLearnerFileReturnHref,
@@ -11,7 +10,6 @@ export type CourseLearnerFileViewerProps = {
   fileId: string;
   filename: string;
   embedSrc: string;
-  openSeparatelyHref: string;
 };
 
 export function CourseLearnerFileViewerDenied({
@@ -47,7 +45,6 @@ export default function CourseLearnerFileViewer({
   fileId,
   filename,
   embedSrc,
-  openSeparatelyHref,
 }: CourseLearnerFileViewerProps) {
   const returnHref = buildCourseLearnerFileReturnHref(authorSlug, productSlug);
 
@@ -71,15 +68,6 @@ export default function CourseLearnerFileViewer({
           className="h-[70vh] w-full border-0 bg-white"
         />
       </div>
-
-      <p className="mt-4 text-sm leading-6 text-[#7d70a2]">
-        <a
-          href={openSeparatelyHref}
-          className="font-semibold text-[#7042c5] underline-offset-2 hover:underline"
-        >
-          {COURSE_LEARNER_FILE_OPEN_SEPARATELY_LABEL}
-        </a>
-      </p>
     </section>
   );
 }
@@ -110,12 +98,6 @@ export function buildCourseLearnerFileViewerViewModel(input: {
       input.authorSlug,
       input.productSlug,
       input.fileId,
-    ),
-    openSeparatelyHref: buildCourseLearnerFilePath(
-      input.authorSlug,
-      input.productSlug,
-      input.fileId,
-      { raw: true },
     ),
   };
 }

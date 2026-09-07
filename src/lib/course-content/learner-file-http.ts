@@ -5,8 +5,6 @@ const PUBLICATION_FILE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const COURSE_LEARNER_FILE_VIEWER_BACK_LABEL = "← Вернуться к курсу";
-export const COURSE_LEARNER_FILE_OPEN_SEPARATELY_LABEL = "Открыть PDF отдельно";
-export const COURSE_LEARNER_FILE_RAW_QUERY = "raw";
 
 export type CourseLearnerFileHttpMode = "json" | "embed" | "document";
 
@@ -27,11 +25,6 @@ export function isPublicationFileId(value: string | null | undefined): boolean {
 export function resolveCourseLearnerFileHttpMode(
   request: Request,
 ): CourseLearnerFileHttpMode {
-  const url = new URL(request.url);
-  if (url.searchParams.get(COURSE_LEARNER_FILE_RAW_QUERY) === "1") {
-    return "embed";
-  }
-
   const dest = request.headers.get("sec-fetch-dest")?.trim().toLowerCase();
   if (dest === "iframe" || dest === "embed" || dest === "object") {
     return "embed";
@@ -68,10 +61,8 @@ export function buildCourseLearnerFilePath(
   authorSlug: string,
   productSlug: string,
   fileId: string,
-  options?: { raw?: boolean },
 ): string {
-  const path = `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/file/${encodeURIComponent(fileId)}`;
-  return options?.raw ? `${path}?${COURSE_LEARNER_FILE_RAW_QUERY}=1` : path;
+  return `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/file/${encodeURIComponent(fileId)}`;
 }
 
 export function buildCourseLearnerFileViewerPath(

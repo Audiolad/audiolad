@@ -16,7 +16,6 @@ import {
   groupLearnerCourse,
 } from "../src/lib/course-content/index.ts";
 import {
-  COURSE_LEARNER_FILE_OPEN_SEPARATELY_LABEL,
   COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
   buildCourseLearnerFileReturnHref,
   buildCourseLearnerFileViewerPath,
@@ -224,7 +223,8 @@ function testPdfOpensInAppViewer() {
         headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate" },
       }),
     ),
-    "embed",
+    "document",
+    "query overrides must not turn top-level navigation into a raw PDF",
   );
   assert.equal(
     resolveCourseLearnerFileHttpMode(
@@ -312,14 +312,27 @@ function testPdfOpensInAppViewer() {
     new RegExp(`/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`),
   );
   assert.match(viewer, /data-course-learner-file-viewer="ready"/);
+  assert.match(viewer, /<iframe/);
   assert.match(
     viewer,
-    new RegExp(`/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}`),
+    new RegExp(
+      `src="/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}"`,
+    ),
   );
+  assert.doesNotMatch(viewer, /<a[^>]+href="[^"]*\/api\/listen\/product\//);
+  assert.doesNotMatch(viewer, /[?&]raw=1/);
+  assert.doesNotMatch(viewer, /Открыть PDF отдельно/);
+  assert.doesNotMatch(viewer, /target="_blank"/);
   assert.doesNotMatch(viewer, /window\.location|signedUrl|storage_path/);
   assert.doesNotMatch(viewer, /<meta http-equiv="refresh"/i);
   assert.match(viewer, new RegExp(LONG_PDF_NAME));
-  assert.match(viewer, new RegExp(COURSE_LEARNER_FILE_OPEN_SEPARATELY_LABEL));
+
+  const viewerSource = read(
+    "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
+  );
+  assert.doesNotMatch(viewerSource, /Открыть PDF отдельно/);
+  assert.doesNotMatch(viewerSource, /openSeparately|raw:\s*true|[?&]raw=1/);
+  assert.doesNotMatch(viewerSource, /target="_blank"/);
 
   const denied = renderToStaticMarkup(
     createElement(CourseLearnerFileViewerDenied, {
@@ -356,6 +369,11 @@ function testPdfOpensInAppViewer() {
   assert.match(route, /createInlinePdfProxyResponse/);
   assert.match(route, /NextResponse\.redirect/);
   assert.doesNotMatch(route, /NextResponse\.redirect\(signed\.url/);
+
+  const fileHttp = read("src/lib/course-content/learner-file-http.ts");
+  assert.doesNotMatch(fileHttp, /COURSE_LEARNER_FILE_RAW_QUERY|Открыть PDF отдельно/);
+  assert.doesNotMatch(fileHttp, /searchParams\.get\(/);
+  assert.match(fileHttp, /sec-fetch-dest/);
 }
 
 function testLongFilenameDoesNotEscapeCard() {
