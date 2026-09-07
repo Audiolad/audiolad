@@ -172,9 +172,8 @@ export function evaluateAssetDelete({ asset, project }) {
   if (!storagePath.includes(CLEANUP_PROJECT_ID) || !storagePath.includes(String(asset.id))) {
     return { ok: false, reason: "storage_path_missing_ids" };
   }
-  if (Boolean(project && project.author_id)) {
-    return { ok: false, reason: "has_real_user_author" };
-  }
+  // Project.author_id must not block allowlisted proven_test asset deletes.
+  // evaluateProjectDelete still refuses the project row when author_id is set.
   if (!isProvenTestBlob([
     asset.id,
     asset.project_id,

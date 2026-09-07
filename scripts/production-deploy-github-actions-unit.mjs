@@ -1609,7 +1609,14 @@ function writeCleanupMockModules(currentDir, { secretUrl, secretKey, assets, pro
 
 function writeDiskCleanupFixture(
   root,
-  { secretUrl, secretKey, currentIsAllowlisted = false, extraAssets = [], denyReleaseRm = false },
+  {
+    secretUrl,
+    secretKey,
+    currentIsAllowlisted = false,
+    extraAssets = [],
+    denyReleaseRm = false,
+    projectAuthorId = null,
+  },
 ) {
   const releaseCurrent = currentIsAllowlisted
     ? "20260906-113101-2acc27e1"
@@ -1673,7 +1680,7 @@ function writeDiskCleanupFixture(
     assets,
     project: {
       id: projectId,
-      author_id: null,
+      author_id: projectAuthorId,
       name: "",
       status: "active",
       deleted_at: null,
@@ -1936,6 +1943,42 @@ function assertDiskCleanupHelper(workflowText) {
     assert.doesNotMatch(remoteOutput, /ASSET_CLEANUP=UNAVAILABLE reason=error/);
   } finally {
     rmSync(remoteRoot, { recursive: true, force: true });
+  }
+
+  const authoredRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-authored-"));
+  try {
+    const fixture = writeDiskCleanupFixture(authoredRoot, {
+      secretUrl,
+      secretKey,
+      projectAuthorId: "6aa9-real-acceptance-author",
+    });
+    const result = runDiskCleanupHelper(authoredRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(
+      result.status,
+      0,
+      `acceptance project author_id must not fail asset cleanup: ${output}`,
+    );
+    assert.match(output, /ASSETS_CLEANUP = OK/);
+    assert.match(output, /CLEANUP = SUCCESS/);
+    assert.match(output, /storage_removed/);
+    assert.match(output, /note=project_left id=6aa9fd82-7bb6-4df6-8761-6c2f8a1337b4 reason=has_author/);
+    assert.doesNotMatch(output, /has_real_user_author/);
+    assert.doesNotMatch(output, /NEEDS_REVIEW kind=project/);
+    const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+    assert.ok(state.removedStorage.length >= 1, "allowlisted storage must still be deleted");
+    assert.equal(
+      (state.studio_project_assets || []).some((row) => row.id === "800870b6-59cc-4f71-9df7-e30260723f83"),
+      false,
+      "allowlisted asset row must be deleted even when project.author_id is set",
+    );
+    assert.equal(
+      (state.studio_projects || []).some((row) => row.id === "6aa9fd82-7bb6-4df6-8761-6c2f8a1337b4"),
+      true,
+      "authored acceptance project row must remain",
+    );
+  } finally {
+    rmSync(authoredRoot, { recursive: true, force: true });
   }
 
   const deniedRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-denied-"));

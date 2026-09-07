@@ -178,12 +178,22 @@ function main() {
     }).reason,
     "storage_path_missing_ids",
   );
-  assert.equal(
+  const authoredProject = { ...guestProject, author_id: "real-author" };
+  assert.deepEqual(
     evaluateAssetDelete({
       asset: goodAsset,
-      project: { ...guestProject, author_id: "real-author" },
+      project: authoredProject,
+    }),
+    { ok: true, reason: "allowlisted_asset" },
+    "allowlisted proven_test assets stay deletable when the acceptance project has author_id",
+  );
+  assert.equal(
+    evaluateAssetDelete({
+      asset: { ...goodAsset, original_name: "meditation.mp3" },
+      project: authoredProject,
     }).reason,
-    "has_real_user_author",
+    "original_name_mismatch_for_id",
+    "author_id must not weaken other asset gates",
   );
   assert.equal(
     evaluateAssetDelete({
@@ -336,6 +346,26 @@ function main() {
   assertEmbeddedAllowlistTempIsMjs(helperText, "helper");
   assertEmbeddedAllowlistTempIsMjs(workflowText, "workflow");
   assertEmbeddedAllowlistResolveImports(helperText);
+  for (const [label, source] of [
+    ["helper", helperText],
+    ["workflow", workflowText],
+  ]) {
+    assert.doesNotMatch(
+      source,
+      /NEEDS_REVIEW kind=project reason=has_real_user_author/,
+      `${label} must not abort asset cleanup because the acceptance project has author_id`,
+    );
+    assert.doesNotMatch(
+      source,
+      /reason: "has_real_user_author"/,
+      `${label} evaluateAssetDelete must not refuse allowlisted assets solely for project.author_id`,
+    );
+    assert.match(
+      source,
+      /return \{ ok: false, reason: "has_author" \}/,
+      `${label} evaluateProjectDelete must still refuse deleting a project that has author_id`,
+    );
+  }
   for (const needle of [
     "OPS_DISK_STORAGE_CLEANUP",
     CLEANUP_PROJECT_ID,
