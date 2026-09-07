@@ -19,7 +19,7 @@ import {
 } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { buildCatalogMetadata } from "@/lib/seo/public-page-metadata";
-import { listTopicsWithCatalogCounts } from "@/lib/topics/queries";
+import { listTopicsWithCatalogCountsSafe } from "@/lib/topics/queries";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,7 +69,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   const visitorId = await readPriceVisitorId();
   const [topicsWithCounts, defaultListing, authUser] = await Promise.all([
-    listTopicsWithCatalogCounts(supabase),
+    listTopicsWithCatalogCountsSafe(supabase),
     canLoadDefaultListingInParallel
       ? listPublishedCatalog(supabase, { ...listingQuery, topic: null }, {
           visitorId,

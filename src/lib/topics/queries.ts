@@ -13,6 +13,103 @@ import type {
 const TOPIC_SELECT =
   "id, key, slug, title, description, sort_order, is_active, show_on_home, created_at, updated_at";
 
+/** PostgREST `.in(practice_id, …)` URL/payload limit — 93 UUIDs 502 nginx in prod. */
+export const PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE = 50;
+
+type PracticeTopicAssignmentRow = {
+  practice_id?: string;
+  topic_id?: string;
+  topics?: { key?: string } | { key?: string }[] | null;
+};
+
+type SupabaseLikeError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+  status?: number | string;
+};
+
+export function chunkIds<T>(
+  ids: readonly T[],
+  chunkSize: number = PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
+): T[][] {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < ids.length; index += chunkSize) {
+    chunks.push(ids.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+function extractSupabaseLikeError(error: unknown): SupabaseLikeError {
+  if (!error || typeof error !== "object") {
+    return {
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const record = error as Record<string, unknown>;
+
+  return {
+    code: typeof record.code === "string" ? record.code : undefined,
+    message:
+      typeof record.message === "string"
+        ? record.message
+        : error instanceof Error
+          ? error.message
+          : undefined,
+    details: typeof record.details === "string" ? record.details : undefined,
+    hint: typeof record.hint === "string" ? record.hint : undefined,
+    status:
+      typeof record.status === "number" || typeof record.status === "string"
+        ? record.status
+        : undefined,
+  };
+}
+
+export function logTopicsCatalogCountsError(
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
+  const supabaseError = extractSupabaseLikeError(error);
+
+  console.error("[topics] topics_catalog_counts_failed", {
+    code: supabaseError.code ?? null,
+    message: supabaseError.message ?? null,
+    details: supabaseError.details ?? null,
+    hint: supabaseError.hint ?? null,
+    status: supabaseError.status ?? null,
+    ...context,
+  });
+}
+
+function throwTopicsCatalogCountsFailed(
+  error: unknown,
+  context?: Record<string, unknown>,
+): never {
+  logTopicsCatalogCountsError(error, context);
+  throw new Error("topics_catalog_counts_failed", { cause: error });
+}
+
+export async function listTopicsWithCatalogCountsSafe(
+  supabase: SupabaseClient,
+): Promise<TopicWithCatalogCount[]> {
+  try {
+    return await listTopicsWithCatalogCounts(supabase);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      error.message !== "topics_catalog_counts_failed"
+    ) {
+      logTopicsCatalogCountsError(error, { stage: "soft_fail_wrapper" });
+    }
+
+    return [];
+  }
+}
+
 function mapTopicRow(row: TopicRow): TopicOption {
   return {
     key: row.key,
@@ -110,7 +207,9 @@ export async function listTopicsWithCatalogCounts(
     .eq("is_catalog_listed", true);
 
   if (practicesError) {
-    throw new Error("topics_catalog_counts_failed");
+    throwTopicsCatalogCountsFailed(practicesError, {
+      stage: "list_published_catalog_practice_ids",
+    });
   }
 
   const practiceIds = filterPublicPracticeRows(
@@ -124,18 +223,35 @@ export async function listTopicsWithCatalogCounts(
     }));
   }
 
-  const { data: assignmentRows, error: assignmentsError } = await supabase
-    .from("practice_topics")
-    .select("practice_id, topic_id, topics!inner(key)")
-    .in("practice_id", practiceIds);
+  const assignmentRows: PracticeTopicAssignmentRow[] = [];
+  const practiceIdChunks = chunkIds(
+    practiceIds,
+    PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
+  );
 
-  if (assignmentsError) {
-    throw new Error("topics_catalog_counts_failed");
+  for (let chunkIndex = 0; chunkIndex < practiceIdChunks.length; chunkIndex += 1) {
+    const chunk = practiceIdChunks[chunkIndex];
+    const { data: chunkRows, error: assignmentsError } = await supabase
+      .from("practice_topics")
+      .select("practice_id, topic_id, topics!inner(key)")
+      .in("practice_id", chunk);
+
+    if (assignmentsError) {
+      throwTopicsCatalogCountsFailed(assignmentsError, {
+        stage: "list_practice_topic_assignments",
+        chunkIndex,
+        chunkSize: chunk.length,
+        practiceCount: practiceIds.length,
+        chunkCount: practiceIdChunks.length,
+      });
+    }
+
+    assignmentRows.push(...((chunkRows ?? []) as PracticeTopicAssignmentRow[]));
   }
 
   const countByKey = new Map<string, number>();
 
-  for (const row of assignmentRows ?? []) {
+  for (const row of assignmentRows) {
     const topicsValue = row.topics as { key?: string } | { key?: string }[] | null;
     const topic = Array.isArray(topicsValue) ? topicsValue[0] : topicsValue;
     const key = topic?.key?.trim();

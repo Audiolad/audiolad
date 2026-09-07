@@ -17,8 +17,13 @@ assert.match(
 );
 assert.match(
   page,
-  /Promise\.all\(\[\s*listTopicsWithCatalogCounts\(supabase\),\s*canLoadDefaultListingInParallel\s*\?[\s\S]*listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: null \}/,
+  /Promise\.all\(\[\s*listTopicsWithCatalogCountsSafe\(supabase\),\s*canLoadDefaultListingInParallel\s*\?[\s\S]*listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: null \}/,
   "default path overlaps topics with unfiltered listing",
+);
+assert.match(
+  page,
+  /listTopicsWithCatalogCountsSafe/,
+  "catalog topics counts soft-fail so a PostgREST error cannot 500 /catalog",
 );
 assert.match(
   page,
