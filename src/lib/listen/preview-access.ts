@@ -89,9 +89,9 @@ export function resolveListenApiDecision(input: {
     return {
       ok: true,
       access: input.listenAccess,
-      useServiceRoleStorage: shouldUseServiceRoleStorageForReason(
-        input.accessReason,
-      ),
+      // Course lesson assets stay private and may still be draft while the
+      // entitled buyer already has canonical course access.
+      useServiceRoleStorage: true,
     };
   }
 

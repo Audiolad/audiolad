@@ -399,6 +399,10 @@ export function PracticePrimaryActionSection({
   const showPrimaryPlay =
     presentation.primaryAction.kind === "listen" ||
     presentation.primaryAction.kind === "buy";
+  const openCourseAction =
+    presentation.primaryAction.kind === "open_course"
+      ? presentation.primaryAction
+      : null;
   const buyAction =
     presentation.primaryAction.kind === "buy"
       ? presentation.primaryAction
@@ -529,6 +533,18 @@ export function PracticePrimaryActionSection({
               </>
             )}
           </div>
+        </div>
+      ) : openCourseAction ? (
+        <div
+          data-practice-hero-actions
+          className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+        >
+          <a
+            href={openCourseAction.href}
+            className={FEATURED_CARD_PRIMARY_CTA_CLASS}
+          >
+            {openCourseAction.label}
+          </a>
         </div>
       ) : showPrimaryPlay ? (
         <div

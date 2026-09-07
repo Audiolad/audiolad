@@ -507,6 +507,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     publishPreviewMode,
     publishListenerViewMode,
     promoPreviewMode,
+    isCourse: isCoursePublication(
+      practice.publication_class,
+      practice.product_kind,
+    ),
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);

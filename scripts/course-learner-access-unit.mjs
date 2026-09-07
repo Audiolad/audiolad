@@ -782,6 +782,40 @@ const playA = await canPlayCourseAudioItem({
 });
 assert.equal(playA, true, "L1 can play A");
 
+const playDraftA = await canPlayCourseAudioItem({
+  supabase: mockUserSupabase({
+    entitlement: { access_source: "granted", expires_at: null, access_level: 1 },
+  }),
+  serviceRole: mockServiceRole(),
+  practice: coursePractice({ status: "draft" }),
+  userId: "buyer-l1",
+  audioItemId: AUDIO_A,
+  options: { isPlatformAdmin: async () => false },
+});
+assert.equal(playDraftA, true, "L1 entitlement plays draft-course L1 audio");
+
+const playDraftB = await canPlayCourseAudioItem({
+  supabase: mockUserSupabase({
+    entitlement: { access_source: "granted", expires_at: null, access_level: 1 },
+  }),
+  serviceRole: mockServiceRole(),
+  practice: coursePractice({ status: "draft" }),
+  userId: "buyer-l1",
+  audioItemId: AUDIO_B,
+  options: { isPlatformAdmin: async () => false },
+});
+assert.equal(playDraftB, false, "L1 entitlement cannot play draft-course L2 audio");
+
+const playDraftStranger = await canPlayCourseAudioItem({
+  supabase: mockUserSupabase(),
+  serviceRole: mockServiceRole(),
+  practice: coursePractice({ status: "draft" }),
+  userId: "stranger",
+  audioItemId: AUDIO_A,
+  options: { isPlatformAdmin: async () => false },
+});
+assert.equal(playDraftStranger, false, "no entitlement cannot play draft-course audio");
+
 const playB = await canPlayCourseAudioItem({
   supabase: mockUserSupabase({
     entitlement: { access_source: "purchase", expires_at: null, access_level: 1 },
@@ -1276,9 +1310,11 @@ assert.doesNotMatch(page, /app\/api\/learn/);
 const signedAudio = read("src/lib/listen/signed-audio.ts");
 assert.match(signedAudio, /canPlayCourseAudioItem/);
 assert.match(signedAudio, /isCoursePublication/);
+assert.match(signedAudio, /shouldEnforcePublishedAudioItemForEntitledSignedUrl/);
 
 const sessionLoader = read("src/lib/listen/load-session-payload.ts");
 assert.match(sessionLoader, /listAccessibleCourseAudioItemIds/);
+assert.match(sessionLoader, /shouldApplyEntitledPublishedAudioFilter/);
 assert.match(sessionLoader, /isCoursePublication[\s\S]*return \[\]/);
 
 const pageShared = read("src/lib/listen/page-shared.tsx");
@@ -1289,7 +1325,15 @@ const fileRoute = read(
 );
 assert.match(fileRoute, /signLearnerPublicationFile/);
 assert.match(fileRoute, /getPracticeByAuthorAndSlug/);
+assert.match(fileRoute, /wantsProtectedFileDocumentOpen/);
 assert.doesNotMatch(fileRoute, /canAccessCourseContent\(/);
+
+const fileDownload = read(
+  "src/components/products/course-learner/CourseLearnerFileDownload.tsx",
+);
+assert.match(fileDownload, /target="_blank"/);
+assert.match(fileDownload, /noopener noreferrer/);
+assert.doesNotMatch(fileDownload, /window\.open/);
 
 assert.equal(existsSync(join(root, "src/app/learn")), false);
 assert.equal(existsSync(join(root, "src/app/api/learn")), false);

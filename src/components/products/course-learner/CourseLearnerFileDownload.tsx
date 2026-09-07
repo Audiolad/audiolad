@@ -1,7 +1,4 @@
-"use client";
-
-import { useState } from "react";
-
+import { buildCourseLearnerFilePath } from "@/lib/course-content/learner-file-http";
 import type { LearnerCourseFileBlock } from "@/lib/course-content/learner-types";
 
 type CourseLearnerFileDownloadProps = {
@@ -15,54 +12,20 @@ export default function CourseLearnerFileDownload({
   authorSlug,
   productSlug,
 }: CourseLearnerFileDownloadProps) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function download() {
-    if (busy) {
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/file/${encodeURIComponent(block.fileId)}`,
-      );
-      const payload = (await response.json()) as {
-        url?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !payload.url) {
-        setError("Не удалось открыть файл.");
-        return;
-      }
-
-      window.open(payload.url, "_blank", "noopener,noreferrer");
-    } catch {
-      setError("Не удалось открыть файл.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const href = buildCourseLearnerFilePath(authorSlug, productSlug, block.fileId);
 
   return (
-    <div>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void download()}
-        className="inline-flex min-h-11 items-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+    <div className="min-w-0 max-w-full">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-11 w-full max-w-full min-w-0 items-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
       >
-        {busy ? "Открываем…" : block.filename}
-      </button>
-      {error ? (
-        <p className="mt-2 text-sm leading-6 text-[#b34f63]" role="alert">
-          {error}
-        </p>
-      ) : null}
+        <span className="min-w-0 break-all [overflow-wrap:anywhere]">
+          {block.filename}
+        </span>
+      </a>
     </div>
   );
 }
