@@ -232,8 +232,13 @@ assert.doesNotMatch(seoSection, /PRODUCT_CONTENT_LIMITS\.seoUsageItems,\s*\n\s*\
 assert.doesNotMatch(seoSection, /Найти статью/);
 
 const publicSections = read("src/components/products/PracticeSeoContentSections.tsx");
-assert.match(publicSections, /RelatedProductLinkCard/);
-assert.match(publicSections, /authorRecommendationsTitle/);
+assert.match(publicSections, /AuthorRecommendationsSection/);
+assert.match(publicSections, /includeRelatedProducts = true/);
+const publicRecommendations = read(
+  "src/components/products/AuthorRecommendationsSection.tsx",
+);
+assert.match(publicRecommendations, /RelatedProductLinkCard/);
+assert.match(publicRecommendations, /authorRecommendationsTitle/);
 assert.doesNotMatch(publicSections, /Связанные продукты/);
 assert.doesNotMatch(publicSections, /relatedListens/);
 assert.doesNotMatch(publicSections, /Связанные страницы/);

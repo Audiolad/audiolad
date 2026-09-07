@@ -116,8 +116,18 @@ assert.doesNotMatch(
 );
 assert.match(
   practiceContent,
-  /<PracticeSeoContentSections content=\{seoContent\}/,
-  "ONE public recommendations path via PracticeSeoContentSections",
+  /<PracticeSeoContentSections[\s\S]*content=\{seoContent\}/,
+  "ONE public usage/FAQ path via PracticeSeoContentSections",
+);
+assert.match(
+  practiceContent,
+  /<AuthorRecommendationsSection content=\{seoContent\}/,
+  "ONE public recommendations path via AuthorRecommendationsSection",
+);
+assert.match(
+  practiceContent,
+  /includeRelatedProducts=\{false\}/,
+  "practice page does not remount recommendations inside SEO sections",
 );
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");

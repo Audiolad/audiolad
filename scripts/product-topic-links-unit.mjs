@@ -117,6 +117,10 @@ assert(
   component.includes("shrink-0") || component.includes("w-fit"),
   "topic chips size to content",
 );
+assert(component.includes("min-h-11"), "topic chips keep a 44px tap area");
+assert(component.includes("rounded-full"), "topic chips stay pills");
+assert(component.includes("text-xs"), "topic chips use a compact type size");
+assert(component.includes("px-3 py-1.5"), "topic chips use compact padding");
 assert(
   practiceTopics.includes("getActivePracticeTopics"),
   "safe loader uses active-only query",

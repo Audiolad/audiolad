@@ -173,23 +173,25 @@ assert.match(
 );
 assert.match(
   seoSections,
-  /content\.relatedProducts\.length \? \(/,
-  "author recommendations render only when related products exist",
+  /AuthorRecommendationsSection/,
+  "author recommendations stay in the shared SEO stack for audio post",
+);
+assert.match(
+  seoSections,
+  /includeRelatedProducts = true/,
+  "audio post default still includes related products after FAQ",
 );
 
 const faqBranch = seoSections.indexOf("content.faqItems.length");
 const recommendationsBranch = seoSections.indexOf(
-  "content.relatedProducts.length",
+  "AuthorRecommendationsSection",
 );
 assert.ok(faqBranch >= 0 && recommendationsBranch > faqBranch);
 
 const faqHeading = seoSections.indexOf("Вопросы и ответы");
-const recommendationsTitle = seoSections.indexOf(
-  "content.authorRecommendationsTitle",
-);
 if (faqHeading >= 0) {
   assert.ok(
-    faqHeading < recommendationsTitle,
+    faqHeading < recommendationsBranch,
     "when FAQ markup exists, it stays before author recommendations",
   );
 }
