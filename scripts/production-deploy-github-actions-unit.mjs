@@ -32,6 +32,10 @@ const diskAuditPath = join(
   repoRoot,
   "deploy/scripts/audiolad-disk-storage-audit.sh",
 );
+const diskCleanupPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-disk-storage-cleanup.sh",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -152,17 +156,21 @@ function main() {
   assert.ok(jobs.diagnose, "job diagnose must exist");
   assert.ok(jobs.studio_worker_recover, "job studio_worker_recover must exist");
   assert.ok(jobs.disk_storage_audit, "job disk_storage_audit must exist");
+  assert.ok(jobs.disk_storage_cleanup, "job disk_storage_cleanup must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.studio_worker_recover.environment, "production");
   assert.equal(jobs.disk_storage_audit.environment, "production");
+  assert.equal(jobs.disk_storage_cleanup.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_audit["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.disk_storage_cleanup["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_CLEANUP'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -222,6 +230,10 @@ function main() {
   assert.ok(
     confirm.options.includes("OPS_DISK_STORAGE_AUDIT"),
     "confirm options must include OPS_DISK_STORAGE_AUDIT",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_DISK_STORAGE_CLEANUP"),
+    "confirm options must include OPS_DISK_STORAGE_CLEANUP",
   );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
@@ -287,6 +299,7 @@ function main() {
   const sshStepOffset = workflowText.indexOf("name: Deploy via SSH wrapper");
   const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
   const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk/Storage audit via SSH");
+  const diskCleanupStepOffset = workflowText.indexOf("name: One-shot allowlist disk/Storage cleanup via SSH");
   assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
   assert.ok(
     workflowAncestorOffset > resolveStepOffset,
@@ -304,6 +317,10 @@ function main() {
     diskAuditStepOffset > workflowAncestorOffset,
     "workflow must verify origin/main ancestry before SSH disk/Storage audit",
   );
+  assert.ok(
+    diskCleanupStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH disk/Storage cleanup",
+  );
 
   assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
   assertRemoteDiagnoseScriptSyntax(workflowText);
@@ -314,6 +331,9 @@ function main() {
   assertDiskStorageAudit(workflowText, docsText);
   assertRemoteDiskAuditScriptSyntax(workflowText);
   assertDiskAuditHelper();
+  assertDiskStorageCleanup(workflowText, docsText);
+  assertRemoteDiskCleanupScriptSyntax(workflowText);
+  assertDiskCleanupHelper();
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -1022,10 +1042,12 @@ function assertDiskStorageAudit(workflowText, docsText) {
   }
 
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
+  const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
   assert.ok(auditStart >= 0 && deployStart > auditStart, "audit job must precede deploy job");
-  const auditJob = workflowText.slice(auditStart, deployStart);
+  assert.ok(cleanupStart > auditStart && deployStart > cleanupStart, "cleanup job must sit between audit and deploy");
+  const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
     workflowText.indexOf("name: Production read-only diagnostics"),
@@ -1068,6 +1090,7 @@ function assertDiskStorageAudit(workflowText, docsText) {
   assert.doesNotMatch(diagnoseJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_AUDIT/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
   assert.match(docsText, /audiolad-disk-storage-audit\.sh/);
 }
@@ -1306,6 +1329,480 @@ function assertDiskAuditHelper() {
     assert.ok(existsSync(join(fixture.tmpDir, "synth_3h_le10800.wav")), "audit must not delete test fixture file");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function extractRemoteDiskCleanupScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE_DISK_CLEANUP'\n");
+  const end = workflowText.indexOf("\n          REMOTE_DISK_CLEANUP\n", start);
+  assert.ok(start >= 0 && end > start, "cleanup job must contain a REMOTE_DISK_CLEANUP heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE_DISK_CLEANUP'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertDiskStorageCleanup(workflowText, docsText) {
+  const required = [
+    "OPS_DISK_STORAGE_CLEANUP",
+    "DISK AFTER =",
+    "SPACE FREED =",
+    "CURRENT RELEASE INTACT =",
+    "PREVIOUS RELEASE INTACT =",
+    "REAL USER PROJECTS UNTOUCHED =",
+    "TEST STORAGE OBJECTS REMOVED =",
+    "TEST DB ROWS CLEANED =",
+    "WORKER STATUS =",
+    "PUBLIC HEALTH =",
+    "CLEANUP =",
+    "CUTOVER = NO",
+    "MODE = allowlist_cleanup",
+    "20260906-113101-2acc27e1",
+    "20260907-064414-b85c870a",
+    "6aa9fd82-7bb6-4df6-8761-6c2f8a1337b4",
+    "4fc1d620-aaff-44fe-9893-8ca27e29",
+    "800870b6-59cc-4f71-9df7-e30260723f83",
+    "studio-draft-assets",
+    "loadEnvConfig(dir, false, silent, true)",
+    "CUTOVER=NO",
+    "audiolad_deploy=NOT_INVOKED",
+    "confirm=OPS_DISK_STORAGE_CLEANUP",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `disk cleanup workflow must contain ${needle}`,
+    );
+  }
+
+  const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
+  const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  assert.ok(cleanupStart >= 0 && deployStart > cleanupStart, "cleanup job must precede deploy job");
+  const cleanupJob = workflowText.slice(cleanupStart, deployStart);
+  const auditJob = workflowText.slice(auditStart, cleanupStart);
+  const recoverJob = workflowText.slice(recoverStart, auditStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    recoverStart,
+  );
+  const deployJob = workflowText.slice(deployStart);
+  assert.doesNotMatch(
+    cleanupJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "cleanup job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(cleanupJob, /pm2 delete/, "cleanup job must not restart PM2");
+  assert.doesNotMatch(cleanupJob, /pm2 start/, "cleanup job must not start PM2 apps");
+  assert.doesNotMatch(cleanupJob, /pm2 (restart|flush|save)/, "cleanup job must not mutate PM2");
+  const cleanupCode = cleanupJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(cleanupCode, /\bdeploy\.sh\b/, "cleanup job must not call deploy.sh");
+  assert.match(cleanupCode, /\brm -rf --/, "cleanup job must rm -rf only after allowlist gates");
+  assert.doesNotMatch(cleanupJob, /docker\s+(prune|rm|volume rm)/, "cleanup must not prune docker");
+  assert.doesNotMatch(cleanupJob, /\bnginx\s+-s\b/, "cleanup must not signal nginx");
+  assert.doesNotMatch(
+    cleanupCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "cleanup job must not source env files",
+  );
+  assert.doesNotMatch(
+    cleanupJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "cleanup job must not cat env files",
+  );
+  assert.doesNotMatch(diagnoseJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.match(docsText, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.match(docsText, /audiolad-disk-storage-cleanup\.sh/);
+  assert.match(docsText, /34113627251/);
+}
+
+function assertRemoteDiskCleanupScriptSyntax(workflowText) {
+  const remote = extractRemoteDiskCleanupScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-disk-cleanup-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote disk cleanup bash -n failed: ${syntax.stderr}`);
+}
+
+function writeCleanupMockModules(currentDir, { secretUrl, secretKey, assets, project, jobs }) {
+  mkdirSync(join(currentDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(join(currentDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "package.json"),
+    JSON.stringify({ name: "@supabase/supabase-js", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      `const secretUrl = ${JSON.stringify(secretUrl)};`,
+      `const secretKey = ${JSON.stringify(secretKey)};`,
+      "const statePath = process.env.AUDIOLAD_CLEANUP_MOCK_STATE;",
+      "function loadState() {",
+      "  return JSON.parse(fs.readFileSync(statePath, 'utf8'));",
+      "}",
+      "function saveState(state) {",
+      "  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));",
+      "}",
+      "function matches(row, filters) {",
+      "  return filters.every((f) => {",
+      "    if (f.op === 'eq') return String(row[f.col] ?? '') === String(f.val);",
+      "    return true;",
+      "  });",
+      "}",
+      "function createClient() {",
+      "  return {",
+      "    from(table) {",
+      "      const ctx = { table, filters: [], head: false, countExact: false };",
+      "      const api = {",
+      "        select(_cols, opts) {",
+      "          if (opts && opts.head) ctx.head = true;",
+      "          if (opts && opts.count === 'exact') ctx.countExact = true;",
+      "          return api;",
+      "        },",
+        "        eq(col, val) { ctx.filters.push({ op: 'eq', col, val }); return api; },",
+      "        maybeSingle() {",
+      "          const state = loadState();",
+      "          const rows = (state[ctx.table] || []).filter((row) => matches(row, ctx.filters));",
+      "          return Promise.resolve({ data: rows[0] || null, error: null, count: rows.length });",
+      "        },",
+      "        delete() { ctx.deleting = true; return api; },",
+      "        then(resolve, reject) {",
+      "          try {",
+      "            const state = loadState();",
+      "            const rows = (state[ctx.table] || []).filter((row) => matches(row, ctx.filters));",
+      "            if (ctx.deleting) {",
+      "              const keep = (state[ctx.table] || []).filter((row) => !matches(row, ctx.filters));",
+      "              const removed = (state[ctx.table] || []).length - keep.length;",
+      "              state[ctx.table] = keep;",
+      "              state.deleted = (state.deleted || 0) + removed;",
+      "              saveState(state);",
+      "              resolve({ data: [], error: null, count: removed });",
+      "              return;",
+      "            }",
+      "            resolve({ data: ctx.head ? [] : rows, error: null, count: rows.length });",
+      "          } catch (err) {",
+      "            if (typeof reject === 'function') reject(err);",
+      "            else throw err;",
+      "          }",
+      "        },",
+      "      };",
+      "      return api;",
+      "    },",
+      "    storage: {",
+      "      from(bucket) {",
+      "        return {",
+      "          remove(paths) {",
+      "            const state = loadState();",
+      "            state.removedStorage = (state.removedStorage || []).concat(",
+      "              (paths || []).map((p) => ({ bucket, path: p })),",
+      "            );",
+      "            saveState(state);",
+      "            return Promise.resolve({ data: paths, error: null });",
+      "          },",
+      "        };",
+      "      },",
+      "    },",
+      "  };",
+      "}",
+      "module.exports = { createClient };",
+      "",
+    ].join("\n"),
+  );
+  const statePath = join(currentDir, "cleanup-mock-state.json");
+  writeFileSync(
+    statePath,
+    JSON.stringify(
+      {
+        studio_projects: project ? [project] : [],
+        studio_project_assets: assets,
+        studio_render_jobs: jobs,
+        studio_asset_sources: assets.map((asset) => ({
+          id: asset.source_id || asset.id,
+          storage_path: asset.storage_path,
+        })),
+        removedStorage: [],
+        deleted: 0,
+      },
+      null,
+      2,
+    ),
+  );
+  return statePath;
+}
+
+function writeDiskCleanupFixture(root, { secretUrl, secretKey, currentIsAllowlisted = false, extraAssets = [] }) {
+  const releaseCurrent = currentIsAllowlisted
+    ? "20260906-113101-2acc27e1"
+    : "20260907-120000-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const releasePrevious = "20260907-110000-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const releaseAllowB = "20260907-064414-b85c870a";
+  const releaseOther = "20260907-100034-fbda1c14";
+  const currentDir = join(root, "deploy", "releases", releaseCurrent);
+  const previousDir = join(root, "deploy", "releases", releasePrevious);
+  const allowADir = join(root, "deploy", "releases", "20260906-113101-2acc27e1");
+  const allowBDir = join(root, "deploy", "releases", releaseAllowB);
+  const otherDir = join(root, "deploy", "releases", releaseOther);
+  const sharedDir = join(root, "deploy", "shared");
+  const binDir = join(root, "bin");
+  const tmpDir = join(root, "tmp");
+  mkdirSync(currentDir, { recursive: true });
+  mkdirSync(previousDir, { recursive: true });
+  mkdirSync(allowBDir, { recursive: true });
+  mkdirSync(otherDir, { recursive: true });
+  mkdirSync(allowADir, { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+  mkdirSync(tmpDir, { recursive: true });
+  writeFileSync(join(currentDir, ".deploy-commit"), "a".repeat(40) + "\n");
+  writeFileSync(join(previousDir, ".deploy-commit"), "b".repeat(40) + "\n");
+  writeFileSync(join(allowADir, "old-payload.bin"), "x".repeat(4096));
+  writeFileSync(join(allowBDir, "old-payload.bin"), "y".repeat(4096));
+  writeFileSync(join(otherDir, "keep.bin"), "keep-me");
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  symlinkSync(join(sharedDir, ".env.production"), join(currentDir, ".env.production"));
+  symlinkSync(currentDir, join(root, "deploy", "current"));
+  symlinkSync(previousDir, join(root, "deploy", "previous"));
+  mkdirSync(join(tmpDir, "audiolad-studio-gain-1-hwE7Nx"), { recursive: true });
+  writeFileSync(join(tmpDir, "audiolad-studio-meditation.html"), "leave");
+  const projectId = "6aa9fd82-7bb6-4df6-8761-6c2f8a1337b4";
+  const assets = [
+    {
+      id: "800870b6-59cc-4f71-9df7-e30260723f83",
+      project_id: projectId,
+      original_name: "real_75min.mp3",
+      storage_path: `studio/guest/${projectId}/800870b6-59cc-4f71-9df7-e30260723f83/real_75min.mp3`,
+      source_id: "800870b6-59cc-4f71-9df7-e30260723f83",
+      deleted_at: "2026-09-01T00:00:00Z",
+    },
+    {
+      id: "4fc1d620-aaff-44fe-9893-8ca27e29aa33",
+      project_id: projectId,
+      original_name: "synth_over3h.mp3",
+      storage_path: `studio/guest/${projectId}/4fc1d620-aaff-44fe-9893-8ca27e29aa33/synth_over3h.mp3`,
+      source_id: "4fc1d620-aaff-44fe-9893-8ca27e29aa33",
+      deleted_at: "2026-09-01T00:00:00Z",
+    },
+    ...extraAssets,
+  ];
+  const statePath = writeCleanupMockModules(currentDir, {
+    secretUrl,
+    secretKey,
+    assets,
+    project: {
+      id: projectId,
+      author_id: null,
+      name: "",
+      status: "active",
+      deleted_at: null,
+      guest_session_id: "59c7e5b8-eae4-4394-82fb-b815a10be6c2",
+      project_data: {},
+    },
+    jobs: [
+      {
+        id: "job-test",
+        project_id: projectId,
+        status: "failed",
+        output_storage_path: "",
+      },
+    ],
+  });
+  writeFileSync(
+    join(binDir, "pm2"),
+    [
+      "#!/usr/bin/env bash",
+      'if [[ "${1:-}" == "status" ]]; then',
+      "  echo '| audiolad-studio-render-worker | online |'",
+      "  exit 0",
+      "fi",
+      'if [[ "${1:-}" == "jlist" ]]; then',
+      "  echo '[{\"name\":\"audiolad-studio-render-worker\",\"pm2_env\":{\"status\":\"online\"}}]'",
+      "  exit 0",
+      "fi",
+      "exit 0",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(binDir, "curl"),
+    [
+      "#!/usr/bin/env bash",
+      'if [[ "$*" == *health/build* ]]; then',
+      "  echo '{\"status\":\"ok\"}'",
+      "  exit 0",
+      "fi",
+      "exit 1",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(binDir, "docker"),
+    ["#!/usr/bin/env bash", "echo 'permission denied' >&2", "exit 1", ""].join("\n"),
+  );
+  chmodSync(join(binDir, "pm2"), 0o755);
+  chmodSync(join(binDir, "curl"), 0o755);
+  chmodSync(join(binDir, "docker"), 0o755);
+  return {
+    binDir,
+    deployRoot: join(root, "deploy"),
+    tmpDir,
+    statePath,
+    releaseCurrent,
+    releasePrevious,
+    releaseAllowB,
+    releaseOther,
+    currentIsAllowlisted,
+  };
+}
+
+function runDiskCleanupHelper(root, fixture) {
+  return spawnSync("bash", [diskCleanupPath], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: fixture.deployRoot,
+      PATH: `${fixture.binDir}:${process.env.PATH ?? ""}`,
+      AUDIOLAD_CLEANUP_MOCK_STATE: fixture.statePath,
+      AUDIOLAD_DOCKER_BIN: join(fixture.binDir, "docker"),
+    },
+  });
+}
+
+function assertDiskCleanupHelper() {
+  const helperText = readFileSync(diskCleanupPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", diskCleanupPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `disk cleanup helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.match(helperText, /MODE = allowlist_cleanup/);
+  assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.match(helperText, /20260906-113101-2acc27e1/);
+  assert.match(helperText, /4fc1d620-aaff-44fe-9893-8ca27e29/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 delete/);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
+  chmodSync(diskCleanupPath, 0o755);
+
+  const secretUrl = "https://cleanup-allowlist-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+  const root = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-"));
+  try {
+    const fixture = writeDiskCleanupFixture(root, { secretUrl, secretKey });
+    const result = runDiskCleanupHelper(root, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `disk cleanup helper failed: ${output}`);
+    assert.match(output, /MODE = allowlist_cleanup/);
+    assert.match(output, /CUTOVER = NO/);
+    assert.match(output, /CLEANUP = SUCCESS/);
+    assert.match(output, /CURRENT RELEASE INTACT = YES/);
+    assert.match(output, /PREVIOUS RELEASE INTACT = YES/);
+    assert.match(output, /REAL USER PROJECTS UNTOUCHED = YES/);
+    assert.match(output, /release_deleted name=20260907-064414-b85c870a/);
+    assert.match(output, /storage_removed/);
+    assert.match(output, /redacted_resolved id=4fc1d620-aaff-44fe-9893-8ca27e29aa33/);
+    assert.doesNotMatch(output, /pm2 delete/);
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseCurrent)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releasePrevious)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseOther)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", "20260906-113101-2acc27e1")), false);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseAllowB)), false);
+    assert.equal(existsSync(join(fixture.deployRoot, "shared", ".env.production")), true);
+    assert.equal(existsSync(join(fixture.tmpDir, "audiolad-studio-gain-1-hwE7Nx")), true);
+    assert.equal(existsSync(join(fixture.tmpDir, "audiolad-studio-meditation.html")), true);
+    const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+    assert.ok(state.removedStorage.length >= 1, "must remove allowlisted storage objects");
+    assert.equal(
+      (state.studio_project_assets || []).some((row) => row.id === "800870b6-59cc-4f71-9df7-e30260723f83"),
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  const blockedRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-blocked-"));
+  try {
+    const fixture = writeDiskCleanupFixture(blockedRoot, { secretUrl, secretKey, currentIsAllowlisted: true });
+    const result = runDiskCleanupHelper(blockedRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.notEqual(result.status, 0, "cleanup must fail when CURRENT is allowlisted");
+    assert.match(output, /NEEDS_REVIEW kind=release reason=gate_failed/);
+    assert.match(output, /CLEANUP = FAILED/);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", "20260906-113101-2acc27e1")), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releaseCurrent)), true);
+    assert.equal(existsSync(join(fixture.deployRoot, "releases", fixture.releasePrevious)), true);
+  } finally {
+    rmSync(blockedRoot, { recursive: true, force: true });
+  }
+
+  const foreignRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-cleanup-foreign-"));
+  try {
+    const fixture = writeDiskCleanupFixture(foreignRoot, {
+      secretUrl,
+      secretKey,
+      extraAssets: [
+        {
+          id: "real-user-asset",
+          project_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          original_name: "client.mp3",
+          storage_path: "studio/author/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/real-user-asset/client.mp3",
+          source_id: "800870b6-59cc-4f71-9df7-e30260723f83",
+        },
+      ],
+    });
+    const result = runDiskCleanupHelper(foreignRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.notEqual(result.status, 0, "cleanup must fail when storage is shared with another project");
+    assert.match(output, /NEEDS_REVIEW kind=asset reason=shared_with_other_project/);
+    assert.match(output, /CLEANUP = FAILED/);
+    const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+    assert.equal(
+      (state.studio_project_assets || []).some((row) => row.id === "real-user-asset"),
+      true,
+      "real user asset row must remain",
+    );
+  } finally {
+    rmSync(foreignRoot, { recursive: true, force: true });
   }
 }
 

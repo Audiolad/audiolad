@@ -191,6 +191,47 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### One-shot allowlist cleanup (`confirm=OPS_DISK_STORAGE_CLEANUP`)
+
+Тот же workflow, но `confirm=OPS_DISK_STORAGE_CLEANUP` запускает job
+**Ops disk/Storage cleanup**: SSH как `deploy`, фиксированная one-shot
+последовательность. Удаляет **только** 13 пунктов `SAFE TO DELETE` из
+audit run `34113627251` (2 old releases + 11 test assets проекта
+`6aa9fd82-7bb6-4df6-8761-6c2f8a1337b4`). Нет cutover, нет
+`audiolad-deploy`, нет произвольного remote shell. Перед каждым delete
+повторно проверяется hardcoded allowlist. CURRENT / PREVIOUS, пути
+`NEEDS REVIEW`, реальные user-проекты, `shared/.env.production`, nginx,
+Docker volumes и PM2 restart не трогаются. Worker status читается
+только. Secret values не печатаются.
+
+Exact flags:
+
+```text
+DISK AFTER =
+SPACE FREED =
+CURRENT RELEASE INTACT = YES/NO
+PREVIOUS RELEASE INTACT = YES/NO
+REAL USER PROJECTS UNTOUCHED = YES/NO
+TEST STORAGE OBJECTS REMOVED =
+TEST DB ROWS CLEANED =
+WORKER STATUS =
+PUBLIC HEALTH =
+CLEANUP = SUCCESS/FAILED
+CUTOVER = NO
+MODE = allowlist_cleanup
+```
+
+Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
+делает checkout):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-disk-storage-cleanup.sh
+```
+
+**Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
+branch **`main`**. Ослаблять protection нельзя.
+
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
@@ -208,6 +249,11 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
   audit job не стартует; deploy job пропускается.
 - `confirm=OPS_DISK_STORAGE_AUDIT` с `main` — только read-only disk/Storage
   audit, без deletes и без cutover.
+- `confirm=OPS_DISK_STORAGE_CLEANUP` с PR-ветки при environment protection —
+  cleanup job не стартует; deploy job пропускается.
+- `confirm=OPS_DISK_STORAGE_CLEANUP` с `main` — только hardcoded allowlist
+  cleanup 13 пунктов audit run 34113627251, без cutover и без
+  `audiolad-deploy`.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
