@@ -211,6 +211,48 @@ function testProductAggregateEditChangesSumNotCount() {
   assert.equal(afterAgg[0]?.conversion, 1);
 }
 
+function testAuthorSelfRatingCountsAsNormalActiveRow() {
+  const ratings: AdminRatingFact[] = [
+    {
+      userId: "listener-1",
+      practiceId: "p1",
+      authorId: "a1",
+      stars: 4,
+      createdAt: yesterday,
+    },
+    {
+      userId: "a1",
+      practiceId: "p1",
+      authorId: "a1",
+      stars: 5,
+      createdAt: yesterday,
+    },
+  ];
+
+  const products = aggregateAdminRatingsByProduct({
+    ratings,
+    eligible: [
+      { userId: "listener-1", practiceId: "p1", ratingEligibleAt: yesterday },
+      { userId: "a1", practiceId: "p1", ratingEligibleAt: yesterday },
+    ],
+    window7d,
+    window30d,
+  });
+  const authors = aggregateAdminRatingsByAuthor({
+    ratings,
+    window7d,
+    window30d,
+  });
+
+  assert.equal(products[0]?.ratingCount, 2);
+  assert.equal(products[0]?.totalStars, 9);
+  assert.equal(authors[0]?.ratingCount, 2);
+  assert.equal(authors[0]?.totalStars, 9);
+  assert.equal(authors[0]?.uniqueRaters, 2);
+  assert.equal("authorRating" in (products[0] ?? {}), false);
+  assert.equal("selfRating" in (authors[0] ?? {}), false);
+}
+
 function testAuthorMultiPractice() {
   const ratings: AdminRatingFact[] = [
     {
@@ -411,6 +453,7 @@ function testSourceContracts() {
   assert.doesNotMatch(panel, /from "@\/lib\/admin\/analytics-ratings-queries"/);
   assert.doesNotMatch(panel, /type="button"[^>]*>\s*(Исключить|Вернуть)/);
   assert.doesNotMatch(panel, /fraud|фрод/i);
+  assert.doesNotMatch(panel, /авторская|author_rating|self_rating/);
 
   assert.match(url, /value === "ratings"/);
   assert.match(queries, /createServiceRoleClient/);
@@ -447,6 +490,7 @@ testSummaryFixture();
 testTemporalAB();
 testEligibleConversionGrain();
 testProductAggregateEditChangesSumNotCount();
+testAuthorSelfRatingCountsAsNormalActiveRow();
 testAuthorMultiPractice();
 testJournalOrderAndPagination();
 testDiagnosticsNeutralWording();

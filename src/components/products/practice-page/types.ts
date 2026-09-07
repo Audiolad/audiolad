@@ -6,6 +6,7 @@ import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import type { PublicAudioItem } from "@/lib/products/public-audio-items";
 import type { PublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
+import type { PracticeRatingAggregate } from "@/lib/ratings/types";
 
 export type PracticePageCoverData = {
   displayUrl: string | null;
@@ -79,5 +80,5 @@ export type PracticePageViewModel = {
   showAuthorAppreciationPrototype: boolean;
   publishPreview: PracticePagePublishPreview | null;
   ratingsUiEnabled: boolean;
-  isAuthorOwner: boolean;
+  ratingAggregate: PracticeRatingAggregate;
 };

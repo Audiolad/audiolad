@@ -28,3 +28,29 @@ export function aggregateActivePracticeRatings(
 
   return { totalStars, ratingCount };
 }
+
+/**
+ * Client-side aggregate preview for the same card. Server PUT response is
+ * canonical. Same-value resubmit must not change totals or count.
+ */
+export function applyOptimisticPracticeRatingAggregate(
+  aggregate: PracticeRatingAggregate,
+  previousStars: number | null,
+  nextStars: number,
+): PracticeRatingAggregate {
+  if (previousStars == null) {
+    return {
+      totalStars: aggregate.totalStars + nextStars,
+      ratingCount: aggregate.ratingCount + 1,
+    };
+  }
+
+  if (previousStars === nextStars) {
+    return aggregate;
+  }
+
+  return {
+    totalStars: aggregate.totalStars - previousStars + nextStars,
+    ratingCount: aggregate.ratingCount,
+  };
+}

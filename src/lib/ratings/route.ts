@@ -123,8 +123,6 @@ export async function handlePracticeRatingPut(
     practice.publication_class,
     practice.product_kind,
   );
-  const isAuthorOwner =
-    access.mode === "author_preview" || userId === practice.author_id;
 
   let ratingEligibleAt: string | null;
 
@@ -144,7 +142,6 @@ export async function handlePracticeRatingPut(
     access,
     isCourse,
     productKind: practice.product_kind,
-    isAuthorOwner,
     ratingEligibleAt,
   });
 

@@ -9,7 +9,13 @@ export const RATING_NOT_ELIGIBLE_COPY =
 
 export const RATING_THANKS_COPY = "Спасибо за ваш отклик 🙏";
 
-export const RATING_AUTHOR_DENIED_COPY = "Нельзя оценить свой продукт.";
+export function formatPracticeRatingAggregateStarsSr(totalStars: number): string {
+  return `Накоплено звёзд: ${totalStars}`;
+}
+
+export function formatPracticeRatingAggregateCountSr(ratingCount: number): string {
+  return `Поставили оценку: ${ratingCount}`;
+}
 
 export function buildPracticeRatingApiPath(
   authorSlug: string,

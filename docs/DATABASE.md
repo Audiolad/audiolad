@@ -826,7 +826,7 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 - После порога `real_listened_ms` продолжает расти.
 - Аноним без `user_id` — строки нет.
 - Preview-only — никогда не начисляется (даже 60–90 с clip).
-- Автор (`author_preview`) может копить `real_listened_ms`, но `rating_eligible_at` не ставится.
+- Автор (`author_preview`) копит `real_listened_ms` и получает `rating_eligible_at` по тому же порогу 30000 ms, что и слушатель. Preview-clip / `catalog_preview` по-прежнему не становятся eligible.
 - Курсы (`publication_class=course`) в Stage 1 не начисляются (FOLLOW-UP); access/clip/progress курса не меняются.
 
 ### RLS / RPC
@@ -884,7 +884,7 @@ UNIQUE `(user_id, practice_id)`.
 - Зарегистрированный пользователь.
 - `practice_listen_stats.rating_eligible_at IS NOT NULL` для этого продукта (Stage 1, ≥ 30000 ms MEDIA-TIME).
 - Полный listen-доступ того же духа, что `PUT .../listen-stats` (не preview-only).
-- Не автор/владелец продукта (даже если историческая строка listen-stats есть).
+- Автор/владелец своего rateable продукта (`author_preview` на practice/music/audio_post) — те же правила, что у слушателя: полный listen-доступ и `rating_eligible_at` после 30000 ms. Отдельной author-оценки нет. Публикация не является gate: автор может оценить в author preview до публикации; после публикации строка входит в публичный агрегат как обычный голос.
 - Аноним — никогда. Preview — никогда.
 
 Публичный агрегат: **`totalStars` = SUM(stars)**, **`ratingCount` = COUNT(*)** по строкам с `excluded_at IS NULL`. Среднее — не публичная метрика.
@@ -906,13 +906,14 @@ UNIQUE `(user_id, practice_id)`.
 - `practice_ratings`: `authenticated` SELECT только своих строк. Прямые INSERT / UPDATE / DELETE запрещены.
 - `practice_rating_events`: клиентского доступа нет (anon / authenticated / PUBLIC отозваны).
 - Мутация только через `set_practice_rating` (`SECURITY DEFINER`). `EXECUTE` только у `service_role`.
-- Маршрут `PUT .../rating` сначала проверяет сессию, доступ, eligibility и «не автор», затем считает HMAC на сервере и вызывает RPC.
+- Маршрут `PUT .../rating` сначала проверяет сессию, доступ и eligibility, затем считает HMAC на сервере и вызывает RPC.
 
 ### API
 
-- `GET /api/listen/product/{author}/{product}/rating` — own-state (`stars`, `createdAt`, `updatedAt`, `ratingEligible`) + `aggregate.totalStars` / `aggregate.ratingCount`. 401 без сессии.
+- `GET /api/listen/product/{author}/{product}/rating` — own-state (`stars`, `createdAt`, `updatedAt`, `ratingEligible`) + `aggregate.totalStars` / `aggregate.ratingCount`. 401 без сессии. Анонимный GET не открывается ради публичного агрегата.
+- Публичный агрегат на PDP — server-rendered `totalStars` / `ratingCount` через `getPracticeRatingAggregate` (active `practice_ratings`, `excluded_at IS NULL`). После PUT клиент берёт канонический агрегат из ответа.
 - `PUT` того же пути — тело `{ stars: 1..5 }`. Legacy-маршрут зеркалит product, как listen-stats.
-- Ошибки: `unauthorized` (401), `rating_not_eligible` (403), `author_cannot_rate_own_product` (403), `invalid_stars` (400), `not_found` (404).
+- Ошибки: `unauthorized` (401), `rating_not_eligible` (403), `invalid_stars` (400), `not_found` (404).
 - UI на PDP за флагом `RATINGS_UI_ENABLED` (явное включение, как `PAYOUT_PROFILES_ENABLED`). Схема и API от флага не зависят.
 - Клиентский GET `ratingEligible` только для начального UI. Клик авторизованного пользователя всегда шлёт PUT; сервер заново проверяет eligibility. После 30 с прослушивания на уже открытой PDP оценка ставится без перезагрузки.
 - Известный UX-backlog (не дыра в безопасности): paid preview корректно отвечает 403 `rating_not_eligible`, а PDP показывает общее «Не удалось сохранить оценку…». UI оценки в Stage 3 не меняем.

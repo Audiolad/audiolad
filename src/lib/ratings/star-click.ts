@@ -1,10 +1,14 @@
+import { applyOptimisticPracticeRatingAggregate } from "@/lib/ratings/aggregate";
 import {
   putOwnPracticeRating,
-  RATING_AUTHOR_DENIED_COPY,
   RATING_NOT_ELIGIBLE_COPY,
   RATING_THANKS_COPY,
 } from "@/lib/ratings/client";
-import type { PracticeRatingPutState } from "@/lib/ratings/types";
+import type {
+  PracticeRatingAggregate,
+  PracticeRatingPutState,
+} from "@/lib/ratings/types";
+import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 
 export type PracticeRatingStarClickAction = "sign_in" | "put" | "ignore";
 
@@ -13,6 +17,7 @@ export type PracticeRatingUiState = {
   ratingEligible: boolean;
   message: string | null;
   pendingStars: number | null;
+  aggregate: PracticeRatingAggregate;
 };
 
 /**
@@ -42,10 +47,6 @@ export function messageForPracticeRatingError(
     return RATING_NOT_ELIGIBLE_COPY;
   }
 
-  if (error === "author_cannot_rate_own_product") {
-    return RATING_AUTHOR_DENIED_COPY;
-  }
-
   return "Не удалось сохранить оценку. Попробуйте ещё раз.";
 }
 
@@ -58,17 +59,24 @@ export function applyOptimisticPracticeRating(
     pendingStars: nextStars,
     stars: nextStars,
     message: null,
+    aggregate: applyOptimisticPracticeRatingAggregate(
+      state.aggregate,
+      state.stars,
+      nextStars,
+    ),
   };
 }
 
 export function applyPracticeRatingPutSuccess(
   stars: number,
+  aggregate: PracticeRatingAggregate = EMPTY_RATING_AGGREGATE,
 ): PracticeRatingUiState {
   return {
     stars,
     ratingEligible: true,
     message: RATING_THANKS_COPY,
     pendingStars: null,
+    aggregate,
   };
 }
 
@@ -76,12 +84,14 @@ export function applyPracticeRatingPutFailure(
   previousStars: number | null,
   previousEligible: boolean,
   error: string | undefined,
+  previousAggregate: PracticeRatingAggregate = EMPTY_RATING_AGGREGATE,
 ): PracticeRatingUiState {
   return {
     stars: previousStars,
     ratingEligible: previousEligible,
     message: messageForPracticeRatingError(error),
     pendingStars: null,
+    aggregate: previousAggregate,
   };
 }
 
@@ -97,13 +107,16 @@ export async function runAuthenticatedPracticeRatingClick(input: {
   apiPath: string;
   currentStars: number | null;
   ratingEligible: boolean;
+  currentAggregate?: PracticeRatingAggregate;
   nextStars: number;
   put?: PracticeRatingPutFn;
 }): Promise<PracticeRatingUiState> {
+  const previousAggregate = input.currentAggregate ?? EMPTY_RATING_AGGREGATE;
+
   try {
     const put = input.put ?? putOwnPracticeRating;
     const result = await put(input.apiPath, input.nextStars);
-    return applyPracticeRatingPutSuccess(result.stars);
+    return applyPracticeRatingPutSuccess(result.stars, result.aggregate);
   } catch (error) {
     const code =
       error && typeof error === "object" && "error" in error
@@ -113,6 +126,7 @@ export async function runAuthenticatedPracticeRatingClick(input: {
       input.currentStars,
       input.ratingEligible,
       code,
+      previousAggregate,
     );
   }
 }

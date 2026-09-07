@@ -7,6 +7,8 @@ import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   buildPracticeRatingApiPath,
   fetchOwnPracticeRating,
+  formatPracticeRatingAggregateCountSr,
+  formatPracticeRatingAggregateStarsSr,
   RATING_THANKS_COPY,
 } from "@/lib/ratings/client";
 import {
@@ -16,35 +18,69 @@ import {
   type PracticeRatingUiState,
 } from "@/lib/ratings/star-click";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
+import type { PracticeRatingAggregate } from "@/lib/ratings/types";
 
 type PracticeRatingStarsProps = {
   authorSlug: string;
   productSlug: string;
   signInReturnPath: string;
   isAuthenticated: boolean;
-  isAuthorOwner: boolean;
+  initialAggregate: PracticeRatingAggregate;
 };
 
-const EMPTY_RATING_UI: PracticeRatingUiState = {
-  stars: null,
-  ratingEligible: false,
-  message: null,
-  pendingStars: null,
-};
+function emptyRatingUi(
+  aggregate: PracticeRatingAggregate,
+): PracticeRatingUiState {
+  return {
+    stars: null,
+    ratingEligible: false,
+    message: null,
+    pendingStars: null,
+    aggregate,
+  };
+}
+
+function RatingAggregateStarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+    </svg>
+  );
+}
+
+function RatingAggregateUserIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" />
+    </svg>
+  );
+}
 
 export default function PracticeRatingStars({
   authorSlug,
   productSlug,
   signInReturnPath,
   isAuthenticated,
-  isAuthorOwner,
+  initialAggregate,
 }: PracticeRatingStarsProps) {
   const router = useRouter();
   const apiPath = buildPracticeRatingApiPath(authorSlug, productSlug);
-  const [ui, setUi] = useState<PracticeRatingUiState>(EMPTY_RATING_UI);
+  const [ui, setUi] = useState<PracticeRatingUiState>(() =>
+    emptyRatingUi(initialAggregate),
+  );
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthorOwner) {
+    if (!isAuthenticated) {
       return;
     }
 
@@ -61,6 +97,7 @@ export default function PracticeRatingStars({
           ratingEligible: state.ratingEligible,
           message: state.stars != null ? RATING_THANKS_COPY : null,
           pendingStars: null,
+          aggregate: state.aggregate,
         });
       })
       .catch(() => {
@@ -70,11 +107,7 @@ export default function PracticeRatingStars({
     return () => {
       cancelled = true;
     };
-  }, [apiPath, isAuthenticated, isAuthorOwner]);
-
-  if (isAuthorOwner) {
-    return null;
-  }
+  }, [apiPath, isAuthenticated]);
 
   const displayStars = ui.pendingStars ?? ui.stars;
   const isPending = ui.pendingStars != null;
@@ -96,12 +129,14 @@ export default function PracticeRatingStars({
 
     const previousStars = ui.stars;
     const previousEligible = ui.ratingEligible;
+    const previousAggregate = ui.aggregate;
     setUi(applyOptimisticPracticeRating(ui, nextStars));
 
     const next = await runAuthenticatedPracticeRatingClick({
       apiPath,
       currentStars: previousStars,
       ratingEligible: previousEligible,
+      currentAggregate: previousAggregate,
       nextStars,
     });
     setUi(next);
@@ -140,6 +175,32 @@ export default function PracticeRatingStars({
             </button>
           );
         })}
+      </div>
+      <div
+        className="mt-2"
+        data-practice-rating-public-aggregate=""
+        data-practice-rating-total-stars={ui.aggregate.totalStars}
+        data-practice-rating-count={ui.aggregate.ratingCount}
+      >
+        <p className="sr-only">
+          {formatPracticeRatingAggregateStarsSr(ui.aggregate.totalStars)}
+        </p>
+        <p className="sr-only">
+          {formatPracticeRatingAggregateCountSr(ui.aggregate.ratingCount)}
+        </p>
+        <div
+          aria-hidden="true"
+          className="flex items-center gap-4 text-sm leading-5 text-[#65577f]"
+        >
+          <span className="inline-flex items-center gap-1">
+            <span>{ui.aggregate.totalStars}</span>
+            <RatingAggregateStarIcon />
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span>{ui.aggregate.ratingCount}</span>
+            <RatingAggregateUserIcon />
+          </span>
+        </div>
       </div>
       {ui.message ? (
         <p

@@ -112,6 +112,8 @@ import { loadCourseLearnerContent } from "@/lib/course-content/learner-content";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import { isRatingsUiEnabled } from "@/lib/ratings/feature";
+import { getPracticeRatingAggregate } from "@/lib/ratings/read";
+import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -686,6 +688,19 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const promoStartPending =
     validPromoStart && !isHeroPromoOfferActive(priceOffer);
 
+  const ratingsUiEnabled =
+    isRatingsUiEnabled() &&
+    !isCoursePublication(practice.publication_class, practice.product_kind);
+
+  let ratingAggregate = EMPTY_RATING_AGGREGATE;
+  if (ratingsUiEnabled) {
+    try {
+      ratingAggregate = await getPracticeRatingAggregate(practice.id);
+    } catch {
+      ratingAggregate = EMPTY_RATING_AGGREGATE;
+    }
+  }
+
   const viewModel: PracticePageViewModel = {
     practice: {
       id: practice.id,
@@ -742,10 +757,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     promoStartToken,
     promoStartPending,
     showAuthorAppreciationPrototype,
-    ratingsUiEnabled:
-      isRatingsUiEnabled() &&
-      !isCoursePublication(practice.publication_class, practice.product_kind),
-    isAuthorOwner: Boolean(user?.id) && user?.id === practice.author_id,
+    ratingsUiEnabled,
+    ratingAggregate,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {
