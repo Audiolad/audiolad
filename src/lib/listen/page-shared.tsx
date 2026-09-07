@@ -35,6 +35,7 @@ import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from
 import { listAccessibleCourseAudioItemIds } from "@/lib/course-content/learner-assets";
 import { resolveCourseLearnerAccess } from "@/lib/course-content/learner-access";
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { shouldApplyEntitledPublishedAudioFilter } from "@/lib/listen/course-audio-status";
 import {
   canAccessCourseContent,
   resolveProductAccess,
@@ -278,14 +279,20 @@ async function loadListenTracks(
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
 
-  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+  const isCourse = isCoursePublication(
+    practice.publication_class,
+    practice.product_kind,
+  );
+
+  if (isCourse) {
     const learnerAccess = await resolveCourseLearnerAccess(
       supabase,
       practice,
       userId,
     );
+    const serviceRole = createServiceRoleClient();
     const accessibleIds = await listAccessibleCourseAudioItemIds({
-      serviceRole: createServiceRoleClient(),
+      serviceRole,
       publicationId: practice.id,
       access: learnerAccess,
     });
@@ -294,10 +301,17 @@ async function loadListenTracks(
       return [];
     }
 
-    query = query.in("id", [...accessibleIds]);
+    query = serviceRole
+      .from("audio_items")
+      .select(
+        "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status",
+      )
+      .eq("practice_id", practice.id)
+      .in("id", [...accessibleIds])
+      .order("position", { ascending: true });
   }
 
-  if (accessMode === "entitled") {
+  if (shouldApplyEntitledPublishedAudioFilter({ isCourse, accessMode })) {
     query = query.eq("status", "published");
   }
 

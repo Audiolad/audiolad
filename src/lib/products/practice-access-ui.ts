@@ -99,7 +99,17 @@ export type PracticePrimaryAction =
   | {
       kind: "audio_pending";
       label: string;
+    }
+  | {
+      kind: "open_course";
+      href: string;
+      label: string;
     };
+
+export const COURSE_LEARNER_CONTENTS_ANCHOR_ID = "course-contents";
+export const COURSE_LEARNER_OPEN_CTA_LABEL = "Перейти к курсу";
+export const COURSE_LEARNER_CONTINUE_CTA_LABEL = "Продолжить курс";
+export const PRODUCT_UNAVAILABLE_CTA_LABEL = "Продукт недоступен";
 
 export type PracticeAuthorToolbarAction =
   | {
@@ -141,6 +151,8 @@ export type PracticeAccessPresentation = {
   primaryAction: PracticePrimaryAction;
   libraryAction: PracticeLibraryAction;
   showPaymentLegalNote: boolean;
+  /** Marketing «О продукте». Hidden only for an active entitled learner course. */
+  showProductAbout: boolean;
 };
 
 export function resolveLibraryAction(input: {
@@ -368,6 +380,31 @@ function resolveCommercialAccess(
   return access;
 }
 
+function buildEntitledCoursePresentation(
+  access: ProductAccessResult,
+): Pick<
+  PracticeAccessPresentation,
+  | "statusBadge"
+  | "statusDetail"
+  | "primaryAction"
+  | "showPaymentLegalNote"
+> {
+  return {
+    statusBadge: "Доступ открыт",
+    statusDetail: getEntitlementStatusLabel(access.accessSource),
+    primaryAction: {
+      kind: "open_course",
+      href: `#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`,
+      label: COURSE_LEARNER_OPEN_CTA_LABEL,
+    },
+    showPaymentLegalNote: false,
+  };
+}
+
+function isActiveEntitlementReason(reason: ProductAccessResult["reason"]): boolean {
+  return reason === "purchased" || reason === "granted" || reason === "admin";
+}
+
 function buildCommercialPresentation(input: {
   access: ProductAccessResult;
   practice: PracticePricing & {
@@ -380,6 +417,7 @@ function buildCommercialPresentation(input: {
   paymentsConfigured: boolean;
   isAuthenticated: boolean;
   purchaseSurface?: "practice_page" | "preview";
+  isCourse?: boolean;
 }): Pick<
   PracticeAccessPresentation,
   | "statusBadge"
@@ -394,6 +432,7 @@ function buildCommercialPresentation(input: {
     paymentsConfigured,
     isAuthenticated,
     purchaseSurface = "practice_page",
+    isCourse = false,
   } = input;
   const effectivePrice =
     typeof practice.displayPrice === "number" &&
@@ -412,6 +451,10 @@ function buildCommercialPresentation(input: {
   const listenLabel = isGuestListenEntry ? "Начать слушать" : PLAY_ACTION_LABEL;
 
   if (access.reason === "admin") {
+    if (isCourse) {
+      return buildEntitledCoursePresentation(access);
+    }
+
     return {
       statusBadge: "Доступ открыт",
       statusDetail: "Технический просмотр",
@@ -427,6 +470,10 @@ function buildCommercialPresentation(input: {
           },
       showPaymentLegalNote: false,
     };
+  }
+
+  if (isCourse && access.hasEntitlement && isActiveEntitlementReason(access.reason)) {
+    return buildEntitledCoursePresentation(access);
   }
 
   if (access.canListen && access.reason === "guest_promo") {
@@ -525,7 +572,7 @@ function buildCommercialPresentation(input: {
       statusDetail: unavailableDetail,
       primaryAction: {
         kind: "audio_pending",
-        label: unavailableDetail ?? "Продукт недоступен",
+        label: unavailableDetail ?? PRODUCT_UNAVAILABLE_CTA_LABEL,
       },
       showPaymentLegalNote: false,
     };
@@ -630,6 +677,8 @@ export function buildPracticeAccessPresentation(input: {
   publishListenerViewMode?: boolean;
   /** Author-only personal-timer preview. Buy CTA stays visual, not live. */
   promoPreviewMode?: boolean;
+  /** Course publication: entitled learner CTA opens the outline, not storefront. */
+  isCourse?: boolean;
 }): PracticeAccessPresentation {
   const {
     access,
@@ -641,8 +690,16 @@ export function buildPracticeAccessPresentation(input: {
     publishPreviewMode = false,
     publishListenerViewMode = false,
     promoPreviewMode = false,
+    isCourse = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
+  const showProductAbout = !(
+    isCourse &&
+    access.hasEntitlement &&
+    !buyerPreviewMode &&
+    !publishPreviewMode &&
+    !publishListenerViewMode
+  );
   const listenHref = buildListenPath(authorSlug, practice.slug, {
     autoplay: true,
   });
@@ -660,6 +717,7 @@ export function buildPracticeAccessPresentation(input: {
       authorSlug,
       paymentsConfigured,
       isAuthenticated: false,
+      isCourse,
     });
     const libraryAction = resolveLibraryAction({
       access: listenerAccess,
@@ -683,6 +741,7 @@ export function buildPracticeAccessPresentation(input: {
           authorToolbarMessage: null,
           authorToolbarActions: [],
           showAdminPreview: false,
+          showProductAbout,
         },
         promoPreviewMode,
       );
@@ -700,6 +759,7 @@ export function buildPracticeAccessPresentation(input: {
         authorToolbarMessage: null,
         authorToolbarActions: [],
         showAdminPreview: false,
+        showProductAbout,
       },
       promoPreviewMode,
     );
@@ -720,6 +780,7 @@ export function buildPracticeAccessPresentation(input: {
       // Guest CTA copy and funnel, without changing real server-side access.
       isAuthenticated: false,
       purchaseSurface: "preview",
+      isCourse,
     });
     const libraryAction = resolveLibraryAction({
       access: commercialAccess,
@@ -740,6 +801,7 @@ export function buildPracticeAccessPresentation(input: {
         authorToolbarMessage: null,
         authorToolbarActions: [],
         showAdminPreview: false,
+        showProductAbout,
       },
       promoPreviewMode,
     );
@@ -762,6 +824,7 @@ export function buildPracticeAccessPresentation(input: {
     authorSlug,
     paymentsConfigured,
     isAuthenticated,
+    isCourse,
   });
 
   if (isAuthorOwner) {
@@ -783,6 +846,7 @@ export function buildPracticeAccessPresentation(input: {
           listenHref,
         }),
         showAdminPreview: false,
+        showProductAbout,
       },
       promoPreviewMode,
     );
@@ -800,6 +864,7 @@ export function buildPracticeAccessPresentation(input: {
       authorToolbarMessage: null,
       authorToolbarActions: [],
       showAdminPreview: access.reason === "admin",
+      showProductAbout,
     },
     promoPreviewMode,
   );

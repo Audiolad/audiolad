@@ -4,6 +4,7 @@ import {
   type LearnerCourseLevelChrome,
 } from "@/lib/course-content/learner-groups";
 import type { LearnerCourse, LearnerCourseLesson } from "@/lib/course-content/learner-types";
+import { COURSE_LEARNER_CONTENTS_ANCHOR_ID } from "@/lib/products/practice-access-ui";
 
 import CourseLearnerAudioBlock from "./CourseLearnerAudioBlock";
 import CourseLearnerFileDownload from "./CourseLearnerFileDownload";
@@ -31,12 +32,12 @@ function UnlockedLesson({
   const Heading = headingLevel;
 
   return (
-    <article className="rounded-[20px] border border-[#f0e6fb] bg-[#fcfaff] px-4 py-4">
-      <Heading className="text-[16px] font-semibold text-[#25135c]">
+    <article className="min-w-0 max-w-full rounded-[20px] border border-[#f0e6fb] bg-[#fcfaff] px-4 py-4">
+      <Heading className="min-w-0 break-words text-[16px] font-semibold text-[#25135c]">
         <span className="mr-2 tabular-nums text-[#8a7ca9]">{index}.</span>
         {lesson.title}
       </Heading>
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 min-w-0 max-w-full space-y-3">
         {(lesson.blocks ?? []).map((block) => {
           if (block.type === "text") {
             return (
@@ -83,8 +84,8 @@ function LockedLessonTitle({
   const Heading = headingLevel;
 
   return (
-    <article className="rounded-[20px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-4">
-      <Heading className="text-[16px] font-semibold text-[#3f3560]">
+    <article className="min-w-0 max-w-full rounded-[20px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-4">
+      <Heading className="min-w-0 break-words text-[16px] font-semibold text-[#3f3560]">
         {lesson.title}
       </Heading>
     </article>
@@ -93,8 +94,8 @@ function LockedLessonTitle({
 
 function LevelChrome({ chrome }: { chrome: LearnerCourseLevelChrome }) {
   return (
-    <header className="space-y-2">
-      <h3 className="text-[16px] font-semibold text-[#25135c]">{chrome.heading}</h3>
+    <header className="min-w-0 space-y-2">
+      <h3 className="min-w-0 break-words text-[16px] font-semibold text-[#25135c]">{chrome.heading}</h3>
       {chrome.description ? (
         <p className="text-sm leading-6 text-[#7d70a2]">{chrome.description}</p>
       ) : null}
@@ -108,7 +109,7 @@ function LevelUpgrade({ chrome }: { chrome: LearnerCourseLevelChrome }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 max-w-full space-y-3">
       {chrome.upgradePriceLabel ? (
         <p className="text-sm font-semibold text-[#7042c5]">{chrome.upgradePriceLabel}</p>
       ) : null}
@@ -146,7 +147,7 @@ function LessonList({
   headingLevel: "h3" | "h4";
 }) {
   return (
-    <ol className="space-y-4">
+    <ol className="min-w-0 max-w-full space-y-4">
       {lessons.map((lesson, offset) => (
         <li key={lesson.id}>
           {lesson.locked ? (
@@ -178,8 +179,11 @@ export default function CourseLearnerContent({
   const view = groupLearnerCourse(course);
 
   return (
-    <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-      <h2 className="text-[17px] font-semibold text-[#25135c]">Содержание курса</h2>
+    <section
+      id={COURSE_LEARNER_CONTENTS_ANCHOR_ID}
+      className="mt-6 min-w-0 max-w-full rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"
+    >
+      <h2 className="min-w-0 break-words text-[17px] font-semibold text-[#25135c]">Содержание курса</h2>
 
       {view.kind === "flat" ? (
         <div className="mt-4">
@@ -204,7 +208,7 @@ export default function CourseLearnerContent({
             return (
               <section
                 key={group.requiredAccessLevel}
-                className="space-y-3"
+                className="min-w-0 max-w-full space-y-3"
                 data-learner-level={group.requiredAccessLevel}
               >
                 {group.chrome ? <LevelChrome chrome={group.chrome} /> : null}
