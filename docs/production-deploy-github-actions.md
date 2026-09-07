@@ -148,6 +148,49 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### Read-only disk/Storage audit (`confirm=OPS_DISK_STORAGE_AUDIT`)
+
+Тот же workflow, но `confirm=OPS_DISK_STORAGE_AUDIT` запускает job
+**Ops disk/Storage audit**: SSH как `deploy`, фиксированная read-only
+последовательность (без deletes, без cutover, без `audiolad-deploy`).
+Печатает размеры/пути: `df` (DISK BEFORE), `du` largest dirs, old
+`/var/www/audiolad-deploy/releases/*` (CURRENT / PREVIOUS / CANDIDATE),
+PM2 / nginx / docker log sizes if readable, search for acceptance
+fixtures (`6aa9fd82`, `synth_3h`, `synth_3h_le10800`, ~10802s / 343MiB /
+75-min names). DB+Storage probes follow the recover pattern
+(`docker exec supabase-db` or `loadEnvConfig` + supabase-js). Secret
+values are never printed. Studio objects are `SAFE TO DELETE` only when
+proven acceptance/test **or** the DB row is deleted/released with no
+active reference; anything uncertain goes to `NEEDS REVIEW`. Real user
+Studio projects/assets are never marked `SAFE TO DELETE`. Old releases
+older than current + previous rollback may be listed as
+`SAFE TO DELETE` for the release kind only.
+
+Exact flags:
+
+```text
+DISK BEFORE =
+LARGEST DIRECTORIES =
+TEST/ORPHAN FILES FOUND =
+OLD RELEASES FOUND =
+SAFE TO DELETE =
+ESTIMATED SPACE RECOVERY =
+CUTOVER = NO
+audiolad_deploy = NOT_INVOKED
+MODE = read_only_audit
+```
+
+Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
+делает checkout):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-disk-storage-audit.sh
+```
+
+**Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
+branch **`main`**. Ослаблять protection нельзя.
+
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
@@ -161,6 +204,10 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
   recover job не стартует; deploy job пропускается.
 - `confirm=OPS_STUDIO_WORKER_RECOVER` с `main` — только clean-restart Studio
   render worker, без cutover.
+- `confirm=OPS_DISK_STORAGE_AUDIT` с PR-ветки при environment protection —
+  audit job не стартует; deploy job пропускается.
+- `confirm=OPS_DISK_STORAGE_AUDIT` с `main` — только read-only disk/Storage
+  audit, без deletes и без cutover.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
