@@ -1,7 +1,26 @@
 import { LISTEN_STATS_HEARTBEAT_MS } from "@/lib/listen/listen-stats-constants";
 import { readAnonymousId } from "@/lib/analytics/identity-storage";
+import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 
 export { LISTEN_STATS_HEARTBEAT_MS };
+
+export function readListenStatsClientAuthenticated(
+  cookieHeader?: string,
+  supabaseUrl?: string,
+): boolean {
+  const header =
+    cookieHeader ??
+    (typeof document === "undefined" ? "" : document.cookie);
+
+  if (!header.trim()) {
+    return false;
+  }
+
+  return hasSupabaseAuthCookie(
+    header,
+    supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+  );
+}
 
 export type ListenStatsHeartbeatPayload = {
   audioItemId: string;
@@ -15,8 +34,13 @@ export function shouldReportListenStatsHeartbeat(input: {
   isPreviewMode: boolean;
   guestProgressMode: boolean;
   audioItemId: string | null | undefined;
+  isAuthenticated?: boolean;
 }): boolean {
-  if (input.isPrivateAudio || input.isPreviewMode || input.guestProgressMode) {
+  if (input.isPrivateAudio || input.guestProgressMode) {
+    return false;
+  }
+
+  if (input.isPreviewMode && input.isAuthenticated !== true) {
     return false;
   }
 

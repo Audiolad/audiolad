@@ -211,6 +211,59 @@ function testProductAggregateEditChangesSumNotCount() {
   assert.equal(afterAgg[0]?.conversion, 1);
 }
 
+function testPreviewDerivedRatingCountsAsNormalActiveRow() {
+  const ratings: AdminRatingFact[] = [
+    {
+      userId: "buyer-1",
+      practiceId: "p1",
+      authorId: "a1",
+      stars: 4,
+      createdAt: yesterday,
+    },
+    {
+      userId: "preview-listener",
+      practiceId: "p1",
+      authorId: "a1",
+      stars: 5,
+      createdAt: yesterday,
+    },
+  ];
+
+  const products = aggregateAdminRatingsByProduct({
+    ratings,
+    eligible: [
+      { userId: "buyer-1", practiceId: "p1", ratingEligibleAt: yesterday },
+      {
+        userId: "preview-listener",
+        practiceId: "p1",
+        ratingEligibleAt: yesterday,
+      },
+    ],
+    window7d,
+    window30d,
+  });
+  const summary = summarizeAdminRatings({
+    ratings,
+    eligible: [
+      { userId: "buyer-1", practiceId: "p1", ratingEligibleAt: yesterday },
+      {
+        userId: "preview-listener",
+        practiceId: "p1",
+        ratingEligibleAt: yesterday,
+      },
+    ],
+    window: allTime,
+  });
+
+  assert.equal(products[0]?.ratingCount, 2);
+  assert.equal(products[0]?.totalStars, 9);
+  assert.equal(summary.ratingCount, 2);
+  assert.equal(summary.totalStars, 9);
+  assert.equal(summary.eligibleListeners, 2);
+  assert.equal(summary.ratedEligible, 2);
+  assert.equal("previewRating" in (products[0] ?? {}), false);
+}
+
 function testAuthorSelfRatingCountsAsNormalActiveRow() {
   const ratings: AdminRatingFact[] = [
     {
@@ -484,12 +537,15 @@ function testSourceContracts() {
   assert.match(database, /Admin Ratings analytics \(Stage 3\)/);
   assert.match(database, /время первой оценки/);
   assert.match(database, /Не удалось сохранить оценку/);
+  assert.match(database, /включая авторизованных слушателей легального paid preview/);
+  assert.match(panel, /включая авторизованных preview-слушателей/);
 }
 
 testSummaryFixture();
 testTemporalAB();
 testEligibleConversionGrain();
 testProductAggregateEditChangesSumNotCount();
+testPreviewDerivedRatingCountsAsNormalActiveRow();
 testAuthorSelfRatingCountsAsNormalActiveRow();
 testAuthorMultiPractice();
 testJournalOrderAndPagination();

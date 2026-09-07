@@ -30,6 +30,26 @@ export function isFullListenAccessMode(mode: ListenAccessMode): boolean {
   return mode === "entitled" || mode === "author_preview";
 }
 
+/**
+ * Trusted MEDIA-TIME / rating gate only. Must stay out of full-access
+ * checks: full_audio, signed full Storage URL, practice_audio_progress.
+ */
+export function isRatingListenAccessMode(mode: ListenAccessMode): boolean {
+  return (
+    mode === "entitled" ||
+    mode === "author_preview" ||
+    mode === "catalog_preview"
+  );
+}
+
+export function isCatalogPreviewApiPurpose(purpose: ListenApiPurpose): boolean {
+  return (
+    purpose === "preview_audio" ||
+    purpose === "listen_stats" ||
+    purpose === "rating"
+  );
+}
+
 export function canWritePracticeProgress(access: ListenAccess): boolean {
   return isFullListenAccessMode(access.mode);
 }
@@ -43,8 +63,10 @@ export function shouldUseServiceRoleStorageForReason(
 /**
  * Server source of truth for listen API audio vs progress vs listen-stats.
  * Client `preview=1` / playbackMode never grant full audio, progress writes,
- * or listen-stats accrual. Course lesson audio is never opened by catalog preview.
- * Rating PUT uses the same full-access decision as listen-stats.
+ * or listen-stats accrual. Legal catalog_preview is minted only when the
+ * backend already authorizes storefront preview — never from client flags.
+ * Course lesson audio is never opened by catalog preview.
+ * Rating PUT and listen-stats use rating-listen access, not full-listen access.
  */
 export function resolveListenApiDecision(input: {
   purpose: ListenApiPurpose;
@@ -88,13 +110,13 @@ export function resolveListenApiDecision(input: {
   }
 
   if (
-    input.purpose === "preview_audio" &&
+    isCatalogPreviewApiPurpose(input.purpose) &&
     input.catalogPreviewEligible
   ) {
     return {
       ok: true,
       access: { mode: "catalog_preview" },
-      useServiceRoleStorage: true,
+      useServiceRoleStorage: input.purpose === "preview_audio",
     };
   }
 

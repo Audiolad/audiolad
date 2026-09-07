@@ -23,7 +23,7 @@ export const ADMIN_RATINGS_JOURNAL_NOTE =
   "Журнал — audit событий first|changed. Источник текущей оценки — practice_ratings, не события. Период журнала фильтрует occurred_at.";
 
 export const ADMIN_RATINGS_PREVIEW_UX_BACKLOG =
-  "Известный UX-backlog (не дыра в безопасности): paid preview корректно отвечает 403 rating_not_eligible, а PDP показывает общее «Не удалось сохранить оценку…». UI оценки в Stage 3 не меняем.";
+  "Eligible listeners — пары user×practice с rating_eligible_at, включая авторизованных слушателей легального paid preview (≥30 с MEDIA-TIME). Preview-derived оценка — обычная active practice_ratings. До 30 с PUT отвечает 403 rating_not_eligible; PDP может показать общее «Не удалось сохранить оценку…». UI оценки не меняем.";
 
 export const ADMIN_RATINGS_MODERATION_FOLLOWUP =
   "Exclude/Restore с обязательной причиной — follow-up: нужны право записи (не analytics.view) и аудит циклов exclude/restore. Текущие колонки excluded_at/reason/by хранят только актуальное состояние.";

@@ -5,7 +5,7 @@
 ## Технический backlog
 
 - `fix(next): remove invalid headers export from src/app/(platform)/d/layout.tsx` — устранить baseline-ошибку Next.js build: `headers` не является допустимым export поля layout.
-- Ratings UX (не security): paid preview корректно отвечает 403 `rating_not_eligible`, PDP показывает общее «Не удалось сохранить оценку…». Не менять UI оценки без отдельного задания.
+- Ratings UX (не security): до 30 с preview PUT отвечает 403 `rating_not_eligible`, PDP показывает общее «Не удалось сохранить оценку…». Не менять UI оценки без отдельного задания.
 - Ratings Stage 3B (если понадобится): Exclude/Restore с обязательной причиной и аудитом циклов; расширенная диагностика аномалий, если текущий observe-only блок раздует scope.
 
 ## 0. SEO — после PR1 (приоритет: средний)
