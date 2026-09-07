@@ -855,6 +855,9 @@ export function useSequentialPlayer({
         return;
       }
 
+      recoveryUrlAttemptedRef.current = false;
+      recoveryPromiseRef.current = null;
+
       const previousTrack = tracks[currentTrackIndex];
 
       if (previousTrack) {
@@ -930,6 +933,9 @@ export function useSequentialPlayer({
     if (!currentTrack?.id) {
       return;
     }
+
+    recoveryUrlAttemptedRef.current = false;
+    recoveryPromiseRef.current = null;
 
     const trackId = currentTrack.id;
     const handoff = handoffSourceRef?.current;
@@ -1389,15 +1395,6 @@ export function useSequentialPlayer({
         return;
       }
 
-      setPlayingState(false);
-      setIsRecovering(false);
-
-      if (!userInitiatedPauseRef.current) {
-        // Keep user intent — they may want to retry after foreground recovery.
-      }
-
-      setIsLoading(false);
-
       const mediaError = audio.error;
 
       console.error("private_audio_session_switch", {
@@ -1407,13 +1404,64 @@ export function useSequentialPlayer({
       });
 
       if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+        setPlayingState(false);
+        setIsRecovering(false);
+        setIsLoading(false);
         setPlayerError("Формат аудио не поддерживается на этом устройстве.");
-      } else {
-        setPlayerError(
-          "Не удалось загрузить аудио. Проверьте соединение и попробуйте ещё раз.",
-        );
+        setStatusMessage("");
+        return;
       }
 
+      // Foreground recovery already owns this generation/src cycle.
+      if (recoveryPromiseRef.current) {
+        return;
+      }
+
+      if (currentTrack && !recoveryUrlAttemptedRef.current) {
+        recoveryUrlAttemptedRef.current = true;
+
+        const capturedPosition =
+          pendingStartPosition > 0
+            ? pendingStartPosition
+            : audio.currentTime;
+        const wantsPlayback = userWantsPlaybackRef.current;
+        const recoveredTrackId = currentTrack.id;
+
+        resumePositionRef.current = capturedPosition;
+        setPendingStartPosition(capturedPosition);
+        wasPlayingBeforeSwitchRef.current = wantsPlayback;
+        setPlayingState(false);
+        setIsRecovering(false);
+        setPlayerError(null);
+        setIsLoading(true);
+        debugSnapshot("media-error-recovery", "refresh-signed-url", {
+          trackId: recoveredTrackId,
+          position: capturedPosition,
+          wantsPlayback,
+        });
+
+        const resignPromise = loadSignedUrlRef.current(recoveredTrackId)
+          .then(() => false)
+          .finally(() => {
+            if (recoveryPromiseRef.current === resignPromise) {
+              recoveryPromiseRef.current = null;
+            }
+          });
+        recoveryPromiseRef.current = resignPromise;
+        return;
+      }
+
+      setPlayingState(false);
+      setIsRecovering(false);
+
+      if (!userInitiatedPauseRef.current) {
+        // Keep user intent — they may want to retry after foreground recovery.
+      }
+
+      setIsLoading(false);
+      setPlayerError(
+        "Не удалось загрузить аудио. Проверьте соединение и попробуйте ещё раз.",
+      );
       setStatusMessage("");
     };
 
@@ -1843,6 +1891,8 @@ export function useSequentialPlayer({
       return;
     }
 
+    recoveryUrlAttemptedRef.current = false;
+    recoveryPromiseRef.current = null;
     setPlayerError(null);
     setUrlError(null);
     setIsLoading(true);
