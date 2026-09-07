@@ -4,6 +4,10 @@ import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 
 export { LISTEN_STATS_HEARTBEAT_MS };
 
+/**
+ * Client-side optimization for preview heartbeat gating only.
+ * Not a security boundary: server getUser() remains source of truth.
+ */
 export function readListenStatsClientAuthenticated(
   cookieHeader?: string,
   supabaseUrl?: string,

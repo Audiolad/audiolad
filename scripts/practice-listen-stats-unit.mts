@@ -30,6 +30,7 @@ import {
 } from "../src/lib/listen/listen-stats";
 import {
   buildListenStatsHeartbeatBody,
+  readListenStatsClientAuthenticated,
   shouldReportListenStatsHeartbeat,
 } from "../src/lib/listen/listen-stats-client";
 import {
@@ -763,6 +764,41 @@ function testAccessMatrix() {
   );
 }
 
+/**
+ * Client-side preview heartbeat gate only. Server getUser() remains truth.
+ * Cookie presence is not a security boundary.
+ */
+function testReadListenStatsClientAuthenticated() {
+  const supabaseUrl = "https://abc123.supabase.co";
+
+  assert.equal(
+    readListenStatsClientAuthenticated(
+      "sb-abc123-auth-token=base64-session",
+      supabaseUrl,
+    ),
+    true,
+    "valid auth cookie is treated as signed-in for heartbeat gating",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated(
+      "theme=dark; sb-abc123-auth-token.0=chunk-a; locale=ru",
+      supabaseUrl,
+    ),
+    true,
+    "chunked auth cookie (.0) is treated as signed-in for heartbeat gating",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated("foo=1; bar=2", supabaseUrl),
+    false,
+    "unrelated cookies do not enable preview heartbeat",
+  );
+  assert.equal(
+    readListenStatsClientAuthenticated("", supabaseUrl),
+    false,
+    "empty cookie does not enable preview heartbeat",
+  );
+}
+
 function testOwnStateShape() {
   assert.deepEqual(
     toListenStatsOwnState({ realListenedMs: 12_000, ratingEligibleAt: null }),
@@ -843,6 +879,10 @@ function testSourceContracts() {
   assert.match(listenStatsRoute, /purpose:\s*"listen_stats"/);
   assert.match(listenStatsRoute, /canAccrueListenStats/);
   assert.match(listenStatsRoute, /applyOwnPracticeListenStatsHeartbeat/);
+  const listenStatsClient = read("src/lib/listen/listen-stats-client.ts");
+  assert.match(listenStatsClient, /readListenStatsClientAuthenticated/);
+  assert.match(listenStatsClient, /Not a security boundary/);
+  assert.match(listenStatsClient, /getUser\(\) remains source of truth/);
   assert.match(listenStatsRoute, /access\.mode === "catalog_preview"/);
   assert.match(listenStatsRoute, /audioItem\.status !== "published"/);
   assert.doesNotMatch(listenStatsRoute, /body\.user_id/);
@@ -897,6 +937,7 @@ testAdversarialInflation();
 testIdleHeartbeatGap();
 testRaceNoDoubleNoLoss();
 testAccessMatrix();
+testReadListenStatsClientAuthenticated();
 testOwnStateShape();
 testClientBodyDoesNotTrustDeltaAlone();
 testSourceContracts();
