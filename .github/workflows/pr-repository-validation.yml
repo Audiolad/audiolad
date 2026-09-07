@@ -48,6 +48,7 @@ jobs:
         working-directory: ${{ env.PR_WORKSPACE }}
         run: |
           npm run test:database-migrations:ci
+          npm run test:studio-render-worker-env
           npm run build
           npm run typecheck
           npm run lint
