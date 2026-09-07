@@ -3,6 +3,9 @@
 import { useProductContentsPlayback } from "@/components/products/useProductContentsPlayback";
 import { formatAudioDuration } from "@/lib/products/duration";
 import type { LearnerCourseAudioBlock } from "@/lib/course-content/learner-types";
+import CourseLearnerItemTypeIcon, {
+  COURSE_LEARNER_AUDIO_ITEM_LABEL,
+} from "./CourseLearnerItemTypeIcon";
 
 type CourseLearnerAudioBlockProps = {
   block: LearnerCourseAudioBlock;
@@ -37,7 +40,7 @@ export default function CourseLearnerAudioBlock({
       <button
         type="button"
         disabled={!enabled || isLoading}
-        aria-label={`Слушать: ${block.title}`}
+        aria-label={`${COURSE_LEARNER_AUDIO_ITEM_LABEL}: ${block.title}`}
         aria-busy={isLoading || undefined}
         aria-current={isActive ? "true" : undefined}
         onClick={() => {
@@ -50,8 +53,13 @@ export default function CourseLearnerAudioBlock({
             : "border-[#f0e6fb] bg-[#fcfaff] hover:border-[#dcc9f2] hover:bg-[#f7f2ff]"
         } ${isLoading ? "opacity-75" : ""}`}
       >
-        <span className="min-w-0 break-words text-[15px] font-medium leading-6 text-[#25135c]">
-          {block.title}
+        <span className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 shrink-0">
+            <CourseLearnerItemTypeIcon kind="audio" />
+          </span>
+          <span className="min-w-0 break-words text-[15px] font-medium leading-6 text-[#25135c]">
+            {block.title}
+          </span>
         </span>
         <span className="flex shrink-0 items-center gap-2 text-sm text-[#7d70a2]">
           {isLoading ? <span className="text-xs">Запуск…</span> : null}

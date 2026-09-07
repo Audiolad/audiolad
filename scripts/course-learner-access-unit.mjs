@@ -652,6 +652,8 @@ assert.equal(l1Course.lessons[0].locked, false);
 assert.equal(l1Course.lessons[1].locked, true);
 assert.equal(l1Course.lessons[2].locked, true);
 assert.ok(!("blocks" in l1Course.lessons[1]));
+assert.deepEqual(l1Course.lessons[1].itemKinds, ["audio", "file"]);
+assert.equal(l1Course.lessons[2].itemKinds, undefined);
 assert.doesNotMatch(serializedL1, new RegExp(SECRET_L2_TEXT));
 assert.doesNotMatch(serializedL1, new RegExp(AUDIO_B));
 assert.doesNotMatch(serializedL1, new RegExp(FILE_L2));
@@ -1293,6 +1295,9 @@ const lockedGroupSource = toLearnerCourse({
 const serializedLockedGroup = JSON.stringify(serializeLearnerCourse(lockedGroupSource));
 assert.equal(lockedGroupSource.lessons.every((lesson) => lesson.locked), true);
 assert.ok(lockedGroupSource.lessons.every((lesson) => !("blocks" in lesson)));
+assert.deepEqual(lockedGroupSource.lessons[0].itemKinds, undefined);
+assert.deepEqual(lockedGroupSource.lessons[1].itemKinds, ["audio"]);
+assert.deepEqual(lockedGroupSource.lessons[2].itemKinds, ["file"]);
 assert.doesNotMatch(serializedLockedGroup, new RegExp(SECRET_L2_TEXT));
 assert.doesNotMatch(serializedLockedGroup, /"text"\s*:/);
 assert.doesNotMatch(serializedLockedGroup, /"audioItemId"\s*:/);
@@ -1362,6 +1367,8 @@ const fileViewer = read(
   "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
 );
 assert.match(fileViewer, /COURSE_LEARNER_FILE_VIEWER_BACK_LABEL/);
+assert.match(fileViewer, /buildCourseLearnerFileEmbedSrc/);
+assert.match(fileViewer, /data-course-learner-pdf-frame/);
 assert.match(fileViewer, /<iframe/);
 assert.doesNotMatch(fileViewer, /Открыть PDF отдельно/);
 assert.doesNotMatch(fileViewer, /openSeparately|[?&]raw=1|raw:\s*true/);

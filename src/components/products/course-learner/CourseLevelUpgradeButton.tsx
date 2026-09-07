@@ -49,6 +49,7 @@ export default function CourseLevelUpgradeButton({
     try {
       const response = await fetch("/api/checkout/course-upgrade", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID(),

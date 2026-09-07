@@ -21,6 +21,7 @@ export type {
   LearnerCourseAudioBlock,
   LearnerCourseBlock,
   LearnerCourseFileBlock,
+  LearnerCourseItemKind,
   LearnerCourseLesson,
   LearnerCourseLevel,
   LearnerCourseTextBlock,
@@ -28,6 +29,7 @@ export type {
 
 export {
   assertLearnerLessonRedacted,
+  collectLockedLessonItemKinds,
   mapPracticeAccessLevels,
   normalizeRequiredAccessLevel,
   serializeLearnerCourse,

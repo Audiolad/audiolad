@@ -65,6 +65,21 @@ export function buildCourseLearnerFilePath(
   return `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/file/${encodeURIComponent(fileId)}`;
 }
 
+/**
+ * iOS PDF plugin ignores most Open Parameters, but FitH asks the embed
+ * to use page-width zoom when the engine honors it. Fragment is not sent
+ * to the file API (not a raw-PDF escape).
+ */
+export const COURSE_LEARNER_PDF_EMBED_FRAGMENT = "view=FitH";
+
+export function buildCourseLearnerFileEmbedSrc(
+  authorSlug: string,
+  productSlug: string,
+  fileId: string,
+): string {
+  return `${buildCourseLearnerFilePath(authorSlug, productSlug, fileId)}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}`;
+}
+
 export function buildCourseLearnerFileViewerPath(
   authorSlug: string,
   productSlug: string,
