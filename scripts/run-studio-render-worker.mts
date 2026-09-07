@@ -1,8 +1,14 @@
 /**
  * Long-lived Studio render queue consumer. PM2 keeps this process running
  * (`autorestart: true`, no cron_restart). One job at a time; idle-polls after.
+ * Production env comes from cwd `.env.production` via Next.js `@next/env`.
  */
 import { createClient } from "@supabase/supabase-js";
+import {
+  formatStudioRenderWorkerEnvLog,
+  redactStudioRenderWorkerSecrets,
+  requireStudioRenderWorkerEnv,
+} from "../src/lib/studio/render/worker-env";
 import {
   createStudioRenderWorker,
   STUDIO_RENDER_HEARTBEAT_INTERVAL_MS,
@@ -19,12 +25,16 @@ function envNumber(name: string, fallback: number): number {
 }
 
 async function main() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  const presence = requireStudioRenderWorkerEnv();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("render_worker_environment_missing");
   }
+  console.log(formatStudioRenderWorkerEnvLog("studio_render_env_ready", presence));
   const service = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseUrl,
+    serviceRoleKey,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
   const port = createStudioRenderWorkerPort(service);
@@ -49,6 +59,7 @@ async function main() {
 }
 
 void main().catch((error) => {
-  console.error("studio-render-worker:", error);
+  const raw = error instanceof Error ? error.message : "unknown_error";
+  console.error("studio-render-worker:", redactStudioRenderWorkerSecrets(raw));
   process.exitCode = 1;
 });

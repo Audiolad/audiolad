@@ -613,6 +613,8 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(script, /SIGTERM/);
   assert.match(script, /SIGINT/);
   assert.match(script, /createStudioRenderWorker/);
+  assert.match(script, /requireStudioRenderWorkerEnv/);
+  assert.match(script, /redactStudioRenderWorkerSecrets/);
 }
 
 async function main() {

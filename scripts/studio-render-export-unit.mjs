@@ -28,6 +28,7 @@ assert.match(workerRuntime, /ownership_lost|lease_token/);
 assert.match(workerRuntime, /failure state was not persisted/);
 assert.match(workerRuntime, /allowStudioRenderOutputUpload/);
 assert.match(worker, /createStudioRenderWorker/);
+assert.match(worker, /requireStudioRenderWorkerEnv/);
 assert.match(workerLoop, /renewLease/);
 assert.match(workerLoop, /removeEventListener\("abort"/);
 assert.match(shell, /flushAndWait/);

@@ -13,8 +13,12 @@ practice or audio item.
 2. Review and apply `20260923120000_studio_render_job_lease_heartbeat.sql`
    **before** starting the long-lived worker (adds `lease_token`,
    `renew_studio_render_job_lease`, and `release_studio_render_job`).
-3. Verify `ffmpeg`, `tsx`, `NEXT_PUBLIC_SUPABASE_URL`, and
-   `SUPABASE_SERVICE_ROLE_KEY` in the worker environment.
+3. Verify `ffmpeg` and `tsx`. A clean
+   `pm2 start deploy/studio-render-worker.ecosystem.config.cjs` loads
+   authoritative `.env.production` from the release cwd via Next.js
+   `@next/env` (deploy already links `shared/.env.production`). Confirm
+   conceptually that `NEXT_PUBLIC_SUPABASE_URL` and
+   `SUPABASE_SERVICE_ROLE_KEY` are present. Never print their values.
 4. Confirm with `pm2 describe audiolad-studio-render-worker` that the running
    process is the long-lived consumer (`autorestart: true`, **no**
    `cron_restart`). Do not run the former one-shot cron worker alongside it.
@@ -23,6 +27,27 @@ practice or audio item.
    production approval. This document does not start or restart PM2.
 6. Monitor failed jobs and expired leases; do not enable multiple workers
    without revisiting queue throughput and lease policy.
+
+## Production env bootstrap
+
+The worker process is long-lived (`autorestart: true`, **no** `cron_restart`).
+PM2 ecosystem `env` only sets `NODE_ENV=production`. Secrets are not stored in
+the ecosystem file and must not be taken from a once-saved shell / `pm2 save`.
+
+On ordinary start/restart the worker calls Next.js `loadEnvConfig` against
+`cwd` (`/var/www/audiolad-deploy/current`). Deploy already creates:
+
+```text
+current/.env.production -> shared/.env.production
+current/.env.local      -> shared/.env.production
+```
+
+That is the same production env bootstrap `next start` uses. After a reboot or
+a fresh `pm2 start deploy/studio-render-worker.ecosystem.config.cjs` the
+process therefore has `NEXT_PUBLIC_SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` without an inherited dump. Worker logs report
+boolean presence only (`studio_render_env_ready`) and redact secret values on
+errors.
 
 ## Worker lifecycle (long-form)
 
