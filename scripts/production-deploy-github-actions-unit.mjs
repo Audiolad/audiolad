@@ -2,7 +2,16 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, chmodSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +19,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github/workflows/production-deploy.yml");
 const wrapperPath = join(repoRoot, "deploy/scripts/github-actions-deploy-wrapper.sh");
 const docsPath = join(repoRoot, "docs/production-deploy-github-actions.md");
+const studioDiagnosePath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-studio-render-worker-env-diagnose.sh",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -248,7 +261,236 @@ function main() {
     "workflow must verify origin/main ancestry before SSH diagnostics",
   );
 
+  assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
+  assertRemoteDiagnoseScriptSyntax(workflowText);
+  assertStudioDiagnoseHelper();
+
   console.log("production-deploy-github-actions-unit: all tests passed");
+}
+
+function extractRemoteDiagnoseScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE'\n");
+  const end = workflowText.indexOf("\n          REMOTE\n", start);
+  assert.ok(start >= 0 && end > start, "diagnose job must contain a REMOTE heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText) {
+  const required = [
+    "STUDIO_RENDER_WORKER_ENV_DIAGNOSTIC",
+    "STUDIO_RENDER_WORKER_CURRENT_RELEASE",
+    "CURRENT RELEASE=",
+    'diagnose_env_path "CURRENT_ENV_PRODUCTION"',
+    'diagnose_env_path "CURRENT_ENV_LOCAL"',
+    'diagnose_env_path "SHARED_ENV_PRODUCTION"',
+    "STUDIO_RENDER_WORKER_NAMEI_CURRENT_ENV_PRODUCTION",
+    "STUDIO_RENDER_WORKER_NAMEI_CURRENT_ENV_LOCAL",
+    "STUDIO_RENDER_WORKER_NAMEI_SHARED_ENV_PRODUCTION",
+    "STUDIO_RENDER_WORKER_DEPLOY_CAN_READ",
+    "DEPLOY_CAN_READ_",
+    "STUDIO_RENDER_WORKER_PM2",
+    "STUDIO_RENDER_WORKER_PM2_DESCRIBE",
+    "STUDIO_RENDER_WORKER_PM2_LOGS",
+    'run_loadenv_probe "CWD"',
+    "STUDIO_RENDER_WORKER_LOADENV_REALPATH",
+    "HAS_NEXT_PUBLIC_SUPABASE_URL=",
+    "HAS_SUPABASE_SERVICE_ROLE_KEY=",
+    "STUDIO_RENDER_WORKER_SUDO_N_L",
+    "loadEnvConfig(dir, false, silent, true)",
+    "sudo -n -l",
+    "namei -l",
+    "realpath=BROKEN",
+    "stat_owner=",
+    "studio_render_env_ready|environment_missing|hasNextPublic|hasSupabase|redacted",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `diagnose workflow must contain ${needle}`,
+    );
+  }
+
+  assert.match(workflowText, /unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(workflowText, /NODE_ENV=production/);
+  assert.match(workflowText, /Divergent env variables/);
+  assert.doesNotMatch(workflowText, /workflow_dispatch:[\s\S]*remote_command/);
+  assert.doesNotMatch(workflowText, /inputs:[\s\S]*command:/);
+  assert.doesNotMatch(
+    workflowText,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "must not cat env files",
+  );
+  assert.doesNotMatch(
+    workflowText,
+    /head\s+[^\n]*\.(env\.production|env\.local)/,
+    "must not head env files",
+  );
+  assert.match(
+    workflowText,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+  );
+  const deployJob = workflowText.slice(workflowText.indexOf("name: Deploy to production"));
+  assert.match(deployJob, /sudo -n \/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(deployJob, /STUDIO_RENDER_WORKER_ENV_DIAGNOSTIC/);
+  assert.match(docsText, /Studio render-worker env/);
+  assert.match(docsText, /audiolad-studio-render-worker-env-diagnose\.sh/);
+}
+
+function assertRemoteDiagnoseScriptSyntax(workflowText) {
+  const remote = extractRemoteDiagnoseScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-diagnose-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote diagnose bash -n failed: ${syntax.stderr}`);
+}
+
+function assertStudioDiagnoseHelper() {
+  const helperText = readFileSync(studioDiagnosePath, "utf8");
+  const syntax = spawnSync("bash", ["-n", studioDiagnosePath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /STUDIO_RENDER_WORKER_ENV_DIAGNOSTIC/);
+  assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  chmodSync(studioDiagnosePath, 0o755);
+
+  const root = mkdtempSync(join(tmpdir(), "audiolad-studio-env-diagnose-"));
+  const secretUrl = "https://env-bootstrap-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+  const releaseName = "20260907-000000-testdiag";
+  const releaseDir = join(root, "releases", releaseName);
+  const sharedDir = join(root, "shared");
+  const binDir = join(root, "bin");
+  const outLog = join(root, "worker-out.log");
+  const errLog = join(root, "worker-error.log");
+  mkdirSync(releaseDir, { recursive: true });
+  mkdirSync(join(releaseDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  chmodSync(join(sharedDir, ".env.production"), 0o600);
+  symlinkSync(join(sharedDir, ".env.production"), join(releaseDir, ".env.production"));
+  symlinkSync(join(sharedDir, ".env.production"), join(releaseDir, ".env.local"));
+  symlinkSync(releaseDir, join(root, "current"));
+  writeFileSync(join(releaseDir, "package.json"), JSON.stringify({ name: "audiolad-fixture", private: true }));
+  writeFileSync(
+    join(releaseDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(releaseDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    outLog,
+    [
+      `leaked ${secretKey} ${secretUrl}`,
+      '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}',
+      "unrelated noise",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    errLog,
+    [
+      `render_worker_environment_missing SUPABASE_SERVICE_ROLE_KEY=${secretKey} url=${secretUrl}`,
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(root, "pm2-jlist.json"),
+    JSON.stringify([
+      {
+        name: "audiolad-studio-render-worker",
+        pm2_env: {
+          status: "errored",
+          restart_time: 7,
+          unstable_restarts: 1,
+          cron_restart: null,
+          autorestart: true,
+          pm_cwd: "/var/www/audiolad-deploy/current",
+          pm_out_log_path: outLog,
+          pm_err_log_path: errLog,
+          env: { SUPABASE_SERVICE_ROLE_KEY: secretKey },
+        },
+      },
+    ]),
+  );
+  writeFileSync(
+    join(binDir, "pm2"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `JLIST=${JSON.stringify(join(root, "pm2-jlist.json"))}`,
+      'if [[ "${1:-}" == "jlist" ]]; then',
+      '  cat "${JLIST}"',
+      'elif [[ "${1:-}" == "describe" ]]; then',
+      "  echo '| status            | errored |'",
+      "  echo '| restarts          | 7 |'",
+      "  echo '| exec cwd          | /var/www/audiolad-deploy/current |'",
+      "  echo 'Divergent env variables from local env'",
+      `  echo 'SUPABASE_SERVICE_ROLE_KEY=${secretKey}'`,
+      'elif [[ "${1:-}" == "status" ]]; then',
+      "  echo 'audiolad-studio-render-worker errored'",
+      "else",
+      "  exit 1",
+      "fi",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(binDir, "pm2"), 0o755);
+
+  try {
+    const result = spawnSync("bash", [studioDiagnosePath], {
+      encoding: "utf8",
+      timeout: 15000,
+      env: {
+        ...process.env,
+        DEPLOY_ROOT: root,
+        PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      },
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `helper failed: ${output}`);
+    assert.match(output, new RegExp(`CURRENT RELEASE=${releaseName}`));
+    assert.match(output, /DEPLOY_CAN_READ_SHARED_ENV_PRODUCTION=YES/);
+    assert.match(output, /DEPLOY_CAN_READ_CURRENT_ENV_PRODUCTION=YES/);
+    assert.match(output, /HAS_NEXT_PUBLIC_SUPABASE_URL=true/);
+    assert.match(output, /HAS_SUPABASE_SERVICE_ROLE_KEY=true/);
+    assert.match(output, /studio_render_env_ready/);
+    assert.match(output, /environment_missing/);
+    assert.doesNotMatch(output, /unrelated noise/);
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, /NEXT_PUBLIC_SUPABASE_URL=https/);
+    assert.match(output, /status=errored/);
+    assert.match(output, /restarts=7/);
+    assert.match(output, /cron_restart=none/);
+    assert.match(output, /autorestart=True/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 main();
