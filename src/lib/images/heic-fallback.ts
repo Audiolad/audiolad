@@ -42,6 +42,7 @@ function startHeicChild(scriptPath: string): ChildProcess {
   const { fork } = nodeRequire("node:child_process") as typeof import("node:child_process");
   return fork(scriptPath, [], {
     stdio: ["ignore", "ignore", "ignore", "ipc"],
+    serialization: "advanced",
   });
 }
 

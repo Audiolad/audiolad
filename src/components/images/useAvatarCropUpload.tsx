@@ -7,6 +7,8 @@ import { AVATAR_ERROR_MESSAGES } from "@/lib/images/avatar-constants";
 import {
   AvatarSourceResolutionError,
   createOrientedPreviewUrl,
+  peekAvatarSourceDimensions,
+  shouldUseServerAvatarPreview,
   validateAvatarSourceFile,
 } from "@/lib/images/avatar-source-validation";
 
@@ -110,21 +112,27 @@ export function useAvatarCropUpload({
       setIsPreparingSource(true);
 
       try {
+        const headerDimensions = await peekAvatarSourceDimensions(file);
+        const useServerPreview = shouldUseServerAvatarPreview(file, headerDimensions);
         let previewSource = file;
 
-        try {
-          const previewUrl = await createOrientedPreviewUrl(file);
-          previewUrlRef.current = previewUrl;
-          setSourceFile(file);
-          setCropImageSrc(previewUrl);
-          setIsCropOpen(true);
-          return;
-        } catch (previewError) {
-          if (previewError instanceof AvatarSourceResolutionError) {
-            throw previewError;
-          }
-
+        if (useServerPreview) {
           previewSource = await requestServerAvatarPreview(file);
+        } else {
+          try {
+            const previewUrl = await createOrientedPreviewUrl(file);
+            previewUrlRef.current = previewUrl;
+            setSourceFile(file);
+            setCropImageSrc(previewUrl);
+            setIsCropOpen(true);
+            return;
+          } catch (previewError) {
+            if (previewError instanceof AvatarSourceResolutionError) {
+              throw previewError;
+            }
+
+            previewSource = await requestServerAvatarPreview(file);
+          }
         }
 
         const previewUrl = await createOrientedPreviewUrl(previewSource);

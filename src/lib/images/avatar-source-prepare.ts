@@ -5,7 +5,11 @@ import {
   AVATAR_MAX_INPUT_PIXELS,
   AVATAR_PREVIEW_MAX_EDGE,
 } from "@/lib/images/avatar-constants";
-import { convertHeicToJpegBuffer, isHeicLikeMime } from "@/lib/images/heic-fallback";
+import {
+  convertHeicToJpegBuffer,
+  isHeicLikeMime,
+} from "@/lib/images/heic-fallback";
+import { peekImageHeaderDimensions } from "@/lib/images/image-magic";
 import type { ImageProcessErrorCode } from "@/lib/images/image-types";
 import type { ImageProfile } from "@/lib/images/image-types";
 import {
@@ -26,6 +30,10 @@ export type PreparedAvatarSource =
     }
   | { ok: false; code: ImageProcessErrorCode };
 
+export type PrepareAvatarSourceOptions = {
+  convertHeic?: typeof convertHeicToJpegBuffer;
+};
+
 function buildSharpInput(input: Buffer) {
   return sharp(input, {
     failOn: "error",
@@ -35,11 +43,32 @@ function buildSharpInput(input: Buffer) {
   });
 }
 
-async function readSharpMetadata(input: Buffer) {
+/**
+ * Header-only dimensions. Must NOT use limitInputPixels — that gate can throw
+ * "exceeds pixel limit" before width/height are available, skipping bounds
+ * and leaking over-limit HEIC into WASM.
+ */
+export async function readAvatarHeaderDimensions(
+  input: Buffer,
+): Promise<{ width: number; height: number } | null> {
+  const parsed = peekImageHeaderDimensions(input);
+
+  if (parsed) {
+    return parsed;
+  }
+
   try {
-    return { ok: true as const, meta: await buildSharpInput(input).metadata() };
+    const meta = await sharp(input, {
+      failOn: "none",
+      sequentialRead: true,
+      animated: false,
+    }).metadata();
+
+    const width = meta.width ?? 0;
+    const height = meta.height ?? 0;
+    return width > 0 && height > 0 ? { width, height } : null;
   } catch {
-    return { ok: false as const };
+    return null;
   }
 }
 
@@ -68,6 +97,7 @@ export async function prepareAvatarSourceBuffer(
   input: Buffer,
   declaredMime: string | null | undefined,
   profile: ImageProfile = "user-avatar",
+  options?: PrepareAvatarSourceOptions,
 ): Promise<PreparedAvatarSource> {
   if (!isAvatarImageProfile(profile)) {
     return { ok: false, code: "invalid_file_type" };
@@ -79,21 +109,24 @@ export async function prepareAvatarSourceBuffer(
     return validated;
   }
 
-  let working = input;
-  const headerMeta = await readSharpMetadata(working);
+  const header = await readAvatarHeaderDimensions(input);
 
-  if (headerMeta.ok) {
-    const boundError = validateImageSourceBounds(
-      headerMeta.meta.width ?? 0,
-      headerMeta.meta.height ?? 0,
-      profile,
-    );
+  if (header) {
+    const boundError = validateImageSourceBounds(header.width, header.height, profile);
 
     if (boundError) {
       return { ok: false, code: boundError };
     }
+  } else if (
+    isHeicLikeMime(validated.data.magicMime) ||
+    validated.data.magicMime === "image/heic" ||
+    validated.data.magicMime === "image/heif"
+  ) {
+    // No dimensions → do not WASM-decode a possible decompression bomb.
+    return { ok: false, code: "corrupt_image" };
   }
 
+  let working = input;
   let sharpMeta = await trySharpDecode(working, profile);
 
   if (sharpMeta.ok === false && sharpMeta.code) {
@@ -107,7 +140,8 @@ export async function prepareAvatarSourceBuffer(
       validated.data.magicMime === "image/heif")
   ) {
     try {
-      working = await convertHeicToJpegBuffer(input, AVATAR_HEIC_CONVERT_TIMEOUT_MS);
+      const convertHeic = options?.convertHeic ?? convertHeicToJpegBuffer;
+      working = await convertHeic(input, AVATAR_HEIC_CONVERT_TIMEOUT_MS);
       sharpMeta = await trySharpDecode(working, profile);
     } catch {
       return { ok: false, code: "corrupt_image" };

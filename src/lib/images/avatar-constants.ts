@@ -14,6 +14,8 @@ export const AVATAR_MAX_SOURCE_DIMENSION = 12_000;
 export const AVATAR_SQUARE_TOLERANCE_PX = 2;
 export const AVATAR_HEIC_CONVERT_TIMEOUT_MS = 15_000;
 export const AVATAR_PREVIEW_MAX_EDGE = 4096;
+/** Phone JPEGs above this go to server preview — no 48MP canvas on device. */
+export const AVATAR_CLIENT_DIRECT_PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
 
 export const AVATAR_SOURCE_MIME_TYPES = new Set([
   "image/jpeg",

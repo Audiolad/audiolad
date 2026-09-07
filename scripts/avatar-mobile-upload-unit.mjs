@@ -10,23 +10,33 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import {
+  AVATAR_CLIENT_DIRECT_PREVIEW_MAX_BYTES,
   AVATAR_ERROR_MESSAGES,
   AVATAR_INPUT_ACCEPT,
   AVATAR_MAX_INPUT_PIXELS,
   AVATAR_MAX_SOURCE_BYTES,
   AVATAR_MAX_SOURCE_DIMENSION,
+  AVATAR_PREVIEW_MAX_EDGE,
   AVATAR_UPLOAD_HINT,
 } from "../src/lib/images/avatar-constants.ts";
 import {
   avatarSourceBoundsError,
   peekAvatarSourceKind,
+  shouldUseServerAvatarPreview,
   validateAvatarSourceFile,
   validateAvatarSourceFileMeta,
 } from "../src/lib/images/avatar-source-validation.ts";
-import { prepareAvatarSourceBuffer } from "../src/lib/images/avatar-source-prepare.ts";
+import {
+  prepareAvatarSourceBuffer,
+  readAvatarHeaderDimensions,
+} from "../src/lib/images/avatar-source-prepare.ts";
 import { convertHeicToJpegBuffer } from "../src/lib/images/heic-fallback.ts";
 import { getImageProfileConfig } from "../src/lib/images/image-profiles.ts";
-import { detectImageKindFromBytes } from "../src/lib/images/image-magic.ts";
+import {
+  detectImageKindFromBytes,
+  peekImageHeaderDimensions,
+  readHeifIspeDimensions,
+} from "../src/lib/images/image-magic.ts";
 import { processImageForProfile } from "../src/lib/images/process-image.ts";
 import { avatarProcessErrorMessage } from "../src/lib/images/process-avatar-image.ts";
 import { processAndUploadImageSet } from "../src/lib/images/upload-image-set.ts";
@@ -493,6 +503,10 @@ async function testHeicTimeoutKillsWorker() {
   const fallbackSource = readFileSync(join(root, "src/lib/images/heic-fallback.ts"), "utf8");
   assert(fallbackSource.includes("node:child_process"), "HEIC convert uses a child process");
   assert(fallbackSource.includes('kill("SIGKILL")'), "timeout must SIGKILL the child");
+  assert(
+    fallbackSource.includes('serialization: "advanced"'),
+    "fork must use advanced serialization for large Buffers",
+  );
 
   const started = Date.now();
   let timedOut = false;
@@ -506,6 +520,44 @@ async function testHeicTimeoutKillsWorker() {
   const elapsed = Date.now() - started;
   assert(timedOut, "hanging worker must reject with heic_convert_timeout");
   assert(elapsed < 2000, `terminate must abort hang quickly, took ${elapsed}ms`);
+}
+
+async function testLargeHeicIpcTimeout() {
+  const payload = Buffer.alloc(12 * 1024 * 1024, 0x5a);
+  const started = Date.now();
+  let timedOut = false;
+
+  try {
+    await convertHeicToJpegBuffer(payload, 120, { hangForTest: true });
+  } catch (error) {
+    timedOut = error instanceof Error && error.message === "heic_convert_timeout";
+  }
+
+  const elapsed = Date.now() - started;
+  assert(timedOut, "12 MiB IPC hang must still timeout");
+  assert(elapsed < 2500, `large Buffer IPC+kill must stay fast, took ${elapsed}ms`);
+}
+
+function createJpegWithSofDimensions(width, height) {
+  return Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01,
+    0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x0b, 0x08,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9,
+  ]);
+}
+
+function patchHeicIspe(buffer, width, height) {
+  const copy = Buffer.from(buffer);
+  const marker = Buffer.from("ispe");
+  const index = copy.indexOf(marker);
+  assert(index >= 0, "sample.heic must contain ispe");
+  copy.writeUInt32BE(width, index + 8);
+  copy.writeUInt32BE(height, index + 12);
+  return copy;
 }
 
 async function testHighResolutionBounds() {
@@ -526,6 +578,78 @@ async function testHighResolutionBounds() {
     avatarSourceBoundsError(16_384, 12_288) === AVATAR_ERROR_MESSAGES.resolutionTooLarge,
     "client 200MP uses resolution copy",
   );
+
+  const oversizeJpeg = createJpegWithSofDimensions(12_000, 9_000);
+  const jpegHeader = peekImageHeaderDimensions(oversizeJpeg);
+  assert(jpegHeader?.width === 12_000 && jpegHeader.height === 9_000, "JPEG SOF preflight");
+  const jpegPrepared = await prepareAvatarSourceBuffer(oversizeJpeg, "image/jpeg", "user-avatar");
+  assert(!jpegPrepared.ok && jpegPrepared.code === "image_too_large", "108MP JPEG rejected at header");
+
+  const rawHeic = readFileSync(heicPath);
+  const oversizeHeic = patchHeicIspe(rawHeic, 12_000, 9_000);
+  assert(detectImageKindFromBytes(oversizeHeic) === "image/heic" || detectImageKindFromBytes(oversizeHeic) === "image/heif", "patched fixture stays HEIC");
+  const ispe = readHeifIspeDimensions(oversizeHeic);
+  assert(ispe?.width === 12_000 && ispe.height === 9_000, "ispe preflight reads patched 108MP");
+  const header = await readAvatarHeaderDimensions(oversizeHeic);
+  assert(header?.width === 12_000 && header.height === 9_000, "header path sees 108MP without decode");
+
+  let convertCalls = 0;
+  const prepared = await prepareAvatarSourceBuffer(oversizeHeic, "", "user-avatar", {
+    convertHeic: async () => {
+      convertCalls += 1;
+      throw new Error("convert must not run for over-limit HEIC");
+    },
+  });
+  assert(!prepared.ok && prepared.code === "image_too_large", "over-limit HEIC rejected before WASM");
+  assert(convertCalls === 0, "convertHeicToJpegBuffer must not be called for 108MP HEIC");
+}
+
+async function testFortyEightMpPreviewPath() {
+  assert(AVATAR_PREVIEW_MAX_EDGE === 4096, "crop preview stays at 4096");
+  assert(
+    AVATAR_CLIENT_DIRECT_PREVIEW_MAX_BYTES === 2 * 1024 * 1024,
+    "direct client preview stays under 2 MiB",
+  );
+  assert(
+    shouldUseServerAvatarPreview({ name: "IMG_0001.HEIC", type: "", size: 400_000 }),
+    "HEIC always uses server preview",
+  );
+  assert(
+    shouldUseServerAvatarPreview({
+      name: "IMG_PHONE.JPG",
+      type: "image/jpeg",
+      size: 8 * 1024 * 1024,
+    }),
+    "8 MB phone JPEG uses server preview",
+  );
+  assert(
+    shouldUseServerAvatarPreview(
+      { name: "wide.jpg", type: "image/jpeg", size: 400_000 },
+      { width: 8000, height: 6000 },
+    ),
+    "48MP header uses server preview even if file is small",
+  );
+  assert(
+    !shouldUseServerAvatarPreview({
+      name: "tiny.jpg",
+      type: "image/jpeg",
+      size: 80_000,
+    }),
+    "small jpeg can stay on the fast path",
+  );
+
+  const hook = readFileSync(join(root, "src/components/images/useAvatarCropUpload.tsx"), "utf8");
+  assert(hook.includes("shouldUseServerAvatarPreview"), "hook routes heavy sources to server preview");
+  assert(hook.includes("setSourceFile(previewSource)"), "crop sourceBlob is the bounded preview");
+  const validation = readFileSync(join(root, "src/lib/images/avatar-source-validation.ts"), "utf8");
+  assert(
+    validation.includes("AvatarSourceNeedsBoundedPreview"),
+    "client must refuse a canvas larger than preview max edge",
+  );
+  assert(
+    validation.includes("AVATAR_PREVIEW_MAX_EDGE"),
+    "client canvas is capped at preview max edge",
+  );
 }
 
 async function testAuthorApiMessageContract() {
@@ -544,7 +668,9 @@ async function main() {
   await testWebpOnlyPersistence();
   await testHeicFallbackAndPreviewBounds();
   await testHeicTimeoutKillsWorker();
+  await testLargeHeicIpcTimeout();
   await testHighResolutionBounds();
+  await testFortyEightMpPreviewPath();
   await testExifOrientation();
   await testStorageUploadIsWebp();
   await testAuthorApiMessageContract();

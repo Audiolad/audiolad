@@ -1,14 +1,17 @@
 import {
+  AVATAR_CLIENT_DIRECT_PREVIEW_MAX_BYTES,
   AVATAR_ERROR_MESSAGES,
   AVATAR_MAX_INPUT_PIXELS,
   AVATAR_MAX_SOURCE_BYTES,
   AVATAR_MAX_SOURCE_DIMENSION,
+  AVATAR_PREVIEW_MAX_EDGE,
   AVATAR_SOURCE_MIME_TYPES,
 } from "@/lib/images/avatar-constants";
 import {
   detectImageKindFromBytes,
   isAvatarSourceImageKind,
   isBannedAvatarImageKind,
+  peekImageHeaderDimensions,
 } from "@/lib/images/image-magic";
 
 const VIDEO_EXTENSIONS = [".mov", ".mp4", ".m4v", ".webm", ".avi", ".mkv"];
@@ -169,6 +172,43 @@ export class AvatarSourceResolutionError extends Error {
   }
 }
 
+export class AvatarSourceNeedsBoundedPreview extends Error {
+  constructor() {
+    super("avatar_needs_bounded_preview");
+    this.name = "AvatarSourceNeedsBoundedPreview";
+  }
+}
+
+export function shouldUseServerAvatarPreview(
+  file: Pick<File, "name" | "type" | "size">,
+  headerDimensions?: { width: number; height: number } | null,
+): boolean {
+  if (isHeicLikeFile(file)) {
+    return true;
+  }
+
+  if (file.size > AVATAR_CLIENT_DIRECT_PREVIEW_MAX_BYTES) {
+    return true;
+  }
+
+  if (
+    headerDimensions &&
+    (headerDimensions.width > AVATAR_PREVIEW_MAX_EDGE ||
+      headerDimensions.height > AVATAR_PREVIEW_MAX_EDGE)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function peekAvatarSourceDimensions(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  const header = new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer());
+  return peekImageHeaderDimensions(header);
+}
+
 export function avatarSourceBoundsError(
   width: number,
   height: number,
@@ -250,6 +290,13 @@ export async function createOrientedPreviewUrl(source: Blob): Promise<string> {
 
     if (boundsError) {
       throw new AvatarSourceResolutionError();
+    }
+
+    if (
+      bitmap.width > AVATAR_PREVIEW_MAX_EDGE ||
+      bitmap.height > AVATAR_PREVIEW_MAX_EDGE
+    ) {
+      throw new AvatarSourceNeedsBoundedPreview();
     }
 
     const canvas = document.createElement("canvas");

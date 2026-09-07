@@ -136,3 +136,126 @@ export function isAvatarSourceImageKind(kind: DetectedImageKind | null): boolean
 export function isBannedAvatarImageKind(kind: DetectedImageKind | null): boolean {
   return kind === "image/gif" || kind === "image/svg+xml" || kind === "video";
 }
+
+function readUint16Be(bytes: Uint8Array, offset: number): number {
+  return ((bytes[offset] ?? 0) << 8) | (bytes[offset + 1] ?? 0);
+}
+
+function readUint32Be(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset] ?? 0) << 24) |
+    ((bytes[offset + 1] ?? 0) << 16) |
+    ((bytes[offset + 2] ?? 0) << 8) |
+    (bytes[offset + 3] ?? 0)
+  ) >>> 0;
+}
+
+export function readJpegSofDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  let offset = 2;
+
+  while (offset + 8 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = bytes[offset + 1] ?? 0;
+
+    if (marker === 0xd8 || marker === 0xd9 || marker === 0x00) {
+      offset += 2;
+      continue;
+    }
+
+    const size = readUint16Be(bytes, offset + 2);
+
+    if (
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf)
+    ) {
+      if (offset + 8 >= bytes.length) {
+        return null;
+      }
+
+      const height = readUint16Be(bytes, offset + 5);
+      const width = readUint16Be(bytes, offset + 7);
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+
+    if (size < 2) {
+      return null;
+    }
+
+    offset += 2 + size;
+  }
+
+  return null;
+}
+
+export function readPngIhdrDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  if (bytes.length < 24 || readAscii(bytes, 12, 4) !== "IHDR") {
+    return null;
+  }
+
+  const width = readUint32Be(bytes, 16);
+  const height = readUint32Be(bytes, 20);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+/** Largest ispe box — primary frame, not the thumbnail. No pixel decode. */
+export function readHeifIspeDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  let best: { width: number; height: number } | null = null;
+
+  for (let cursor = 0; cursor + 16 <= bytes.length; cursor += 1) {
+    if (
+      bytes[cursor] !== 0x69 ||
+      bytes[cursor + 1] !== 0x73 ||
+      bytes[cursor + 2] !== 0x70 ||
+      bytes[cursor + 3] !== 0x65
+    ) {
+      continue;
+    }
+
+    const width = readUint32Be(bytes, cursor + 8);
+    const height = readUint32Be(bytes, cursor + 12);
+
+    if (
+      width > 0 &&
+      height > 0 &&
+      width <= 1_000_000 &&
+      height <= 1_000_000 &&
+      (!best || width * height > best.width * best.height)
+    ) {
+      best = { width, height };
+    }
+  }
+
+  return best;
+}
+
+export function peekImageHeaderDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  const kind = detectImageKindFromBytes(bytes);
+
+  if (kind === "image/jpeg") {
+    return readJpegSofDimensions(bytes);
+  }
+
+  if (kind === "image/png") {
+    return readPngIhdrDimensions(bytes);
+  }
+
+  if (kind === "image/heic" || kind === "image/heif") {
+    return readHeifIspeDimensions(bytes);
+  }
+
+  return null;
+}
