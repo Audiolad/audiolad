@@ -581,6 +581,8 @@ jobs:
           SURVIVE_SECONDS="${AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS:-151}"
           ONLINE_TIMEOUT_SECONDS="${AUDIOLAD_STUDIO_WORKER_ONLINE_TIMEOUT_SECONDS:-60}"
           POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_POLL_SECONDS:-5}"
+          ENV_BOOTSTRAP_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_SECONDS:-60}"
+          ENV_BOOTSTRAP_POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_POLL_SECONDS:-3}"
           DB_CONTAINER="${AUDIOLAD_SUPABASE_DB_CONTAINER:-supabase-db}"
 
           ENV_FILE_OWNER_GROUP_MODE=""
@@ -913,6 +915,59 @@ jobs:
             return 1
           }
 
+          truncate_worker_log_if_writable() {
+            local path="$1"
+            if [[ -z "${path}" ]]; then
+              return 0
+            fi
+            if [[ -f "${path}" && -w "${path}" ]]; then
+              : > "${path}"
+              echo "truncated_pm2_log=${path}"
+              return 0
+            fi
+            echo "pm2_log_not_truncated path=${path}"
+          }
+
+          recent_env_bootstrap_logs() {
+            local out_log="$1"
+            local err_log="$2"
+            local combined=""
+            if [[ -n "${out_log}" && -r "${out_log}" ]]; then
+              combined+="$(tail -n 80 "${out_log}")"
+              combined+=$'\n'
+            fi
+            if [[ -n "${err_log}" && -r "${err_log}" ]]; then
+              combined+="$(tail -n 80 "${err_log}")"
+              combined+=$'\n'
+            fi
+            printf '%s\n' "${combined}" | filter_worker_log_lines | redact_studio_stream
+          }
+
+          env_bootstrap_ready() {
+            local text="$1"
+            [[ "${text}" == *studio_render_env_ready* ]] \
+              && [[ "${text}" == *'"hasNextPublicSupabaseUrl":true'* ]] \
+              && [[ "${text}" == *'"hasSupabaseServiceRoleKey":true'* ]]
+          }
+
+          poll_env_bootstrap() {
+            local out_log="$1"
+            local err_log="$2"
+            local deadline=$((SECONDS + ENV_BOOTSTRAP_SECONDS))
+            local filtered=""
+            while (( SECONDS < deadline )); do
+              filtered="$(recent_env_bootstrap_logs "${out_log}" "${err_log}")"
+              if env_bootstrap_ready "${filtered}"; then
+                printf '%s\n' "${filtered}"
+                return 0
+              fi
+              sleep "${ENV_BOOTSTRAP_POLL_SECONDS}"
+            done
+            filtered="$(recent_env_bootstrap_logs "${out_log}" "${err_log}")"
+            printf '%s\n' "${filtered}"
+            return 1
+          }
+
           wait_until_pm2_online() {
             local deadline=$((SECONDS + ONLINE_TIMEOUT_SECONDS))
             local fields=""
@@ -1029,7 +1084,14 @@ jobs:
           fi
 
           section "STUDIO_RENDER_WORKER_CLEAN_START"
+          PM2_FIELDS="$(read_pm2_recover_fields)"
+          PRIOR_OUT="$(pm2_field "${PM2_FIELDS}" "out_log")"
+          PRIOR_ERR="$(pm2_field "${PM2_FIELDS}" "error_log")"
+          echo "prior_out_log=${PRIOR_OUT:-unknown}"
+          echo "prior_error_log=${PRIOR_ERR:-unknown}"
           pm2 delete audiolad-studio-render-worker || true
+          truncate_worker_log_if_writable "${PRIOR_OUT}"
+          truncate_worker_log_if_writable "${PRIOR_ERR}"
           unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
           (
             unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
@@ -1063,24 +1125,15 @@ jobs:
           section "STUDIO_RENDER_WORKER_ENV_BOOTSTRAP"
           echo "out_log_path=${OUT_LOG:-unknown}"
           echo "error_log_path=${ERR_LOG:-unknown}"
-          FILTERED=""
-          if [[ -n "${OUT_LOG}" && -r "${OUT_LOG}" ]]; then
-            FILTERED+="$(tail -n 200 "${OUT_LOG}")"
-            FILTERED+=$'\n'
-          fi
-          if [[ -n "${ERR_LOG}" && -r "${ERR_LOG}" ]]; then
-            FILTERED+="$(tail -n 200 "${ERR_LOG}")"
-            FILTERED+=$'\n'
-          fi
-          FILTERED="$(printf '%s\n' "${FILTERED}" | filter_worker_log_lines | redact_studio_stream)"
+          set +e
+          FILTERED="$(poll_env_bootstrap "${OUT_LOG}" "${ERR_LOG}")"
+          set -e
           printf '%s\n' "${FILTERED}"
-          if [[ "${FILTERED}" == *studio_render_env_ready* ]] \
-            && [[ "${FILTERED}" == *hasNextPublicSupabaseUrl*true* ]] \
-            && [[ "${FILTERED}" == *hasSupabaseServiceRoleKey*true* ]]; then
+          if env_bootstrap_ready "${FILTERED}"; then
             ENV_BOOTSTRAP="YES"
           else
             ENV_BOOTSTRAP="NO"
-            fail_recover "worker logs missing studio_render_env_ready with both env booleans true"
+            fail_recover "worker logs missing recent studio_render_env_ready with both env booleans true"
             exit 1
           fi
           echo "ENV BOOTSTRAP = YES"

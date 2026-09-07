@@ -563,6 +563,11 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
     "pm2 save",
     "SELECT count(*) FROM public.studio_render_jobs WHERE status IN ('queued', 'processing')",
     "loadEnvConfig(dir, false, silent, true)",
+    "truncated_pm2_log=",
+    "poll_env_bootstrap",
+    "tail -n 80",
+    '"hasNextPublicSupabaseUrl":true',
+    '"hasSupabaseServiceRoleKey":true',
   ];
   for (const needle of required) {
     assert.match(
@@ -701,11 +706,17 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
     outLog,
     [
       `leaked ${secretKey} ${secretUrl}`,
-      '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}',
+      "stale out-log noise from previous errored process",
       "",
     ].join("\n"),
   );
-  writeFileSync(errLog, "");
+  writeFileSync(
+    errLog,
+    [
+      `render_worker_environment_missing SUPABASE_SERVICE_ROLE_KEY=${secretKey} url=${secretUrl}`,
+      "",
+    ].join("\n"),
+  );
   writeFileSync(
     join(root, "pm2-jlist.json"),
     JSON.stringify([
@@ -738,6 +749,7 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
       'elif [[ "${1:-}" == "start" ]]; then',
       '  : > "${STARTED}"',
       '  printf "%s\\n" "${2:-}" >> "${STARTED}"',
+      `  printf '%s\\n' '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}' >> ${JSON.stringify(outLog)}`,
       'elif [[ "${1:-}" == "save" ]]; then',
       '  : > "${SAVED}"',
       "else",
@@ -764,6 +776,8 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
     deletedMarker,
     savedMarker,
     envFile: join(sharedDir, ".env.production"),
+    outLog,
+    errLog,
   };
 }
 
@@ -792,6 +806,9 @@ function assertStudioRecoverHelper() {
   assert.match(helperText, /#353 PRODUCTION ACCEPTANCE/);
   assert.match(helperText, /RENDER_SMOKE=PASS/);
   assert.match(helperText, /pm2 delete audiolad-studio-render-worker \|\| true/);
+  assert.match(helperText, /truncated_pm2_log=/);
+  assert.match(helperText, /poll_env_bootstrap/);
+  assert.match(helperText, /tail -n 80/);
   assert.match(helperText, /unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
   assert.doesNotMatch(helperText, /sudo\s+-n/);
@@ -823,13 +840,41 @@ function assertStudioRecoverHelper() {
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /audiolad_deploy = NOT_INVOKED/);
     assert.match(output, /studio_render_env_ready/);
+    assert.match(output, /truncated_pm2_log=/);
+    assert.doesNotMatch(output, /environment_missing/);
     assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.equal(readFileSync(fixture.errLog, "utf8").trim(), "", "prior error log should be truncated");
+    assert.match(
+      readFileSync(fixture.outLog, "utf8"),
+      /"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true/,
+    );
     assert.ok(existsSyncSafe(fixture.deletedMarker), "pm2 delete should run when worker exists");
     assert.ok(existsSyncSafe(fixture.startedMarker), "pm2 start should run");
     assert.ok(existsSyncSafe(fixture.savedMarker), "pm2 save should run after success");
   } finally {
     rmSync(happyRoot, { recursive: true, force: true });
+  }
+
+  if (process.getuid && process.getuid() !== 0) {
+    const staleRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-stale-"));
+    try {
+      const fixture = writeRecoverFixture(staleRoot, { secretUrl, secretKey });
+      chmodSync(fixture.errLog, 0o444);
+      const result = runRecoverHelper(staleRoot, fixture.binDir, {
+        AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_SECONDS: "2",
+        AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_POLL_SECONDS: "0",
+      });
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      assert.equal(result.status, 0, `stale missing lines must not fail bootstrap: ${output}`);
+      assert.match(output, /ENV BOOTSTRAP = YES/);
+      assert.match(output, /#353 PRODUCTION ACCEPTANCE = SUCCESS/);
+      assert.match(output, /pm2_log_not_truncated/);
+      assert.match(readFileSync(fixture.errLog, "utf8"), /environment_missing/);
+    } finally {
+      chmodSync(join(staleRoot, "worker-error.log"), 0o644);
+      rmSync(staleRoot, { recursive: true, force: true });
+    }
   }
 
   const busyRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-busy-"));

@@ -14,6 +14,8 @@ ECOSYSTEM_REL="deploy/studio-render-worker.ecosystem.config.cjs"
 SURVIVE_SECONDS="${AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS:-151}"
 ONLINE_TIMEOUT_SECONDS="${AUDIOLAD_STUDIO_WORKER_ONLINE_TIMEOUT_SECONDS:-60}"
 POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_POLL_SECONDS:-5}"
+ENV_BOOTSTRAP_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_SECONDS:-60}"
+ENV_BOOTSTRAP_POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_POLL_SECONDS:-3}"
 DB_CONTAINER="${AUDIOLAD_SUPABASE_DB_CONTAINER:-supabase-db}"
 
 ENV_FILE_OWNER_GROUP_MODE=""
@@ -354,25 +356,56 @@ JS
   return 1
 }
 
-logs_show_env_ready() {
+truncate_worker_log_if_writable() {
+  local path="$1"
+  if [[ -z "${path}" ]]; then
+    return 0
+  fi
+  if [[ -f "${path}" && -w "${path}" ]]; then
+    : > "${path}"
+    echo "truncated_pm2_log=${path}"
+    return 0
+  fi
+  echo "pm2_log_not_truncated path=${path}"
+}
+
+recent_env_bootstrap_logs() {
   local out_log="$1"
   local err_log="$2"
   local combined=""
   if [[ -n "${out_log}" && -r "${out_log}" ]]; then
-    combined+="$(tail -n 200 "${out_log}")"
+    combined+="$(tail -n 80 "${out_log}")"
     combined+=$'\n'
   fi
   if [[ -n "${err_log}" && -r "${err_log}" ]]; then
-    combined+="$(tail -n 200 "${err_log}")"
+    combined+="$(tail -n 80 "${err_log}")"
     combined+=$'\n'
   fi
-  combined="$(printf '%s\n' "${combined}" | filter_worker_log_lines | redact_studio_stream)"
-  printf '%s\n' "${combined}"
-  if [[ "${combined}" == *studio_render_env_ready* ]] \
-    && [[ "${combined}" == *hasNextPublicSupabaseUrl*true* ]] \
-    && [[ "${combined}" == *hasSupabaseServiceRoleKey*true* ]]; then
-    return 0
-  fi
+  printf '%s\n' "${combined}" | filter_worker_log_lines | redact_studio_stream
+}
+
+env_bootstrap_ready() {
+  local text="$1"
+  [[ "${text}" == *studio_render_env_ready* ]] \
+    && [[ "${text}" == *'"hasNextPublicSupabaseUrl":true'* ]] \
+    && [[ "${text}" == *'"hasSupabaseServiceRoleKey":true'* ]]
+}
+
+poll_env_bootstrap() {
+  local out_log="$1"
+  local err_log="$2"
+  local deadline=$((SECONDS + ENV_BOOTSTRAP_SECONDS))
+  local filtered=""
+  while (( SECONDS < deadline )); do
+    filtered="$(recent_env_bootstrap_logs "${out_log}" "${err_log}")"
+    if env_bootstrap_ready "${filtered}"; then
+      printf '%s\n' "${filtered}"
+      return 0
+    fi
+    sleep "${ENV_BOOTSTRAP_POLL_SECONDS}"
+  done
+  filtered="$(recent_env_bootstrap_logs "${out_log}" "${err_log}")"
+  printf '%s\n' "${filtered}"
   return 1
 }
 
@@ -437,6 +470,8 @@ run_studio_render_worker_recover() {
   local start_restarts=""
   local out_log=""
   local err_log=""
+  local prior_out=""
+  local prior_err=""
   local filtered=""
 
   section "STUDIO_RENDER_WORKER_RECOVER"
@@ -500,7 +535,14 @@ run_studio_render_worker_recover() {
   fi
 
   section "STUDIO_RENDER_WORKER_CLEAN_START"
+  fields="$(read_pm2_recover_fields)"
+  prior_out="$(pm2_field "${fields}" "out_log")"
+  prior_err="$(pm2_field "${fields}" "error_log")"
+  echo "prior_out_log=${prior_out:-unknown}"
+  echo "prior_error_log=${prior_err:-unknown}"
   pm2 delete audiolad-studio-render-worker || true
+  truncate_worker_log_if_writable "${prior_out}"
+  truncate_worker_log_if_writable "${prior_err}"
   unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
   (
     unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
@@ -535,16 +577,14 @@ run_studio_render_worker_recover() {
   echo "out_log_path=${out_log:-unknown}"
   echo "error_log_path=${err_log:-unknown}"
   set +e
-  filtered="$(logs_show_env_ready "${out_log}" "${err_log}")"
+  filtered="$(poll_env_bootstrap "${out_log}" "${err_log}")"
   set -e
   printf '%s\n' "${filtered}"
-  if [[ "${filtered}" == *studio_render_env_ready* ]] \
-    && [[ "${filtered}" == *hasNextPublicSupabaseUrl*true* ]] \
-    && [[ "${filtered}" == *hasSupabaseServiceRoleKey*true* ]]; then
+  if env_bootstrap_ready "${filtered}"; then
     ENV_BOOTSTRAP="YES"
   else
     ENV_BOOTSTRAP="NO"
-    fail_recover "worker logs missing studio_render_env_ready with both env booleans true"
+    fail_recover "worker logs missing recent studio_render_env_ready with both env booleans true"
     return 1
   fi
   echo "ENV BOOTSTRAP = YES"
