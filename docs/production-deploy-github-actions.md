@@ -124,8 +124,14 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 (metadata `shared/.env.production`, count `studio_render_jobs` queued/processing,
 `pm2 delete audiolad-studio-render-worker || true` + stock
 `pm2 start deploy/studio-render-worker.ecosystem.config.cjs` из
-`/var/www/audiolad-deploy/current`, wait online, `studio_render_env_ready`,
-survival >150s, safe render smoke PASS, `pm2 save` только если
+`/var/www/audiolad-deploy/current`. Перед restart сохраняются byte-offset
+текущих PM2 out/error логов (без `pm2 flush` и без truncate истории).
+После start читаются только байты после этих offset; poll до ~30s ждёт
+свежий `studio_render_env_ready` с обоими env boolean `true`. Исторический
+`render_worker_environment_missing` до offset игнорируется; тот же event
+после offset — FAIL. Затем `status=online`, фиксируются PID и restart
+count, ожидание >165s без изменения PID/status/restart count, safe render
+smoke PASS, `pm2 save` только если
 `#353 PRODUCTION ACCEPTANCE = SUCCESS`). **Не вызывает**
 `audiolad-deploy`, не запускает `deploy.sh`, не делает nginx / symlink cutover.
 Произвольных remote-command inputs нет. Содержимое env-файлов и значения

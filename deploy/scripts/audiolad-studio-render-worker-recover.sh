@@ -11,17 +11,22 @@ CURRENT_LINK="${DEPLOY_ROOT}/current"
 SHARED_ENV_PRODUCTION="${DEPLOY_ROOT}/shared/.env.production"
 PM2_APP_NAME="audiolad-studio-render-worker"
 ECOSYSTEM_REL="deploy/studio-render-worker.ecosystem.config.cjs"
-SURVIVE_SECONDS="${AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS:-151}"
+SURVIVE_SECONDS="${AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS:-166}"
 ONLINE_TIMEOUT_SECONDS="${AUDIOLAD_STUDIO_WORKER_ONLINE_TIMEOUT_SECONDS:-60}"
 POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_POLL_SECONDS:-5}"
+ENV_BOOTSTRAP_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_SECONDS:-30}"
+ENV_BOOTSTRAP_POLL_SECONDS="${AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_POLL_SECONDS:-2}"
 DB_CONTAINER="${AUDIOLAD_SUPABASE_DB_CONTAINER:-supabase-db}"
 
 ENV_FILE_OWNER_GROUP_MODE=""
 DEPLOY_CAN_READ_ENV="NO"
+ENV_PERMISSIONS=""
 ACTIVE_RENDER_JOBS_BEFORE="UNKNOWN"
 WORKER_CLEAN_START="NO"
-ENV_BOOTSTRAP="NO"
+FRESH_ENV_READY_LOG="NO"
 WORKER_RESTARTS="UNKNOWN"
+WORKER_PID=""
+RESTART_COUNT_STABLE="NO"
 SURVIVED_OVER_2_5_MIN="NO"
 RENDER_SMOKE="FAIL"
 ACCEPTANCE="FAILED"
@@ -51,15 +56,14 @@ if ! declare -F section >/dev/null 2>&1; then
 fi
 
 print_final_flags() {
-  printf '%s\n' "ENV FILE OWNER/GROUP/MODE = ${ENV_FILE_OWNER_GROUP_MODE}"
-  printf '%s\n' "DEPLOY CAN READ ENV = ${DEPLOY_CAN_READ_ENV}"
-  printf '%s\n' "ACTIVE RENDER JOBS BEFORE = ${ACTIVE_RENDER_JOBS_BEFORE}"
+  printf '%s\n' "ENV PERMISSIONS = ${ENV_PERMISSIONS:-${ENV_FILE_OWNER_GROUP_MODE} READ=${DEPLOY_CAN_READ_ENV}}"
+  printf '%s\n' "FRESH ENV READY LOG = ${FRESH_ENV_READY_LOG}"
   printf '%s\n' "WORKER CLEAN START = ${WORKER_CLEAN_START}"
-  printf '%s\n' "ENV BOOTSTRAP = ${ENV_BOOTSTRAP}"
-  printf '%s\n' "WORKER RESTARTS = ${WORKER_RESTARTS}"
+  printf '%s\n' "RESTART COUNT STABLE = ${RESTART_COUNT_STABLE}"
   printf '%s\n' "SURVIVED >2.5 MIN = ${SURVIVED_OVER_2_5_MIN}"
   printf '%s\n' "RENDER SMOKE = ${RENDER_SMOKE}"
   printf '%s\n' "#353 PRODUCTION ACCEPTANCE = ${ACCEPTANCE}"
+  printf '%s\n' "ACTIVE RENDER JOBS BEFORE = ${ACTIVE_RENDER_JOBS_BEFORE}"
   printf '%s\n' "CUTOVER = ${CUTOVER}"
   printf '%s\n' "CUTOVER=NO"
   printf '%s\n' "audiolad_deploy = ${AUDIOLAD_DEPLOY}"
@@ -83,12 +87,14 @@ try:
 except Exception:
     print("status=missing")
     print("restart_time=")
+    print("pid=")
     print("out_log=")
     print("error_log=")
     raise SystemExit(0)
 if not isinstance(procs, list):
     print("status=missing")
     print("restart_time=")
+    print("pid=")
     print("out_log=")
     print("error_log=")
     raise SystemExit(0)
@@ -98,11 +104,13 @@ for proc in procs:
     env = proc.get("pm2_env") if isinstance(proc.get("pm2_env"), dict) else {}
     print("status=%s" % env.get("status", ""))
     print("restart_time=%s" % env.get("restart_time", ""))
+    print("pid=%s" % proc.get("pid", env.get("pm_pid", "")))
     print("out_log=%s" % env.get("pm_out_log_path", ""))
     print("error_log=%s" % env.get("pm_err_log_path", ""))
     raise SystemExit(0)
 print("status=missing")
 print("restart_time=")
+print("pid=")
 print("out_log=")
 print("error_log=")
 '
@@ -113,6 +121,7 @@ read_pm2_recover_fields() {
   if ! command -v pm2 >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
     printf '%s\n' "status=missing"
     printf '%s\n' "restart_time="
+    printf '%s\n' "pid="
     printf '%s\n' "out_log="
     printf '%s\n' "error_log="
     return 0
@@ -123,6 +132,7 @@ read_pm2_recover_fields() {
   if [[ -z "${raw}" ]]; then
     printf '%s\n' "status=missing"
     printf '%s\n' "restart_time="
+    printf '%s\n' "pid="
     printf '%s\n' "out_log="
     printf '%s\n' "error_log="
     return 0
@@ -354,25 +364,108 @@ JS
   return 1
 }
 
-logs_show_env_ready() {
+SAVED_OUT_LOG=""
+SAVED_ERR_LOG=""
+SAVED_OUT_OFFSET=0
+SAVED_ERR_OFFSET=0
+
+log_file_size() {
+  local path="$1"
+  if [[ -z "${path}" || ! -f "${path}" ]]; then
+    printf '%s\n' "0"
+    return 0
+  fi
+  stat -c '%s' "${path}" 2>/dev/null || printf '%s\n' "0"
+}
+
+save_log_offsets() {
+  local fields="$1"
+  SAVED_OUT_LOG="$(pm2_field "${fields}" "out_log")"
+  SAVED_ERR_LOG="$(pm2_field "${fields}" "error_log")"
+  SAVED_OUT_OFFSET="$(log_file_size "${SAVED_OUT_LOG}")"
+  SAVED_ERR_OFFSET="$(log_file_size "${SAVED_ERR_LOG}")"
+  echo "LOG OFFSETS saved out=${SAVED_OUT_LOG:-none}:${SAVED_OUT_OFFSET} err=${SAVED_ERR_LOG:-none}:${SAVED_ERR_OFFSET}"
+}
+
+read_appended_log() {
+  local path="$1"
+  local saved_path="$2"
+  local saved_offset="$3"
+  local size=0
+  local offset=0
+  if [[ -z "${path}" || ! -r "${path}" ]]; then
+    return 0
+  fi
+  size="$(log_file_size "${path}")"
+  if [[ "${path}" == "${saved_path}" ]]; then
+    offset="${saved_offset:-0}"
+    if (( size < offset )); then
+      offset=0
+    fi
+  else
+    offset=0
+  fi
+  if (( size <= offset )); then
+    return 0
+  fi
+  tail -c "+$((offset + 1))" "${path}" 2>/dev/null || true
+}
+
+read_fresh_worker_logs() {
   local out_log="$1"
   local err_log="$2"
   local combined=""
-  if [[ -n "${out_log}" && -r "${out_log}" ]]; then
-    combined+="$(tail -n 200 "${out_log}")"
-    combined+=$'\n'
+  combined+="$(read_appended_log "${out_log}" "${SAVED_OUT_LOG}" "${SAVED_OUT_OFFSET}")"
+  combined+=$'\n'
+  combined+="$(read_appended_log "${err_log}" "${SAVED_ERR_LOG}" "${SAVED_ERR_OFFSET}")"
+  combined+=$'\n'
+  printf '%s\n' "${combined}" | filter_worker_log_lines | redact_studio_stream
+}
+
+fresh_logs_show_env_ready() {
+  local logs="$1"
+  if [[ "${logs}" != *studio_render_env_ready* ]]; then
+    return 1
   fi
-  if [[ -n "${err_log}" && -r "${err_log}" ]]; then
-    combined+="$(tail -n 200 "${err_log}")"
-    combined+=$'\n'
-  fi
-  combined="$(printf '%s\n' "${combined}" | filter_worker_log_lines | redact_studio_stream)"
-  printf '%s\n' "${combined}"
-  if [[ "${combined}" == *studio_render_env_ready* ]] \
-    && [[ "${combined}" == *hasNextPublicSupabaseUrl*true* ]] \
-    && [[ "${combined}" == *hasSupabaseServiceRoleKey*true* ]]; then
+  if { [[ "${logs}" == *hasNextPublicSupabaseUrl=true* ]] || [[ "${logs}" == *'"hasNextPublicSupabaseUrl":true'* ]]; } \
+    && { [[ "${logs}" == *hasSupabaseServiceRoleKey=true* ]] || [[ "${logs}" == *'"hasSupabaseServiceRoleKey":true'* ]]; }; then
     return 0
   fi
+  return 1
+}
+
+fresh_logs_show_env_missing() {
+  local logs="$1"
+  [[ "${logs}" == *render_worker_environment_missing* || "${logs}" == *environment_missing* ]]
+}
+
+poll_fresh_env_ready() {
+  local out_log="$1"
+  local err_log="$2"
+  local waited=0
+  local logs=""
+  echo "ENV BOOTSTRAP poll: waiting up to ${ENV_BOOTSTRAP_SECONDS}s for FRESH post-offset studio_render_env_ready"
+  while (( waited < ENV_BOOTSTRAP_SECONDS )); do
+    logs="$(read_fresh_worker_logs "${out_log}" "${err_log}")"
+    if fresh_logs_show_env_missing "${logs}"; then
+      printf '%s\n' "${logs}"
+      echo "ENV BOOTSTRAP FAIL: environment_missing / render_worker_environment_missing in post-offset bytes"
+      FRESH_ENV_READY_LOG="NO"
+      return 1
+    fi
+    if fresh_logs_show_env_ready "${logs}"; then
+      printf '%s\n' "${logs}"
+      echo "ENV BOOTSTRAP: FRESH studio_render_env_ready after ${waited}s"
+      FRESH_ENV_READY_LOG="YES"
+      return 0
+    fi
+    sleep "${ENV_BOOTSTRAP_POLL_SECONDS}"
+    waited=$((waited + ENV_BOOTSTRAP_POLL_SECONDS))
+  done
+  logs="$(read_fresh_worker_logs "${out_log}" "${err_log}")"
+  printf '%s\n' "${logs}"
+  echo "ENV BOOTSTRAP FAIL: no FRESH studio_render_env_ready in post-offset bytes within ${ENV_BOOTSTRAP_SECONDS}s"
+  FRESH_ENV_READY_LOG="NO"
   return 1
 }
 
@@ -396,20 +489,27 @@ wait_until_pm2_online() {
 
 poll_survival() {
   local start_restarts="$1"
+  local start_pid="$2"
   local deadline=$((SECONDS + SURVIVE_SECONDS))
   local fields=""
   local status=""
   local now_restarts=""
+  local now_pid=""
   while (( SECONDS < deadline )); do
     fields="$(read_pm2_recover_fields)"
     status="$(pm2_field "${fields}" "status")"
     now_restarts="$(pm2_field "${fields}" "restart_time")"
+    now_pid="$(pm2_field "${fields}" "pid")"
     if [[ "${status}" != "online" ]]; then
       printf '%s\n' "${fields}"
       return 1
     fi
     if [[ "${now_restarts}" =~ ^[0-9]+$ && "${start_restarts}" =~ ^[0-9]+$ ]] \
-      && (( now_restarts > start_restarts )); then
+      && (( now_restarts != start_restarts )); then
+      printf '%s\n' "${fields}"
+      return 1
+    fi
+    if [[ -n "${start_pid}" && -n "${now_pid}" && "${now_pid}" != "${start_pid}" ]]; then
       printf '%s\n' "${fields}"
       return 1
     fi
@@ -419,11 +519,15 @@ poll_survival() {
   printf '%s\n' "${fields}"
   status="$(pm2_field "${fields}" "status")"
   now_restarts="$(pm2_field "${fields}" "restart_time")"
+  now_pid="$(pm2_field "${fields}" "pid")"
   if [[ "${status}" != "online" ]]; then
     return 1
   fi
   if [[ "${now_restarts}" =~ ^[0-9]+$ && "${start_restarts}" =~ ^[0-9]+$ ]] \
-    && (( now_restarts > start_restarts )); then
+    && (( now_restarts != start_restarts )); then
+    return 1
+  fi
+  if [[ -n "${start_pid}" && -n "${now_pid}" && "${now_pid}" != "${start_pid}" ]]; then
     return 1
   fi
   return 0
@@ -435,9 +539,11 @@ run_studio_render_worker_recover() {
   local fields=""
   local status=""
   local start_restarts=""
+  local start_pid=""
   local out_log=""
   local err_log=""
-  local filtered=""
+  local end_restarts=""
+  local end_pid=""
 
   section "STUDIO_RENDER_WORKER_RECOVER"
   echo "mode=ops_studio_worker_recover"
@@ -474,6 +580,8 @@ run_studio_render_worker_recover() {
     DEPLOY_CAN_READ_ENV="NO"
   fi
   printf 'DEPLOY CAN READ ENV = %s\n' "${DEPLOY_CAN_READ_ENV}"
+  ENV_PERMISSIONS="${ENV_FILE_OWNER_GROUP_MODE} READ=${DEPLOY_CAN_READ_ENV}"
+  printf 'ENV PERMISSIONS = %s\n' "${ENV_PERMISSIONS}"
   if [[ "${DEPLOY_CAN_READ_ENV}" != "YES" ]]; then
     fail_recover "deploy cannot read shared .env.production; refusing restart"
     return 1
@@ -500,6 +608,8 @@ run_studio_render_worker_recover() {
   fi
 
   section "STUDIO_RENDER_WORKER_CLEAN_START"
+  fields="$(read_pm2_recover_fields)"
+  save_log_offsets "${fields}"
   pm2 delete audiolad-studio-render-worker || true
   unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
   (
@@ -522,9 +632,11 @@ run_studio_render_worker_recover() {
   set -e
   status="$(pm2_field "${fields}" "status")"
   WORKER_RESTARTS="$(pm2_field "${fields}" "restart_time")"
+  WORKER_PID="$(pm2_field "${fields}" "pid")"
   out_log="$(pm2_field "${fields}" "out_log")"
   err_log="$(pm2_field "${fields}" "error_log")"
   echo "status=${status}"
+  echo "WORKER PID=${WORKER_PID}"
   echo "WORKER RESTARTS=${WORKER_RESTARTS}"
   if [[ "${status}" != "online" ]]; then
     fail_recover "worker did not reach PM2 status=online"
@@ -534,38 +646,57 @@ run_studio_render_worker_recover() {
   section "STUDIO_RENDER_WORKER_ENV_BOOTSTRAP"
   echo "out_log_path=${out_log:-unknown}"
   echo "error_log_path=${err_log:-unknown}"
+  echo "saved_out_offset=${SAVED_OUT_OFFSET}"
+  echo "saved_err_offset=${SAVED_ERR_OFFSET}"
   set +e
-  filtered="$(logs_show_env_ready "${out_log}" "${err_log}")"
+  poll_fresh_env_ready "${out_log}" "${err_log}"
   set -e
-  printf '%s\n' "${filtered}"
-  if [[ "${filtered}" == *studio_render_env_ready* ]] \
-    && [[ "${filtered}" == *hasNextPublicSupabaseUrl*true* ]] \
-    && [[ "${filtered}" == *hasSupabaseServiceRoleKey*true* ]]; then
-    ENV_BOOTSTRAP="YES"
-  else
-    ENV_BOOTSTRAP="NO"
-    fail_recover "worker logs missing studio_render_env_ready with both env booleans true"
+  echo "FRESH ENV READY LOG = ${FRESH_ENV_READY_LOG}"
+  if [[ "${FRESH_ENV_READY_LOG}" != "YES" ]]; then
+    fail_recover "no FRESH post-offset studio_render_env_ready with both env booleans true"
     return 1
   fi
-  echo "ENV BOOTSTRAP = YES"
+
+  fields="$(read_pm2_recover_fields)"
+  status="$(pm2_field "${fields}" "status")"
+  WORKER_RESTARTS="$(pm2_field "${fields}" "restart_time")"
+  WORKER_PID="$(pm2_field "${fields}" "pid")"
+  echo "status=${status}"
+  echo "WORKER PID=${WORKER_PID}"
+  echo "WORKER RESTARTS=${WORKER_RESTARTS}"
+  if [[ "${status}" != "online" ]]; then
+    fail_recover "worker left PM2 status=online before survival window"
+    return 1
+  fi
 
   section "STUDIO_RENDER_WORKER_SURVIVAL"
   start_restarts="${WORKER_RESTARTS}"
+  start_pid="${WORKER_PID}"
   set +e
-  fields="$(poll_survival "${start_restarts}")"
+  fields="$(poll_survival "${start_restarts}" "${start_pid}")"
   set -e
   status="$(pm2_field "${fields}" "status")"
-  WORKER_RESTARTS="$(pm2_field "${fields}" "restart_time")"
+  end_restarts="$(pm2_field "${fields}" "restart_time")"
+  end_pid="$(pm2_field "${fields}" "pid")"
+  WORKER_RESTARTS="${end_restarts}"
+  WORKER_PID="${end_pid}"
   echo "status=${status}"
+  echo "WORKER PID=${WORKER_PID}"
   echo "WORKER RESTARTS=${WORKER_RESTARTS}"
+  if [[ "${end_restarts}" =~ ^[0-9]+$ && "${start_restarts}" =~ ^[0-9]+$ ]] \
+    && (( end_restarts == start_restarts )); then
+    RESTART_COUNT_STABLE="YES"
+  else
+    RESTART_COUNT_STABLE="NO"
+  fi
+  echo "RESTART COUNT STABLE = ${RESTART_COUNT_STABLE}"
   if [[ "${status}" == "online" ]] \
-    && [[ "${WORKER_RESTARTS}" =~ ^[0-9]+$ ]] \
-    && [[ "${start_restarts}" =~ ^[0-9]+$ ]] \
-    && (( WORKER_RESTARTS <= start_restarts )); then
+    && [[ "${RESTART_COUNT_STABLE}" == "YES" ]] \
+    && [[ -n "${start_pid}" && "${end_pid}" == "${start_pid}" ]]; then
     SURVIVED_OVER_2_5_MIN="YES"
   else
     SURVIVED_OVER_2_5_MIN="NO"
-    fail_recover "worker did not survive ${SURVIVE_SECONDS}s without restart_time increase"
+    fail_recover "worker did not survive ${SURVIVE_SECONDS}s with stable pid/status/restart count"
     return 1
   fi
   echo "SURVIVED >2.5 MIN = YES"
@@ -583,7 +714,7 @@ run_studio_render_worker_recover() {
     return 1
   fi
 
-  if [[ "${WORKER_CLEAN_START}" == "YES" && "${ENV_BOOTSTRAP}" == "YES" && "${SURVIVED_OVER_2_5_MIN}" == "YES" && "${RENDER_SMOKE}" == "PASS" ]]; then
+  if [[ "${WORKER_CLEAN_START}" == "YES" && "${FRESH_ENV_READY_LOG}" == "YES" && "${RESTART_COUNT_STABLE}" == "YES" && "${SURVIVED_OVER_2_5_MIN}" == "YES" && "${RENDER_SMOKE}" == "PASS" ]]; then
     ACCEPTANCE="SUCCESS"
     pm2 save
   fi
