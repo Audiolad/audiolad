@@ -96,8 +96,21 @@ secrets.
 ### Read-only diagnostics (`confirm=DO_NOT_DEPLOY`)
 
 Тот же workflow, но `confirm=DO_NOT_DEPLOY` запускает job **Production read-only
-diagnostics**: SSH read-only `systemctl` / `journalctl` / хвост reconcile-log.
-**Не вызывает** `audiolad-deploy` и не меняет production.
+diagnostics**: SSH read-only `systemctl` / `journalctl` / хвост reconcile-log,
+затем фиксированный блок Studio render-worker env (current release,
+`current/.env.*` + `shared/.env.production` metadata/`namei`/`test -r`,
+PM2 status/describe/logs без env dump, `loadEnvConfig` presence-only probe,
+`sudo -n -l`). Содержимое env-файлов и значения секретов не печатаются.
+Произвольных remote-command inputs нет. **Не вызывает** `audiolad-deploy`
+и не меняет production.
+
+Локальный/operator эквивалент того же блока (не вызывается с сервера этим
+workflow — diagnose job не делает checkout и не exec-ит `/current`):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-studio-render-worker-env-diagnose.sh
+```
 
 **Ограничение GitHub Environment:** секреты `production` доступны только с ref,
 разрешённого в настройках environment (обычно только `main`). Dispatch с PR-ветки
