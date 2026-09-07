@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -22,6 +23,10 @@ const docsPath = join(repoRoot, "docs/production-deploy-github-actions.md");
 const studioDiagnosePath = join(
   repoRoot,
   "deploy/scripts/audiolad-studio-render-worker-env-diagnose.sh",
+);
+const studioRecoverPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-studio-render-worker-recover.sh",
 );
 const SHA40 = "a".repeat(40);
 
@@ -141,11 +146,15 @@ function main() {
   assert.ok(jobs.resolve, "job resolve must exist");
   assert.ok(jobs.deploy, "job deploy must exist");
   assert.ok(jobs.diagnose, "job diagnose must exist");
+  assert.ok(jobs.studio_worker_recover, "job studio_worker_recover must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
+  assert.equal(jobs.studio_worker_recover.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -184,6 +193,10 @@ function main() {
   assert.equal(confirm.type, "choice");
   assert.ok(confirm.options.includes("DEPLOY"), "confirm options must include DEPLOY");
   assert.ok(confirm.options.includes("DO_NOT_DEPLOY"), "confirm options must include DO_NOT_DEPLOY");
+  assert.ok(
+    confirm.options.includes("OPS_STUDIO_WORKER_RECOVER"),
+    "confirm options must include OPS_STUDIO_WORKER_RECOVER",
+  );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `wrapper bash -n failed: ${syntax.stderr}`);
@@ -264,6 +277,9 @@ function main() {
   assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
   assertRemoteDiagnoseScriptSyntax(workflowText);
   assertStudioDiagnoseHelper();
+  assertStudioRenderWorkerRecover(workflowText, docsText);
+  assertRemoteRecoverScriptSyntax(workflowText);
+  assertStudioRecoverHelper();
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -491,6 +507,335 @@ function assertStudioDiagnoseHelper() {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+}
+
+function extractRemoteRecoverScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE_RECOVER'\n");
+  const end = workflowText.indexOf("\n          REMOTE_RECOVER\n", start);
+  assert.ok(start >= 0 && end > start, "recover job must contain a REMOTE_RECOVER heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE_RECOVER'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertStudioRenderWorkerRecover(workflowText, docsText) {
+  const required = [
+    "OPS_STUDIO_WORKER_RECOVER",
+    "STUDIO_RENDER_WORKER_RECOVER",
+    "ENV FILE OWNER/GROUP/MODE =",
+    "DEPLOY CAN READ ENV =",
+    "ACTIVE RENDER JOBS BEFORE=",
+    "WORKER CLEAN START =",
+    "ENV BOOTSTRAP =",
+    "WORKER RESTARTS=",
+    "SURVIVED >2.5 MIN =",
+    "RENDER SMOKE =",
+    "#353 PRODUCTION ACCEPTANCE =",
+    "CUTOVER = ${CUTOVER}",
+    "audiolad_deploy = ${AUDIOLAD_DEPLOY}",
+    "CUTOVER=NO",
+    "audiolad_deploy=NOT_INVOKED",
+    "SKIPPED_NO_SAFE_HOOK",
+    "pm2 delete",
+    "unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY",
+    "deploy/studio-render-worker.ecosystem.config.cjs",
+    "studio_render_env_ready",
+    "hasNextPublicSupabaseUrl",
+    "hasSupabaseServiceRoleKey",
+    "pm2 save",
+    "SELECT count(*) FROM public.studio_render_jobs WHERE status IN ('queued', 'processing')",
+    "loadEnvConfig(dir, false, silent, true)",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `recover workflow must contain ${needle}`,
+    );
+  }
+
+  const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  assert.ok(recoverStart >= 0 && deployStart > recoverStart, "recover job must precede deploy job");
+  const recoverJob = workflowText.slice(recoverStart, deployStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    recoverStart,
+  );
+  assert.doesNotMatch(
+    recoverJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "recover job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(recoverJob, /\bdeploy\.sh\b/, "recover job must not call deploy.sh");
+  assert.doesNotMatch(recoverJob, /\bnginx\b/, "recover job must not touch nginx");
+  const recoverCode = recoverJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(
+    recoverCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "recover job must not source env files",
+  );
+  assert.doesNotMatch(
+    recoverJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "recover job must not cat env files",
+  );
+  assert.doesNotMatch(diagnoseJob, /pm2 delete/, "diagnose job must stay read-only");
+  assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_WORKER_RECOVER/);
+  assert.match(docsText, /OPS_STUDIO_WORKER_RECOVER/);
+  assert.match(docsText, /audiolad-studio-render-worker-recover\.sh/);
+}
+
+function assertRemoteRecoverScriptSyntax(workflowText) {
+  const remote = extractRemoteRecoverScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-recover-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote recover bash -n failed: ${syntax.stderr}`);
+}
+
+function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl, secretKey }) {
+  const releaseName = "20260907-000000-testrecover";
+  const releaseDir = join(root, "releases", releaseName);
+  const sharedDir = join(root, "shared");
+  const binDir = join(root, "bin");
+  const outLog = join(root, "worker-out.log");
+  const errLog = join(root, "worker-error.log");
+  const startedMarker = join(root, "pm2-started");
+  const deletedMarker = join(root, "pm2-deleted");
+  const savedMarker = join(root, "pm2-saved");
+  mkdirSync(releaseDir, { recursive: true });
+  mkdirSync(join(releaseDir, "deploy"), { recursive: true });
+  mkdirSync(join(releaseDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(join(releaseDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  chmodSync(join(sharedDir, ".env.production"), envMode);
+  symlinkSync(join(sharedDir, ".env.production"), join(releaseDir, ".env.production"));
+  symlinkSync(releaseDir, join(root, "current"));
+  writeFileSync(
+    join(releaseDir, "deploy", "studio-render-worker.ecosystem.config.cjs"),
+    "module.exports = { apps: [{ name: 'audiolad-studio-render-worker' }] };\n",
+  );
+  writeFileSync(
+    join(releaseDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(releaseDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(releaseDir, "node_modules", "@supabase", "supabase-js", "package.json"),
+    JSON.stringify({ name: "@supabase/supabase-js", main: "index.js" }),
+  );
+  writeFileSync(
+    join(releaseDir, "node_modules", "@supabase", "supabase-js", "index.js"),
+    [
+      "function createClient() {",
+      "  return {",
+      "    from() {",
+      "      return {",
+      "        select() { return this; },",
+      "        in() {",
+      "          return Promise.resolve({ count: 0, error: null });",
+      "        },",
+      "      };",
+      "    },",
+      "  };",
+      "}",
+      "module.exports = { createClient };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    outLog,
+    [
+      `leaked ${secretKey} ${secretUrl}`,
+      '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}',
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(errLog, "");
+  writeFileSync(
+    join(root, "pm2-jlist.json"),
+    JSON.stringify([
+      {
+        name: "audiolad-studio-render-worker",
+        pm2_env: {
+          status: "online",
+          restart_time: 0,
+          pm_cwd: join(root, "current"),
+          pm_out_log_path: outLog,
+          pm_err_log_path: errLog,
+          env: { SUPABASE_SERVICE_ROLE_KEY: secretKey },
+        },
+      },
+    ]),
+  );
+  writeFileSync(
+    join(binDir, "pm2"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `JLIST=${JSON.stringify(join(root, "pm2-jlist.json"))}`,
+      `STARTED=${JSON.stringify(startedMarker)}`,
+      `DELETED=${JSON.stringify(deletedMarker)}`,
+      `SAVED=${JSON.stringify(savedMarker)}`,
+      'if [[ "${1:-}" == "jlist" ]]; then',
+      '  cat "${JLIST}"',
+      'elif [[ "${1:-}" == "delete" ]]; then',
+      '  : > "${DELETED}"',
+      'elif [[ "${1:-}" == "start" ]]; then',
+      '  : > "${STARTED}"',
+      '  printf "%s\\n" "${2:-}" >> "${STARTED}"',
+      'elif [[ "${1:-}" == "save" ]]; then',
+      '  : > "${SAVED}"',
+      "else",
+      "  exit 1",
+      "fi",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(binDir, "pm2"), 0o755);
+  writeFileSync(
+    join(binDir, "docker"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `printf '%s\\n' ${JSON.stringify(jobCount)}`,
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(binDir, "docker"), 0o755);
+  return {
+    releaseName,
+    binDir,
+    startedMarker,
+    deletedMarker,
+    savedMarker,
+    envFile: join(sharedDir, ".env.production"),
+  };
+}
+
+function runRecoverHelper(root, binDir, extraEnv = {}) {
+  return spawnSync("bash", [studioRecoverPath], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: root,
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+      AUDIOLAD_DOCKER_BIN: join(binDir, "docker"),
+      AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS: "0",
+      AUDIOLAD_STUDIO_WORKER_ONLINE_TIMEOUT_SECONDS: "2",
+      AUDIOLAD_STUDIO_WORKER_POLL_SECONDS: "0",
+      ...extraEnv,
+    },
+  });
+}
+
+function assertStudioRecoverHelper() {
+  const helperText = readFileSync(studioRecoverPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", studioRecoverPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `recover helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /STUDIO_RENDER_WORKER_RECOVER/);
+  assert.match(helperText, /#353 PRODUCTION ACCEPTANCE/);
+  assert.match(helperText, /SKIPPED_NO_SAFE_HOOK/);
+  assert.match(helperText, /unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /sudo\s+-n/);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
+  assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  chmodSync(studioRecoverPath, 0o755);
+
+  const secretUrl = "https://env-bootstrap-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+
+  const happyRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-"));
+  try {
+    const fixture = writeRecoverFixture(happyRoot, { secretUrl, secretKey });
+    const result = runRecoverHelper(happyRoot, fixture.binDir);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `recover helper failed: ${output}`);
+    assert.match(output, /DEPLOY CAN READ ENV = YES/);
+    assert.match(output, /ACTIVE RENDER JOBS BEFORE=0/);
+    assert.match(output, /WORKER CLEAN START = YES/);
+    assert.match(output, /ENV BOOTSTRAP = YES/);
+    assert.match(output, /SURVIVED >2\.5 MIN = YES/);
+    assert.match(output, /RENDER SMOKE = SKIPPED_NO_SAFE_HOOK/);
+    assert.match(output, /#353 PRODUCTION ACCEPTANCE = SUCCESS/);
+    assert.match(output, /CUTOVER = NO/);
+    assert.match(output, /audiolad_deploy = NOT_INVOKED/);
+    assert.match(output, /studio_render_env_ready/);
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.ok(existsSyncSafe(fixture.deletedMarker), "pm2 delete should run when worker exists");
+    assert.ok(existsSyncSafe(fixture.startedMarker), "pm2 start should run");
+    assert.ok(existsSyncSafe(fixture.savedMarker), "pm2 save should run after success");
+  } finally {
+    rmSync(happyRoot, { recursive: true, force: true });
+  }
+
+  const busyRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-busy-"));
+  try {
+    const fixture = writeRecoverFixture(busyRoot, { jobCount: "2", secretUrl, secretKey });
+    const result = runRecoverHelper(busyRoot, fixture.binDir);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.notEqual(result.status, 0, "recover must abort when jobs > 0");
+    assert.match(output, /ACTIVE RENDER JOBS BEFORE=2/);
+    assert.match(output, /#353 PRODUCTION ACCEPTANCE = FAILED/);
+    assert.equal(existsSyncSafe(fixture.deletedMarker), false, "must not delete worker when jobs > 0");
+    assert.equal(existsSyncSafe(fixture.startedMarker), false, "must not start worker when jobs > 0");
+  } finally {
+    rmSync(busyRoot, { recursive: true, force: true });
+  }
+
+  if (process.getuid && process.getuid() !== 0) {
+    const unreadRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-unread-"));
+    try {
+      const fixture = writeRecoverFixture(unreadRoot, { envMode: 0o000, secretUrl, secretKey });
+      const result = runRecoverHelper(unreadRoot, fixture.binDir);
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      assert.notEqual(result.status, 0, "recover must abort when env is unreadable");
+      assert.match(output, /DEPLOY CAN READ ENV = NO/);
+      assert.match(output, /#353 PRODUCTION ACCEPTANCE = FAILED/);
+      assert.equal(existsSyncSafe(fixture.startedMarker), false, "must not start when env unreadable");
+    } finally {
+      rmSync(unreadRoot, { recursive: true, force: true });
+    }
+  }
+}
+
+function existsSyncSafe(path) {
+  return existsSync(path);
 }
 
 main();
