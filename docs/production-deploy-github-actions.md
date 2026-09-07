@@ -122,9 +122,11 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 Тот же workflow, но `confirm=OPS_STUDIO_WORKER_RECOVER` запускает job
 **Ops Studio worker recover**: SSH как `deploy`, фиксированная remote-последовательность
 (metadata `shared/.env.production`, count `studio_render_jobs` queued/processing,
-`pm2 delete` + `pm2 start deploy/studio-render-worker.ecosystem.config.cjs` из
+`pm2 delete audiolad-studio-render-worker || true` + stock
+`pm2 start deploy/studio-render-worker.ecosystem.config.cjs` из
 `/var/www/audiolad-deploy/current`, wait online, `studio_render_env_ready`,
-survival >150s, `pm2 save` только после успеха). **Не вызывает**
+survival >150s, safe render smoke PASS, `pm2 save` только если
+`#353 PRODUCTION ACCEPTANCE = SUCCESS`). **Не вызывает**
 `audiolad-deploy`, не запускает `deploy.sh`, не делает nginx / symlink cutover.
 Произвольных remote-command inputs нет. Содержимое env-файлов и значения
 секретов не печатаются. Worker сам читает env через `#353` `loadEnvConfig`.

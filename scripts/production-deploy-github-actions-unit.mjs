@@ -186,7 +186,21 @@ function main() {
   assert.match(wrapperText, /run-from-target-sha\.sh/);
   assert.doesNotMatch(combinedCode, /\brsync\b/);
   assert.doesNotMatch(wrapperText, /\bnpm\b/);
-  assert.doesNotMatch(combinedCode, /\|\| true/);
+  const recoverJobStartForTrue = workflowText.indexOf("name: Ops Studio worker recover");
+  const deployJobStartForTrue = workflowText.indexOf("name: Deploy to production");
+  const workflowWithoutRecover =
+    recoverJobStartForTrue >= 0 && deployJobStartForTrue > recoverJobStartForTrue
+      ? workflowText.slice(0, recoverJobStartForTrue) + workflowText.slice(deployJobStartForTrue)
+      : workflowText;
+  const combinedWithoutRecover = `${workflowWithoutRecover}\n${wrapperText}`
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(
+    combinedWithoutRecover,
+    /\|\| true/,
+    "DEPLOY / diagnose / wrapper must not use || true; recover may use pm2 delete || true",
+  );
 
   const confirm = workflow.on.workflow_dispatch.inputs.confirm;
   assert.equal(confirm.required, true);
@@ -537,8 +551,10 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
     "audiolad_deploy = ${AUDIOLAD_DEPLOY}",
     "CUTOVER=NO",
     "audiolad_deploy=NOT_INVOKED",
-    "SKIPPED_NO_SAFE_HOOK",
-    "pm2 delete",
+    "RENDER_SMOKE=PASS",
+    "pm2 delete audiolad-studio-render-worker || true",
+    "recover_stale_studio_render_jobs",
+    "CUTOVER=NO",
     "unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY",
     "deploy/studio-render-worker.ecosystem.config.cjs",
     "studio_render_env_ready",
@@ -570,6 +586,15 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
     "recover job must not invoke audiolad-deploy",
   );
   assert.doesNotMatch(recoverJob, /\bdeploy\.sh\b/, "recover job must not call deploy.sh");
+  assert.match(
+    recoverJob,
+    /pm2 delete audiolad-studio-render-worker \|\| true/,
+    "recover must delete the worker with || true only after the jobs==0 gate",
+  );
+  assert.match(
+    recoverJob,
+    /pm2 start deploy\/studio-render-worker\.ecosystem\.config\.cjs/,
+  );
   assert.doesNotMatch(recoverJob, /\bnginx\b/, "recover job must not touch nginx");
   const recoverCode = recoverJob
     .split("\n")
@@ -657,6 +682,7 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
     [
       "function createClient() {",
       "  return {",
+      "    rpc() { return Promise.resolve({ data: null, error: null }); },",
       "    from() {",
       "      return {",
       "        select() { return this; },",
@@ -764,7 +790,8 @@ function assertStudioRecoverHelper() {
   assert.equal(syntax.status, 0, `recover helper bash -n failed: ${syntax.stderr}`);
   assert.match(helperText, /STUDIO_RENDER_WORKER_RECOVER/);
   assert.match(helperText, /#353 PRODUCTION ACCEPTANCE/);
-  assert.match(helperText, /SKIPPED_NO_SAFE_HOOK/);
+  assert.match(helperText, /RENDER_SMOKE=PASS/);
+  assert.match(helperText, /pm2 delete audiolad-studio-render-worker \|\| true/);
   assert.match(helperText, /unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
   assert.doesNotMatch(helperText, /sudo\s+-n/);
@@ -790,8 +817,9 @@ function assertStudioRecoverHelper() {
     assert.match(output, /WORKER CLEAN START = YES/);
     assert.match(output, /ENV BOOTSTRAP = YES/);
     assert.match(output, /SURVIVED >2\.5 MIN = YES/);
-    assert.match(output, /RENDER SMOKE = SKIPPED_NO_SAFE_HOOK/);
+    assert.match(output, /RENDER SMOKE = PASS/);
     assert.match(output, /#353 PRODUCTION ACCEPTANCE = SUCCESS/);
+    assert.match(output, /CUTOVER=NO/);
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /audiolad_deploy = NOT_INVOKED/);
     assert.match(output, /studio_render_env_ready/);

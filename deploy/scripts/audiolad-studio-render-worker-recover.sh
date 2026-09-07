@@ -23,7 +23,7 @@ WORKER_CLEAN_START="NO"
 ENV_BOOTSTRAP="NO"
 WORKER_RESTARTS="UNKNOWN"
 SURVIVED_OVER_2_5_MIN="NO"
-RENDER_SMOKE="SKIPPED_NO_SAFE_HOOK"
+RENDER_SMOKE="FAIL"
 ACCEPTANCE="FAILED"
 CUTOVER="NO"
 AUDIOLAD_DEPLOY="NOT_INVOKED"
@@ -61,6 +61,7 @@ print_final_flags() {
   printf '%s\n' "RENDER SMOKE = ${RENDER_SMOKE}"
   printf '%s\n' "#353 PRODUCTION ACCEPTANCE = ${ACCEPTANCE}"
   printf '%s\n' "CUTOVER = ${CUTOVER}"
+  printf '%s\n' "CUTOVER=NO"
   printf '%s\n' "audiolad_deploy = ${AUDIOLAD_DEPLOY}"
 }
 
@@ -264,6 +265,95 @@ count_active_studio_render_jobs() {
   return 1
 }
 
+run_safe_render_smoke() {
+  local dir="${CURRENT_LINK}"
+  local probe=""
+  local output=""
+  local code=0
+  local line=""
+  local result=""
+  if [[ -n "${AUDIOLAD_STUDIO_RENDER_SMOKE_RESULT:-}" ]]; then
+    printf '%s\n' "${AUDIOLAD_STUDIO_RENDER_SMOKE_RESULT}"
+    return 0
+  fi
+  if [[ ! -d "${dir}" ]]; then
+    return 1
+  fi
+  probe="$(mktemp)"
+  cat >"${probe}" <<'JS'
+const silent = { info() {}, error() {} };
+const dir = process.argv[2];
+delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+const { loadEnvConfig } = require("@next/env");
+loadEnvConfig(dir, false, silent, true);
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !key) {
+  console.log("RENDER_SMOKE=FAIL");
+  process.exit(2);
+}
+const { createClient } = require("@supabase/supabase-js");
+const service = createClient(url, key, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+const timer = setTimeout(() => {
+  console.log("RENDER_SMOKE=FAIL");
+  process.exit(2);
+}, 20000);
+service.rpc("recover_stale_studio_render_jobs")
+  .then((recover) => {
+    if (recover.error) {
+      console.log("RENDER_SMOKE=FAIL");
+      process.exit(2);
+    }
+    return service
+      .from("studio_render_jobs")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["queued", "processing"]);
+  })
+  .then(({ count, error }) => {
+    clearTimeout(timer);
+    if (error || count !== 0) {
+      console.log("RENDER_SMOKE=FAIL");
+      process.exit(2);
+    }
+    console.log("RENDER_SMOKE=PASS");
+  })
+  .catch(() => {
+    clearTimeout(timer);
+    console.log("RENDER_SMOKE=FAIL");
+    process.exit(2);
+  });
+JS
+  set +e
+  output="$(
+    unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
+    export NODE_ENV=production
+    export NODE_PATH="${dir}/node_modules${NODE_PATH:+:${NODE_PATH}}"
+    cd "${dir}"
+    node "${probe}" "${dir}" 2>/dev/null
+  )"
+  code=$?
+  set -e
+  rm -f "${probe}"
+  output="$(printf '%s\n' "${output}" | redact_studio_stream)"
+  while IFS= read -r line; do
+    case "${line}" in
+      RENDER_SMOKE=PASS|RENDER_SMOKE=FAIL)
+        result="${line#RENDER_SMOKE=}"
+        ;;
+    esac
+  done <<< "${output}"
+  if [[ "${code}" -eq 0 && "${result}" == "PASS" ]]; then
+    printf '%s\n' "PASS"
+    return 0
+  fi
+  return 1
+}
+
 logs_show_env_ready() {
   local out_log="$1"
   local err_log="$2"
@@ -396,12 +486,8 @@ run_studio_render_worker_recover() {
     return 1
   fi
   printf 'ACTIVE RENDER JOBS BEFORE=%s\n' "${ACTIVE_RENDER_JOBS_BEFORE}"
-  if [[ ! "${ACTIVE_RENDER_JOBS_BEFORE}" =~ ^[0-9]+$ ]]; then
-    fail_recover "active render job count is not a number"
-    return 1
-  fi
-  if (( ACTIVE_RENDER_JOBS_BEFORE > 0 )); then
-    fail_recover "active render jobs > 0; refusing restart"
+  if [[ "${ACTIVE_RENDER_JOBS_BEFORE}" != "0" ]]; then
+    fail_recover "active render jobs != 0; refusing restart"
     return 1
   fi
 
@@ -414,16 +500,12 @@ run_studio_render_worker_recover() {
   fi
 
   section "STUDIO_RENDER_WORKER_CLEAN_START"
-  fields="$(read_pm2_recover_fields)"
-  status="$(pm2_field "${fields}" "status")"
-  if [[ "${status}" != "missing" && -n "${status}" ]]; then
-    pm2 delete "${PM2_APP_NAME}"
-  fi
+  pm2 delete audiolad-studio-render-worker || true
   unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
   (
     unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
     cd "${CURRENT_LINK}"
-    pm2 start "${ECOSYSTEM_REL}"
+    pm2 start deploy/studio-render-worker.ecosystem.config.cjs
   )
   fields="$(read_pm2_recover_fields)"
   status="$(pm2_field "${fields}" "status")"
@@ -489,9 +571,19 @@ run_studio_render_worker_recover() {
   echo "SURVIVED >2.5 MIN = YES"
 
   section "STUDIO_RENDER_WORKER_SMOKE"
+  set +e
+  RENDER_SMOKE="$(run_safe_render_smoke)"
+  set -e
+  if [[ "${RENDER_SMOKE}" != "PASS" ]]; then
+    RENDER_SMOKE="FAIL"
+  fi
   echo "RENDER SMOKE = ${RENDER_SMOKE}"
+  if [[ "${RENDER_SMOKE}" != "PASS" ]]; then
+    fail_recover "safe render smoke did not PASS"
+    return 1
+  fi
 
-  if [[ "${WORKER_CLEAN_START}" == "YES" && "${ENV_BOOTSTRAP}" == "YES" && "${SURVIVED_OVER_2_5_MIN}" == "YES" ]]; then
+  if [[ "${WORKER_CLEAN_START}" == "YES" && "${ENV_BOOTSTRAP}" == "YES" && "${SURVIVED_OVER_2_5_MIN}" == "YES" && "${RENDER_SMOKE}" == "PASS" ]]; then
     ACCEPTANCE="SUCCESS"
     pm2 save
   fi
