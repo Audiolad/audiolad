@@ -618,6 +618,10 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
       return "Урок или блок не найден.";
     case "invalid_request":
       return "Некорректный запрос.";
+    case "audio_title_too_long":
+      return "Название аудио не должно превышать 100 символов.";
+    case "update_failed":
+      return "Не удалось сохранить название аудио.";
     case "invalid_reorder":
       return "Не удалось сохранить порядок. Обновите страницу и попробуйте снова.";
     case "missing_title":

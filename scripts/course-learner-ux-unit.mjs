@@ -15,7 +15,19 @@ import {
   canDownloadCoursePublicationFile,
   groupLearnerCourse,
 } from "../src/lib/course-content/index.ts";
-import { wantsProtectedFileDocumentOpen } from "../src/lib/course-content/learner-file-http.ts";
+import {
+  COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
+  buildCourseLearnerFileReturnHref,
+  buildCourseLearnerFileViewerPath,
+  resolveCourseLearnerFileHttpMode,
+  resolvePracticeFileViewerRoute,
+  wantsProtectedFileDocumentOpen,
+} from "../src/lib/course-content/learner-file-http.ts";
+import { presentCourseAudioTitle } from "../src/lib/course-content/course-audio-title.ts";
+import CourseLearnerFileViewerModule, {
+  CourseLearnerFileViewerDenied,
+  buildCourseLearnerFileViewerViewModel,
+} from "../src/components/products/course-learner/CourseLearnerFileViewer.tsx";
 import {
   shouldApplyEntitledPublishedAudioFilter,
   shouldEnforcePublishedAudioItemForEntitledSignedUrl,
@@ -36,6 +48,8 @@ const CourseLearnerContent =
   CourseLearnerContentModule.default ?? CourseLearnerContentModule;
 const CourseLearnerFileDownload =
   CourseLearnerFileDownloadModule.default ?? CourseLearnerFileDownloadModule;
+const CourseLearnerFileViewer =
+  CourseLearnerFileViewerModule.default ?? CourseLearnerFileViewerModule;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LONG_PDF_NAME =
@@ -182,14 +196,43 @@ function testListenApiDecisionKeepsLevelEnforcement() {
   assert.equal(preview.ok, false, "catalog preview still cannot open course audio");
 }
 
-function testPdfOpensInNewTab() {
+const FILE_ID = "55555555-5555-4555-8555-555555555555";
+const AUTHOR_SLUG = "zoya-petrova";
+const PRODUCT_SLUG = "kody-zhenskoy-prityagatelnosti";
+
+function testPdfOpensInAppViewer() {
   assert.equal(
-    wantsProtectedFileDocumentOpen(
+    resolveCourseLearnerFileHttpMode(
       new Request("https://audiolad.ru/file", {
         headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate" },
       }),
     ),
-    true,
+    "document",
+  );
+  assert.equal(
+    resolveCourseLearnerFileHttpMode(
+      new Request("https://audiolad.ru/file", {
+        headers: { "sec-fetch-dest": "iframe" },
+      }),
+    ),
+    "embed",
+  );
+  assert.equal(
+    resolveCourseLearnerFileHttpMode(
+      new Request("https://audiolad.ru/file?raw=1", {
+        headers: { "sec-fetch-dest": "document", "sec-fetch-mode": "navigate" },
+      }),
+    ),
+    "document",
+    "query overrides must not turn top-level navigation into a raw PDF",
+  );
+  assert.equal(
+    resolveCourseLearnerFileHttpMode(
+      new Request("https://audiolad.ru/file", {
+        headers: { accept: "application/json" },
+      }),
+    ),
+    "json",
   );
   assert.equal(
     wantsProtectedFileDocumentOpen(
@@ -200,15 +243,32 @@ function testPdfOpensInNewTab() {
     false,
   );
 
+  assert.equal(
+    buildCourseLearnerFileViewerPath(AUTHOR_SLUG, PRODUCT_SLUG, FILE_ID),
+    `/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}`,
+  );
+  assert.equal(
+    buildCourseLearnerFileReturnHref(AUTHOR_SLUG, PRODUCT_SLUG),
+    `/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`,
+  );
+  assert.deepEqual(
+    resolvePracticeFileViewerRoute([AUTHOR_SLUG, PRODUCT_SLUG, "file", FILE_ID]),
+    { authorSlug: AUTHOR_SLUG, productSlug: PRODUCT_SLUG, fileId: FILE_ID },
+  );
+  assert.equal(
+    resolvePracticeFileViewerRoute([AUTHOR_SLUG, PRODUCT_SLUG]),
+    null,
+  );
+
   const markup = renderToStaticMarkup(
     createElement(CourseLearnerFileDownload, {
-      authorSlug: "zoya-petrova",
-      productSlug: "kody-zhenskoy-prityagatelnosti",
+      authorSlug: AUTHOR_SLUG,
+      productSlug: PRODUCT_SLUG,
       block: {
         id: "file-1",
         type: "file",
         position: 0,
-        fileId: "55555555-5555-4555-8555-555555555555",
+        fileId: FILE_ID,
         filename: LONG_PDF_NAME,
         mime: "application/pdf",
         sizeBytes: 12000,
@@ -216,9 +276,12 @@ function testPdfOpensInNewTab() {
     }),
   );
 
-  assert.match(markup, /target="_blank"/);
-  assert.match(markup, /rel="noopener noreferrer"/);
-  assert.match(markup, /\/api\/listen\/product\/zoya-petrova\/kody-zhenskoy-prityagatelnosti\/file\//);
+  assert.match(
+    markup,
+    new RegExp(`/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}`),
+  );
+  assert.doesNotMatch(markup, /\/api\/listen\/product\//);
+  assert.doesNotMatch(markup, /target="_blank"/);
   assert.doesNotMatch(markup, /window\.open/);
   assert.match(markup, /break-all/);
   assert.match(markup, /min-w-0/);
@@ -229,16 +292,88 @@ function testPdfOpensInNewTab() {
     "src/components/products/course-learner/CourseLearnerFileDownload.tsx",
   );
   assert.doesNotMatch(source, /window\.open|useState|fetch\(/);
-  assert.match(source, /target="_blank"/);
-  assert.match(source, /noopener noreferrer/);
-  assert.match(source, /buildCourseLearnerFilePath/);
+  assert.doesNotMatch(source, /target="_blank"/);
+  assert.match(source, /buildCourseLearnerFileViewerPath/);
+
+  const viewer = renderToStaticMarkup(
+    createElement(
+      CourseLearnerFileViewer,
+      buildCourseLearnerFileViewerViewModel({
+        authorSlug: AUTHOR_SLUG,
+        productSlug: PRODUCT_SLUG,
+        fileId: FILE_ID,
+        filename: LONG_PDF_NAME,
+      }),
+    ),
+  );
+  assert.match(viewer, new RegExp(COURSE_LEARNER_FILE_VIEWER_BACK_LABEL));
+  assert.match(
+    viewer,
+    new RegExp(`/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`),
+  );
+  assert.match(viewer, /data-course-learner-file-viewer="ready"/);
+  assert.match(viewer, /<iframe/);
+  assert.match(
+    viewer,
+    new RegExp(
+      `src="/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}"`,
+    ),
+  );
+  assert.doesNotMatch(viewer, /<a[^>]+href="[^"]*\/api\/listen\/product\//);
+  assert.doesNotMatch(viewer, /[?&]raw=1/);
+  assert.doesNotMatch(viewer, /Открыть PDF отдельно/);
+  assert.doesNotMatch(viewer, /target="_blank"/);
+  assert.doesNotMatch(viewer, /window\.location|signedUrl|storage_path/);
+  assert.doesNotMatch(viewer, /<meta http-equiv="refresh"/i);
+  assert.match(viewer, new RegExp(LONG_PDF_NAME));
+
+  const viewerSource = read(
+    "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
+  );
+  assert.doesNotMatch(viewerSource, /Открыть PDF отдельно/);
+  assert.doesNotMatch(viewerSource, /openSeparately|raw:\s*true|[?&]raw=1/);
+  assert.doesNotMatch(viewerSource, /target="_blank"/);
+
+  const denied = renderToStaticMarkup(
+    createElement(CourseLearnerFileViewerDenied, {
+      authorSlug: AUTHOR_SLUG,
+      productSlug: PRODUCT_SLUG,
+      message: "Нет доступа к этому документу.",
+    }),
+  );
+  assert.match(denied, new RegExp(COURSE_LEARNER_FILE_VIEWER_BACK_LABEL));
+  assert.match(
+    denied,
+    new RegExp(`/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`),
+  );
+
+  const page = read(
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+  );
+  assert.match(page, /resolvePracticeFileViewerRoute/);
+  assert.match(page, /CourseLearnerFileViewerPage/);
+  assert.doesNotMatch(page, /redirect\(signed\.url/);
+
+  const viewerPage = read(
+    "src/components/products/course-learner/CourseLearnerFileViewerPage.tsx",
+  );
+  assert.match(viewerPage, /loadCourseLearnerFileViewer/);
+  assert.doesNotMatch(viewerPage, /redirect\(|signed\.url|storage_path/);
 
   const route = read(
     "src/app/api/listen/product/[slug]/[productSlug]/file/[fileId]/route.ts",
   );
   assert.match(route, /signLearnerPublicationFile/);
-  assert.match(route, /wantsProtectedFileDocumentOpen/);
+  assert.match(route, /resolveCourseLearnerFileHttpMode/);
+  assert.match(route, /buildCourseLearnerFileViewerPath/);
+  assert.match(route, /createInlinePdfProxyResponse/);
   assert.match(route, /NextResponse\.redirect/);
+  assert.doesNotMatch(route, /NextResponse\.redirect\(signed\.url/);
+
+  const fileHttp = read("src/lib/course-content/learner-file-http.ts");
+  assert.doesNotMatch(fileHttp, /COURSE_LEARNER_FILE_RAW_QUERY|Открыть PDF отдельно/);
+  assert.doesNotMatch(fileHttp, /searchParams\.get\(/);
+  assert.match(fileHttp, /sec-fetch-dest/);
 }
 
 function testLongFilenameDoesNotEscapeCard() {
@@ -477,7 +612,20 @@ function testAssetHelpersStayImported() {
 
 testDraftCourseAudioGates();
 testListenApiDecisionKeepsLevelEnforcement();
-testPdfOpensInNewTab();
+function testCourseAudioTitlePresentation() {
+  assert.equal(
+    presentCourseAudioTitle(
+      "Методика открытия системы для работы с собой",
+      1,
+    ),
+    "Методика открытия системы для работы с собой",
+  );
+  assert.equal(presentCourseAudioTitle("   ", 3), "Аудио 3");
+  assert.equal(presentCourseAudioTitle(null, 1), "Аудио 1");
+}
+
+testPdfOpensInAppViewer();
+testCourseAudioTitlePresentation();
 testLongFilenameDoesNotEscapeCard();
 testEntitledCoursePresentationMatrix();
 testLockedLevelStillRedactedInUi();

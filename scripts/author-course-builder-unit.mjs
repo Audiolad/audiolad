@@ -50,6 +50,7 @@ import {
 import { isCoursePublication } from "../src/lib/author-products/publication-class.ts";
 import { evaluatePublishReadiness } from "../src/lib/author-products/publish.ts";
 import { validatePositionReorderBatch } from "../src/lib/author-products/reorder-batch.ts";
+import { parseAuthorAudioTitle } from "../src/lib/author-products/audio-title.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -907,5 +908,69 @@ assert.doesNotMatch(
   coursePdfNginx,
   /\/api\/author\/products\/\[?\^\/\]\+\/audio/,
 );
+
+const customAudioTitle = "Методика открытия системы для работы с собой";
+assert.deepEqual(parseAuthorAudioTitle(customAudioTitle), {
+  ok: true,
+  value: customAudioTitle,
+});
+assert.equal(parseAuthorAudioTitle("   ").ok, false);
+assert.equal(parseAuthorAudioTitle("<b>hack</b>").ok, false);
+assert.equal(parseAuthorAudioTitle("x".repeat(101)).reason, "audio_title_too_long");
+
+const courseBuilderSource = read("src/lib/author-products/course-builder.ts");
+assert.match(courseBuilderSource, /parseAuthorAudioTitle/);
+assert.match(
+  courseBuilderSource,
+  /from\("audio_items"\)[\s\S]*update\(\{ title: parsed\.value/,
+);
+assert.match(
+  courseBuilderSource,
+  /title: `Аудио \$\{nextPosition\}`/,
+);
+assert.doesNotMatch(
+  courseBuilderSource,
+  /title: file\.name|title: input\.file|original_file_name.*title/,
+);
+
+const blockRoute = read(
+  "src/app/api/author/products/[id]/course/lessons/[lessonId]/blocks/[blockId]/route.ts",
+);
+assert.match(blockRoute, /title:/);
+assert.match(blockRoute, /updateCourseLessonBlock/);
+
+const reorderSource = courseBuilderSource.slice(
+  courseBuilderSource.indexOf("export async function reorderCourseLessonBlocks"),
+  courseBuilderSource.indexOf("async function cleanupUnusedCourseAssets"),
+);
+assert.match(reorderSource, /from\("course_lesson_blocks"\)/);
+assert.doesNotMatch(reorderSource, /from\("audio_items"\)/);
+assert.doesNotMatch(reorderSource, /title:/);
+
+const uploadRoute = read(
+  "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
+);
+assert.match(uploadRoute, /original_file_name: file\.name/);
+assert.doesNotMatch(uploadRoute, /title:/);
+
+const finalizeUpload = read(
+  "src/lib/author-products/server/direct-audio-upload.ts",
+);
+assert.match(finalizeUpload, /original_file_name: input\.fileName/);
+assert.doesNotMatch(
+  finalizeUpload.slice(
+    finalizeUpload.indexOf("finalizeProductAudioDirectUpload"),
+  ),
+  /title:/,
+);
+
+assert.match(form, /if \(isCourse\) \{\s*return \{ ok: true \}/);
+assert.match(builder, /CourseAudioTitleField/);
+assert.match(builder, /onSave=\{\(nextTitle\) =>/);
+
+const audioPatch = read(
+  "src/app/api/author/products/[id]/audio/[audioId]/route.ts",
+);
+assert.match(audioPatch, /parseAuthorAudioTitle/);
 
 console.log("author-course-builder-unit: ok");

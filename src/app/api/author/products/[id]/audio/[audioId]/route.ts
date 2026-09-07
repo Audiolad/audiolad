@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 
-import {
-  validateAudioDescriptionLength,
-  validateAudioTitleLength,
-} from "@/lib/author-products/limits";
+import { parseAuthorAudioTitle } from "@/lib/author-products/audio-title";
+import { validateAudioDescriptionLength } from "@/lib/author-products/limits";
 import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
@@ -46,20 +44,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       updated_at: new Date().toISOString(),
     };
 
-    if ("title" in body && typeof body.title === "string") {
-      const title = body.title.trim();
+    if ("title" in body) {
+      const parsed = parseAuthorAudioTitle(body.title);
 
-      if (!title) {
-        return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.reason }, { status: 400 });
       }
 
-      const titleError = validateAudioTitleLength(title);
-
-      if (titleError) {
-        return NextResponse.json({ error: titleError }, { status: 400 });
-      }
-
-      updates.title = title;
+      updates.title = parsed.value;
     }
 
     if ("description" in body) {

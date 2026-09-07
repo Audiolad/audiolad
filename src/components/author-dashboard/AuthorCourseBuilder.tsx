@@ -974,14 +974,12 @@ function AuthorCourseLessonEditor({
 
             {block.type === "audio" ? (
               <div className="space-y-3">
-                <input
-                  defaultValue={block.audio?.title ?? ""}
+                <CourseAudioTitleField
+                  title={block.audio?.title ?? ""}
                   disabled={disabled}
-                  onBlur={(event) =>
-                    void patchBlock(block.id, { title: event.target.value })
+                  onSave={(nextTitle) =>
+                    void patchBlock(block.id, { title: nextTitle })
                   }
-                  placeholder="Название аудио"
-                  className="w-full rounded-[16px] border border-[#e4d7f4] px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
                 />
                 <p className="text-sm text-[#7d70a2]">
                   {block.audio?.original_file_name ?? "Файл не загружен"} ·{" "}
@@ -1089,6 +1087,42 @@ function AuthorCourseLessonEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function CourseAudioTitleField({
+  title,
+  disabled,
+  onSave,
+}: {
+  title: string;
+  disabled: boolean;
+  onSave: (title: string) => void;
+}) {
+  const [value, setValue] = useState(title);
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setValue(title);
+    }
+  }, [title]);
+
+  return (
+    <input
+      value={value}
+      disabled={disabled}
+      onChange={(event) => setValue(event.target.value)}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        onSave(value);
+      }}
+      placeholder="Название аудио"
+      className="w-full rounded-[16px] border border-[#e4d7f4] px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
+    />
   );
 }
 
