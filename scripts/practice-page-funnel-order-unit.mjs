@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Ordinary practice/product page funnel order:
- * listen → rate → thank author → topics → author recommendations → long SEO.
+ * listen → rate → thank author → topics → (contents if composite) →
+ * author recommendations → long SEO.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -17,11 +18,13 @@ function read(relativePath) {
 /**
  * Documented public-page section keys after the hero listen CTA.
  * Conditional blocks stay off when their datasets are empty.
+ * Composite contents (course / multi-track) precede cross-sell recommendations.
  */
 function resolvePracticePageFunnelOrder({
   hasRating = false,
   hasThankAuthor = false,
   hasTopics = false,
+  hasContents = false,
   hasAuthorRecommendations = false,
   hasAbout = false,
   hasUsage = false,
@@ -37,6 +40,9 @@ function resolvePracticePageFunnelOrder({
   }
   if (hasTopics) {
     order.push("topics");
+  }
+  if (hasContents) {
+    order.push("contents");
   }
   if (hasAuthorRecommendations) {
     order.push("author-recommendations");
@@ -85,6 +91,34 @@ assert.deepEqual(
     "listening-notice",
     "footer",
   ],
+  "single-track / ordinary product: recommendations follow topics, no contents block",
+);
+assert.deepEqual(
+  resolvePracticePageFunnelOrder({
+    hasRating: true,
+    hasThankAuthor: true,
+    hasTopics: true,
+    hasContents: true,
+    hasAuthorRecommendations: true,
+    hasAbout: true,
+    hasUsage: true,
+    hasFaq: true,
+    hasListeningNotice: true,
+  }),
+  [
+    "hero",
+    "rating",
+    "thank-author",
+    "topics",
+    "contents",
+    "author-recommendations",
+    "about",
+    "usage",
+    "faq",
+    "listening-notice",
+    "footer",
+  ],
+  "composite product: current-product contents precede author recommendations",
 );
 assert.deepEqual(
   resolvePracticePageFunnelOrder({
@@ -94,15 +128,26 @@ assert.deepEqual(
     hasListeningNotice: true,
   }),
   ["hero", "rating", "about", "usage", "listening-notice", "footer"],
-  "thank-author, topics, recommendations and FAQ stay off when data is absent",
+  "thank-author, topics, contents, recommendations and FAQ stay off when data is absent",
 );
 assert.deepEqual(
   resolvePracticePageFunnelOrder({
+    hasTopics: true,
     hasAuthorRecommendations: true,
     hasAbout: true,
   }),
-  ["hero", "author-recommendations", "about", "footer"],
-  "author recommendations precede «О продукте» when both exist",
+  ["hero", "topics", "author-recommendations", "about", "footer"],
+  "single product: topics before recs, recs before «О продукте»",
+);
+assert.deepEqual(
+  resolvePracticePageFunnelOrder({
+    hasTopics: true,
+    hasContents: true,
+    hasAuthorRecommendations: true,
+    hasAbout: true,
+  }),
+  ["hero", "topics", "contents", "author-recommendations", "about", "footer"],
+  "composite: topics before contents, contents before recs, recs before about",
 );
 
 const practiceContent = read(
@@ -136,6 +181,8 @@ const markers = [
   ["rating", "<PracticeRatingStars"],
   ["thank-author", 'data-practice-section="thank-author"'],
   ["topics", "<ProductTopicLinks"],
+  ["course-contents", "<CourseLearnerContent"],
+  ["track-contents", "<ProductContentsSection"],
   ["author-recommendations", "<AuthorRecommendationsSection"],
   ["about", "<ProductCopySections"],
   ["seo-usage-faq", "<PracticeSeoContentSections"],
@@ -179,6 +226,36 @@ assert.equal(
   (practiceContent.match(/<AuthorRecommendationsSection/g) || []).length,
   1,
   "exactly one author-recommendations mount",
+);
+assert.equal(
+  (practiceContent.match(/<CourseLearnerContent/g) || []).length,
+  1,
+  "exactly one course-contents mount path",
+);
+assert.equal(
+  (practiceContent.match(/<ProductContentsSection/g) || []).length,
+  1,
+  "exactly one multi-track contents mount path",
+);
+assert.match(
+  practiceContent,
+  /hasTrackContents/,
+  "multi-track contents mount only when isMultiAudioProduct is true",
+);
+assert.match(
+  practiceContent,
+  /isMultiAudioProduct\(publicAudioItems\.length\)/,
+  "track contents reuse the existing multi-material predicate",
+);
+assert.match(
+  renderTree,
+  /learnerCourse \? \([\s\S]*<CourseLearnerContent[\s\S]*hasTrackContents \? \([\s\S]*<ProductContentsSection[\s\S]*<AuthorRecommendationsSection/,
+  "composite contents (course or multi-track) precede the single recommendations mount",
+);
+assert.doesNotMatch(
+  renderTree,
+  /<AuthorRecommendationsSection[\s\S]*<(CourseLearnerContent|ProductContentsSection)/,
+  "recommendations must not appear before contents/course",
 );
 assert.equal(
   (practiceContent.match(/<ProductCopySections/g) || []).length,

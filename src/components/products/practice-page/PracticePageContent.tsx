@@ -7,6 +7,7 @@ import ProductContentsSection from "@/components/products/ProductContentsSection
 import PracticeSeoContentSections from "@/components/products/PracticeSeoContentSections";
 import ProductCopySections from "@/components/products/ProductCopySections";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
+import { isMultiAudioProduct } from "@/lib/products/duration";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
@@ -37,6 +38,8 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
   const showThankAuthor =
     viewModel.showAuthorAppreciationPrototype && Boolean(authorName);
+  const hasTrackContents =
+    !learnerCourse && isMultiAudioProduct(publicAudioItems.length);
 
   return (
     <div className={`min-w-0 ${platformBottomContentPaddingClass}`}>
@@ -77,15 +80,13 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
 
-        <AuthorRecommendationsSection content={seoContent} className="mt-6" />
-
         {learnerCourse ? (
           <CourseLearnerContent
             course={learnerCourse}
             authorSlug={resolvedAuthorSlug}
             productSlug={practice.slug}
           />
-        ) : (
+        ) : hasTrackContents ? (
           <ProductContentsSection
             items={publicAudioItems}
             durationMinutesFallback={practice.duration_minutes}
@@ -102,7 +103,9 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
               productSlug: practice.slug,
             }}
           />
-        )}
+        ) : null}
+
+        <AuthorRecommendationsSection content={seoContent} className="mt-6" />
 
         <ProductCopySections description={description} />
         <PracticeSeoContentSections
