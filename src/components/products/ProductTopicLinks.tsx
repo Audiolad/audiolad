@@ -32,7 +32,7 @@ export default function ProductTopicLinks({
           <li key={topic.key} className="max-w-full shrink-0">
             <Link
               href={resolveTopicPublicHref(topic.key)}
-              className="inline-flex min-h-11 max-w-full items-center rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-3 py-1.5 text-xs font-medium text-[#7042c5] transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              className="inline-flex min-h-11 max-w-full items-center whitespace-normal rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-2.5 py-1 text-[10px] font-medium leading-tight text-[#7042c5] transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               {topic.title}
             </Link>
