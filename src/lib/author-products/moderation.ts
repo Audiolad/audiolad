@@ -279,6 +279,26 @@ export function assertPracticePublicContentEditable(
   }
 }
 
+/**
+ * Ordinary unpublished+approved snapshots are immutable (PATCH 409).
+ * «Опубликовать снова» must skip saveProduct and POST /publish directly.
+ * Drafts and bypass authors still save first — they can edit that snapshot.
+ */
+export function shouldSaveProductBeforePublish(input: {
+  status: string;
+  moderationStatus: string | null | undefined;
+  canBypassProductModeration: boolean;
+}): boolean {
+  if (input.canBypassProductModeration) {
+    return true;
+  }
+
+  return !(
+    input.status === "unpublished" &&
+    input.moderationStatus === MODERATION_STATUS.APPROVED
+  );
+}
+
 export function isPracticePublishedImmutableError(
   error: unknown,
 ): error is PracticePublishedImmutableError {

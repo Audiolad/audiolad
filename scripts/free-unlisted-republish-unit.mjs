@@ -39,6 +39,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = path.join(root, "supabase/migrations");
 const NEW_MIGRATION =
   "20260915120000_preserve_catalog_visibility_on_start_editing.sql";
+const UNPUBLISH_MIGRATION =
+  "20260929120000_preserve_catalog_visibility_on_unpublish.sql";
 const POTOK_ID = "7f7da757-9191-4e3d-95c0-02834321ad35";
 
 function read(relativePath) {
@@ -228,6 +230,70 @@ function testLifecycleSqlPreservesVisibility() {
   const selectedRepublished = applyApproveAndPublish(selectedEditing);
   assert.equal(selectedRepublished.catalog_visibility, "selected_users");
   assert.equal(selectedRepublished.is_catalog_listed, false);
+}
+
+function applyUnpublish(row) {
+  return {
+    ...row,
+    status: "unpublished",
+  };
+}
+
+function applyPublishAudioProduct(row) {
+  return {
+    ...row,
+    status: "published",
+    is_catalog_listed: row.is_catalog_listed ?? true,
+    catalog_visibility: parseCatalogVisibility(
+      row.catalog_visibility,
+      row.is_catalog_listed ?? true,
+    ),
+  };
+}
+
+function testUnpublishSqlPreservesVisibility() {
+  const latest = extractLatestFunction("unpublish_approved_practice");
+  assert.equal(latest.file, UNPUBLISH_MIGRATION);
+  const setClause = extractUpdateSet(latest.body);
+  assert.match(setClause, /status = 'unpublished'/);
+  assert.doesNotMatch(setClause, /is_catalog_listed/);
+  assert.doesNotMatch(setClause, /catalog_visibility/);
+
+  const unpublishSql = read(`supabase/migrations/${UNPUBLISH_MIGRATION}`);
+  assert.doesNotMatch(unpublishSql, /is_catalog_listed\s*=\s*false/);
+  assert.doesNotMatch(
+    unpublishSql,
+    /CREATE OR REPLACE FUNCTION public\.approve_and_publish_practice/,
+  );
+
+  const publish = extractLatestFunction("publish_audio_product");
+  assert.match(
+    publish.body,
+    /COALESCE\(v_practice\.is_catalog_listed, true\)/,
+  );
+
+  const listed = applyPublishAudioProduct(
+    applyUnpublish({
+      status: "published",
+      is_catalog_listed: true,
+      catalog_visibility: "listed",
+      moderation_status: "approved",
+    }),
+  );
+  assert.equal(listed.status, "published");
+  assert.equal(listed.is_catalog_listed, true);
+  assert.equal(listed.catalog_visibility, "listed");
+
+  const unlisted = applyPublishAudioProduct(
+    applyUnpublish({
+      status: "published",
+      is_catalog_listed: false,
+      catalog_visibility: "unlisted",
+      moderation_status: "approved",
+    }),
+  );
+  assert.equal(unlisted.is_catalog_listed, false);
+  assert.equal(unlisted.catalog_visibility, "unlisted");
 }
 
 function testFirstPublishControlCaseVersusRepublish() {
@@ -524,6 +590,7 @@ function testPaidUnlistedStillAcquirable() {
 
 async function main() {
   testLifecycleSqlPreservesVisibility();
+  testUnpublishSqlPreservesVisibility();
   testFirstPublishControlCaseVersusRepublish();
   testRepairSqlIsOneRowAndNotAMigration();
   await testFreeListedPdp();
