@@ -23,6 +23,7 @@ export {
   listHomeTopics,
   listHomeTopicsWithCatalogCounts,
   listTopicsWithCatalogCounts,
+  listTopicsWithCatalogCountsSafe,
 } from "./queries";
 
 export { isSetPracticeTopicsResult, setPracticeTopics } from "./sync";

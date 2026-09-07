@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 
 import CatalogMobileFilters from "@/components/catalog/CatalogMobileFilters";
-import { listTopicsWithCatalogCounts } from "@/lib/topics/queries";
+import { listTopicsWithCatalogCountsSafe } from "@/lib/topics/queries";
 import { createClient } from "@/lib/supabase/server";
 
 async function CatalogMobileFiltersReady() {
   const supabase = await createClient();
-  const topics = (await listTopicsWithCatalogCounts(supabase))
+  const topics = (await listTopicsWithCatalogCountsSafe(supabase))
     .filter((topic) => topic.catalogProductCount > 0)
     .map((topic) => ({ key: topic.key, title: topic.title }));
 

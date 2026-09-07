@@ -48,7 +48,7 @@
 | `learning` | Обучение | 100 |
 | `spirituality` | Духовность | 110 |
 
-Фильтры каталога и кабинет автора читают этот справочник через `listActiveTopics()` / `listTopicsWithCatalogCounts()`. Хардкод массива тем в UI запрещён.
+Фильтры каталога и кабинет автора читают этот справочник через `listActiveTopics()` / `listTopicsWithCatalogCounts()`. Хардкод массива тем в UI запрещён. Счётчики каталога запрашивают `practice_topics` чанками по 50 `practice_id`; `/catalog` и мобильные фильтры используют `listTopicsWithCatalogCountsSafe()` и не падают целиком, если один чанк PostgREST не ответил. Главная уже оборачивает `listHomeTopicsWithCatalogCounts()` в `safeHomeSection`.
 
 ---
 
