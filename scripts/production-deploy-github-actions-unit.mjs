@@ -28,6 +28,10 @@ const studioRecoverPath = join(
   repoRoot,
   "deploy/scripts/audiolad-studio-render-worker-recover.sh",
 );
+const diskAuditPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-disk-storage-audit.sh",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -147,14 +151,18 @@ function main() {
   assert.ok(jobs.deploy, "job deploy must exist");
   assert.ok(jobs.diagnose, "job diagnose must exist");
   assert.ok(jobs.studio_worker_recover, "job studio_worker_recover must exist");
+  assert.ok(jobs.disk_storage_audit, "job disk_storage_audit must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.studio_worker_recover.environment, "production");
+  assert.equal(jobs.disk_storage_audit.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.disk_storage_audit["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -210,6 +218,10 @@ function main() {
   assert.ok(
     confirm.options.includes("OPS_STUDIO_WORKER_RECOVER"),
     "confirm options must include OPS_STUDIO_WORKER_RECOVER",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_DISK_STORAGE_AUDIT"),
+    "confirm options must include OPS_DISK_STORAGE_AUDIT",
   );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
@@ -274,6 +286,7 @@ function main() {
   const workflowAncestorOffset = workflowText.indexOf("merge-base --is-ancestor");
   const sshStepOffset = workflowText.indexOf("name: Deploy via SSH wrapper");
   const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
+  const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk/Storage audit via SSH");
   assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
   assert.ok(
     workflowAncestorOffset > resolveStepOffset,
@@ -287,6 +300,10 @@ function main() {
     diagnoseStepOffset > workflowAncestorOffset,
     "workflow must verify origin/main ancestry before SSH diagnostics",
   );
+  assert.ok(
+    diskAuditStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH disk/Storage audit",
+  );
 
   assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
   assertRemoteDiagnoseScriptSyntax(workflowText);
@@ -294,6 +311,9 @@ function main() {
   assertStudioRenderWorkerRecover(workflowText, docsText);
   assertRemoteRecoverScriptSyntax(workflowText);
   assertStudioRecoverHelper();
+  assertDiskStorageAudit(workflowText, docsText);
+  assertRemoteDiskAuditScriptSyntax(workflowText);
+  assertDiskAuditHelper();
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -574,9 +594,11 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
   }
 
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   assert.ok(recoverStart >= 0 && deployStart > recoverStart, "recover job must precede deploy job");
-  const recoverJob = workflowText.slice(recoverStart, deployStart);
+  assert.ok(auditStart > recoverStart && deployStart > auditStart, "audit job must sit between recover and deploy");
+  const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
     workflowText.indexOf("name: Production read-only diagnostics"),
     recoverStart,
@@ -955,6 +977,335 @@ function assertStudioRecoverHelper() {
     } finally {
       rmSync(unreadRoot, { recursive: true, force: true });
     }
+  }
+}
+
+function extractRemoteDiskAuditScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE_DISK_AUDIT'\n");
+  const end = workflowText.indexOf("\n          REMOTE_DISK_AUDIT\n", start);
+  assert.ok(start >= 0 && end > start, "audit job must contain a REMOTE_DISK_AUDIT heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE_DISK_AUDIT'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertDiskStorageAudit(workflowText, docsText) {
+  const required = [
+    "OPS_DISK_STORAGE_AUDIT",
+    "DISK BEFORE =",
+    "LARGEST DIRECTORIES =",
+    "TEST/ORPHAN FILES FOUND =",
+    "OLD RELEASES FOUND =",
+    "SAFE TO DELETE =",
+    "ESTIMATED SPACE RECOVERY =",
+    "CUTOVER = NO",
+    "audiolad_deploy = NOT_INVOKED",
+    "MODE = read_only_audit",
+    "du -xh --max-depth=2",
+    "6aa9fd82",
+    "synth_3h",
+    "synth_3h_le10800",
+    "studio-draft-assets",
+    "studio-renders",
+    "loadEnvConfig(dir, false, silent, true)",
+    "CUTOVER=NO",
+    "audiolad_deploy=NOT_INVOKED",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `disk audit workflow must contain ${needle}`,
+    );
+  }
+
+  const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  assert.ok(auditStart >= 0 && deployStart > auditStart, "audit job must precede deploy job");
+  const auditJob = workflowText.slice(auditStart, deployStart);
+  const recoverJob = workflowText.slice(recoverStart, auditStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    recoverStart,
+  );
+  const deployJob = workflowText.slice(deployStart);
+  assert.doesNotMatch(
+    auditJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "audit job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(auditJob, /pm2 delete/, "audit job must stay read-only");
+  assert.doesNotMatch(auditJob, /pm2 start/, "audit job must not start PM2 apps");
+  assert.doesNotMatch(auditJob, /pm2 (restart|flush|save)/, "audit job must not mutate PM2");
+  const auditCode = auditJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(auditCode, /\bdeploy\.sh\b/, "audit job must not call deploy.sh");
+  const remoteAudit = extractRemoteDiskAuditScript(workflowText);
+  const remoteAuditCode = remoteAudit
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(remoteAuditCode, /\brm -rf\b/, "audit remote script must not rm -rf production paths");
+  assert.doesNotMatch(remoteAuditCode, /\btruncate\b/, "audit job must not truncate");
+  assert.doesNotMatch(remoteAuditCode, /DELETE FROM/i, "audit job must not DELETE SQL");
+  assert.doesNotMatch(remoteAuditCode, /\.remove\(/, "audit job must not remove storage objects");
+  assert.doesNotMatch(remoteAuditCode, /docker\s+(prune|rm|volume rm)/, "audit job must not prune docker");
+  assert.doesNotMatch(
+    auditCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "audit job must not source env files",
+  );
+  assert.doesNotMatch(
+    auditJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "audit job must not cat env files",
+  );
+  assert.doesNotMatch(diagnoseJob, /OPS_DISK_STORAGE_AUDIT/);
+  assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_AUDIT/);
+  assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_AUDIT/);
+  assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
+  assert.match(docsText, /audiolad-disk-storage-audit\.sh/);
+}
+
+function assertRemoteDiskAuditScriptSyntax(workflowText) {
+  const remote = extractRemoteDiskAuditScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-disk-audit-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote disk audit bash -n failed: ${syntax.stderr}`);
+}
+
+function writeDiskAuditFixture(root, { secretUrl, secretKey }) {
+  const releaseCurrent = "20260907-120000-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const releasePrevious = "20260907-110000-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const releaseOld = "20260906-090000-cccccccccccccccccccccccccccccccccccccccc";
+  const currentDir = join(root, "deploy", "releases", releaseCurrent);
+  const previousDir = join(root, "deploy", "releases", releasePrevious);
+  const oldDir = join(root, "deploy", "releases", releaseOld);
+  const sharedDir = join(root, "deploy", "shared");
+  const binDir = join(root, "bin");
+  const tmpDir = join(root, "tmp");
+  const logDir = join(root, "log");
+  const nginxDir = join(root, "log", "nginx");
+  const pm2Dir = join(root, "pm2-logs");
+  mkdirSync(currentDir, { recursive: true });
+  mkdirSync(previousDir, { recursive: true });
+  mkdirSync(oldDir, { recursive: true });
+  mkdirSync(join(currentDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(join(currentDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+  mkdirSync(tmpDir, { recursive: true });
+  mkdirSync(nginxDir, { recursive: true });
+  mkdirSync(pm2Dir, { recursive: true });
+  writeFileSync(join(currentDir, ".deploy-commit"), "a".repeat(40) + "\n");
+  writeFileSync(join(previousDir, ".deploy-commit"), "b".repeat(40) + "\n");
+  writeFileSync(join(oldDir, ".deploy-commit"), "c".repeat(40) + "\n");
+  writeFileSync(join(oldDir, "old-payload.bin"), "x".repeat(4096));
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  symlinkSync(join(sharedDir, ".env.production"), join(currentDir, ".env.production"));
+  symlinkSync(currentDir, join(root, "deploy", "current"));
+  symlinkSync(previousDir, join(root, "deploy", "previous"));
+  writeFileSync(join(tmpDir, "synth_3h_le10800.wav"), "fixture-wav");
+  mkdirSync(join(tmpDir, "audiolad-studio-6aa9fd82-leftover"), { recursive: true });
+  writeFileSync(join(tmpDir, "audiolad-studio-6aa9fd82-leftover", "work.wav"), "tmp-work");
+  writeFileSync(join(tmpDir, "real-user-render-workspace.txt"), "do-not-mark-safe");
+  writeFileSync(join(nginxDir, "access.log"), "ok\n");
+  writeFileSync(join(pm2Dir, "audiolad-out.log"), "ok\n");
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "package.json"),
+    JSON.stringify({ name: "@supabase/supabase-js", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "index.js"),
+    [
+      "function rowsFor(table, filter) {",
+      "  const col = filter && filter.col;",
+      "  const pat = String((filter && filter.pat) || '').toLowerCase();",
+      "  if (table === 'studio_projects') {",
+      "    if (pat.includes('synth_3h') || pat.includes('6aa9fd82')) {",
+      "      return [{ id: '6aa9fd82-1111-2222-3333-444444444444', status: 'deleted', deleted_at: '2026-09-01T00:00:00Z', author_id: 'author-test', name: 'synth_3h_le10800' }];",
+      "    }",
+      "    if (pat.includes('75-min')) {",
+      "      return [];",
+      "    }",
+      "    return [];",
+      "  }",
+      "  if (table === 'studio_project_assets') {",
+      "    if (pat.includes('6aa9fd82') || pat.includes('synth_3h') || col === 'size_bytes' || col === 'duration_seconds') {",
+      "      return [{ id: 'asset-test', project_id: '6aa9fd82-1111-2222-3333-444444444444', storage_path: 'studio/author/6aa9fd82-1111-2222-3333-444444444444/asset-test/synth_3h.wav', original_name: 'synth_3h_le10800.wav', size_bytes: 359661568, duration_seconds: 10802, deleted_at: '2026-09-01T00:00:00Z' }];",
+      "    }",
+      "    return [];",
+      "  }",
+      "  if (table === 'studio_render_jobs') {",
+      "    if (pat.includes('6aa9fd82') || pat.includes('synth_3h')) {",
+      "      return [{ id: 'job-test', project_id: '6aa9fd82-1111-2222-3333-444444444444', status: 'failed', output_storage_path: 'studio/6aa9fd82-1111-2222-3333-444444444444/render.mp3' }];",
+      "    }",
+      "    return [];",
+      "  }",
+      "  return [];",
+      "}",
+      "function createClient() {",
+      "  return {",
+      "    from(table) {",
+      "      const state = { table, col: '', pat: '', gteCol: '', lteCol: '' };",
+      "      const api = {",
+      "        select() { return api; },",
+      "        ilike(col, pat) { state.col = col; state.pat = pat; return api; },",
+      "        gte(col) { state.gteCol = col; return api; },",
+      "        lte(col) { state.lteCol = col; return api; },",
+      "        then(resolve) {",
+      "          resolve({ data: rowsFor(state.table, { col: state.col || state.gteCol, pat: state.pat }), error: null });",
+      "        },",
+      "      };",
+      "      return api;",
+      "    },",
+      "    storage: {",
+      "      from(bucket) {",
+      "        return {",
+      "          list(_prefix, opts) {",
+      "            const search = String((opts && opts.search) || '').toLowerCase();",
+      "            if (!search.includes('6aa9fd82') && !search.includes('synth_3h')) {",
+      "              return Promise.resolve({ data: [], error: null });",
+      "            }",
+      "            return Promise.resolve({",
+      "              data: [{ name: 'studio/author/6aa9fd82-1111-2222-3333-444444444444/asset-test/synth_3h.wav', metadata: { size: 359661568 } }],",
+      "              error: null,",
+      "            });",
+      "          },",
+      "        };",
+      "      },",
+      "    },",
+      "  };",
+      "}",
+      "module.exports = { createClient };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(binDir, "docker"),
+    [
+      "#!/usr/bin/env bash",
+      "echo 'permission denied' >&2",
+      "exit 1",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(binDir, "docker"), 0o755);
+  return {
+    binDir,
+    deployRoot: join(root, "deploy"),
+    tmpDir,
+    logDir,
+    nginxDir,
+    pm2Dir,
+    releaseOld,
+    releaseCurrent,
+    releasePrevious,
+  };
+}
+
+function runDiskAuditHelper(root, fixture) {
+  return spawnSync("bash", [diskAuditPath], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: fixture.deployRoot,
+      AUDIT_TMP_DIR: fixture.tmpDir,
+      AUDIT_LOG_DIR: fixture.logDir,
+      AUDIT_NGINX_LOG_DIR: fixture.nginxDir,
+      AUDIT_PM2_LOG_DIR: fixture.pm2Dir,
+      PATH: `${fixture.binDir}:${process.env.PATH ?? ""}`,
+      AUDIOLAD_DOCKER_BIN: join(fixture.binDir, "docker"),
+    },
+  });
+}
+
+function assertDiskAuditHelper() {
+  const helperText = readFileSync(diskAuditPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", diskAuditPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `disk audit helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /OPS_DISK_STORAGE_AUDIT/);
+  assert.match(helperText, /DISK BEFORE =/);
+  assert.match(helperText, /SAFE TO DELETE =/);
+  assert.match(helperText, /MODE = read_only_audit/);
+  assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 delete/);
+  assert.doesNotMatch(helperText, /DELETE FROM/i);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
+  assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  chmodSync(diskAuditPath, 0o755);
+
+  const secretUrl = "https://env-bootstrap-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+  const root = mkdtempSync(join(tmpdir(), "audiolad-disk-storage-audit-"));
+  try {
+    const fixture = writeDiskAuditFixture(root, { secretUrl, secretKey });
+    const result = runDiskAuditHelper(root, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `disk audit helper failed: ${output}`);
+    assert.match(output, /DISK BEFORE =/);
+    assert.match(output, /LARGEST DIRECTORIES =/);
+    assert.match(output, /TEST\/ORPHAN FILES FOUND =/);
+    assert.match(output, /OLD RELEASES FOUND =/);
+    assert.match(output, /SAFE TO DELETE =/);
+    assert.match(output, /ESTIMATED SPACE RECOVERY =/);
+    assert.match(output, /CUTOVER = NO/);
+    assert.match(output, /audiolad_deploy = NOT_INVOKED/);
+    assert.match(output, /MODE = read_only_audit/);
+    assert.match(output, /CUTOVER=NO/);
+    assert.match(output, /db_probe=docker_unavailable fallback=node/);
+    assert.match(output, new RegExp(`mark=CURRENT`));
+    assert.match(output, new RegExp(`mark=PREVIOUS`));
+    assert.match(output, new RegExp(`release=${fixture.releaseOld} mark=CANDIDATE`));
+    assert.match(output, new RegExp(`SAFE_TO_DELETE kind=release[\\s\\S]*${fixture.releaseOld}`));
+    assert.match(output, /synth_3h_le10800/);
+    assert.match(output, /6aa9fd82/);
+    assert.match(output, /SAFE_TO_DELETE kind=disk_test_fixture/);
+    assert.match(output, /SAFE_TO_DELETE kind=project|SAFE_TO_DELETE kind=asset|SAFE_TO_DELETE kind=storage/);
+    assert.doesNotMatch(output, /real-user-render-workspace\.txt/);
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.ok(existsSync(join(fixture.deployRoot, "releases", fixture.releaseOld)), "audit must not delete old release");
+    assert.ok(existsSync(join(fixture.tmpDir, "synth_3h_le10800.wav")), "audit must not delete test fixture file");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 }
 

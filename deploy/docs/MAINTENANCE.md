@@ -78,6 +78,13 @@ journalctl -t audiolad-maintenance --since today
 sudo /usr/local/sbin/audiolad-maintenance.sh --apply
 ```
 
+## Related read-only audit
+
+GitHub Actions `confirm=OPS_DISK_STORAGE_AUDIT` (`docs/production-deploy-github-actions.md`)
+is a list-only production disk/Storage audit. It does **not** apply this
+cleanup, does not delete, and does not call `audiolad-deploy`. Operator
+equivalent: `bash deploy/scripts/audiolad-disk-storage-audit.sh`.
+
 ## Tests
 
 ```bash
