@@ -10,6 +10,8 @@ assert(!profile.includes("Квадратное изображение"),"no lega
 const avatar=read("src/components/author-dashboard/AuthorAvatarUploadBlock.tsx");
 assert(avatar.includes("useAvatarCropUpload"),"avatar uses crop hook");
 assert(avatar.includes("AVATAR_UPLOAD_HINT"),"avatar uses shared hint");
+assert(avatar.includes("AVATAR_INPUT_ACCEPT"),"avatar uses wide picker accept");
+assert(!avatar.includes('accept="image/jpeg,image/png,image/webp"'),"avatar no jpeg/png/webp-only accept");
 assert(!avatar.includes("validateCoverFile"),"avatar no cover validation");
 assert(AVATAR_UPLOAD_HINT.includes("вы сможете выбрать нужную область"),"hint mentions crop");
 const hook=read("src/components/author-dashboard/useAuthorAssetUpload.ts");

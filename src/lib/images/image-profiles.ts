@@ -1,5 +1,7 @@
 import type { ImageProfile, ImageVariantKey } from "@/lib/images/image-types";
 
+import { AVATAR_MAX_SOURCE_BYTES } from "@/lib/images/avatar-constants";
+
 import {
   IMAGE_DEFAULT_MAX_UPLOAD_BYTES,
   PLACEHOLDER_QUALITY,
@@ -127,7 +129,7 @@ export const IMAGE_PROFILES: Record<ImageProfile, ImageProfileConfig> = {
   },
   "author-avatar": {
     profile: "author-avatar",
-    maxUploadBytes: 3 * 1024 * 1024,
+    maxUploadBytes: AVATAR_MAX_SOURCE_BYTES,
     requireSquare: true,
     variants: AVATAR_VARIANTS,
     includePlaceholder: false,
@@ -145,12 +147,12 @@ export const IMAGE_PROFILES: Record<ImageProfile, ImageProfileConfig> = {
   },
   "user-avatar": {
     profile: "user-avatar",
-    maxUploadBytes: 3 * 1024 * 1024,
+    maxUploadBytes: AVATAR_MAX_SOURCE_BYTES,
     requireSquare: true,
     variants: AVATAR_VARIANTS,
     includePlaceholder: false,
     allowUpscale: false,
-    storesOriginal: true,
+    storesOriginal: false,
   },
   "author-banner": {
     profile: "author-banner",

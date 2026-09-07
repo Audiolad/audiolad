@@ -3,7 +3,11 @@
 import { useCallback, useState } from "react";
 
 import { useAvatarCropUpload } from "@/components/images/useAvatarCropUpload";
-import { AVATAR_ERROR_MESSAGES, AVATAR_UPLOAD_HINT } from "@/lib/images/avatar-constants";
+import {
+  AVATAR_ERROR_MESSAGES,
+  AVATAR_INPUT_ACCEPT,
+  AVATAR_UPLOAD_HINT,
+} from "@/lib/images/avatar-constants";
 
 type AuthorAvatarUploadBlockProps = {
   authorId: string;
@@ -63,6 +67,7 @@ export default function AuthorAvatarUploadBlock({
     handleFileChange,
     cropper,
     isSavingCrop,
+    isPreparingSource,
   } = useAvatarCropUpload({
     disabled: disabled || uploading || deleting,
     onUpload: uploadAvatar,
@@ -98,7 +103,7 @@ export default function AuthorAvatarUploadBlock({
     }
   }, [authorId, avatarUrl, deleting, disabled, onUpdated, uploading]);
 
-  const isBusy = uploading || deleting || isSavingCrop;
+  const isBusy = uploading || deleting || isSavingCrop || isPreparingSource;
   const displayError = error ?? cropError;
   const showPreview = Boolean(avatarUrl?.trim()) && !previewFailed;
 
@@ -143,6 +148,8 @@ export default function AuthorAvatarUploadBlock({
           >
             {uploading || isSavingCrop
               ? "Загрузка…"
+              : isPreparingSource
+                ? "Обрабатываем фотографию…"
               : showPreview
                 ? "Изменить"
                 : "Загрузить"}
@@ -165,7 +172,7 @@ export default function AuthorAvatarUploadBlock({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={AVATAR_INPUT_ACCEPT}
         className="sr-only"
         onChange={handleFileChange}
       />

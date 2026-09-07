@@ -12,7 +12,7 @@ import {
   restrictCropPosition,
 } from "../src/lib/images/avatar-crop-math.ts";
 import {
-  AVATAR_MAX_BYTES,
+  AVATAR_MAX_SOURCE_BYTES,
   AVATAR_OUTPUT_SIZE,
   AVATAR_SQUARE_TOLERANCE_PX,
   AVATAR_UPLOAD_HINT,
@@ -106,11 +106,11 @@ function testAvatarSourceValidationAllowsNonSquare() {
   const tooLarge = {
     name: "big.webp",
     type: "image/webp",
-    size: AVATAR_MAX_BYTES + 1,
+    size: AVATAR_MAX_SOURCE_BYTES + 1,
   };
 
   assert(
-    validateAvatarSourceFileMeta(tooLarge)?.includes("3 МБ"),
+    validateAvatarSourceFileMeta(tooLarge)?.includes("20 МБ"),
     "oversized avatar source should be rejected",
   );
 
@@ -121,14 +121,15 @@ function testAvatarSourceValidationAllowsNonSquare() {
   };
 
   assert(
-    validateAvatarSourceFileMeta(badType)?.includes("JPG"),
-    "unsupported avatar mime should be rejected",
+    validateAvatarSourceFileMeta(badType)?.includes("распознать") ||
+      validateAvatarSourceFileMeta(badType)?.includes("галереи"),
+    "unsupported avatar source should be rejected with a friendly message",
   );
 }
 
 function testCoverValidationAllowsServerCrop() {
   const source = readFileSync(
-    "/var/www/audiolad/src/lib/author-products/cover-validation-client.ts",
+    new URL("../src/lib/author-products/cover-validation-client.ts", import.meta.url),
     "utf8",
   );
 
@@ -144,7 +145,7 @@ function testCoverValidationAllowsServerCrop() {
 
 function testAvatarUploadHintUpdated() {
   const authorAvatar = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorAvatarUploadBlock.tsx",
+    new URL("../src/components/author-dashboard/AuthorAvatarUploadBlock.tsx", import.meta.url),
     "utf8",
   );
 
@@ -164,7 +165,7 @@ function testAvatarUploadHintUpdated() {
 
 function testSharedCropperComponentExists() {
   const cropper = readFileSync(
-    "/var/www/audiolad/src/components/images/AvatarCropperModal.tsx",
+    new URL("../src/components/images/AvatarCropperModal.tsx", import.meta.url),
     "utf8",
   );
 
@@ -175,7 +176,7 @@ function testSharedCropperComponentExists() {
 
 function testBannerHintUsesDedicatedValidation() {
   const authorBanner = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
+    new URL("../src/components/author-dashboard/AuthorBannerUploadBlock.tsx", import.meta.url),
     "utf8",
   );
 

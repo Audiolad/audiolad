@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AvatarCropperModal from "@/components/images/AvatarCropperModal";
 import { AVATAR_ERROR_MESSAGES } from "@/lib/images/avatar-constants";
 import {
+  AvatarSourceResolutionError,
   createOrientedPreviewUrl,
+  peekAvatarSourceDimensions,
+  shouldUseServerAvatarPreview,
   validateAvatarSourceFile,
 } from "@/lib/images/avatar-source-validation";
 
@@ -13,6 +16,34 @@ type UseAvatarCropUploadOptions = {
   disabled?: boolean;
   onUpload: (file: File) => Promise<void>;
 };
+
+async function requestServerAvatarPreview(file: File): Promise<File> {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch("/api/images/avatar-preview", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as
+      | { message?: string }
+      | null;
+    throw new Error(payload?.message || AVATAR_ERROR_MESSAGES.processFailed);
+  }
+
+  const blob = await response.blob();
+
+  if (!blob.size) {
+    throw new Error(AVATAR_ERROR_MESSAGES.processFailed);
+  }
+
+  return new File([blob], "avatar-preview.jpg", {
+    type: blob.type || "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
 
 export function useAvatarCropUpload({
   disabled = false,
@@ -24,6 +55,7 @@ export function useAvatarCropUpload({
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [isSavingCrop, setIsSavingCrop] = useState(false);
+  const [isPreparingSource, setIsPreparingSource] = useState(false);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
 
   const revokePreviewUrl = useCallback(() => {
@@ -40,7 +72,7 @@ export function useAvatarCropUpload({
   }, [revokePreviewUrl]);
 
   const closeCropper = useCallback(() => {
-    if (isSavingCrop) {
+    if (isSavingCrop || isPreparingSource) {
       return;
     }
 
@@ -48,22 +80,22 @@ export function useAvatarCropUpload({
     setCropImageSrc(null);
     setSourceFile(null);
     revokePreviewUrl();
-  }, [isSavingCrop, revokePreviewUrl]);
+  }, [isPreparingSource, isSavingCrop, revokePreviewUrl]);
 
   const openPicker = useCallback(() => {
-    if (disabled || isSavingCrop) {
+    if (disabled || isSavingCrop || isPreparingSource) {
       return;
     }
 
     fileInputRef.current?.click();
-  }, [disabled, isSavingCrop]);
+  }, [disabled, isPreparingSource, isSavingCrop]);
 
   const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       event.target.value = "";
 
-      if (!file || disabled || isSavingCrop) {
+      if (!file || disabled || isSavingCrop || isPreparingSource) {
         return;
       }
 
@@ -77,18 +109,48 @@ export function useAvatarCropUpload({
       }
 
       revokePreviewUrl();
+      setIsPreparingSource(true);
 
       try {
-        const previewUrl = await createOrientedPreviewUrl(file);
+        const headerDimensions = await peekAvatarSourceDimensions(file);
+        const useServerPreview = shouldUseServerAvatarPreview(file, headerDimensions);
+        let previewSource = file;
+
+        if (useServerPreview) {
+          previewSource = await requestServerAvatarPreview(file);
+        } else {
+          try {
+            const previewUrl = await createOrientedPreviewUrl(file);
+            previewUrlRef.current = previewUrl;
+            setSourceFile(file);
+            setCropImageSrc(previewUrl);
+            setIsCropOpen(true);
+            return;
+          } catch (previewError) {
+            if (previewError instanceof AvatarSourceResolutionError) {
+              throw previewError;
+            }
+
+            previewSource = await requestServerAvatarPreview(file);
+          }
+        }
+
+        const previewUrl = await createOrientedPreviewUrl(previewSource);
         previewUrlRef.current = previewUrl;
-        setSourceFile(file);
+        setSourceFile(previewSource);
         setCropImageSrc(previewUrl);
         setIsCropOpen(true);
-      } catch {
-        setError(AVATAR_ERROR_MESSAGES.readFailed);
+      } catch (previewError) {
+        setError(
+          previewError instanceof Error && previewError.message.trim()
+            ? previewError.message
+            : AVATAR_ERROR_MESSAGES.processFailed,
+        );
+      } finally {
+        setIsPreparingSource(false);
       }
     },
-    [disabled, isSavingCrop, revokePreviewUrl],
+    [disabled, isPreparingSource, isSavingCrop, revokePreviewUrl],
   );
 
   const handleCropConfirm = useCallback(
@@ -129,6 +191,7 @@ export function useAvatarCropUpload({
     cropper,
     isCropOpen,
     isSavingCrop,
+    isPreparingSource,
     sourceFile,
   };
 }

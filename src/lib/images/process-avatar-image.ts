@@ -1,10 +1,8 @@
-import {
-  AVATAR_MAX_BYTES,
-  AVATAR_SQUARE_TOLERANCE_PX,
-} from "@/lib/images/avatar-constants";
+import { AVATAR_ERROR_MESSAGES, AVATAR_MAX_SOURCE_BYTES } from "@/lib/images/avatar-constants";
 import { isNearlySquare } from "@/lib/images/avatar-crop-math";
+import { AVATAR_SQUARE_TOLERANCE_PX } from "@/lib/images/avatar-constants";
 import { processImageForProfile } from "@/lib/images/process-image";
-import type { ImageProcessErrorCode } from "@/lib/images/image-types";
+import type { ImageProcessErrorCode, ImageProfile } from "@/lib/images/image-types";
 
 export type AvatarProcessErrorCode = ImageProcessErrorCode;
 
@@ -25,13 +23,20 @@ export async function processAvatarImageBuffer(
     maxBytes?: number;
     outputSize?: number;
     requireSquare?: boolean;
+    profile?: Extract<ImageProfile, "author-avatar" | "user-avatar">;
   },
 ): Promise<AvatarProcessResult> {
-  if (options?.maxBytes && input.length > options.maxBytes) {
+  const maxBytes = options?.maxBytes ?? AVATAR_MAX_SOURCE_BYTES;
+
+  if (input.length > maxBytes) {
     return { ok: false, code: "invalid_file_size" };
   }
 
-  const processed = await processImageForProfile(input, declaredMime, "author-avatar");
+  const processed = await processImageForProfile(
+    input,
+    declaredMime,
+    options?.profile ?? "author-avatar",
+  );
 
   if (!processed.ok) {
     return processed;
@@ -56,7 +61,6 @@ export async function processAvatarImageBuffer(
   const targetSize = options?.outputSize;
 
   if (targetSize && targetSize < xl.width) {
-    // Backward-compatible single-buffer consumers expect capped size.
     return {
       ok: true,
       buffer: xl.buffer,
@@ -78,18 +82,18 @@ export async function processAvatarImageBuffer(
 export function avatarProcessErrorMessage(code: AvatarProcessErrorCode): string {
   switch (code) {
     case "missing_file":
-      return "Выберите изображение для аватара.";
+      return AVATAR_ERROR_MESSAGES.notImage;
     case "invalid_file_size":
-      return `Размер изображения не должен превышать ${Math.round(AVATAR_MAX_BYTES / (1024 * 1024))} МБ.`;
+      return AVATAR_ERROR_MESSAGES.fileTooLarge;
     case "invalid_file_type":
-      return "Выберите изображение JPG, PNG или WebP";
+      return AVATAR_ERROR_MESSAGES.notImage;
     case "invalid_aspect_ratio":
-      return "Не удалось сохранить фотографию. Попробуйте ещё раз.";
+      return AVATAR_ERROR_MESSAGES.saveFailed;
     case "corrupt_image":
-      return "Не удалось открыть изображение. Попробуйте выбрать другой файл";
+      return AVATAR_ERROR_MESSAGES.processFailed;
     case "image_too_large":
-      return "Изображение слишком большое. Выберите файл меньшего разрешения.";
+      return AVATAR_ERROR_MESSAGES.resolutionTooLarge;
     default:
-      return "Не удалось сохранить фотографию. Попробуйте ещё раз.";
+      return AVATAR_ERROR_MESSAGES.saveFailed;
   }
 }

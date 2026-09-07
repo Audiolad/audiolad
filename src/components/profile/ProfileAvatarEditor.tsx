@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { useAvatarCropUpload } from "@/components/images/useAvatarCropUpload";
-import { AVATAR_ERROR_MESSAGES, AVATAR_UPLOAD_HINT } from "@/lib/images/avatar-constants";
+import {
+  AVATAR_ERROR_MESSAGES,
+  AVATAR_INPUT_ACCEPT,
+  AVATAR_UPLOAD_HINT,
+} from "@/lib/images/avatar-constants";
 
 type ProfileAvatarEditorProps = {
   initialAvatarUrl: string | null;
@@ -94,6 +98,7 @@ export default function ProfileAvatarEditor({
     handleFileChange,
     cropper,
     isSavingCrop,
+    isPreparingSource,
   } = useAvatarCropUpload({
     disabled: isUploading || isDeleting,
     onUpload: uploadAvatar,
@@ -126,7 +131,7 @@ export default function ProfileAvatarEditor({
     }
   }
 
-  const isBusy = isUploading || isDeleting || isSavingCrop;
+  const isBusy = isUploading || isDeleting || isSavingCrop || isPreparingSource;
   const displayError = cropError ?? (isError ? message : null);
 
   return (
@@ -169,7 +174,7 @@ export default function ProfileAvatarEditor({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={AVATAR_INPUT_ACCEPT}
             className="sr-only"
             onChange={handleFileChange}
           />
@@ -182,6 +187,8 @@ export default function ProfileAvatarEditor({
         <p className="mt-2 text-sm font-medium text-[#8a7ca9]">
           {isUploading || isSavingCrop
             ? "Загружаем фотографию…"
+            : isPreparingSource
+              ? "Обрабатываем фотографию…"
             : isDeleting
               ? "Удаляем фотографию…"
               : "Изменить фотографию"}

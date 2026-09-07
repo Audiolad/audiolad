@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 
 import {
+  AVATAR_ERROR_MESSAGES,
+  AVATAR_MAX_INPUT_PIXELS,
+} from "@/lib/images/avatar-constants";
+import { prepareAvatarSourceBuffer } from "@/lib/images/avatar-source-prepare";
+import {
   IMAGE_MAX_INPUT_PIXELS,
   PLACEHOLDER_MAX_BYTES,
 } from "@/lib/images/image-constants";
@@ -14,6 +19,7 @@ import type {
   ProcessedImageVariant,
 } from "@/lib/images/image-types";
 import {
+  isAvatarImageProfile,
   validateImageBufferForProfile,
   validateImageDimensions,
 } from "@/lib/images/validate-image";
@@ -22,10 +28,12 @@ export type ProcessImageResult =
   | { ok: true; data: ProcessedImageSet }
   | { ok: false; code: ImageProcessErrorCode };
 
-function buildSharpInput(input: Buffer) {
+function buildSharpInput(input: Buffer, profile?: ImageProfile) {
   return sharp(input, {
     failOn: "error",
-    limitInputPixels: IMAGE_MAX_INPUT_PIXELS,
+    limitInputPixels: isAvatarImageProfile(profile ?? "product-cover")
+      ? AVATAR_MAX_INPUT_PIXELS
+      : IMAGE_MAX_INPUT_PIXELS,
     sequentialRead: true,
     animated: false,
   });
@@ -60,23 +68,39 @@ export async function processImageForProfile(
     skipOriginalStore?: boolean;
   },
 ): Promise<ProcessImageResult> {
-  const validated = validateImageBufferForProfile(input, declaredMime, profile);
+  const avatarProfile = isAvatarImageProfile(profile);
+  let working = input;
+  const validated = validateImageBufferForProfile(working, declaredMime, profile);
 
   if (!validated.ok) {
     return validated;
   }
 
+  if (avatarProfile) {
+    const prepared = await prepareAvatarSourceBuffer(working, declaredMime, profile);
+
+    if (!prepared.ok) {
+      return prepared;
+    }
+
+    working = prepared.buffer;
+  }
+
   const config = getImageProfileConfig(profile);
   const versionId = options?.versionId ?? randomUUID();
+  const skipOriginal = options?.skipOriginalStore === true || avatarProfile;
 
   try {
-    const meta = await buildSharpInput(input).metadata();
+    const meta = await buildSharpInput(working, profile).metadata();
+    const allowedFormats = avatarProfile
+      ? ["jpeg", "png", "webp", "heif", "avif"]
+      : ["jpeg", "png", "webp"];
 
-    if (!meta.format || !["jpeg", "png", "webp"].includes(meta.format)) {
+    if (!meta.format || !allowedFormats.includes(meta.format)) {
       return { ok: false, code: "invalid_file_type" };
     }
 
-    if (meta.pages && meta.pages > 1) {
+    if (meta.pages && meta.pages > 1 && meta.format !== "heif") {
       return { ok: false, code: "invalid_file_type" };
     }
 
@@ -89,7 +113,7 @@ export async function processImageForProfile(
     }
 
     const hasAlpha = meta.hasAlpha === true;
-    const rotated = buildSharpInput(input).rotate();
+    const rotated = buildSharpInput(working, profile).rotate();
     const variants: ProcessedImageVariant[] = [];
 
     for (const spec of config.variants) {
@@ -129,7 +153,7 @@ export async function processImageForProfile(
     if (config.includePlaceholder) {
       const placeholderSpec = getPlaceholderSpec();
       const placeholderEncoded = await encodeVariant(
-        buildSharpInput(input)
+        buildSharpInput(working, profile)
           .rotate()
           .resize(placeholderSpec.width, placeholderSpec.height, {
             fit: "cover",
@@ -172,7 +196,7 @@ export async function processImageForProfile(
         versionId,
         sourceWidth: width,
         sourceHeight: height,
-        originalBuffer: options?.skipOriginalStore ? Buffer.alloc(0) : input,
+        originalBuffer: skipOriginal ? Buffer.alloc(0) : input,
         originalExtension: validated.data.originalExtension,
         variants,
         placeholderBlurDataUrl,
@@ -191,11 +215,17 @@ export function imageProcessErrorMessage(
     case "missing_file":
       return "Выберите изображение.";
     case "invalid_file_size":
+      if (profile === "author-avatar" || profile === "user-avatar") {
+        return AVATAR_ERROR_MESSAGES.fileTooLarge;
+      }
       if (profile === "playlist-cover") {
         return "Размер изображения не должен превышать 5 МБ.";
       }
       return "Размер изображения не должен превышать 3 МБ.";
     case "invalid_file_type":
+      if (profile === "author-avatar" || profile === "user-avatar") {
+        return AVATAR_ERROR_MESSAGES.notImage;
+      }
       return "Выберите изображение JPG, PNG или WebP.";
     case "invalid_aspect_ratio":
       if (profile === "author-banner") {
@@ -213,8 +243,14 @@ export function imageProcessErrorMessage(
       }
       return "Минимальный размер изображения — 400 × 400 пикселей.";
     case "image_too_large":
+      if (profile === "author-avatar" || profile === "user-avatar") {
+        return AVATAR_ERROR_MESSAGES.resolutionTooLarge;
+      }
       return "Изображение слишком большое. Выберите файл меньшего разрешения.";
     case "corrupt_image":
+      if (profile === "author-avatar" || profile === "user-avatar") {
+        return AVATAR_ERROR_MESSAGES.processFailed;
+      }
       return "Не удалось открыть изображение. Попробуйте выбрать другой файл.";
     default:
       return "Не удалось сохранить изображение. Попробуйте ещё раз.";
