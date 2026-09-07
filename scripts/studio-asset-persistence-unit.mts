@@ -299,7 +299,8 @@ assert.doesNotMatch(
 assert.match(provider, /assetPersistenceStatus !== "error"/);
 assert.match(provider, /sourceType: "upload"/);
 assert.match(provider, /assetId: track\.assetId/);
-assert.match(provider, /validateStudioLocalDuration/);
+assert.match(provider, /createStudioLocalDurationError/);
+assert.match(provider, /formatStudioLocalIngestError/);
 assert.doesNotMatch(provider, /decodeAudioData/);
 assert.doesNotMatch(provider, /file\.arrayBuffer\(|blob\.arrayBuffer\(/);
 assert.match(history, /assetPersistenceStatus/);
