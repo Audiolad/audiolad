@@ -538,12 +538,11 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
   const required = [
     "OPS_STUDIO_WORKER_RECOVER",
     "STUDIO_RENDER_WORKER_RECOVER",
-    "ENV FILE OWNER/GROUP/MODE =",
-    "DEPLOY CAN READ ENV =",
+    "ENV PERMISSIONS =",
+    "FRESH ENV READY LOG =",
     "ACTIVE RENDER JOBS BEFORE=",
     "WORKER CLEAN START =",
-    "ENV BOOTSTRAP =",
-    "WORKER RESTARTS=",
+    "RESTART COUNT STABLE =",
     "SURVIVED >2.5 MIN =",
     "RENDER SMOKE =",
     "#353 PRODUCTION ACCEPTANCE =",
@@ -560,6 +559,8 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
     "studio_render_env_ready",
     "hasNextPublicSupabaseUrl",
     "hasSupabaseServiceRoleKey",
+    "save_log_offsets",
+    "tail -c \"+$((offset + 1))\"",
     "pm2 save",
     "SELECT count(*) FROM public.studio_render_jobs WHERE status IN ('queued', 'processing')",
     "loadEnvConfig(dir, false, silent, true)",
@@ -614,6 +615,12 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
   assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_WORKER_RECOVER/);
   assert.match(docsText, /OPS_STUDIO_WORKER_RECOVER/);
   assert.match(docsText, /audiolad-studio-render-worker-recover\.sh/);
+  assert.doesNotMatch(recoverJob, /pm2 flush/, "recover must not flush PM2 logs");
+  assert.doesNotMatch(
+    recoverJob,
+    /tail -n 200/,
+    "recover must not scan full historical tails for env ready",
+  );
 }
 
 function assertRemoteRecoverScriptSyntax(workflowText) {
@@ -625,7 +632,7 @@ function assertRemoteRecoverScriptSyntax(workflowText) {
   assert.equal(syntax.status, 0, `remote recover bash -n failed: ${syntax.stderr}`);
 }
 
-function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl, secretKey }) {
+function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl, secretKey, onStartAppend = "ready" }) {
   const releaseName = "20260907-000000-testrecover";
   const releaseDir = join(root, "releases", releaseName);
   const sharedDir = join(root, "shared");
@@ -702,18 +709,34 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
     [
       `leaked ${secretKey} ${secretUrl}`,
       '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}',
+      "historical ready must be ignored because it is before the saved offset",
       "",
     ].join("\n"),
   );
-  writeFileSync(errLog, "");
+  writeFileSync(
+    errLog,
+    [
+      '{"event":"render_worker_environment_missing","hasNextPublicSupabaseUrl":false,"hasSupabaseServiceRoleKey":false}',
+      "historical missing must be ignored because it is before the saved offset",
+      "",
+    ].join("\n"),
+  );
+  const startAppendLine =
+    onStartAppend === "missing"
+      ? '{"event":"render_worker_environment_missing","hasNextPublicSupabaseUrl":false,"hasSupabaseServiceRoleKey":false}'
+      : onStartAppend === "ready"
+        ? '{"event":"studio_render_env_ready","hasNextPublicSupabaseUrl":true,"hasSupabaseServiceRoleKey":true}'
+        : "";
   writeFileSync(
     join(root, "pm2-jlist.json"),
     JSON.stringify([
       {
         name: "audiolad-studio-render-worker",
+        pid: 4242,
         pm2_env: {
           status: "online",
           restart_time: 0,
+          pm_pid: 4242,
           pm_cwd: join(root, "current"),
           pm_out_log_path: outLog,
           pm_err_log_path: errLog,
@@ -738,6 +761,9 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
       'elif [[ "${1:-}" == "start" ]]; then',
       '  : > "${STARTED}"',
       '  printf "%s\\n" "${2:-}" >> "${STARTED}"',
+      startAppendLine
+        ? `  printf '%s\\n' ${JSON.stringify(startAppendLine)} >> ${JSON.stringify(outLog)}`
+        : "  true",
       'elif [[ "${1:-}" == "save" ]]; then',
       '  : > "${SAVED}"',
       "else",
@@ -764,6 +790,8 @@ function writeRecoverFixture(root, { jobCount = "0", envMode = 0o640, secretUrl,
     deletedMarker,
     savedMarker,
     envFile: join(sharedDir, ".env.production"),
+    outLog,
+    errLog,
   };
 }
 
@@ -779,6 +807,8 @@ function runRecoverHelper(root, binDir, extraEnv = {}) {
       AUDIOLAD_STUDIO_WORKER_SURVIVE_SECONDS: "0",
       AUDIOLAD_STUDIO_WORKER_ONLINE_TIMEOUT_SECONDS: "2",
       AUDIOLAD_STUDIO_WORKER_POLL_SECONDS: "0",
+      AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_SECONDS: "2",
+      AUDIOLAD_STUDIO_WORKER_ENV_BOOTSTRAP_POLL_SECONDS: "1",
       ...extraEnv,
     },
   });
@@ -791,10 +821,17 @@ function assertStudioRecoverHelper() {
   assert.match(helperText, /STUDIO_RENDER_WORKER_RECOVER/);
   assert.match(helperText, /#353 PRODUCTION ACCEPTANCE/);
   assert.match(helperText, /RENDER_SMOKE=PASS/);
+  assert.match(helperText, /ENV PERMISSIONS/);
+  assert.match(helperText, /FRESH ENV READY LOG/);
+  assert.match(helperText, /RESTART COUNT STABLE/);
+  assert.match(helperText, /save_log_offsets/);
+  assert.match(helperText, /tail -c "\+\$\(\(offset \+ 1\)\)"/);
   assert.match(helperText, /pm2 delete audiolad-studio-render-worker \|\| true/);
   assert.match(helperText, /unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
   assert.doesNotMatch(helperText, /sudo\s+-n/);
+  assert.doesNotMatch(helperText, /pm2 flush/);
+  assert.doesNotMatch(helperText, /tail -n 200/);
   const helperCode = helperText
     .split("\n")
     .filter((line) => !/^\s*#/.test(line))
@@ -813,9 +850,11 @@ function assertStudioRecoverHelper() {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 0, `recover helper failed: ${output}`);
     assert.match(output, /DEPLOY CAN READ ENV = YES/);
+    assert.match(output, /ENV PERMISSIONS = .*READ=YES/);
     assert.match(output, /ACTIVE RENDER JOBS BEFORE=0/);
     assert.match(output, /WORKER CLEAN START = YES/);
-    assert.match(output, /ENV BOOTSTRAP = YES/);
+    assert.match(output, /FRESH ENV READY LOG = YES/);
+    assert.match(output, /RESTART COUNT STABLE = YES/);
     assert.match(output, /SURVIVED >2\.5 MIN = YES/);
     assert.match(output, /RENDER SMOKE = PASS/);
     assert.match(output, /#353 PRODUCTION ACCEPTANCE = SUCCESS/);
@@ -823,11 +862,23 @@ function assertStudioRecoverHelper() {
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /audiolad_deploy = NOT_INVOKED/);
     assert.match(output, /studio_render_env_ready/);
+    assert.match(output, /WORKER PID=4242/);
+    assert.doesNotMatch(output, /historical ready must be ignored/);
+    assert.doesNotMatch(output, /historical missing must be ignored/);
     assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.ok(existsSyncSafe(fixture.deletedMarker), "pm2 delete should run when worker exists");
     assert.ok(existsSyncSafe(fixture.startedMarker), "pm2 start should run");
     assert.ok(existsSyncSafe(fixture.savedMarker), "pm2 save should run after success");
+    const outAfter = readFileSync(fixture.outLog, "utf8");
+    const errAfter = readFileSync(fixture.errLog, "utf8");
+    assert.match(outAfter, /historical ready must be ignored/, "must not truncate out log history");
+    assert.match(errAfter, /render_worker_environment_missing/, "must not truncate error log history");
+    assert.equal(
+      (outAfter.match(/studio_render_env_ready/g) || []).length,
+      2,
+      "historical ready stays and a fresh ready line is appended",
+    );
   } finally {
     rmSync(happyRoot, { recursive: true, force: true });
   }
@@ -844,6 +895,51 @@ function assertStudioRecoverHelper() {
     assert.equal(existsSyncSafe(fixture.startedMarker), false, "must not start worker when jobs > 0");
   } finally {
     rmSync(busyRoot, { recursive: true, force: true });
+  }
+
+  const staleReadyRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-stale-"));
+  try {
+    const fixture = writeRecoverFixture(staleReadyRoot, {
+      secretUrl,
+      secretKey,
+      onStartAppend: "none",
+    });
+    const result = runRecoverHelper(staleReadyRoot, fixture.binDir);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.notEqual(result.status, 0, "historical ready before offset must not count as fresh");
+    assert.match(output, /FRESH ENV READY LOG = NO/);
+    assert.match(output, /#353 PRODUCTION ACCEPTANCE = FAILED/);
+    assert.equal(existsSyncSafe(fixture.savedMarker), false, "must not pm2 save when fresh ready is missing");
+    assert.match(
+      readFileSync(fixture.outLog, "utf8"),
+      /historical ready must be ignored/,
+      "must not truncate historical ready lines",
+    );
+    assert.match(
+      readFileSync(fixture.errLog, "utf8"),
+      /render_worker_environment_missing/,
+      "must not truncate historical missing lines",
+    );
+  } finally {
+    rmSync(staleReadyRoot, { recursive: true, force: true });
+  }
+
+  const missingAfterRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-env-recover-missing-"));
+  try {
+    const fixture = writeRecoverFixture(missingAfterRoot, {
+      secretUrl,
+      secretKey,
+      onStartAppend: "missing",
+    });
+    const result = runRecoverHelper(missingAfterRoot, fixture.binDir);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.notEqual(result.status, 0, "post-offset environment_missing must fail");
+    assert.match(output, /FRESH ENV READY LOG = NO/);
+    assert.match(output, /environment_missing \/ render_worker_environment_missing in post-offset bytes/);
+    assert.match(output, /#353 PRODUCTION ACCEPTANCE = FAILED/);
+    assert.equal(existsSyncSafe(fixture.savedMarker), false, "must not pm2 save after post-offset missing");
+  } finally {
+    rmSync(missingAfterRoot, { recursive: true, force: true });
   }
 
   if (process.getuid && process.getuid() !== 0) {
