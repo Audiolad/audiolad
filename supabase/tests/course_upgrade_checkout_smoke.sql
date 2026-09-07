@@ -219,10 +219,10 @@ BEGIN
   -- Entitled L1 on an unpublished course can start L2 checkout.
   -- A stranger still cannot (practice_not_published).
   DECLARE
-    unpublished_buyer uuid := 'b2222222-2222-4222-8222-222222222222';
-    unpublished_id uuid := 'd2222222-2222-4222-8222-222222222222';
-    key5 uuid := 'f5555555-5555-4555-8555-555555555555';
-    key6 uuid := 'f6666666-6666-4666-8666-666666666666';
+    unpublished_buyer uuid := 'b9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9';
+    unpublished_id uuid := 'd9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9';
+    key5 uuid := 'f9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e1';
+    key6 uuid := 'f9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e2';
   BEGIN
     INSERT INTO auth.users (id) VALUES (unpublished_buyer);
     INSERT INTO public.practices (
