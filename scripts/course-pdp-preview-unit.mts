@@ -281,6 +281,16 @@ function testPageLoaderContracts() {
   assert.doesNotMatch(page, /canAccessCourseContent/);
   assert.match(page, /loadCourseLearnerContent/);
   assert.match(page, /skipPrivateCourseOutline/);
+  assert.match(
+    read("src/components/products/practice-page/PracticePageParts.tsx"),
+    /PREVIEW_ACTION_LABEL/,
+    "paid course PDP still renders Прослушать фрагмент next to buy",
+  );
+  assert.equal(
+    shouldLoadPublicAudioItemsOnProductPage("course", "practice"),
+    false,
+    "configured course preview does not flatten lessons onto the PDP",
+  );
 
   assert.match(
     lookup,

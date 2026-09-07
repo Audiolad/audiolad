@@ -200,7 +200,37 @@ function testListenApiDecisionKeepsLevelEnforcement() {
     catalogPreviewEligible: true,
     listenAccess: null,
   });
-  assert.equal(preview.ok, false, "catalog preview still cannot open course audio");
+  assert.equal(preview.ok, true, "published listed course may mint catalog_preview");
+  if (preview.ok) {
+    assert.equal(preview.access.mode, "catalog_preview");
+    assert.equal(preview.useServiceRoleStorage, true);
+  }
+
+  const unpublishedPreview = resolveListenApiDecision({
+    purpose: "preview_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: false,
+    listenAccess: null,
+  });
+  assert.equal(
+    unpublishedPreview.ok,
+    false,
+    "unpublished course has no public storefront preview",
+  );
+
+  const previewFull = resolveListenApiDecision({
+    purpose: "full_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(previewFull.ok, false, "catalog preview still cannot open full course audio");
 }
 
 const FILE_ID = "55555555-5555-4555-8555-555555555555";

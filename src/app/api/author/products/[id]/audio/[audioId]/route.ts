@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { parseAuthorAudioTitle } from "@/lib/author-products/audio-title";
 import { validateAudioDescriptionLength } from "@/lib/author-products/limits";
 import {
+  toAudioPreviewWindowColumns,
+  validateAudioPreviewWindow,
+} from "@/lib/listen/preview-window";
+import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
@@ -52,6 +56,42 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
 
       updates.title = parsed.value;
+    }
+
+    if ("preview_start_ms" in body || "preview_end_ms" in body) {
+      const record = body as Record<string, unknown>;
+      const previewStartMs =
+        record.preview_start_ms == null
+          ? null
+          : typeof record.preview_start_ms === "number" &&
+              Number.isInteger(record.preview_start_ms)
+            ? record.preview_start_ms
+            : undefined;
+      const previewEndMs =
+        record.preview_end_ms == null
+          ? null
+          : typeof record.preview_end_ms === "number" &&
+              Number.isInteger(record.preview_end_ms)
+            ? record.preview_end_ms
+            : undefined;
+
+      if (previewStartMs === undefined || previewEndMs === undefined) {
+        return NextResponse.json(
+          { error: "preview_window_not_integer_ms" },
+          { status: 400 },
+        );
+      }
+
+      const validated = validateAudioPreviewWindow({
+        previewStartMs,
+        previewEndMs,
+      });
+
+      if (!validated.ok) {
+        return NextResponse.json({ error: validated.reason }, { status: 400 });
+      }
+
+      Object.assign(updates, toAudioPreviewWindowColumns(validated.window));
     }
 
     if ("description" in body) {

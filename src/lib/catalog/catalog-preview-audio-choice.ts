@@ -17,7 +17,8 @@ export type CatalogPreviewAudioChoiceResult<T> =
 /**
  * Pick the storefront preview audio row.
  * A requested audioItemId must belong to the already-scoped product rows
- * (fail closed). Courses still require a configured 30–90s window.
+ * (fail closed). Courses still require a configured 30–90s window and an
+ * explicit Level 1 allow-list — missing allow-list fails closed.
  */
 export function chooseCatalogPreviewAudioRow<
   T extends CatalogPreviewAudioChoiceInput,
@@ -26,12 +27,18 @@ export function chooseCatalogPreviewAudioRow<
   options: {
     isCourse: boolean;
     audioItemId?: string | null;
+    allowedAudioItemIds?: ReadonlySet<string>;
   },
 ): CatalogPreviewAudioChoiceResult<T> {
+  const scopedRows = options.isCourse
+    ? options.allowedAudioItemIds
+      ? rows.filter((item) => options.allowedAudioItemIds!.has(item.id))
+      : []
+    : rows;
   const requestedId = options.audioItemId?.trim() || null;
 
   if (requestedId) {
-    const match = rows.find((item) => item.id === requestedId) ?? null;
+    const match = scopedRows.find((item) => item.id === requestedId) ?? null;
 
     if (!match) {
       return { ok: false, reason: "unavailable" };
@@ -48,12 +55,15 @@ export function chooseCatalogPreviewAudioRow<
   }
 
   let chosen =
-    rows.find((item) =>
+    scopedRows.find((item) =>
       isConfiguredStorefrontPreviewWindow(fromAudioPreviewWindowColumns(item)),
     ) ?? null;
 
   if (!chosen && !options.isCourse) {
-    chosen = rows.find((item) => item.is_preview === true) ?? rows[0] ?? null;
+    chosen =
+      scopedRows.find((item) => item.is_preview === true) ??
+      scopedRows[0] ??
+      null;
   }
 
   if (options.isCourse && !chosen) {

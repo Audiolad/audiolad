@@ -51,8 +51,16 @@ export {
   canDownloadCoursePublicationFile,
   canPlayCourseAudioItem,
   listAccessibleCourseAudioItemIds,
+  listCourseStorefrontPreviewAudioItemIds,
   loadCourseBlockAssociations,
 } from "./learner-assets";
+
+export {
+  COURSE_STOREFRONT_PREVIEW_MAX_ACCESS_LEVEL,
+  collectCourseLevel1AudioItemIds,
+  isCourseLessonEligibleForStorefrontPreview,
+  isCourseStorefrontPreviewClipEligible,
+} from "./storefront-preview";
 
 export {
   COURSE_LESSON_BLOCK_TYPES,

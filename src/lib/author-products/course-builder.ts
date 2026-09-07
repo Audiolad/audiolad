@@ -34,6 +34,10 @@ import {
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
 import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
+import {
+  courseStorefrontPreviewWriteOrThrow,
+  resolveCourseStorefrontPreviewDto,
+} from "@/lib/author-products/course-storefront-preview";
 import { validatePositionReorderBatch } from "@/lib/author-products/reorder-batch";
 import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
@@ -60,7 +64,7 @@ const FILE_SELECT =
 const CTA_SELECT =
   "publication_id, title, description, button_text, url, enabled, created_at, updated_at";
 const AUDIO_ASSET_SELECT =
-  "id, title, duration_seconds, original_file_name, audio_path";
+  "id, title, duration_seconds, original_file_name, audio_path, preview_start_ms, preview_end_ms";
 
 export { CourseBuilderError, isCourseBuilderError };
 
@@ -1324,4 +1328,85 @@ export async function saveCourseCompletionCta(
   }
 
   return data as CourseCompletionCtaDto;
+}
+
+/**
+ * Storefront preview window is catalog merchandising metadata.
+ * Allowed on published courses so authors can enable «Прослушать фрагмент»
+ * without unpublishing or replacing lesson files.
+ */
+export async function saveCourseStorefrontPreview(
+  supabase: SupabaseClient,
+  publicationId: string,
+  body: unknown,
+): Promise<CourseBuilderSnapshot> {
+  const snapshot = await loadCourseBuilderSnapshot(supabase, publicationId);
+  const current = resolveCourseStorefrontPreviewDto(snapshot.lessons);
+  const parsed = courseStorefrontPreviewWriteOrThrow(
+    body,
+    new Set(current.candidates.map((item) => item.audioItemId)),
+  );
+  const now = new Date().toISOString();
+
+  if (parsed.clear) {
+    const { error } = await supabase
+      .from("audio_items")
+      .update({
+        preview_start_ms: null,
+        preview_end_ms: null,
+        is_preview: false,
+        updated_at: now,
+      })
+      .eq("practice_id", publicationId);
+
+    if (error) {
+      console.error("author_course_storefront_preview_clear_error", error.message);
+      throw new CourseBuilderError("internal_error", 500);
+    }
+
+    return loadCourseBuilderSnapshot(supabase, publicationId);
+  }
+
+  const { error: clearError } = await supabase
+    .from("audio_items")
+    .update({
+      preview_start_ms: null,
+      preview_end_ms: null,
+      is_preview: false,
+      updated_at: now,
+    })
+    .eq("practice_id", publicationId)
+    .neq("id", parsed.audioItemId);
+
+  if (clearError) {
+    console.error(
+      "author_course_storefront_preview_clear_others_error",
+      clearError.message,
+    );
+    throw new CourseBuilderError("internal_error", 500);
+  }
+
+  const { data, error } = await supabase
+    .from("audio_items")
+    .update({
+      preview_start_ms: parsed.previewStartMs,
+      preview_end_ms: parsed.previewEndMs,
+      is_preview: true,
+      updated_at: now,
+    })
+    .eq("id", parsed.audioItemId)
+    .eq("practice_id", publicationId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("author_course_storefront_preview_update_error", error.message);
+    throw new CourseBuilderError("internal_error", 500);
+  }
+
+  if (!data?.id) {
+    throw new CourseBuilderError("storefront_preview_not_level_1", 400);
+  }
+
+  return loadCourseBuilderSnapshot(supabase, publicationId);
 }

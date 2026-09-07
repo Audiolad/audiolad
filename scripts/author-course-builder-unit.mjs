@@ -143,6 +143,17 @@ assert.match(builder, /getCourseBuilderAudioUploadError/);
 assert.doesNotMatch(builder, /Не удалось загрузить PDF/);
 assert.doesNotMatch(builder, /Не удалось загрузить аудио\./);
 assert.match(builder, /course_completion_ctas|completion-cta/);
+assert.match(builder, /data-author-course-storefront-preview/);
+assert.match(builder, /course\/storefront-preview/);
+assert.match(
+  read("src/app/api/author/products/[id]/course/storefront-preview/route.ts"),
+  /requirePracticeMutationAccess/,
+);
+assert.doesNotMatch(
+  read("src/app/api/author/products/[id]/course/storefront-preview/route.ts"),
+  /requireCourseBuilderMutationAccess/,
+  "published courses can configure storefront preview without unpublishing",
+);
 assert.match(builder, /\/api\/author\/products\/\$\{.*\}\/audio\/\$\{.*\}\/upload/);
 assert.match(builder, /\/api\/author\/products\/\$\{practiceId\}\/course\/files\//);
 assert.doesNotMatch(builder, /promo_/);

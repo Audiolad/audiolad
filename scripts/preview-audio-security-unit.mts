@@ -269,7 +269,26 @@ function testAccessDecisions() {
     catalogPreviewEligible: true,
     listenAccess: null,
   });
-  assert.equal(coursePreview.ok, false, "course preview cannot bypass course access");
+  assert.equal(coursePreview.ok, true, "published course may use catalog preview_audio");
+  if (coursePreview.ok) {
+    assert.equal(coursePreview.access.mode, "catalog_preview");
+    assert.equal(canWritePracticeProgress(coursePreview.access), false);
+  }
+
+  const coursePreviewFull = resolveListenApiDecision({
+    purpose: "full_audio",
+    isCourse: true,
+    courseAllowed: false,
+    canListen: false,
+    accessReason: "payment_required",
+    catalogPreviewEligible: true,
+    listenAccess: null,
+  });
+  assert.equal(
+    coursePreviewFull.ok,
+    false,
+    "course preview cannot bypass course access for full audio",
+  );
 
   const courseEntitled = resolveListenApiDecision({
     purpose: "full_audio",
@@ -450,11 +469,18 @@ function testSourceContracts() {
   assert.match(signedAudio, /preview_clip:\s*true/);
   assert.match(signedAudio, /buildListenPreviewClipPath/);
   const catalogPreviewBlock = signedAudio.slice(
-    signedAudio.indexOf('access.mode === "catalog_preview"'),
+    signedAudio.lastIndexOf('access.mode === "catalog_preview"'),
     signedAudio.indexOf('access.mode === "entitled"'),
   );
   assert.match(catalogPreviewBlock, /preview_clip:\s*true/);
   assert.doesNotMatch(catalogPreviewBlock, /createSignedUrl/);
+  const coursePreviewBlock = signedAudio.slice(
+    signedAudio.indexOf('isCourse && access.mode === "catalog_preview"'),
+    signedAudio.indexOf("listen_course_preview_access_error"),
+  );
+  assert.match(coursePreviewBlock, /preview_clip:\s*true/);
+  assert.match(coursePreviewBlock, /isCourseStorefrontPreviewClipEligible/);
+  assert.doesNotMatch(coursePreviewBlock, /createSignedUrl/);
   assert.match(apiContext, /purpose \?\? "full_audio"/);
   assert.match(progress, /purpose:\s*"progress"/);
   assert.match(progress, /canWritePracticeProgress/);
