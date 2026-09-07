@@ -33,7 +33,7 @@ export default function CourseLearnerAudioBlock({
   const durationLabel = formatAudioDuration(block.durationSeconds);
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <button
         type="button"
         disabled={!enabled || isLoading}
@@ -44,13 +44,13 @@ export default function CourseLearnerAudioBlock({
           clearErrorMessage();
           void playTrack(block.audioItemId);
         }}
-        className={`flex w-full items-center justify-between gap-3 rounded-[18px] border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+        className={`flex w-full min-w-0 max-w-full items-center justify-between gap-3 rounded-[18px] border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
           isActive
             ? "border-[#cdb6ea] bg-[#f3ebff]"
             : "border-[#f0e6fb] bg-[#fcfaff] hover:border-[#dcc9f2] hover:bg-[#f7f2ff]"
         } ${isLoading ? "opacity-75" : ""}`}
       >
-        <span className="min-w-0 text-[15px] font-medium leading-6 text-[#25135c]">
+        <span className="min-w-0 break-words text-[15px] font-medium leading-6 text-[#25135c]">
           {block.title}
         </span>
         <span className="flex shrink-0 items-center gap-2 text-sm text-[#7d70a2]">

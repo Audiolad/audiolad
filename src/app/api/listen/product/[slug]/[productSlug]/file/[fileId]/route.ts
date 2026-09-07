@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { wantsProtectedFileDocumentOpen } from "@/lib/course-content/learner-file-http";
 import { signLearnerPublicationFile } from "@/lib/course-content/learner-file-sign";
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
@@ -63,6 +64,10 @@ export async function GET(request: Request, context: RouteContext) {
             ? 500
             : 403;
       return NextResponse.json({ error: signed.reason }, { status });
+    }
+
+    if (wantsProtectedFileDocumentOpen(request)) {
+      return NextResponse.redirect(signed.url, 302);
     }
 
     return NextResponse.json({

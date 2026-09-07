@@ -107,7 +107,9 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
         <AuthorRecommendationsSection content={seoContent} className="mt-6" />
 
-        <ProductCopySections description={description} />
+        {presentation.showProductAbout !== false ? (
+          <ProductCopySections description={description} />
+        ) : null}
         <PracticeSeoContentSections
           content={seoContent}
           productKind={viewModel.productKind}

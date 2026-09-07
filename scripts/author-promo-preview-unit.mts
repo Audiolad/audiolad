@@ -672,6 +672,7 @@ function testOrdinaryBuyerPdpKeepsLiveBuy() {
       primaryAction: liveBuy,
       libraryAction: "sign_in",
       showPaymentLegalNote: true,
+      showProductAbout: true,
     },
     false,
   );
