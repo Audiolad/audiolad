@@ -9,10 +9,16 @@ import { mapCatalogProductToListingItem } from "../src/lib/catalog/listing.ts";
 import { CATALOG_GALLERY_MAX_SLIDES } from "../src/lib/catalog/gallery.ts";
 import { buildCoverFirstHeroSlides } from "../src/lib/catalog/product-hero-gallery.ts";
 import {
+  PUBLICATION_GALLERY_LOAD_CHUNK_SIZE,
+  PUBLICATION_GALLERY_POSTGREST_MAX_ROWS,
+  PUBLICATION_GALLERY_TABLE,
   catalogGalleryForPublication,
+  chunkPublicationGalleryIds,
   groupPublicationGalleryRowsByPublicationId,
+  loadPublicationGalleriesByIds,
   mapPublicationGalleryRowsToCatalogSlides,
 } from "../src/lib/catalog/publication-gallery.ts";
+import { mapPracticeRowsToCatalogProducts } from "../src/lib/products/catalog.ts";
 import {
   isProductGalleryClass,
   isProductGalleryEligible,
@@ -73,6 +79,24 @@ function product(overrides = {}) {
 }
 
 assert.equal(CATALOG_GALLERY_MAX_SLIDES, 30);
+assert.equal(PUBLICATION_GALLERY_POSTGREST_MAX_ROWS, 1000);
+assert.equal(
+  PUBLICATION_GALLERY_LOAD_CHUNK_SIZE,
+  30,
+  "chunk size stays ~30 publications so limit stays under PostgREST max-rows",
+);
+assert.ok(
+  PUBLICATION_GALLERY_LOAD_CHUNK_SIZE * CATALOG_GALLERY_MAX_SLIDES <=
+    PUBLICATION_GALLERY_POSTGREST_MAX_ROWS,
+  "chunk limit must stay at or below PostgREST max-rows",
+);
+assert.deepEqual(
+  chunkPublicationGalleryIds(
+    Array.from({ length: 40 }, (_, index) => `pub-${index}`),
+  ).map((chunk) => chunk.length),
+  [30, 10],
+  "40 ids split into two chunks",
+);
 
 assert.equal(isProductGalleryClass("practice"), true);
 assert.equal(isProductGalleryClass("course"), true);
@@ -342,6 +366,297 @@ assert.deepEqual(
   practiceHeroSlides.map((slide) => slide.id),
   ["cover", "leftover"],
   "existing practice gallery still reaches the public hero",
+);
+
+function createGalleryQuerySupabase(onQuery) {
+  return {
+    from(table) {
+      assert.equal(table, PUBLICATION_GALLERY_TABLE);
+      const state = { ids: [], limit: null, orders: [] };
+      const chain = {
+        select(columns) {
+          state.select = columns;
+          return chain;
+        },
+        in(column, values) {
+          assert.equal(column, "publication_id");
+          state.ids = [...values];
+          return chain;
+        },
+        order(column, options) {
+          state.orders.push({ column, options });
+          return chain;
+        },
+        limit(value) {
+          state.limit = value;
+          return chain;
+        },
+        then(resolve, reject) {
+          return Promise.resolve(onQuery(state)).then(resolve, reject);
+        },
+      };
+      return chain;
+    },
+  };
+}
+
+function slideRow(publicationId, position, id = `${publicationId}-s${position}`) {
+  return {
+    id,
+    publication_id: publicationId,
+    image_url: `/${id}.jpg`,
+    position,
+    alt: id,
+  };
+}
+
+const fortyIds = Array.from({ length: 40 }, (_, index) => `pub-${index + 1}`);
+const loaderQueries = [];
+const chunkedLoader = createGalleryQuerySupabase((state) => {
+  loaderQueries.push({
+    ids: state.ids,
+    limit: state.limit,
+    orders: state.orders,
+    select: state.select,
+  });
+  return {
+    data: state.ids.flatMap((publicationId) => [
+      slideRow(publicationId, 1),
+      slideRow(publicationId, 0),
+    ]),
+    error: null,
+  };
+});
+
+const chunkedGalleries = await loadPublicationGalleriesByIds(
+  chunkedLoader,
+  fortyIds,
+);
+
+assert.equal(loaderQueries.length, 2, "40 ids load as multiple chunks");
+assert.deepEqual(
+  loaderQueries.map((query) => query.ids.length),
+  [30, 10],
+);
+assert.deepEqual(
+  loaderQueries.map((query) => query.limit),
+  [30 * CATALOG_GALLERY_MAX_SLIDES, 10 * CATALOG_GALLERY_MAX_SLIDES],
+  "each chunk limits to chunk.length * MAX_SLIDES",
+);
+assert.ok(
+  loaderQueries.every((query) => query.limit <= PUBLICATION_GALLERY_POSTGREST_MAX_ROWS),
+  "no chunk asks PostgREST for more than max-rows",
+);
+assert.ok(
+  loaderQueries.every(
+    (query) =>
+      query.select === "id, publication_id, image_url, position, alt" &&
+      query.orders[0]?.column === "position" &&
+      query.orders[0]?.options?.ascending === true &&
+      query.orders[1]?.column === "id" &&
+      query.orders[1]?.options?.ascending === true,
+  ),
+  "chunk queries keep the same select/order semantics",
+);
+assert.equal(chunkedGalleries.size, 40);
+assert.deepEqual(
+  chunkedGalleries.get("pub-1")?.map((slide) => slide.id),
+  ["pub-1-s0", "pub-1-s1"],
+  "slide order within a publication is preserved after grouping",
+);
+assert.deepEqual(
+  chunkedGalleries.get("pub-40")?.map((slide) => slide.id),
+  ["pub-40-s0", "pub-40-s1"],
+  "later chunks keep the same per-publication order",
+);
+
+const mixedQueries = [];
+const errors = [];
+const originalError = console.error;
+console.error = (...args) => {
+  errors.push(args);
+};
+try {
+  const partialGalleries = await loadPublicationGalleriesByIds(
+    createGalleryQuerySupabase((state) => {
+      mixedQueries.push(state.ids.slice());
+      if (state.ids.includes("pub-1")) {
+        return { data: null, error: { message: "statement timeout" } };
+      }
+      return {
+        data: state.ids.map((publicationId) => slideRow(publicationId, 0)),
+        error: null,
+      };
+    }),
+    fortyIds,
+  );
+
+  assert.equal(mixedQueries.length, 2, "failed chunk does not stop later chunks");
+  assert.equal(partialGalleries.has("pub-1"), false, "failed chunk ids are omitted");
+  assert.equal(
+    partialGalleries.get("pub-31")?.length,
+    1,
+    "successful chunks keep their galleries",
+  );
+  assert.equal(
+    String(errors[0]?.[0]),
+    "publication_gallery_chunk_load_error",
+  );
+  assert.match(
+    String(errors[0]?.[1]),
+    /chunkSize=30/,
+    "chunk failure log includes chunk size",
+  );
+  assert.match(
+    String(errors[0]?.[1]),
+    /statement timeout/,
+    "chunk failure log includes the error message",
+  );
+} finally {
+  console.error = originalError;
+}
+
+const thrownErrors = [];
+console.error = (...args) => {
+  thrownErrors.push(args);
+};
+try {
+  const thrownGalleries = await loadPublicationGalleriesByIds(
+    createGalleryQuerySupabase((state) => {
+      if (state.ids.includes("pub-1")) {
+        throw new Error("network down");
+      }
+      return {
+        data: state.ids.map((publicationId) => slideRow(publicationId, 0)),
+        error: null,
+      };
+    }),
+    fortyIds,
+  );
+  assert.equal(thrownGalleries.has("pub-1"), false);
+  assert.equal(
+    thrownGalleries.get("pub-31")?.length,
+    1,
+    "a thrown chunk error does not wipe later chunks",
+  );
+  assert.match(String(thrownErrors[0]?.[1]), /chunkSize=30/);
+  assert.match(String(thrownErrors[0]?.[1]), /network down/);
+} finally {
+  console.error = originalError;
+}
+
+function createCatalogListingSupabase(galleryRowsByPublication) {
+  return {
+    from(table) {
+      const state = { ids: [] };
+      const chain = {
+        select() {
+          return chain;
+        },
+        in(column, values) {
+          state.ids = [...values];
+          return chain;
+        },
+        eq() {
+          return chain;
+        },
+        order() {
+          return chain;
+        },
+        limit() {
+          return chain;
+        },
+        then(resolve, reject) {
+          if (table === PUBLICATION_GALLERY_TABLE) {
+            const data = state.ids.flatMap(
+              (publicationId) => galleryRowsByPublication.get(publicationId) ?? [],
+            );
+            return Promise.resolve({ data, error: null }).then(resolve, reject);
+          }
+
+          return Promise.resolve({ data: [], error: null }).then(resolve, reject);
+        },
+      };
+      return chain;
+    },
+  };
+}
+
+const listingPracticeId = "ready-25";
+const listingProducts = await mapPracticeRowsToCatalogProducts(
+  createCatalogListingSupabase(
+    new Map([
+      [
+        listingPracticeId,
+        Array.from({ length: 3 }, (_, position) =>
+          slideRow(listingPracticeId, position),
+        ),
+      ],
+    ]),
+  ),
+  [
+    {
+      id: listingPracticeId,
+      author_id: "author-1",
+      title: "25 готовых решений",
+      slug: "25-gotovyh-resheniy",
+      subtitle: null,
+      description: null,
+      format: "Аудиопрактика",
+      product_kind: "practice",
+      publication_class: "practice",
+      duration_minutes: 12,
+      price: 990,
+      is_free: false,
+      cover_url: "/cover.jpg",
+      status: "published",
+      is_catalog_listed: true,
+      published_at: "2026-08-01T00:00:00.000Z",
+      created_at: "2026-08-01T00:00:00.000Z",
+      authors: { name: "Анна", slug: "anna" },
+    },
+    {
+      id: "empty-gallery-pub",
+      author_id: "author-1",
+      title: "Без галереи",
+      slug: "bez-galerei",
+      subtitle: null,
+      description: null,
+      format: "Аудиопрактика",
+      product_kind: "practice",
+      publication_class: "practice",
+      duration_minutes: 8,
+      price: 490,
+      is_free: false,
+      cover_url: "/cover-2.jpg",
+      status: "published",
+      is_catalog_listed: true,
+      published_at: "2026-07-01T00:00:00.000Z",
+      created_at: "2026-07-01T00:00:00.000Z",
+      authors: { name: "Анна", slug: "anna" },
+    },
+  ],
+);
+
+const listingWithGallery = listingProducts.find(
+  (item) => item.id === listingPracticeId,
+);
+const listingWithoutGallery = listingProducts.find(
+  (item) => item.id === "empty-gallery-pub",
+);
+assert.equal(listingWithGallery?.gallery?.length, 3, "default listing keeps gallery where rows exist");
+assert.deepEqual(listingWithoutGallery?.gallery, [], "missing gallery rows stay []");
+
+const listingCard = mapCatalogProductToListingItem(listingWithGallery);
+assert.deepEqual(
+  listingCard.gallery.map((slide) => slide.id),
+  ["ready-25-s0", "ready-25-s1", "ready-25-s2"],
+  "listing without q attaches non-empty gallery to the card DTO",
+);
+assert.deepEqual(
+  mapCatalogProductToListingItem(listingWithoutGallery).gallery,
+  [],
+  "listing without q keeps empty gallery when no rows exist",
 );
 
 console.log("publication-gallery-unit: ok");
