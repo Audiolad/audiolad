@@ -257,7 +257,10 @@ nginx / symlink cutover, не пишет в БД и Storage, не создаёт
 `studio_asset_sources`, наличие Storage object через list/info (без
 signed URL), и original/source project через колонки
 `duplicated_from` / `parent*` если они есть в схеме, иначе name heuristic
-` — копия` и matching `source_id`.
+` — копия` и matching `source_id`. Если строки `studio_projects` нет или
+запрос вернул ошибку — всё равно читает `studio_project_assets` по
+`project_id`, печатает `project_query_error` (redacted), host Supabase
+(без ключа и без полного URL) и prefix-кандидаты `id ilike 3832ded1%`.
 
 Exact flags:
 

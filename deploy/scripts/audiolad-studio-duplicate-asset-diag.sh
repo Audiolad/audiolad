@@ -3,7 +3,7 @@
 # confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG. Never writes DB/Storage rows,
 # never creates signed URLs, never invokes audiolad-deploy / deploy.sh,
 # never does nginx or current/previous symlink cutover, never prints env
-# file contents, secret values, URLs, or keys.
+# file contents, secret values, full URLs, or keys. Prints supabase host only.
 # Loads shared/.env.production through current-release loadEnvConfig +
 # supabase-js service role, same as recover / disk audit. Do not source
 # .env.production in this shell.
@@ -63,6 +63,7 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 delete process.env.NEXT_PUBLIC_SUPABASE_URL;
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
+  console.log("supabase_url_host=" + supabaseUrlHost(url));
   console.log("DIAG_PROBE=UNAVAILABLE reason=missing_env");
   printFlags({
     brokenProjectId,
@@ -106,6 +107,36 @@ function printFlags(flags) {
   console.log("SOURCE_OBJECTS_INTACT=" + flags.sourceObjectsIntact);
   console.log("ORIGINAL_PROJECT_ID=" + (flags.originalProjectId || ""));
   console.log("ORIGINAL_REFS_READY=" + flags.originalRefsReady);
+}
+
+function supabaseUrlHost(raw) {
+  const text = String(raw || "");
+  try {
+    return new URL(text).host || "";
+  } catch {
+    return text.replace(/^https?:\/\//i, "").split("/")[0].split("?")[0];
+  }
+}
+
+function errorText(err) {
+  if (!err) return "none";
+  const msg = err.message || err.details || err.code || String(err);
+  return field(msg);
+}
+
+function asRows(data) {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") return [data];
+  return [];
+}
+
+async function queryRows(builder) {
+  try {
+    const result = unwrap(await builder);
+    return { rows: asRows(result.data), error: result.error || null };
+  } catch (err) {
+    return { rows: [], error: err };
+  }
 }
 
 function field(value) {
@@ -182,86 +213,85 @@ function scoreOriginalCandidate(project, broken, sourceIds, otherAssets) {
 
 Promise.resolve()
   .then(async () => {
-    const projectResult = unwrap(
-      await service.from("studio_projects").select("*").eq("id", brokenProjectId),
+    console.log("supabase_url_host=" + supabaseUrlHost(url));
+
+    const projectLookup = await queryRows(
+      service
+        .from("studio_projects")
+        .select("id,name,status,deleted_at,created_at,author_id,guest_session_id")
+        .eq("id", brokenProjectId),
     );
-    if (projectResult.error) {
-      console.log("DIAG_PROBE=UNAVAILABLE reason=project_query_error");
-      printFlags({
-        brokenProjectId,
-        assetRowCount: "",
-        uploadStateCounts: "",
-        sourceIdNeIdCount: "",
-        allReserved: "",
-        sourceObjectsIntact: "",
-        originalProjectId: "",
-        originalRefsReady: "",
-      });
-      clearTimeout(timer);
-      process.exit(2);
+    console.log("project_query_error=" + errorText(projectLookup.error));
+    const project = projectLookup.rows[0] || null;
+    if (projectLookup.error && !project) {
+      console.log("project_found=ERROR");
+    } else {
+      console.log("project_found=" + (project ? "YES" : "NO"));
     }
-    const projectRows = Array.isArray(projectResult.data)
-      ? projectResult.data
-      : projectResult.data
-        ? [projectResult.data]
-        : [];
-    const project = projectRows[0] || null;
     if (!project) {
-      console.log("project_found=NO");
-      printFlags({
-        brokenProjectId,
-        assetRowCount: 0,
-        uploadStateCounts: "",
-        sourceIdNeIdCount: 0,
-        allReserved: "NO",
-        sourceObjectsIntact: "NO",
-        originalProjectId: "",
-        originalRefsReady: "NO",
-      });
-      console.log("DIAG_PROBE=OK");
-      clearTimeout(timer);
-      return;
+      const prefix = String(brokenProjectId || "").slice(0, 8);
+      const prefixLookup = await queryRows(
+        service.from("studio_projects").select("id,deleted_at,status").ilike("id", prefix + "%"),
+      );
+      console.log("project_prefix=" + prefix);
+      console.log("project_prefix_query_error=" + errorText(prefixLookup.error));
+      console.log("PROJECT_ID_PREFIX_CANDIDATES=" + prefixLookup.rows.length);
+      for (const row of prefixLookup.rows) {
+        console.log(
+          "PROJECT_CANDIDATE id=" +
+            field(row.id) +
+            " status=" +
+            field(row.status) +
+            " deleted_at=" +
+            deletedLabel(row.deleted_at),
+        );
+      }
     }
 
-    const presentParentKeys = PARENT_KEYS.filter((key) =>
-      Object.prototype.hasOwnProperty.call(project, key),
-    );
-    console.log(
-      "schema_parent_keys=" + (presentParentKeys.length ? presentParentKeys.join(",") : "none"),
-    );
-    console.log(
-      "project_name=" +
-        field(project.name) +
-        " status=" +
-        field(project.status) +
-        " deleted_at=" +
-        deletedLabel(project.deleted_at),
-    );
+    const presentParentKeys = project
+      ? PARENT_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(project, key))
+      : [];
+    if (project) {
+      console.log(
+        "schema_parent_keys=" + (presentParentKeys.length ? presentParentKeys.join(",") : "none"),
+      );
+      console.log(
+        "project_name=" +
+          field(project.name) +
+          " status=" +
+          field(project.status) +
+          " deleted_at=" +
+          deletedLabel(project.deleted_at),
+      );
+    } else {
+      console.log("schema_parent_keys=skipped");
+    }
+    if (project) {
+      const starLookup = await queryRows(
+        service.from("studio_projects").select("*").eq("id", brokenProjectId),
+      );
+      console.log("project_star_query_error=" + errorText(starLookup.error));
+      if (!starLookup.error && starLookup.rows[0]) {
+        Object.assign(project, starLookup.rows[0]);
+      }
+      const presentAfterStar = PARENT_KEYS.filter((key) =>
+        Object.prototype.hasOwnProperty.call(project, key),
+      );
+      if (presentAfterStar.length) {
+        console.log("schema_parent_keys=" + presentAfterStar.join(","));
+      }
+    }
 
-    const assetResult = unwrap(
-      await service
+    const assetLookup = await queryRows(
+      service
         .from("studio_project_assets")
         .select(
           "id,source_id,original_name,upload_state,deleted_at,storage_path,created_at,project_id",
         )
         .eq("project_id", brokenProjectId),
     );
-    if (assetResult.error || !Array.isArray(assetResult.data)) {
-      console.log("DIAG_PROBE=UNAVAILABLE reason=asset_query_error");
-      printFlags({
-        brokenProjectId,
-        assetRowCount: "",
-        uploadStateCounts: "",
-        sourceIdNeIdCount: "",
-        allReserved: "",
-        sourceObjectsIntact: "",
-        originalProjectId: "",
-        originalRefsReady: "",
-      });
-      clearTimeout(timer);
-      process.exit(2);
-    }
-    const assets = assetResult.data;
+    console.log("asset_query_error=" + errorText(assetLookup.error));
+    const assets = assetLookup.rows;
     const sourceIds = [...new Set(assets.map((row) => row.source_id).filter(Boolean))];
 
     let sources = [];
@@ -272,9 +302,12 @@ Promise.resolve()
           .select("id,storage_path,deleted_at")
           .in("id", sourceIds),
       );
+      console.log("source_query_error=" + errorText(sourceResult.error));
       if (!sourceResult.error && Array.isArray(sourceResult.data)) {
         sources = sourceResult.data;
       }
+    } else {
+      console.log("source_query_error=none");
     }
     const sourceById = new Map(sources.map((row) => [row.id, row]));
 
@@ -335,7 +368,7 @@ Promise.resolve()
       }
     }
 
-    const baseName = copyBaseName(project.name);
+    const baseName = copyBaseName(project && project.name);
     let nameMatchId = "";
     if (baseName) {
       const nameResult = unwrap(
@@ -344,8 +377,8 @@ Promise.resolve()
       if (!nameResult.error && Array.isArray(nameResult.data)) {
         const matches = nameResult.data.filter((row) => {
           if (row.id === brokenProjectId) return false;
-          if (project.author_id && row.author_id && row.author_id !== project.author_id) return false;
-          if (project.guest_session_id && row.guest_session_id && row.guest_session_id !== project.guest_session_id) {
+          if (project && project.author_id && row.author_id && row.author_id !== project.author_id) return false;
+          if (project && project.guest_session_id && row.guest_session_id && row.guest_session_id !== project.guest_session_id) {
             return false;
           }
           return true;
@@ -368,7 +401,7 @@ Promise.resolve()
         const ranked = candResult.data
           .map((row) => ({
             row,
-            score: scoreOriginalCandidate(row, project, sourceIds, otherAssets),
+            score: scoreOriginalCandidate(row, project || { id: brokenProjectId }, sourceIds, otherAssets),
           }))
           .sort((a, b) => b.score - a.score || String(a.row.created_at || "").localeCompare(String(b.row.created_at || "")));
         if (ranked[0] && ranked[0].score > 0) sourceMatchId = ranked[0].row.id;
@@ -432,9 +465,10 @@ Promise.resolve()
     console.log("DIAG_PROBE=OK");
     clearTimeout(timer);
   })
-  .catch(() => {
+  .catch((err) => {
     clearTimeout(timer);
     console.log("DIAG_PROBE=UNAVAILABLE reason=error");
+    console.log("probe_error=" + errorText(err));
     printFlags({
       brokenProjectId,
       assetRowCount: "",

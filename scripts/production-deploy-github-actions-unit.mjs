@@ -2078,6 +2078,10 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
     "studio_asset_sources",
     "confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG",
     "no_signed_urls_no_keys_no_storage_urls",
+    "supabase_url_host=",
+    "project_query_error=",
+    "PROJECT_ID_PREFIX_CANDIDATES=",
+    ".ilike(",
   ];
   for (const needle of required) {
     assert.match(
@@ -2210,12 +2214,17 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "const PATH_A = 'studio/author/orig/src-a/voice.wav';",
       "const PATH_B = 'studio/author/orig/src-b/gone.wav';",
       "const scenario = " + JSON.stringify(scenario) + ";",
+      "const PREFIX_HIT = '3832ded1-aaaa-4aaa-8aaa-bbbbbbbbbbbb';",
       "const projects = [",
       "  { id: BROKEN, name: 'Ночной полёт — копия', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-08T12:00:00Z' },",
       "  { id: ORIGINAL, name: 'Ночной полёт', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-01T12:00:00Z' },",
       "];",
       "if (scenario === 'with_parent_column') {",
       "  projects[0].duplicated_from = ORIGINAL;",
+      "}",
+      "if (scenario === 'project_missing' || scenario === 'project_query_error') {",
+      "  projects.splice(0, 1);",
+      "  projects.push({ id: PREFIX_HIT, name: 'prefix-near-miss', status: 'deleted', deleted_at: '2026-09-01T00:00:00Z', author_id: 'author-1', guest_session_id: null, created_at: '2026-08-01T00:00:00Z' });",
       "}",
       "const assets = [",
       "  { id: COPY_A, project_id: BROKEN, source_id: SOURCE_A, original_name: 'voice.wav', upload_state: 'reserved', deleted_at: null, storage_path: PATH_A, created_at: '2026-09-08T12:00:01Z' },",
@@ -2232,6 +2241,10 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "  return rows.filter((row) => filters.every((f) => {",
       "    if (f.op === 'eq') return String(row[f.col]) === String(f.val);",
       "    if (f.op === 'in') return (f.val || []).includes(row[f.col]);",
+      "    if (f.op === 'ilike') {",
+      "      const raw = String(f.val || '').toLowerCase().replace(/%/g, '');",
+      "      return String(row[f.col] || '').toLowerCase().startsWith(raw);",
+      "    }",
       "    return true;",
       "  }));",
       "}",
@@ -2243,7 +2256,12 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "        select() { return api; },",
       "        eq(col, val) { state.filters.push({ op: 'eq', col, val }); return api; },",
       "        in(col, val) { state.filters.push({ op: 'in', col, val }); return api; },",
+      "        ilike(col, val) { state.filters.push({ op: 'ilike', col, val }); return api; },",
       "        then(resolve) {",
+      "          if (scenario === 'project_query_error' && table === 'studio_projects' && state.filters.some((f) => f.op === 'eq' && f.col === 'id')) {",
+      "            resolve({ data: null, error: { message: 'simulated project lookup failed PGRST116' } });",
+      "            return;",
+      "          }",
       "          let rows = [];",
       "          if (table === 'studio_projects') rows = projects;",
       "          if (table === 'studio_project_assets') rows = assets;",
@@ -2361,6 +2379,10 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /ORIGINAL_REF source_id=11111111-1111-4111-8111-111111111111/);
     assert.match(output, /ORIGINAL_PROJECT_VIA=name_heuristic\+matching_sources/);
     assert.match(output, /schema_parent_keys=none/);
+    assert.match(output, /supabase_url_host=dup-asset-diag-test\.example\.invalid/);
+    assert.match(output, /project_found=YES/);
+    assert.match(output, /project_query_error=none/);
+    assert.match(output, /asset_query_error=none/);
     assert.doesNotMatch(output, /createSignedUrl/);
     assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -2385,6 +2407,51 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /ORIGINAL_REFS_READY=YES/);
   } finally {
     rmSync(parentRoot, { recursive: true, force: true });
+  }
+
+  const missingProjectRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-noproject-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(missingProjectRoot, {
+      secretUrl,
+      secretKey,
+      scenario: "project_missing",
+    });
+    const result = runStudioDupAssetDiagHelper(missingProjectRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `missing-project diag failed: ${output}`);
+    assert.match(output, /project_found=NO/);
+    assert.match(output, /project_query_error=none/);
+    assert.match(output, /PROJECT_ID_PREFIX_CANDIDATES=1/);
+    assert.match(output, /PROJECT_CANDIDATE id=3832ded1-aaaa-4aaa-8aaa-bbbbbbbbbbbb/);
+    assert.match(output, /ASSET_ROW_COUNT=2/);
+    assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333/);
+    assert.match(output, /ORIGINAL_PROJECT_VIA=matching_sources/);
+    assert.match(output, /ORIGINAL_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+    assert.match(output, /supabase_url_host=dup-asset-diag-test\.example\.invalid/);
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    rmSync(missingProjectRoot, { recursive: true, force: true });
+  }
+
+  const projectErrorRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-projerr-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(projectErrorRoot, {
+      secretUrl,
+      secretKey,
+      scenario: "project_query_error",
+    });
+    const result = runStudioDupAssetDiagHelper(projectErrorRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `project-query-error diag failed: ${output}`);
+    assert.match(output, /project_found=ERROR/);
+    assert.match(output, /project_query_error=simulated project lookup failed PGRST116/);
+    assert.match(output, /PROJECT_ID_PREFIX_CANDIDATES=1/);
+    assert.match(output, /ASSET_ROW_COUNT=2/);
+    assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333/);
+    assert.doesNotMatch(output, /DIAG_PROBE=UNAVAILABLE reason=project_query_error/);
+  } finally {
+    rmSync(projectErrorRoot, { recursive: true, force: true });
   }
 
   const missingRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-missing-"));
