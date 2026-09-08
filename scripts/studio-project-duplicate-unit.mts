@@ -179,11 +179,19 @@ assert.match(
   readyMigration,
   /GRANT EXECUTE ON FUNCTION public\.duplicate_studio_project\(uuid, uuid, jsonb, jsonb\) TO service_role/,
 );
-assert.doesNotMatch(readyMigration, /UPDATE public\.studio_project_assets/);
+assert.match(readyMigration, /UPDATE public\.studio_project_assets AS ref/);
+assert.match(readyMigration, /project\.status = 'active'/);
+assert.match(readyMigration, /ref\.upload_state = 'reserved'/);
+assert.match(readyMigration, /ref\.source_id IS NOT NULL/);
+assert.match(readyMigration, /ref\.source_id <> ref\.id/);
+assert.match(readyMigration, /source\.deleted_at IS NULL/);
+assert.match(readyMigration, /ref\.deleted_at IS NULL/);
+assert.match(readyMigration, /to_regclass\('storage\.objects'\) IS NULL/);
+assert.match(readyMigration, /obj\.name IN \(source\.storage_path, ref\.storage_path\)/);
 assert.doesNotMatch(readyMigration, /3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+assert.doesNotMatch(readyMigration, /3832ded1-4100-4478-a8d4-7fc6a635f72e/);
 assert.doesNotMatch(readyMigration, /[Cc]onfirmed broken copy/);
-assert.match(readyMigration, /RPC-only/);
-assert.match(readyMigration, /sealed production Storage scan/);
+assert.doesNotMatch(readyDuplicateSql, /UPDATE public\.studio_project_assets/);
 
 assert.match(repository, /remapStudioProjectForDuplicate/);
 assert.match(repository, /duplicate_studio_project/);
@@ -520,6 +528,73 @@ assert.equal(
   "ordinary source_id = id reserved uploads stay hidden and are not duplicate refs",
 );
 assert.equal(inProgressUpload.source_id, inProgressUpload.id);
+
+type RepairCandidate = SimulatedRef & {
+  project_status: "active" | "deleted";
+  source_deleted_at: string | null;
+  storage_exists: boolean;
+};
+
+function systemicRepair(rows: readonly RepairCandidate[], catalogPresent: boolean) {
+  return rows.filter((row) =>
+    row.project_status === "active"
+    && row.deleted_at == null
+    && row.upload_state === "reserved"
+    && row.source_id != null
+    && row.source_id !== row.id
+    && row.source_deleted_at == null
+    && (!catalogPresent || row.storage_exists),
+  );
+}
+
+const reservedShared: RepairCandidate = {
+  id: "77777777-7777-4777-8777-777777777777",
+  project_id: "copy-buggy",
+  source_id: voiceAssetId,
+  storage_path: sourceRefs[0]!.storage_path,
+  deleted_at: null,
+  upload_state: "reserved",
+  duration_seconds: 12,
+  size_bytes: 4_000,
+  project_status: "active",
+  source_deleted_at: null,
+  storage_exists: true,
+};
+const reservedInProgress: RepairCandidate = {
+  ...inProgressUpload,
+  project_status: "active",
+  source_deleted_at: null,
+  storage_exists: false,
+};
+const reservedMissingObject: RepairCandidate = {
+  ...reservedShared,
+  id: "88888888-8888-4888-8888-888888888888",
+  storage_exists: false,
+};
+const reservedDeletedProject: RepairCandidate = {
+  ...reservedShared,
+  id: "99999999-9999-4999-8999-999999999999",
+  project_status: "deleted",
+};
+const repaired = systemicRepair(
+  [reservedShared, reservedInProgress, reservedMissingObject, reservedDeletedProject],
+  true,
+);
+assert.deepEqual(repaired.map((row) => row.id), [reservedShared.id]);
+assert.equal(repaired[0]?.upload_state, "reserved");
+const afterRepair = repaired.map((row) => ({ ...row, upload_state: "ready" as const }));
+assert.ok(afterRepair.every((row) => row.upload_state === "ready"));
+assert.ok(afterRepair.every((row) => row.source_id !== row.id));
+assert.equal(
+  systemicRepair([reservedInProgress], true).length,
+  0,
+  "source_id = id reserved uploads are never repaired",
+);
+assert.equal(
+  systemicRepair([reservedMissingObject], true).length,
+  0,
+  "missing storage object is not flipped when the catalog exists",
+);
 
 const route = await readFile(
   new URL("../src/app/api/studio/projects/[projectId]/duplicate/route.ts", import.meta.url),

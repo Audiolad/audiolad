@@ -88,9 +88,10 @@ source. Replacing audio creates a new source before updating the reference
 (copy-on-write). Additive migration
 `20261002120000_studio_duplicate_project_upload_state_ready.sql` sets
 `upload_state = 'ready'` on newly duplicated shared refs so
-`listStudioAssets` can hydrate them. It does not copy Storage objects
-and does not UPDATE existing reserved rows. Data repair waits for a
-sealed production Storage scan.
+`listStudioAssets` can hydrate them. It also systemically marks live
+shared reserved refs ready when the source is live and, if
+`storage.objects` exists, the physical object is present. It does not
+copy Storage objects and never updates `source_id = id` uploads.
 
 ### Production runbook (do not run automatically)
 
