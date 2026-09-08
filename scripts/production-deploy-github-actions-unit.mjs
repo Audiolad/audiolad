@@ -36,6 +36,10 @@ const diskCleanupPath = join(
   repoRoot,
   "deploy/scripts/audiolad-disk-storage-cleanup.sh",
 );
+const studioDupAssetDiagPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-studio-duplicate-asset-diag.sh",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -157,20 +161,24 @@ function main() {
   assert.ok(jobs.studio_worker_recover, "job studio_worker_recover must exist");
   assert.ok(jobs.disk_storage_audit, "job disk_storage_audit must exist");
   assert.ok(jobs.disk_storage_cleanup, "job disk_storage_cleanup must exist");
+  assert.ok(jobs.studio_duplicate_asset_diag, "job studio_duplicate_asset_diag must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.studio_worker_recover.environment, "production");
   assert.equal(jobs.disk_storage_audit.environment, "production");
   assert.equal(jobs.disk_storage_cleanup.environment, "production");
+  assert.equal(jobs.studio_duplicate_asset_diag.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_audit["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_cleanup["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.studio_duplicate_asset_diag["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_CLEANUP'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_DUPLICATE_ASSET_DIAG'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -234,6 +242,10 @@ function main() {
   assert.ok(
     confirm.options.includes("OPS_DISK_STORAGE_CLEANUP"),
     "confirm options must include OPS_DISK_STORAGE_CLEANUP",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_STUDIO_DUPLICATE_ASSET_DIAG"),
+    "confirm options must include OPS_STUDIO_DUPLICATE_ASSET_DIAG",
   );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
@@ -300,6 +312,9 @@ function main() {
   const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
   const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk/Storage audit via SSH");
   const diskCleanupStepOffset = workflowText.indexOf("name: One-shot allowlist disk/Storage cleanup via SSH");
+  const dupAssetDiagStepOffset = workflowText.indexOf(
+    "name: Read-only Studio duplicate asset diagnostic via SSH",
+  );
   assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
   assert.ok(
     workflowAncestorOffset > resolveStepOffset,
@@ -321,6 +336,10 @@ function main() {
     diskCleanupStepOffset > workflowAncestorOffset,
     "workflow must verify origin/main ancestry before SSH disk/Storage cleanup",
   );
+  assert.ok(
+    dupAssetDiagStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH Studio duplicate asset diagnostic",
+  );
 
   assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
   assertRemoteDiagnoseScriptSyntax(workflowText);
@@ -334,6 +353,9 @@ function main() {
   assertDiskStorageCleanup(workflowText, docsText);
   assertRemoteDiskCleanupScriptSyntax(workflowText);
   assertDiskCleanupHelper(workflowText);
+  assertStudioDuplicateAssetDiag(workflowText, docsText);
+  assertRemoteStudioDupAssetDiagScriptSyntax(workflowText);
+  assertStudioDupAssetDiagHelper(workflowText);
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -655,6 +677,8 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
   );
   assert.doesNotMatch(diagnoseJob, /pm2 delete/, "diagnose job must stay read-only");
   assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_WORKER_RECOVER/);
+  assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(docsText, /OPS_STUDIO_WORKER_RECOVER/);
   assert.match(docsText, /audiolad-studio-render-worker-recover\.sh/);
   assert.doesNotMatch(recoverJob, /pm2 flush/, "recover must not flush PM2 logs");
@@ -1045,8 +1069,10 @@ function assertDiskStorageAudit(workflowText, docsText) {
   const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  const dupDiagStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
   assert.ok(auditStart >= 0 && deployStart > auditStart, "audit job must precede deploy job");
   assert.ok(cleanupStart > auditStart && deployStart > cleanupStart, "cleanup job must sit between audit and deploy");
+  assert.ok(dupDiagStart > cleanupStart && deployStart > dupDiagStart, "dup-asset diag job must sit between cleanup and deploy");
   const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
@@ -1091,6 +1117,7 @@ function assertDiskStorageAudit(workflowText, docsText) {
   assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
   assert.match(docsText, /audiolad-disk-storage-audit\.sh/);
 }
@@ -1391,8 +1418,10 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  const dupDiagStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
   assert.ok(cleanupStart >= 0 && deployStart > cleanupStart, "cleanup job must precede deploy job");
-  const cleanupJob = workflowText.slice(cleanupStart, deployStart);
+  assert.ok(dupDiagStart > cleanupStart && deployStart > dupDiagStart, "dup-asset diag job must sit between cleanup and deploy");
+  const cleanupJob = workflowText.slice(cleanupStart, dupDiagStart);
   const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
@@ -1430,6 +1459,11 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(cleanupJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(deployJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(docsText, /OPS_DISK_STORAGE_CLEANUP/);
   assert.match(docsText, /audiolad-disk-storage-cleanup\.sh/);
   assert.match(docsText, /34113627251/);
@@ -2009,6 +2043,381 @@ function assertDiskCleanupHelper(workflowText) {
     assert.ok(state.removedStorage.length >= 1, "assets must still be deleted when release rm is denied");
   } finally {
     rmSync(deniedRoot, { recursive: true, force: true });
+  }
+}
+
+function extractRemoteStudioDupAssetDiagScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE_STUDIO_DUP_ASSET_DIAG'\n");
+  const end = workflowText.indexOf("\n          REMOTE_STUDIO_DUP_ASSET_DIAG\n", start);
+  assert.ok(start >= 0 && end > start, "dup-asset diag job must contain a REMOTE_STUDIO_DUP_ASSET_DIAG heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE_STUDIO_DUP_ASSET_DIAG'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertStudioDuplicateAssetDiag(workflowText, docsText) {
+  const required = [
+    "OPS_STUDIO_DUPLICATE_ASSET_DIAG",
+    "STUDIO_DUPLICATE_ASSET_DIAG",
+    "3832ded1-4100-447e-a8d4-7fc6a635f72e",
+    "BROKEN_PROJECT_ID=",
+    "ASSET_ROW_COUNT=",
+    "UPLOAD_STATE_COUNTS=",
+    "SOURCE_ID_NE_ID_COUNT=",
+    "ALL_RESERVED=",
+    "SOURCE_OBJECTS_INTACT=",
+    "ORIGINAL_PROJECT_ID=",
+    "ORIGINAL_REFS_READY=",
+    "loadEnvConfig(dir, false, silent, true)",
+    "CUTOVER=NO",
+    "audiolad_deploy=NOT_INVOKED",
+    "MODE = read_only_duplicate_asset_diag",
+    "studio-draft-assets",
+    "studio_asset_sources",
+    "confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG",
+    "no_signed_urls_no_keys_no_storage_urls",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `dup-asset diag workflow must contain ${needle}`,
+    );
+  }
+
+  const dupStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
+  const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
+  const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  assert.ok(dupStart >= 0 && deployStart > dupStart, "dup-asset diag job must precede deploy job");
+  const dupJob = workflowText.slice(dupStart, deployStart);
+  const cleanupJob = workflowText.slice(cleanupStart, dupStart);
+  const auditJob = workflowText.slice(auditStart, cleanupStart);
+  const recoverJob = workflowText.slice(recoverStart, auditStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    recoverStart,
+  );
+  const deployJob = workflowText.slice(deployStart);
+  assert.doesNotMatch(
+    dupJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "dup-asset diag job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(dupJob, /pm2 delete/, "dup-asset diag job must stay read-only");
+  assert.doesNotMatch(dupJob, /pm2 start/, "dup-asset diag job must not start PM2 apps");
+  assert.doesNotMatch(dupJob, /pm2 (restart|flush|save)/, "dup-asset diag job must not mutate PM2");
+  assert.doesNotMatch(dupJob, /\bnginx\s+-s\b/, "dup-asset diag must not signal nginx");
+  const dupCode = dupJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(dupCode, /\bdeploy\.sh\b/, "dup-asset diag job must not call deploy.sh");
+  const remote = extractRemoteStudioDupAssetDiagScript(workflowText);
+  const remoteCode = remote
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(remoteCode, /\brm -rf\b/, "dup-asset diag remote must not rm -rf production paths");
+  assert.doesNotMatch(remoteCode, /DELETE FROM/i, "dup-asset diag must not DELETE SQL");
+  assert.doesNotMatch(remoteCode, /UPDATE /i, "dup-asset diag must not UPDATE SQL");
+  assert.doesNotMatch(remoteCode, /INSERT INTO/i, "dup-asset diag must not INSERT SQL");
+  assert.doesNotMatch(remoteCode, /\.remove\(/, "dup-asset diag must not remove storage objects");
+  assert.doesNotMatch(remoteCode, /\.update\(/, "dup-asset diag must not update rows");
+  assert.doesNotMatch(remoteCode, /\.insert\(/, "dup-asset diag must not insert rows");
+  assert.doesNotMatch(remoteCode, /\.delete\(/, "dup-asset diag must not delete rows");
+  assert.doesNotMatch(remote, /createSignedUrl/, "dup-asset diag must not create signed URLs");
+  assert.doesNotMatch(remote, /createSignedUploadUrl/, "dup-asset diag must not create signed upload URLs");
+  assert.doesNotMatch(
+    dupCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "dup-asset diag job must not source env files",
+  );
+  assert.doesNotMatch(
+    dupJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "dup-asset diag job must not cat env files",
+  );
+  assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(cleanupJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(deployJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.match(docsText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.match(docsText, /audiolad-studio-duplicate-asset-diag\.sh/);
+}
+
+function assertRemoteStudioDupAssetDiagScriptSyntax(workflowText) {
+  const remote = extractRemoteStudioDupAssetDiagScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-studio-dup-asset-diag-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote studio dup-asset diag bash -n failed: ${syntax.stderr}`);
+}
+
+function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario = "copy_reserved" }) {
+  const releaseCurrent = "20260908-120000-dddddddddddddddddddddddddddddddddddddddd";
+  const currentDir = join(root, "deploy", "releases", releaseCurrent);
+  const sharedDir = join(root, "deploy", "shared");
+  mkdirSync(join(currentDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(join(currentDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  writeFileSync(join(currentDir, ".deploy-commit"), "d".repeat(40) + "\n");
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  symlinkSync(join(sharedDir, ".env.production"), join(currentDir, ".env.production"));
+  symlinkSync(currentDir, join(root, "deploy", "current"));
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "package.json"),
+    JSON.stringify({ name: "@supabase/supabase-js", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "index.js"),
+    [
+      "const BROKEN = '3832ded1-4100-447e-a8d4-7fc6a635f72e';",
+      "const ORIGINAL = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';",
+      "const SOURCE_A = '11111111-1111-4111-8111-111111111111';",
+      "const SOURCE_B = '22222222-2222-4222-8222-222222222222';",
+      "const COPY_A = '33333333-3333-4333-8333-333333333333';",
+      "const COPY_B = '44444444-4444-4444-8444-444444444444';",
+      "const PATH_A = 'studio/author/orig/src-a/voice.wav';",
+      "const PATH_B = 'studio/author/orig/src-b/gone.wav';",
+      "const scenario = " + JSON.stringify(scenario) + ";",
+      "const projects = [",
+      "  { id: BROKEN, name: 'Ночной полёт — копия', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-08T12:00:00Z' },",
+      "  { id: ORIGINAL, name: 'Ночной полёт', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-01T12:00:00Z' },",
+      "];",
+      "if (scenario === 'with_parent_column') {",
+      "  projects[0].duplicated_from = ORIGINAL;",
+      "}",
+      "const assets = [",
+      "  { id: COPY_A, project_id: BROKEN, source_id: SOURCE_A, original_name: 'voice.wav', upload_state: 'reserved', deleted_at: null, storage_path: PATH_A, created_at: '2026-09-08T12:00:01Z' },",
+      "  { id: COPY_B, project_id: BROKEN, source_id: SOURCE_B, original_name: 'deleted-take.wav', upload_state: 'reserved', deleted_at: '2026-09-08T13:00:00Z', storage_path: PATH_B, created_at: '2026-09-08T12:00:02Z' },",
+      "  { id: SOURCE_A, project_id: ORIGINAL, source_id: SOURCE_A, original_name: 'voice.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_A, created_at: '2026-09-01T12:00:01Z' },",
+      "  { id: SOURCE_B, project_id: ORIGINAL, source_id: SOURCE_B, original_name: 'deleted-take.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_B, created_at: '2026-09-01T12:00:02Z' },",
+      "];",
+      "const sources = [",
+      "  { id: SOURCE_A, storage_path: PATH_A, deleted_at: null },",
+      "  { id: SOURCE_B, storage_path: PATH_B, deleted_at: null },",
+      "];",
+      "const storageNames = scenario === 'missing_object' ? ['voice.wav'] : ['voice.wav', 'gone.wav'];",
+      "function applyFilters(rows, filters) {",
+      "  return rows.filter((row) => filters.every((f) => {",
+      "    if (f.op === 'eq') return String(row[f.col]) === String(f.val);",
+      "    if (f.op === 'in') return (f.val || []).includes(row[f.col]);",
+      "    return true;",
+      "  }));",
+      "}",
+      "function createClient() {",
+      "  return {",
+      "    from(table) {",
+      "      const state = { table, filters: [] };",
+      "      const api = {",
+      "        select() { return api; },",
+      "        eq(col, val) { state.filters.push({ op: 'eq', col, val }); return api; },",
+      "        in(col, val) { state.filters.push({ op: 'in', col, val }); return api; },",
+      "        then(resolve) {",
+      "          let rows = [];",
+      "          if (table === 'studio_projects') rows = projects;",
+      "          if (table === 'studio_project_assets') rows = assets;",
+      "          if (table === 'studio_asset_sources') rows = sources;",
+      "          resolve({ data: applyFilters(rows, state.filters), error: null });",
+      "        },",
+      "      };",
+      "      return api;",
+      "    },",
+      "    storage: {",
+      "      from(bucket) {",
+      "        if (bucket !== 'studio-draft-assets') {",
+      "          return {",
+      "            list() { return Promise.resolve({ data: [], error: null }); },",
+      "            info() { return Promise.resolve({ data: null, error: { message: 'missing' } }); },",
+      "            createSignedUrl() { throw new Error('createSignedUrl must not be called'); },",
+      "          };",
+      "        }",
+      "        return {",
+      "          list(_prefix, opts) {",
+      "            const search = String((opts && opts.search) || '');",
+      "            const data = storageNames.filter((name) => name === search).map((name) => ({ name, metadata: { size: 12 } }));",
+      "            return Promise.resolve({ data, error: null });",
+      "          },",
+      "          info(path) {",
+      "            const name = String(path || '').split('/').pop();",
+      "            if (storageNames.includes(name)) return Promise.resolve({ data: { name }, error: null });",
+      "            return Promise.resolve({ data: null, error: { message: 'not_found' } });",
+      "          },",
+      "          createSignedUrl() { throw new Error('createSignedUrl must not be called'); },",
+      "        };",
+      "      },",
+      "    },",
+      "  };",
+      "}",
+      "module.exports = { createClient };",
+      "",
+    ].join("\n"),
+  );
+  return {
+    deployRoot: join(root, "deploy"),
+    releaseCurrent,
+  };
+}
+
+function runStudioDupAssetDiagHelper(root, fixture) {
+  return spawnSync("bash", [studioDupAssetDiagPath], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: fixture.deployRoot,
+    },
+  });
+}
+
+function runStudioDupAssetDiagViaStdin(scriptText, fixture) {
+  return spawnSync("bash", ["-s", "a".repeat(40), "b".repeat(40)], {
+    encoding: "utf8",
+    timeout: 20000,
+    input: scriptText,
+    env: {
+      ...process.env,
+      DEPLOY_ROOT: fixture.deployRoot,
+    },
+  });
+}
+
+function assertStudioDupAssetDiagHelper(workflowText) {
+  const helperText = readFileSync(studioDupAssetDiagPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", studioDupAssetDiagPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `studio dup-asset diag helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.match(helperText, /3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+  assert.match(helperText, /BROKEN_PROJECT_ID=/);
+  assert.match(helperText, /ORIGINAL_REFS_READY=/);
+  assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.doesNotMatch(helperText, /createSignedUrl/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 delete/);
+  assert.doesNotMatch(helperText, /DELETE FROM/i);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
+  assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  chmodSync(studioDupAssetDiagPath, 0o755);
+
+  const secretUrl = "https://dup-asset-diag-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+  const root = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey });
+    const result = runStudioDupAssetDiagHelper(root, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `studio dup-asset diag helper failed: ${output}`);
+    assert.match(output, /confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+    assert.match(output, /CUTOVER = NO/);
+    assert.match(output, /audiolad_deploy = NOT_INVOKED/);
+    assert.match(output, /MODE = read_only_duplicate_asset_diag/);
+    assert.match(output, /BROKEN_PROJECT_ID=3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+    assert.match(output, /ASSET_ROW_COUNT=2/);
+    assert.match(output, /UPLOAD_STATE_COUNTS=reserved:2/);
+    assert.match(output, /SOURCE_ID_NE_ID_COUNT=2/);
+    assert.match(output, /ALL_RESERVED=YES/);
+    assert.match(output, /SOURCE_OBJECTS_INTACT=YES/);
+    assert.match(output, /ORIGINAL_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+    assert.match(output, /ORIGINAL_REFS_READY=YES/);
+    assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333/);
+    assert.match(output, /deleted_at=set/);
+    assert.match(output, /deleted_at=null/);
+    assert.match(output, /source_exists=true/);
+    assert.match(output, /storage_object_exists=true/);
+    assert.match(output, /ORIGINAL_REF source_id=11111111-1111-4111-8111-111111111111/);
+    assert.match(output, /ORIGINAL_PROJECT_VIA=name_heuristic\+matching_sources/);
+    assert.match(output, /schema_parent_keys=none/);
+    assert.doesNotMatch(output, /createSignedUrl/);
+    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(output, /signedUrl/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  const parentRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-parent-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(parentRoot, {
+      secretUrl,
+      secretKey,
+      scenario: "with_parent_column",
+    });
+    const result = runStudioDupAssetDiagHelper(parentRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `parent-column diag failed: ${output}`);
+    assert.match(output, /schema_parent_keys=duplicated_from/);
+    assert.match(output, /ORIGINAL_PROJECT_VIA=column:duplicated_from/);
+    assert.match(output, /ORIGINAL_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+    assert.match(output, /ORIGINAL_REFS_READY=YES/);
+  } finally {
+    rmSync(parentRoot, { recursive: true, force: true });
+  }
+
+  const missingRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-missing-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(missingRoot, {
+      secretUrl,
+      secretKey,
+      scenario: "missing_object",
+    });
+    const result = runStudioDupAssetDiagHelper(missingRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `missing-object diag failed: ${output}`);
+    assert.match(output, /storage_object_exists=false/);
+    assert.match(output, /SOURCE_OBJECTS_INTACT=NO/);
+    assert.match(output, /ALL_RESERVED=YES/);
+  } finally {
+    rmSync(missingRoot, { recursive: true, force: true });
+  }
+
+  const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-remote-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(remoteRoot, { secretUrl, secretKey });
+    const remote = extractRemoteStudioDupAssetDiagScript(workflowText);
+    const remoteResult = runStudioDupAssetDiagViaStdin(remote, fixture);
+    const remoteOutput = `${remoteResult.stdout ?? ""}${remoteResult.stderr ?? ""}`;
+    assert.equal(remoteResult.status, 0, `workflow bash -s dup-asset diag failed: ${remoteOutput}`);
+    assert.match(remoteOutput, /confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+    assert.match(remoteOutput, /ORIGINAL_REFS_READY=YES/);
+    assert.match(remoteOutput, /BROKEN_PROJECT_ID=3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+    assert.doesNotMatch(remoteOutput, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(remoteOutput, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    rmSync(remoteRoot, { recursive: true, force: true });
   }
 }
 
