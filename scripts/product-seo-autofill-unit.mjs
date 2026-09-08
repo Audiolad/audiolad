@@ -13,6 +13,7 @@ import {
   PRODUCT_SEO_AI_ERROR_MESSAGE,
   PRODUCT_SEO_AI_ERROR_MESSAGES,
   authorFacingProductSeoAiErrorMessage,
+  productSeoAiError,
   productSeoAiInvalidOutputError,
 } from "../src/lib/seo/product-autofill/errors.ts";
 import {
@@ -34,7 +35,10 @@ import {
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
-import { evaluateListenOnlineFaqIntent } from "../src/lib/seo/listen-online-faq-intent.ts";
+import {
+  evaluateListenOnlineFaqIntent,
+  LITERAL_PRODUCT_TITLE_PLACEHOLDER,
+} from "../src/lib/seo/listen-online-faq-intent.ts";
 import {
   countExactNormalizedSeoPhrase,
   evaluatePrimaryQueryOveruse,
@@ -4976,6 +4980,27 @@ await withEnvAsync(yandexEnv(), async () => {
   assert.equal(qualityAfterSafe.calls[1].kind, "safeGenerate");
 }
 
+function providerCodeResult(code) {
+  return productSeoAiError(code);
+}
+
+async function generateYandexFromHandlers(handlers, userId, requestOverride = {}) {
+  const fetchImpl = mockFetch(handlers);
+  const yandexProvider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const captured = await withCapturedInfo(() =>
+    generateProductSeoDraft(requestInput(requestOverride), {
+      userId,
+      provider: yandexProvider,
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    }),
+  );
+  return { ...captured, fetchImpl };
+}
+
 {
   const localFallback = buildProductSeoContentFilterFallback({
     title: PRAYER_TITLE,
@@ -5008,6 +5033,306 @@ await withEnvAsync(yandexEnv(), async () => {
   );
 }
 
+{
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    providerCodeResult("RATE_LIMITED"),
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest(), {
+        userId: "content-filter-call2-rate-limited",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.equal(captured.result.error.code, "RATE_LIMITED");
+  assert.equal(provider.calls.length, 2);
+  assert.deepEqual(
+    provider.calls.map((call) => call.kind),
+    ["generate", "safeGenerate"],
+  );
+  assert.doesNotMatch(captured.text, /product_seo_ai_content_filter_fallback/);
+}
+
+{
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    providerCodeResult("TIMEOUT"),
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest(), {
+        userId: "content-filter-call2-timeout",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.equal(captured.result.error.code, "TIMEOUT");
+  assert.equal(provider.calls.length, 2);
+  assert.doesNotMatch(captured.text, /product_seo_ai_content_filter_fallback/);
+}
+
+{
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    providerCodeResult("PROVIDER_ERROR"),
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest(), {
+        userId: "content-filter-call2-provider-error",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.equal(captured.result.error.code, "PROVIDER_ERROR");
+  assert.equal(provider.calls.length, 2);
+  assert.doesNotMatch(captured.text, /product_seo_ai_content_filter_fallback/);
+}
+
+{
+  const invalidOutput = productSeoAiInvalidOutputError({ stage: "provider_generate" });
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    invalidOutput,
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest(), {
+        userId: "content-filter-call2-invalid-output",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, false);
+  assert.equal(captured.result.error.code, "INVALID_OUTPUT");
+  assert.notEqual(captured.result.error.code, "CONTENT_FILTERED");
+  assert.deepEqual(captured.result.error.diagnostic, { stage: "provider_generate" });
+  assert.equal(provider.calls.length, 2);
+  assert.doesNotMatch(captured.text, /product_seo_ai_content_filter_fallback/);
+}
+
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl, text } = await generateYandexFromHandlers(
+    [
+      () => jsonResponse(200, yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS)),
+      () => jsonResponse(429, { error: "RATE_LIMITED" }),
+    ],
+    "yandex-call2-429",
+    prayerRequest(),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "RATE_LIMITED");
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.doesNotMatch(text, /product_seo_ai_content_filter_fallback/);
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl, text } = await generateYandexFromHandlers(
+    [
+      () => jsonResponse(200, yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS)),
+      abortErrorFetch(),
+    ],
+    "yandex-call2-timeout",
+    prayerRequest(),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "TIMEOUT");
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.doesNotMatch(text, /product_seo_ai_content_filter_fallback/);
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl, text } = await generateYandexFromHandlers(
+    [
+      () => jsonResponse(200, yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS)),
+      () => jsonResponse(503, { error: "unavailable" }),
+    ],
+    "yandex-call2-5xx",
+    prayerRequest(),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_ERROR");
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.doesNotMatch(text, /product_seo_ai_content_filter_fallback/);
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl, text } = await generateYandexFromHandlers(
+    [
+      () => jsonResponse(200, yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS)),
+      () => jsonResponse(200, yandexCompletion("это почти JSON, но не JSON")),
+    ],
+    "yandex-call2-malformed-not-content-filter",
+    prayerRequest(),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_OUTPUT");
+  assert.notEqual(result.error.code, "CONTENT_FILTERED");
+  assert.deepEqual(result.error.diagnostic, { stage: "provider_generate" });
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.doesNotMatch(text, /product_seo_ai_content_filter_fallback/);
+});
+
+await withEnvAsync(yandexEnv(), async () => {
+  const yandexProvider = createProductSeoAiProvider({
+    fetchImpl: mockFetch([
+      () => jsonResponse(200, yandexCompletion("{}", "ALTERNATIVE_STATUS_TRUNCATED_FINAL")),
+    ]),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const truncated = await yandexProvider.generate({ request: requestInput() });
+  assert.equal(truncated.ok, false);
+  assert.equal(truncated.error.code, "INVALID_OUTPUT");
+  assert.notEqual(truncated.error.code, "CONTENT_FILTERED");
+
+  const malformedProvider = createProductSeoAiProvider({
+    fetchImpl: mockFetch([
+      () => jsonResponse(200, yandexCompletion("это почти JSON, но не JSON")),
+    ]),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const malformed = await malformedProvider.generate({ request: requestInput() });
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.error.code, "INVALID_OUTPUT");
+  assert.notEqual(malformed.error.code, "CONTENT_FILTERED");
+
+  const rateProvider = createProductSeoAiProvider({
+    fetchImpl: mockFetch([() => jsonResponse(429, { error: "RATE_LIMITED" })]),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const rateLimited = await rateProvider.generate({ request: requestInput() });
+  assert.equal(rateLimited.error.code, "RATE_LIMITED");
+  assert.notEqual(rateLimited.error.code, "CONTENT_FILTERED");
+
+  const timeoutProvider = createProductSeoAiProvider({
+    fetchImpl: abortErrorFetch(),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const timeout = await timeoutProvider.generate({ request: requestInput() });
+  assert.equal(timeout.error.code, "TIMEOUT");
+  assert.notEqual(timeout.error.code, "CONTENT_FILTERED");
+
+  const serverProvider = createProductSeoAiProvider({
+    fetchImpl: mockFetch([() => jsonResponse(503, { error: "unavailable" })]),
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const serverError = await serverProvider.generate({ request: requestInput() });
+  assert.equal(serverError.error.code, "PROVIDER_ERROR");
+  assert.notEqual(serverError.error.code, "CONTENT_FILTERED");
+});
+
+{
+  const blankPrimary = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(
+      requestInput({
+        title: "Вечерняя практика",
+        seoPrimaryQuery: "",
+        seoSecondaryQueries: [],
+      }),
+      {
+        userId: "content-filter-blank-primary",
+        provider: mockProvider([
+          contentFilteredResult("generate"),
+          contentFilteredResult("safe_generate"),
+        ]),
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      },
+    ),
+  );
+  assert.equal(blankPrimary.ok, true);
+  assert.equal(containsSeoPhrase(blankPrimary.data.seoTitle, "Вечерняя практика"), true);
+  assert.doesNotMatch(blankPrimary.data.seoTitle, /название продукта/i);
+  const blankPrimaryText = [
+    blankPrimary.data.seoTitle,
+    blankPrimary.data.seoDescription,
+    ...blankPrimary.data.faqItems.map((item) => `${item.question} ${item.answer}`),
+  ].join("\n");
+  assert.doesNotMatch(blankPrimaryText, new RegExp(LITERAL_PRODUCT_TITLE_PLACEHOLDER, "i"));
+}
+
+{
+  const blankTitle = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(
+      requestInput({
+        title: "",
+        seoPrimaryQuery: "медитация для сна",
+        seoSecondaryQueries: [],
+      }),
+      {
+        userId: "content-filter-blank-title",
+        provider: mockProvider([
+          contentFilteredResult("generate"),
+          contentFilteredResult("safe_generate"),
+        ]),
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      },
+    ),
+  );
+  assert.equal(blankTitle.ok, true);
+  assert.equal(containsSeoPhrase(blankTitle.data.seoTitle, "медитация для сна"), true);
+  assert.match(blankTitle.data.faqItems[2].question, /этот материал|эта аудиопрактика/);
+  assert.doesNotMatch(blankTitle.data.faqItems[2].question, /«медитация для сна»/);
+  const blankTitleText = [
+    blankTitle.data.seoTitle,
+    blankTitle.data.seoDescription,
+    ...blankTitle.data.faqItems.map((item) => `${item.question} ${item.answer}`),
+  ].join("\n");
+  assert.doesNotMatch(blankTitleText, new RegExp(LITERAL_PRODUCT_TITLE_PLACEHOLDER, "i"));
+  assert.equal(
+    evaluateListenOnlineFaqIntent({
+      productTitle: "",
+      accessMode: "unknown",
+      faqItems: blankTitle.data.faqItems,
+      primaryQuery: "медитация для сна",
+    }).q3HasLiteralTitlePlaceholder,
+    false,
+  );
+}
+
+{
+  const bothBlank = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(
+      requestInput({
+        title: "",
+        seoPrimaryQuery: "",
+        seoSecondaryQueries: [],
+      }),
+      {
+        userId: "content-filter-blank-title-and-primary",
+        provider: mockProvider([
+          contentFilteredResult("generate"),
+          contentFilteredResult("safe_generate"),
+        ]),
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      },
+    ),
+  );
+  assert.equal(bothBlank.ok, true);
+  const bothBlankText = [
+    bothBlank.data.seoTitle,
+    bothBlank.data.seoDescription,
+    ...bothBlank.data.faqItems.map((item) => `${item.question} ${item.answer}`),
+  ].join("\n");
+  assert.doesNotMatch(bothBlankText, new RegExp(LITERAL_PRODUCT_TITLE_PLACEHOLDER, "i"));
+  assert.match(bothBlank.data.seoTitle, /аудиозапись|аудиопрактика|АудиоЛад/i);
+  assert.match(bothBlank.data.faqItems[2].question, /этот материал|эта аудиопрактика/);
+}
+
 const fallbackSource = read("src/lib/seo/product-autofill/content-filter-fallback.ts");
 const promptSource = read("src/lib/seo/product-autofill/prompt.ts");
 const yandexSource = read("src/lib/seo/product-autofill/yandex-provider.ts");
@@ -5022,6 +5347,8 @@ assert.match(orchestrate, /product_seo_ai_content_filtered/);
 assert.match(orchestrate, /product_seo_ai_content_filter_retry/);
 assert.match(orchestrate, /product_seo_ai_content_filter_fallback/);
 assert.match(orchestrate, /safeGenerate/);
+assert.match(orchestrate, /if \(!isContentFilteredResult\(retried\)\)/);
+assert.match(orchestrate, /return retried;/);
 assert.match(orchestrate, /MAX_PROVIDER_CALLS = 3/);
 assert.match(promptSource, /buildProductSeoSafeGrounding/);
 assert.doesNotMatch(buildProductSeoSafeUserPrompt({ request: prayerRequest() }), /О продукте/);
