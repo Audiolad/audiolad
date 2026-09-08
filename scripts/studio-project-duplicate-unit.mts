@@ -31,7 +31,6 @@ const LONGFORM_MIGRATION =
   "../supabase/migrations/20260928120000_studio_longform_asset_limits.sql";
 const READY_DUPLICATE_MIGRATION =
   "../supabase/migrations/20261002120000_studio_duplicate_project_upload_state_ready.sql";
-const BROKEN_COPY_ID = "3832ded1-4100-447e-a8d4-7fc6a635f72e";
 
 const voiceAssetId = "11111111-1111-4111-8111-111111111111";
 const musicAAssetId = "22222222-2222-4222-8222-222222222222";
@@ -180,18 +179,11 @@ assert.match(
   readyMigration,
   /GRANT EXECUTE ON FUNCTION public\.duplicate_studio_project\(uuid, uuid, jsonb, jsonb\) TO service_role/,
 );
-
-assert.match(readyMigration, new RegExp(BROKEN_COPY_ID.replaceAll("-", "\\-")));
-assert.match(readyMigration, /ref\.upload_state = 'reserved'/);
-assert.match(readyMigration, /ref\.source_id IS NOT NULL/);
-assert.match(readyMigration, /ref\.source_id <> ref\.id/);
-assert.match(readyMigration, /source\.deleted_at IS NULL/);
-assert.match(readyMigration, /ref\.deleted_at IS NULL/);
-assert.match(readyMigration, /to_regclass\('storage\.objects'\) IS NULL/);
-assert.match(readyMigration, /obj\.bucket_id = 'studio-draft-assets'/);
-assert.match(readyMigration, /obj\.name = source\.storage_path/);
-assert.match(readyMigration, /upload_state = 'ready'/);
-assert.match(readyMigration, /upload_state_changed_at = now\(\)/);
+assert.doesNotMatch(readyMigration, /UPDATE public\.studio_project_assets/);
+assert.doesNotMatch(readyMigration, /3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+assert.doesNotMatch(readyMigration, /[Cc]onfirmed broken copy/);
+assert.match(readyMigration, /RPC-only/);
+assert.match(readyMigration, /sealed production Storage scan/);
 
 assert.match(repository, /remapStudioProjectForDuplicate/);
 assert.match(repository, /duplicate_studio_project/);
@@ -512,52 +504,22 @@ assert.equal(longformCopy[0]?.duration_seconds, 10_800);
 assert.equal(longformCopy[0]?.size_bytes, MAX_STUDIO_ASSET_BYTES);
 assert.doesNotMatch(readyDuplicateSql, /INSERT INTO public\.studio_asset_sources/);
 
-type RepairCandidate = SimulatedRef & { source_deleted_at: string | null; storage_exists: boolean };
-function repairBrokenCopy(rows: readonly RepairCandidate[]) {
-  return rows.filter((row) =>
-    row.project_id === BROKEN_COPY_ID
-    && row.deleted_at == null
-    && row.upload_state === "reserved"
-    && row.source_id != null
-    && row.source_id !== row.id
-    && row.source_deleted_at == null
-    && row.storage_exists,
-  );
-}
-
-const inProgressUpload: RepairCandidate = {
+const inProgressUpload: SimulatedRef = {
   id: "66666666-6666-4666-8666-666666666666",
-  project_id: BROKEN_COPY_ID,
+  project_id: "copy-ready",
   source_id: "66666666-6666-4666-8666-666666666666",
-  storage_path: "studio/author/broken/in-progress.wav",
+  storage_path: "studio/author/copy-ready/in-progress.wav",
   deleted_at: null,
   upload_state: "reserved",
   duration_seconds: null,
   size_bytes: 100,
-  source_deleted_at: null,
-  storage_exists: false,
 };
-const brokenShared: RepairCandidate = {
-  id: "77777777-7777-4777-8777-777777777777",
-  project_id: BROKEN_COPY_ID,
-  source_id: voiceAssetId,
-  storage_path: sourceRefs[0]!.storage_path,
-  deleted_at: null,
-  upload_state: "reserved",
-  duration_seconds: 12,
-  size_bytes: 4_000,
-  source_deleted_at: null,
-  storage_exists: true,
-};
-const otherProjectReserved: RepairCandidate = {
-  ...brokenShared,
-  id: "88888888-8888-4888-8888-888888888888",
-  project_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-};
-assert.deepEqual(
-  repairBrokenCopy([inProgressUpload, brokenShared, otherProjectReserved]).map((row) => row.id),
-  [brokenShared.id],
+assert.equal(
+  listReadyAssets([...readyCopy, inProgressUpload], "copy-ready").length,
+  3,
+  "ordinary source_id = id reserved uploads stay hidden and are not duplicate refs",
 );
+assert.equal(inProgressUpload.source_id, inProgressUpload.id);
 
 const route = await readFile(
   new URL("../src/app/api/studio/projects/[projectId]/duplicate/route.ts", import.meta.url),

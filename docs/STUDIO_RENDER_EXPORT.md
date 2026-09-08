@@ -87,8 +87,10 @@ project/reference IDs while its references point at the original immutable
 source. Replacing audio creates a new source before updating the reference
 (copy-on-write). Additive migration
 `20261002120000_studio_duplicate_project_upload_state_ready.sql` sets
-`upload_state = 'ready'` on those shared refs so `listStudioAssets` can
-hydrate them. It does not copy Storage objects.
+`upload_state = 'ready'` on newly duplicated shared refs so
+`listStudioAssets` can hydrate them. It does not copy Storage objects
+and does not UPDATE existing reserved rows. Data repair waits for a
+sealed production Storage scan.
 
 ### Production runbook (do not run automatically)
 

@@ -6,7 +6,9 @@ BEGIN;
 -- 'reserved', so omitted upload_state made copies invisible to
 -- listStudioAssets (ready only). Duplicated refs are already finalized
 -- physical audio: mark them ready explicitly. No Storage copy, no source
--- row, no reserve/finalize or long-form limit changes.
+-- row, no reserve/finalize or long-form limit changes. This migration is
+-- RPC-only: it does not UPDATE existing rows. A data repair of already
+-- reserved shared refs waits for a sealed production Storage scan.
 
 CREATE OR REPLACE FUNCTION public.duplicate_studio_project(
   p_source_project_id uuid,
@@ -100,33 +102,5 @@ $$;
 
 REVOKE ALL ON FUNCTION public.duplicate_studio_project(uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.duplicate_studio_project(uuid, uuid, jsonb, jsonb) TO service_role;
-
--- Confirmed broken copy 3832ded1-4100-447e-a8d4-7fc6a635f72e: live shared
--- refs (source_id <> id) left at reserved. Ordinary in-progress uploads
--- keep source_id = id and are not touched. Storage.objects is checked
--- when that catalog exists; if the catalog is absent (SQL-only fixtures)
--- the remaining gates still apply. This migration does not create, copy,
--- or delete Storage objects.
-UPDATE public.studio_project_assets AS ref
-SET
-  upload_state = 'ready',
-  upload_state_changed_at = now()
-FROM public.studio_asset_sources AS source
-WHERE ref.project_id = '3832ded1-4100-447e-a8d4-7fc6a635f72e'::uuid
-  AND ref.deleted_at IS NULL
-  AND ref.upload_state = 'reserved'
-  AND ref.source_id IS NOT NULL
-  AND ref.source_id <> ref.id
-  AND source.id = ref.source_id
-  AND source.deleted_at IS NULL
-  AND (
-    to_regclass('storage.objects') IS NULL
-    OR EXISTS (
-      SELECT 1
-      FROM storage.objects AS obj
-      WHERE obj.bucket_id = 'studio-draft-assets'
-        AND obj.name = source.storage_path
-    )
-  );
 
 COMMIT;

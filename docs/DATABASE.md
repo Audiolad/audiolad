@@ -220,10 +220,10 @@ immutable `studio_asset_sources` и **не** копирует Storage. Посл�
 `20260928120000` DEFAULT `upload_state` стал `'reserved'`; миграция
 `20261002120000_studio_duplicate_project_upload_state_ready.sql` явно
 ставит `upload_state = 'ready'` и `upload_state_changed_at = now()` на
-скопированных refs. Та же миграция чинит подтверждённую копию
-`3832ded1-4100-447e-a8d4-7fc6a635f72e` только если ref живой,
-`upload_state='reserved'`, `source_id <> id` (не in-progress upload),
-source жив, и объект есть в `storage.objects` (если каталог доступен).
+скопированных refs. Миграция **RPC-only**: существующих reserved-строк
+она не трогает. Data-repair уже созданных shared refs ждёт sealed
+production Storage scan; `source_id = id` (обычный upload) никогда не
+должен попадать в такой repair.
 
 Загрузка: JSON reserve (метаданные) → браузерный signed PUT напрямую на
 Storage host (`NEXT_PUBLIC_SUPABASE_URL/storage/v1/object/upload/sign/...`) →
