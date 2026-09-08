@@ -85,7 +85,13 @@ asset reference to a source with the same ID and storage path; it does not move,
 rewrite, or delete existing Storage objects. A copied project receives new
 project/reference IDs while its references point at the original immutable
 source. Replacing audio creates a new source before updating the reference
-(copy-on-write).
+(copy-on-write). Additive migration
+`20261002120000_studio_duplicate_project_upload_state_ready.sql` sets
+`upload_state = 'ready'` on newly duplicated shared refs so
+`listStudioAssets` can hydrate them. It also systemically marks live
+shared reserved refs ready when the source is live and, if
+`storage.objects` exists, the physical object is present. It does not
+copy Storage objects and never updates `source_id = id` uploads.
 
 ### Production runbook (do not run automatically)
 
