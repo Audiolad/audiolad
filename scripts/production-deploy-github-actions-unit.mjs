@@ -2061,7 +2061,9 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
   const required = [
     "OPS_STUDIO_DUPLICATE_ASSET_DIAG",
     "STUDIO_DUPLICATE_ASSET_DIAG",
-    "3832ded1-4100-447e-a8d4-7fc6a635f72e",
+    "3832ded1-4100-4478-a8d4-7fc6a635f72e",
+    "AUDIOLAD_DUP_ASSET_PROJECT_ID",
+    "AUDIOLAD_DUP_VERIFY_PROJECT_ID",
     "BROKEN_PROJECT_ID=",
     "ASSET_ROW_COUNT=",
     "UPLOAD_STATE_COUNTS=",
@@ -2070,6 +2072,11 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
     "SOURCE_OBJECTS_INTACT=",
     "ORIGINAL_PROJECT_ID=",
     "ORIGINAL_REFS_READY=",
+    "VERIFY_PROJECT_ID=",
+    "VERIFY_ASSET_COUNT=",
+    "VERIFY_ALL_READY=",
+    "VERIFY_SHARED_REF_COUNT=",
+    "VERIFY_OWN_UPLOAD_COUNT=",
     "BROKEN_SHARED_REFS_COUNT=",
     "BROKEN_PROJECT_IDS=",
     "3832DED1_FOUND=",
@@ -2212,7 +2219,7 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
   writeFileSync(
     join(currentDir, "node_modules", "@supabase", "supabase-js", "index.js"),
     [
-      "const BROKEN = '3832ded1-4100-447e-a8d4-7fc6a635f72e';",
+      "const BROKEN = '3832ded1-4100-4478-a8d4-7fc6a635f72e';",
       "const ORIGINAL = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';",
       "const SOURCE_A = '11111111-1111-4111-8111-111111111111';",
       "const SOURCE_B = '22222222-2222-4222-8222-222222222222';",
@@ -2248,6 +2255,9 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "  { id: PRAYER_COPY_ASSET, project_id: PRAYER_COPY, source_id: PRAYER_SOURCE, original_name: 'prayer.wav', upload_state: 'reserved', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-08T14:00:01Z' },",
       "  { id: PRAYER_SOURCE, project_id: PRAYER_ORIG, source_id: PRAYER_SOURCE, original_name: 'prayer.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-01T14:00:01Z' },",
       "];",
+      "if (scenario === 'ready_repaired') {",
+      "  assets[0].upload_state = 'ready';",
+      "}",
       "const sources = [",
       "  { id: SOURCE_A, storage_path: PATH_A, deleted_at: null },",
       "  { id: SOURCE_B, storage_path: PATH_B, deleted_at: null },",
@@ -2344,26 +2354,31 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
   };
 }
 
-function runStudioDupAssetDiagHelper(root, fixture) {
+function studioDupAssetDiagEnv(fixture, extraEnv = {}) {
+  const env = {
+    ...process.env,
+    DEPLOY_ROOT: fixture.deployRoot,
+  };
+  delete env.AUDIOLAD_DUP_ASSET_PROJECT_ID;
+  delete env.AUDIOLAD_DUP_VERIFY_PROJECT_ID;
+  Object.assign(env, extraEnv);
+  return env;
+}
+
+function runStudioDupAssetDiagHelper(root, fixture, extraEnv = {}) {
   return spawnSync("bash", [studioDupAssetDiagPath], {
     encoding: "utf8",
     timeout: 20000,
-    env: {
-      ...process.env,
-      DEPLOY_ROOT: fixture.deployRoot,
-    },
+    env: studioDupAssetDiagEnv(fixture, extraEnv),
   });
 }
 
-function runStudioDupAssetDiagViaStdin(scriptText, fixture) {
+function runStudioDupAssetDiagViaStdin(scriptText, fixture, extraEnv = {}) {
   return spawnSync("bash", ["-s", "a".repeat(40), "b".repeat(40)], {
     encoding: "utf8",
     timeout: 20000,
     input: scriptText,
-    env: {
-      ...process.env,
-      DEPLOY_ROOT: fixture.deployRoot,
-    },
+    env: studioDupAssetDiagEnv(fixture, extraEnv),
   });
 }
 
@@ -2372,8 +2387,12 @@ function assertStudioDupAssetDiagHelper(workflowText) {
   const syntax = spawnSync("bash", ["-n", studioDupAssetDiagPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `studio dup-asset diag helper bash -n failed: ${syntax.stderr}`);
   assert.match(helperText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
-  assert.match(helperText, /3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+  assert.match(helperText, /3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+  assert.match(helperText, /AUDIOLAD_DUP_ASSET_PROJECT_ID/);
+  assert.match(helperText, /AUDIOLAD_DUP_VERIFY_PROJECT_ID/);
   assert.match(helperText, /BROKEN_PROJECT_ID=/);
+  assert.match(helperText, /VERIFY_PROJECT_ID=/);
+  assert.match(helperText, /VERIFY_ALL_READY=/);
   assert.match(helperText, /ORIGINAL_REFS_READY=/);
   assert.match(helperText, /BROKEN_SHARED_REFS_COUNT=/);
   assert.match(helperText, /3832DED1_FOUND=/);
@@ -2404,7 +2423,7 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /CUTOVER = NO/);
     assert.match(output, /audiolad_deploy = NOT_INVOKED/);
     assert.match(output, /MODE = read_only_duplicate_asset_diag/);
-    assert.match(output, /BROKEN_PROJECT_ID=3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+    assert.match(output, /BROKEN_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
     assert.match(output, /ASSET_ROW_COUNT=2/);
     assert.match(output, /UPLOAD_STATE_COUNTS=reserved:2/);
     assert.match(output, /SOURCE_ID_NE_ID_COUNT=2/);
@@ -2412,6 +2431,13 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /SOURCE_OBJECTS_INTACT=YES/);
     assert.match(output, /ORIGINAL_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
     assert.match(output, /ORIGINAL_REFS_READY=YES/);
+    assert.match(output, /===== VERIFY LIVE ASSETS =====/);
+    assert.match(output, /VERIFY_ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 upload_state=reserved source_id_equals_id=NO/);
+    assert.match(output, /VERIFY_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+    assert.match(output, /VERIFY_ASSET_COUNT=1/);
+    assert.match(output, /VERIFY_ALL_READY=NO/);
+    assert.match(output, /VERIFY_SHARED_REF_COUNT=1/);
+    assert.match(output, /VERIFY_OWN_UPLOAD_COUNT=0/);
     assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333/);
     assert.match(output, /deleted_at=set/);
     assert.match(output, /deleted_at=null/);
@@ -2425,7 +2451,7 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /project_query_error=none/);
     assert.match(output, /asset_query_error=none/);
     assert.match(output, /BROKEN_SHARED_REFS_COUNT=2/);
-    assert.match(output, /BROKEN_PROJECT_IDS=3832ded1-4100-447e-a8d4-7fc6a635f72e,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+    assert.match(output, /BROKEN_PROJECT_IDS=3832ded1-4100-4478-a8d4-7fc6a635f72e,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
     assert.match(output, /3832DED1_FOUND=YES/);
     assert.match(output, /DUPLICATION_AUDIT_PROJECT_ID=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
     assert.match(output, /DUPLICATION_AUDIT_SOURCE_PROJECT_ID=cccccccc-cccc-4ccc-8ccc-cccccccccccc/);
@@ -2532,6 +2558,50 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     rmSync(missingRoot, { recursive: true, force: true });
   }
 
+  const readyRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-ready-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(readyRoot, {
+      secretUrl,
+      secretKey,
+      scenario: "ready_repaired",
+    });
+    const result = runStudioDupAssetDiagHelper(readyRoot, fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `ready-repaired diag failed: ${output}`);
+    assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 original_name=voice.wav upload_state=ready/);
+    assert.match(output, /UPLOAD_STATE_COUNTS=ready:1,reserved:1/);
+    assert.match(output, /ALL_RESERVED=NO/);
+    assert.match(output, /VERIFY_ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 upload_state=ready source_id_equals_id=NO/);
+    assert.match(output, /VERIFY_ASSET_COUNT=1/);
+    assert.match(output, /VERIFY_ALL_READY=YES/);
+    assert.match(output, /VERIFY_SHARED_REF_COUNT=1/);
+    assert.match(output, /VERIFY_OWN_UPLOAD_COUNT=0/);
+    assert.match(output, /SOURCE_OBJECTS_INTACT=YES/);
+    assert.match(output, /BROKEN_SHARED_REFS_COUNT=1/);
+  } finally {
+    rmSync(readyRoot, { recursive: true, force: true });
+  }
+
+  const verifyOverrideRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-verify-"));
+  try {
+    const fixture = writeStudioDupAssetDiagFixture(verifyOverrideRoot, { secretUrl, secretKey });
+    const result = runStudioDupAssetDiagHelper(verifyOverrideRoot, fixture, {
+      AUDIOLAD_DUP_VERIFY_PROJECT_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `verify-override diag failed: ${output}`);
+    assert.match(output, /BROKEN_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+    assert.match(output, /VERIFY_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+    assert.match(output, /VERIFY_ASSET id=11111111-1111-4111-8111-111111111111 source_id=11111111-1111-4111-8111-111111111111 upload_state=ready source_id_equals_id=YES/);
+    assert.match(output, /VERIFY_ASSET id=22222222-2222-4222-8222-222222222222 source_id=22222222-2222-4222-8222-222222222222 upload_state=ready source_id_equals_id=YES/);
+    assert.match(output, /VERIFY_ASSET_COUNT=2/);
+    assert.match(output, /VERIFY_ALL_READY=YES/);
+    assert.match(output, /VERIFY_SHARED_REF_COUNT=0/);
+    assert.match(output, /VERIFY_OWN_UPLOAD_COUNT=2/);
+  } finally {
+    rmSync(verifyOverrideRoot, { recursive: true, force: true });
+  }
+
   const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-studio-dup-asset-diag-remote-"));
   try {
     const fixture = writeStudioDupAssetDiagFixture(remoteRoot, { secretUrl, secretKey });
@@ -2541,7 +2611,9 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.equal(remoteResult.status, 0, `workflow bash -s dup-asset diag failed: ${remoteOutput}`);
     assert.match(remoteOutput, /confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
     assert.match(remoteOutput, /ORIGINAL_REFS_READY=YES/);
-    assert.match(remoteOutput, /BROKEN_PROJECT_ID=3832ded1-4100-447e-a8d4-7fc6a635f72e/);
+    assert.match(remoteOutput, /BROKEN_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+    assert.match(remoteOutput, /VERIFY_ALL_READY=NO/);
+    assert.match(remoteOutput, /VERIFY_ASSET_COUNT=1/);
     assert.match(remoteOutput, /BROKEN_SHARED_REFS_COUNT=2/);
     assert.match(remoteOutput, /DUPLICATION_AUDIT_PROJECT_ID=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
     assert.doesNotMatch(remoteOutput, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

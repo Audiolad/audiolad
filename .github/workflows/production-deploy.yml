@@ -3320,12 +3320,13 @@ jobs:
           DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
           CURRENT_LINK="${DEPLOY_ROOT}/current"
           SHARED_ENV_PRODUCTION="${DEPLOY_ROOT}/shared/.env.production"
-          BROKEN_PROJECT_ID="${AUDIOLAD_DUP_ASSET_PROJECT_ID:-3832ded1-4100-447e-a8d4-7fc6a635f72e}"
-          
+          BROKEN_PROJECT_ID="${AUDIOLAD_DUP_ASSET_PROJECT_ID:-3832ded1-4100-4478-a8d4-7fc6a635f72e}"
+          VERIFY_PROJECT_ID="${AUDIOLAD_DUP_VERIFY_PROJECT_ID:-${BROKEN_PROJECT_ID}}"
+
           CUTOVER="NO"
           AUDIOLAD_DEPLOY="NOT_INVOKED"
           MODE="read_only_duplicate_asset_diag"
-          
+
           if ! declare -F redact_stream >/dev/null 2>&1; then
             redact_stream() {
               sed -E \
@@ -3335,19 +3336,19 @@ jobs:
                 -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
             }
           fi
-          
+
           redact_studio_stream() {
             redact_stream | sed -E \
               -e 's#https?://[^[:space:]\"'\'']+#[redacted-url]#g' \
               -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[redacted-jwt]/g'
           }
-          
+
           if ! declare -F section >/dev/null 2>&1; then
             section() {
               printf '\n===== %s =====\n' "$1"
             }
           fi
-          
+
           run_duplicate_asset_diag_node() {
             local dir="${CURRENT_LINK}"
             local probe=""
@@ -3362,6 +3363,7 @@ jobs:
           const silent = { info() {}, error() {} };
           const dir = process.argv[2];
           const brokenProjectId = process.argv[3];
+          const verifyProjectId = process.argv[4] || brokenProjectId;
           delete process.env.NEXT_PUBLIC_SUPABASE_URL;
           delete process.env.SUPABASE_SERVICE_ROLE_KEY;
           const { loadEnvConfig } = require("@next/env");
@@ -3384,14 +3386,15 @@ jobs:
               originalRefsReady: "",
             });
             printScanFlags(emptyScanFlags());
+            printVerifyFlags(emptyVerifyFlags());
             process.exit(2);
           }
-          
+
           const { createClient } = require("@supabase/supabase-js");
           const service = createClient(url, key, {
             auth: { autoRefreshToken: false, persistSession: false },
           });
-          
+
           const PARENT_KEYS = [
             "duplicated_from",
             "parent",
@@ -3408,12 +3411,12 @@ jobs:
           const MAX_SCAN_ROWS = 2000;
           const seenProjectOrAssetIds = new Set();
           const objectExistsCache = new Map();
-          
+
           const timer = setTimeout(() => {
             console.log("DIAG_PROBE=UNAVAILABLE reason=timeout");
             process.exit(2);
           }, 90000);
-          
+
           function printFlags(flags) {
             console.log("BROKEN_PROJECT_ID=" + (flags.brokenProjectId || ""));
             console.log("ASSET_ROW_COUNT=" + flags.assetRowCount);
@@ -3424,7 +3427,7 @@ jobs:
             console.log("ORIGINAL_PROJECT_ID=" + (flags.originalProjectId || ""));
             console.log("ORIGINAL_REFS_READY=" + flags.originalRefsReady);
           }
-          
+
           function emptyScanFlags() {
             return {
               brokenSharedRefsCount: "",
@@ -3435,7 +3438,7 @@ jobs:
               auditSourceProjectId: "",
             };
           }
-          
+
           function printScanFlags(flags) {
             console.log("BROKEN_SHARED_REFS_COUNT=" + flags.brokenSharedRefsCount);
             console.log("BROKEN_PROJECT_IDS=" + (flags.brokenProjectIds || ""));
@@ -3444,20 +3447,110 @@ jobs:
             console.log("DUPLICATION_AUDIT_PROJECT_ID=" + (flags.auditProjectId || ""));
             console.log("DUPLICATION_AUDIT_SOURCE_PROJECT_ID=" + (flags.auditSourceProjectId || ""));
           }
-          
+
+          function emptyVerifyFlags() {
+            return {
+              verifyProjectId: verifyProjectId || "",
+              verifyAssetCount: "",
+              verifyAllReady: "",
+              verifySharedRefCount: "",
+              verifyOwnUploadCount: "",
+              sourceObjectsIntact: "",
+            };
+          }
+
+          function printVerifyFlags(flags) {
+            console.log("VERIFY_PROJECT_ID=" + (flags.verifyProjectId || ""));
+            console.log("VERIFY_ASSET_COUNT=" + flags.verifyAssetCount);
+            console.log("VERIFY_ALL_READY=" + flags.verifyAllReady);
+            console.log("VERIFY_SHARED_REF_COUNT=" + flags.verifySharedRefCount);
+            console.log("VERIFY_OWN_UPLOAD_COUNT=" + flags.verifyOwnUploadCount);
+            console.log("SOURCE_OBJECTS_INTACT=" + flags.sourceObjectsIntact);
+          }
+
+          async function emitVerifyLiveAssets(reuseAssets, reuseSourceById) {
+            console.log("===== VERIFY LIVE ASSETS =====");
+            let rows = [];
+            let sourceMap = reuseSourceById instanceof Map ? reuseSourceById : new Map();
+            const sameAsProbe =
+              String(verifyProjectId || "") === String(brokenProjectId || "") &&
+              Array.isArray(reuseAssets);
+            if (sameAsProbe) {
+              rows = reuseAssets;
+            } else if (isUuid(verifyProjectId)) {
+              const lookup = await queryRows(
+                service
+                  .from("studio_project_assets")
+                  .select(
+                    "id,source_id,original_name,upload_state,deleted_at,storage_path,created_at,project_id",
+                  )
+                  .eq("project_id", verifyProjectId),
+              );
+              console.log("verify_asset_query_error=" + errorText(lookup.error));
+              rows = lookup.rows;
+              const verifySourceIds = [...new Set(rows.map((row) => row.source_id).filter(Boolean))];
+              if (verifySourceIds.length > 0) {
+                const sourcesLookup = await fetchByIds(
+                  "studio_asset_sources",
+                  "id,storage_path,deleted_at",
+                  verifySourceIds,
+                );
+                sourceMap = new Map(sourcesLookup.rows.map((row) => [row.id, row]));
+              } else {
+                sourceMap = new Map();
+              }
+            } else {
+              console.log("verify_asset_query_error=invalid_verify_project_id");
+            }
+            const live = rows.filter((row) => !row.deleted_at);
+            let shared = 0;
+            let own = 0;
+            let allReady = live.length > 0;
+            let objectsIntact = live.length > 0;
+            for (const asset of live) {
+              noteProjectOrAssetId(asset.id);
+              noteProjectOrAssetId(asset.project_id);
+              const equals = Boolean(asset.source_id && asset.id && asset.source_id === asset.id);
+              if (equals) own += 1;
+              else shared += 1;
+              if ((asset.upload_state || "") !== "ready") allReady = false;
+              const source = sourceMap.get(asset.source_id) || null;
+              const objectPath = (source && source.storage_path) || asset.storage_path || "";
+              const objectExists = await cachedStorageObjectExists(objectPath);
+              if (!objectExists) objectsIntact = false;
+              console.log(
+                [
+                  "VERIFY_ASSET",
+                  "id=" + field(asset.id),
+                  "source_id=" + field(asset.source_id),
+                  "upload_state=" + field(asset.upload_state),
+                  "source_id_equals_id=" + (equals ? "YES" : "NO"),
+                ].join(" "),
+              );
+            }
+            printVerifyFlags({
+              verifyProjectId,
+              verifyAssetCount: live.length,
+              verifyAllReady: allReady ? "YES" : "NO",
+              verifySharedRefCount: shared,
+              verifyOwnUploadCount: own,
+              sourceObjectsIntact: objectsIntact ? "YES" : "NO",
+            });
+          }
+
           function noteProjectOrAssetId(id) {
             const value = String(id || "").toLowerCase();
             if (value) seenProjectOrAssetIds.add(value);
           }
-          
+
           function targetFoundLabel() {
             return seenProjectOrAssetIds.has(TARGET_UUID) ? "YES" : "NO";
           }
-          
+
           function yesNo(value) {
             return value ? "YES" : "NO";
           }
-          
+
           function supabaseUrlHost(raw) {
             const text = String(raw || "");
             try {
@@ -3466,19 +3559,19 @@ jobs:
               return text.replace(/^https?:\/\//i, "").split("/")[0].split("?")[0];
             }
           }
-          
+
           function errorText(err) {
             if (!err) return "none";
             const msg = err.message || err.details || err.code || String(err);
             return field(msg);
           }
-          
+
           function asRows(data) {
             if (Array.isArray(data)) return data;
             if (data && typeof data === "object") return [data];
             return [];
           }
-          
+
           async function queryRows(builder) {
             try {
               const result = unwrap(await builder);
@@ -3487,31 +3580,31 @@ jobs:
               return { rows: [], error: err };
             }
           }
-          
+
           function field(value) {
             if (value == null || value === "") return "";
             return String(value).replace(/\s+/g, " ").slice(0, 240);
           }
-          
+
           function deletedLabel(value) {
             return value ? "set" : "null";
           }
-          
+
           function boolLabel(value) {
             return value ? "true" : "false";
           }
-          
+
           function isUuid(value) {
             return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
               String(value || ""),
             );
           }
-          
+
           function unwrap(result) {
             if (!result) return { data: null, error: { message: "empty_result" } };
             return result;
           }
-          
+
           async function storageObjectExists(storagePath) {
             if (!storagePath || typeof storagePath !== "string") return false;
             const slash = storagePath.lastIndexOf("/");
@@ -3537,7 +3630,7 @@ jobs:
             }
             return false;
           }
-          
+
           async function cachedStorageObjectExists(storagePath) {
             const key = String(storagePath || "");
             if (objectExistsCache.has(key)) return objectExistsCache.get(key);
@@ -3545,7 +3638,7 @@ jobs:
             objectExistsCache.set(key, exists);
             return exists;
           }
-          
+
           async function fetchByIds(table, columns, ids) {
             const unique = [...new Set((ids || []).filter(Boolean))];
             const out = [];
@@ -3559,7 +3652,7 @@ jobs:
             }
             return { rows: out, error: null };
           }
-          
+
           function metadataObject(raw) {
             if (!raw) return {};
             if (typeof raw === "string") {
@@ -3572,7 +3665,7 @@ jobs:
             }
             return typeof raw === "object" ? raw : {};
           }
-          
+
           function metadataSourceProjectId(meta) {
             const obj = metadataObject(meta);
             for (const key of [
@@ -3585,7 +3678,7 @@ jobs:
             }
             return "";
           }
-          
+
           function metadataNameFields(meta) {
             const obj = metadataObject(meta);
             return Object.keys(obj)
@@ -3593,7 +3686,7 @@ jobs:
               .map((key) => key + "=" + field(obj[key]))
               .join(" ");
           }
-          
+
           function collectTrackAssetIds(projectData) {
             let data = projectData;
             if (typeof data === "string") {
@@ -3606,16 +3699,16 @@ jobs:
             const tracks = data && Array.isArray(data.tracks) ? data.tracks : [];
             return tracks.map((track) => track && track.assetId).filter(Boolean);
           }
-          
+
           function isPrayerCopyName(name) {
             return PRAYER_NAME_RE.test(String(name || ""));
           }
-          
+
           function copyBaseName(name) {
             const match = String(name || "").match(COPY_NAME_RE);
             return match ? match[1] : "";
           }
-          
+
           function scoreOriginalCandidate(project, broken, sourceIds, otherAssets) {
             let score = 0;
             const refs = otherAssets.filter((row) => row.project_id === project.id);
@@ -3632,12 +3725,12 @@ jobs:
             if (project.status === "active") score += 1;
             return score;
           }
-          
+
           Promise.resolve()
             .then(async () => {
               console.log("supabase_url_host=" + supabaseUrlHost(url));
               console.log("===== SINGLE PROJECT PROBE =====");
-          
+
               const projectLookup = await queryRows(
                 service
                   .from("studio_projects")
@@ -3672,7 +3765,7 @@ jobs:
                   );
                 }
               }
-          
+
               const presentParentKeys = project
                 ? PARENT_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(project, key))
                 : [];
@@ -3706,7 +3799,7 @@ jobs:
                   console.log("schema_parent_keys=" + presentAfterStar.join(","));
                 }
               }
-          
+
               const assetLookup = await queryRows(
                 service
                   .from("studio_project_assets")
@@ -3722,7 +3815,7 @@ jobs:
                 noteProjectOrAssetId(asset.project_id);
               }
               const sourceIds = [...new Set(assets.map((row) => row.source_id).filter(Boolean))];
-          
+
               let sources = [];
               if (sourceIds.length > 0) {
                 const sourceResult = unwrap(
@@ -3739,7 +3832,7 @@ jobs:
                 console.log("source_query_error=none");
               }
               const sourceById = new Map(sources.map((row) => [row.id, row]));
-          
+
               const counts = {};
               let sourceIdNeIdCount = 0;
               let allReserved = assets.length > 0;
@@ -3768,12 +3861,12 @@ jobs:
                   ].join(" "),
                 );
               }
-          
+
               const uploadStateCounts = Object.keys(counts)
                 .sort()
                 .map((state) => state + ":" + counts[state])
                 .join(",");
-          
+
               let otherAssets = [];
               if (sourceIds.length > 0) {
                 const otherResult = unwrap(
@@ -3786,7 +3879,7 @@ jobs:
                   otherAssets = otherResult.data.filter((row) => row.project_id !== brokenProjectId);
                 }
               }
-          
+
               let originalProjectId = "";
               let originalVia = "none";
               for (const key of presentParentKeys) {
@@ -3796,7 +3889,7 @@ jobs:
                   break;
                 }
               }
-          
+
               const baseName = copyBaseName(project && project.name);
               let nameMatchId = "";
               if (baseName) {
@@ -3816,7 +3909,7 @@ jobs:
                   if (matches[0]) nameMatchId = matches[0].id;
                 }
               }
-          
+
               const candidateIds = [...new Set(otherAssets.map((row) => row.project_id).filter(Boolean))];
               let sourceMatchId = "";
               if (candidateIds.length > 0) {
@@ -3836,7 +3929,7 @@ jobs:
                   if (ranked[0] && ranked[0].score > 0) sourceMatchId = ranked[0].row.id;
                 }
               }
-          
+
               if (!originalProjectId) {
                 if (sourceMatchId && nameMatchId && sourceMatchId === nameMatchId) {
                   originalProjectId = sourceMatchId;
@@ -3852,7 +3945,7 @@ jobs:
               console.log("ORIGINAL_PROJECT_VIA=" + originalVia);
               if (nameMatchId) console.log("name_heuristic_id=" + nameMatchId);
               if (sourceMatchId) console.log("matching_sources_id=" + sourceMatchId);
-          
+
               let originalRefsReady = "NO";
               if (originalProjectId && sourceIds.length > 0) {
                 const originalRefs = otherAssets.filter((row) => row.project_id === originalProjectId);
@@ -3880,7 +3973,7 @@ jobs:
               } else if (originalProjectId && sourceIds.length === 0) {
                 originalRefsReady = "YES";
               }
-          
+
               printFlags({
                 brokenProjectId,
                 assetRowCount: assets.length,
@@ -3891,7 +3984,7 @@ jobs:
                 originalProjectId,
                 originalRefsReady,
               });
-          
+
               console.log("===== GLOBAL BROKEN SHARED REFS =====");
               const reservedLookup = { rows: [], error: null };
               for (let from = 0; from < MAX_SCAN_ROWS; from += PAGE_SIZE) {
@@ -3936,7 +4029,7 @@ jobs:
                 brokenProjectsLookup.rows.map((row) => [row.id, row]),
               );
               for (const row of brokenProjectsLookup.rows) noteProjectOrAssetId(row.id);
-          
+
               const brokenSourceIds = [
                 ...new Set(brokenRefs.map((row) => row.source_id).filter(Boolean)),
               ];
@@ -3949,7 +4042,7 @@ jobs:
               const brokenSourceById = new Map(
                 brokenSourcesLookup.rows.map((row) => [row.id, row]),
               );
-          
+
               let globalSourceObjectsIntact = brokenRefs.length === 0;
               if (brokenRefs.length > 0) globalSourceObjectsIntact = true;
               for (const row of brokenRefs) {
@@ -3973,7 +4066,7 @@ jobs:
                   ].join(" "),
                 );
               }
-          
+
               console.log("===== DUPLICATION AUDIT =====");
               console.log("AUDIT_TABLE=" + AUDIT_TABLE);
               console.log("AUDIT_ACTION=studio_project_duplicated");
@@ -4001,7 +4094,7 @@ jobs:
                 auditProjectsLookup.rows.map((row) => [row.id, row]),
               );
               for (const row of auditProjectsLookup.rows) noteProjectOrAssetId(row.id);
-          
+
               const prayerNameLookup = await queryRows(
                 service
                   .from("studio_projects")
@@ -4023,7 +4116,7 @@ jobs:
                   ].join(" "),
                 );
               }
-          
+
               let preferredAudit = null;
               for (const row of auditRows) {
                 const joined = auditProjectById.get(row.resource_id) || null;
@@ -4083,7 +4176,7 @@ jobs:
               } else {
                 console.log("DUPLICATION_AUDIT_VIA=none");
               }
-          
+
               console.log("===== SOURCE PROJECT CHECK =====");
               const inferredSourceIds = [
                 ...new Set(
@@ -4189,7 +4282,8 @@ jobs:
                   console.log("SOURCE_REF_OMITTED=" + (refLookup.rows.length - refsToPrint.length));
                 }
               }
-          
+
+              await emitVerifyLiveAssets(assets, sourceById);
               printScanFlags({
                 brokenSharedRefsCount: brokenRefs.length,
                 brokenProjectIds: brokenProjectIds.join(","),
@@ -4216,6 +4310,7 @@ jobs:
                 originalRefsReady: "",
               });
               printScanFlags(emptyScanFlags());
+              printVerifyFlags(emptyVerifyFlags());
               process.exit(2);
             });
           JS
@@ -4225,7 +4320,7 @@ jobs:
               export NODE_ENV=production
               export NODE_PATH="${dir}/node_modules${NODE_PATH:+:${NODE_PATH}}"
               cd "${dir}"
-              node "${probe}" "${dir}" "${BROKEN_PROJECT_ID}" 2>/dev/null
+              node "${probe}" "${dir}" "${BROKEN_PROJECT_ID}" "${VERIFY_PROJECT_ID}" 2>/dev/null
             )"
             code=$?
             set -e
@@ -4239,7 +4334,7 @@ jobs:
             fi
             return 0
           }
-          
+
           run_studio_duplicate_asset_diag() {
             local current_real=""
             section "STUDIO_DUPLICATE_ASSET_DIAG"
@@ -4254,7 +4349,7 @@ jobs:
               echo "workflow_origin_main_sha=${ORIGIN_MAIN_SHA:-}"
             fi
             unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
-          
+
             section "CURRENT RELEASE"
             if current_real="$(readlink -f "${CURRENT_LINK}")" && [[ -n "${current_real}" ]]; then
               echo "current_link=${CURRENT_LINK}"
@@ -4270,14 +4365,15 @@ jobs:
             echo "note=no_signed_urls_no_keys_no_storage_urls"
             echo "loadEnvConfig=service_role_read_only"
             echo "BROKEN_PROJECT_ID=${BROKEN_PROJECT_ID}"
-          
+            echo "VERIFY_PROJECT_ID=${VERIFY_PROJECT_ID}"
+
             section "DUPLICATE ASSET ROWS"
             echo "mode=read_only"
-            echo "scan=single_project_probe+global_broken_shared_refs+duplication_audit"
+            echo "scan=single_project_probe+global_broken_shared_refs+duplication_audit+verify_live_assets"
             if ! run_duplicate_asset_diag_node; then
               echo "diag_probe=unavailable"
             fi
-          
+
             section "STUDIO_DUPLICATE_ASSET_DIAG_END"
             echo "CUTOVER = NO"
             echo "audiolad_deploy = NOT_INVOKED"
