@@ -21,6 +21,7 @@ const BUCKET = "studio-draft-assets";
 const PASSWORD = "StudioSharedAssets-2026!";
 const migration = path.join(process.cwd(), "supabase/migrations/20260912120000_studio_shared_asset_sources_and_duplicate_project.sql");
 const longformMigration = path.join(process.cwd(), "supabase/migrations/20260928120000_studio_longform_asset_limits.sql");
+const duplicateReadyMigration = path.join(process.cwd(), "supabase/migrations/20261002120000_studio_duplicate_project_upload_state_ready.sql");
 
 function required(name: string) {
   const value = process.env[name];
@@ -36,6 +37,7 @@ function assertSafety() {
   assert(existsSync(path.join(stack, "docker-compose.yml")), "test stack docker-compose.yml is required");
   assert(existsSync(migration), "shared asset migration is required from this checkout");
   assert(existsSync(longformMigration), "studio long-form migration is required from this checkout");
+  assert(existsSync(duplicateReadyMigration), "duplicate upload_state ready migration is required from this checkout");
   return stack;
 }
 function sqlLiteral(value: string) { return `'${value.replaceAll("'", "''")}'`; }
@@ -168,6 +170,7 @@ async function main() {
     }
     sql(stack, readFileSync(migration, "utf8"));
     sql(stack, readFileSync(longformMigration, "utf8"));
+    sql(stack, readFileSync(duplicateReadyMigration, "utf8"));
     const refs = await service.from("studio_project_assets").select("id,source_id,storage_path").eq("project_id", projectId);
     assert.ifError(refs.error); assert.equal(refs.data?.length, 2); assert(refs.data?.every((row) => row.source_id === row.id));
     const integrity = sql(stack, "SELECT count(*) FROM studio_project_assets r LEFT JOIN studio_asset_sources s ON s.id=r.source_id WHERE s.id IS NULL OR r.source_id IS NULL;");
@@ -199,10 +202,14 @@ async function main() {
       // every project-local identity. It starts at its own revision.
       const duplicate = await fetch(`${next.value}/api/studio/projects/${projectId}/duplicate`, { method: "POST", headers: headers(token) });
       assert.equal(duplicate.status, 201); const duplicateId = (await duplicate.json()).project.id as string;
-      const copied = await service.from("studio_project_assets").select("id,source_id,storage_path").eq("project_id", duplicateId);
+      const copied = await service.from("studio_project_assets").select("id,source_id,storage_path,upload_state").eq("project_id", duplicateId);
       assert.ifError(copied.error); assert.equal(copied.data?.length, 2);
       assert.deepEqual(new Set(copied.data?.map((row) => row.source_id)), new Set(refs.data?.map((row) => row.source_id)));
       assert.notDeepEqual(new Set(copied.data?.map((row) => row.id)), new Set(refs.data?.map((row) => row.id)));
+      assert.ok(copied.data?.every((row) => row.upload_state === "ready"), "duplicate shared refs are ready");
+      const listed = await fetch(`${next.value}/api/studio/projects/${duplicateId}/assets`, { headers: headers(token) });
+      assert.equal(listed.status, 200);
+      assert.equal(((await listed.json()).assets as unknown[]).length, 2, "listStudioAssets returns every duplicate ref");
       const duplicateRow = await service.from("studio_projects").select("author_id,guest_session_id,revision,name").eq("id", duplicateId).single();
       assert.ifError(duplicateRow.error); assert.equal(duplicateRow.data.author_id, authorId);
       assert.equal(duplicateRow.data.guest_session_id, null); assert.equal(duplicateRow.data.revision, 1);
