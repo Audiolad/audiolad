@@ -12,7 +12,9 @@ set -Eeuo pipefail
 DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
 CURRENT_LINK="${DEPLOY_ROOT}/current"
 SHARED_ENV_PRODUCTION="${DEPLOY_ROOT}/shared/.env.production"
-BROKEN_PROJECT_ID="${AUDIOLAD_DUP_ASSET_PROJECT_ID:-3832ded1-4100-447e-a8d4-7fc6a635f72e}"
+BROKEN_PROJECT_ID="${AUDIOLAD_DUP_ASSET_PROJECT_ID:-3832ded1-4100-4478-a8d4-7fc6a635f72e}"
+VERIFY_PROJECT_ID="${AUDIOLAD_DUP_VERIFY_PROJECT_ID:-08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120}"
+VERIFY_SOURCE_PROJECT_ID="${AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID:-6780c421-4411-4114-9c27-5f433dca1c2a}"
 
 CUTOVER="NO"
 AUDIOLAD_DEPLOY="NOT_INVOKED"
@@ -54,6 +56,8 @@ run_duplicate_asset_diag_node() {
 const silent = { info() {}, error() {} };
 const dir = process.argv[2];
 const brokenProjectId = process.argv[3];
+const verifyProjectId = process.argv[4] || brokenProjectId;
+const verifySourceProjectId = process.argv[5] || "";
 delete process.env.NEXT_PUBLIC_SUPABASE_URL;
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 const { loadEnvConfig } = require("@next/env");
@@ -76,6 +80,7 @@ if (!url || !key) {
     originalRefsReady: "",
   });
   printScanFlags(emptyScanFlags());
+  printVerifyFlags(emptyVerifyFlags());
   process.exit(2);
 }
 
@@ -135,6 +140,124 @@ function printScanFlags(flags) {
   console.log("SOURCE_OBJECTS_INTACT=" + flags.sourceObjectsIntact);
   console.log("DUPLICATION_AUDIT_PROJECT_ID=" + (flags.auditProjectId || ""));
   console.log("DUPLICATION_AUDIT_SOURCE_PROJECT_ID=" + (flags.auditSourceProjectId || ""));
+}
+
+function emptyVerifyFlags() {
+  return {
+    verifyProjectId: verifyProjectId || "",
+    verifyAssetCount: "",
+    verifyAllReady: "",
+    verifySharedRefCount: "",
+    verifyOwnUploadCount: "",
+    sourceObjectsIntact: "",
+    verifySourceProjectId: verifySourceProjectId || "",
+    verifySourceIdReuse: "",
+  };
+}
+
+function printVerifyFlags(flags) {
+  console.log("VERIFY_PROJECT_ID=" + (flags.verifyProjectId || ""));
+  console.log("VERIFY_ASSET_COUNT=" + flags.verifyAssetCount);
+  console.log("VERIFY_ALL_READY=" + flags.verifyAllReady);
+  console.log("VERIFY_SHARED_REF_COUNT=" + flags.verifySharedRefCount);
+  console.log("VERIFY_OWN_UPLOAD_COUNT=" + flags.verifyOwnUploadCount);
+  console.log("VERIFY_SOURCE_PROJECT_ID=" + (flags.verifySourceProjectId || ""));
+  console.log("VERIFY_SOURCE_ID_REUSE=" + flags.verifySourceIdReuse);
+  console.log("SOURCE_OBJECTS_INTACT=" + flags.sourceObjectsIntact);
+}
+
+async function emitVerifyLiveAssets(reuseAssets, reuseSourceById) {
+  console.log("===== VERIFY LIVE ASSETS =====");
+  let rows = [];
+  let sourceMap = reuseSourceById instanceof Map ? reuseSourceById : new Map();
+  const sameAsProbe =
+    String(verifyProjectId || "") === String(brokenProjectId || "") &&
+    Array.isArray(reuseAssets);
+  if (sameAsProbe) {
+    rows = reuseAssets;
+  } else if (isUuid(verifyProjectId)) {
+    const lookup = await queryRows(
+      service
+        .from("studio_project_assets")
+        .select(
+          "id,source_id,original_name,upload_state,deleted_at,storage_path,created_at,project_id",
+        )
+        .eq("project_id", verifyProjectId),
+    );
+    console.log("verify_asset_query_error=" + errorText(lookup.error));
+    rows = lookup.rows;
+    const verifySourceIds = [...new Set(rows.map((row) => row.source_id).filter(Boolean))];
+    if (verifySourceIds.length > 0) {
+      const sourcesLookup = await fetchByIds(
+        "studio_asset_sources",
+        "id,storage_path,deleted_at",
+        verifySourceIds,
+      );
+      sourceMap = new Map(sourcesLookup.rows.map((row) => [row.id, row]));
+    } else {
+      sourceMap = new Map();
+    }
+  } else {
+    console.log("verify_asset_query_error=invalid_verify_project_id");
+  }
+  const live = rows.filter((row) => !row.deleted_at);
+  const sourceLiveIds = new Set();
+  if (isUuid(verifySourceProjectId)) {
+    const sourceLiveLookup = await queryRows(
+      service
+        .from("studio_project_assets")
+        .select("id,source_id,deleted_at,project_id")
+        .eq("project_id", verifySourceProjectId),
+    );
+    console.log("verify_source_project_query_error=" + errorText(sourceLiveLookup.error));
+    for (const row of sourceLiveLookup.rows.filter((item) => !item.deleted_at)) {
+      noteProjectOrAssetId(row.id);
+      noteProjectOrAssetId(row.project_id);
+      if (row.id) sourceLiveIds.add(row.id);
+      if (row.source_id) sourceLiveIds.add(row.source_id);
+    }
+  } else {
+    console.log("verify_source_project_query_error=invalid_verify_source_project_id");
+  }
+  let shared = 0;
+  let own = 0;
+  let allReady = live.length > 0;
+  let objectsIntact = live.length > 0;
+  let sourceIdReuse = live.length > 0;
+  for (const asset of live) {
+    noteProjectOrAssetId(asset.id);
+    noteProjectOrAssetId(asset.project_id);
+    const equals = Boolean(asset.source_id && asset.id && asset.source_id === asset.id);
+    if (equals) own += 1;
+    else shared += 1;
+    if ((asset.upload_state || "") !== "ready") allReady = false;
+    const onSource = Boolean(asset.source_id && sourceLiveIds.has(asset.source_id));
+    if (!onSource) sourceIdReuse = false;
+    const source = sourceMap.get(asset.source_id) || null;
+    const objectPath = (source && source.storage_path) || asset.storage_path || "";
+    const objectExists = await cachedStorageObjectExists(objectPath);
+    if (!objectExists) objectsIntact = false;
+    console.log(
+      [
+        "VERIFY_ASSET",
+        "id=" + field(asset.id),
+        "source_id=" + field(asset.source_id),
+        "upload_state=" + field(asset.upload_state),
+        "source_id_equals_id=" + (equals ? "YES" : "NO"),
+        "source_id_on_source_project=" + (onSource ? "YES" : "NO"),
+      ].join(" "),
+    );
+  }
+  printVerifyFlags({
+    verifyProjectId,
+    verifyAssetCount: live.length,
+    verifyAllReady: allReady ? "YES" : "NO",
+    verifySharedRefCount: shared,
+    verifyOwnUploadCount: own,
+    sourceObjectsIntact: objectsIntact ? "YES" : "NO",
+    verifySourceProjectId,
+    verifySourceIdReuse: sourceIdReuse ? "YES" : "NO",
+  });
 }
 
 function noteProjectOrAssetId(id) {
@@ -882,6 +1005,7 @@ Promise.resolve()
       }
     }
 
+    await emitVerifyLiveAssets(assets, sourceById);
     printScanFlags({
       brokenSharedRefsCount: brokenRefs.length,
       brokenProjectIds: brokenProjectIds.join(","),
@@ -908,6 +1032,7 @@ Promise.resolve()
       originalRefsReady: "",
     });
     printScanFlags(emptyScanFlags());
+    printVerifyFlags(emptyVerifyFlags());
     process.exit(2);
   });
 JS
@@ -917,7 +1042,7 @@ JS
     export NODE_ENV=production
     export NODE_PATH="${dir}/node_modules${NODE_PATH:+:${NODE_PATH}}"
     cd "${dir}"
-    node "${probe}" "${dir}" "${BROKEN_PROJECT_ID}" 2>/dev/null
+    node "${probe}" "${dir}" "${BROKEN_PROJECT_ID}" "${VERIFY_PROJECT_ID}" "${VERIFY_SOURCE_PROJECT_ID}" 2>/dev/null
   )"
   code=$?
   set -e
@@ -962,10 +1087,12 @@ run_studio_duplicate_asset_diag() {
   echo "note=no_signed_urls_no_keys_no_storage_urls"
   echo "loadEnvConfig=service_role_read_only"
   echo "BROKEN_PROJECT_ID=${BROKEN_PROJECT_ID}"
+  echo "VERIFY_PROJECT_ID=${VERIFY_PROJECT_ID}"
+  echo "VERIFY_SOURCE_PROJECT_ID=${VERIFY_SOURCE_PROJECT_ID}"
 
   section "DUPLICATE ASSET ROWS"
   echo "mode=read_only"
-  echo "scan=single_project_probe+global_broken_shared_refs+duplication_audit"
+  echo "scan=single_project_probe+global_broken_shared_refs+duplication_audit+verify_live_assets"
   if ! run_duplicate_asset_diag_node; then
     echo "diag_probe=unavailable"
   fi
