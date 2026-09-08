@@ -269,11 +269,14 @@ scan live `studio_project_assets` (`upload_state=reserved`,
 (`project_data.tracks` asset ids, refs, Storage existence).
 
 Секция **VERIFY LIVE ASSETS** читает live (`deleted_at IS NULL`) assets
-для `AUDIOLAD_DUP_VERIFY_PROJECT_ID` или, если не задан, для активного
-probe id. Для каждого live asset: `id`, `source_id`, `upload_state`,
-`source_id_equals_id` YES/NO, плюс `SOURCE_OBJECTS_INTACT` по этим
-строкам. Нужна для Acceptance B после #377 (repair `4478` и новая
-копия из `6780c421-4411-4114-9c27-5f433dca1c2a`).
+для `AUDIOLAD_DUP_VERIFY_PROJECT_ID` (default
+`08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120`, «Молитва от уныния и депрессии
+— копия 2»). Для каждого live asset: `id`, `source_id`, `upload_state`,
+`source_id_equals_id` YES/NO, `source_id_on_source_project` YES/NO
+против `AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID` (default
+`6780c421-4411-4114-9c27-5f433dca1c2a`), плюс `SOURCE_OBJECTS_INTACT`.
+Acceptance B после #377: `VERIFY_ALL_READY`, `VERIFY_SHARED_REF_COUNT`,
+`VERIFY_SOURCE_ID_REUSE`, `SOURCE_OBJECTS_INTACT`.
 
 Exact flags:
 
@@ -291,6 +294,8 @@ VERIFY_ASSET_COUNT=
 VERIFY_ALL_READY=
 VERIFY_SHARED_REF_COUNT=
 VERIFY_OWN_UPLOAD_COUNT=
+VERIFY_SOURCE_PROJECT_ID=
+VERIFY_SOURCE_ID_REUSE=
 BROKEN_SHARED_REFS_COUNT=
 BROKEN_PROJECT_IDS=
 3832DED1_FOUND=
@@ -313,6 +318,7 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 # Optional: probe another copy, or verify a newly created duplicate
 AUDIOLAD_DUP_ASSET_PROJECT_ID=<probe-id> \
 AUDIOLAD_DUP_VERIFY_PROJECT_ID=<new-copy-id> \
+AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID=6780c421-4411-4114-9c27-5f433dca1c2a \
   DEPLOY_ROOT=/var/www/audiolad-deploy \
   bash deploy/scripts/audiolad-studio-duplicate-asset-diag.sh
 ```
@@ -347,10 +353,11 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 - `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с `main` — только read-only
   Studio duplicate-asset diagnostic: single-project probe для
   `3832ded1-4100-4478-a8d4-7fc6a635f72e` (override
-  `AUDIOLAD_DUP_ASSET_PROJECT_ID`) плюс VERIFY LIVE ASSETS
-  (`AUDIOLAD_DUP_VERIFY_PROJECT_ID` или тот же probe id), global
-  broken shared refs и duplication audit, без writes, signed URL,
-  cutover и `audiolad-deploy`.
+  `AUDIOLAD_DUP_ASSET_PROJECT_ID`) плюс VERIFY LIVE ASSETS default
+  `08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120` vs source
+  `6780c421-4411-4114-9c27-5f433dca1c2a`, global broken shared refs
+  и duplication audit, без writes, signed URL, cutover и
+  `audiolad-deploy`.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает

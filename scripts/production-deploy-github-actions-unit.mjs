@@ -2062,8 +2062,11 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
     "OPS_STUDIO_DUPLICATE_ASSET_DIAG",
     "STUDIO_DUPLICATE_ASSET_DIAG",
     "3832ded1-4100-4478-a8d4-7fc6a635f72e",
+    "08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120",
+    "6780c421-4411-4114-9c27-5f433dca1c2a",
     "AUDIOLAD_DUP_ASSET_PROJECT_ID",
     "AUDIOLAD_DUP_VERIFY_PROJECT_ID",
+    "AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID",
     "BROKEN_PROJECT_ID=",
     "ASSET_ROW_COUNT=",
     "UPLOAD_STATE_COUNTS=",
@@ -2077,6 +2080,8 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
     "VERIFY_ALL_READY=",
     "VERIFY_SHARED_REF_COUNT=",
     "VERIFY_OWN_UPLOAD_COUNT=",
+    "VERIFY_SOURCE_PROJECT_ID=",
+    "VERIFY_SOURCE_ID_REUSE=",
     "BROKEN_SHARED_REFS_COUNT=",
     "BROKEN_PROJECT_IDS=",
     "3832DED1_FOUND=",
@@ -2229,6 +2234,10 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "const PRAYER_ORIG = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';",
       "const PRAYER_SOURCE = '55555555-5555-4555-8555-555555555555';",
       "const PRAYER_COPY_ASSET = '66666666-6666-4666-8666-666666666666';",
+      "const ACCEPT_SOURCE = '6780c421-4411-4114-9c27-5f433dca1c2a';",
+      "const ACCEPT_COPY = '08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120';",
+      "const ACCEPT_SRC_A = '12121212-1212-4121-8121-121212121212';",
+      "const ACCEPT_COPY_A = '13131313-1313-4131-8131-131313131313';",
       "const PATH_A = 'studio/author/orig/src-a/voice.wav';",
       "const PATH_B = 'studio/author/orig/src-b/gone.wav';",
       "const PATH_P = 'studio/author/orig/src-p/prayer.wav';",
@@ -2239,6 +2248,8 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "  { id: ORIGINAL, name: 'Ночной полёт', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-01T12:00:00Z', project_data: { tracks: [{ id: 't1', assetId: SOURCE_A }, { id: 't2', assetId: SOURCE_B }] } },",
       "  { id: PRAYER_COPY, name: 'Молитва от уныния и депрессии — копия', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-08T14:00:00Z', project_data: { tracks: [] } },",
       "  { id: PRAYER_ORIG, name: 'Молитва от уныния и депрессии', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-01T14:00:00Z', project_data: { tracks: [{ id: 'pt1', assetId: PRAYER_SOURCE }] } },",
+      "  { id: ACCEPT_SOURCE, name: 'Молитва от уныния и депрессии', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-01T15:00:00Z', project_data: { tracks: [{ id: 'at1', assetId: ACCEPT_SRC_A }] } },",
+      "  { id: ACCEPT_COPY, name: 'Молитва от уныния и депрессии — копия 2', status: 'active', deleted_at: null, author_id: 'author-1', guest_session_id: null, created_at: '2026-09-08T15:00:00Z', project_data: { tracks: [] } },",
       "];",
       "if (scenario === 'with_parent_column') {",
       "  projects[0].duplicated_from = ORIGINAL;",
@@ -2254,6 +2265,8 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "  { id: SOURCE_B, project_id: ORIGINAL, source_id: SOURCE_B, original_name: 'deleted-take.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_B, created_at: '2026-09-01T12:00:02Z' },",
       "  { id: PRAYER_COPY_ASSET, project_id: PRAYER_COPY, source_id: PRAYER_SOURCE, original_name: 'prayer.wav', upload_state: 'reserved', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-08T14:00:01Z' },",
       "  { id: PRAYER_SOURCE, project_id: PRAYER_ORIG, source_id: PRAYER_SOURCE, original_name: 'prayer.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-01T14:00:01Z' },",
+      "  { id: ACCEPT_SRC_A, project_id: ACCEPT_SOURCE, source_id: ACCEPT_SRC_A, original_name: 'prayer.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-01T15:00:01Z' },",
+      "  { id: ACCEPT_COPY_A, project_id: ACCEPT_COPY, source_id: ACCEPT_SRC_A, original_name: 'prayer.wav', upload_state: 'ready', deleted_at: null, storage_path: PATH_P, created_at: '2026-09-08T15:00:01Z' },",
       "];",
       "if (scenario === 'ready_repaired') {",
       "  assets[0].upload_state = 'ready';",
@@ -2262,6 +2275,7 @@ function writeStudioDupAssetDiagFixture(root, { secretUrl, secretKey, scenario =
       "  { id: SOURCE_A, storage_path: PATH_A, deleted_at: null },",
       "  { id: SOURCE_B, storage_path: PATH_B, deleted_at: null },",
       "  { id: PRAYER_SOURCE, storage_path: PATH_P, deleted_at: null },",
+      "  { id: ACCEPT_SRC_A, storage_path: PATH_P, deleted_at: null },",
       "];",
       "const auditEvents = [",
       "  { id: 'audit-old', created_at: '2026-09-08T12:00:00Z', action: 'studio_project_duplicated', resource_type: 'studio_project', resource_id: BROKEN, metadata: { source_project_id: ORIGINAL } },",
@@ -2361,6 +2375,7 @@ function studioDupAssetDiagEnv(fixture, extraEnv = {}) {
   };
   delete env.AUDIOLAD_DUP_ASSET_PROJECT_ID;
   delete env.AUDIOLAD_DUP_VERIFY_PROJECT_ID;
+  delete env.AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID;
   Object.assign(env, extraEnv);
   return env;
 }
@@ -2388,11 +2403,15 @@ function assertStudioDupAssetDiagHelper(workflowText) {
   assert.equal(syntax.status, 0, `studio dup-asset diag helper bash -n failed: ${syntax.stderr}`);
   assert.match(helperText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(helperText, /3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+  assert.match(helperText, /08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120/);
+  assert.match(helperText, /6780c421-4411-4114-9c27-5f433dca1c2a/);
   assert.match(helperText, /AUDIOLAD_DUP_ASSET_PROJECT_ID/);
   assert.match(helperText, /AUDIOLAD_DUP_VERIFY_PROJECT_ID/);
+  assert.match(helperText, /AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID/);
   assert.match(helperText, /BROKEN_PROJECT_ID=/);
   assert.match(helperText, /VERIFY_PROJECT_ID=/);
   assert.match(helperText, /VERIFY_ALL_READY=/);
+  assert.match(helperText, /VERIFY_SOURCE_ID_REUSE=/);
   assert.match(helperText, /ORIGINAL_REFS_READY=/);
   assert.match(helperText, /BROKEN_SHARED_REFS_COUNT=/);
   assert.match(helperText, /3832DED1_FOUND=/);
@@ -2432,12 +2451,14 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(output, /ORIGINAL_PROJECT_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
     assert.match(output, /ORIGINAL_REFS_READY=YES/);
     assert.match(output, /===== VERIFY LIVE ASSETS =====/);
-    assert.match(output, /VERIFY_ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 upload_state=reserved source_id_equals_id=NO/);
-    assert.match(output, /VERIFY_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
+    assert.match(output, /VERIFY_ASSET id=13131313-1313-4131-8131-131313131313 source_id=12121212-1212-4121-8121-121212121212 upload_state=ready source_id_equals_id=NO source_id_on_source_project=YES/);
+    assert.match(output, /VERIFY_PROJECT_ID=08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120/);
     assert.match(output, /VERIFY_ASSET_COUNT=1/);
-    assert.match(output, /VERIFY_ALL_READY=NO/);
+    assert.match(output, /VERIFY_ALL_READY=YES/);
     assert.match(output, /VERIFY_SHARED_REF_COUNT=1/);
     assert.match(output, /VERIFY_OWN_UPLOAD_COUNT=0/);
+    assert.match(output, /VERIFY_SOURCE_PROJECT_ID=6780c421-4411-4114-9c27-5f433dca1c2a/);
+    assert.match(output, /VERIFY_SOURCE_ID_REUSE=YES/);
     assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333/);
     assert.match(output, /deleted_at=set/);
     assert.match(output, /deleted_at=null/);
@@ -2565,13 +2586,16 @@ function assertStudioDupAssetDiagHelper(workflowText) {
       secretKey,
       scenario: "ready_repaired",
     });
-    const result = runStudioDupAssetDiagHelper(readyRoot, fixture);
+    const result = runStudioDupAssetDiagHelper(readyRoot, fixture, {
+      AUDIOLAD_DUP_VERIFY_PROJECT_ID: "3832ded1-4100-4478-a8d4-7fc6a635f72e",
+    });
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 0, `ready-repaired diag failed: ${output}`);
     assert.match(output, /ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 original_name=voice.wav upload_state=ready/);
     assert.match(output, /UPLOAD_STATE_COUNTS=ready:1,reserved:1/);
     assert.match(output, /ALL_RESERVED=NO/);
     assert.match(output, /VERIFY_ASSET id=33333333-3333-4333-8333-333333333333 source_id=11111111-1111-4111-8111-111111111111 upload_state=ready source_id_equals_id=NO/);
+    assert.match(output, /VERIFY_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
     assert.match(output, /VERIFY_ASSET_COUNT=1/);
     assert.match(output, /VERIFY_ALL_READY=YES/);
     assert.match(output, /VERIFY_SHARED_REF_COUNT=1/);
@@ -2612,7 +2636,10 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(remoteOutput, /confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
     assert.match(remoteOutput, /ORIGINAL_REFS_READY=YES/);
     assert.match(remoteOutput, /BROKEN_PROJECT_ID=3832ded1-4100-4478-a8d4-7fc6a635f72e/);
-    assert.match(remoteOutput, /VERIFY_ALL_READY=NO/);
+    assert.match(remoteOutput, /VERIFY_PROJECT_ID=08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120/);
+    assert.match(remoteOutput, /VERIFY_ALL_READY=YES/);
+    assert.match(remoteOutput, /VERIFY_SHARED_REF_COUNT=1/);
+    assert.match(remoteOutput, /VERIFY_SOURCE_ID_REUSE=YES/);
     assert.match(remoteOutput, /VERIFY_ASSET_COUNT=1/);
     assert.match(remoteOutput, /BROKEN_SHARED_REFS_COUNT=2/);
     assert.match(remoteOutput, /DUPLICATION_AUDIT_PROJECT_ID=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
