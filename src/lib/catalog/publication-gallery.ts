@@ -9,6 +9,24 @@ import {
 
 export const PUBLICATION_GALLERY_TABLE = "publication_gallery_slides";
 
+/**
+ * PostgREST default max-rows is ~1000. A bulk `.in()` plus
+ * `limit = ids.length * CATALOG_GALLERY_MAX_SLIDES` exceeds that on the
+ * default catalog listing and fail-closes to an empty Map.
+ */
+export const PUBLICATION_GALLERY_POSTGREST_MAX_ROWS = 1000;
+
+/**
+ * Publications per gallery query. 30 × CATALOG_GALLERY_MAX_SLIDES (30) = 900
+ * rows, below PostgREST max-rows, and keeps `.in()` lists small.
+ */
+export const PUBLICATION_GALLERY_LOAD_CHUNK_SIZE = Math.min(
+  30,
+  Math.floor(
+    PUBLICATION_GALLERY_POSTGREST_MAX_ROWS / CATALOG_GALLERY_MAX_SLIDES,
+  ),
+);
+
 export type PublicationGallerySlideRow = {
   id: string;
   publication_id: string;
@@ -74,6 +92,68 @@ export function groupPublicationGalleryRowsByPublicationId(
   return result;
 }
 
+export function chunkPublicationGalleryIds(
+  ids: readonly string[],
+  chunkSize: number = PUBLICATION_GALLERY_LOAD_CHUNK_SIZE,
+): string[][] {
+  const size = Math.max(1, chunkSize);
+  const chunks: string[][] = [];
+
+  for (let index = 0; index < ids.length; index += size) {
+    chunks.push(ids.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function galleryChunkErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
+async function loadPublicationGalleryChunk(
+  supabase: SupabaseClient,
+  chunk: readonly string[],
+): Promise<Map<string, CatalogSlide[]>> {
+  try {
+    const { data, error } = await supabase
+      .from(PUBLICATION_GALLERY_TABLE)
+      .select("id, publication_id, image_url, position, alt")
+      .in("publication_id", chunk)
+      .order("position", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(chunk.length * CATALOG_GALLERY_MAX_SLIDES);
+
+    if (error) {
+      console.error(
+        "publication_gallery_chunk_load_error",
+        `chunkSize=${chunk.length} message=${galleryChunkErrorMessage(error)}`,
+      );
+      return new Map();
+    }
+
+    return groupPublicationGalleryRowsByPublicationId(
+      (data ?? []) as PublicationGallerySlideRow[],
+    );
+  } catch (error) {
+    console.error(
+      "publication_gallery_chunk_load_error",
+      `chunkSize=${chunk.length} message=${galleryChunkErrorMessage(error)}`,
+    );
+    return new Map();
+  }
+}
+
 export async function loadPublicationGalleriesByIds(
   supabase: SupabaseClient,
   publicationIds: readonly string[],
@@ -86,20 +166,15 @@ export async function loadPublicationGalleriesByIds(
     return new Map();
   }
 
-  const { data, error } = await supabase
-    .from(PUBLICATION_GALLERY_TABLE)
-    .select("id, publication_id, image_url, position, alt")
-    .in("publication_id", ids)
-    .order("position", { ascending: true })
-    .order("id", { ascending: true })
-    .limit(ids.length * CATALOG_GALLERY_MAX_SLIDES);
+  const result = new Map<string, CatalogSlide[]>();
 
-  if (error) {
-    console.error("publication_gallery_load_error", error.message);
-    return new Map();
+  for (const chunk of chunkPublicationGalleryIds(ids)) {
+    const chunkMap = await loadPublicationGalleryChunk(supabase, chunk);
+
+    for (const [publicationId, slides] of chunkMap) {
+      result.set(publicationId, slides);
+    }
   }
 
-  return groupPublicationGalleryRowsByPublicationId(
-    (data ?? []) as PublicationGallerySlideRow[],
-  );
+  return result;
 }

@@ -19,7 +19,31 @@ const shell = read("src/components/catalog/cards/CatalogCardShell.tsx");
 const css = read("src/app/globals.css");
 const grid = read("src/components/products/CatalogProductGrid.tsx");
 
-assert.match(gallery, /data-catalog-gallery/, "gallery scroller is marked");
+assert.match(
+  gallery,
+  /if \(pages\.length === 1\) \{/,
+  "empty gallery (cover only) keeps the static fallback",
+);
+const emptyGalleryFallback = gallery.match(
+  /if \(pages\.length === 1\) \{[\s\S]*?\n  \}/,
+)?.[0];
+assert.ok(emptyGalleryFallback, "empty-gallery fallback branch is present");
+assert.match(
+  emptyGalleryFallback,
+  /<Link[\s\S]*ProductCoverThumbnail/,
+  "empty-gallery fallback is still a static cover Link",
+);
+assert.doesNotMatch(
+  emptyGalleryFallback,
+  /data-catalog-gallery/,
+  "empty-gallery fallback does not mount the scroller",
+);
+assert.match(gallery, /data-catalog-gallery/, "non-empty gallery mounts the scroller");
+assert.match(
+  gallery,
+  /data-catalog-gallery-count=\{card\.gallery\.length\}/,
+  "non-empty gallery reports slide count",
+);
 assert.match(gallery, /catalog-card-gallery-slide/, "slides use the snap class");
 assert.match(shell, /data-catalog-media-zone/, "gallery lives in the media zone");
 assert.match(shell, /CatalogProductPlayButton/, "Play stays outside the scroller");
