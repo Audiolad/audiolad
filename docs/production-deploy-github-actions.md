@@ -251,13 +251,19 @@ read-only последовательность. **Не вызывает** `audio
 nginx / symlink cutover, не пишет в БД и Storage, не создаёт signed URL,
 не печатает URL, ключи и значения секретов. Загружает
 `shared/.env.production` только через `loadEnvConfig` текущего релиза
-(service role). Диагностирует один hardcoded project id
-`3832ded1-4100-447e-a8d4-7fc6a635f72e`: все строки
-`studio_project_assets` (включая soft-deleted), наличие
-`studio_asset_sources`, наличие Storage object через list/info (без
-signed URL), и original/source project через колонки
-`duplicated_from` / `parent*` если они есть в схеме, иначе name heuristic
-` — копия` и matching `source_id`.
+(service role). Сначала диагностирует один hardcoded project id
+`3832ded1-4100-447e-a8d4-7fc6a635f72e` (включая soft-deleted asset rows,
+`studio_asset_sources`, Storage list/info без signed URL, original/source
+через `duplicated_from` / `parent*` или name heuristic ` — копия`).
+Если строки `studio_projects` нет или запрос вернул ошибку — **не
+завершается**: всё равно читает assets по `project_id`, печатает
+`project_query_error` (redacted), host Supabase (без ключа и без полного
+URL), prefix-кандидаты `id ilike 3832ded1%`, затем глобальный read-only
+scan live `studio_project_assets` (`upload_state=reserved`,
+`deleted_at IS NULL`, `source_id IS NOT NULL`, `source_id <> id`),
+аудит `author_support_audit_events.action=studio_project_duplicated`
+(плюс name search «Молитва от уныния…») и проверку source project
+(`project_data.tracks` asset ids, refs, Storage existence).
 
 Exact flags:
 
@@ -270,6 +276,11 @@ ALL_RESERVED=
 SOURCE_OBJECTS_INTACT=
 ORIGINAL_PROJECT_ID=
 ORIGINAL_REFS_READY=
+BROKEN_SHARED_REFS_COUNT=
+BROKEN_PROJECT_IDS=
+3832DED1_FOUND=
+DUPLICATION_AUDIT_PROJECT_ID=
+DUPLICATION_AUDIT_SOURCE_PROJECT_ID=
 CUTOVER = NO
 audiolad_deploy = NOT_INVOKED
 MODE = read_only_duplicate_asset_diag
@@ -313,9 +324,10 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 - `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с PR-ветки при environment
   protection — diagnostic job не стартует; deploy job пропускается.
 - `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с `main` — только read-only
-  Studio duplicate-asset diagnostic для
-  `3832ded1-4100-447e-a8d4-7fc6a635f72e`, без writes, signed URL,
-  cutover и `audiolad-deploy`.
+  Studio duplicate-asset diagnostic: single-project probe для
+  `3832ded1-4100-447e-a8d4-7fc6a635f72e` плюс global broken shared refs
+  и duplication audit, без writes, signed URL, cutover и
+  `audiolad-deploy`.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
