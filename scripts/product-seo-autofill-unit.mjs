@@ -11,6 +11,8 @@ import {
 } from "../src/lib/seo/product-autofill/config.ts";
 import {
   PRODUCT_SEO_AI_ERROR_MESSAGE,
+  PRODUCT_SEO_AI_ERROR_MESSAGES,
+  authorFacingProductSeoAiErrorMessage,
   productSeoAiInvalidOutputError,
 } from "../src/lib/seo/product-autofill/errors.ts";
 import {
@@ -21,10 +23,14 @@ import {
   prependPrimaryAndShorten,
 } from "../src/lib/seo/product-autofill/orchestrate.ts";
 import { createProductSeoAiProvider } from "../src/lib/seo/product-autofill/provider.ts";
+import { buildProductSeoContentFilterFallback } from "../src/lib/seo/product-autofill/content-filter-fallback.ts";
 import {
   buildProductSeoGrounding,
   buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
+  buildProductSeoSafeGrounding,
+  buildProductSeoSafeSystemPrompt,
+  buildProductSeoSafeUserPrompt,
   buildProductSeoSystemPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
 } from "../src/lib/seo/product-autofill/prompt.ts";
@@ -68,6 +74,7 @@ import {
 import {
   buildYandexAiModelUri,
   YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS,
+  YANDEX_AI_CONTENT_FILTER_STATUS,
 } from "../src/lib/seo/product-autofill/yandex-provider.ts";
 import {
   faqAnswerIsQuestion,
@@ -162,6 +169,9 @@ function mockProvider(sequence) {
     calls,
     async generate(input) {
       return take("generate", { input });
+    },
+    async safeGenerate(input) {
+      return take("safeGenerate", { input });
     },
     async repair(input, previous, issues) {
       return take("repair", { input, previous, issues });
@@ -2237,6 +2247,7 @@ await withEnvAsync(yandexEnv({ YANDEX_AI_FOLDER_ID: undefined }), async () => {
 assert.equal(PRODUCT_SEO_AI_DEFAULT_PROVIDER, "openai");
 assert.equal(PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL, "yandexgpt-lite");
 assert.equal(YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS, "ALTERNATIVE_STATUS_FINAL");
+assert.equal(YANDEX_AI_CONTENT_FILTER_STATUS, "ALTERNATIVE_STATUS_CONTENT_FILTER");
 assert.equal(
   PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
   "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
@@ -4642,5 +4653,393 @@ const ungroundedDraft = validDraft({
   assert.doesNotMatch(practicePage, /FAQPage/);
   assert.doesNotMatch(section, /meta keywords|seoKeywords/i);
 }
+
+function contentFilteredResult(kind = "generate") {
+  return {
+    ok: false,
+    error: {
+      code: "CONTENT_FILTERED",
+      message: PRODUCT_SEO_AI_ERROR_MESSAGES.CONTENT_FILTERED,
+      providerStatus: YANDEX_AI_CONTENT_FILTER_STATUS,
+      kind,
+    },
+  };
+}
+
+const PRAYER_TITLE = "Молитва от уныния и депрессии";
+const CLAIM_FIXTURE_TITLE = "Страх болезни и деньги";
+
+function prayerRequest(overrides = {}) {
+  return requestInput({
+    title: PRAYER_TITLE,
+    subtitle: "Авторская запись",
+    description:
+      "Подробное свободное описание с личными деталями, которые не должны попасть в compact retry.",
+    productKind: "prayer",
+    seoPrimaryQuery: PRAYER_TITLE,
+    seoSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+    ...overrides,
+  });
+}
+
+function prayerSafeDraft(overrides = {}) {
+  return {
+    seoTitle: PRAYER_TITLE,
+    seoDescription: `«${PRAYER_TITLE}» – аудиозапись для самостоятельного прослушивания на АудиоЛаде.`,
+    usageItems: [
+      { content: "Слушать в спокойной обстановке для вечернего прослушивания." },
+      { content: "Возвращаться к записи в удобное время." },
+      { content: "Использовать как часть личной практики прослушивания." },
+    ],
+    faqItems: [
+      {
+        question: `Что такое «${PRAYER_TITLE}»?`,
+        answer: "Это аудиозапись для самостоятельного прослушивания.",
+        anchor: "chto-takoe",
+      },
+      {
+        question: "Как эта страница связана с авторской поисковой темой?",
+        answer: "Аудиоматериал на этой странице относится к поисковой теме «личная практика».",
+        anchor: "kak-svyazano",
+      },
+      listenOnlineFaq(PRAYER_TITLE),
+    ],
+    ...overrides,
+  };
+}
+
+assert.equal(
+  authorFacingProductSeoAiErrorMessage("CONTENT_FILTERED"),
+  PRODUCT_SEO_AI_ERROR_MESSAGES.CONTENT_FILTERED,
+);
+assert.notEqual(
+  PRODUCT_SEO_AI_ERROR_MESSAGES.CONTENT_FILTERED,
+  PRODUCT_SEO_AI_ERROR_MESSAGES.INVALID_OUTPUT,
+);
+
+await withEnvAsync(yandexEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS),
+      ),
+  ]);
+  const yandexProvider = createProductSeoAiProvider({
+    fetchImpl,
+    env: process.env,
+    rateLimit: createProductSeoAiRateLimitStore(),
+  });
+  const result = await yandexProvider.generate({ request: requestInput() });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "CONTENT_FILTERED");
+  assert.notEqual(result.error.code, "INVALID_OUTPUT");
+  assert.equal(result.error.providerStatus, YANDEX_AI_CONTENT_FILTER_STATUS);
+  assert.equal("diagnostic" in result.error, false);
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+{
+  const provider = mockProvider([{ ok: true, draft: validDraft(), raw: {} }]);
+  const result = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(requestInput(), {
+      userId: "content-filter-normal-call1",
+      provider,
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    }),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(provider.calls.length, 1);
+  assert.equal(provider.calls[0].kind, "generate");
+}
+
+{
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    { ok: true, draft: prayerSafeDraft(), raw: {} },
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest(), {
+        userId: "content-filter-prayer-recovery",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, true);
+  assert.equal(provider.calls.length, 2);
+  assert.equal(provider.calls[0].kind, "generate");
+  assert.equal(provider.calls[1].kind, "safeGenerate");
+  assert.equal(captured.result.data.seoTitle, PRAYER_TITLE);
+  assert.match(captured.text, /product_seo_ai_content_filtered/);
+  assert.match(captured.text, /product_seo_ai_content_filter_retry/);
+  assert.doesNotMatch(captured.text, /product_seo_ai_content_filter_fallback/);
+  assert.doesNotMatch(
+    captured.text,
+    /Подробное свободное описание с личными деталями/,
+  );
+  const safeGrounding = buildProductSeoSafeGrounding({
+    request: prayerRequest(),
+  });
+  assert.doesNotMatch(safeGrounding, /Подробное свободное описание с личными деталями/);
+  assert.doesNotMatch(safeGrounding, /О продукте/);
+  const safeSystem = buildProductSeoSafeSystemPrompt({ request: prayerRequest() });
+  assert.match(safeSystem, /нейтральный SEO-сопроводительный текст/);
+  assert.doesNotMatch(safeSystem, /О продукте/);
+  assert.match(safeGrounding, /Название продукта: Молитва от уныния и депрессии/);
+  assert.match(safeGrounding, /Основной запрос: Молитва от уныния и депрессии/);
+  assert.match(safeGrounding, /Активный дополнительный запрос №1: вечернее прослушивание/);
+  assert.match(safeGrounding, /Активный дополнительный запрос №2: личная практика/);
+}
+
+await withEnvAsync(yandexEnv(), async () => {
+  const { result, fetchImpl } = await generateYandexFromBodies(
+    [
+      yandexCompletion("{}", YANDEX_AI_CONTENT_FILTER_STATUS),
+      yandexCompletion(JSON.stringify(prayerSafeDraft())),
+    ],
+    "yandex-prayer-content-filter-recovery",
+    prayerRequest(),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(fetchImpl.calls.length, 2);
+  const call1 = JSON.parse(fetchImpl.calls[0].init.body);
+  const call2 = JSON.parse(fetchImpl.calls[1].init.body);
+  assert.match(JSON.stringify(call1.messages), /О продукте/);
+  assert.doesNotMatch(JSON.stringify(call2.messages), /О продукте/);
+  assert.doesNotMatch(
+    JSON.stringify(call2.messages),
+    /Подробное свободное описание с личными деталями/,
+  );
+});
+
+{
+  const provider = mockProvider([
+    contentFilteredResult("generate"),
+    contentFilteredResult("safe_generate"),
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const captured = await withCapturedInfo(() =>
+    withEnvAsync(enabledEnv(), () =>
+      generateProductSeoDraft(prayerRequest({ isFree: true }), {
+        userId: "content-filter-double-fallback",
+        provider,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      }),
+    ),
+  );
+  assert.equal(captured.result.ok, true, "double content filter must use local fallback");
+  assert.equal(provider.calls.length, 2);
+  assert.deepEqual(
+    provider.calls.map((call) => call.kind),
+    ["generate", "safeGenerate"],
+  );
+  assert.match(captured.text, /product_seo_ai_content_filter_fallback/);
+  assert.doesNotMatch(captured.text, /INVALID_OUTPUT/);
+
+  const draft = captured.result.data;
+  assert.equal(containsSeoPhrase(draft.seoTitle, PRAYER_TITLE), true);
+  assert.equal(containsSeoPhrase(draft.seoDescription, PRAYER_TITLE), true);
+  assert.equal(containsSeoPhrase(draft.faqItems[0].question, PRAYER_TITLE), true);
+  for (const item of draft.usageItems) {
+    assert.equal(countExactNormalizedSeoPhrase(item.content, PRAYER_TITLE), 0);
+  }
+  assert.equal(countExactNormalizedSeoPhrase(draft.faqItems[0].answer, PRAYER_TITLE), 0);
+  assert.equal(countExactNormalizedSeoPhrase(draft.faqItems[1].question, PRAYER_TITLE), 0);
+  assert.equal(countExactNormalizedSeoPhrase(draft.faqItems[1].answer, PRAYER_TITLE), 0);
+  assert.equal(countExactNormalizedSeoPhrase(draft.faqItems[2].answer, PRAYER_TITLE), 0);
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: PRAYER_TITLE,
+      activeSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+      usageItems: draft.usageItems,
+      faqItems: draft.faqItems,
+    }).secondary1UsageCovered,
+    true,
+  );
+  assert.equal(
+    evaluateSecondaryQueryCoverage({
+      primaryQuery: PRAYER_TITLE,
+      activeSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+      usageItems: draft.usageItems,
+      faqItems: draft.faqItems,
+    }).secondary2FaqCovered,
+    true,
+  );
+  assert.equal(
+    evaluatePrimaryQueryOveruse({
+      primaryQuery: PRAYER_TITLE,
+      productTitle: PRAYER_TITLE,
+      usageItems: draft.usageItems,
+      faqItems: draft.faqItems,
+    }).primaryOveruse,
+    false,
+  );
+  const freeIntent = evaluateListenOnlineFaqIntent({
+    productTitle: PRAYER_TITLE,
+    accessMode: "free",
+    faqItems: draft.faqItems,
+    primaryQuery: PRAYER_TITLE,
+    secondary2: "личная практика",
+  });
+  assert.equal(freeIntent.listenOnlineIntent, true);
+  assert.match(draft.faqItems[2].question, /бесплатно онлайн/);
+  assert.equal(freeIntent.q3Secondary2Contaminated, false);
+}
+
+{
+  const paidFallback = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(prayerRequest({ isFree: false }), {
+      userId: "content-filter-paid-q3",
+      provider: mockProvider([
+        contentFilteredResult("generate"),
+        contentFilteredResult("safe_generate"),
+      ]),
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    }),
+  );
+  assert.equal(paidFallback.ok, true);
+  assert.doesNotMatch(paidFallback.data.faqItems[2].question, /бесплатн/);
+  assert.doesNotMatch(paidFallback.data.faqItems[2].answer, /бесплатн/);
+}
+
+{
+  const claimRequest = requestInput({
+    title: CLAIM_FIXTURE_TITLE,
+    subtitle: "депрессия болезнь деньги страх",
+    description: "Этот текст лечит депрессию, избавляет от страха и гарантирует доход.",
+    productKind: "practice",
+    seoPrimaryQuery: CLAIM_FIXTURE_TITLE,
+    seoSecondaryQueries: ["страх перед выступлением", "тема денег в практике"],
+    isFree: false,
+  });
+  const result = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(claimRequest, {
+      userId: "content-filter-no-claims",
+      provider: mockProvider([
+        contentFilteredResult("generate"),
+        contentFilteredResult("safe_generate"),
+      ]),
+      aiRateLimit: createProductSeoAiRateLimitStore(),
+    }),
+  );
+  assert.equal(result.ok, true);
+  const allText = [
+    result.data.seoTitle,
+    result.data.seoDescription,
+    ...result.data.usageItems.map((item) => item.content),
+    ...result.data.faqItems.map((item) => `${item.question} ${item.answer}`),
+  ].join("\n");
+  assert.doesNotMatch(allText, /лечит|исцеляет|гарантирует|избавляет|поможет победить/i);
+  const validation = validateProductSeoAiDraft(result.data, {
+    primaryQuery: CLAIM_FIXTURE_TITLE,
+    title: CLAIM_FIXTURE_TITLE,
+    subtitle: claimRequest.subtitle,
+    description: claimRequest.description,
+    productKind: claimRequest.productKind,
+    usageItems: [],
+    manualSecondaryQueries: claimRequest.seoSecondaryQueries,
+  });
+  assert.equal(validation.ok, true);
+}
+
+{
+  const qualityAfterSafe = mockProvider([
+    contentFilteredResult("generate"),
+    {
+      ok: true,
+      draft: validDraft({
+        usageItems: [
+          { content: "В тихой комнате" },
+          { content: "После работы" },
+          { content: "Когда есть свободная минута" },
+        ],
+      }),
+      raw: {},
+    },
+    { ok: true, draft: validDraft(), raw: {} },
+  ]);
+  const result = await withEnvAsync(enabledEnv(), () =>
+    generateProductSeoDraft(
+      requestInput({ seoSecondaryQueries: ["практика перед сном"] }),
+      {
+        userId: "content-filter-max-three-calls",
+        provider: qualityAfterSafe,
+        aiRateLimit: createProductSeoAiRateLimitStore(),
+      },
+    ),
+  );
+  assert.equal(result.ok, true);
+  assert.ok(qualityAfterSafe.calls.length <= 3);
+  assert.equal(qualityAfterSafe.calls[0].kind, "generate");
+  assert.equal(qualityAfterSafe.calls[1].kind, "safeGenerate");
+}
+
+{
+  const localFallback = buildProductSeoContentFilterFallback({
+    title: PRAYER_TITLE,
+    productKind: "prayer",
+    primaryQuery: PRAYER_TITLE,
+    activeSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+    accessMode: "free",
+  });
+  const validated = validateProductSeoAiDraft(localFallback, {
+    primaryQuery: PRAYER_TITLE,
+    title: PRAYER_TITLE,
+    subtitle: "Авторская запись",
+    description: "Нейтральное описание.",
+    productKind: "prayer",
+    usageItems: [],
+    manualSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+  });
+  assert.equal(validated.ok, true);
+  assert.equal(
+    isSecondaryCoverageComplete(
+      evaluateSecondaryQueryCoverage({
+        primaryQuery: PRAYER_TITLE,
+        activeSecondaryQueries: ["вечернее прослушивание", "личная практика"],
+        usageItems: localFallback.usageItems,
+        faqItems: localFallback.faqItems,
+      }),
+      2,
+    ),
+    true,
+  );
+}
+
+const fallbackSource = read("src/lib/seo/product-autofill/content-filter-fallback.ts");
+const promptSource = read("src/lib/seo/product-autofill/prompt.ts");
+const yandexSource = read("src/lib/seo/product-autofill/yandex-provider.ts");
+const errorsSource = read("src/lib/seo/product-autofill/errors.ts");
+assert.match(yandexSource, /YANDEX_AI_CONTENT_FILTER_STATUS/);
+assert.match(yandexSource, /productSeoAiContentFilteredError/);
+assert.match(
+  yandexSource,
+  /if \(alternative\?\.status === YANDEX_AI_CONTENT_FILTER_STATUS\)/,
+);
+assert.match(orchestrate, /product_seo_ai_content_filtered/);
+assert.match(orchestrate, /product_seo_ai_content_filter_retry/);
+assert.match(orchestrate, /product_seo_ai_content_filter_fallback/);
+assert.match(orchestrate, /safeGenerate/);
+assert.match(orchestrate, /MAX_PROVIDER_CALLS = 3/);
+assert.match(promptSource, /buildProductSeoSafeGrounding/);
+assert.doesNotMatch(buildProductSeoSafeUserPrompt({ request: prayerRequest() }), /О продукте/);
+assert.doesNotMatch(fallbackSource, /bannedWords|allowedWords|BLOCKED_TOPIC|specialCase/);
+assert.doesNotMatch(errorsSource, /Yandex|модерац/i);
+assert.match(errorsSource, /CONTENT_FILTERED/);
+assert.match(
+  errorsSource,
+  /Сервис генерации не смог обработать этот текст\. Попробуйте немного изменить формулировку или заполнить SEO-поля вручную\./,
+);
+assert.match(section, /authorFacingProductSeoAiErrorMessage/);
+assert.doesNotMatch(section, /INVALID_OUTPUT/);
+assert.doesNotMatch(section, /Yandex|ALTERNATIVE_STATUS_CONTENT_FILTER/);
+assert.equal(
+  /молитва|депрессия|уныние|болезнь|страх/.test(
+    fallbackSource.replace(/["'`][^"'`]*["'`]/g, ""),
+  ),
+  false,
+);
 
 console.log("product-seo-autofill-unit: ok");

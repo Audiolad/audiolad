@@ -21,7 +21,10 @@ import {
   formatSeoSecondaryQueryBulkMessage,
   parseSeoSecondaryQueryList,
 } from "@/lib/seo/secondary-query-list";
-import { PRODUCT_SEO_AI_ERROR_MESSAGE } from "@/lib/seo/product-autofill/errors";
+import {
+  authorFacingProductSeoAiErrorMessage,
+  PRODUCT_SEO_AI_ERROR_MESSAGE,
+} from "@/lib/seo/product-autofill/errors";
 import {
   hasFilledGeneratedSeoFields,
   PRODUCT_SEO_ACCORDION_BADGE_COPY,
@@ -420,8 +423,10 @@ export default function AuthorProductSeoSection({
         !Array.isArray(payload.faqItems)
       ) {
         setGenerateError(
-          (payload && typeof payload.error === "string" && payload.error) ||
-            PRODUCT_SEO_AI_ERROR_MESSAGE,
+          authorFacingProductSeoAiErrorMessage(
+            payload && typeof payload.code === "string" ? payload.code : null,
+            payload && typeof payload.error === "string" ? payload.error : null,
+          ),
         );
         return;
       }

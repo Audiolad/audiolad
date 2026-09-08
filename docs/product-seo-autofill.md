@@ -61,6 +61,12 @@ document does not write production env.
 The UI never names the provider. The browser never receives keys or
 chooses the model.
 
+Yandex `ALTERNATIVE_STATUS_CONTENT_FILTER` is classified as
+`CONTENT_FILTERED`, not `INVALID_OUTPUT`. CALL1 stays the current rich
+generate. One compact safe retry may follow, then a local deterministic
+fallback if the retry is also filtered. Provider call budget stays 3.
+The UI shows a distinct author message only if every fallback path fails.
+
 ### Yandex AI Studio
 
 Official REST only:

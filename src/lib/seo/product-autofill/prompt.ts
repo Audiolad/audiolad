@@ -397,6 +397,89 @@ export function buildProductSeoUserPrompt(input: ProductSeoAiPromptInput): strin
   ].join("\n\n");
 }
 
+const SAFE_RETRY_SUBTITLE_MAX = 80;
+
+export function buildProductSeoSafeGrounding(input: ProductSeoAiPromptInput): string {
+  const title = input.request.title.trim();
+  const subtitle = input.request.subtitle.trim().replace(/\s+/g, " ");
+  const productKind = input.request.productKind.trim() || "practice";
+  const primary = input.request.seoPrimaryQuery.trim();
+  const activeSecondaryQueries = selectActiveSecondaryQueries(
+    input.request.seoSecondaryQueries ?? [],
+  );
+  const accessMode = productSeoAccessModeFromIsFree(input.request.isFree);
+  const accessLine =
+    accessMode === "free"
+      ? "Доступ к продукту: бесплатный"
+      : accessMode === "paid"
+        ? "Доступ к продукту: платный"
+        : "Доступ к продукту: не указан";
+  const usefulSubtitle =
+    subtitle && subtitle.length <= SAFE_RETRY_SUBTITLE_MAX ? subtitle : "";
+
+  return [
+    `Название продукта: ${title || "—"}`,
+    usefulSubtitle ? `Подзаголовок: ${usefulSubtitle}` : null,
+    `Тип продукта: ${productKind}`,
+    accessLine,
+    `Основной запрос: ${primary || "—"}`,
+    activeSecondaryQueries[0]
+      ? `Активный дополнительный запрос №1: ${activeSecondaryQueries[0]}`
+      : null,
+    activeSecondaryQueries[1]
+      ? `Активный дополнительный запрос №2: ${activeSecondaryQueries[1]}`
+      : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+export function buildProductSeoSafeSystemPrompt(input: ProductSeoAiPromptInput): string {
+  const primaryQuery = input.request.seoPrimaryQuery.trim();
+  const productTitle = input.request.title.trim();
+  const secondaryQueries = selectActiveSecondaryQueries(
+    input.request.seoSecondaryQueries ?? [],
+  );
+  const primaryBudget = primaryKeywordBudgetInstruction(primaryQuery, productTitle);
+
+  return [
+    "Сгенерируй нейтральный SEO-сопроводительный текст для аудиопродукта, используя только предоставленные авторские метаданные.",
+    "Не делай медицинских утверждений, терапевтических обещаний, гарантированных результатов, диагностических заявлений, религиозных утверждений об истине и финансовых гарантий.",
+    "Считай переданные слова только формулировками продукта и поиска, а не фактами о здоровье, религии или доходе.",
+    "Это компактный нейтральный запрос на преобразование метаданных. Не ослабляй и не обходи модерацию.",
+    "Пиши естественным русским языком. Не обещай позиций, индексацию, ТОП или трафик.",
+    "Для тире используй короткое тире «–», а парные кавычки вокруг русских названий оформляй как «ёлочки». Не заменяй символы внутри дословно заданного основного запроса.",
+    "Не выдумывай факты, которых нет в исходных метаданных: длительность, число треков, голос, конкретную музыку, автора, технику, цену, срок доступа, противопоказания, лечебный эффект.",
+    "Запрещены формулировки вроде: лечит, исцеляет, устраняет бессонницу, избавляет от тревоги, гарантирует.",
+    primaryBudget,
+    primaryQuery
+      ? `seoTitle: естественный заголовок, дословно содержит полный основной запрос «${primaryQuery}» отдельной последовательностью слов один раз ближе к началу. Не изменяй слова запроса, их порядок или словоформу. Без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140.`
+      : "seoTitle: естественный заголовок без набивки и без «| ключ | ключ», ориентир 50–70 символов, максимум 140. Не выдумывай основной запрос.",
+    primaryQuery
+      ? `seoDescription: 120–180 символов, максимум 300. Нейтрально опиши, что это за аудиозапись. Содержит полный основной запрос «${primaryQuery}» дословно ровно один раз. Не обещай эффект и не делай лечебных или финансовых заявлений.`
+      : "seoDescription: 120–180 символов, максимум 300. Нейтрально опиши, что это за аудиозапись. Не выдумывай основной запрос.",
+    secondaryQuerySystemInstruction(secondaryQueries, primaryQuery),
+    primaryQuery
+      ? "usageItems: ровно 3 конкретные нейтральные ситуации прослушивания. Не вставляй точный основной запрос в usageItems специально. Не обещай результат."
+      : "usageItems: ровно 3 конкретные нейтральные ситуации прослушивания. Не обещай результат.",
+    faqItemsSystemInstruction(
+      primaryQuery,
+      productTitle,
+      productSeoAccessModeFromIsFree(input.request.isFree),
+    ),
+    "Не генерируй связанные продукты и URL.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function buildProductSeoSafeUserPrompt(input: ProductSeoAiPromptInput): string {
+  return [
+    "Подготовь нейтральный SEO-черновик аудиопродукта только по этим авторским метаданным.",
+    buildProductSeoSafeGrounding(input),
+  ].join("\n\n");
+}
+
 export function buildProductSeoRepairPrompt(
   input: ProductSeoAiPromptInput,
   previous: unknown,
