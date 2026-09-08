@@ -5,7 +5,9 @@ import {
   getProductSeoAiConfig,
   type ProductSeoAiConfig,
 } from "@/lib/seo/product-autofill/config";
+import { buildProductSeoContentFilterFallback } from "@/lib/seo/product-autofill/content-filter-fallback";
 import {
+  productSeoAiContentFilteredError,
   productSeoAiError,
   productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
@@ -37,6 +39,8 @@ import {
 import {
   productSeoAccessModeFromIsFree,
   type ProductSeoAiErrorCode,
+  type ProductSeoAiErrorResult,
+  type ProductSeoAiProviderCallKind,
   type ProductSeoAiRawDraft,
   type ProductSeoAiResult,
   type ProductSeoAutofillDraft,
@@ -570,6 +574,9 @@ export async function generateProductSeoDraft(
     );
     providerCallCount += 1;
     if (!repaired.ok || !repaired.draft?.usageItems || !repaired.draft?.faqItems) {
+      if (isContentFilteredResult(repaired)) {
+        logContentFiltered(repaired, repaired.error.kind ?? "quality_repair", providerCallCount);
+      }
       return { ok: true, data: fallbackHardValidDraft };
     }
 
@@ -754,13 +761,91 @@ export async function generateProductSeoDraft(
   }
 
   const provider = options.provider ?? createProductSeoAiProvider({ env, config });
+
+  function isContentFilteredResult(
+    result: { ok: true } | { ok: false; error: { code: string; providerStatus?: string; kind?: ProductSeoAiProviderCallKind } },
+  ): result is {
+    ok: false;
+    error: {
+      code: "CONTENT_FILTERED";
+      message: string;
+      providerStatus?: string;
+      kind?: ProductSeoAiProviderCallKind;
+    };
+  } {
+    return !result.ok && result.error.code === "CONTENT_FILTERED";
+  }
+
+  function logContentFiltered(
+    result: ProductSeoAiErrorResult,
+    kind: ProductSeoAiProviderCallKind,
+    providerCallNumber: number,
+  ): void {
+    const providerStatus =
+      result.error.code === "CONTENT_FILTERED"
+        ? result.error.providerStatus ?? "ALTERNATIVE_STATUS_CONTENT_FILTER"
+        : "ALTERNATIVE_STATUS_CONTENT_FILTER";
+    logProductSeoAiEvent("product_seo_ai_content_filtered", {
+      provider: config.provider,
+      model: config.model,
+      kind,
+      providerStatus,
+      providerCallNumber,
+    });
+  }
+
+  function completeWithContentFilterFallback(): ProductSeoAiResult {
+    logProductSeoAiEvent("product_seo_ai_content_filter_fallback", {
+      provider: config.provider,
+      model: config.model,
+      providerCallNumber: providerCallCount,
+    });
+    const fallbackDraft = normalizeGeneratedDraft(
+      buildProductSeoContentFilterFallback({
+        title: request.title,
+        productKind: request.productKind,
+        primaryQuery: primary,
+        activeSecondaryQueries,
+        accessMode: productSeoAccessModeFromIsFree(request.isFree),
+      }),
+    );
+    const fallbackValidation = validateDraft(fallbackDraft);
+    if (!fallbackValidation.ok) {
+      return productSeoAiContentFilteredError({ kind: "safe_generate" });
+    }
+    return { ok: true, data: fallbackValidation.draft };
+  }
+
   const first = await provider.generate(promptInput);
   providerCallCount += 1;
   if (!first.ok) {
-    return first;
+    if (!isContentFilteredResult(first)) {
+      return first;
+    }
+    logContentFiltered(first, first.error.kind ?? "generate", providerCallCount);
+    logProductSeoAiEvent("product_seo_ai_content_filter_retry", {
+      provider: config.provider,
+      model: config.model,
+      providerCallNumber: providerCallCount + 1,
+    });
+    const retried = await provider.safeGenerate(promptInput);
+    providerCallCount += 1;
+    if (!retried.ok) {
+      if (!isContentFilteredResult(retried)) {
+        return retried;
+      }
+      logContentFiltered(retried, retried.error.kind ?? "safe_generate", providerCallCount);
+      return completeWithContentFilterFallback();
+    }
+    return continueFromGeneratedDraft(retried.draft);
   }
 
-  const firstDraft = normalizeGeneratedDraft(first.draft);
+  return continueFromGeneratedDraft(first.draft);
+
+  async function continueFromGeneratedDraft(
+    rawDraft: ProductSeoAiRawDraft,
+  ): Promise<ProductSeoAiResult> {
+  const firstDraft = normalizeGeneratedDraft(rawDraft);
   const firstValidation = validateDraft(firstDraft);
 
   if (firstValidation.ok) {
@@ -781,6 +866,9 @@ export async function generateProductSeoDraft(
   );
   providerCallCount += 1;
   if (!repaired.ok) {
+    if (isContentFilteredResult(repaired)) {
+      logContentFiltered(repaired, repaired.error.kind ?? "repair", providerCallCount);
+    }
     return repaired;
   }
 
@@ -829,6 +917,9 @@ export async function generateProductSeoDraft(
     );
     providerCallCount += 1;
     if (!thirdRepair.ok) {
+      if (isContentFilteredResult(thirdRepair)) {
+        logContentFiltered(thirdRepair, thirdRepair.error.kind ?? "repair", providerCallCount);
+      }
       return thirdRepair;
     }
 
@@ -867,4 +958,5 @@ export async function generateProductSeoDraft(
   }
 
   return completeWithOptionalQualityRepair(repairedValidation.draft, repairedDraft);
+  }
 }

@@ -63,6 +63,36 @@ function hasPageAccessWording(text: string): boolean {
  * Soft quality signal for reserved FAQ Q3 listen-online intent.
  * Not a hard validator. Never invents free access.
  */
+/**
+ * Deterministic Q3 listen-online contract. Uses only the product title and
+ * confirmed access mode. Never invents free access.
+ */
+export function buildDeterministicListenOnlineFaqItem(input: {
+  productTitle: string;
+  accessMode: ProductSeoAccessMode;
+}): { question: string; answer: string; anchor: string } {
+  const title = input.productTitle.trim();
+  const subject = title ? `«${title}»` : "этот материал";
+  const free = input.accessMode === "free";
+  const paid = input.accessMode === "paid";
+
+  const question = free
+    ? `Где можно послушать ${subject} бесплатно онлайн?`
+    : `Где можно послушать ${subject} онлайн?`;
+
+  const answer = free
+    ? "Эту запись можно бесплатно слушать онлайн прямо на этой странице в плеере АудиоЛада."
+    : paid
+      ? "Эту запись можно слушать онлайн на этой странице после получения доступа."
+      : "Эту запись можно слушать онлайн на этой странице в плеере АудиоЛада.";
+
+  return {
+    question,
+    answer,
+    anchor: "gde-poslushat",
+  };
+}
+
 export function evaluateListenOnlineFaqIntent(
   input: ListenOnlineFaqIntentInput,
 ): ListenOnlineFaqIntent {

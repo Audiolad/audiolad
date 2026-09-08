@@ -346,6 +346,15 @@ assert.match(section, /hasFilledGeneratedSeoFields/);
 assert.match(section, /getProductSeoSecondaryUsage/);
 assert.match(section, /secondaryUsageByQuery/);
 assert.match(section, /api\/author\/seo\/product-autofill/);
+assert.match(section, /authorFacingProductSeoAiErrorMessage/);
+assert.doesNotMatch(section, /ALTERNATIVE_STATUS_CONTENT_FILTER|YandexGPT|модерац/i);
+const autofillErrors = read("src/lib/seo/product-autofill/errors.ts");
+assert.match(autofillErrors, /CONTENT_FILTERED/);
+assert.match(
+  autofillErrors,
+  /Сервис генерации не смог обработать этот текст\. Попробуйте немного изменить формулировку или заполнить SEO-поля вручную\./,
+);
+assert.doesNotMatch(autofillErrors, /Yandex|ALTERNATIVE_STATUS/);
 assert.match(section, /isFree: boolean/);
 assert.match(section, /isFree,/);
 assert.match(

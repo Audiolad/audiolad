@@ -14,6 +14,8 @@ import { createYandexProductSeoAiProvider } from "@/lib/seo/product-autofill/yan
 import {
   buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
+  buildProductSeoSafeSystemPrompt,
+  buildProductSeoSafeUserPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -37,6 +39,7 @@ export type ProductSeoAiProviderResult =
 
 export type ProductSeoAiProvider = {
   generate(input: ProductSeoAiPromptInput): Promise<ProductSeoAiProviderResult>;
+  safeGenerate(input: ProductSeoAiPromptInput): Promise<ProductSeoAiProviderResult>;
   repair(
     input: ProductSeoAiPromptInput,
     previous: unknown,
@@ -186,6 +189,7 @@ function resultContainsSecret(value: unknown, secret: string | null): boolean {
 function createUnknownProductSeoAiProvider(): ProductSeoAiProvider {
   return {
     generate: async () => productSeoAiError("PROVIDER_ERROR"),
+    safeGenerate: async () => productSeoAiError("PROVIDER_ERROR"),
     repair: async () => productSeoAiError("PROVIDER_ERROR"),
     qualityRepair: async () => productSeoAiError("PROVIDER_ERROR"),
   };
@@ -201,7 +205,7 @@ function createOpenAiProductSeoAiProvider(
 
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
-    kind: "generate" | "repair" | "quality_repair",
+    kind: "generate" | "repair" | "quality_repair" | "safe_generate",
     generateIssues?: string[],
   ): Promise<ProductSeoAiProviderResult> {
     const { systemPrompt, userPrompt } = prompts;
@@ -257,7 +261,7 @@ function createOpenAiProductSeoAiProvider(
         error: "INVALID_OUTPUT",
       });
       return productSeoAiInvalidOutputError(
-        kind === "generate"
+        kind === "generate" || kind === "safe_generate"
           ? { stage: "provider_generate" }
           : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
       );
@@ -284,6 +288,15 @@ function createOpenAiProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
+      );
+    },
+    safeGenerate(input) {
+      return callModel(
+        {
+          systemPrompt: buildProductSeoSafeSystemPrompt(input),
+          userPrompt: buildProductSeoSafeUserPrompt(input),
+        },
+        "safe_generate",
       );
     },
     repair(input, previous, generateIssues) {

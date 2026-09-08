@@ -94,12 +94,19 @@ export type ProductSeoAiRawDraft = {
 
 export type ProductSeoAccordionBadgeKind = "recommend" | "partial" | "ready";
 
+export type ProductSeoAiProviderCallKind =
+  | "generate"
+  | "repair"
+  | "quality_repair"
+  | "safe_generate";
+
 export type ProductSeoAiErrorCode =
   | "AI_DISABLED"
   | "NOT_CONFIGURED"
   | "RATE_LIMITED"
   | "TIMEOUT"
   | "PROVIDER_ERROR"
+  | "CONTENT_FILTERED"
   | "INVALID_OUTPUT"
   | "INVALID_PRIMARY"
   | "MISSING_PRIMARY"
@@ -170,8 +177,14 @@ export type ProductSeoAiErrorResult = {
   ok: false;
   error:
     | {
-        code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">;
+        code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT" | "CONTENT_FILTERED">;
         message: string;
+      }
+    | {
+        code: "CONTENT_FILTERED";
+        message: string;
+        providerStatus?: string;
+        kind?: ProductSeoAiProviderCallKind;
       }
     | {
         code: "INVALID_OUTPUT";

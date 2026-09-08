@@ -1,6 +1,7 @@
 import type {
   ProductSeoAiErrorCode,
   ProductSeoAiErrorResult,
+  ProductSeoAiProviderCallKind,
   ProductSeoInvalidOutputDiagnostic,
 } from "@/lib/seo/product-autofill/types";
 import { normalizeProductSeoValidationIssues } from "@/lib/seo/product-autofill/validate";
@@ -17,11 +18,41 @@ export const PRODUCT_SEO_AI_ERROR_MESSAGES: Record<
   RATE_LIMITED: "Слишком много попыток подряд. Попробуйте немного позже.",
   TIMEOUT: PRODUCT_SEO_AI_ERROR_MESSAGE,
   PROVIDER_ERROR: PRODUCT_SEO_AI_ERROR_MESSAGE,
+  CONTENT_FILTERED:
+    "Сервис генерации не смог обработать этот текст. Попробуйте немного изменить формулировку или заполнить SEO-поля вручную.",
   INVALID_OUTPUT: PRODUCT_SEO_AI_ERROR_MESSAGE,
   INVALID_PRIMARY: "Сначала выберите основной поисковый запрос.",
   MISSING_PRIMARY: "Сначала выберите основной поисковый запрос.",
   INVALID_STYLE_PROFILE: "Некорректные настройки стиля текста.",
 };
+
+export function productSeoAiContentFilteredError(details?: {
+  providerStatus?: string;
+  kind?: ProductSeoAiProviderCallKind;
+}): ProductSeoAiErrorResult {
+  return {
+    ok: false,
+    error: {
+      code: "CONTENT_FILTERED",
+      message: PRODUCT_SEO_AI_ERROR_MESSAGES.CONTENT_FILTERED,
+      ...(details?.providerStatus ? { providerStatus: details.providerStatus } : {}),
+      ...(details?.kind ? { kind: details.kind } : {}),
+    },
+  };
+}
+
+export function authorFacingProductSeoAiErrorMessage(
+  code?: string | null,
+  fallbackMessage?: string | null,
+): string {
+  if (code === "CONTENT_FILTERED") {
+    return PRODUCT_SEO_AI_ERROR_MESSAGES.CONTENT_FILTERED;
+  }
+  if (typeof fallbackMessage === "string" && fallbackMessage.trim()) {
+    return fallbackMessage;
+  }
+  return PRODUCT_SEO_AI_ERROR_MESSAGE;
+}
 
 export function productSeoAiError(
   code: Exclude<ProductSeoAiErrorCode, "INVALID_OUTPUT">,
@@ -162,6 +193,7 @@ export function productSeoAiHttpStatus(code: ProductSeoAiErrorCode): number {
     case "MISSING_PRIMARY":
     case "INVALID_STYLE_PROFILE":
     case "INVALID_OUTPUT":
+    case "CONTENT_FILTERED":
       return 400;
     case "RATE_LIMITED":
       return 429;

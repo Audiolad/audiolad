@@ -7,12 +7,15 @@ import {
 } from "@/lib/seo/product-autofill/config";
 import {
   classifyProductSeoAiHttpError,
+  productSeoAiContentFilteredError,
   productSeoAiError,
   productSeoAiInvalidOutputError,
 } from "@/lib/seo/product-autofill/errors";
 import {
   buildProductSeoQualityRepairPrompt,
   buildProductSeoRepairPrompt,
+  buildProductSeoSafeSystemPrompt,
+  buildProductSeoSafeUserPrompt,
   buildProductSeoSystemPrompt,
   buildProductSeoUserPrompt,
   PRODUCT_SEO_AI_JSON_SCHEMA,
@@ -26,6 +29,7 @@ import {
   PRODUCT_SEO_YANDEX_AI_DEFAULT_MODEL,
   type ProductSeoAiErrorCode,
   type ProductSeoAiErrorResult,
+  type ProductSeoAiProviderCallKind,
   type ProductSeoAiRawDraft,
 } from "@/lib/seo/product-autofill/types";
 import { parseProductSeoAiRawDraft } from "@/lib/seo/product-autofill/validate";
@@ -36,6 +40,7 @@ export type YandexProductSeoAiProviderResult =
 
 export type YandexProductSeoAiProvider = {
   generate(input: ProductSeoAiPromptInput): Promise<YandexProductSeoAiProviderResult>;
+  safeGenerate(input: ProductSeoAiPromptInput): Promise<YandexProductSeoAiProviderResult>;
   repair(
     input: ProductSeoAiPromptInput,
     previous: unknown,
@@ -71,6 +76,7 @@ const BLOCKED_LOG_FIELDS = new Set([
 ]);
 
 export const YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS = "ALTERNATIVE_STATUS_FINAL";
+export const YANDEX_AI_CONTENT_FILTER_STATUS = "ALTERNATIVE_STATUS_CONTENT_FILTER";
 
 export function buildYandexAiModelUri(folderId: string, modelId: string): string {
   return `gpt://${folderId}/${modelId}/latest`;
@@ -214,11 +220,11 @@ function fail(
 }
 
 function invalidOutput(
-  kind: "generate" | "repair" | "quality_repair",
+  kind: ProductSeoAiProviderCallKind,
   generateIssues?: string[],
 ): ProductSeoAiErrorResult {
   return productSeoAiInvalidOutputError(
-    kind === "generate"
+    kind === "generate" || kind === "safe_generate"
       ? { stage: "provider_generate" }
       : { stage: "provider_repair", generateIssues: generateIssues ?? [] },
   );
@@ -235,7 +241,7 @@ export function createYandexProductSeoAiProvider(
 
   async function callModel(
     prompts: { systemPrompt: string; userPrompt: string },
-    kind: "generate" | "repair" | "quality_repair",
+    kind: ProductSeoAiProviderCallKind,
     generateIssues?: string[],
   ): Promise<YandexProductSeoAiProviderResult> {
     const apiKey = readYandexAiApiKey(env);
@@ -282,6 +288,12 @@ export function createYandexProductSeoAiProvider(
 
     const alternative = readYandexFirstAlternative(attempt.body);
     if (!alternative || alternative.status !== YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS) {
+      if (alternative?.status === YANDEX_AI_CONTENT_FILTER_STATUS) {
+        return productSeoAiContentFilteredError({
+          providerStatus: alternative.status,
+          kind,
+        });
+      }
       logAiEvent("yandex_completion_invalid", {
         provider: "yandex",
         model,
@@ -340,6 +352,15 @@ export function createYandexProductSeoAiProvider(
           userPrompt: buildProductSeoUserPrompt(input),
         },
         "generate",
+      );
+    },
+    safeGenerate(input: ProductSeoAiPromptInput) {
+      return callModel(
+        {
+          systemPrompt: buildProductSeoSafeSystemPrompt(input),
+          userPrompt: buildProductSeoSafeUserPrompt(input),
+        },
+        "safe_generate",
       );
     },
     repair(input, previous, generateIssues) {
