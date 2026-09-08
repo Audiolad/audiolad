@@ -270,7 +270,7 @@ scan live `studio_project_assets` (`upload_state=reserved`,
 
 Секция **VERIFY LIVE ASSETS** читает live (`deleted_at IS NULL`) assets
 для `AUDIOLAD_DUP_VERIFY_PROJECT_ID` (default
-`08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120`, «Молитва от уныния и депрессии
+`d8b6ad31-d5e1-4c0f-9f3c-ccd7067cf120`, «Молитва от уныния и депрессии
 — копия 2»). Для каждого live asset: `id`, `source_id`, `upload_state`,
 `source_id_equals_id` YES/NO, `source_id_on_source_project` YES/NO
 против `AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID` (default
@@ -354,7 +354,7 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
   Studio duplicate-asset diagnostic: single-project probe для
   `3832ded1-4100-4478-a8d4-7fc6a635f72e` (override
   `AUDIOLAD_DUP_ASSET_PROJECT_ID`) плюс VERIFY LIVE ASSETS default
-  `08b6ad31-d5e1-4c0f-9f3c-ccd7067cf120` vs source
+  `d8b6ad31-d5e1-4c0f-9f3c-ccd7067cf120` vs source
   `6780c421-4411-4114-9c27-5f433dca1c2a`, global broken shared refs
   и duplication audit, без writes, signed URL, cutover и
   `audiolad-deploy`.
