@@ -243,6 +243,51 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### Read-only Studio duplicate-asset diagnostic (`confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG`)
+
+Тот же workflow, но `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` запускает job
+**Ops Studio duplicate asset diagnostic**: SSH как `deploy`, фиксированная
+read-only последовательность. **Не вызывает** `audiolad-deploy`, не делает
+nginx / symlink cutover, не пишет в БД и Storage, не создаёт signed URL,
+не печатает URL, ключи и значения секретов. Загружает
+`shared/.env.production` только через `loadEnvConfig` текущего релиза
+(service role). Диагностирует один hardcoded project id
+`3832ded1-4100-447e-a8d4-7fc6a635f72e`: все строки
+`studio_project_assets` (включая soft-deleted), наличие
+`studio_asset_sources`, наличие Storage object через list/info (без
+signed URL), и original/source project через колонки
+`duplicated_from` / `parent*` если они есть в схеме, иначе name heuristic
+` — копия` и matching `source_id`.
+
+Exact flags:
+
+```text
+BROKEN_PROJECT_ID=
+ASSET_ROW_COUNT=
+UPLOAD_STATE_COUNTS=
+SOURCE_ID_NE_ID_COUNT=
+ALL_RESERVED=
+SOURCE_OBJECTS_INTACT=
+ORIGINAL_PROJECT_ID=
+ORIGINAL_REFS_READY=
+CUTOVER = NO
+audiolad_deploy = NOT_INVOKED
+MODE = read_only_duplicate_asset_diag
+```
+
+DEPLOY NOT IN SCOPE.
+
+Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
+делает checkout):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-studio-duplicate-asset-diag.sh
+```
+
+**Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
+branch **`main`**. Ослаблять protection нельзя.
+
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
@@ -265,6 +310,12 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 - `confirm=OPS_DISK_STORAGE_CLEANUP` с `main` — только hardcoded allowlist
   cleanup 13 пунктов audit run 34113627251, без cutover и без
   `audiolad-deploy`.
+- `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с PR-ветки при environment
+  protection — diagnostic job не стартует; deploy job пропускается.
+- `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с `main` — только read-only
+  Studio duplicate-asset diagnostic для
+  `3832ded1-4100-447e-a8d4-7fc6a635f72e`, без writes, signed URL,
+  cutover и `audiolad-deploy`.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
