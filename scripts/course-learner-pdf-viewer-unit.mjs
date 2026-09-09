@@ -17,7 +17,6 @@ import {
   resolveCourseLearnerFileHttpMode,
 } from "../src/lib/course-content/learner-file-http.ts";
 import {
-  COURSE_LEARNER_PDF_ERROR_LABEL,
   COURSE_LEARNER_PDF_LOADING_LABEL,
   computePdfPageCssSize,
   documentHasHorizontalOverflow,
