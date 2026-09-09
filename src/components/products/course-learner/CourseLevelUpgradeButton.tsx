@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { mapCourseUpgradeClientError } from "@/lib/course-content/course-upgrade-client-errors";
+import { resolveCourseUpgradeUiError } from "@/lib/course-content/course-upgrade-client-errors";
 
 type CourseLevelUpgradeButtonProps = {
   practiceId: string;
@@ -49,11 +49,6 @@ export default function CourseLevelUpgradeButton({
           ? (body as { error: string }).error
           : undefined;
 
-      if (response.status === 401) {
-        setErrorMessage(mapCourseUpgradeClientError("unauthorized"));
-        return;
-      }
-
       const paymentUrl =
         body &&
         typeof body === "object" &&
@@ -64,14 +59,20 @@ export default function CourseLevelUpgradeButton({
           ? (body as { payment: { payment_url: string } }).payment.payment_url
           : null;
 
-      if (!response.ok || !paymentUrl) {
-        setErrorMessage(mapCourseUpgradeClientError(errorCode));
+      const uiError = resolveCourseUpgradeUiError({
+        httpStatus: response.status,
+        errorCode,
+        paymentUrl,
+      });
+
+      if (uiError) {
+        setErrorMessage(uiError);
         return;
       }
 
-      window.location.assign(paymentUrl);
+      window.location.assign(paymentUrl as string);
     } catch {
-      setErrorMessage(mapCourseUpgradeClientError(undefined));
+      setErrorMessage(resolveCourseUpgradeUiError({ httpStatus: 0, networkFailed: true }));
     } finally {
       setIsLoading(false);
     }

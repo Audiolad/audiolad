@@ -21,7 +21,11 @@ function fail(
   stage: string,
   error: string,
   status: number,
-  extra?: { orderId?: string | null; practiceId?: string | null },
+  extra?: {
+    orderId?: string | null;
+    practiceId?: string | null;
+    targetAccessLevel?: number | null;
+  },
 ) {
   logCourseUpgradeFailure({
     stage,
@@ -29,6 +33,7 @@ function fail(
     status,
     orderId: extra?.orderId,
     practiceId: extra?.practiceId,
+    targetAccessLevel: extra?.targetAccessLevel,
   });
   return NextResponse.json({ error }, { status });
 }
@@ -73,11 +78,13 @@ export async function POST(request: Request) {
   }
 
   const practiceId = parsed.value.practiceId;
+  const targetAccessLevel = parsed.value.targetAccessLevel ?? null;
   const customerEmail = user.email?.trim() ?? "";
 
   if (!customerEmail) {
     return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
       practiceId,
+      targetAccessLevel,
     });
   }
 
@@ -88,6 +95,7 @@ export async function POST(request: Request) {
   if (typeof idempotencyKey !== "string") {
     return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
       practiceId,
+      targetAccessLevel,
     });
   }
 
@@ -103,7 +111,7 @@ export async function POST(request: Request) {
       COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
       mapped.error,
       mapped.status,
-      { practiceId },
+      { practiceId, targetAccessLevel },
     );
   }
 
@@ -117,7 +125,7 @@ export async function POST(request: Request) {
       COURSE_UPGRADE_CHECKOUT_STAGES.COERCE,
       "internal_error",
       500,
-      { practiceId },
+      { practiceId, targetAccessLevel },
     );
   }
 
@@ -130,14 +138,18 @@ export async function POST(request: Request) {
       COURSE_UPGRADE_CHECKOUT_STAGES.START_TOCHKA,
       "payments_not_configured",
       503,
-      { orderId: orderRow.order_id, practiceId },
+      {
+        orderId: orderRow.order_id,
+        practiceId,
+        targetAccessLevel: orderRow.target_access_level,
+      },
     );
   }
 
   const { data: payable, error: payableError } = await serviceRoleClient
     .from("orders")
     .select(
-      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at",
+      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at, order_kind, target_access_level",
     )
     .eq("id", orderRow.order_id)
     .maybeSingle();
@@ -148,7 +160,11 @@ export async function POST(request: Request) {
       COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD,
       "internal_error",
       500,
-      { orderId: orderRow.order_id, practiceId },
+      {
+        orderId: orderRow.order_id,
+        practiceId,
+        targetAccessLevel: orderRow.target_access_level,
+      },
     );
   }
 
@@ -163,14 +179,30 @@ export async function POST(request: Request) {
     return fail(started.stage, started.error, started.status, {
       orderId: orderRow.order_id,
       practiceId,
+      targetAccessLevel: orderRow.target_access_level,
     });
+  }
+
+  const paymentUrl = started.body.payment.payment_url.trim();
+
+  if (!paymentUrl) {
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.PAYMENT_URL,
+      "provider_checkout_failed",
+      502,
+      {
+        orderId: orderRow.order_id,
+        practiceId,
+        targetAccessLevel: orderRow.target_access_level,
+      },
+    );
   }
 
   return NextResponse.json(
     toCourseUpgradeSuccessBody({
       order: orderRow,
       paymentId: started.body.payment.id,
-      paymentUrl: started.body.payment.payment_url,
+      paymentUrl,
     }),
     { status: started.status === 201 ? 201 : 200 },
   );

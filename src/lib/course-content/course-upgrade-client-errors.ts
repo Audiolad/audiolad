@@ -19,6 +19,9 @@ export type CourseUpgradeClientErrorCode =
 export const COURSE_UPGRADE_GENERIC_ERROR =
   "Не удалось начать оплату. Попробуйте ещё раз.";
 
+export const COURSE_UPGRADE_NETWORK_ERROR =
+  "Не удалось связаться с сервером. Проверьте соединение и попробуйте ещё раз.";
+
 /**
  * Stable listener-facing copy for known checkout states.
  * Does not include provider tokens, raw Tochka payloads, or internal stages.
@@ -55,7 +58,43 @@ export function mapCourseUpgradeClientError(
       return "Не удалось начать оплату. Обновите страницу и попробуйте ещё раз.";
     case "provider_checkout_failed":
       return "Платёжная система не создала ссылку. Попробуйте ещё раз через минуту.";
+    case "internal_error":
+      return COURSE_UPGRADE_GENERIC_ERROR;
     default:
       return COURSE_UPGRADE_GENERIC_ERROR;
   }
+}
+
+/**
+ * Production main collapsed unmapped codes, 2xx-without-URL, and network
+ * throws into the same generic sentence. Keep those three paths distinct
+ * where the backend state is known and safe to show.
+ */
+export function resolveCourseUpgradeUiError(input: {
+  httpStatus: number;
+  errorCode?: string;
+  paymentUrl?: string | null;
+  networkFailed?: boolean;
+}): string {
+  if (input.networkFailed) {
+    return COURSE_UPGRADE_NETWORK_ERROR;
+  }
+
+  if (input.httpStatus === 401) {
+    return mapCourseUpgradeClientError("unauthorized");
+  }
+
+  const paymentUrl = input.paymentUrl?.trim() ?? "";
+
+  if (input.httpStatus >= 200 && input.httpStatus < 300 && !paymentUrl) {
+    return mapCourseUpgradeClientError(
+      input.errorCode ?? "provider_checkout_failed",
+    );
+  }
+
+  if (input.httpStatus < 200 || input.httpStatus >= 300 || !paymentUrl) {
+    return mapCourseUpgradeClientError(input.errorCode);
+  }
+
+  return "";
 }

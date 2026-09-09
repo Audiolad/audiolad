@@ -22,6 +22,7 @@ export function logCourseUpgradeFailure(input: {
   status: number;
   orderId?: string | null;
   practiceId?: string | null;
+  targetAccessLevel?: number | null;
 }): void {
   console.error("course_upgrade_failed", {
     FAILED_STAGE: input.stage,
@@ -29,5 +30,6 @@ export function logCourseUpgradeFailure(input: {
     ACTUAL_HTTP_STATUS: input.status,
     order_id: input.orderId ?? null,
     practice_id: input.practiceId ?? null,
+    target_access_level: input.targetAccessLevel ?? null,
   });
 }

@@ -28,7 +28,9 @@ import {
 } from "../src/lib/course-content/course-upgrade-order-api.ts";
 import {
   COURSE_UPGRADE_GENERIC_ERROR,
+  COURSE_UPGRADE_NETWORK_ERROR,
   mapCourseUpgradeClientError,
+  resolveCourseUpgradeUiError,
 } from "../src/lib/course-content/course-upgrade-client-errors.ts";
 import { COURSE_UPGRADE_CHECKOUT_STAGES } from "../src/lib/course-content/course-upgrade-stages.ts";
 import { decidePendingTochkaPayment } from "../src/lib/payments/pending-tochka-payment.ts";
@@ -372,6 +374,10 @@ assert.equal(
   mapCourseUpgradeClientError("unknown_code"),
   COURSE_UPGRADE_GENERIC_ERROR,
 );
+assert.equal(
+  mapCourseUpgradeClientError("internal_error"),
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
 assert.notEqual(
   mapCourseUpgradeClientError("provider_checkout_failed"),
   COURSE_UPGRADE_GENERIC_ERROR,
@@ -382,11 +388,14 @@ assert.equal(
 );
 
 assert.match(route, /logCourseUpgradeFailure/);
+assert.match(route, /order_kind, target_access_level/);
+assert.match(route, /COURSE_UPGRADE_CHECKOUT_STAGES\.PAYMENT_URL/);
+assert.match(route, /targetAccessLevel: orderRow\.target_access_level/);
 assert.match(
   read("src/lib/course-content/course-upgrade-stages.ts"),
   /FAILED_STAGE/,
 );
-assert.match(button, /mapCourseUpgradeClientError/);
+assert.match(button, /resolveCourseUpgradeUiError/);
 assert.match(startPay, /decidePendingTochkaPayment/);
 assert.match(startPay, /provider_checkout_failed/);
 assert.match(startPay, /tochka_recreate_failed/);
@@ -425,6 +434,54 @@ assert.equal(
     jwt: "secret-token",
   }),
   null,
+);
+
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 200,
+    paymentUrl: "",
+  }),
+  mapCourseUpgradeClientError("provider_checkout_failed"),
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 500,
+    errorCode: "internal_error",
+  }),
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 409,
+    errorCode: "author_finance_not_ready",
+  }),
+  mapCourseUpgradeClientError("author_finance_not_ready"),
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 0,
+    networkFailed: true,
+  }),
+  COURSE_UPGRADE_NETWORK_ERROR,
+);
+assert.notEqual(COURSE_UPGRADE_NETWORK_ERROR, COURSE_UPGRADE_GENERIC_ERROR);
+
+const accrualSql = read(
+  "supabase/migrations/20260730160000_author_canonical_sales.sql",
+);
+const accrualFn = accrualSql.slice(
+  accrualSql.indexOf("CREATE OR REPLACE FUNCTION public.order_sale_accrual_ready"),
+  accrualSql.indexOf("REVOKE ALL ON FUNCTION public.order_sale_accrual_ready"),
+);
+assert.match(accrualFn, /author_sale_accrual_ready/);
+assert.doesNotMatch(accrualFn, /course_upgrade/);
+assert.match(
+  read("deploy/scripts/audiolad-reconcile-diagnose.sh"),
+  /GetCourse appreciation reconcile/,
+);
+assert.doesNotMatch(
+  read("deploy/scripts/audiolad-reconcile-diagnose.sh"),
+  /course_upgrade_failed|create_payment_tochka/,
 );
 
 console.log("course-upgrade-checkout-unit: ok");
