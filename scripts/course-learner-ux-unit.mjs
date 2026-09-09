@@ -18,13 +18,21 @@ import {
 import {
   COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
   buildCourseLearnerFileReturnHref,
-  buildCourseLearnerFileEmbedSrc,
+  buildCourseLearnerFilePath,
   buildCourseLearnerFileViewerPath,
-  COURSE_LEARNER_PDF_EMBED_FRAGMENT,
   resolveCourseLearnerFileHttpMode,
   resolvePracticeFileViewerRoute,
   wantsProtectedFileDocumentOpen,
 } from "../src/lib/course-content/learner-file-http.ts";
+import {
+  COURSE_LEARNER_PDF_ERROR_LABEL,
+  COURSE_LEARNER_PDF_LOADING_LABEL,
+  computePdfPageCssSize,
+  documentHasHorizontalOverflow,
+  formatPdfPageLabel,
+  selectPdfPagesToRender,
+} from "../src/lib/course-content/learner-pdf-layout.ts";
+import CourseLearnerPdfPagesModule from "../src/components/products/course-learner/CourseLearnerPdfPages.tsx";
 import { presentCourseAudioTitle } from "../src/lib/course-content/course-audio-title.ts";
 import CourseLearnerFileViewerModule, {
   CourseLearnerFileViewerDenied,
@@ -351,22 +359,16 @@ function testPdfOpensInAppViewer() {
     new RegExp(`/practice/${AUTHOR_SLUG}/${PRODUCT_SLUG}#${COURSE_LEARNER_CONTENTS_ANCHOR_ID}`),
   );
   assert.match(viewer, /data-course-learner-file-viewer="ready"/);
-  assert.match(viewer, /<iframe/);
-  assert.match(viewer, /data-course-learner-pdf-frame="true"/);
-  assert.match(viewer, /absolute inset-0/);
+  assert.doesNotMatch(viewer, /<iframe/);
+  assert.doesNotMatch(viewer, /application\/pdf#|view=FitH/);
+  assert.match(viewer, /data-course-learner-pdf-pages="true"/);
+  assert.match(viewer, new RegExp(COURSE_LEARNER_PDF_LOADING_LABEL));
   assert.match(viewer, /max-w-full/);
   assert.match(viewer, /min-w-0/);
-  assert.match(viewer, /overflow-hidden/);
   assert.match(viewer, /overflow-x-clip/);
-  assert.match(
-    viewer,
-    new RegExp(
-      `src="/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}"`,
-    ),
-  );
   assert.equal(
-    buildCourseLearnerFileEmbedSrc(AUTHOR_SLUG, PRODUCT_SLUG, FILE_ID),
-    `/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}`,
+    buildCourseLearnerFilePath(AUTHOR_SLUG, PRODUCT_SLUG, FILE_ID),
+    `/api/listen/product/${AUTHOR_SLUG}/${PRODUCT_SLUG}/file/${FILE_ID}`,
   );
   assert.doesNotMatch(viewer, /<a[^>]+href="[^"]*\/api\/listen\/product\//);
   assert.doesNotMatch(viewer, /[?&]raw=1/);
@@ -375,6 +377,73 @@ function testPdfOpensInAppViewer() {
   assert.doesNotMatch(viewer, /window\.location|signedUrl|storage_path/);
   assert.doesNotMatch(viewer, /<meta http-equiv="refresh"/i);
   assert.match(viewer, new RegExp(LONG_PDF_NAME));
+
+  const pageOne = computePdfPageCssSize({
+    containerWidth: 390,
+    pageWidth: 612,
+    pageHeight: 792,
+    devicePixelRatio: 2,
+  });
+  const pageTwo = computePdfPageCssSize({
+    containerWidth: 390,
+    pageWidth: 612,
+    pageHeight: 792,
+    devicePixelRatio: 2,
+  });
+  const pageThree = computePdfPageCssSize({
+    containerWidth: 390,
+    pageWidth: 612,
+    pageHeight: 792,
+    devicePixelRatio: 2,
+  });
+  assert.equal(pageOne.cssWidth, 390);
+  assert.ok(pageOne.cssHeight > 0);
+  assert.ok(pageOne.cssWidth <= 390);
+  assert.equal(pageOne.canvasWidth, 780);
+  assert.equal(
+    documentHasHorizontalOverflow({
+      containerWidth: 390,
+      pageCssWidths: [pageOne.cssWidth, pageTwo.cssWidth, pageThree.cssWidth],
+    }),
+    false,
+  );
+  assert.deepEqual(selectPdfPagesToRender({ pageCount: 3, visiblePage: 1 }), [1, 2, 3]);
+  assert.equal(formatPdfPageLabel(2, 3), "Страница 2 из 3");
+
+  const resized = computePdfPageCssSize({
+    containerWidth: 320,
+    pageWidth: 612,
+    pageHeight: 792,
+    devicePixelRatio: 3,
+  });
+  assert.equal(resized.cssWidth, 320);
+  assert.ok(resized.cssWidth <= 320);
+  assert.notEqual(resized.scale, pageOne.scale);
+  assert.equal(resized.canvasWidth, 960);
+
+  const PdfPages =
+    CourseLearnerPdfPagesModule.default ?? CourseLearnerPdfPagesModule;
+  const pagesMarkup = renderToStaticMarkup(
+    createElement(PdfPages, {
+      fileSrc: buildCourseLearnerFilePath(AUTHOR_SLUG, PRODUCT_SLUG, FILE_ID),
+      filename: LONG_PDF_NAME,
+    }),
+  );
+  assert.match(pagesMarkup, new RegExp(COURSE_LEARNER_PDF_LOADING_LABEL));
+  assert.doesNotMatch(pagesMarkup, /<iframe/);
+  assert.doesNotMatch(pagesMarkup, /view=FitH/);
+
+  const pdfPagesSource = read(
+    "src/components/products/course-learner/CourseLearnerPdfPages.tsx",
+  );
+  assert.match(pdfPagesSource, /getDocument/);
+  assert.match(pdfPagesSource, /IntersectionObserver/);
+  assert.match(pdfPagesSource, /devicePixelRatio/);
+  assert.match(pdfPagesSource, /fetchProtectedPdfBytes/);
+  assert.doesNotMatch(pdfPagesSource, /<iframe/);
+  assert.match(pdfPagesSource, /COURSE_LEARNER_PDF_ERROR_LABEL/);
+  const pdfFetchSource = read("src/lib/course-content/learner-pdf-document.ts");
+  assert.match(pdfFetchSource, /Accept: "application\/pdf"/);
 
   const viewerSource = read(
     "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
@@ -423,6 +492,15 @@ function testPdfOpensInAppViewer() {
   assert.doesNotMatch(fileHttp, /COURSE_LEARNER_FILE_RAW_QUERY|Открыть PDF отдельно/);
   assert.doesNotMatch(fileHttp, /searchParams\.get\(/);
   assert.match(fileHttp, /sec-fetch-dest/);
+  assert.match(fileHttp, /application\/pdf/);
+  assert.equal(
+    resolveCourseLearnerFileHttpMode(
+      new Request("https://audiolad.ru/file", {
+        headers: { accept: "application/pdf" },
+      }),
+    ),
+    "embed",
+  );
 }
 
 function testLongFilenameDoesNotEscapeCard() {

@@ -7,11 +7,31 @@ import {
   parseJsonObject,
   toCourseUpgradeSuccessBody,
 } from "@/lib/course-content/course-upgrade-order-api";
+import {
+  COURSE_UPGRADE_CHECKOUT_STAGES,
+  logCourseUpgradeFailure,
+} from "@/lib/course-content/course-upgrade-stages";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { startTochkaCheckoutForPendingOrder } from "@/lib/payments/start-tochka-checkout";
 import type { OrderRow } from "@/lib/payments/payment-api";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+function fail(
+  stage: string,
+  error: string,
+  status: number,
+  extra?: { orderId?: string | null; practiceId?: string | null },
+) {
+  logCourseUpgradeFailure({
+    stage,
+    error,
+    status,
+    orderId: extra?.orderId,
+    practiceId: extra?.practiceId,
+  });
+  return NextResponse.json({ error }, { status });
+}
 
 export async function POST(request: Request) {
   const supabase = await createClientFromRequest(request);
@@ -22,12 +42,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "unauthorized", 401);
   }
 
   if (authError) {
     console.error("course_upgrade_auth_error", authError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "internal_error", 500);
   }
 
   let body: unknown;
@@ -35,25 +55,30 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400);
   }
 
   const parsedBody = parseJsonObject(body);
 
   if (!parsedBody) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400);
   }
 
   const parsed = parseCourseUpgradeRequest(parsedBody);
 
   if (!parsed.ok) {
-    return NextResponse.json({ error: parsed.error }, { status: 400 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, parsed.error, 400, {
+      practiceId: typeof parsedBody.practiceId === "string" ? parsedBody.practiceId : null,
+    });
   }
 
+  const practiceId = parsed.value.practiceId;
   const customerEmail = user.email?.trim() ?? "";
 
   if (!customerEmail) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
+      practiceId,
+    });
   }
 
   const idempotencyKey = resolveIdempotencyKey(
@@ -61,7 +86,9 @@ export async function POST(request: Request) {
   );
 
   if (typeof idempotencyKey !== "string") {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
+      practiceId,
+    });
   }
 
   const { data, error } = await supabase.rpc("create_course_upgrade_order", {
@@ -72,7 +99,12 @@ export async function POST(request: Request) {
 
   if (error) {
     const mapped = mapCourseUpgradeRpcError(error.message);
-    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
+      mapped.error,
+      mapped.status,
+      { practiceId },
+    );
   }
 
   const orderRow = coerceCourseUpgradeOrderRow(
@@ -81,7 +113,12 @@ export async function POST(request: Request) {
 
   if (!orderRow) {
     console.error("course_upgrade_order_invalid_row");
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.COERCE,
+      "internal_error",
+      500,
+      { practiceId },
+    );
   }
 
   let serviceRoleClient;
@@ -89,9 +126,11 @@ export async function POST(request: Request) {
   try {
     serviceRoleClient = createServiceRoleClient();
   } catch {
-    return NextResponse.json(
-      { error: "payments_not_configured" },
-      { status: 503 },
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.START_TOCHKA,
+      "payments_not_configured",
+      503,
+      { orderId: orderRow.order_id, practiceId },
     );
   }
 
@@ -105,7 +144,12 @@ export async function POST(request: Request) {
 
   if (payableError || !payable) {
     console.error("course_upgrade_order_reload_error", payableError?.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD,
+      "internal_error",
+      500,
+      { orderId: orderRow.order_id, practiceId },
+    );
   }
 
   const started = await startTochkaCheckoutForPendingOrder({
@@ -116,10 +160,10 @@ export async function POST(request: Request) {
   });
 
   if (!started.ok) {
-    return NextResponse.json(
-      { error: started.error },
-      { status: started.status },
-    );
+    return fail(started.stage, started.error, started.status, {
+      orderId: orderRow.order_id,
+      practiceId,
+    });
   }
 
   return NextResponse.json(

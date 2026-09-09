@@ -26,6 +26,13 @@ import {
   parseJsonObject,
   toCourseUpgradeSuccessBody,
 } from "../src/lib/course-content/course-upgrade-order-api.ts";
+import {
+  COURSE_UPGRADE_GENERIC_ERROR,
+  mapCourseUpgradeClientError,
+} from "../src/lib/course-content/course-upgrade-client-errors.ts";
+import { COURSE_UPGRADE_CHECKOUT_STAGES } from "../src/lib/course-content/course-upgrade-stages.ts";
+import { decidePendingTochkaPayment } from "../src/lib/payments/pending-tochka-payment.ts";
+import { extractSafeTochkaErrorCode } from "../src/lib/payments/tochka-error.ts";
 import { groupLearnerCourse } from "../src/lib/course-content/learner-groups.ts";
 import { toCheckoutStatusBody } from "../src/lib/payments/checkout-status-api.ts";
 import { rublesToMinor } from "../src/lib/pricing/money.ts";
@@ -270,7 +277,7 @@ assert.doesNotMatch(
 const startPay = read("src/lib/payments/start-tochka-checkout.ts");
 assert.match(startPay, /createTochkaPaymentOperation/);
 assert.match(startPay, /getOrderSaleAccrualReady/);
-assert.match(startPay, /amount_minor !== input\.orderRow\.price_minor_snapshot/);
+assert.match(startPay, /amountMinor !== priceMinor/);
 
 // H — UI: one CTA on next locked level
 const levels = attachNativeUpgradeAction({
@@ -348,5 +355,76 @@ assert.match(grant, /GRANT_PRACTICE_ACCESS_RPC/);
 // J — config drift documented
 assert.match(schema, /Failed\/cancelled\/refunded orders do not block/);
 assert.match(rpc, /Amount stays \(config drift\)/);
+
+assert.equal(
+  mapCourseUpgradeClientError("provider_checkout_failed"),
+  "Платёжная система не создала ссылку. Попробуйте ещё раз через минуту.",
+);
+assert.equal(
+  mapCourseUpgradeClientError("order_already_paid"),
+  "Этот платёж уже завершён. Обновите страницу.",
+);
+assert.equal(
+  mapCourseUpgradeClientError("practice_not_found"),
+  "Курс не найден или временно недоступен.",
+);
+assert.equal(
+  mapCourseUpgradeClientError("unknown_code"),
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
+assert.notEqual(
+  mapCourseUpgradeClientError("provider_checkout_failed"),
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
+assert.equal(
+  mapCourseUpgradeRpcError("idempotency_key_conflict").error,
+  "invalid_request",
+);
+
+assert.match(route, /logCourseUpgradeFailure/);
+assert.match(
+  read("src/lib/course-content/course-upgrade-stages.ts"),
+  /FAILED_STAGE/,
+);
+assert.match(button, /mapCourseUpgradeClientError/);
+assert.match(startPay, /decidePendingTochkaPayment/);
+assert.match(startPay, /provider_checkout_failed/);
+assert.match(startPay, /tochka_recreate_failed/);
+assert.match(startPay, /paymentLinkId/);
+
+const stuckPending = decidePendingTochkaPayment({
+  pendingPayment: {
+    id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    order_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    provider: "tochka",
+    provider_payment_id: null,
+    idempotency_key: "key",
+    status: "pending",
+    amount_minor: 222200,
+    currency: "RUB",
+    provider_metadata: {},
+    created_at: "2026-09-09T12:00:00.000Z",
+    confirmed_at: null,
+  },
+  orderId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  orderAmountMinor: 222200,
+});
+assert.equal(stuckPending.kind, "recreate");
+
+assert.equal(COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_TOCHKA, "createTochkaPaymentOperation");
+assert.equal(
+  extractSafeTochkaErrorCode({
+    Errors: [{ code: "duplicate_payment_link", message: "Bearer secret-token" }],
+    jwt: "secret-token",
+  }),
+  "duplicate_payment_link",
+);
+assert.equal(
+  extractSafeTochkaErrorCode({
+    message: "Bearer secret-token",
+    jwt: "secret-token",
+  }),
+  null,
+);
 
 console.log("course-upgrade-checkout-unit: ok");
