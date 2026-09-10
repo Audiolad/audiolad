@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { getCoverPublicUrl } from "../src/lib/author-products/utils";
+import { getProductCoverDisplayUrl } from "../src/lib/products/cover-display";
 import { studioLicenseAmountMinor } from "../src/lib/studio-music/access";
 import {
   applyStudioMusicCatalogCursor,
@@ -331,6 +333,137 @@ assert.equal(
   true,
 );
 
+const PUBLIC_COVER_URL =
+  "https://audiolad.ru/storage/v1/object/public/practice-covers/practices/43bde74b-0767-448b-9ec3-e01e22b616f3/variants/681f1a2e-ff4b-4e63-b086-d4b4d176104d/md.webp";
+const ORDINARY_CDN_COVER_URL = "https://cdn.audiolad.ru/covers/dawn.webp";
+const previousSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.local";
+
+function coverDto(url: string | null) {
+  return { items: [{ cover: { url } }] };
+}
+
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(coverDto(PUBLIC_COVER_URL)),
+  false,
+  "public practice-covers cover.url must not be forbidden",
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(
+    coverDto(`${PUBLIC_COVER_URL}?v=2026-09-10T06%3A40%3A34.732Z`),
+  ),
+  false,
+);
+
+const helperCoverUrl = getCoverPublicUrl(
+  "practices/43bde74b-0767-448b-9ec3-e01e22b616f3/cover.webp",
+);
+assert.match(helperCoverUrl, /\/storage\/v1\/object\/public\/practice-covers\//);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(coverDto(helperCoverUrl)),
+  false,
+  "getCoverPublicUrl output must be allowed on cover.url",
+);
+
+const pipelineCoverUrl = getProductCoverDisplayUrl(
+  null,
+  "2026-09-10T06:40:34.732Z",
+  {
+    version: 1,
+    versionId: "v1",
+    profile: "product-cover",
+    sourceWidth: 1000,
+    sourceHeight: 1000,
+    variants: {
+      md: {
+        path: "practices/43bde74b-0767-448b-9ec3-e01e22b616f3/variants/681f1a2e-ff4b-4e63-b086-d4b4d176104d/md.webp",
+        width: 360,
+        height: 360,
+        byteSize: 1200,
+        mimeType: "image/webp",
+      },
+    },
+  },
+  360,
+);
+assert.ok(pipelineCoverUrl);
+assert.match(
+  pipelineCoverUrl,
+  /\/storage\/v1\/object\/public\/practice-covers\//,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(coverDto(pipelineCoverUrl)),
+  false,
+  "cover-display pipeline URL must be allowed on cover.url",
+);
+
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(coverDto(ORDINARY_CDN_COVER_URL)),
+  false,
+  "ordinary https CDN cover.url must not be forbidden",
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(
+    coverDto("https://cdn.audiolad.ru/practice-audio/full.mp3"),
+  ),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(
+    coverDto(
+      "https://example.supabase.local/storage/v1/object/public/practice-audio/full.mp3",
+    ),
+  ),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(
+    coverDto(
+      "https://example.supabase.local/storage/v1/object/sign/practice-covers/secret.webp",
+    ),
+  ),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(
+    coverDto(`${PUBLIC_COVER_URL}?token=leak`),
+  ),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields({
+    cover: { url: PUBLIC_COVER_URL },
+    audio_path: "music/file.mp3",
+  }),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields({
+    cover: { url: PUBLIC_COVER_URL },
+    signedUrl: "https://example.supabase.local/storage/v1/object/sign/x",
+  }),
+  true,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields({
+    url: PUBLIC_COVER_URL,
+  }),
+  true,
+  "public cover storage must not be allowed outside cover.url",
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields({
+    leak: PUBLIC_COVER_URL,
+  }),
+  true,
+);
+
+if (previousSupabaseUrl === undefined) {
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+} else {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = previousSupabaseUrl;
+}
+
 const ranked = [
   { id: "b", sortTimestamp: 20 },
   { id: "a", sortTimestamp: 10 },
@@ -449,6 +582,29 @@ const guestAll = await handleStudioMusicCatalog({
 assert.equal(guestAll.status, 200);
 assert.equal("items" in guestAll.body && guestAll.body.items.length, 2);
 assert.equal("viewer" in guestAll.body && guestAll.body.viewer.authenticated, false);
+
+const publicCoverPublication = publication({
+  cover_url: PUBLIC_COVER_URL,
+  updated_at: "2026-09-10T06:40:34.732Z",
+});
+const guestAllWithCover = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: null,
+  store: createStore({ publicItems: [publicCoverPublication] }),
+});
+assert.equal(guestAllWithCover.status, 200);
+assert.ok("items" in guestAllWithCover.body);
+assert.equal(guestAllWithCover.body.items.length, 1);
+assert.match(
+  guestAllWithCover.body.items[0]?.cover.url ?? "",
+  /\/storage\/v1\/object\/public\/practice-covers\//,
+);
+assert.equal(
+  studioMusicCatalogDtoContainsForbiddenFields(guestAllWithCover.body),
+  false,
+);
 
 const guestFree = await handleStudioMusicCatalog({
   filter: "free",
