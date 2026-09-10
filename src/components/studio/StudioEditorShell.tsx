@@ -2365,6 +2365,7 @@ export default function StudioEditorShell({
               </button>
               {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-2 text-sm text-emerald-100 lg:px-3">Скачать MP3</a> : null}
               {renderJob?.status === "completed" && accessMode !== "guest" ? null : (
+                <>
                 <button
                   type="button"
                   disabled={saveIsUnavailable || catalogExportBlocked || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
@@ -2382,6 +2383,7 @@ export default function StudioEditorShell({
                     {CATALOG_MUSIC_RENDER_GUARD_MESSAGE}
                   </span>
                 ) : null}
+                </>
               )}
             </div>
           </div>

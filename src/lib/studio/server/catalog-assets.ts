@@ -18,9 +18,6 @@ import { toStudioAssetDto, type StudioProjectAssetRow } from "./model";
 import { requireStudioProjectAccess } from "./repository";
 import { StudioApiError } from "./validation";
 
-const ASSET_SELECT =
-  "id, project_id, source_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, catalog_practice_id, catalog_audio_item_id, upload_state, upload_state_changed_at, pending_source_id, pending_storage_path, pending_size_bytes, pending_original_name, pending_mime_type, pending_reserved_at, created_at, deleted_at";
-
 const PRACTICE_AUDIO_BUCKET = "practice-audio";
 const STREAM_SIGN_TTL_SECONDS = 120;
 

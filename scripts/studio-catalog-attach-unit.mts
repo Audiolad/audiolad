@@ -114,15 +114,16 @@ assert.deepEqual(
   }),
   { ok: true },
 );
-assert.equal(
-  authorizeStudioCatalogAttachRefs({
-    practiceId: PRACTICE_ID,
-    audioItemId: AUDIO_ID,
-    practice: { id: PRACTICE_ID, deleted_at: null, product_kind: "music" },
-    audioItem: { id: AUDIO_ID, practice_id: OTHER_AUDIO, duration_seconds: 12 },
-  }).code,
-  "invalid_catalog_audio_item",
-);
+const mismatchedRefs = authorizeStudioCatalogAttachRefs({
+  practiceId: PRACTICE_ID,
+  audioItemId: AUDIO_ID,
+  practice: { id: PRACTICE_ID, deleted_at: null, product_kind: "music" },
+  audioItem: { id: AUDIO_ID, practice_id: OTHER_AUDIO, duration_seconds: 12 },
+});
+assert.equal(mismatchedRefs.ok, false);
+if (!mismatchedRefs.ok) {
+  assert.equal(mismatchedRefs.code, "invalid_catalog_audio_item");
+}
 
 assert.equal(resolveStudioCatalogAssetTitle({ title: "  Рассвет " }), "Рассвет");
 
@@ -237,9 +238,6 @@ const catalogDocument = serializeStudioProjectState({
     trackKind: "music",
     voicePreset: "none",
     assetPersistenceStatus: "saved",
-    sourceType: "catalog",
-    catalogPracticeId: PRACTICE_ID,
-    catalogAudioItemId: AUDIO_ID,
     clips: [{
       id: "clip-1",
       startTime: 0,
