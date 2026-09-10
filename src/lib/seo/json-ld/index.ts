@@ -1,5 +1,6 @@
 export {
   buildAboutPageJsonLd,
+  buildAiMusicHubPageJsonLd,
   buildAuthorJsonLd,
   buildBreadcrumbListJsonLd,
   buildForAuthorsPageJsonLd,
@@ -13,6 +14,8 @@ export {
   shouldEmitAuthorJsonLd,
   shouldEmitPracticeJsonLd,
   type AboutPageJsonLdInput,
+  type AiMusicHubFaqJsonLdInput,
+  type AiMusicHubPageJsonLdInput,
   type AuthorJsonLdInput,
   type BreadcrumbItemInput,
   type ForAuthorsFaqJsonLdInput,

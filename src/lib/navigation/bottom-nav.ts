@@ -60,7 +60,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     pathname.startsWith("/help/") ||
     pathname === "/about" ||
     pathname === "/philosophy" ||
-    pathname === "/for-authors"
+    pathname === "/for-authors" ||
+    pathname === "/kak-zarabatyvat-na-ii-muzyke-v-audiolad"
   );
 }
 
