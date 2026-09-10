@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildLibraryPurchasedHref,
   buildPaidAuthenticatedPrimaryHref,
+  buildStudioMusicPaidHref,
+  isStudioMusicLicenseCheckout,
 } from "@/lib/payments/checkout-result-cta";
 import {
   isTerminalCheckoutStatus,
@@ -76,21 +78,29 @@ export default function CheckoutResultClient() {
   const inFlightRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const studioLicense = isStudioMusicLicenseCheckout(status?.orderKind);
   const libraryHref = useMemo(
-    () => buildLibraryPurchasedHref(status?.practiceSlug ?? null),
-    [status?.practiceSlug],
+    () =>
+      studioLicense
+        ? buildStudioMusicPaidHref()
+        : buildLibraryPurchasedHref(status?.practiceSlug ?? null),
+    [status?.practiceSlug, studioLicense],
   );
   const listenHref = useMemo(
     () =>
       buildPaidAuthenticatedPrimaryHref({
         authorSlug: status?.authorSlug ?? null,
         practiceSlug: status?.practiceSlug ?? null,
+        orderKind: status?.orderKind ?? null,
       }),
-    [status?.authorSlug, status?.practiceSlug],
+    [status?.authorSlug, status?.orderKind, status?.practiceSlug],
   );
   const signInHref = useMemo(
-    () => buildSignInHref(status?.practiceSlug ?? null),
-    [status?.practiceSlug],
+    () =>
+      studioLicense
+        ? `/auth/sign-in?next=${encodeURIComponent(buildStudioMusicPaidHref())}`
+        : buildSignInHref(status?.practiceSlug ?? null),
+    [status?.practiceSlug, studioLicense],
   );
 
   const restartPolling = useCallback(() => {
@@ -232,7 +242,14 @@ export default function CheckoutResultClient() {
   }
 
   if (viewState === "paid_authenticated") {
-    return (
+    return studioLicense ? (
+      <ResultCard
+        title="Оплата прошла. Музыка доступна в Студии."
+        description="Лицензия для Студии открыта. Вернитесь в каталог музыки, чтобы использовать её в проекте."
+        actionHref={listenHref}
+        actionLabel="Открыть Студию"
+      />
+    ) : (
       <ResultCard
         title="Оплата прошла. Доступ открыт."
         description="Можно начать слушать прямо сейчас."
@@ -245,7 +262,14 @@ export default function CheckoutResultClient() {
   }
 
   if (viewState === "paid_unauthenticated") {
-    return (
+    return studioLicense ? (
+      <ResultCard
+        title="Оплата получена"
+        description="Музыка добавлена в ваш аккаунт. Войдите, чтобы открыть её в Студии."
+        actionHref={signInHref}
+        actionLabel="Войти и открыть Студию"
+      />
+    ) : (
       <ResultCard
         title="Оплата получена"
         description="Практика добавлена в ваш аккаунт. Войдите, чтобы открыть её в Аудиотеке."
@@ -259,11 +283,15 @@ export default function CheckoutResultClient() {
     return (
       <ResultCard
         title="Платёж обрабатывается"
-        description="Банк уже принял платёж. Иногда подтверждение занимает немного больше времени. После подтверждения практика автоматически появится в вашей Аудиотеке."
+        description={
+          studioLicense
+            ? "Банк уже принял платёж. Иногда подтверждение занимает немного больше времени. После подтверждения музыка появится в Студии."
+            : "Банк уже принял платёж. Иногда подтверждение занимает немного больше времени. После подтверждения практика автоматически появится в вашей Аудиотеке."
+        }
         actionLabel="Проверить ещё раз"
         onActionClick={restartPolling}
         secondaryHref={libraryHref}
-        secondaryLabel="Перейти в Аудиотеку"
+        secondaryLabel={studioLicense ? "Открыть Студию" : "Перейти в Аудиотеку"}
         isLoading={isPolling}
       />
     );

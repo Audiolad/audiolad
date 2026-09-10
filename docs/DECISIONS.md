@@ -75,6 +75,35 @@
 
 ---
 
+## 2026-09-10 — Studio music free acquire + paid checkout (PR3)
+
+**Контекст:** После витрины PR2 пользователь должен получить бесплатную
+музыку и купить платную Studio-лицензию, не создавая listen-доступ и не
+меняя finance.
+
+**Решение:**
+
+- Free: `POST /api/studio/music/acquire` → `acquire_free_studio_music`.
+  Без order / payment / ledger. Идемпотентно. UI сразу показывает
+  «Доступно в Студии».
+- Paid: thin `POST /api/checkout/studio-music` =
+  auth → `create_studio_music_order` → reload pending order →
+  `startTochkaCheckoutForPendingOrder`. Canonical `paymentLinkId` = orderId.
+  Сумма только с серверного заказа (`2 ×` listener checkout). Client
+  `expectedAmountMinor` только для гонки `price_changed`.
+- Overlay сохраняет дизайн PR2. CTA: «Получить бесплатно» /
+  «Купить для Студии за {studio price}» / loading / «Доступно в Студии» /
+  «Ваша музыка». Повторная покупка при entitlement запрещена.
+- Возврат Tochka идёт в существующий `/checkout/result` +
+  `/api/checkout/status`. Redirect сам по себе не доказательство оплаты.
+  Для `studio_music_license` CTA ведёт в Студию, не в Аудиотеку / listen.
+- Не писать `user_practices`. Не менять 70/30, finance tables, payout,
+  `music_usage_permission`, AuthorProductForm, attach, FFmpeg.
+
+**Принято:** владелец продукта (задание PR3 Studio acquire + checkout).
+
+---
+
 ## 2026-08-31 — Product Gallery for Music / release
 
 **Контекст:** Phase 1B закрывала витрину для `release` и `post`. Музыкальным

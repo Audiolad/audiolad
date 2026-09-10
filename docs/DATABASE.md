@@ -370,6 +370,13 @@ PR2 (app-layer, no schema change): Studio catalog browse + MPEG preview clip +
 server Studio price / ownership labels. Still out of scope: checkout / «Купить»,
 free acquire callers, attach-to-project, full-track Studio playback, FFmpeg.
 
+PR3 (app-layer, no schema change): Studio catalog acquire + paid checkout.
+`POST /api/studio/music/acquire` calls `acquire_free_studio_music`.
+`POST /api/checkout/studio-music` calls `create_studio_music_order` then
+reuses `startTochkaCheckoutForPendingOrder`. No new finance rules, no
+`user_practices` writes, no `studio_price` column. Still out of scope:
+attach-to-project, full-track Studio playback, FFmpeg.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из
