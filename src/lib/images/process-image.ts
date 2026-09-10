@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
 import {
   AVATAR_ERROR_MESSAGES,
@@ -40,7 +40,7 @@ function buildSharpInput(input: Buffer, profile?: ImageProfile) {
 }
 
 async function encodeVariant(
-  pipeline: sharp.Sharp,
+  pipeline: Sharp,
   quality: number,
   hasAlpha: boolean,
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
