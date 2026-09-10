@@ -1,0 +1,57 @@
+name: Studio Music License Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-music-license-isolated.yml"
+      - "scripts/studio-music-license-sql-unit.mjs"
+      - "scripts/studio-music-license-unit.mjs"
+      - "scripts/lib/studio-music-license-sql-stub.sql"
+      - "src/lib/studio-music/access.ts"
+      - "src/lib/author-products/sale-lock.ts"
+      - "supabase/migrations/20261003120000_studio_music_entitlements.sql"
+      - "supabase/migrations/20261003120100_studio_music_license_orders.sql"
+      - "supabase/migrations/20261003120200_create_practice_order_pending_kind.sql"
+      - "supabase/migrations/20261003120300_create_course_upgrade_order_pending_kind.sql"
+      - "supabase/migrations/20261003120400_fulfill_tochka_studio_music_license.sql"
+      - "supabase/migrations/20261003120500_studio_music_canonical_sales.sql"
+      - "supabase/tests/studio_music_license_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  studio-music-license-isolated:
+    name: Studio Music License Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_studio_music_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_studio_music_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_studio_music_isolated
+      - name: Execute Studio music license SQL
+        env:
+          AUDIOLAD_STUDIO_MUSIC_ISOLATED: "1"
+          AUDIOLAD_STUDIO_MUSIC_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_studio_music_isolated
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:studio-music-license:isolated

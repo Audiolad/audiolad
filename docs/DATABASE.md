@@ -328,14 +328,42 @@ Additive migrations: `20260925120000_course_upgrade_order_kind.sql`,
 
 | Объект | Назначение |
 |--------|------------|
-| `orders.order_kind` | `TEXT NOT NULL DEFAULT 'product_purchase'`. Existing rows stay base purchases via DEFAULT. `course_upgrade` is a sequential access-level upgrade for the same `practices.id`. Not a second public Product. |
+| `orders.order_kind` | `TEXT NOT NULL DEFAULT 'product_purchase'`. Existing rows stay base purchases via DEFAULT. `course_upgrade` is a sequential access-level upgrade for the same `practices.id`. `studio_music_license` is a Studio-use license for a music publication (see below). Not a second public Product. |
 | `orders.target_access_level` | `INTEGER NULL`, CHECK NULL or `>= 1`. `course_upgrade` requires `>= 2`. Immutable snapshot. Not duplicated on `payments`. |
 | `create_course_upgrade_order` | Authenticated RPC. For a new key, server derives `current+1` and `practice_access_levels.upgrade_price` (integer RUB → kopecks). Ignores client amount. Requires an ACTIVE entitlement. An already-entitled learner may start the next sequential upgrade even when the course is unpublished; strangers still hit `practice_not_published` / commercial catalog gates. Does **not** use `already_owned`. Reuses pending `(user, practice)` via existing unique index. Replay of an existing key for the same user/practice/`course_upgrade` returns the original snapshot before recomputing `current+1`. |
-| `fulfill_tochka_payment_transactional` | Same function, latest body replaced. `product_purchase` still calls `grant_practice_purchase_access`. `course_upgrade` calls `grant_practice_access(..., target, 'purchase', {granted_via:'course_upgrade'})` inside the same transaction. Success is not `access_inserted`. Entitlement `access_source` is not rewritten. |
-| Canonical sale (`course_upgrade`) | Paid order + succeeded real payment + valid amount/currency (`p.amount_minor = o.amount_minor`, `p.currency = o.currency`, `p.currency = 'RUB'`). Defined by the paid transaction, not by historical `user_practices.access_source`. Helpers: `canonical_sale_has_paid_access`, `canonical_sale_qualifies`. `author_canonical_sales_base` uses the same payment/order money invariant. `product_purchase` still requires `access_source='purchase'`. |
+| `fulfill_tochka_payment_transactional` | Same function, latest body replaced (`20261003120400`). `product_purchase` still calls `grant_practice_purchase_access`. `course_upgrade` calls `grant_practice_access(..., target, 'purchase', {granted_via:'course_upgrade'})` inside the same transaction. `studio_music_license` grants `studio_music_entitlements` only and never writes `user_practices`. Success is not `access_inserted`. Entitlement `access_source` is not rewritten. |
+| Canonical sale (`course_upgrade` / `studio_music_license`) | Paid order + succeeded real payment + valid amount/currency (`p.amount_minor = o.amount_minor`, `p.currency = o.currency`, `p.currency = 'RUB'`). Defined by the paid transaction, not by historical `user_practices.access_source`. Helpers: `canonical_sale_has_paid_access`, `canonical_sale_qualifies`. `author_canonical_sales_base` uses the same payment/order money invariant. `product_purchase` still requires `access_source='purchase'`. |
 | Delete guard | Cannot DELETE a `practice_access_levels` row while a pending/paid `course_upgrade` targets that level. Failed/cancelled/refunded do not block; a later attempt uses the live catalog price. Fulfill charges the order snapshot, not live `upgrade_price`. |
 
 `price_minor_snapshot` on an upgrade order is the charged upgrade amount (same as `amount_minor`), because `/api/payments` requires them equal. Base `already_owned` is unchanged.
+
+Pending uniqueness is `(user_id, practice_id, order_kind)` where `status='pending'` (`orders_one_pending_per_user_practice_kind_idx`). Listener and Studio pending orders can coexist. `create_practice_order` reuses only `product_purchase` pendings; `create_course_upgrade_order` reuses only `course_upgrade` pendings.
+
+#### Studio music entitlements (PR1 foundation)
+
+Migrations: `20261003120000_studio_music_entitlements.sql`,
+`20261003120100_studio_music_license_orders.sql`,
+`20261003120200_create_practice_order_pending_kind.sql`,
+`20261003120300_create_course_upgrade_order_pending_kind.sql`,
+`20261003120400_fulfill_tochka_studio_music_license.sql`,
+`20261003120500_studio_music_canonical_sales.sql`.
+
+Publication-level Studio-use right for music (`product_kind=music` or `publication_class=release`). Album = one row on `practices.id` covering all `audio_items`. This is **not** listen access and **not** `user_practices`.
+
+| Объект | Назначение |
+|--------|------------|
+| `studio_music_entitlements` | `user_id`, `practice_id`, `grant_source` (`purchase` \| `free` \| `owner`), optional `order_id` (required for purchase), `granted_at` / `created_at`, `revoked_at` / `revoke_reason`. Partial UNIQUE `(user_id, practice_id) WHERE revoked_at IS NULL`. FK `practice_id` ON DELETE RESTRICT. RLS: users SELECT own rows; writes only via SECURITY DEFINER / `service_role`. |
+| `can_acquire_studio_music` | New grant only: published music/release + `music_usage_permission='platform_reuse_allowed'` + commercial visibility. Later permission/price/unpublish changes do **not** revoke an existing grant. |
+| `has_studio_music_entitlement` / `can_use_music_in_studio` | Active stored grant, or live `author_members` owner/editor. Must **not** live-check current `platform_reuse_allowed`. Must **not** be used by ordinary listen APIs. |
+| `create_studio_music_order` | Authenticated RPC. Amount = `2 × resolve_practice_effective_price` (kopecks), snapshotted. Client is not the price source. `already_studio_entitled` is separate from listener `already_owned`. Fail-safe: free / `price<=0` → `practice_not_for_sale`; effective `<=0` → `invalid_practice_price`; expected-amount race → `price_changed`. |
+| `acquire_free_studio_music` | Authenticated RPC. First factual acquire of `is_free` + `platform_reuse_allowed`. Permanent entitlement, no order. Idempotent. |
+| Refund / revoke | `payment_refunds` still do **not** auto-revoke listen or Studio access. `revoke_studio_music_entitlement` / `revoke_studio_music_entitlement_for_order` set `revoked_at` (refund / admin). Publication edits never revoke. Exported Studio MP3s are not clawed back. |
+| Sale lock | `practice_is_content_locked_after_sale` also treats active Studio entitlements as a lock. Paid Studio orders already lock via `orders.status='paid'`. |
+| Finance | Paid `studio_music_license` qualifies in `canonical_sale_has_paid_access` from the paid order (no fake `user_practices`). `ensure_author_sale_accrual` already accrues any succeeded payment with `author_id_snapshot`. Listener `product_purchase` still requires `access_source='purchase'`. |
+
+Owner path: live `is_practice_author_member` (owner/editor). MVP does not store an `owner` entitlement row. Leaving the author workspace drops that live path unless a purchase/free grant exists.
+
+**Out of scope for this foundation:** Studio UI, catalog overlay, attach-to-project, full-track Studio playback, FFmpeg worker/render, `studio_price` column, `studio_allowed` flag.
 
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.

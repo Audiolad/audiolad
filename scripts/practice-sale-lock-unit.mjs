@@ -32,6 +32,7 @@ function read(relativePath) {
 
 function createSaleLockClient({
   entitlementCount = 0,
+  studioEntitlementCount = 0,
   paidOrderCount = 0,
   anyOrderCount = 0,
   status = "draft",
@@ -51,6 +52,10 @@ function createSaleLockClient({
           return builder;
         },
         eq(column, value) {
+          state.filters[column] = value;
+          return builder;
+        },
+        is(column, value) {
           state.filters[column] = value;
           return builder;
         },
@@ -80,6 +85,10 @@ function createSaleLockClient({
 
               if (table === "user_practices") {
                 return { count: entitlementCount, error: null };
+              }
+
+              if (table === "studio_music_entitlements") {
+                return { count: studioEntitlementCount, error: null };
               }
 
               if (table === "orders") {
@@ -123,6 +132,15 @@ async function testSaleLockTrueWithPaidOrder() {
   );
   assert.equal(lock.locked, true);
   assert.equal(lock.reason, "paid_order");
+}
+
+async function testSaleLockTrueWithStudioEntitlement() {
+  const lock = await getPracticeSaleLock(
+    createSaleLockClient({ studioEntitlementCount: 1 }),
+    "practice-1",
+  );
+  assert.equal(lock.locked, true);
+  assert.equal(lock.reason, "entitlement");
 }
 
 async function testAssertPracticeContentMutableThrows() {
@@ -219,6 +237,7 @@ function testSourceWiring() {
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 
   assert.match(saleLockSource, /PRODUCT_CONTENT_LOCKED_AFTER_SALE/);
+  assert.match(saleLockSource, /studio_music_entitlements/);
   assert.match(lifecycleSource, /getPracticeDeleteLock/);
   assert.match(lifecycleSource, /softDeletePractice|soft_delete_practice/);
   assert.match(fileRoute, /assertPracticeContentMutable/);
@@ -245,6 +264,7 @@ async function main() {
   await testSaleLockFalseWithoutOrdersOrEntitlements();
   await testSaleLockTrueWithEntitlement();
   await testSaleLockTrueWithPaidOrder();
+  await testSaleLockTrueWithStudioEntitlement();
   await testAssertPracticeContentMutableThrows();
   await testLifecycleDeleteUsesPaidDeleteLock();
   await testLifecyclePendingOrderDoesNotBlockDelete();

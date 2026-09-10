@@ -6,6 +6,39 @@
 
 ---
 
+## 2026-10-03 — Studio music license foundation (PR1)
+
+**Контекст:** MVP «Музыка для медитаций в Студии» нуждается в постоянном
+праве Studio-use отдельно от слушательского `user_practices`. Живая
+проверка `music_usage_permission` после покупки отзывала бы доступ при
+снятии разрешения / цены / публикации.
+
+**Решение:**
+
+- Новая таблица `studio_music_entitlements` на уровне публикации
+  (`practices.id`). Альбом — одна строка на все `audio_items`.
+- `music_usage_permission='platform_reuse_allowed'` только для **нового**
+  acquire. Уже выданное право не зависит от поздних правок публикации.
+- Слушательская покупка ≠ Studio. Studio-покупка ≠ listen / `user_practices`.
+- Бесплатная музыка: при первом фактическом acquire создаётся постоянный
+  grant `free` без заказа.
+- Авторское право: live `author_members` (owner/editor), без обязательной
+  owner-строки.
+- Studio price = `2 × resolve_practice_effective_price`, снимок в `orders`.
+  Колонки `studio_price` нет.
+- `orders.order_kind='studio_music_license'`. Pending unique scoped by
+  `order_kind`. Отдельный RPC, не `create_practice_order`.
+- Tochka fulfill идемпотентно пишет entitlement и не пишет `user_practices`.
+- Оплаченный Studio license — каноническая продажа музыки (finance /
+  commission) без подделки `user_practices`.
+- Авто-revoke по refund для listen нет; добавлен такой же минимальный hook
+  `revoked_at` для Studio (refund/admin).
+- Не трогать Studio UI, overlay, attach, full-track playback, FFmpeg worker.
+
+**Принято:** владелец продукта (задание PR1 foundation).
+
+---
+
 ## 2026-08-31 — Product Gallery for Music / release
 
 **Контекст:** Phase 1B закрывала витрину для `release` и `post`. Музыкальным

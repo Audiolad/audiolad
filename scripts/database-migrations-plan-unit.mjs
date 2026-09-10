@@ -547,6 +547,45 @@ function testRepoOneFileOneVersion() {
         "20261002120000_studio_duplicate_project_upload_state_ready.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20261003120000_studio_music_entitlements.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20261003120100_studio_music_license_orders.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261003120200_create_practice_order_pending_kind.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261003120300_create_course_upgrade_order_pending_kind.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261003120400_fulfill_tochka_studio_music_license.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20261003120500_studio_music_canonical_sales.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -648,8 +687,14 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260930120000",
     "20261001120000",
     "20261002120000",
+    "20261003120000",
+    "20261003120100",
+    "20261003120200",
+    "20261003120300",
+    "20261003120400",
+    "20261003120500",
   ]);
-  assert.equal(plan.database_migrations_pending, 69);
+  assert.equal(plan.database_migrations_pending, 75);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -730,8 +775,14 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260930120000",
     "20261001120000",
     "20261002120000",
+    "20261003120000",
+    "20261003120100",
+    "20261003120200",
+    "20261003120300",
+    "20261003120400",
+    "20261003120500",
   ]);
-  assert.equal(plan.database_migrations_pending, 63);
+  assert.equal(plan.database_migrations_pending, 69);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -819,8 +870,14 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260930120000",
     "20261001120000",
     "20261002120000",
+    "20261003120000",
+    "20261003120100",
+    "20261003120200",
+    "20261003120300",
+    "20261003120400",
+    "20261003120500",
   ]);
-  assert.equal(plan.database_migrations_pending, 54);
+  assert.equal(plan.database_migrations_pending, 60);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
