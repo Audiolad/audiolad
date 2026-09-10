@@ -9,13 +9,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { STUDIO_MUSIC_ORDER_KIND } from "../src/lib/studio-music/access.ts";
+import { STUDIO_MUSIC_ORDER_KIND } from "../src/lib/studio-music/access";
 import {
   coerceStudioMusicAcquireRow,
   mapStudioMusicAcquireRpcError,
   parseStudioMusicAcquireRequest,
   toStudioMusicAcquireSuccessBody,
-} from "../src/lib/studio-music/acquire-api.ts";
+} from "../src/lib/studio-music/acquire-api";
 import {
   formatStudioMusicBuyLabel,
   markStudioMusicCatalogItemAvailable,
@@ -24,7 +24,7 @@ import {
   STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
   STUDIO_MUSIC_LOADING_LABEL,
   studioCheckoutUsesServerOrderAmount,
-} from "../src/lib/studio-music/catalog-actions.ts";
+} from "../src/lib/studio-music/catalog-actions";
 import {
   coerceStudioMusicOrderRow,
   mapStudioMusicCheckoutRpcError,
@@ -33,22 +33,22 @@ import {
   parseStudioMusicPriceChangedDetail,
   STUDIO_MUSIC_CHECKOUT_STAGES,
   toStudioMusicCheckoutSuccessBody,
-} from "../src/lib/studio-music/checkout-api.ts";
+} from "../src/lib/studio-music/checkout-api";
 import {
   mapStudioMusicAcquireClientError,
   mapStudioMusicCheckoutClientError,
   resolveStudioMusicCheckoutUiError,
-} from "../src/lib/studio-music/client-errors.ts";
+} from "../src/lib/studio-music/client-errors";
 import {
   resolveStudioMusicDisplayLabel,
   resolveStudioMusicOwnership,
   type StudioMusicCatalogItem,
-} from "../src/lib/studio-music/catalog.ts";
+} from "../src/lib/studio-music/catalog";
 import {
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
   isStudioMusicLicenseCheckout,
-} from "../src/lib/payments/checkout-result-cta.ts";
+} from "../src/lib/payments/checkout-result-cta";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -97,6 +97,9 @@ function catalogItem(
 }
 
 // 1. free acquire success
+assert.equal(mapStudioMusicAcquireRpcError("practice_not_free").error, "practice_not_free");
+assert.equal(mapStudioMusicAcquireRpcError("not_authenticated").status, 401);
+
 const freeParsed = parseStudioMusicAcquireRequest({ practiceId: PRACTICE_ID });
 assert.deepEqual(freeParsed, { ok: true, value: { practiceId: PRACTICE_ID } });
 const freeRow = coerceStudioMusicAcquireRow({
