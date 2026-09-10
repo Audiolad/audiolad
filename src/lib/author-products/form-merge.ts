@@ -10,6 +10,12 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import {
+  defaultStudioMusicPricingModeForForm,
+  studioMusicPriceMinorToRubles,
+  studioMusicPricingModeAfterListenerFlip,
+  type StudioMusicPricingMode,
+} from "@/lib/studio-music/pricing";
+import {
   parsePublicationClass,
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
@@ -34,6 +40,8 @@ export type ProductFormSnapshot = {
   productKind: ProductKind;
   publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
+  studioMusicPricingMode: StudioMusicPricingMode | null;
+  studioMusicPriceRubles: number;
   formatPreset: string;
   customFormat: string;
   slug: string;
@@ -93,6 +101,31 @@ export function productDetailToFormSnapshot(
         ? (normalizeMusicUsagePermission(practice.music_usage_permission) ??
           MUSIC_USAGE_PERMISSION.LISTEN_ONLY)
         : null,
+    studioMusicPricingMode: studioMusicPricingModeAfterListenerFlip({
+      reuseAllowed:
+        productKind === "music" &&
+        (normalizeMusicUsagePermission(practice.music_usage_permission) ??
+          MUSIC_USAGE_PERMISSION.LISTEN_ONLY) ===
+          MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+      listenerIsFree: productKind === "audio_post" || practice.is_free === true,
+      currentMode:
+        practice.studio_music_pricing_mode === "free" ||
+        practice.studio_music_pricing_mode === "auto_2x_listener" ||
+        practice.studio_music_pricing_mode === "fixed"
+          ? practice.studio_music_pricing_mode
+          : defaultStudioMusicPricingModeForForm({
+              reuseAllowed:
+                productKind === "music" &&
+                (normalizeMusicUsagePermission(practice.music_usage_permission) ??
+                  MUSIC_USAGE_PERMISSION.LISTEN_ONLY) ===
+                  MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+              listenerIsFree:
+                productKind === "audio_post" || practice.is_free === true,
+            }),
+    }),
+    studioMusicPriceRubles: studioMusicPriceMinorToRubles(
+      practice.studio_music_price_minor,
+    ),
     formatPreset: preset,
     customFormat,
     slug: practice.slug,
@@ -159,6 +192,11 @@ export function mergeServerProductIntoForm(
       current.productKind === "music"
         ? (current.musicUsagePermission ?? server.musicUsagePermission)
         : null,
+    studioMusicPricingMode:
+      current.productKind === "music"
+        ? (current.studioMusicPricingMode ?? server.studioMusicPricingMode)
+        : null,
+    studioMusicPriceRubles: current.studioMusicPriceRubles,
     formatPreset: current.formatPreset || server.formatPreset,
     customFormat: current.customFormat,
     isFree: current.productKind === "audio_post" ? true : current.isFree,

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { getCoverPublicUrl } from "../src/lib/author-products/utils";
 import { getProductCoverDisplayUrl } from "../src/lib/products/cover-display";
 import { studioLicenseAmountMinor } from "../src/lib/studio-music/access";
+import { STUDIO_MUSIC_PRICING_MODE } from "../src/lib/studio-music/pricing";
 import {
   applyStudioMusicCatalogCursor,
   decodeStudioMusicCatalogCursor,
@@ -47,6 +48,8 @@ const listedAllowed: StudioMusicCatalogPublication = {
   music_usage_permission: "platform_reuse_allowed",
   is_free: false,
   price: 500,
+  studio_music_pricing_mode: "auto_2x_listener",
+  studio_music_price_minor: null,
   catalog_visibility: "listed",
   is_catalog_listed: true,
   title: "Рассвет",
@@ -186,10 +189,33 @@ const freeListed = publication({
   id: "22222222-2222-4222-8222-222222222222",
   is_free: true,
   price: 0,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FREE,
+  studio_music_price_minor: null,
   title: "Тишина",
 });
 assert.equal(isFreePublicStudioMusicInventory(freeListed), true);
 assert.equal(isFreePublicStudioMusicInventory(listedAllowed), false);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+      studio_music_price_minor: 60000,
+    }),
+  ),
+  false,
+);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: false,
+      price: 300,
+      studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FREE,
+    }),
+  ),
+  true,
+);
 assert.equal(
   isFreePublicStudioMusicInventory(
     publication({ is_free: true, music_usage_permission: "listen_only" }),
@@ -314,6 +340,11 @@ assert.equal(albumItem.duration_seconds, null);
 assert.equal(albumItem.listener_effective_minor, 50000);
 assert.equal(albumItem.studio_effective_minor, 100000);
 assert.equal(albumItem.studio_effective_minor, studioLicenseAmountMinor(50000));
+assert.equal(albumItem.listener_is_free, false);
+assert.equal(albumItem.studio_is_free, false);
+assert.equal(albumItem.studio_pricing_mode, STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER);
+assert.match(albumItem.listener_price_label, /Прослушивание/);
+assert.match(albumItem.studio_price_label, /Для Студии/);
 assert.equal(
   studioMusicCatalogDtoContainsForbiddenFields(albumItem),
   false,
@@ -524,7 +555,7 @@ function createStore(input: {
   return {
     async listPublicInventory({ filter, cursor, limit }) {
       const rows = (input.publicItems ?? []).filter((item) =>
-        filter === "free" ? item.is_free === true : true,
+        filter === "free" ? isFreePublicStudioMusicInventory(item) : true,
       );
       return pagePublications(rows, cursor, limit);
     },
@@ -620,6 +651,44 @@ assert.equal(
   freeListed.id,
 );
 
+const listenerFreeStudioFixed = publication({
+  id: "44444444-4444-4444-8444-444444444444",
+  is_free: true,
+  price: 0,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+  studio_music_price_minor: 60000,
+  title: "Фикс",
+});
+const listenerPaidStudioFree = publication({
+  id: "55555555-5555-4555-8555-555555555555",
+  is_free: false,
+  price: 300,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FREE,
+  title: "Студия бесплатно",
+});
+const guestFreeIndependent = await handleStudioMusicCatalog({
+  filter: "free",
+  cursor: null,
+  limit: "20",
+  userId: null,
+  store: createStore({
+    publicItems: [listenerFreeStudioFixed, listenerPaidStudioFree],
+    prices: new Map([
+      [listenerFreeStudioFixed.id!, { listenerEffectiveMinor: null }],
+      [listenerPaidStudioFree.id!, { listenerEffectiveMinor: 30000 }],
+    ]),
+  }),
+});
+assert.equal(guestFreeIndependent.status, 200);
+assert.ok("items" in guestFreeIndependent.body);
+assert.equal(guestFreeIndependent.body.items.length, 1);
+assert.equal(
+  guestFreeIndependent.body.items[0]?.publication_id,
+  listenerPaidStudioFree.id,
+);
+assert.equal(guestFreeIndependent.body.items[0]?.studio_is_free, true);
+assert.equal(guestFreeIndependent.body.items[0]?.listener_is_free, false);
+
 const guestMine = await handleStudioMusicCatalog({
   filter: "mine",
   cursor: null,
@@ -710,7 +779,8 @@ assert.doesNotMatch(catalogSource, /\/api\/catalog[/'"`]/);
 assert.doesNotMatch(catalogSource, /create_studio_music_order/);
 assert.doesNotMatch(catalogSource, /acquire_free_studio_music/);
 assert.match(catalogSource, /PRICE_SURFACES\.CHECKOUT/);
-assert.match(catalogSource, /studioLicenseAmountMinor/);
+assert.match(catalogSource, /resolveStudioMusicAcquisition/);
+assert.match(catalogSource, /studio_music_pricing_mode/);
 assert.match(catalogSource, /resolvePracticePriceRpc/);
 assert.match(catalogSource, /studioMusicListedVisibilityOrFilter/);
 assert.match(catalogSource, /studioMusicCatalogFetchLimit/);

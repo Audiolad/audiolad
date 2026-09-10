@@ -49,7 +49,10 @@ export function formatStudioMusicBuyLabel(
 export function resolveStudioMusicCatalogAction(
   item: Pick<
     StudioMusicCatalogItem,
-    "is_free" | "studio_effective_minor" | "ownership"
+    | "is_free"
+    | "studio_is_free"
+    | "studio_effective_minor"
+    | "ownership"
   >,
 ): StudioMusicCatalogAction {
   if (item.ownership.can_use) {
@@ -70,7 +73,8 @@ export function resolveStudioMusicCatalogAction(
     return { kind: "none", label: "" };
   }
 
-  if (item.is_free) {
+  const studioIsFree = item.studio_is_free ?? item.is_free;
+  if (studioIsFree) {
     return {
       kind: "free",
       label: STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
@@ -109,7 +113,7 @@ export function markStudioMusicCatalogItemAvailable(
     ownership,
     display_label: resolveStudioMusicDisplayLabel({
       ownership,
-      isFree: item.is_free,
+      isFree: item.studio_is_free ?? item.is_free,
       studioEffectiveMinor: item.studio_effective_minor,
     }),
   };

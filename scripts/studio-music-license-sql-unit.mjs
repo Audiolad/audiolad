@@ -21,6 +21,7 @@ const upgradePendingName =
 const fulfillName = "20261003120400_fulfill_tochka_studio_music_license.sql";
 const financeName = "20261003120500_studio_music_canonical_sales.sql";
 const orderRevokeName = "20261003120600_studio_music_entitlement_order_revoke.sql";
+const pricingName = "20261003120700_studio_music_independent_pricing.sql";
 const previousLatest = "20261002120000_studio_duplicate_project_upload_state_ready.sql";
 const stubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/studio_music_license_smoke.sql");
@@ -40,6 +41,7 @@ const upgradePending = readFileSync(join(migrationsDir, upgradePendingName), "ut
 const fulfill = readFileSync(join(migrationsDir, fulfillName), "utf8");
 const finance = readFileSync(join(migrationsDir, financeName), "utf8");
 const orderRevoke = readFileSync(join(migrationsDir, orderRevokeName), "utf8");
+const pricing = readFileSync(join(migrationsDir, pricingName), "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 
 assert(existsSync(join(migrationsDir, previousLatest)), "previous latest migration stays intact");
@@ -50,6 +52,7 @@ assert(existsSync(join(migrationsDir, upgradePendingName)), "upgrade pending-kin
 assert(existsSync(join(migrationsDir, fulfillName)), "fulfill replacement exists");
 assert(existsSync(join(migrationsDir, financeName)), "finance helper exists");
 assert(existsSync(join(migrationsDir, orderRevokeName)), "order-specific revoke migration exists");
+assert(existsSync(join(migrationsDir, pricingName)), "independent Studio pricing migration exists");
 assert(existsSync(stubPath), "isolated stub exists");
 assert(existsSync(smokePath), "smoke SQL exists");
 
@@ -66,6 +69,7 @@ for (const stamp of [
   "20261003120400",
   "20261003120500",
   "20261003120600",
+  "20261003120700",
 ]) {
   assert(versions.includes(stamp), `${stamp} is listed`);
 }
@@ -133,6 +137,25 @@ assert(/grant_source = 'purchase'/.test(orderRevoke));
 assert(!/revoke_studio_music_entitlement\(\s*v_order\.user_id/.test(orderRevoke));
 assert(/already_revoked/.test(fulfill));
 
+assert(/studio_music_pricing_mode/.test(pricing));
+assert(/studio_music_price_minor/.test(pricing));
+assert(/auto_2x_listener/.test(pricing));
+assert(/resolve_studio_music_acquisition/.test(pricing));
+assert(/CREATE OR REPLACE FUNCTION public\.create_studio_music_order/.test(pricing));
+assert(/CREATE OR REPLACE FUNCTION public\.acquire_free_studio_music/.test(pricing));
+assert(/acquisition_status IS DISTINCT FROM 'free'/.test(pricing));
+assert(/acquisition_status IS DISTINCT FROM 'paid'/.test(pricing));
+assert(/v_listener_minor \* 2/.test(pricing));
+assert(/studio_music_price_minor/.test(pricing));
+assert(!/INSERT INTO public\.user_practices/.test(pricing));
+assert(!/DROP TABLE/.test(pricing));
+assert(!/TRUNCATE/.test(pricing));
+assert(/never user_practices/.test(fulfill));
+assert(!/author_share_bps/.test(pricing));
+assert(!/platform_absorbs/.test(pricing));
+assert(!/ceil_author_remainder_platform/.test(pricing));
+assert(!/user_practices/.test(pricing));
+
 assert(/studio amount must be 2x/.test(smoke));
 assert(/listener purchase must not grant Studio/.test(smoke));
 assert(/Studio purchase must not write user_practices/.test(smoke));
@@ -155,6 +178,10 @@ assert(/duplicate fulfill must not insert a second row/.test(smoke));
 assert(/revoke order A must never revoke grant_source=free/.test(smoke));
 assert(/new purchase after revoke must create entitlement B/.test(smoke));
 assert(/entitlement B must stay active after late revoke of A/.test(smoke));
+assert(/PR3.1: free acquire must reject Studio fixed/.test(smoke));
+assert(/PR3.1: fixed Studio amount must be 60000/.test(smoke));
+assert(/PR3.1: paid order must reject Studio free/.test(smoke));
+assert(/PR3.1: paid listener \+ Studio free must allow free acquire/.test(smoke));
 
 function dockerAvailable() {
   try {
@@ -205,6 +232,7 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, fulfillName), "utf8"),
     readFileSync(join(migrationsDir, financeName), "utf8"),
     readFileSync(join(migrationsDir, orderRevokeName), "utf8"),
+    readFileSync(join(migrationsDir, pricingName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

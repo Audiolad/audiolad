@@ -26,7 +26,7 @@ const FILTERS: Array<{
 }> = [
   { id: "all", label: "Вся" },
   { id: "mine", label: "Моя", authOnly: true },
-  { id: "free", label: "Бесплатная" },
+  { id: "free", label: "Бесплатно для Студии" },
 ];
 
 function previewKeyFor(publicationId: string, audioItemId: string) {
@@ -470,7 +470,7 @@ function StudioMusicCatalogOverlayBody({
         {items.length === 0 && !loading ? (
           <p className="text-sm text-[#97a4b8]">Пока нет музыки в этом разделе.</p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
             {items.map((item) => (
               <StudioMusicCatalogCard
                 key={item.publication_id}

@@ -47,6 +47,8 @@ function publication(
     deleted_at: null,
     is_free: false,
     price: 500,
+    studio_music_pricing_mode: "auto_2x_listener",
+    studio_music_price_minor: null,
     catalog_visibility: "listed",
     is_catalog_listed: true,
     cover_url: null,
@@ -513,7 +515,12 @@ function assertNoDuplicates(ids: string[]) {
 
 {
   const eligible = Array.from({ length: 100 }, (_, index) =>
-    publication(index + 200, { is_free: true, price: 0 }),
+    publication(index + 200, {
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "free",
+      studio_music_price_minor: null,
+    }),
   );
   const recording = createRecordingSupabase({ practices: eligible });
   const store = createSupabaseStudioMusicCatalogStore(recording.client);

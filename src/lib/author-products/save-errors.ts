@@ -42,6 +42,10 @@ const VALIDATION_CODES = new Set([
   "audio_post_must_be_free",
   "music_usage_not_allowed_for_practice",
   "missing_music_usage_permission",
+  "invalid_studio_music_pricing_mode",
+  "invalid_studio_music_price",
+  "studio_music_auto_not_allowed",
+  "studio_music_pricing_mode_required",
   "invalid_moderation_status_for_submit",
   "publish_not_ready",
   "title_too_long",
@@ -192,6 +196,18 @@ export function getProductSaveErrorMessage(input: {
     case "validation":
       if (input.error === "appreciation_not_eligible") {
         return PRODUCT_SAVE_APPRECIATION_NOT_ELIGIBLE_MESSAGE;
+      }
+      if (input.error === "studio_music_auto_not_allowed") {
+        return "Для бесплатного прослушивания выберите бесплатную Студию или свою цену.";
+      }
+      if (input.error === "studio_music_pricing_mode_required") {
+        return "Выберите цену использования в Студии.";
+      }
+      if (
+        input.error === "invalid_studio_music_price" ||
+        input.error === "invalid_studio_music_pricing_mode"
+      ) {
+        return "Проверьте цену использования в Студии.";
       }
       return safeMessage ?? PRODUCT_SAVE_VALIDATION_MESSAGE;
     case "permission":

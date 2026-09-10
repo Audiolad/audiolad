@@ -25,6 +25,8 @@ export type StudioMusicPublicationInput = {
   music_usage_permission?: string | null;
   is_free?: boolean | null;
   price?: number | null;
+  studio_music_pricing_mode?: string | null;
+  studio_music_price_minor?: number | null;
 };
 
 export type StudioMusicEntitlementInput = {
@@ -101,15 +103,65 @@ export function canAcquireStudioMusic(
   return true;
 }
 
+function isListenerPublicationFree(
+  practice: Pick<StudioMusicPublicationInput, "is_free" | "price">,
+): boolean {
+  return (
+    practice.is_free === true ||
+    practice.price == null ||
+    practice.price <= 0
+  );
+}
+
+function storedOrLegacyStudioPricingMode(
+  practice: StudioMusicPublicationInput,
+): "free" | "auto_2x_listener" | "fixed" | null {
+  if (
+    practice.studio_music_pricing_mode === "free" ||
+    practice.studio_music_pricing_mode === "auto_2x_listener" ||
+    practice.studio_music_pricing_mode === "fixed"
+  ) {
+    return practice.studio_music_pricing_mode;
+  }
+
+  if (
+    practice.music_usage_permission !==
+    MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
+  ) {
+    return null;
+  }
+
+  return isListenerPublicationFree(practice) ? "free" : "auto_2x_listener";
+}
+
 export function canAcquirePaidStudioMusic(
   practice: StudioMusicPublicationInput,
-  options?: { commerciallyAccessible?: boolean },
+  options?: {
+    commerciallyAccessible?: boolean;
+    listenerEffectiveMinor?: number | null;
+  },
 ): boolean {
   if (!canAcquireStudioMusic(practice, options)) {
     return false;
   }
 
-  if (practice.is_free === true || practice.price == null || practice.price <= 0) {
+  const mode = storedOrLegacyStudioPricingMode(practice);
+  if (mode === "fixed") {
+    return (
+      practice.studio_music_price_minor != null &&
+      Number.isFinite(practice.studio_music_price_minor) &&
+      practice.studio_music_price_minor > 0
+    );
+  }
+
+  if (mode !== "auto_2x_listener") {
+    return false;
+  }
+
+  if (
+    options?.listenerEffectiveMinor != null &&
+    options.listenerEffectiveMinor <= 0
+  ) {
     return false;
   }
 
@@ -120,7 +172,11 @@ export function canAcquireFreeStudioMusic(
   practice: StudioMusicPublicationInput,
   options?: { commerciallyAccessible?: boolean },
 ): boolean {
-  return canAcquireStudioMusic(practice, options) && practice.is_free === true;
+  if (!canAcquireStudioMusic(practice, options)) {
+    return false;
+  }
+
+  return storedOrLegacyStudioPricingMode(practice) === "free";
 }
 
 /**

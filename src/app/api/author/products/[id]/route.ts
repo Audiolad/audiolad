@@ -77,6 +77,7 @@ import { planPracticeYandexRecrawl } from "@/lib/seo/yandex-webmaster/planner";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
+import { normalizeStudioMusicPricingForSave } from "@/lib/studio-music/pricing";
 import { slugifyTitle } from "@/lib/author-products/utils";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
@@ -625,6 +626,53 @@ export async function PATCH(request: Request, context: RouteContext) {
 
         updates.format = formatResult.format;
       }
+    }
+
+    const nextListenerIsFree =
+      (typeof updates.is_free === "boolean"
+        ? updates.is_free
+        : practice.is_free) === true;
+    const nextMusicUsagePermission =
+      "music_usage_permission" in updates
+        ? (updates.music_usage_permission as string | null)
+        : practice.music_usage_permission;
+    const studioPricingPresent =
+      "studio_music_pricing_mode" in body ||
+      "studio_music_price" in body ||
+      "studio_music_price_minor" in body ||
+      "music_usage_permission" in body ||
+      "is_free" in body ||
+      "price" in body ||
+      "product_kind" in body;
+
+    if (studioPricingPresent || nextProductKind !== PRODUCT_KIND.MUSIC) {
+      const studioPricing = normalizeStudioMusicPricingForSave({
+        productKind: nextProductKind,
+        musicUsagePermission: nextMusicUsagePermission,
+        listenerIsFree: nextListenerIsFree,
+        mode:
+          "studio_music_pricing_mode" in body
+            ? (body as { studio_music_pricing_mode?: unknown })
+                .studio_music_pricing_mode
+            : practice.studio_music_pricing_mode,
+        priceRubles: (body as { studio_music_price?: unknown })
+          .studio_music_price,
+        priceMinor:
+          "studio_music_price_minor" in body
+            ? (body as { studio_music_price_minor?: unknown })
+                .studio_music_price_minor
+            : practice.studio_music_price_minor,
+      });
+
+      if (!studioPricing.ok) {
+        return NextResponse.json(
+          { error: studioPricing.code },
+          { status: 400 },
+        );
+      }
+
+      updates.studio_music_pricing_mode = studioPricing.mode;
+      updates.studio_music_price_minor = studioPricing.priceMinor;
     }
 
     const appreciationPatch = resolveAppreciationOverridePatch({
