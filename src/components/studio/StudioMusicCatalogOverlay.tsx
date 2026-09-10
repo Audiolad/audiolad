@@ -35,8 +35,16 @@ function previewKeyFor(publicationId: string, audioItemId: string) {
 
 function StudioMusicCatalogOverlayBody({
   onClose,
+  selectedPracticeId = null,
+  selectedAudioItemId = null,
+  attachingAudioItemId = null,
+  onAdd,
 }: {
   onClose: () => void;
+  selectedPracticeId?: string | null;
+  selectedAudioItemId?: string | null;
+  attachingAudioItemId?: string | null;
+  onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -477,12 +485,23 @@ function StudioMusicCatalogOverlayBody({
                 item={item}
                 activePreviewKey={activePreviewKey}
                 busy={busyPublicationId === item.publication_id}
+                attachingAudioItemId={
+                  attachingAudioItemId &&
+                  item.tracks.some((track) => track.id === attachingAudioItemId)
+                    ? attachingAudioItemId
+                    : null
+                }
                 actionError={actionErrors[item.publication_id] ?? null}
+                selectedPracticeId={selectedPracticeId}
+                selectedAudioItemId={selectedAudioItemId}
                 onPreview={(publicationId, audioItemId) => {
                   void playPreview(publicationId, audioItemId);
                 }}
                 onAcquire={(next) => {
                   void acquirePublication(next);
+                }}
+                onAdd={(next, audioItemId) => {
+                  onAdd?.(next.publication_id, audioItemId);
                 }}
               />
             ))}
@@ -515,13 +534,29 @@ function StudioMusicCatalogOverlayBody({
 export function StudioMusicCatalogOverlay({
   open,
   onClose,
+  selectedPracticeId = null,
+  selectedAudioItemId = null,
+  attachingAudioItemId = null,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
+  selectedPracticeId?: string | null;
+  selectedAudioItemId?: string | null;
+  attachingAudioItemId?: string | null;
+  onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
   if (!open) {
     return null;
   }
 
-  return <StudioMusicCatalogOverlayBody onClose={onClose} />;
+  return (
+    <StudioMusicCatalogOverlayBody
+      onClose={onClose}
+      selectedPracticeId={selectedPracticeId}
+      selectedAudioItemId={selectedAudioItemId}
+      attachingAudioItemId={attachingAudioItemId}
+      onAdd={onAdd}
+    />
+  );
 }

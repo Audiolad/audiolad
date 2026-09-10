@@ -3,6 +3,7 @@ import "server-only";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 import { STUDIO_PLAYBACK_URL_TTL_SECONDS } from "../signed-playback";
+import { createStudioCatalogPlaybackDescriptor } from "./catalog-assets";
 import { STUDIO_ASSETS_BUCKET } from "./model";
 import { getStudioProjectAsset } from "./repository";
 import { StudioApiError } from "./validation";
@@ -13,6 +14,12 @@ export async function createStudioAssetPlaybackUrl(
   ttlSeconds = STUDIO_PLAYBACK_URL_TTL_SECONDS,
 ) {
   const { asset, service } = await getStudioProjectAsset(projectId, assetId);
+  if (asset.source_type === "catalog") {
+    return createStudioCatalogPlaybackDescriptor(projectId, asset);
+  }
+  if (!asset.storage_path) {
+    throw new StudioApiError("not_found", 404);
+  }
   const expiresIn =
     Number.isFinite(ttlSeconds) && ttlSeconds > 0
       ? Math.floor(ttlSeconds)

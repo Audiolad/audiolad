@@ -1,3 +1,4 @@
+import { CATALOG_MUSIC_UNAVAILABLE_MESSAGE } from "./catalog-asset";
 import {
   parseStudioProjectDocument,
   type StudioPersistedProjectState,
@@ -160,6 +161,9 @@ export async function loadPersistedStudioAsset({
   signal?: AbortSignal;
 }): Promise<StudioHydratedAsset> {
   abortIfNeeded(signal);
+  if (metadata.sourceType === "catalog" && metadata.available === false) {
+    throw new Error(CATALOG_MUSIC_UNAVAILABLE_MESSAGE);
+  }
   const signed = await signPlayback(metadata, signal);
   abortIfNeeded(signal);
   const playbackUrl = typeof signed.url === "string" ? signed.url.trim() : "";

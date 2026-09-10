@@ -12,6 +12,7 @@ import {
   type StudioDownloadableJob,
 } from "../guest-policy";
 import { getGuestSession } from "./guest-session";
+import { CATALOG_MUSIC_RENDER_NOT_AVAILABLE, projectHasActiveCatalogMusic } from "../catalog-asset";
 import { listStudioAssets, getStudioProject } from "./repository";
 import { StudioApiError } from "./validation";
 import { parseStudioProjectData } from "./validation";
@@ -39,6 +40,17 @@ export async function createStudioRenderJob(projectId: string): Promise<StudioRe
   const project = await getStudioProject(projectId);
   parseStudioProjectData(project.project_data);
   const assets = await listStudioAssets(projectId);
+  if (
+    projectHasActiveCatalogMusic({
+      tracks: project.project_data.tracks,
+      assets: assets.map((asset) => ({
+        id: asset.id,
+        source_type: asset.source_type,
+      })),
+    })
+  ) {
+    throw new StudioApiError(CATALOG_MUSIC_RENDER_NOT_AVAILABLE, 422);
+  }
   let snapshot;
   try {
     snapshot = createStudioRenderSnapshot({

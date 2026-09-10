@@ -61,6 +61,8 @@ export function createStudioRenderSnapshot(input: {
       asset.project_id !== project.id ||
       !referencedAssetIds.has(asset.id) ||
       asset.deleted_at !== null ||
+      asset.source_type === "catalog" ||
+      !asset.storage_path ||
       asset.duration_seconds === null ||
       !Number.isFinite(asset.duration_seconds) ||
       asset.duration_seconds <= 0

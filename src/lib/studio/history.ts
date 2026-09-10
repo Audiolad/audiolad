@@ -23,6 +23,9 @@ export type StudioTrackSnapshot = {
   muted: boolean;
   trackKind?: StudioTrackKind;
   voicePreset?: StudioVoicePreset;
+  sourceType?: "upload" | "recording" | "catalog";
+  catalogPracticeId?: string | null;
+  catalogAudioItemId?: string | null;
 };
 
 export type StudioSlotSnapshot = {

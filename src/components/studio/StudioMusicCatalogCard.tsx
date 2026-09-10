@@ -3,9 +3,12 @@
 import { useState } from "react";
 
 import { formatAudioDuration } from "@/lib/products/duration";
+import { isSameCatalogSelection } from "@/lib/studio/catalog-asset";
 import {
   nextStudioMusicAlbumExpanded,
   resolveStudioMusicCatalogAction,
+  STUDIO_MUSIC_ADD_LABEL,
+  STUDIO_MUSIC_ADDED_LABEL,
   STUDIO_MUSIC_LOADING_LABEL,
 } from "@/lib/studio-music/catalog-actions";
 import type { StudioMusicCatalogItem } from "@/lib/studio-music/catalog";
@@ -14,16 +17,24 @@ export function StudioMusicCatalogCard({
   item,
   activePreviewKey,
   busy = false,
+  attachingAudioItemId = null,
   actionError = null,
+  selectedPracticeId = null,
+  selectedAudioItemId = null,
   onPreview,
   onAcquire,
+  onAdd,
 }: {
   item: StudioMusicCatalogItem;
   activePreviewKey: string | null;
   busy?: boolean;
+  attachingAudioItemId?: string | null;
   actionError?: string | null;
+  selectedPracticeId?: string | null;
+  selectedAudioItemId?: string | null;
   onPreview: (publicationId: string, audioItemId: string) => void;
   onAcquire?: (item: StudioMusicCatalogItem) => void;
+  onAdd?: (item: StudioMusicCatalogItem, audioItemId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isAlbum = item.kind === "album";
@@ -32,8 +43,17 @@ export function StudioMusicCatalogCard({
   const previewKeyFor = (audioItemId: string) =>
     `${item.publication_id}:${audioItemId}`;
 
+  const canAdd = action.kind === "available" || action.kind === "own";
+  const isSelected = (audioItemId: string) =>
+    isSameCatalogSelection({
+      selectedPracticeId,
+      selectedAudioItemId,
+      practiceId: item.publication_id,
+      audioItemId,
+    });
+
   const applyExpandClick = (
-    source: "row" | "tracks" | "preview" | "acquire",
+    source: "row" | "tracks" | "preview" | "acquire" | "add",
   ) => {
     setExpanded((current) =>
       nextStudioMusicAlbumExpanded({
@@ -140,6 +160,27 @@ export function StudioMusicCatalogCard({
                 {busy ? STUDIO_MUSIC_LOADING_LABEL : action.label}
               </button>
             ) : null}
+            {canAdd && !isAlbum && primaryTrackId ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isSelected(primaryTrackId)) {
+                    return;
+                  }
+                  onAdd?.(item, primaryTrackId);
+                }}
+                disabled={busy || attachingAudioItemId === primaryTrackId}
+                aria-busy={attachingAudioItemId === primaryTrackId}
+                className="rounded-md border border-[#9d7ae8] px-3 py-1.5 text-xs font-semibold text-[#e8dcff] disabled:opacity-60"
+              >
+                {attachingAudioItemId === primaryTrackId
+                  ? STUDIO_MUSIC_LOADING_LABEL
+                  : isSelected(primaryTrackId)
+                    ? STUDIO_MUSIC_ADDED_LABEL
+                    : STUDIO_MUSIC_ADD_LABEL}
+              </button>
+            ) : null}
           </div>
           {actionError ? (
             <p role="alert" className="text-xs text-rose-200 md:text-right">
@@ -161,18 +202,43 @@ export function StudioMusicCatalogCard({
                   {formatAudioDuration(track.duration_seconds) ?? "—"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onPreview(item.publication_id, track.id);
-                }}
-                className="shrink-0 rounded-md bg-[#7650bd] px-2 py-1 text-[11px] font-semibold text-white"
-              >
-                {activePreviewKey === previewKeyFor(track.id)
-                  ? "Стоп"
-                  : "Слушать"}
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    applyExpandClick("preview");
+                    onPreview(item.publication_id, track.id);
+                  }}
+                  className="rounded-md bg-[#7650bd] px-2 py-1 text-[11px] font-semibold text-white"
+                >
+                  {activePreviewKey === previewKeyFor(track.id)
+                    ? "Стоп"
+                    : "Слушать"}
+                </button>
+                {canAdd ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      applyExpandClick("add");
+                      if (isSelected(track.id)) {
+                        return;
+                      }
+                      onAdd?.(item, track.id);
+                    }}
+                    disabled={busy || attachingAudioItemId === track.id}
+                    aria-busy={attachingAudioItemId === track.id}
+                    className="rounded-md border border-[#9d7ae8] px-2 py-1 text-[11px] font-semibold text-[#e8dcff] disabled:opacity-60"
+                  >
+                    {attachingAudioItemId === track.id
+                      ? STUDIO_MUSIC_LOADING_LABEL
+                      : isSelected(track.id)
+                        ? STUDIO_MUSIC_ADDED_LABEL
+                        : "Добавить"}
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

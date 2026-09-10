@@ -317,6 +317,9 @@ export async function reserveStudioDirectReplacement(input: {
   const existing = await getStudioProjectAsset(input.projectId, input.assetId, {
     allowedStates: ["ready"],
   });
+  if (existing.asset.source_type === "catalog") {
+    throw new StudioApiError("invalid_asset", 422);
+  }
   if (existing.asset.pending_storage_path) {
     await abandonStudioDirectReplacement(input.projectId, input.assetId);
   }
