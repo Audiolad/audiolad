@@ -2872,6 +2872,12 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
   assert.match(docsText, /visudo -cf/);
   assert.match(docsText, /audiolad-course-upgrade-logdiag/);
   assert.match(docsText, /Do not install on production/);
+  assert.match(docsText, /#!\/bin\/bash/);
+  assert.match(docsText, /python3 -I/);
+  assert.match(docsText, /O_NOFOLLOW/);
+  assert.match(docsText, /ONLY `\/root\/\.pm2\/logs`/);
+  assert.match(docsText, /still not installed/);
+  assert.match(docsText, /fails closed/);
 
   const job = workflow.jobs.course_upgrade_diag;
   assert.equal(job.environment, "production");
@@ -3828,24 +3834,54 @@ print(classify(sys.argv[1]))
   const logdiagSyntax = spawnSync("bash", ["-n", courseUpgradeLogdiagPath], { encoding: "utf8" });
   assert.equal(logdiagSyntax.status, 0, `logdiag wrapper bash -n failed: ${logdiagSyntax.stderr}`);
   const logdiagText = readFileSync(courseUpgradeLogdiagPath, "utf8");
+  const logdiagLines = logdiagText.split(/\r?\n/);
+  assert.equal(logdiagLines[0], "#!/bin/bash", "privileged wrapper shebang must be exact /bin/bash");
+  assert.doesNotMatch(logdiagText, /\/usr\/bin\/env bash/);
+  assert.match(logdiagText, /^PATH=\/usr\/sbin:\/usr\/bin:\/bin$/m);
+  assert.match(logdiagText, /^unset BASH_ENV \|\| true$/m);
+  assert.match(logdiagText, /^unset ENV \|\| true$/m);
+  assert.match(logdiagText, /^unset PYTHONPATH \|\| true$/m);
+  assert.match(logdiagText, /^unset PYTHONHOME \|\| true$/m);
+  assert.match(logdiagText, /^unset PYTHONSTARTUP \|\| true$/m);
+  assert.match(logdiagText, /^unset PYTHONUSERBASE \|\| true$/m);
+  assert.match(logdiagText, /^unset CDPATH \|\| true$/m);
+  assert.match(logdiagText, /python3 -I /);
+  const pythonInvocations = [...logdiagText.matchAll(/^\s*python3\b[^\n]*/gm)].map((match) => match[0]);
+  assert.ok(pythonInvocations.length >= 2, "wrapper must invoke python3 helpers");
+  for (const invocation of pythonInvocations) {
+    assert.match(invocation, /python3 -I /, `Python helper must be isolated: ${invocation}`);
+  }
+  assert.match(logdiagText, /^PRIVILEGED_LOG_ROOT=\/root\/\.pm2\/logs$/m);
+  assert.doesNotMatch(logdiagText, /\/home\/deploy\/\.pm2\/logs/);
   assert.match(logdiagText, /SAFE_SUMMARY/);
-  assert.match(logdiagText, /gzip\.open\([^)]*"rt"/);
+  assert.match(logdiagText, /os\.O_NOFOLLOW/);
+  assert.match(logdiagText, /gzip\.GzipFile\(/);
+  assert.match(logdiagText, /fileobj=/);
+  assert.doesNotMatch(logdiagText, /gzip\.open\(/);
+  assert.match(logdiagText, /ofollow_unavailable/);
+  assert.match(logdiagText, /privileged_log_skip/);
   assert.doesNotMatch(logdiagText, /sudo bash/);
+  assert.doesNotMatch(logdiagText, /SETENV/);
   assert.doesNotMatch(logdiagText, /pm2 delete/);
   assert.doesNotMatch(logdiagText, /pm2 (restart|start|flush|save)/);
   assert.doesNotMatch(logdiagText, /INSERT INTO/i);
+  assert.doesNotMatch(logdiagText, /UPDATE /i);
+  assert.doesNotMatch(logdiagText, /DELETE FROM/i);
   assert.doesNotMatch(logdiagText, /NOPASSWD:\s*ALL/);
   const rejectArgs = spawnSync("bash", [courseUpgradeLogdiagPath, "anything"], { encoding: "utf8" });
   assert.notEqual(rejectArgs.status, 0, "logdiag wrapper must reject arguments");
   assert.match(`${rejectArgs.stdout ?? ""}${rejectArgs.stderr ?? ""}`, /accepts no arguments/);
+  const rejectTwo = spawnSync("bash", [courseUpgradeLogdiagPath, "a", "b"], { encoding: "utf8" });
+  assert.notEqual(rejectTwo.status, 0, "logdiag wrapper must reject argc != 0");
   const sudoersText = readFileSync(courseUpgradeLogdiagSudoersPath, "utf8");
   assert.match(
     sudoersText,
     /^deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-course-upgrade-logdiag ""$/m,
   );
   assert.doesNotMatch(sudoersText, /NOPASSWD:\s*ALL/);
+  assert.doesNotMatch(sudoersText, /SETENV/);
   assert.doesNotMatch(sudoersText, /\*/);
-  assert.match(logdiagText, /^PATH=\/usr\/sbin:\/usr\/bin:\/bin$/m);
+  assert.doesNotMatch(sudoersText, /sudo bash/);
   const evilPath = mkdtempSync(join(tmpdir(), "audiolad-logdiag-evil-path-"));
   try {
     writeFileSync(
@@ -3861,9 +3897,149 @@ print(classify(sys.argv[1]))
     assert.equal(hardened.status, 0, `wrapper must ignore caller PATH: ${hardenedOut}`);
     assert.doesNotMatch(hardenedOut, /EVIL_PYTHON/);
     assert.match(hardenedOut, /PRIVILEGED_LOGDIAG=OK/);
+    assert.match(hardenedOut, /privileged_log_root=\/root\/\.pm2\/logs/);
   } finally {
     rmSync(evilPath, { recursive: true, force: true });
   }
+
+  assertHardenedPrivilegedLogdiagContract(logdiagText);
+}
+
+function extractLogdiagPythonHelpers(scriptText) {
+  const blocks = [];
+  const marker = "<<'PY'\n";
+  let from = 0;
+  while (true) {
+    const start = scriptText.indexOf(marker, from);
+    if (start < 0) {
+      break;
+    }
+    const bodyStart = start + marker.length;
+    const end = scriptText.indexOf("\nPY\n", bodyStart);
+    if (end < 0) {
+      break;
+    }
+    blocks.push(scriptText.slice(bodyStart, end));
+    from = end + 4;
+  }
+  return blocks;
+}
+
+function writeLogdiagCopyWithRoot(destPath, privilegedLogRoot) {
+  writeFileSync(
+    destPath,
+    readFileSync(courseUpgradeLogdiagPath, "utf8").split("/root/.pm2/logs").join(privilegedLogRoot),
+    { mode: 0o755 },
+  );
+}
+
+function assertHardenedPrivilegedLogdiagContract(logdiagText) {
+  const helpers = extractLogdiagPythonHelpers(logdiagText);
+  assert.equal(helpers.length, 2, "privileged wrapper must embed scanner and path-classifier helpers");
+  const [scanHelper] = helpers;
+  assert.match(scanHelper, /ALLOWED_ROOT = "\/root\/\.pm2\/logs"/);
+  assert.match(scanHelper, /os\.O_NOFOLLOW/);
+  assert.match(scanHelper, /gzip\.GzipFile\(/);
+  assert.match(scanHelper, /fileobj=/);
+  assert.doesNotMatch(scanHelper, /gzip\.open\(/);
+
+  const scanRoot = mkdtempSync(join(tmpdir(), "audiolad-logdiag-scan-"));
+  const helperFile = join(scanRoot, "scan.py");
+  writeFileSync(helperFile, scanHelper);
+  const outsideLog = join(scanRoot, "outside", "audiolad-p3000-error.log");
+  mkdirSync(dirname(outsideLog), { recursive: true });
+  const outsideEvent = [
+    "2026-09-10T04:36:12.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2, raw: 'OUTSIDE_RAW_SECRET' }",
+    "",
+  ].join("\n");
+  writeFileSync(outsideLog, outsideEvent);
+  const outsideScan = spawnSync(
+    "python3",
+    ["-I", helperFile, outsideLog, "2026-09-10T04:25:00Z", "2026-09-10T04:50:00Z"],
+    { encoding: "utf8" },
+  );
+  const outsideOut = `${outsideScan.stdout ?? ""}${outsideScan.stderr ?? ""}`;
+  assert.equal(outsideScan.status, 0, `outside-root scan should fail closed: ${outsideOut}`);
+  assert.match(outsideOut, /privileged_log_skip path=.* reason=outside_privileged_root/);
+  assert.doesNotMatch(outsideOut, /SAFE_SUMMARY/);
+  assert.doesNotMatch(outsideOut, /OUTSIDE_RAW_SECRET/);
+
+  const evilPy = join(scanRoot, "evil-site");
+  mkdirSync(evilPy, { recursive: true });
+  writeFileSync(join(evilPy, "gzip.py"), "print('EVIL_GZIP')\nraise SystemExit(99)\n");
+  const isolated = spawnSync(
+    "python3",
+    ["-I", helperFile, outsideLog, "2026-09-10T04:25:00Z", "2026-09-10T04:50:00Z"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PYTHONPATH: evilPy,
+        PYTHONHOME: evilPy,
+        PYTHONSTARTUP: join(evilPy, "gzip.py"),
+        PYTHONUSERBASE: evilPy,
+      },
+    },
+  );
+  const isolatedOut = `${isolated.stdout ?? ""}${isolated.stderr ?? ""}`;
+  assert.equal(isolated.status, 0, `python3 -I must ignore caller Python env: ${isolatedOut}`);
+  assert.doesNotMatch(isolatedOut, /EVIL_GZIP/);
+  assert.match(isolatedOut, /outside_privileged_root/);
+
+  const fixtureRoot = join(scanRoot, "wrapper-root");
+  const privilegedLogRoot = join(fixtureRoot, "root", ".pm2", "logs");
+  const wrapperCopy = join(fixtureRoot, "audiolad-course-upgrade-logdiag");
+  mkdirSync(privilegedLogRoot, { recursive: true });
+  writeLogdiagCopyWithRoot(wrapperCopy, privilegedLogRoot);
+  chmodSync(wrapperCopy, 0o755);
+
+  const secretRaw = "RAW_LOG_SECRET_NEVER_PRINT";
+  const regularEvent = [
+    `2026-09-10T04:36:12.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2, leak: '${secretRaw}' }`,
+    "",
+  ].join("\n");
+  const gzEvent = [
+    "2026-09-10T04:36:40.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: '12121212-1212-4121-8121-121212121212', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }",
+    "",
+  ].join("\n");
+  writeFileSync(join(privilegedLogRoot, "audiolad-p3000-error.log"), regularEvent);
+  writeFileSync(join(privilegedLogRoot, "audiolad-p3000-error.log.1.gz"), gzipSync(gzEvent));
+  writeFileSync(join(scanRoot, "symlink-target.log"), `${outsideEvent}${secretRaw}\n`);
+  symlinkSync(
+    join(scanRoot, "symlink-target.log"),
+    join(privilegedLogRoot, "audiolad-p3001-error.log"),
+  );
+
+  const scanned = spawnSync("/bin/bash", [wrapperCopy], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PYTHONPATH: evilPy,
+      PYTHONHOME: evilPy,
+      PYTHONSTARTUP: join(evilPy, "gzip.py"),
+      PYTHONUSERBASE: evilPy,
+    },
+  });
+  const scannedOut = `${scanned.stdout ?? ""}${scanned.stderr ?? ""}`;
+  assert.equal(scanned.status, 0, `hardened wrapper scan failed: ${scannedOut}`);
+  assert.match(scannedOut, /PRIVILEGED_LOGDIAG=OK/);
+  assert.match(scannedOut, new RegExp(`privileged_log_root=${privilegedLogRoot.replace(/\//g, "\\/")}`));
+  assert.match(scannedOut, /privileged_log_candidate path=.*audiolad-p3000-error\.log/);
+  assert.match(scannedOut, /privileged_log_candidate path=.*audiolad-p3000-error\.log\.1\.gz/);
+  assert.match(scannedOut, /privileged_log_skip path=.*audiolad-p3001-error\.log reason=symlink/);
+  assert.doesNotMatch(scannedOut, /privileged_log_candidate path=.*audiolad-p3001-error\.log/);
+  assert.match(
+    scannedOut,
+    /SAFE_SUMMARY window=priority[^\n]*event=course_upgrade_failed[^\n]*FAILED_STAGE=createTochkaPaymentOperation[^\n]*ACTUAL_API_ERROR=provider_checkout_failed[^\n]*ACTUAL_HTTP_STATUS=502[^\n]*order_id=dddddddd-dddd-4ddd-8ddd-dddddddddddd/,
+  );
+  assert.match(scannedOut, /order_id=12121212-1212-4121-8121-121212121212/);
+  assert.doesNotMatch(scannedOut, /RAW_LOG_SECRET_NEVER_PRINT/);
+  assert.doesNotMatch(scannedOut, /OUTSIDE_RAW_SECRET/);
+  assert.doesNotMatch(scannedOut, /EVIL_GZIP/);
+  assert.doesNotMatch(scannedOut, /\/home\/deploy\/\.pm2\/logs/);
+  assert.match(scannedOut, /SAFE_SUMMARY/);
+  assert.match(scannedOut, /note=SAFE_SUMMARY only/);
+  rmSync(scanRoot, { recursive: true, force: true });
 }
 
 function existsSyncSafe(path) {

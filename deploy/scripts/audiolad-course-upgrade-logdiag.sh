@@ -1,12 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Draft privileged read-only Audiolad web PM2 log diagnostic.
 # Intended install path: /usr/local/sbin/audiolad-course-upgrade-logdiag
 # (root:root, 0755). This file is NOT installed by merging to main.
 #
 # Accepts NO arguments. No arbitrary command, path, or remote shell.
+# Privileged wrapper reads ONLY /root/.pm2/logs (root PM2 God namespace).
+# Deploy-user PM2 logs stay with ordinary OPS_COURSE_UPGRADE_DIAG (no sudo).
 # Reads ONLY Audiolad web PM2 logs matching audiolad-p3000*,
 # audiolad-p3001*, audiolad-p30xx* (including rotations and .gz).
-# Never prints raw log lines. Emits allowlisted SAFE_SUMMARY only.
+# Never follows caller/user-controlled symlinks. Never prints raw log lines.
+# Emits allowlisted SAFE_SUMMARY only.
 # Never restarts/starts/deletes PM2. Never writes app or DB.
 # Never checkout / Tochka / deploy / cutover.
 set -Eeuo pipefail
@@ -19,17 +22,20 @@ fi
 # Ignore caller PATH. Fixed safe search path only.
 PATH=/usr/sbin:/usr/bin:/bin
 export PATH
-unset CDPATH
+unset BASH_ENV || true
+unset ENV || true
+unset PYTHONPATH || true
+unset PYTHONHOME || true
+unset PYTHONSTARTUP || true
+unset PYTHONUSERBASE || true
+unset CDPATH || true
 hash -r 2>/dev/null || true
 
 PRIORITY_START="${AUDIOLAD_COURSE_UPGRADE_DIAG_WINDOW_START:-2026-09-10T04:25:00Z}"
 PRIORITY_END="${AUDIOLAD_COURSE_UPGRADE_DIAG_WINDOW_END:-2026-09-10T04:50:00Z}"
 
-# Fixed candidate homes only. No caller-supplied paths.
-LOG_DIRS=(
-  /root/.pm2/logs
-  /home/deploy/.pm2/logs
-)
+# Fixed privileged log root only. No caller-supplied paths. No non-root homes.
+PRIVILEGED_LOG_ROOT=/root/.pm2/logs
 
 redact_stream() {
   sed -E \
@@ -62,7 +68,10 @@ scan_log_file() {
   helper="$(mktemp /tmp/audiolad-course-upgrade-logdiag-scan.XXXXXX.py)"
   cat >"${helper}" <<'PY'
 import gzip
+import io
+import os
 import re
+import stat
 import sys
 from collections import deque
 from datetime import datetime, timezone
@@ -70,6 +79,7 @@ from datetime import datetime, timezone
 path = sys.argv[1]
 priority_start = sys.argv[2]
 priority_end = sys.argv[3]
+ALLOWED_ROOT = "/root/.pm2/logs"
 PRIORITY_MAX = 40
 RECENT_MAX = 20
 LOOKAHEAD = 16
@@ -196,10 +206,86 @@ def is_object_close(line):
     return stripped in ("}", "};", "},") or stripped.endswith("}")
 
 
+def skip_candidate(reason):
+    print("privileged_log_skip path=%s reason=%s" % (path, reason))
+    raise SystemExit(0)
+
+
+def canonical_inside_root(candidate, root=ALLOWED_ROOT):
+    real = os.path.realpath(candidate)
+    abs_root = os.path.abspath(root)
+    root_real = os.path.realpath(root)
+    if root_real != abs_root:
+        return False
+    prefix = abs_root.rstrip(os.sep) + os.sep
+    return real == abs_root.rstrip(os.sep) or real.startswith(prefix)
+
+
 def open_log(log_path):
-    if log_path.endswith(".gz"):
-        return gzip.open(log_path, "rt", errors="replace")
-    return open(log_path, "r", errors="replace")
+    if not hasattr(os, "O_NOFOLLOW"):
+        skip_candidate("ofollow_unavailable")
+    try:
+        lst = os.lstat(log_path)
+    except OSError:
+        skip_candidate("lstat_failed")
+    if stat.S_ISLNK(lst.st_mode):
+        skip_candidate("symlink")
+    if not stat.S_ISREG(lst.st_mode):
+        skip_candidate("not_regular_file")
+    if not canonical_inside_root(log_path):
+        skip_candidate("outside_privileged_root")
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    fd = None
+    raw = None
+    try:
+        fd = os.open(log_path, flags)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            skip_candidate("fstat_not_regular")
+        raw = os.fdopen(fd, "rb")
+        fd = None
+        if log_path.endswith(".gz"):
+            gz = gzip.GzipFile(fileobj=raw, mode="rb")
+            return io.TextIOWrapper(gz, errors="replace")
+        return io.TextIOWrapper(raw, errors="replace")
+    except SystemExit:
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:
+                pass
+        elif fd is not None:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+        raise
+    except OSError:
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:
+                pass
+        elif fd is not None:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+        raise
+    except Exception:
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:
+                pass
+        elif fd is not None:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+        raise
 
 
 def emit(bucket, window, lineno, event, ts, fields):
@@ -313,7 +399,7 @@ for item in list(priority) + list(recent):
             parts.append("%s=%s" % (key, item["fields"][key]))
     print(" ".join(parts))
 PY
-  python3 "${helper}" "$1" "${PRIORITY_START}" "${PRIORITY_END}"
+  python3 -I "${helper}" "$1" "${PRIORITY_START}" "${PRIORITY_END}"
   rm -f "${helper}"
 }
 
@@ -326,10 +412,13 @@ import os
 import stat
 import sys
 
+ALLOWED_ROOT = "/root/.pm2/logs"
+
+
 def classify(path):
     path = os.path.abspath(path)
     try:
-        st = os.stat(path)
+        st = os.lstat(path)
     except FileNotFoundError:
         parent = os.path.dirname(path)
         if parent == path:
@@ -344,6 +433,10 @@ def classify(path):
         if err.errno in (errno.EACCES, errno.EPERM):
             return "UNKNOWN_PERMISSION_DENIED"
         return "UNKNOWN_PERMISSION_DENIED"
+    if stat.S_ISLNK(st.st_mode):
+        return "SYMLINK_SKIP"
+    if path == os.path.abspath(ALLOWED_ROOT) and os.path.realpath(path) != path:
+        return "SYMLINK_SKIP"
     readable = os.access(path, os.R_OK)
     if stat.S_ISDIR(st.st_mode):
         if readable and os.access(path, os.X_OK):
@@ -355,7 +448,7 @@ def classify(path):
 
 print(classify(sys.argv[1]))
 PY
-  python3 "${helper}" "$1"
+  python3 -I "${helper}" "$1"
   rm -f "${helper}"
 }
 
@@ -381,27 +474,30 @@ echo "tochka_calls=NOT_INVOKED"
 echo "entitlement_writes=NOT_INVOKED"
 echo "pm2_mutate=NOT_INVOKED"
 echo "mode=read_only_privileged_web_pm2_logs"
+echo "privileged_log_root=${PRIVILEGED_LOG_ROOT}"
 echo "priority_window_start=${PRIORITY_START}"
 echo "priority_window_end=${PRIORITY_END}"
 echo "note=SAFE_SUMMARY only; raw log lines are never printed"
+echo "note=privileged wrapper reads ONLY /root/.pm2/logs; deploy-user PM2 logs stay unsudoed"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "scanner_unavailable reason=python3_not_found"
   exit 0
 fi
 
-for dir in "${LOG_DIRS[@]}"; do
-  state="$(classify_path_state "${dir}")"
-  echo "log_dir path=${dir} state=${state}"
-  if [[ "${state}" != "PRESENT_READABLE" ]]; then
-    continue
-  fi
+state="$(classify_path_state "${PRIVILEGED_LOG_ROOT}")"
+echo "log_dir path=${PRIVILEGED_LOG_ROOT} state=${state}"
+if [[ "${state}" == "PRESENT_READABLE" ]]; then
   shopt -s nullglob
   for path in \
-    "${dir}"/audiolad-p3000* \
-    "${dir}"/audiolad-p3001* \
-    "${dir}"/audiolad-p30*
+    "${PRIVILEGED_LOG_ROOT}"/audiolad-p3000* \
+    "${PRIVILEGED_LOG_ROOT}"/audiolad-p3001* \
+    "${PRIVILEGED_LOG_ROOT}"/audiolad-p30*
   do
+    if [[ -L "${path}" ]]; then
+      echo "privileged_log_skip path=${path} reason=symlink"
+      continue
+    fi
     [[ -f "${path}" ]] || continue
     allowlisted_web_log "${path}" || continue
     echo "privileged_log_candidate path=${path}"
@@ -410,6 +506,6 @@ for dir in "${LOG_DIRS[@]}"; do
     echo ">>log_matches"
   done
   shopt -u nullglob
-done
+fi
 
 echo "PRIVILEGED_LOGDIAG_END=OK"

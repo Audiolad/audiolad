@@ -488,21 +488,41 @@ contract for Audiolad web PM2 logs. Do not reuse `audiolad-deploy` or
 maintenance sudo for log reading.
 
 This PR adds Draft assets only. **Do not install on production from
-this PR, from CI, or from `OPS_COURSE_UPGRADE_DIAG`.** After a later
-explicit owner/architect approval, a human may install:
+this PR, from CI, or from `OPS_COURSE_UPGRADE_DIAG`.** The wrapper
+and sudoers are still not installed. After a later explicit
+owner/architect approval, a human may install:
 
 | Asset | Repo path | Intended server path |
 |-------|-----------|----------------------|
 | Wrapper | `deploy/scripts/audiolad-course-upgrade-logdiag.sh` | `/usr/local/sbin/audiolad-course-upgrade-logdiag` |
 | sudoers | `deploy/sudoers/audiolad-course-upgrade-logdiag` | `/etc/sudoers.d/audiolad-course-upgrade-logdiag` |
 
+Proven production layout (OPS run `34489344776`): live web owner is
+`root`, parent is root PM2 God, `LIVE_WEB_PM2_HOME=/root/.pm2` is not
+readable by the SSH deploy user, and `/home/<deploy>/.pm2/logs` is
+already `PRESENT_READABLE` without sudo. Ordinary
+`OPS_COURSE_UPGRADE_DIAG` keeps reading that deploy-user namespace
+without sudo. The privileged wrapper reads ONLY `/root/.pm2/logs`.
+
 Wrapper contract:
 
+- shebang is exact `#!/bin/bash` (not `#!/usr/bin/env bash`);
+- sets `PATH=/usr/sbin:/usr/bin:/bin` and unsets `BASH_ENV`, `ENV`,
+  `PYTHONPATH`, `PYTHONHOME`, `PYTHONSTARTUP`, `PYTHONUSERBASE`,
+  `CDPATH` when present;
+- every embedded Python helper/scanner runs as `python3 -I`;
 - root-owned, mode 0755;
 - **no arguments**; no arbitrary command, path, or remote shell;
+- privileged log root is fixed `PRIVILEGED_LOG_ROOT=/root/.pm2/logs`
+  only — `/home/deploy/.pm2/logs` and other non-root homes are absent;
 - reads only `audiolad-p3000*`, `audiolad-p3001*`, `audiolad-p30xx*`
-  under `/root/.pm2/logs` and `/home/deploy/.pm2/logs`, including
-  rotations and `.gz`;
+  under that root, including rotations and `.gz`;
+- does not follow caller/user-controlled symlinks: symlink candidates
+  are skipped; only real regular files are opened; canonical path must
+  remain inside `/root/.pm2/logs`; open uses `O_NOFOLLOW` and `fstat`
+  of a regular file before read; `.gz` is decompressed from that fd
+  (`gzip.GzipFile(fileobj=…)`, never unrestricted `gzip.open(path)`);
+  if `O_NOFOLLOW` is unavailable the privileged scan fails closed;
 - never prints raw log; `SAFE_SUMMARY` only
   (`FAILED_STAGE`, `ACTUAL_API_ERROR`, `ACTUAL_HTTP_STATUS`,
   `order_id`, `practice_id`, `target_access_level`, safe provider
@@ -514,7 +534,9 @@ sudoers contract (production `deploy` user only). Standard sudoers
 empty-argument list (`""`) allows the exact command with **zero**
 arguments only. A command name with no argument list would allow any
 argv; that form is not used. The shell wrapper also rejects `argc!=0`.
-Wrapper sets `PATH=/usr/sbin:/usr/bin:/bin` and ignores caller PATH.
+No wildcards, no arbitrary args, no `sudo bash`, no shell, no
+`NOPASSWD: ALL`, no `SETENV`. `visudo -cf` remains mandatory in the
+installation plan below. The sudoers command is unchanged.
 
 ```text
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag ""
@@ -537,7 +559,9 @@ visudo -cf /etc/sudoers.d/audiolad-course-upgrade-logdiag
 ```
 
 Until that install happens, `OPS_COURSE_UPGRADE_DIAG` reports
-`PRIVILEGED_LOGDIAG=MISSING` / `NEED_INSTALL` and continues.
+`PRIVILEGED_LOGDIAG=MISSING` / `NEED_INSTALL` and continues. This
+hardening PR still does **not** install the wrapper or sudoers on
+production.
 
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
