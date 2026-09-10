@@ -174,6 +174,8 @@ export function createSupabaseStudioMusicPreviewStore(
           music_usage_permission,
           is_free,
           price,
+          studio_music_pricing_mode,
+          studio_music_price_minor,
           catalog_visibility,
           is_catalog_listed
         `,

@@ -83,7 +83,10 @@ function catalogItem(
     items_count: 1,
     tracks: [{ id: "track-1", title: "Рассвет", duration_seconds: 120 }],
     is_free: isFree,
+    listener_is_free: isFree,
     listener_effective_minor: isFree ? null : 50000,
+    studio_pricing_mode: isFree ? "free" : "auto_2x_listener",
+    studio_is_free: isFree,
     studio_effective_minor: isFree ? null : studioEffectiveMinor,
     ownership,
     display_label: resolveStudioMusicDisplayLabel({
@@ -91,7 +94,14 @@ function catalogItem(
       isFree,
       studioEffectiveMinor: isFree ? null : studioEffectiveMinor,
     }),
+    listener_price_label: isFree
+      ? "Прослушивание: бесплатно"
+      : "Прослушивание: 500\u00a0₽",
+    studio_price_label: isFree
+      ? "Для Студии: бесплатно"
+      : "Для Студии: 1\u00a0000\u00a0₽",
     kind_label: "Трек",
+    subtitle: null,
     ...overrides,
   };
 }

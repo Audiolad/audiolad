@@ -612,5 +612,58 @@ BEGIN
         RAISE EXCEPTION 'expected not_studio_music, got %', SQLERRM;
       END IF;
   END;
+
+  -- PR3.1 independent pricing: listener free + Studio fixed 600
+  UPDATE public.practices
+  SET
+    is_free = true,
+    price = 0,
+    music_usage_permission = 'platform_reuse_allowed',
+    status = 'published',
+    studio_music_pricing_mode = 'fixed',
+    studio_music_price_minor = 60000
+  WHERE id = free_music;
+
+  PERFORM set_config('request.jwt.claim.sub', new_user::text, true);
+  BEGIN
+    PERFORM public.acquire_free_studio_music(free_music);
+    RAISE EXCEPTION 'PR3.1: free acquire must reject Studio fixed';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%practice_not_free%' THEN
+        RAISE EXCEPTION 'PR3.1: expected practice_not_free, got %', SQLERRM;
+      END IF;
+  END;
+
+  SELECT amount_minor INTO v_amount
+  FROM public.create_studio_music_order(free_music, gen_random_uuid(), NULL);
+  IF v_amount IS DISTINCT FROM 60000 THEN
+    RAISE EXCEPTION 'PR3.1: fixed Studio amount must be 60000, got %', v_amount;
+  END IF;
+
+  -- listener paid + Studio free → free acquire, no paid order
+  UPDATE public.practices
+  SET
+    is_free = false,
+    price = 300,
+    studio_music_pricing_mode = 'free',
+    studio_music_price_minor = NULL
+  WHERE id = album_music;
+
+  BEGIN
+    PERFORM public.create_studio_music_order(album_music, gen_random_uuid(), NULL);
+    RAISE EXCEPTION 'PR3.1: paid order must reject Studio free';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%practice_not_for_sale%' THEN
+        RAISE EXCEPTION 'PR3.1: expected practice_not_for_sale, got %', SQLERRM;
+      END IF;
+  END;
+
+  SELECT inserted INTO v_inserted
+  FROM public.acquire_free_studio_music(album_music);
+  IF v_inserted IS NOT TRUE THEN
+    RAISE EXCEPTION 'PR3.1: paid listener + Studio free must allow free acquire';
+  END IF;
 END
 $$;

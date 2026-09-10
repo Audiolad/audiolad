@@ -41,6 +41,8 @@ const PRACTICE_DETAIL_SELECT = `
   product_kind,
   publication_class,
   music_usage_permission,
+  studio_music_pricing_mode,
+  studio_music_price_minor,
   duration_minutes,
   price,
   is_free,

@@ -49,7 +49,10 @@ export function formatStudioMusicBuyLabel(
 export function resolveStudioMusicCatalogAction(
   item: Pick<
     StudioMusicCatalogItem,
-    "is_free" | "studio_effective_minor" | "ownership"
+    | "is_free"
+    | "studio_is_free"
+    | "studio_effective_minor"
+    | "ownership"
   >,
 ): StudioMusicCatalogAction {
   if (item.ownership.can_use) {
@@ -70,7 +73,8 @@ export function resolveStudioMusicCatalogAction(
     return { kind: "none", label: "" };
   }
 
-  if (item.is_free) {
+  const studioIsFree = item.studio_is_free ?? item.is_free;
+  if (studioIsFree) {
     return {
       kind: "free",
       label: STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
@@ -109,7 +113,7 @@ export function markStudioMusicCatalogItemAvailable(
     ownership,
     display_label: resolveStudioMusicDisplayLabel({
       ownership,
-      isFree: item.is_free,
+      isFree: item.studio_is_free ?? item.is_free,
       studioEffectiveMinor: item.studio_effective_minor,
     }),
   };
@@ -129,6 +133,26 @@ export function resolveStudioMusicEntitlementAfterCheckout(input: {
   }
 
   return input.checkoutStatus === "paid";
+}
+
+export type StudioMusicAlbumExpandClickSource =
+  | "row"
+  | "tracks"
+  | "preview"
+  | "acquire";
+
+export function nextStudioMusicAlbumExpanded(input: {
+  kind: "album" | "single";
+  expanded: boolean;
+  source: StudioMusicAlbumExpandClickSource;
+}): boolean {
+  if (input.kind !== "album") {
+    return false;
+  }
+  if (input.source === "preview" || input.source === "acquire") {
+    return input.expanded;
+  }
+  return !input.expanded;
 }
 
 export function studioCheckoutUsesServerOrderAmount(

@@ -138,6 +138,13 @@ import {
 } from "@/lib/products/publish-preview";
 import { formatRubles } from "@/lib/products/price-format";
 import {
+  DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+  STUDIO_MUSIC_PRICING_MODE,
+  defaultStudioMusicPricingModeForForm,
+  studioMusicPricingModeAfterListenerFlip,
+  type StudioMusicPricingMode,
+} from "@/lib/studio-music/pricing";
+import {
   createDefaultListeningNoticeFormState,
   DEFAULT_LISTENING_NOTICE_TEXT,
   DEFAULT_LISTENING_NOTICE_TITLE,
@@ -280,6 +287,8 @@ type FormState = {
   productKind: ProductKind;
   publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
+  studioMusicPricingMode: StudioMusicPricingMode | null;
+  studioMusicPriceRubles: number;
   formatPreset: string;
   customFormat: string;
   slug: string;
@@ -427,6 +436,8 @@ function buildInitialForm(
       created.productKind === PRODUCT_KIND.MUSIC
         ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
         : null,
+    studioMusicPricingMode: null,
+    studioMusicPriceRubles: DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
     formatPreset:
       created.productKind === PRODUCT_KIND.AUDIO_POST
         ? AUDIO_POST_KIND_LABEL
@@ -561,6 +572,19 @@ function buildProductSavePayload(
     music_usage_permission:
       form.productKind === PRODUCT_KIND.MUSIC
         ? form.musicUsagePermission
+        : null,
+    studio_music_pricing_mode:
+      form.productKind === PRODUCT_KIND.MUSIC &&
+      form.musicUsagePermission ===
+        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
+        ? form.studioMusicPricingMode
+        : null,
+    studio_music_price:
+      form.productKind === PRODUCT_KIND.MUSIC &&
+      form.musicUsagePermission ===
+        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED &&
+      form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED
+        ? form.studioMusicPriceRubles
         : null,
     format:
       form.productKind === PRODUCT_KIND.MUSIC
@@ -711,6 +735,7 @@ export default function AuthorProductForm({
     seoDescription?: string;
     seoAbout?: string;
     authorRecommendationsTitle?: string;
+    studioMusicPrice?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -2913,6 +2938,14 @@ export default function AuthorProductForm({
                     setForm((current) => ({
                       ...current,
                       musicUsagePermission: value,
+                      studioMusicPricingMode:
+                        value ===
+                        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
+                          ? defaultStudioMusicPricingModeForForm({
+                              reuseAllowed: true,
+                              listenerIsFree: current.isFree,
+                            })
+                          : null,
                     }))
                   }
                 />
@@ -2926,6 +2959,108 @@ export default function AuthorProductForm({
                 </span>
               </label>
             ))}
+          </fieldset>
+        ) : null}
+
+        {form.productKind === PRODUCT_KIND.MUSIC &&
+        form.musicUsagePermission ===
+          MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED ? (
+          <fieldset className="block space-y-3">
+            <legend className="mb-1 block text-sm font-medium">
+              Использование в Студии АудиоЛада
+            </legend>
+            <p className="text-sm leading-5 text-[#7d70a2]">
+              Разрешите другим авторам использовать вашу музыку при создании
+              медитаций и практик.
+            </p>
+            {(
+              [
+                {
+                  value: STUDIO_MUSIC_PRICING_MODE.FREE,
+                  label: "Бесплатно для Студии",
+                  show: true,
+                },
+                {
+                  value: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,
+                  label:
+                    "Автоматическая цена (в 2 раза дороже текущей цены прослушивания)",
+                  show: !form.isFree,
+                },
+                {
+                  value: STUDIO_MUSIC_PRICING_MODE.FIXED,
+                  label: "Своя цена",
+                  show: true,
+                },
+              ] as const
+            )
+              .filter((option) => option.show)
+              .map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                    form.studioMusicPricingMode === option.value
+                      ? "border-[#9a74d8] bg-[#f8f4ff]"
+                      : "border-[#e4d7f4] bg-white"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="studio_music_pricing_mode"
+                    className="mt-1"
+                    checked={form.studioMusicPricingMode === option.value}
+                    disabled={busy || !canEditPublicFields}
+                    onChange={() =>
+                      setForm((current) => ({
+                        ...current,
+                        studioMusicPricingMode: option.value,
+                        studioMusicPriceRubles:
+                          option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
+                          current.studioMusicPriceRubles < MIN_PAID_PRICE_RUB
+                            ? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES
+                            : current.studioMusicPriceRubles,
+                      }))
+                    }
+                  />
+                  <span className="block text-sm font-medium text-[#3f3560]">
+                    {option.label}
+                  </span>
+                </label>
+              ))}
+            {form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED ? (
+              <label className="block">
+                <span className="mb-1 block text-sm text-[#7d70a2]">
+                  Цена для Студии, ₽
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_PAID_PRICE_RUB}
+                  max={MAX_PAID_PRICE_RUB}
+                  step={1}
+                  value={form.studioMusicPriceRubles}
+                  disabled={busy || !canEditPublicFields}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    setForm((current) => ({
+                      ...current,
+                      studioMusicPriceRubles: Number.isInteger(next)
+                        ? next
+                        : current.studioMusicPriceRubles,
+                    }));
+                  }}
+                  className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+                />
+                {fieldErrors.studioMusicPrice ? (
+                  <p className="mt-2 text-sm text-[#9b3d3d]">
+                    {fieldErrors.studioMusicPrice}
+                  </p>
+                ) : null}
+              </label>
+            ) : null}
+            <p className="text-sm leading-5 text-[#7d70a2]">
+              Покупатель получает постоянное право использовать эту музыку в
+              Студии. Автор получает 70% с каждой продажи.
+            </p>
           </fieldset>
         ) : null}
 
@@ -3023,7 +3158,19 @@ export default function AuthorProductForm({
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => setForm((current) => ({ ...current, isFree: true }))}
+              onClick={() =>
+                setForm((current) => ({
+                  ...current,
+                  isFree: true,
+                  studioMusicPricingMode: studioMusicPricingModeAfterListenerFlip({
+                    reuseAllowed:
+                      current.musicUsagePermission ===
+                      MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+                    listenerIsFree: true,
+                    currentMode: current.studioMusicPricingMode,
+                  }),
+                }))
+              }
               disabled={!canEditPublicFields}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 form.isFree
@@ -3037,7 +3184,18 @@ export default function AuthorProductForm({
               type="button"
               disabled={!canMutateContent || !canUsePaidPricing}
               onClick={() =>
-                setForm((current) => ({ ...current, isFree: false, price: 99 }))
+                setForm((current) => ({
+                  ...current,
+                  isFree: false,
+                  price: 99,
+                  studioMusicPricingMode: studioMusicPricingModeAfterListenerFlip({
+                    reuseAllowed:
+                      current.musicUsagePermission ===
+                      MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+                    listenerIsFree: false,
+                    currentMode: current.studioMusicPricingMode,
+                  }),
+                }))
               }
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 !form.isFree

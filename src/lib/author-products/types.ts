@@ -83,6 +83,8 @@ export type PracticeRow = {
   product_kind: ProductKind;
   publication_class: PublicationClass | null;
   music_usage_permission: MusicUsagePermission | null;
+  studio_music_pricing_mode: "free" | "auto_2x_listener" | "fixed" | null;
+  studio_music_price_minor: number | null;
   duration_minutes: number | null;
   price: number;
   is_free: boolean;
@@ -147,6 +149,8 @@ export function coercePracticeRow(
     | "product_kind"
     | "publication_class"
     | "music_usage_permission"
+    | "studio_music_pricing_mode"
+    | "studio_music_price_minor"
     | "is_catalog_listed"
     | "catalog_visibility"
     | "moderation_status"
@@ -173,6 +177,8 @@ export function coercePracticeRow(
     product_kind?: string | null;
     publication_class?: string | null;
     music_usage_permission?: string | null;
+    studio_music_pricing_mode?: string | null;
+    studio_music_price_minor?: number | null;
     moderation_status?: string | null;
     moderation_attempt?: number | null;
     moderation_submitted_at?: string | null;
@@ -205,6 +211,17 @@ export function coercePracticeRow(
       row.music_usage_permission === "listen_only" ||
       row.music_usage_permission === "platform_reuse_allowed"
         ? row.music_usage_permission
+        : null,
+    studio_music_pricing_mode:
+      row.studio_music_pricing_mode === "free" ||
+      row.studio_music_pricing_mode === "auto_2x_listener" ||
+      row.studio_music_pricing_mode === "fixed"
+        ? row.studio_music_pricing_mode
+        : null,
+    studio_music_price_minor:
+      typeof row.studio_music_price_minor === "number" &&
+      Number.isInteger(row.studio_music_price_minor)
+        ? row.studio_music_price_minor
         : null,
     moderation_status: row.moderation_status ?? "not_submitted",
     moderation_attempt: row.moderation_attempt ?? 0,

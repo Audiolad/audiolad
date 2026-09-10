@@ -28,6 +28,8 @@ export function serializeProductEditorBaseline(
     productKind: string;
     publicationClass: string | null;
     musicUsagePermission: string | null;
+    studioMusicPricingMode?: string | null;
+    studioMusicPriceRubles?: number;
     formatPreset: string;
     customFormat: string;
     slug: string;
@@ -71,6 +73,8 @@ export function serializeProductEditorBaseline(
     productKind: form.productKind,
     publicationClass: form.publicationClass,
     musicUsagePermission: form.musicUsagePermission,
+    studioMusicPricingMode: form.studioMusicPricingMode ?? null,
+    studioMusicPriceRubles: form.studioMusicPriceRubles ?? 0,
     formatPreset: form.formatPreset,
     customFormat: form.customFormat,
     slug: form.slug,

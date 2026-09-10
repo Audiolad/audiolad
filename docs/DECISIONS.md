@@ -24,8 +24,8 @@
   grant `free` без заказа.
 - Авторское право: live `author_members` (owner/editor), без обязательной
   owner-строки.
-- Studio price = `2 × resolve_practice_effective_price`, снимок в `orders`.
-  Колонки `studio_price` нет.
+- Studio price (PR1–PR3) = `2 × resolve_practice_effective_price`, снимок в
+  `orders`. PR3.1 adds independent `studio_music_pricing_mode`.
 - `orders.order_kind='studio_music_license'`. Pending unique scoped by
   `order_kind`. Отдельный RPC, не `create_practice_order`.
 - Tochka fulfill идемпотентно пишет entitlement и не пишет `user_practices`.
@@ -101,6 +101,36 @@
   `music_usage_permission`, AuthorProductForm, attach, FFmpeg.
 
 **Принято:** владелец продукта (задание PR3 Studio acquire + checkout).
+
+---
+
+## 2026-09-10 — Independent Studio music pricing + list catalog (PR3.1)
+
+**Контекст:** Нейрокомпозиторам нужна независимая цена права использования
+в Студии (B) от цены прослушивания (A). Канонический пример: слушать
+бесплатно, Студия 600 ₽. Витрина PR3 с огромными 2-колоночными карточками
+не показывает несколько релизов сразу.
+
+**Решение:**
+
+- Режимы `studio_music_pricing_mode`: `free` | `auto_2x_listener` | `fixed`.
+  `studio_music_price_minor` только для `fixed`.
+- Backfill: текущая бесплатная публикация → Studio `free`; платная →
+  `auto_2x_listener`. Существующие цены и entitlements не меняются.
+- Один серверный resolver `resolve_studio_music_acquisition` для витрины,
+  free acquire, paid order и `price_changed`. UI не решает бесплатность.
+- Free acquire гейтится Studio-free, не `practices.is_free`.
+- AUTO = 2 × текущий listener checkout effective (акции сначала на
+  listener). FIXED игнорирует listener promotions.
+- Кабинет: блок «Использование в Студии АудиоЛада» только при
+  `platform_reuse_allowed`. Для бесплатного прослушивания AUTO не
+  предлагается. Paid→free при AUTO требует явный выбор.
+- Фильтр «Бесплатно для Студии» = Studio-free. Desktop — вертикальный
+  список строк; mobile — одна колонка компактных карточек.
+- Finance 70/30, `platform_absorbs`, ceil-author не меняются.
+  `user_practices` не пишется. Entitlements постоянны.
+
+**Принято:** владелец продукта (задание PR3.1 independent pricing + list).
 
 ---
 

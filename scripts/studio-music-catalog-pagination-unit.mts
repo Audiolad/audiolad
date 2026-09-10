@@ -14,6 +14,7 @@ import {
   handleStudioMusicCatalog,
   isStudioMusicListedVisibilityRow,
   studioMusicCatalogFetchLimit,
+  studioMusicCatalogFreeOrFilter,
   studioMusicListedVisibilityOrFilter,
   takeStudioMusicCatalogPage,
   type StudioMusicCatalogPublication,
@@ -47,6 +48,8 @@ function publication(
     deleted_at: null,
     is_free: false,
     price: 500,
+    studio_music_pricing_mode: "auto_2x_listener",
+    studio_music_price_minor: null,
     catalog_visibility: "listed",
     is_catalog_listed: true,
     cover_url: null,
@@ -100,13 +103,19 @@ function matchPostgrestClause(
     );
   }
 
+  if (clause.startsWith("or(") && clause.endsWith(")")) {
+    return splitPostgrestList(clause.slice(3, -1)).some((part) =>
+      matchPostgrestClause(row, part),
+    );
+  }
+
   const inMatch = clause.match(/^([a-z_]+)\.in\.\((.+)\)$/);
   if (inMatch) {
     const values = inMatch[2].split(",").map((value) => value.trim());
     return values.includes(String(row[inMatch[1]] ?? ""));
   }
 
-  const match = clause.match(/^([a-z_]+)\.(eq|is|lt)\.(.+)$/);
+  const match = clause.match(/^([a-z_]+)\.(eq|is|lte|lt)\.(.+)$/);
   if (!match) {
     return false;
   }
@@ -133,6 +142,14 @@ function matchPostgrestClause(
       return actual === false;
     }
     return String(actual ?? "") === expected;
+  }
+
+  if (operator === "lte") {
+    if (actual == null || typeof actual !== "number") {
+      return false;
+    }
+    const limit = Number(expected);
+    return Number.isFinite(limit) && actual <= limit;
   }
 
   return String(actual ?? "") < expected;
@@ -369,6 +386,15 @@ function assertNoDuplicates(ids: string[]) {
     catalogSource,
     /\.eq\(\s*["']catalog_visibility["']\s*,\s*["']listed["']\s*\)/,
   );
+  assert.equal(
+    studioMusicCatalogFreeOrFilter(),
+    "studio_music_pricing_mode.eq.free,and(studio_music_pricing_mode.is.null,is_free.eq.true),and(studio_music_pricing_mode.is.null,price.is.null),and(studio_music_pricing_mode.is.null,price.lte.0)",
+  );
+  assert.match(catalogSource, /studioMusicCatalogFreeOrFilter\(\)/);
+  assert.doesNotMatch(
+    catalogSource,
+    /\.eq\(\s*["']studio_music_pricing_mode["']\s*,\s*["']free["']\s*\)/,
+  );
 }
 
 {
@@ -513,7 +539,12 @@ function assertNoDuplicates(ids: string[]) {
 
 {
   const eligible = Array.from({ length: 100 }, (_, index) =>
-    publication(index + 200, { is_free: true, price: 0 }),
+    publication(index + 200, {
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "free",
+      studio_music_price_minor: null,
+    }),
   );
   const recording = createRecordingSupabase({ practices: eligible });
   const store = createSupabaseStudioMusicCatalogStore(recording.client);
@@ -753,6 +784,58 @@ function assertNoDuplicates(ids: string[]) {
   assert.equal(joined.includes(evilId), false);
   assert.equal(joined.includes("id.eq.hacked"), false);
   assert.match(joined, /catalog_visibility\.eq\.listed/);
+}
+
+{
+  const freePredicate = studioMusicCatalogFreeOrFilter();
+  const rows = [
+    publication(1, {
+      title: "mode-free-paid-listener",
+      is_free: false,
+      price: 300,
+      studio_music_pricing_mode: "free",
+    }),
+    publication(2, {
+      title: "mode-fixed-free-listener",
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "fixed",
+      studio_music_price_minor: 60000,
+    }),
+    publication(3, {
+      title: "mode-null-free-listener",
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: null,
+    }),
+    publication(4, {
+      title: "mode-null-paid-listener",
+      is_free: false,
+      price: 300,
+      studio_music_pricing_mode: null,
+    }),
+  ];
+  const recording = createRecordingSupabase({ practices: rows });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const page = await store.listPublicInventory({
+    filter: "free",
+    cursor: null,
+    limit: 20,
+  });
+  assert.ok(
+    recording.practiceOrFilters[0]?.includes(freePredicate),
+    `production free filter missing: ${JSON.stringify(recording.practiceOrFilters[0])}`,
+  );
+  assert.equal(
+    recording.practiceOrFilters[0]?.some((filter) =>
+      filter.includes('studio_music_pricing_mode","free"'),
+    ),
+    false,
+  );
+  assert.deepEqual(
+    [...page.practices.map((practice) => practice.title)].sort(),
+    ["mode-free-paid-listener", "mode-null-free-listener"],
+  );
 }
 
 console.log("studio-music-catalog-pagination-unit: ok");

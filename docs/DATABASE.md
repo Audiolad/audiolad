@@ -356,8 +356,8 @@ Publication-level Studio-use right for music (`product_kind=music` or `publicati
 | `studio_music_entitlements` | `user_id`, `practice_id`, `grant_source` (`purchase` \| `free` \| `owner`), optional `order_id` (required for purchase), `granted_at` / `created_at`, `revoked_at` / `revoke_reason`. Partial UNIQUE `(user_id, practice_id) WHERE revoked_at IS NULL`. Partial UNIQUE `(order_id) WHERE order_id IS NOT NULL` (active or revoked — one row per paid order). FK `practice_id` ON DELETE RESTRICT. RLS: users SELECT own rows; writes only via SECURITY DEFINER / `service_role`. |
 | `can_acquire_studio_music` | New grant only: published music/release + `music_usage_permission='platform_reuse_allowed'` + commercial visibility. Later permission/price/unpublish changes do **not** revoke an existing grant. |
 | `has_studio_music_entitlement` / `can_use_music_in_studio` | Active stored grant, or live `author_members` owner/editor. Must **not** live-check current `platform_reuse_allowed`. Must **not** be used by ordinary listen APIs. |
-| `create_studio_music_order` | Authenticated RPC. Amount = `2 × resolve_practice_effective_price` (kopecks), snapshotted. Client is not the price source. `already_studio_entitled` is separate from listener `already_owned`. Fail-safe: free / `price<=0` → `practice_not_for_sale`; effective `<=0` → `invalid_practice_price`; expected-amount race → `price_changed`. |
-| `acquire_free_studio_music` | Authenticated RPC. First factual acquire of `is_free` + `platform_reuse_allowed`. Permanent entitlement, no order. Idempotent. |
+| `create_studio_music_order` | Authenticated RPC. Amount from `resolve_studio_music_acquisition` (PR3.1). `auto_2x_listener` = `2 ×` listener checkout effective; `fixed` = `studio_music_price_minor`; `free` → `practice_not_for_sale`. Client is not the price source. `already_studio_entitled` is separate from listener `already_owned`. Expected-amount race → `price_changed`. |
+| `acquire_free_studio_music` | Authenticated RPC. First factual acquire when **Studio** pricing is free (not listener `is_free`). Permanent entitlement, no order. Idempotent. |
 | Refund / revoke | `payment_refunds` still do **not** auto-revoke listen or Studio access. `revoke_studio_music_entitlement` (admin, current active user+practice row) and `revoke_studio_music_entitlement_for_order` set `revoked_at`. The order hook updates **only** `WHERE order_id = p_order_id AND revoked_at IS NULL` (purchase rows). It must not revoke another order, a newer repurchase, `grant_source='free'`, or live owner/editor access. Grant/fulfill of a revoked `order_id` does not insert a new active row. A later lawful order B for the same user+practice may grant again. Publication edits never revoke. Exported Studio MP3s are not clawed back. |
 | Sale lock | `practice_is_content_locked_after_sale` also treats active Studio entitlements as a lock. Paid Studio orders already lock via `orders.status='paid'`. |
 | Finance | Paid `studio_music_license` qualifies in `canonical_sale_has_paid_access` from the paid order (no fake `user_practices`). `ensure_author_sale_accrual` already accrues any succeeded payment with `author_id_snapshot`. Listener `product_purchase` still requires `access_source='purchase'`. |
@@ -374,8 +374,21 @@ PR3 (app-layer, no schema change): Studio catalog acquire + paid checkout.
 `POST /api/studio/music/acquire` calls `acquire_free_studio_music`.
 `POST /api/checkout/studio-music` calls `create_studio_music_order` then
 reuses `startTochkaCheckoutForPendingOrder`. No new finance rules, no
-`user_practices` writes, no `studio_price` column. Still out of scope:
+`user_practices` writes. Still out of scope:
 attach-to-project, full-track Studio playback, FFmpeg.
+
+PR3.1 (additive): independent listener vs Studio pricing.
+Migration `20261003120700_studio_music_independent_pricing.sql`.
+Columns `practices.studio_music_pricing_mode` (`free` \| `auto_2x_listener` \|
+`fixed`) and `practices.studio_music_price_minor` (fixed only, kopecks,
+whole-ruble 49–100000 ₽). Only for music/release with
+`platform_reuse_allowed`. Backfill: existing eligible free listener →
+`free`; existing eligible paid listener → `auto_2x_listener`. No existing
+track changes price. Canonical resolver
+`resolve_studio_music_acquisition` is used by catalog, free acquire, paid
+order, and `price_changed`. Catalog `free` filter = Studio-free, not
+`practices.is_free`. Entitlements stay permanent. Finance 70/30 and
+`platform_absorbs` unchanged.
 
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.

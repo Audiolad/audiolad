@@ -22,12 +22,18 @@ import {
   canUseMusicInStudio,
   hasStudioMusicEntitlement,
   isStudioMusicPublication,
-  studioLicenseAmountMinor,
   STUDIO_MUSIC_GRANT_SOURCE,
   type StudioMusicEntitlementInput,
   type StudioMusicGrantSource,
   type StudioMusicPublicationInput,
 } from "./access";
+import {
+  formatListenerCatalogPriceLabel,
+  formatStudioUseCatalogPriceLabel,
+  isStudioMusicFreeForCatalog,
+  resolveStudioMusicAcquisition,
+  type StudioMusicPricingMode,
+} from "./pricing";
 
 export const STUDIO_MUSIC_CATALOG_FILTERS = ["all", "mine", "free"] as const;
 export type StudioMusicCatalogFilter =
@@ -70,6 +76,7 @@ export type StudioMusicCatalogPublication = StudioMusicPublicationInput & {
   updated_at?: string | null;
   published_at?: string | null;
   created_at?: string | null;
+  subtitle?: string | null;
   authors?:
     | { name?: string | null; slug?: string | null }
     | { name?: string | null; slug?: string | null }[]
@@ -99,16 +106,23 @@ export type StudioMusicCatalogItem = {
   publication_id: string;
   kind: StudioMusicCatalogKind;
   title: string;
+  subtitle: string | null;
   author: { name: string; slug: string | null };
   cover: { url: string | null };
   duration_seconds: number | null;
   items_count: number;
   tracks: StudioMusicCatalogTrack[];
+  /** Studio-free, not listener is_free. */
   is_free: boolean;
+  listener_is_free: boolean;
   listener_effective_minor: number | null;
+  studio_pricing_mode: StudioMusicPricingMode | null;
+  studio_is_free: boolean;
   studio_effective_minor: number | null;
   ownership: StudioMusicCatalogOwnership;
   display_label: string;
+  listener_price_label: string;
+  studio_price_label: string;
   kind_label: string;
 };
 
@@ -201,6 +215,21 @@ export function studioMusicListedVisibilityOrFilter(): string {
     "catalog_visibility.eq.listed",
     "and(catalog_visibility.is.null,is_catalog_listed.eq.true)",
     "and(catalog_visibility.is.null,is_catalog_listed.is.null)",
+  ].join(",");
+}
+
+/**
+ * PostgREST `or` for filter=free: explicit Studio-free OR legacy NULL
+ * inferred as Studio-free (listener free). Eligibility gates stay on
+ * the same query. Does not treat listener is_free as Studio-free when
+ * mode is fixed/auto.
+ */
+export function studioMusicCatalogFreeOrFilter(): string {
+  return [
+    "studio_music_pricing_mode.eq.free",
+    "and(studio_music_pricing_mode.is.null,is_free.eq.true)",
+    "and(studio_music_pricing_mode.is.null,price.is.null)",
+    "and(studio_music_pricing_mode.is.null,price.lte.0)",
   ].join(",");
 }
 
@@ -346,7 +375,10 @@ export function isFreePublicStudioMusicInventory(
   practice: StudioMusicCatalogPublication,
   options?: { commerciallyAccessible?: boolean },
 ): boolean {
-  return isPublicStudioMusicInventory(practice, options) && practice.is_free === true;
+  return (
+    isPublicStudioMusicInventory(practice, options) &&
+    isStudioMusicFreeForCatalog(practice, options)
+  );
 }
 
 /**
@@ -558,38 +590,57 @@ export function mapStudioMusicCatalogItem(input: {
     duration_seconds: normalizeDurationSeconds(track.durationSeconds),
   }));
   const kind = resolveStudioMusicKind(tracks.length);
-  const isFree = input.practice.is_free === true;
-  const studioEffectiveMinor = isFree
-    ? null
-    : studioLicenseAmountMinor(input.listenerEffectiveMinor);
+  const acquisition = resolveStudioMusicAcquisition({
+    practice: input.practice,
+    listenerEffectiveMinor: input.listenerEffectiveMinor,
+    commerciallyAccessible: isCommerciallyAccessibleStudioPublication(
+      input.practice,
+    ),
+  });
+  const studioIsFree = acquisition.studio_is_free;
+  const studioEffectiveMinor = acquisition.amount_minor;
+  const listenerIsFree = acquisition.listener_is_free;
   const durationSeconds =
     kind === STUDIO_MUSIC_CATALOG_KIND.SINGLE
       ? (tracks[0]?.duration_seconds ?? null)
       : null;
+  const subtitle = input.practice.subtitle?.trim() || null;
 
   return {
     publication_id: String(input.practice.id),
     kind,
     title: input.practice.title?.trim() || "Без названия",
+    subtitle,
     author: authorFromJoin(input.practice.authors),
     cover: {
       url: getProductCoverDisplayUrl(
         input.practice.cover_url,
         input.practice.updated_at,
         input.practice.cover_image,
-        360,
+        180,
       ),
     },
     duration_seconds: durationSeconds,
     items_count: tracks.length,
     tracks,
-    is_free: isFree,
-    listener_effective_minor: isFree ? null : input.listenerEffectiveMinor,
+    is_free: studioIsFree,
+    listener_is_free: listenerIsFree,
+    listener_effective_minor: acquisition.listener_effective_minor,
+    studio_pricing_mode: acquisition.pricing_mode,
+    studio_is_free: studioIsFree,
     studio_effective_minor: studioEffectiveMinor,
     ownership: input.ownership,
     display_label: resolveStudioMusicDisplayLabel({
       ownership: input.ownership,
-      isFree,
+      isFree: studioIsFree,
+      studioEffectiveMinor,
+    }),
+    listener_price_label: formatListenerCatalogPriceLabel({
+      listenerIsFree,
+      listenerEffectiveMinor: acquisition.listener_effective_minor,
+    }),
+    studio_price_label: formatStudioUseCatalogPriceLabel({
+      studioIsFree,
       studioEffectiveMinor,
     }),
     kind_label: getMusicReleaseLabel(tracks.length),
@@ -809,6 +860,9 @@ const PRACTICE_SELECT = `
   deleted_at,
   is_free,
   price,
+  studio_music_pricing_mode,
+  studio_music_price_minor,
+  subtitle,
   catalog_visibility,
   is_catalog_listed,
   cover_url,
@@ -910,7 +964,7 @@ export function createSupabaseStudioMusicCatalogStore(
         .or(studioMusicListedVisibilityOrFilter());
 
       if (filter === "free") {
-        query = query.eq("is_free", true);
+        query = query.or(studioMusicCatalogFreeOrFilter());
       }
 
       query = applyStudioMusicCatalogKeyset(query, cursor, limit);
