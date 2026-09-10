@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Read-only course-upgrade / L2 checkout diagnostic for operators / GHA
-# confirm=OPS_COURSE_UPGRADE_DIAG. Never invokes audiolad-deploy / deploy.sh,
-# never does nginx or current/previous symlink cutover, never restarts PM2,
-# never POSTs checkout, never calls Tochka, never writes orders / payments /
+# confirm=OPS_COURSE_UPGRADE_DIAG. This file is the sole implementation.
+# Never invokes audiolad-deploy / deploy.sh, never does nginx or
+# current/previous symlink cutover, never restarts PM2, never POSTs
+# checkout, never calls Tochka, never writes orders / payments /
 # entitlements / DB / Storage. No arbitrary remote command input.
 # Auto-discovers production audiolad-p30xx PM2 layout (does not assume only
-# p3000 or only p3001). Inspects active logs, rotated .log.*, and orphaned
-# logs of deleted PM2 apps. Optional read-only DB correlation uses current
-# release loadEnvConfig + supabase-js service role, same as other OPS diags.
-# Do not source .env.production in this shell. Never print env values, JWT,
-# tokens, payment_url, Authorization, cookies, or service-role material.
+# p3000 or only p3001). Inspects active logs, rotated .log.*, .gz, and
+# orphaned logs of deleted PM2 apps. Optional read-only DB correlation uses
+# current release loadEnvConfig + supabase-js service role. Do not source
+# .env.production in this shell. Never print env values, JWT, tokens,
+# payment_url, Authorization, cookies, emails, user_id, or service-role
+# material. Log scan is streaming and memory-bounded.
 set -Eeuo pipefail
 
 TARGET_SHA="${1:-${TARGET_SHA:-}}"
@@ -30,8 +32,6 @@ CUTOVER="NO"
 AUDIOLAD_DEPLOY="NOT_INVOKED"
 MODE="read_only_course_upgrade_diag"
 
-SEARCH_PATTERN='course_upgrade_failed|FAILED_STAGE|ACTUAL_API_ERROR|ACTUAL_HTTP_STATUS|create_payment_tochka_error|create_payment_tochka_http_error|provider_checkout_failed|createTochkaPaymentOperation|startTochkaCheckoutForPendingOrder|course_upgrade_auth_error|course_upgrade_order_invalid_row|course_upgrade_order_reload_error|create_payment_metadata_update_error'
-
 if ! declare -F redact_stream >/dev/null 2>&1; then
   redact_stream() {
     sed -E \
@@ -41,31 +41,28 @@ if ! declare -F redact_stream >/dev/null 2>&1; then
       -e 's/(TOCHKA_[A-Z0-9_]+=).*/\1***/g' \
       -e 's/(Authorization:[[:space:]]*).*/\1[redacted-authorization]/Ig' \
       -e 's/(Bearer[[:space:]]+)[A-Za-z0-9._~+/-]+=*/\1[redacted-token]/g' \
-      -e 's/(^|[^[:alnum:]_])(payment_url["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^[:space:]"'"'"']+/\1\2[redacted-payment-url]/Ig' \
-      -e 's/(cookie[s]?["'"'"']?[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1[redacted-cookie]/Ig' \
+      -e 's/has_checkout_token=/__SAFE_HAS_CHECKOUT_FLAG=/g' \
+      -e 's/has_payment_url=/__SAFE_HAS_PAYMENT_URL=/g' \
+      -e 's/has_provider_metadata=/__SAFE_HAS_PROVIDER_METADATA=/g' \
+      -e 's/has_provider_payment_id=/__SAFE_HAS_PROVIDER_PAYMENT_ID=/g' \
+      -e 's/(^|[^[:alnum:]_])((access_token|refresh_token|checkout_token|provider_token|[A-Za-z0-9_]*_token|token)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^[:space:],;"'"'"'}]+/\1\2[redacted-token]/Ig' \
+      -e 's/(^|[^[:alnum:]_])((payment_url)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^[:space:]"'"'"']+/\1\2[redacted-payment-url]/Ig' \
+      -e 's/(^|[^[:alnum:]_])((user_id)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^[:space:],;"'"'"'}]+/\1\2[redacted-user-id]/Ig' \
+      -e 's/(^|[^[:alnum:]_])((cookie|cookies)["'"'"']?[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1\2[redacted-cookie]/Ig' \
+      -e 's/(^|[^[:alnum:]_])((password|passwd|secret|api_key|service_role)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?)[^[:space:]"'"'"']+/\1\2[redacted-secret]/Ig' \
       -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
       -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[redacted-jwt]/g' \
-      -e 's#https?://[^[:space:]\"'"'"']+#[redacted-url]#g'
+      -e 's#https?://[^[:space:]\"'"'"']+#[redacted-url]#g' \
+      -e 's/__SAFE_HAS_CHECKOUT_FLAG=/has_checkout_token=/g' \
+      -e 's/__SAFE_HAS_PAYMENT_URL=/has_payment_url=/g' \
+      -e 's/__SAFE_HAS_PROVIDER_METADATA=/has_provider_metadata=/g' \
+      -e 's/__SAFE_HAS_PROVIDER_PAYMENT_ID=/has_provider_payment_id=/g'
   }
 fi
 
 if ! declare -F section >/dev/null 2>&1; then
   section() {
     printf '\n===== %s =====\n' "$1"
-  }
-fi
-
-if ! declare -F try_cmd >/dev/null 2>&1; then
-  try_cmd() {
-    local label="$1"
-    shift
-    section "${label}"
-    if "$@" 2>&1 | redact_stream; then
-      return 0
-    fi
-    local code=$?
-    printf 'BLOCKED exit=%s label=%s\n' "${code}" "${label}"
-    return 0
   }
 fi
 
@@ -136,16 +133,55 @@ scan_log_file() {
   local helper=""
   helper="$(mktemp /tmp/audiolad-course-upgrade-scan.XXXXXX.py)"
   cat >"${helper}" <<'PY'
-import re, sys
+import gzip
+import re
+import sys
+from collections import deque
 from datetime import datetime, timezone
 
 path = sys.argv[1]
 priority_start = sys.argv[2]
 priority_end = sys.argv[3]
-pattern = re.compile(sys.argv[4])
-window_re = re.compile(
+PRIORITY_MAX = 40
+RECENT_MAX = 20
+LOOKAHEAD = 16
+
+EVENT_RE = re.compile(
+    r"(?<![A-Za-z0-9_])("
+    r"course_upgrade_failed|"
+    r"create_payment_tochka_error|"
+    r"create_payment_tochka_http_error|"
+    r"course_upgrade_auth_error|"
+    r"course_upgrade_order_invalid_row|"
+    r"course_upgrade_order_reload_error|"
+    r"create_payment_metadata_update_error|"
+    r"provider_checkout_failed|"
+    r"createTochkaPaymentOperation|"
+    r"startTochkaCheckoutForPendingOrder"
+    r")(?![A-Za-z0-9_])"
+)
+FIELD_VALUE_PREFIX_RE = re.compile(
+    r"(FAILED_STAGE|ACTUAL_API_ERROR|ACTUAL_HTTP_STATUS)\s*[:=]\s*"
+)
+WINDOW_RE = re.compile(
     r"20\d{2}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?"
 )
+FIELD_RE = re.compile(
+    r"(FAILED_STAGE|ACTUAL_API_ERROR|ACTUAL_HTTP_STATUS|order_id|practice_id|target_access_level)"
+    r"""["']?\s*[:=]\s*["']?([^\s,"'}]+)"""
+)
+HTTP_ERR_RE = re.compile(
+    r"create_payment_tochka_http_error(?:\s+|:)(\d{3})(?:\s+([A-Za-z0-9_.-]{1,64}))?"
+)
+STAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
+ERROR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
+STATUS_RE = re.compile(r"^\d{3}$")
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+LEVEL_RE = re.compile(r"^-?\d{1,4}$")
+CODE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
+
 
 def parse_ts(raw):
     text = raw.strip()
@@ -165,92 +201,191 @@ def parse_ts(raw):
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
+
 start = parse_ts(priority_start)
 end = parse_ts(priority_end)
-field_re = re.compile(
-    r"(FAILED_STAGE|ACTUAL_API_ERROR|ACTUAL_HTTP_STATUS|order_id|practice_id|target_access_level)"
-    r"""["']?\s*[:=]\s*["']?([^\s,"'}]+)"""
-)
+
 
 def classify(line):
-    match = window_re.search(line)
+    match = WINDOW_RE.search(line)
     if not match or start is None or end is None:
-        return "unknown"
+        return "unknown", ""
     ts = parse_ts(match.group(0))
     if ts is None:
-        return "unknown"
+        return "unknown", match.group(0)
     if start <= ts <= end:
-        return "priority"
-    return "recent"
+        return "priority", match.group(0)
+    return "recent", match.group(0)
 
-def extract(line):
-    found = {}
-    for match in field_re.finditer(line):
-        found[match.group(1)] = match.group(2)
-    return found
 
+def sanitize(key, value):
+    raw = value.strip().strip("'\"")
+    if key == "FAILED_STAGE":
+        return raw if STAGE_RE.fullmatch(raw) else None
+    if key == "ACTUAL_API_ERROR":
+        return raw if ERROR_RE.fullmatch(raw) else None
+    if key == "ACTUAL_HTTP_STATUS":
+        return raw if STATUS_RE.fullmatch(raw) else None
+    if key in ("order_id", "practice_id"):
+        return raw.lower() if UUID_RE.fullmatch(raw) else None
+    if key == "target_access_level":
+        return raw if LEVEL_RE.fullmatch(raw) else None
+    if key == "provider_http_status":
+        return raw if STATUS_RE.fullmatch(raw) else None
+    if key == "provider_error_code":
+        return raw if CODE_RE.fullmatch(raw) else None
+    return None
+
+
+def extract_allowlisted(line, fields):
+    for match in FIELD_RE.finditer(line):
+        cleaned = sanitize(match.group(1), match.group(2))
+        if cleaned is not None:
+            fields[match.group(1)] = cleaned
+    http = HTTP_ERR_RE.search(line)
+    if http:
+        status = sanitize("provider_http_status", http.group(1))
+        if status:
+            fields["provider_http_status"] = status
+        if http.group(2):
+            code = sanitize("provider_error_code", http.group(2))
+            if code:
+                fields["provider_error_code"] = code
+
+
+def detect_event(line):
+    match = EVENT_RE.search(line)
+    if not match:
+        return None
+    prefix = line[: match.start()]
+    if FIELD_VALUE_PREFIX_RE.search(prefix):
+        return None
+    return match.group(1)
+
+
+def is_object_close(line):
+    stripped = line.strip()
+    return stripped in ("}", "};", "},") or stripped.endswith("}")
+
+
+def open_log(log_path):
+    if log_path.endswith(".gz"):
+        return gzip.open(log_path, "rt", errors="replace")
+    return open(log_path, "r", errors="replace")
+
+
+def emit(bucket, window, lineno, event, ts, fields):
+    item = {
+        "window": window,
+        "line": lineno,
+        "event": event or "unknown",
+        "ts": ts,
+        "fields": dict(fields),
+    }
+    bucket.append(item)
+
+
+priority = deque(maxlen=PRIORITY_MAX)
+recent = deque(maxlen=RECENT_MAX)
+match_count = 0
+priority_count = 0
+other_count = 0
+
+handle = None
 try:
-    with open(path, "r", errors="replace") as handle:
-        lines = handle.readlines()
-except OSError:
-    print("log_unreadable path=%s" % path)
+    handle = open_log(path)
+except gzip.BadGzipFile as err:
+    print("compressed_log_error path=%s" % path)
+    print("scan_error_class=%s" % err.__class__.__name__)
+    raise SystemExit(0)
+except OSError as err:
+    kind = "compressed_log_error" if path.endswith(".gz") else "log_unreadable"
+    print("%s path=%s" % (kind, path))
+    print("scan_error_class=%s" % err.__class__.__name__)
     raise SystemExit(0)
 
-priority = []
-other = []
-for idx, raw in enumerate(lines):
-    block = raw.rstrip("\n")
-    if not pattern.search(block):
-        continue
-    look = 1
-    while idx + look < len(lines) and look <= 8:
-        nxt = lines[idx + look].rstrip("\n")
-        if pattern.search(nxt):
-            break
-        stripped = nxt.strip()
-        if (
-            stripped.startswith("{")
-            or "FAILED_STAGE" in nxt
-            or "ACTUAL_" in nxt
-            or stripped.startswith("}")
-        ):
-            block += " " + stripped
-            look += 1
+try:
+    lineno = 0
+    pending = None
+    while True:
+        if pending is not None:
+            raw = pending
+            pending = None
+        else:
+            raw = handle.readline()
+            if raw == "":
+                break
+        lineno += 1
+        line = raw.rstrip("\n")
+        event = detect_event(line)
+        if event is None:
             continue
-        break
-    window = classify(block)
-    item = (window, idx + 1, block)
-    if window == "priority":
-        priority.append(item)
-    else:
-        other.append(item)
+        fields = {}
+        extract_allowlisted(line, fields)
+        window, ts = classify(line)
+        if event == "course_upgrade_failed" or "{" in line:
+            for _ in range(LOOKAHEAD):
+                nxt = handle.readline()
+                if nxt == "":
+                    break
+                lineno += 1
+                nxt_line = nxt.rstrip("\n")
+                extract_allowlisted(nxt_line, fields)
+                if is_object_close(nxt_line):
+                    break
+                nxt_event = detect_event(nxt_line)
+                if nxt_event and WINDOW_RE.match(nxt_line.lstrip()):
+                    pending = nxt
+                    lineno -= 1
+                    break
+        match_count += 1
+        if window == "priority":
+            priority_count += 1
+            emit(priority, window, lineno, event, ts, fields)
+        else:
+            other_count += 1
+            emit(recent, window, lineno, event, ts, fields)
+except (OSError, EOFError, gzip.BadGzipFile) as err:
+    kind = "compressed_log_error" if path.endswith(".gz") else "log_unreadable"
+    print("%s path=%s" % (kind, path))
+    print("scan_error_class=%s" % err.__class__.__name__)
+    raise SystemExit(0)
+finally:
+    if handle is not None:
+        try:
+            handle.close()
+        except Exception:
+            pass
 
-selected = priority[-40:] + other[-20:]
-print("match_count=%s" % (len(priority) + len(other)))
-print("priority_match_count=%s" % len(priority))
-print("other_match_count=%s" % len(other))
-print("printed_match_count=%s" % len(selected))
+print("match_count=%s" % match_count)
+print("priority_match_count=%s" % priority_count)
+print("other_match_count=%s" % other_count)
+print("printed_match_count=%s" % (len(priority) + len(recent)))
 wanted = (
     "FAILED_STAGE",
     "ACTUAL_API_ERROR",
     "ACTUAL_HTTP_STATUS",
+    "provider_http_status",
+    "provider_error_code",
     "order_id",
     "practice_id",
     "target_access_level",
 )
-for window, lineno, block in selected:
-    fields = extract(block)
-    parts = ["SAFE_SUMMARY", "window=%s" % window, "line=%s" % lineno]
+for item in list(priority) + list(recent):
+    parts = [
+        "SAFE_SUMMARY",
+        "window=%s" % item["window"],
+        "line=%s" % item["line"],
+        "event=%s" % item["event"],
+    ]
+    if item["ts"]:
+        parts.append("ts=%s" % item["ts"])
     for key in wanted:
-        if key in fields:
-            parts.append("%s=%s" % (key, fields[key]))
+        if key in item["fields"]:
+            parts.append("%s=%s" % (key, item["fields"][key]))
     print(" ".join(parts))
-    snippet = block.replace("\t", " ")
-    if len(snippet) > 400:
-        snippet = snippet[:400] + "...[truncated]"
-    print("MATCH_LINE window=%s line=%s text=%s" % (window, lineno, snippet))
 PY
-  python3 "${helper}" "$1" "${PRIORITY_START}" "${PRIORITY_END}" "${SEARCH_PATTERN}"
+  python3 "${helper}" "$1" "${PRIORITY_START}" "${PRIORITY_END}"
   rm -f "${helper}"
 }
 
@@ -287,8 +422,7 @@ scan_candidate() {
   if command -v python3 >/dev/null 2>&1; then
     scan_log_file "${path}" | redact_stream
   else
-    grep -E -n "${SEARCH_PATTERN}" "${path}" | tail -n 40 | redact_stream \
-      || echo "grep_no_matches"
+    echo "scanner_unavailable reason=python3_not_found"
   fi
   echo ">>log_matches"
 }
@@ -337,6 +471,15 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 delete process.env.NEXT_PUBLIC_SUPABASE_URL;
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const SAFE_METADATA_KEYS = new Set([
+  "payment_url",
+  "payment_link_id",
+  "provider_status",
+  "create_response",
+  "checkout_token",
+  "error",
+]);
+
 function supabaseUrlHost(raw) {
   try {
     return raw ? new URL(raw).host : "";
@@ -347,7 +490,7 @@ function supabaseUrlHost(raw) {
 
 function field(value) {
   if (value == null) return "";
-  return String(value).replace(/\s+/g, " ").slice(0, 120);
+  return String(value).replace(/\s+/g, " ").slice(0, 80);
 }
 
 function yesNo(value) {
@@ -356,11 +499,13 @@ function yesNo(value) {
 
 function metadataInfo(raw) {
   const meta = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
-  const keys = meta ? Object.keys(meta).sort() : [];
+  const keys = meta ? Object.keys(meta) : [];
+  const safeKeys = keys.filter((name) => SAFE_METADATA_KEYS.has(name)).sort();
   return {
     present: Boolean(meta) && keys.length > 0,
     keyCount: keys.length,
-    keys: keys.join(","),
+    keys: safeKeys.join(","),
+    unknownKeyCount: keys.length - safeKeys.length,
     hasPaymentUrl: Boolean(meta && meta.payment_url),
     hasCheckoutToken: Boolean(meta && meta.checkout_token),
   };
@@ -389,7 +534,11 @@ const timer = setTimeout(() => {
 
 function errorText(err) {
   if (!err) return "none";
-  return field(err.message || err.code || "error");
+  const text = String(err.message || err.code || "error");
+  if (/token|secret|password|bearer|eyJ|service.role|payment_url/i.test(text)) {
+    return "redacted_error";
+  }
+  return field(text);
 }
 
 (async () => {
@@ -436,7 +585,6 @@ function errorText(err) {
   const profile = profileRes.data;
   console.log("listener_query_error=" + errorText(profileRes.error));
   console.log("listener_matched=" + yesNo(Boolean(profile && profile.id)));
-  console.log("user_id=" + field(profile && profile.id));
 
   if (!practice || !practice.id || !profile || !profile.id) {
     printDeferred("missing_practice_or_listener");
@@ -455,7 +603,6 @@ function errorText(err) {
   console.log("entitlement_present=" + yesNo(Boolean(entitlement)));
   console.log("access_level=" + field(entitlement && entitlement.access_level));
   console.log("access_source=" + field(entitlement && entitlement.access_source));
-  console.log("granted_at=" + field(entitlement && entitlement.granted_at));
 
   const orderRes = await service
     .from("orders")
@@ -527,6 +674,7 @@ function errorText(err) {
         "has_checkout_token=" + yesNo(meta.hasCheckoutToken),
         "metadata_key_count=" + meta.keyCount,
         "metadata_keys=" + field(meta.keys),
+        "metadata_unknown_key_count=" + meta.unknownKeyCount,
       ].join(" "),
     );
   }
@@ -607,7 +755,7 @@ run_course_upgrade_diag() {
   fi
   echo "shared_env_path=${SHARED_ENV_PRODUCTION} exists=$([[ -e "${SHARED_ENV_PRODUCTION}" ]] && echo YES || echo NO)"
   echo "note=shared_env_production_loaded_via_current_loadEnvConfig"
-  echo "note=no_tokens_no_payment_url_no_env_values"
+  echo "note=no_tokens_no_payment_url_no_env_values_no_user_id"
 
   section "PUBLIC_HEALTH_BUILD"
   curl -fsS --max-time 8 "${AUDIOLAD_COURSE_UPGRADE_DIAG_HEALTH_URL:-https://audiolad.ru/api/health/build}" 2>&1 | redact_stream || echo "health_build_fetch_failed"
@@ -660,8 +808,6 @@ run_course_upgrade_diag() {
     printf '%s\n' "${pm2_safe}" | awk -F= '/^(out_log|error_log)=/{print substr($0, index($0,"=")+1)}'
     while IFS= read -r dir; do
       [[ -d "${dir}" ]] || continue
-      # Active, orphaned, and rotated names for both blue/green slots plus
-      # any other discovered audiolad-p30xx files. Globs stay read-only.
       shopt -s nullglob
       for path in \
         "${dir}"/audiolad-p3000*out* \
@@ -686,7 +832,8 @@ run_course_upgrade_diag() {
       *audiolad-p30*) kind="p30xx" ;;
     esac
     case "${path}" in
-      *.log.[0-9]*|*.log.[0-9]*.gz|*.log.*[0-9]*) kind="${kind}_rotated" ;;
+      *.gz) kind="${kind}_gz" ;;
+      *.log.[0-9]*|*.log.*[0-9]*) kind="${kind}_rotated" ;;
     esac
     if ! printf '%s\n' "${pm2_safe}" | grep -F -q -- "${path}"; then
       kind="${kind}_orphaned_or_unlisted"
@@ -698,40 +845,29 @@ run_course_upgrade_diag() {
 
   section "JOURNAL_OPTIONAL"
   echo "note=app output usually goes to PM2 files; journal is optional fallback"
-  if command -v journalctl >/dev/null 2>&1; then
-    local journal_helper=""
-    journal_helper="$(mktemp /tmp/audiolad-course-upgrade-journal.XXXXXX.py)"
-    cat >"${journal_helper}" <<'PY'
-import re, sys
-pattern = re.compile(sys.argv[1])
-count = 0
-for line in sys.stdin:
-    if pattern.search(line):
-        count += 1
-        text = line.rstrip()[:400]
-        print("JOURNAL_MATCH %s" % text)
-        if count >= 40:
-            break
-print("journal_priority_match_count=%s" % count)
-PY
-    section "JOURNAL_PRIORITY_MATCHES"
+  if command -v journalctl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    local journal_tmp=""
+    journal_tmp="$(mktemp /tmp/audiolad-course-upgrade-journal.XXXXXX.log)"
     set +e
-    journalctl --no-pager --since "${PRIORITY_START}" --until "${PRIORITY_END}" -n 400 2>/dev/null \
-      | python3 "${journal_helper}" "${SEARCH_PATTERN}" \
-      | redact_stream
-    local journal_code=${PIPESTATUS[0]}
+    journalctl --no-pager --since "${PRIORITY_START}" --until "${PRIORITY_END}" -n 400 >"${journal_tmp}" 2>/dev/null
+    local journal_code=$?
     set -e
-    rm -f "${journal_helper}"
-    if [[ "${journal_code}" -ne 0 ]]; then
+    if [[ "${journal_code}" -eq 0 && -s "${journal_tmp}" ]]; then
+      section "JOURNAL_PRIORITY_MATCHES"
+      scan_log_file "${journal_tmp}" | redact_stream
+    else
       echo "journal_match_scan_blocked_or_empty exit=${journal_code}"
     fi
+    rm -f "${journal_tmp}"
+  elif command -v journalctl >/dev/null 2>&1; then
+    echo "journal_scanner_unavailable reason=python3_not_found"
   else
     echo "journalctl_not_found"
   fi
 
   section "DB_CORRELATION"
   echo "mode=read_only"
-  echo "note=hardcoded QA listener + kody course; email never printed"
+  echo "note=hardcoded QA listener + kody course; email and user_id never printed"
   echo "note=no order/payment/entitlement writes"
   unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
   run_course_upgrade_db_probe

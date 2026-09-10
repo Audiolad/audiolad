@@ -15,6 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github/workflows/production-deploy.yml");
@@ -305,7 +306,30 @@ function main() {
   assert.match(workflowText, /merge-base --is-ancestor/);
   assert.doesNotMatch(wrapperText, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
 
-  assert.doesNotMatch(workflowText, /actions\/checkout/);
+  const courseUpgradeJobMarker = workflowText.indexOf("name: Ops course upgrade diagnostic");
+  const deployJobMarkerForCheckout = workflowText.indexOf("name: Deploy to production");
+  assert.ok(
+    courseUpgradeJobMarker >= 0 && deployJobMarkerForCheckout > courseUpgradeJobMarker,
+    "course-upgrade diag job must precede deploy job",
+  );
+  const courseUpgradeJobYaml = workflowText.slice(courseUpgradeJobMarker, deployJobMarkerForCheckout);
+  const workflowOutsideCourseUpgrade =
+    workflowText.slice(0, courseUpgradeJobMarker) + workflowText.slice(deployJobMarkerForCheckout);
+  assert.doesNotMatch(
+    workflowOutsideCourseUpgrade,
+    /actions\/checkout/,
+    "only course_upgrade_diag may use actions/checkout",
+  );
+  assert.equal(
+    (courseUpgradeJobYaml.match(/actions\/checkout@v4/g) || []).length,
+    1,
+    "course_upgrade_diag must use actions/checkout@v4 exactly once",
+  );
+  assert.match(courseUpgradeJobYaml, /persist-credentials:\s+false/);
+  assert.match(
+    courseUpgradeJobYaml,
+    /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/,
+  );
   assert.doesNotMatch(workflowText, /git submodule/);
   assert.doesNotMatch(workflowText, /\bgit checkout\b/);
   const workflowFetchLines = workflowText
@@ -376,8 +400,7 @@ function main() {
   assertRemoteStudioDupAssetDiagScriptSyntax(workflowText);
   assertStudioDupAssetDiagHelper(workflowText);
   assertCourseUpgradeDiag(workflowText, docsText);
-  assertRemoteCourseUpgradeDiagScriptSyntax(workflowText);
-  assertCourseUpgradeDiagHelper(workflowText);
+  assertCourseUpgradeDiagHelper();
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -2691,45 +2714,16 @@ function assertStudioDupAssetDiagHelper(workflowText) {
   }
 }
 
-function extractRemoteCourseUpgradeDiagScript(workflowText) {
-  const start = workflowText.indexOf("<<'REMOTE_COURSE_UPGRADE_DIAG'\n");
-  const end = workflowText.indexOf("\n          REMOTE_COURSE_UPGRADE_DIAG\n", start);
-  assert.ok(start >= 0 && end > start, "course-upgrade diag job must contain a REMOTE_COURSE_UPGRADE_DIAG heredoc");
-  return workflowText
-    .slice(start + "<<'REMOTE_COURSE_UPGRADE_DIAG'\n".length, end)
-    .split("\n")
-    .map((line) => line.replace(/^          /, ""))
-    .join("\n");
-}
-
 function assertCourseUpgradeDiag(workflowText, docsText) {
   const required = [
     "OPS_COURSE_UPGRADE_DIAG",
-    "COURSE_UPGRADE_DIAG",
-    "audiolad-p30",
-    "course_upgrade_failed",
-    "FAILED_STAGE",
-    "ACTUAL_API_ERROR",
-    "ACTUAL_HTTP_STATUS",
-    "create_payment_tochka_error",
-    "create_payment_tochka_http_error",
-    "provider_checkout_failed",
-    "createTochkaPaymentOperation",
-    "startTochkaCheckoutForPendingOrder",
-    "kody-zhenskoy-prityagatelnosti",
-    "sergey-and-zoya",
-    "2026-09-10T04:25:00Z",
-    "2026-09-10T04:50:00Z",
-    "CUTOVER=NO",
-    "audiolad_deploy=NOT_INVOKED",
-    "checkout_post=NOT_INVOKED",
-    "tochka_calls=NOT_INVOKED",
-    "entitlement_writes=NOT_INVOKED",
-    "MODE = read_only_course_upgrade_diag",
-    "loadEnvConfig(dir, false, silent, true)",
-    "SAFE_SUMMARY",
-    "DB_CORRELATION",
-    "qa_listener=hardcoded_redacted",
+    "actions/checkout@v4",
+    "persist-credentials: false",
+    "origin_main_sha",
+    "audiolad-course-upgrade-diag.sh",
+    "bash -n deploy/scripts/audiolad-course-upgrade-diag.sh",
+    "bash -s --",
+    "< deploy/scripts/audiolad-course-upgrade-diag.sh",
     "confirm=OPS_COURSE_UPGRADE_DIAG",
   ];
   for (const needle of required) {
@@ -2739,6 +2733,13 @@ function assertCourseUpgradeDiag(workflowText, docsText) {
       `course-upgrade diag workflow must contain ${needle}`,
     );
   }
+  assert.doesNotMatch(
+    workflowText,
+    /REMOTE_COURSE_UPGRADE_DIAG/,
+    "workflow must not embed a duplicated course-upgrade diag heredoc",
+  );
+  assert.doesNotMatch(workflowText, /\.readlines\s*\(/);
+  assert.doesNotMatch(workflowText, /\bMATCH_LINE\b/);
 
   const courseUpgradeStart = workflowText.indexOf("name: Ops course upgrade diagnostic");
   const deployStart = workflowText.indexOf("name: Deploy to production");
@@ -2768,19 +2769,12 @@ function assertCourseUpgradeDiag(workflowText, docsText) {
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
   assert.doesNotMatch(courseCode, /\bdeploy\.sh\b/, "course-upgrade diag job must not call deploy.sh");
-  const remote = extractRemoteCourseUpgradeDiagScript(workflowText);
-  const remoteCode = remote
-    .split("\n")
-    .filter((line) => !/^\s*#/.test(line))
-    .join("\n");
-  assert.doesNotMatch(remoteCode, /\brm -rf\b/, "course-upgrade diag remote must not rm -rf production paths");
-  assert.doesNotMatch(remoteCode, /DELETE FROM/i, "course-upgrade diag must not DELETE SQL");
-  assert.doesNotMatch(remoteCode, /UPDATE /i, "course-upgrade diag must not UPDATE SQL");
-  assert.doesNotMatch(remoteCode, /INSERT INTO/i, "course-upgrade diag must not INSERT SQL");
-  assert.doesNotMatch(remoteCode, /\.update\(/, "course-upgrade diag must not update rows");
-  assert.doesNotMatch(remoteCode, /\.insert\(/, "course-upgrade diag must not insert rows");
-  assert.doesNotMatch(remoteCode, /\.delete\(/, "course-upgrade diag must not delete rows");
-  assert.doesNotMatch(remote, /createSignedUrl/, "course-upgrade diag must not create signed URLs");
+  assert.match(courseJob, /uses:\s+actions\/checkout@v4/);
+  assert.match(courseJob, /persist-credentials:\s+false/);
+  assert.match(courseJob, /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/);
+  assert.match(courseJob, /bash -n deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
+  assert.match(courseJob, /"bash -s --"/);
+  assert.match(courseJob, /< deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
   assert.doesNotMatch(
     courseCode,
     /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
@@ -2797,15 +2791,8 @@ function assertCourseUpgradeDiag(workflowText, docsText) {
   assert.match(docsText, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /audiolad-course-upgrade-diag\.sh/);
   assert.match(docsText, /Evidence cannot be pulled until this confirm is merged/);
-}
-
-function assertRemoteCourseUpgradeDiagScriptSyntax(workflowText) {
-  const remote = extractRemoteCourseUpgradeDiagScript(workflowText);
-  const scriptPath = join(tmpdir(), `audiolad-course-upgrade-diag-remote-${process.pid}.sh`);
-  writeFileSync(scriptPath, remote);
-  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
-  rmSync(scriptPath, { force: true });
-  assert.equal(syntax.status, 0, `remote course-upgrade diag bash -n failed: ${syntax.stderr}`);
+  assert.match(docsText, /persist-credentials: false/);
+  assert.match(docsText, /SAFE_SUMMARY/);
 }
 
 function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
@@ -2910,6 +2897,9 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
   const p3001Err = join(pm2Dir, "audiolad-p3001-error.log");
   const p3000Err = join(pm2Dir, "audiolad-p3000-error.log");
   const p3000Rotated = join(pm2Dir, "audiolad-p3000-error.log.1");
+  const p3000Gz = join(pm2Dir, "audiolad-p3000-error.log.1.gz");
+  const p3000BrokenGz = join(pm2Dir, "audiolad-p3000-error.log.2.gz");
+  const p3000Out = join(pm2Dir, "audiolad-p3000-out.log");
   writeFileSync(join(pm2Dir, "audiolad-p3001-out.log"), "ready\n");
   writeFileSync(
     p3001Err,
@@ -2917,12 +2907,41 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
   );
   writeFileSync(
     p3000Err,
-    "2026-09-10T04:36:12.000Z leak petpovss@yandex.ru payment_url: https://pay.tochka.example/secret-link Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }\n",
+    [
+      "2026-09-10T04:36:12.000Z course_upgrade_failed {",
+      "  FAILED_STAGE: 'createTochkaPaymentOperation',",
+      "  ACTUAL_API_ERROR: 'provider_checkout_failed',",
+      "  ACTUAL_HTTP_STATUS: 502,",
+      "  order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',",
+      "  practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',",
+      "  target_access_level: 2,",
+      "  checkout_token: 'plain-secret-value-never-print',",
+      "  email: 'petpovss@yandex.ru',",
+      "  payment_url: 'https://pay.tochka.example/secret-link',",
+      "  authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig'",
+      "}",
+      "",
+    ].join("\n"),
   );
   writeFileSync(
     p3000Rotated,
     "2026-09-10T04:40:00.000Z create_payment_tochka_http_error 403 tochka_create_payment_failed\n",
   );
+  writeFileSync(
+    p3000Gz,
+    gzipSync(
+      "2026-09-10T04:36:40.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: '12121212-1212-4121-8121-121212121212', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }\n",
+    ),
+  );
+  writeFileSync(p3000BrokenGz, Buffer.from("not-a-gzip-file"));
+  const largeLines = [];
+  for (let i = 0; i < 50000; i += 1) {
+    largeLines.push(`2026-09-10T03:00:00.000Z noise line ${i} ready ok`);
+  }
+  largeLines.push(
+    "2026-09-10T04:36:30.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_timeout', ACTUAL_HTTP_STATUS: 504, order_id: '34343434-3434-4343-8343-343434343434', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }",
+  );
+  writeFileSync(p3000Out, `${largeLines.join("\n")}\n`);
 
   const jlist = [
     {
@@ -2991,12 +3010,57 @@ function courseUpgradeDiagEnv(fixture, extraEnv = {}) {
 function runCourseUpgradeDiagHelper(fixture, extraEnv = {}) {
   return spawnSync("bash", [courseUpgradeDiagPath], {
     encoding: "utf8",
-    timeout: 20000,
+    timeout: 30000,
     env: courseUpgradeDiagEnv(fixture, extraEnv),
   });
 }
 
-function assertCourseUpgradeDiagHelper(workflowText) {
+function assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey }) {
+  assert.match(output, /confirm=OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(output, /CUTOVER = NO/);
+  assert.match(output, /audiolad_deploy = NOT_INVOKED/);
+  assert.match(output, /checkout_post = NOT_INVOKED/);
+  assert.match(output, /tochka_calls = NOT_INVOKED/);
+  assert.match(output, /entitlement_writes = NOT_INVOKED/);
+  assert.match(output, /MODE = read_only_course_upgrade_diag/);
+  assert.match(output, /ACTIVE_P30_COUNT=1/);
+  assert.match(output, /ACTIVE_P30_NAMES=audiolad-p3001/);
+  assert.match(output, /ACTIVE_P30_APP name=audiolad-p3001 status=online/);
+  assert.match(output, /p3000_orphaned_or_unlisted|p3000_rotated_orphaned_or_unlisted|p3000_gz_orphaned_or_unlisted/);
+  assert.match(
+    output,
+    /SAFE_SUMMARY window=priority[^\n]*event=course_upgrade_failed[^\n]*FAILED_STAGE=createTochkaPaymentOperation[^\n]*ACTUAL_API_ERROR=provider_checkout_failed[^\n]*ACTUAL_HTTP_STATUS=502[^\n]*order_id=dddddddd-dddd-4ddd-8ddd-dddddddddddd[^\n]*practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb[^\n]*target_access_level=2/,
+  );
+  assert.match(output, /order_id=12121212-1212-4121-8121-121212121212/);
+  assert.match(output, /order_id=34343434-3434-4343-8343-343434343434/);
+  assert.match(output, /SAFE_SUMMARY window=recent/);
+  assert.match(output, /FAILED_STAGE=reload_orders_row/);
+  assert.match(output, /provider_http_status=403/);
+  assert.match(output, /provider_error_code=tochka_create_payment_failed/);
+  assert.match(output, /kind=p3000_gz_orphaned_or_unlisted|kind=p3000_gz/);
+  assert.match(output, /compressed_log_error|log_unreadable/);
+  assert.match(output, /DB_CORRELATION=OK/);
+  assert.match(output, /access_level=1/);
+  assert.match(output, /practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  assert.match(output, /ORDER id=dddddddd-dddd-4ddd-8ddd-dddddddddddd status=pending/);
+  assert.match(output, /target_access_level=2 amount_minor=222200/);
+  assert.match(output, /has_payment_url=NO/);
+  assert.match(output, /has_checkout_token=NO/);
+  assert.match(output, /has_provider_metadata=NO/);
+  assert.match(output, /qa_listener=hardcoded_redacted/);
+  assert.doesNotMatch(output, /\bMATCH_LINE\b/);
+  assert.doesNotMatch(output, /plain-secret-value-never-print/);
+  assert.doesNotMatch(output, /petpovss@yandex\.ru/);
+  assert.doesNotMatch(output, /user_id=/);
+  assert.doesNotMatch(output, /cccccccc-cccc-4ccc-8ccc-cccccccccccc/);
+  assert.doesNotMatch(output, /pay\.tochka\.example/);
+  assert.doesNotMatch(output, /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/);
+  assert.doesNotMatch(output, /super-secret-service-role-key-do-not-log/);
+  assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
+function assertCourseUpgradeDiagHelper() {
   const helperText = readFileSync(courseUpgradeDiagPath, "utf8");
   const syntax = spawnSync("bash", ["-n", courseUpgradeDiagPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `course-upgrade diag helper bash -n failed: ${syntax.stderr}`);
@@ -3004,16 +3068,31 @@ function assertCourseUpgradeDiagHelper(workflowText) {
   assert.match(helperText, /kody-zhenskoy-prityagatelnosti/);
   assert.match(helperText, /2026-09-10T04:25:00Z/);
   assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.match(helperText, /gzip\.open\([^)]*"rt"/);
+  assert.match(helperText, /handle\.readline\(\)/);
+  assert.match(helperText, /PRIORITY_MAX = 40/);
+  assert.match(helperText, /RECENT_MAX = 20/);
+  assert.match(helperText, /LOOKAHEAD = 16/);
+  assert.match(helperText, /compressed_log_error/);
+  assert.doesNotMatch(helperText, /\.readlines\s*\(/);
+  assert.doesNotMatch(helperText, /\bMATCH_LINE\b/);
   assert.doesNotMatch(helperText, /createSignedUrl/);
   assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
   assert.doesNotMatch(helperText, /pm2 delete/);
+  assert.doesNotMatch(helperText, /pm2 (restart|flush|save)/);
   assert.doesNotMatch(helperText, /DELETE FROM/i);
+  assert.doesNotMatch(helperText, /UPDATE /i);
+  assert.doesNotMatch(helperText, /INSERT INTO/i);
+  assert.doesNotMatch(helperText, /\.update\(/);
+  assert.doesNotMatch(helperText, /\.insert\(/);
+  assert.doesNotMatch(helperText, /\.delete\(/);
   const helperCode = helperText
     .split("\n")
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
   assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
   assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  assert.doesNotMatch(helperCode, /\brm -rf\b/);
   chmodSync(courseUpgradeDiagPath, 0o755);
 
   const secretUrl = "https://course-upgrade-diag-test.example.invalid";
@@ -3024,37 +3103,7 @@ function assertCourseUpgradeDiagHelper(workflowText) {
     const result = runCourseUpgradeDiagHelper(fixture);
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 0, `course-upgrade diag helper failed: ${output}`);
-    assert.match(output, /confirm=OPS_COURSE_UPGRADE_DIAG/);
-    assert.match(output, /CUTOVER = NO/);
-    assert.match(output, /audiolad_deploy = NOT_INVOKED/);
-    assert.match(output, /checkout_post = NOT_INVOKED/);
-    assert.match(output, /MODE = read_only_course_upgrade_diag/);
-    assert.match(output, /ACTIVE_P30_COUNT=1/);
-    assert.match(output, /ACTIVE_P30_NAMES=audiolad-p3001/);
-    assert.match(output, /ACTIVE_P30_APP name=audiolad-p3001 status=online/);
-    assert.match(output, /SAFE_SUMMARY window=priority/);
-    assert.match(output, /FAILED_STAGE=createTochkaPaymentOperation/);
-    assert.match(output, /ACTUAL_API_ERROR=provider_checkout_failed/);
-    assert.match(output, /ACTUAL_HTTP_STATUS=502/);
-    assert.match(output, /target_access_level=2/);
-    assert.match(output, /SAFE_SUMMARY window=recent/);
-    assert.match(output, /FAILED_STAGE=reload_orders_row/);
-    assert.match(output, /p3000_orphaned_or_unlisted|p3000_rotated_orphaned_or_unlisted/);
-    assert.match(output, /DB_CORRELATION=OK/);
-    assert.match(output, /access_level=1/);
-    assert.match(output, /ORDER id=dddddddd-dddd-4ddd-8ddd-dddddddddddd status=pending/);
-    assert.match(output, /target_access_level=2 amount_minor=222200/);
-    assert.match(output, /has_payment_url=NO/);
-    assert.match(output, /has_provider_metadata=NO/);
-    assert.match(output, /qa_listener=hardcoded_redacted/);
-    assert.match(output, /\[redacted-email\]/);
-    assert.match(output, /\[redacted-jwt\]|\[redacted-token\]|\[redacted-authorization\]/);
-    assert.match(output, /\[redacted-payment-url\]|\[redacted-url\]/);
-    assert.doesNotMatch(output, /petpovss@yandex\.ru/);
-    assert.doesNotMatch(output, /pay\.tochka\.example/);
-    assert.doesNotMatch(output, /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/);
-    assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -3062,20 +3111,16 @@ function assertCourseUpgradeDiagHelper(workflowText) {
   const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-remote-"));
   try {
     const fixture = writeCourseUpgradeDiagFixture(remoteRoot, { secretUrl, secretKey });
-    const remote = extractRemoteCourseUpgradeDiagScript(workflowText);
-    const remoteResult = spawnSync("bash", ["-s", "a".repeat(40), "b".repeat(40)], {
+    const remoteResult = spawnSync("bash", ["-s", "--", "a".repeat(40), "b".repeat(40)], {
       encoding: "utf8",
-      timeout: 20000,
-      input: remote,
+      timeout: 30000,
+      input: readFileSync(courseUpgradeDiagPath),
       env: courseUpgradeDiagEnv(fixture),
     });
     const remoteOutput = `${remoteResult.stdout ?? ""}${remoteResult.stderr ?? ""}`;
-    assert.equal(remoteResult.status, 0, `workflow bash -s course-upgrade diag failed: ${remoteOutput}`);
-    assert.match(remoteOutput, /confirm=OPS_COURSE_UPGRADE_DIAG/);
-    assert.match(remoteOutput, /FAILED_STAGE=createTochkaPaymentOperation/);
-    assert.match(remoteOutput, /DB_CORRELATION=OK/);
+    assert.equal(remoteResult.status, 0, `workflow bash -s -- course-upgrade diag failed: ${remoteOutput}`);
+    assertCourseUpgradeDiagOutput(remoteOutput, { secretUrl, secretKey });
     assert.match(remoteOutput, /workflow_target_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
-    assert.doesNotMatch(remoteOutput, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   } finally {
     rmSync(remoteRoot, { recursive: true, force: true });
   }
