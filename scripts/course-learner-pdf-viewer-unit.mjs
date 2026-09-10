@@ -17,13 +17,20 @@ import {
   resolveCourseLearnerFileHttpMode,
 } from "../src/lib/course-content/learner-file-http.ts";
 import {
+  COURSE_LEARNER_PDF_HEADER_MOBILE_PADDING_CLASS,
   COURSE_LEARNER_PDF_LOADING_LABEL,
+  COURSE_LEARNER_PDF_MOBILE_BREAKOUT_CLASS,
+  COURSE_LEARNER_PDF_PAGE_MOBILE_FULL_BLEED_CLASS,
+  COURSE_LEARNER_PRACTICE_MOBILE_GUTTER_PX,
   computePdfPageCssSize,
   documentHasHorizontalOverflow,
   formatPdfPageLabel,
+  isMobilePdfBodyFullBleed,
   isPdfPageEligibleForRender,
   listPdfPagesToRelease,
+  mobilePdfFullBleedWidth,
   pageWrapperFitsContainer,
+  practiceLayoutPaddedContentWidth,
   selectPdfPagesToRender,
 } from "../src/lib/course-content/learner-pdf-layout.ts";
 import { buildPdfPageSlots } from "../src/lib/course-content/learner-pdf-document.ts";
@@ -179,7 +186,16 @@ assert.match(
   ),
 );
 assert.match(markup, /data-course-learner-pdf-pages="true"/);
+assert.match(markup, /data-course-learner-file-viewer-header="true"/);
 assert.match(markup, new RegExp(COURSE_LEARNER_PDF_LOADING_LABEL));
+assert.ok(
+  markup.includes(COURSE_LEARNER_PDF_MOBILE_BREAKOUT_CLASS),
+  "ready viewer section breaks out of practice px-5 on mobile",
+);
+assert.ok(
+  markup.includes(COURSE_LEARNER_PDF_HEADER_MOBILE_PADDING_CLASS),
+  "back link and title keep mobile side padding",
+);
 assert.doesNotMatch(markup, /<iframe/);
 assert.doesNotMatch(markup, /view=FitH/);
 assert.equal(
@@ -206,8 +222,73 @@ const viewerSource = read(
 const pagesSource = read(
   "src/components/products/course-learner/CourseLearnerPdfPages.tsx",
 );
+const practiceLayoutSource = read(
+  "src/app/(platform)/(listener)/practice/[...segments]/layout.tsx",
+);
 const route = read(
   "src/app/api/listen/product/[slug]/[productSlug]/file/[fileId]/route.ts",
+);
+
+assert.match(
+  practiceLayoutSource,
+  /listener-practice-content px-5 pb-6 pt-0 lg:px-10 xl:px-0 xl:pb-8 xl:pt-0/,
+  "iPhone gutter source stays the practice-route px-5 wrapper",
+);
+assert.ok(
+  viewerSource.includes(COURSE_LEARNER_PDF_MOBILE_BREAKOUT_CLASS),
+  "ready viewer section uses the mobile full-bleed breakout literals",
+);
+assert.ok(
+  viewerSource.includes(COURSE_LEARNER_PDF_HEADER_MOBILE_PADDING_CLASS),
+  "header literals re-apply practice px-5 on mobile",
+);
+assert.match(viewerSource, /data-course-learner-file-viewer-header="true"/);
+assert.doesNotMatch(
+  viewerSource,
+  /data-course-learner-file-viewer="denied"[\s\S]*max-sm:-mx-5/,
+  "denied chrome must keep normal practice gutters",
+);
+assert.ok(
+  pagesSource.includes(COURSE_LEARNER_PDF_PAGE_MOBILE_FULL_BLEED_CLASS),
+  "PDF page wrappers drop side radius/border on mobile",
+);
+
+const iphoneViewport = 390;
+const paddedContentWidth = practiceLayoutPaddedContentWidth({
+  viewportWidth: iphoneViewport,
+});
+assert.equal(COURSE_LEARNER_PRACTICE_MOBILE_GUTTER_PX, 20);
+assert.equal(paddedContentWidth, 350);
+assert.equal(mobilePdfFullBleedWidth(iphoneViewport), iphoneViewport);
+assert.equal(
+  isMobilePdfBodyFullBleed({
+    viewportWidth: iphoneViewport,
+    pdfBodyWidth: paddedContentWidth,
+  }),
+  false,
+  "practice px-5 gutters are the leftover ~10% width",
+);
+assert.equal(
+  isMobilePdfBodyFullBleed({
+    viewportWidth: iphoneViewport,
+    pdfBodyWidth: iphoneViewport,
+  }),
+  true,
+);
+
+const fullBleedSlots = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: iphoneViewport,
+  devicePixelRatio: 2,
+});
+assert.equal(fullBleedSlots[0].cssWidth, iphoneViewport);
+assert.equal(
+  documentHasHorizontalOverflow({
+    containerWidth: iphoneViewport,
+    pageCssWidths: fullBleedSlots.map((slot) => slot.cssWidth),
+  }),
+  false,
+  "full-bleed pages must not create horizontal overflow",
 );
 assert.doesNotMatch(viewerSource, /<iframe/);
 assert.match(pagesSource, /getDocument/);

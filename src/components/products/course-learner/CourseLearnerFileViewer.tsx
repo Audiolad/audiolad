@@ -54,9 +54,12 @@ export default function CourseLearnerFileViewer({
     <section
       data-course-learner-file-viewer="ready"
       data-file-id={fileId}
-      className="mx-auto flex w-full min-h-[70vh] min-w-0 max-w-5xl flex-col overflow-x-clip pb-8 pt-4"
+      className="mx-auto flex w-full min-h-[70vh] min-w-0 max-w-5xl flex-col overflow-x-clip pb-8 pt-4 max-sm:-mx-5 max-sm:w-[calc(100%+2.5rem)] max-sm:max-w-none"
     >
-      <div className="sticky top-0 z-20 min-w-0 max-w-full border-b border-[#eadff8] bg-[#f7f4fb]/95 py-3 backdrop-blur">
+      <div
+        data-course-learner-file-viewer-header="true"
+        className="sticky top-0 z-20 min-w-0 max-w-full border-b border-[#eadff8] bg-[#f7f4fb]/95 py-3 backdrop-blur max-sm:px-5"
+      >
         <CourseLearnerFileViewerBack href={returnHref} />
         <h1 className="mt-3 min-w-0 break-all text-[18px] font-semibold leading-6 text-[#25135c] [overflow-wrap:anywhere]">
           {filename}
