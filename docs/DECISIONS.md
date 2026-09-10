@@ -33,9 +33,15 @@
   commission) без подделки `user_practices`.
 - Авто-revoke по refund для listen нет; добавлен такой же минимальный hook
   `revoked_at` для Studio (refund/admin).
+- `revoke_studio_music_entitlement_for_order` отзывает **только** строку
+  с `order_id = p_order_id`. Поздний revoke заказа A не трогает новую
+  покупку B, `grant_source='free'` и live owner/editor.
+- UNIQUE `(order_id) WHERE order_id IS NOT NULL` + grant/fulfill: повтор
+  fulfill отозванного заказа A не создаёт новый active grant. Новый
+  законный заказ B после revoke A — можно.
 - Не трогать Studio UI, overlay, attach, full-track playback, FFmpeg worker.
 
-**Принято:** владелец продукта (задание PR1 foundation).
+**Принято:** владелец продукта (задание PR1 foundation + blocking revoke/replay fix).
 
 ---
 

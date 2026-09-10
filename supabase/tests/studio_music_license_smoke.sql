@@ -19,11 +19,19 @@ DECLARE
   ev1 uuid := '21111111-1111-4111-8111-111111111111';
   ev2 uuid := '22222222-2222-4222-8222-222222222222';
   ev3 uuid := '23333333-3333-4333-8333-333333333333';
+  ev4 uuid := '24444444-4444-4444-8444-444444444444';
+  ev5 uuid := '25555555-5555-4555-8555-555555555555';
+  ev6 uuid := '26666666-6666-4666-8666-666666666666';
+  pay3 uuid := '13333333-3333-4333-8333-333333333333';
   listen_pay uuid := '31111111-1111-4111-8111-111111111111';
   listen_ev uuid := '41111111-1111-4111-8111-111111111111';
   listen_order uuid;
   v_order uuid;
   v_order2 uuid;
+  v_order_b uuid;
+  v_free_paid_order uuid;
+  v_grant jsonb;
+  v_revoke jsonb;
   v_amount bigint;
   v_kind text;
   v_count integer;
@@ -409,6 +417,188 @@ BEGIN
   PERFORM public.revoke_studio_music_entitlement_for_order(v_order);
   IF public.has_studio_music_entitlement(buyer, paid_music) THEN
     RAISE EXCEPTION 'refund hook must revoke Studio entitlement';
+  END IF;
+
+  -- B. Fulfillment replay after revoke cannot re-grant old order A
+  INSERT INTO public.payment_webhook_events (
+    id, provider, dedup_key, event_type, processing_status
+  ) VALUES (
+    ev4, 'tochka', 'studio-1-after-revoke', 'incomingPayment', 'received'
+  );
+  v_fulfill := public.fulfill_tochka_payment_transactional(
+    ev4, 'tochka-studio-1', pay1, 100000, 'RUB', 'APPROVED'
+  );
+  IF coalesce(v_fulfill ->> 'ok', 'false') <> 'true' THEN
+    RAISE EXCEPTION 'B: fulfill replay after revoke should not fail %', v_fulfill;
+  END IF;
+  IF coalesce((v_fulfill ->> 'access_inserted')::boolean, false) THEN
+    RAISE EXCEPTION 'B: fulfill replay after revoke must not insert';
+  END IF;
+
+  v_grant := public.grant_studio_music_purchase_entitlement(v_order);
+  IF coalesce((v_grant ->> 'inserted')::boolean, false)
+     OR coalesce((v_grant ->> 'already_revoked')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'B: grant replay after revoke must be already_revoked %', v_grant;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE order_id = v_order AND revoked_at IS NULL;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'B: no active entitlement from revoked order A, got %', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'B: buyer must have no active paid_music entitlement after A revoke+replay';
+  END IF;
+
+  BEGIN
+    INSERT INTO public.studio_music_entitlements (
+      user_id, practice_id, grant_source, order_id
+    ) VALUES (
+      buyer, paid_music, 'purchase', v_order
+    );
+    RAISE EXCEPTION 'B: UNIQUE(order_id) must reject a second row for A';
+  EXCEPTION
+    WHEN unique_violation THEN
+      NULL;
+    WHEN others THEN
+      IF SQLERRM LIKE '%UNIQUE(order_id) must reject%' THEN
+        RAISE;
+      END IF;
+      IF SQLSTATE <> '23505' THEN
+        RAISE EXCEPTION 'B: expected unique_violation for order_id, got % %', SQLSTATE, SQLERRM;
+      END IF;
+  END;
+
+  -- D. Paid revoke cannot revoke grant_source=free
+  INSERT INTO public.orders (
+    user_id, practice_id, status, amount_minor, currency,
+    practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
+    author_id_snapshot, idempotency_key, order_kind, paid_at
+  ) VALUES (
+    buyer, free_music, 'paid', 100, 'RUB',
+    'Free music', 'free-music', 100, author, 'studio-on-free-race',
+    'studio_music_license', now()
+  )
+  RETURNING id INTO v_free_paid_order;
+
+  INSERT INTO public.studio_music_entitlements (
+    user_id, practice_id, grant_source, order_id, revoked_at, revoke_reason
+  ) VALUES (
+    buyer, free_music, 'purchase', v_free_paid_order, now(), 'prior-refund'
+  );
+
+  v_revoke := public.revoke_studio_music_entitlement_for_order(v_free_paid_order);
+  IF coalesce((v_revoke ->> 'revoked')::boolean, true) THEN
+    RAISE EXCEPTION 'D: already-revoked purchase must not report a new revoke %', v_revoke;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer
+    AND practice_id = free_music
+    AND grant_source = 'free'
+    AND revoked_at IS NULL;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'D: revoke order A must never revoke grant_source=free';
+  END IF;
+
+  v_revoke := public.revoke_studio_music_entitlement_for_order(v_order);
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer
+    AND practice_id = free_music
+    AND grant_source = 'free'
+    AND revoked_at IS NULL;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'D: revoke of unrelated paid order must leave free grant';
+  END IF;
+
+  IF public.can_use_music_in_studio(owner_user, paid_music) IS NOT TRUE THEN
+    RAISE EXCEPTION 'D: paid revoke must not remove live owner access';
+  END IF;
+
+  -- E / A / C. New lawful purchase B after revoke A; old revoke cannot kill B;
+  -- duplicate fulfill of B stays one row.
+  PERFORM set_config('request.jwt.claim.sub', buyer::text, true);
+  SELECT order_id INTO v_order_b
+  FROM public.create_studio_music_order(paid_music, gen_random_uuid(), NULL);
+
+  INSERT INTO public.payments (
+    id, order_id, provider, provider_payment_id, idempotency_key, status,
+    amount_minor, currency
+  ) VALUES (
+    pay3, v_order_b, 'tochka', 'tochka-studio-b', 'studio-b', 'pending', 100000, 'RUB'
+  );
+  INSERT INTO public.payment_webhook_events (
+    id, provider, dedup_key, event_type, processing_status
+  ) VALUES (
+    ev5, 'tochka', 'studio-b', 'incomingPayment', 'received'
+  );
+  v_fulfill := public.fulfill_tochka_payment_transactional(
+    ev5, 'tochka-studio-b', pay3, 100000, 'RUB', 'APPROVED'
+  );
+  IF coalesce(v_fulfill ->> 'ok', 'false') <> 'true'
+     OR coalesce((v_fulfill ->> 'access_inserted')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'E: new purchase after revoke must create entitlement B %', v_fulfill;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE order_id = v_order_b AND revoked_at IS NULL;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'E: expected one active entitlement for new order B';
+  END IF;
+
+  -- C. Normal duplicate fulfillment remains idempotent
+  INSERT INTO public.payment_webhook_events (
+    id, provider, dedup_key, event_type, processing_status
+  ) VALUES (
+    ev6, 'tochka', 'studio-b-retry', 'incomingPayment', 'received'
+  );
+  v_fulfill := public.fulfill_tochka_payment_transactional(
+    ev6, 'tochka-studio-b', pay3, 100000, 'RUB', 'APPROVED'
+  );
+  IF coalesce(v_fulfill ->> 'ok', 'false') <> 'true' THEN
+    RAISE EXCEPTION 'C: duplicate fulfill of B failed %', v_fulfill;
+  END IF;
+  IF coalesce((v_fulfill ->> 'access_inserted')::boolean, true) THEN
+    RAISE EXCEPTION 'C: duplicate fulfill must not insert a second row';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = paid_music;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'C: expected revoked A + one B, got % rows', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'C: expected exactly one active entitlement after duplicate fulfill';
+  END IF;
+
+  -- A. Old revoke cannot kill new purchase
+  v_revoke := public.revoke_studio_music_entitlement_for_order(v_order);
+  IF coalesce((v_revoke ->> 'revoked')::boolean, true) THEN
+    RAISE EXCEPTION 'A: replay revoke of A must not revoke another entitlement %', v_revoke;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.studio_music_entitlements
+  WHERE order_id = v_order_b AND revoked_at IS NULL AND grant_source = 'purchase';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'A: entitlement B must stay active after late revoke of A';
+  END IF;
+
+  IF public.has_studio_music_entitlement(buyer, paid_music) IS NOT TRUE THEN
+    RAISE EXCEPTION 'A: buyer must still have Studio access via B';
   END IF;
 
   -- non-music cannot be acquired

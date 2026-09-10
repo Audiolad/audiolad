@@ -20,6 +20,7 @@ const upgradePendingName =
   "20261003120300_create_course_upgrade_order_pending_kind.sql";
 const fulfillName = "20261003120400_fulfill_tochka_studio_music_license.sql";
 const financeName = "20261003120500_studio_music_canonical_sales.sql";
+const orderRevokeName = "20261003120600_studio_music_entitlement_order_revoke.sql";
 const previousLatest = "20261002120000_studio_duplicate_project_upload_state_ready.sql";
 const stubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/studio_music_license_smoke.sql");
@@ -38,6 +39,7 @@ const listenerPending = readFileSync(join(migrationsDir, listenerPendingName), "
 const upgradePending = readFileSync(join(migrationsDir, upgradePendingName), "utf8");
 const fulfill = readFileSync(join(migrationsDir, fulfillName), "utf8");
 const finance = readFileSync(join(migrationsDir, financeName), "utf8");
+const orderRevoke = readFileSync(join(migrationsDir, orderRevokeName), "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 
 assert(existsSync(join(migrationsDir, previousLatest)), "previous latest migration stays intact");
@@ -47,6 +49,7 @@ assert(existsSync(join(migrationsDir, listenerPendingName)), "listener pending-k
 assert(existsSync(join(migrationsDir, upgradePendingName)), "upgrade pending-kind patch exists");
 assert(existsSync(join(migrationsDir, fulfillName)), "fulfill replacement exists");
 assert(existsSync(join(migrationsDir, financeName)), "finance helper exists");
+assert(existsSync(join(migrationsDir, orderRevokeName)), "order-specific revoke migration exists");
 assert(existsSync(stubPath), "isolated stub exists");
 assert(existsSync(smokePath), "smoke SQL exists");
 
@@ -62,6 +65,7 @@ for (const stamp of [
   "20261003120300",
   "20261003120400",
   "20261003120500",
+  "20261003120600",
 ]) {
   assert(versions.includes(stamp), `${stamp} is listed`);
 }
@@ -122,6 +126,13 @@ assert(/course_upgrade/.test(finance));
 assert(/access_source = 'purchase'/.test(finance));
 assert(/canonical_sale_has_paid_access/.test(finance));
 
+assert(/studio_music_entitlements_order_id_uidx/.test(orderRevoke));
+assert(/WHERE e\.order_id = p_order_id/.test(orderRevoke));
+assert(/already_revoked/.test(orderRevoke));
+assert(/grant_source = 'purchase'/.test(orderRevoke));
+assert(!/revoke_studio_music_entitlement\(\s*v_order\.user_id/.test(orderRevoke));
+assert(/already_revoked/.test(fulfill));
+
 assert(/studio amount must be 2x/.test(smoke));
 assert(/listener purchase must not grant Studio/.test(smoke));
 assert(/Studio purchase must not write user_practices/.test(smoke));
@@ -138,6 +149,12 @@ assert(/publication-level/.test(smoke));
 assert(/must qualify as canonical sale/.test(smoke));
 assert(/listener user_practices regression/.test(smoke));
 assert(/fulfill_tochka_payment_transactional\(/.test(smoke));
+assert(/no active entitlement from revoked order A/.test(smoke));
+assert(/UNIQUE\(order_id\) must reject/.test(smoke));
+assert(/duplicate fulfill must not insert a second row/.test(smoke));
+assert(/revoke order A must never revoke grant_source=free/.test(smoke));
+assert(/new purchase after revoke must create entitlement B/.test(smoke));
+assert(/entitlement B must stay active after late revoke of A/.test(smoke));
 
 function dockerAvailable() {
   try {
@@ -187,6 +204,7 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, ordersName), "utf8"),
     readFileSync(join(migrationsDir, fulfillName), "utf8"),
     readFileSync(join(migrationsDir, financeName), "utf8"),
+    readFileSync(join(migrationsDir, orderRevokeName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

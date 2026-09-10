@@ -590,7 +590,15 @@ BEGIN
   END IF;
 
   IF v_access_after < 1 THEN
-    RAISE EXCEPTION 'access_grant_missing_after_fulfill' USING ERRCODE = 'P0001';
+    -- Replay of a paid Studio order after that order's entitlement was
+    -- revoked must not invent a new active grant. grant_* returns
+    -- already_revoked; do not treat that as a missing first-time grant.
+    IF v_order_kind = 'studio_music_license'
+       AND coalesce((v_grant ->> 'already_revoked')::boolean, false) THEN
+      NULL;
+    ELSE
+      RAISE EXCEPTION 'access_grant_missing_after_fulfill' USING ERRCODE = 'P0001';
+    END IF;
   END IF;
 
   -- Success = valid payment + successful grant, not access_inserted.
@@ -646,7 +654,7 @@ BEGIN
     'order_id', v_order.id,
     'payment_status', v_payment.status,
     'order_status', v_order.status,
-    'access_granted', true,
+    'access_granted', (v_access_after >= 1),
     'access_inserted', v_access_inserted,
     'access_rows', v_access_after,
     'was_repaired', v_was_repaired,
@@ -693,7 +701,7 @@ GRANT EXECUTE ON FUNCTION public.fulfill_tochka_payment_transactional(
 ) TO service_role;
 
 COMMENT ON FUNCTION public.fulfill_tochka_payment_transactional IS
-  'audiolad:payments-p30-studio-music:v1; transactional Tochka APPROVED fulfill + repair; product_purchase uses grant_practice_purchase_access; course_upgrade grants target via grant_practice_access; studio_music_license grants studio_music_entitlements only (never user_practices); success is not access_inserted; service_role only; never trusts client amount/user/test flags.';
+  'audiolad:payments-p30-studio-music:v2; transactional Tochka APPROVED fulfill + repair; product_purchase uses grant_practice_purchase_access; course_upgrade grants target via grant_practice_access; studio_music_license grants studio_music_entitlements only (never user_practices); revoked order replay does not re-grant; success is not access_inserted; service_role only; never trusts client amount/user/test flags.';
 
 DO $$
 BEGIN

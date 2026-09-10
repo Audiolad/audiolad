@@ -346,18 +346,19 @@ Migrations: `20261003120000_studio_music_entitlements.sql`,
 `20261003120200_create_practice_order_pending_kind.sql`,
 `20261003120300_create_course_upgrade_order_pending_kind.sql`,
 `20261003120400_fulfill_tochka_studio_music_license.sql`,
-`20261003120500_studio_music_canonical_sales.sql`.
+`20261003120500_studio_music_canonical_sales.sql`,
+`20261003120600_studio_music_entitlement_order_revoke.sql`.
 
 Publication-level Studio-use right for music (`product_kind=music` or `publication_class=release`). Album = one row on `practices.id` covering all `audio_items`. This is **not** listen access and **not** `user_practices`.
 
 | Объект | Назначение |
 |--------|------------|
-| `studio_music_entitlements` | `user_id`, `practice_id`, `grant_source` (`purchase` \| `free` \| `owner`), optional `order_id` (required for purchase), `granted_at` / `created_at`, `revoked_at` / `revoke_reason`. Partial UNIQUE `(user_id, practice_id) WHERE revoked_at IS NULL`. FK `practice_id` ON DELETE RESTRICT. RLS: users SELECT own rows; writes only via SECURITY DEFINER / `service_role`. |
+| `studio_music_entitlements` | `user_id`, `practice_id`, `grant_source` (`purchase` \| `free` \| `owner`), optional `order_id` (required for purchase), `granted_at` / `created_at`, `revoked_at` / `revoke_reason`. Partial UNIQUE `(user_id, practice_id) WHERE revoked_at IS NULL`. Partial UNIQUE `(order_id) WHERE order_id IS NOT NULL` (active or revoked — one row per paid order). FK `practice_id` ON DELETE RESTRICT. RLS: users SELECT own rows; writes only via SECURITY DEFINER / `service_role`. |
 | `can_acquire_studio_music` | New grant only: published music/release + `music_usage_permission='platform_reuse_allowed'` + commercial visibility. Later permission/price/unpublish changes do **not** revoke an existing grant. |
 | `has_studio_music_entitlement` / `can_use_music_in_studio` | Active stored grant, or live `author_members` owner/editor. Must **not** live-check current `platform_reuse_allowed`. Must **not** be used by ordinary listen APIs. |
 | `create_studio_music_order` | Authenticated RPC. Amount = `2 × resolve_practice_effective_price` (kopecks), snapshotted. Client is not the price source. `already_studio_entitled` is separate from listener `already_owned`. Fail-safe: free / `price<=0` → `practice_not_for_sale`; effective `<=0` → `invalid_practice_price`; expected-amount race → `price_changed`. |
 | `acquire_free_studio_music` | Authenticated RPC. First factual acquire of `is_free` + `platform_reuse_allowed`. Permanent entitlement, no order. Idempotent. |
-| Refund / revoke | `payment_refunds` still do **not** auto-revoke listen or Studio access. `revoke_studio_music_entitlement` / `revoke_studio_music_entitlement_for_order` set `revoked_at` (refund / admin). Publication edits never revoke. Exported Studio MP3s are not clawed back. |
+| Refund / revoke | `payment_refunds` still do **not** auto-revoke listen or Studio access. `revoke_studio_music_entitlement` (admin, current active user+practice row) and `revoke_studio_music_entitlement_for_order` set `revoked_at`. The order hook updates **only** `WHERE order_id = p_order_id AND revoked_at IS NULL` (purchase rows). It must not revoke another order, a newer repurchase, `grant_source='free'`, or live owner/editor access. Grant/fulfill of a revoked `order_id` does not insert a new active row. A later lawful order B for the same user+practice may grant again. Publication edits never revoke. Exported Studio MP3s are not clawed back. |
 | Sale lock | `practice_is_content_locked_after_sale` also treats active Studio entitlements as a lock. Paid Studio orders already lock via `orders.status='paid'`. |
 | Finance | Paid `studio_music_license` qualifies in `canonical_sale_has_paid_access` from the paid order (no fake `user_practices`). `ensure_author_sale_accrual` already accrues any succeeded payment with `author_id_snapshot`. Listener `product_purchase` still requires `access_source='purchase'`. |
 
