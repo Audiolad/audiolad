@@ -218,6 +218,21 @@ export function studioMusicListedVisibilityOrFilter(): string {
   ].join(",");
 }
 
+/**
+ * PostgREST `or` for filter=free: explicit Studio-free OR legacy NULL
+ * inferred as Studio-free (listener free). Eligibility gates stay on
+ * the same query. Does not treat listener is_free as Studio-free when
+ * mode is fixed/auto.
+ */
+export function studioMusicCatalogFreeOrFilter(): string {
+  return [
+    "studio_music_pricing_mode.eq.free",
+    "and(studio_music_pricing_mode.is.null,is_free.eq.true)",
+    "and(studio_music_pricing_mode.is.null,price.is.null)",
+    "and(studio_music_pricing_mode.is.null,price.lte.0)",
+  ].join(",");
+}
+
 export function isStudioMusicListedVisibilityRow(practice: {
   catalog_visibility?: string | null;
   is_catalog_listed?: boolean | null;
@@ -949,7 +964,7 @@ export function createSupabaseStudioMusicCatalogStore(
         .or(studioMusicListedVisibilityOrFilter());
 
       if (filter === "free") {
-        query = query.eq("studio_music_pricing_mode", "free");
+        query = query.or(studioMusicCatalogFreeOrFilter());
       }
 
       query = applyStudioMusicCatalogKeyset(query, cursor, limit);

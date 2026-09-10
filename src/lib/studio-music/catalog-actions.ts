@@ -135,6 +135,26 @@ export function resolveStudioMusicEntitlementAfterCheckout(input: {
   return input.checkoutStatus === "paid";
 }
 
+export type StudioMusicAlbumExpandClickSource =
+  | "row"
+  | "tracks"
+  | "preview"
+  | "acquire";
+
+export function nextStudioMusicAlbumExpanded(input: {
+  kind: "album" | "single";
+  expanded: boolean;
+  source: StudioMusicAlbumExpandClickSource;
+}): boolean {
+  if (input.kind !== "album") {
+    return false;
+  }
+  if (input.source === "preview" || input.source === "acquire") {
+    return input.expanded;
+  }
+  return !input.expanded;
+}
+
 export function studioCheckoutUsesServerOrderAmount(
   orderAmountMinor: number,
   clientExpectedMinor: number | null | undefined,

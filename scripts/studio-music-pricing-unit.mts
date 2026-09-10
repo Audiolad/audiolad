@@ -17,7 +17,10 @@ import {
   type StudioMusicCatalogPublication,
   type StudioMusicCatalogStore,
 } from "../src/lib/studio-music/catalog";
-import { resolveStudioMusicCatalogAction } from "../src/lib/studio-music/catalog-actions";
+import {
+  nextStudioMusicAlbumExpanded,
+  resolveStudioMusicCatalogAction,
+} from "../src/lib/studio-music/catalog-actions";
 import {
   DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
   inferLegacyStudioMusicPricingMode,
@@ -383,6 +386,26 @@ const mappedFixed = mapStudioMusicCatalogItem({
 assert.equal(mappedFixed.is_free, false);
 assert.equal(mappedFixed.studio_is_free, false);
 assert.equal(mappedFixed.listener_is_free, true);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: null,
+    }),
+  ),
+  true,
+);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: false,
+      price: 300,
+      studio_music_pricing_mode: null,
+    }),
+  ),
+  false,
+);
 assert.equal(mappedFixed.studio_effective_minor, 60000);
 assert.match(mappedFixed.listener_price_label, /Прослушивание: бесплатно/);
 assert.match(mappedFixed.studio_price_label, /Для Студии/);
@@ -451,6 +474,63 @@ assert.equal(
   "22222222-2222-4222-8222-222222222222",
 );
 
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: false,
+    source: "row",
+  }),
+  true,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: true,
+    source: "row",
+  }),
+  false,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: false,
+    source: "tracks",
+  }),
+  true,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: true,
+    source: "preview",
+  }),
+  true,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: false,
+    source: "preview",
+  }),
+  false,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "album",
+    expanded: true,
+    source: "acquire",
+  }),
+  true,
+);
+assert.equal(
+  nextStudioMusicAlbumExpanded({
+    kind: "single",
+    expanded: false,
+    source: "row",
+  }),
+  false,
+);
+
 const overlay = read("src/components/studio/StudioMusicCatalogOverlay.tsx");
 const card = read("src/components/studio/StudioMusicCatalogCard.tsx");
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
@@ -461,6 +541,8 @@ assert.match(card, /md:flex-row/);
 assert.match(card, /md:h-\[136px\]/);
 assert.match(card, /h-36 w-full/);
 assert.match(card, /stopPropagation/);
+assert.match(card, /onClick=\{isAlbum \? \(\) => applyExpandClick\("row"\) : undefined\}/);
+assert.match(card, /applyExpandClick\("tracks"\)/);
 assert.match(card, /Треки/);
 assert.match(card, /Прослушивание|listener_price_label/);
 assert.match(card, /studio_price_label/);

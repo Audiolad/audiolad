@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { formatAudioDuration } from "@/lib/products/duration";
 import {
+  nextStudioMusicAlbumExpanded,
   resolveStudioMusicCatalogAction,
   STUDIO_MUSIC_LOADING_LABEL,
 } from "@/lib/studio-music/catalog-actions";
@@ -31,16 +32,26 @@ export function StudioMusicCatalogCard({
   const previewKeyFor = (audioItemId: string) =>
     `${item.publication_id}:${audioItemId}`;
 
-  const toggleExpand = () => {
-    if (!isAlbum) {
-      return;
-    }
-    setExpanded((current) => !current);
+  const applyExpandClick = (
+    source: "row" | "tracks" | "preview" | "acquire",
+  ) => {
+    setExpanded((current) =>
+      nextStudioMusicAlbumExpanded({
+        kind: item.kind,
+        expanded: current,
+        source,
+      }),
+    );
   };
 
   return (
     <article className="studio-music-catalog-card overflow-hidden rounded-xl border border-white/10 bg-[#121b28]">
-      <div className="flex flex-col gap-3 p-3 md:flex-row md:items-center">
+      <div
+        className={`flex flex-col gap-3 p-3 md:flex-row md:items-center${
+          isAlbum ? " cursor-pointer" : ""
+        }`}
+        onClick={isAlbum ? () => applyExpandClick("row") : undefined}
+      >
         <div className="h-36 w-full shrink-0 overflow-hidden rounded-lg bg-[#0d131d] md:h-[136px] md:w-[136px]">
           {item.cover.url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -108,7 +119,7 @@ export function StudioMusicCatalogCard({
                 aria-expanded={expanded}
                 onClick={(event) => {
                   event.stopPropagation();
-                  toggleExpand();
+                  applyExpandClick("tracks");
                 }}
                 className="rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold text-[#e2e8f5]"
               >

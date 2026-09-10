@@ -27,6 +27,7 @@ import {
   resolveStudioMusicOwnership,
   studioMusicCatalogDtoContainsForbiddenFields,
   studioMusicCatalogSortTimestamp,
+  studioMusicCatalogFreeOrFilter,
   studioMusicListedVisibilityOrFilter,
   takeStudioMusicCatalogPage,
   type StudioMusicCatalogPublication,
@@ -221,6 +222,30 @@ assert.equal(
     publication({ is_free: true, music_usage_permission: "listen_only" }),
   ),
   false,
+);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: null,
+    }),
+  ),
+  true,
+);
+assert.equal(
+  isFreePublicStudioMusicInventory(
+    publication({
+      is_free: false,
+      price: 300,
+      studio_music_pricing_mode: null,
+    }),
+  ),
+  false,
+);
+assert.equal(
+  studioMusicCatalogFreeOrFilter(),
+  "studio_music_pricing_mode.eq.free,and(studio_music_pricing_mode.is.null,is_free.eq.true),and(studio_music_pricing_mode.is.null,price.is.null),and(studio_music_pricing_mode.is.null,price.lte.0)",
 );
 
 assert.equal(
@@ -783,8 +808,13 @@ assert.match(catalogSource, /resolveStudioMusicAcquisition/);
 assert.match(catalogSource, /studio_music_pricing_mode/);
 assert.match(catalogSource, /resolvePracticePriceRpc/);
 assert.match(catalogSource, /studioMusicListedVisibilityOrFilter/);
+assert.match(catalogSource, /studioMusicCatalogFreeOrFilter/);
 assert.match(catalogSource, /studioMusicCatalogFetchLimit/);
 assert.doesNotMatch(catalogSource, /\.eq\(\s*["']catalog_visibility["']\s*,\s*["']listed["']\s*\)/);
+assert.doesNotMatch(
+  catalogSource,
+  /\.eq\(\s*["']studio_music_pricing_mode["']\s*,\s*["']free["']\s*\)/,
+);
 
 const overlay = read("src/components/studio/StudioMusicCatalogOverlay.tsx");
 assert.doesNotMatch(overlay, /\*\s*2/);
