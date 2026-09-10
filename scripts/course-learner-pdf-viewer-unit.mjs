@@ -243,9 +243,17 @@ assert.ok(
   "header literals re-apply practice px-5 on mobile",
 );
 assert.match(viewerSource, /data-course-learner-file-viewer-header="true"/);
+const deniedSource = viewerSource.slice(
+  0,
+  viewerSource.indexOf("export default function CourseLearnerFileViewer"),
+);
+assert.match(
+  deniedSource,
+  /data-course-learner-file-viewer="denied"/,
+);
 assert.doesNotMatch(
-  viewerSource,
-  /data-course-learner-file-viewer="denied"[\s\S]*max-sm:-mx-5/,
+  deniedSource,
+  /max-sm:-mx-5/,
   "denied chrome must keep normal practice gutters",
 );
 assert.ok(
