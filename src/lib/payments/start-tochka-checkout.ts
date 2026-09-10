@@ -101,7 +101,6 @@ async function createTochkaPaymentForOrder(input: {
   userId: string;
   customerEmail: string;
   serviceRoleClient: SupabaseClient;
-  paymentLinkId?: string;
 }): Promise<
   | { ok: true; paymentUrl: string }
   | {
@@ -125,7 +124,6 @@ async function createTochkaPaymentForOrder(input: {
       consumerId: input.userId,
       customerEmail: input.customerEmail,
       itemName: input.orderRow.practice_title_snapshot,
-      paymentLinkId: input.paymentLinkId,
     });
 
     const persisted = await persistTochkaPaymentMetadata(
@@ -307,31 +305,31 @@ export async function startTochkaCheckoutForPendingOrder(input: {
         serviceRoleClient: input.serviceRoleClient,
       });
 
-      if (recreated.ok) {
+      if (!recreated.ok) {
+        console.error(
+          "create_payment_pending_recreate_failed",
+          orderRow.id,
+          pendingPayment.id,
+          recreated.stage,
+          recreated.error,
+        );
         return {
-          ok: true,
-          status: 200,
-          body: toPaymentCreateBody(
-            pendingPayment.id,
-            pendingPayment.order_id,
-            recreated.paymentUrl,
-          ),
+          ok: false,
+          status: recreated.status,
+          error: recreated.error,
+          stage: recreated.stage,
         };
       }
 
-      console.error(
-        "create_payment_pending_recreate_failed",
-        orderRow.id,
-        pendingPayment.id,
-        recreated.stage,
-        recreated.error,
-      );
-      await markPaymentFailed(
-        input.serviceRoleClient,
-        pendingPayment.id,
-        "tochka_recreate_failed",
-        pendingPayment.provider_metadata ?? {},
-      );
+      return {
+        ok: true,
+        status: 200,
+        body: toPaymentCreateBody(
+          pendingPayment.id,
+          pendingPayment.order_id,
+          recreated.paymentUrl,
+        ),
+      };
     }
   }
 
@@ -385,27 +383,6 @@ export async function startTochkaCheckoutForPendingOrder(input: {
   });
 
   if (!created.ok) {
-    const retried = await createTochkaPaymentForOrder({
-      orderRow,
-      paymentId: paymentRow.id,
-      userId: input.userId,
-      customerEmail: input.customerEmail,
-      serviceRoleClient: input.serviceRoleClient,
-      paymentLinkId: paymentRow.id,
-    });
-
-    if (retried.ok) {
-      return {
-        ok: true,
-        status: 201,
-        body: toPaymentCreateBody(
-          paymentRow.id,
-          paymentRow.order_id,
-          retried.paymentUrl,
-        ),
-      };
-    }
-
     await markPaymentFailed(
       input.serviceRoleClient,
       paymentRow.id,
@@ -414,9 +391,9 @@ export async function startTochkaCheckoutForPendingOrder(input: {
 
     return {
       ok: false,
-      status: retried.status,
-      error: retried.error,
-      stage: retried.stage,
+      status: created.status,
+      error: created.error,
+      stage: created.stage,
     };
   }
 

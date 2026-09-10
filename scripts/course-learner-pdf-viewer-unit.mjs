@@ -25,6 +25,12 @@ import {
   selectPdfPagesToRender,
 } from "../src/lib/course-content/learner-pdf-layout.ts";
 import { buildPdfPageSlots } from "../src/lib/course-content/learner-pdf-document.ts";
+import {
+  PdfPageRenderTaskRegistry,
+  beginPdfRenderGeneration,
+  isPdfRenderCancelled,
+  shouldShowPdfPageRenderError,
+} from "../src/lib/course-content/learner-pdf-render-tasks.ts";
 import { COURSE_LEARNER_CONTENTS_ANCHOR_ID } from "../src/lib/products/practice-access-ui.ts";
 import CourseLearnerFileViewerModule, {
   buildCourseLearnerFileViewerViewModel,
@@ -203,8 +209,94 @@ assert.doesNotMatch(viewerSource, /<iframe/);
 assert.match(pagesSource, /getDocument/);
 assert.match(pagesSource, /<canvas/);
 assert.match(pagesSource, /COURSE_LEARNER_PDF_ERROR_LABEL/);
+assert.match(pagesSource, /useMemo/);
+assert.match(pagesSource, /PdfPageRenderTaskRegistry/);
+assert.match(pagesSource, /beginPdfRenderGeneration/);
+assert.match(pagesSource, /shouldShowPdfPageRenderError/);
+assert.match(pagesSource, /cancelAll/);
+assert.doesNotMatch(pagesSource, /<iframe/);
 assert.match(route, /signLearnerPublicationFile/);
 assert.match(route, /createInlinePdfProxyResponse/);
 assert.doesNotMatch(route, /NextResponse\.redirect\(signed\.url/);
+
+const registry = new PdfPageRenderTaskRegistry();
+const renderedPages = new Set([1]);
+let firstCancelled = false;
+let firstStillRunning = true;
+const firstTask = {
+  cancel() {
+    firstCancelled = true;
+    firstStillRunning = false;
+  },
+  promise: new Promise(() => undefined),
+};
+registry.set(1, firstTask);
+assert.equal(registry.has(1), true);
+
+const nextGeneration = beginPdfRenderGeneration({
+  generation: 1,
+  renderedPages,
+  registry,
+});
+assert.equal(nextGeneration, 2);
+assert.equal(firstCancelled, true);
+assert.equal(firstStillRunning, false);
+assert.equal(registry.has(1), false);
+assert.equal(renderedPages.size, 0);
+
+const cancelledError = {
+  name: "RenderingCancelledException",
+  message: "Rendering cancelled, page 1",
+};
+assert.equal(isPdfRenderCancelled(cancelledError), true);
+assert.equal(shouldShowPdfPageRenderError(cancelledError), false);
+assert.equal(
+  shouldShowPdfPageRenderError(new Error("canvas_context_missing")),
+  true,
+);
+
+let secondRendered = false;
+const secondTask = {
+  cancel() {
+    throw new Error("second_generation_must_not_cancel_itself");
+  },
+  promise: Promise.resolve().then(() => {
+    secondRendered = true;
+  }),
+};
+registry.set(1, secondTask);
+await secondTask.promise;
+registry.clear(1);
+assert.equal(secondRendered, true);
+assert.equal(registry.size, 0);
+
+const portrait = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: 390,
+  devicePixelRatio: 3,
+});
+const landscape = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: 844,
+  devicePixelRatio: 3,
+});
+const portraitAgain = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: 390,
+  devicePixelRatio: 3,
+});
+assert.equal(portrait[0].cssWidth, 390);
+assert.equal(landscape[0].cssWidth, 844);
+assert.equal(portraitAgain[0].cssWidth, 390);
+assert.equal(portraitAgain[0].scale, portrait[0].scale);
+assert.ok(portraitAgain[0].scale > 0);
+assert.ok(portraitAgain[0].canvasWidth > 0);
+assert.equal(
+  documentHasHorizontalOverflow({
+    containerWidth: 390,
+    pageCssWidths: portraitAgain.map((slot) => slot.cssWidth),
+  }),
+  false,
+);
 
 console.log("course-learner-pdf-viewer-unit: ok");

@@ -10,9 +10,9 @@ export type PendingTochkaPaymentDecision =
   | { kind: "mark_failed_amount_changed" };
 
 /**
- * Decide what to do with a live pending Tochka payment on a pending order.
- * A payment without a usable checkout URL must be recreated or abandoned —
- * it must not block every later click forever.
+ * Same pending-payment decision as production main:
+ * reuse a valid URL+token, or allow one recreate with orderId.
+ * Recreate failure must not invent a new payment lifecycle.
  */
 export function decidePendingTochkaPayment(input: {
   pendingPayment: PaymentRow;

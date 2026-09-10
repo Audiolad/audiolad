@@ -398,8 +398,13 @@ assert.match(
 assert.match(button, /resolveCourseUpgradeUiError/);
 assert.match(startPay, /decidePendingTochkaPayment/);
 assert.match(startPay, /provider_checkout_failed/);
-assert.match(startPay, /tochka_recreate_failed/);
-assert.match(startPay, /paymentLinkId/);
+assert.doesNotMatch(startPay, /tochka_recreate_failed/);
+assert.doesNotMatch(startPay, /paymentLinkId:\s*paymentRow\.id/);
+assert.doesNotMatch(startPay, /paymentLinkId:\s*input\.paymentLinkId/);
+assert.match(
+  read("src/lib/payments/tochka-client.ts"),
+  /paymentLinkId:\s*input\.orderId/,
+);
 
 const stuckPending = decidePendingTochkaPayment({
   pendingPayment: {

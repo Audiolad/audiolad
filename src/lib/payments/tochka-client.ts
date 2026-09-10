@@ -22,7 +22,6 @@ export type CreateTochkaPaymentInput = {
   consumerId: string;
   customerEmail: string;
   itemName: string;
-  paymentLinkId?: string;
 };
 
 export type CreateTochkaPaymentResult = {
@@ -127,7 +126,7 @@ function buildCreatePaymentData(
     amount,
     purpose: input.purpose.slice(0, 140),
     paymentMode: config.paymentModes,
-    paymentLinkId: input.paymentLinkId ?? input.orderId,
+    paymentLinkId: input.orderId,
     redirectUrl,
     failRedirectUrl,
     consumerId: input.consumerId,

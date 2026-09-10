@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   COURSE_LEARNER_PDF_WORKER_SRC,
@@ -16,6 +16,11 @@ import {
   selectPdfPagesToRender,
   type PdfPageSize,
 } from "@/lib/course-content/learner-pdf-layout";
+import {
+  PdfPageRenderTaskRegistry,
+  beginPdfRenderGeneration,
+  shouldShowPdfPageRenderError,
+} from "@/lib/course-content/learner-pdf-render-tasks";
 
 type CourseLearnerPdfPagesProps = {
   fileSrc: string;
@@ -44,6 +49,7 @@ export default function CourseLearnerPdfPages({
   const pdfRef = useRef<PdfDocument | null>(null);
   const renderedPagesRef = useRef<Set<number>>(new Set());
   const renderGenerationRef = useRef(0);
+  const renderTasksRef = useRef(new PdfPageRenderTaskRegistry());
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [pageSizes, setPageSizes] = useState<PdfPageSize[]>([]);
@@ -53,24 +59,36 @@ export default function CourseLearnerPdfPages({
   const [loadGeneration, setLoadGeneration] = useState(0);
 
   const pageCount = pageSizes.length;
-  const slots = buildPdfPageSlots({
-    pageSizes,
-    containerWidth,
-    devicePixelRatio:
-      typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
-  });
+  const devicePixelRatio =
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  const slots = useMemo(
+    () =>
+      buildPdfPageSlots({
+        pageSizes,
+        containerWidth,
+        devicePixelRatio,
+      }),
+    [pageSizes, containerWidth, devicePixelRatio],
+  );
+
+  const bumpRenderGeneration = useCallback(() => {
+    renderGenerationRef.current = beginPdfRenderGeneration({
+      generation: renderGenerationRef.current,
+      renderedPages: renderedPagesRef.current,
+      registry: renderTasksRef.current,
+    });
+  }, []);
 
   const retry = useCallback(() => {
+    bumpRenderGeneration();
     setStatus("loading");
     setPageSizes([]);
     setPageErrors({});
     setVisiblePage(1);
-    renderedPagesRef.current = new Set();
-    renderGenerationRef.current += 1;
     pdfRef.current?.destroy().catch(() => undefined);
     pdfRef.current = null;
     setLoadGeneration((value) => value + 1);
-  }, []);
+  }, [bumpRenderGeneration]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -100,6 +118,7 @@ export default function CourseLearnerPdfPages({
 
   useEffect(() => {
     let cancelled = false;
+    const renderTasks = renderTasksRef.current;
 
     async function loadDocument() {
       setStatus("loading");
@@ -156,15 +175,15 @@ export default function CourseLearnerPdfPages({
 
     return () => {
       cancelled = true;
+      renderTasks.cancelAll();
       pdfRef.current?.destroy().catch(() => undefined);
       pdfRef.current = null;
     };
   }, [fileSrc, loadGeneration]);
 
   useEffect(() => {
-    renderedPagesRef.current = new Set();
-    renderGenerationRef.current += 1;
-  }, [containerWidth]);
+    bumpRenderGeneration();
+  }, [bumpRenderGeneration, containerWidth]);
 
   useEffect(() => {
     if (status !== "ready" || pageCount === 0) {
@@ -209,6 +228,7 @@ export default function CourseLearnerPdfPages({
       visiblePage,
     });
     const generation = renderGenerationRef.current;
+    const renderTasks = renderTasksRef.current;
     const dpr =
       typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
 
@@ -248,10 +268,17 @@ export default function CourseLearnerPdfPages({
             throw new Error("canvas_context_missing");
           }
 
-          await page.render({
+          const task = page.render({
             canvasContext: context,
             viewport,
-          }).promise;
+          });
+          renderTasks.set(pageNumber, task);
+
+          try {
+            await task.promise;
+          } finally {
+            renderTasks.clear(pageNumber);
+          }
 
           if (cancelled || generation !== renderGenerationRef.current) {
             return;
@@ -267,10 +294,16 @@ export default function CourseLearnerPdfPages({
             delete next[pageNumber];
             return next;
           });
-        } catch {
-          if (!cancelled) {
-            setPageErrors((current) => ({ ...current, [pageNumber]: true }));
+        } catch (error) {
+          if (
+            cancelled ||
+            generation !== renderGenerationRef.current ||
+            !shouldShowPdfPageRenderError(error)
+          ) {
+            continue;
           }
+
+          setPageErrors((current) => ({ ...current, [pageNumber]: true }));
         }
       }
     }
@@ -279,6 +312,7 @@ export default function CourseLearnerPdfPages({
 
     return () => {
       cancelled = true;
+      renderTasks.cancelAll();
     };
   }, [containerWidth, pageCount, slots, status, visiblePage]);
 
