@@ -11,6 +11,9 @@ import type {
 
 export const AUTHOR_DIRECTION_OTHER = "Другое";
 
+export const AUTHOR_DIRECTION_NEUROCOMPOSER =
+  "Нейрокомпозитор / создатель ИИ-музыки";
+
 export const AUTHOR_DIRECTION_PRESETS = [
   "Медитации",
   "Аудиопрактики",
@@ -23,6 +26,7 @@ export const AUTHOR_DIRECTION_PRESETS = [
   "Эзотерика",
   "Работа с детьми",
   "Здоровье",
+  AUTHOR_DIRECTION_NEUROCOMPOSER,
   AUTHOR_DIRECTION_OTHER,
 ] as const;
 
@@ -116,7 +120,7 @@ export const AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT =
   "Подробности о планируемых материалах будут уточнены при рассмотрении заявки.";
 
 export const AUTHOR_APPLICATION_READINESS_ERROR =
-  "Выберите один из вариантов о ваших аудиопрактиках или обучении.";
+  "Выберите один из вариантов о ваших материалах или обучении.";
 
 export const AUTHOR_APPLICATION_DIRECTION_ERROR =
   "Выберите хотя бы одно направление.";

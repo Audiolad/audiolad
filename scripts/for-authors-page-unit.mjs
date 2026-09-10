@@ -117,16 +117,32 @@ function testPageContent() {
   assert.doesNotMatch(page, /маркетплейс/i);
   assert.doesNotMatch(page, /гарантированн/i);
   assert.equal(FOR_AUTHORS_FAQ.length, 12);
-  assert.equal(FOR_AUTHORS_AUDIENCE.length, 5);
+  assert.equal(FOR_AUTHORS_AUDIENCE.length, 6);
   assert.equal(FOR_AUTHORS_AUDIENCE[4]?.title, "Энергопрактики и эзотерики");
   assert.match(
     FOR_AUTHORS_AUDIENCE[4]?.description ?? "",
     /смысл, состояние и энергетику/,
   );
+  assert.equal(
+    FOR_AUTHORS_AUDIENCE[5]?.title,
+    "Музыканты, нейрокомпозиторы и создатели ИИ-музыки",
+  );
+  assert.match(
+    FOR_AUTHORS_AUDIENCE[5]?.description ?? "",
+    /Для музыки голос не обязателен/,
+  );
   assert.ok(FOR_AUTHORS_FORMATS.includes("энергопрактики;"));
   assert.ok(FOR_AUTHORS_FORMATS.includes("квант-медитации;"));
   assert.ok(FOR_AUTHORS_FORMATS.includes("духовные аудиоматериалы;"));
+  assert.ok(FOR_AUTHORS_FORMATS.includes("музыка;"));
+  assert.ok(FOR_AUTHORS_FORMATS.includes("музыкальные треки и альбомы;"));
   assert.match(FOR_AUTHORS_FAQ[0].answer, /энергопрактики, эзотерики/);
+  assert.match(FOR_AUTHORS_FAQ[0].answer, /музыканты, нейрокомпозиторы/);
+  assert.match(FOR_AUTHORS_FAQ[1].answer, /Для музыки голос не обязателен/);
+  assert.doesNotMatch(
+    page,
+    /Основой авторского материала на АудиоЛаде должен быть живой голос/,
+  );
 }
 
 function testNavigationAndSitemap() {

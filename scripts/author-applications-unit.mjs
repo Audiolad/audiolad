@@ -11,6 +11,9 @@ import {
 import {
   AUTHOR_APPLICATION_DIRECTION_ERROR,
   AUTHOR_APPLICATION_READINESS_ERROR,
+  AUTHOR_DIRECTION_NEUROCOMPOSER,
+  AUTHOR_DIRECTION_OTHER,
+  AUTHOR_DIRECTION_PRESETS,
   buildSubmittedContacts,
   hasAuthorApplicationFieldErrors,
   normalizeAuthorApplicationFormValues,
@@ -83,6 +86,67 @@ function testDirectionParsingOther() {
   const parsed = parseStoredDirection("Медитации, Другое: Астрология");
   assert(parsed.selectedDirections.includes("Другое"), "other flag parsed");
   assert(parsed.directionOther === "Астрология", "other text parsed");
+}
+
+function testNeurocomposerPresetSerializes() {
+  assert(
+    AUTHOR_DIRECTION_PRESETS.includes(AUTHOR_DIRECTION_NEUROCOMPOSER),
+    "neurocomposer is a known preset",
+  );
+  assert(
+    AUTHOR_DIRECTION_PRESETS[AUTHOR_DIRECTION_PRESETS.length - 1] ===
+      AUTHOR_DIRECTION_OTHER,
+    "Другое remains the last preset",
+  );
+  assert(
+    serializeDirection([AUTHOR_DIRECTION_NEUROCOMPOSER], "") ===
+      AUTHOR_DIRECTION_NEUROCOMPOSER,
+    "new preset serializes",
+  );
+}
+
+function testNeurocomposerParsedAsKnownPreset() {
+  const parsed = parseStoredDirection(AUTHOR_DIRECTION_NEUROCOMPOSER);
+  assert(
+    parsed.selectedDirections.includes(AUTHOR_DIRECTION_NEUROCOMPOSER),
+    "after parse recognized as known preset",
+  );
+  assert(
+    !parsed.selectedDirections.includes(AUTHOR_DIRECTION_OTHER),
+    "neurocomposer is not Другое",
+  );
+  assert(parsed.directionOther === "", "neurocomposer has no other text");
+}
+
+function testOtherDirectionStillWorksAfterNewPreset() {
+  assert(
+    serializeDirection([AUTHOR_DIRECTION_OTHER], "Астрология") ===
+      "Другое: Астрология",
+    "existing Другое still serializes",
+  );
+  const parsed = parseStoredDirection("Другое: Астрология");
+  assert(
+    parsed.selectedDirections.includes(AUTHOR_DIRECTION_OTHER),
+    "existing Другое still parses",
+  );
+  assert(parsed.directionOther === "Астрология", "Другое text still parsed");
+}
+
+function testOldDirectionsUnchanged() {
+  assert(
+    serializeDirection(["Медитации", "Психология"], "") ===
+      "Медитации, Психология",
+    "old directions serialize unchanged",
+  );
+  const parsed = parseStoredDirection("Медитации, Психология, Эзотерика");
+  assert(parsed.selectedDirections.includes("Медитации"), "old Медитации");
+  assert(parsed.selectedDirections.includes("Психология"), "old Психология");
+  assert(parsed.selectedDirections.includes("Эзотерика"), "old Эзотерика");
+  assert(
+    !parsed.selectedDirections.includes(AUTHOR_DIRECTION_OTHER),
+    "old directions are not Другое",
+  );
+  assert(parsed.directionOther === "", "old directions have no other text");
 }
 
 function testReadyMaterialsOnly() {
@@ -310,6 +374,10 @@ function run() {
   testDirectionSerialization();
   testDirectionParsingLegacy();
   testDirectionParsingOther();
+  testNeurocomposerPresetSerializes();
+  testNeurocomposerParsedAsKnownPreset();
+  testOtherDirectionStillWorksAfterNewPreset();
+  testOldDirectionsUnchanged();
   testReadyMaterialsOnly();
   testWantsTrainingOnly();
   testBothReadinessOptions();

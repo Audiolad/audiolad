@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Стать автором – АудиоЛад",
   description:
-    "Подайте заявку и начните публиковать аудиопрактики, медитации и программы на платформе АудиоЛад.",
+    "Подайте заявку и начните публиковать аудиопрактики, музыку и программы на платформе АудиоЛад.",
   alternates: {
     canonical: `${getAppOrigin()}/become-author`,
   },
