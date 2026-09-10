@@ -15,6 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github/workflows/production-deploy.yml");
@@ -39,6 +40,10 @@ const diskCleanupPath = join(
 const studioDupAssetDiagPath = join(
   repoRoot,
   "deploy/scripts/audiolad-studio-duplicate-asset-diag.sh",
+);
+const courseUpgradeDiagPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-course-upgrade-diag.sh",
 );
 const SHA40 = "a".repeat(40);
 
@@ -162,23 +167,27 @@ function main() {
   assert.ok(jobs.disk_storage_audit, "job disk_storage_audit must exist");
   assert.ok(jobs.disk_storage_cleanup, "job disk_storage_cleanup must exist");
   assert.ok(jobs.studio_duplicate_asset_diag, "job studio_duplicate_asset_diag must exist");
+  assert.ok(jobs.course_upgrade_diag, "job course_upgrade_diag must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.studio_worker_recover.environment, "production");
   assert.equal(jobs.disk_storage_audit.environment, "production");
   assert.equal(jobs.disk_storage_cleanup.environment, "production");
   assert.equal(jobs.studio_duplicate_asset_diag.environment, "production");
+  assert.equal(jobs.course_upgrade_diag.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_audit["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_cleanup["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_duplicate_asset_diag["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.course_upgrade_diag["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_CLEANUP'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_DUPLICATE_ASSET_DIAG'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_COURSE_UPGRADE_DIAG'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -247,6 +256,10 @@ function main() {
     confirm.options.includes("OPS_STUDIO_DUPLICATE_ASSET_DIAG"),
     "confirm options must include OPS_STUDIO_DUPLICATE_ASSET_DIAG",
   );
+  assert.ok(
+    confirm.options.includes("OPS_COURSE_UPGRADE_DIAG"),
+    "confirm options must include OPS_COURSE_UPGRADE_DIAG",
+  );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `wrapper bash -n failed: ${syntax.stderr}`);
@@ -293,7 +306,30 @@ function main() {
   assert.match(workflowText, /merge-base --is-ancestor/);
   assert.doesNotMatch(wrapperText, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
 
-  assert.doesNotMatch(workflowText, /actions\/checkout/);
+  const courseUpgradeJobMarker = workflowText.indexOf("name: Ops course upgrade diagnostic");
+  const deployJobMarkerForCheckout = workflowText.indexOf("name: Deploy to production");
+  assert.ok(
+    courseUpgradeJobMarker >= 0 && deployJobMarkerForCheckout > courseUpgradeJobMarker,
+    "course-upgrade diag job must precede deploy job",
+  );
+  const courseUpgradeJobYaml = workflowText.slice(courseUpgradeJobMarker, deployJobMarkerForCheckout);
+  const workflowOutsideCourseUpgrade =
+    workflowText.slice(0, courseUpgradeJobMarker) + workflowText.slice(deployJobMarkerForCheckout);
+  assert.doesNotMatch(
+    workflowOutsideCourseUpgrade,
+    /actions\/checkout/,
+    "only course_upgrade_diag may use actions/checkout",
+  );
+  assert.equal(
+    (courseUpgradeJobYaml.match(/actions\/checkout@v4/g) || []).length,
+    1,
+    "course_upgrade_diag must use actions/checkout@v4 exactly once",
+  );
+  assert.match(courseUpgradeJobYaml, /persist-credentials:\s+false/);
+  assert.match(
+    courseUpgradeJobYaml,
+    /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/,
+  );
   assert.doesNotMatch(workflowText, /git submodule/);
   assert.doesNotMatch(workflowText, /\bgit checkout\b/);
   const workflowFetchLines = workflowText
@@ -314,6 +350,9 @@ function main() {
   const diskCleanupStepOffset = workflowText.indexOf("name: One-shot allowlist disk/Storage cleanup via SSH");
   const dupAssetDiagStepOffset = workflowText.indexOf(
     "name: Read-only Studio duplicate asset diagnostic via SSH",
+  );
+  const courseUpgradeDiagStepOffset = workflowText.indexOf(
+    "name: Read-only course upgrade diagnostic via SSH",
   );
   assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
   assert.ok(
@@ -340,6 +379,10 @@ function main() {
     dupAssetDiagStepOffset > workflowAncestorOffset,
     "workflow must verify origin/main ancestry before SSH Studio duplicate asset diagnostic",
   );
+  assert.ok(
+    courseUpgradeDiagStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH course-upgrade diagnostic",
+  );
 
   assertStudioRenderWorkerEnvDiagnostic(workflowText, docsText);
   assertRemoteDiagnoseScriptSyntax(workflowText);
@@ -356,6 +399,8 @@ function main() {
   assertStudioDuplicateAssetDiag(workflowText, docsText);
   assertRemoteStudioDupAssetDiagScriptSyntax(workflowText);
   assertStudioDupAssetDiagHelper(workflowText);
+  assertCourseUpgradeDiag(workflowText, docsText);
+  assertCourseUpgradeDiagHelper();
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -679,6 +724,8 @@ function assertStudioRenderWorkerRecover(workflowText, docsText) {
   assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_WORKER_RECOVER/);
   assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_STUDIO_WORKER_RECOVER/);
   assert.match(docsText, /audiolad-studio-render-worker-recover\.sh/);
   assert.doesNotMatch(recoverJob, /pm2 flush/, "recover must not flush PM2 logs");
@@ -1118,6 +1165,7 @@ function assertDiskStorageAudit(workflowText, docsText) {
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
   assert.match(docsText, /audiolad-disk-storage-audit\.sh/);
 }
@@ -1464,6 +1512,11 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(cleanupJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(deployJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(cleanupJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(deployJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_DISK_STORAGE_CLEANUP/);
   assert.match(docsText, /audiolad-disk-storage-cleanup\.sh/);
   assert.match(docsText, /34113627251/);
@@ -2111,12 +2164,17 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
   }
 
   const dupStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
+  const courseUpgradeStart = workflowText.indexOf("name: Ops course upgrade diagnostic");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
   assert.ok(dupStart >= 0 && deployStart > dupStart, "dup-asset diag job must precede deploy job");
-  const dupJob = workflowText.slice(dupStart, deployStart);
+  assert.ok(
+    courseUpgradeStart > dupStart && deployStart > courseUpgradeStart,
+    "course-upgrade diag job must sit between dup-asset diag and deploy",
+  );
+  const dupJob = workflowText.slice(dupStart, courseUpgradeStart);
   const cleanupJob = workflowText.slice(cleanupStart, dupStart);
   const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
@@ -2169,6 +2227,12 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(cleanupJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(deployJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(cleanupJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(dupJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(deployJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(docsText, /audiolad-studio-duplicate-asset-diag\.sh/);
 }
@@ -2645,6 +2709,457 @@ function assertStudioDupAssetDiagHelper(workflowText) {
     assert.match(remoteOutput, /DUPLICATION_AUDIT_PROJECT_ID=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
     assert.doesNotMatch(remoteOutput, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(remoteOutput, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    rmSync(remoteRoot, { recursive: true, force: true });
+  }
+}
+
+function assertCourseUpgradeDiag(workflowText, docsText) {
+  const required = [
+    "OPS_COURSE_UPGRADE_DIAG",
+    "actions/checkout@v4",
+    "persist-credentials: false",
+    "origin_main_sha",
+    "audiolad-course-upgrade-diag.sh",
+    "bash -n deploy/scripts/audiolad-course-upgrade-diag.sh",
+    "bash -s --",
+    "< deploy/scripts/audiolad-course-upgrade-diag.sh",
+    "confirm=OPS_COURSE_UPGRADE_DIAG",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `course-upgrade diag workflow must contain ${needle}`,
+    );
+  }
+  assert.doesNotMatch(
+    workflowText,
+    /REMOTE_COURSE_UPGRADE_DIAG/,
+    "workflow must not embed a duplicated course-upgrade diag heredoc",
+  );
+  assert.doesNotMatch(workflowText, /\.readlines\s*\(/);
+  assert.doesNotMatch(workflowText, /\bMATCH_LINE\b/);
+
+  const courseUpgradeStart = workflowText.indexOf("name: Ops course upgrade diagnostic");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  const dupStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
+  assert.ok(
+    courseUpgradeStart >= 0 && deployStart > courseUpgradeStart,
+    "course-upgrade diag job must precede deploy job",
+  );
+  const courseJob = workflowText.slice(courseUpgradeStart, deployStart);
+  const dupJob = workflowText.slice(dupStart, courseUpgradeStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    workflowText.indexOf("name: Ops Studio worker recover"),
+  );
+  const deployJob = workflowText.slice(deployStart);
+  assert.doesNotMatch(
+    courseJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "course-upgrade diag job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(courseJob, /pm2 delete/, "course-upgrade diag job must stay read-only");
+  assert.doesNotMatch(courseJob, /pm2 start/, "course-upgrade diag job must not start PM2 apps");
+  assert.doesNotMatch(courseJob, /pm2 (restart|flush|save)/, "course-upgrade diag job must not mutate PM2");
+  assert.doesNotMatch(courseJob, /\bnginx\s+-s\b/, "course-upgrade diag must not signal nginx");
+  const courseCode = courseJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(courseCode, /\bdeploy\.sh\b/, "course-upgrade diag job must not call deploy.sh");
+  assert.match(courseJob, /uses:\s+actions\/checkout@v4/);
+  assert.match(courseJob, /persist-credentials:\s+false/);
+  assert.match(courseJob, /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/);
+  assert.match(courseJob, /bash -n deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
+  assert.match(courseJob, /"bash -s --"/);
+  assert.match(courseJob, /< deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
+  assert.doesNotMatch(
+    courseCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "course-upgrade diag job must not source env files",
+  );
+  assert.doesNotMatch(
+    courseJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "course-upgrade diag job must not cat env files",
+  );
+  assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(dupJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(deployJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(docsText, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(docsText, /audiolad-course-upgrade-diag\.sh/);
+  assert.match(docsText, /Evidence cannot be pulled until this confirm is merged/);
+  assert.match(docsText, /persist-credentials: false/);
+  assert.match(docsText, /SAFE_SUMMARY/);
+}
+
+function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
+  const releaseCurrent = "20260910-045134-ac9020e1050f5702fd806d29677aa4212ee68d39";
+  const currentDir = join(root, "deploy", "releases", releaseCurrent);
+  const sharedDir = join(root, "deploy", "shared");
+  const binDir = join(root, "bin");
+  const pm2Dir = join(root, "home", ".pm2", "logs");
+  mkdirSync(join(currentDir, "node_modules", "@next", "env"), { recursive: true });
+  mkdirSync(join(currentDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
+  mkdirSync(sharedDir, { recursive: true });
+  mkdirSync(binDir, { recursive: true });
+  mkdirSync(pm2Dir, { recursive: true });
+  writeFileSync(join(currentDir, ".deploy-commit"), "ac9020e1050f5702fd806d29677aa4212ee68d39\n");
+  writeFileSync(
+    join(sharedDir, ".env.production"),
+    `NEXT_PUBLIC_SUPABASE_URL=${secretUrl}\nSUPABASE_SERVICE_ROLE_KEY=${secretKey}\n`,
+  );
+  symlinkSync(join(sharedDir, ".env.production"), join(currentDir, ".env.production"));
+  symlinkSync(currentDir, join(root, "deploy", "current"));
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "package.json"),
+    JSON.stringify({ name: "@next/env", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@next", "env", "index.js"),
+    [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "function loadEnvConfig(dir) {",
+      "  const file = path.join(dir, '.env.production');",
+      "  const text = fs.readFileSync(file, 'utf8');",
+      "  for (const line of text.split('\\n')) {",
+      "    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);",
+      "    if (m) process.env[m[1]] = m[2];",
+      "  }",
+      "}",
+      "module.exports = { loadEnvConfig };",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "package.json"),
+    JSON.stringify({ name: "@supabase/supabase-js", main: "index.js" }),
+  );
+  writeFileSync(
+    join(currentDir, "node_modules", "@supabase", "supabase-js", "index.js"),
+    [
+      "const AUTHOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';",
+      "const PRACTICE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';",
+      "const USER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';",
+      "const ORDER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';",
+      "const PAYMENT = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';",
+      "const authors = [{ id: AUTHOR, slug: 'sergey-and-zoya' }];",
+      "const practices = [{ id: PRACTICE, slug: 'kody-zhenskoy-prityagatelnosti', author_id: AUTHOR }];",
+      "const profiles = [{ id: USER, email: 'petpovss@yandex.ru' }];",
+      "const entitlements = [{ user_id: USER, practice_id: PRACTICE, access_level: 1, access_source: 'purchase', granted_at: '2026-09-01T12:00:00Z' }];",
+      "const orders = [{ id: ORDER, user_id: USER, practice_id: PRACTICE, status: 'pending', order_kind: 'course_upgrade', target_access_level: 2, amount_minor: 222200, currency: 'RUB', created_at: '2026-09-10T04:36:00Z', paid_at: null, practice_slug_snapshot: 'kody-zhenskoy-prityagatelnosti' }];",
+      "const payments = [{ id: PAYMENT, order_id: ORDER, status: 'pending', provider: 'tochka', amount_minor: 222200, currency: 'RUB', created_at: '2026-09-10T04:36:01Z', confirmed_at: null, failed_at: null, provider_payment_id: null, provider_metadata: {} }];",
+      "function applyFilters(rows, filters) {",
+      "  return rows.filter((row) => filters.every((f) => {",
+      "    if (f.op === 'eq') return String(row[f.col]) === String(f.val);",
+      "    if (f.op === 'in') return (f.val || []).includes(row[f.col]);",
+      "    return true;",
+      "  }));",
+      "}",
+      "function createClient() {",
+      "  return {",
+      "    from(table) {",
+      "      const state = { table, filters: [] };",
+      "      const api = {",
+      "        select() { return api; },",
+      "        eq(col, val) { state.filters.push({ op: 'eq', col, val }); return api; },",
+      "        in(col, val) { state.filters.push({ op: 'in', col, val }); return api; },",
+      "        order() { return api; },",
+      "        limit() { return api; },",
+      "        maybeSingle() {",
+      "          let rows = [];",
+      "          if (table === 'authors') rows = authors;",
+      "          if (table === 'practices') rows = practices;",
+      "          if (table === 'profiles') rows = profiles;",
+      "          if (table === 'user_practices') rows = entitlements;",
+      "          const filtered = applyFilters(rows, state.filters);",
+      "          return Promise.resolve({ data: filtered[0] || null, error: null });",
+      "        },",
+      "        then(resolve) {",
+      "          let rows = [];",
+      "          if (table === 'orders') rows = orders;",
+      "          if (table === 'payments') rows = payments;",
+      "          resolve({ data: applyFilters(rows, state.filters), error: null });",
+      "        },",
+      "      };",
+      "      return api;",
+      "    },",
+      "  };",
+      "}",
+      "module.exports = { createClient };",
+      "",
+    ].join("\n"),
+  );
+
+  const p3001Err = join(pm2Dir, "audiolad-p3001-error.log");
+  const p3000Err = join(pm2Dir, "audiolad-p3000-error.log");
+  const p3000Rotated = join(pm2Dir, "audiolad-p3000-error.log.1");
+  const p3000Gz = join(pm2Dir, "audiolad-p3000-error.log.1.gz");
+  const p3000BrokenGz = join(pm2Dir, "audiolad-p3000-error.log.2.gz");
+  const p3000Out = join(pm2Dir, "audiolad-p3000-out.log");
+  writeFileSync(join(pm2Dir, "audiolad-p3001-out.log"), "ready\n");
+  writeFileSync(
+    p3001Err,
+    [
+      "2026-09-10T05:10:00.000Z course_upgrade_failed { FAILED_STAGE: 'reload_orders_row', ACTUAL_API_ERROR: 'internal_error', ACTUAL_HTTP_STATUS: 500, order_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }",
+      "2026-09-10T05:10:01.000Z course_upgrade_failed { FAILED_STAGE: 'startTochkaCheckoutForPendingOrder', ACTUAL_API_ERROR: 'auth_required', ACTUAL_HTTP_STATUS: 401, order_id: '99999999-9999-4999-8999-999999999999', practice_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', target_access_level: 3 }",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    p3000Err,
+    [
+      "2026-09-10T04:36:12.000Z course_upgrade_failed {",
+      "  FAILED_STAGE: 'createTochkaPaymentOperation',",
+      "  ACTUAL_API_ERROR: 'provider_checkout_failed',",
+      "  ACTUAL_HTTP_STATUS: 502,",
+      "  order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',",
+      "  practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',",
+      "  target_access_level: 2,",
+      "  checkout_token: 'plain-secret-value-never-print',",
+      "  email: 'petpovss@yandex.ru',",
+      "  payment_url: 'https://pay.tochka.example/secret-link',",
+      "  authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig'",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    p3000Rotated,
+    "2026-09-10T04:40:00.000Z create_payment_tochka_http_error 403 tochka_create_payment_failed\n",
+  );
+  writeFileSync(
+    p3000Gz,
+    gzipSync(
+      "2026-09-10T04:36:40.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_checkout_failed', ACTUAL_HTTP_STATUS: 502, order_id: '12121212-1212-4121-8121-121212121212', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }\n",
+    ),
+  );
+  writeFileSync(p3000BrokenGz, Buffer.from("not-a-gzip-file"));
+  const largeLines = [];
+  for (let i = 0; i < 50000; i += 1) {
+    largeLines.push(`2026-09-10T03:00:00.000Z noise line ${i} ready ok`);
+  }
+  largeLines.push(
+    "2026-09-10T04:36:30.000Z course_upgrade_failed { FAILED_STAGE: 'createTochkaPaymentOperation', ACTUAL_API_ERROR: 'provider_timeout', ACTUAL_HTTP_STATUS: 504, order_id: '34343434-3434-4343-8343-343434343434', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }",
+  );
+  writeFileSync(p3000Out, `${largeLines.join("\n")}\n`);
+
+  const jlist = [
+    {
+      name: "audiolad-p3001",
+      pid: 4122354,
+      pm2_env: {
+        status: "online",
+        restart_time: 0,
+        pm_cwd: currentDir,
+        pm_out_log_path: join(pm2Dir, "audiolad-p3001-out.log"),
+        pm_err_log_path: p3001Err,
+        pm_pid_path: join(root, "home", ".pm2", "pids", "audiolad-p3001.pid"),
+      },
+    },
+    {
+      name: "audiolad-studio-render-worker",
+      pid: 99,
+      pm2_env: { status: "online", restart_time: 1 },
+    },
+  ];
+  const jlistPath = join(root, "pm2-jlist.json");
+  writeFileSync(jlistPath, JSON.stringify(jlist));
+  writeFileSync(
+    join(binDir, "pm2"),
+    [
+      "#!/bin/bash",
+      `if [[ "$1" == "jlist" ]]; then cat ${JSON.stringify(jlistPath)}; exit 0; fi`,
+      'echo "unexpected pm2 $*" >&2',
+      "exit 1",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(binDir, "curl"),
+    [
+      "#!/bin/bash",
+      'echo \'{"status":"ok","deployCommit":"ac9020e1050f5702fd806d29677aa4212ee68d39"}\'',
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  chmodSync(join(binDir, "pm2"), 0o755);
+  chmodSync(join(binDir, "curl"), 0o755);
+  return {
+    deployRoot: join(root, "deploy"),
+    home: join(root, "home"),
+    binDir,
+    p3000Err,
+    p3001Err,
+  };
+}
+
+function courseUpgradeDiagEnv(fixture, extraEnv = {}) {
+  return {
+    ...process.env,
+    PATH: `${fixture.binDir}:${process.env.PATH || "/usr/bin"}`,
+    HOME: fixture.home,
+    PM2_HOME: join(fixture.home, ".pm2"),
+    DEPLOY_ROOT: fixture.deployRoot,
+    AUDIOLAD_COURSE_UPGRADE_DIAG_HEALTH_URL: "http://127.0.0.1:9/health-unused",
+    ...extraEnv,
+  };
+}
+
+function runCourseUpgradeDiagHelper(fixture, extraEnv = {}) {
+  return spawnSync("bash", [courseUpgradeDiagPath], {
+    encoding: "utf8",
+    timeout: 30000,
+    env: courseUpgradeDiagEnv(fixture, extraEnv),
+  });
+}
+
+function assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey }) {
+  assert.match(output, /confirm=OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(output, /CUTOVER = NO/);
+  assert.match(output, /audiolad_deploy = NOT_INVOKED/);
+  assert.match(output, /checkout_post = NOT_INVOKED/);
+  assert.match(output, /tochka_calls = NOT_INVOKED/);
+  assert.match(output, /entitlement_writes = NOT_INVOKED/);
+  assert.match(output, /MODE = read_only_course_upgrade_diag/);
+  assert.match(output, /ACTIVE_P30_COUNT=1/);
+  assert.match(output, /ACTIVE_P30_NAMES=audiolad-p3001/);
+  assert.match(output, /ACTIVE_P30_APP name=audiolad-p3001 status=online/);
+  assert.match(output, /p3000_orphaned_or_unlisted|p3000_rotated_orphaned_or_unlisted|p3000_gz_orphaned_or_unlisted/);
+  assert.match(
+    output,
+    /SAFE_SUMMARY window=priority[^\n]*event=course_upgrade_failed[^\n]*FAILED_STAGE=createTochkaPaymentOperation[^\n]*ACTUAL_API_ERROR=provider_checkout_failed[^\n]*ACTUAL_HTTP_STATUS=502[^\n]*order_id=dddddddd-dddd-4ddd-8ddd-dddddddddddd[^\n]*practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb[^\n]*target_access_level=2/,
+  );
+  assert.match(output, /order_id=12121212-1212-4121-8121-121212121212/);
+  assert.match(output, /order_id=34343434-3434-4343-8343-343434343434/);
+  assert.match(output, /SAFE_SUMMARY window=recent/);
+  const singleLineSummaries = output
+    .split("\n")
+    .filter((line) => line.includes("SAFE_SUMMARY") && line.includes("window=recent"));
+  const firstClosed = singleLineSummaries.find(
+    (line) =>
+      line.includes("FAILED_STAGE=reload_orders_row") &&
+      line.includes("order_id=ffffffff-ffff-4fff-8fff-ffffffffffff"),
+  );
+  const secondClosed = singleLineSummaries.find(
+    (line) =>
+      line.includes("FAILED_STAGE=startTochkaCheckoutForPendingOrder") &&
+      line.includes("order_id=99999999-9999-4999-8999-999999999999"),
+  );
+  assert.ok(firstClosed, "closed single-line course_upgrade_failed must emit its own SAFE_SUMMARY");
+  assert.match(firstClosed, /ACTUAL_API_ERROR=internal_error/);
+  assert.match(firstClosed, /ACTUAL_HTTP_STATUS=500/);
+  assert.match(firstClosed, /practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  assert.match(firstClosed, /target_access_level=2/);
+  assert.doesNotMatch(firstClosed, /startTochkaCheckoutForPendingOrder/);
+  assert.doesNotMatch(firstClosed, /auth_required/);
+  assert.doesNotMatch(firstClosed, /ACTUAL_HTTP_STATUS=401/);
+  assert.doesNotMatch(firstClosed, /99999999-9999-4999-8999-999999999999/);
+  assert.doesNotMatch(firstClosed, /aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+  assert.doesNotMatch(firstClosed, /target_access_level=3/);
+  assert.ok(secondClosed, "next diagnostic event must appear as a separate SAFE_SUMMARY");
+  assert.match(secondClosed, /ACTUAL_API_ERROR=auth_required/);
+  assert.match(secondClosed, /ACTUAL_HTTP_STATUS=401/);
+  assert.match(secondClosed, /practice_id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+  assert.match(secondClosed, /target_access_level=3/);
+  assert.doesNotMatch(secondClosed, /reload_orders_row/);
+  assert.doesNotMatch(secondClosed, /internal_error/);
+  assert.doesNotMatch(secondClosed, /ffffffff-ffff-4fff-8fff-ffffffffffff/);
+  assert.doesNotMatch(secondClosed, /target_access_level=2/);
+  assert.match(output, /FAILED_STAGE=reload_orders_row/);
+  assert.match(output, /FAILED_STAGE=startTochkaCheckoutForPendingOrder/);
+  assert.match(output, /provider_http_status=403/);
+  assert.match(output, /provider_error_code=tochka_create_payment_failed/);
+  assert.match(output, /kind=p3000_gz_orphaned_or_unlisted|kind=p3000_gz/);
+  assert.match(output, /compressed_log_error|log_unreadable/);
+  assert.match(output, /DB_CORRELATION=OK/);
+  assert.match(output, /access_level=1/);
+  assert.match(output, /practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  assert.match(output, /ORDER id=dddddddd-dddd-4ddd-8ddd-dddddddddddd status=pending/);
+  assert.match(output, /target_access_level=2 amount_minor=222200/);
+  assert.match(output, /has_payment_url=NO/);
+  assert.match(output, /has_checkout_token=NO/);
+  assert.match(output, /has_provider_metadata=NO/);
+  assert.match(output, /qa_listener=hardcoded_redacted/);
+  assert.doesNotMatch(output, /\bMATCH_LINE\b/);
+  assert.doesNotMatch(output, /plain-secret-value-never-print/);
+  assert.doesNotMatch(output, /petpovss@yandex\.ru/);
+  assert.doesNotMatch(output, /user_id=/);
+  assert.doesNotMatch(output, /cccccccc-cccc-4ccc-8ccc-cccccccccccc/);
+  assert.doesNotMatch(output, /pay\.tochka\.example/);
+  assert.doesNotMatch(output, /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/);
+  assert.doesNotMatch(output, /super-secret-service-role-key-do-not-log/);
+  assert.doesNotMatch(output, new RegExp(secretKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(output, new RegExp(secretUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
+function assertCourseUpgradeDiagHelper() {
+  const helperText = readFileSync(courseUpgradeDiagPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", courseUpgradeDiagPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `course-upgrade diag helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(helperText, /kody-zhenskoy-prityagatelnosti/);
+  assert.match(helperText, /2026-09-10T04:25:00Z/);
+  assert.match(helperText, /loadEnvConfig\(dir, false, silent, true\)/);
+  assert.match(helperText, /gzip\.open\([^)]*"rt"/);
+  assert.match(helperText, /handle\.readline\(\)/);
+  assert.match(helperText, /PRIORITY_MAX = 40/);
+  assert.match(helperText, /RECENT_MAX = 20/);
+  assert.match(helperText, /LOOKAHEAD = 16/);
+  assert.match(helperText, /not is_object_close\(line\)/);
+  assert.match(helperText, /compressed_log_error/);
+  assert.doesNotMatch(helperText, /\.readlines\s*\(/);
+  assert.doesNotMatch(helperText, /\bMATCH_LINE\b/);
+  assert.doesNotMatch(helperText, /createSignedUrl/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 delete/);
+  assert.doesNotMatch(helperText, /pm2 (restart|flush|save)/);
+  assert.doesNotMatch(helperText, /DELETE FROM/i);
+  assert.doesNotMatch(helperText, /UPDATE /i);
+  assert.doesNotMatch(helperText, /INSERT INTO/i);
+  assert.doesNotMatch(helperText, /\.update\(/);
+  assert.doesNotMatch(helperText, /\.insert\(/);
+  assert.doesNotMatch(helperText, /\.delete\(/);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
+  assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
+  assert.doesNotMatch(helperCode, /\brm -rf\b/);
+  chmodSync(courseUpgradeDiagPath, 0o755);
+
+  const secretUrl = "https://course-upgrade-diag-test.example.invalid";
+  const secretKey = "super-secret-service-role-key-do-not-log";
+  const root = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey });
+    const result = runCourseUpgradeDiagHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `course-upgrade diag helper failed: ${output}`);
+    assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-remote-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(remoteRoot, { secretUrl, secretKey });
+    const remoteResult = spawnSync("bash", ["-s", "--", "a".repeat(40), "b".repeat(40)], {
+      encoding: "utf8",
+      timeout: 30000,
+      input: readFileSync(courseUpgradeDiagPath),
+      env: courseUpgradeDiagEnv(fixture),
+    });
+    const remoteOutput = `${remoteResult.stdout ?? ""}${remoteResult.stderr ?? ""}`;
+    assert.equal(remoteResult.status, 0, `workflow bash -s -- course-upgrade diag failed: ${remoteOutput}`);
+    assertCourseUpgradeDiagOutput(remoteOutput, { secretUrl, secretKey });
+    assert.match(remoteOutput, /workflow_target_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
   } finally {
     rmSync(remoteRoot, { recursive: true, force: true });
   }

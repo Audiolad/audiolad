@@ -20,15 +20,24 @@
 # duplicate-asset diagnostic: single-project probe plus global broken
 # shared-ref scan and duplication audit. No writes, no signed URLs, no
 # cutover, no audiolad-deploy. Remote bash is hardcoded.
+# confirm=OPS_COURSE_UPGRADE_DIAG is ops-only read-only L2 / course-upgrade
+# failure diagnosis: auto-discover audiolad-p30xx PM2 layout, inspect active
+# and orphaned/rotated/.gz app logs, optional journal matches, optional
+# redacted DB correlation. Sole implementation is
+# deploy/scripts/audiolad-course-upgrade-diag.sh. The job checks out exact
+# origin_main_sha with persist-credentials: false, bash -n, then pipes the
+# helper over SSH stdin. Does not exec the production current-release tree.
+# Does not execute PR-branch code. No writes, no checkout POST, no Tochka
+# calls, no entitlement mutation, no cutover, no audiolad-deploy.
 # confirm=DEPLOY runs the canonical deploy path only.
 #
 # Environment protection: GitHub Environment `production` typically allows only
 # refs on the default branch. DO_NOT_DEPLOY / OPS_STUDIO_WORKER_RECOVER /
 # OPS_DISK_STORAGE_AUDIT / OPS_DISK_STORAGE_CLEANUP /
-# OPS_STUDIO_DUPLICATE_ASSET_DIAG from a PR branch may fail
-# before any job steps (job steps=[]). After merge to main, dispatch those
-# confirms from main. Do not weaken environment protection to allow PR-branch
-# production access.
+# OPS_STUDIO_DUPLICATE_ASSET_DIAG / OPS_COURSE_UPGRADE_DIAG from a PR branch
+# may fail before any job steps (job steps=[]). After merge to main, dispatch
+# those confirms from main. Do not weaken environment protection to allow
+# PR-branch production access.
 name: Production Deploy
 
 on:
@@ -40,7 +49,7 @@ on:
         type: string
         default: ""
       confirm:
-        description: "DEPLOY starts production deploy. DO_NOT_DEPLOY runs read-only diagnostics. OPS_STUDIO_WORKER_RECOVER clean-restarts the Studio render worker with no cutover. OPS_DISK_STORAGE_AUDIT is a read-only disk/Storage cleanup audit (no deletes). OPS_DISK_STORAGE_CLEANUP is a one-shot hardcoded allowlist cleanup of the 13 SAFE TO DELETE items from audit run 34113627251. OPS_STUDIO_DUPLICATE_ASSET_DIAG is a read-only Studio duplicate-asset diagnostic (single-project probe plus global broken shared refs and duplication audit; no writes, no signed URLs, no cutover)."
+        description: "DEPLOY starts production deploy. DO_NOT_DEPLOY runs read-only diagnostics. OPS_STUDIO_WORKER_RECOVER clean-restarts the Studio render worker with no cutover. OPS_DISK_STORAGE_AUDIT is a read-only disk/Storage cleanup audit (no deletes). OPS_DISK_STORAGE_CLEANUP is a one-shot hardcoded allowlist cleanup of the 13 SAFE TO DELETE items from audit run 34113627251. OPS_STUDIO_DUPLICATE_ASSET_DIAG is a read-only Studio duplicate-asset diagnostic (single-project probe plus global broken shared refs and duplication audit; no writes, no signed URLs, no cutover). OPS_COURSE_UPGRADE_DIAG is a read-only L2 / course-upgrade log+DB diagnostic (auto-discover audiolad-p30xx, no writes, no checkout POST, no Tochka, no cutover)."
         required: true
         type: choice
         options:
@@ -49,6 +58,7 @@ on:
           - OPS_DISK_STORAGE_AUDIT
           - OPS_DISK_STORAGE_CLEANUP
           - OPS_STUDIO_DUPLICATE_ASSET_DIAG
+          - OPS_COURSE_UPGRADE_DIAG
           - DEPLOY
 
 permissions:
@@ -4413,6 +4423,92 @@ jobs:
           }
           run_studio_duplicate_asset_diag
           REMOTE_STUDIO_DUP_ASSET_DIAG
+
+      - name: Remove SSH identity
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${SSH_DIR:-}" ]]; then
+            rm -rf "${SSH_DIR}"
+          fi
+
+  # Sole implementation: deploy/scripts/audiolad-course-upgrade-diag.sh
+  # After trusted resolve, checks out exact origin_main_sha
+  # (persist-credentials: false), bash -n, pipes helper over SSH stdin.
+  # Does not exec the production current-release tree. Does not execute
+  # PR-branch code. Production Environment / main restriction unchanged.
+  course_upgrade_diag:
+    name: Ops course upgrade diagnostic
+    needs: resolve
+    if: inputs.confirm == 'OPS_COURSE_UPGRADE_DIAG'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH identity
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          echo "SSH_DIR=${SSH_DIR}" >> "${GITHUB_ENV}"
+          echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Checkout trusted origin/main helper
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.origin_main_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Syntax-check trusted course-upgrade helper
+        env:
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [[ "${HEAD_SHA}" != "${ORIGIN_MAIN_SHA}" ]]; then
+            echo "checked-out HEAD ${HEAD_SHA} != trusted origin_main_sha ${ORIGIN_MAIN_SHA}" >&2
+            exit 1
+          fi
+          test -f deploy/scripts/audiolad-course-upgrade-diag.sh
+          bash -n deploy/scripts/audiolad-course-upgrade-diag.sh
+
+      - name: Read-only course upgrade diagnostic via SSH
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          TARGET_SHA: ${{ needs.resolve.outputs.target_sha }}
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+        run: |
+          set -euo pipefail
+          : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
+          : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
+          : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
+          test -f deploy/scripts/audiolad-course-upgrade-diag.sh
+
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            "bash -s --" "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}" \
+            < deploy/scripts/audiolad-course-upgrade-diag.sh
 
       - name: Remove SSH identity
         if: always()
