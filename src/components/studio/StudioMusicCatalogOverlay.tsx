@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { StudioMusicCatalogCard } from "@/components/studio/StudioMusicCatalogCard";
 import type {
@@ -19,11 +19,13 @@ const FILTERS: Array<{
   { id: "free", label: "Бесплатная" },
 ];
 
-export function StudioMusicCatalogOverlay({
-  open,
+function previewKeyFor(publicationId: string, audioItemId: string) {
+  return `${publicationId}:${audioItemId}`;
+}
+
+function StudioMusicCatalogOverlayBody({
   onClose,
 }: {
-  open: boolean;
   onClose: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -32,11 +34,11 @@ export function StudioMusicCatalogOverlay({
   const [authenticated, setAuthenticated] = useState(false);
   const [items, setItems] = useState<StudioMusicCatalogItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
-  const stopPreview = useCallback(() => {
+  const stopPreview = () => {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -48,15 +50,17 @@ export function StudioMusicCatalogOverlay({
       objectUrlRef.current = null;
     }
     setActivePreviewKey(null);
-  }, []);
+  };
 
-  const loadPage = useCallback(
-    async (nextFilter: StudioMusicCatalogFilter, cursor: string | null) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalog(cursor: string | null) {
       setLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams({
-          filter: nextFilter,
+          filter,
           limit: "20",
         });
         if (cursor) {
@@ -66,45 +70,42 @@ export function StudioMusicCatalogOverlay({
           `/api/studio/music/catalog?${params.toString()}`,
           { cache: "no-store" },
         );
-        if (nextFilter === "mine" && response.status === 401) {
-          setAuthenticated(false);
-          setFilter("all");
-          setItems([]);
-          setNextCursor(null);
-          await loadPage("all", null);
+        if (filter === "mine" && response.status === 401) {
+          if (!cancelled) {
+            setAuthenticated(false);
+            setFilter("all");
+          }
           return;
         }
         if (!response.ok) {
           throw new Error("catalog_unavailable");
         }
         const body = (await response.json()) as StudioMusicCatalogResult;
+        if (cancelled) {
+          return;
+        }
         setAuthenticated(body.viewer.authenticated);
         setItems((current) => (cursor ? [...current, ...body.items] : body.items));
         setNextCursor(body.nextCursor);
       } catch {
-        setError("Не удалось загрузить каталог музыки");
+        if (!cancelled) {
+          setError("Не удалось загрузить каталог музыки");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    },
-    [],
-  );
+    }
+
+    void loadCatalog(null);
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
 
   useEffect(() => {
-    if (!open) {
-      stopPreview();
-      return;
-    }
-    setFilter("all");
-    setItems([]);
-    setNextCursor(null);
-    void loadPage("all", null);
-  }, [open, loadPage, stopPreview]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+    const audio = audioRef.current;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -113,11 +114,21 @@ export function StudioMusicCatalogOverlay({
       }
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, stopPreview]);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute("src");
+      }
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [onClose]);
 
   const playPreview = async (publicationId: string, audioItemId: string) => {
-    const key = `${publicationId}:${audioItemId}`;
+    const key = previewKeyFor(publicationId, audioItemId);
     if (activePreviewKey === key) {
       stopPreview();
       return;
@@ -147,9 +158,33 @@ export function StudioMusicCatalogOverlay({
     });
   };
 
-  if (!open) {
-    return null;
-  }
+  const loadMore = async () => {
+    if (!nextCursor) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        filter,
+        limit: "20",
+        cursor: nextCursor,
+      });
+      const response = await fetch(
+        `/api/studio/music/catalog?${params.toString()}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("catalog_unavailable");
+      }
+      const body = (await response.json()) as StudioMusicCatalogResult;
+      setItems((current) => [...current, ...body.items]);
+      setNextCursor(body.nextCursor);
+    } catch {
+      setError("Не удалось загрузить каталог музыки");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const visibleFilters = FILTERS.filter(
     (item) => !item.authOnly || authenticated,
@@ -188,10 +223,9 @@ export function StudioMusicCatalogOverlay({
             type="button"
             onClick={() => {
               stopPreview();
-              setFilter(item.id);
               setItems([]);
               setNextCursor(null);
-              void loadPage(item.id, null);
+              setFilter(item.id);
             }}
             className={`h-9 rounded-full px-4 text-sm font-semibold ${
               filter === item.id
@@ -232,7 +266,7 @@ export function StudioMusicCatalogOverlay({
         {nextCursor && !loading ? (
           <button
             type="button"
-            onClick={() => void loadPage(filter, nextCursor)}
+            onClick={() => void loadMore()}
             className="mt-4 h-10 rounded-lg border border-white/15 px-4 text-sm font-semibold"
           >
             Ещё
@@ -248,4 +282,18 @@ export function StudioMusicCatalogOverlay({
       />
     </div>
   );
+}
+
+export function StudioMusicCatalogOverlay({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return <StudioMusicCatalogOverlayBody onClose={onClose} />;
 }

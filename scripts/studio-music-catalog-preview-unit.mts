@@ -4,13 +4,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { StudioMusicCatalogPublication } from "../src/lib/studio-music/catalog.ts";
+import type { StudioMusicCatalogPublication } from "../src/lib/studio-music/catalog";
 import {
   authorizeStudioMusicPreview,
   handleStudioMusicPreview,
   studioMusicPreviewJsonContainsForbiddenFields,
   type StudioMusicPreviewStore,
-} from "../src/lib/studio-music/preview.ts";
+} from "../src/lib/studio-music/preview";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
