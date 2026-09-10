@@ -157,7 +157,7 @@ function testCopyAndEconomics() {
   assert.match(text, /AI-музык/);
   assert.match(text, /нейромузык/);
   assert.match(AI_MUSIC_HUB_INTRO[0], /Suno, Udio/);
-  assert.match(AI_MUSIC_HUB_INTRO[1], /набор MP3-файлов/);
+  assert.match(AI_MUSIC_HUB_INTRO[1], /набора MP3-файлов/);
 
   assert.equal(AI_MUSIC_HUB_WAYS.length, 2);
   assert.match(
