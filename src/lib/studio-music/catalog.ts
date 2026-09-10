@@ -126,13 +126,27 @@ export type StudioMusicCatalogHandlerResult = {
   body: StudioMusicCatalogResult | { error: string };
 };
 
+export type StudioMusicCatalogPage = {
+  practices: StudioMusicCatalogPublication[];
+  nextCursor: string | null;
+};
+
 export type StudioMusicCatalogStore = {
-  listPublicInventory(filter: "all" | "free"): Promise<StudioMusicCatalogPublication[]>;
-  listMine(userId: string): Promise<{
-    practices: StudioMusicCatalogPublication[];
-    entitlements: StudioMusicCatalogEntitlement[];
-    authorMemberAuthorIds: string[];
-  }>;
+  listPublicInventory(input: {
+    filter: "all" | "free";
+    cursor: string | null;
+    limit: number;
+  }): Promise<StudioMusicCatalogPage>;
+  listMine(input: {
+    userId: string;
+    cursor: string | null;
+    limit: number;
+  }): Promise<
+    StudioMusicCatalogPage & {
+      entitlements: StudioMusicCatalogEntitlement[];
+      authorMemberAuthorIds: string[];
+    }
+  >;
   loadPublishedTracks(
     practiceIds: string[],
   ): Promise<PublishedAudioItemDetail[]>;
@@ -171,6 +185,49 @@ export function parseStudioMusicCatalogLimit(
     return STUDIO_MUSIC_CATALOG_PAGE_SIZE;
   }
   return Math.min(parsed, STUDIO_MUSIC_CATALOG_MAX_LIMIT);
+}
+
+export function studioMusicCatalogFetchLimit(limit: number): number {
+  return parseStudioMusicCatalogLimit(String(limit)) + 1;
+}
+
+/**
+ * PostgREST OR equivalent of isListedCatalogVisibility:
+ * listed; legacy null visibility + is_catalog_listed true; legacy both unset.
+ * Explicit unlisted / selected_users are excluded.
+ */
+export function studioMusicListedVisibilityOrFilter(): string {
+  return [
+    "catalog_visibility.eq.listed",
+    "and(catalog_visibility.is.null,is_catalog_listed.eq.true)",
+    "and(catalog_visibility.is.null,is_catalog_listed.is.null)",
+  ].join(",");
+}
+
+export function isStudioMusicListedVisibilityRow(practice: {
+  catalog_visibility?: string | null;
+  is_catalog_listed?: boolean | null;
+}): boolean {
+  return isListedCatalogVisibility(
+    practice.catalog_visibility,
+    practice.is_catalog_listed,
+  );
+}
+
+function quoteStudioMusicFilterValue(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+export function buildStudioMusicCatalogCursorOrFilter(
+  cursor: { sortTimestamp: number; id: string } | null,
+): string | null {
+  if (!cursor) {
+    return null;
+  }
+  const iso = quoteStudioMusicFilterValue(
+    new Date(cursor.sortTimestamp).toISOString(),
+  );
+  return `created_at.lt.${iso},and(created_at.eq.${iso},id.lt.${cursor.id})`;
 }
 
 export function encodeStudioMusicCatalogCursor(
@@ -387,14 +444,34 @@ export function resolveStudioMusicKind(
 export function studioMusicCatalogSortTimestamp(
   practice: StudioMusicCatalogPublication,
 ): number {
+  const created = practice.created_at ? Date.parse(practice.created_at) : Number.NaN;
+  if (Number.isFinite(created)) {
+    return created;
+  }
   const published = practice.published_at
     ? Date.parse(practice.published_at)
     : Number.NaN;
-  if (Number.isFinite(published)) {
-    return published;
-  }
-  const created = practice.created_at ? Date.parse(practice.created_at) : Number.NaN;
-  return Number.isFinite(created) ? created : 0;
+  return Number.isFinite(published) ? published : 0;
+}
+
+export function takeStudioMusicCatalogPage(
+  practices: StudioMusicCatalogPublication[],
+  limit: number,
+): StudioMusicCatalogPage {
+  const pageLimit = studioMusicCatalogFetchLimit(limit);
+  const fetched = practices.slice(0, pageLimit);
+  const page = fetched.slice(0, limit);
+  const last = page[page.length - 1];
+  return {
+    practices: page,
+    nextCursor:
+      fetched.length > limit && last
+        ? encodeStudioMusicCatalogCursor(
+            studioMusicCatalogSortTimestamp(last),
+            String(last.id),
+          )
+        : null,
+  };
 }
 
 export function applyStudioMusicCatalogCursor<T extends { sortTimestamp: number; id: string }>(
@@ -560,15 +637,19 @@ export async function handleStudioMusicCatalog(input: {
   }
 
   const limit = parseStudioMusicCatalogLimit(input.limit);
-  const cursor = decodeStudioMusicCatalogCursor(input.cursor);
   const authenticated = Boolean(input.userId);
 
   let practices: StudioMusicCatalogPublication[] = [];
+  let nextCursor: string | null = null;
   let entitlements: StudioMusicCatalogEntitlement[] = [];
   let authorMemberAuthorIds: string[] = [];
 
   if (filter === "mine" && input.userId) {
-    const mine = await input.store.listMine(input.userId);
+    const mine = await input.store.listMine({
+      userId: input.userId,
+      cursor: input.cursor,
+      limit,
+    });
     entitlements = mine.entitlements;
     authorMemberAuthorIds = mine.authorMemberAuthorIds;
     practices = mine.practices.filter((practice) =>
@@ -581,36 +662,22 @@ export async function handleStudioMusicCatalog(input: {
         ),
       }),
     );
+    nextCursor = mine.nextCursor;
   } else {
-    const inventory = await input.store.listPublicInventory(
-      filter === "free" ? "free" : "all",
-    );
-    practices = inventory.filter((practice) =>
+    const inventory = await input.store.listPublicInventory({
+      filter: filter === "free" ? "free" : "all",
+      cursor: input.cursor,
+      limit,
+    });
+    practices = inventory.practices.filter((practice) =>
       filter === "free"
         ? isFreePublicStudioMusicInventory(practice)
         : isPublicStudioMusicInventory(practice),
     );
+    nextCursor = inventory.nextCursor;
   }
 
-  const ranked = practices
-    .map((practice) => ({
-      practice,
-      id: String(practice.id),
-      sortTimestamp: studioMusicCatalogSortTimestamp(practice),
-    }))
-    .sort((left, right) => {
-      if (right.sortTimestamp !== left.sortTimestamp) {
-        return right.sortTimestamp - left.sortTimestamp;
-      }
-      return right.id.localeCompare(left.id);
-    });
-
-  const afterCursor = applyStudioMusicCatalogCursor(ranked, cursor);
-  const { page, nextCursor } = paginateStudioMusicCatalogItems(
-    afterCursor,
-    limit,
-  );
-  const pagePractices = page.map((entry) => entry.practice);
+  const pagePractices = practices;
   const pageIds = pagePractices.map((practice) => String(practice.id));
 
   const [tracks, prices] = await Promise.all([
@@ -734,38 +801,71 @@ async function loadStudioMusicAudioItems(
   }));
 }
 
+function applyStudioMusicCatalogKeyset<T>(
+  query: T,
+  cursor: string | null,
+  limit: number,
+): T {
+  const q = query as {
+    or: (filters: string) => unknown;
+    order: (
+      column: string,
+      options: { ascending: boolean; nullsFirst?: boolean },
+    ) => unknown;
+    limit: (value: number) => unknown;
+  };
+  const cursorFilter = buildStudioMusicCatalogCursorOrFilter(
+    decodeStudioMusicCatalogCursor(cursor),
+  );
+  let next = q;
+  if (cursorFilter) {
+    next = next.or(cursorFilter) as typeof q;
+  }
+  next = next.order("created_at", {
+    ascending: false,
+    nullsFirst: false,
+  }) as typeof q;
+  next = next.order("id", { ascending: false }) as typeof q;
+  return next.limit(studioMusicCatalogFetchLimit(limit)) as T;
+}
+
 export function createSupabaseStudioMusicCatalogStore(
   supabase: SupabaseClient,
 ): StudioMusicCatalogStore {
   return {
-    async listPublicInventory(filter) {
+    async listPublicInventory({ filter, cursor, limit }) {
       let query = supabase
         .from("practices")
         .select(PRACTICE_SELECT)
         .eq("status", "published")
         .is("deleted_at", null)
-        .eq("catalog_visibility", "listed")
         .eq(
           "music_usage_permission",
           MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
         )
-        .or("product_kind.eq.music,publication_class.eq.release");
+        .or("product_kind.eq.music,publication_class.eq.release")
+        .or(studioMusicListedVisibilityOrFilter());
 
       if (filter === "free") {
         query = query.eq("is_free", true);
       }
+
+      query = applyStudioMusicCatalogKeyset(query, cursor, limit);
 
       const { data, error } = await query;
       if (error) {
         throw new Error("studio_music_catalog_lookup_failed");
       }
 
-      return filterPublicPracticeRows(
-        (data ?? []) as StudioMusicCatalogPublication[],
+      return takeStudioMusicCatalogPage(
+        filterPublicPracticeRows(
+          (data ?? []) as StudioMusicCatalogPublication[],
+        ),
+        limit,
       );
     },
 
-    async listMine(userId) {
+    async listMine({ userId, cursor, limit }) {
       const [entitlementResult, memberResult] = await Promise.all([
         supabase
           .from("studio_music_entitlements")
@@ -800,13 +900,19 @@ export function createSupabaseStudioMusicCatalogStore(
       ];
 
       if (entitledIds.length === 0 && authorMemberAuthorIds.length === 0) {
-        return { practices: [], entitlements, authorMemberAuthorIds };
+        return {
+          practices: [],
+          nextCursor: null,
+          entitlements,
+          authorMemberAuthorIds,
+        };
       }
 
       let query = supabase
         .from("practices")
         .select(PRACTICE_SELECT)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .or("product_kind.eq.music,publication_class.eq.release");
 
       if (entitledIds.length > 0 && authorMemberAuthorIds.length > 0) {
         query = query.or(
@@ -818,13 +924,19 @@ export function createSupabaseStudioMusicCatalogStore(
         query = query.in("author_id", authorMemberAuthorIds);
       }
 
+      query = applyStudioMusicCatalogKeyset(query, cursor, limit);
+
       const { data, error } = await query;
       if (error) {
         throw new Error("studio_music_mine_practices_lookup_failed");
       }
 
+      const page = takeStudioMusicCatalogPage(
+        (data ?? []) as StudioMusicCatalogPublication[],
+        limit,
+      );
       return {
-        practices: (data ?? []) as StudioMusicCatalogPublication[],
+        ...page,
         entitlements,
         authorMemberAuthorIds,
       };

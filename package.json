@@ -206,7 +206,7 @@
     "test:course-upgrade-checkout:isolated": "AUDIOLAD_COURSE_UPGRADE_ISOLATED=1 node scripts/course-upgrade-checkout-sql-unit.mjs",
     "test:studio-music-license": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-music-license-unit.mjs && node scripts/studio-music-license-sql-unit.mjs",
     "test:studio-music-license:isolated": "AUDIOLAD_STUDIO_MUSIC_ISOLATED=1 node scripts/studio-music-license-sql-unit.mjs",
-    "test:studio-music-catalog": "npx tsx scripts/studio-music-catalog-unit.mts && npx tsx scripts/studio-music-catalog-preview-unit.mts && npx tsx scripts/studio-music-catalog-ui-unit.mts",
+    "test:studio-music-catalog": "npx tsx scripts/studio-music-catalog-unit.mts && npx tsx scripts/studio-music-catalog-preview-unit.mts && npx tsx scripts/studio-music-catalog-ui-unit.mts && npx tsx scripts/studio-music-catalog-pagination-unit.mts",
     "test:practice-access-links": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/practice-access-links-unit.mjs && npx tsx scripts/author-practice-access-links-unit.mjs && node scripts/practice-access-links-sql-unit.mjs",
     "test:practice-access-links:isolated": "AUDIOLAD_PRACTICE_ACCESS_LINKS_ISOLATED=1 node scripts/practice-access-links-sql-unit.mjs",
     "test:course-access-levels": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/course-access-levels-unit.mjs && node scripts/course-access-levels-sql-unit.mjs && node scripts/course-access-levels-readiness-sql-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-course-access-levels-unit.mjs && npm run test:course-upgrade-checkout && npm run test:practice-access-links",

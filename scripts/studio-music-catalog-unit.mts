@@ -7,12 +7,14 @@ import { fileURLToPath } from "node:url";
 import { studioLicenseAmountMinor } from "../src/lib/studio-music/access";
 import {
   applyStudioMusicCatalogCursor,
+  decodeStudioMusicCatalogCursor,
   encodeStudioMusicCatalogCursor,
   formatStudioCatalogPriceLabel,
   handleStudioMusicCatalog,
   isFreePublicStudioMusicInventory,
   isMineStudioMusicPublication,
   isPublicStudioMusicInventory,
+  isStudioMusicListedVisibilityRow,
   mapStudioMusicCatalogItem,
   paginateStudioMusicCatalogItems,
   parseStudioMusicCatalogFilter,
@@ -21,6 +23,9 @@ import {
   resolveStudioMusicKind,
   resolveStudioMusicOwnership,
   studioMusicCatalogDtoContainsForbiddenFields,
+  studioMusicCatalogSortTimestamp,
+  studioMusicListedVisibilityOrFilter,
+  takeStudioMusicCatalogPage,
   type StudioMusicCatalogPublication,
   type StudioMusicCatalogStore,
 } from "../src/lib/studio-music/catalog";
@@ -103,6 +108,77 @@ assert.equal(
   isPublicStudioMusicInventory(listedAllowed, { commerciallyAccessible: false }),
   false,
 );
+
+assert.equal(isStudioMusicListedVisibilityRow(listedAllowed), true);
+assert.equal(
+  isStudioMusicListedVisibilityRow({
+    catalog_visibility: null,
+    is_catalog_listed: true,
+  }),
+  true,
+);
+assert.equal(
+  isStudioMusicListedVisibilityRow({
+    catalog_visibility: null,
+    is_catalog_listed: null,
+  }),
+  true,
+);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({ catalog_visibility: null, is_catalog_listed: true }),
+  ),
+  true,
+);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({ catalog_visibility: null, is_catalog_listed: null }),
+  ),
+  true,
+);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({ catalog_visibility: null, is_catalog_listed: false }),
+  ),
+  false,
+);
+assert.equal(
+  isStudioMusicListedVisibilityRow({
+    catalog_visibility: null,
+    is_catalog_listed: false,
+  }),
+  false,
+);
+assert.equal(
+  isStudioMusicListedVisibilityRow({
+    catalog_visibility: "unlisted",
+    is_catalog_listed: false,
+  }),
+  false,
+);
+assert.equal(
+  isStudioMusicListedVisibilityRow({
+    catalog_visibility: "selected_users",
+    is_catalog_listed: false,
+  }),
+  false,
+);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({
+      catalog_visibility: "selected_users",
+      is_catalog_listed: true,
+    }),
+  ),
+  false,
+);
+
+const listedOr = studioMusicListedVisibilityOrFilter();
+assert.match(listedOr, /catalog_visibility\.eq\.listed/);
+assert.match(listedOr, /catalog_visibility\.is\.null,is_catalog_listed\.eq\.true/);
+assert.match(listedOr, /catalog_visibility\.is\.null,is_catalog_listed\.is\.null/);
+assert.doesNotMatch(listedOr, /selected_users/);
+assert.doesNotMatch(listedOr, /unlisted/);
 
 const freeListed = publication({
   id: "22222222-2222-4222-8222-222222222222",
@@ -268,6 +344,36 @@ assert.equal(
   encodeStudioMusicCatalogCursor(20, "b"),
 );
 
+function rankPublications(practices: StudioMusicCatalogPublication[]) {
+  return [...practices]
+    .map((practice) => ({
+      practice,
+      id: String(practice.id),
+      sortTimestamp: studioMusicCatalogSortTimestamp(practice),
+    }))
+    .sort((left, right) => {
+      if (right.sortTimestamp !== left.sortTimestamp) {
+        return right.sortTimestamp - left.sortTimestamp;
+      }
+      return right.id.localeCompare(left.id);
+    });
+}
+
+function pagePublications(
+  practices: StudioMusicCatalogPublication[],
+  cursor: string | null,
+  limit: number,
+) {
+  const after = applyStudioMusicCatalogCursor(
+    rankPublications(practices),
+    decodeStudioMusicCatalogCursor(cursor),
+  );
+  return takeStudioMusicCatalogPage(
+    after.map((entry) => entry.practice),
+    limit,
+  );
+}
+
 function createStore(input: {
   publicItems?: StudioMusicCatalogPublication[];
   mine?: {
@@ -283,19 +389,23 @@ function createStore(input: {
   tracks?: Map<string, Array<{ id: string; title: string; durationSeconds: number | null }>>;
 }): StudioMusicCatalogStore {
   return {
-    async listPublicInventory(filter) {
-      return (input.publicItems ?? []).filter((item) =>
+    async listPublicInventory({ filter, cursor, limit }) {
+      const rows = (input.publicItems ?? []).filter((item) =>
         filter === "free" ? item.is_free === true : true,
       );
+      return pagePublications(rows, cursor, limit);
     },
-    async listMine() {
-      return (
-        input.mine ?? {
-          practices: [],
-          entitlements: [],
-          authorMemberAuthorIds: [],
-        }
-      );
+    async listMine({ cursor, limit }) {
+      const mine = input.mine ?? {
+        practices: [],
+        entitlements: [],
+        authorMemberAuthorIds: [],
+      };
+      return {
+        ...pagePublications(mine.practices, cursor, limit),
+        entitlements: mine.entitlements,
+        authorMemberAuthorIds: mine.authorMemberAuthorIds,
+      };
     },
     async loadPublishedTracks(practiceIds) {
       return practiceIds.flatMap((id) =>
@@ -446,6 +556,9 @@ assert.doesNotMatch(catalogSource, /acquire_free_studio_music/);
 assert.match(catalogSource, /PRICE_SURFACES\.CHECKOUT/);
 assert.match(catalogSource, /studioLicenseAmountMinor/);
 assert.match(catalogSource, /resolvePracticePriceRpc/);
+assert.match(catalogSource, /studioMusicListedVisibilityOrFilter/);
+assert.match(catalogSource, /studioMusicCatalogFetchLimit/);
+assert.doesNotMatch(catalogSource, /\.eq\(\s*["']catalog_visibility["']\s*,\s*["']listed["']\s*\)/);
 
 const overlay = read("src/components/studio/StudioMusicCatalogOverlay.tsx");
 assert.doesNotMatch(overlay, /\*\s*2/);
