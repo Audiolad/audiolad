@@ -59,12 +59,17 @@ import {
   type StudioTrackSnapshot,
 } from "@/lib/studio/history";
 import {
+  CATALOG_MUSIC_UNAVAILABLE_MESSAGE,
+  studioCatalogStreamPath,
+} from "@/lib/studio/catalog-asset";
+import {
   StudioPersistenceClientError,
   abandonStudioProjectAssetUpload,
   getStudioAssetPlaybackUrl,
   retryStudioProjectAssetUpload,
   uploadStudioProjectAsset,
   type StudioAssetSourceType,
+  type StudioUploadedAsset,
 } from "@/lib/studio/persistence-client";
 import {
   getHydratedTrackLoadState,
@@ -125,6 +130,9 @@ export type StudioLocalTrack = {
   muted: boolean;
   trackKind: StudioTrackKind;
   voicePreset: StudioVoicePreset;
+  sourceType?: StudioAssetSourceType;
+  catalogPracticeId?: string | null;
+  catalogAudioItemId?: string | null;
   status: "loading" | "ready" | "error";
   isReplacing: boolean;
   replacementError: string | null;
@@ -152,6 +160,10 @@ type StudioAudioContextValue = {
     options: { startTime: number },
   ) => Promise<StudioLocalTrack | null>;
   replaceTrackAudio: (trackId: string, file: File) => Promise<boolean>;
+  ingestCatalogAsset: (
+    asset: StudioUploadedAsset,
+    replaceTrackId?: string | null,
+  ) => StudioLocalTrack | null;
   retryTrackAssetUpload: (trackId: string) => void;
   hydratePersistedProject: (
     hydration: StudioProjectHydration,
@@ -207,6 +219,9 @@ type TrackAsset = {
   ownsObjectUrl: boolean;
   expiresAt: number | null;
   persistedAssetId: string | null;
+  catalogPracticeId?: string | null;
+  catalogAudioItemId?: string | null;
+  available?: boolean;
 };
 
 type TrackRuntime = TrackAsset & {
@@ -233,6 +248,9 @@ function toTrackAsset(asset: TrackAsset): TrackAsset {
     ownsObjectUrl: asset.ownsObjectUrl,
     expiresAt: asset.expiresAt,
     persistedAssetId: asset.persistedAssetId,
+    catalogPracticeId: asset.catalogPracticeId ?? null,
+    catalogAudioItemId: asset.catalogAudioItemId ?? null,
+    available: asset.available,
   };
 }
 
@@ -878,7 +896,7 @@ export function StudioAudioProvider({
     if (!persistenceProjectId) return;
     const asset = assetVaultRef.current.get(trackId);
     const track = tracksRef.current.find((item) => item.id === trackId);
-    if (!asset?.file || !track) return;
+    if (!asset?.file || !track || asset.sourceType === "catalog") return;
 
     cancelTrackAssetUpload(trackId);
     const generation = assetUploadGenerationRef.current.get(trackId) ?? 0;
@@ -1030,6 +1048,9 @@ export function StudioAudioProvider({
             ownsObjectUrl: false,
             expiresAt: asset.expiresAt,
             persistedAssetId: asset.metadata.id,
+            catalogPracticeId: asset.metadata.catalogPracticeId ?? null,
+            catalogAudioItemId: asset.metadata.catalogAudioItemId ?? null,
+            available: asset.metadata.available !== false,
           };
           const runtime = createTrackRuntime(playbackAsset);
           trackRuntimesRef.current.set(track.id, runtime);
@@ -1057,6 +1078,9 @@ export function StudioAudioProvider({
           muted: track.muted,
           trackKind: track.trackKind ?? (metadata?.sourceType === "recording" ? "voice" : "music"),
           voicePreset: track.voicePreset ?? "none",
+          sourceType: metadata?.sourceType,
+          catalogPracticeId: metadata?.catalogPracticeId ?? null,
+          catalogAudioItemId: metadata?.catalogAudioItemId ?? null,
           status: loadState.status,
           isReplacing: false,
           replacementError: loadState.replacementError,
@@ -1123,7 +1147,8 @@ export function StudioAudioProvider({
           throw new Error("Аудиофайл проекта повреждён.");
         }
         const sourceType: StudioAssetSourceType =
-          track.trackKind === "voice" ? "recording" : "upload";
+          track.sourceType ??
+          (track.trackKind === "voice" ? "recording" : "upload");
         const asset: TrackAsset = {
           file: null,
           playbackUrl: signed.url,
@@ -1132,6 +1157,9 @@ export function StudioAudioProvider({
           ownsObjectUrl: false,
           expiresAt: signed.expiresAt,
           persistedAssetId: track.assetId,
+          catalogPracticeId: track.catalogPracticeId ?? null,
+          catalogAudioItemId: track.catalogAudioItemId ?? null,
+          available: true,
         };
         const runtime = createTrackRuntime(asset);
         applyVoicePreset(runtime, track.voicePreset, track.trackKind === "voice");
@@ -1306,6 +1334,9 @@ export function StudioAudioProvider({
             muted: false,
             trackKind,
             voicePreset: "none",
+            sourceType: "upload",
+            catalogPracticeId: null,
+            catalogAudioItemId: null,
             status: "ready",
             isReplacing: false,
             replacementError: null,
@@ -1420,6 +1451,9 @@ export function StudioAudioProvider({
           muted: false,
           trackKind: "voice",
           voicePreset: "none",
+          sourceType: "recording",
+          catalogPracticeId: null,
+          catalogAudioItemId: null,
           status: "ready",
           isReplacing: false,
           replacementError: null,
@@ -1573,6 +1607,9 @@ export function StudioAudioProvider({
                   fileSize: file.size,
                   assetId: null,
                   assetPersistenceStatus: "pending" as const,
+                  sourceType: "upload" as const,
+                  catalogPracticeId: null,
+                  catalogAudioItemId: null,
                   status: "ready" as const,
                   isReplacing: false,
                   replacementError: null,
@@ -1622,6 +1659,159 @@ export function StudioAudioProvider({
       startTrackAssetUpload,
       stopSources,
       updateTrack,
+    ],
+  );
+
+  const ingestCatalogAsset = useCallback(
+    (asset: StudioUploadedAsset, replaceTrackId?: string | null) => {
+      if (!persistenceProjectId || asset.sourceType !== "catalog") {
+        return null;
+      }
+      const duration = asset.durationSeconds;
+      if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+        setProjectError("Не удалось добавить этот трек в проект.");
+        return null;
+      }
+
+      const available = asset.available !== false;
+      const nextAsset: TrackAsset = {
+        file: null,
+        playbackUrl: studioCatalogStreamPath(persistenceProjectId, asset.id),
+        duration,
+        sourceType: "catalog",
+        ownsObjectUrl: false,
+        expiresAt: Date.now() + 4 * 60 * 60 * 1000,
+        persistedAssetId: asset.id,
+        catalogPracticeId: asset.catalogPracticeId ?? null,
+        catalogAudioItemId: asset.catalogAudioItemId ?? null,
+        available,
+      };
+
+      const remapClips = (clips: StudioLocalTrack["clips"]) =>
+        clips.length === 0
+          ? [{
+              id: crypto.randomUUID(),
+              startTime: 0,
+              offset: 0,
+              duration,
+              fadeInDuration: 0,
+              fadeOutDuration: 0,
+            }]
+          : clips.map((clip) => {
+              const layout = getStudioClipLayout(clip, duration);
+              return {
+                ...clip,
+                ...layout,
+                ...clampStudioClipFades(clip, layout.duration),
+              };
+            });
+
+      const withCatalogFields = (
+        item: StudioLocalTrack,
+        clips: StudioLocalTrack["clips"],
+      ): StudioLocalTrack => ({
+        ...item,
+        fileName: asset.originalName,
+        fileSize: 0,
+        assetId: asset.id,
+        assetPersistenceStatus: "saved",
+        clips,
+        sourceType: "catalog",
+        catalogPracticeId: asset.catalogPracticeId ?? null,
+        catalogAudioItemId: asset.catalogAudioItemId ?? null,
+        status: available ? "ready" : "error",
+        isReplacing: false,
+        replacementError: available ? null : CATALOG_MUSIC_UNAVAILABLE_MESSAGE,
+      });
+
+      if (statusRef.current === "playing") {
+        const position = getPlaybackPosition();
+        stopSources();
+        cancelProgressLoop();
+        positionRef.current = position;
+        setCurrentTime(position);
+        setStatusValue("paused");
+      }
+
+      if (replaceTrackId) {
+        const current = tracksRef.current.find((item) => item.id === replaceTrackId);
+        if (!current) {
+          return null;
+        }
+        const oldRuntime = trackRuntimesRef.current.get(replaceTrackId);
+        if (oldRuntime) {
+          disconnectTrackGraph(oldRuntime);
+          maybeRevokePlaybackUrl(oldRuntime, replaceTrackId);
+        }
+        if (available) {
+          const runtime = createTrackRuntime(nextAsset);
+          applyVoicePreset(runtime, current.voicePreset, false);
+          trackRuntimesRef.current.set(replaceTrackId, runtime);
+        } else {
+          trackRuntimesRef.current.delete(replaceTrackId);
+        }
+        assetVaultRef.current.set(replaceTrackId, nextAsset);
+        const nextTracks = tracksRef.current.map((item) =>
+          item.id === replaceTrackId
+            ? withCatalogFields(item, remapClips(item.clips))
+            : item,
+        );
+        replaceTracks(nextTracks);
+        applyTrackGains();
+        return nextTracks.find((item) => item.id === replaceTrackId) ?? null;
+      }
+
+      if (tracksRef.current.length >= MAX_LOCAL_TRACKS) {
+        setProjectError(`В проект можно добавить не больше ${MAX_LOCAL_TRACKS} дорожек.`);
+        return null;
+      }
+
+      const id = crypto.randomUUID();
+      const created = withCatalogFields(
+        {
+          id,
+          fileName: asset.originalName,
+          fileSize: 0,
+          assetId: asset.id,
+          assetPersistenceStatus: "saved",
+          clips: [],
+          volume: 1,
+          muted: false,
+          trackKind: "music",
+          voicePreset: "none",
+          sourceType: "catalog",
+          catalogPracticeId: asset.catalogPracticeId ?? null,
+          catalogAudioItemId: asset.catalogAudioItemId ?? null,
+          status: "ready",
+          isReplacing: false,
+          replacementError: null,
+        },
+        remapClips([]),
+      );
+      if (available) {
+        const runtime = createTrackRuntime(nextAsset);
+        applyVoicePreset(runtime, "none", false);
+        trackRuntimesRef.current.set(id, runtime);
+      }
+      assetVaultRef.current.set(id, nextAsset);
+      replaceTracks([...tracksRef.current, created]);
+      applyTrackGains();
+      if (statusRef.current !== "playing") {
+        setStatusValue(statusRef.current === "paused" ? "paused" : "ready");
+      }
+      return created;
+    },
+    [
+      applyTrackGains,
+      applyVoicePreset,
+      cancelProgressLoop,
+      createTrackRuntime,
+      getPlaybackPosition,
+      maybeRevokePlaybackUrl,
+      persistenceProjectId,
+      replaceTracks,
+      setStatusValue,
+      stopSources,
     ],
   );
 
@@ -1994,6 +2184,9 @@ export function StudioAudioProvider({
         muted: source.muted,
         trackKind: source.trackKind,
         voicePreset: source.voicePreset,
+        sourceType: source.sourceType,
+        catalogPracticeId: source.catalogPracticeId,
+        catalogAudioItemId: source.catalogAudioItemId,
       },
       {
         trackId: crypto.randomUUID(),
@@ -2020,6 +2213,9 @@ export function StudioAudioProvider({
       muted: snapshot.muted,
       trackKind: snapshot.trackKind ?? source.trackKind,
       voicePreset: snapshot.voicePreset ?? source.voicePreset,
+      sourceType: snapshot.sourceType ?? source.sourceType,
+      catalogPracticeId: snapshot.catalogPracticeId ?? source.catalogPracticeId,
+      catalogAudioItemId: snapshot.catalogAudioItemId ?? source.catalogAudioItemId,
       status: "ready",
       isReplacing: false,
       replacementError: null,
@@ -2108,6 +2304,9 @@ export function StudioAudioProvider({
         muted: track.muted,
         trackKind: track.trackKind,
         voicePreset: track.voicePreset,
+        sourceType: track.sourceType,
+        catalogPracticeId: track.catalogPracticeId,
+        catalogAudioItemId: track.catalogAudioItemId,
       }),
     );
     return createStudioEditingSnapshot({
@@ -2294,6 +2493,7 @@ export function StudioAudioProvider({
       loadLocalFiles,
       ingestRecordedFile,
       replaceTrackAudio,
+      ingestCatalogAsset,
       retryTrackAssetUpload,
       hydratePersistedProject,
       play,
@@ -2325,6 +2525,7 @@ export function StudioAudioProvider({
       getTrackBuffer,
       exportEditingState,
       ingestRecordedFile,
+      ingestCatalogAsset,
       loadLocalFiles,
       pause,
       play,

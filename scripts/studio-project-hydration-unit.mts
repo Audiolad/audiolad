@@ -407,4 +407,63 @@ const missingDurationHydration = await hydrateStudioProject({
 assert.equal(missingDurationHydration.assets.size, 0);
 assert.equal(missingDurationHydration.failures.size, 1);
 
+{
+  let catalogSigns = 0;
+  const catalogAssetId = "33333333-3333-4333-8333-333333333333";
+  const catalogHydration = await hydrateStudioProject({
+    project: {
+      ...project,
+      projectData: {
+        ...project.projectData,
+        slots: [{
+          id: "slot-1",
+          name: "Музыка",
+          audioTrackId: "track-catalog",
+          trackKind: "music",
+        }],
+        tracks: [{
+          id: "track-catalog",
+          assetId: catalogAssetId,
+          name: "Музыка",
+          volume: 1,
+          muted: false,
+          trackKind: "music",
+          clips: [{
+            id: "clip-catalog",
+            startTime: 0,
+            offset: 0,
+            duration: 12,
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+          }],
+        }],
+      },
+    },
+    assets: [{
+      id: catalogAssetId,
+      projectId,
+      originalName: "Рассвет",
+      mimeType: "audio/mpeg",
+      sizeBytes: 0,
+      durationSeconds: 12,
+      sourceType: "catalog",
+      createdAt: "2026-09-10T00:00:00.000Z",
+      catalogPracticeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      catalogAudioItemId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      available: false,
+    }],
+    signPlayback: async () => {
+      catalogSigns += 1;
+      throw new Error("should not sign unavailable catalog");
+    },
+  });
+  assert.equal(catalogSigns, 0);
+  assert.equal(catalogHydration.assets.size, 0);
+  assert.equal(catalogHydration.failures.size, 1);
+  assert.match(
+    catalogHydration.failures.get(catalogAssetId)?.message ?? "",
+    /Музыка из каталога недоступна/,
+  );
+}
+
 console.log("studio project hydration checks passed");

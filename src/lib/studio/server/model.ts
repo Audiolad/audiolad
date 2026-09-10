@@ -84,16 +84,20 @@ export type StudioProjectRow = {
   deleted_at: string | null;
 };
 
+export type StudioAssetSourceType = "upload" | "recording" | "catalog";
+
 export type StudioProjectAssetRow = {
   id: string;
   project_id: string;
   source_id?: string | null;
-  storage_path: string;
+  storage_path: string | null;
   original_name: string;
   mime_type: string;
   size_bytes: number;
   duration_seconds: number | null;
-  source_type: "upload" | "recording";
+  source_type: StudioAssetSourceType;
+  catalog_practice_id?: string | null;
+  catalog_audio_item_id?: string | null;
   upload_state?: StudioAssetUploadState;
   pending_source_id?: string | null;
   pending_storage_path?: string | null;
@@ -145,8 +149,23 @@ export function toStudioProjectListItemDto(project: StudioProjectListItem) {
 export function toStudioAssetDto(
   asset: StudioProjectAssetRow,
   peaks?: StudioAssetPeaksDto | null,
+  options?: { available?: boolean },
 ) {
-  return {
+  const dto: {
+    id: string;
+    projectId: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    durationSeconds: number | null;
+    sourceType: StudioAssetSourceType;
+    uploadState: StudioAssetUploadState;
+    createdAt: string;
+    peaks: StudioAssetPeaksDto | null;
+    catalogPracticeId?: string;
+    catalogAudioItemId?: string;
+    available?: boolean;
+  } = {
     id: asset.id,
     projectId: asset.project_id,
     originalName: asset.original_name,
@@ -156,6 +175,16 @@ export function toStudioAssetDto(
     sourceType: asset.source_type,
     uploadState: asset.upload_state ?? "ready",
     createdAt: asset.created_at,
-    peaks: peaks ?? null,
+    peaks: asset.source_type === "catalog" ? null : peaks ?? null,
   };
+  if (asset.source_type === "catalog") {
+    if (asset.catalog_practice_id) {
+      dto.catalogPracticeId = asset.catalog_practice_id;
+    }
+    if (asset.catalog_audio_item_id) {
+      dto.catalogAudioItemId = asset.catalog_audio_item_id;
+    }
+    dto.available = options?.available !== false;
+  }
+  return dto;
 }
