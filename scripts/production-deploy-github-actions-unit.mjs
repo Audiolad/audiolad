@@ -45,6 +45,14 @@ const courseUpgradeDiagPath = join(
   repoRoot,
   "deploy/scripts/audiolad-course-upgrade-diag.sh",
 );
+const courseUpgradeLogdiagPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-course-upgrade-logdiag.sh",
+);
+const courseUpgradeLogdiagSudoersPath = join(
+  repoRoot,
+  "deploy/sudoers/audiolad-course-upgrade-logdiag",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -2853,6 +2861,13 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
   assert.match(docsText, /origin_main_sha/);
   assert.doesNotMatch(docsText, /persist-credentials/);
   assert.match(docsText, /SAFE_SUMMARY/);
+  assert.match(docsText, /WEB_PID_STATUS/);
+  assert.match(docsText, /UNKNOWN_PERMISSION_DENIED/);
+  assert.match(docsText, /PRESENT_READABLE/);
+  assert.match(docsText, /PRIVILEGED_LOGDIAG/);
+  assert.match(docsText, /ENTITLEMENT_STATE_MISMATCH/);
+  assert.match(docsText, /audiolad-course-upgrade-logdiag/);
+  assert.match(docsText, /Do not install on production/);
 
   const job = workflow.jobs.course_upgrade_diag;
   assert.equal(job.environment, "production");
@@ -3049,12 +3064,45 @@ function assertCourseUpgradeHelperFetchTransport(workflow) {
   }
 }
 
-function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
+function writeFakeProcTree(procRoot, { webPid = 1001, extraParents = 0 } = {}) {
+  mkdirSync(procRoot, { recursive: true });
+  writeFileSync(join(procRoot, "stat"), "btime 1700000000\n");
+  const chain = [webPid];
+  let current = webPid;
+  for (let i = 0; i < extraParents; i += 1) {
+    current += 1;
+    chain.push(current);
+  }
+  chain.push(1);
+  for (let i = 0; i < chain.length; i += 1) {
+    const pid = chain[i];
+    const ppid = i + 1 < chain.length ? chain[i + 1] : 0;
+    const dir = join(procRoot, String(pid));
+    mkdirSync(dir, { recursive: true });
+    const comm = pid === webPid ? "next-server" : pid === 1 ? "systemd" : `parent${pid}`;
+    writeFileSync(
+      join(dir, "status"),
+      [`Name:\t${comm}`, `PPid:\t${ppid}`, `Uid:\t0\t0\t0\t0`, ""].join("\n"),
+    );
+    writeFileSync(join(dir, "comm"), `${comm}\n`);
+    writeFileSync(
+      join(dir, "stat"),
+      `${pid} (${comm}) S ${ppid} ${pid} ${pid} 0 -1 4194304 0 0 0 0 0 0 0 0 20 0 1 0 12345 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n`,
+    );
+    symlinkSync("/usr/bin/node", join(dir, "exe"));
+  }
+  return { webPid, parentPids: chain.slice(1) };
+}
+
+function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey, entitlementMode = "present" } = {}) {
   const releaseCurrent = "20260910-045134-ac9020e1050f5702fd806d29677aa4212ee68d39";
   const currentDir = join(root, "deploy", "releases", releaseCurrent);
   const sharedDir = join(root, "deploy", "shared");
   const binDir = join(root, "bin");
   const pm2Dir = join(root, "home", ".pm2", "logs");
+  const procRoot = join(root, "proc");
+  const webPid = 1001;
+  writeFakeProcTree(procRoot, { webPid, extraParents: 1 });
   mkdirSync(join(currentDir, "node_modules", "@next", "env"), { recursive: true });
   mkdirSync(join(currentDir, "node_modules", "@supabase", "supabase-js"), { recursive: true });
   mkdirSync(sharedDir, { recursive: true });
@@ -3103,9 +3151,68 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
       "const authors = [{ id: AUTHOR, slug: 'sergey-and-zoya' }];",
       "const practices = [{ id: PRACTICE, slug: 'kody-zhenskoy-prityagatelnosti', author_id: AUTHOR }];",
       "const profiles = [{ id: USER, email: 'petpovss@yandex.ru' }];",
-      "const entitlements = [{ user_id: USER, practice_id: PRACTICE, access_level: 1, access_source: 'purchase', granted_at: '2026-09-01T12:00:00Z' }];",
-      "const orders = [{ id: ORDER, user_id: USER, practice_id: PRACTICE, status: 'pending', order_kind: 'course_upgrade', target_access_level: 2, amount_minor: 222200, currency: 'RUB', created_at: '2026-09-10T04:36:00Z', paid_at: null, practice_slug_snapshot: 'kody-zhenskoy-prityagatelnosti' }];",
+      `const entitlements = ${JSON.stringify(
+        entitlementMode === "present"
+          ? [
+              {
+                user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                practice_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                access_level: 1,
+                access_source: "purchase",
+                granted_at: "2026-09-01T12:00:00Z",
+              },
+            ]
+          : [],
+      )};`,
+      `const orders = ${JSON.stringify(
+        [
+          {
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            practice_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            status: "pending",
+            order_kind: "course_upgrade",
+            target_access_level: 2,
+            amount_minor: 222200,
+            currency: "RUB",
+            created_at: "2026-09-10T04:36:00Z",
+            paid_at: null,
+            practice_slug_snapshot: "kody-zhenskoy-prityagatelnosti",
+          },
+          ...(entitlementMode === "mismatch"
+            ? [
+                {
+                  id: "abababab-abab-4aba-8aba-abababababab",
+                  user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                  practice_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                  status: "paid",
+                  order_kind: "product_purchase",
+                  target_access_level: null,
+                  amount_minor: 19900,
+                  currency: "RUB",
+                  created_at: "2026-08-01T09:00:00Z",
+                  paid_at: "2026-08-01T10:00:00Z",
+                  practice_slug_snapshot: "kody-zhenskoy-prityagatelnosti",
+                },
+              ]
+            : []),
+        ],
+      )};`,
       "const payments = [{ id: PAYMENT, order_id: ORDER, status: 'pending', provider: 'tochka', amount_minor: 222200, currency: 'RUB', created_at: '2026-09-10T04:36:01Z', confirmed_at: null, failed_at: null, provider_payment_id: null, provider_metadata: {} }];",
+      `const accessLinks = ${JSON.stringify(
+        entitlementMode === "mismatch"
+          ? [
+              {
+                id: "acacacac-acac-4aca-8aca-acacacacacac",
+                practice_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                status: "redeemed",
+                target_access_level: 1,
+                redeemed_at: "2026-07-15T12:00:00Z",
+                redeemed_by_user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              },
+            ]
+          : [],
+      )};`,
       "function applyFilters(rows, filters) {",
       "  return rows.filter((row) => filters.every((f) => {",
       "    if (f.op === 'eq') return String(row[f.col]) === String(f.val);",
@@ -3136,6 +3243,7 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
       "          let rows = [];",
       "          if (table === 'orders') rows = orders;",
       "          if (table === 'payments') rows = payments;",
+      "          if (table === 'practice_access_links') rows = accessLinks;",
       "          resolve({ data: applyFilters(rows, state.filters), error: null });",
       "        },",
       "      };",
@@ -3237,7 +3345,7 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
     join(binDir, "curl"),
     [
       "#!/bin/bash",
-      'echo \'{"status":"ok","deployCommit":"ac9020e1050f5702fd806d29677aa4212ee68d39"}\'',
+      'echo \'{"status":"ok","deployCommit":"ac9020e1050f5702fd806d29677aa4212ee68d39","pid":1001}\'',
       "",
     ].join("\n"),
     { mode: 0o755 },
@@ -3248,6 +3356,8 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
     deployRoot: join(root, "deploy"),
     home: join(root, "home"),
     binDir,
+    procRoot,
+    missingWrapper: join(root, "missing-privileged-wrapper"),
     p3000Err,
     p3001Err,
   };
@@ -3261,6 +3371,9 @@ function courseUpgradeDiagEnv(fixture, extraEnv = {}) {
     PM2_HOME: join(fixture.home, ".pm2"),
     DEPLOY_ROOT: fixture.deployRoot,
     AUDIOLAD_COURSE_UPGRADE_DIAG_HEALTH_URL: "http://127.0.0.1:9/health-unused",
+    AUDIOLAD_COURSE_UPGRADE_DIAG_PROC_ROOT: fixture.procRoot,
+    AUDIOLAD_COURSE_UPGRADE_LOGDIAG_WRAPPER: fixture.missingWrapper,
+    AUDIOLAD_COURSE_UPGRADE_DIAG_SUDO: join(fixture.binDir, "sudo-not-used"),
     ...extraEnv,
   };
 }
@@ -3340,6 +3453,24 @@ function assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey }) {
   assert.match(output, /has_checkout_token=NO/);
   assert.match(output, /has_provider_metadata=NO/);
   assert.match(output, /qa_listener=hardcoded_redacted/);
+  assert.match(output, /WEB_PID_STATUS=OK/);
+  assert.match(output, /web_pid=1001/);
+  assert.match(output, /WEB_PROCESS pid=1001 ppid=1002 euser=\S+ uid=0 comm=next-server exe=node/);
+  assert.match(output, /PARENT depth=1 pid=1002/);
+  assert.match(output, /PARENT_CHAIN_BOUND=6/);
+  assert.match(output, /LIVE_WEB_OWNER=/);
+  assert.match(output, /LIVE_WEB_PM2_HOME=\/root\/\.pm2/);
+  assert.match(output, /pm2_jlist_namespace=ssh_user/);
+  assert.match(output, /ACTIVE_P30_COUNT=0 may be true for this namespace/);
+  assert.match(output, /log_dir path=\/root\/\.pm2\/logs state=(PRESENT_READABLE|PRESENT_NOT_READABLE|ABSENT_PROVEN|UNKNOWN_PERMISSION_DENIED)/);
+  assert.doesNotMatch(output, /log_dir path=\/root\/\.pm2\/logs exists=NO/);
+  assert.match(output, /PRIVILEGED_LOGDIAG=MISSING/);
+  assert.match(output, /NEED_INSTALL=YES/);
+  assert.match(output, /ENTITLEMENT_STATE_MISMATCH=NO/);
+  assert.match(output, /canonical_user_practices=PRESENT/);
+  assert.match(output, /privileged_wrapper_install = NOT_INVOKED/);
+  assert.doesNotMatch(output, /cmdline=/);
+  assert.doesNotMatch(output, /\/environ/);
   assert.doesNotMatch(output, /\bMATCH_LINE\b/);
   assert.doesNotMatch(output, /plain-secret-value-never-print/);
   assert.doesNotMatch(output, /petpovss@yandex\.ru/);
@@ -3379,14 +3510,26 @@ function assertCourseUpgradeDiagHelper() {
   assert.doesNotMatch(helperText, /\.update\(/);
   assert.doesNotMatch(helperText, /\.insert\(/);
   assert.doesNotMatch(helperText, /\.delete\(/);
+  assert.doesNotMatch(helperText, /sudo bash/);
+  assert.doesNotMatch(helperText, /NOPASSWD:\s*ALL/);
+  assert.doesNotMatch(helperText, /["']cmdline["']/);
+  assert.doesNotMatch(helperText, /["']environ["']/);
+  assert.match(helperText, /MAX_PARENTS=6/);
+  assert.match(helperText, /UNKNOWN_PERMISSION_DENIED/);
+  assert.match(helperText, /PRESENT_NOT_READABLE/);
+  assert.match(helperText, /ABSENT_PROVEN/);
+  assert.match(helperText, /ENTITLEMENT_STATE_MISMATCH/);
+  assert.match(helperText, /PRIVILEGED_LOGDIAG=MISSING/);
   const helperCode = helperText
     .split("\n")
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
+  assert.doesNotMatch(helperCode, /PM2_HOME=\/root\/\.pm2/);
   assert.doesNotMatch(helperCode, /\bsource\s+[^\n]*\.env\.production/);
   assert.doesNotMatch(helperText, /cat\s+[^\n]*\.(env\.production|env\.local)/);
   assert.doesNotMatch(helperCode, /\brm -rf\b/);
   chmodSync(courseUpgradeDiagPath, 0o755);
+  chmodSync(courseUpgradeLogdiagPath, 0o755);
 
   const secretUrl = "https://course-upgrade-diag-test.example.invalid";
   const secretKey = "super-secret-service-role-key-do-not-log";
@@ -3417,6 +3560,217 @@ function assertCourseUpgradeDiagHelper() {
   } finally {
     rmSync(remoteRoot, { recursive: true, force: true });
   }
+
+  const rejectRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-pid-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(rejectRoot, { secretUrl, secretKey });
+    writeFileSync(
+      join(fixture.binDir, "curl"),
+      ["#!/bin/bash", 'echo \'{"status":"ok","pid":"not-a-pid"}\'', ""].join("\n"),
+      { mode: 0o755 },
+    );
+    const result = runCourseUpgradeDiagHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `pid rejection must not fail the job: ${output}`);
+    assert.match(output, /WEB_PID_STATUS=REJECTED/);
+    assert.match(output, /web_pid_reason=pid_not_positive_integer/);
+    assert.doesNotMatch(output, /WEB_PROCESS pid=/);
+    assert.match(output, /PRIVILEGED_LOGDIAG=MISSING/);
+    assert.match(output, /CUTOVER = NO/);
+  } finally {
+    rmSync(rejectRoot, { recursive: true, force: true });
+  }
+
+  const chainRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-chain-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(chainRoot, { secretUrl, secretKey });
+    rmSync(fixture.procRoot, { recursive: true, force: true });
+    writeFakeProcTree(fixture.procRoot, { webPid: 1001, extraParents: 8 });
+    const result = runCourseUpgradeDiagHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `parent chain diag failed: ${output}`);
+    assert.match(output, /PARENT depth=6 pid=1007/);
+    assert.doesNotMatch(output, /PARENT depth=7 /);
+    assert.doesNotMatch(output, /PARENT depth=\d+ pid=1008/);
+    assert.doesNotMatch(output, /PARENT depth=\d+ pid=1009/);
+    assert.match(output, /PARENT_CHAIN_COUNT=6/);
+    assert.match(output, /PARENT_CHAIN_BOUND=6/);
+  } finally {
+    rmSync(chainRoot, { recursive: true, force: true });
+  }
+
+  const mismatchRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-mismatch-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(mismatchRoot, {
+      secretUrl,
+      secretKey,
+      entitlementMode: "mismatch",
+    });
+    const result = runCourseUpgradeDiagHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `mismatch diag failed: ${output}`);
+    assert.match(output, /canonical_user_practices=MISSING/);
+    assert.match(output, /ENTITLEMENT_STATE_MISMATCH=YES/);
+    assert.match(output, /HISTORICAL_L1_EVIDENCE=YES/);
+    assert.match(output, /HISTORICAL_L1_MECHANISMS=purchase,access_link/);
+    assert.match(output, /paid_base_order_count=1/);
+    assert.match(output, /redeemed_access_link_count=1/);
+    assert.doesNotMatch(output, /petpovss@yandex\.ru/);
+    assert.doesNotMatch(output, /user_id=/);
+    assert.doesNotMatch(output, /cccccccc-cccc-4ccc-8ccc-cccccccccccc/);
+    assert.doesNotMatch(output, /token_hash=/);
+  } finally {
+    rmSync(mismatchRoot, { recursive: true, force: true });
+  }
+
+  const unprovenRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-unproven-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(unprovenRoot, {
+      secretUrl,
+      secretKey,
+      entitlementMode: "absent",
+    });
+    const result = runCourseUpgradeDiagHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `unproven diag failed: ${output}`);
+    assert.match(output, /canonical_user_practices=MISSING/);
+    assert.match(output, /ENTITLEMENT_STATE_MISMATCH=UNPROVEN/);
+    assert.match(output, /HISTORICAL_L1_EVIDENCE=NO/);
+    assert.match(output, /HISTORICAL_L1_MECHANISMS=none/);
+    assert.doesNotMatch(output, /user_id=/);
+    assert.doesNotMatch(output, /petpovss@yandex\.ru/);
+  } finally {
+    rmSync(unprovenRoot, { recursive: true, force: true });
+  }
+
+  const pathRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-paths-"));
+  try {
+    const readable = join(pathRoot, "readable");
+    const missing = join(readable, "no-such-dir");
+    const denied = join(pathRoot, "denied");
+    const deniedChild = join(denied, "child");
+    mkdirSync(readable, { recursive: true });
+    mkdirSync(denied, { recursive: true });
+    chmodSync(denied, 0o000);
+    const classify = `
+import errno, os, stat, sys
+def classify(path):
+    path = os.path.abspath(path)
+    try:
+        st = os.stat(path)
+    except FileNotFoundError:
+        parent = os.path.dirname(path)
+        if parent == path:
+            return "ABSENT_PROVEN"
+        parent_state = classify(parent)
+        if parent_state in ("PRESENT_READABLE", "ABSENT_PROVEN"):
+            return "ABSENT_PROVEN"
+        return "UNKNOWN_PERMISSION_DENIED"
+    except PermissionError:
+        return "UNKNOWN_PERMISSION_DENIED"
+    except OSError as err:
+        if err.errno in (errno.EACCES, errno.EPERM):
+            return "UNKNOWN_PERMISSION_DENIED"
+        return "UNKNOWN_PERMISSION_DENIED"
+    readable = os.access(path, os.R_OK)
+    if stat.S_ISDIR(st.st_mode):
+        if readable and os.access(path, os.X_OK):
+            return "PRESENT_READABLE"
+        return "PRESENT_NOT_READABLE"
+    if readable:
+        return "PRESENT_READABLE"
+    return "PRESENT_NOT_READABLE"
+print(classify(sys.argv[1]))
+`;
+    const runClassify = (target) => {
+      const result = spawnSync("python3", ["-c", classify, target], { encoding: "utf8" });
+      assert.equal(result.status, 0, `classify failed for ${target}: ${result.stderr}`);
+      return (result.stdout || "").trim();
+    };
+    assert.equal(runClassify(readable), "PRESENT_READABLE");
+    assert.equal(runClassify(missing), "ABSENT_PROVEN");
+    const deniedState = runClassify(deniedChild);
+    assert.ok(
+      deniedState === "UNKNOWN_PERMISSION_DENIED" || deniedState === "PRESENT_NOT_READABLE",
+      `denied child should not be ABSENT_PROVEN, got ${deniedState}`,
+    );
+    assert.notEqual(deniedState, "ABSENT_PROVEN");
+    const notReadable = join(pathRoot, "closed");
+    mkdirSync(notReadable, { recursive: true });
+    chmodSync(notReadable, 0o000);
+    const closedState = runClassify(notReadable);
+    assert.ok(
+      closedState === "PRESENT_NOT_READABLE" || closedState === "UNKNOWN_PERMISSION_DENIED",
+      `closed dir must not be treated as absent, got ${closedState}`,
+    );
+    chmodSync(denied, 0o755);
+    chmodSync(notReadable, 0o755);
+  } finally {
+    try {
+      chmodSync(join(pathRoot, "denied"), 0o755);
+    } catch {
+      // already restored or never created
+    }
+    try {
+      chmodSync(join(pathRoot, "closed"), 0o755);
+    } catch {
+      // already restored
+    }
+    rmSync(pathRoot, { recursive: true, force: true });
+  }
+
+  const wrapperRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-logdiag-"));
+  try {
+    const fixture = writeCourseUpgradeDiagFixture(wrapperRoot, { secretUrl, secretKey });
+    const wrapperCopy = join(fixture.binDir, "audiolad-course-upgrade-logdiag");
+    writeFileSync(wrapperCopy, readFileSync(courseUpgradeLogdiagPath));
+    chmodSync(wrapperCopy, 0o755);
+    writeFileSync(
+      join(fixture.binDir, "sudo"),
+      [
+        "#!/bin/bash",
+        `if [[ "$1" == "-n" && "$2" == ${JSON.stringify(wrapperCopy)} && "$#" -eq 2 ]]; then`,
+        `  exec "$2"`,
+        "fi",
+        'echo "forbidden sudo $*" >&2',
+        "exit 1",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    const result = runCourseUpgradeDiagHelper(fixture, {
+      AUDIOLAD_COURSE_UPGRADE_LOGDIAG_WRAPPER: wrapperCopy,
+      AUDIOLAD_COURSE_UPGRADE_DIAG_SUDO: join(fixture.binDir, "sudo"),
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `privileged wrapper path failed: ${output}`);
+    assert.match(output, /PRIVILEGED_LOGDIAG=OK/);
+    assert.doesNotMatch(output, /sudo bash/);
+    assert.doesNotMatch(output, /forbidden sudo/);
+  } finally {
+    rmSync(wrapperRoot, { recursive: true, force: true });
+  }
+
+  const logdiagSyntax = spawnSync("bash", ["-n", courseUpgradeLogdiagPath], { encoding: "utf8" });
+  assert.equal(logdiagSyntax.status, 0, `logdiag wrapper bash -n failed: ${logdiagSyntax.stderr}`);
+  const logdiagText = readFileSync(courseUpgradeLogdiagPath, "utf8");
+  assert.match(logdiagText, /SAFE_SUMMARY/);
+  assert.match(logdiagText, /gzip\.open\([^)]*"rt"/);
+  assert.doesNotMatch(logdiagText, /sudo bash/);
+  assert.doesNotMatch(logdiagText, /pm2 delete/);
+  assert.doesNotMatch(logdiagText, /pm2 (restart|start|flush|save)/);
+  assert.doesNotMatch(logdiagText, /INSERT INTO/i);
+  assert.doesNotMatch(logdiagText, /NOPASSWD:\s*ALL/);
+  const rejectArgs = spawnSync("bash", [courseUpgradeLogdiagPath, "anything"], { encoding: "utf8" });
+  assert.notEqual(rejectArgs.status, 0, "logdiag wrapper must reject arguments");
+  assert.match(`${rejectArgs.stdout ?? ""}${rejectArgs.stderr ?? ""}`, /accepts no arguments/);
+  const sudoersText = readFileSync(courseUpgradeLogdiagSudoersPath, "utf8");
+  assert.match(
+    sudoersText,
+    /^deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-course-upgrade-logdiag$/m,
+  );
+  assert.doesNotMatch(sudoersText, /NOPASSWD:\s*ALL/);
+  assert.doesNotMatch(sudoersText, /\*/);
 }
 
 function existsSyncSafe(path) {
