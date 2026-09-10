@@ -1,3 +1,9 @@
+import {
+  COURSE_UPGRADE_BOUNDARY_HEADER,
+  COURSE_UPGRADE_MARKER_HEADER,
+  COURSE_UPGRADE_REQUEST_ID_HEADER,
+} from "@/lib/course-content/course-upgrade-stages";
+
 export type CourseUpgradeClientErrorCode =
   | "unauthorized"
   | "auth_unavailable"
@@ -16,6 +22,48 @@ export type CourseUpgradeClientErrorCode =
   | "order_not_payable"
   | "provider_checkout_failed"
   | "internal_error";
+
+const SAFE_COURSE_UPGRADE_ERROR_CODES = new Set<string>([
+  "unauthorized",
+  "auth_unavailable",
+  "invalid_request",
+  "invalid_target_access_level",
+  "practice_not_found",
+  "not_course",
+  "practice_not_for_sale",
+  "not_entitled",
+  "upgrade_not_configured",
+  "already_at_target",
+  "pending_order_exists",
+  "author_finance_not_ready",
+  "payments_not_configured",
+  "order_already_paid",
+  "order_not_payable",
+  "provider_checkout_failed",
+  "internal_error",
+]);
+
+const REQUEST_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type CourseUpgradeDiagnosticBoundary =
+  | "proxy"
+  | "route"
+  | "marked"
+  | "no-marker";
+
+export type CourseUpgradeCheckoutEvidence = {
+  httpStatus: number;
+  errorCode: string;
+  boundary: CourseUpgradeDiagnosticBoundary;
+  requestIdShort: string | null;
+};
+
+export {
+  COURSE_UPGRADE_BOUNDARY_HEADER,
+  COURSE_UPGRADE_MARKER_HEADER,
+  COURSE_UPGRADE_REQUEST_ID_HEADER,
+};
 
 export const COURSE_UPGRADE_GENERIC_ERROR =
   "Не удалось начать оплату. Попробуйте ещё раз.";
@@ -141,14 +189,101 @@ export function readCourseUpgradePaymentUrl(body: unknown): string | null {
   return null;
 }
 
+export function readCourseUpgradeDiagnosticBoundary(input: {
+  markerHeader?: string | null;
+  boundaryHeader?: string | null;
+}): CourseUpgradeDiagnosticBoundary {
+  if (input.markerHeader?.trim() !== "1") {
+    return "no-marker";
+  }
+
+  const boundary = input.boundaryHeader?.trim();
+
+  if (boundary === "proxy" || boundary === "route") {
+    return boundary;
+  }
+
+  return "marked";
+}
+
+export function readCourseUpgradeRequestIdShort(
+  requestIdHeader?: string | null,
+): string | null {
+  const value = requestIdHeader?.trim() ?? "";
+
+  if (!REQUEST_ID_PATTERN.test(value)) {
+    return null;
+  }
+
+  return value.slice(0, 4).toLowerCase();
+}
+
+export function readSafeCourseUpgradeDiagnosticErrorCode(input: {
+  body?: unknown;
+  unexpectedResponse?: boolean;
+  networkFailed?: boolean;
+}): string {
+  if (input.networkFailed) {
+    return "network";
+  }
+
+  if (input.unexpectedResponse) {
+    return "non_json";
+  }
+
+  const code = readCourseUpgradeErrorCode(input.body);
+
+  if (code && SAFE_COURSE_UPGRADE_ERROR_CODES.has(code)) {
+    return code;
+  }
+
+  return "unknown";
+}
+
+export function readCourseUpgradeCheckoutEvidence(input: {
+  httpStatus: number;
+  body?: unknown;
+  unexpectedResponse?: boolean;
+  networkFailed?: boolean;
+  markerHeader?: string | null;
+  boundaryHeader?: string | null;
+  requestIdHeader?: string | null;
+}): CourseUpgradeCheckoutEvidence {
+  return {
+    httpStatus: input.httpStatus,
+    errorCode: readSafeCourseUpgradeDiagnosticErrorCode(input),
+    boundary: readCourseUpgradeDiagnosticBoundary(input),
+    requestIdShort: readCourseUpgradeRequestIdShort(input.requestIdHeader),
+  };
+}
+
+export function formatCourseUpgradeCheckoutDiagnostic(
+  evidence: CourseUpgradeCheckoutEvidence,
+): string {
+  const parts = [
+    `HTTP ${evidence.httpStatus}`,
+    evidence.errorCode,
+    evidence.boundary,
+  ];
+
+  if (evidence.requestIdShort) {
+    parts.push(`${evidence.requestIdShort}…`);
+  }
+
+  return `Диагностика: ${parts.join(" · ")}`;
+}
+
 export function interpretCourseUpgradeCheckoutResponse(input: {
   httpStatus: number;
   body?: unknown;
   unexpectedResponse?: boolean;
   networkFailed?: boolean;
+  markerHeader?: string | null;
+  boundaryHeader?: string | null;
+  requestIdHeader?: string | null;
 }):
   | { kind: "redirect"; paymentUrl: string }
-  | { kind: "error"; message: string } {
+  | { kind: "error"; message: string; diagnostic: string } {
   const paymentUrl = readCourseUpgradePaymentUrl(input.body);
   const uiError = resolveCourseUpgradeUiError({
     httpStatus: input.httpStatus,
@@ -159,7 +294,13 @@ export function interpretCourseUpgradeCheckoutResponse(input: {
   });
 
   if (uiError) {
-    return { kind: "error", message: uiError };
+    return {
+      kind: "error",
+      message: uiError,
+      diagnostic: formatCourseUpgradeCheckoutDiagnostic(
+        readCourseUpgradeCheckoutEvidence(input),
+      ),
+    };
   }
 
   return { kind: "redirect", paymentUrl: (paymentUrl ?? "").trim() };

@@ -3,8 +3,10 @@
 import { useState } from "react";
 
 import {
+  COURSE_UPGRADE_BOUNDARY_HEADER,
+  COURSE_UPGRADE_MARKER_HEADER,
+  COURSE_UPGRADE_REQUEST_ID_HEADER,
   interpretCourseUpgradeCheckoutResponse,
-  resolveCourseUpgradeUiError,
 } from "@/lib/course-content/course-upgrade-client-errors";
 
 type CourseLevelUpgradeButtonProps = {
@@ -19,7 +21,10 @@ export default function CourseLevelUpgradeButton({
   label,
 }: CourseLevelUpgradeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorView, setErrorView] = useState<{
+    message: string;
+    diagnostic: string;
+  } | null>(null);
 
   async function handleUpgrade() {
     if (isLoading) {
@@ -27,7 +32,7 @@ export default function CourseLevelUpgradeButton({
     }
 
     setIsLoading(true);
-    setErrorMessage(null);
+    setErrorView(null);
 
     try {
       const response = await fetch("/api/checkout/course-upgrade", {
@@ -56,18 +61,32 @@ export default function CourseLevelUpgradeButton({
         httpStatus: response.status,
         body,
         unexpectedResponse,
+        markerHeader: response.headers.get(COURSE_UPGRADE_MARKER_HEADER),
+        boundaryHeader: response.headers.get(COURSE_UPGRADE_BOUNDARY_HEADER),
+        requestIdHeader: response.headers.get(COURSE_UPGRADE_REQUEST_ID_HEADER),
       });
 
       if (outcome.kind === "error") {
-        setErrorMessage(outcome.message);
+        setErrorView({
+          message: outcome.message,
+          diagnostic: outcome.diagnostic,
+        });
         return;
       }
 
       window.location.assign(outcome.paymentUrl);
     } catch {
-      setErrorMessage(
-        resolveCourseUpgradeUiError({ httpStatus: 0, networkFailed: true }),
-      );
+      const outcome = interpretCourseUpgradeCheckoutResponse({
+        httpStatus: 0,
+        networkFailed: true,
+      });
+
+      if (outcome.kind === "error") {
+        setErrorView({
+          message: outcome.message,
+          diagnostic: outcome.diagnostic,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -85,10 +104,11 @@ export default function CourseLevelUpgradeButton({
       >
         {isLoading ? "Открываем оплату…" : label}
       </button>
-      {errorMessage ? (
-        <p className="text-sm text-[#b42318]" role="alert">
-          {errorMessage}
-        </p>
+      {errorView ? (
+        <div className="space-y-1" role="alert">
+          <p className="text-sm text-[#b42318]">{errorView.message}</p>
+          <p className="text-xs text-[#b42318]">{errorView.diagnostic}</p>
+        </div>
       ) : null}
     </div>
   );
