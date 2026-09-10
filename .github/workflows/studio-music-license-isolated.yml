@@ -17,6 +17,7 @@ on:
       - "supabase/migrations/20261003120400_fulfill_tochka_studio_music_license.sql"
       - "supabase/migrations/20261003120500_studio_music_canonical_sales.sql"
       - "supabase/migrations/20261003120600_studio_music_entitlement_order_revoke.sql"
+      - "supabase/migrations/20261003120700_studio_music_independent_pricing.sql"
       - "supabase/tests/studio_music_license_smoke.sql"
 
 permissions:

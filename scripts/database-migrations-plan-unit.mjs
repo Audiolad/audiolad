@@ -593,6 +593,13 @@ function testRepoOneFileOneVersion() {
         "20261003120600_studio_music_entitlement_order_revoke.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261003120700_studio_music_independent_pricing.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -701,8 +708,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261003120400",
     "20261003120500",
     "20261003120600",
+    "20261003120700",
   ]);
-  assert.equal(plan.database_migrations_pending, 76);
+  assert.equal(plan.database_migrations_pending, 77);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -790,8 +798,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261003120400",
     "20261003120500",
     "20261003120600",
+    "20261003120700",
   ]);
-  assert.equal(plan.database_migrations_pending, 70);
+  assert.equal(plan.database_migrations_pending, 71);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -886,8 +895,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261003120400",
     "20261003120500",
     "20261003120600",
+    "20261003120700",
   ]);
-  assert.equal(plan.database_migrations_pending, 61);
+  assert.equal(plan.database_migrations_pending, 62);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
