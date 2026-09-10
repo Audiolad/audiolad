@@ -596,11 +596,45 @@ export function mapStudioMusicCatalogItem(input: {
   };
 }
 
+function isStudioMusicCatalogHttpUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function studioMusicCatalogStringLooksLikeLeak(value: string): boolean {
+  return (
+    value.includes("/storage/v1/object") ||
+    value.includes("practice-audio/") ||
+    isStudioMusicCatalogHttpUrl(value)
+  );
+}
+
+/** Public cover images are the only storage/http values the catalog DTO may expose. */
+function isSafePublicStudioMusicCoverUrl(value: string): boolean {
+  if (
+    value.includes("token=") ||
+    value.includes("practice-audio/") ||
+    value.includes("/storage/v1/object/sign")
+  ) {
+    return false;
+  }
+
+  if (value.includes("/storage/v1/object/public/practice-covers/")) {
+    return true;
+  }
+
+  return (
+    isStudioMusicCatalogHttpUrl(value) && !value.includes("/storage/v1/object")
+  );
+}
+
 export function studioMusicCatalogDtoContainsForbiddenFields(
   value: unknown,
+  parentKey = "",
 ): boolean {
   if (Array.isArray(value)) {
-    return value.some(studioMusicCatalogDtoContainsForbiddenFields);
+    return value.some((item) =>
+      studioMusicCatalogDtoContainsForbiddenFields(item, parentKey),
+    );
   }
   if (!value || typeof value !== "object") {
     return false;
@@ -612,25 +646,19 @@ export function studioMusicCatalogDtoContainsForbiddenFields(
     ) {
       return true;
     }
-    if (typeof nested === "string") {
-      if (
-        nested.includes("/storage/v1/object") ||
-        nested.includes("practice-audio/") ||
-        nested.startsWith("http://") ||
-        nested.startsWith("https://")
-      ) {
-        if (key !== "url") {
-          return true;
-        }
-        if (
-          nested.includes("/storage/v1/object") ||
-          nested.includes("token=")
-        ) {
-          return true;
-        }
+    if (
+      typeof nested === "string" &&
+      studioMusicCatalogStringLooksLikeLeak(nested)
+    ) {
+      const allowedCoverUrl =
+        parentKey === "cover" &&
+        key === "url" &&
+        isSafePublicStudioMusicCoverUrl(nested);
+      if (!allowedCoverUrl) {
+        return true;
       }
     }
-    if (studioMusicCatalogDtoContainsForbiddenFields(nested)) {
+    if (studioMusicCatalogDtoContainsForbiddenFields(nested, key)) {
       return true;
     }
   }
