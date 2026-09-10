@@ -6,12 +6,19 @@
 # checkout, never calls Tochka, never writes orders / payments /
 # entitlements / DB / Storage. No arbitrary remote command input.
 # Auto-discovers production audiolad-p30xx PM2 layout (does not assume only
-# p3000 or only p3001). Inspects active logs, rotated .log.*, .gz, and
-# orphaned logs of deleted PM2 apps. Optional read-only DB correlation uses
-# current release loadEnvConfig + supabase-js service role. Do not source
-# .env.production in this shell. Never print env values, JWT, tokens,
-# payment_url, Authorization, cookies, emails, user_id, or service-role
-# material. Log scan is streaming and memory-bounded.
+# p3000 or only p3001). Proves live web PID from public /api/health/build
+# only (positive integer; safe process fields; parent chain <= 6). Distinguishes
+# PM2/log-dir states PRESENT_READABLE / PRESENT_NOT_READABLE / ABSENT_PROVEN /
+# UNKNOWN_PERMISSION_DENIED. Never treats /root/.pm2/logs exists=NO as proof
+# of absence when /root is not traversable. Never switches an unreadable
+# root PM2 home into the pm2 command unless that home is PRESENT_READABLE.
+# Privileged logdiag wrapper is Draft
+# only and is not installed by this job. Inspects active logs, rotated .log.*,
+# .gz, and orphaned logs of deleted PM2 apps. Optional read-only DB
+# correlation uses current release loadEnvConfig + supabase-js service role.
+# Do not source .env.production in this shell. Never print env values, JWT,
+# tokens, payment_url, Authorization, cookies, emails, user_id, or
+# service-role material. Log scan is streaming and memory-bounded.
 set -Eeuo pipefail
 
 TARGET_SHA="${1:-${TARGET_SHA:-}}"
@@ -65,6 +72,347 @@ if ! declare -F section >/dev/null 2>&1; then
     printf '\n===== %s =====\n' "$1"
   }
 fi
+
+# Test seams only. Production uses /proc, real sudo, and the fixed wrapper path.
+PROC_ROOT="${AUDIOLAD_COURSE_UPGRADE_DIAG_PROC_ROOT:-/proc}"
+PRIVILEGED_WRAPPER="${AUDIOLAD_COURSE_UPGRADE_LOGDIAG_WRAPPER:-/usr/local/sbin/audiolad-course-upgrade-logdiag}"
+SUDO_BIN="${AUDIOLAD_COURSE_UPGRADE_DIAG_SUDO:-sudo}"
+MAX_PARENTS=6
+PID_MAX=4194304
+
+classify_path_state() {
+  local helper=""
+  helper="$(mktemp /tmp/audiolad-course-upgrade-path.XXXXXX.py)"
+  cat >"${helper}" <<'PY'
+import errno
+import os
+import stat
+import sys
+
+def classify(path):
+    path = os.path.abspath(path)
+    try:
+        st = os.stat(path)
+    except FileNotFoundError:
+        parent = os.path.dirname(path)
+        if parent == path:
+            return "ABSENT_PROVEN"
+        parent_state = classify(parent)
+        if parent_state in ("PRESENT_READABLE", "ABSENT_PROVEN"):
+            return "ABSENT_PROVEN"
+        return "UNKNOWN_PERMISSION_DENIED"
+    except PermissionError:
+        return "UNKNOWN_PERMISSION_DENIED"
+    except OSError as err:
+        if err.errno in (errno.EACCES, errno.EPERM):
+            return "UNKNOWN_PERMISSION_DENIED"
+        return "UNKNOWN_PERMISSION_DENIED"
+    readable = os.access(path, os.R_OK)
+    if stat.S_ISDIR(st.st_mode):
+        if readable and os.access(path, os.X_OK):
+            return "PRESENT_READABLE"
+        return "PRESENT_NOT_READABLE"
+    if readable:
+        return "PRESENT_READABLE"
+    return "PRESENT_NOT_READABLE"
+
+print(classify(sys.argv[1]))
+PY
+  local state=""
+  set +e
+  state="$(python3 "${helper}" "$1" 2>/dev/null)"
+  set -e
+  rm -f "${helper}"
+  if [[ -z "${state}" ]]; then
+    echo "UNKNOWN_PERMISSION_DENIED"
+  else
+    printf '%s\n' "${state}"
+  fi
+}
+
+extract_health_pid() {
+  local helper=""
+  helper="$(mktemp /tmp/audiolad-course-upgrade-pid.XXXXXX.py)"
+  cat >"${helper}" <<'PY'
+import json
+import re
+import sys
+
+PID_MAX = 4194304
+raw = sys.stdin.read()
+try:
+    data = json.loads(raw)
+except Exception:
+    print("WEB_PID_STATUS=REJECTED")
+    print("web_pid_reason=health_json_unreadable")
+    raise SystemExit(0)
+
+if not isinstance(data, dict):
+    print("WEB_PID_STATUS=REJECTED")
+    print("web_pid_reason=health_json_not_object")
+    raise SystemExit(0)
+
+pid = data.get("pid")
+if isinstance(pid, bool) or pid is None:
+    print("WEB_PID_STATUS=REJECTED")
+    print("web_pid_reason=pid_missing_or_not_integer")
+    raise SystemExit(0)
+
+if isinstance(pid, int):
+    value = pid
+elif isinstance(pid, str) and re.fullmatch(r"[1-9][0-9]{0,9}", pid):
+    value = int(pid)
+else:
+    print("WEB_PID_STATUS=REJECTED")
+    print("web_pid_reason=pid_not_positive_integer")
+    raise SystemExit(0)
+
+if value <= 0 or value > PID_MAX:
+    print("WEB_PID_STATUS=REJECTED")
+    print("web_pid_reason=pid_out_of_range")
+    raise SystemExit(0)
+
+print("WEB_PID_STATUS=OK")
+print("web_pid=%s" % value)
+PY
+  local out=""
+  set +e
+  out="$(python3 "${helper}" 2>/dev/null)"
+  set -e
+  rm -f "${helper}"
+  if [[ -z "${out}" ]]; then
+    echo "WEB_PID_STATUS=REJECTED"
+    echo "web_pid_reason=pid_parser_failed"
+  else
+    printf '%s\n' "${out}"
+  fi
+}
+
+print_safe_process_chain() {
+  local helper=""
+  helper="$(mktemp /tmp/audiolad-course-upgrade-proc.XXXXXX.py)"
+  cat >"${helper}" <<'PY'
+import json
+import os
+import pwd
+import re
+import sys
+from datetime import datetime, timezone
+
+proc_root = sys.argv[1]
+raw_pid = sys.argv[2]
+max_parents = int(sys.argv[3])
+pid_max = int(sys.argv[4])
+
+if not re.fullmatch(r"[1-9][0-9]{0,9}", raw_pid):
+    print("WEB_PROCESS_STATUS=REJECTED")
+    print("web_pid_reason=pid_not_positive_integer")
+    raise SystemExit(0)
+
+pid = int(raw_pid)
+if pid <= 0 or pid > pid_max:
+    print("WEB_PROCESS_STATUS=REJECTED")
+    print("web_pid_reason=pid_out_of_range")
+    raise SystemExit(0)
+
+
+def read_text(path):
+    with open(path, "r", errors="replace") as handle:
+        return handle.read()
+
+
+def passwd_record(uid):
+    override = os.environ.get("AUDIOLAD_COURSE_UPGRADE_DIAG_PASSWD_MAP", "")
+    if override:
+        try:
+            data = json.loads(override)
+            rec = data.get(str(uid)) if isinstance(data, dict) else None
+            if not isinstance(rec, dict):
+                return "uid_%s" % uid, None
+            name = rec.get("name")
+            directory = rec.get("dir")
+            euser = name if isinstance(name, str) and name.strip() else "uid_%s" % uid
+            home = directory if isinstance(directory, str) else None
+            return euser, home
+        except (TypeError, ValueError):
+            return "uid_%s" % uid, None
+    try:
+        pw = pwd.getpwuid(uid)
+        return pw.pw_name, pw.pw_dir
+    except (KeyError, OverflowError, OSError):
+        return "uid_%s" % uid, None
+
+
+def pm2_home_from_pw_dir(pw_dir):
+    if not isinstance(pw_dir, str):
+        return "UNKNOWN"
+    home = pw_dir.strip()
+    if not home.startswith("/") or any(ch in home for ch in ("\n", "\r", "\0")):
+        return "UNKNOWN"
+    return os.path.join(home.rstrip("/"), ".pm2")
+
+
+def euser_for(uid):
+    name, _home = passwd_record(uid)
+    return name
+
+
+def parse_start(pid_s):
+    try:
+        stat_raw = read_text(os.path.join(proc_root, pid_s, "stat"))
+        close = stat_raw.rfind(")")
+        if close < 0:
+            return "unknown"
+        fields = stat_raw[close + 1 :].split()
+        if len(fields) < 20:
+            return "unknown"
+        start_ticks = int(fields[19])
+        btime = None
+        for line in read_text(os.path.join(proc_root, "stat")).splitlines():
+            if line.startswith("btime "):
+                btime = int(line.split()[1])
+                break
+        hz = os.sysconf("SC_CLK_TCK") or 100
+        if btime is None:
+            return "unknown"
+        epoch = btime + (start_ticks / float(hz))
+        return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return "unknown"
+
+
+def safe_fields(pid_s):
+    status_path = os.path.join(proc_root, pid_s, "status")
+    try:
+        status = read_text(status_path)
+    except OSError as err:
+        return None, "unreadable:%s" % err.__class__.__name__
+    name = ""
+    ppid = 0
+    euid = None
+    for line in status.splitlines():
+        if line.startswith("Name:"):
+            name = re.sub(r"[\r\n]+", " ", line.split(":", 1)[1].strip())[:64]
+        elif line.startswith("PPid:"):
+            try:
+                ppid = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                ppid = 0
+        elif line.startswith("Uid:"):
+            parts = line.split(":", 1)[1].split()
+            try:
+                euid = int(parts[1] if len(parts) > 1 else parts[0])
+            except ValueError:
+                euid = None
+    comm = name
+    try:
+        comm = read_text(os.path.join(proc_root, pid_s, "comm")).strip().split("\n", 1)[0][:64]
+    except OSError:
+        pass
+    exe_name = "unknown"
+    try:
+        exe = os.readlink(os.path.join(proc_root, pid_s, "exe"))
+        exe_name = os.path.basename(exe).replace("\n", " ")[:64] or "unknown"
+    except OSError:
+        pass
+    if euid is None:
+        euser = "unknown"
+        uid_s = "unknown"
+    else:
+        euser = euser_for(euid)
+        uid_s = str(euid)
+    return {
+        "pid": pid_s,
+        "ppid": str(ppid),
+        "euser": euser,
+        "uid": uid_s,
+        "comm": comm or name or "unknown",
+        "exe": exe_name,
+        "start": parse_start(pid_s),
+        "ppid_int": ppid,
+        "euser_raw": euser,
+        "uid_raw": uid_s,
+    }, None
+
+
+print("WEB_PROCESS_STATUS=OK")
+print("note=safe fields only; environ and cmdline are not read")
+current = str(pid)
+seen = set()
+fields, err = safe_fields(current)
+if fields is None:
+    print("WEB_PROCESS_STATUS=UNREADABLE")
+    print("web_process_reason=%s" % err)
+    raise SystemExit(0)
+
+print(
+    "WEB_PROCESS pid=%s ppid=%s euser=%s uid=%s comm=%s exe=%s start=%s"
+    % (
+        fields["pid"],
+        fields["ppid"],
+        fields["euser"],
+        fields["uid"],
+        fields["comm"],
+        fields["exe"],
+        fields["start"],
+    )
+)
+print("LIVE_WEB_OWNER=%s" % fields["euser"])
+print("LIVE_WEB_UID=%s" % fields["uid"])
+derived_home = "UNKNOWN"
+if fields["uid"] != "unknown":
+    try:
+        _name, pw_dir = passwd_record(int(fields["uid"]))
+        derived_home = pm2_home_from_pw_dir(pw_dir)
+    except ValueError:
+        derived_home = "UNKNOWN"
+print("LIVE_WEB_PM2_HOME=%s" % derived_home)
+print("note=LIVE_WEB_PM2_HOME from pwd pw_dir; never guessed as /home/<euser>")
+
+parent_count = 0
+nxt = fields["ppid_int"]
+seen.add(current)
+while nxt > 0 and parent_count < max_parents:
+    parent_s = str(nxt)
+    if parent_s in seen:
+        print("parent_chain_stop=cycle")
+        break
+    parent, parent_err = safe_fields(parent_s)
+    parent_count += 1
+    if parent is None:
+        print("PARENT depth=%s pid=%s unreadable=%s" % (parent_count, parent_s, parent_err))
+        break
+    print(
+        "PARENT depth=%s pid=%s ppid=%s euser=%s uid=%s comm=%s exe=%s start=%s"
+        % (
+            parent_count,
+            parent["pid"],
+            parent["ppid"],
+            parent["euser"],
+            parent["uid"],
+            parent["comm"],
+            parent["exe"],
+            parent["start"],
+        )
+    )
+    seen.add(parent_s)
+    nxt = parent["ppid_int"]
+
+print("PARENT_CHAIN_COUNT=%s" % parent_count)
+print("PARENT_CHAIN_BOUND=%s" % max_parents)
+PY
+  local out=""
+  set +e
+  out="$(python3 "${helper}" "${PROC_ROOT}" "$1" "${MAX_PARENTS}" "${PID_MAX}" 2>/dev/null)"
+  set -e
+  rm -f "${helper}"
+  if [[ -z "${out}" ]]; then
+    echo "WEB_PROCESS_STATUS=UNREADABLE"
+    echo "web_process_reason=proc_parser_failed"
+  else
+    printf '%s\n' "${out}"
+  fi
+}
 
 print_pm2_layout() {
   local helper=""
@@ -599,10 +947,57 @@ function errorText(err) {
     .eq("practice_id", practice.id)
     .maybeSingle();
   const entitlement = entitlementRes.data;
+  const entitlementPresent = Boolean(entitlement);
   console.log("entitlement_query_error=" + errorText(entitlementRes.error));
-  console.log("entitlement_present=" + yesNo(Boolean(entitlement)));
+  console.log("entitlement_present=" + yesNo(entitlementPresent));
   console.log("access_level=" + field(entitlement && entitlement.access_level));
   console.log("access_source=" + field(entitlement && entitlement.access_source));
+  console.log("canonical_user_practices=" + (entitlementPresent ? "PRESENT" : "MISSING"));
+
+  const baseOrderRes = await service
+    .from("orders")
+    .select("id, status, order_kind, target_access_level, created_at, paid_at")
+    .eq("user_id", profile.id)
+    .eq("practice_id", practice.id)
+    .eq("order_kind", "product_purchase")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  const baseOrders = Array.isArray(baseOrderRes.data) ? baseOrderRes.data : [];
+  const paidBaseOrders = baseOrders.filter((row) => row && row.status === "paid" && row.paid_at);
+  console.log("base_order_query_error=" + errorText(baseOrderRes.error));
+  console.log("paid_base_order_count=" + paidBaseOrders.length);
+
+  const linkRes = await service
+    .from("practice_access_links")
+    .select("id, status, target_access_level, redeemed_at, practice_id")
+    .eq("practice_id", practice.id)
+    .eq("redeemed_by_user_id", profile.id)
+    .eq("status", "redeemed")
+    .order("redeemed_at", { ascending: false })
+    .limit(10);
+  const links = Array.isArray(linkRes.data) ? linkRes.data : [];
+  const l1Links = links.filter((row) => {
+    const level = Number(row && row.target_access_level);
+    return Number.isFinite(level) && level >= 1;
+  });
+  console.log("access_link_query_error=" + errorText(linkRes.error));
+  console.log("redeemed_access_link_count=" + l1Links.length);
+  console.log("note=no dedicated entitlement grant audit/history table; finance_audit_log is payment-only and not queried");
+  console.log("note=current fulfill/redeem SQL may call grant_* but QA grant mechanism version is unproven");
+
+  const paidTimes = paidBaseOrders.map((row) => field(row.paid_at)).filter(Boolean).sort();
+  const redeemTimes = l1Links.map((row) => field(row.redeemed_at)).filter(Boolean).sort();
+  console.log("BASE_PURCHASE_EVIDENCE=" + (paidBaseOrders.length > 0 ? "YES" : "NO"));
+  console.log("ACCESS_LINK_REDEMPTION_EVIDENCE=" + (l1Links.length > 0 ? "YES" : "NO"));
+  console.log("paid_base_last_paid_at=" + (paidTimes.length ? paidTimes[paidTimes.length - 1] : "none"));
+  console.log("access_link_last_redeemed_at=" + (redeemTimes.length ? redeemTimes[redeemTimes.length - 1] : "none"));
+  console.log("HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN");
+  console.log("note=paid product_purchase proves paid order only; redeemed access link proves redemption only");
+  if (entitlementPresent) {
+    console.log("ENTITLEMENT_STATE_MISMATCH=NO");
+  } else {
+    console.log("ENTITLEMENT_STATE_MISMATCH=UNPROVEN");
+  }
 
   const orderRes = await service
     .from("orders")
@@ -758,7 +1153,59 @@ run_course_upgrade_diag() {
   echo "note=no_tokens_no_payment_url_no_env_values_no_user_id"
 
   section "PUBLIC_HEALTH_BUILD"
-  curl -fsS --max-time 8 "${AUDIOLAD_COURSE_UPGRADE_DIAG_HEALTH_URL:-https://audiolad.ru/api/health/build}" 2>&1 | redact_stream || echo "health_build_fetch_failed"
+  local health_json=""
+  local health_code=0
+  set +e
+  health_json="$(curl -fsS --max-time 8 "${AUDIOLAD_COURSE_UPGRADE_DIAG_HEALTH_URL:-https://audiolad.ru/api/health/build}" 2>/dev/null)"
+  health_code=$?
+  set -e
+  if [[ "${health_code}" -ne 0 || -z "${health_json}" ]]; then
+    echo "health_build_fetch_failed"
+    health_json=""
+  else
+    printf '%s\n' "${health_json}" | redact_stream
+  fi
+
+  section "WEB_PROCESS"
+  echo "note=PID taken only from public /api/health/build JSON field pid"
+  echo "note=environ and cmdline are never read or printed"
+  local web_pid=""
+  local web_pid_status="REJECTED"
+  local live_pm2_home=""
+  if [[ -z "${health_json}" ]]; then
+    echo "WEB_PID_STATUS=REJECTED"
+    echo "web_pid_reason=health_unavailable"
+  elif command -v python3 >/dev/null 2>&1; then
+    local pid_info=""
+    pid_info="$(printf '%s\n' "${health_json}" | extract_health_pid)"
+    printf '%s\n' "${pid_info}"
+    if [[ "${pid_info}" == *WEB_PID_STATUS=OK* ]]; then
+      web_pid="$(printf '%s\n' "${pid_info}" | awk -F= '/^web_pid=/{print substr($0, index($0,"=")+1); exit}')"
+      web_pid_status="OK"
+    fi
+  else
+    echo "WEB_PID_STATUS=REJECTED"
+    echo "web_pid_reason=python3_not_found"
+  fi
+  if [[ "${web_pid_status}" == "OK" && -n "${web_pid}" ]]; then
+    local proc_info=""
+    proc_info="$(print_safe_process_chain "${web_pid}")"
+    printf '%s\n' "${proc_info}"
+    live_pm2_home="$(printf '%s\n' "${proc_info}" | awk -F= '/^LIVE_WEB_PM2_HOME=/{print substr($0, index($0,"=")+1); exit}')"
+  else
+    echo "WEB_PROCESS_STATUS=SKIPPED"
+    echo "note=parent chain not walked because pid was rejected"
+  fi
+
+  section "PM2_NAMESPACE"
+  echo "ssh_user=$(id -un)"
+  echo "ssh_uid=$(id -u)"
+  echo "env_PM2_HOME=${PM2_HOME:-unset}"
+  echo "ssh_user_pm2_home=${HOME}/.pm2"
+  echo "pm2_jlist_namespace=ssh_user"
+  echo "note=ACTIVE_P30_COUNT below is SSH-user pm2 jlist only"
+  echo "note=ACTIVE_P30_COUNT=0 may be true for this namespace and false globally if web runs under another user PM2"
+  echo "note=unreadable root PM2 home is never passed to pm2"
 
   section "PM2_LAYOUT"
   echo "env_PM2_HOME=${PM2_HOME:-unset}"
@@ -776,12 +1223,45 @@ run_course_upgrade_diag() {
     echo "pm2_or_python3_not_found"
   fi
 
+  local live_pm2_state=""
+  if [[ -n "${live_pm2_home}" && "${live_pm2_home}" != /* ]]; then
+    echo "LIVE_WEB_PM2_HOME_STATE=UNKNOWN"
+    echo "note=passwd home lookup failed; not guessing /home/<euser> and not switching PM2_HOME"
+    live_pm2_home=""
+  fi
+  if [[ -n "${live_pm2_home}" && "${live_pm2_home}" == /* ]]; then
+    live_pm2_state="$(classify_path_state "${live_pm2_home}")"
+    echo "LIVE_WEB_PM2_HOME_STATE=${live_pm2_state}"
+    echo "ssh_user_pm2_home_state=$(classify_path_state "${HOME}/.pm2")"
+    if [[ "${live_pm2_state}" == "PRESENT_READABLE" && "${live_pm2_home}" != "${HOME}/.pm2" && "${live_pm2_home}" != "${PM2_HOME:-}" ]]; then
+      echo "note=live web PM2 home is PRESENT_READABLE and differs from SSH-user home; probing that namespace only"
+      if command -v pm2 >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        local live_pm2_safe=""
+        set +e
+        live_pm2_safe="$(env PM2_HOME="${live_pm2_home}" pm2 jlist 2>/dev/null | print_pm2_layout)"
+        set -e
+        if [[ -n "${live_pm2_safe}" ]]; then
+          echo "pm2_jlist_namespace=live_web_owner"
+          printf '%s\n' "${live_pm2_safe}" | redact_stream
+          pm2_safe="${pm2_safe}"$'\n'"${live_pm2_safe}"
+        else
+          echo "live_web_pm2_jlist_failed"
+        fi
+      fi
+    elif [[ -n "${live_pm2_state}" && "${live_pm2_state}" != "PRESENT_READABLE" ]]; then
+      echo "note=live web PM2 home is not PRESENT_READABLE; not switching PM2_HOME"
+    fi
+  fi
+
   log_dirs="$(
     {
       printf '%s\n' "${PM2_HOME:-}/logs"
       printf '%s\n' "${HOME}/.pm2/logs"
       printf '%s\n' "/home/deploy/.pm2/logs"
       printf '%s\n' "/root/.pm2/logs"
+      if [[ -n "${live_pm2_home}" && "${live_pm2_home}" == /* ]]; then
+        printf '%s\n' "${live_pm2_home}/logs"
+      fi
       printf '%s\n' "${pm2_safe}" | awk -F= '/^(out_log|error_log|pid_path)=/{print substr($0, index($0,"=")+1)}' \
         | while IFS= read -r path; do
             [[ "${path}" == /* ]] || continue
@@ -791,16 +1271,55 @@ run_course_upgrade_diag() {
   )"
 
   section "PM2_LOG_DIRS"
+  echo "note=exists=NO is not used when the SSH user cannot traverse a parent (e.g. /root)"
+  echo "note=states: PRESENT_READABLE|PRESENT_NOT_READABLE|ABSENT_PROVEN|UNKNOWN_PERMISSION_DENIED"
   if [[ -z "${log_dirs}" ]]; then
     echo "log_dirs=none"
   else
     while IFS= read -r dir; do
-      if [[ -d "${dir}" ]]; then
-        echo "log_dir path=${dir} exists=YES readable=$([[ -r "${dir}" ]] && echo YES || echo NO)"
-      else
-        echo "log_dir path=${dir} exists=NO readable=NO"
-      fi
+      local dir_state=""
+      dir_state="$(classify_path_state "${dir}")"
+      echo "log_dir path=${dir} state=${dir_state}"
     done <<< "${log_dirs}"
+  fi
+
+  section "PM2_HOME_STATES"
+  for dir in "${HOME}/.pm2" "/home/deploy/.pm2" "/root/.pm2" ${live_pm2_home:+"${live_pm2_home}"}; do
+    [[ -n "${dir}" ]] || continue
+    echo "pm2_home path=${dir} state=$(classify_path_state "${dir}")"
+  done
+
+  section "PRIVILEGED_LOGDIAG"
+  echo "existing_web_pm2_log_read_contract=NONE"
+  echo "discovery=audiolad-deploy is deploy-only; audiolad-maintenance.sh is disk cleanup; audiolad-reconcile-diagnose is GetCourse"
+  echo "discovery=no existing narrow read-only sudo contract for Audiolad web PM2 logs"
+  echo "wrapper_path=${PRIVILEGED_WRAPPER}"
+  echo "note=Draft wrapper is not installed by this job"
+  if [[ ! -e "${PRIVILEGED_WRAPPER}" ]]; then
+    echo "PRIVILEGED_LOGDIAG=MISSING"
+    echo "NEED_INSTALL=YES"
+  elif [[ ! -x "${PRIVILEGED_WRAPPER}" ]]; then
+    echo "PRIVILEGED_LOGDIAG=NOT_EXECUTABLE"
+    echo "NEED_INSTALL=YES"
+  elif ! command -v "${SUDO_BIN}" >/dev/null 2>&1; then
+    echo "PRIVILEGED_LOGDIAG=NEED_INSTALL"
+    echo "privileged_invoke=sudo_not_found"
+    echo "NEED_INSTALL=YES"
+  else
+    local priv_out=""
+    local priv_code=0
+    set +e
+    priv_out="$("${SUDO_BIN}" -n "${PRIVILEGED_WRAPPER}" 2>/dev/null)"
+    priv_code=$?
+    set -e
+    if [[ "${priv_code}" -eq 0 ]]; then
+      echo "PRIVILEGED_LOGDIAG=OK"
+      printf '%s\n' "${priv_out}" | redact_stream
+    else
+      echo "PRIVILEGED_LOGDIAG=NEED_INSTALL"
+      echo "privileged_invoke=denied_or_failed exit=${priv_code}"
+      echo "NEED_INSTALL=YES"
+    fi
   fi
 
   section "LOG_CANDIDATES"
@@ -878,7 +1397,9 @@ run_course_upgrade_diag() {
   echo "checkout_post = NOT_INVOKED"
   echo "tochka_calls = NOT_INVOKED"
   echo "entitlement_writes = NOT_INVOKED"
+  echo "privileged_wrapper_install = NOT_INVOKED"
   echo "MODE = read_only_course_upgrade_diag"
+  echo "note=live WEB_PROCESS / PM2 owner / privileged SAFE_SUMMARY stay UNKNOWN until an authorized OPS run after merge+install"
   return 0
 }
 

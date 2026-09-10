@@ -367,15 +367,37 @@ cutover активен часто `audiolad-p3001`, а orphaned-логи `audiol
 
 Что читает:
 
-- `pm2 jlist` (safe fields), `PM2_HOME`, типичные log dirs
-  (`$HOME/.pm2/logs`, `/home/deploy/.pm2/logs`, `/root/.pm2/logs`);
+- public `/api/health/build` JSON field `pid` only (positive integer;
+  otherwise `WEB_PID_STATUS=REJECTED`). For that PID and a parent chain
+  of at most 6 ancestors: `pid`, `ppid`, effective user, `uid`,
+  comm/exe basename, start time. Environ and full command line are
+  never read or printed. Live web PM2 home is
+  `pwd.getpwuid(euid).pw_dir` + `/.pm2` — never guessed as
+  `/root/.pm2` or `/home/<euser>/.pm2`. Passwd failure →
+  `LIVE_WEB_PM2_HOME=UNKNOWN`. Goal: Unix owner of the live web
+  process, without assuming root/deploy;
+- `pm2 jlist` of the **SSH-user** namespace (safe fields), `PM2_HOME`,
+  typical log dirs (`$HOME/.pm2/logs`, `/home/deploy/.pm2/logs`,
+  `/root/.pm2/logs`) plus the PM2 home derived from the live process
+  owner. `ACTIVE_P30_COUNT` is SSH-user `pm2 jlist` only: `=0` may be
+  true for that namespace and false globally if the web process is
+  owned by another user's PM2;
+- log dir / PM2 home states are **not** `exists=YES|NO`. States:
+  `PRESENT_READABLE`, `PRESENT_NOT_READABLE`, `ABSENT_PROVEN`,
+  `UNKNOWN_PERMISSION_DENIED`. `exists=NO` is **not** proof that
+  `/root/.pm2/logs` is absent when the SSH user cannot traverse
+  `/root`;
+- `PM2_HOME=/root/.pm2 pm2 …` is never run unless that home is
+  `PRESENT_READABLE`;
 - active `audiolad-p30xx` out/error;
 - `audiolad-p3000*` / `audiolad-p3001*` out/error, rotated `.log.*`,
   `.gz`, orphaned logs удалённых PM2 app;
 - optional `journalctl` только по тем же payment/checkout маркерам
   (через тот же streaming scanner);
 - окно приоритета `2026-09-10T04:25:00Z`–`2026-09-10T04:50:00Z` плюс
-  недавние совпадения;
+  недавние совпадения. Hypothesis to **check**, not force:
+  `FAILED_STAGE=create_course_upgrade_order` and
+  `ACTUAL_API_ERROR=not_entitled`;
 - optional read-only DB correlation через current-release
   `loadEnvConfig` + service role: hardcoded QA listener
   (email и `user_id` не печатаются) + курс
@@ -384,7 +406,37 @@ cutover активен часто `audiolad-p3001`, а orphaned-логи `audiol
   как safe fields + boolean
   `has_provider_metadata` / `has_payment_url` / `has_checkout_token`;
   metadata — только proven-safe key names).
+  Historical correlation uses only real schema and does **not**
+  treat paid orders or access-link redemptions as proof of a
+  canonical L1 grant. Flags:
+  `BASE_PURCHASE_EVIDENCE=YES|NO` (paid `product_purchase` only);
+  `ACCESS_LINK_REDEMPTION_EVIDENCE=YES|NO` (redeemed
+  `practice_access_links` only; no token_hash / user ids printed);
+  `HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN` unless a real
+  grant-audit/history row exists or the exact QA-era SQL/RPC is
+  proven to have atomically written `user_practices` — neither is
+  available in this schema (`finance_audit_log` is payment-only and
+  is not queried). Current fulfill/redeem SQL may call `grant_*`;
+  that does not prove the mechanism version that issued QA L1.
+  `ENTITLEMENT_STATE_MISMATCH=NO` when the canonical
+  `user_practices` row is present; `UNPROVEN` when it is missing.
+  Paid/redemption evidence never auto-sets mismatch `YES`.
   Если env/release/probe недоступны — `DB_CORRELATION=DEFERRED`.
+
+Privilege discovery: **no existing** narrow read-only sudo contract
+can safely read Audiolad web PM2 logs. `/usr/local/sbin/audiolad-deploy`
+is deploy-only. `/usr/local/sbin/audiolad-maintenance.sh` is disk
+cleanup. `audiolad-reconcile-diagnose` is GetCourse. The job does
+**not** invent `sudo bash`, arbitrary sudo, arbitrary paths, or
+`NOPASSWD: ALL`.
+
+If `/usr/local/sbin/audiolad-course-upgrade-logdiag` is already
+installed and the deploy user may `sudo -n` that exact path with
+**no arguments**, the job invokes it read-only and prints its
+`SAFE_SUMMARY`. Otherwise it reports `PRIVILEGED_LOGDIAG=MISSING`
+or `NEED_INSTALL` and continues (other sections may still succeed).
+This PR prepares the wrapper + sudoers Draft only. It does **not**
+install them on production.
 
 Exact flags / маркеры:
 
@@ -396,9 +448,19 @@ checkout_post = NOT_INVOKED
 tochka_calls = NOT_INVOKED
 entitlement_writes = NOT_INVOKED
 MODE = read_only_course_upgrade_diag
+WEB_PID_STATUS=OK|REJECTED
+LIVE_WEB_OWNER=
+LIVE_WEB_PM2_HOME=  # from pwd.getpwuid(euid).pw_dir + /.pm2; UNKNOWN if passwd missing
+LIVE_WEB_PM2_HOME_STATE=PRESENT_READABLE|PRESENT_NOT_READABLE|ABSENT_PROVEN|UNKNOWN_PERMISSION_DENIED
 ACTIVE_P30_COUNT=
 ACTIVE_P30_NAMES=
+PRIVILEGED_LOGDIAG=MISSING|NEED_INSTALL|OK
+NEED_INSTALL=YES
 SAFE_SUMMARY window= event= FAILED_STAGE= ACTUAL_API_ERROR= ACTUAL_HTTP_STATUS=
+BASE_PURCHASE_EVIDENCE=YES|NO
+ACCESS_LINK_REDEMPTION_EVIDENCE=YES|NO
+HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=YES|NO|UNPROVEN
+ENTITLEMENT_STATE_MISMATCH=YES|NO|UNPROVEN
 DB_CORRELATION=OK|DEFERRED
 ```
 
@@ -418,6 +480,64 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
+
+### Privileged web PM2 logdiag wrapper (Draft only — do not install)
+
+In-repo discovery found **no** existing narrow read-only privilege
+contract for Audiolad web PM2 logs. Do not reuse `audiolad-deploy` or
+maintenance sudo for log reading.
+
+This PR adds Draft assets only. **Do not install on production from
+this PR, from CI, or from `OPS_COURSE_UPGRADE_DIAG`.** After a later
+explicit owner/architect approval, a human may install:
+
+| Asset | Repo path | Intended server path |
+|-------|-----------|----------------------|
+| Wrapper | `deploy/scripts/audiolad-course-upgrade-logdiag.sh` | `/usr/local/sbin/audiolad-course-upgrade-logdiag` |
+| sudoers | `deploy/sudoers/audiolad-course-upgrade-logdiag` | `/etc/sudoers.d/audiolad-course-upgrade-logdiag` |
+
+Wrapper contract:
+
+- root-owned, mode 0755;
+- **no arguments**; no arbitrary command, path, or remote shell;
+- reads only `audiolad-p3000*`, `audiolad-p3001*`, `audiolad-p30xx*`
+  under `/root/.pm2/logs` and `/home/deploy/.pm2/logs`, including
+  rotations and `.gz`;
+- never prints raw log; `SAFE_SUMMARY` only
+  (`FAILED_STAGE`, `ACTUAL_API_ERROR`, `ACTUAL_HTTP_STATUS`,
+  `order_id`, `practice_id`, `target_access_level`, safe provider
+  status/code);
+- never `pm2 restart|start|delete|save`; never writes app/DB;
+  never checkout / Tochka / deploy / cutover.
+
+sudoers contract (production `deploy` user only). Standard sudoers
+empty-argument list (`""`) allows the exact command with **zero**
+arguments only. A command name with no argument list would allow any
+argv; that form is not used. The shell wrapper also rejects `argc!=0`.
+Wrapper sets `PATH=/usr/sbin:/usr/bin:/bin` and ignores caller PATH.
+
+```text
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag ""
+```
+
+No unrestricted ALL sudo. No argument wildcard. No `sudo bash`.
+
+Installation plan (**do not execute from this PR**):
+
+```bash
+# MANUAL, later authorized install only. Not CI. Not OPS_COURSE_UPGRADE_DIAG.
+install -o root -g root -m 0755 \
+  deploy/scripts/audiolad-course-upgrade-logdiag.sh \
+  /usr/local/sbin/audiolad-course-upgrade-logdiag
+install -o root -g root -m 0440 \
+  deploy/sudoers/audiolad-course-upgrade-logdiag \
+  /etc/sudoers.d/audiolad-course-upgrade-logdiag
+visudo -cf /etc/sudoers.d/audiolad-course-upgrade-logdiag
+[[ "$(stat -c '%U:%G %a' /usr/local/sbin/audiolad-course-upgrade-logdiag)" == "root:root 755" ]]
+```
+
+Until that install happens, `OPS_COURSE_UPGRADE_DIAG` reports
+`PRIVILEGED_LOGDIAG=MISSING` / `NEED_INSTALL` and continues.
 
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
