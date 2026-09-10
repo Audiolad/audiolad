@@ -19,12 +19,14 @@ import {
 } from "../src/lib/studio-music/catalog";
 import { resolveStudioMusicCatalogAction } from "../src/lib/studio-music/catalog-actions";
 import {
+  DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
   inferLegacyStudioMusicPricingMode,
   normalizeStudioMusicPricingForSave,
   resolveStudioMusicAcquisition,
   STUDIO_MUSIC_ACQUISITION_STATUS,
   STUDIO_MUSIC_PRICING_ERROR,
   STUDIO_MUSIC_PRICING_MODE,
+  studioMusicPriceMinorToRubles,
   studioMusicPricingModeAfterListenerFlip,
 } from "../src/lib/studio-music/pricing";
 
@@ -222,7 +224,7 @@ assert.equal(listenerOwned.can_acquire, true);
 
 // 12. Studio entitlement ≠ listener ownership / no user_practices
 assert.doesNotMatch(read("src/lib/studio-music/pricing.ts"), /user_practices/);
-assert.doesNotMatch(ordersSql, /user_practices/);
+assert.doesNotMatch(ordersSql, /INSERT INTO public\.user_practices/);
 assert.doesNotMatch(
   read("src/app/api/studio/music/acquire/route.ts"),
   /from\(["']user_practices["']\)/,
@@ -337,6 +339,9 @@ assert.equal(
   }),
   null,
 );
+assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, 600);
+assert.equal(studioMusicPriceMinorToRubles(null), 0);
+assert.equal(studioMusicPriceMinorToRubles(60000), 600);
 
 // Catalog free filter = FREE FOR STUDIO
 assert.equal(

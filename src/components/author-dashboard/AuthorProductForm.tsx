@@ -138,6 +138,7 @@ import {
 } from "@/lib/products/publish-preview";
 import { formatRubles } from "@/lib/products/price-format";
 import {
+  DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
   STUDIO_MUSIC_PRICING_MODE,
   defaultStudioMusicPricingModeForForm,
   studioMusicPricingModeAfterListenerFlip,
@@ -436,7 +437,7 @@ function buildInitialForm(
         ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
         : null,
     studioMusicPricingMode: null,
-    studioMusicPriceRubles: 600,
+    studioMusicPriceRubles: DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
     formatPreset:
       created.productKind === PRODUCT_KIND.AUDIO_POST
         ? AUDIO_POST_KIND_LABEL
@@ -3012,6 +3013,11 @@ export default function AuthorProductForm({
                       setForm((current) => ({
                         ...current,
                         studioMusicPricingMode: option.value,
+                        studioMusicPriceRubles:
+                          option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
+                          current.studioMusicPriceRubles < MIN_PAID_PRICE_RUB
+                            ? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES
+                            : current.studioMusicPriceRubles,
                       }))
                     }
                   />

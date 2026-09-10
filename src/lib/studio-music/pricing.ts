@@ -1,5 +1,4 @@
 import {
-  MIN_PAID_PRICE_RUB,
   rublesToMinor,
   validatePaidPriceRubles,
 } from "@/lib/pricing/money";
@@ -316,6 +315,9 @@ export function studioMusicPricingModeAfterListenerFlip(input: {
   return input.currentMode;
 }
 
+/** Placeholder in the author form when the author picks a fixed Studio price. */
+export const DEFAULT_STUDIO_MUSIC_FIXED_RUBLES = 600;
+
 export function studioMusicPriceMinorToRubles(
   minor: number | null | undefined,
 ): number {
@@ -325,7 +327,7 @@ export function studioMusicPriceMinorToRubles(
     minor <= 0 ||
     minor % 100 !== 0
   ) {
-    return MIN_PAID_PRICE_RUB;
+    return 0;
   }
   return minor / 100;
 }

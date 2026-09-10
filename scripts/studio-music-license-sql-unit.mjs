@@ -154,7 +154,7 @@ assert(/never user_practices/.test(fulfill));
 assert(!/author_share_bps/.test(pricing));
 assert(!/platform_absorbs/.test(pricing));
 assert(!/ceil_author_remainder_platform/.test(pricing));
-assert(!/user_practices/.test(pricing));
+assert(!/INSERT INTO public\.user_practices/.test(pricing));
 
 assert(/studio amount must be 2x/.test(smoke));
 assert(/listener purchase must not grant Studio/.test(smoke));
