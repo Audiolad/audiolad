@@ -186,7 +186,10 @@ assert.equal(
 );
 
 // 8. paid checkout forbidden for Studio FREE
-assert.equal(paidListenerStudioFree.status !== "paid", true);
+assert.notEqual(
+  paidListenerStudioFree.status,
+  STUDIO_MUSIC_ACQUISITION_STATUS.PAID,
+);
 
 // 9. free acquire forbidden for Studio FIXED/AUTO paid
 assert.equal(
