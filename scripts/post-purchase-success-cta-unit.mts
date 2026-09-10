@@ -26,6 +26,14 @@ function testPrimaryHrefUsesPracticePage() {
     }),
     "/practice/anna/morning",
   );
+  assert.equal(
+    buildPaidAuthenticatedPrimaryHref({
+      authorSlug: "anna",
+      practiceSlug: "morning",
+      orderKind: "studio_music_license",
+    }),
+    "/studio",
+  );
 
   const body = toCheckoutStatusBody({
     status: "paid",

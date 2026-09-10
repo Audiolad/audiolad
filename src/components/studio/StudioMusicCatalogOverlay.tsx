@@ -3,11 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 
 import { StudioMusicCatalogCard } from "@/components/studio/StudioMusicCatalogCard";
+import { buildBuySignInHref } from "@/lib/auth/buy-sign-in";
+import {
+  markStudioMusicCatalogItemAvailable,
+  resolveStudioMusicCatalogAction,
+} from "@/lib/studio-music/catalog-actions";
 import type {
   StudioMusicCatalogFilter,
   StudioMusicCatalogItem,
   StudioMusicCatalogResult,
 } from "@/lib/studio-music/catalog";
+import {
+  mapStudioMusicAcquireClientError,
+  resolveStudioMusicCheckoutUiError,
+} from "@/lib/studio-music/client-errors";
+import { STUDIO_MUSIC_GRANT_SOURCE } from "@/lib/studio-music/access";
 
 const FILTERS: Array<{
   id: StudioMusicCatalogFilter;
@@ -37,6 +47,8 @@ function StudioMusicCatalogOverlayBody({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+  const [busyPublicationId, setBusyPublicationId] = useState<string | null>(null);
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
 
   const stopPreview = () => {
     const audio = audioRef.current;
@@ -158,6 +170,217 @@ function StudioMusicCatalogOverlayBody({
     });
   };
 
+  const patchItem = (
+    publicationId: string,
+    updater: (item: StudioMusicCatalogItem) => StudioMusicCatalogItem,
+  ) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.publication_id === publicationId ? updater(item) : item,
+      ),
+    );
+  };
+
+  const refreshPublication = async (publicationId: string) => {
+    const params = new URLSearchParams({
+      filter,
+      limit: "20",
+    });
+    const response = await fetch(
+      `/api/studio/music/catalog?${params.toString()}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      return;
+    }
+    const body = (await response.json()) as StudioMusicCatalogResult;
+    const next = body.items.find((item) => item.publication_id === publicationId);
+    if (!next) {
+      return;
+    }
+    patchItem(publicationId, () => next);
+  };
+
+  const redirectToSignIn = () => {
+    const currentPath =
+      typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : "";
+    const href = buildBuySignInHref(currentPath, currentPath);
+    if (href) {
+      window.location.assign(href);
+    }
+  };
+
+  const acquirePublication = async (item: StudioMusicCatalogItem) => {
+    const action = resolveStudioMusicCatalogAction(item);
+    if (action.kind !== "free" && action.kind !== "paid") {
+      return;
+    }
+
+    setBusyPublicationId(item.publication_id);
+    setActionErrors((current) => {
+      const next = { ...current };
+      delete next[item.publication_id];
+      return next;
+    });
+    setError(null);
+
+    try {
+      if (action.kind === "free") {
+        const response = await fetch("/api/studio/music/acquire", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ practiceId: item.publication_id }),
+        });
+        const body: unknown = await response.json().catch(() => null);
+
+        if (response.status === 401) {
+          redirectToSignIn();
+          return;
+        }
+
+        const errorCode =
+          body &&
+          typeof body === "object" &&
+          "error" in body &&
+          typeof (body as { error?: unknown }).error === "string"
+            ? (body as { error: string }).error
+            : undefined;
+
+        if (!response.ok) {
+          setActionErrors((current) => ({
+            ...current,
+            [item.publication_id]: mapStudioMusicAcquireClientError(errorCode),
+          }));
+          return;
+        }
+
+        patchItem(item.publication_id, (current) =>
+          markStudioMusicCatalogItemAvailable(current, {
+            grantSource: STUDIO_MUSIC_GRANT_SOURCE.FREE,
+          }),
+        );
+        await refreshPublication(item.publication_id);
+        return;
+      }
+
+      const response = await fetch("/api/checkout/studio-music", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          practiceId: item.publication_id,
+          ...(typeof item.studio_effective_minor === "number" &&
+          Number.isInteger(item.studio_effective_minor) &&
+          item.studio_effective_minor > 0
+            ? { expectedAmountMinor: item.studio_effective_minor }
+            : {}),
+        }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+
+      if (response.status === 401) {
+        redirectToSignIn();
+        return;
+      }
+
+      const errorCode =
+        body &&
+        typeof body === "object" &&
+        "error" in body &&
+        typeof (body as { error?: unknown }).error === "string"
+          ? (body as { error: string }).error
+          : undefined;
+
+      if (errorCode === "already_studio_entitled") {
+        patchItem(item.publication_id, (current) =>
+          markStudioMusicCatalogItemAvailable(current, {
+            grantSource: STUDIO_MUSIC_GRANT_SOURCE.PURCHASE,
+          }),
+        );
+        await refreshPublication(item.publication_id);
+        return;
+      }
+
+      if (errorCode === "price_changed") {
+        const currentAmount =
+          body &&
+          typeof body === "object" &&
+          "current_amount_minor" in body &&
+          typeof (body as { current_amount_minor?: unknown }).current_amount_minor ===
+            "number"
+            ? (body as { current_amount_minor: number }).current_amount_minor
+            : null;
+        const message =
+          body &&
+          typeof body === "object" &&
+          "message" in body &&
+          typeof (body as { message?: unknown }).message === "string"
+            ? (body as { message: string }).message
+            : resolveStudioMusicCheckoutUiError({
+                httpStatus: response.status,
+                errorCode,
+              });
+        if (currentAmount && currentAmount > 0) {
+          patchItem(item.publication_id, (current) => ({
+            ...current,
+            studio_effective_minor: currentAmount,
+          }));
+        }
+        setActionErrors((current) => ({
+          ...current,
+          [item.publication_id]: message,
+        }));
+        await refreshPublication(item.publication_id);
+        return;
+      }
+
+      const paymentUrl =
+        body &&
+        typeof body === "object" &&
+        "payment" in body &&
+        (body as { payment?: { payment_url?: unknown } }).payment &&
+        typeof (body as { payment: { payment_url?: unknown } }).payment
+          .payment_url === "string"
+          ? (body as { payment: { payment_url: string } }).payment.payment_url
+          : null;
+
+      const uiError = resolveStudioMusicCheckoutUiError({
+        httpStatus: response.status,
+        errorCode,
+        paymentUrl,
+      });
+
+      if (uiError) {
+        setActionErrors((current) => ({
+          ...current,
+          [item.publication_id]: uiError,
+        }));
+        return;
+      }
+
+      window.location.assign(paymentUrl as string);
+    } catch {
+      setActionErrors((current) => ({
+        ...current,
+        [item.publication_id]:
+          action.kind === "free"
+            ? mapStudioMusicAcquireClientError("internal_error")
+            : resolveStudioMusicCheckoutUiError({
+                httpStatus: 0,
+                networkFailed: true,
+              }),
+      }));
+    } finally {
+      setBusyPublicationId(null);
+    }
+  };
+
   const loadMore = async () => {
     if (!nextCursor) {
       return;
@@ -253,8 +476,13 @@ function StudioMusicCatalogOverlayBody({
                 key={item.publication_id}
                 item={item}
                 activePreviewKey={activePreviewKey}
+                busy={busyPublicationId === item.publication_id}
+                actionError={actionErrors[item.publication_id] ?? null}
                 onPreview={(publicationId, audioItemId) => {
                   void playPreview(publicationId, audioItemId);
+                }}
+                onAcquire={(next) => {
+                  void acquirePublication(next);
                 }}
               />
             ))}
