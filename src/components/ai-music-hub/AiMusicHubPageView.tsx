@@ -7,11 +7,11 @@ import {
   AI_MUSIC_HUB_CLOSING_HEADING,
   AI_MUSIC_HUB_CLOSING_TEXT,
   AI_MUSIC_HUB_CTA_LABEL,
+  AI_MUSIC_HUB_DURATION_NOTE,
   AI_MUSIC_HUB_DUAL_INCOME_HEADING,
   AI_MUSIC_HUB_DUAL_INCOME_TEXT,
   AI_MUSIC_HUB_ECONOMICS_HEADING,
   AI_MUSIC_HUB_ECONOMICS_INTRO,
-  AI_MUSIC_HUB_ECONOMICS_NOTE,
   AI_MUSIC_HUB_ECONOMICS_STATS,
   AI_MUSIC_HUB_FAQ,
   AI_MUSIC_HUB_FAQ_HEADING,
@@ -20,13 +20,15 @@ import {
   AI_MUSIC_HUB_FORMATS_INTRO,
   AI_MUSIC_HUB_INTRO,
   AI_MUSIC_HUB_KICKER,
+  AI_MUSIC_HUB_ONE_PURCHASE_FORMULA,
   AI_MUSIC_HUB_PAGE_H1,
   AI_MUSIC_HUB_PLATFORMS_HEADING,
   AI_MUSIC_HUB_PLATFORMS_TEXT,
-  AI_MUSIC_HUB_PRODUCTS,
+  AI_MUSIC_HUB_PRODUCTS_EXAMPLES,
+  AI_MUSIC_HUB_PRODUCTS_FORMULA,
   AI_MUSIC_HUB_PRODUCTS_HEADING,
   AI_MUSIC_HUB_PRODUCTS_INTRO,
-  AI_MUSIC_HUB_SCALING_DISCLAIMER,
+  AI_MUSIC_HUB_SCALING_AFTER,
   AI_MUSIC_HUB_SCALING_HEADING,
   AI_MUSIC_HUB_SCALING_INTRO,
   AI_MUSIC_HUB_SCALING_ROWS,
@@ -199,8 +201,8 @@ export default function AiMusicHubPageView() {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-sm leading-6 text-[#4a3d73] sm:text-[15px] sm:leading-7">
-          {AI_MUSIC_HUB_ECONOMICS_NOTE}
+        <p className="mt-5 rounded-[20px] border border-[#d8c8ee] bg-[#faf7ff] px-5 py-4 text-base font-semibold leading-7 text-[#25135c] sm:text-[17px] sm:leading-8">
+          {AI_MUSIC_HUB_ONE_PURCHASE_FORMULA}
         </p>
       </section>
 
@@ -254,9 +256,13 @@ export default function AiMusicHubPageView() {
             </tbody>
           </table>
         </div>
-        <p className="mt-4 text-sm leading-6 text-[#7d70a2]">
-          {AI_MUSIC_HUB_SCALING_DISCLAIMER}
-        </p>
+        <div className="mt-5 rounded-[28px] border border-[#d8c8ee] bg-gradient-to-br from-[#fffaff] to-[#efe4fb] px-5 py-6 sm:px-6">
+          <div className="space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            {AI_MUSIC_HUB_SCALING_AFTER.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        </div>
       </Section>
 
       <section
@@ -277,9 +283,13 @@ export default function AiMusicHubPageView() {
       </section>
 
       <Section id="ai-music-products" title={AI_MUSIC_HUB_PRODUCTS_HEADING}>
-        <p className={proseClassName}>{AI_MUSIC_HUB_PRODUCTS_INTRO}</p>
-        <ul className="mt-5 grid list-none gap-3 p-0 sm:grid-cols-3">
-          {AI_MUSIC_HUB_PRODUCTS.map((item) => (
+        <div className={proseClassName}>
+          {AI_MUSIC_HUB_PRODUCTS_INTRO.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
+        <ul className="mt-5 grid list-none gap-3 p-0 sm:grid-cols-2">
+          {AI_MUSIC_HUB_PRODUCTS_EXAMPLES.map((item) => (
             <li key={item.title} className={cardClassName}>
               <h3 className="text-base font-semibold text-[#25135c]">
                 {item.title}
@@ -290,6 +300,9 @@ export default function AiMusicHubPageView() {
             </li>
           ))}
         </ul>
+        <p className="mt-5 rounded-[20px] border border-[#eadff8] bg-[#faf7ff] px-5 py-4 text-base leading-7 text-[#25135c] sm:text-[17px] sm:leading-8">
+          {AI_MUSIC_HUB_PRODUCTS_FORMULA}
+        </p>
       </Section>
 
       <Section id="ai-music-scenarios" title={AI_MUSIC_HUB_SCENARIOS_HEADING}>
@@ -311,7 +324,7 @@ export default function AiMusicHubPageView() {
         <div className="mt-5 hidden overflow-x-auto rounded-[20px] border border-[#e8def5] bg-white sm:block">
           <table className="w-full min-w-0 text-left text-sm">
             <caption className="sr-only">
-              Сценарии использования музыки авторами в Студии
+              Примеры музыкальных продуктов по задачам
             </caption>
             <thead>
               <tr className="border-b border-[#eadff8] text-[#7d70a2]">
@@ -343,6 +356,9 @@ export default function AiMusicHubPageView() {
             </tbody>
           </table>
         </div>
+        <p className="mt-4 text-sm leading-6 text-[#7d70a2] sm:text-[15px] sm:leading-7">
+          {AI_MUSIC_HUB_DURATION_NOTE}
+        </p>
       </Section>
 
       <Section id="ai-music-formats" title={AI_MUSIC_HUB_FORMATS_HEADING}>

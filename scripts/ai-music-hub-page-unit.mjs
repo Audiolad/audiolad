@@ -11,9 +11,12 @@ import {
   AI_MUSIC_HUB_ECONOMICS_STATS,
   AI_MUSIC_HUB_FAQ,
   AI_MUSIC_HUB_INTRO,
+  AI_MUSIC_HUB_ONE_PURCHASE_FORMULA,
   AI_MUSIC_HUB_PAGE_H1,
   AI_MUSIC_HUB_PATH,
-  AI_MUSIC_HUB_SCALING_DISCLAIMER,
+  AI_MUSIC_HUB_PRODUCTS_FORMULA,
+  AI_MUSIC_HUB_PRODUCTS_HEADING,
+  AI_MUSIC_HUB_SCALING_AFTER,
   AI_MUSIC_HUB_SCALING_ROWS,
   AI_MUSIC_HUB_SCENARIOS,
   AI_MUSIC_HUB_SEO_DESCRIPTION,
@@ -138,12 +141,29 @@ function testCopyAndEconomics() {
   const text = collectUserFacingText();
   assert.equal(text.includes(EM_DASH), false, "user-facing copy must use en dash");
   assert.doesNotMatch(text, FORBIDDEN_STATUS);
+  assert.doesNotMatch(text, /210 ₽/);
+  assert.doesNotMatch(text, /90 ₽/);
+  assert.doesNotMatch(text, /постоянное право/);
+  assert.doesNotMatch(text, /бессрочн/);
+  assert.doesNotMatch(text, /эксклюзивн/);
+  assert.doesNotMatch(text, /без отдельной подписки/);
+  assert.doesNotMatch(text, /дополнительных комиссий сверх модели 70\/30/);
+  assert.doesNotMatch(text, /Отдельных тарифов, подписок/);
+  assert.doesNotMatch(text, /Автором публикации остаётесь вы/);
+  assert.doesNotMatch(text, /ИИ используется как инструмент/);
+  assert.doesNotMatch(text, /как автор делится ссылкой/);
 
   assert.match(text, /ИИ-музык/);
   assert.match(text, /AI-музык/);
   assert.match(text, /нейромузык/);
+  assert.match(AI_MUSIC_HUB_INTRO[0], /Suno, Udio/);
+  assert.match(AI_MUSIC_HUB_INTRO[1], /набор MP3-файлов/);
 
   assert.equal(AI_MUSIC_HUB_WAYS.length, 2);
+  assert.match(
+    AI_MUSIC_HUB_WAYS[1].description,
+    /Автор медитации приобретает право использовать музыкальную публикацию внутри Студии/,
+  );
   assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[0]?.value, "300 ₽");
   assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[1]?.value, "600 ₽");
   assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[2]?.value, "420 ₽");
@@ -159,8 +179,36 @@ function testCopyAndEconomics() {
       "420 000 ₽",
     ],
   );
-  assert.ok(AI_MUSIC_HUB_SCALING_DISCLAIMER.length > 40);
-  assert.equal(AI_MUSIC_HUB_SCENARIOS.length, 8);
+  assert.equal(AI_MUSIC_HUB_SCALING_AFTER.length, 5);
+  assert.match(AI_MUSIC_HUB_SCALING_AFTER[0], /не прогноз дохода/);
+  assert.match(AI_MUSIC_HUB_SCALING_AFTER[4], /музыкальный каталог/);
+  assert.equal(
+    AI_MUSIC_HUB_ONE_PURCHASE_FORMULA,
+    "420 ₽ – это не доход со всего трека. Это доход с одной покупки права использования.",
+  );
+  assert.match(
+    text,
+    /Одна музыкальная работа потенциально может приносить доход из двух источников/,
+  );
+  assert.equal(
+    AI_MUSIC_HUB_PRODUCTS_HEADING,
+    "Не просто генерируйте музыку – создавайте музыкальные продукты",
+  );
+  assert.match(AI_MUSIC_HUB_PRODUCTS_FORMULA, /каталог самостоятельных цифровых продуктов/);
+  assert.deepEqual(
+    AI_MUSIC_HUB_SCENARIOS.map((row) => row.scene),
+    [
+      "Медитация",
+      "Сон",
+      "Йога",
+      "Массаж",
+      "SPA",
+      "Дыхательные практики",
+      "Концентрация",
+      "Релакс",
+    ],
+  );
+  assert.equal(AI_MUSIC_HUB_SCENARIOS[0].use, "музыка для медитации без слов");
   assert.equal(AI_MUSIC_HUB_FAQ.length, 7);
   assert.equal(
     AI_MUSIC_HUB_CTA_LABEL,
@@ -176,8 +224,8 @@ function testCopyAndEconomics() {
   assert.match(text, /Udio/);
   assert.match(text, /Spotify/);
   assert.match(text, /YouTube/);
-  assert.doesNotMatch(text, /подписк[аи] для автора/);
-  assert.doesNotMatch(AI_MUSIC_HUB_INTRO.join(" "), /гарантированн/);
+  assert.match(text, /дополнительный канал/);
+  assert.match(text, /проверить актуальные условия/);
 }
 
 function testPageWiring() {
@@ -199,6 +247,8 @@ function testPageWiring() {
   assert.match(view, /href=\{BECOME_AUTHOR_HREF\}/);
   assert.match(view, /AI_MUSIC_HUB_CTA_LABEL/);
   assert.match(view, /ArticleFaqList/);
+  assert.match(view, /AI_MUSIC_HUB_SCALING_AFTER/);
+  assert.match(view, /AI_MUSIC_HUB_ONE_PURCHASE_FORMULA/);
   assert.match(view, /id="ai-music-ways"/);
   assert.match(view, /id="ai-music-economics"/);
   assert.match(view, /id="ai-music-scaling"/);
@@ -209,6 +259,7 @@ function testPageWiring() {
   assert.doesNotMatch(view, /href="\/studio\/meditation"/);
   assert.doesNotMatch(view, /school\.audiolad\.ru/);
   assert.doesNotMatch(view, /href="\/auth\/sign-up"/);
+  assert.doesNotMatch(view, /ECONOMICS_NOTE/);
   assert.equal(view.includes(EM_DASH), false);
   assert.doesNotMatch(view, FORBIDDEN_STATUS);
 
