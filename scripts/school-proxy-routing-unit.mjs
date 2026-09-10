@@ -106,6 +106,17 @@ assert.match(
   "school root rewrite must remain",
 );
 assert.match(
+  proxySource,
+  /runCourseUpgradeProtectedUpdateSession/,
+  "course-upgrade fail-closed wrap stays on the default updateSession path",
+);
+assert.match(
+  proxySource,
+  /return updateSession\(request, \{ rewritePathname: SCHOOL_SITE_PATH \}\)/,
+  "school rewrite must still call updateSession directly",
+);
+assertAction("audiolad.ru", "/api/checkout/course-upgrade", "pass_through");
+assert.match(
   policySource,
   /SCHOOL_PUBLIC_ASSET_PATHS/,
   "school public asset allowlist exists",

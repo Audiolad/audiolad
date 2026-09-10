@@ -27,12 +27,22 @@ import {
   toCourseUpgradeSuccessBody,
 } from "../src/lib/course-content/course-upgrade-order-api.ts";
 import {
+  COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
   COURSE_UPGRADE_GENERIC_ERROR,
   COURSE_UPGRADE_NETWORK_ERROR,
+  COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+  interpretCourseUpgradeCheckoutResponse,
   mapCourseUpgradeClientError,
   resolveCourseUpgradeUiError,
 } from "../src/lib/course-content/course-upgrade-client-errors.ts";
-import { COURSE_UPGRADE_CHECKOUT_STAGES } from "../src/lib/course-content/course-upgrade-stages.ts";
+import {
+  COURSE_UPGRADE_CHECKOUT_PATH,
+  COURSE_UPGRADE_CHECKOUT_STAGES,
+  createCourseUpgradeRequestClient,
+  logCourseUpgradeFailure,
+  readCourseUpgradeRequestUser,
+  runCourseUpgradeProtectedUpdateSession,
+} from "../src/lib/course-content/course-upgrade-stages.ts";
 import { decidePendingTochkaPayment } from "../src/lib/payments/pending-tochka-payment.ts";
 import { extractSafeTochkaErrorCode } from "../src/lib/payments/tochka-error.ts";
 import { groupLearnerCourse } from "../src/lib/course-content/learner-groups.ts";
@@ -175,6 +185,10 @@ assert.match(button, /disabled=\{isLoading\}/);
 assert.match(button, /\/api\/checkout\/course-upgrade/);
 assert.match(button, /Idempotency-Key/);
 assert.match(button, /credentials: "same-origin"/);
+assert.match(button, /interpretCourseUpgradeCheckoutResponse/);
+assert.match(button, /window\.location\.assign\(outcome\.paymentUrl\)/);
+assert.match(button, /unexpectedResponse/);
+assert.match(button, /networkFailed: true/);
 
 // D / E — grant + fulfill contracts (latest function, not the 20260725 original only)
 const fulfill = read(
@@ -396,6 +410,7 @@ assert.match(
   /FAILED_STAGE/,
 );
 assert.match(button, /resolveCourseUpgradeUiError/);
+assert.match(button, /interpretCourseUpgradeCheckoutResponse/);
 assert.match(startPay, /decidePendingTochkaPayment/);
 assert.match(startPay, /provider_checkout_failed/);
 assert.doesNotMatch(startPay, /tochka_recreate_failed/);
@@ -470,6 +485,88 @@ assert.equal(
   COURSE_UPGRADE_NETWORK_ERROR,
 );
 assert.notEqual(COURSE_UPGRADE_NETWORK_ERROR, COURSE_UPGRADE_GENERIC_ERROR);
+assert.equal(
+  mapCourseUpgradeClientError("auth_unavailable"),
+  COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
+);
+assert.notEqual(
+  COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
+assert.notEqual(
+  COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
+  COURSE_UPGRADE_NETWORK_ERROR,
+);
+assert.equal(
+  mapCourseUpgradeClientError("not_entitled"),
+  "Сначала нужен доступ к текущему уровню.",
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 403,
+    errorCode: "not_entitled",
+  }),
+  "Сначала нужен доступ к текущему уровню.",
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 503,
+    errorCode: "auth_unavailable",
+  }),
+  COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
+);
+assert.equal(
+  resolveCourseUpgradeUiError({
+    httpStatus: 500,
+    unexpectedResponse: true,
+  }),
+  COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+);
+assert.notEqual(
+  COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+  COURSE_UPGRADE_NETWORK_ERROR,
+);
+assert.notEqual(
+  COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+  COURSE_UPGRADE_GENERIC_ERROR,
+);
+assert.equal(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 500,
+    unexpectedResponse: true,
+  }).kind,
+  "error",
+);
+assert.equal(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 500,
+    unexpectedResponse: true,
+  }).message,
+  COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+);
+assert.equal(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 0,
+    networkFailed: true,
+  }).message,
+  COURSE_UPGRADE_NETWORK_ERROR,
+);
+assert.deepEqual(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 201,
+    body: {
+      payment: { payment_url: "https://pay.example/ok" },
+    },
+  }),
+  { kind: "redirect", paymentUrl: "https://pay.example/ok" },
+);
+assert.equal(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 403,
+    body: { error: "not_entitled" },
+  }).message,
+  "Сначала нужен доступ к текущему уровню.",
+);
 
 const accrualSql = read(
   "supabase/migrations/20260730160000_author_canonical_sales.sql",
@@ -487,6 +584,360 @@ assert.match(
 assert.doesNotMatch(
   read("deploy/scripts/audiolad-reconcile-diagnose.sh"),
   /course_upgrade_failed|create_payment_tochka/,
+);
+
+assert.equal(COURSE_UPGRADE_CHECKOUT_PATH, "/api/checkout/course-upgrade");
+assert.equal(COURSE_UPGRADE_CHECKOUT_STAGES.PROXY_AUTH, "proxy_auth");
+assert.equal(
+  COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_REQUEST_CLIENT,
+  "create_request_client",
+);
+assert.equal(
+  COURSE_UPGRADE_CHECKOUT_STAGES.AUTHENTICATE_USER,
+  "authenticate_user",
+);
+assert.equal(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "auth");
+
+const proxySource = read("src/proxy.ts");
+assert.match(proxySource, /runCourseUpgradeProtectedUpdateSession/);
+assert.match(proxySource, /auth_unavailable/);
+assert.match(proxySource, /NextResponse\.json/);
+assert.match(
+  proxySource,
+  /return updateSession\(request, \{ rewritePathname: SCHOOL_SITE_PATH \}\)/,
+);
+assert.match(
+  proxySource,
+  /return updateSession\(request, \{ rewritePathname: MAX_SITE_PATH \}\)/,
+);
+assert.doesNotMatch(
+  route,
+  /p_expected_amount|already_owned/,
+);
+
+assert.match(route, /createCourseUpgradeRequestClient/);
+assert.match(route, /readCourseUpgradeRequestUser/);
+assert.match(route, /CREATE_REQUEST_CLIENT|create_request_client/);
+assert.match(route, /AUTHENTICATE_USER|authenticate_user/);
+assert.match(route, /COURSE_UPGRADE_CHECKOUT_STAGES\.AUTH, "unauthorized"/);
+assert.match(route, /logCourseUpgradeAuthError/);
+assert.doesNotMatch(route, /authError\.message/);
+assert.doesNotMatch(route, /console\.error\(\s*"course_upgrade_auth_error"\s*,\s*authError/);
+
+async function captureConsoleErrorAsync(run) {
+  const entries = [];
+  const original = console.error;
+  console.error = (...args) => {
+    entries.push(args);
+  };
+  try {
+    return { entries, result: await run() };
+  } finally {
+    console.error = original;
+  }
+}
+
+function serializedLogs(entries) {
+  return entries
+    .map((args) =>
+      args
+        .map((value) => {
+          if (typeof value === "string") {
+            return value;
+          }
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        })
+        .join(" "),
+    )
+    .join("\n");
+}
+
+const PROXY_THROWN_SECRET = "leak-cookie=SECRET_JWT_eyJhbGciOi.not.real";
+const proxyThrow = await captureConsoleErrorAsync(async () =>
+  runCourseUpgradeProtectedUpdateSession({
+    pathname: COURSE_UPGRADE_CHECKOUT_PATH,
+    updateSession: async () => {
+      throw new Error(PROXY_THROWN_SECRET);
+    },
+    failClosed: () => ({
+      status: 503,
+      body: { error: "auth_unavailable" },
+    }),
+  }),
+);
+assert.deepEqual(proxyThrow.result, {
+  status: 503,
+  body: { error: "auth_unavailable" },
+});
+assert.equal(proxyThrow.entries[0]?.[0], "course_upgrade_auth_error");
+assert.deepEqual(proxyThrow.entries[0]?.[1], {
+  FAILED_STAGE: "proxy_auth",
+  ACTUAL_API_ERROR: "auth_unavailable",
+  ACTUAL_HTTP_STATUS: 503,
+});
+assert.doesNotMatch(serializedLogs(proxyThrow.entries), /SECRET_JWT|leak-cookie/);
+
+await assert.rejects(
+  () =>
+    runCourseUpgradeProtectedUpdateSession({
+      pathname: "/api/checkout/studio-music",
+      updateSession: async () => {
+        throw new Error(PROXY_THROWN_SECRET);
+      },
+      failClosed: () => ({ shouldNot: true }),
+    }),
+  (error) => error instanceof Error && error.message === PROXY_THROWN_SECRET,
+);
+
+let otherPathNextCalled = false;
+const otherPathOk = await runCourseUpgradeProtectedUpdateSession({
+  pathname: "/catalog",
+  updateSession: async () => {
+    otherPathNextCalled = true;
+    return { kind: "next" };
+  },
+  failClosed: () => ({ kind: "fail-closed" }),
+});
+assert.deepEqual(otherPathOk, { kind: "next" });
+assert.equal(otherPathNextCalled, true);
+
+const { NextRequest, NextResponse } = await import("next/server");
+const { proxy, setProxyUpdateSessionForTests } = await import(
+  "../src/proxy.ts"
+);
+
+function mainSiteRequest(pathname) {
+  return new NextRequest(new URL(pathname, "https://audiolad.ru"), {
+    method: "POST",
+    headers: { host: "audiolad.ru" },
+  });
+}
+
+const originalNext = NextResponse.next;
+let nextCallCount = 0;
+NextResponse.next = (...args) => {
+  nextCallCount += 1;
+  return originalNext.apply(NextResponse, args);
+};
+
+try {
+  setProxyUpdateSessionForTests(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+
+  const proxyCheckoutThrow = await captureConsoleErrorAsync(() =>
+    proxy(mainSiteRequest(COURSE_UPGRADE_CHECKOUT_PATH)),
+  );
+  assert.equal(proxyCheckoutThrow.result.status, 503);
+  assert.deepEqual(await proxyCheckoutThrow.result.json(), {
+    error: "auth_unavailable",
+  });
+  assert.equal(
+    nextCallCount,
+    0,
+    "fail-closed /api/checkout/course-upgrade must not call NextResponse.next",
+  );
+  assert.equal(proxyCheckoutThrow.entries[0]?.[0], "course_upgrade_auth_error");
+  assert.deepEqual(proxyCheckoutThrow.entries[0]?.[1], {
+    FAILED_STAGE: "proxy_auth",
+    ACTUAL_API_ERROR: "auth_unavailable",
+    ACTUAL_HTTP_STATUS: 503,
+  });
+  assert.doesNotMatch(
+    serializedLogs(proxyCheckoutThrow.entries),
+    /SECRET_JWT|leak-cookie/,
+  );
+
+  setProxyUpdateSessionForTests(async (request) =>
+    NextResponse.next({ request }),
+  );
+  const catalogNext = await proxy(mainSiteRequest("/catalog"));
+  assert.ok(
+    nextCallCount > 0,
+    "other pathname must still be able to take NextResponse.next",
+  );
+  assert.notEqual(catalogNext.status, 503);
+
+  setProxyUpdateSessionForTests(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+  await assert.rejects(
+    () => proxy(mainSiteRequest("/catalog")),
+    (error) => error instanceof Error && error.message === PROXY_THROWN_SECRET,
+  );
+} finally {
+  NextResponse.next = originalNext;
+  setProxyUpdateSessionForTests(null);
+}
+
+const clientThrow = await captureConsoleErrorAsync(async () => {
+  const created = await createCourseUpgradeRequestClient(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+  if (!created.ok) {
+    logCourseUpgradeFailure({
+      stage: created.stage,
+      error: created.error,
+      status: created.status,
+    });
+  }
+  return created;
+});
+assert.deepEqual(clientThrow.result, {
+  ok: false,
+  stage: "create_request_client",
+  error: "auth_unavailable",
+  status: 503,
+});
+assert.equal(clientThrow.entries[0]?.[0], "course_upgrade_failed");
+assert.equal(clientThrow.entries[0]?.[1]?.FAILED_STAGE, "create_request_client");
+assert.equal(clientThrow.entries[0]?.[1]?.ACTUAL_API_ERROR, "auth_unavailable");
+assert.equal(clientThrow.entries[0]?.[1]?.ACTUAL_HTTP_STATUS, 503);
+assert.doesNotMatch(serializedLogs(clientThrow.entries), /SECRET_JWT|leak-cookie/);
+
+const getUserThrow = await captureConsoleErrorAsync(async () => {
+  const authenticated = await readCourseUpgradeRequestUser(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+  if (!authenticated.ok) {
+    logCourseUpgradeFailure({
+      stage: authenticated.stage,
+      error: authenticated.error,
+      status: authenticated.status,
+    });
+  }
+  return authenticated;
+});
+assert.deepEqual(getUserThrow.result, {
+  ok: false,
+  stage: "authenticate_user",
+  error: "auth_unavailable",
+  status: 503,
+});
+assert.equal(getUserThrow.entries[0]?.[0], "course_upgrade_failed");
+assert.equal(getUserThrow.entries[0]?.[1]?.FAILED_STAGE, "authenticate_user");
+assert.equal(
+  getUserThrow.entries[0]?.[1]?.ACTUAL_API_ERROR,
+  "auth_unavailable",
+);
+assert.doesNotMatch(serializedLogs(getUserThrow.entries), /SECRET_JWT|leak-cookie/);
+
+const unauthenticated = await readCourseUpgradeRequestUser(async () => ({
+  data: { user: null },
+  error: null,
+}));
+assert.deepEqual(unauthenticated, {
+  ok: true,
+  user: null,
+  authError: null,
+});
+
+const { POST, setCourseUpgradeCreateClientForTests } = await import(
+  "../src/app/api/checkout/course-upgrade/route.ts"
+);
+
+async function postUpgrade(createClient) {
+  setCourseUpgradeCreateClientForTests(createClient);
+  try {
+    return await POST(
+      new Request("https://audiolad.ru/api/checkout/course-upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          practiceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          targetAccessLevel: 2,
+        }),
+      }),
+    );
+  } finally {
+    setCourseUpgradeCreateClientForTests(null);
+  }
+}
+
+const routeClientThrow = await captureConsoleErrorAsync(() =>
+  postUpgrade(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  }),
+);
+assert.equal(routeClientThrow.result.status, 503);
+assert.deepEqual(await routeClientThrow.result.json(), {
+  error: "auth_unavailable",
+});
+assert.equal(routeClientThrow.entries[0]?.[0], "course_upgrade_failed");
+assert.equal(
+  routeClientThrow.entries[0]?.[1]?.FAILED_STAGE,
+  "create_request_client",
+);
+assert.doesNotMatch(
+  serializedLogs(routeClientThrow.entries),
+  /SECRET_JWT|leak-cookie/,
+);
+
+const routeGetUserThrow = await captureConsoleErrorAsync(() =>
+  postUpgrade(async () => ({
+    auth: {
+      getUser: async () => {
+        throw new Error(PROXY_THROWN_SECRET);
+      },
+    },
+  })),
+);
+assert.equal(routeGetUserThrow.result.status, 503);
+assert.deepEqual(await routeGetUserThrow.result.json(), {
+  error: "auth_unavailable",
+});
+assert.equal(
+  routeGetUserThrow.entries[0]?.[1]?.FAILED_STAGE,
+  "authenticate_user",
+);
+
+const routeUnauthorized = await captureConsoleErrorAsync(() =>
+  postUpgrade(async () => ({
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+    },
+  })),
+);
+assert.equal(routeUnauthorized.result.status, 401);
+assert.deepEqual(await routeUnauthorized.result.json(), {
+  error: "unauthorized",
+});
+assert.equal(routeUnauthorized.entries[0]?.[1]?.FAILED_STAGE, "auth");
+assert.equal(
+  routeUnauthorized.entries[0]?.[1]?.ACTUAL_API_ERROR,
+  "unauthorized",
+);
+
+const AUTH_ERROR_SECRET = "supabase-auth-raw-SECRET_JWT_do-not-log";
+const routeAuthError = await captureConsoleErrorAsync(() =>
+  postUpgrade(async () => ({
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            email: "listener@example.com",
+          },
+        },
+        error: { message: AUTH_ERROR_SECRET },
+      }),
+    },
+  })),
+);
+assert.equal(routeAuthError.result.status, 500);
+assert.deepEqual(await routeAuthError.result.json(), {
+  error: "internal_error",
+});
+const routeAuthLogs = serializedLogs(routeAuthError.entries);
+assert.match(routeAuthLogs, /course_upgrade_auth_error/);
+assert.match(routeAuthLogs, /FAILED_STAGE/);
+assert.doesNotMatch(
+  routeAuthLogs,
+  /supabase-auth-raw-SECRET_JWT|listener@example\.com/,
 );
 
 console.log("course-upgrade-checkout-unit: ok");

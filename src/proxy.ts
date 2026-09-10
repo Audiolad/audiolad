@@ -7,7 +7,16 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
+import { runCourseUpgradeProtectedUpdateSession } from "@/lib/course-content/course-upgrade-stages";
 import { updateSession } from "@/lib/supabase/proxy";
+
+type UpdateSessionFn = typeof updateSession;
+
+let updateSessionImpl: UpdateSessionFn = updateSession;
+
+export function setProxyUpdateSessionForTests(fn: UpdateSessionFn | null) {
+  updateSessionImpl = fn ?? updateSession;
+}
 
 function getRequestHostname(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-host");
@@ -33,7 +42,12 @@ export async function proxy(request: NextRequest) {
     return updateSession(request, { rewritePathname: MAX_SITE_PATH });
   }
 
-  return updateSession(request);
+  return runCourseUpgradeProtectedUpdateSession({
+    pathname,
+    updateSession: () => updateSessionImpl(request),
+    failClosed: () =>
+      NextResponse.json({ error: "auth_unavailable" }, { status: 503 }),
+  });
 }
 
 export const config = {
