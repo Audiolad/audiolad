@@ -620,6 +620,9 @@ assert.match(route, /readCourseUpgradeRequestUser/);
 assert.match(route, /CREATE_REQUEST_CLIENT|create_request_client/);
 assert.match(route, /AUTHENTICATE_USER|authenticate_user/);
 assert.match(route, /COURSE_UPGRADE_CHECKOUT_STAGES\.AUTH, "unauthorized"/);
+assert.match(route, /logCourseUpgradeAuthError/);
+assert.doesNotMatch(route, /authError\.message/);
+assert.doesNotMatch(route, /console\.error\(\s*"course_upgrade_auth_error"\s*,\s*authError/);
 
 async function captureConsoleErrorAsync(run) {
   const entries = [];
@@ -654,7 +657,6 @@ function serializedLogs(entries) {
 }
 
 const PROXY_THROWN_SECRET = "leak-cookie=SECRET_JWT_eyJhbGciOi.not.real";
-let proxyNextCalled = false;
 const proxyThrow = await captureConsoleErrorAsync(async () =>
   runCourseUpgradeProtectedUpdateSession({
     pathname: COURSE_UPGRADE_CHECKOUT_PATH,
@@ -671,7 +673,6 @@ assert.deepEqual(proxyThrow.result, {
   status: 503,
   body: { error: "auth_unavailable" },
 });
-assert.equal(proxyNextCalled, false);
 assert.equal(proxyThrow.entries[0]?.[0], "course_upgrade_auth_error");
 assert.deepEqual(proxyThrow.entries[0]?.[1], {
   FAILED_STAGE: "proxy_auth",
@@ -703,6 +704,75 @@ const otherPathOk = await runCourseUpgradeProtectedUpdateSession({
 });
 assert.deepEqual(otherPathOk, { kind: "next" });
 assert.equal(otherPathNextCalled, true);
+
+const { NextRequest, NextResponse } = await import("next/server");
+const { proxy, setProxyUpdateSessionForTests } = await import(
+  "../src/proxy.ts"
+);
+
+function mainSiteRequest(pathname) {
+  return new NextRequest(new URL(pathname, "https://audiolad.ru"), {
+    method: "POST",
+    headers: { host: "audiolad.ru" },
+  });
+}
+
+const originalNext = NextResponse.next;
+let nextCallCount = 0;
+NextResponse.next = (...args) => {
+  nextCallCount += 1;
+  return originalNext.apply(NextResponse, args);
+};
+
+try {
+  setProxyUpdateSessionForTests(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+
+  const proxyCheckoutThrow = await captureConsoleErrorAsync(() =>
+    proxy(mainSiteRequest(COURSE_UPGRADE_CHECKOUT_PATH)),
+  );
+  assert.equal(proxyCheckoutThrow.result.status, 503);
+  assert.deepEqual(await proxyCheckoutThrow.result.json(), {
+    error: "auth_unavailable",
+  });
+  assert.equal(
+    nextCallCount,
+    0,
+    "fail-closed /api/checkout/course-upgrade must not call NextResponse.next",
+  );
+  assert.equal(proxyCheckoutThrow.entries[0]?.[0], "course_upgrade_auth_error");
+  assert.deepEqual(proxyCheckoutThrow.entries[0]?.[1], {
+    FAILED_STAGE: "proxy_auth",
+    ACTUAL_API_ERROR: "auth_unavailable",
+    ACTUAL_HTTP_STATUS: 503,
+  });
+  assert.doesNotMatch(
+    serializedLogs(proxyCheckoutThrow.entries),
+    /SECRET_JWT|leak-cookie/,
+  );
+
+  setProxyUpdateSessionForTests(async (request) =>
+    NextResponse.next({ request }),
+  );
+  const catalogNext = await proxy(mainSiteRequest("/catalog"));
+  assert.ok(
+    nextCallCount > 0,
+    "other pathname must still be able to take NextResponse.next",
+  );
+  assert.notEqual(catalogNext.status, 503);
+
+  setProxyUpdateSessionForTests(async () => {
+    throw new Error(PROXY_THROWN_SECRET);
+  });
+  await assert.rejects(
+    () => proxy(mainSiteRequest("/catalog")),
+    (error) => error instanceof Error && error.message === PROXY_THROWN_SECRET,
+  );
+} finally {
+  NextResponse.next = originalNext;
+  setProxyUpdateSessionForTests(null);
+}
 
 const clientThrow = await captureConsoleErrorAsync(async () => {
   const created = await createCourseUpgradeRequestClient(async () => {
@@ -840,6 +910,34 @@ assert.equal(routeUnauthorized.entries[0]?.[1]?.FAILED_STAGE, "auth");
 assert.equal(
   routeUnauthorized.entries[0]?.[1]?.ACTUAL_API_ERROR,
   "unauthorized",
+);
+
+const AUTH_ERROR_SECRET = "supabase-auth-raw-SECRET_JWT_do-not-log";
+const routeAuthError = await captureConsoleErrorAsync(() =>
+  postUpgrade(async () => ({
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            email: "listener@example.com",
+          },
+        },
+        error: { message: AUTH_ERROR_SECRET },
+      }),
+    },
+  })),
+);
+assert.equal(routeAuthError.result.status, 500);
+assert.deepEqual(await routeAuthError.result.json(), {
+  error: "internal_error",
+});
+const routeAuthLogs = serializedLogs(routeAuthError.entries);
+assert.match(routeAuthLogs, /course_upgrade_auth_error/);
+assert.match(routeAuthLogs, /FAILED_STAGE/);
+assert.doesNotMatch(
+  routeAuthLogs,
+  /supabase-auth-raw-SECRET_JWT|listener@example\.com/,
 );
 
 console.log("course-upgrade-checkout-unit: ok");

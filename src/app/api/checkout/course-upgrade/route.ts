@@ -10,6 +10,7 @@ import {
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
   createCourseUpgradeRequestClient,
+  logCourseUpgradeAuthError,
   logCourseUpgradeFailure,
   readCourseUpgradeRequestUser,
 } from "@/lib/course-content/course-upgrade-stages";
@@ -84,7 +85,11 @@ export async function POST(request: Request) {
   }
 
   if (authError) {
-    console.error("course_upgrade_auth_error", authError.message);
+    logCourseUpgradeAuthError({
+      stage: COURSE_UPGRADE_CHECKOUT_STAGES.AUTH,
+      error: "internal_error",
+      status: 500,
+    });
     return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "internal_error", 500);
   }
 
