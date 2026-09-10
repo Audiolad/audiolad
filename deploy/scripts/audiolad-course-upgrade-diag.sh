@@ -192,6 +192,7 @@ print_safe_process_chain() {
   local helper=""
   helper="$(mktemp /tmp/audiolad-course-upgrade-proc.XXXXXX.py)"
   cat >"${helper}" <<'PY'
+import json
 import os
 import pwd
 import re
@@ -220,11 +221,40 @@ def read_text(path):
         return handle.read()
 
 
-def euser_for(uid):
+def passwd_record(uid):
+    override = os.environ.get("AUDIOLAD_COURSE_UPGRADE_DIAG_PASSWD_MAP", "")
+    if override:
+        try:
+            data = json.loads(override)
+            rec = data.get(str(uid)) if isinstance(data, dict) else None
+            if not isinstance(rec, dict):
+                return "uid_%s" % uid, None
+            name = rec.get("name")
+            directory = rec.get("dir")
+            euser = name if isinstance(name, str) and name.strip() else "uid_%s" % uid
+            home = directory if isinstance(directory, str) else None
+            return euser, home
+        except (TypeError, ValueError):
+            return "uid_%s" % uid, None
     try:
-        return pwd.getpwuid(uid).pw_name
+        pw = pwd.getpwuid(uid)
+        return pw.pw_name, pw.pw_dir
     except (KeyError, OverflowError, OSError):
-        return "uid_%s" % uid
+        return "uid_%s" % uid, None
+
+
+def pm2_home_from_pw_dir(pw_dir):
+    if not isinstance(pw_dir, str):
+        return "UNKNOWN"
+    home = pw_dir.strip()
+    if not home.startswith("/") or any(ch in home for ch in ("\n", "\r", "\0")):
+        return "UNKNOWN"
+    return os.path.join(home.rstrip("/"), ".pm2")
+
+
+def euser_for(uid):
+    name, _home = passwd_record(uid)
+    return name
 
 
 def parse_start(pid_s):
@@ -329,11 +359,15 @@ print(
 )
 print("LIVE_WEB_OWNER=%s" % fields["euser"])
 print("LIVE_WEB_UID=%s" % fields["uid"])
-if fields["uid"] == "0" or fields["euser"] == "root":
-    derived_home = "/root/.pm2"
-else:
-    derived_home = "/home/%s/.pm2" % fields["euser"]
+derived_home = "UNKNOWN"
+if fields["uid"] != "unknown":
+    try:
+        _name, pw_dir = passwd_record(int(fields["uid"]))
+        derived_home = pm2_home_from_pw_dir(pw_dir)
+    except ValueError:
+        derived_home = "UNKNOWN"
 print("LIVE_WEB_PM2_HOME=%s" % derived_home)
+print("note=LIVE_WEB_PM2_HOME from pwd pw_dir; never guessed as /home/<euser>")
 
 parent_count = 0
 nxt = fields["ppid_int"]
@@ -948,25 +982,19 @@ function errorText(err) {
   });
   console.log("access_link_query_error=" + errorText(linkRes.error));
   console.log("redeemed_access_link_count=" + l1Links.length);
-  console.log("note=no dedicated entitlement audit/history table; finance_audit_log is payment-only and not queried");
+  console.log("note=no dedicated entitlement grant audit/history table; finance_audit_log is payment-only and not queried");
+  console.log("note=current fulfill/redeem SQL may call grant_* but QA grant mechanism version is unproven");
 
-  const mechanisms = [];
-  if (paidBaseOrders.length > 0) mechanisms.push("purchase");
-  if (l1Links.length > 0) mechanisms.push("access_link");
-  const historical = mechanisms.length > 0;
-  const provenTimes = []
-    .concat(paidBaseOrders.map((row) => row.paid_at).filter(Boolean))
-    .concat(l1Links.map((row) => row.redeemed_at).filter(Boolean))
-    .map((value) => field(value))
-    .filter(Boolean)
-    .sort();
-  console.log("HISTORICAL_L1_EVIDENCE=" + (historical ? "YES" : "NO"));
-  console.log("HISTORICAL_L1_MECHANISMS=" + (mechanisms.join(",") || "none"));
-  console.log("HISTORICAL_L1_LAST_PROVEN_AT=" + (provenTimes.length ? provenTimes[provenTimes.length - 1] : "none"));
+  const paidTimes = paidBaseOrders.map((row) => field(row.paid_at)).filter(Boolean).sort();
+  const redeemTimes = l1Links.map((row) => field(row.redeemed_at)).filter(Boolean).sort();
+  console.log("BASE_PURCHASE_EVIDENCE=" + (paidBaseOrders.length > 0 ? "YES" : "NO"));
+  console.log("ACCESS_LINK_REDEMPTION_EVIDENCE=" + (l1Links.length > 0 ? "YES" : "NO"));
+  console.log("paid_base_last_paid_at=" + (paidTimes.length ? paidTimes[paidTimes.length - 1] : "none"));
+  console.log("access_link_last_redeemed_at=" + (redeemTimes.length ? redeemTimes[redeemTimes.length - 1] : "none"));
+  console.log("HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN");
+  console.log("note=paid product_purchase proves paid order only; redeemed access link proves redemption only");
   if (entitlementPresent) {
     console.log("ENTITLEMENT_STATE_MISMATCH=NO");
-  } else if (historical) {
-    console.log("ENTITLEMENT_STATE_MISMATCH=YES");
   } else {
     console.log("ENTITLEMENT_STATE_MISMATCH=UNPROVEN");
   }
@@ -1196,7 +1224,12 @@ run_course_upgrade_diag() {
   fi
 
   local live_pm2_state=""
-  if [[ -n "${live_pm2_home}" ]]; then
+  if [[ -n "${live_pm2_home}" && "${live_pm2_home}" != /* ]]; then
+    echo "LIVE_WEB_PM2_HOME_STATE=UNKNOWN"
+    echo "note=passwd home lookup failed; not guessing /home/<euser> and not switching PM2_HOME"
+    live_pm2_home=""
+  fi
+  if [[ -n "${live_pm2_home}" && "${live_pm2_home}" == /* ]]; then
     live_pm2_state="$(classify_path_state "${live_pm2_home}")"
     echo "LIVE_WEB_PM2_HOME_STATE=${live_pm2_state}"
     echo "ssh_user_pm2_home_state=$(classify_path_state "${HOME}/.pm2")"
@@ -1226,7 +1259,7 @@ run_course_upgrade_diag() {
       printf '%s\n' "${HOME}/.pm2/logs"
       printf '%s\n' "/home/deploy/.pm2/logs"
       printf '%s\n' "/root/.pm2/logs"
-      if [[ -n "${live_pm2_home}" ]]; then
+      if [[ -n "${live_pm2_home}" && "${live_pm2_home}" == /* ]]; then
         printf '%s\n' "${live_pm2_home}/logs"
       fi
       printf '%s\n' "${pm2_safe}" | awk -F= '/^(out_log|error_log|pid_path)=/{print substr($0, index($0,"=")+1)}' \

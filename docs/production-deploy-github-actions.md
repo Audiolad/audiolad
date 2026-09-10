@@ -371,8 +371,11 @@ cutover активен часто `audiolad-p3001`, а orphaned-логи `audiol
   otherwise `WEB_PID_STATUS=REJECTED`). For that PID and a parent chain
   of at most 6 ancestors: `pid`, `ppid`, effective user, `uid`,
   comm/exe basename, start time. Environ and full command line are
-  never read or printed. Goal: Unix owner of the live web process,
-  without assuming root/deploy;
+  never read or printed. Live web PM2 home is
+  `pwd.getpwuid(euid).pw_dir` + `/.pm2` — never guessed as
+  `/root/.pm2` or `/home/<euser>/.pm2`. Passwd failure →
+  `LIVE_WEB_PM2_HOME=UNKNOWN`. Goal: Unix owner of the live web
+  process, without assuming root/deploy;
 - `pm2 jlist` of the **SSH-user** namespace (safe fields), `PM2_HOME`,
   typical log dirs (`$HOME/.pm2/logs`, `/home/deploy/.pm2/logs`,
   `/root/.pm2/logs`) plus the PM2 home derived from the live process
@@ -403,15 +406,21 @@ cutover активен часто `audiolad-p3001`, а orphaned-логи `audiol
   как safe fields + boolean
   `has_provider_metadata` / `has_payment_url` / `has_checkout_token`;
   metadata — только proven-safe key names).
-  Historical L1 evidence uses only real schema: paid
-  `product_purchase` orders and redeemed `practice_access_links`
-  (no token_hash / user ids printed). There is no dedicated
-  entitlement audit table; `finance_audit_log` is payment-only and
-  is not queried. Flags:
-  `ENTITLEMENT_STATE_MISMATCH=YES` when historical L1 exists and
-  canonical `user_practices` is missing;
-  `UNPROVEN` when there is no historical evidence;
-  `NO` when the canonical row is present.
+  Historical correlation uses only real schema and does **not**
+  treat paid orders or access-link redemptions as proof of a
+  canonical L1 grant. Flags:
+  `BASE_PURCHASE_EVIDENCE=YES|NO` (paid `product_purchase` only);
+  `ACCESS_LINK_REDEMPTION_EVIDENCE=YES|NO` (redeemed
+  `practice_access_links` only; no token_hash / user ids printed);
+  `HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN` unless a real
+  grant-audit/history row exists or the exact QA-era SQL/RPC is
+  proven to have atomically written `user_practices` — neither is
+  available in this schema (`finance_audit_log` is payment-only and
+  is not queried). Current fulfill/redeem SQL may call `grant_*`;
+  that does not prove the mechanism version that issued QA L1.
+  `ENTITLEMENT_STATE_MISMATCH=NO` when the canonical
+  `user_practices` row is present; `UNPROVEN` when it is missing.
+  Paid/redemption evidence never auto-sets mismatch `YES`.
   Если env/release/probe недоступны — `DB_CORRELATION=DEFERRED`.
 
 Privilege discovery: **no existing** narrow read-only sudo contract
@@ -441,12 +450,16 @@ entitlement_writes = NOT_INVOKED
 MODE = read_only_course_upgrade_diag
 WEB_PID_STATUS=OK|REJECTED
 LIVE_WEB_OWNER=
+LIVE_WEB_PM2_HOME=  # from pwd.getpwuid(euid).pw_dir + /.pm2; UNKNOWN if passwd missing
 LIVE_WEB_PM2_HOME_STATE=PRESENT_READABLE|PRESENT_NOT_READABLE|ABSENT_PROVEN|UNKNOWN_PERMISSION_DENIED
 ACTIVE_P30_COUNT=
 ACTIVE_P30_NAMES=
 PRIVILEGED_LOGDIAG=MISSING|NEED_INSTALL|OK
 NEED_INSTALL=YES
 SAFE_SUMMARY window= event= FAILED_STAGE= ACTUAL_API_ERROR= ACTUAL_HTTP_STATUS=
+BASE_PURCHASE_EVIDENCE=YES|NO
+ACCESS_LINK_REDEMPTION_EVIDENCE=YES|NO
+HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=YES|NO|UNPROVEN
 ENTITLEMENT_STATE_MISMATCH=YES|NO|UNPROVEN
 DB_CORRELATION=OK|DEFERRED
 ```
@@ -497,10 +510,14 @@ Wrapper contract:
 - never `pm2 restart|start|delete|save`; never writes app/DB;
   never checkout / Tochka / deploy / cutover.
 
-sudoers contract (production `deploy` user only):
+sudoers contract (production `deploy` user only). Standard sudoers
+empty-argument list (`""`) allows the exact command with **zero**
+arguments only. A command name with no argument list would allow any
+argv; that form is not used. The shell wrapper also rejects `argc!=0`.
+Wrapper sets `PATH=/usr/sbin:/usr/bin:/bin` and ignores caller PATH.
 
 ```text
-deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag ""
 ```
 
 No unrestricted ALL sudo. No argument wildcard. No `sudo bash`.
@@ -515,7 +532,7 @@ install -o root -g root -m 0755 \
 install -o root -g root -m 0440 \
   deploy/sudoers/audiolad-course-upgrade-logdiag \
   /etc/sudoers.d/audiolad-course-upgrade-logdiag
-visudo -c -f /etc/sudoers.d/audiolad-course-upgrade-logdiag
+visudo -cf /etc/sudoers.d/audiolad-course-upgrade-logdiag
 [[ "$(stat -c '%U:%G %a' /usr/local/sbin/audiolad-course-upgrade-logdiag)" == "root:root 755" ]]
 ```
 

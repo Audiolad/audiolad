@@ -16,6 +16,12 @@ if [[ $# -ne 0 ]]; then
   exit 1
 fi
 
+# Ignore caller PATH. Fixed safe search path only.
+PATH=/usr/sbin:/usr/bin:/bin
+export PATH
+unset CDPATH
+hash -r 2>/dev/null || true
+
 PRIORITY_START="${AUDIOLAD_COURSE_UPGRADE_DIAG_WINDOW_START:-2026-09-10T04:25:00Z}"
 PRIORITY_END="${AUDIOLAD_COURSE_UPGRADE_DIAG_WINDOW_END:-2026-09-10T04:50:00Z}"
 

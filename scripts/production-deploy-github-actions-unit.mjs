@@ -2866,6 +2866,10 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
   assert.match(docsText, /PRESENT_READABLE/);
   assert.match(docsText, /PRIVILEGED_LOGDIAG/);
   assert.match(docsText, /ENTITLEMENT_STATE_MISMATCH/);
+  assert.match(docsText, /BASE_PURCHASE_EVIDENCE/);
+  assert.match(docsText, /HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE/);
+  assert.match(docsText, /pw_dir/);
+  assert.match(docsText, /visudo -cf/);
   assert.match(docsText, /audiolad-course-upgrade-logdiag/);
   assert.match(docsText, /Do not install on production/);
 
@@ -3092,6 +3096,15 @@ function writeFakeProcTree(procRoot, { webPid = 1001, extraParents = 0 } = {}) {
     symlinkSync("/usr/bin/node", join(dir, "exe"));
   }
   return { webPid, parentPids: chain.slice(1) };
+}
+
+function setFakeProcUid(procRoot, pid, uid) {
+  const statusPath = join(procRoot, String(pid), "status");
+  const text = readFileSync(statusPath, "utf8").replace(
+    /Uid:\t\d+\t\d+\t\d+\t\d+/,
+    `Uid:\t${uid}\t${uid}\t${uid}\t${uid}`,
+  );
+  writeFileSync(statusPath, text);
 }
 
 function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey, entitlementMode = "present" } = {}) {
@@ -3467,6 +3480,10 @@ function assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey }) {
   assert.match(output, /PRIVILEGED_LOGDIAG=MISSING/);
   assert.match(output, /NEED_INSTALL=YES/);
   assert.match(output, /ENTITLEMENT_STATE_MISMATCH=NO/);
+  assert.match(output, /BASE_PURCHASE_EVIDENCE=NO/);
+  assert.match(output, /ACCESS_LINK_REDEMPTION_EVIDENCE=NO/);
+  assert.match(output, /HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN/);
+  assert.doesNotMatch(output, /HISTORICAL_L1_EVIDENCE=YES/);
   assert.match(output, /canonical_user_practices=PRESENT/);
   assert.match(output, /privileged_wrapper_install = NOT_INVOKED/);
   assert.doesNotMatch(output, /cmdline=/);
@@ -3519,6 +3536,11 @@ function assertCourseUpgradeDiagHelper() {
   assert.match(helperText, /PRESENT_NOT_READABLE/);
   assert.match(helperText, /ABSENT_PROVEN/);
   assert.match(helperText, /ENTITLEMENT_STATE_MISMATCH/);
+  assert.match(helperText, /BASE_PURCHASE_EVIDENCE/);
+  assert.match(helperText, /HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN/);
+  assert.match(helperText, /pw_dir/);
+  assert.doesNotMatch(helperText, /\/home\/%s\/\.pm2/);
+  assert.doesNotMatch(helperText, /HISTORICAL_L1_EVIDENCE=/);
   assert.match(helperText, /PRIVILEGED_LOGDIAG=MISSING/);
   const helperCode = helperText
     .split("\n")
@@ -3610,9 +3632,12 @@ function assertCourseUpgradeDiagHelper() {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 0, `mismatch diag failed: ${output}`);
     assert.match(output, /canonical_user_practices=MISSING/);
-    assert.match(output, /ENTITLEMENT_STATE_MISMATCH=YES/);
-    assert.match(output, /HISTORICAL_L1_EVIDENCE=YES/);
-    assert.match(output, /HISTORICAL_L1_MECHANISMS=purchase,access_link/);
+    assert.match(output, /BASE_PURCHASE_EVIDENCE=YES/);
+    assert.match(output, /ACCESS_LINK_REDEMPTION_EVIDENCE=YES/);
+    assert.match(output, /HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN/);
+    assert.match(output, /ENTITLEMENT_STATE_MISMATCH=UNPROVEN/);
+    assert.doesNotMatch(output, /HISTORICAL_L1_EVIDENCE=YES/);
+    assert.doesNotMatch(output, /ENTITLEMENT_STATE_MISMATCH=YES/);
     assert.match(output, /paid_base_order_count=1/);
     assert.match(output, /redeemed_access_link_count=1/);
     assert.doesNotMatch(output, /petpovss@yandex\.ru/);
@@ -3635,8 +3660,10 @@ function assertCourseUpgradeDiagHelper() {
     assert.equal(result.status, 0, `unproven diag failed: ${output}`);
     assert.match(output, /canonical_user_practices=MISSING/);
     assert.match(output, /ENTITLEMENT_STATE_MISMATCH=UNPROVEN/);
-    assert.match(output, /HISTORICAL_L1_EVIDENCE=NO/);
-    assert.match(output, /HISTORICAL_L1_MECHANISMS=none/);
+    assert.match(output, /BASE_PURCHASE_EVIDENCE=NO/);
+    assert.match(output, /ACCESS_LINK_REDEMPTION_EVIDENCE=NO/);
+    assert.match(output, /HISTORICAL_CANONICAL_L1_GRANT_EVIDENCE=UNPROVEN/);
+    assert.doesNotMatch(output, /HISTORICAL_L1_EVIDENCE=YES/);
     assert.doesNotMatch(output, /user_id=/);
     assert.doesNotMatch(output, /petpovss@yandex\.ru/);
   } finally {
@@ -3719,6 +3746,53 @@ print(classify(sys.argv[1]))
     rmSync(pathRoot, { recursive: true, force: true });
   }
 
+  const homeCases = [
+    {
+      label: "root pw_dir",
+      uid: 0,
+      map: { 0: { name: "root", dir: "/root" } },
+      expectHome: "/root/.pm2",
+    },
+    {
+      label: "ordinary deploy home",
+      uid: 1000,
+      map: { 1000: { name: "deploy", dir: "/home/deploy" } },
+      expectHome: "/home/deploy/.pm2",
+    },
+    {
+      label: "nonstandard home",
+      uid: 2000,
+      map: { 2000: { name: "audiolad", dir: "/srv/audiolad" } },
+      expectHome: "/srv/audiolad/.pm2",
+    },
+    {
+      label: "missing passwd",
+      uid: 4242,
+      map: {},
+      expectHome: "UNKNOWN",
+    },
+  ];
+  for (const homeCase of homeCases) {
+    const homeRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-diag-home-"));
+    try {
+      const fixture = writeCourseUpgradeDiagFixture(homeRoot, { secretUrl, secretKey });
+      setFakeProcUid(fixture.procRoot, 1001, homeCase.uid);
+      const result = runCourseUpgradeDiagHelper(fixture, {
+        AUDIOLAD_COURSE_UPGRADE_DIAG_PASSWD_MAP: JSON.stringify(homeCase.map),
+      });
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      assert.equal(result.status, 0, `${homeCase.label} diag failed: ${output}`);
+      assert.match(output, new RegExp(`LIVE_WEB_PM2_HOME=${homeCase.expectHome.replace(/\//g, "\\/")}`));
+      assert.doesNotMatch(output, /LIVE_WEB_PM2_HOME=\/home\/audiolad\/\.pm2/);
+      if (homeCase.expectHome === "UNKNOWN") {
+        assert.match(output, /LIVE_WEB_PM2_HOME_STATE=UNKNOWN/);
+        assert.match(output, /not guessing \/home\/<euser>/);
+      }
+    } finally {
+      rmSync(homeRoot, { recursive: true, force: true });
+    }
+  }
+
   const wrapperRoot = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-logdiag-"));
   try {
     const fixture = writeCourseUpgradeDiagFixture(wrapperRoot, { secretUrl, secretKey });
@@ -3767,10 +3841,29 @@ print(classify(sys.argv[1]))
   const sudoersText = readFileSync(courseUpgradeLogdiagSudoersPath, "utf8");
   assert.match(
     sudoersText,
-    /^deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-course-upgrade-logdiag$/m,
+    /^deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-course-upgrade-logdiag ""$/m,
   );
   assert.doesNotMatch(sudoersText, /NOPASSWD:\s*ALL/);
   assert.doesNotMatch(sudoersText, /\*/);
+  assert.match(logdiagText, /^PATH=\/usr\/sbin:\/usr\/bin:\/bin$/m);
+  const evilPath = mkdtempSync(join(tmpdir(), "audiolad-logdiag-evil-path-"));
+  try {
+    writeFileSync(
+      join(evilPath, "python3"),
+      "#!/bin/bash\necho EVIL_PYTHON\nexit 99\n",
+      { mode: 0o755 },
+    );
+    const hardened = spawnSync("/bin/bash", [courseUpgradeLogdiagPath], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: evilPath },
+    });
+    const hardenedOut = `${hardened.stdout ?? ""}${hardened.stderr ?? ""}`;
+    assert.equal(hardened.status, 0, `wrapper must ignore caller PATH: ${hardenedOut}`);
+    assert.doesNotMatch(hardenedOut, /EVIL_PYTHON/);
+    assert.match(hardenedOut, /PRIVILEGED_LOGDIAG=OK/);
+  } finally {
+    rmSync(evilPath, { recursive: true, force: true });
+  }
 }
 
 function existsSyncSafe(path) {

@@ -1,5 +1,7 @@
 # Draft only. Do NOT install from CI or from OPS_COURSE_UPGRADE_DIAG.
 # Narrow read-only sudoers fragment for the production deploy user.
-# No unrestricted ALL sudo. No wildcards. No arguments.
+# No unrestricted ALL sudo. No wildcards. No arbitrary paths or shell.
+# Empty argument list ("") locks zero arguments under standard sudoers
+# semantics (command with no argv). The shell wrapper also rejects argc!=0.
 # Allows exactly: sudo -n /usr/local/sbin/audiolad-course-upgrade-logdiag
-deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-course-upgrade-logdiag ""
