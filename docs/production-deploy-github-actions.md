@@ -332,17 +332,20 @@ branch **`main`**. Ослаблять protection нельзя.
 **Ops course upgrade diagnostic**: SSH как `deploy`, фиксированная
 read-only последовательность. **Единственная реализация** —
 `deploy/scripts/audiolad-course-upgrade-diag.sh`. После trusted resolve
-job делает `actions/checkout@v4` **точного** `origin_main_sha`
-(`persist-credentials: false`, `fetch-depth: 1`), проверяет
-`git rev-parse HEAD`, `bash -n` helper, затем:
+job **не** делает `actions/checkout` / clone / worktree. Он забирает
+только этот файл через GitHub Contents API на **точном** immutable
+`origin_main_sha` (`^[0-9a-f]{40}$`), `Accept: application/vnd.github.raw`,
+`contents: read` / `GITHUB_TOKEN`, пишет во временный файл, проверяет
+`test -s`, `bash -n` и маркер `OPS_COURSE_UPGRADE_DIAG`, затем:
 
 ```text
 ssh ... "bash -s --" "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}" \
-  < deploy/scripts/audiolad-course-upgrade-diag.sh
+  < "${COURSE_UPGRADE_HELPER}"
 ```
 
 Не exec-ит helper из production current-release tree. Не выполняет
-код PR-ветки: checkout всегда trusted `origin/main`. **Не вызывает**
+код PR-ветки: helper всегда с trusted `origin_main_sha`, не с
+`github.ref` / PR head. **Не вызывает**
 `audiolad-deploy`, не делает nginx / symlink cutover, не пишет в БД,
 не делает POST `/api/checkout/course-upgrade`, не вызывает Tochka, не
 меняет `user_practices` / orders / payments, не печатает JWT, tokens

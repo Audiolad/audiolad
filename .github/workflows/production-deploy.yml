@@ -24,11 +24,13 @@
 # failure diagnosis: auto-discover audiolad-p30xx PM2 layout, inspect active
 # and orphaned/rotated/.gz app logs, optional journal matches, optional
 # redacted DB correlation. Sole implementation is
-# deploy/scripts/audiolad-course-upgrade-diag.sh. The job checks out exact
-# origin_main_sha with persist-credentials: false, bash -n, then pipes the
-# helper over SSH stdin. Does not exec the production current-release tree.
-# Does not execute PR-branch code. No writes, no checkout POST, no Tochka
-# calls, no entitlement mutation, no cutover, no audiolad-deploy.
+# deploy/scripts/audiolad-course-upgrade-diag.sh. The job fetches that one
+# file via GitHub Contents API at exact origin_main_sha (Accept:
+# application/vnd.github.raw), validates SHA ^[0-9a-f]{40}$, bash -n, then
+# pipes the helper over SSH stdin. Does not checkout, clone, or exec the
+# production current-release tree. Does not execute PR-branch code. No
+# writes, no checkout POST, no Tochka calls, no entitlement mutation, no
+# cutover, no audiolad-deploy.
 # confirm=DEPLOY runs the canonical deploy path only.
 #
 # Environment protection: GitHub Environment `production` typically allows only
@@ -4433,10 +4435,11 @@ jobs:
           fi
 
   # Sole implementation: deploy/scripts/audiolad-course-upgrade-diag.sh
-  # After trusted resolve, checks out exact origin_main_sha
-  # (persist-credentials: false), bash -n, pipes helper over SSH stdin.
-  # Does not exec the production current-release tree. Does not execute
-  # PR-branch code. Production Environment / main restriction unchanged.
+  # After trusted resolve, fetches that one file via GitHub Contents API
+  # at exact origin_main_sha, bash -n, pipes helper over SSH stdin.
+  # Does not checkout, clone, or exec the production current-release tree.
+  # Does not execute PR-branch code. Production Environment / main
+  # restriction unchanged.
   course_upgrade_diag:
     name: Ops course upgrade diagnostic
     needs: resolve
@@ -4464,25 +4467,32 @@ jobs:
           echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
           echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
 
-      - name: Checkout trusted origin/main helper
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve.outputs.origin_main_sha }}
-          persist-credentials: false
-          fetch-depth: 1
-
-      - name: Syntax-check trusted course-upgrade helper
+      - name: Fetch trusted origin/main helper
         env:
           ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          HEAD_SHA="$(git rev-parse HEAD)"
-          if [[ "${HEAD_SHA}" != "${ORIGIN_MAIN_SHA}" ]]; then
-            echo "checked-out HEAD ${HEAD_SHA} != trusted origin_main_sha ${ORIGIN_MAIN_SHA}" >&2
+          set +x
+          if [[ ! "${ORIGIN_MAIN_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ORIGIN_MAIN_SHA must be a 40-character lowercase hex SHA" >&2
             exit 1
           fi
-          test -f deploy/scripts/audiolad-course-upgrade-diag.sh
-          bash -n deploy/scripts/audiolad-course-upgrade-diag.sh
+          : "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+          umask 077
+          HELPER="$(mktemp)"
+          chmod 0600 "${HELPER}"
+          echo "COURSE_UPGRADE_HELPER=${HELPER}" >> "${GITHUB_ENV}"
+          curl -fsS \
+            -H "Accept: application/vnd.github.raw" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o "${HELPER}" \
+            -- \
+            "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-course-upgrade-diag.sh?ref=${ORIGIN_MAIN_SHA}"
+          test -f "${HELPER}"
+          test -s "${HELPER}"
+          bash -n "${HELPER}"
+          grep -F -q "OPS_COURSE_UPGRADE_DIAG" "${HELPER}"
 
       - name: Read-only course upgrade diagnostic via SSH
         env:
@@ -4496,7 +4506,9 @@ jobs:
           : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
           : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
           : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
-          test -f deploy/scripts/audiolad-course-upgrade-diag.sh
+          : "${COURSE_UPGRADE_HELPER:?COURSE_UPGRADE_HELPER is required}"
+          test -f "${COURSE_UPGRADE_HELPER}"
+          test -s "${COURSE_UPGRADE_HELPER}"
 
           ssh \
             -i "${SSH_KEY_FILE}" \
@@ -4508,12 +4520,15 @@ jobs:
             -- \
             "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
             "bash -s --" "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}" \
-            < deploy/scripts/audiolad-course-upgrade-diag.sh
+            < "${COURSE_UPGRADE_HELPER}"
 
-      - name: Remove SSH identity
+      - name: Remove trusted helper and SSH identity
         if: always()
         run: |
           set -euo pipefail
+          if [[ -n "${COURSE_UPGRADE_HELPER:-}" ]]; then
+            rm -f "${COURSE_UPGRADE_HELPER}"
+          fi
           if [[ -n "${SSH_DIR:-}" ]]; then
             rm -rf "${SSH_DIR}"
           fi

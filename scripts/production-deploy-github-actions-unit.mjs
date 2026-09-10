@@ -313,25 +313,25 @@ function main() {
     "course-upgrade diag job must precede deploy job",
   );
   const courseUpgradeJobYaml = workflowText.slice(courseUpgradeJobMarker, deployJobMarkerForCheckout);
-  const workflowOutsideCourseUpgrade =
-    workflowText.slice(0, courseUpgradeJobMarker) + workflowText.slice(deployJobMarkerForCheckout);
   assert.doesNotMatch(
-    workflowOutsideCourseUpgrade,
+    workflowText,
     /actions\/checkout/,
-    "only course_upgrade_diag may use actions/checkout",
+    "production-deploy must not use actions/checkout",
   );
-  assert.equal(
-    (courseUpgradeJobYaml.match(/actions\/checkout@v4/g) || []).length,
-    1,
-    "course_upgrade_diag must use actions/checkout@v4 exactly once",
+  assert.doesNotMatch(
+    courseUpgradeJobYaml,
+    /actions\/checkout/,
+    "course_upgrade_diag must not use actions/checkout",
   );
-  assert.match(courseUpgradeJobYaml, /persist-credentials:\s+false/);
+  assert.doesNotMatch(courseUpgradeJobYaml, /persist-credentials/);
   assert.match(
     courseUpgradeJobYaml,
-    /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/,
+    /ORIGIN_MAIN_SHA:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/,
   );
   assert.doesNotMatch(workflowText, /git submodule/);
   assert.doesNotMatch(workflowText, /\bgit checkout\b/);
+  assert.doesNotMatch(workflowText, /\bgit clone\b/);
+  assert.doesNotMatch(workflowText, /\bgit worktree\b/);
   const workflowFetchLines = workflowText
     .split("\n")
     .map((line) => line.trim())
@@ -399,8 +399,9 @@ function main() {
   assertStudioDuplicateAssetDiag(workflowText, docsText);
   assertRemoteStudioDupAssetDiagScriptSyntax(workflowText);
   assertStudioDupAssetDiagHelper(workflowText);
-  assertCourseUpgradeDiag(workflowText, docsText);
+  assertCourseUpgradeDiag(workflowText, docsText, workflow);
   assertCourseUpgradeDiagHelper();
+  assertCourseUpgradeHelperFetchTransport(workflow);
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -2714,16 +2715,13 @@ function assertStudioDupAssetDiagHelper(workflowText) {
   }
 }
 
-function assertCourseUpgradeDiag(workflowText, docsText) {
+function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
   const required = [
     "OPS_COURSE_UPGRADE_DIAG",
-    "actions/checkout@v4",
-    "persist-credentials: false",
     "origin_main_sha",
     "audiolad-course-upgrade-diag.sh",
-    "bash -n deploy/scripts/audiolad-course-upgrade-diag.sh",
+    "application/vnd.github.raw",
     "bash -s --",
-    "< deploy/scripts/audiolad-course-upgrade-diag.sh",
     "confirm=OPS_COURSE_UPGRADE_DIAG",
   ];
   for (const needle of required) {
@@ -2769,12 +2767,41 @@ function assertCourseUpgradeDiag(workflowText, docsText) {
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
   assert.doesNotMatch(courseCode, /\bdeploy\.sh\b/, "course-upgrade diag job must not call deploy.sh");
-  assert.match(courseJob, /uses:\s+actions\/checkout@v4/);
-  assert.match(courseJob, /persist-credentials:\s+false/);
-  assert.match(courseJob, /ref:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/);
-  assert.match(courseJob, /bash -n deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
+  assert.doesNotMatch(courseJob, /actions\/checkout/);
+  assert.doesNotMatch(courseJob, /persist-credentials/);
+  assert.doesNotMatch(courseCode, /\bgit checkout\b/);
+  assert.doesNotMatch(courseCode, /\bgit clone\b/);
+  assert.doesNotMatch(courseCode, /\bgit worktree\b/);
+  assert.doesNotMatch(courseCode, /\bgit submodule\b/);
+  assert.doesNotMatch(courseJob, /github\.ref\b/);
+  assert.doesNotMatch(courseJob, /github\.head_ref/);
+  assert.doesNotMatch(courseJob, /github\.sha\b/);
+  assert.doesNotMatch(courseJob, /github\.event\.pull_request/);
+  assert.doesNotMatch(courseJob, /[?&]ref=main\b/);
+  assert.doesNotMatch(courseJob, /[?&]ref=\$\{\{\s*github\./);
+  assert.match(
+    courseJob,
+    /contents\/deploy\/scripts\/audiolad-course-upgrade-diag\.sh\?ref=\$\{ORIGIN_MAIN_SHA\}/,
+  );
+  assert.match(courseJob, /Accept:\s+application\/vnd\.github\.raw/);
+  assert.match(courseJob, /Authorization:\s+Bearer \$\{GITHUB_TOKEN\}/);
+  assert.match(courseJob, /ORIGIN_MAIN_SHA:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/);
+  assert.match(courseJob, /\[\[ ! "\$\{ORIGIN_MAIN_SHA\}" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
+  assert.match(courseJob, /bash -n "\$\{HELPER\}"/);
+  assert.match(courseJob, /grep -F -q "OPS_COURSE_UPGRADE_DIAG" "\$\{HELPER\}"/);
   assert.match(courseJob, /"bash -s --"/);
-  assert.match(courseJob, /< deploy\/scripts\/audiolad-course-upgrade-diag\.sh/);
+  assert.match(courseJob, /< "\$\{COURSE_UPGRADE_HELPER\}"/);
+  const fetchOffset = courseJob.indexOf("name: Fetch trusted origin/main helper");
+  const bashNOffset = courseJob.indexOf('bash -n "${HELPER}"');
+  const sshStepOffset = courseJob.indexOf("name: Read-only course upgrade diagnostic via SSH");
+  const sshStdinOffset = courseJob.indexOf('< "${COURSE_UPGRADE_HELPER}"');
+  assert.ok(fetchOffset >= 0, "course-upgrade diag must fetch the trusted helper");
+  assert.ok(bashNOffset > fetchOffset, "helper bash -n must run in the fetch step");
+  assert.ok(sshStepOffset > bashNOffset, "SSH must run after helper bash -n");
+  assert.ok(sshStdinOffset > sshStepOffset, "SSH must pipe the fetched helper on stdin");
+  assert.match(courseJob, /name: Remove trusted helper and SSH identity/);
+  assert.match(courseJob, /if:\s+always\(\)/);
+  assert.match(courseJob, /rm -f "\$\{COURSE_UPGRADE_HELPER\}"/);
   assert.doesNotMatch(
     courseCode,
     /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
@@ -2785,14 +2812,210 @@ function assertCourseUpgradeDiag(workflowText, docsText) {
     /cat\s+[^\n]*\.(env\.production|env\.local)/,
     "course-upgrade diag job must not cat env files",
   );
+  assert.doesNotMatch(courseJob, /\btochka\b/i, "course-upgrade diag job must not call Tochka");
+  assert.doesNotMatch(courseJob, /\/api\/checkout\/course-upgrade/, "course-upgrade diag job must not POST checkout");
+  assert.doesNotMatch(courseJob, /\bINSERT INTO\b/i, "course-upgrade diag job must not write the DB");
+  assert.doesNotMatch(courseJob, /\bUPDATE\b/i, "course-upgrade diag job must not write the DB");
+  assert.doesNotMatch(courseJob, /\bDELETE FROM\b/i, "course-upgrade diag job must not write the DB");
   assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(dupJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(deployJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /audiolad-course-upgrade-diag\.sh/);
   assert.match(docsText, /Evidence cannot be pulled until this confirm is merged/);
-  assert.match(docsText, /persist-credentials: false/);
+  assert.match(docsText, /application\/vnd\.github\.raw/);
+  assert.match(docsText, /origin_main_sha/);
+  assert.doesNotMatch(docsText, /persist-credentials/);
   assert.match(docsText, /SAFE_SUMMARY/);
+
+  const job = workflow.jobs.course_upgrade_diag;
+  assert.equal(job.environment, "production");
+  assert.ok(
+    job.steps.every((step) => !step.uses),
+    "course_upgrade_diag must not use any GitHub Action",
+  );
+  assert.equal(
+    job.steps.filter((step) => step.name === "Fetch trusted origin/main helper").length,
+    1,
+  );
+  assert.equal(
+    job.steps.filter((step) => step.name === "Read-only course upgrade diagnostic via SSH").length,
+    1,
+  );
+  const cleanup = job.steps.find((step) => step.name === "Remove trusted helper and SSH identity");
+  assert.ok(cleanup, "cleanup step must exist");
+  assert.equal(cleanup.if, "always()");
+}
+
+function extractCourseUpgradeFetchScript(workflow) {
+  const fetchStep = workflow.jobs.course_upgrade_diag.steps.find(
+    (step) => step.name === "Fetch trusted origin/main helper",
+  );
+  assert.ok(fetchStep, "fetch trusted helper step must exist");
+  assert.equal(typeof fetchStep.run, "string", "fetch step must be an inline run script");
+  assert.equal(fetchStep.uses, undefined, "fetch step must not use a GitHub Action");
+  return fetchStep.run;
+}
+
+function writeFakeCurl(binDir, { recordPath, bodyPath = "", exitCode = 0 }) {
+  writeFileSync(
+    join(binDir, "curl"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `printf '%s\\n' "$*" >> "${recordPath}"`,
+      "out=''",
+      'args=("$@")',
+      'for ((i=0; i<${#args[@]}; i++)); do',
+      '  if [[ "${args[$i]}" == "-o" ]]; then',
+      '    out="${args[$((i+1))]}"',
+      "  fi",
+      "done",
+      `if [[ -n "$out" && -n "${bodyPath}" && -f "${bodyPath}" ]]; then`,
+      `  cp "${bodyPath}" "$out"`,
+      "fi",
+      `exit ${exitCode}`,
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(binDir, "curl"), 0o755);
+}
+
+function runCourseUpgradeFetchScript(script, { sha, token, fakeBin, extraEnv = {} }) {
+  const work = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-fetch-"));
+  const githubEnv = join(work, "github.env");
+  writeFileSync(githubEnv, "");
+  const env = {
+    PATH: fakeBin ? `${fakeBin}:/usr/bin:/bin` : "/usr/bin:/bin",
+    HOME: work,
+    ORIGIN_MAIN_SHA: sha,
+    GITHUB_ENV: githubEnv,
+    LANG: "C",
+    ...extraEnv,
+  };
+  if (token !== undefined) {
+    env.GITHUB_TOKEN = token;
+  }
+  const result = spawnSync("bash", ["-c", script], {
+    encoding: "utf8",
+    timeout: 10000,
+    env,
+  });
+  return { result, work, githubEnv };
+}
+
+function assertCourseUpgradeHelperFetchTransport(workflow) {
+  const script = extractCourseUpgradeFetchScript(workflow);
+  assert.match(script, /set \+x/);
+  assert.doesNotMatch(script, /echo\s+.*GITHUB_TOKEN/);
+  assert.doesNotMatch(script, /printf\s+.*GITHUB_TOKEN/);
+  assert.doesNotMatch(script, /\bcat\s+"\$\{HELPER\}"/);
+  assert.doesNotMatch(script, /\bgit\b/);
+  assert.doesNotMatch(script, /actions\/checkout/);
+  assert.match(
+    script,
+    /https:\/\/api\.github\.com\/repos\/Audiolad\/audiolad\/contents\/deploy\/scripts\/audiolad-course-upgrade-diag\.sh\?ref=\$\{ORIGIN_MAIN_SHA\}/,
+  );
+
+  const malformed = [
+    "",
+    "main",
+    "HEAD",
+    "origin/main",
+    "refs/heads/main",
+    "refs/pull/385/head",
+    "012ff2e",
+    "a".repeat(39),
+    "a".repeat(41),
+    "A".repeat(40),
+    `${"a".repeat(40)}\n`,
+    "012ff2e02529dfea3987918fb0c5a74ab110fb16X",
+  ];
+  for (const sha of malformed) {
+    const binDir = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-curl-"));
+    const recordPath = join(binDir, "curl-args.txt");
+    writeFakeCurl(binDir, { recordPath, bodyPath: "" });
+    const { result, work } = runCourseUpgradeFetchScript(script, {
+      sha,
+      token: "must-not-be-used",
+      fakeBin: binDir,
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    try {
+      assert.notEqual(result.status, 0, `malformed SHA ${JSON.stringify(sha)} must be rejected`);
+      assert.match(
+        output,
+        /40-character lowercase hex SHA|unbound variable|ORIGIN_MAIN_SHA/,
+        `malformed SHA ${JSON.stringify(sha)} must fail closed: ${output}`,
+      );
+      assert.equal(existsSync(recordPath), false, `curl must not run for malformed SHA ${JSON.stringify(sha)}`);
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+      rmSync(work, { recursive: true, force: true });
+    }
+  }
+
+  const trustedSha = "012ff2e02529dfea3987918fb0c5a74ab110fb16";
+  const goodBody = "#!/usr/bin/env bash\n# confirm=OPS_COURSE_UPGRADE_DIAG\necho ok\n";
+  const cases = [
+    { label: "empty helper", body: "", expectCurl: true },
+    { label: "syntax-invalid helper", body: "echo (\n", expectCurl: true },
+    { label: "helper without marker", body: "#!/usr/bin/env bash\necho ok\n", expectCurl: true },
+  ];
+  for (const testCase of cases) {
+    const binDir = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-curl-"));
+    const recordPath = join(binDir, "curl-args.txt");
+    const bodyPath = join(binDir, "body.sh");
+    writeFileSync(bodyPath, testCase.body);
+    writeFakeCurl(binDir, { recordPath, bodyPath });
+    const { result, work } = runCourseUpgradeFetchScript(script, {
+      sha: trustedSha,
+      token: "test-github-token",
+      fakeBin: binDir,
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    try {
+      assert.notEqual(result.status, 0, `${testCase.label} must fail: ${output}`);
+      assert.equal(existsSync(recordPath), true, `${testCase.label} must reach curl after SHA validation`);
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+      rmSync(work, { recursive: true, force: true });
+    }
+  }
+
+  const binDir = mkdtempSync(join(tmpdir(), "audiolad-course-upgrade-curl-"));
+  const recordPath = join(binDir, "curl-args.txt");
+  const bodyPath = join(binDir, "body.sh");
+  writeFileSync(bodyPath, goodBody);
+  writeFakeCurl(binDir, { recordPath, bodyPath });
+  const { result, work, githubEnv } = runCourseUpgradeFetchScript(script, {
+    sha: trustedSha,
+    token: "test-github-token",
+    fakeBin: binDir,
+  });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  try {
+    assert.equal(result.status, 0, `trusted helper fetch must succeed: ${output}`);
+    assert.equal(output.includes("test-github-token"), false, "fetch script must not print the token");
+    assert.doesNotMatch(output, /confirm=OPS_COURSE_UPGRADE_DIAG/, "fetch script must not print the helper");
+    const recorded = readFileSync(recordPath, "utf8");
+    assert.match(
+      recorded,
+      new RegExp(
+        `https://api\\.github\\.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-course-upgrade-diag\\.sh\\?ref=${trustedSha}`,
+      ),
+    );
+    assert.match(recorded, /Accept: application\/vnd\.github\.raw/);
+    assert.match(recorded, /Authorization: Bearer test-github-token/);
+    assert.doesNotMatch(recorded, /[?&]ref=main\b/);
+    assert.doesNotMatch(recorded, /refs\/heads\//);
+    assert.doesNotMatch(recorded, /refs\/pull\//);
+    const envText = readFileSync(githubEnv, "utf8");
+    assert.match(envText, /^COURSE_UPGRADE_HELPER=/m);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
 }
 
 function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
