@@ -106,8 +106,14 @@ assert(/schemaVersion must stay 2/.test(smoke));
 assert(/must not copy into storage\.objects/.test(smoke));
 
 function dockerAvailable() {
+  const container = process.env.AUDIOLAD_SUPABASE_DB_CONTAINER || "supabase-db";
   try {
     execFileSync("docker", ["info"], { stdio: "ignore" });
+    execFileSync(
+      "docker",
+      ["exec", container, "psql", "-U", "postgres", "-d", "postgres", "-c", "SELECT 1"],
+      { stdio: "ignore" },
+    );
     return true;
   } catch {
     return false;
