@@ -2720,7 +2720,7 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
     "OPS_COURSE_UPGRADE_DIAG",
     "origin_main_sha",
     "audiolad-course-upgrade-diag.sh",
-    "application/vnd.github.raw",
+    "application/vnd.github.raw+json",
     "bash -s --",
     "confirm=OPS_COURSE_UPGRADE_DIAG",
   ];
@@ -2783,7 +2783,28 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
     courseJob,
     /contents\/deploy\/scripts\/audiolad-course-upgrade-diag\.sh\?ref=\$\{ORIGIN_MAIN_SHA\}/,
   );
-  assert.match(courseJob, /Accept:\s+application\/vnd\.github\.raw/);
+  assert.match(courseJob, /Accept:\s+application\/vnd\.github\.raw\+json/);
+  assert.match(workflowText, /application\/vnd\.github\.raw\+json/);
+  assert.doesNotMatch(
+    "Accept: application/vnd.github.raw",
+    /application\/vnd\.github\.raw\+json/,
+    "exact media-type assertion must not pass on bare application/vnd.github.raw",
+  );
+  assert.match(
+    "Accept: application/vnd.github.raw+json",
+    /application\/vnd\.github\.raw\+json/,
+    "exact media-type assertion must accept application/vnd.github.raw+json",
+  );
+  assert.doesNotMatch(
+    courseJob,
+    /application\/vnd\.github\.raw(?!\+json)/,
+    "course job must not use bare application/vnd.github.raw without +json",
+  );
+  assert.doesNotMatch(
+    workflowText,
+    /application\/vnd\.github\.raw(?!\+json)/,
+    "workflow must not use bare application/vnd.github.raw without +json",
+  );
   assert.match(courseJob, /Authorization:\s+Bearer \$\{GITHUB_TOKEN\}/);
   assert.match(courseJob, /ORIGIN_MAIN_SHA:\s+\$\{\{\s*needs\.resolve\.outputs\.origin_main_sha\s*\}\}/);
   assert.match(courseJob, /\[\[ ! "\$\{ORIGIN_MAIN_SHA\}" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
@@ -2823,7 +2844,12 @@ function assertCourseUpgradeDiag(workflowText, docsText, workflow) {
   assert.match(docsText, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /audiolad-course-upgrade-diag\.sh/);
   assert.match(docsText, /Evidence cannot be pulled until this confirm is merged/);
-  assert.match(docsText, /application\/vnd\.github\.raw/);
+  assert.match(docsText, /application\/vnd\.github\.raw\+json/);
+  assert.doesNotMatch(
+    docsText,
+    /application\/vnd\.github\.raw(?!\+json)/,
+    "docs must not use bare application/vnd.github.raw without +json",
+  );
   assert.match(docsText, /origin_main_sha/);
   assert.doesNotMatch(docsText, /persist-credentials/);
   assert.match(docsText, /SAFE_SUMMARY/);
@@ -3005,7 +3031,12 @@ function assertCourseUpgradeHelperFetchTransport(workflow) {
         `https://api\\.github\\.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-course-upgrade-diag\\.sh\\?ref=${trustedSha}`,
       ),
     );
-    assert.match(recorded, /Accept: application\/vnd\.github\.raw/);
+    assert.match(recorded, /Accept: application\/vnd\.github\.raw\+json/);
+    assert.doesNotMatch(
+      recorded,
+      /application\/vnd\.github\.raw(?!\+json)/,
+      "fetched Accept header must not use bare application/vnd.github.raw without +json",
+    );
     assert.match(recorded, /Authorization: Bearer test-github-token/);
     assert.doesNotMatch(recorded, /[?&]ref=main\b/);
     assert.doesNotMatch(recorded, /refs\/heads\//);

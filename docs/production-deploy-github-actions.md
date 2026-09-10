@@ -334,7 +334,7 @@ read-only последовательность. **Единственная ре�
 `deploy/scripts/audiolad-course-upgrade-diag.sh`. После trusted resolve
 job **не** делает `actions/checkout` / clone / worktree. Он забирает
 только этот файл через GitHub Contents API на **точном** immutable
-`origin_main_sha` (`^[0-9a-f]{40}$`), `Accept: application/vnd.github.raw`,
+`origin_main_sha` (`^[0-9a-f]{40}$`), `Accept: application/vnd.github.raw+json`,
 `contents: read` / `GITHUB_TOKEN`, пишет во временный файл, проверяет
 `test -s`, `bash -n` и маркер `OPS_COURSE_UPGRADE_DIAG`, затем:
 
