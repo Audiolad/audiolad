@@ -355,7 +355,7 @@ function AuthorApplicationForm({
         aria-describedby={errors.readiness ? "readiness-error" : undefined}
       >
         <legend className={becomeAuthorLabelClass}>
-          Ваш опыт с аудиопрактиками <span className="text-[#b34f63]">*</span>
+          Ваш опыт с материалами <span className="text-[#b34f63]">*</span>
         </legend>
 
         <label className={becomeAuthorCheckboxCardClass}>
@@ -370,7 +370,7 @@ function AuthorApplicationForm({
             disabled={isPending}
           />
           <span className={`${becomeAuthorBodyClass} text-[#25135c]`}>
-            Я уже записываю свои аудиопрактики
+            Я уже создаю аудиопрактики или музыку
           </span>
         </label>
 
