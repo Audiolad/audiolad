@@ -218,16 +218,46 @@ function quoteStudioMusicFilterValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+function studioMusicCatalogCursorIso(
+  sortTimestamp: number,
+): string | null {
+  if (!Number.isFinite(sortTimestamp)) {
+    return null;
+  }
+  try {
+    const date = new Date(sortTimestamp);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+export function isStudioMusicCatalogCursor(
+  cursor: { sortTimestamp: number; id: string } | null | undefined,
+): cursor is { sortTimestamp: number; id: string } {
+  if (!cursor) {
+    return false;
+  }
+  return (
+    isStudioMusicCatalogUuid(cursor.id) &&
+    studioMusicCatalogCursorIso(cursor.sortTimestamp) != null
+  );
+}
+
 export function buildStudioMusicCatalogCursorOrFilter(
   cursor: { sortTimestamp: number; id: string } | null,
 ): string | null {
-  if (!cursor) {
+  if (!isStudioMusicCatalogCursor(cursor)) {
     return null;
   }
-  const iso = quoteStudioMusicFilterValue(
-    new Date(cursor.sortTimestamp).toISOString(),
-  );
-  return `created_at.lt.${iso},and(created_at.eq.${iso},id.lt.${cursor.id})`;
+  const iso = studioMusicCatalogCursorIso(cursor.sortTimestamp);
+  if (!iso) {
+    return null;
+  }
+  return `created_at.lt.${quoteStudioMusicFilterValue(iso)},and(created_at.eq.${quoteStudioMusicFilterValue(iso)},id.lt.${cursor.id})`;
 }
 
 export function encodeStudioMusicCatalogCursor(
@@ -250,7 +280,7 @@ export function decodeStudioMusicCatalogCursor(
   }
   const sortTimestamp = Number(raw.slice(0, separator));
   const id = raw.slice(separator + 1).trim();
-  if (!id || !Number.isFinite(sortTimestamp)) {
+  if (!isStudioMusicCatalogCursor({ sortTimestamp, id })) {
     return null;
   }
   return { sortTimestamp, id };
@@ -634,6 +664,11 @@ export async function handleStudioMusicCatalog(input: {
 
   if (filter === "mine" && !input.userId) {
     return { status: 401, body: { error: "unauthorized" } };
+  }
+
+  const rawCursor = input.cursor?.trim() ?? "";
+  if (rawCursor && !decodeStudioMusicCatalogCursor(rawCursor)) {
+    return { status: 400, body: { error: "invalid_cursor" } };
   }
 
   const limit = parseStudioMusicCatalogLimit(input.limit);

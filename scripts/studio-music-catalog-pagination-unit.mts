@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  buildStudioMusicCatalogCursorOrFilter,
   createSupabaseStudioMusicCatalogStore,
+  decodeStudioMusicCatalogCursor,
+  encodeStudioMusicCatalogCursor,
   handleStudioMusicCatalog,
   isStudioMusicListedVisibilityRow,
   studioMusicCatalogFetchLimit,
@@ -157,6 +160,7 @@ type RecordingSupabase = {
   client: SupabaseClient;
   practiceLimits: number[];
   materializedPracticeCounts: number[];
+  practiceOrFilters: string[][];
   trackPracticeIds: string[][];
   pricePracticeIds: string[];
 };
@@ -173,6 +177,7 @@ function createRecordingSupabase(input: {
 }): RecordingSupabase {
   const practiceLimits: number[] = [];
   const materializedPracticeCounts: number[] = [];
+  const practiceOrFilters: string[][] = [];
   const trackPracticeIds: string[][] = [];
   const pricePracticeIds: string[] = [];
 
@@ -180,6 +185,7 @@ function createRecordingSupabase(input: {
     if (query.limitValue != null) {
       practiceLimits.push(query.limitValue);
     }
+    practiceOrFilters.push([...query.ors]);
 
     let rows = input.practices.filter((practice) => {
       const row = practice as Record<string, unknown>;
@@ -338,6 +344,7 @@ function createRecordingSupabase(input: {
     client,
     practiceLimits,
     materializedPracticeCounts,
+    practiceOrFilters,
     trackPracticeIds,
     pricePracticeIds,
   };
@@ -658,6 +665,94 @@ function assertNoDuplicates(ids: string[]) {
   assert.ok(first.body.nextCursor);
   assert.deepEqual(recording.practiceLimits, [21]);
   assert.equal(recording.materializedPracticeCounts[0], 21);
+}
+
+{
+  const validId = uuidFromIndex(1);
+  const generated = encodeStudioMusicCatalogCursor(
+    Date.parse("2026-04-01T00:00:00.000Z"),
+    validId,
+  );
+  const decoded = decodeStudioMusicCatalogCursor(generated);
+  assert.ok(decoded);
+  assert.equal(decoded.id, validId);
+  const filter = buildStudioMusicCatalogCursorOrFilter(decoded);
+  assert.ok(filter);
+  assert.match(filter, new RegExp(`id\\.lt\\.${validId}`));
+}
+
+{
+  const rejected = [
+    encodeStudioMusicCatalogCursor(Date.parse("2026-04-01T00:00:00.000Z"), "not-a-uuid"),
+    `${Date.parse("2026-04-01T00:00:00.000Z")}:pub-1,id.eq.other`,
+    `${Date.parse("2026-04-01T00:00:00.000Z")}:foo)or(id.eq.bar`,
+    `${Date.parse("2026-04-01T00:00:00.000Z")}:aaaa,and(id.eq.bbbb)`,
+    `${Number.MAX_VALUE}:${uuidFromIndex(2)}`,
+    `${8.64e15 + 1}:${uuidFromIndex(3)}`,
+  ];
+  for (const cursor of rejected) {
+    assert.equal(
+      decodeStudioMusicCatalogCursor(cursor),
+      null,
+      `expected reject: ${cursor}`,
+    );
+    assert.equal(buildStudioMusicCatalogCursorOrFilter(decodeStudioMusicCatalogCursor(cursor)), null);
+  }
+  assert.equal(
+    buildStudioMusicCatalogCursorOrFilter({
+      sortTimestamp: Date.parse("2026-04-01T00:00:00.000Z"),
+      id: "evil,or(id.eq.x)",
+    }),
+    null,
+  );
+  assert.doesNotThrow(() => {
+    decodeStudioMusicCatalogCursor(`${Number.MAX_VALUE}:${uuidFromIndex(4)}`);
+    buildStudioMusicCatalogCursorOrFilter({
+      sortTimestamp: Number.MAX_VALUE,
+      id: uuidFromIndex(4),
+    });
+  });
+}
+
+{
+  const eligible = Array.from({ length: 40 }, (_, index) => publication(index + 800));
+  const store = createSupabaseStudioMusicCatalogStore(
+    createRecordingSupabase({ practices: eligible }).client,
+  );
+  const invalid = await handleStudioMusicCatalog({
+    filter: "all",
+    cursor: `${Date.parse("2026-04-01T00:00:00.000Z")}:not-a-uuid`,
+    limit: "20",
+    userId: null,
+    store,
+  });
+  assert.deepEqual(invalid, { status: 400, body: { error: "invalid_cursor" } });
+
+  const huge = await handleStudioMusicCatalog({
+    filter: "all",
+    cursor: `${Number.MAX_VALUE}:${uuidFromIndex(1)}`,
+    limit: "20",
+    userId: null,
+    store,
+  });
+  assert.deepEqual(huge, { status: 400, body: { error: "invalid_cursor" } });
+}
+
+{
+  const evilId = "11111111-1111-4111-8111-000000000001,id.eq.hacked";
+  const recording = createRecordingSupabase({
+    practices: Array.from({ length: 5 }, (_, index) => publication(index + 900)),
+  });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  await store.listPublicInventory({
+    filter: "all",
+    cursor: `${Date.parse("2026-04-01T00:00:00.000Z")}:${evilId}`,
+    limit: 20,
+  });
+  const joined = recording.practiceOrFilters.flat().join("\n");
+  assert.equal(joined.includes(evilId), false);
+  assert.equal(joined.includes("id.eq.hacked"), false);
+  assert.match(joined, /catalog_visibility\.eq\.listed/);
 }
 
 console.log("studio-music-catalog-pagination-unit: ok");
