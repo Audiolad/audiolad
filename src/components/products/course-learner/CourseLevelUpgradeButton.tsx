@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 
-import { resolveCourseUpgradeUiError } from "@/lib/course-content/course-upgrade-client-errors";
+import {
+  interpretCourseUpgradeCheckoutResponse,
+  resolveCourseUpgradeUiError,
+} from "@/lib/course-content/course-upgrade-client-errors";
 
 type CourseLevelUpgradeButtonProps = {
   practiceId: string;
@@ -40,39 +43,31 @@ export default function CourseLevelUpgradeButton({
         }),
       });
 
-      const body: unknown = await response.json().catch(() => null);
-      const errorCode =
-        body &&
-        typeof body === "object" &&
-        "error" in body &&
-        typeof (body as { error?: unknown }).error === "string"
-          ? (body as { error: string }).error
-          : undefined;
+      let body: unknown = null;
+      let unexpectedResponse = false;
 
-      const paymentUrl =
-        body &&
-        typeof body === "object" &&
-        "payment" in body &&
-        (body as { payment?: { payment_url?: unknown } }).payment &&
-        typeof (body as { payment: { payment_url?: unknown } }).payment
-          .payment_url === "string"
-          ? (body as { payment: { payment_url: string } }).payment.payment_url
-          : null;
+      try {
+        body = await response.json();
+      } catch {
+        unexpectedResponse = true;
+      }
 
-      const uiError = resolveCourseUpgradeUiError({
+      const outcome = interpretCourseUpgradeCheckoutResponse({
         httpStatus: response.status,
-        errorCode,
-        paymentUrl,
+        body,
+        unexpectedResponse,
       });
 
-      if (uiError) {
-        setErrorMessage(uiError);
+      if (outcome.kind === "error") {
+        setErrorMessage(outcome.message);
         return;
       }
 
-      window.location.assign(paymentUrl as string);
+      window.location.assign(outcome.paymentUrl);
     } catch {
-      setErrorMessage(resolveCourseUpgradeUiError({ httpStatus: 0, networkFailed: true }));
+      setErrorMessage(
+        resolveCourseUpgradeUiError({ httpStatus: 0, networkFailed: true }),
+      );
     } finally {
       setIsLoading(false);
     }

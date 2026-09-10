@@ -9,13 +9,26 @@ import {
 } from "@/lib/course-content/course-upgrade-order-api";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
+  createCourseUpgradeRequestClient,
   logCourseUpgradeFailure,
+  readCourseUpgradeRequestUser,
 } from "@/lib/course-content/course-upgrade-stages";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { startTochkaCheckoutForPendingOrder } from "@/lib/payments/start-tochka-checkout";
 import type { OrderRow } from "@/lib/payments/payment-api";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+type CreateClientFromRequest = typeof createClientFromRequest;
+
+let createClientFromRequestImpl: CreateClientFromRequest =
+  createClientFromRequest;
+
+export function setCourseUpgradeCreateClientForTests(
+  fn: CreateClientFromRequest | null,
+) {
+  createClientFromRequestImpl = fn ?? createClientFromRequest;
+}
 
 function fail(
   stage: string,
@@ -39,12 +52,32 @@ function fail(
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClientFromRequest(request);
+  const created = await createCourseUpgradeRequestClient(() =>
+    createClientFromRequestImpl(request),
+  );
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  if (!created.ok) {
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_REQUEST_CLIENT,
+      created.error,
+      created.status,
+    );
+  }
+
+  const supabase = created.client;
+  const authenticated = await readCourseUpgradeRequestUser(() =>
+    supabase.auth.getUser(),
+  );
+
+  if (!authenticated.ok) {
+    return fail(
+      COURSE_UPGRADE_CHECKOUT_STAGES.AUTHENTICATE_USER,
+      authenticated.error,
+      authenticated.status,
+    );
+  }
+
+  const { user, authError } = authenticated;
 
   if (!user) {
     return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "unauthorized", 401);

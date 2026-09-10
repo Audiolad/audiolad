@@ -1,5 +1,6 @@
 export type CourseUpgradeClientErrorCode =
   | "unauthorized"
+  | "auth_unavailable"
   | "invalid_request"
   | "invalid_target_access_level"
   | "practice_not_found"
@@ -22,6 +23,12 @@ export const COURSE_UPGRADE_GENERIC_ERROR =
 export const COURSE_UPGRADE_NETWORK_ERROR =
   "Не удалось связаться с сервером. Проверьте соединение и попробуйте ещё раз.";
 
+export const COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR =
+  "Не удалось проверить вход в аккаунт. Обновите страницу и попробуйте ещё раз.";
+
+export const COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR =
+  "Не удалось обработать ответ сервера. Обновите страницу и попробуйте ещё раз.";
+
 /**
  * Stable listener-facing copy for known checkout states.
  * Does not include provider tokens, raw Tochka payloads, or internal stages.
@@ -32,6 +39,8 @@ export function mapCourseUpgradeClientError(
   switch (code) {
     case "unauthorized":
       return "Войдите, чтобы открыть следующий уровень.";
+    case "auth_unavailable":
+      return COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR;
     case "not_entitled":
       return "Сначала нужен доступ к текущему уровню.";
     case "upgrade_not_configured":
@@ -75,9 +84,14 @@ export function resolveCourseUpgradeUiError(input: {
   errorCode?: string;
   paymentUrl?: string | null;
   networkFailed?: boolean;
+  unexpectedResponse?: boolean;
 }): string {
   if (input.networkFailed) {
     return COURSE_UPGRADE_NETWORK_ERROR;
+  }
+
+  if (input.unexpectedResponse) {
+    return COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR;
   }
 
   if (input.httpStatus === 401) {
@@ -97,4 +111,56 @@ export function resolveCourseUpgradeUiError(input: {
   }
 
   return "";
+}
+
+export function readCourseUpgradeErrorCode(body: unknown): string | undefined {
+  if (
+    body &&
+    typeof body === "object" &&
+    "error" in body &&
+    typeof (body as { error?: unknown }).error === "string"
+  ) {
+    return (body as { error: string }).error;
+  }
+
+  return undefined;
+}
+
+export function readCourseUpgradePaymentUrl(body: unknown): string | null {
+  if (
+    body &&
+    typeof body === "object" &&
+    "payment" in body &&
+    (body as { payment?: { payment_url?: unknown } }).payment &&
+    typeof (body as { payment: { payment_url?: unknown } }).payment
+      .payment_url === "string"
+  ) {
+    return (body as { payment: { payment_url: string } }).payment.payment_url;
+  }
+
+  return null;
+}
+
+export function interpretCourseUpgradeCheckoutResponse(input: {
+  httpStatus: number;
+  body?: unknown;
+  unexpectedResponse?: boolean;
+  networkFailed?: boolean;
+}):
+  | { kind: "redirect"; paymentUrl: string }
+  | { kind: "error"; message: string } {
+  const paymentUrl = readCourseUpgradePaymentUrl(input.body);
+  const uiError = resolveCourseUpgradeUiError({
+    httpStatus: input.httpStatus,
+    errorCode: readCourseUpgradeErrorCode(input.body),
+    paymentUrl,
+    networkFailed: input.networkFailed,
+    unexpectedResponse: input.unexpectedResponse,
+  });
+
+  if (uiError) {
+    return { kind: "error", message: uiError };
+  }
+
+  return { kind: "redirect", paymentUrl: (paymentUrl ?? "").trim() };
 }

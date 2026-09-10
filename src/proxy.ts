@@ -7,6 +7,7 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
+import { runCourseUpgradeProtectedUpdateSession } from "@/lib/course-content/course-upgrade-stages";
 import { updateSession } from "@/lib/supabase/proxy";
 
 function getRequestHostname(request: NextRequest): string {
@@ -33,7 +34,12 @@ export async function proxy(request: NextRequest) {
     return updateSession(request, { rewritePathname: MAX_SITE_PATH });
   }
 
-  return updateSession(request);
+  return runCourseUpgradeProtectedUpdateSession({
+    pathname,
+    updateSession: () => updateSession(request),
+    failClosed: () =>
+      NextResponse.json({ error: "auth_unavailable" }, { status: 503 }),
+  });
 }
 
 export const config = {
