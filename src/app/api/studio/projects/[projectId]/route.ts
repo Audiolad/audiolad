@@ -6,7 +6,8 @@ import {
   softDeleteStudioProject,
   updateStudioProject,
 } from "@/lib/studio/server/repository";
-import { toStudioAssetDto, toStudioProjectDto } from "@/lib/studio/server/model";
+import { toListedStudioAssetDtos } from "@/lib/studio/server/catalog-assets";
+import { toStudioProjectDto } from "@/lib/studio/server/model";
 import {
   parseRevision,
   parseStudioProjectData,
@@ -28,7 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const assets = await listStudioAssets(projectId);
     return NextResponse.json({
       project: toStudioProjectDto(project),
-      assets: assets.map((asset) => toStudioAssetDto(asset)),
+      assets: await toListedStudioAssetDtos(assets),
     }, {
       headers: {
         "Cache-Control": "private, no-store",

@@ -600,6 +600,12 @@ function testRepoOneFileOneVersion() {
         "20261003120700_studio_music_independent_pricing.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20261004120000_studio_catalog_project_assets.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -709,8 +715,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261003120500",
     "20261003120600",
     "20261003120700",
+    "20261004120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 77);
+  assert.equal(plan.database_migrations_pending, 78);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -799,8 +806,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261003120500",
     "20261003120600",
     "20261003120700",
+    "20261004120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 71);
+  assert.equal(plan.database_migrations_pending, 72);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -896,8 +904,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261003120500",
     "20261003120600",
     "20261003120700",
+    "20261004120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 62);
+  assert.equal(plan.database_migrations_pending, 63);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {

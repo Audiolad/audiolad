@@ -390,6 +390,24 @@ order, and `price_changed`. Catalog `free` filter = Studio-free, not
 `practices.is_free`. Entitlements stay permanent. Finance 70/30 and
 `platform_absorbs` unchanged.
 
+PR4 (additive): catalog music attaches to a Studio project by reference.
+Migration `20261004120000_studio_catalog_project_assets.sql`.
+`studio_project_assets.source_type` adds `catalog`. New columns
+`catalog_practice_id` / `catalog_audio_item_id` (FK RESTRICT to
+`practices` / `audio_items`). Catalog rows have `storage_path` NULL,
+`source_id` NULL, `size_bytes = 0`, `upload_state = ready`. No copy into
+`studio-draft-assets`. Trigger rejects mismatched
+`audio_item.practice_id`. Partial UNIQUE
+`(project_id, catalog_practice_id, catalog_audio_item_id) WHERE
+deleted_at IS NULL AND source_type='catalog'` — soft-deleted rows do not
+block reattach. RPC `attach_studio_catalog_project_asset` is
+`service_role` only and gates with `can_use_music_in_studio` (never
+`user_practices`). `project_data` stays schemaVersion 2; tracks still
+only store `assetId`. Full playback is a same-origin stream after a
+fresh entitlement/author check. Render of an active catalog track is
+rejected until PR5 (`catalog_music_render_not_available`). Existing
+upload/recording rows stay valid.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из

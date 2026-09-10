@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   StudioPersistenceClientError,
+  attachStudioCatalogAsset,
   getStudioAssetPlaybackUrl,
   replaceStudioProjectAsset,
   retryStudioProjectAssetUpload,
@@ -522,6 +523,80 @@ assert.doesNotMatch(client, /createClient\(/);
         error.code === "invalid_audio_duration",
     );
     assert.equal(abandonCount, 1);
+  });
+}
+
+{
+  const practiceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const audioItemId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  await withFetch(async (url, init) => {
+    const href = String(url);
+    assert.equal(href, `/api/studio/projects/${projectId}/assets/catalog`);
+    assert.equal(init?.method, "POST");
+    const payload = JSON.parse(String(init?.body));
+    assert.deepEqual(payload, { practiceId, audioItemId });
+    assert.equal(Object.keys(payload).length, 2);
+    return Response.json({
+      asset: {
+        id: assetId,
+        projectId,
+        originalName: "Рассвет",
+        mimeType: "audio/mpeg",
+        sizeBytes: 0,
+        durationSeconds: 180,
+        sourceType: "catalog",
+        createdAt: "2026-09-10T00:00:00.000Z",
+        catalogPracticeId: practiceId,
+        catalogAudioItemId: audioItemId,
+        available: true,
+      },
+    }, { status: 201 });
+  }, async () => {
+    const asset = await attachStudioCatalogAsset({
+      projectId,
+      practiceId,
+      audioItemId,
+    });
+    assert.equal(asset.sourceType, "catalog");
+    assert.equal(asset.catalogPracticeId, practiceId);
+    assert.equal(asset.catalogAudioItemId, audioItemId);
+    assert.equal(asset.available, true);
+  });
+}
+
+{
+  await withFetch(async (url) => {
+    assert.equal(
+      String(url),
+      `/api/studio/projects/${projectId}/assets/catalog`,
+    );
+    return Response.json(
+      {
+        asset: {
+          id: assetId,
+          projectId,
+          originalName: "leak",
+          mimeType: "audio/mpeg",
+          sizeBytes: 0,
+          durationSeconds: 12,
+          sourceType: "catalog",
+          createdAt: "2026-09-10T00:00:00.000Z",
+          storage_path: "practice-audio/secret.mp3",
+        },
+      },
+      { status: 201 },
+    );
+  }, async () => {
+    await assert.rejects(
+      attachStudioCatalogAsset({
+        projectId,
+        practiceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        audioItemId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "server_error",
+    );
   });
 }
 

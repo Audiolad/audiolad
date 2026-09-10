@@ -2,7 +2,7 @@
 
 import { STUDIO_ASSETS_BUCKET } from "@/lib/studio/limits";
 
-export type StudioAssetSourceType = "upload" | "recording";
+export type StudioAssetSourceType = "upload" | "recording" | "catalog";
 
 export type StudioUploadedAsset = {
   id: string;
@@ -13,6 +13,9 @@ export type StudioUploadedAsset = {
   durationSeconds: number | null;
   sourceType: StudioAssetSourceType;
   createdAt: string;
+  catalogPracticeId?: string;
+  catalogAudioItemId?: string;
+  available?: boolean;
 };
 
 export type StudioPersistenceClientErrorCode =
@@ -34,6 +37,10 @@ export type StudioPersistenceClientErrorCode =
   | "invalid_project_asset"
   | "guest_project_limit"
   | "guest_render_entitlement"
+  | "catalog_music_forbidden"
+  | "catalog_music_unavailable"
+  | "catalog_music_render_not_available"
+  | "invalid_catalog_audio_item"
   | "rate_limited"
   | "server_error"
   | "network_error";
@@ -57,6 +64,10 @@ const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   invalid_project_asset: "Один из аудиофайлов проекта недоступен для экспорта.",
   guest_project_limit: "Чтобы создавать больше проектов, войдите или зарегистрируйтесь.",
   guest_render_entitlement: "Чтобы создавать новые MP3, войдите или зарегистрируйтесь.",
+  catalog_music_forbidden: "Эта музыка недоступна в Студии.",
+  catalog_music_unavailable: "Музыка из каталога недоступна.",
+  catalog_music_render_not_available: "Экспорт с музыкой из каталога пока недоступен",
+  invalid_catalog_audio_item: "Не удалось добавить этот трек в проект.",
   rate_limited: "Слишком много попыток. Подождите немного и попробуйте снова.",
   server_error: "Сервер не смог сохранить аудио. Попробуйте ещё раз.",
   network_error: "Не удалось связаться с сервером. Проверьте подключение и повторите.",
@@ -325,6 +336,10 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
           serverCode === "upload_not_complete" ||
           serverCode === "guest_project_limit" ||
           serverCode === "guest_render_entitlement" ||
+          serverCode === "catalog_music_forbidden" ||
+          serverCode === "catalog_music_unavailable" ||
+          serverCode === "catalog_music_render_not_available" ||
+          serverCode === "invalid_catalog_audio_item" ||
           serverCode === "rate_limited"
         ? serverCode
         : getErrorCode(response.status),
@@ -510,14 +525,52 @@ export async function getStudioAssetPlaybackUrl({
 }
 
 function isUploadedAsset(value: unknown): value is StudioUploadedAsset {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      "id" in value &&
-      typeof value.id === "string" &&
-      "projectId" in value &&
-      typeof value.projectId === "string",
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("id" in value) ||
+    typeof value.id !== "string" ||
+    !("projectId" in value) ||
+    typeof value.projectId !== "string"
+  ) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    "storage_path" in record ||
+    "storagePath" in record ||
+    "audio_path" in record ||
+    "signedUrl" in record
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export async function attachStudioCatalogAsset({
+  projectId,
+  practiceId,
+  audioItemId,
+  signal,
+}: {
+  projectId: string;
+  practiceId: string;
+  audioItemId: string;
+  signal?: AbortSignal;
+}): Promise<StudioUploadedAsset> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/catalog`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ practiceId, audioItemId }),
+      signal,
+    },
   );
+  if (!response.ok) {
+    throw await toStudioFetchError(response);
+  }
+  return await readAssetResponse(response);
 }
 
 export type StudioSignedUpload = { path: string; token: string };

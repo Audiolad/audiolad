@@ -65,7 +65,13 @@ import {
 import { serializeStudioProjectState, validateStudioProjectDocument } from "@/lib/studio/persistence";
 import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
-import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
+import {
+  CATALOG_MUSIC_RENDER_GUARD_MESSAGE,
+  isSameCatalogSelection,
+  projectTracksBlockCatalogRender,
+  resolveActiveCatalogMusicSelection,
+} from "@/lib/studio/catalog-asset";
+import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
   isDesktopEnvironment,
@@ -585,6 +591,8 @@ export default function StudioEditorShell({
   const mobileOverflowRef = useRef<HTMLDivElement | null>(null);
   const [musicChooserSlotId, setMusicChooserSlotId] = useState<string | null>(null);
   const [musicCatalogOverlayOpen, setMusicCatalogOverlayOpen] = useState(false);
+  const [catalogTargetSlotId, setCatalogTargetSlotId] = useState<string | null>(null);
+  const [attachingCatalogAudioItemId, setAttachingCatalogAudioItemId] = useState<string | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
     { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
@@ -607,6 +615,7 @@ export default function StudioEditorShell({
     removeTrack,
     rippleDeleteClip,
     replaceTrackAudio,
+    ingestCatalogAsset,
     retryTrackAssetUpload,
     restoreEditingState,
     seek,
@@ -1268,8 +1277,85 @@ export default function StudioEditorShell({
   };
 
   const pickCatalogMusic = () => {
+    setCatalogTargetSlotId(musicChooserSlotId);
     setMusicChooserSlotId(null);
     setMusicCatalogOverlayOpen(true);
+  };
+
+  const selectedCatalogMusic = resolveActiveCatalogMusicSelection({
+    slots,
+    tracks,
+  });
+  const catalogExportBlocked = projectTracksBlockCatalogRender(tracks);
+
+  const attachCatalogToProject = async (practiceId: string, audioItemId: string) => {
+    const projectId = persistedHydration?.project.id;
+    if (!projectId) {
+      setEditingError("Сохраните проект, чтобы добавить музыку из каталога.");
+      return;
+    }
+    if (
+      isSameCatalogSelection({
+        selectedPracticeId: selectedCatalogMusic?.practiceId,
+        selectedAudioItemId: selectedCatalogMusic?.audioItemId,
+        practiceId,
+        audioItemId,
+      })
+    ) {
+      return;
+    }
+    const slotId =
+      catalogTargetSlotId ??
+      slotsRef.current.find((slot) => slot.trackKind === "music")?.id ??
+      null;
+    if (!slotId) {
+      return;
+    }
+    setAttachingCatalogAudioItemId(audioItemId);
+    setEditingError(null);
+    try {
+      const asset = await attachStudioCatalogAsset({
+        projectId,
+        practiceId,
+        audioItemId,
+      });
+      const existingTrackId =
+        slotsRef.current.find((item) => item.id === slotId)?.audioTrackId ?? null;
+      const track = ingestCatalogAsset(asset, existingTrackId);
+      if (!track) {
+        return;
+      }
+      if (!existingTrackId) {
+        setSlots((currentSlots) =>
+          currentSlots.map((slot) =>
+            slot.id === slotId
+              ? {
+                  ...slot,
+                  audioTrackId: track.id,
+                  name: isStudioDefaultTrackName(
+                    slot.name,
+                    slot.trackKind ?? "music",
+                  )
+                    ? getStudioTrackNameFromSourceDisplayName(asset.originalName) ||
+                      slot.name
+                    : slot.name,
+                }
+              : slot,
+          ),
+        );
+      } else {
+        renameDefaultSlotFromSource(slotId, asset.originalName);
+      }
+      markSavedChange();
+    } catch (error) {
+      setEditingError(
+        error instanceof StudioPersistenceClientError
+          ? error.message
+          : "Не удалось добавить этот трек в проект.",
+      );
+    } finally {
+      setAttachingCatalogAudioItemId(null);
+    }
   };
 
   const startSlotRecording = (slotId: string) => {
@@ -1844,6 +1930,10 @@ export default function StudioEditorShell({
     const projectId = persistedHydration?.project.id;
     const controller = controllerRef.current;
     if (!projectId || !controller || renderBusy) return;
+    if (catalogExportBlocked) {
+      setRenderError(CATALOG_MUSIC_RENDER_GUARD_MESSAGE);
+      return;
+    }
     setRenderError(null);
     setRenderBusy(true);
     try {
@@ -2275,11 +2365,12 @@ export default function StudioEditorShell({
               </button>
               {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-2 text-sm text-emerald-100 lg:px-3">Скачать MP3</a> : null}
               {renderJob?.status === "completed" && accessMode !== "guest" ? null : (
+                <>
                 <button
                   type="button"
-                  disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
+                  disabled={saveIsUnavailable || catalogExportBlocked || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
                   onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }}
-                  title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"
+                  title={catalogExportBlocked ? CATALOG_MUSIC_RENDER_GUARD_MESSAGE : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"}
                   className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-2 text-sm text-[#eadfff] disabled:opacity-45 lg:px-3"
                 >
                   {renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? (
@@ -2287,6 +2378,12 @@ export default function StudioEditorShell({
                   ) : null}
                   <span className="relative z-10">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</span>
                 </button>
+                {catalogExportBlocked ? (
+                  <span className="hidden max-w-[12rem] text-[11px] leading-tight text-[#d8c8fb] lg:inline">
+                    {CATALOG_MUSIC_RENDER_GUARD_MESSAGE}
+                  </span>
+                ) : null}
+                </>
               )}
             </div>
           </div>
@@ -2757,6 +2854,12 @@ export default function StudioEditorShell({
       <StudioMusicCatalogOverlay
         open={musicCatalogOverlayOpen}
         onClose={() => setMusicCatalogOverlayOpen(false)}
+        selectedPracticeId={selectedCatalogMusic?.practiceId ?? null}
+        selectedAudioItemId={selectedCatalogMusic?.audioItemId ?? null}
+        attachingAudioItemId={attachingCatalogAudioItemId}
+        onAdd={(practiceId, audioItemId) => {
+          void attachCatalogToProject(practiceId, audioItemId);
+        }}
       />
 
       <StudioInAppRotateHintBanner

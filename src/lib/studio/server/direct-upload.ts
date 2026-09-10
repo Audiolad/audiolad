@@ -48,6 +48,13 @@ function mapServiceError(error: { message: string }, fallback = "internal_error"
   throw new StudioApiError(fallback, 500);
 }
 
+function requireUploadStoragePath(asset: StudioProjectAssetRow): string {
+  if (!asset.storage_path || asset.source_type === "catalog") {
+    throw new StudioApiError("invalid_asset", 422);
+  }
+  return asset.storage_path;
+}
+
 async function setUploadState(
   projectId: string,
   assetId: string,
@@ -226,11 +233,11 @@ export async function reserveStudioDirectUpload(input: {
   if (error) mapServiceError(error);
   const asset = data as StudioProjectAssetRow;
   try {
-    const signedUpload = await createSignedUpload(asset.storage_path);
+    const signedUpload = await createSignedUpload(storagePath);
     await setUploadState(input.projectId, asset.id, "uploading");
     return { asset: { ...asset, upload_state: "uploading" }, signedUpload };
   } catch (error) {
-    await failAndReleaseStudioUpload(input.projectId, asset.id, asset.storage_path);
+    await failAndReleaseStudioUpload(input.projectId, asset.id, storagePath);
     throw error;
   }
 }
@@ -246,19 +253,20 @@ export async function retryStudioDirectUpload(
   const { asset, ownerId, ownerKind } = await getStudioProjectAsset(projectId, assetId, {
     allowedStates: ["reserved", "uploading", "failed"],
   });
+  const storagePath = requireUploadStoragePath(asset);
   if (
-    !isStudioStoragePath(asset.storage_path, ownerId, projectId, asset.id, ownerKind)
+    !isStudioStoragePath(storagePath, ownerId, projectId, asset.id, ownerKind)
   ) {
     throw new StudioApiError("invalid_asset", 500);
   }
-  const object = await readStudioStorageObjectInfo(asset.storage_path);
+  const object = await readStudioStorageObjectInfo(storagePath);
   if (object && object.size === Number(asset.size_bytes)) {
     return { asset, signedUpload: null, alreadyUploaded: true };
   }
   if (object) {
-    await deleteStoragePaths([asset.storage_path]);
+    await deleteStoragePaths([storagePath]);
   }
-  const signedUpload = await createSignedUpload(asset.storage_path);
+  const signedUpload = await createSignedUpload(storagePath);
   await setUploadState(projectId, assetId, "uploading");
   return { asset: { ...asset, upload_state: "uploading" }, signedUpload, alreadyUploaded: false };
 }
@@ -277,7 +285,7 @@ export async function finalizeStudioDirectUpload(
   await setUploadState(projectId, assetId, "processing");
   try {
     const inspected = await inspectUploadedAudio({
-      storagePath: asset.storage_path,
+      storagePath: requireUploadStoragePath(asset),
       mimeType: asset.mime_type,
       reservedBytes: Number(asset.size_bytes),
     });
@@ -300,7 +308,11 @@ export async function finalizeStudioDirectUpload(
       await setUploadState(projectId, assetId, "uploading").catch(() => undefined);
       throw error;
     }
-    await failAndReleaseStudioUpload(projectId, assetId, asset.storage_path);
+    await failAndReleaseStudioUpload(
+      projectId,
+      assetId,
+      asset.storage_path ?? undefined,
+    );
     throw error;
   }
 }
@@ -317,6 +329,9 @@ export async function reserveStudioDirectReplacement(input: {
   const existing = await getStudioProjectAsset(input.projectId, input.assetId, {
     allowedStates: ["ready"],
   });
+  if (existing.asset.source_type === "catalog") {
+    throw new StudioApiError("invalid_asset", 422);
+  }
   if (existing.asset.pending_storage_path) {
     await abandonStudioDirectReplacement(input.projectId, input.assetId);
   }
@@ -436,7 +451,7 @@ export async function abandonStudioDirectUpload(projectId: string, assetId: stri
   const { asset } = await getStudioProjectAsset(projectId, assetId, {
     allowedStates: ["reserved", "uploading", "processing", "failed"],
   });
-  await failAndReleaseStudioUpload(projectId, assetId, asset.storage_path);
+  await failAndReleaseStudioUpload(projectId, assetId, asset.storage_path ?? undefined);
 }
 
 export async function abandonStudioDirectReplacement(projectId: string, assetId: string) {
