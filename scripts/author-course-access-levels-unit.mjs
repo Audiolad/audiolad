@@ -573,6 +573,10 @@ function createCatalogClient(initialRows = []) {
         filters.push((row) => row[column] === value);
         return api;
       },
+      is(column, value) {
+        filters.push((row) => (value === null ? row[column] == null : row[column] === value));
+        return api;
+      },
       gte(column, value) {
         filters.push((row) => row[column] >= value);
         return api;

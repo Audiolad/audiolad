@@ -51,6 +51,20 @@ export async function getPracticeSaleLock(
     return { locked: true, reason: "entitlement" };
   }
 
+  const { count: studioEntitlementCount, error: studioError } = await supabase
+    .from("studio_music_entitlements")
+    .select("id", { count: "exact", head: true })
+    .eq("practice_id", practiceId)
+    .is("revoked_at", null);
+
+  if (studioError) {
+    throw new Error("studio_entitlement_lookup_failed");
+  }
+
+  if ((studioEntitlementCount ?? 0) > 0) {
+    return { locked: true, reason: "entitlement" };
+  }
+
   const { count: paidOrderCount, error: orderError } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
