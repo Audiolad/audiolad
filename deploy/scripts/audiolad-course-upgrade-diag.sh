@@ -323,7 +323,7 @@ try:
         fields = {}
         extract_allowlisted(line, fields)
         window, ts = classify(line)
-        if event == "course_upgrade_failed" or "{" in line:
+        if (event == "course_upgrade_failed" or "{" in line) and not is_object_close(line):
             for _ in range(LOOKAHEAD):
                 nxt = handle.readline()
                 if nxt == "":

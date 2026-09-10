@@ -2903,7 +2903,11 @@ function writeCourseUpgradeDiagFixture(root, { secretUrl, secretKey }) {
   writeFileSync(join(pm2Dir, "audiolad-p3001-out.log"), "ready\n");
   writeFileSync(
     p3001Err,
-    "2026-09-10T05:10:00.000Z course_upgrade_failed { FAILED_STAGE: 'reload_orders_row', ACTUAL_API_ERROR: 'internal_error', ACTUAL_HTTP_STATUS: 500, order_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }\n",
+    [
+      "2026-09-10T05:10:00.000Z course_upgrade_failed { FAILED_STAGE: 'reload_orders_row', ACTUAL_API_ERROR: 'internal_error', ACTUAL_HTTP_STATUS: 500, order_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', practice_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', target_access_level: 2 }",
+      "2026-09-10T05:10:01.000Z course_upgrade_failed { FAILED_STAGE: 'startTochkaCheckoutForPendingOrder', ACTUAL_API_ERROR: 'auth_required', ACTUAL_HTTP_STATUS: 401, order_id: '99999999-9999-4999-8999-999999999999', practice_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', target_access_level: 3 }",
+      "",
+    ].join("\n"),
   );
   writeFileSync(
     p3000Err,
@@ -3034,7 +3038,41 @@ function assertCourseUpgradeDiagOutput(output, { secretUrl, secretKey }) {
   assert.match(output, /order_id=12121212-1212-4121-8121-121212121212/);
   assert.match(output, /order_id=34343434-3434-4343-8343-343434343434/);
   assert.match(output, /SAFE_SUMMARY window=recent/);
+  const singleLineSummaries = output
+    .split("\n")
+    .filter((line) => line.includes("SAFE_SUMMARY") && line.includes("window=recent"));
+  const firstClosed = singleLineSummaries.find(
+    (line) =>
+      line.includes("FAILED_STAGE=reload_orders_row") &&
+      line.includes("order_id=ffffffff-ffff-4fff-8fff-ffffffffffff"),
+  );
+  const secondClosed = singleLineSummaries.find(
+    (line) =>
+      line.includes("FAILED_STAGE=startTochkaCheckoutForPendingOrder") &&
+      line.includes("order_id=99999999-9999-4999-8999-999999999999"),
+  );
+  assert.ok(firstClosed, "closed single-line course_upgrade_failed must emit its own SAFE_SUMMARY");
+  assert.match(firstClosed, /ACTUAL_API_ERROR=internal_error/);
+  assert.match(firstClosed, /ACTUAL_HTTP_STATUS=500/);
+  assert.match(firstClosed, /practice_id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/);
+  assert.match(firstClosed, /target_access_level=2/);
+  assert.doesNotMatch(firstClosed, /startTochkaCheckoutForPendingOrder/);
+  assert.doesNotMatch(firstClosed, /auth_required/);
+  assert.doesNotMatch(firstClosed, /ACTUAL_HTTP_STATUS=401/);
+  assert.doesNotMatch(firstClosed, /99999999-9999-4999-8999-999999999999/);
+  assert.doesNotMatch(firstClosed, /aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+  assert.doesNotMatch(firstClosed, /target_access_level=3/);
+  assert.ok(secondClosed, "next diagnostic event must appear as a separate SAFE_SUMMARY");
+  assert.match(secondClosed, /ACTUAL_API_ERROR=auth_required/);
+  assert.match(secondClosed, /ACTUAL_HTTP_STATUS=401/);
+  assert.match(secondClosed, /practice_id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
+  assert.match(secondClosed, /target_access_level=3/);
+  assert.doesNotMatch(secondClosed, /reload_orders_row/);
+  assert.doesNotMatch(secondClosed, /internal_error/);
+  assert.doesNotMatch(secondClosed, /ffffffff-ffff-4fff-8fff-ffffffffffff/);
+  assert.doesNotMatch(secondClosed, /target_access_level=2/);
   assert.match(output, /FAILED_STAGE=reload_orders_row/);
+  assert.match(output, /FAILED_STAGE=startTochkaCheckoutForPendingOrder/);
   assert.match(output, /provider_http_status=403/);
   assert.match(output, /provider_error_code=tochka_create_payment_failed/);
   assert.match(output, /kind=p3000_gz_orphaned_or_unlisted|kind=p3000_gz/);
@@ -3073,6 +3111,7 @@ function assertCourseUpgradeDiagHelper() {
   assert.match(helperText, /PRIORITY_MAX = 40/);
   assert.match(helperText, /RECENT_MAX = 20/);
   assert.match(helperText, /LOOKAHEAD = 16/);
+  assert.match(helperText, /not is_object_close\(line\)/);
   assert.match(helperText, /compressed_log_error/);
   assert.doesNotMatch(helperText, /\.readlines\s*\(/);
   assert.doesNotMatch(helperText, /\bMATCH_LINE\b/);
