@@ -1,3 +1,5 @@
+import { listPdfPagesToRelease } from "./learner-pdf-layout";
+
 /**
  * PDF.js forbids concurrent page.render() on the same canvas.
  * Keep one RenderTask per page and cancel it before the next generation
@@ -61,8 +63,21 @@ export class PdfPageRenderTaskRegistry {
     return cancelled;
   }
 
-  clear(pageNumber: number): void {
+  get(pageNumber: number): PdfRenderTaskLike | undefined {
+    return this.tasks.get(pageNumber);
+  }
+
+  /**
+   * Drop a finished task only if it is still the registered task.
+   * A cancelled generation must not clear a newer task on the same page.
+   */
+  clear(pageNumber: number, task: PdfRenderTaskLike): boolean {
+    if (this.tasks.get(pageNumber) !== task) {
+      return false;
+    }
+
     this.tasks.delete(pageNumber);
+    return true;
   }
 
   has(pageNumber: number): boolean {
@@ -86,4 +101,46 @@ export function beginPdfRenderGeneration(input: {
   input.registry.cancelAll();
   input.renderedPages.clear();
   return input.generation + 1;
+}
+
+export type PdfPageCanvasLike = {
+  width: number;
+  height: number;
+  style?: { width?: string; height?: string };
+};
+
+/**
+ * Drop the bitmap only. CSS width/height on the element stay so the
+ * vertical placeholder does not collapse.
+ */
+export function releasePdfPageCanvas(
+  canvas: PdfPageCanvasLike | null | undefined,
+): void {
+  if (!canvas) {
+    return;
+  }
+
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
+export function evictPdfPagesOutsideWindow(input: {
+  pageCount: number;
+  residentPages: readonly number[];
+  renderedPages: Set<number>;
+  registry: PdfPageRenderTaskRegistry;
+  getCanvas: (pageNumber: number) => PdfPageCanvasLike | null;
+}): number[] {
+  const released = listPdfPagesToRelease({
+    pageCount: input.pageCount,
+    residentPages: input.residentPages,
+  });
+
+  for (const pageNumber of released) {
+    input.registry.cancel(pageNumber);
+    input.renderedPages.delete(pageNumber);
+    releasePdfPageCanvas(input.getCanvas(pageNumber));
+  }
+
+  return released;
 }

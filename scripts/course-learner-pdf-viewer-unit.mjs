@@ -21,6 +21,8 @@ import {
   computePdfPageCssSize,
   documentHasHorizontalOverflow,
   formatPdfPageLabel,
+  isPdfPageEligibleForRender,
+  listPdfPagesToRelease,
   pageWrapperFitsContainer,
   selectPdfPagesToRender,
 } from "../src/lib/course-content/learner-pdf-layout.ts";
@@ -28,7 +30,9 @@ import { buildPdfPageSlots } from "../src/lib/course-content/learner-pdf-documen
 import {
   PdfPageRenderTaskRegistry,
   beginPdfRenderGeneration,
+  evictPdfPagesOutsideWindow,
   isPdfRenderCancelled,
+  releasePdfPageCanvas,
   shouldShowPdfPageRenderError,
 } from "../src/lib/course-content/learner-pdf-render-tasks.ts";
 import { COURSE_LEARNER_CONTENTS_ANCHOR_ID } from "../src/lib/products/practice-access-ui.ts";
@@ -214,6 +218,8 @@ assert.match(pagesSource, /PdfPageRenderTaskRegistry/);
 assert.match(pagesSource, /beginPdfRenderGeneration/);
 assert.match(pagesSource, /shouldShowPdfPageRenderError/);
 assert.match(pagesSource, /cancelAll/);
+assert.match(pagesSource, /clear\(pageNumber, task\)/);
+assert.match(pagesSource, /evictPdfPagesOutsideWindow/);
 assert.doesNotMatch(pagesSource, /<iframe/);
 assert.match(route, /signLearnerPublicationFile/);
 assert.match(route, /createInlinePdfProxyResponse/);
@@ -266,9 +272,38 @@ const secondTask = {
 };
 registry.set(1, secondTask);
 await secondTask.promise;
-registry.clear(1);
+assert.equal(registry.clear(1, secondTask), true);
 assert.equal(secondRendered, true);
 assert.equal(registry.size, 0);
+
+const staleRegistry = new PdfPageRenderTaskRegistry();
+let taskACancelled = false;
+let taskBCancelled = false;
+const taskA = {
+  cancel() {
+    taskACancelled = true;
+  },
+  promise: Promise.resolve(),
+};
+const taskB = {
+  cancel() {
+    taskBCancelled = true;
+  },
+  promise: new Promise(() => undefined),
+};
+staleRegistry.set(1, taskA);
+assert.equal(staleRegistry.get(1), taskA);
+staleRegistry.cancel(1);
+assert.equal(taskACancelled, true);
+staleRegistry.set(1, taskB);
+assert.equal(staleRegistry.get(1), taskB);
+assert.equal(staleRegistry.clear(1, taskA), false);
+assert.equal(staleRegistry.get(1), taskB);
+assert.equal(staleRegistry.has(1), true);
+assert.equal(taskBCancelled, false);
+assert.equal(staleRegistry.cancelAll(), 1);
+assert.equal(taskBCancelled, true);
+assert.equal(staleRegistry.has(1), false);
 
 const portrait = buildPdfPageSlots({
   pageSizes,
@@ -298,5 +333,116 @@ assert.equal(
   }),
   false,
 );
+
+const longDocResident = selectPdfPagesToRender({
+  pageCount: 30,
+  visiblePage: 15,
+});
+assert.deepEqual(longDocResident, [13, 14, 15, 16, 17]);
+assert.ok(longDocResident.length <= 5, "resident canvas window stays bounded");
+assert.deepEqual(
+  listPdfPagesToRelease({ pageCount: 30, residentPages: longDocResident }),
+  [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30,
+  ],
+);
+
+const evictionRegistry = new PdfPageRenderTaskRegistry();
+const evictionRendered = new Set([1, 2, 3, 13, 14, 15]);
+const canvases = new Map();
+for (let page = 1; page <= 30; page += 1) {
+  canvases.set(page, {
+    width: 1170,
+    height: 1560,
+    style: { width: "390px", height: "520px" },
+  });
+}
+let evictedPageOneTaskCancelled = false;
+evictionRegistry.set(1, {
+  cancel() {
+    evictedPageOneTaskCancelled = true;
+  },
+  promise: new Promise(() => undefined),
+});
+
+const evicted = evictPdfPagesOutsideWindow({
+  pageCount: 30,
+  residentPages: longDocResident,
+  renderedPages: evictionRendered,
+  registry: evictionRegistry,
+  getCanvas: (pageNumber) => canvases.get(pageNumber) ?? null,
+});
+assert.ok(evicted.includes(1));
+assert.equal(evictedPageOneTaskCancelled, true);
+assert.equal(evictionRendered.has(1), false);
+assert.deepEqual([...evictionRendered].sort((left, right) => left - right), [
+  13, 14, 15,
+]);
+assert.equal(canvases.get(1).width, 0);
+assert.equal(canvases.get(1).height, 0);
+assert.equal(canvases.get(1).style.width, "390px");
+assert.equal(canvases.get(1).style.height, "520px");
+assert.equal(canvases.get(15).width, 1170);
+assert.equal(
+  isPdfPageEligibleForRender({
+    pageNumber: 1,
+    residentPages: longDocResident,
+    renderedPages: evictionRendered,
+  }),
+  false,
+);
+
+const backScrollResident = selectPdfPagesToRender({
+  pageCount: 30,
+  visiblePage: 1,
+});
+assert.deepEqual(backScrollResident, [1, 2, 3]);
+assert.equal(
+  isPdfPageEligibleForRender({
+    pageNumber: 1,
+    residentPages: backScrollResident,
+    renderedPages: evictionRendered,
+  }),
+  true,
+);
+
+evictPdfPagesOutsideWindow({
+  pageCount: 30,
+  residentPages: backScrollResident,
+  renderedPages: evictionRendered,
+  registry: evictionRegistry,
+  getCanvas: (pageNumber) => canvases.get(pageNumber) ?? null,
+});
+assert.equal(evictionRendered.has(15), false);
+assert.equal(canvases.get(15).width, 0);
+assert.equal(canvases.get(15).style.height, "520px");
+canvases.get(1).width = backScrollResident.includes(1)
+  ? portrait[0].canvasWidth
+  : 0;
+assert.ok(canvases.get(1).width > 0, "back-scroll re-renders evicted page 1");
+
+const afterEvictionResize = beginPdfRenderGeneration({
+  generation: 4,
+  renderedPages: evictionRendered,
+  registry: evictionRegistry,
+});
+assert.equal(afterEvictionResize, 5);
+assert.equal(evictionRendered.size, 0);
+const resizeResident = selectPdfPagesToRender({
+  pageCount: 30,
+  visiblePage: 15,
+});
+assert.equal(
+  isPdfPageEligibleForRender({
+    pageNumber: 15,
+    residentPages: resizeResident,
+    renderedPages: evictionRendered,
+  }),
+  true,
+  "visible page is eligible again after resize, not left blank",
+);
+releasePdfPageCanvas(canvases.get(12));
+assert.equal(canvases.get(12).style.width, "390px");
 
 console.log("course-learner-pdf-viewer-unit: ok");

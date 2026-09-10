@@ -19,6 +19,7 @@ import {
 import {
   PdfPageRenderTaskRegistry,
   beginPdfRenderGeneration,
+  evictPdfPagesOutsideWindow,
   shouldShowPdfPageRenderError,
 } from "@/lib/course-content/learner-pdf-render-tasks";
 
@@ -229,6 +230,14 @@ export default function CourseLearnerPdfPages({
     });
     const generation = renderGenerationRef.current;
     const renderTasks = renderTasksRef.current;
+    evictPdfPagesOutsideWindow({
+      pageCount,
+      residentPages: pagesToRender,
+      renderedPages: renderedPagesRef.current,
+      registry: renderTasks,
+      getCanvas: (pageNumber) =>
+        pageRefs.current.get(pageNumber)?.querySelector("canvas") ?? null,
+    });
     const dpr =
       typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
 
@@ -277,7 +286,7 @@ export default function CourseLearnerPdfPages({
           try {
             await task.promise;
           } finally {
-            renderTasks.clear(pageNumber);
+            renderTasks.clear(pageNumber, task);
           }
 
           if (cancelled || generation !== renderGenerationRef.current) {
@@ -367,6 +376,7 @@ export default function CourseLearnerPdfPages({
               style={{
                 width: "100%",
                 maxWidth: "100%",
+                minHeight: slot.cssHeight ? `${slot.cssHeight}px` : undefined,
               }}
             >
               <canvas

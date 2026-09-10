@@ -111,6 +111,43 @@ export function selectPdfPagesToRender(input: {
   return pages;
 }
 
+/**
+ * Pages whose heavy canvas backing store may be released. Placeholders
+ * stay in the DOM; only bitmaps outside the resident window are freed.
+ */
+export function listPdfPagesToRelease(input: {
+  pageCount: number;
+  residentPages: readonly number[];
+}): number[] {
+  const pageCount = Math.max(0, Math.floor(input.pageCount));
+  const keep = new Set(input.residentPages);
+  const released: number[] = [];
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    if (!keep.has(page)) {
+      released.push(page);
+    }
+  }
+
+  return released;
+}
+
+export function isPdfPageEligibleForRender(input: {
+  pageNumber: number;
+  residentPages: readonly number[];
+  renderedPages: Iterable<number>;
+}): boolean {
+  if (!input.residentPages.includes(input.pageNumber)) {
+    return false;
+  }
+
+  const rendered =
+    input.renderedPages instanceof Set
+      ? input.renderedPages
+      : new Set(input.renderedPages);
+  return !rendered.has(input.pageNumber);
+}
+
 export function formatPdfPageLabel(pageNumber: number, pageCount: number): string {
   return `Страница ${pageNumber} из ${pageCount}`;
 }
