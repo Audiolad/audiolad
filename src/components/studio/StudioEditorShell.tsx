@@ -9,6 +9,8 @@ import {
   useStudioAudio,
 } from "@/components/studio/StudioAudioProvider";
 import { StudioBrand } from "@/components/studio/StudioBrand";
+import { StudioAddMusicChooser } from "@/components/studio/StudioAddMusicChooser";
+import { StudioMusicCatalogOverlay } from "@/components/studio/StudioMusicCatalogOverlay";
 import { useStudioRecorder } from "@/components/studio/useStudioRecorder";
 import {
   StudioTimeline,
@@ -581,6 +583,8 @@ export default function StudioEditorShell({
   const navigationInProgressRef = useRef(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const mobileOverflowRef = useRef<HTMLDivElement | null>(null);
+  const [musicChooserSlotId, setMusicChooserSlotId] = useState<string | null>(null);
+  const [musicCatalogOverlayOpen, setMusicCatalogOverlayOpen] = useState(false);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
     { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
@@ -1104,6 +1108,14 @@ export default function StudioEditorShell({
       if (event.isComposing || isNativeInteractiveTarget(event.target)) {
         return;
       }
+      if (musicCatalogOverlayOpen || musicChooserSlotId) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setMusicCatalogOverlayOpen(false);
+          setMusicChooserSlotId(null);
+        }
+        return;
+      }
       const modifier = event.ctrlKey || event.metaKey;
 
       if (
@@ -1206,6 +1218,8 @@ export default function StudioEditorShell({
     deleteSelectedClip,
     duplicateSelectedClip,
     isPlaying,
+    musicCatalogOverlayOpen,
+    musicChooserSlotId,
     pasteClipboard,
     pause,
     play,
@@ -1242,6 +1256,20 @@ export default function StudioEditorShell({
       addAudioInputRef.current.dataset.trackKind = slot?.trackKind ?? "music";
       addAudioInputRef.current.click();
     }
+  };
+
+  const openAddMusicChooser = (slotId: string) => {
+    setMusicChooserSlotId(slotId);
+  };
+
+  const pickDeviceMusic = (slotId: string) => {
+    setMusicChooserSlotId(null);
+    openAddAudioDialog(slotId);
+  };
+
+  const pickCatalogMusic = () => {
+    setMusicChooserSlotId(null);
+    setMusicCatalogOverlayOpen(true);
   };
 
   const startSlotRecording = (slotId: string) => {
@@ -1582,14 +1610,26 @@ export default function StudioEditorShell({
                 </>
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  {trackKind === "music" && musicChooserSlotId === slot.id ? (
+                    <StudioAddMusicChooser
+                      onPickDevice={() => pickDeviceMusic(slot.id)}
+                      onPickCatalog={pickCatalogMusic}
+                      onClose={() => setMusicChooserSlotId(null)}
+                    />
+                  ) : (
                   <button
                     type="button"
                     disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
-                    onClick={() => openAddAudioDialog(slot.id)}
+                    onClick={() =>
+                      trackKind === "music"
+                        ? openAddMusicChooser(slot.id)
+                        : openAddAudioDialog(slot.id)
+                    }
                     className="text-[#d8c8fb] disabled:opacity-40"
                   >
                     {trackKind === "voice" ? "Загрузить голос" : "Добавить музыку"}
                   </button>
+                  )}
                   {trackKind === "voice" && (recordingSlotId === slot.id && isRecording ? null : (
                     <button
                       type="button"
@@ -1643,18 +1683,35 @@ export default function StudioEditorShell({
           {isVoiceSlot ? "При записи под музыку лучше использовать наушники." : "Загрузите фоновую музыку или ambience."}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {!isVoiceSlot && musicChooserSlotId === slot.id ? (
+            <div
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <StudioAddMusicChooser
+                onPickDevice={() => pickDeviceMusic(slot.id)}
+                onPickCatalog={pickCatalogMusic}
+                onClose={() => setMusicChooserSlotId(null)}
+              />
+            </div>
+          ) : (
           <button
             type="button"
             disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
             onPointerUp={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              openAddAudioDialog(slot.id);
+              if (isVoiceSlot) {
+                openAddAudioDialog(slot.id);
+                return;
+              }
+              openAddMusicChooser(slot.id);
             }}
             className="h-10 rounded-lg bg-[#7650bd] px-4 text-sm font-semibold text-white disabled:opacity-40"
           >
             {isVoiceSlot ? "Загрузить голос" : "Добавить музыку"}
           </button>
+          )}
           {isThisSlotRecording ? (
             <button
               type="button"
@@ -2696,6 +2753,11 @@ export default function StudioEditorShell({
           />
         </main>
       </div>
+
+      <StudioMusicCatalogOverlay
+        open={musicCatalogOverlayOpen}
+        onClose={() => setMusicCatalogOverlayOpen(false)}
+      />
 
       <StudioInAppRotateHintBanner
         accessMode={accessMode}

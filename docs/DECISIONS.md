@@ -45,6 +45,36 @@
 
 ---
 
+## 2026-09-10 — Studio music catalog browse (PR2)
+
+**Контекст:** После foundation нужна витрина «Музыка для медитаций» внутри
+уже смонтированной Студии: просмотр, превью-клип и серверная Studio-цена.
+Покупка, attach в проект и полное воспроизведение остаются следующими PR.
+
+**Решение:**
+
+- Music-add в `StudioEditorShell`: chooser «С устройства» | «Каталог
+  АудиоЛада». Device path не меняется. Overlay — fullscreen внутри shell,
+  без смены маршрута и без remount.
+- `GET /api/studio/music/catalog?filter=all|mine|free` и
+  `GET /api/studio/music/preview`. Не использовать `/api/catalog` и
+  `/api/catalog/play`.
+- **all/free:** published, `deleted_at` null, music/release,
+  `platform_reuse_allowed`, commercially accessible, **только listed**.
+  Гость видит Вся/Бесплатная и может слушать разрешённые превью. «Моя»
+  скрыта; `mine` требует auth (401).
+- **mine:** active `studio_music_entitlements` или live `author_members`.
+  Без повторной проверки status/permission/listed. `user_practices` не
+  является Studio-владением. Автор видит свою музыку без opt-in.
+- Цена только на сервере: `resolve_practice_effective_price(..., checkout)`
+  затем `studioLicenseAmountMinor` (×2).
+- Превью: `buildPracticePreviewClip`, только MPEG-клип. Authz: публичная
+  витрина ИЛИ authenticated `can_use_music_in_studio`.
+
+**Принято:** владелец продукта (задание PR2 Studio catalog browse).
+
+---
+
 ## 2026-08-31 — Product Gallery for Music / release
 
 **Контекст:** Phase 1B закрывала витрину для `release` и `post`. Музыкальным

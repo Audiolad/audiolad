@@ -366,6 +366,10 @@ Owner path: live `is_practice_author_member` (owner/editor). MVP does not store 
 
 **Out of scope for this foundation:** Studio UI, catalog overlay, attach-to-project, full-track Studio playback, FFmpeg worker/render, `studio_price` column, `studio_allowed` flag.
 
+PR2 (app-layer, no schema change): Studio catalog browse + MPEG preview clip +
+server Studio price / ownership labels. Still out of scope: checkout / «Купить»,
+free acquire callers, attach-to-project, full-track Studio playback, FFmpeg.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из
