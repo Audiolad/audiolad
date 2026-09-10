@@ -326,6 +326,74 @@ AUDIOLAD_DUP_VERIFY_SOURCE_PROJECT_ID=6780c421-4411-4114-9c27-5f433dca1c2a \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### Read-only course-upgrade / L2 diagnostic (`confirm=OPS_COURSE_UPGRADE_DIAG`)
+
+Тот же workflow, но `confirm=OPS_COURSE_UPGRADE_DIAG` запускает job
+**Ops course upgrade diagnostic**: SSH как `deploy`, фиксированная
+read-only последовательность. **Не вызывает** `audiolad-deploy`, не делает
+nginx / symlink cutover, не пишет в БД, не делает POST
+`/api/checkout/course-upgrade`, не вызывает Tochka, не меняет
+`user_practices` / orders / payments, не печатает JWT, tokens,
+`payment_url`, Authorization, cookies, service-role и значения env.
+
+Зачем: `#383` пишет `course_upgrade_failed` + `FAILED_STAGE` /
+`ACTUAL_API_ERROR` / `ACTUAL_HTTP_STATUS` в app-логи PM2
+(`audiolad-p30xx`). Существующий `DO_NOT_DEPLOY` смотрит GetCourse
+reconcile и Studio render-worker, **не** эти app-логи. После blue/green
+cutover активен часто `audiolad-p3001`, а orphaned-логи `audiolad-p3000`
+могут остаться на диске. Job сам находит текущий PM2 layout и оба слота.
+
+Что читает:
+
+- `pm2 jlist` (safe fields), `PM2_HOME`, типичные log dirs
+  (`$HOME/.pm2/logs`, `/home/deploy/.pm2/logs`, `/root/.pm2/logs`);
+- active `audiolad-p30xx` out/error;
+- `audiolad-p3000*` / `audiolad-p3001*` out/error, rotated `.log.*`,
+  orphaned logs удалённых PM2 app;
+- optional `journalctl` только по тем же payment/checkout маркерам;
+- окно приоритета `2026-09-10T04:25:00Z`–`2026-09-10T04:50:00Z` плюс
+  недавние совпадения;
+- optional read-only DB correlation через current-release
+  `loadEnvConfig` + service role: hardcoded QA listener
+  (email не печатается) + курс
+  `sergey-and-zoya/kody-zhenskoy-prityagatelnosti`
+  (`access_level`, recent `course_upgrade` orders/payments как safe
+  fields + boolean presence `provider_metadata` / `payment_url`).
+  Если env/release/probe недоступны — `DB_CORRELATION=DEFERRED`.
+
+Exact flags / маркеры:
+
+```text
+confirm=OPS_COURSE_UPGRADE_DIAG
+CUTOVER = NO
+audiolad_deploy = NOT_INVOKED
+checkout_post = NOT_INVOKED
+tochka_calls = NOT_INVOKED
+entitlement_writes = NOT_INVOKED
+MODE = read_only_course_upgrade_diag
+ACTIVE_P30_COUNT=
+ACTIVE_P30_NAMES=
+SAFE_SUMMARY window= FAILED_STAGE= ACTUAL_API_ERROR= ACTUAL_HTTP_STATUS=
+DB_CORRELATION=OK|DEFERRED
+```
+
+**Evidence cannot be pulled until this confirm is merged to `main` and
+dispatched from `main`.** Environment `production` обычно блокирует
+production jobs с PR-ветки (`steps=[]`). Ослаблять protection нельзя.
+
+DEPLOY NOT IN SCOPE.
+
+Локальный/operator эквивалент (workflow его не exec-ит с `/current` —
+job не делает checkout):
+
+```bash
+DEPLOY_ROOT=/var/www/audiolad-deploy \
+  bash deploy/scripts/audiolad-course-upgrade-diag.sh
+```
+
+**Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
+branch **`main`**. Ослаблять protection нельзя.
+
 Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 Параллельный второй запуск ждёт, а не отменяет первый.
 
@@ -358,6 +426,11 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
   `6780c421-4411-4114-9c27-5f433dca1c2a`, global broken shared refs
   и duplication audit, без writes, signed URL, cutover и
   `audiolad-deploy`.
+- `confirm=OPS_COURSE_UPGRADE_DIAG` с PR-ветки при environment
+  protection — diagnostic job не стартует; deploy job пропускается.
+- `confirm=OPS_COURSE_UPGRADE_DIAG` с `main` — только read-only
+  course-upgrade / L2 app-log + optional redacted DB correlation.
+  Не пишет, не деплоит, не вызывает Tochka, не делает checkout POST.
 - `confirm=DEPLOY` — канонический deploy path без изменений.
 - Падение `deploy.sh` до cutover (включая candidate smoke) — красный workflow,
   тот же exit code. Production остаётся на предыдущем релизе; это уже делает
