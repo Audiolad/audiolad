@@ -386,7 +386,7 @@ function AuthorApplicationForm({
             disabled={isPending}
           />
           <span className={`${becomeAuthorBodyClass} text-[#25135c]`}>
-            Хочу научиться создавать аудиопрактики или музыку
+            Хочу научиться создавать аудиопрактики
           </span>
         </label>
 
