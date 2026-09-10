@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Node --require harness for unit tests (intentional CJS).
     "scripts/cjs-stub-server-only.cjs",
     "scripts/author-practice-access-cjs-stub.cjs",
+    // Vendored PDF.js worker (minified third-party).
+    "public/pdfjs/**",
   ]),
 ]);
 

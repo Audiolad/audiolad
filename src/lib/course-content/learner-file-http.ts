@@ -20,13 +20,20 @@ export function isPublicationFileId(value: string | null | undefined): boolean {
 
 /**
  * Top-level document navigation to the protected file API must not become
- * the learner PDF surface. iframe/embed still need the PDF bytes.
+ * the learner PDF surface. Same-origin PDF.js fetch asks for application/pdf
+ * bytes. Native iframe/embed is no longer the primary viewer.
  */
 export function resolveCourseLearnerFileHttpMode(
   request: Request,
 ): CourseLearnerFileHttpMode {
   const dest = request.headers.get("sec-fetch-dest")?.trim().toLowerCase();
+  const accept = request.headers.get("accept") ?? "";
+
   if (dest === "iframe" || dest === "embed" || dest === "object") {
+    return "embed";
+  }
+
+  if (accept.includes("application/pdf")) {
     return "embed";
   }
 
@@ -39,7 +46,6 @@ export function resolveCourseLearnerFileHttpMode(
     return "document";
   }
 
-  const accept = request.headers.get("accept") ?? "";
   const prefersJson = accept.includes("application/json");
   const prefersHtml = accept.includes("text/html");
   if (prefersHtml && !prefersJson) {
@@ -66,9 +72,8 @@ export function buildCourseLearnerFilePath(
 }
 
 /**
- * iOS PDF plugin ignores most Open Parameters, but FitH asks the embed
- * to use page-width zoom when the engine honors it. Fragment is not sent
- * to the file API (not a raw-PDF escape).
+ * Legacy native-plugin fragment. The primary viewer is PDF.js canvases,
+ * not an iframe application/pdf embed.
  */
 export const COURSE_LEARNER_PDF_EMBED_FRAGMENT = "view=FitH";
 
@@ -77,7 +82,7 @@ export function buildCourseLearnerFileEmbedSrc(
   productSlug: string,
   fileId: string,
 ): string {
-  return `${buildCourseLearnerFilePath(authorSlug, productSlug, fileId)}#${COURSE_LEARNER_PDF_EMBED_FRAGMENT}`;
+  return buildCourseLearnerFilePath(authorSlug, productSlug, fileId);
 }
 
 export function buildCourseLearnerFileViewerPath(

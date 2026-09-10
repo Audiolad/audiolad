@@ -2,33 +2,13 @@
 
 import { useState } from "react";
 
+import { resolveCourseUpgradeUiError } from "@/lib/course-content/course-upgrade-client-errors";
+
 type CourseLevelUpgradeButtonProps = {
   practiceId: string;
   targetAccessLevel: number;
   label: string;
 };
-
-function mapUpgradeError(code: string | undefined): string {
-  switch (code) {
-    case "unauthorized":
-      return "Войдите, чтобы открыть следующий уровень.";
-    case "not_entitled":
-      return "Сначала нужен доступ к текущему уровню.";
-    case "upgrade_not_configured":
-    case "invalid_target_access_level":
-      return "Следующий уровень сейчас недоступен.";
-    case "already_at_target":
-      return "Этот уровень уже открыт.";
-    case "pending_order_exists":
-      return "Есть незавершённый платёж. Дождитесь завершения или повторите позже.";
-    case "author_finance_not_ready":
-      return "Оплата временно недоступна. Попробуйте позже.";
-    case "payments_not_configured":
-      return "Оплата сейчас недоступна.";
-    default:
-      return "Не удалось начать оплату. Попробуйте ещё раз.";
-  }
-}
 
 export default function CourseLevelUpgradeButton({
   practiceId,
@@ -69,11 +49,6 @@ export default function CourseLevelUpgradeButton({
           ? (body as { error: string }).error
           : undefined;
 
-      if (response.status === 401) {
-        setErrorMessage(mapUpgradeError("unauthorized"));
-        return;
-      }
-
       const paymentUrl =
         body &&
         typeof body === "object" &&
@@ -84,14 +59,20 @@ export default function CourseLevelUpgradeButton({
           ? (body as { payment: { payment_url: string } }).payment.payment_url
           : null;
 
-      if (!response.ok || !paymentUrl) {
-        setErrorMessage(mapUpgradeError(errorCode));
+      const uiError = resolveCourseUpgradeUiError({
+        httpStatus: response.status,
+        errorCode,
+        paymentUrl,
+      });
+
+      if (uiError) {
+        setErrorMessage(uiError);
         return;
       }
 
-      window.location.assign(paymentUrl);
+      window.location.assign(paymentUrl as string);
     } catch {
-      setErrorMessage(mapUpgradeError(undefined));
+      setErrorMessage(resolveCourseUpgradeUiError({ httpStatus: 0, networkFailed: true }));
     } finally {
       setIsLoading(false);
     }

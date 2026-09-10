@@ -1367,9 +1367,9 @@ const fileViewer = read(
   "src/components/products/course-learner/CourseLearnerFileViewer.tsx",
 );
 assert.match(fileViewer, /COURSE_LEARNER_FILE_VIEWER_BACK_LABEL/);
-assert.match(fileViewer, /buildCourseLearnerFileEmbedSrc/);
-assert.match(fileViewer, /data-course-learner-pdf-frame/);
-assert.match(fileViewer, /<iframe/);
+assert.match(fileViewer, /buildCourseLearnerFilePath/);
+assert.match(fileViewer, /CourseLearnerPdfPages/);
+assert.doesNotMatch(fileViewer, /<iframe/);
 assert.doesNotMatch(fileViewer, /Открыть PDF отдельно/);
 assert.doesNotMatch(fileViewer, /openSeparately|[?&]raw=1|raw:\s*true/);
 assert.doesNotMatch(fileViewer, /target="_blank"/);

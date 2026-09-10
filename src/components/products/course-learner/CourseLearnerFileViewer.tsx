@@ -1,15 +1,17 @@
 import {
   COURSE_LEARNER_FILE_VIEWER_BACK_LABEL,
-  buildCourseLearnerFileEmbedSrc,
+  buildCourseLearnerFilePath,
   buildCourseLearnerFileReturnHref,
 } from "@/lib/course-content/learner-file-http";
+
+import CourseLearnerPdfPages from "./CourseLearnerPdfPages";
 
 export type CourseLearnerFileViewerProps = {
   authorSlug: string;
   productSlug: string;
   fileId: string;
   filename: string;
-  embedSrc: string;
+  fileSrc: string;
 };
 
 export function CourseLearnerFileViewerDenied({
@@ -44,7 +46,7 @@ export default function CourseLearnerFileViewer({
   productSlug,
   fileId,
   filename,
-  embedSrc,
+  fileSrc,
 }: CourseLearnerFileViewerProps) {
   const returnHref = buildCourseLearnerFileReturnHref(authorSlug, productSlug);
 
@@ -61,18 +63,7 @@ export default function CourseLearnerFileViewer({
         </h1>
       </div>
 
-      <div
-        data-course-learner-pdf-frame="true"
-        className="relative isolate mt-4 h-[70vh] w-full min-w-0 max-w-full overflow-hidden rounded-[20px] border border-[#eadff8] bg-white"
-      >
-        <iframe
-          src={embedSrc}
-          title={filename}
-          width="100%"
-          height="100%"
-          className="absolute inset-0 h-full w-full max-w-full min-w-0 border-0 bg-white"
-        />
-      </div>
+      <CourseLearnerPdfPages fileSrc={fileSrc} filename={filename} />
     </section>
   );
 }
@@ -99,7 +90,7 @@ export function buildCourseLearnerFileViewerViewModel(input: {
     productSlug: input.productSlug,
     fileId: input.fileId,
     filename: input.filename,
-    embedSrc: buildCourseLearnerFileEmbedSrc(
+    fileSrc: buildCourseLearnerFilePath(
       input.authorSlug,
       input.productSlug,
       input.fileId,

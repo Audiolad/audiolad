@@ -55,6 +55,9 @@ export type CourseUpgradeErrorCode =
   | "pending_order_exists"
   | "author_finance_not_ready"
   | "payments_not_configured"
+  | "order_already_paid"
+  | "order_not_payable"
+  | "provider_checkout_failed"
   | "internal_error";
 
 export function parseJsonObject(raw: unknown): Record<string, unknown> | null {
@@ -148,6 +151,10 @@ export function mapCourseUpgradeRpcError(message: string): {
     return { status: 409, error: "pending_order_exists" };
   }
 
+  if (normalized.includes("idempotency_key_conflict")) {
+    return { status: 409, error: "invalid_request" };
+  }
+
   if (
     normalized.includes("practice_not_for_sale") ||
     normalized.includes("invalid_practice_price")
@@ -221,6 +228,12 @@ export function coerceCourseUpgradeOrderRow(
   const row = value as Record<string, unknown>;
   const amountMinor = asInteger(row.amount_minor);
   const target = asInteger(row.target_access_level);
+  const createdAt =
+    typeof row.created_at === "string"
+      ? row.created_at
+      : row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : null;
 
   if (
     typeof row.order_id !== "string" ||
@@ -231,7 +244,7 @@ export function coerceCourseUpgradeOrderRow(
     typeof row.currency !== "string" ||
     row.order_kind !== COURSE_UPGRADE_ORDER_KIND ||
     target == null ||
-    typeof row.created_at !== "string"
+    createdAt == null
   ) {
     return null;
   }
@@ -245,7 +258,7 @@ export function coerceCourseUpgradeOrderRow(
     currency: row.currency,
     order_kind: COURSE_UPGRADE_ORDER_KIND,
     target_access_level: target,
-    created_at: row.created_at,
+    created_at: createdAt,
   };
 }
 

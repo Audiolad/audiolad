@@ -1,5 +1,9 @@
 import { buildCheckoutResultQuery } from "@/lib/payments/checkout-token";
 import {
+  extractSafeTochkaErrorCode,
+  extractSafeTochkaHttpStatus,
+} from "@/lib/payments/tochka-error";
+import {
   getTochkaConfig,
   minorToRubles,
   type TochkaConfig,
@@ -197,6 +201,13 @@ export async function createTochkaPaymentOperation(
     | null;
 
   if (!response.ok || !payload) {
+    const safeCode = extractSafeTochkaErrorCode(payload);
+    const safeStatus = extractSafeTochkaHttpStatus(response.status);
+    console.error(
+      "create_payment_tochka_http_error",
+      safeStatus,
+      safeCode ?? "tochka_create_payment_failed",
+    );
     throw new Error("tochka_create_payment_failed");
   }
 
