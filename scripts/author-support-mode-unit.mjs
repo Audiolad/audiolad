@@ -465,6 +465,12 @@ assert.doesNotMatch(
   /\.from\("author_members"\)[\s\S]*\.eq\("user_id", user\.id\)/,
 );
 
+const topicSync = read("src/lib/topics/sync.ts");
+const topicRoute = read("src/app/api/author/products/[id]/topics/route.ts");
+assert.match(topicSync, /callAuthorUserRpc/);
+assert.match(topicSync, /"set_practice_topics"/);
+assert.match(topicRoute, /product_topics_updated/);
+
 const submitRoute = read("src/app/api/author/products/[id]/submit-for-moderation/route.ts");
 assert.match(submitRoute, /product_submitted_for_moderation/);
 
@@ -657,7 +663,7 @@ assert.equal(
     pathname: "/api/author/promotion/pages",
     method: "POST",
   }),
-  true,
+  false,
 );
 assert.equal(
   isAuthorSupportBlockedMutation({
@@ -715,7 +721,7 @@ assert.equal(
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/promotion/pages", "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/onboarding", "POST"),
@@ -733,6 +739,14 @@ assert.equal(
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/profile", "PATCH"),
+  false,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(
+    activeSupportCookie,
+    "/api/author/appreciation-settings",
+    "PATCH",
+  ),
   false,
 );
 
@@ -843,6 +857,10 @@ assert.doesNotMatch(audit, /console\.error\("author_support_audit_insert_failed"
 assert.match(context, /callAuthorUserRpc/);
 assert.match(context, /p_token_hash/);
 assert.match(context, /AUTHOR_SUPPORT_RPC_WRAPPERS/);
+assert.match(
+  read("src/lib/author-support/proof.ts"),
+  /set_practice_topics:\s*"set_practice_topics_with_support_proof"/,
+);
 
 assert.match(studioRepo, /studio_asset_replaced/);
 assert.match(studioRepo, /studio_asset_deleted/);
@@ -925,6 +943,32 @@ assert.doesNotMatch(
   `${createDiagnostics}\n${supportErrorAlert}`,
   /<form[\s\S]*<form/,
 );
+
+const promotionAccess = read("src/lib/promotion/access.ts");
+assert.match(promotionAccess, /requireAuthorMutationMembership\(authorId\)/);
+assert.match(promotionAccess, /action: "promotion_updated"/);
+assert.doesNotMatch(
+  promotionAccess,
+  /if \(execution\?\.isSupportMode\) \{\s*throw new AuthorAccessError\("support_mutation_blocked"/,
+);
+const promotionInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "promotion_module",
+);
+assert.equal(promotionInventory?.disposition, "allowed_audited");
+assert.equal(promotionInventory?.action, "promotion_updated");
+assert.ok(
+  AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.includes("/api/author/promotion"),
+);
+const appreciationInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "author_appreciation_settings",
+);
+assert.equal(appreciationInventory?.disposition, "allowed_audited");
+
+const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+assert.match(practicePage, /peekAuthorExecutionContext/);
+assert.match(practicePage, /getAuthorDataClient/);
+assert.match(practicePage, /execution\.actingAuthorId === practice\.author_id/);
+assert.match(practicePage, /isAuthorMember: true/);
 
 assert.doesNotMatch(read("src/lib/author-support/actions.ts"), /console\.error\("author_support_audit_insert_failed"\)/);
 

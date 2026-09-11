@@ -183,6 +183,13 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "author_appreciation_settings",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_appreciation_settings_updated",
+      routePatterns: ["src/app/api/author/appreciation-settings/route.ts"],
+    },
+    {
       key: "studio_project_create",
       group: "studio",
       disposition: "allowed_audited",
@@ -303,8 +310,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "promotion_module",
-      group: "blocked",
-      disposition: "blocked",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "promotion_updated",
       routePatterns: [
         "src/app/api/author/promotion/pages/route.ts",
         "src/app/api/author/promotion/pages/[id]/route.ts",

@@ -118,6 +118,10 @@ import { isRatingsUiEnabled } from "@/lib/ratings/feature";
 import { getPracticeRatingAggregate } from "@/lib/ratings/read";
 import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  getAuthorDataClient,
+  peekAuthorExecutionContext,
+} from "@/lib/author-support/context";
 
 export const dynamic = "force-dynamic";
 
@@ -327,8 +331,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   const { authorSlug, productSlug } = route;
   const supabase = await createClient();
+  const execution = await peekAuthorExecutionContext();
+  // The data client is elevated only after the server has validated the
+  // HttpOnly support session. Scope is checked against the resolved product
+  // below before any private content is rendered.
+  const productDataClient = execution?.isSupportMode
+    ? await getAuthorDataClient(execution, supabase)
+    : supabase;
   const { practice, error } = await getPracticeByAuthorAndSlug(
-    supabase,
+    productDataClient,
     authorSlug,
     productSlug,
   );
@@ -350,9 +361,30 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   let access;
 
   try {
-    access = await resolveProductAccess(supabase, practice, user?.id ?? null);
+    access = await resolveProductAccess(
+      productDataClient,
+      practice,
+      user?.id ?? null,
+    );
   } catch {
     return <PracticePageErrorState />;
+  }
+
+  const supportOwnsPractice =
+    execution?.isSupportMode === true &&
+    execution.actingAuthorId === practice.author_id;
+  if (supportOwnsPractice) {
+    access = {
+      ...access,
+      canListen: true,
+      canAcquire: true,
+      reason: "author_owner" as const,
+      isAuthorMember: true,
+      accessSource: null,
+      hasEntitlement: false,
+      accessLevel: null,
+      canSeeSelectedUsers: true,
+    };
   }
 
   if (
@@ -392,7 +424,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       practice.publication_class,
       practice.product_kind,
     )
-      ? await loadPublicAudioItems(supabase, {
+      ? await loadPublicAudioItems(productDataClient, {
           practiceId: practice.id,
           practiceStatus: practice.status,
           authorPreview,
@@ -435,7 +467,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   ) {
     try {
       const loaded = await loadCourseLearnerContent({
-        supabase,
+        supabase: productDataClient,
         serviceRole: createServiceRoleClient(),
         userId: user.id,
         practice,
@@ -465,7 +497,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   let resolvedPrice = promoPreviewMode
     ? await resolveAuthorPromoPreview({
-        supabase,
+        supabase: productDataClient,
         practiceId: practice.id,
         promotionId: promoPreviewId ?? "",
         isFree: practice.is_free,
@@ -477,7 +509,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   if (!promoPreviewMode) {
     const visitorId = await readPriceVisitorId();
     resolvedPrice = await resolvePracticePriceRpc({
-      supabase,
+      supabase: productDataClient,
       practiceId: practice.id,
       surface: PRICE_SURFACES.PRODUCT,
       visitorId,
@@ -499,7 +531,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   });
   const validPromoStart =
     shouldStartPromo && promoStartToken
-      ? (await loadPricePromotionsForPractice(supabase, practice.id)).some(
+      ? (await loadPricePromotionsForPractice(productDataClient, practice.id)).some(
           (promotion) => promotion.startToken === promoStartToken,
         )
       : false;
@@ -512,7 +544,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     try {
       courseStorefrontPreviewAvailable = await loadCourseStorefrontPreviewAvailable(
         {
-          supabase,
+          supabase: productDataClient,
           serviceRole: createServiceRoleClient(),
           practice,
         },
@@ -599,7 +631,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
   });
-  const galleryMap = await loadPublicationGalleriesByIds(supabase, [practice.id]);
+  const galleryMap = await loadPublicationGalleriesByIds(productDataClient, [practice.id]);
   const gallerySlides = catalogGalleryForPublication(
     practice.publication_class,
     practice.product_kind,
@@ -656,12 +688,12 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const promoListenPath = buildListenPath(resolvedAuthorSlug, practice.slug);
 
   const practiceTopics = await loadPublicPracticeTopicsSafe(
-    supabase,
+    productDataClient,
     practice.id,
   );
   const listeningNotice = resolvePublicListeningNotice(practice);
   const seoContent = await loadPublicPracticeSeoContent(
-    supabase,
+    productDataClient,
     practice.id,
     practice.author_recommendations_title,
   );

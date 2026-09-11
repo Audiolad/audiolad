@@ -45,7 +45,14 @@ const PROMO_PAGE_DETAIL_SELECT = `
 `;
 
 export async function requirePromoPageAccess(promoPageId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const { peekAuthorExecutionContext, getAuthorDataClient } = await import(
+    "@/lib/author-support/context"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: page, error } = await supabase
     .from("promo_pages")
@@ -68,7 +75,14 @@ export async function requirePromoPageAccess(promoPageId: string) {
 }
 
 export async function requirePromoPageMutationAccess(promoPageId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const { peekAuthorExecutionContext, getAuthorDataClient } = await import(
+    "@/lib/author-support/context"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: page, error } = await supabase
     .from("promo_pages")

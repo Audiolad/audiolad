@@ -14,6 +14,8 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
   "product_course_updated",
   "product_gallery_updated",
   "product_price_promotion_updated",
+  "promotion_updated",
+  "author_appreciation_settings_updated",
   "product_submitted_for_moderation",
   "product_withdrawn_from_moderation",
   "product_published",
@@ -33,6 +35,8 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
 
 export const AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES = [
   "/api/author/products",
+  "/api/author/promotion",
+  "/api/author/appreciation-settings",
   "/api/studio/projects",
   "/api/author/profile",
 ] as const;
