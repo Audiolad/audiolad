@@ -822,15 +822,21 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(script, /createStudioRenderWorker/);
   assert.match(script, /requireStudioRenderWorkerEnv/);
   assert.match(script, /redactStudioRenderWorkerSecrets/);
-  assert.match(script, /studio_render_worker_boot/);
+  assert.match(script, /formatStudioRenderWorkerBootLog/);
   assert.match(script, /checkRelease/);
+  const releaseHelper = readFileSync(
+    new URL("../src/lib/studio/render/worker-release.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(releaseHelper, /studio_render_worker_boot/);
   const loop = readFileSync(
     new URL("../src/lib/studio/render/worker.ts", import.meta.url),
     "utf8",
   );
   assert.match(loop, /checkRelease/);
   assert.match(loop, /refreshExit/);
-  assert.match(loop, /studio_render_release_mismatch/);
+  assert.match(loop, /formatStudioRenderReleaseMismatchLog/);
+  assert.match(loop, /formatStudioRenderReleaseUnavailableLog/);
 }
 
 async function main() {

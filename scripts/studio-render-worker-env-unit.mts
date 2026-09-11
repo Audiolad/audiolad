@@ -155,6 +155,7 @@ function testPm2CleanStartContract() {
   const config = readRepo("deploy/studio-render-worker.ecosystem.config.cjs");
   const runner = readRepo("scripts/run-studio-render-worker.mts");
   const helper = readRepo("src/lib/studio/render/worker-env.ts");
+  const releaseHelper = readRepo("src/lib/studio/render/worker-release.ts");
 
   assert.doesNotMatch(config, /cron_restart/);
   assert.match(config, /autorestart:\s*true/);
@@ -163,7 +164,7 @@ function testPm2CleanStartContract() {
   assert.doesNotMatch(config, /NEXT_PUBLIC_SUPABASE_URL/);
   assert.match(config, /@next\/env/);
   assert.match(config, /\.env\.production/);
-  assert.match(config, /self-refresh/);
+  assert.match(config, /[Ss]elf-refresh/);
   assert.match(config, /OPS_STUDIO_WORKER_RECOVER/);
   assert.doesNotMatch(config, /pm2 restart audiolad-studio-render-worker --update-env/);
 
@@ -176,9 +177,12 @@ function testPm2CleanStartContract() {
   assert.match(runner, /requireStudioRenderWorkerEnv/);
   assert.match(runner, /redactStudioRenderWorkerSecrets/);
   assert.match(runner, /studio_render_env_ready/);
-  assert.match(runner, /studio_render_worker_boot/);
+  assert.match(runner, /formatStudioRenderWorkerBootLog/);
   assert.match(runner, /captureStudioRenderBootRelease/);
   assert.match(runner, /checkRelease/);
+  assert.match(releaseHelper, /studio_render_worker_boot/);
+  assert.match(releaseHelper, /studio_render_release_mismatch/);
+  assert.match(releaseHelper, /studio_render_release_guard_unavailable/);
   assert.doesNotMatch(runner, /console\.(log|error)\([^)]*process\.env/);
 }
 
