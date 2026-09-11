@@ -21,6 +21,7 @@ import {
   type ClaimedStudioRenderJob,
   type StudioRenderWorkerPort,
 } from "../src/lib/studio/render/worker";
+import type { StudioRenderReleaseComparison } from "../src/lib/studio/render/worker-release";
 
 const snapshot = {
   project: { id: "project", revision: 1, name: "Test", schemaVersion: 2, studioVersion: 1 },
@@ -35,6 +36,34 @@ function job(id: string, token = `token-${id}`): ClaimedStudioRenderJob {
     guest_session_id: null,
     lease_token: token,
     project_snapshot: snapshot,
+  };
+}
+
+function releaseComparison(
+  state: StudioRenderReleaseComparison["state"],
+): StudioRenderReleaseComparison {
+  return {
+    state,
+    bootReleasePath: "/releases/boot",
+    bootSha: "bootsha",
+    currentReleasePath: state === "CURRENT" ? "/releases/boot" : "/releases/other",
+    currentSha: state === "CURRENT" ? "bootsha" : "othersha",
+    reason: state === "UNKNOWN" ? "release_path_unreadable" : undefined,
+  };
+}
+
+function createLogger() {
+  const lines: string[] = [];
+  return {
+    lines,
+    logger: {
+      info(message: string) {
+        lines.push(message);
+      },
+      error(message: string) {
+        lines.push(message);
+      },
+    },
   };
 }
 
@@ -573,6 +602,184 @@ async function testDrainTerminatesChildBeforeRelease() {
   assert.deepEqual(port.failed, []);
 }
 
+async function testCurrentReleaseClaimsAndExecutes() {
+  const port = createPort({ claimQueue: [job("fresh")] });
+  await runUntil(
+    port,
+    { checkRelease: () => releaseComparison("CURRENT") },
+    () => port.completed.includes("fresh"),
+  );
+  assert.deepEqual(port.executed, ["fresh"]);
+  assert.deepEqual(port.completed, ["fresh"]);
+  assert.deepEqual(port.released, []);
+}
+
+async function testStaleBeforeClaimDoesNotClaimAndExits() {
+  const { lines, logger } = createLogger();
+  const port = createPort({ claimQueue: [job("skipped")] });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 200,
+    logger,
+    checkRelease: () => releaseComparison("STALE"),
+  });
+  await worker.run();
+  assert.deepEqual(port.claims, []);
+  assert.deepEqual(port.executed, []);
+  assert.equal(worker.isStopping(), false, "STALE must not use requestShutdown()");
+  assert.ok(lines.some((line) => line.includes("studio_render_release_mismatch")));
+}
+
+async function testUnknownBeforeClaimDoesNotClaimOrExit() {
+  const { lines, logger } = createLogger();
+  let checks = 0;
+  const port = createPort({ claimQueue: [job("blocked")] });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 15,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 200,
+    logger,
+    checkRelease: () => {
+      checks += 1;
+      return releaseComparison("UNKNOWN");
+    },
+  });
+  const running = worker.run();
+  const started = Date.now();
+  while (checks < 3) {
+    if (Date.now() - started > 1500) {
+      worker.requestShutdown();
+      await running;
+      throw new Error("timed out waiting for UNKNOWN retries");
+    }
+    await delay(10);
+  }
+  assert.equal(worker.isStopping(), false);
+  assert.deepEqual(port.claims, []);
+  assert.deepEqual(port.executed, []);
+  assert.ok(lines.some((line) => line.includes("studio_render_release_guard_unavailable")));
+  worker.requestShutdown();
+  await running;
+}
+
+async function testPostClaimStaleReleasesWithoutExecuteAndExits() {
+  const { lines, logger } = createLogger();
+  let checks = 0;
+  const port = createPort({ claimQueue: [job("raced")] });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 200,
+    logger,
+    checkRelease: () => {
+      checks += 1;
+      return releaseComparison(checks === 1 ? "CURRENT" : "STALE");
+    },
+  });
+  await worker.run();
+  assert.deepEqual(port.claims, ["raced"]);
+  assert.deepEqual(port.released, ["raced"]);
+  assert.deepEqual(port.executed, []);
+  assert.equal(worker.isStopping(), false);
+  assert.ok(lines.some((line) => line.includes("studio_render_release_mismatch")));
+}
+
+async function testPostClaimUnknownReleasesWithoutExecuteAndRetries() {
+  const { lines, logger } = createLogger();
+  let checks = 0;
+  const port = createPort({ claimQueue: [job("maybe"), job("later")] });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 15,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 200,
+    logger,
+    checkRelease: () => {
+      checks += 1;
+      if (checks === 1) return releaseComparison("CURRENT");
+      return releaseComparison("UNKNOWN");
+    },
+  });
+  const running = worker.run();
+  const started = Date.now();
+  while (checks < 4) {
+    if (Date.now() - started > 1500) {
+      worker.requestShutdown();
+      await running;
+      throw new Error("timed out waiting for post-claim UNKNOWN retry");
+    }
+    await delay(10);
+  }
+  assert.deepEqual(port.claims, ["maybe"]);
+  assert.deepEqual(port.released, ["maybe"]);
+  assert.deepEqual(port.executed, []);
+  assert.equal(worker.isStopping(), false);
+  assert.ok(lines.some((line) => line.includes("studio_render_release_guard_unavailable")));
+  worker.requestShutdown();
+  await running;
+}
+
+async function testInFlightJobFinishesAfterCutoverThenExits() {
+  const started = createDeferred();
+  const finish = createDeferred();
+  let state: StudioRenderReleaseComparison["state"] = "CURRENT";
+  const port = createPort({
+    claimQueue: [job("long"), job("next")],
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      await finish.promise;
+      if (signal.aborted) throw new StudioRenderAbandonedError();
+      return { sizeBytes: 1 };
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 500,
+    logger: { info() {}, error() {} },
+    checkRelease: () => releaseComparison(state),
+  });
+  const running = worker.run();
+  await started.promise;
+  state = "STALE";
+  finish.resolve();
+  await running;
+  assert.deepEqual(port.executed, ["long"]);
+  assert.deepEqual(port.completed, ["long"]);
+  assert.deepEqual(port.failed, []);
+  assert.equal(port.claims.includes("next"), false, "must not claim after finishing on a stale release");
+  assert.equal(worker.isStopping(), false, "cutover during execute must not requestShutdown()");
+}
+
+async function testSigtermHardDrainUnchangedWithReleaseGate() {
+  const started = createDeferred();
+  const port = createPort({
+    claimQueue: [job("drain-gated")],
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      await sleep(400, signal);
+      if (signal.aborted) throw new StudioRenderAbandonedError();
+      return { sizeBytes: 1 };
+    },
+  });
+  let state: StudioRenderReleaseComparison["state"] = "CURRENT";
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 40,
+    logger: { info() {}, error() {} },
+    checkRelease: () => releaseComparison(state),
+  });
+  const running = worker.run();
+  await started.promise;
+  state = "STALE";
+  worker.requestShutdown();
+  await running;
+  assert.equal(worker.isStopping(), true);
+  assert.deepEqual(port.released, ["drain-gated"]);
+  assert.deepEqual(port.completed, []);
+}
+
 function testPm2ConfigHasNoCronRestart() {
   const config = readFileSync(
     new URL("../deploy/studio-render-worker.ecosystem.config.cjs", import.meta.url),
@@ -615,6 +822,15 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(script, /createStudioRenderWorker/);
   assert.match(script, /requireStudioRenderWorkerEnv/);
   assert.match(script, /redactStudioRenderWorkerSecrets/);
+  assert.match(script, /studio_render_worker_boot/);
+  assert.match(script, /checkRelease/);
+  const loop = readFileSync(
+    new URL("../src/lib/studio/render/worker.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(loop, /checkRelease/);
+  assert.match(loop, /refreshExit/);
+  assert.match(loop, /studio_render_release_mismatch/);
 }
 
 async function main() {
@@ -633,6 +849,13 @@ async function main() {
   await testAbortStopsSpawnedFfmpegChild();
   await testConfirmedLeaseLossCancelsFfmpeg();
   await testDrainTerminatesChildBeforeRelease();
+  await testCurrentReleaseClaimsAndExecutes();
+  await testStaleBeforeClaimDoesNotClaimAndExits();
+  await testUnknownBeforeClaimDoesNotClaimOrExit();
+  await testPostClaimStaleReleasesWithoutExecuteAndExits();
+  await testPostClaimUnknownReleasesWithoutExecuteAndRetries();
+  await testInFlightJobFinishesAfterCutoverThenExits();
+  await testSigtermHardDrainUnchangedWithReleaseGate();
   testPm2ConfigHasNoCronRestart();
   testStreamingUploadAndLeaseTokenComplete();
   console.log("studio-render-worker-unit: PASS");

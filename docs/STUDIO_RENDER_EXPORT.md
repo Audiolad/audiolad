@@ -54,7 +54,24 @@ errors.
 The worker is a single long-lived queue consumer: it recovers stale leases,
 claims at most one job, renders it, then keeps polling. Idle interval is 5s
 (`STUDIO_RENDER_IDLE_INTERVAL_MS`). It does not busy-loop and does not exit
-after a job.
+after a completed job.
+
+Release self-refresh: on boot the process captures the resolved realpath of
+its cwd plus `.deploy-commit` when present, and logs
+`studio_render_worker_boot`. Before claiming a new job — and again immediately
+after claim, before `executeJob` — it compares that boot identity with
+`realpath(/var/www/audiolad-deploy/current)` and that path's `.deploy-commit`.
+A PM2 `pm_cwd` string of `/current` is not treated as proof of the loaded
+release. CURRENT → claim/execute normally. STALE → do not claim (or
+`releaseJob` if already claimed); log `studio_render_release_mismatch`; exit 0
+so PM2 `autorestart: true` respawns against the new release. UNKNOWN (cannot
+read current identity) → do not claim; log
+`studio_render_release_guard_unavailable`; idle-retry without exiting. If
+`/current` changes while a claimed job is already executing, the worker does
+not abort FFmpeg and does not call `requestShutdown()`; it finishes
+complete/fail, then the next loop iteration sees STALE and clean-exits.
+Production deploy updates web + the `/current` symlink and does not restart
+this PM2 app. `OPS_STUDIO_WORKER_RECOVER` remains break-glass.
 
 Lease: **1800s** on claim, renewed every **5 minutes** by
 `renew_studio_render_job_lease` only while this process still owns
@@ -71,10 +88,13 @@ Graceful shutdown (SIGTERM/SIGINT): stop claiming; wait up to **90s**
 drain window the worker aborts the render signal (SIGTERM, then SIGKILL after
 2s if needed), **awaits the child `close`**, cleans the workspace, and only
 then calls `release_studio_render_job` (attempt_count decremented). Confirmed
-lease loss uses the same abort path. A transient heartbeat error does not
-cancel FFmpeg. PM2 `kill_timeout` is **120s**. Deploy during a multi-hour
-render will interrupt FFmpeg after the drain window; prefer waiting until the
-worker is idle. Waiting hours for drain is unsafe.
+lease loss uses the same abort path. A release-identity mismatch must not
+arm this AbortController. A transient heartbeat error does not cancel
+FFmpeg. PM2 `kill_timeout` is **120s**. Ordinary `/current` cutover no longer
+sends SIGTERM to this worker; an in-flight render finishes on the boot
+release, then the process clean-exits before the next claim. Waiting hours
+for a hard drain is still unsafe if an operator sends SIGTERM (break-glass
+recover, reboot, or manual stop).
 
 ## Shared Studio audio sources and project duplication
 

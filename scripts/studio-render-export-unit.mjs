@@ -29,6 +29,8 @@ assert.match(workerRuntime, /failure state was not persisted/);
 assert.match(workerRuntime, /allowStudioRenderOutputUpload/);
 assert.match(worker, /createStudioRenderWorker/);
 assert.match(worker, /requireStudioRenderWorkerEnv/);
+assert.match(worker, /studio_render_worker_boot/);
+assert.match(workerLoop, /checkRelease/);
 assert.match(workerLoop, /renewLease/);
 assert.match(workerLoop, /removeEventListener\("abort"/);
 assert.match(shell, /flushAndWait/);

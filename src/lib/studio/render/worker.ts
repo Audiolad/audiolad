@@ -4,6 +4,11 @@
  */
 
 import type { StudioRenderSnapshot } from "./types";
+import {
+  formatStudioRenderReleaseMismatchLog,
+  formatStudioRenderReleaseUnavailableLog,
+  type StudioRenderReleaseComparison,
+} from "./worker-release";
 
 /** Same default as claim_studio_render_job. Dead workers recover within this window. */
 export const STUDIO_RENDER_LEASE_SECONDS = 1800;
@@ -63,6 +68,10 @@ export type StudioRenderWorkerPort = {
   releaseJob: (job: ClaimedStudioRenderJob) => Promise<boolean>;
 };
 
+export type StudioRenderReleaseCheck = () =>
+  | StudioRenderReleaseComparison
+  | Promise<StudioRenderReleaseComparison>;
+
 export type StudioRenderWorkerOptions = {
   idleIntervalMs?: number;
   heartbeatIntervalMs?: number;
@@ -71,6 +80,11 @@ export type StudioRenderWorkerOptions = {
   shutdownDrainMs?: number;
   now?: () => number;
   logger?: StudioRenderWorkerLogger;
+  /**
+   * Version gate before/after claim. Omitted → treat as CURRENT (tests).
+   * STALE clean-exits the loop without arming the SIGTERM AbortController.
+   */
+  checkRelease?: StudioRenderReleaseCheck;
 };
 
 export class StudioRenderAbandonedError extends Error {
@@ -272,6 +286,7 @@ export function createStudioRenderWorker(
   };
 
   let stopping = false;
+  let refreshExit = false;
   const shutdown = new AbortController();
 
   const requestShutdown = () => {
@@ -279,6 +294,45 @@ export function createStudioRenderWorker(
     stopping = true;
     shutdown.abort();
   };
+
+  async function inspectRelease(): Promise<StudioRenderReleaseComparison> {
+    if (!options.checkRelease) {
+      return {
+        state: "CURRENT",
+        bootReleasePath: null,
+        bootSha: null,
+        currentReleasePath: null,
+        currentSha: null,
+      };
+    }
+    try {
+      return await options.checkRelease();
+    } catch (error) {
+      return {
+        state: "UNKNOWN",
+        bootReleasePath: null,
+        bootSha: null,
+        currentReleasePath: null,
+        currentSha: null,
+        reason: error instanceof Error ? error.message : "release_check_failed",
+      };
+    }
+  }
+
+  function applyReleaseGate(
+    comparison: StudioRenderReleaseComparison,
+  ): "ok" | "retry" | "exit" {
+    if (comparison.state === "CURRENT") return "ok";
+    if (comparison.state === "STALE") {
+      logger.info(formatStudioRenderReleaseMismatchLog(comparison));
+      refreshExit = true;
+      return "exit";
+    }
+    logger.info(formatStudioRenderReleaseUnavailableLog(
+      comparison.reason ?? "current_identity_unreadable",
+    ));
+    return "retry";
+  }
 
   async function handleJob(
     job: ClaimedStudioRenderJob,
@@ -355,16 +409,29 @@ export function createStudioRenderWorker(
   }
 
   async function run(): Promise<void> {
-    while (!stopping) {
+    while (!stopping && !refreshExit) {
       try {
         await port.recoverStaleJobs();
-        if (stopping) break;
+        if (stopping || refreshExit) break;
+        const preGate = applyReleaseGate(await inspectRelease());
+        if (preGate === "exit") break;
+        if (preGate === "retry") {
+          await sleep(idleIntervalMs, shutdown.signal);
+          continue;
+        }
         const job = await port.claimJob();
         if (stopping) {
           if (job) await port.releaseJob(job);
           break;
         }
         if (!job) {
+          await sleep(idleIntervalMs, shutdown.signal);
+          continue;
+        }
+        const postGate = applyReleaseGate(await inspectRelease());
+        if (postGate !== "ok") {
+          await port.releaseJob(job);
+          if (postGate === "exit") break;
           await sleep(idleIntervalMs, shutdown.signal);
           continue;
         }

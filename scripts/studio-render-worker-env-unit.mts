@@ -163,6 +163,9 @@ function testPm2CleanStartContract() {
   assert.doesNotMatch(config, /NEXT_PUBLIC_SUPABASE_URL/);
   assert.match(config, /@next\/env/);
   assert.match(config, /\.env\.production/);
+  assert.match(config, /self-refresh/);
+  assert.match(config, /OPS_STUDIO_WORKER_RECOVER/);
+  assert.doesNotMatch(config, /pm2 restart audiolad-studio-render-worker --update-env/);
 
   assert.match(helper, /loadEnvConfig/);
   assert.match(helper, /from "@next\/env"/);
@@ -173,6 +176,9 @@ function testPm2CleanStartContract() {
   assert.match(runner, /requireStudioRenderWorkerEnv/);
   assert.match(runner, /redactStudioRenderWorkerSecrets/);
   assert.match(runner, /studio_render_env_ready/);
+  assert.match(runner, /studio_render_worker_boot/);
+  assert.match(runner, /captureStudioRenderBootRelease/);
+  assert.match(runner, /checkRelease/);
   assert.doesNotMatch(runner, /console\.(log|error)\([^)]*process\.env/);
 }
 
