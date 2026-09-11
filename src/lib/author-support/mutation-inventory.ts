@@ -105,6 +105,16 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "product_access_links",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: [
+        "src/app/api/author/products/[id]/access-links/route.ts",
+        "src/app/api/author/products/[id]/access-links/[linkId]/revoke/route.ts",
+      ],
+    },
+    {
       key: "product_price_promotions",
       group: "product",
       disposition: "allowed_audited",
