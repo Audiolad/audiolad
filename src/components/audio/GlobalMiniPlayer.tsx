@@ -8,6 +8,7 @@ import {
   usePlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import PreviewEndedBuyCta from "@/components/audio/PreviewEndedBuyCta";
+import RepeatModeButton from "@/components/audio/RepeatModeButton";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 import { BOTTOM_NAV_MAIN_HEIGHT_PX } from "@/lib/navigation/bottom-nav";
@@ -88,8 +89,15 @@ function MiniCloseIcon() {
 }
 
 export default function GlobalMiniPlayer() {
-  const { session, showMiniPlayer, openFullPlayer, stopAndClear, activeQueue } =
-    useGlobalAudioPlayer();
+  const {
+    session,
+    showMiniPlayer,
+    openFullPlayer,
+    stopAndClear,
+    activeQueue,
+    repeatMode,
+    cycleRepeatMode,
+  } = useGlobalAudioPlayer();
   const engine = usePlayerEngine();
 
   if (!showMiniPlayer || !session) {
@@ -147,7 +155,7 @@ export default function GlobalMiniPlayer() {
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate text-sm font-semibold text-white">{title}</p>
         {subtitle ? (
           isPrivateAudioSession(activeSession) ? (
@@ -187,16 +195,16 @@ export default function GlobalMiniPlayer() {
           <MiniCloseIcon />
         </button>
 
-        <div className="flex min-h-0 flex-1 items-center gap-3 pr-8">
+        <div className="flex min-h-0 flex-1 items-center gap-2 pr-8">
           {inlineOnly ? (
-            <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
               {trackMeta}
             </div>
           ) : (
             <button
               type="button"
               onClick={handleOpenFullPlayer}
-              className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               aria-label={`Открыть полный плеер: ${title}`}
             >
               {trackMeta}
@@ -204,6 +212,12 @@ export default function GlobalMiniPlayer() {
           )}
 
           <div className="flex shrink-0 items-center gap-1">
+            <RepeatModeButton
+              variant="onDark"
+              repeatMode={repeatMode}
+              onCycle={cycleRepeatMode}
+              className="h-8 w-8 min-h-8 min-w-8 shrink-0 px-0"
+            />
             {queueMode ? (
               <button
                 type="button"
