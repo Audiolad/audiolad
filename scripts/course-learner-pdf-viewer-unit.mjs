@@ -245,16 +245,26 @@ assert.match(
   /listener-practice-content px-5/,
   "practice route padding stays; PDF breakout escapes it",
 );
-assert.ok(
-  viewerSource.includes(COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS),
+assert.match(
+  viewerSource,
+  /COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS/,
   "FileViewer overflow-x-clip is lg-only so mobile bleed is not clipped",
 );
 assert.match(viewerSource, /max-w-5xl/);
 assert.match(viewerSource, /data-course-learner-file-viewer-header="true"/);
-assert.ok(
-  pagesSource.includes(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS),
+assert.match(
+  pagesSource,
+  /COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS/,
   "PDF pages own the mobile 100vw / calc(50%-50vw) breakout",
 );
+assert.match(COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS, /lg:overflow-x-clip/);
+assert.doesNotMatch(
+  COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS,
+  /(?<!lg:)overflow-x-clip/,
+);
+assert.match(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS, /100vw/);
+assert.match(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS, /calc\(50%-50vw\)/);
+assert.match(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS, /max-lg:/);
 assert.match(pagesSource, /ResizeObserver/);
 assert.match(pagesSource, /IntersectionObserver/);
 assert.match(pagesSource, /devicePixelRatio/);
