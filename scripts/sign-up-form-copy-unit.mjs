@@ -28,7 +28,7 @@ function testCentralizedCopy() {
   assert.equal(SIGNUP_PASSWORD_HINT, "Минимум 8 символов.");
   assert.equal(
     EMAIL_FIELD_HINT,
-    "Для регистрации используйте Яндекс Почту или Mail.ru.",
+    "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно использовать и другой поддерживаемый почтовый сервис.",
   );
   assert.equal(PASSWORD_MIN_LENGTH, 8);
 }
@@ -99,6 +99,18 @@ function testDiagnosticsInlineRegistrationForm() {
   assert.match(saveCta, /autoComplete="new-password"/);
 }
 
+function testBecomeAuthorFormUsesSharedEmailHint() {
+  const authorApplicationPanel = readRepoFile(
+    "src",
+    "components",
+    "become-author",
+    "AuthorApplicationPanel.tsx",
+  );
+
+  assert.match(authorApplicationPanel, /EMAIL_FIELD_HINT/);
+  assert.match(authorApplicationPanel, /id="contactEmail-hint"/);
+}
+
 function testPromoUsesSharedSignUpRoute() {
   const promoPrompts = readRepoFile(
     "src",
@@ -117,6 +129,7 @@ function run() {
   testPasswordValidationLength();
   testPasswordToggleMarkupStillPresentOnSignUpPage();
   testDiagnosticsInlineRegistrationForm();
+  testBecomeAuthorFormUsesSharedEmailHint();
   testPromoUsesSharedSignUpRoute();
   console.log("sign-up-form-copy-unit: ok");
 }

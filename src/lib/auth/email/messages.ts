@@ -3,7 +3,7 @@ import type { EmailValidationErrorCode } from "./types";
 export const SIGNUP_EMAIL_LABEL = "Email";
 
 export const EMAIL_FIELD_HINT =
-  "Для регистрации используйте Яндекс Почту или Mail.ru.";
+  "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно использовать и другой поддерживаемый почтовый сервис.";
 
 export const SIGNUP_PASSWORD_LABEL = "Придумайте пароль";
 
@@ -17,7 +17,7 @@ export const EMAIL_VALIDATION_MESSAGES: Record<EmailValidationErrorCode, string>
     invalid_format:
       "Проверьте адрес электронной почты. Например: name@yandex.ru",
     domain_not_allowed:
-      "Этот почтовый сервис пока нельзя использовать для регистрации. Укажите адрес Яндекс Почты или Mail.ru.",
+      "Этот почтовый сервис пока нельзя использовать для регистрации. Рекомендуем Яндекс Почту.",
     local_part_empty:
       "Проверьте адрес электронной почты. Например: name@yandex.ru",
     domain_empty:
