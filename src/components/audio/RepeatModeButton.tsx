@@ -20,7 +20,7 @@ function RepeatIcon({
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth={compact ? "2.25" : "1.75"}
+      strokeWidth={compact ? "2.5" : "1.75"}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -28,10 +28,10 @@ function RepeatIcon({
     >
       {compact ? (
         <>
-          <path d="M17 1.75V6.5h4.75" />
-          <path d="M21.75 6.5A9.75 9.75 0 0 0 4.75 12" />
-          <path d="M7 22.25V17.5H2.25" />
-          <path d="M2.25 17.5A9.75 9.75 0 0 0 19.25 12" />
+          <path d="M17.5 1.35v5.4h5.15" />
+          <path d="M22.65 6.75A10.35 10.35 0 0 0 4.15 11.55" />
+          <path d="M6.5 22.65v-5.4H1.35" />
+          <path d="M1.35 17.25A10.35 10.35 0 0 0 19.85 12.45" />
         </>
       ) : (
         <>
@@ -44,12 +44,12 @@ function RepeatIcon({
       {showOne ? (
         <text
           x="12"
-          y={compact ? "15" : "13.2"}
+          y={compact ? "16.2" : "13.2"}
           textAnchor="middle"
           fill="currentColor"
           stroke="none"
-          fontSize={compact ? "10.5" : "8"}
-          fontWeight={compact ? "800" : "700"}
+          fontSize={compact ? "13.5" : "8"}
+          fontWeight={compact ? "900" : "700"}
         >
           1
         </text>
@@ -98,7 +98,7 @@ export default function RepeatModeButton({
       } ${className}`}
     >
       <RepeatIcon
-        className={iconVariant === "compact" ? "h-6 w-6" : undefined}
+        className={iconVariant === "compact" ? "h-7 w-7" : undefined}
         showOne={repeatMode === "one"}
         compact={iconVariant === "compact"}
       />
