@@ -9,6 +9,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import PreviewEndedBuyCta from "@/components/audio/PreviewEndedBuyCta";
+import RepeatModeButton from "@/components/audio/RepeatModeButton";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 
@@ -161,11 +162,15 @@ function DesktopPlayerActiveState({
   engine,
   queueMode,
   openFullPlayer,
+  repeatMode,
+  cycleRepeatMode,
 }: {
   session: NonNullable<ReturnType<typeof useGlobalAudioPlayer>["session"]>;
   engine: NonNullable<ReturnType<typeof useOptionalPlayerEngine>>;
   queueMode: boolean;
   openFullPlayer: () => void;
+  repeatMode: ReturnType<typeof useGlobalAudioPlayer>["repeatMode"];
+  cycleRepeatMode: ReturnType<typeof useGlobalAudioPlayer>["cycleRepeatMode"];
 }) {
   const activeCoverUrl =
     engine.currentTrack?.coverImageUrl ?? session.coverImageUrl;
@@ -361,6 +366,12 @@ function DesktopPlayerActiveState({
             </button>
           )}
 
+          <RepeatModeButton
+            variant="onLight"
+            repeatMode={repeatMode}
+            onCycle={cycleRepeatMode}
+          />
+
           <button
             type="button"
             onClick={() => {
@@ -378,8 +389,14 @@ function DesktopPlayerActiveState({
 }
 
 export default function DesktopPlayerBar() {
-  const { session, openFullPlayer, activeQueue, desktopPlayerRestoreState } =
-    useGlobalAudioPlayer();
+  const {
+    session,
+    openFullPlayer,
+    activeQueue,
+    desktopPlayerRestoreState,
+    repeatMode,
+    cycleRepeatMode,
+  } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
 
   useEffect(() => {
@@ -412,6 +429,8 @@ export default function DesktopPlayerBar() {
         engine={engine}
         queueMode={Boolean(activeQueue)}
         openFullPlayer={openFullPlayer}
+        repeatMode={repeatMode}
+        cycleRepeatMode={cycleRepeatMode}
       />
     );
   }

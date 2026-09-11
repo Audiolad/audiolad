@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type MutableRefObject,
   type ReactNode,
 } from "react";
@@ -75,6 +76,15 @@ import {
 } from "@/lib/playlists/player-queue-types";
 import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 import { createClient } from "@/lib/supabase/client";
+import { resetContinuousListenSession } from "@/lib/listen/repeat-analytics";
+import {
+  getRepeatModeServerSnapshot,
+  nextRepeatMode,
+  readStoredRepeatMode,
+  subscribePlayerRepeatMode,
+  writeStoredRepeatMode,
+  type RepeatMode,
+} from "@/lib/listen/repeat-mode";
 
 export const GLOBAL_MINI_PLAYER_HEIGHT_PX = 72;
 
@@ -119,6 +129,8 @@ type SessionContextValue = {
   confirmInternalQueueNavigation: (practiceId: string) => void;
   noticeMessage: string | null;
   clearNoticeMessage: () => void;
+  repeatMode: RepeatMode;
+  cycleRepeatMode: () => void;
 };
 
 type PendingQueueNavigation = {
@@ -247,6 +259,7 @@ function GlobalPlayerEngine({
   skipAutoplayUrlSync,
   onTracksExhausted,
   onRequestPreviousProduct,
+  getRepeatMode,
   children,
 }: {
   session: LoadSessionInput;
@@ -264,6 +277,7 @@ function GlobalPlayerEngine({
     fromPracticeId: string,
   ) => Promise<"advanced" | "completed" | "none">;
   onRequestPreviousProduct: () => Promise<boolean>;
+  getRepeatMode: () => RepeatMode;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -337,6 +351,7 @@ function GlobalPlayerEngine({
     playbackMode: catalogSession?.playbackMode ?? "full",
     previewStartMs: catalogSession?.previewStartMs,
     previewEndMs: catalogSession?.previewEndMs,
+    getRepeatMode,
   });
 
   const {
@@ -608,6 +623,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const [activeQueue, setActiveQueue] = useState<PlaylistQueue | null>(null);
   const [queueCompleted, setQueueCompleted] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const repeatMode = useSyncExternalStore(
+    subscribePlayerRepeatMode,
+    readStoredRepeatMode,
+    getRepeatModeServerSnapshot,
+  );
   const [desktopPlayerRestoreState, setDesktopPlayerRestoreState] =
     useState<DesktopPlayerRestoreState>("pending");
   const [playbackInstanceId, setPlaybackInstanceId] = useState(0);
@@ -644,6 +664,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  const cycleRepeatMode = useCallback(() => {
+    writeStoredRepeatMode(nextRepeatMode(readStoredRepeatMode()));
+  }, []);
+
+  const getRepeatMode = useCallback(() => readStoredRepeatMode(), []);
 
   useEffect(() => {
     activeQueueRef.current = activeQueue;
@@ -840,6 +866,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     }
     clearMediaSession();
     clearDesktopPlayerLastSession();
+    resetContinuousListenSession();
     sessionRef.current = null;
     setSession(null);
     clearPlaylistQueue();
@@ -1478,12 +1505,17 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       }
 
       if (result === "completed") {
+        if (readStoredRepeatMode() === "all") {
+          const restart = await restartPlaylistQueue();
+          return restart.ok ? "advanced" : "completed";
+        }
+
         return "completed";
       }
 
       return "none";
     },
-    [activateEntryAtIndex, queueCompleted],
+    [activateEntryAtIndex, queueCompleted, restartPlaylistQueue],
   );
 
   const onRequestPreviousProduct = useCallback(async (): Promise<boolean> => {
@@ -1752,11 +1784,14 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       confirmInternalQueueNavigation,
       noticeMessage,
       clearNoticeMessage,
+      repeatMode,
+      cycleRepeatMode,
     }),
     [
       activeQueue,
       clearNoticeMessage,
       clearPlaylistQueue,
+      cycleRepeatMode,
       confirmInternalQueueNavigation,
       currentQueueEntry,
       desktopPlayerRestoreState,
@@ -1769,6 +1804,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       openFullPlayer,
       prepareSharedAudioGesture,
       queueCompleted,
+      repeatMode,
       restartPlaylistQueue,
       returnToPlaylistSource,
       session,
@@ -1801,6 +1837,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           skipAutoplayUrlSync={Boolean(activeQueue)}
           onTracksExhausted={onTracksExhausted}
           onRequestPreviousProduct={onRequestPreviousProduct}
+          getRepeatMode={getRepeatMode}
         >
           {children}
         </GlobalPlayerEngine>
