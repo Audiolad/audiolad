@@ -21,6 +21,7 @@ import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
 import type { PracticeLibraryAction } from "@/lib/products/practice-access-ui";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
+import type { RepeatMode } from "@/lib/listen/repeat-mode";
 
 export type ListenPlayerProps = {
   practiceId: string;
@@ -304,6 +305,8 @@ type ListenPlayerContextValue = {
   clearNoticeMessage: ReturnType<
     typeof useGlobalAudioPlayer
   >["clearNoticeMessage"];
+  repeatMode: RepeatMode;
+  cycleRepeatMode: () => void;
 };
 
 const ListenPlayerContext = createContext<ListenPlayerContextValue | null>(
@@ -456,6 +459,8 @@ export function ListenPlayerProvider({
     returnToPlaylistSource,
     noticeMessage,
     clearNoticeMessage,
+    repeatMode,
+    cycleRepeatMode,
   } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
   const isEngineReady =
@@ -605,6 +610,8 @@ export function ListenPlayerProvider({
     returnToPlaylistSource,
     noticeMessage,
     clearNoticeMessage,
+    repeatMode,
+    cycleRepeatMode,
   };
 
   return (

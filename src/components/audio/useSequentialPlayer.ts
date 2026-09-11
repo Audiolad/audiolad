@@ -86,6 +86,11 @@ import {
   reportListenStatsHeartbeat,
   shouldReportListenStatsHeartbeat,
 } from "@/lib/listen/listen-stats-client";
+import {
+  DEFAULT_REPEAT_MODE,
+  resolveNaturalEndedRepeatAction,
+  type RepeatMode,
+} from "@/lib/listen/repeat-mode";
 
 type TracksExhaustedResult = "advanced" | "completed" | "none";
 
@@ -144,6 +149,11 @@ type UseSequentialPlayerOptions = {
   previewStartMs?: number;
   previewEndMs?: number;
   onPreviewEnded?: () => void;
+  /**
+   * Fresh repeat mode from GlobalAudioPlayerProvider SoT.
+   * Engine must not own an independent copy.
+   */
+  getRepeatMode?: () => RepeatMode;
 };
 
 type SwitchTrackOptions = {
@@ -194,6 +204,7 @@ export function useSequentialPlayer({
   previewStartMs,
   previewEndMs,
   onPreviewEnded,
+  getRepeatMode,
 }: UseSequentialPlayerOptions) {
   const isPrivateAudio = sourceType === "private_audio";
   const isPreviewMode = playbackMode === "preview";
@@ -238,6 +249,7 @@ export function useSequentialPlayer({
   const getSessionGenerationRef = useRef(getSessionGeneration);
   const onTracksExhaustedRef = useRef(onTracksExhausted);
   const onRequestPreviousProductRef = useRef(onRequestPreviousProduct);
+  const getRepeatModeRef = useRef(getRepeatMode);
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const currentTrackRef = useRef<ListenTrack | null>(null);
@@ -271,6 +283,10 @@ export function useSequentialPlayer({
   useEffect(() => {
     onRequestPreviousProductRef.current = onRequestPreviousProduct;
   }, [onRequestPreviousProduct]);
+
+  useEffect(() => {
+    getRepeatModeRef.current = getRepeatMode;
+  }, [getRepeatMode]);
 
   const initialPlayback = useMemo(() => {
     if (hasPreviewWindow) {
@@ -1411,7 +1427,44 @@ export function useSequentialPlayer({
         force: true,
       });
 
-      if (currentTrackIndex < tracks.length - 1) {
+      const endedAction = resolveNaturalEndedRepeatAction({
+        repeatMode: getRepeatModeRef.current?.() ?? DEFAULT_REPEAT_MODE,
+        hasNextInSession: currentTrackIndex < tracks.length - 1,
+      });
+
+      if (endedAction === "replay-one") {
+        userWantsPlaybackRef.current = true;
+        setProgramCompleted(false);
+        setCurrentTime(0);
+
+        try {
+          audio.currentTime = 0;
+        } catch {
+          // Ignore seek errors on a just-ended element.
+        }
+
+        ensureSharedAudioAudible(audio);
+        void audio.play().catch((error: unknown) => {
+          if (!isHandlerCurrent()) {
+            return;
+          }
+
+          const name = playErrorName(error);
+          debugSnapshot("repeat-one", `rejected:${name}`, {
+            usedPrefetch: false,
+            prefetch: "miss",
+            currentAudioItemId: currentTrack.id,
+            nextAudioItemId: currentTrack.id,
+            advanceKind: "session",
+            errorName: name,
+          });
+          userWantsPlaybackRef.current = false;
+          setAutoplayHint(AUTOPLAY_START_HINT);
+        });
+        return;
+      }
+
+      if (endedAction === "auto-next") {
         void switchToTrack(currentTrackIndex + 1, {
           autoPlay: true,
           startPosition: 0,
@@ -1422,13 +1475,35 @@ export function useSequentialPlayer({
 
       if (onTracksExhaustedRef.current) {
         void onTracksExhaustedRef.current(practiceId).then((result) => {
+          if (!isHandlerCurrent()) {
+            return;
+          }
+
           if (result === "advanced" || result === "completed") {
             userWantsPlaybackRef.current = result === "advanced";
             return;
           }
 
+          if (endedAction === "restart-effective-queue") {
+            void switchToTrack(0, {
+              autoPlay: true,
+              startPosition: 0,
+              fromEndedOrNext: true,
+            });
+            return;
+          }
+
           userWantsPlaybackRef.current = false;
           setProgramCompleted(true);
+        });
+        return;
+      }
+
+      if (endedAction === "restart-effective-queue") {
+        void switchToTrack(0, {
+          autoPlay: true,
+          startPosition: 0,
+          fromEndedOrNext: true,
         });
         return;
       }

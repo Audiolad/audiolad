@@ -15,6 +15,11 @@ import {
   STUDIO_RENDER_IDLE_INTERVAL_MS,
   STUDIO_RENDER_SHUTDOWN_DRAIN_MS,
 } from "../src/lib/studio/render/worker";
+import {
+  captureStudioRenderBootRelease,
+  compareStudioRenderRelease,
+  formatStudioRenderWorkerBootLog,
+} from "../src/lib/studio/render/worker-release";
 import { createStudioRenderWorkerPort } from "../src/lib/studio/render/worker-runtime";
 
 function envNumber(name: string, fallback: number): number {
@@ -38,10 +43,14 @@ async function main() {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
   const port = createStudioRenderWorkerPort(service);
+  const boot = await captureStudioRenderBootRelease();
+  const bootComparison = await compareStudioRenderRelease({ boot });
+  console.log(formatStudioRenderWorkerBootLog(bootComparison));
   const worker = createStudioRenderWorker(port, {
     idleIntervalMs: envNumber("STUDIO_RENDER_IDLE_INTERVAL_MS", STUDIO_RENDER_IDLE_INTERVAL_MS),
     heartbeatIntervalMs: envNumber("STUDIO_RENDER_HEARTBEAT_INTERVAL_MS", STUDIO_RENDER_HEARTBEAT_INTERVAL_MS),
     shutdownDrainMs: envNumber("STUDIO_RENDER_SHUTDOWN_DRAIN_MS", STUDIO_RENDER_SHUTDOWN_DRAIN_MS),
+    checkRelease: () => compareStudioRenderRelease({ boot }),
   });
 
   const onSignal = (signal: NodeJS.Signals) => {

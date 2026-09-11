@@ -21,6 +21,11 @@ import {
   isListeningCompleted,
   updateListeningProgressState,
 } from "@/lib/analytics/listening";
+import {
+  rememberContinuousListenCompleted,
+  rememberContinuousListenPlayStarted,
+  touchContinuousListenSessionActivity,
+} from "@/lib/listen/repeat-analytics";
 
 type ListenAnalyticsTrackerProps = {
   practiceId: string;
@@ -94,6 +99,10 @@ export default function ListenAnalyticsTracker({
 
     listeningSessionKeyRef.current = listeningKey;
 
+    if (!rememberContinuousListenPlayStarted(practiceId, trackId)) {
+      return;
+    }
+
     void trackPlatformEvent({
       sessionId,
       event_name: "audio_play_started",
@@ -114,6 +123,10 @@ export default function ListenAnalyticsTracker({
     const now = Date.now();
     const previousTick = lastTickRef.current;
     lastTickRef.current = now;
+
+    if (isPlaying) {
+      touchContinuousListenSessionActivity(now);
+    }
 
     const deltaSeconds =
       isPlaying && previousTick ? Math.min(5, (now - previousTick) / 1000) : 0;
@@ -167,6 +180,10 @@ export default function ListenAnalyticsTracker({
       if (!hasTrackedListeningMilestone(listeningKey, "audio_completed")) {
         completionTrackedRef.current = true;
         markListeningMilestoneTracked(listeningKey, "audio_completed");
+
+        if (!rememberContinuousListenCompleted(practiceId, trackId)) {
+          return;
+        }
 
         void trackPlatformEvent({
           sessionId,

@@ -19,6 +19,7 @@ import {
   RewindFifteenIcon,
   useListenPlayer,
 } from "@/components/audio/listen-player-shared";
+import RepeatModeButton from "@/components/audio/RepeatModeButton";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 export default function ListenPlayerMobile() {
@@ -81,6 +82,8 @@ export default function ListenPlayerMobile() {
     returnToPlaylistSource,
     noticeMessage,
     clearNoticeMessage,
+    repeatMode,
+    cycleRepeatMode,
   } = useListenPlayer();
 
   return (
@@ -348,14 +351,22 @@ export default function ListenPlayerMobile() {
                     {isPlaying ? <PauseIcon /> : <PlayIcon />}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleSpeedChange}
-                    aria-label={`Скорость воспроизведения ${playbackRate}×`}
-                    className="mt-3 min-h-11 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                  >
-                    {playbackRate}×
-                  </button>
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <RepeatModeButton
+                      variant="onDark"
+                      repeatMode={repeatMode}
+                      onCycle={cycleRepeatMode}
+                      className="min-h-11 min-w-11"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSpeedChange}
+                      aria-label={`Скорость воспроизведения ${playbackRate}×`}
+                      className="min-h-11 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                    >
+                      {playbackRate}×
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col items-center">
