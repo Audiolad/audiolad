@@ -24,6 +24,7 @@ import {
 import {
   rememberContinuousListenCompleted,
   rememberContinuousListenPlayStarted,
+  touchContinuousListenSessionActivity,
 } from "@/lib/listen/repeat-analytics";
 
 type ListenAnalyticsTrackerProps = {
@@ -122,6 +123,10 @@ export default function ListenAnalyticsTracker({
     const now = Date.now();
     const previousTick = lastTickRef.current;
     lastTickRef.current = now;
+
+    if (isPlaying) {
+      touchContinuousListenSessionActivity(now);
+    }
 
     const deltaSeconds =
       isPlaying && previousTick ? Math.min(5, (now - previousTick) / 1000) : 0;

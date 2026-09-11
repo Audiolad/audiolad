@@ -6,7 +6,7 @@ type ContinuousListenItemState = {
 };
 
 type ContinuousListenSession = {
-  startedAt: number;
+  lastActivityAt: number;
   items: Map<string, ContinuousListenItemState>;
 };
 
@@ -16,13 +16,14 @@ function itemKey(practiceId: string, audioItemId: string): string {
   return `${practiceId}:${audioItemId}`;
 }
 
-function ensureContinuousSession(now = Date.now()): ContinuousListenSession {
-  if (
-    !continuousSession ||
-    now - continuousSession.startedAt > LISTENING_SESSION_GAP_MS
-  ) {
+function isSessionExpired(session: ContinuousListenSession, now: number): boolean {
+  return now - session.lastActivityAt > LISTENING_SESSION_GAP_MS;
+}
+
+function ensureContinuousSession(now: number): ContinuousListenSession {
+  if (!continuousSession || isSessionExpired(continuousSession, now)) {
     continuousSession = {
-      startedAt: now,
+      lastActivityAt: now,
       items: new Map(),
     };
   }
@@ -47,20 +48,33 @@ function getItemState(
   return created;
 }
 
+/**
+ * Keep a live continuous session alive while audio is actually playing.
+ * Mount, pause, stop, and Repeat-button clicks must not call this.
+ */
+export function touchContinuousListenSessionActivity(now = Date.now()): void {
+  if (!continuousSession || isSessionExpired(continuousSession, now)) {
+    return;
+  }
+
+  continuousSession.lastActivityAt = now;
+}
+
 /** First play_started for this item in the continuous session. Later auto-loops return false. */
 export function rememberContinuousListenPlayStarted(
   practiceId: string,
   audioItemId: string,
+  now = Date.now(),
 ): boolean {
-  const session = ensureContinuousSession();
+  const session = ensureContinuousSession(now);
   const state = getItemState(session, practiceId, audioItemId);
+  session.lastActivityAt = now;
 
   if (state.playStarted) {
     return false;
   }
 
   state.playStarted = true;
-  session.startedAt = Date.now();
   return true;
 }
 
@@ -68,16 +82,17 @@ export function rememberContinuousListenPlayStarted(
 export function rememberContinuousListenCompleted(
   practiceId: string,
   audioItemId: string,
+  now = Date.now(),
 ): boolean {
-  const session = ensureContinuousSession();
+  const session = ensureContinuousSession(now);
   const state = getItemState(session, practiceId, audioItemId);
+  session.lastActivityAt = now;
 
   if (state.completed) {
     return false;
   }
 
   state.completed = true;
-  session.startedAt = Date.now();
   return true;
 }
 

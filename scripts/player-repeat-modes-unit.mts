@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { LISTENING_SESSION_GAP_MS } from "../src/lib/analytics/constants";
 import {
   rememberContinuousListenCompleted,
   rememberContinuousListenPlayStarted,
   resetContinuousListenSession,
+  touchContinuousListenSessionActivity,
 } from "../src/lib/listen/repeat-analytics";
 import {
   DEFAULT_REPEAT_MODE,
@@ -162,6 +164,73 @@ function testAnalyticsNoDuplicateCompletion() {
   );
 }
 
+function testHourLongContinuousRepeatStaysDeduped() {
+  resetContinuousListenSession();
+
+  const hourMs = 60 * 60 * 1000;
+  const tickMs = 4 * 60 * 1000;
+
+  assert.ok(
+    tickMs < LISTENING_SESSION_GAP_MS,
+    "test ticks must be closer than the inactivity gap",
+  );
+  assert.equal(
+    rememberContinuousListenPlayStarted("album", "track-a", 0),
+    true,
+    "t=0 first play_started counts",
+  );
+
+  for (let t = tickMs; t <= hourMs; t += tickMs) {
+    touchContinuousListenSessionActivity(t);
+  }
+
+  assert.equal(
+    rememberContinuousListenCompleted("album", "track-a", hourMs),
+    true,
+    "t=60m first completion counts",
+  );
+  assert.equal(
+    rememberContinuousListenPlayStarted("album", "track-a", hourMs + 1_000),
+    false,
+    "auto-repeat must not fire a second play_started",
+  );
+
+  for (let t = hourMs + tickMs; t <= hourMs * 2; t += tickMs) {
+    touchContinuousListenSessionActivity(t);
+  }
+
+  assert.equal(
+    rememberContinuousListenCompleted("album", "track-a", hourMs * 2),
+    false,
+    "t=120m auto-loop completion must stay deduped",
+  );
+}
+
+function testInactivityGapStartsNewSession() {
+  resetContinuousListenSession();
+
+  assert.equal(
+    rememberContinuousListenPlayStarted("album", "track-a", 0),
+    true,
+    "first play after idle counts",
+  );
+  touchContinuousListenSessionActivity(1_000);
+  rememberContinuousListenCompleted("album", "track-a", 2_000);
+
+  const afterGap = 2_000 + LISTENING_SESSION_GAP_MS + 1;
+
+  assert.equal(
+    rememberContinuousListenPlayStarted("album", "track-a", afterGap),
+    true,
+    "playback after >5m inactivity may start a new session",
+  );
+  assert.equal(
+    rememberContinuousListenCompleted("album", "track-a", afterGap + 1),
+    true,
+    "new session after inactivity may count completion again",
+  );
+}
+
 function testHandleEndedContract() {
   const player = read("src/components/audio/useSequentialPlayer.ts");
   const handleEnded = sliceBetween(
@@ -252,6 +321,20 @@ function testProviderSoT() {
   assert.match(tracker, /if \(!trackId \|\| !isPlaying \|\| playStartedRef\.current\)/);
   assert.match(tracker, /rememberContinuousListenPlayStarted/);
   assert.match(tracker, /rememberContinuousListenCompleted/);
+  assert.match(tracker, /touchContinuousListenSessionActivity/);
+  assert.match(
+    tracker,
+    /if \(isPlaying\) \{\s*touchContinuousListenSessionActivity\(now\);/,
+    "activity touch is gated on actual playback ticks",
+  );
+
+  const analytics = read("src/lib/listen/repeat-analytics.ts");
+  assert.match(analytics, /lastActivityAt/);
+  assert.doesNotMatch(
+    analytics,
+    /startedAt/,
+    "continuous session expiry uses last activity, not first event time",
+  );
 }
 
 function testUiSurfaces() {
@@ -328,6 +411,8 @@ function main() {
   testEndedMatrix();
   testLocalStorageHelpers();
   testAnalyticsNoDuplicateCompletion();
+  testHourLongContinuousRepeatStaysDeduped();
+  testInactivityGapStartsNewSession();
   testHandleEndedContract();
   testProviderSoT();
   testUiSurfaces();
