@@ -2,6 +2,8 @@ import {
   COURSE_UPGRADE_BOUNDARY_HEADER,
   COURSE_UPGRADE_MARKER_HEADER,
   COURSE_UPGRADE_REQUEST_ID_HEADER,
+  COURSE_UPGRADE_STAGE_HEADER,
+  isCourseUpgradeCheckoutStage,
 } from "@/lib/course-content/course-upgrade-stages";
 
 export type CourseUpgradeClientErrorCode =
@@ -57,13 +59,17 @@ export type CourseUpgradeCheckoutEvidence = {
   errorCode: string;
   boundary: CourseUpgradeDiagnosticBoundary;
   requestIdShort: string | null;
+  stage?: string | null;
 };
 
 export {
   COURSE_UPGRADE_BOUNDARY_HEADER,
   COURSE_UPGRADE_MARKER_HEADER,
   COURSE_UPGRADE_REQUEST_ID_HEADER,
+  COURSE_UPGRADE_STAGE_HEADER,
 };
+
+export const COURSE_UPGRADE_UNKNOWN_STAGE = "unknown-stage";
 
 export const COURSE_UPGRADE_GENERIC_ERROR =
   "Не удалось начать оплату. Попробуйте ещё раз.";
@@ -218,6 +224,20 @@ export function readCourseUpgradeRequestIdShort(
   return value.slice(0, 4).toLowerCase();
 }
 
+export function readSafeCourseUpgradeDiagnosticStage(
+  stageHeader?: string | null,
+): string | null {
+  if (stageHeader == null || stageHeader === "") {
+    return null;
+  }
+
+  if (isCourseUpgradeCheckoutStage(stageHeader)) {
+    return stageHeader;
+  }
+
+  return COURSE_UPGRADE_UNKNOWN_STAGE;
+}
+
 export function readSafeCourseUpgradeDiagnosticErrorCode(input: {
   body?: unknown;
   unexpectedResponse?: boolean;
@@ -248,12 +268,14 @@ export function readCourseUpgradeCheckoutEvidence(input: {
   markerHeader?: string | null;
   boundaryHeader?: string | null;
   requestIdHeader?: string | null;
+  stageHeader?: string | null;
 }): CourseUpgradeCheckoutEvidence {
   return {
     httpStatus: input.httpStatus,
     errorCode: readSafeCourseUpgradeDiagnosticErrorCode(input),
     boundary: readCourseUpgradeDiagnosticBoundary(input),
     requestIdShort: readCourseUpgradeRequestIdShort(input.requestIdHeader),
+    stage: readSafeCourseUpgradeDiagnosticStage(input.stageHeader),
   };
 }
 
@@ -265,6 +287,10 @@ export function formatCourseUpgradeCheckoutDiagnostic(
     evidence.errorCode,
     evidence.boundary,
   ];
+
+  if (evidence.stage) {
+    parts.push(evidence.stage);
+  }
 
   if (evidence.requestIdShort) {
     parts.push(`${evidence.requestIdShort}…`);
@@ -281,6 +307,7 @@ export function interpretCourseUpgradeCheckoutResponse(input: {
   markerHeader?: string | null;
   boundaryHeader?: string | null;
   requestIdHeader?: string | null;
+  stageHeader?: string | null;
 }):
   | { kind: "redirect"; paymentUrl: string }
   | { kind: "error"; message: string; diagnostic: string } {

@@ -8,8 +8,9 @@ import {
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
 import {
+  COURSE_UPGRADE_CHECKOUT_STAGES,
   createCourseUpgradeRequestId,
-  courseUpgradeObservabilityHeaders,
+  courseUpgradeFailureHeaders,
   runCourseUpgradeProtectedUpdateSession,
 } from "@/lib/course-content/course-upgrade-stages";
 import { updateSession } from "@/lib/supabase/proxy";
@@ -54,9 +55,10 @@ export async function proxy(request: NextRequest) {
         { error: "auth_unavailable" },
         {
           status: 503,
-          headers: courseUpgradeObservabilityHeaders(
+          headers: courseUpgradeFailureHeaders(
             "proxy",
             createCourseUpgradeRequestId(),
+            COURSE_UPGRADE_CHECKOUT_STAGES.PROXY_AUTH,
           ),
         },
       ),

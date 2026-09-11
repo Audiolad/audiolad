@@ -33,7 +33,9 @@ import {
   COURSE_UPGRADE_MARKER_HEADER,
   COURSE_UPGRADE_NETWORK_ERROR,
   COURSE_UPGRADE_REQUEST_ID_HEADER,
+  COURSE_UPGRADE_STAGE_HEADER,
   COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+  COURSE_UPGRADE_UNKNOWN_STAGE,
   formatCourseUpgradeCheckoutDiagnostic,
   interpretCourseUpgradeCheckoutResponse,
   mapCourseUpgradeClientError,
@@ -42,7 +44,9 @@ import {
 import {
   COURSE_UPGRADE_CHECKOUT_PATH,
   COURSE_UPGRADE_CHECKOUT_STAGES,
+  courseUpgradeFailureHeaders,
   courseUpgradeObservabilityHeaders,
+  isCourseUpgradeCheckoutStage,
   createCourseUpgradeRequestClient,
   createCourseUpgradeRequestId,
   logCourseUpgradeFailure,
@@ -420,6 +424,8 @@ assert.match(button, /interpretCourseUpgradeCheckoutResponse/);
 assert.match(button, /COURSE_UPGRADE_MARKER_HEADER/);
 assert.match(button, /COURSE_UPGRADE_BOUNDARY_HEADER/);
 assert.match(button, /COURSE_UPGRADE_REQUEST_ID_HEADER/);
+assert.match(button, /COURSE_UPGRADE_STAGE_HEADER/);
+assert.match(button, /stageHeader:/);
 assert.match(startPay, /decidePendingTochkaPayment/);
 assert.match(startPay, /provider_checkout_failed/);
 assert.doesNotMatch(startPay, /tochka_recreate_failed/);
@@ -611,11 +617,25 @@ const proxySource = read("src/proxy.ts");
 assert.match(proxySource, /runCourseUpgradeProtectedUpdateSession/);
 assert.match(proxySource, /auth_unavailable/);
 assert.match(proxySource, /NextResponse\.json/);
-assert.match(proxySource, /courseUpgradeObservabilityHeaders/);
+assert.match(proxySource, /courseUpgradeFailureHeaders/);
+assert.match(proxySource, /COURSE_UPGRADE_CHECKOUT_STAGES\.PROXY_AUTH/);
 assert.match(proxySource, /"proxy"/);
+assert.match(route, /courseUpgradeFailureHeaders/);
 assert.match(route, /courseUpgradeObservabilityHeaders/);
 assert.match(route, /createCourseUpgradeRequestId/);
 assert.match(route, /"route"/);
+assert.doesNotMatch(
+  route,
+  /headers: courseUpgradeFailureHeaders\("route", requestId\)/,
+);
+assert.match(
+  route,
+  /headers: courseUpgradeFailureHeaders\("route", requestId, stage\)/,
+);
+assert.match(
+  route,
+  /headers: courseUpgradeObservabilityHeaders\("route", requestId\)/,
+);
 assert.match(
   proxySource,
   /return updateSession\(request, \{ rewritePathname: SCHOOL_SITE_PATH \}\)/,
@@ -971,25 +991,115 @@ function assertCourseUpgradeObservability(response, boundary) {
   );
 }
 
+function assertCourseUpgradeFailureStage(response, stage) {
+  assert.equal(isCourseUpgradeCheckoutStage(stage), true);
+  assert.equal(response.headers.get(COURSE_UPGRADE_STAGE_HEADER), stage);
+  assert.doesNotMatch(
+    response.headers.get(COURSE_UPGRADE_STAGE_HEADER) ?? "",
+    /SECRET|Bearer|Authorization|listener@|uid=|cookie|postgres|sql|stack/i,
+  );
+}
+
 assert.equal(COURSE_UPGRADE_MARKER_HEADER, "x-audiolad-course-upgrade");
 assert.equal(COURSE_UPGRADE_REQUEST_ID_HEADER, "x-audiolad-request-id");
 assert.equal(
   COURSE_UPGRADE_BOUNDARY_HEADER,
   "x-audiolad-course-upgrade-boundary",
 );
+assert.equal(
+  COURSE_UPGRADE_STAGE_HEADER,
+  "x-audiolad-course-upgrade-stage",
+);
+assert.equal(COURSE_UPGRADE_UNKNOWN_STAGE, "unknown-stage");
 assert.match(createCourseUpgradeRequestId(), REQUEST_ID_RE);
 assert.deepEqual(courseUpgradeObservabilityHeaders("route", "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa"), {
   "x-audiolad-course-upgrade": "1",
   "x-audiolad-request-id": "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
   "x-audiolad-course-upgrade-boundary": "route",
 });
+assert.equal(
+  courseUpgradeObservabilityHeaders(
+    "route",
+    "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+  )[COURSE_UPGRADE_STAGE_HEADER],
+  undefined,
+);
+assert.deepEqual(
+  courseUpgradeFailureHeaders(
+    "route",
+    "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
+  ),
+  {
+    "x-audiolad-course-upgrade": "1",
+    "x-audiolad-request-id": "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    "x-audiolad-course-upgrade-boundary": "route",
+    "x-audiolad-course-upgrade-stage": "create_course_upgrade_order",
+  },
+);
+assert.deepEqual(
+  courseUpgradeFailureHeaders(
+    "proxy",
+    "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    COURSE_UPGRADE_CHECKOUT_STAGES.PROXY_AUTH,
+  ),
+  {
+    "x-audiolad-course-upgrade": "1",
+    "x-audiolad-request-id": "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    "x-audiolad-course-upgrade-boundary": "proxy",
+    "x-audiolad-course-upgrade-stage": "proxy_auth",
+  },
+);
+assert.equal(
+  courseUpgradeFailureHeaders(
+    "route",
+    "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    "relation \"orders\" does not exist HINT: check uid",
+  )[COURSE_UPGRADE_STAGE_HEADER],
+  undefined,
+);
+assert.equal(
+  courseUpgradeFailureHeaders(
+    "route",
+    "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+    "Authorization: Bearer SECRET_JWT",
+  )[COURSE_UPGRADE_STAGE_HEADER],
+  undefined,
+);
+assert.equal(COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER, "create_course_upgrade_order");
+assert.equal(COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD, "reload_orders_row");
+assert.equal(isCourseUpgradeCheckoutStage("create_course_upgrade_order"), true);
+assert.equal(isCourseUpgradeCheckoutStage("reload_orders_row"), true);
+assert.equal(isCourseUpgradeCheckoutStage("proxy_auth"), true);
+assert.equal(isCourseUpgradeCheckoutStage("unknown-stage"), false);
+assert.equal(isCourseUpgradeCheckoutStage("Authorization: Bearer SECRET"), false);
 
 assert.ok(proxyCheckoutThrow, "proxy fail-closed response must be captured");
 assertCourseUpgradeObservability(proxyCheckoutThrow.result, "proxy");
+assertCourseUpgradeFailureStage(
+  proxyCheckoutThrow.result,
+  COURSE_UPGRADE_CHECKOUT_STAGES.PROXY_AUTH,
+);
 assertCourseUpgradeObservability(routeClientThrow.result, "route");
+assertCourseUpgradeFailureStage(
+  routeClientThrow.result,
+  COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_REQUEST_CLIENT,
+);
 assertCourseUpgradeObservability(routeGetUserThrow.result, "route");
+assertCourseUpgradeFailureStage(
+  routeGetUserThrow.result,
+  COURSE_UPGRADE_CHECKOUT_STAGES.AUTHENTICATE_USER,
+);
 assertCourseUpgradeObservability(routeUnauthorized.result, "route");
+assertCourseUpgradeFailureStage(
+  routeUnauthorized.result,
+  COURSE_UPGRADE_CHECKOUT_STAGES.AUTH,
+);
 assertCourseUpgradeObservability(routeAuthError.result, "route");
+assertCourseUpgradeFailureStage(
+  routeAuthError.result,
+  COURSE_UPGRADE_CHECKOUT_STAGES.AUTH,
+);
 assert.equal(routeClientThrow.result.status, 503);
 assert.equal(routeAuthError.result.status, 500);
 
@@ -1003,12 +1113,13 @@ const routeAuthDiagnostic = interpretCourseUpgradeCheckoutResponse({
   requestIdHeader: routeAuthError.result.headers.get(
     COURSE_UPGRADE_REQUEST_ID_HEADER,
   ),
+  stageHeader: routeAuthError.result.headers.get(COURSE_UPGRADE_STAGE_HEADER),
 });
 assert.equal(routeAuthDiagnostic.kind, "error");
 assert.equal(routeAuthDiagnostic.message, COURSE_UPGRADE_GENERIC_ERROR);
 assert.match(
   routeAuthDiagnostic.diagnostic,
-  /^Диагностика: HTTP 500 · internal_error · route · [0-9a-f]{4}…$/,
+  /^Диагностика: HTTP 500 · internal_error · route · auth · [0-9a-f]{4}…$/,
 );
 assert.doesNotMatch(
   routeAuthDiagnostic.diagnostic,
@@ -1027,11 +1138,14 @@ const proxyAuthDiagnostic = interpretCourseUpgradeCheckoutResponse({
   requestIdHeader: proxyCheckoutThrow.result.headers.get(
     COURSE_UPGRADE_REQUEST_ID_HEADER,
   ),
+  stageHeader: proxyCheckoutThrow.result.headers.get(
+    COURSE_UPGRADE_STAGE_HEADER,
+  ),
 });
 assert.equal(proxyAuthDiagnostic.message, COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR);
 assert.match(
   proxyAuthDiagnostic.diagnostic,
-  /^Диагностика: HTTP 503 · auth_unavailable · proxy · [0-9a-f]{4}…$/,
+  /^Диагностика: HTTP 503 · auth_unavailable · proxy · proxy_auth · [0-9a-f]{4}…$/,
 );
 
 const fixtureRequestId = "7f3a9c2e-4111-4111-8111-aaaaaaaaaaaa";
@@ -1049,17 +1163,47 @@ assert.equal(
   "Диагностика: HTTP 500 · internal_error · route · 7f3a…",
 );
 
+const createOrderDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 500,
+  body: { error: "internal_error" },
+  markerHeader: "1",
+  boundaryHeader: "route",
+  requestIdHeader: fixtureRequestId,
+  stageHeader: COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
+});
+assert.equal(createOrderDiag.kind, "error");
+assert.equal(createOrderDiag.message, COURSE_UPGRADE_GENERIC_ERROR);
+assert.equal(
+  createOrderDiag.diagnostic,
+  "Диагностика: HTTP 500 · internal_error · route · create_course_upgrade_order · 7f3a…",
+);
+
+const reloadDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 500,
+  body: { error: "internal_error" },
+  markerHeader: "1",
+  boundaryHeader: "route",
+  requestIdHeader: fixtureRequestId,
+  stageHeader: COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD,
+});
+assert.equal(reloadDiag.message, COURSE_UPGRADE_GENERIC_ERROR);
+assert.equal(
+  reloadDiag.diagnostic,
+  "Диагностика: HTTP 500 · internal_error · route · reload_orders_row · 7f3a…",
+);
+
 const proxyDiag = interpretCourseUpgradeCheckoutResponse({
   httpStatus: 503,
   body: { error: "auth_unavailable" },
   markerHeader: "1",
   boundaryHeader: "proxy",
   requestIdHeader: fixtureRequestId,
+  stageHeader: COURSE_UPGRADE_CHECKOUT_STAGES.PROXY_AUTH,
 });
 assert.equal(proxyDiag.message, COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR);
 assert.equal(
   proxyDiag.diagnostic,
-  "Диагностика: HTTP 503 · auth_unavailable · proxy · 7f3a…",
+  "Диагностика: HTTP 503 · auth_unavailable · proxy · proxy_auth · 7f3a…",
 );
 
 const malformedDiag = interpretCourseUpgradeCheckoutResponse({
@@ -1083,15 +1227,17 @@ const leakedDiag = interpretCourseUpgradeCheckoutResponse({
   markerHeader: "1",
   boundaryHeader: "route",
   requestIdHeader: fixtureRequestId,
+  stageHeader:
+    'relation "orders" does not exist HINT: uid=aaaa email=listener@example.com',
 });
 assert.equal(leakedDiag.message, COURSE_UPGRADE_GENERIC_ERROR);
 assert.equal(
   leakedDiag.diagnostic,
-  "Диагностика: HTTP 500 · unknown · route · 7f3a…",
+  "Диагностика: HTTP 500 · unknown · route · unknown-stage · 7f3a…",
 );
 assert.doesNotMatch(
   leakedDiag.diagnostic,
-  /SECRET_JWT|Bearer|route\.ts|listener@example\.com/,
+  /SECRET_JWT|Bearer|route\.ts|listener@example\.com|relation |"orders"|HINT|uid=/,
 );
 
 const injectedHeaderDiag = interpretCourseUpgradeCheckoutResponse({
@@ -1100,12 +1246,46 @@ const injectedHeaderDiag = interpretCourseUpgradeCheckoutResponse({
   markerHeader: "1",
   boundaryHeader: "Authorization: Bearer SECRET_JWT",
   requestIdHeader: "not-a-uuid SECRET_JWT",
+  stageHeader: "Authorization: Bearer SECRET_JWT cookie=sb-access-token",
 });
 assert.equal(
   injectedHeaderDiag.diagnostic,
-  "Диагностика: HTTP 502 · non_json · marked",
+  "Диагностика: HTTP 502 · non_json · marked · unknown-stage",
 );
-assert.doesNotMatch(injectedHeaderDiag.diagnostic, /SECRET_JWT|Bearer/);
+assert.doesNotMatch(
+  injectedHeaderDiag.diagnostic,
+  /SECRET_JWT|Bearer|cookie|sb-access-token/,
+);
+
+const injectedAllowlistedLookalike = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 500,
+  body: { error: "internal_error" },
+  markerHeader: "1",
+  boundaryHeader: "route",
+  requestIdHeader: fixtureRequestId,
+  stageHeader: "create_course_upgrade_order\nAuthorization: Bearer SECRET",
+});
+assert.equal(
+  injectedAllowlistedLookalike.diagnostic,
+  "Диагностика: HTTP 500 · internal_error · route · unknown-stage · 7f3a…",
+);
+assert.doesNotMatch(injectedAllowlistedLookalike.diagnostic, /SECRET|Bearer/);
+
+for (const stage of Object.values(COURSE_UPGRADE_CHECKOUT_STAGES)) {
+  const rendered = interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 500,
+    body: { error: "internal_error" },
+    markerHeader: "1",
+    boundaryHeader: "route",
+    requestIdHeader: fixtureRequestId,
+    stageHeader: stage,
+  });
+  assert.match(
+    rendered.diagnostic,
+    new RegExp(` · ${stage} · 7f3a…$`),
+  );
+  assert.doesNotMatch(rendered.diagnostic, /unknown-stage/);
+}
 
 assert.deepEqual(
   interpretCourseUpgradeCheckoutResponse({
@@ -1116,6 +1296,7 @@ assert.deepEqual(
     markerHeader: "1",
     boundaryHeader: "route",
     requestIdHeader: fixtureRequestId,
+    stageHeader: COURSE_UPGRADE_CHECKOUT_STAGES.PAYMENT_URL,
   }),
   { kind: "redirect", paymentUrl: "https://pay.example/ok" },
 );
@@ -1128,6 +1309,26 @@ assert.equal(
     requestIdShort: "7f3a",
   }),
   "Диагностика: HTTP 503 · auth_unavailable · proxy · 7f3a…",
+);
+assert.equal(
+  formatCourseUpgradeCheckoutDiagnostic({
+    httpStatus: 500,
+    errorCode: "internal_error",
+    boundary: "route",
+    stage: COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
+    requestIdShort: "ace9",
+  }),
+  "Диагностика: HTTP 500 · internal_error · route · create_course_upgrade_order · ace9…",
+);
+assert.equal(
+  formatCourseUpgradeCheckoutDiagnostic({
+    httpStatus: 500,
+    errorCode: "internal_error",
+    boundary: "route",
+    stage: COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD,
+    requestIdShort: "ace9",
+  }),
+  "Диагностика: HTTP 500 · internal_error · route · reload_orders_row · ace9…",
 );
 
 assert.match(button, /errorView\.message/);

@@ -6,6 +6,7 @@ import {
   COURSE_UPGRADE_BOUNDARY_HEADER,
   COURSE_UPGRADE_MARKER_HEADER,
   COURSE_UPGRADE_REQUEST_ID_HEADER,
+  COURSE_UPGRADE_STAGE_HEADER,
   interpretCourseUpgradeCheckoutResponse,
 } from "@/lib/course-content/course-upgrade-client-errors";
 
@@ -64,6 +65,7 @@ export default function CourseLevelUpgradeButton({
         markerHeader: response.headers.get(COURSE_UPGRADE_MARKER_HEADER),
         boundaryHeader: response.headers.get(COURSE_UPGRADE_BOUNDARY_HEADER),
         requestIdHeader: response.headers.get(COURSE_UPGRADE_REQUEST_ID_HEADER),
+        stageHeader: response.headers.get(COURSE_UPGRADE_STAGE_HEADER),
       });
 
       if (outcome.kind === "error") {

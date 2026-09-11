@@ -9,6 +9,7 @@ import {
 } from "@/lib/course-content/course-upgrade-order-api";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
+  courseUpgradeFailureHeaders,
   courseUpgradeObservabilityHeaders,
   createCourseUpgradeRequestClient,
   createCourseUpgradeRequestId,
@@ -56,7 +57,7 @@ function fail(
     { error },
     {
       status,
-      headers: courseUpgradeObservabilityHeaders("route", requestId),
+      headers: courseUpgradeFailureHeaders("route", requestId, stage),
     },
   );
 }

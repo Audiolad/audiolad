@@ -4,6 +4,8 @@ export const COURSE_UPGRADE_MARKER_HEADER = "x-audiolad-course-upgrade";
 export const COURSE_UPGRADE_REQUEST_ID_HEADER = "x-audiolad-request-id";
 export const COURSE_UPGRADE_BOUNDARY_HEADER =
   "x-audiolad-course-upgrade-boundary";
+export const COURSE_UPGRADE_STAGE_HEADER =
+  "x-audiolad-course-upgrade-stage";
 
 export type CourseUpgradeResponseBoundary = "proxy" | "route";
 
@@ -42,6 +44,30 @@ export const COURSE_UPGRADE_CHECKOUT_STAGES = {
 
 export type CourseUpgradeCheckoutStage =
   (typeof COURSE_UPGRADE_CHECKOUT_STAGES)[keyof typeof COURSE_UPGRADE_CHECKOUT_STAGES];
+
+const COURSE_UPGRADE_CHECKOUT_STAGE_VALUES = new Set<string>(
+  Object.values(COURSE_UPGRADE_CHECKOUT_STAGES),
+);
+
+export function isCourseUpgradeCheckoutStage(
+  value: string,
+): value is CourseUpgradeCheckoutStage {
+  return COURSE_UPGRADE_CHECKOUT_STAGE_VALUES.has(value);
+}
+
+export function courseUpgradeFailureHeaders(
+  boundary: CourseUpgradeResponseBoundary,
+  requestId: string,
+  stage: string,
+): Record<string, string> {
+  const headers = courseUpgradeObservabilityHeaders(boundary, requestId);
+
+  if (isCourseUpgradeCheckoutStage(stage)) {
+    headers[COURSE_UPGRADE_STAGE_HEADER] = stage;
+  }
+
+  return headers;
+}
 
 export function logCourseUpgradeFailure(input: {
   stage: string;
