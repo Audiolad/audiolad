@@ -28,7 +28,7 @@ function testCentralizedCopy() {
   assert.equal(SIGNUP_PASSWORD_HINT, "Минимум 8 символов.");
   assert.equal(
     EMAIL_FIELD_HINT,
-    "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно указать и другой email.",
+    "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно использовать и другой поддерживаемый почтовый сервис.",
   );
   assert.equal(PASSWORD_MIN_LENGTH, 8);
 }
