@@ -1,5 +1,27 @@
 export const COURSE_UPGRADE_CHECKOUT_PATH = "/api/checkout/course-upgrade";
 
+export const COURSE_UPGRADE_MARKER_HEADER = "x-audiolad-course-upgrade";
+export const COURSE_UPGRADE_REQUEST_ID_HEADER = "x-audiolad-request-id";
+export const COURSE_UPGRADE_BOUNDARY_HEADER =
+  "x-audiolad-course-upgrade-boundary";
+
+export type CourseUpgradeResponseBoundary = "proxy" | "route";
+
+export function createCourseUpgradeRequestId(): string {
+  return crypto.randomUUID();
+}
+
+export function courseUpgradeObservabilityHeaders(
+  boundary: CourseUpgradeResponseBoundary,
+  requestId: string,
+): Record<string, string> {
+  return {
+    [COURSE_UPGRADE_MARKER_HEADER]: "1",
+    [COURSE_UPGRADE_REQUEST_ID_HEADER]: requestId,
+    [COURSE_UPGRADE_BOUNDARY_HEADER]: boundary,
+  };
+}
+
 export const COURSE_UPGRADE_CHECKOUT_STAGES = {
   PROXY_AUTH: "proxy_auth",
   CREATE_REQUEST_CLIENT: "create_request_client",

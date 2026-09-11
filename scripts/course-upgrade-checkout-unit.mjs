@@ -28,9 +28,13 @@ import {
 } from "../src/lib/course-content/course-upgrade-order-api.ts";
 import {
   COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR,
+  COURSE_UPGRADE_BOUNDARY_HEADER,
   COURSE_UPGRADE_GENERIC_ERROR,
+  COURSE_UPGRADE_MARKER_HEADER,
   COURSE_UPGRADE_NETWORK_ERROR,
+  COURSE_UPGRADE_REQUEST_ID_HEADER,
   COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR,
+  formatCourseUpgradeCheckoutDiagnostic,
   interpretCourseUpgradeCheckoutResponse,
   mapCourseUpgradeClientError,
   resolveCourseUpgradeUiError,
@@ -38,7 +42,9 @@ import {
 import {
   COURSE_UPGRADE_CHECKOUT_PATH,
   COURSE_UPGRADE_CHECKOUT_STAGES,
+  courseUpgradeObservabilityHeaders,
   createCourseUpgradeRequestClient,
+  createCourseUpgradeRequestId,
   logCourseUpgradeFailure,
   readCourseUpgradeRequestUser,
   runCourseUpgradeProtectedUpdateSession,
@@ -409,8 +415,11 @@ assert.match(
   read("src/lib/course-content/course-upgrade-stages.ts"),
   /FAILED_STAGE/,
 );
-assert.match(button, /resolveCourseUpgradeUiError/);
+assert.match(button, /errorView\.diagnostic/);
 assert.match(button, /interpretCourseUpgradeCheckoutResponse/);
+assert.match(button, /COURSE_UPGRADE_MARKER_HEADER/);
+assert.match(button, /COURSE_UPGRADE_BOUNDARY_HEADER/);
+assert.match(button, /COURSE_UPGRADE_REQUEST_ID_HEADER/);
 assert.match(startPay, /decidePendingTochkaPayment/);
 assert.match(startPay, /provider_checkout_failed/);
 assert.doesNotMatch(startPay, /tochka_recreate_failed/);
@@ -602,6 +611,11 @@ const proxySource = read("src/proxy.ts");
 assert.match(proxySource, /runCourseUpgradeProtectedUpdateSession/);
 assert.match(proxySource, /auth_unavailable/);
 assert.match(proxySource, /NextResponse\.json/);
+assert.match(proxySource, /courseUpgradeObservabilityHeaders/);
+assert.match(proxySource, /"proxy"/);
+assert.match(route, /courseUpgradeObservabilityHeaders/);
+assert.match(route, /createCourseUpgradeRequestId/);
+assert.match(route, /"route"/);
 assert.match(
   proxySource,
   /return updateSession\(request, \{ rewritePathname: SCHOOL_SITE_PATH \}\)/,
@@ -619,7 +633,7 @@ assert.match(route, /createCourseUpgradeRequestClient/);
 assert.match(route, /readCourseUpgradeRequestUser/);
 assert.match(route, /CREATE_REQUEST_CLIENT|create_request_client/);
 assert.match(route, /AUTHENTICATE_USER|authenticate_user/);
-assert.match(route, /COURSE_UPGRADE_CHECKOUT_STAGES\.AUTH, "unauthorized"/);
+assert.match(route, /COURSE_UPGRADE_CHECKOUT_STAGES\.AUTH,\s*"unauthorized"/);
 assert.match(route, /logCourseUpgradeAuthError/);
 assert.doesNotMatch(route, /authError\.message/);
 assert.doesNotMatch(route, /console\.error\(\s*"course_upgrade_auth_error"\s*,\s*authError/);
@@ -724,12 +738,14 @@ NextResponse.next = (...args) => {
   return originalNext.apply(NextResponse, args);
 };
 
+let proxyCheckoutThrow;
+
 try {
   setProxyUpdateSessionForTests(async () => {
     throw new Error(PROXY_THROWN_SECRET);
   });
 
-  const proxyCheckoutThrow = await captureConsoleErrorAsync(() =>
+  proxyCheckoutThrow = await captureConsoleErrorAsync(() =>
     proxy(mainSiteRequest(COURSE_UPGRADE_CHECKOUT_PATH)),
   );
   assert.equal(proxyCheckoutThrow.result.status, 503);
@@ -939,5 +955,183 @@ assert.doesNotMatch(
   routeAuthLogs,
   /supabase-auth-raw-SECRET_JWT|listener@example\.com/,
 );
+
+const REQUEST_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function assertCourseUpgradeObservability(response, boundary) {
+  assert.equal(response.headers.get(COURSE_UPGRADE_MARKER_HEADER), "1");
+  assert.equal(
+    response.headers.get(COURSE_UPGRADE_BOUNDARY_HEADER),
+    boundary,
+  );
+  assert.match(
+    response.headers.get(COURSE_UPGRADE_REQUEST_ID_HEADER) ?? "",
+    REQUEST_ID_RE,
+  );
+}
+
+assert.equal(COURSE_UPGRADE_MARKER_HEADER, "x-audiolad-course-upgrade");
+assert.equal(COURSE_UPGRADE_REQUEST_ID_HEADER, "x-audiolad-request-id");
+assert.equal(
+  COURSE_UPGRADE_BOUNDARY_HEADER,
+  "x-audiolad-course-upgrade-boundary",
+);
+assert.match(createCourseUpgradeRequestId(), REQUEST_ID_RE);
+assert.deepEqual(courseUpgradeObservabilityHeaders("route", "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa"), {
+  "x-audiolad-course-upgrade": "1",
+  "x-audiolad-request-id": "7f3a9c2e-1111-4111-8111-aaaaaaaaaaaa",
+  "x-audiolad-course-upgrade-boundary": "route",
+});
+
+assert.ok(proxyCheckoutThrow, "proxy fail-closed response must be captured");
+assertCourseUpgradeObservability(proxyCheckoutThrow.result, "proxy");
+assertCourseUpgradeObservability(routeClientThrow.result, "route");
+assertCourseUpgradeObservability(routeGetUserThrow.result, "route");
+assertCourseUpgradeObservability(routeUnauthorized.result, "route");
+assertCourseUpgradeObservability(routeAuthError.result, "route");
+assert.equal(routeClientThrow.result.status, 503);
+assert.equal(routeAuthError.result.status, 500);
+
+const routeAuthDiagnostic = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: routeAuthError.result.status,
+  body: { error: "internal_error" },
+  markerHeader: routeAuthError.result.headers.get(COURSE_UPGRADE_MARKER_HEADER),
+  boundaryHeader: routeAuthError.result.headers.get(
+    COURSE_UPGRADE_BOUNDARY_HEADER,
+  ),
+  requestIdHeader: routeAuthError.result.headers.get(
+    COURSE_UPGRADE_REQUEST_ID_HEADER,
+  ),
+});
+assert.equal(routeAuthDiagnostic.kind, "error");
+assert.equal(routeAuthDiagnostic.message, COURSE_UPGRADE_GENERIC_ERROR);
+assert.match(
+  routeAuthDiagnostic.diagnostic,
+  /^Диагностика: HTTP 500 · internal_error · route · [0-9a-f]{4}…$/,
+);
+assert.doesNotMatch(
+  routeAuthDiagnostic.diagnostic,
+  /SECRET_JWT|listener@example\.com|supabase-auth-raw/,
+);
+
+const proxyAuthDiagnostic = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 503,
+  body: { error: "auth_unavailable" },
+  markerHeader: proxyCheckoutThrow.result.headers.get(
+    COURSE_UPGRADE_MARKER_HEADER,
+  ),
+  boundaryHeader: proxyCheckoutThrow.result.headers.get(
+    COURSE_UPGRADE_BOUNDARY_HEADER,
+  ),
+  requestIdHeader: proxyCheckoutThrow.result.headers.get(
+    COURSE_UPGRADE_REQUEST_ID_HEADER,
+  ),
+});
+assert.equal(proxyAuthDiagnostic.message, COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR);
+assert.match(
+  proxyAuthDiagnostic.diagnostic,
+  /^Диагностика: HTTP 503 · auth_unavailable · proxy · [0-9a-f]{4}…$/,
+);
+
+const fixtureRequestId = "7f3a9c2e-4111-4111-8111-aaaaaaaaaaaa";
+const internalDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 500,
+  body: { error: "internal_error" },
+  markerHeader: "1",
+  boundaryHeader: "route",
+  requestIdHeader: fixtureRequestId,
+});
+assert.equal(internalDiag.kind, "error");
+assert.equal(internalDiag.message, COURSE_UPGRADE_GENERIC_ERROR);
+assert.equal(
+  internalDiag.diagnostic,
+  "Диагностика: HTTP 500 · internal_error · route · 7f3a…",
+);
+
+const proxyDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 503,
+  body: { error: "auth_unavailable" },
+  markerHeader: "1",
+  boundaryHeader: "proxy",
+  requestIdHeader: fixtureRequestId,
+});
+assert.equal(proxyDiag.message, COURSE_UPGRADE_AUTH_UNAVAILABLE_ERROR);
+assert.equal(
+  proxyDiag.diagnostic,
+  "Диагностика: HTTP 503 · auth_unavailable · proxy · 7f3a…",
+);
+
+const malformedDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 502,
+  body: "<html>Bearer SECRET_JWT</html>",
+  unexpectedResponse: true,
+});
+assert.equal(malformedDiag.kind, "error");
+assert.equal(malformedDiag.message, COURSE_UPGRADE_UNEXPECTED_RESPONSE_ERROR);
+assert.equal(
+  malformedDiag.diagnostic,
+  "Диагностика: HTTP 502 · non_json · no-marker",
+);
+assert.doesNotMatch(malformedDiag.diagnostic, /SECRET_JWT|html|Bearer/);
+
+const leakedDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 500,
+  body: {
+    error: "Bearer SECRET_JWT stack at route.ts:99 listener@example.com",
+  },
+  markerHeader: "1",
+  boundaryHeader: "route",
+  requestIdHeader: fixtureRequestId,
+});
+assert.equal(leakedDiag.message, COURSE_UPGRADE_GENERIC_ERROR);
+assert.equal(
+  leakedDiag.diagnostic,
+  "Диагностика: HTTP 500 · unknown · route · 7f3a…",
+);
+assert.doesNotMatch(
+  leakedDiag.diagnostic,
+  /SECRET_JWT|Bearer|route\.ts|listener@example\.com/,
+);
+
+const injectedHeaderDiag = interpretCourseUpgradeCheckoutResponse({
+  httpStatus: 502,
+  unexpectedResponse: true,
+  markerHeader: "1",
+  boundaryHeader: "Authorization: Bearer SECRET_JWT",
+  requestIdHeader: "not-a-uuid SECRET_JWT",
+});
+assert.equal(
+  injectedHeaderDiag.diagnostic,
+  "Диагностика: HTTP 502 · non_json · marked",
+);
+assert.doesNotMatch(injectedHeaderDiag.diagnostic, /SECRET_JWT|Bearer/);
+
+assert.deepEqual(
+  interpretCourseUpgradeCheckoutResponse({
+    httpStatus: 201,
+    body: {
+      payment: { payment_url: "https://pay.example/ok" },
+    },
+    markerHeader: "1",
+    boundaryHeader: "route",
+    requestIdHeader: fixtureRequestId,
+  }),
+  { kind: "redirect", paymentUrl: "https://pay.example/ok" },
+);
+
+assert.equal(
+  formatCourseUpgradeCheckoutDiagnostic({
+    httpStatus: 503,
+    errorCode: "auth_unavailable",
+    boundary: "proxy",
+    requestIdShort: "7f3a",
+  }),
+  "Диагностика: HTTP 503 · auth_unavailable · proxy · 7f3a…",
+);
+
+assert.match(button, /errorView\.message/);
+assert.match(button, /window\.location\.assign\(outcome\.paymentUrl\)/);
+assert.doesNotMatch(button, /authError\.message|SECRET_JWT|Authorization/);
 
 console.log("course-upgrade-checkout-unit: ok");

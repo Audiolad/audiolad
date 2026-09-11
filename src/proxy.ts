@@ -7,7 +7,11 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
-import { runCourseUpgradeProtectedUpdateSession } from "@/lib/course-content/course-upgrade-stages";
+import {
+  createCourseUpgradeRequestId,
+  courseUpgradeObservabilityHeaders,
+  runCourseUpgradeProtectedUpdateSession,
+} from "@/lib/course-content/course-upgrade-stages";
 import { updateSession } from "@/lib/supabase/proxy";
 
 type UpdateSessionFn = typeof updateSession;
@@ -46,7 +50,16 @@ export async function proxy(request: NextRequest) {
     pathname,
     updateSession: () => updateSessionImpl(request),
     failClosed: () =>
-      NextResponse.json({ error: "auth_unavailable" }, { status: 503 }),
+      NextResponse.json(
+        { error: "auth_unavailable" },
+        {
+          status: 503,
+          headers: courseUpgradeObservabilityHeaders(
+            "proxy",
+            createCourseUpgradeRequestId(),
+          ),
+        },
+      ),
   });
 }
 

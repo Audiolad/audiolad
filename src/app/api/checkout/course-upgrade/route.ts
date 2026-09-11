@@ -9,7 +9,9 @@ import {
 } from "@/lib/course-content/course-upgrade-order-api";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
+  courseUpgradeObservabilityHeaders,
   createCourseUpgradeRequestClient,
+  createCourseUpgradeRequestId,
   logCourseUpgradeAuthError,
   logCourseUpgradeFailure,
   readCourseUpgradeRequestUser,
@@ -32,6 +34,7 @@ export function setCourseUpgradeCreateClientForTests(
 }
 
 function fail(
+  requestId: string,
   stage: string,
   error: string,
   status: number,
@@ -49,16 +52,24 @@ function fail(
     practiceId: extra?.practiceId,
     targetAccessLevel: extra?.targetAccessLevel,
   });
-  return NextResponse.json({ error }, { status });
+  return NextResponse.json(
+    { error },
+    {
+      status,
+      headers: courseUpgradeObservabilityHeaders("route", requestId),
+    },
+  );
 }
 
 export async function POST(request: Request) {
+  const requestId = createCourseUpgradeRequestId();
   const created = await createCourseUpgradeRequestClient(() =>
     createClientFromRequestImpl(request),
   );
 
   if (!created.ok) {
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_REQUEST_CLIENT,
       created.error,
       created.status,
@@ -72,6 +83,7 @@ export async function POST(request: Request) {
 
   if (!authenticated.ok) {
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.AUTHENTICATE_USER,
       authenticated.error,
       authenticated.status,
@@ -81,7 +93,12 @@ export async function POST(request: Request) {
   const { user, authError } = authenticated;
 
   if (!user) {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "unauthorized", 401);
+    return fail(
+      requestId,
+      COURSE_UPGRADE_CHECKOUT_STAGES.AUTH,
+      "unauthorized",
+      401,
+    );
   }
 
   if (authError) {
@@ -90,7 +107,12 @@ export async function POST(request: Request) {
       error: "internal_error",
       status: 500,
     });
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.AUTH, "internal_error", 500);
+    return fail(
+      requestId,
+      COURSE_UPGRADE_CHECKOUT_STAGES.AUTH,
+      "internal_error",
+      500,
+    );
   }
 
   let body: unknown;
@@ -98,19 +120,29 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400);
+    return fail(
+      requestId,
+      COURSE_UPGRADE_CHECKOUT_STAGES.PARSE,
+      "invalid_request",
+      400,
+    );
   }
 
   const parsedBody = parseJsonObject(body);
 
   if (!parsedBody) {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400);
+    return fail(
+      requestId,
+      COURSE_UPGRADE_CHECKOUT_STAGES.PARSE,
+      "invalid_request",
+      400,
+    );
   }
 
   const parsed = parseCourseUpgradeRequest(parsedBody);
 
   if (!parsed.ok) {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, parsed.error, 400, {
+    return fail(requestId, COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, parsed.error, 400, {
       practiceId: typeof parsedBody.practiceId === "string" ? parsedBody.practiceId : null,
     });
   }
@@ -120,7 +152,7 @@ export async function POST(request: Request) {
   const customerEmail = user.email?.trim() ?? "";
 
   if (!customerEmail) {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
+    return fail(requestId, COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
       practiceId,
       targetAccessLevel,
     });
@@ -131,7 +163,7 @@ export async function POST(request: Request) {
   );
 
   if (typeof idempotencyKey !== "string") {
-    return fail(COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
+    return fail(requestId, COURSE_UPGRADE_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
       practiceId,
       targetAccessLevel,
     });
@@ -146,6 +178,7 @@ export async function POST(request: Request) {
   if (error) {
     const mapped = mapCourseUpgradeRpcError(error.message);
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.CREATE_ORDER,
       mapped.error,
       mapped.status,
@@ -160,6 +193,7 @@ export async function POST(request: Request) {
   if (!orderRow) {
     console.error("course_upgrade_order_invalid_row");
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.COERCE,
       "internal_error",
       500,
@@ -173,6 +207,7 @@ export async function POST(request: Request) {
     serviceRoleClient = createServiceRoleClient();
   } catch {
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.START_TOCHKA,
       "payments_not_configured",
       503,
@@ -195,6 +230,7 @@ export async function POST(request: Request) {
   if (payableError || !payable) {
     console.error("course_upgrade_order_reload_error", payableError?.message);
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.RELOAD,
       "internal_error",
       500,
@@ -214,7 +250,7 @@ export async function POST(request: Request) {
   });
 
   if (!started.ok) {
-    return fail(started.stage, started.error, started.status, {
+    return fail(requestId, started.stage, started.error, started.status, {
       orderId: orderRow.order_id,
       practiceId,
       targetAccessLevel: orderRow.target_access_level,
@@ -225,6 +261,7 @@ export async function POST(request: Request) {
 
   if (!paymentUrl) {
     return fail(
+      requestId,
       COURSE_UPGRADE_CHECKOUT_STAGES.PAYMENT_URL,
       "provider_checkout_failed",
       502,
@@ -242,6 +279,9 @@ export async function POST(request: Request) {
       paymentId: started.body.payment.id,
       paymentUrl,
     }),
-    { status: started.status === 201 ? 201 : 200 },
+    {
+      status: started.status === 201 ? 201 : 200,
+      headers: courseUpgradeObservabilityHeaders("route", requestId),
+    },
   );
 }
