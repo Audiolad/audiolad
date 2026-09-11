@@ -429,11 +429,9 @@ function testRouteFiles() {
   const aiMusicHubEntry = STATIC_SITEMAP_PAGES.find(
     (page) => page.path === "/kak-zarabatyvat-na-ii-muzyke-v-audiolad",
   );
-  assert(aiMusicHubEntry, "AI music hub included in static sitemap pages");
   assert(
-    aiMusicHubEntry.changeFrequency === "monthly" &&
-      aiMusicHubEntry.priority === 0.7,
-    "AI music hub sitemap uses monthly / 0.7",
+    !aiMusicHubEntry,
+    "temporary production-test: AI music hub excluded from sitemap",
   );
 }
 

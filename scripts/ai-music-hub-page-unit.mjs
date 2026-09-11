@@ -64,7 +64,7 @@ function testMetadata() {
   );
   assert.equal(metadata.openGraph?.type, "article");
   assert.equal(metadata.twitter?.card, "summary");
-  assert.equal(metadata.robots?.index, true);
+  assert.equal(metadata.robots?.index, false);
   assert.equal(metadata.robots?.follow, true);
   assert.equal(
     AI_MUSIC_HUB_PAGE_H1,
@@ -277,9 +277,11 @@ function testNavigationAndSitemap() {
   const sitemapEntry = STATIC_SITEMAP_PAGES.find(
     (page) => page.path === AI_MUSIC_HUB_PATH,
   );
-  assert.ok(sitemapEntry, "sitemap includes AI music hub");
-  assert.equal(sitemapEntry.changeFrequency, "monthly");
-  assert.equal(sitemapEntry.priority, 0.7);
+  assert.equal(
+    sitemapEntry,
+    undefined,
+    "temporary production-test: AI music hub is excluded from sitemap",
+  );
 }
 
 testMetadata();
