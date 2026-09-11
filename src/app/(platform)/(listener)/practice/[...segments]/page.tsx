@@ -56,6 +56,7 @@ import {
   resolveLegacyPracticePath,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
+import { getAuthorBySlug } from "@/lib/authors/lookup";
 import {
   buildListenPath,
   buildPracticeCanonicalUrl,
@@ -122,6 +123,7 @@ import {
   getAuthorDataClient,
   peekAuthorExecutionContext,
 } from "@/lib/author-support/context";
+import { canUseAuthorSupportDataForRoute } from "@/lib/author-support/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -332,10 +334,18 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const { authorSlug, productSlug } = route;
   const supabase = await createClient();
   const execution = await peekAuthorExecutionContext();
-  // The data client is elevated only after the server has validated the
-  // HttpOnly support session. Scope is checked against the resolved product
-  // below before any private content is rendered.
-  const productDataClient = execution?.isSupportMode
+  // Resolve the public route author with the ordinary client first. This
+  // prevents a valid session for author X from elevating a lookup for Y.
+  const routeAuthor = execution?.isSupportMode
+    ? await getAuthorBySlug(supabase, authorSlug)
+    : { author: null, error: false };
+  const supportRouteScope = canUseAuthorSupportDataForRoute({
+    isSupportMode: execution?.isSupportMode === true,
+    actingAuthorId: execution?.actingAuthorId ?? null,
+    routeAuthorId: routeAuthor.author?.id ?? null,
+  });
+  // A second ownership check against the resolved product remains below.
+  const productDataClient = execution && supportRouteScope
     ? await getAuthorDataClient(execution, supabase)
     : supabase;
   const { practice, error } = await getPracticeByAuthorAndSlug(
@@ -371,6 +381,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   }
 
   const supportOwnsPractice =
+    supportRouteScope &&
     execution?.isSupportMode === true &&
     execution.actingAuthorId === practice.author_id;
   if (supportOwnsPractice) {

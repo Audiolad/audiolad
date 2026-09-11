@@ -18,6 +18,7 @@ import {
   AUTHOR_SUPPORT_TTL_SECONDS,
   assertSupportAuthorScope,
   buildAuthorSupportCookieOptions,
+  canUseAuthorSupportDataForRoute,
   evaluateAuthorMembersCanMutate,
   evaluateAuthorSupportSqlAuthority,
   evaluateAuthorSupportStart,
@@ -137,6 +138,38 @@ assert.equal(
     requestedAuthorId: targetAuthorId,
   }),
   true,
+);
+assert.equal(
+  canUseAuthorSupportDataForRoute({
+    isSupportMode: true,
+    actingAuthorId: targetAuthorId,
+    routeAuthorId: targetAuthorId,
+  }),
+  true,
+);
+assert.equal(
+  canUseAuthorSupportDataForRoute({
+    isSupportMode: true,
+    actingAuthorId: targetAuthorId,
+    routeAuthorId: otherAuthorId,
+  }),
+  false,
+);
+assert.equal(
+  canUseAuthorSupportDataForRoute({
+    isSupportMode: false,
+    actingAuthorId: targetAuthorId,
+    routeAuthorId: targetAuthorId,
+  }),
+  false,
+);
+assert.equal(
+  canUseAuthorSupportDataForRoute({
+    isSupportMode: true,
+    actingAuthorId: null,
+    routeAuthorId: targetAuthorId,
+  }),
+  false,
 );
 
 const activeSession = {
@@ -683,6 +716,13 @@ assert.equal(
   true,
 );
 assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/studio/projects/project-id/assets/catalog",
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
   AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.includes("/api/author/personal-materials"),
   false,
 );
@@ -725,6 +765,14 @@ assert.equal(
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/onboarding", "POST"),
+  true,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(
+    activeSupportCookie,
+    "/api/studio/projects/project-id/assets/catalog",
+    "POST",
+  ),
   true,
 );
 
@@ -883,8 +931,9 @@ function walkRoutes(dir, acc = []) {
 }
 
 const authorRoutes = walkRoutes(path.join(root, "src/app/api/author"));
+const studioRoutes = walkRoutes(path.join(root, "src/app/api/studio"));
 const mutatingRouteRe = /export async function (POST|PATCH|PUT|DELETE)/;
-for (const routePath of authorRoutes) {
+for (const routePath of [...authorRoutes, ...studioRoutes]) {
   const source = read(routePath);
   if (!mutatingRouteRe.test(source)) {
     continue;
@@ -966,6 +1015,9 @@ assert.equal(appreciationInventory?.disposition, "allowed_audited");
 const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(practicePage, /peekAuthorExecutionContext/);
 assert.match(practicePage, /getAuthorDataClient/);
+assert.match(practicePage, /getAuthorBySlug\(supabase, authorSlug\)/);
+assert.match(practicePage, /canUseAuthorSupportDataForRoute/);
+assert.match(practicePage, /execution && supportRouteScope/);
 assert.match(practicePage, /execution\.actingAuthorId === practice\.author_id/);
 assert.match(practicePage, /isAuthorMember: true/);
 

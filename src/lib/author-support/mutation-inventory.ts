@@ -291,6 +291,14 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/studio/music/acquire/route.ts"],
     },
     {
+      key: "studio_catalog_asset_attach",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: [
+        "src/app/api/studio/projects/[projectId]/assets/catalog/route.ts",
+      ],
+    },
+    {
       key: "finance_payout",
       group: "blocked",
       disposition: "blocked",
