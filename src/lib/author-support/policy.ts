@@ -14,6 +14,8 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
   "product_course_updated",
   "product_gallery_updated",
   "product_price_promotion_updated",
+  "promotion_updated",
+  "author_appreciation_settings_updated",
   "product_submitted_for_moderation",
   "product_withdrawn_from_moderation",
   "product_published",
@@ -33,6 +35,8 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
 
 export const AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES = [
   "/api/author/products",
+  "/api/author/promotion",
+  "/api/author/appreciation-settings",
   "/api/studio/projects",
   "/api/author/profile",
 ] as const;
@@ -77,6 +81,16 @@ const SENSITIVE_PATH_PREFIXES = [
   "/api/author/finance",
 ] as const;
 
+function isBlockedAuthorSupportStudioMutation(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/studio/music/") ||
+    pathname.startsWith("/api/studio/guest/") ||
+    pathname.startsWith("/api/studio/audiobooks/") ||
+    (pathname.startsWith("/api/studio/projects/") &&
+      pathname.includes("/assets/catalog"))
+  );
+}
+
 const SENSITIVE_METADATA_KEY =
   /password|token|secret|key|cookie|authorization|payload|card|account|inn|phone|bank/i;
 
@@ -111,6 +125,10 @@ export function isAuthorSupportBlockedMutation(input: {
   const mutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   if (!mutating) {
     return false;
+  }
+
+  if (isBlockedAuthorSupportStudioMutation(path)) {
+    return true;
   }
 
   if (isAuthorSupportAllowedMutationPath(path)) {
@@ -229,6 +247,27 @@ export function assertSupportAuthorScope(input: {
   requestedAuthorId: string;
 }): boolean {
   return input.actingAuthorId === input.requestedAuthorId;
+}
+
+/**
+ * Route-level guard for elevated author-support reads. The public author
+ * lookup resolves a route slug to this canonical author id before the
+ * service-role client is selected.
+ */
+export function canUseAuthorSupportDataForRoute(input: {
+  isSupportMode: boolean;
+  actingAuthorId: string | null;
+  routeAuthorId: string | null;
+}): boolean {
+  return (
+    input.isSupportMode === true &&
+    input.actingAuthorId !== null &&
+    input.routeAuthorId !== null &&
+    assertSupportAuthorScope({
+      actingAuthorId: input.actingAuthorId,
+      requestedAuthorId: input.routeAuthorId,
+    })
+  );
 }
 
 export function resolveSupportBypassCapability(input: {

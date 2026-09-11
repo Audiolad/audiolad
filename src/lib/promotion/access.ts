@@ -10,6 +10,7 @@ import type { AuthorMemberRole, AuthorWorkspace } from "@/lib/author-products/ty
 import { hasPermission } from "@/lib/auth/platform-access";
 
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 
 export async function listPromotionWorkspaces(
   userId: string,
@@ -82,7 +83,17 @@ export async function requireAuthorPromotionAccess(authorId: string) {
 export async function requireAuthorPromotionMutationAccess(authorId: string) {
   const execution = await peekAuthorExecutionContext();
   if (execution?.isSupportMode) {
-    throw new AuthorAccessError("support_mutation_blocked", 403);
+    const membership = await requireAuthorMutationMembership(authorId);
+    await recordAuthorSupportAudit({
+      action: "promotion_updated",
+      resourceType: "author",
+      resourceId: authorId,
+      metadata: { gate: "requireAuthorPromotionMutationAccess" },
+    });
+    return {
+      ...membership,
+      isPlatformAdmin: false,
+    };
   }
 
   const { supabase, user } = await requireAuthenticatedUser();
@@ -106,7 +117,12 @@ export async function requireAuthorPromotionMutationAccess(authorId: string) {
 }
 
 export async function requirePromotionCampaignAccess(campaignId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const execution = await peekAuthorExecutionContext();
+  const { getAuthorDataClient } = await import("@/lib/author-support/context");
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: campaign, error } = await supabase
     .from("promotion_campaigns")
@@ -149,7 +165,12 @@ export async function requirePromotionCampaignAccess(campaignId: string) {
 }
 
 export async function requirePromotionCampaignMutationAccess(campaignId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const execution = await peekAuthorExecutionContext();
+  const { getAuthorDataClient } = await import("@/lib/author-support/context");
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: campaign, error } = await supabase
     .from("promotion_campaigns")

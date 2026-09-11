@@ -20,6 +20,7 @@ export const AUTHOR_SUPPORT_RPC_WRAPPERS = {
     "lookup_practice_visibility_user_with_support_proof",
   search_practice_visibility_users:
     "search_practice_visibility_users_with_support_proof",
+  set_practice_topics: "set_practice_topics_with_support_proof",
 } as const;
 
 export type AuthorSupportRpcName = keyof typeof AUTHOR_SUPPORT_RPC_WRAPPERS;

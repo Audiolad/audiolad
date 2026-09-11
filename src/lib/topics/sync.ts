@@ -38,10 +38,15 @@ export async function setPracticeTopics(
     ),
   ].sort();
 
-  const { data, error } = await supabase.rpc("set_practice_topics", {
-    p_practice_id: practiceId,
-    p_topic_keys: normalizedKeys,
-  });
+  const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "set_practice_topics",
+    {
+      p_practice_id: practiceId,
+      p_topic_keys: normalizedKeys,
+    },
+  );
 
   if (error) {
     const mapped = mapTopicRpcError(error.message);
