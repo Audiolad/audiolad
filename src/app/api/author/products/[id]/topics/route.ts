@@ -15,6 +15,7 @@ import {
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { setPracticeTopics } from "@/lib/topics/sync";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -82,6 +83,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         { status: syncResult.status },
       );
     }
+
+    await recordAuthorSupportAudit({
+      action: "product_topics_updated",
+      resourceType: "practice",
+      resourceId: id,
+      metadata: { topic_count: syncResult.result.topic_count },
+    });
 
     const topics = await loadAuthorProductTopicFormData(
       supabase,

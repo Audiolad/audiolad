@@ -46,7 +46,14 @@ export const QUICK_OFFER_DETAIL_SELECT = `
 `;
 
 export async function requireQuickOfferAccess(offerId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const { peekAuthorExecutionContext, getAuthorDataClient } = await import(
+    "@/lib/author-support/context"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: offer, error } = await supabase
     .from("quick_offers")
@@ -69,7 +76,14 @@ export async function requireQuickOfferAccess(offerId: string) {
 }
 
 export async function requireQuickOfferMutationAccess(offerId: string) {
-  const { supabase, user } = await requireAuthenticatedUser();
+  const { supabase: userSupabase, user } = await requireAuthenticatedUser();
+  const { peekAuthorExecutionContext, getAuthorDataClient } = await import(
+    "@/lib/author-support/context"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const supabase = execution
+    ? await getAuthorDataClient(execution, userSupabase)
+    : userSupabase;
 
   const { data: offer, error } = await supabase
     .from("quick_offers")

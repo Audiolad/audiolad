@@ -21,6 +21,10 @@ const actorBypass = readFileSync(
   join(root, "supabase/migrations/20260819120000_actor_bypass_product_moderation.sql"),
   "utf8",
 );
+const supportTopics = readFileSync(
+  join(root, "supabase/migrations/20261005121000_author_support_topics.sql"),
+  "utf8",
+);
 
 assert.match(visibility, /ADD COLUMN IF NOT EXISTS catalog_visibility text/);
 assert.match(visibility, /selected_users/);
@@ -31,6 +35,14 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(support, /DROP FUNCTION IF EXISTS public\.sync_practice_catalog_visibility/);
 assert.doesNotMatch(support, /DROP TABLE .*practice_visibility_users/);
+
+assert.match(supportTopics, /CREATE OR REPLACE FUNCTION public\.set_practice_topics/);
+assert.match(supportTopics, /public\.author_members_can_mutate\(v_practice\.author_id\)/);
+assert.match(
+  supportTopics,
+  /CREATE OR REPLACE FUNCTION public\.set_practice_topics_with_support_proof/,
+);
+assert.match(supportTopics, /public\.set_author_support_session_proof\(p_token_hash\)/);
 
 assert.match(actorBypass, /audiolad:actor-bypass-product-moderation:v1/);
 assert.match(actorBypass, /audiolad:publish-audio-product:v10/);

@@ -81,6 +81,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/products/[id]/course/lessons/[lessonId]/blocks/[blockId]/route.ts",
         "src/app/api/author/products/[id]/course/files/[fileId]/route.ts",
         "src/app/api/author/products/[id]/course/completion-cta/route.ts",
+        "src/app/api/author/products/[id]/course/access-levels/route.ts",
+        "src/app/api/author/products/[id]/course/access-levels/[level]/route.ts",
+        "src/app/api/author/products/[id]/course/storefront-preview/route.ts",
       ],
     },
     {
@@ -102,6 +105,16 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: [
         "src/app/api/author/products/[id]/visibility-users/route.ts",
         "src/app/api/author/products/[id]/visibility-users/lookup/route.ts",
+      ],
+    },
+    {
+      key: "product_access_links",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: [
+        "src/app/api/author/products/[id]/access-links/route.ts",
+        "src/app/api/author/products/[id]/access-links/[linkId]/revoke/route.ts",
       ],
     },
     {
@@ -181,6 +194,13 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/profile/contact-icon/route.ts",
         "src/app/api/author/profile/banner-position/route.ts",
       ],
+    },
+    {
+      key: "author_appreciation_settings",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_appreciation_settings_updated",
+      routePatterns: ["src/app/api/author/appreciation-settings/route.ts"],
     },
     {
       key: "studio_project_create",
@@ -265,6 +285,20 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "studio_music_acquire",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: ["src/app/api/studio/music/acquire/route.ts"],
+    },
+    {
+      key: "studio_catalog_asset_attach",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: [
+        "src/app/api/studio/projects/[projectId]/assets/catalog/route.ts",
+      ],
+    },
+    {
       key: "finance_payout",
       group: "blocked",
       disposition: "blocked",
@@ -303,8 +337,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "promotion_module",
-      group: "blocked",
-      disposition: "blocked",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "promotion_updated",
       routePatterns: [
         "src/app/api/author/promotion/pages/route.ts",
         "src/app/api/author/promotion/pages/[id]/route.ts",
