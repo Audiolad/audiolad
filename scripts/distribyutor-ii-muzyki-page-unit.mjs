@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   DISTRIBYUTOR_II_MUZYKI_FAQ,
+  DISTRIBYUTOR_II_MUZYKI_HUB_HREF,
   DISTRIBYUTOR_II_MUZYKI_PAGE_H1,
   DISTRIBYUTOR_II_MUZYKI_PATH,
   DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
@@ -20,6 +21,7 @@ const view = readFileSync("src/components/distribyutor-ii-muzyki/DistribyutorIiM
 const page = readFileSync("src/app/(platform)/(listener)/distribyutor-ii-muzyki/page.tsx", "utf8");
 const sitemapSource = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
 const contentSource = readFileSync("src/lib/seo/distribyutor-ii-muzyki/content.ts", "utf8");
+const introCta = readFileSync("src/components/ai-music/AiMusicIntroCta.tsx", "utf8");
 const metadata = buildDistribyutorIiMuzykiMetadata();
 assert.equal(metadata.title, DISTRIBYUTOR_II_MUZYKI_SEO_TITLE);
 assert.equal(metadata.description, DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION);
@@ -30,6 +32,16 @@ assert.equal(metadata.robots?.follow, true);
 assert.equal(DISTRIBYUTOR_II_MUZYKI_PAGE_H1, DISTRIBYUTOR_II_MUZYKI_SEO_TITLE);
 assert.match(view, /DISTRIBYUTOR_II_MUZYKI_PAGE_H1/);
 assert.equal((view.match(/DISTRIBYUTOR_II_MUZYKI_HUB_LABEL/g) ?? []).length >= 2, true);
+assert.match(view, /AiMusicIntroCta/);
+assert.match(introCta, /Посмотрите, как устроен АудиоЛад/);
+assert.match(introCta, /href="\/"/);
+assert.match(introCta, /href="\/become-author"/);
+assert.match(introCta, /flex-col gap-3 sm:flex-row/);
+assert.match(introCta, /overflow-hidden/);
+assert.equal(
+  DISTRIBYUTOR_II_MUZYKI_HUB_HREF,
+  "/kak-zarabatyvat-na-ii-muzyke-v-audiolad",
+);
 assert.equal((view.match(/<Visual number=/g) ?? []).length, 4);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(view.includes("♫"), false, "visuals must not use music-note emoji");
