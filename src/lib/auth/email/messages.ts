@@ -3,7 +3,7 @@ import type { EmailValidationErrorCode } from "./types";
 export const SIGNUP_EMAIL_LABEL = "Email";
 
 export const EMAIL_FIELD_HINT =
-  "Для регистрации используйте Яндекс Почту или Mail.ru.";
+  "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно указать и другой email.";
 
 export const SIGNUP_PASSWORD_LABEL = "Придумайте пароль";
 

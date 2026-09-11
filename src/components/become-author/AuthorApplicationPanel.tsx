@@ -15,6 +15,7 @@ import {
   trackPlatformEvent,
 } from "@/lib/analytics/client";
 import { submitAuthorApplication } from "@/app/(platform)/become-author/actions";
+import { EMAIL_FIELD_HINT } from "@/lib/auth/email";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   clearAuthorApplicationDraft,
@@ -318,10 +319,20 @@ function AuthorApplicationForm({
               patchValues({ contactEmail: event.currentTarget.value })
             }
             aria-invalid={Boolean(errors.contactEmail)}
-            aria-describedby={errors.contactEmail ? "contactEmail-error" : undefined}
+            aria-describedby={
+              errors.contactEmail
+                ? "contactEmail-hint contactEmail-error"
+                : "contactEmail-hint"
+            }
             className={becomeAuthorInputClass}
             disabled={isPending}
           />
+          <p
+            id="contactEmail-hint"
+            className="mt-2 text-xs leading-5 text-[#8a7ca9]"
+          >
+            {EMAIL_FIELD_HINT}
+          </p>
           <FieldError id="contactEmail-error" message={errors.contactEmail} />
         </div>
 
