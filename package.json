@@ -138,6 +138,7 @@
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
     "test:become-author-page-order": "node scripts/become-author-page-order-unit.mjs",
     "test:ai-music-hub": "npx tsx scripts/ai-music-hub-page-unit.mjs",
+    "test:distribyutor-ii-muzyki": "npx tsx scripts/distribyutor-ii-muzyki-page-unit.mjs",
     "test:author-contacts": "npx tsx scripts/author-contacts-unit.mjs && node scripts/author-contacts-sql-unit.mjs",
     "test:quick-offers": "npx tsx scripts/quick-offers-unit.mjs",
     "test:retired-meditation-solutions-landing": "npx tsx scripts/retired-meditation-solutions-landing-unit.mts",

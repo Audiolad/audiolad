@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import {
+  DISTRIBYUTOR_II_MUZYKI_FAQ,
+  DISTRIBYUTOR_II_MUZYKI_HUB_LABEL,
+  DISTRIBYUTOR_II_MUZYKI_PAGE_H1,
+  DISTRIBYUTOR_II_MUZYKI_PATH,
+  DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
+  DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
+} from "../src/lib/seo/distribyutor-ii-muzyki/content.ts";
+import { buildAiMusicHubPageJsonLd } from "../src/lib/seo/json-ld/index.ts";
+import { isBottomNavNeutralPathname } from "../src/lib/navigation/bottom-nav.ts";
+import {
+  buildDistribyutorIiMuzykiMetadata,
+  buildSiteCanonicalUrl,
+} from "../src/lib/seo/public-page-metadata.ts";
+
+const view = readFileSync("src/components/distribyutor-ii-muzyki/DistribyutorIiMuzykiPageView.tsx", "utf8");
+const page = readFileSync("src/app/(platform)/(listener)/distribyutor-ii-muzyki/page.tsx", "utf8");
+const sitemapSource = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
+const contentSource = readFileSync("src/lib/seo/distribyutor-ii-muzyki/content.ts", "utf8");
+const metadata = buildDistribyutorIiMuzykiMetadata();
+assert.equal(metadata.title, DISTRIBYUTOR_II_MUZYKI_SEO_TITLE);
+assert.equal(metadata.description, DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION);
+assert.equal(metadata.alternates?.canonical, buildSiteCanonicalUrl(DISTRIBYUTOR_II_MUZYKI_PATH));
+assert.equal(metadata.alternates?.canonical, "https://audiolad.ru/distribyutor-ii-muzyki");
+assert.equal(metadata.robots?.index, true);
+assert.equal(metadata.robots?.follow, true);
+assert.equal(DISTRIBYUTOR_II_MUZYKI_PAGE_H1, DISTRIBYUTOR_II_MUZYKI_SEO_TITLE);
+assert.match(view, /DISTRIBYUTOR_II_MUZYKI_PAGE_H1/);
+assert.equal((view.match(/DISTRIBYUTOR_II_MUZYKI_HUB_LABEL/g) ?? []).length >= 2, true);
+assert.equal((view.match(/<Visual number=/g) ?? []).length, 4);
+assert.equal(view.includes("—"), false, "Russian content must use medium dash");
+assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
+assert.match(contentSource, /Дистрибьютор ИИ-музыки/);
+assert.equal(DISTRIBYUTOR_II_MUZYKI_FAQ.length, 8);
+assert.match(view, /ArticleFaqList/);
+assert.match(page, /buildAiMusicHubPageJsonLd/);
+const graph = buildAiMusicHubPageJsonLd({ title: DISTRIBYUTOR_II_MUZYKI_PAGE_H1, description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION, path: DISTRIBYUTOR_II_MUZYKI_PATH, faq: DISTRIBYUTOR_II_MUZYKI_FAQ }, "https://audiolad.ru")["@graph"];
+assert.deepEqual(graph.map((node) => node["@type"]).filter((type) => ["WebPage", "Article", "BreadcrumbList", "FAQPage"].includes(type)), ["WebPage", "Article", "BreadcrumbList", "FAQPage"]);
+assert.equal(isBottomNavNeutralPathname(DISTRIBYUTOR_II_MUZYKI_PATH), true);
+assert.match(sitemapSource, /path: "\/distribyutor-ii-muzyki", changeFrequency: "monthly", priority: 0.7/);
+console.log("distribyutor-ii-muzyki-page-unit: ok");

@@ -15,6 +15,11 @@ import {
   AI_MUSIC_HUB_SEO_TITLE,
 } from "@/lib/seo/ai-music-hub/content";
 import {
+  DISTRIBYUTOR_II_MUZYKI_PATH,
+  DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
+  DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
+} from "@/lib/seo/distribyutor-ii-muzyki/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -246,6 +251,30 @@ export function buildAiMusicHubMetadata(): Metadata {
       card: "summary",
       title: AI_MUSIC_HUB_SEO_TITLE,
       description: AI_MUSIC_HUB_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildDistribyutorIiMuzykiMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(DISTRIBYUTOR_II_MUZYKI_PATH);
+
+  return {
+    title: DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
+    description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
+      description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
+      description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
     },
   };
 }
