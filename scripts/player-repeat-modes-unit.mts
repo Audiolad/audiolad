@@ -361,16 +361,63 @@ function testUiSurfaces() {
   assert.equal(REPEAT_MODE_ARIA_LABELS.one, "Повтор трека");
   assert.match(button, /showOne=\{repeatMode === "one"\}/);
   assert.match(button, /data-repeat-mode=\{repeatMode\}/);
+  assert.match(
+    button,
+    /event\.stopPropagation\(\)/,
+    "shared button stops bubbling so mini Repeat does not open the full player",
+  );
   assert.doesNotMatch(button, /lucide|from "react-icons"/);
 
   assert.match(desktop, /<RepeatModeButton/);
   assert.match(mobile, /<RepeatModeButton/);
   assert.match(bar, /<RepeatModeButton/);
+  assert.match(mini, /<RepeatModeButton/);
   assert.match(desktop, /cycleRepeatMode/);
   assert.match(mobile, /cycleRepeatMode/);
   assert.match(bar, /cycleRepeatMode/);
+  assert.match(mini, /cycleRepeatMode/);
 
-  assert.doesNotMatch(mini, /RepeatModeButton|cycleRepeatMode/);
+  assert.match(
+    mini,
+    /useGlobalAudioPlayer\(\)/,
+    "mini reads the shared player hook",
+  );
+  assert.match(
+    mini,
+    /repeatMode,\s*cycleRepeatMode/,
+    "mini inherits canonical repeatMode + cycleRepeatMode",
+  );
+  assert.match(
+    mini,
+    /from "@\/components\/audio\/RepeatModeButton"/,
+    "mini uses the shared RepeatModeButton",
+  );
+  assert.match(
+    mini,
+    /onCycle=\{cycleRepeatMode\}/,
+    "mini cycles through the provider SoT",
+  );
+  assert.match(
+    mini,
+    /repeatMode=\{repeatMode\}/,
+    "mini renders the provider repeatMode",
+  );
+  assert.doesNotMatch(
+    mini,
+    /useState|localStorage|readStoredRepeatMode|writeStoredRepeatMode|PLAYER_REPEAT_MODE_STORAGE_KEY|nextRepeatMode|resolveNaturalEndedRepeatAction/,
+    "mini must not own a second repeat SoT",
+  );
+  assert.doesNotMatch(
+    mini,
+    /function RepeatIcon|function RepeatModeButton/,
+    "mini must not duplicate the Repeat control",
+  );
+  assert.doesNotMatch(
+    sliceBetween(mini, "<RepeatModeButton", "/>"),
+    /hidden/,
+    "Repeat stays available on narrow mini widths",
+  );
+
   assert.doesNotMatch(nowPlaying, /RepeatModeButton|cycleRepeatMode/);
   assert.doesNotMatch(personal, /RepeatModeButton|cycleRepeatMode|repeatMode/);
   assert.doesNotMatch(studio, /RepeatModeButton|cycleRepeatMode|repeatMode/);
