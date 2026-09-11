@@ -3,6 +3,7 @@ import {
   buildCourseLearnerFilePath,
   buildCourseLearnerFileReturnHref,
 } from "@/lib/course-content/learner-file-http";
+import { COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS } from "@/lib/course-content/learner-pdf-layout";
 
 import CourseLearnerPdfPages from "./CourseLearnerPdfPages";
 
@@ -54,9 +55,12 @@ export default function CourseLearnerFileViewer({
     <section
       data-course-learner-file-viewer="ready"
       data-file-id={fileId}
-      className="mx-auto flex w-full min-h-[70vh] min-w-0 max-w-5xl flex-col overflow-x-clip pb-8 pt-4"
+      className={`mx-auto flex w-full min-h-[70vh] min-w-0 max-w-5xl flex-col pb-8 pt-4 ${COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS}`}
     >
-      <div className="sticky top-0 z-20 min-w-0 max-w-full border-b border-[#eadff8] bg-[#f7f4fb]/95 py-3 backdrop-blur">
+      <div
+        data-course-learner-file-viewer-header="true"
+        className="sticky top-0 z-20 min-w-0 max-w-full border-b border-[#eadff8] bg-[#f7f4fb]/95 py-3 backdrop-blur"
+      >
         <CourseLearnerFileViewerBack href={returnHref} />
         <h1 className="mt-3 min-w-0 break-all text-[18px] font-semibold leading-6 text-[#25135c] [overflow-wrap:anywhere]">
           {filename}
