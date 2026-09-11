@@ -216,6 +216,7 @@ export default function GlobalMiniPlayer() {
               variant="onDark"
               repeatMode={repeatMode}
               onCycle={cycleRepeatMode}
+              iconVariant="compact"
               className="h-8 w-8 min-h-8 min-w-8 shrink-0 px-0"
             />
             {queueMode ? (
