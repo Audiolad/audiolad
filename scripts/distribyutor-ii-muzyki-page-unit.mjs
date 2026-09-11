@@ -33,9 +33,30 @@ assert.match(view, /DISTRIBYUTOR_II_MUZYKI_PAGE_H1/);
 assert.equal((view.match(/DISTRIBYUTOR_II_MUZYKI_HUB_LABEL/g) ?? []).length >= 2, true);
 assert.equal((view.match(/<Visual number=/g) ?? []).length, 4);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
+assert.equal(view.includes("♫"), false, "visuals must not use music-note emoji");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
 assert.match(contentSource, /Дистрибьютор ИИ-музыки/);
 assert.equal(DISTRIBYUTOR_II_MUZYKI_FAQ.length, 8);
+assert.deepEqual(
+  DISTRIBYUTOR_II_MUZYKI_FAQ.map((item) => item.question),
+  [
+    "Что такое дистрибьютор ИИ-музыки?",
+    "Какие музыкальные дистрибьюторы существуют?",
+    "Можно ли загрузить ИИ-музыку через DistroKid?",
+    "Можно ли загрузить музыку из Suno на стриминговые сервисы?",
+    "Обязательно ли делать один трек на 30 или 60 минут?",
+    "Где можно продавать музыку, созданную ИИ?",
+    "Нужно ли создавать целый альбом?",
+    "Можно ли размещать одну и ту же музыку на разных площадках?",
+  ],
+);
+for (const destination of [
+  "Яндекс Музыка",
+  "VK Музыка",
+  "Spotify",
+  "Apple Music",
+  "YouTube Music",
+]) assert.match(view, new RegExp(destination));
 assert.match(view, /ArticleFaqList/);
 assert.match(page, /buildAiMusicHubPageJsonLd/);
 const graph = buildAiMusicHubPageJsonLd({ title: DISTRIBYUTOR_II_MUZYKI_PAGE_H1, description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION, path: DISTRIBYUTOR_II_MUZYKI_PATH, faq: DISTRIBYUTOR_II_MUZYKI_FAQ }, "https://audiolad.ru")["@graph"];
