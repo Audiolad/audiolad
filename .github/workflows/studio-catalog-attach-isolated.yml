@@ -1,0 +1,54 @@
+name: Studio Catalog Attach Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-catalog-attach-isolated.yml"
+      - "scripts/studio-catalog-attach-sql-unit.mjs"
+      - "scripts/studio-catalog-attach-unit.mts"
+      - "scripts/lib/studio-catalog-attach-sql-stub.sql"
+      - "scripts/lib/studio-music-license-sql-stub.sql"
+      - "src/lib/studio/server/catalog-assets.ts"
+      - "supabase/migrations/20261003120000_studio_music_entitlements.sql"
+      - "supabase/migrations/20261004120000_studio_catalog_project_assets.sql"
+      - "supabase/migrations/20261004120100_studio_catalog_attach_asset_id.sql"
+      - "supabase/tests/studio_catalog_attach_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  studio-catalog-attach-isolated:
+    name: Studio Catalog Attach Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_studio_catalog_attach_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_studio_catalog_attach_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_studio_catalog_attach_isolated
+      - name: Execute attach_studio_catalog_project_asset
+        env:
+          AUDIOLAD_STUDIO_CATALOG_ATTACH_ISOLATED: "1"
+          AUDIOLAD_STUDIO_CATALOG_ATTACH_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_studio_catalog_attach_isolated
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:studio-catalog-attach:isolated

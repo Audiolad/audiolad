@@ -318,6 +318,20 @@ assert.match(catalogServer, /Range/);
 assert.match(catalogServer, /upstream\.body/);
 assert.doesNotMatch(catalogServer, /user_practices/);
 assert.match(catalogServer, /studioCatalogStreamPath/);
+assert.match(catalogServer, /studio_catalog_attach_error/);
+assert.match(catalogServer, /error\.code/);
+assert.match(catalogServer, /error\.details/);
+assert.match(catalogServer, /error\.hint/);
+assert.match(catalogServer, /internal_error/);
+
+const hotfixSql = read(
+  "supabase/migrations/20261004120100_studio_catalog_attach_asset_id.sql",
+);
+assert.match(hotfixSql, /INSERT INTO public\.studio_project_assets \(\s*id,/);
+assert.match(hotfixSql, /gen_random_uuid\(\)/);
+assert.doesNotMatch(hotfixSql, /ALTER COLUMN id SET DEFAULT/);
+assert.doesNotMatch(hotfixSql, /FROM public\.user_practices/);
+assert.doesNotMatch(hotfixSql, /JOIN public\.user_practices/);
 
 const signedPlayback = read("src/lib/studio/server/signed-playback.ts");
 assert.match(signedPlayback, /createStudioCatalogPlaybackDescriptor/);

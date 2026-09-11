@@ -408,6 +408,15 @@ fresh entitlement/author check. Render of an active catalog track is
 rejected until PR5 (`catalog_music_render_not_available`). Existing
 upload/recording rows stay valid.
 
+PR4.1 (hotfix, additive function replace only):
+Migration `20261004120100_studio_catalog_attach_asset_id.sql`.
+`studio_project_assets.id` stays `uuid PRIMARY KEY` with **no column
+default** (applied in `20260809150000`; upload/recording still pass a
+client UUID). `attach_studio_catalog_project_asset` now INSERTs
+`id = gen_random_uuid()`. Same signature and access rules as PR4.
+No table-level DEFAULT. No Storage copy. `project_data` stays
+schemaVersion 2.
+
 **Storage:** private bucket `publication-files` (не `personal-materials`,
 не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
 Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из

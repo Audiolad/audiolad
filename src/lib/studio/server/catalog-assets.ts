@@ -38,7 +38,12 @@ type CatalogAudioItemRow = {
   audio_path: string | null;
 };
 
-function mapAttachError(error: { message?: string; code?: string }): never {
+function mapAttachError(error: {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}): never {
   const message = (error.message ?? "").toLowerCase();
   if (message.includes("catalog_music_forbidden")) {
     throw new StudioApiError("catalog_music_forbidden", 403);
@@ -52,7 +57,12 @@ function mapAttachError(error: { message?: string; code?: string }): never {
   if (message.includes("invalid_asset") || message.includes("invalid_audio")) {
     throw new StudioApiError("invalid_asset", 422);
   }
-  console.error("studio_catalog_attach_error", error.message);
+  console.error("studio_catalog_attach_error", {
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+  });
   throw new StudioApiError("internal_error", 500);
 }
 
