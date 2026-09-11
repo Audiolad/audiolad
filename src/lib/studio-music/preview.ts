@@ -91,7 +91,7 @@ export type StudioMusicPreviewStore = {
   }): Promise<{ bytes: Uint8Array; startMs: number; endMs: number }>;
   streamFullAudio(input: {
     audioItem: StudioMusicPreviewAudioItem;
-    rangeHeader: string | null;
+    rangeHeader: string;
   }): Promise<Response>;
 };
 
