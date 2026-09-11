@@ -83,6 +83,7 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/products/[id]/course/completion-cta/route.ts",
         "src/app/api/author/products/[id]/course/access-levels/route.ts",
         "src/app/api/author/products/[id]/course/access-levels/[level]/route.ts",
+        "src/app/api/author/products/[id]/course/storefront-preview/route.ts",
       ],
     },
     {
