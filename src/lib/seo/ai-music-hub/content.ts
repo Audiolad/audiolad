@@ -166,7 +166,7 @@ export type AiMusicHubScreenshot = {
 export const AI_MUSIC_HUB_SCREENSHOTS: readonly AiMusicHubScreenshot[] = [
   {
     id: "home",
-    src: "/images/ai-music-hub/home.webp",
+    src: "/images/ai-music-hub/home-20260911.webp",
     alt: "Главная страница АудиоЛада",
     caption:
       "АудиоЛад – платформа, где люди находят музыку, медитации и другие аудиопродукты.",
@@ -175,7 +175,7 @@ export const AI_MUSIC_HUB_SCREENSHOTS: readonly AiMusicHubScreenshot[] = [
   },
   {
     id: "product",
-    src: "/images/ai-music-hub/product.webp",
+    src: "/images/ai-music-hub/product-20260911.webp",
     alt: "Страница музыкального трека на АудиоЛаде",
     caption:
       "Ваш трек или альбом становится самостоятельным музыкальным продуктом со своей страницей.",
@@ -193,7 +193,7 @@ export const AI_MUSIC_HUB_SCREENSHOTS: readonly AiMusicHubScreenshot[] = [
   },
   {
     id: "author",
-    src: "/images/ai-music-hub/author.webp",
+    src: "/images/ai-music-hub/author-20260911.webp",
     alt: "Страница автора с несколькими музыкальными публикациями",
     caption:
       "Каждая новая работа становится ещё одним продуктом в вашем музыкальном каталоге.",
