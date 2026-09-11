@@ -113,6 +113,8 @@ export default function BecomeAuthorHeader({
   );
 }
 
+export const AUTHOR_APPLICATION_PANEL_ID = "author-application-panel";
+
 export function BecomeAuthorHero() {
   return (
     <section className="mt-6 rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)] lg:p-6">
@@ -130,6 +132,27 @@ export function BecomeAuthorHero() {
         оформлять продукты, собирать аудиторию и подключать продажи.
       </p>
     </section>
+  );
+}
+
+export function BecomeAuthorTopCta({
+  audience,
+}: {
+  audience: BecomeAuthorAudience;
+}) {
+  if (audience === "author") {
+    return null;
+  }
+
+  return (
+    <div className="mt-5">
+      <a
+        href={`#${AUTHOR_APPLICATION_PANEL_ID}`}
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] lg:w-auto"
+      >
+        Стать автором
+      </a>
+    </div>
   );
 }
 
