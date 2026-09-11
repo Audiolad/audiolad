@@ -59,8 +59,12 @@ function RepeatIcon({
 }
 
 const VARIANT_CLASS = {
-  onDark:
-    "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-white/20 px-2.5 text-white/90 transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+  onDark: {
+    default:
+      "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-white/20 px-2.5 text-white/90 transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+    compact:
+      "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-white/20 px-0 text-white/90 transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+  },
   onLight:
     "inline-flex h-10 w-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]",
 } as const;
@@ -79,6 +83,10 @@ export default function RepeatModeButton({
   className?: string;
 }) {
   const active = repeatMode !== "off";
+  const variantClass =
+    variant === "onDark"
+      ? VARIANT_CLASS.onDark[iconVariant]
+      : VARIANT_CLASS.onLight;
 
   return (
     <button
@@ -87,7 +95,7 @@ export default function RepeatModeButton({
       aria-label={REPEAT_MODE_ARIA_LABELS[repeatMode]}
       aria-pressed={active}
       data-repeat-mode={repeatMode}
-      className={`${VARIANT_CLASS[variant]} ${
+      className={`${variantClass} ${
         active
           ? variant === "onDark"
             ? "bg-white/20 text-white"
@@ -98,7 +106,7 @@ export default function RepeatModeButton({
       } ${className}`}
     >
       <RepeatIcon
-        className={iconVariant === "compact" ? "h-7 w-7" : undefined}
+        className={iconVariant === "compact" ? "h-7 w-7 shrink-0" : undefined}
         showOne={repeatMode === "one"}
         compact={iconVariant === "compact"}
       />
