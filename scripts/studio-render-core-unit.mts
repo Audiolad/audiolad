@@ -237,7 +237,12 @@ async function main() {
     sourceProject.project_data.tracks[0].name = "mutated source";
     sourceAssets[0].storage_path = "mutated-source.wav";
     assert.equal(snapshot.tracks[0].clips[0].offset, 0.25, "snapshot must not retain source clip references");
-    assert.equal(snapshot.assets[0].storagePath, "voice.wav", "snapshot must not retain source asset references");
+    const firstSnapshotAsset = snapshot.assets[0];
+    assert.equal(firstSnapshotAsset.sourceType, "upload");
+    if (firstSnapshotAsset.sourceType === "upload" || firstSnapshotAsset.sourceType === "recording") {
+      assert.equal(firstSnapshotAsset.storagePath, "voice.wav", "snapshot must not retain source asset references");
+    }
+    assert.equal(snapshot.project.schemaVersion, 2);
     assert.equal(snapshot.assets.length, 2, "snapshot must not retain unreferenced project assets");
     assert.equal(buildStudioRenderTimeline(snapshot).durationSeconds, 2.25);
     assert.throws(() => createStudioRenderSnapshot({
@@ -882,6 +887,67 @@ async function main() {
       Math.round(1.8 * RATE),
     );
     assert(midPeak > 0.1, "voice+music region must have signal");
+
+    const catalogMusicId = "33333333-3333-4333-8333-333333333333";
+    const catalogPracticeId = "44444444-4444-4444-8444-444444444444";
+    const catalogAudioItemId = "55555555-5555-4555-8555-555555555555";
+    const catalogProject = project("none", 1, false);
+    catalogProject.project_data.tracks[1].assetId = catalogMusicId;
+    const catalogSnapshot = createStudioRenderSnapshot({
+      project: catalogProject,
+      expectedRevision: 7,
+      assets: [
+        asset(ASSET_VOICE, "voice.wav"),
+        {
+          id: catalogMusicId,
+          project_id: "project",
+          storage_path: null,
+          original_name: "dawn.mp3",
+          mime_type: "audio/mpeg",
+          size_bytes: 0,
+          duration_seconds: 3,
+          source_type: "catalog" as const,
+          catalog_practice_id: catalogPracticeId,
+          catalog_audio_item_id: catalogAudioItemId,
+          catalog_access_user_id: "principal-user",
+          created_at: "2026-01-01T00:00:00Z",
+          deleted_at: null,
+        },
+      ],
+    });
+    assert.equal(catalogSnapshot.project.schemaVersion, 2);
+    const catalogAsset = catalogSnapshot.assets.find((item) => item.id === catalogMusicId);
+    assert.ok(catalogAsset);
+    assert.equal(catalogAsset.sourceType, "catalog");
+    if (catalogAsset.sourceType === "catalog") {
+      assert.equal(catalogAsset.practiceId, catalogPracticeId);
+      assert.equal(catalogAsset.audioItemId, catalogAudioItemId);
+      assert.equal("storagePath" in catalogAsset, false);
+      assert.equal("audio_path" in catalogAsset, false);
+      assert.equal("catalogAccessUserId" in catalogAsset, false);
+    }
+    const catalogJson = JSON.stringify(catalogSnapshot);
+    assert.doesNotMatch(catalogJson, /audio_path/);
+    assert.doesNotMatch(catalogJson, /catalog_access_user_id/);
+    assert.doesNotMatch(catalogJson, /signedUrl|practice-audio/);
+    const catalogMix = await renderFixturePcm(
+      root,
+      "catalog-mix",
+      catalogSnapshot,
+      new Map([[ASSET_VOICE, voicePath], [catalogMusicId, musicPath]]),
+    );
+    assert.equal(catalogMix.result.expectedDurationSeconds, 2);
+    assert(
+      sampleRangePeak(catalogMix.samples, Math.round(0.2 * RATE), Math.round(1.8 * RATE)) > 0.1,
+      "voice + catalog music mix must have signal",
+    );
+    const catalogGraph = buildStudioRenderFilterGraph({
+      snapshot: catalogSnapshot,
+      localAssetPaths: new Map([[ASSET_VOICE, voicePath], [catalogMusicId, musicPath]]),
+    });
+    assert.match(catalogGraph.filterComplex, /apad,atrim=duration=/);
+    assert.doesNotMatch(catalogGraph.filterComplex, /practice-audio|audio_item|supabase/i);
+    assert.equal(new StudioRenderDurationError(2, 1).code, "render_duration_mismatch");
 
     // One asset → one clip still works (single -i).
     const singleClipGraph = buildStudioRenderFilterGraph({

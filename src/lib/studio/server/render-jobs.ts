@@ -12,10 +12,13 @@ import {
   type StudioDownloadableJob,
 } from "../guest-policy";
 import { getGuestSession } from "./guest-session";
-import { CATALOG_MUSIC_RENDER_NOT_AVAILABLE, projectHasActiveCatalogMusic } from "../catalog-asset";
 import { listStudioAssets, getStudioProject } from "./repository";
 import { StudioApiError } from "./validation";
 import { parseStudioProjectData } from "./validation";
+import {
+  authorizeCatalogAssetsForStudioRender,
+  tryGetAuthenticatedUserId,
+} from "./catalog-render";
 import {
   createStudioRenderSnapshot,
   StudioRenderSnapshotError,
@@ -40,17 +43,15 @@ export async function createStudioRenderJob(projectId: string): Promise<StudioRe
   const project = await getStudioProject(projectId);
   parseStudioProjectData(project.project_data);
   const assets = await listStudioAssets(projectId);
-  if (
-    projectHasActiveCatalogMusic({
-      tracks: project.project_data.tracks,
-      assets: assets.map((asset) => ({
-        id: asset.id,
-        source_type: asset.source_type,
-      })),
-    })
-  ) {
-    throw new StudioApiError(CATALOG_MUSIC_RENDER_NOT_AVAILABLE, 422);
-  }
+  const service = createServiceRoleClient();
+  await authorizeCatalogAssetsForStudioRender({
+    service,
+    projectId: project.id,
+    currentUserId: await tryGetAuthenticatedUserId(),
+    hasProjectAccess: true,
+    tracks: project.project_data.tracks,
+    assets,
+  });
   let snapshot;
   try {
     snapshot = createStudioRenderSnapshot({
@@ -68,7 +69,6 @@ export async function createStudioRenderJob(projectId: string): Promise<StudioRe
     throw new StudioApiError("no_active_tracks", 422);
   }
 
-  const service = createServiceRoleClient();
   if (project.guest_session_id) {
     const session = await getGuestSession();
     if (!session || session.id !== project.guest_session_id) {

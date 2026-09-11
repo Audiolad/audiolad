@@ -1,0 +1,57 @@
+name: Studio Catalog Render FFmpeg
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-catalog-render-ffmpeg.yml"
+      - "package.json"
+      - "scripts/studio-catalog-music-render-unit.mts"
+      - "src/lib/studio/catalog-asset.ts"
+      - "src/lib/studio/persistence-client.ts"
+      - "src/lib/studio/render/catalog-source.ts"
+      - "src/lib/studio/render/ffmpeg.ts"
+      - "src/lib/studio/render/render.ts"
+      - "src/lib/studio/render/snapshot.ts"
+      - "src/lib/studio/render/timeline.ts"
+      - "src/lib/studio/render/types.ts"
+      - "src/lib/studio/render/worker-runtime.ts"
+      - "src/lib/studio/server/catalog-render.ts"
+      - "src/lib/studio/server/model.ts"
+      - "src/lib/studio/server/render-jobs.ts"
+      - "src/lib/studio/server/repository.ts"
+      - "src/components/studio/StudioEditorShell.tsx"
+      - "supabase/migrations/20261004120200_studio_catalog_render_principal.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  studio-catalog-render-ffmpeg:
+    name: Studio Catalog Render FFmpeg
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install ffmpeg
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Print ffmpeg and ffprobe versions
+        run: |
+          set -euo pipefail
+          ffmpeg -version
+          ffprobe -version
+      - name: Install dependencies
+        run: npm ci
+      - name: Run catalog music render with required ffmpeg
+        env:
+          AUDIOLAD_REQUIRE_FFMPEG: "1"
+        run: |
+          set -euo pipefail
+          AUDIOLAD_REQUIRE_FFMPEG=1 npm run test:studio-catalog-music-render

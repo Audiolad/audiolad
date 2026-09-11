@@ -13,13 +13,18 @@ import {
   resolveStudioMusicCatalogAction,
 } from "../src/lib/studio-music/catalog-actions";
 import {
+  CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
   CATALOG_MUSIC_RENDER_GUARD_MESSAGE,
   CATALOG_MUSIC_RENDER_NOT_AVAILABLE,
+  CATALOG_MUSIC_UNAVAILABLE,
   CATALOG_MUSIC_UNAVAILABLE_MESSAGE,
   authorizeStudioCatalogAttachRefs,
   authorizeStudioCatalogUse,
+  canAdoptCatalogAccessPrincipal,
+  evaluateLiveCatalogRenderAccess,
   isSameCatalogSelection,
   parseHttpByteRange,
+  projectCatalogMusicExportUnavailable,
   projectHasActiveCatalogMusic,
   projectTracksBlockCatalogRender,
   resolveActiveCatalogMusicSelection,
@@ -27,6 +32,7 @@ import {
   studioCatalogAssetDtoContainsForbiddenFields,
   studioCatalogPartialContentHeaders,
   studioCatalogStreamPath,
+  studioRenderSnapshotContainsForbiddenCatalogFields,
 } from "../src/lib/studio/catalog-asset";
 import {
   serializeStudioProjectState,
@@ -186,6 +192,116 @@ assert.equal(
   ]),
   false,
 );
+assert.equal(
+  projectCatalogMusicExportUnavailable([
+    { sourceType: "catalog", clips: [{ id: "c" }], status: "ready" },
+  ]),
+  false,
+);
+assert.equal(
+  projectCatalogMusicExportUnavailable([
+    { sourceType: "catalog", clips: [{ id: "c" }], status: "error", available: false },
+  ]),
+  true,
+);
+assert.equal(
+  projectCatalogMusicExportUnavailable([
+    { sourceType: "upload", clips: [{ id: "c" }], status: "ready" },
+  ]),
+  false,
+);
+
+assert.equal(
+  canAdoptCatalogAccessPrincipal({
+    catalogAccessUserId: null,
+    currentUserId: "user-1",
+    hasProjectAccess: true,
+    canUseMusicInStudio: true,
+  }),
+  true,
+);
+assert.equal(
+  canAdoptCatalogAccessPrincipal({
+    catalogAccessUserId: "already-set",
+    currentUserId: "user-2",
+    hasProjectAccess: true,
+    canUseMusicInStudio: true,
+  }),
+  false,
+);
+assert.equal(
+  canAdoptCatalogAccessPrincipal({
+    catalogAccessUserId: null,
+    currentUserId: "user-1",
+    hasProjectAccess: true,
+    canUseMusicInStudio: false,
+  }),
+  false,
+);
+
+const liveOk = evaluateLiveCatalogRenderAccess({
+  jobProjectId: PROJECT_ID,
+  snapshotAssetId: ASSET_ID,
+  snapshotPracticeId: PRACTICE_ID,
+  snapshotAudioItemId: AUDIO_ID,
+  live: {
+    id: ASSET_ID,
+    project_id: PROJECT_ID,
+    source_type: "catalog",
+    deleted_at: null,
+    catalog_practice_id: PRACTICE_ID,
+    catalog_audio_item_id: AUDIO_ID,
+    catalog_access_user_id: "user-1",
+  },
+  canUseMusicInStudio: true,
+  audioItem: { id: AUDIO_ID, practice_id: PRACTICE_ID, audio_path: "music/dawn.mp3" },
+  requireAudioPath: true,
+});
+assert.equal(liveOk.ok, true);
+if (liveOk.ok) {
+  assert.equal(liveOk.audioPath, "music/dawn.mp3");
+}
+assert.deepEqual(
+  evaluateLiveCatalogRenderAccess({
+    jobProjectId: PROJECT_ID,
+    snapshotAssetId: ASSET_ID,
+    snapshotPracticeId: PRACTICE_ID,
+    snapshotAudioItemId: AUDIO_ID,
+    live: {
+      id: ASSET_ID,
+      project_id: PROJECT_ID,
+      source_type: "catalog",
+      deleted_at: null,
+      catalog_practice_id: PRACTICE_ID,
+      catalog_audio_item_id: AUDIO_ID,
+      catalog_access_user_id: "user-1",
+    },
+    canUseMusicInStudio: false,
+    requireAudioPath: false,
+  }),
+  { ok: false, code: CATALOG_MUSIC_UNAVAILABLE },
+);
+assert.deepEqual(
+  evaluateLiveCatalogRenderAccess({
+    jobProjectId: PROJECT_ID,
+    snapshotAssetId: ASSET_ID,
+    snapshotPracticeId: PRACTICE_ID,
+    snapshotAudioItemId: AUDIO_ID,
+    live: {
+      id: ASSET_ID,
+      project_id: PROJECT_ID,
+      source_type: "catalog",
+      deleted_at: null,
+      catalog_practice_id: PRACTICE_ID,
+      catalog_audio_item_id: AUDIO_ID,
+      catalog_access_user_id: "user-1",
+    },
+    canUseMusicInStudio: true,
+    audioItem: { id: AUDIO_ID, practice_id: PRACTICE_ID, audio_path: "" },
+    requireAudioPath: true,
+  }),
+  { ok: false, code: CATALOG_MUSIC_UNAVAILABLE },
+);
 
 assert.equal(
   isSameCatalogSelection({
@@ -290,6 +406,11 @@ assert.equal(
   "Экспорт с музыкой из каталога пока недоступен",
 );
 assert.equal(CATALOG_MUSIC_UNAVAILABLE_MESSAGE, "Музыка из каталога недоступна.");
+assert.equal(
+  CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
+  "Музыка из каталога больше недоступна для экспорта.",
+);
+assert.equal(CATALOG_MUSIC_UNAVAILABLE, "catalog_music_unavailable");
 
 const model = read("src/lib/studio/server/model.ts");
 assert.match(model, /source_type === "catalog"/);
@@ -297,6 +418,11 @@ assert.match(model, /catalogPracticeId/);
 assert.match(model, /peaks: asset\.source_type === "catalog" \? null/);
 assert.doesNotMatch(model, /dto\.storage_path/);
 assert.doesNotMatch(model, /storagePath:/);
+assert.doesNotMatch(model, /catalogAccessUserId/);
+assert.doesNotMatch(model, /dto\.catalog_access_user_id/);
+
+const repository = read("src/lib/studio/server/repository.ts");
+assert.match(repository, /catalog_access_user_id/);
 
 const attachRoute = read("src/app/api/studio/projects/[projectId]/assets/catalog/route.ts");
 assert.match(attachRoute, /practiceId/);
@@ -324,6 +450,17 @@ assert.match(catalogServer, /error\.details/);
 assert.match(catalogServer, /error\.hint/);
 assert.match(catalogServer, /internal_error/);
 
+const workerRuntime = read("src/lib/studio/render/worker-runtime.ts");
+assert.match(workerRuntime, /materializeCatalogRenderSource/);
+assert.match(workerRuntime, /assertCatalogRenderAccessStillValid/);
+assert.doesNotMatch(workerRuntime, /user_practices/);
+assert.doesNotMatch(workerRuntime, /from\(assetsBucket\).*catalog/);
+const catalogSource = read("src/lib/studio/render/catalog-source.ts");
+assert.match(catalogSource, /practice-audio/);
+assert.match(catalogSource, /can_use_music_in_studio/);
+assert.doesNotMatch(catalogSource, /user_practices/);
+assert.doesNotMatch(catalogSource, /studio-draft-assets/);
+
 const hotfixSql = read(
   "supabase/migrations/20261004120100_studio_catalog_attach_asset_id.sql",
 );
@@ -338,16 +475,22 @@ assert.match(signedPlayback, /createStudioCatalogPlaybackDescriptor/);
 assert.match(signedPlayback, /source_type === "catalog"/);
 
 const renderJobs = read("src/lib/studio/server/render-jobs.ts");
-assert.match(renderJobs, /CATALOG_MUSIC_RENDER_NOT_AVAILABLE/);
-assert.match(renderJobs, /projectHasActiveCatalogMusic/);
-assert.match(
+assert.match(renderJobs, /authorizeCatalogAssetsForStudioRender/);
+assert.match(renderJobs, /tryGetAuthenticatedUserId/);
+assert.doesNotMatch(renderJobs, /CATALOG_MUSIC_RENDER_NOT_AVAILABLE/);
+assert.doesNotMatch(renderJobs, /projectHasActiveCatalogMusic/);
+assert.doesNotMatch(
   renderJobs,
   /throw new StudioApiError\(CATALOG_MUSIC_RENDER_NOT_AVAILABLE, 422\)/,
 );
 
 const snapshot = read("src/lib/studio/render/snapshot.ts");
-assert.match(snapshot, /asset\.source_type === "catalog"/);
-assert.match(snapshot, /!asset\.storage_path/);
+assert.match(snapshot, /source_type === "catalog"/);
+assert.match(snapshot, /practiceId: asset\.catalog_practice_id/);
+assert.match(snapshot, /audioItemId: asset\.catalog_audio_item_id/);
+assert.doesNotMatch(snapshot, /catalogAccessUserId:/);
+assert.doesNotMatch(snapshot, /audio_path:/);
+assert.doesNotMatch(snapshot, /audioPath:/);
 
 const provider = read("src/components/studio/StudioAudioProvider.tsx");
 assert.match(provider, /ingestCatalogAsset/);
@@ -359,11 +502,48 @@ const shell = read("src/components/studio/StudioEditorShell.tsx");
 assert.match(shell, /attachStudioCatalogAsset/);
 assert.match(shell, /ingestCatalogAsset/);
 assert.match(shell, /serializeStudioProjectState/);
-assert.match(shell, /CATALOG_MUSIC_RENDER_GUARD_MESSAGE/);
+assert.match(shell, /CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE/);
+assert.match(shell, /projectCatalogMusicExportUnavailable/);
+assert.doesNotMatch(shell, /CATALOG_MUSIC_RENDER_GUARD_MESSAGE/);
+assert.doesNotMatch(shell, /projectTracksBlockCatalogRender/);
+
+assert.equal(
+  studioRenderSnapshotContainsForbiddenCatalogFields({
+    sourceType: "catalog",
+    practiceId: PRACTICE_ID,
+    audioItemId: AUDIO_ID,
+    audio_path: "secret.mp3",
+  }),
+  true,
+);
+assert.equal(
+  studioRenderSnapshotContainsForbiddenCatalogFields({
+    sourceType: "catalog",
+    practiceId: PRACTICE_ID,
+    audioItemId: AUDIO_ID,
+    mimeType: "audio/mpeg",
+    durationSeconds: 12,
+  }),
+  false,
+);
+
+const pr5Sql = read("supabase/migrations/20261004120200_studio_catalog_render_principal.sql");
+assert.match(pr5Sql, /catalog_access_user_id/);
+assert.match(pr5Sql, /p_user_id/);
+assert.doesNotMatch(pr5Sql, /FROM public\.user_practices/);
+
+const ffmpegWorkflow = read(".github/workflows/studio-catalog-render-ffmpeg.yml");
+assert.match(ffmpegWorkflow, /name: Studio Catalog Render FFmpeg/);
+assert.match(ffmpegWorkflow, /AUDIOLAD_REQUIRE_FFMPEG: "1"/);
+assert.match(ffmpegWorkflow, /sudo apt-get install -y ffmpeg/);
+assert.match(ffmpegWorkflow, /ffmpeg -version/);
+assert.match(ffmpegWorkflow, /ffprobe -version/);
+assert.match(ffmpegWorkflow, /npm run test:studio-catalog-music-render/);
 
 const client = read("src/lib/studio/persistence-client.ts");
 assert.match(client, /attachStudioCatalogAsset/);
-assert.match(client, /catalog_music_render_not_available/);
+assert.match(client, /catalog_music_unavailable/);
+assert.match(client, /больше недоступна для экспорта/);
 assert.match(client, /"storage_path" in record/);
 
 const preview = read("src/lib/studio-music/preview.ts");
