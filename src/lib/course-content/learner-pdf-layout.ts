@@ -6,6 +6,30 @@ export const COURSE_LEARNER_PDF_RETRY_LABEL = "Повторить";
 
 export const COURSE_LEARNER_PDF_RENDER_WINDOW = 2;
 
+/**
+ * Listener mobile body cap in `ListenerAppShell` (`max-w-[430px]` below `lg`).
+ * Do not change that global default for the whole site — PDF pages break out
+ * of it with CSS full-bleed instead.
+ */
+export const COURSE_LEARNER_LISTENER_SHELL_MOBILE_MAX_WIDTH_PX = 430;
+
+/** File viewer desktop cap (`max-w-5xl`). PDF must not stretch across a monitor. */
+export const COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX = 1024;
+
+/**
+ * Mobile-only breakout from the constrained listener column and practice
+ * `px-5`. Uses viewport units + centering calc so any phone width works.
+ */
+export const COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS =
+  "max-lg:ml-[calc(50%-50vw)] max-lg:mr-[calc(50%-50vw)] max-lg:w-[100vw] max-lg:max-w-[100vw]";
+
+/**
+ * Allow the PDF stack to escape the section on mobile. Keep clip on `lg+`
+ * so desktop max-width UX is unchanged.
+ */
+export const COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS =
+  "overflow-x-visible lg:overflow-x-clip";
+
 export type PdfPageSize = {
   width: number;
   height: number;
@@ -78,6 +102,28 @@ export function documentHasHorizontalOverflow(input: {
 }): boolean {
   return input.pageCssWidths.some(
     (width) => !pageWrapperFitsContainer(width, input.containerWidth),
+  );
+}
+
+export function listenerShellMobileContentWidth(viewportWidth: number): number {
+  const viewport = asPositiveNumber(viewportWidth);
+  return Math.min(viewport, COURSE_LEARNER_LISTENER_SHELL_MOBILE_MAX_WIDTH_PX);
+}
+
+/** CSS `100vw` breakout: the PDF body occupies the viewport, not the 430px shell. */
+export function mobilePdfFullBleedWidth(viewportWidth: number): number {
+  return asPositiveNumber(viewportWidth);
+}
+
+export function isMobilePdfBodyFullBleed(input: {
+  viewportWidth: number;
+  pdfBodyWidth: number;
+}): boolean {
+  return (
+    Math.abs(
+      asPositiveNumber(input.pdfBodyWidth) -
+        mobilePdfFullBleedWidth(input.viewportWidth),
+    ) <= 0.5
   );
 }
 
