@@ -62,6 +62,11 @@ assert.match(view, /Не нужно ждать, пока накопится бо
 assert.match(view, /10 треков × примерно 6 минут/);
 assert.match(view, /Первое – музыку покупают слушатели/);
 assert.match(view, /50 музыкальных работ/);
+assert.match(view, /Здесь самое интересное/);
+assert.match(view, /<li>jazz ambience;<\/li>/);
+assert.match(view, /Мне нужна именно эта музыка/);
+assert.match(view, /если человек раньше не слышал этот трек/);
+assert.match(view, /альбом из десяти музыкальных композиций/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(view.includes("♫"), false, "visuals must not use music-note emoji");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
