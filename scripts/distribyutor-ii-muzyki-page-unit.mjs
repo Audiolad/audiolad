@@ -57,7 +57,11 @@ assert.ok(
     view.indexOf('id="dlinnyy-trek"'),
 );
 assert.match(view, /10–15 хороших композиций/);
-assert.match(view, /50 к 100 и 300 работам/);
+assert.match(view, /Музыка для дыхательных практик – около 20 минут/i);
+assert.match(view, /Не нужно ждать, пока накопится большой альбом/i);
+assert.match(view, /10 треков × примерно 6 минут/);
+assert.match(view, /Первое – музыку покупают слушатели/);
+assert.match(view, /50 музыкальных работ/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(view.includes("♫"), false, "visuals must not use music-note emoji");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
