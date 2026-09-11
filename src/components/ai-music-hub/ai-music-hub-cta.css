@@ -17,8 +17,8 @@
 .ai-music-hub-cta__check {
   display: inline-flex;
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
   transform-origin: center;
@@ -30,8 +30,8 @@
 
 .ai-music-hub-cta__check svg {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
 }
 
 .ai-music-hub-cta:hover {

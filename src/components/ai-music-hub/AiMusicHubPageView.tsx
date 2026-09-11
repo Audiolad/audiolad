@@ -63,10 +63,13 @@ const primaryCtaClassName = `ai-music-hub-cta inline-flex min-h-12 w-full max-w-
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
       <path
-        fill="currentColor"
-        d="M9.2 17.4 4.35 12.55a1.4 1.4 0 0 1 1.98-1.98L9.2 13.44l8.47-8.47a1.4 1.4 0 1 1 1.98 1.98L9.2 17.4Z"
+        d="M5.6 12.2 10.1 16.6 18.4 7.6"
+        stroke="currentColor"
+        strokeWidth="3.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
