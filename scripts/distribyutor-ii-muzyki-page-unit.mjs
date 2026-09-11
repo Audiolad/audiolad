@@ -43,6 +43,21 @@ assert.equal(
   "/kak-zarabatyvat-na-ii-muzyke-v-audiolad",
 );
 assert.equal((view.match(/<Visual number=/g) ?? []).length, 4);
+assert.doesNotMatch(view, /<FlowVisuals\s*\/>/);
+assert.ok(
+  view.indexOf("<DistributorWarehouseVisual") >
+    view.indexOf('id="chto-takoe"'),
+);
+assert.ok(
+  view.indexOf("<DistributionChannelsVisual") >
+    view.indexOf('id="gde-publikovat"'),
+);
+assert.ok(
+  view.indexOf("<ShortTracksVisual") >
+    view.indexOf('id="dlinnyy-trek"'),
+);
+assert.match(view, /10–15 хороших композиций/);
+assert.match(view, /50 к 100 и 300 работам/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(view.includes("♫"), false, "visuals must not use music-note emoji");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
