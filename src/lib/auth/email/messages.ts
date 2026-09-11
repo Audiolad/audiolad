@@ -17,7 +17,7 @@ export const EMAIL_VALIDATION_MESSAGES: Record<EmailValidationErrorCode, string>
     invalid_format:
       "Проверьте адрес электронной почты. Например: name@yandex.ru",
     domain_not_allowed:
-      "Этот почтовый сервис пока нельзя использовать для регистрации. Укажите адрес Яндекс Почты или Mail.ru.",
+      "Проверьте адрес электронной почты и попробуйте ещё раз.",
     local_part_empty:
       "Проверьте адрес электронной почты. Например: name@yandex.ru",
     domain_empty:
