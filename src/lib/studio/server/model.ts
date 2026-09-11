@@ -98,6 +98,7 @@ export type StudioProjectAssetRow = {
   source_type: StudioAssetSourceType;
   catalog_practice_id?: string | null;
   catalog_audio_item_id?: string | null;
+  catalog_access_user_id?: string | null;
   upload_state?: StudioAssetUploadState;
   pending_source_id?: string | null;
   pending_storage_path?: string | null;

@@ -37,7 +37,7 @@ const PROJECT_SELECT =
   "id, author_id, guest_session_id, name, project_data, schema_version, revision, status, created_at, updated_at, last_opened_at, deleted_at";
 const PROJECT_LIST_SELECT = "id, name, updated_at, last_opened_at, revision";
 const ASSET_SELECT =
-  "id, project_id, source_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, catalog_practice_id, catalog_audio_item_id, upload_state, upload_state_changed_at, pending_source_id, pending_storage_path, pending_size_bytes, pending_original_name, pending_mime_type, pending_reserved_at, created_at, deleted_at";
+  "id, project_id, source_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, catalog_practice_id, catalog_audio_item_id, catalog_access_user_id, upload_state, upload_state_changed_at, pending_source_id, pending_storage_path, pending_size_bytes, pending_original_name, pending_mime_type, pending_reserved_at, created_at, deleted_at";
 
 export type StudioProjectAccess = {
   ownerKind: "author" | "guest";

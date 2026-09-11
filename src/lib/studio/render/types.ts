@@ -37,13 +37,36 @@ export type StudioRenderClip = Readonly<{
   fadeOutDuration: number;
 }>;
 
-export type StudioRenderAsset = Readonly<{
+export type StudioRenderFileAsset = Readonly<{
   id: string;
+  sourceType: "upload" | "recording";
   storagePath: string;
   mimeType: string;
   durationSeconds: number;
-  sourceType: "upload" | "recording";
 }>;
+
+export type StudioRenderCatalogAsset = Readonly<{
+  id: string;
+  sourceType: "catalog";
+  practiceId: string;
+  audioItemId: string;
+  mimeType: string;
+  durationSeconds: number;
+}>;
+
+export type StudioRenderAsset = StudioRenderFileAsset | StudioRenderCatalogAsset;
+
+export function isStudioRenderCatalogAsset(
+  asset: StudioRenderAsset,
+): asset is StudioRenderCatalogAsset {
+  return asset.sourceType === "catalog";
+}
+
+export function isStudioRenderFileAsset(
+  asset: StudioRenderAsset,
+): asset is StudioRenderFileAsset {
+  return asset.sourceType === "upload" || asset.sourceType === "recording";
+}
 
 export type StudioRenderInput = Readonly<{
   snapshot: StudioRenderSnapshot;

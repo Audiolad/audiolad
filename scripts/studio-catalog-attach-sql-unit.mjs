@@ -16,6 +16,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
 const pr4Name = "20261004120000_studio_catalog_project_assets.sql";
 const hotfixName = "20261004120100_studio_catalog_attach_asset_id.sql";
+const pr5Name = "20261004120200_studio_catalog_render_principal.sql";
 const previousLatest = "20261003120700_studio_music_independent_pricing.sql";
 const entitlementsName = "20261003120000_studio_music_entitlements.sql";
 const licenseStubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
@@ -33,6 +34,7 @@ function assert(condition, message) {
 assert(existsSync(join(migrationsDir, previousLatest)), "previous latest migration stays intact");
 assert(existsSync(join(migrationsDir, pr4Name)), "PR4 catalog attach migration stays intact");
 assert(existsSync(join(migrationsDir, hotfixName)), "PR4.1 catalog attach id hotfix exists");
+assert(existsSync(join(migrationsDir, pr5Name)), "PR5 catalog render principal migration exists");
 assert(existsSync(join(migrationsDir, entitlementsName)), "entitlements migration exists");
 assert(existsSync(licenseStubPath), "license stub exists");
 assert(existsSync(studioStubPath), "catalog attach studio stub exists");
@@ -45,9 +47,11 @@ const versions = names.map((name) => name.match(/^(\d{8,})_/)?.[1]);
 assert(new Set(versions).size === versions.length, "no duplicate timestamps");
 assert(versions.includes("20261004120000"), "20261004120000 is listed");
 assert(versions.includes("20261004120100"), "20261004120100 is listed");
+assert(versions.includes("20261004120200"), "20261004120200 is listed");
 
 const pr4 = readFileSync(join(migrationsDir, pr4Name), "utf8");
 const hotfix = readFileSync(join(migrationsDir, hotfixName), "utf8");
+const pr5 = readFileSync(join(migrationsDir, pr5Name), "utf8");
 const stub = readFileSync(studioStubPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 
@@ -104,6 +108,27 @@ assert(/user_practices-only/.test(smoke));
 assert(/no entitlement/.test(smoke));
 assert(/schemaVersion must stay 2/.test(smoke));
 assert(/must not copy into storage\.objects/.test(smoke));
+assert(/catalog_access_user_id/.test(smoke));
+assert(/legacy NULL must be adopted/.test(smoke));
+assert(/other authorized user must not overwrite/.test(smoke));
+assert(/unauthorized must not adopt/.test(smoke));
+assert(/user_practices-only must not receive catalog_access_user_id/.test(smoke));
+assert(/upload row must stay unaffected/.test(smoke));
+assert(/recording row must stay unaffected/.test(smoke));
+
+assert(/ADD COLUMN IF NOT EXISTS catalog_access_user_id/.test(pr5));
+assert(/catalog_access_user_id = p_user_id/.test(pr5));
+assert(/IF v_asset\.catalog_access_user_id IS NULL/.test(pr5));
+assert(/No global backfill/.test(pr5) || /no global backfill/.test(pr5));
+assert(/can_use_music_in_studio/.test(pr5));
+assert(/gen_random_uuid\(\)/.test(pr5));
+assert(/source_asset\.catalog_access_user_id/.test(pr5));
+assert(!/FROM public\.user_practices/.test(pr5));
+assert(!/JOIN public\.user_practices/.test(pr5));
+assert(!/INSERT INTO storage\.objects/.test(pr5));
+assert(!/20261004120000/.test(pr5) || /Does not rewrite 20261004120000/.test(pr5));
+assert(/Forward-only/.test(pr5) || /forward-only/.test(pr5));
+assert(!/ALTER COLUMN id SET DEFAULT/.test(pr5));
 
 function dockerAvailable() {
   const container = process.env.AUDIOLAD_SUPABASE_DB_CONTAINER || "supabase-db";
@@ -159,6 +184,7 @@ function bootstrapSql() {
     readFileSync(studioStubPath, "utf8"),
     readFileSync(join(migrationsDir, pr4Name), "utf8"),
     readFileSync(join(migrationsDir, hotfixName), "utf8"),
+    readFileSync(join(migrationsDir, pr5Name), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

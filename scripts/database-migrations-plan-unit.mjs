@@ -612,6 +612,12 @@ function testRepoOneFileOneVersion() {
         row.filename === "20261004120100_studio_catalog_attach_asset_id.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20261004120200_studio_catalog_render_principal.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -723,8 +729,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261003120700",
     "20261004120000",
     "20261004120100",
+    "20261004120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 79);
+  assert.equal(plan.database_migrations_pending, 80);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -815,8 +822,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261003120700",
     "20261004120000",
     "20261004120100",
+    "20261004120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 73);
+  assert.equal(plan.database_migrations_pending, 74);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -914,8 +922,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261003120700",
     "20261004120000",
     "20261004120100",
+    "20261004120200",
   ]);
-  assert.equal(plan.database_migrations_pending, 64);
+  assert.equal(plan.database_migrations_pending, 65);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {

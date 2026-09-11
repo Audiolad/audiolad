@@ -6,12 +6,23 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
+  CATALOG_MUSIC_UNAVAILABLE,
+} from "../catalog-asset";
+import {
   renderStudioProjectToMp3,
   StudioRenderChildAbortedError,
   StudioRenderDurationError,
 } from "./render";
+import {
+  assertCatalogRenderAccessStillValid,
+  materializeCatalogRenderSource,
+  snapshotHasCatalogMusic,
+  StudioCatalogMusicUnavailableError,
+} from "./catalog-source";
 import { renderOutputPath } from "./storage";
 import type { StudioRenderSnapshot } from "./types";
+import { isStudioRenderCatalogAsset, isStudioRenderFileAsset } from "./types";
 import {
   allowStudioRenderOutputUpload,
   parseClaimedStudioRenderJob,
@@ -81,11 +92,16 @@ export function createStudioRenderWorkerPort(
   };
 }
 
+export type StudioRenderExecuteDeps = {
+  renderToMp3?: typeof renderStudioProjectToMp3;
+};
+
 export async function executeClaimedStudioRenderJob(
   service: SupabaseClient,
   job: ClaimedStudioRenderJob,
   signal: AbortSignal = new AbortController().signal,
   leaseSeconds = STUDIO_RENDER_LEASE_SECONDS,
+  deps: StudioRenderExecuteDeps = {},
 ): Promise<StudioRenderExecuteResult> {
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
   try {
@@ -93,6 +109,18 @@ export async function executeClaimedStudioRenderJob(
     const snapshot = job.project_snapshot;
     const paths = new Map<string, string>();
     for (const asset of snapshot.assets) {
+      if (isStudioRenderCatalogAsset(asset)) {
+        const path = await materializeCatalogRenderSource(service, {
+          jobProjectId: job.project_id,
+          asset,
+          workspace,
+        });
+        paths.set(asset.id, path);
+        continue;
+      }
+      if (!isStudioRenderFileAsset(asset)) {
+        throw new Error("source_unavailable");
+      }
       const { data, error: downloadError } = await service.storage
         .from(assetsBucket)
         .download(asset.storagePath);
@@ -103,7 +131,8 @@ export async function executeClaimedStudioRenderJob(
     }
     let result;
     try {
-      result = await renderStudioProjectToMp3(
+      const renderToMp3 = deps.renderToMp3 ?? renderStudioProjectToMp3;
+      result = await renderToMp3(
         { snapshot, localAssetPaths: paths },
         { renderId: job.id, outputDirectory: workspace, signal },
       );
@@ -129,6 +158,12 @@ export async function executeClaimedStudioRenderJob(
       ffmpegStderrSummary: result.stderr.slice(-1000),
     }));
     const outputPath = renderOutputPath(job.id);
+    if (snapshotHasCatalogMusic(snapshot)) {
+      await assertCatalogRenderAccessStillValid(service, {
+        jobProjectId: job.project_id,
+        snapshot,
+      });
+    }
     const mayUpload = await allowStudioRenderOutputUpload(signal, async () => {
       const { data, error } = await service.rpc("renew_studio_render_job_lease", {
         p_job_id: job.id,
@@ -214,9 +249,17 @@ export async function failClaimedStudioRenderJob(
   if (error instanceof StudioRenderAbandonedError || error instanceof StudioRenderChildAbortedError) {
     return false;
   }
-  const errorCode = error instanceof StudioRenderDurationError
-    ? error.code
-    : "render_failed";
+  const catalogUnavailable =
+    (error instanceof StudioCatalogMusicUnavailableError)
+    || (error instanceof Error && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE);
+  const errorCode = catalogUnavailable
+    ? CATALOG_MUSIC_UNAVAILABLE
+    : error instanceof StudioRenderDurationError
+      ? error.code
+      : "render_failed";
+  const errorMessageSafe = catalogUnavailable
+    ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE
+    : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
   console.error(JSON.stringify({
     event: "studio_render_failed",
     jobId: job.id,
@@ -230,7 +273,7 @@ export async function failClaimedStudioRenderJob(
     .update({
       status: "failed",
       error_code: errorCode,
-      error_message_safe: "Не удалось подготовить экспорт. Исходники проекта сохранены.",
+      error_message_safe: errorMessageSafe,
       lease_expires_at: null,
       lease_token: null,
       updated_at: new Date().toISOString(),

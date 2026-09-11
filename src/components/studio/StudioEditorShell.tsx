@@ -66,9 +66,9 @@ import { serializeStudioProjectState, validateStudioProjectDocument } from "@/li
 import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import {
-  CATALOG_MUSIC_RENDER_GUARD_MESSAGE,
+  CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
   isSameCatalogSelection,
-  projectTracksBlockCatalogRender,
+  projectCatalogMusicExportUnavailable,
   resolveActiveCatalogMusicSelection,
 } from "@/lib/studio/catalog-asset";
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
@@ -1286,7 +1286,7 @@ export default function StudioEditorShell({
     slots,
     tracks,
   });
-  const catalogExportBlocked = projectTracksBlockCatalogRender(tracks);
+  const catalogExportBlocked = projectCatalogMusicExportUnavailable(tracks);
 
   const attachCatalogToProject = async (practiceId: string, audioItemId: string) => {
     const projectId = persistedHydration?.project.id;
@@ -1931,7 +1931,7 @@ export default function StudioEditorShell({
     const controller = controllerRef.current;
     if (!projectId || !controller || renderBusy) return;
     if (catalogExportBlocked) {
-      setRenderError(CATALOG_MUSIC_RENDER_GUARD_MESSAGE);
+      setRenderError(CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE);
       return;
     }
     setRenderError(null);
@@ -2370,7 +2370,7 @@ export default function StudioEditorShell({
                   type="button"
                   disabled={saveIsUnavailable || catalogExportBlocked || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
                   onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }}
-                  title={catalogExportBlocked ? CATALOG_MUSIC_RENDER_GUARD_MESSAGE : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"}
+                  title={catalogExportBlocked ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"}
                   className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-2 text-sm text-[#eadfff] disabled:opacity-45 lg:px-3"
                 >
                   {renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? (
@@ -2380,7 +2380,7 @@ export default function StudioEditorShell({
                 </button>
                 {catalogExportBlocked ? (
                   <span className="hidden max-w-[12rem] text-[11px] leading-tight text-[#d8c8fb] lg:inline">
-                    {CATALOG_MUSIC_RENDER_GUARD_MESSAGE}
+                    {CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE}
                   </span>
                 ) : null}
                 </>

@@ -33,10 +33,46 @@ function resolveTrackKind(
   return slot?.trackKind ?? "voice";
 }
 
+function toRenderAsset(asset: StudioProjectAssetRow): StudioRenderAsset | null {
+  if (
+    asset.duration_seconds === null ||
+    !Number.isFinite(asset.duration_seconds) ||
+    asset.duration_seconds <= 0
+  ) {
+    return null;
+  }
+  if (asset.source_type === "catalog") {
+    if (!asset.catalog_practice_id || !asset.catalog_audio_item_id) {
+      return null;
+    }
+    return {
+      id: asset.id,
+      sourceType: "catalog",
+      practiceId: asset.catalog_practice_id,
+      audioItemId: asset.catalog_audio_item_id,
+      mimeType: asset.mime_type,
+      durationSeconds: asset.duration_seconds,
+    };
+  }
+  if (!asset.storage_path) {
+    return null;
+  }
+  return {
+    id: asset.id,
+    sourceType: asset.source_type,
+    storagePath: asset.storage_path,
+    mimeType: asset.mime_type,
+    durationSeconds: asset.duration_seconds,
+  };
+}
+
 /**
  * Converts exactly one active, revisioned V2 project plus its persisted assets
  * into a serializable render input. Pending local files and duration-less
  * assets are deliberately rejected: a renderer cannot reproduce them.
+ * Catalog assets identify source by practice/audio item ids only. Live DB is
+ * the authorization source of truth; the snapshot must not carry source
+ * storage paths, signed URLs, or the attach principal.
  */
 export function createStudioRenderSnapshot(input: {
   project: StudioProjectRow;
@@ -60,22 +96,15 @@ export function createStudioRenderSnapshot(input: {
     if (
       asset.project_id !== project.id ||
       !referencedAssetIds.has(asset.id) ||
-      asset.deleted_at !== null ||
-      asset.source_type === "catalog" ||
-      !asset.storage_path ||
-      asset.duration_seconds === null ||
-      !Number.isFinite(asset.duration_seconds) ||
-      asset.duration_seconds <= 0
+      asset.deleted_at !== null
     ) {
       continue;
     }
-    assets.set(asset.id, {
-      id: asset.id,
-      storagePath: asset.storage_path,
-      mimeType: asset.mime_type,
-      durationSeconds: asset.duration_seconds,
-      sourceType: asset.source_type,
-    });
+    const renderAsset = toRenderAsset(asset);
+    if (!renderAsset) {
+      continue;
+    }
+    assets.set(asset.id, renderAsset);
   }
 
   const tracks: StudioRenderTrack[] = document.tracks.map((track) => {

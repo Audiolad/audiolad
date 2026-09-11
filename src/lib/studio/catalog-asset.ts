@@ -8,8 +8,13 @@ export const STUDIO_CATALOG_ASSET_SOURCE = "catalog" as const;
 export const CATALOG_MUSIC_RENDER_NOT_AVAILABLE =
   "catalog_music_render_not_available" as const;
 
+export const CATALOG_MUSIC_UNAVAILABLE = "catalog_music_unavailable" as const;
+
 export const CATALOG_MUSIC_UNAVAILABLE_MESSAGE =
   "Музыка из каталога недоступна.";
+
+export const CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE =
+  "Музыка из каталога больше недоступна для экспорта.";
 
 export const CATALOG_MUSIC_RENDER_GUARD_MESSAGE =
   "Экспорт с музыкой из каталога пока недоступен";
@@ -22,6 +27,8 @@ export const STUDIO_CATALOG_FORBIDDEN_DTO_KEYS = [
   "storage_path",
   "full_url",
   "service_role",
+  "catalog_access_user_id",
+  "catalogAccessUserId",
 ] as const;
 
 export type StudioCatalogAttachDecision =
@@ -295,5 +302,159 @@ export function projectTracksBlockCatalogRender(
       track.sourceType === STUDIO_CATALOG_ASSET_SOURCE &&
       Array.isArray(track.clips) &&
       track.clips.length > 0,
+  );
+}
+
+export type StudioCatalogRenderTrack = {
+  sourceType?: string | null;
+  clips?: readonly unknown[];
+  status?: string | null;
+  replacementError?: string | null;
+  available?: boolean;
+};
+
+/**
+ * Export is blocked only when referenced catalog music is known-unavailable.
+ * Authorized catalog music must not use the temporary PR4 render guard.
+ */
+export function projectCatalogMusicExportUnavailable(
+  tracks: readonly StudioCatalogRenderTrack[],
+): boolean {
+  return tracks.some((track) => {
+    if (track.sourceType !== STUDIO_CATALOG_ASSET_SOURCE) {
+      return false;
+    }
+    if (Array.isArray(track.clips) && track.clips.length === 0) {
+      return false;
+    }
+    return track.available === false || track.status === "error";
+  });
+}
+
+export type StudioCatalogRenderLiveRow = {
+  id: string;
+  project_id: string;
+  source_type: string | null;
+  deleted_at: string | null;
+  catalog_practice_id?: string | null;
+  catalog_audio_item_id?: string | null;
+  catalog_access_user_id?: string | null;
+};
+
+export type StudioCatalogRenderAudioItem = {
+  id: string;
+  practice_id?: string | null;
+  audio_path?: string | null;
+};
+
+export type StudioCatalogRenderAccessDecision =
+  | { ok: true; catalogAccessUserId: string; audioPath?: string }
+  | { ok: false; code: typeof CATALOG_MUSIC_UNAVAILABLE };
+
+export function evaluateLiveCatalogRenderAccess(input: {
+  jobProjectId: string;
+  snapshotAssetId: string;
+  snapshotPracticeId?: string | null;
+  snapshotAudioItemId?: string | null;
+  live: StudioCatalogRenderLiveRow | null;
+  canUseMusicInStudio: boolean;
+  audioItem?: StudioCatalogRenderAudioItem | null;
+  requireAudioPath?: boolean;
+}): StudioCatalogRenderAccessDecision {
+  const live = input.live;
+  if (
+    !live ||
+    live.id !== input.snapshotAssetId ||
+    live.project_id !== input.jobProjectId ||
+    live.source_type !== STUDIO_CATALOG_ASSET_SOURCE ||
+    live.deleted_at
+  ) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (!live.catalog_practice_id || !live.catalog_audio_item_id) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (
+    input.snapshotPracticeId &&
+    live.catalog_practice_id !== input.snapshotPracticeId
+  ) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (
+    input.snapshotAudioItemId &&
+    live.catalog_audio_item_id !== input.snapshotAudioItemId
+  ) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (!live.catalog_access_user_id) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (!input.canUseMusicInStudio) {
+    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+  }
+  if (input.requireAudioPath) {
+    if (
+      !input.audioItem ||
+      input.audioItem.id !== live.catalog_audio_item_id ||
+      String(input.audioItem.practice_id ?? "") !== live.catalog_practice_id
+    ) {
+      return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+    }
+    const audioPath = input.audioItem.audio_path?.trim() ?? "";
+    if (!audioPath) {
+      return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
+    }
+    return {
+      ok: true,
+      catalogAccessUserId: live.catalog_access_user_id,
+      audioPath,
+    };
+  }
+  return { ok: true, catalogAccessUserId: live.catalog_access_user_id };
+}
+
+export function canAdoptCatalogAccessPrincipal(input: {
+  catalogAccessUserId?: string | null;
+  currentUserId?: string | null;
+  hasProjectAccess: boolean;
+  canUseMusicInStudio: boolean;
+}): boolean {
+  return (
+    !input.catalogAccessUserId &&
+    Boolean(input.currentUserId) &&
+    input.hasProjectAccess &&
+    input.canUseMusicInStudio
+  );
+}
+
+export function studioRenderSnapshotContainsForbiddenCatalogFields(
+  value: unknown,
+): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) =>
+      studioRenderSnapshotContainsForbiddenCatalogFields(item),
+    );
+  }
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.sourceType === STUDIO_CATALOG_ASSET_SOURCE) {
+    if (
+      "storagePath" in record ||
+      "storage_path" in record ||
+      "audio_path" in record ||
+      "audioPath" in record ||
+      "catalog_access_user_id" in record ||
+      "catalogAccessUserId" in record ||
+      "signedUrl" in record ||
+      "signed_url" in record
+    ) {
+      return true;
+    }
+    return studioCatalogAssetDtoContainsForbiddenFields(value);
+  }
+  return Object.values(record).some((nested) =>
+    studioRenderSnapshotContainsForbiddenCatalogFields(nested),
   );
 }
