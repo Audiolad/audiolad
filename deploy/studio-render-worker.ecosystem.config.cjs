@@ -3,8 +3,10 @@
 // (resolved cwd realpath + `.deploy-commit`), refuses new claims when
 // `/var/www/audiolad-deploy/current` no longer matches that boot release,
 // then exits 0 so PM2 `autorestart: true` respawns with
-// cwd=/var/www/audiolad-deploy/current. OPS_STUDIO_WORKER_RECOVER remains
-// break-glass (stuck process or env bootstrap), not the main deploy path.
+// cwd=/var/www/audiolad-deploy/current. First production process on this
+// revision needs one OPS_STUDIO_WORKER_RECOVER so the running worker has
+// the gate; after that recover is break-glass (stuck process or env
+// bootstrap), not the ordinary deploy path.
 // Start once with `pm2 start deploy/studio-render-worker.ecosystem.config.cjs`.
 // Do not run this alongside the former one-shot cron worker.
 //

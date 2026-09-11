@@ -71,7 +71,27 @@ read current identity) → do not claim; log
 not abort FFmpeg and does not call `requestShutdown()`; it finishes
 complete/fail, then the next loop iteration sees STALE and clean-exits.
 Production deploy updates web + the `/current` symlink and does not restart
-this PM2 app. `OPS_STUDIO_WORKER_RECOVER` remains break-glass.
+this PM2 app. After the one-time first-rollout bootstrap below, ordinary
+future cutovers are self-managing between jobs; `OPS_STUDIO_WORKER_RECOVER`
+remains break-glass.
+
+## First rollout bootstrap
+
+The self-refresh mechanism cannot update a worker process that was
+started from a release predating this change.
+
+For the first production rollout only:
+- deploy this PR normally;
+- verify the live/current SHA;
+- run `OPS_STUDIO_WORKER_RECOVER` once against that verified live SHA;
+- verify the restarted worker boot SHA matches current.
+
+After that one-time bootstrap, ordinary future deploys do not require
+manual worker recovery: an old worker finishes its in-flight job,
+detects the release mismatch before the next claim, exits 0, and PM2
+autorestarts it from current.
+
+`OPS_STUDIO_WORKER_RECOVER` then returns to break-glass/manual recovery use.
 
 Lease: **1800s** on claim, renewed every **5 minutes** by
 `renew_studio_render_job_lease` only while this process still owns
