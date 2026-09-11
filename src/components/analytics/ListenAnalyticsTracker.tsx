@@ -21,6 +21,10 @@ import {
   isListeningCompleted,
   updateListeningProgressState,
 } from "@/lib/analytics/listening";
+import {
+  rememberContinuousListenCompleted,
+  rememberContinuousListenPlayStarted,
+} from "@/lib/listen/repeat-analytics";
 
 type ListenAnalyticsTrackerProps = {
   practiceId: string;
@@ -93,6 +97,10 @@ export default function ListenAnalyticsTracker({
     });
 
     listeningSessionKeyRef.current = listeningKey;
+
+    if (!rememberContinuousListenPlayStarted(practiceId, trackId)) {
+      return;
+    }
 
     void trackPlatformEvent({
       sessionId,
@@ -167,6 +175,10 @@ export default function ListenAnalyticsTracker({
       if (!hasTrackedListeningMilestone(listeningKey, "audio_completed")) {
         completionTrackedRef.current = true;
         markListeningMilestoneTracked(listeningKey, "audio_completed");
+
+        if (!rememberContinuousListenCompleted(practiceId, trackId)) {
+          return;
+        }
 
         void trackPlatformEvent({
           sessionId,
