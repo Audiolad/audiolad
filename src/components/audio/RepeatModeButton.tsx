@@ -8,9 +8,11 @@ import {
 function RepeatIcon({
   className = "h-5 w-5",
   showOne = false,
+  compact = false,
 }: {
   className?: string;
   showOne?: boolean;
+  compact?: boolean;
 }) {
   return (
     <svg
@@ -18,25 +20,36 @@ function RepeatIcon({
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth={compact ? "2.25" : "1.75"}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M17 2v4h4" />
-      <path d="M21 6a9 9 0 0 0-15.5 6" />
-      <path d="M7 22v-4H3" />
-      <path d="M3 18a9 9 0 0 0 15.5-6" />
+      {compact ? (
+        <>
+          <path d="M17 1.75V6.5h4.75" />
+          <path d="M21.75 6.5A9.75 9.75 0 0 0 4.75 12" />
+          <path d="M7 22.25V17.5H2.25" />
+          <path d="M2.25 17.5A9.75 9.75 0 0 0 19.25 12" />
+        </>
+      ) : (
+        <>
+          <path d="M17 2v4h4" />
+          <path d="M21 6a9 9 0 0 0-15.5 6" />
+          <path d="M7 22v-4H3" />
+          <path d="M3 18a9 9 0 0 0 15.5-6" />
+        </>
+      )}
       {showOne ? (
         <text
           x="12"
-          y="13.2"
+          y={compact ? "15" : "13.2"}
           textAnchor="middle"
           fill="currentColor"
           stroke="none"
-          fontSize="8"
-          fontWeight="700"
+          fontSize={compact ? "10.5" : "8"}
+          fontWeight={compact ? "800" : "700"}
         >
           1
         </text>
@@ -56,11 +69,13 @@ export default function RepeatModeButton({
   repeatMode,
   onCycle,
   variant,
+  iconVariant = "default",
   className = "",
 }: {
   repeatMode: RepeatMode;
   onCycle: () => void;
   variant: "onDark" | "onLight";
+  iconVariant?: "default" | "compact";
   className?: string;
 }) {
   const active = repeatMode !== "off";
@@ -82,7 +97,11 @@ export default function RepeatModeButton({
             : "text-[#9485b4]"
       } ${className}`}
     >
-      <RepeatIcon showOne={repeatMode === "one"} />
+      <RepeatIcon
+        className={iconVariant === "compact" ? "h-6 w-6" : undefined}
+        showOne={repeatMode === "one"}
+        compact={iconVariant === "compact"}
+      />
     </button>
   );
 }
