@@ -341,8 +341,22 @@ async function listRenderWorkspaces(): Promise<string[]> {
   return (await readdir(tmpdir())).filter((name) => name.startsWith("audiolad-render-"));
 }
 
-function ffmpegAvailable(): boolean {
-  return spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
+function commandAvailable(name: string): boolean {
+  return spawnSync(name, ["-version"], { encoding: "utf8" }).status === 0;
+}
+
+const REQUIRE_FFMPEG = process.env.AUDIOLAD_REQUIRE_FFMPEG === "1";
+
+function requireFfmpegToolchain(): { ffmpeg: boolean; ffprobe: boolean } {
+  const ffmpeg = commandAvailable("ffmpeg");
+  const ffprobe = commandAvailable("ffprobe");
+  if (REQUIRE_FFMPEG && !ffmpeg) {
+    throw new Error("AUDIOLAD_REQUIRE_FFMPEG=1 but ffmpeg is missing");
+  }
+  if (REQUIRE_FFMPEG && !ffprobe) {
+    throw new Error("AUDIOLAD_REQUIRE_FFMPEG=1 but ffprobe is missing");
+  }
+  return { ffmpeg, ffprobe };
 }
 
 async function stubRenderToMp3(
@@ -414,10 +428,22 @@ async function main() {
 
   const job = claimedJob(snapshot);
   const beforeWorkspaces = new Set(await listRenderWorkspaces());
-  const canRender = ffmpegAvailable();
-  const renderDeps: StudioRenderExecuteDeps = canRender
+  const toolchain = requireFfmpegToolchain();
+  const canRender = toolchain.ffmpeg && toolchain.ffprobe;
+  if (REQUIRE_FFMPEG && !canRender) {
+    throw new Error("AUDIOLAD_REQUIRE_FFMPEG=1 must run the real FFmpeg mix");
+  }
+  let stubUsed = false;
+  const guardedStub: StudioRenderExecuteDeps["renderToMp3"] = async (input, options) => {
+    if (REQUIRE_FFMPEG) {
+      throw new Error("AUDIOLAD_REQUIRE_FFMPEG=1 must not use stub renderer");
+    }
+    stubUsed = true;
+    return stubRenderToMp3(input, options);
+  };
+  const renderDeps: StudioRenderExecuteDeps = (REQUIRE_FFMPEG || canRender)
     ? {}
-    : { renderToMp3: stubRenderToMp3 as StudioRenderExecuteDeps["renderToMp3"] };
+    : { renderToMp3: guardedStub };
   if (!canRender) {
     console.log("studio-catalog-music-render-unit: ffmpeg missing; auth/materialize/revoke still run, mix decode skipped");
   }
@@ -439,7 +465,8 @@ async function main() {
   assert.ok(!stateA.downloads.some((item) => item.startsWith("studio-draft-assets:") && item.includes("dawn")));
   assert.doesNotMatch(JSON.stringify(snapshot), /audio_path/);
 
-  if (canRender) {
+  if (REQUIRE_FFMPEG || canRender) {
+    assert.equal(stubUsed, false, "real mix must not use the stub renderer");
     const uploadedA = stateA.files.get(`studio-renders:${stateA.uploads[0].path}`);
     assert.ok(uploadedA);
     const decodeRoot = await mkdtemp(join(tmpdir(), "audiolad-catalog-mix-"));
@@ -467,6 +494,7 @@ async function main() {
     } finally {
       await rm(decodeRoot, { recursive: true, force: true });
     }
+    console.log("studio-catalog-music-render-unit: real ffmpeg mix executed");
   }
 
   // B: author membership (same canonical RPC, different principal already stored)

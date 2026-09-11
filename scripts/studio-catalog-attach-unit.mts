@@ -532,6 +532,14 @@ assert.match(pr5Sql, /catalog_access_user_id/);
 assert.match(pr5Sql, /p_user_id/);
 assert.doesNotMatch(pr5Sql, /FROM public\.user_practices/);
 
+const ffmpegWorkflow = read(".github/workflows/studio-catalog-render-ffmpeg.yml");
+assert.match(ffmpegWorkflow, /name: Studio Catalog Render FFmpeg/);
+assert.match(ffmpegWorkflow, /AUDIOLAD_REQUIRE_FFMPEG: "1"/);
+assert.match(ffmpegWorkflow, /sudo apt-get install -y ffmpeg/);
+assert.match(ffmpegWorkflow, /ffmpeg -version/);
+assert.match(ffmpegWorkflow, /ffprobe -version/);
+assert.match(ffmpegWorkflow, /npm run test:studio-catalog-music-render/);
+
 const client = read("src/lib/studio/persistence-client.ts");
 assert.match(client, /attachStudioCatalogAsset/);
 assert.match(client, /catalog_music_unavailable/);
