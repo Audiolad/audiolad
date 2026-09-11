@@ -361,11 +361,6 @@ function testUiSurfaces() {
   assert.equal(REPEAT_MODE_ARIA_LABELS.one, "Повтор трека");
   assert.match(button, /showOne=\{repeatMode === "one"\}/);
   assert.match(button, /data-repeat-mode=\{repeatMode\}/);
-  assert.match(
-    button,
-    /event\.stopPropagation\(\)/,
-    "shared button stops bubbling so mini Repeat does not open the full player",
-  );
   assert.doesNotMatch(button, /lucide|from "react-icons"/);
 
   assert.match(desktop, /<RepeatModeButton/);

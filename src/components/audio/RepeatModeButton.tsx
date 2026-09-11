@@ -68,10 +68,7 @@ export default function RepeatModeButton({
   return (
     <button
       type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onCycle();
-      }}
+      onClick={onCycle}
       aria-label={REPEAT_MODE_ARIA_LABELS[repeatMode]}
       aria-pressed={active}
       data-repeat-mode={repeatMode}
