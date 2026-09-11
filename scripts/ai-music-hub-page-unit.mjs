@@ -253,6 +253,15 @@ function testPageWiring() {
 
   assert.match(view, /href=\{BECOME_AUTHOR_HREF\}/);
   assert.match(view, /AI_MUSIC_HUB_CTA_LABEL/);
+  assert.match(view, /function CheckIcon\(/);
+  assert.match(view, /ai-music-hub-cta__check/);
+  assert.doesNotMatch(view, /TrebleClefIcon|ai-music-hub-cta__clef|✓|treble/i);
+
+  const ctaCss = read("src/components/ai-music-hub/ai-music-hub-cta.css");
+  assert.match(ctaCss, /\.ai-music-hub-cta__check\b/);
+  assert.match(ctaCss, /@keyframes ai-music-hub-cta-check/);
+  assert.match(ctaCss, /prefers-reduced-motion:\s*reduce/);
+  assert.doesNotMatch(ctaCss, /clef/i);
   assert.match(view, /AI_MUSIC_HUB_CLOSING_NOTE/);
   assert.match(view, /id="ai-music-what-is"/);
   assert.match(view, /id="ai-music-dual-income"/);
