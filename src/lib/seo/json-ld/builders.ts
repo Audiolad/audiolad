@@ -375,6 +375,117 @@ export function buildForAuthorsPageJsonLd(
   };
 }
 
+export type AiMusicHubFaqJsonLdInput = {
+  question: string;
+  answer: string;
+};
+
+export type AiMusicHubPageJsonLdInput = {
+  title: string;
+  description: string;
+  path?: string;
+  datePublished?: string;
+  faq?: ReadonlyArray<AiMusicHubFaqJsonLdInput>;
+};
+
+/**
+ * Commercial hub for AI / neuro musicians. Emits WebPage + Article + FAQPage
+ * without Product/Offer/AggregateRating nodes.
+ */
+export function buildAiMusicHubPageJsonLd(
+  input: AiMusicHubPageJsonLdInput,
+  origin = getAppOrigin(),
+): JsonLdNode {
+  const siteOrigin = originUrl(origin);
+  const path = input.path ?? "/kak-zarabatyvat-na-ii-muzyke-v-audiolad";
+  const pageUrl = absolutePath(path, origin);
+  const breadcrumbs = buildBreadcrumbListJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Авторам", path: "/for-authors" },
+      { name: input.title, path },
+    ],
+    origin,
+  );
+
+  const webPage: JsonLdNode = {
+    "@type": "WebPage",
+    "@id": `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    isPartOf: {
+      "@id": `${siteOrigin}/#website`,
+    },
+    about: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+    mainEntity: {
+      "@id": `${pageUrl}#article`,
+    },
+  };
+
+  const article: JsonLdNode = {
+    "@type": "Article",
+    "@id": `${pageUrl}#article`,
+    headline: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${pageUrl}#webpage`,
+    },
+    url: pageUrl,
+    author: {
+      "@type": "Organization",
+      "@id": `${siteOrigin}/#organization`,
+      name: SITE_NAME,
+      url: `${siteOrigin}/`,
+    },
+    publisher: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+  };
+
+  if (input.datePublished) {
+    article.datePublished = input.datePublished;
+  }
+
+  const graph: JsonLdNode[] = [
+    buildOrganizationJsonLd(origin),
+    buildWebSiteJsonLd(origin),
+    webPage,
+    article,
+  ];
+
+  if (breadcrumbs) {
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
+    graph.push(breadcrumbNode);
+  }
+
+  if (input.faq && input.faq.length > 0) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${pageUrl}#faq`,
+      mainEntity: input.faq.map((item) => ({
+        "@type": "Question",
+        name: sanitizeJsonLdPlainText(item.question),
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: sanitizeJsonLdPlainText(item.answer),
+        },
+      })),
+    });
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": graph,
+  };
+}
+
 export function buildBreadcrumbListJsonLd(
   items: ReadonlyArray<BreadcrumbItemInput>,
   origin = getAppOrigin(),

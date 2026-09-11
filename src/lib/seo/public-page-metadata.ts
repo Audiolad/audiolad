@@ -10,6 +10,11 @@ import {
   PHILOSOPHY_SEO_TITLE,
 } from "@/lib/seo/philosophy/content";
 import {
+  AI_MUSIC_HUB_PATH,
+  AI_MUSIC_HUB_SEO_DESCRIPTION,
+  AI_MUSIC_HUB_SEO_TITLE,
+} from "@/lib/seo/ai-music-hub/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -40,6 +45,12 @@ export {
   FOR_AUTHORS_SEO_DESCRIPTION,
   FOR_AUTHORS_SEO_TITLE,
 } from "@/lib/seo/for-authors/content";
+
+export {
+  AI_MUSIC_HUB_PAGE_H1,
+  AI_MUSIC_HUB_SEO_DESCRIPTION,
+  AI_MUSIC_HUB_SEO_TITLE,
+} from "@/lib/seo/ai-music-hub/content";
 
 export function buildSiteCanonicalUrl(path = "/"): string {
   const origin = getAppOrigin().replace(/\/$/, "");
@@ -205,6 +216,36 @@ export function buildForAuthorsMetadata(): Metadata {
       card: "summary",
       title: FOR_AUTHORS_SEO_TITLE,
       description: FOR_AUTHORS_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildAiMusicHubMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(AI_MUSIC_HUB_PATH);
+
+  return {
+    title: AI_MUSIC_HUB_SEO_TITLE,
+    description: AI_MUSIC_HUB_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    robots: {
+      // Temporary production-test indexing. Restore index: true after visual QA.
+      index: false,
+      follow: true,
+    },
+    openGraph: {
+      title: AI_MUSIC_HUB_SEO_TITLE,
+      description: AI_MUSIC_HUB_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: AI_MUSIC_HUB_SEO_TITLE,
+      description: AI_MUSIC_HUB_SEO_DESCRIPTION,
     },
   };
 }
