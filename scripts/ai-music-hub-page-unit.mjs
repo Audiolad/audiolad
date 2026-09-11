@@ -1,27 +1,35 @@
 #!/usr/bin/env node
 /**
- * Unit checks for /kak-zarabatyvat-na-ii-muzyke-v-audiolad hub – no DB / network.
+ * Unit checks for /kak-zarabatyvat-na-ii-muzyke-v-audiolad selling landing.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 import {
+  AI_MUSIC_HUB_AUTHORS_HEADING,
+  AI_MUSIC_HUB_CLOSING_HEADING,
+  AI_MUSIC_HUB_CLOSING_NOTE,
   AI_MUSIC_HUB_CTA_LABEL,
   AI_MUSIC_HUB_DATE_PUBLISHED,
-  AI_MUSIC_HUB_ECONOMICS_STATS,
-  AI_MUSIC_HUB_FAQ,
+  AI_MUSIC_HUB_DUAL_INCOME_HEADING,
+  AI_MUSIC_HUB_DUAL_INCOME_RECAP_HEADING,
+  AI_MUSIC_HUB_ECONOMICS_HEADING,
+  AI_MUSIC_HUB_ECONOMICS_INTRO,
+  AI_MUSIC_HUB_ECONOMICS_ROWS,
   AI_MUSIC_HUB_INTRO,
-  AI_MUSIC_HUB_ONE_PURCHASE_FORMULA,
   AI_MUSIC_HUB_PAGE_H1,
   AI_MUSIC_HUB_PATH,
-  AI_MUSIC_HUB_PRODUCTS_FORMULA,
-  AI_MUSIC_HUB_PRODUCTS_HEADING,
-  AI_MUSIC_HUB_SCALING_AFTER,
-  AI_MUSIC_HUB_SCALING_ROWS,
-  AI_MUSIC_HUB_SCENARIOS,
+  AI_MUSIC_HUB_REPEAT_HEADING,
+  AI_MUSIC_HUB_RIGHTS_HEADING,
+  AI_MUSIC_HUB_SCREENSHOTS,
   AI_MUSIC_HUB_SEO_DESCRIPTION,
   AI_MUSIC_HUB_SEO_TITLE,
-  AI_MUSIC_HUB_WAYS,
+  AI_MUSIC_HUB_STEPS_HEADING,
+  AI_MUSIC_HUB_STEPS_LINE,
+  AI_MUSIC_HUB_SUBTITLE,
+  AI_MUSIC_HUB_SUNO_HEADING,
+  AI_MUSIC_HUB_WHAT_IS_HEADING,
 } from "../src/lib/seo/ai-music-hub/content.ts";
 import { buildAiMusicHubPageJsonLd } from "../src/lib/seo/json-ld/index.ts";
 import {
@@ -37,9 +45,11 @@ const ORIGIN = "https://audiolad.ru";
 const FORBIDDEN_STATUS =
   /готовится|скоро появится|в разработке|в будущем/;
 const EM_DASH = "\u2014";
+const OLD_ECONOMICS =
+  /2\s*×|двум текущим ценам|цена права использования|420 ₽|4 200 ₽|42 000 ₽|84 000 ₽|210 000 ₽|420 000 ₽|300 ₽|600 ₽|210 ₽|90 ₽|постоянное право|бессрочн|Регистрация бесплатная/;
 
-function read(path) {
-  return readFileSync(path, "utf8");
+function read(filePath) {
+  return readFileSync(filePath, "utf8");
 }
 
 function collectUserFacingText() {
@@ -62,7 +72,6 @@ function testMetadata() {
     metadata.openGraph?.url,
     buildSiteCanonicalUrl(AI_MUSIC_HUB_PATH),
   );
-  assert.equal(metadata.openGraph?.type, "article");
   assert.equal(metadata.twitter?.card, "summary");
   assert.equal(metadata.robots?.index, false);
   assert.equal(metadata.robots?.follow, true);
@@ -70,10 +79,8 @@ function testMetadata() {
     AI_MUSIC_HUB_PAGE_H1,
     "Как зарабатывать на своей ИИ-музыке в АудиоЛаде",
   );
-  assert.equal(
-    AI_MUSIC_HUB_SEO_TITLE,
-    "Как заработать на ИИ-музыке и нейромузыке – монетизация AI-музыки | АудиоЛад",
-  );
+  assert.equal(AI_MUSIC_HUB_SEO_TITLE, AI_MUSIC_HUB_PAGE_H1);
+  assert.equal(AI_MUSIC_HUB_SEO_DESCRIPTION, AI_MUSIC_HUB_SUBTITLE);
 }
 
 function testJsonLd() {
@@ -83,10 +90,6 @@ function testJsonLd() {
       description: AI_MUSIC_HUB_SEO_DESCRIPTION,
       path: AI_MUSIC_HUB_PATH,
       datePublished: AI_MUSIC_HUB_DATE_PUBLISHED,
-      faq: AI_MUSIC_HUB_FAQ.map((item) => ({
-        question: item.question,
-        answer: item.answer,
-      })),
     },
     ORIGIN,
   );
@@ -101,7 +104,7 @@ function testJsonLd() {
   assert.ok(types.includes("WebPage"), "WebPage present");
   assert.ok(types.includes("Article"), "Article present");
   assert.ok(types.includes("BreadcrumbList"), "BreadcrumbList present");
-  assert.ok(types.includes("FAQPage"), "FAQPage present");
+  assert.ok(!types.includes("FAQPage"), "selling landing has no FAQPage");
   assert.ok(!types.includes("Product"), "no Product");
   assert.ok(!types.includes("Offer"), "no Offer");
   assert.ok(!types.includes("AggregateRating"), "no ratings");
@@ -127,105 +130,108 @@ function testJsonLd() {
     "Авторам",
     AI_MUSIC_HUB_PAGE_H1,
   ]);
-
-  const faq = graph.find((node) => node["@type"] === "FAQPage");
-  assert.equal(faq.mainEntity.length, 7);
-  assert.equal(faq.mainEntity[0].name, AI_MUSIC_HUB_FAQ[0].question);
-  assert.equal(
-    faq.mainEntity[0].acceptedAnswer.text,
-    AI_MUSIC_HUB_FAQ[0].answer,
-  );
 }
 
 function testCopyAndEconomics() {
   const text = collectUserFacingText();
   assert.equal(text.includes(EM_DASH), false, "user-facing copy must use en dash");
   assert.doesNotMatch(text, FORBIDDEN_STATUS);
-  assert.doesNotMatch(text, /210 ₽/);
-  assert.doesNotMatch(text, /90 ₽/);
-  assert.doesNotMatch(text, /постоянное право/);
-  assert.doesNotMatch(text, /бессрочн/);
+  assert.doesNotMatch(text, OLD_ECONOMICS);
   assert.doesNotMatch(text, /эксклюзивн/);
   assert.doesNotMatch(text, /без отдельной подписки/);
   assert.doesNotMatch(text, /дополнительных комиссий сверх модели 70\/30/);
   assert.doesNotMatch(text, /Отдельных тарифов, подписок/);
   assert.doesNotMatch(text, /Автором публикации остаётесь вы/);
-  assert.doesNotMatch(text, /ИИ используется как инструмент/);
-  assert.doesNotMatch(text, /как автор делится ссылкой/);
+  assert.doesNotMatch(text, /Частые вопросы/);
 
-  assert.match(text, /ИИ-музык/);
-  assert.match(text, /AI-музык/);
-  assert.match(text, /нейромузык/);
-  assert.match(AI_MUSIC_HUB_INTRO[0], /Suno, Udio/);
-  assert.match(AI_MUSIC_HUB_INTRO[1], /набора MP3-файлов/);
-
-  assert.equal(AI_MUSIC_HUB_WAYS.length, 2);
-  assert.match(
-    AI_MUSIC_HUB_WAYS[1].description,
-    /Автор медитации приобретает право использовать музыкальную публикацию внутри Студии/,
-  );
-  assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[0]?.value, "300 ₽");
-  assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[1]?.value, "600 ₽");
-  assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[2]?.value, "420 ₽");
-  assert.equal(AI_MUSIC_HUB_ECONOMICS_STATS[3]?.value, "180 ₽");
-  assert.deepEqual(
-    AI_MUSIC_HUB_SCALING_ROWS.map((row) => row.author),
-    [
-      "420 ₽",
-      "4 200 ₽",
-      "42 000 ₽",
-      "84 000 ₽",
-      "210 000 ₽",
-      "420 000 ₽",
-    ],
-  );
-  assert.equal(AI_MUSIC_HUB_SCALING_AFTER.length, 5);
-  assert.match(AI_MUSIC_HUB_SCALING_AFTER[0], /не прогноз дохода/);
-  assert.match(AI_MUSIC_HUB_SCALING_AFTER[4], /музыкальный каталог/);
   assert.equal(
-    AI_MUSIC_HUB_ONE_PURCHASE_FORMULA,
-    "420 ₽ – это не доход со всего трека. Это доход с одной покупки права использования.",
+    AI_MUSIC_HUB_SUBTITLE,
+    "Получайте деньги за свою нейромузыку: от слушателей, которые покупают её на АудиоЛаде, и от авторов медитаций, которые используют её в своих проектах.",
   );
-  assert.match(
-    text,
-    /Одна музыкальная работа потенциально может приносить доход из двух источников/,
-  );
-  assert.equal(
-    AI_MUSIC_HUB_PRODUCTS_HEADING,
-    "Не просто генерируйте музыку – создавайте музыкальные продукты",
-  );
-  assert.match(AI_MUSIC_HUB_PRODUCTS_FORMULA, /каталог самостоятельных цифровых продуктов/);
-  assert.deepEqual(
-    AI_MUSIC_HUB_SCENARIOS.map((row) => row.scene),
-    [
-      "Медитация",
-      "Сон",
-      "Йога",
-      "Массаж",
-      "SPA",
-      "Дыхательные практики",
-      "Концентрация",
-      "Релакс",
-    ],
-  );
-  assert.equal(AI_MUSIC_HUB_SCENARIOS[0].use, "музыка для медитации без слов");
-  assert.equal(AI_MUSIC_HUB_FAQ.length, 7);
+  assert.match(AI_MUSIC_HUB_INTRO, /ИИ-музыка, AI-музыка, нейромузыка/);
   assert.equal(
     AI_MUSIC_HUB_CTA_LABEL,
-    "Зарегистрироваться как автор АудиоЛада",
+    "Зарегистрироваться бесплатно как автор АудиоЛада",
   );
-
-  assert.match(text, /2 × текущая цена для слушателя/);
-  assert.match(text, /70%/);
-  assert.match(text, /30%/);
-  assert.match(text, /Исходный музыкальный файл отдельно/);
-  assert.match(text, /право использования покрывает всю публикацию/);
+  assert.equal(AI_MUSIC_HUB_WHAT_IS_HEADING, "Что такое АудиоЛад");
+  assert.equal(
+    AI_MUSIC_HUB_DUAL_INCOME_HEADING,
+    "Один трек – два источника дохода",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_DUAL_INCOME_RECAP_HEADING,
+    "Один трек. Два источника дохода.",
+  );
+  assert.equal(AI_MUSIC_HUB_ECONOMICS_HEADING, "Простая экономика");
+  assert.match(AI_MUSIC_HUB_ECONOMICS_INTRO, /500 ₽/);
+  assert.deepEqual(
+    AI_MUSIC_HUB_ECONOMICS_ROWS.map((row) => `${row.sales} – ${row.amount}`),
+    [
+      "10 покупок – 5 000 ₽ продаж",
+      "100 покупок – 50 000 ₽ продаж",
+      "1 000 покупок – 500 000 ₽ продаж",
+    ],
+  );
+  assert.match(text, /Автор музыки получает 70% от продаж/);
+  assert.match(text, /30% – комиссия АудиоЛада/);
+  assert.equal(AI_MUSIC_HUB_RIGHTS_HEADING, "Права на музыку остаются у вас");
+  assert.match(text, /Яндекс Музыке, Spotify, YouTube/);
+  assert.equal(AI_MUSIC_HUB_STEPS_HEADING, "Что нужно сделать");
+  assert.equal(
+    AI_MUSIC_HUB_STEPS_LINE,
+    "Зарегистрируйтесь бесплатно → загрузите свою музыку → оформите её → выберите нужные настройки → опубликуйте.",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_REPEAT_HEADING,
+    "Загрузите музыку один раз – получайте за неё деньги снова и снова",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SUNO_HEADING,
+    "А если музыка создана в Suno или Udio?",
+  );
+  assert.match(AI_MUSIC_HUB_AUTHORS_HEADING, /авторы медитаций/);
+  assert.equal(AI_MUSIC_HUB_CLOSING_HEADING, "Попробуйте прямо сейчас");
+  assert.equal(
+    AI_MUSIC_HUB_CLOSING_NOTE,
+    "Начать можно с одной музыкальной работы.",
+  );
   assert.match(text, /Suno/);
   assert.match(text, /Udio/);
-  assert.match(text, /Spotify/);
-  assert.match(text, /YouTube/);
-  assert.match(text, /дополнительный канал/);
-  assert.match(text, /проверить актуальные условия/);
+}
+
+function testScreenshots() {
+  assert.equal(AI_MUSIC_HUB_SCREENSHOTS.length, 4);
+  assert.deepEqual(
+    AI_MUSIC_HUB_SCREENSHOTS.map((shot) => shot.id),
+    ["home", "product", "studio", "author"],
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SCREENSHOTS[0].caption,
+    "АудиоЛад – платформа, где люди находят музыку, медитации и другие аудиопродукты.",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SCREENSHOTS[1].caption,
+    "Ваш трек или альбом становится самостоятельным музыкальным продуктом со своей страницей.",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SCREENSHOTS[2].caption,
+    "В Студии АудиоЛада авторы медитаций и аудиопрактик могут находить музыку для своих проектов.",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SCREENSHOTS[3].caption,
+    "Каждая новая работа становится ещё одним продуктом в вашем музыкальном каталоге.",
+  );
+
+  for (const shot of AI_MUSIC_HUB_SCREENSHOTS) {
+    assert.ok(shot.width > 0 && shot.height > 0);
+    assert.ok(shot.src, `${shot.id} screenshot src is required`);
+    const publicPath = path.join("public", shot.src.replace(/^\//, ""));
+    assert.equal(
+      existsSync(publicPath),
+      true,
+      `screenshot file missing: ${publicPath}`,
+    );
+  }
 }
 
 function testPageWiring() {
@@ -240,28 +246,28 @@ function testPageWiring() {
   assert.match(page, /buildAiMusicHubPageJsonLd/);
   assert.match(page, /buildAiMusicHubMetadata/);
   assert.match(page, /AiMusicHubPageView/);
+  assert.doesNotMatch(page, /AI_MUSIC_HUB_FAQ/);
   assert.doesNotMatch(page, /CreatorPathsCta/);
   assert.doesNotMatch(page, /ArticleDefinition/);
   assert.doesNotMatch(page, /ArticleAudioBlock/);
 
   assert.match(view, /href=\{BECOME_AUTHOR_HREF\}/);
   assert.match(view, /AI_MUSIC_HUB_CTA_LABEL/);
-  assert.match(view, /ArticleFaqList/);
-  assert.match(view, /AI_MUSIC_HUB_SCALING_AFTER/);
-  assert.match(view, /AI_MUSIC_HUB_ONE_PURCHASE_FORMULA/);
-  assert.match(view, /id="ai-music-ways"/);
-  assert.match(view, /id="ai-music-economics"/);
-  assert.match(view, /id="ai-music-scaling"/);
+  assert.match(view, /AI_MUSIC_HUB_CLOSING_NOTE/);
+  assert.match(view, /id="ai-music-what-is"/);
   assert.match(view, /id="ai-music-dual-income"/);
-  assert.match(view, /id="ai-music-scenarios"/);
-  assert.match(view, /id="ai-music-faq"/);
+  assert.match(view, /id="ai-music-economics"/);
+  assert.match(view, /id="ai-music-rights"/);
+  assert.match(view, /id="ai-music-repeat"/);
+  assert.doesNotMatch(view, /ArticleFaqList/);
+  assert.doesNotMatch(view, /Регистрация бесплатная/);
   assert.doesNotMatch(view, /CreatorPathsCta/);
   assert.doesNotMatch(view, /href="\/studio\/meditation"/);
   assert.doesNotMatch(view, /school\.audiolad\.ru/);
   assert.doesNotMatch(view, /href="\/auth\/sign-up"/);
-  assert.doesNotMatch(view, /ECONOMICS_NOTE/);
   assert.equal(view.includes(EM_DASH), false);
   assert.doesNotMatch(view, FORBIDDEN_STATUS);
+  assert.doesNotMatch(view, OLD_ECONOMICS);
 
   assert.match(layout, /HomeMobileHeader/);
   assert.match(layout, /LegalFooter/);
@@ -269,10 +275,7 @@ function testPageWiring() {
 }
 
 function testNavigationAndSitemap() {
-  assert.equal(
-    isBottomNavNeutralPathname(AI_MUSIC_HUB_PATH),
-    true,
-  );
+  assert.equal(isBottomNavNeutralPathname(AI_MUSIC_HUB_PATH), true);
 
   const sitemapEntry = STATIC_SITEMAP_PAGES.find(
     (page) => page.path === AI_MUSIC_HUB_PATH,
@@ -280,7 +283,7 @@ function testNavigationAndSitemap() {
   assert.equal(
     sitemapEntry,
     undefined,
-    "temporary production-test: AI music hub is excluded from sitemap",
+    "AI music landing stays excluded from sitemap",
   );
 }
 
@@ -289,4 +292,5 @@ testJsonLd();
 testCopyAndEconomics();
 testPageWiring();
 testNavigationAndSitemap();
+testScreenshots();
 console.log("ai-music-hub-page-unit: ok");

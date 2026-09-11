@@ -389,8 +389,8 @@ export type AiMusicHubPageJsonLdInput = {
 };
 
 /**
- * Commercial hub for AI / neuro musicians. Emits WebPage + Article + FAQPage
- * without Product/Offer/AggregateRating nodes.
+ * Selling landing for AI / neuro musicians. Emits WebPage + Article
+ * without Product/Offer/AggregateRating nodes. FAQPage is optional.
  */
 export function buildAiMusicHubPageJsonLd(
   input: AiMusicHubPageJsonLdInput,

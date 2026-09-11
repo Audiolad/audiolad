@@ -4,7 +4,6 @@ import AiMusicHubPageView from "@/components/ai-music-hub/AiMusicHubPageView";
 import JsonLd from "@/components/seo/JsonLd";
 import {
   AI_MUSIC_HUB_DATE_PUBLISHED,
-  AI_MUSIC_HUB_FAQ,
   AI_MUSIC_HUB_PAGE_H1,
   AI_MUSIC_HUB_PATH,
   AI_MUSIC_HUB_SEO_DESCRIPTION,
@@ -22,10 +21,6 @@ export default function AiMusicHubPage() {
     description: AI_MUSIC_HUB_SEO_DESCRIPTION,
     path: AI_MUSIC_HUB_PATH,
     datePublished: AI_MUSIC_HUB_DATE_PUBLISHED,
-    faq: AI_MUSIC_HUB_FAQ.map((item) => ({
-      question: item.question,
-      answer: item.answer,
-    })),
   });
 
   return (
