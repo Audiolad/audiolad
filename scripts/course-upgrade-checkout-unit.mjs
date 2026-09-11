@@ -281,6 +281,44 @@ assert.match(
   /unpublished entitled upgrade mismatch/,
 );
 
+const pendingKind = read(
+  "supabase/migrations/20261003120300_create_course_upgrade_order_pending_kind.sql",
+);
+assert.match(pendingKind, /CREATE OR REPLACE FUNCTION public\.create_course_upgrade_order/);
+assert.match(pendingKind, /audiolad:course-upgrade-order:v4/);
+assert.doesNotMatch(pendingKind, /base_price_minor_snapshot/);
+
+const basePriceSnapshot = read(
+  "supabase/migrations/20261005120000_create_course_upgrade_order_base_price_snapshot.sql",
+);
+assert.match(basePriceSnapshot, /CREATE OR REPLACE FUNCTION public\.create_course_upgrade_order/);
+assert.match(basePriceSnapshot, /audiolad:course-upgrade-order:v5/);
+assert.match(basePriceSnapshot, /base_price_minor_snapshot = upgrade amount/);
+assert.match(basePriceSnapshot, /v_target := v_current \+ 1/);
+assert.match(basePriceSnapshot, /upgrade_price::bigint\) \* 100/);
+assert.ok(
+  basePriceSnapshot.indexOf("idempotency_key = v_idempotency_key") <
+    basePriceSnapshot.indexOf("v_target := v_current + 1"),
+  "v5 replay must look up the original key before recomputing current+1",
+);
+assert.doesNotMatch(basePriceSnapshot, /RAISE EXCEPTION 'already_owned'/);
+assert.doesNotMatch(basePriceSnapshot, /DROP TABLE|TRUNCATE/);
+const v5Insert = basePriceSnapshot.match(
+  /INSERT INTO public\.orders \(([\s\S]*?)\)\s*VALUES \(([\s\S]*?)\)\s*RETURNING/,
+);
+assert.ok(v5Insert, "v5 INSERT column/value lists are present");
+assert.match(v5Insert[1], /base_price_minor_snapshot/);
+assert.ok(
+  (v5Insert[2].match(/v_amount_minor/g) || []).length >= 3,
+  "v5 INSERT must write v_amount_minor for amount, price, and base snapshots",
+);
+assert.doesNotMatch(v5Insert[1], /promotion_/);
+
+const checkoutSmoke = read("supabase/tests/course_upgrade_checkout_smoke.sql");
+assert.match(checkoutSmoke, /v_base_snap IS DISTINCT FROM 222200/);
+assert.match(checkoutSmoke, /idempotency must keep original upgrade snapshots/);
+assert.match(checkoutSmoke, /ALTER COLUMN base_price_minor_snapshot SET NOT NULL/);
+
 const createOrder = read(
   "supabase/migrations/20260901120200_create_practice_order_visibility.sql",
 );

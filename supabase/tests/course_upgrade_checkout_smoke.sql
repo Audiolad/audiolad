@@ -23,7 +23,12 @@ DECLARE
   v_source text;
   v_author uuid;
   v_price_snap bigint;
+  v_base_snap bigint;
 BEGIN
+  -- Match production: column is NOT NULL with no default. Table is empty here.
+  -- Dropped at the end so isolated fulfill/projection INSERTs still apply.
+  ALTER TABLE public.orders
+    ALTER COLUMN base_price_minor_snapshot SET NOT NULL;
   INSERT INTO auth.users (id) VALUES (buyer), (other);
   INSERT INTO public.authors (id, name) VALUES (author, 'Author');
 
@@ -48,8 +53,8 @@ BEGIN
   INTO v_id, v_amount, v_target, v_kind, v_currency
   FROM public.create_course_upgrade_order(course_id, key1, NULL);
 
-  SELECT author_id_snapshot, price_minor_snapshot
-  INTO v_author, v_price_snap
+  SELECT author_id_snapshot, price_minor_snapshot, base_price_minor_snapshot
+  INTO v_author, v_price_snap, v_base_snap
   FROM public.orders
   WHERE id = v_id;
 
@@ -57,6 +62,7 @@ BEGIN
      OR v_target IS DISTINCT FROM 2
      OR v_amount IS DISTINCT FROM 222200
      OR v_price_snap IS DISTINCT FROM 222200
+     OR v_base_snap IS DISTINCT FROM 222200
      OR v_currency IS DISTINCT FROM 'RUB'
      OR v_author IS DISTINCT FROM author THEN
     RAISE EXCEPTION 'B: upgrade order snapshot mismatch';
@@ -67,6 +73,17 @@ BEGIN
 
   IF v_id2 IS DISTINCT FROM v_id THEN
     RAISE EXCEPTION 'C: idempotency must reuse';
+  END IF;
+
+  SELECT amount_minor, base_price_minor_snapshot
+  INTO v_amount, v_base_snap
+  FROM public.orders
+  WHERE id = v_id2;
+
+  IF v_amount IS DISTINCT FROM 222200
+     OR v_base_snap IS DISTINCT FROM 222200 THEN
+    RAISE EXCEPTION 'C: idempotency must keep original upgrade snapshots, got % %',
+      v_amount, v_base_snap;
   END IF;
 
   SELECT order_id INTO v_id2
@@ -143,6 +160,15 @@ BEGIN
     RAISE EXCEPTION 'J: retry after failed must use new price 180000, got %', v_amount;
   END IF;
 
+  SELECT base_price_minor_snapshot INTO v_base_snap
+  FROM public.orders
+  WHERE id = v_id2;
+
+  IF v_base_snap IS DISTINCT FROM 180000 THEN
+    RAISE EXCEPTION 'J: base_price_minor_snapshot must equal new upgrade amount 180000, got %',
+      v_base_snap;
+  END IF;
+
   UPDATE public.orders
   SET status = 'failed', updated_at = now()
   WHERE id = v_id2;
@@ -216,6 +242,15 @@ BEGIN
     RAISE EXCEPTION 'I: L2→L3 must charge 150000, got % %', v_target, v_amount;
   END IF;
 
+  SELECT base_price_minor_snapshot INTO v_base_snap
+  FROM public.orders
+  WHERE id = v_id;
+
+  IF v_base_snap IS DISTINCT FROM 150000 THEN
+    RAISE EXCEPTION 'I: L2→L3 base_price_minor_snapshot must equal 150000, got %',
+      v_base_snap;
+  END IF;
+
   -- Entitled L1 on an unpublished course can start L2 checkout.
   -- A stranger still cannot (practice_not_published).
   DECLARE
@@ -244,12 +279,17 @@ BEGIN
     INTO v_id, v_amount, v_target, v_kind, v_currency
     FROM public.create_course_upgrade_order(unpublished_id, key5, 2);
 
+    SELECT base_price_minor_snapshot INTO v_base_snap
+    FROM public.orders
+    WHERE id = v_id;
+
     IF v_kind IS DISTINCT FROM 'course_upgrade'
        OR v_target IS DISTINCT FROM 2
        OR v_amount IS DISTINCT FROM 222200
+       OR v_base_snap IS DISTINCT FROM 222200
        OR v_currency IS DISTINCT FROM 'RUB' THEN
-      RAISE EXCEPTION 'K: unpublished entitled upgrade mismatch % % % %',
-        v_kind, v_target, v_amount, v_currency;
+      RAISE EXCEPTION 'K: unpublished entitled upgrade mismatch % % % % %',
+        v_kind, v_target, v_amount, v_base_snap, v_currency;
     END IF;
 
     PERFORM set_config('request.jwt.claim.sub', other::text, true);
@@ -266,6 +306,9 @@ BEGIN
         END IF;
     END;
   END;
+
+  ALTER TABLE public.orders
+    ALTER COLUMN base_price_minor_snapshot DROP NOT NULL;
 
   RAISE NOTICE 'course_upgrade_checkout_smoke: ok';
 END

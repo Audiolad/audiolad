@@ -618,6 +618,13 @@ function testRepoOneFileOneVersion() {
         row.filename === "20261004120200_studio_catalog_render_principal.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261005120000_create_course_upgrade_order_base_price_snapshot.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -730,8 +737,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261004120000",
     "20261004120100",
     "20261004120200",
+    "20261005120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 80);
+  assert.equal(plan.database_migrations_pending, 81);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -823,8 +831,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261004120000",
     "20261004120100",
     "20261004120200",
+    "20261005120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 74);
+  assert.equal(plan.database_migrations_pending, 75);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -923,8 +932,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261004120000",
     "20261004120100",
     "20261004120200",
+    "20261005120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 65);
+  assert.equal(plan.database_migrations_pending, 66);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
