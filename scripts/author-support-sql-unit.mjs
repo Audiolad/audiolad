@@ -22,7 +22,7 @@ const actorBypass = readFileSync(
   "utf8",
 );
 const supportTopics = readFileSync(
-  join(root, "supabase/migrations/20260911163000_author_support_topics.sql"),
+  join(root, "supabase/migrations/20261005121000_author_support_topics.sql"),
   "utf8",
 );
 
