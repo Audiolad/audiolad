@@ -883,9 +883,8 @@ function walkRoutes(dir, acc = []) {
 }
 
 const authorRoutes = walkRoutes(path.join(root, "src/app/api/author"));
-const studioRoutes = walkRoutes(path.join(root, "src/app/api/studio"));
 const mutatingRouteRe = /export async function (POST|PATCH|PUT|DELETE)/;
-for (const routePath of [...authorRoutes, ...studioRoutes]) {
+for (const routePath of authorRoutes) {
   const source = read(routePath);
   if (!mutatingRouteRe.test(source)) {
     continue;
