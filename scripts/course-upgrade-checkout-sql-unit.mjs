@@ -24,6 +24,10 @@ const projectionName = "20260925120500_course_upgrade_canonical_sales_projection
 const amountMatchName = "20260925120600_course_upgrade_canonical_sales_amount_match.sql";
 const entitledUnpublishedName =
   "20261001120000_course_upgrade_entitled_unpublished.sql";
+const pendingKindName =
+  "20261003120300_create_course_upgrade_order_pending_kind.sql";
+const basePriceSnapshotName =
+  "20261005120000_create_course_upgrade_order_base_price_snapshot.sql";
 const foundationName = "20260923120100_course_access_levels_foundation.sql";
 const originalFulfillName = "20260725190000_payments_p30_transactional_fulfill.sql";
 const stubPath = join(repoRoot, "scripts/lib/course-access-levels-sql-stub.sql");
@@ -58,6 +62,11 @@ const entitledUnpublished = readFileSync(
   join(migrationsDir, entitledUnpublishedName),
   "utf8",
 );
+const pendingKind = readFileSync(join(migrationsDir, pendingKindName), "utf8");
+const basePriceSnapshot = readFileSync(
+  join(migrationsDir, basePriceSnapshotName),
+  "utf8",
+);
 const originalFulfill = readFileSync(join(migrationsDir, originalFulfillName), "utf8");
 
 assert(existsSync(join(migrationsDir, previousName)), "previous latest migration stays intact");
@@ -71,6 +80,11 @@ assert(existsSync(join(migrationsDir, amountMatchName)), "amount-match projectio
 assert(
   existsSync(join(migrationsDir, entitledUnpublishedName)),
   "entitled unpublished upgrade replacement exists",
+);
+assert(existsSync(join(migrationsDir, pendingKindName)), "v4 pending-kind replacement exists");
+assert(
+  existsSync(join(migrationsDir, basePriceSnapshotName)),
+  "v5 base_price_minor_snapshot replacement exists",
 );
 
 const names = readdirSync(migrationsDir).filter((name) =>
@@ -86,6 +100,8 @@ assert(versions.includes("20260925120400"), "canonical helper stamp is listed");
 assert(versions.includes("20260925120500"), "projection stamp is listed");
 assert(versions.includes("20260925120600"), "amount-match stamp is listed");
 assert(versions.includes("20261001120000"), "entitled unpublished stamp is listed");
+assert(versions.includes("20261003120300"), "pending-kind stamp is listed");
+assert(versions.includes("20261005120000"), "base_price snapshot stamp is listed");
 assert(versions.includes("20260924120000"), "readiness stamp remains");
 
 assert(/ADD COLUMN IF NOT EXISTS order_kind text NOT NULL DEFAULT 'product_purchase'/.test(schema));
@@ -141,6 +157,35 @@ assert(/GRANT EXECUTE ON FUNCTION public\.create_course_upgrade_order/.test(enti
 assert(!/DROP TABLE/.test(entitledUnpublished));
 assert(!/TRUNCATE/.test(entitledUnpublished));
 
+assert(/CREATE OR REPLACE FUNCTION public\.create_course_upgrade_order/.test(pendingKind));
+assert(/AND o\.order_kind = 'course_upgrade'/.test(pendingKind));
+assert(!/base_price_minor_snapshot/.test(pendingKind));
+assert(/audiolad:course-upgrade-order:v4/.test(pendingKind));
+
+assert(/CREATE OR REPLACE FUNCTION public\.create_course_upgrade_order/.test(basePriceSnapshot));
+assert(/AND o\.order_kind = 'course_upgrade'/.test(basePriceSnapshot));
+assert(/True idempotency/.test(basePriceSnapshot));
+assert(basePriceSnapshot.indexOf("idempotency_key = v_idempotency_key") < basePriceSnapshot.indexOf("v_target := v_current + 1"));
+assert(/v_target := v_current \+ 1/.test(basePriceSnapshot));
+assert(/upgrade_price::bigint\) \* 100/.test(basePriceSnapshot));
+assert(!/RAISE EXCEPTION 'already_owned'/.test(basePriceSnapshot));
+assert(/GRANT EXECUTE ON FUNCTION public\.create_course_upgrade_order/.test(basePriceSnapshot));
+assert(/FROM anon/.test(basePriceSnapshot));
+assert(/audiolad:course-upgrade-order:v5/.test(basePriceSnapshot));
+assert(/base_price_minor_snapshot = upgrade amount/.test(basePriceSnapshot));
+assert(!/DROP TABLE/.test(basePriceSnapshot));
+assert(!/TRUNCATE/.test(basePriceSnapshot));
+const v5Insert = basePriceSnapshot.match(
+  /INSERT INTO public\.orders \(([\s\S]*?)\)\s*VALUES \(([\s\S]*?)\)\s*RETURNING/,
+);
+assert(v5Insert, "v5 INSERT column/value lists are present");
+assert(/base_price_minor_snapshot/.test(v5Insert[1]));
+assert(
+  (v5Insert[2].match(/v_amount_minor/g) || []).length >= 3,
+  "v5 INSERT must write v_amount_minor for amount, price, and base snapshots",
+);
+assert(!/promotion_/.test(v5Insert[1]));
+
 const fulfillSmoke = readFileSync(fulfillSmokePath, "utf8");
 assert(/fulfill_tochka_payment_transactional\(/.test(fulfillSmoke));
 assert(/external_manual/.test(fulfillSmoke));
@@ -148,9 +193,15 @@ assert(/access_source IS DISTINCT FROM 'admin'/.test(fulfillSmoke) || /stay admi
 assert(/amount_or_currency_mismatch/.test(fulfillSmoke));
 
 const checkoutSmoke = readFileSync(smokePath, "utf8");
+assert(/ADD COLUMN IF NOT EXISTS base_price_minor_snapshot/.test(readFileSync(extraStubPath, "utf8")));
 assert(/unpublished entitled upgrade/.test(checkoutSmoke) || /K: unpublished entitled/.test(checkoutSmoke));
 assert(/practice_not_published/.test(checkoutSmoke));
 assert(/course-upgrade-draft/.test(checkoutSmoke));
+assert(/base_price_minor_snapshot/.test(checkoutSmoke));
+assert(/v_base_snap IS DISTINCT FROM 222200/.test(checkoutSmoke));
+assert(/idempotency must keep original upgrade snapshots/.test(checkoutSmoke));
+assert(/ALTER COLUMN base_price_minor_snapshot SET NOT NULL/.test(checkoutSmoke));
+assert(/ALTER COLUMN base_price_minor_snapshot DROP NOT NULL/.test(checkoutSmoke));
 
 const projectionSmoke = readFileSync(projectionSmokePath, "utf8");
 assert(/author_canonical_sales_base\(/.test(projectionSmoke));
@@ -216,6 +267,8 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, projectionName), "utf8"),
     readFileSync(join(migrationsDir, amountMatchName), "utf8"),
     readFileSync(join(migrationsDir, entitledUnpublishedName), "utf8"),
+    readFileSync(join(migrationsDir, pendingKindName), "utf8"),
+    readFileSync(join(migrationsDir, basePriceSnapshotName), "utf8"),
     readFileSync(smokePath, "utf8"),
     readFileSync(fulfillSmokePath, "utf8"),
     readFileSync(projectionSmokePath, "utf8"),
@@ -242,6 +295,8 @@ function requiredFilesExist() {
     join(migrationsDir, projectionName),
     join(migrationsDir, amountMatchName),
     join(migrationsDir, entitledUnpublishedName),
+    join(migrationsDir, pendingKindName),
+    join(migrationsDir, basePriceSnapshotName),
   ].every(existsSync);
 }
 

@@ -8,6 +8,12 @@ ALTER TABLE public.orders
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS author_id_snapshot uuid NULL;
 
+-- Production: 20260823180000 adds this column then SET NOT NULL with no default.
+-- Isolated fulfill/projection fixtures insert without it, so keep it nullable
+-- here; checkout smoke enforces NOT NULL around the RPC INSERT only.
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS base_price_minor_snapshot bigint;
+
 CREATE UNIQUE INDEX IF NOT EXISTS orders_idempotency_key_unique_idx
   ON public.orders (idempotency_key)
   WHERE idempotency_key IS NOT NULL;
