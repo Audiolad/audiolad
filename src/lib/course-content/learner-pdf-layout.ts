@@ -6,6 +6,27 @@ export const COURSE_LEARNER_PDF_RETRY_LABEL = "Повторить";
 
 export const COURSE_LEARNER_PDF_RENDER_WINDOW = 2;
 
+/**
+ * Practice-route ancestor
+ * `src/app/(platform)/(listener)/practice/[...segments]/layout.tsx`
+ * applies Tailwind `px-5` (20px per side) on mobile. That is the iPhone
+ * side gutter (~10% of a 390px viewport). PDF.js itself is already 100%
+ * of its measured container.
+ */
+export const COURSE_LEARNER_PRACTICE_MOBILE_GUTTER_PX = 20;
+
+/**
+ * Break the file-viewer section out of the practice `px-5` below `sm`.
+ * Header re-applies the same gutter so chrome stays padded.
+ */
+export const COURSE_LEARNER_PDF_MOBILE_BREAKOUT_CLASS =
+  "max-sm:-mx-5 max-sm:w-[calc(100%+2.5rem)] max-sm:max-w-none";
+
+export const COURSE_LEARNER_PDF_HEADER_MOBILE_PADDING_CLASS = "max-sm:px-5";
+
+export const COURSE_LEARNER_PDF_PAGE_MOBILE_FULL_BLEED_CLASS =
+  "max-sm:rounded-none max-sm:border-x-0";
+
 export type PdfPageSize = {
   width: number;
   height: number;
@@ -78,6 +99,32 @@ export function documentHasHorizontalOverflow(input: {
 }): boolean {
   return input.pageCssWidths.some(
     (width) => !pageWrapperFitsContainer(width, input.containerWidth),
+  );
+}
+
+export function practiceLayoutPaddedContentWidth(input: {
+  viewportWidth: number;
+  gutterPx?: number;
+}): number {
+  const viewport = asPositiveNumber(input.viewportWidth);
+  const gutter = asPositiveNumber(
+    input.gutterPx ?? COURSE_LEARNER_PRACTICE_MOBILE_GUTTER_PX,
+  );
+  return Math.max(0, viewport - gutter * 2);
+}
+
+export function mobilePdfFullBleedWidth(viewportWidth: number): number {
+  return asPositiveNumber(viewportWidth);
+}
+
+export function isMobilePdfBodyFullBleed(input: {
+  viewportWidth: number;
+  pdfBodyWidth: number;
+}): boolean {
+  return (
+    Math.abs(
+      input.pdfBodyWidth - mobilePdfFullBleedWidth(input.viewportWidth),
+    ) <= 0.5
   );
 }
 

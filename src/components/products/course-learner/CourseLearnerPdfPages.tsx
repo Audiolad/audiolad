@@ -372,7 +372,7 @@ export default function CourseLearnerPdfPages({
               }}
               data-course-learner-pdf-page={slot.pageNumber}
               data-page-number={slot.pageNumber}
-              className="w-full min-w-0 max-w-full overflow-hidden rounded-[16px] border border-[#eadff8] bg-white"
+              className="w-full min-w-0 max-w-full overflow-hidden rounded-[16px] border border-[#eadff8] bg-white max-sm:rounded-none max-sm:border-x-0"
               style={{
                 width: "100%",
                 maxWidth: "100%",
