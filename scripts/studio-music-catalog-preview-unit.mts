@@ -241,6 +241,12 @@ assert.equal(
   }),
   true,
 );
+assert.equal(
+  studioMusicPreviewJsonContainsForbiddenFields({
+    url: "https://storage.example/storage/v1/object/sign/practice-audio/full.mp3",
+  }),
+  true,
+);
 
 const previewSource = read("src/lib/studio-music/preview.ts");
 assert.match(previewSource, /buildPracticePreviewClip/);
@@ -250,7 +256,8 @@ assert.match(previewSource, /streamFullAudio/);
 assert.match(previewSource, /Range: rangeHeader/);
 assert.doesNotMatch(previewSource, /\/api\/catalog\/play/);
 assert.doesNotMatch(previewSource, /user_practices/);
-assert.doesNotMatch(previewSource, /createSignedUrl/);
+assert.match(previewSource, /\.createSignedUrl\(audioPath, 60\)/);
+assert.match(previewSource, /return new Response\(upstream\.body, \{ status: 206, headers \}\)/);
 
 const route = read("src/app/api/studio/music/preview/route.ts");
 assert.match(route, /handleStudioMusicPreview/);
