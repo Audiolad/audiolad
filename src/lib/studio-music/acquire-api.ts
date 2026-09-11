@@ -99,11 +99,11 @@ function asBoolean(value: unknown): boolean | null {
     return value;
   }
 
-  if (value === "true") {
+  if (value === "true" || value === 1 || value === "1") {
     return true;
   }
 
-  if (value === "false") {
+  if (value === "false" || value === 0 || value === "0") {
     return false;
   }
 

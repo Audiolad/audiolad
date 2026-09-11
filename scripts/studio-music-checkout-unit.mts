@@ -123,6 +123,16 @@ const freeRow = coerceStudioMusicAcquireRow({
 assert.equal(freeRow?.inserted, true);
 assert.equal(freeRow?.order_id, null);
 assert.equal(freeRow?.grant_source, "free");
+assert.equal(
+  coerceStudioMusicAcquireRow({ ...freeRow, inserted: 1 })?.inserted,
+  true,
+  "numeric RPC true must not be turned into internal_error",
+);
+assert.equal(
+  coerceStudioMusicAcquireRow({ ...freeRow, inserted: 0 })?.inserted,
+  false,
+  "numeric RPC false replay must remain idempotent",
+);
 const freeBody = toStudioMusicAcquireSuccessBody(freeRow!);
 assert.equal(freeBody.entitlement.order_id, null);
 assert.equal(freeBody.entitlement.inserted, true);
@@ -460,6 +470,10 @@ assert.equal(
 assert.equal(
   mapStudioMusicAcquireClientError("practice_not_free"),
   "Эта музыка не бесплатная.",
+);
+assert.equal(
+  mapStudioMusicAcquireClientError("support_mutation_blocked"),
+  "В режиме поддержки нельзя получать музыку для Студии.",
 );
 assert.equal(
   resolveStudioMusicCheckoutUiError({
