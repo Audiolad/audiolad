@@ -45,7 +45,7 @@ function testMetadata() {
   assert.equal(metadata.twitter?.card, "summary");
   assert.equal(
     FOR_AUTHORS_PAGE_H1,
-    "Платформа для авторов медитаций и аудиопрактик",
+    "Платформа для авторов нейромузыки, медитаций и аудиопрактик",
   );
 }
 
