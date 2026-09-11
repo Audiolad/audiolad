@@ -113,6 +113,8 @@ export default function BecomeAuthorHeader({
   );
 }
 
+export const AUTHOR_APPLICATION_PANEL_ID = "author-application-panel";
+
 export function BecomeAuthorHero() {
   return (
     <section className="mt-6 rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)] lg:p-6">
@@ -133,9 +135,30 @@ export function BecomeAuthorHero() {
   );
 }
 
+export function BecomeAuthorTopCta({
+  audience,
+}: {
+  audience: BecomeAuthorAudience;
+}) {
+  if (audience === "author") {
+    return null;
+  }
+
+  return (
+    <div className="mt-5">
+      <a
+        href={`#${AUTHOR_APPLICATION_PANEL_ID}`}
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] lg:w-auto"
+      >
+        Стать автором
+      </a>
+    </div>
+  );
+}
+
 export function BecomeAuthorInfoSections() {
   return (
-    <div className="mt-8 space-y-8">
+    <div className="space-y-8">
       <section aria-labelledby="become-author-fit-heading">
         <h2
           id="become-author-fit-heading"
@@ -313,34 +336,38 @@ export function BecomeAuthorInfoSections() {
           </article>
         </div>
       </section>
-
-      <section
-        aria-labelledby="become-author-training-heading"
-        className="rounded-[22px] border border-[#eadff8] bg-[#faf6ff] p-5"
-      >
-        <h2
-          id="become-author-training-heading"
-          className="text-[17px] font-semibold"
-        >
-          Нужна помощь с созданием аудиопрактик?
-        </h2>
-        <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-          <strong>Школа Аудиопрактик</strong> — обучение для тех, кто хочет
-          создавать собственные медитации и аудиопрактики, работать с голосом и
-          превращать свои знания и опыт в любимое дело.
-        </p>
-        <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-          Смотрите программу Школы прямо сейчас и присоединяйтесь.
-        </p>
-        <a
-          href="https://school.audiolad.ru/"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto"
-        >
-          Перейти в Школу Аудиопрактик
-        </a>
-      </section>
     </div>
+  );
+}
+
+export function BecomeAuthorSchoolSection() {
+  return (
+    <section
+      aria-labelledby="become-author-training-heading"
+      className="rounded-[22px] border border-[#eadff8] bg-[#faf6ff] p-5"
+    >
+      <h2
+        id="become-author-training-heading"
+        className="text-[17px] font-semibold"
+      >
+        Нужна помощь с созданием аудиопрактик?
+      </h2>
+      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+        <strong>Школа Аудиопрактик</strong> — обучение для тех, кто хочет
+        создавать собственные медитации и аудиопрактики, работать с голосом и
+        превращать свои знания и опыт в любимое дело.
+      </p>
+      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+        Смотрите программу Школы прямо сейчас и присоединяйтесь.
+      </p>
+      <a
+        href="https://school.audiolad.ru/"
+        target="_blank"
+        rel="noreferrer"
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto"
+      >
+        Перейти в Школу Аудиопрактик
+      </a>
+    </section>
   );
 }

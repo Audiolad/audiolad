@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import AuthorApplicationPanel from "@/components/become-author/AuthorApplicationPanel";
 import BecomeAuthorShell from "@/components/become-author/BecomeAuthorShell";
 import BecomeAuthorHeader, {
+  AUTHOR_APPLICATION_PANEL_ID,
   BecomeAuthorHero,
   BecomeAuthorInfoSections,
+  BecomeAuthorSchoolSection,
+  BecomeAuthorTopCta,
 } from "@/components/become-author/BecomeAuthorContent";
 import { getBecomeAuthorPageView } from "@/lib/author-applications/queries";
 import { rowToFormValues } from "@/lib/author-applications/validation";
@@ -73,13 +76,19 @@ export default async function BecomeAuthorPage({
     <BecomeAuthorShell>
       <BecomeAuthorHeader audience={view.audience} />
 
-      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)] lg:items-start lg:gap-8">
+      <div className="mt-6 flex flex-col lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)] lg:items-start lg:gap-8">
         <div className="min-w-0">
           <BecomeAuthorHero />
-          <BecomeAuthorInfoSections />
+          <BecomeAuthorTopCta audience={view.audience} />
+          <div className="mt-8">
+            <BecomeAuthorInfoSections />
+          </div>
         </div>
 
-        <aside className="mt-8 min-w-0 lg:mt-0 lg:self-start">
+        <aside
+          id={AUTHOR_APPLICATION_PANEL_ID}
+          className="mt-8 min-w-0 scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))] lg:mt-0 lg:self-start"
+        >
           <AuthorApplicationPanel
             audience={view.audience}
             application={view.application}
@@ -89,6 +98,10 @@ export default async function BecomeAuthorPage({
             userEmail={view.userEmail}
           />
         </aside>
+
+        <div className="mt-8 min-w-0 lg:col-span-2">
+          <BecomeAuthorSchoolSection />
+        </div>
       </div>
     </BecomeAuthorShell>
   );
