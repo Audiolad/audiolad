@@ -1,0 +1,115 @@
+/*
+ * Page-local breathing CTA for /kak-zarabatyvat-na-ii-muzyke-v-audiolad.
+ * Spirit matches «Поблагодарить автора»: soft idle scale + glow, no sheen.
+ */
+
+.ai-music-hub-cta {
+  position: relative;
+  transform-origin: center;
+  box-shadow: 0 8px 18px rgba(112, 66, 197, 0.16);
+  transition:
+    background-color 160ms ease,
+    box-shadow 200ms ease,
+    filter 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ai-music-hub-cta__clef {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1.2rem;
+  height: 1.2rem;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.ai-music-hub-cta__clef svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ai-music-hub-cta:hover {
+  box-shadow: 0 10px 22px rgba(112, 66, 197, 0.26);
+}
+
+.ai-music-hub-cta:active {
+  filter: brightness(0.92);
+  box-shadow: 0 6px 14px rgba(112, 66, 197, 0.2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-music-hub-cta {
+    animation:
+      ai-music-hub-cta-breathe 3.8s ease-in-out infinite,
+      ai-music-hub-cta-glow 5.6s ease-in-out infinite;
+  }
+
+  .ai-music-hub-cta__clef {
+    animation: ai-music-hub-cta-clef 2.6s ease-in-out infinite;
+  }
+
+  .ai-music-hub-cta:hover,
+  .ai-music-hub-cta:focus-visible {
+    animation-play-state: paused;
+  }
+
+  .ai-music-hub-cta:hover .ai-music-hub-cta__clef,
+  .ai-music-hub-cta:focus-visible .ai-music-hub-cta__clef {
+    animation-play-state: paused;
+  }
+
+  .ai-music-hub-cta:active {
+    animation: none;
+    transform: scale(0.985);
+  }
+
+  .ai-music-hub-cta:active .ai-music-hub-cta__clef {
+    animation: none;
+  }
+}
+
+@keyframes ai-music-hub-cta-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.014);
+  }
+}
+
+@keyframes ai-music-hub-cta-clef {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes ai-music-hub-cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 8px 18px rgba(112, 66, 197, 0.16);
+  }
+  50% {
+    box-shadow: 0 12px 26px rgba(112, 66, 197, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-music-hub-cta,
+  .ai-music-hub-cta__clef {
+    animation: none;
+  }
+
+  .ai-music-hub-cta:active {
+    transform: none;
+  }
+}
