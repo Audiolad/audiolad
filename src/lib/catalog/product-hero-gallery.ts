@@ -197,9 +197,12 @@ export function buildPracticeHeroLightMeta(input: {
   formatMeta: string | null | undefined;
   authorName?: string | null;
 }): string | null {
-  const lightMeta =
-    formatHeroMaterialsMeta(input.gallerySlides) ??
-    stripRedundantFormatPrefix(input.formatMeta, input.productTypeLabel);
+  // Hero meta is author + duration/audio stats from formatMeta.
+  // Do not use gallery slide count as «N материалов» — gallery 1/N is separate.
+  const lightMeta = stripRedundantFormatPrefix(
+    input.formatMeta,
+    input.productTypeLabel,
+  );
   const author = input.authorName?.trim() || null;
 
   if (author && lightMeta) {

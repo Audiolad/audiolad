@@ -591,6 +591,120 @@ function testMobileWindowedDotsKeepDesktopArrows() {
   );
 }
 
+const MATERIALS_COUNT_RE = /\d+\s+материал(?:а|ов)?(?:\b|$)/;
+
+function assertHeroMetaOmitsMaterialsCount(meta: string | null, label: string) {
+  assert.equal(
+    MATERIALS_COUNT_RE.test(meta ?? ""),
+    false,
+    `${label} must not include materials plural: ${JSON.stringify(meta)}`,
+  );
+}
+
+function testHeroMetaOmitsMaterialsCount() {
+  const galleryThatWouldCountAsMaterials = [
+    { alt: "Материал · PDF" },
+    { alt: "Бонус · PDF + аудио" },
+  ];
+  const authorName = "Сергей Петров";
+
+  const cases: Array<{
+    label: string;
+    productTypeLabel: string;
+    formatMeta: string | null;
+    expected: string;
+  }> = [
+    {
+      label: "single practice",
+      productTypeLabel: "Аудиопрактика",
+      formatMeta: formatProductMeta({
+        format: "Аудиопрактика",
+        audioCount: 1,
+        durationMinutesFallback: 12,
+      }),
+      expected: "Сергей Петров · 12 мин",
+    },
+    {
+      label: "multi-track practice",
+      productTypeLabel: "Аудиопрактика",
+      formatMeta: formatProductMeta({
+        format: "Аудиопрактика",
+        audioCount: 3,
+        durationMinutesFallback: 45,
+      }),
+      expected: "Сергей Петров · 3 аудио · 45 мин",
+    },
+    {
+      label: "course / program",
+      productTypeLabel: "Курс",
+      formatMeta: formatProductMeta({
+        format: "Курс",
+        audioCount: 0,
+        durationMinutesFallback: 120,
+      }),
+      expected: "Сергей Петров · 2 ч",
+    },
+    {
+      label: "music set / album",
+      productTypeLabel: "Музыка",
+      formatMeta: formatProductMeta({
+        format: "Музыка",
+        audioCount: 8,
+        durationMinutesFallback: 40,
+      }),
+      expected: "Сергей Петров · 8 аудио · 40 мин",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const meta = buildPracticeHeroLightMeta({
+      gallerySlides: galleryThatWouldCountAsMaterials,
+      productTypeLabel: testCase.productTypeLabel,
+      formatMeta: testCase.formatMeta,
+      authorName,
+    });
+    assert.equal(meta, testCase.expected, testCase.label);
+    assertHeroMetaOmitsMaterialsCount(meta, testCase.label);
+    assert.equal(
+      resolvePracticeHeroLightMetaRest(meta, authorName)?.includes("материал") ??
+        false,
+      false,
+      `${testCase.label} rest must not include materials plural`,
+    );
+  }
+
+  const noDurationCourse = buildPracticeHeroLightMeta({
+    gallerySlides: [{ alt: "Урок 1" }, { alt: "Урок 2" }, { alt: "Урок 3" }],
+    productTypeLabel: "Курс",
+    formatMeta: formatProductMeta({
+      format: "Курс",
+      audioCount: 0,
+    }),
+    authorName: "Автор",
+  });
+  assert.equal(noDurationCourse, "Автор");
+  assertHeroMetaOmitsMaterialsCount(noDurationCourse, "course without duration");
+  assert.equal(
+    formatHeroMaterialsMeta(galleryThatWouldCountAsMaterials),
+    "2 материала · PDF и аудио",
+    "materials plural still exists as a helper, but hero must not use it",
+  );
+
+  const source = read("src/lib/catalog/product-hero-gallery.ts");
+  const builderStart = source.indexOf(
+    "export function buildPracticeHeroLightMeta(",
+  );
+  const nextExport = source.indexOf("\nexport function ", builderStart + 1);
+  const builder = source.slice(
+    builderStart,
+    nextExport === -1 ? source.length : nextExport,
+  );
+  assert.ok(builderStart >= 0, "buildPracticeHeroLightMeta source is present");
+  assert.match(builder, /stripRedundantFormatPrefix/);
+  assert.doesNotMatch(builder, /formatHeroMaterialsMeta/);
+  assert.doesNotMatch(builder, /formatMaterialsCountLabel/);
+}
+
 function testHeroAuthorNameLinksToPublicAuthorPage() {
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
@@ -665,6 +779,7 @@ function testHeroAuthorNameLinksToPublicAuthorPage() {
 testSliderOnlyWhenGalleryExists();
 testPromoBlockOnlyWhenOfferActive();
 testHeroLightMetaAuthorPrefix();
+testHeroMetaOmitsMaterialsCount();
 testHeroAuthorNameLinksToPublicAuthorPage();
 testNoGalleryNoPromoFallback();
 testMeditationSolutionsGalleryOrder();
