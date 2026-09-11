@@ -4,9 +4,11 @@ import {
   buildPracticePreviewClip,
   type PreviewAudioItemRow,
 } from "@/lib/listen/serve-preview-clip";
+import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 import { canUseMusicInStudio } from "./access";
 import {
+  isFreePublicStudioMusicInventory,
   isPublicStudioMusicInventory,
   isStudioMusicCatalogUuid,
   type StudioMusicCatalogEntitlement,
@@ -18,7 +20,7 @@ export type StudioMusicPreviewAudioItem = PreviewAudioItemRow & {
 };
 
 export type StudioMusicPreviewDecision =
-  | { ok: true }
+  | { ok: true; access: "preview" | "full" }
   | { ok: false; status: number; code: string };
 
 export function authorizeStudioMusicPreview(input: {
@@ -54,12 +56,17 @@ export function authorizeStudioMusicPreview(input: {
   const publishedAudio =
     !input.audioItem.status || input.audioItem.status === "published";
 
-  if (publicInventory && publishedAudio) {
-    return { ok: true };
+  if (input.userId && input.canUse) {
+    return { ok: true, access: "full" };
   }
 
-  if (input.userId && input.canUse) {
-    return { ok: true };
+  if (publicInventory && publishedAudio) {
+    return {
+      ok: true,
+      access: isFreePublicStudioMusicInventory(input.practice)
+        ? "full"
+        : "preview",
+    };
   }
 
   return { ok: false, status: 403, code: "forbidden" };
@@ -67,7 +74,8 @@ export function authorizeStudioMusicPreview(input: {
 
 export type StudioMusicPreviewHandlerResult =
   | { type: "json"; status: number; body: { error: string } }
-  | { type: "clip"; bytes: Uint8Array; startMs: number; endMs: number };
+  | { type: "clip"; bytes: Uint8Array; startMs: number; endMs: number }
+  | { type: "full"; response: Response };
 
 export type StudioMusicPreviewStore = {
   loadPractice(
@@ -81,12 +89,17 @@ export type StudioMusicPreviewStore = {
     practiceId: string;
     audioItem: PreviewAudioItemRow;
   }): Promise<{ bytes: Uint8Array; startMs: number; endMs: number }>;
+  streamFullAudio(input: {
+    audioItem: StudioMusicPreviewAudioItem;
+    rangeHeader: string | null;
+  }): Promise<Response>;
 };
 
 export async function handleStudioMusicPreview(input: {
   publicationId: string | null;
   audioItemId: string | null;
   userId: string | null;
+  rangeHeader?: string | null;
   store: StudioMusicPreviewStore;
 }): Promise<StudioMusicPreviewHandlerResult> {
   if (
@@ -124,6 +137,18 @@ export async function handleStudioMusicPreview(input: {
 
   if (!audioItem) {
     return { type: "json", status: 404, body: { error: "not_found" } };
+  }
+
+  if (decision.access === "full") {
+    return {
+      type: "full",
+      response: await input.store.streamFullAudio({
+        audioItem,
+        // Explicit Range makes catalog seeking reliable even when the media
+        // element's initial metadata request omits it.
+        rangeHeader: input.rangeHeader || "bytes=0-",
+      }),
+    };
   }
 
   const clip = await input.store.buildClip({
@@ -250,7 +275,45 @@ export function createSupabaseStudioMusicPreviewStore(
         storageClient: supabase,
         practiceId,
         audioItem,
+        maxDurationMs: 60_000,
       });
+    },
+
+    async streamFullAudio({ audioItem, rangeHeader }) {
+      const audioPath = audioItem.audio_path?.trim() ?? "";
+      if (!audioPath) {
+        throw new Error("audio_missing");
+      }
+      const { data, error } = await supabase.storage
+        .from("practice-audio")
+        .createSignedUrl(audioPath, 60);
+      const signedUrl = data?.signedUrl
+        ? normalizeStorageSignedUrl(data.signedUrl)
+        : null;
+      if (error || !signedUrl) {
+        throw new Error("preview_source_sign_failed");
+      }
+      const upstream = await fetch(signedUrl, {
+        cache: "no-store",
+        headers: { Range: rangeHeader },
+      });
+      if (upstream.status !== 206) {
+        throw new Error("preview_source_fetch_failed");
+      }
+      const headers = new Headers();
+      for (const name of [
+        "Accept-Ranges",
+        "Content-Length",
+        "Content-Range",
+        "Content-Type",
+      ]) {
+        const value = upstream.headers.get(name);
+        if (value) headers.set(name, value);
+      }
+      headers.set("Cache-Control", "private, no-store");
+      headers.set("Referrer-Policy", "no-referrer");
+      headers.set("X-Content-Type-Options", "nosniff");
+      return new Response(upstream.body, { status: 206, headers });
     },
   };
 }

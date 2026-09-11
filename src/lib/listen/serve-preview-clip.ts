@@ -143,6 +143,11 @@ export async function buildPracticePreviewClip(input: {
   practiceId: string;
   audioItem: PreviewAudioItemRow;
   requireConfiguredWindow?: boolean;
+  /**
+   * A caller-specific upper bound. This only changes that caller's served
+   * clip; the globally configured storefront window remains untouched.
+   */
+  maxDurationMs?: number;
 }): Promise<{
   bytes: Uint8Array;
   startMs: number;
@@ -163,12 +168,34 @@ export async function buildPracticePreviewClip(input: {
   ) {
     throw new Error("preview_window_invalid");
   }
+  const maxDurationMs =
+    typeof input.maxDurationMs === "number" &&
+    Number.isFinite(input.maxDurationMs) &&
+    input.maxDurationMs > 0
+      ? Math.floor(input.maxDurationMs)
+      : null;
+  const endMs =
+    maxDurationMs == null
+      ? window.endMs
+      : Math.min(
+          typeof input.audioItem.duration_seconds === "number" &&
+            Number.isFinite(input.audioItem.duration_seconds) &&
+            input.audioItem.duration_seconds > 0
+            ? Math.floor(input.audioItem.duration_seconds * 1000)
+            : window.startMs + maxDurationMs,
+          window.startMs + maxDurationMs,
+        );
+
+  if (endMs <= window.startMs) {
+    throw new Error("preview_clip_empty");
+  }
+
   const key = clipCacheKey(
     input.practiceId,
     input.audioItem.id,
     audioPath,
     window.startMs,
-    window.endMs,
+    endMs,
   );
   const cached = readClipCache(key);
 
@@ -176,7 +203,7 @@ export async function buildPracticePreviewClip(input: {
     return {
       bytes: cached,
       startMs: window.startMs,
-      endMs: window.endMs,
+      endMs,
       expiresIn: LISTEN_SIGNED_URL_TTL_SECONDS,
     };
   }
@@ -184,11 +211,11 @@ export async function buildPracticePreviewClip(input: {
   const downloaded = await downloadPracticeAudio(input.storageClient, audioPath);
   const extracted =
     downloaded.source instanceof Uint8Array
-      ? extractMp3TimeRange(downloaded.source, window.startMs, window.endMs)
+      ? extractMp3TimeRange(downloaded.source, window.startMs, endMs)
       : await extractMp3TimeRangeFromStream(
           downloaded.source,
           window.startMs,
-          window.endMs,
+          endMs,
           { abort: downloaded.abort },
         );
 
@@ -197,7 +224,7 @@ export async function buildPracticePreviewClip(input: {
   return {
     bytes: extracted.bytes,
     startMs: window.startMs,
-    endMs: window.endMs,
+    endMs,
     expiresIn: LISTEN_SIGNED_URL_TTL_SECONDS,
   };
 }

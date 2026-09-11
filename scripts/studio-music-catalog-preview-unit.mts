@@ -31,6 +31,7 @@ const publicPractice: StudioMusicCatalogPublication = {
   music_usage_permission: "platform_reuse_allowed",
   is_free: false,
   price: 500,
+  studio_music_pricing_mode: "auto_2x_listener",
   catalog_visibility: "listed",
   is_catalog_listed: true,
 };
@@ -56,7 +57,7 @@ assert.deepEqual(
     userId: null,
     canUse: false,
   }),
-  { ok: true },
+  { ok: true, access: "preview" },
 );
 
 assert.deepEqual(
@@ -104,7 +105,7 @@ assert.deepEqual(
     userId: "user-1",
     canUse: true,
   }),
-  { ok: true },
+  { ok: true, access: "full" },
 );
 
 function createStore(input: {
@@ -134,6 +135,17 @@ function createStore(input: {
         startMs: 30000,
         endMs: 90000,
       };
+    },
+    async streamFullAudio({ rangeHeader }) {
+      assert.equal(rangeHeader, "bytes=0-");
+      return new Response(new Uint8Array([0xff, 0xfb, 0x90, 0x00]), {
+        status: 206,
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": "bytes 0-3/4",
+          "Content-Type": "audio/mpeg",
+        },
+      });
     },
   };
 }
@@ -167,7 +179,41 @@ const ownedUnpublished = await handleStudioMusicPreview({
   userId: "user-1",
   store: createStore({ practice: unpublishedPractice, canUse: true }),
 });
-assert.equal(ownedUnpublished.type, "clip");
+assert.equal(ownedUnpublished.type, "full");
+
+const listenerFreeStudioFixed = await handleStudioMusicPreview({
+  publicationId,
+  audioItemId,
+  userId: null,
+  store: createStore({
+    practice: {
+      ...publicPractice,
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "fixed",
+      studio_music_price_minor: 60000,
+    },
+  }),
+});
+assert.equal(listenerFreeStudioFixed.type, "clip");
+
+const listenerPaidStudioFree = await handleStudioMusicPreview({
+  publicationId,
+  audioItemId,
+  userId: null,
+  store: createStore({
+    practice: {
+      ...publicPractice,
+      studio_music_pricing_mode: "free",
+    },
+  }),
+});
+assert.equal(listenerPaidStudioFree.type, "full");
+if (listenerPaidStudioFree.type === "full") {
+  assert.equal(listenerPaidStudioFree.response.status, 206);
+  assert.equal(listenerPaidStudioFree.response.headers.get("Accept-Ranges"), "bytes");
+  assert.match(listenerPaidStudioFree.response.headers.get("Content-Range") ?? "", /^bytes /);
+}
 
 const wrongRelation = await handleStudioMusicPreview({
   publicationId,
@@ -198,6 +244,10 @@ assert.equal(
 
 const previewSource = read("src/lib/studio-music/preview.ts");
 assert.match(previewSource, /buildPracticePreviewClip/);
+assert.match(previewSource, /maxDurationMs: 60_000/);
+assert.match(previewSource, /isFreePublicStudioMusicInventory/);
+assert.match(previewSource, /streamFullAudio/);
+assert.match(previewSource, /Range: rangeHeader/);
 assert.doesNotMatch(previewSource, /\/api\/catalog\/play/);
 assert.doesNotMatch(previewSource, /user_practices/);
 assert.doesNotMatch(previewSource, /createSignedUrl/);
@@ -205,6 +255,8 @@ assert.doesNotMatch(previewSource, /createSignedUrl/);
 const route = read("src/app/api/studio/music/preview/route.ts");
 assert.match(route, /handleStudioMusicPreview/);
 assert.match(route, /audio\/mpeg|previewClipResponseHeaders/);
+assert.match(route, /rangeHeader: request\.headers\.get\("range"\)/);
+assert.match(route, /result\.type === "full"/);
 assert.match(route, /Cache-Control/);
 assert.doesNotMatch(route, /\/api\/catalog\/play/);
 assert.doesNotMatch(route, /audio_path/);
