@@ -10,6 +10,7 @@ import {
 import {
   COURSE_LEARNER_PDF_ERROR_LABEL,
   COURSE_LEARNER_PDF_LOADING_LABEL,
+  COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS,
   COURSE_LEARNER_PDF_RETRY_LABEL,
   formatPdfPageErrorLabel,
   formatPdfPageLabel,
@@ -330,7 +331,7 @@ export default function CourseLearnerPdfPages({
       ref={containerRef}
       data-course-learner-pdf-pages="true"
       data-pdf-status={status}
-      className="mt-4 flex w-full min-w-0 max-w-full flex-col gap-4 overflow-x-clip"
+      className={`mt-4 flex w-full min-w-0 max-w-full flex-col gap-4 overflow-x-clip ${COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS}`}
     >
       {status === "loading" ? (
         <p

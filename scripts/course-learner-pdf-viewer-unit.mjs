@@ -17,12 +17,19 @@ import {
   resolveCourseLearnerFileHttpMode,
 } from "../src/lib/course-content/learner-file-http.ts";
 import {
+  COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX,
+  COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS,
+  COURSE_LEARNER_LISTENER_SHELL_MOBILE_MAX_WIDTH_PX,
   COURSE_LEARNER_PDF_LOADING_LABEL,
+  COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS,
   computePdfPageCssSize,
   documentHasHorizontalOverflow,
   formatPdfPageLabel,
+  isMobilePdfBodyFullBleed,
   isPdfPageEligibleForRender,
+  listenerShellMobileContentWidth,
   listPdfPagesToRelease,
+  mobilePdfFullBleedWidth,
   pageWrapperFitsContainer,
   selectPdfPagesToRender,
 } from "../src/lib/course-content/learner-pdf-layout.ts";
@@ -179,7 +186,16 @@ assert.match(
   ),
 );
 assert.match(markup, /data-course-learner-pdf-pages="true"/);
+assert.match(markup, /data-course-learner-file-viewer-header="true"/);
 assert.match(markup, new RegExp(COURSE_LEARNER_PDF_LOADING_LABEL));
+assert.ok(
+  markup.includes(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS),
+  "PDF page stack uses viewport 100vw breakout on mobile",
+);
+assert.ok(
+  markup.includes(COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS),
+  "file viewer relaxes overflow-x-clip on mobile so the PDF can bleed",
+);
 assert.doesNotMatch(markup, /<iframe/);
 assert.doesNotMatch(markup, /view=FitH/);
 assert.equal(
@@ -206,9 +222,130 @@ const viewerSource = read(
 const pagesSource = read(
   "src/components/products/course-learner/CourseLearnerPdfPages.tsx",
 );
+const shellSource = read("src/components/listener/ListenerAppShell.tsx");
+const practiceLayoutSource = read(
+  "src/app/(platform)/(listener)/practice/[...segments]/layout.tsx",
+);
 const route = read(
   "src/app/api/listen/product/[slug]/[productSlug]/file/[fileId]/route.ts",
 );
+
+assert.match(
+  shellSource,
+  /listener-app-shell__body mx-auto w-full max-w-\[430px\]/,
+  "global listener shell mobile max-w-[430px] must stay unchanged",
+);
+assert.doesNotMatch(
+  shellSource,
+  /COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS|100vw/,
+  "do not move PDF full-bleed into the global listener shell",
+);
+assert.match(
+  practiceLayoutSource,
+  /listener-practice-content px-5/,
+  "practice route padding stays; PDF breakout escapes it",
+);
+assert.ok(
+  viewerSource.includes(COURSE_LEARNER_FILE_VIEWER_OVERFLOW_CLASS),
+  "FileViewer overflow-x-clip is lg-only so mobile bleed is not clipped",
+);
+assert.match(viewerSource, /max-w-5xl/);
+assert.match(viewerSource, /data-course-learner-file-viewer-header="true"/);
+assert.ok(
+  pagesSource.includes(COURSE_LEARNER_PDF_MOBILE_FULL_BLEED_CLASS),
+  "PDF pages own the mobile 100vw / calc(50%-50vw) breakout",
+);
+assert.match(pagesSource, /ResizeObserver/);
+assert.match(pagesSource, /IntersectionObserver/);
+assert.match(pagesSource, /devicePixelRatio/);
+assert.match(
+  pagesSource,
+  /getBoundingClientRect\(\)\.width/,
+  "PDF.js still sizes from its own container width, not a JS viewport hack",
+);
+assert.doesNotMatch(
+  pagesSource,
+  /window\.innerWidth|visualViewport/,
+  "no JS viewport width hacks",
+);
+
+const headerMarkup = markup.match(
+  /<div[^>]*data-course-learner-file-viewer-header="true"[^>]*>/,
+);
+assert.ok(headerMarkup, "header is marked separately from the PDF bleed target");
+assert.doesNotMatch(
+  headerMarkup[0],
+  /100vw|50vw/,
+  "header/back/title need not be full-bleed",
+);
+
+const widePhoneViewport = 480;
+const shellWidth = listenerShellMobileContentWidth(widePhoneViewport);
+assert.equal(COURSE_LEARNER_LISTENER_SHELL_MOBILE_MAX_WIDTH_PX, 430);
+assert.equal(shellWidth, 430);
+assert.equal(mobilePdfFullBleedWidth(widePhoneViewport), widePhoneViewport);
+assert.ok(
+  mobilePdfFullBleedWidth(widePhoneViewport) > shellWidth,
+  "mobile PDF area can occupy viewport width even when the listener column is max-w constrained",
+);
+assert.equal(
+  isMobilePdfBodyFullBleed({
+    viewportWidth: widePhoneViewport,
+    pdfBodyWidth: shellWidth,
+  }),
+  false,
+);
+assert.equal(
+  isMobilePdfBodyFullBleed({
+    viewportWidth: widePhoneViewport,
+    pdfBodyWidth: widePhoneViewport,
+  }),
+  true,
+);
+
+const mobileBleedSlots = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: mobilePdfFullBleedWidth(widePhoneViewport),
+  devicePixelRatio: 2,
+});
+assert.equal(mobileBleedSlots[0].cssWidth, widePhoneViewport);
+assert.ok(
+  pageWrapperFitsContainer(mobileBleedSlots[0].cssWidth, widePhoneViewport),
+  "page/canvas still fit the (now viewport-wide) container",
+);
+assert.equal(
+  documentHasHorizontalOverflow({
+    containerWidth: widePhoneViewport,
+    pageCssWidths: mobileBleedSlots.map((slot) => slot.cssWidth),
+  }),
+  false,
+  "full-bleed pages must not create horizontal overflow",
+);
+
+const desktopMonitorWidth = 1440;
+assert.equal(COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX, 1024);
+assert.ok(COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX < desktopMonitorWidth);
+const desktopSlots = buildPdfPageSlots({
+  pageSizes,
+  containerWidth: COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX,
+  devicePixelRatio: 2,
+});
+assert.equal(
+  desktopSlots[0].cssWidth,
+  COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX,
+);
+assert.ok(
+  desktopSlots[0].cssWidth < desktopMonitorWidth,
+  "desktop max-width UX is preserved — PDF does not stretch across the monitor",
+);
+assert.equal(
+  documentHasHorizontalOverflow({
+    containerWidth: COURSE_LEARNER_FILE_VIEWER_DESKTOP_MAX_WIDTH_PX,
+    pageCssWidths: desktopSlots.map((slot) => slot.cssWidth),
+  }),
+  false,
+);
+
 assert.doesNotMatch(viewerSource, /<iframe/);
 assert.match(pagesSource, /getDocument/);
 assert.match(pagesSource, /<canvas/);
