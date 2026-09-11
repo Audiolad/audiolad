@@ -285,6 +285,12 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      key: "studio_music_acquire",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: ["src/app/api/studio/music/acquire/route.ts"],
+    },
+    {
       key: "finance_payout",
       group: "blocked",
       disposition: "blocked",
