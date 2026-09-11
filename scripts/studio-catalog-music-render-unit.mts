@@ -19,6 +19,7 @@ import {
 import {
   executeClaimedStudioRenderJob,
   failClaimedStudioRenderJob,
+  type StudioRenderExecuteDeps,
 } from "../src/lib/studio/render/worker-runtime";
 import type { ClaimedStudioRenderJob } from "../src/lib/studio/render/worker";
 import type { StudioRenderSnapshot } from "../src/lib/studio/render/types";
@@ -340,6 +341,27 @@ async function listRenderWorkspaces(): Promise<string[]> {
   return (await readdir(tmpdir())).filter((name) => name.startsWith("audiolad-render-"));
 }
 
+function ffmpegAvailable(): boolean {
+  return spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
+}
+
+async function stubRenderToMp3(
+  _input: unknown,
+  options: { renderId: string; outputDirectory: string },
+) {
+  const outputPath = join(options.outputDirectory, `${options.renderId}.mp3`);
+  await writeFile(outputPath, Buffer.alloc(600, 1));
+  return {
+    outputPath,
+    durationSeconds: 2,
+    expectedDurationSeconds: 2,
+    actualDurationSeconds: 2,
+    durationDeltaSeconds: 0,
+    sizeBytes: 600,
+    stderr: "stub-render-no-ffmpeg",
+  };
+}
+
 async function main() {
   const snapshot = createStudioRenderSnapshot({
     project: projectRow(),
@@ -392,10 +414,23 @@ async function main() {
 
   const job = claimedJob(snapshot);
   const beforeWorkspaces = new Set(await listRenderWorkspaces());
+  const canRender = ffmpegAvailable();
+  const renderDeps: StudioRenderExecuteDeps = canRender
+    ? {}
+    : { renderToMp3: stubRenderToMp3 as StudioRenderExecuteDeps["renderToMp3"] };
+  if (!canRender) {
+    console.log("studio-catalog-music-render-unit: ffmpeg missing; auth/materialize/revoke still run, mix decode skipped");
+  }
 
   // A: active entitlement → materialize → render
   const stateA = baseState();
-  const resultA = await executeClaimedStudioRenderJob(createFakeService(stateA) as never, job);
+  const resultA = await executeClaimedStudioRenderJob(
+    createFakeService(stateA) as never,
+    job,
+    new AbortController().signal,
+    1800,
+    renderDeps,
+  );
   assert.ok(resultA.sizeBytes > 500);
   assert.ok(stateA.downloads.includes(`practice-audio:${catalogAudioPath}`));
   assert.ok(stateA.downloads.includes(`studio-draft-assets:${voiceStorage}`));
@@ -404,38 +439,46 @@ async function main() {
   assert.ok(!stateA.downloads.some((item) => item.startsWith("studio-draft-assets:") && item.includes("dawn")));
   assert.doesNotMatch(JSON.stringify(snapshot), /audio_path/);
 
-  const uploadedA = stateA.files.get(`studio-renders:${stateA.uploads[0].path}`);
-  assert.ok(uploadedA);
-  const decodeRoot = await mkdtemp(join(tmpdir(), "audiolad-catalog-mix-"));
-  try {
-    const encodedPath = join(decodeRoot, "mix.mp3");
-    const decodedPath = join(decodeRoot, "mix.wav");
-    await writeFile(encodedPath, uploadedA);
-    const decoded = spawnSync("ffmpeg", [
-      "-hide_banner", "-nostdin", "-y", "-i", encodedPath,
-      "-c:a", "pcm_f32le", "-ar", String(RATE), "-ac", "2", decodedPath,
-    ], { encoding: "utf8" });
-    assert.equal(decoded.status, 0, decoded.stderr);
-    const samples = pcmSamples(await readFile(decodedPath));
-    const mid = peak(samples, Math.round(0.3 * RATE) * 2, Math.round(0.9 * RATE) * 2);
-    const musicOnly = peak(samples, Math.round(1.2 * RATE) * 2, Math.round(1.8 * RATE) * 2);
-    assert(mid > musicOnly, `mix region must be louder than music-only tail: ${mid} vs ${musicOnly}`);
-    assert(musicOnly > 0.01, "catalog music tail must be present");
-    const probe = spawnSync("ffprobe", [
-      "-v", "error", "-show_entries", "format=duration",
-      "-of", "default=noprint_wrappers=1:nokey=1", encodedPath,
-    ], { encoding: "utf8" });
-    assert.equal(probe.status, 0, probe.stderr);
-    const duration = Number(probe.stdout.trim());
-    assert(Math.abs(duration - 2) < 0.35, `mix duration ${duration} must match timeline 2s`);
-  } finally {
-    await rm(decodeRoot, { recursive: true, force: true });
+  if (canRender) {
+    const uploadedA = stateA.files.get(`studio-renders:${stateA.uploads[0].path}`);
+    assert.ok(uploadedA);
+    const decodeRoot = await mkdtemp(join(tmpdir(), "audiolad-catalog-mix-"));
+    try {
+      const encodedPath = join(decodeRoot, "mix.mp3");
+      const decodedPath = join(decodeRoot, "mix.wav");
+      await writeFile(encodedPath, uploadedA);
+      const decoded = spawnSync("ffmpeg", [
+        "-hide_banner", "-nostdin", "-y", "-i", encodedPath,
+        "-c:a", "pcm_f32le", "-ar", String(RATE), "-ac", "2", decodedPath,
+      ], { encoding: "utf8" });
+      assert.equal(decoded.status, 0, decoded.stderr);
+      const samples = pcmSamples(await readFile(decodedPath));
+      const mid = peak(samples, Math.round(0.3 * RATE) * 2, Math.round(0.9 * RATE) * 2);
+      const musicOnly = peak(samples, Math.round(1.2 * RATE) * 2, Math.round(1.8 * RATE) * 2);
+      assert(mid > musicOnly, `mix region must be louder than music-only tail: ${mid} vs ${musicOnly}`);
+      assert(musicOnly > 0.01, "catalog music tail must be present");
+      const probe = spawnSync("ffprobe", [
+        "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", encodedPath,
+      ], { encoding: "utf8" });
+      assert.equal(probe.status, 0, probe.stderr);
+      const duration = Number(probe.stdout.trim());
+      assert(Math.abs(duration - 2) < 0.35, `mix duration ${duration} must match timeline 2s`);
+    } finally {
+      await rm(decodeRoot, { recursive: true, force: true });
+    }
   }
 
   // B: author membership (same canonical RPC, different principal already stored)
   const stateB = baseState();
   stateB.canUse = () => true;
-  const resultB = await executeClaimedStudioRenderJob(createFakeService(stateB) as never, job);
+  const resultB = await executeClaimedStudioRenderJob(
+    createFakeService(stateB) as never,
+    job,
+    new AbortController().signal,
+    1800,
+    renderDeps,
+  );
   assert.ok(resultB.sizeBytes > 500);
   assert.ok(stateB.uploads.length > 0);
 
@@ -486,7 +529,13 @@ async function main() {
     return canUseCount === 1;
   };
   await assert.rejects(
-    () => executeClaimedStudioRenderJob(createFakeService(stateE) as never, job),
+    () => executeClaimedStudioRenderJob(
+      createFakeService(stateE) as never,
+      job,
+      new AbortController().signal,
+      1800,
+      renderDeps,
+    ),
     (error: unknown) =>
       error instanceof Error
       && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE,
@@ -497,7 +546,13 @@ async function main() {
   // F: unlisted/unpublished/listen_only + permanent entitlement still allowed
   const stateF = baseState();
   stateF.canUse = (userId) => userId === PRINCIPAL_ID;
-  const resultF = await executeClaimedStudioRenderJob(createFakeService(stateF) as never, job);
+  const resultF = await executeClaimedStudioRenderJob(
+    createFakeService(stateF) as never,
+    job,
+    new AbortController().signal,
+    1800,
+    renderDeps,
+  );
   assert.ok(resultF.sizeBytes > 500);
   assert.ok(!stateF.queriedTables.includes("practices"));
   assert.ok(!stateF.queriedTables.includes("user_practices"));
