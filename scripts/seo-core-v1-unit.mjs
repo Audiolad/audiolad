@@ -8,6 +8,8 @@ const sql = readFileSync(
   join(root, "supabase/migrations/20261006130000_seo_core_v1.sql"),
   "utf8",
 );
+const adminApi = readFileSync(join(root, "src/app/api/admin/seo-queries/route.ts"), "utf8");
+const adminUi = readFileSync(join(root, "src/components/admin/AdminSeoQueriesClient.tsx"), "utf8");
 
 assert.match(sql, /CREATE TABLE public\.seo_queries/);
 assert.match(sql, /normalized_query.*UNIQUE|normalized_query_unique UNIQUE/s);
@@ -31,4 +33,9 @@ assert.match(sql, /seo_query_reservations_select_owner_or_staff/);
 assert.match(sql, /EXISTS\s+\(SELECT 1 FROM public\.author_members WHERE user_id = auth\.uid\(\) AND role IN \('owner', 'editor'\)\)/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public\.reserve_seo_query/);
 assert.match(sql, /admin_release_seo_query_reservation/);
+assert.match(adminApi, /error\.code === "23505" \? "normalized_query_duplicate"/);
+assert.match(adminApi, /export async function PUT/);
+for (const field of ["query_text", "frequency", "source", "cluster_id", "intent", "recommended_format", "audio_fit"]) {
+  assert.match(adminUi, new RegExp(`name="${field}"|${field}:`), `admin UI edits ${field}`);
+}
 console.log("seo-core-v1-unit: ok");
