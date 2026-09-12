@@ -622,6 +622,12 @@ function assertNoDuplicates(ids: string[]) {
         authorMemberAuthorIds: [],
       };
     },
+    async loadViewerAccess() {
+      return {
+        entitlements: [],
+        authorMemberAuthorIds: [],
+      };
+    },
     async loadPublishedTracks(practiceIds) {
       loadedIds.push([...practiceIds]);
       return practiceIds.map((practiceId) => ({

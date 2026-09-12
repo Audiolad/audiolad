@@ -58,6 +58,24 @@ assert.match(
 assert.match(shell, /musicCatalogOverlayOpen \|\| musicChooserSlotId/);
 assert.match(shell, /setMusicCatalogOverlayOpen\(false\)/);
 assert.match(overlay, /fixed inset-0 z-40/);
+assert.match(
+  overlay,
+  /studio-music-catalog-overlay fixed inset-0 z-40 flex flex-col overflow-hidden/,
+);
+assert.doesNotMatch(
+  overlay,
+  /studio-music-catalog-overlay[^"\n]*overflow-y-auto/,
+);
+assert.match(
+  overlay,
+  /studio-music-catalog-scroll min-h-0 flex-1 overflow-y-auto/,
+);
+assert.match(overlay, /data-testid="studio-music-catalog-scroll"/);
+assert.match(
+  overlay,
+  /studio-music-catalog-player shrink-0 border-t/,
+);
+assert.match(overlay, /data-testid="studio-music-catalog-player"/);
 assert.match(overlay, /Музыка для медитаций/);
 assert.match(overlay, /Вся/);
 assert.match(overlay, /Моя/);
@@ -102,6 +120,9 @@ assert.match(card, /STUDIO_MUSIC_ADDED_LABEL/);
 assert.match(card, /"Добавить"/);
 assert.match(card, /isSelected\(track\.id\)/);
 assert.match(card, /applyExpandClick\("add"\)/);
+assert.match(card, /onPreview\(item\.publication_id, track\.id, track\.title\)/);
+assert.match(card, /onAdd\?\.\(item, track\.id\)/);
+assert.doesNotMatch(card, /canAdd\s*&&\s*isAlbum/);
 assert.doesNotMatch(card, /href=.*\/catalog/);
 assert.doesNotMatch(card, /router\.(push|replace)/);
 assert.match(card, /listener_price_label/);
