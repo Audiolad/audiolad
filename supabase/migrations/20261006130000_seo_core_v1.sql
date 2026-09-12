@@ -318,7 +318,10 @@ BEGIN
 
   IF v_reservation.product_id IS NOT NULL THEN
     SELECT * INTO v_practice FROM public.practices WHERE id = v_reservation.product_id FOR UPDATE;
-    IF NOT FOUND OR v_practice.status <> 'draft' OR v_practice.moderation_status = 'submitted' THEN
+    IF NOT FOUND
+       OR v_practice.deleted_at IS NOT NULL
+       OR v_practice.status <> 'draft'
+       OR v_practice.moderation_status NOT IN ('not_submitted', 'changes_requested') THEN
       RAISE EXCEPTION 'seo_reservation_product_lifecycle_locked' USING ERRCODE = 'P0001';
     END IF;
     PERFORM set_config('audiolad.allow_primary_seo_query_link', 'on', true);

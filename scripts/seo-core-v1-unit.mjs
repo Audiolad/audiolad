@@ -33,6 +33,14 @@ assert.match(sql, /seo_query_reservations_select_owner_or_staff/);
 assert.match(sql, /EXISTS\s+\(SELECT 1 FROM public\.author_members WHERE user_id = auth\.uid\(\) AND role IN \('owner', 'editor'\)\)/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public\.reserve_seo_query/);
 assert.match(sql, /admin_release_seo_query_reservation/);
+const authorReleaseSql = sql.slice(
+  sql.indexOf("CREATE OR REPLACE FUNCTION public.release_seo_query_reservation"),
+  sql.indexOf("CREATE OR REPLACE FUNCTION public.mark_published_seo_query_used"),
+);
+assert.match(authorReleaseSql, /v_practice\.status <> 'draft'/);
+assert.match(authorReleaseSql, /v_practice\.moderation_status NOT IN \('not_submitted', 'changes_requested'\)/);
+assert.match(authorReleaseSql, /v_practice\.deleted_at IS NOT NULL/);
+assert.doesNotMatch(authorReleaseSql, /moderation_status = 'submitted'/);
 assert.match(adminApi, /error\.code === "23505" \? "normalized_query_duplicate"/);
 assert.match(adminApi, /export async function PUT/);
 for (const field of ["query_text", "frequency", "source", "cluster_id", "intent", "recommended_format", "audio_fit"]) {
