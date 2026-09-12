@@ -1,8 +1,9 @@
 -- Disposable CI data fixture for 20260714180000_unified_audio_product_foundation.
--- That migration's own post-check requires first-audio-course to be a legacy
--- audio_url row, while its earlier seed migration creates the product with a
--- NULL URL. This establishes the historical precondition without skipping the
--- migration or modifying production data.
+-- Restores the historical production data state missing from migration history:
+-- its earlier seed creates first-audio-course with a NULL URL and price 990,
+-- while this migration's own post-check requires the legacy URL and price 99.
+-- This establishes that strict precondition without skipping the migration or
+-- modifying production data.
 
 DO $$
 BEGIN
@@ -13,6 +14,8 @@ BEGIN
       AND slug = 'first-audio-course'
       AND audio_url IS NULL
       AND price = 990
+      AND status = 'published'
+      AND is_free = false
   ) THEN
     RAISE EXCEPTION 'expected first-audio-course legacy precondition is absent';
   END IF;

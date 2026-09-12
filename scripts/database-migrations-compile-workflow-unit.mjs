@@ -18,6 +18,8 @@ assert.match(workflow, /pg_isready -U supabase_admin -d postgres/);
 assert.match(workflow, /AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL/);
 assert.doesNotMatch(workflow, /pull_request_target:/);
 assert.doesNotMatch(workflow, /secrets\./);
+assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+assert.match(workflow, /persist-credentials: false/);
 assert.match(workflow, /supabase\/migrations\/\*\*/);
 assert.match(workflow, /supabase\/baseline\/\*\*/);
 assert.match(workflow, /supabase-compile-pre-unified-audio-seed\.sql/);

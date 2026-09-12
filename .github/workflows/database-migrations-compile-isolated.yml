@@ -37,6 +37,9 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - name: Verify disposable Supabase Postgres
         run: |
           set -euo pipefail
