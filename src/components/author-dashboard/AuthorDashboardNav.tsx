@@ -70,6 +70,15 @@ function DiagnosticsIcon() {
   );
 }
 
+function SeoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="5.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m15 15 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function StatsIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -171,6 +180,12 @@ export default function AuthorDashboardNav({
       label: "Продвижение",
       icon: PromotionIcon,
       active: pathname.startsWith("/author-dashboard/promotion"),
+    },
+    {
+      href: `/author-dashboard/seo-opportunities${authorQuery}`,
+      label: "SEO-возможности",
+      icon: SeoIcon,
+      active: pathname.startsWith("/author-dashboard/seo-opportunities"),
     },
     {
       href: `/author-dashboard/stats${authorQuery}`,
