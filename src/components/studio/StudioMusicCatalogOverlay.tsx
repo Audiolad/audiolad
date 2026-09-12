@@ -47,7 +47,6 @@ function StudioMusicCatalogOverlayBody({
   onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
   const [filter, setFilter] = useState<StudioMusicCatalogFilter>("all");
   const [authenticated, setAuthenticated] = useState(false);
   const [items, setItems] = useState<StudioMusicCatalogItem[]>([]);
@@ -55,6 +54,10 @@ function StudioMusicCatalogOverlayBody({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string | null>(null);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const [previewDuration, setPreviewDuration] = useState(0);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const [busyPublicationId, setBusyPublicationId] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
 
@@ -65,11 +68,11 @@ function StudioMusicCatalogOverlayBody({
       audio.removeAttribute("src");
       audio.load();
     }
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
     setActivePreviewKey(null);
+    setPreviewTitle(null);
+    setPreviewCurrentTime(0);
+    setPreviewDuration(0);
+    setPreviewPlaying(false);
   };
 
   useEffect(() => {
@@ -140,14 +143,14 @@ function StudioMusicCatalogOverlayBody({
         audio.pause();
         audio.removeAttribute("src");
       }
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
     };
   }, [onClose]);
 
-  const playPreview = async (publicationId: string, audioItemId: string) => {
+  const playPreview = (
+    publicationId: string,
+    audioItemId: string,
+    trackTitle: string,
+  ) => {
     const key = previewKeyFor(publicationId, audioItemId);
     if (activePreviewKey === key) {
       stopPreview();
@@ -155,27 +158,34 @@ function StudioMusicCatalogOverlayBody({
     }
     stopPreview();
     const params = new URLSearchParams({ publicationId, audioItemId });
-    const response = await fetch(
-      `/api/studio/music/preview?${params.toString()}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      setError("Не удалось включить превью");
-      return;
-    }
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    objectUrlRef.current = objectUrl;
     const audio = audioRef.current;
     if (!audio) {
       return;
     }
-    audio.src = objectUrl;
+    // Same-origin, server-authorized streaming preserves Range requests for
+    // seeking and never exposes a storage key or signed storage URL.
+    audio.src = `/api/studio/music/preview?${params.toString()}`;
     setActivePreviewKey(key);
+    setPreviewTitle(trackTitle);
     void audio.play().catch(() => {
       setError("Не удалось включить превью");
       stopPreview();
     });
+  };
+
+  const seekPreview = (nextTime: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(nextTime)) {
+      return;
+    }
+    const bounded = Math.max(0, Math.min(nextTime, previewDuration || 0));
+    audio.currentTime = bounded;
+    setPreviewCurrentTime(bounded);
+  };
+
+  const formatTime = (seconds: number) => {
+    const whole = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
   };
 
   const patchItem = (
@@ -494,8 +504,8 @@ function StudioMusicCatalogOverlayBody({
                 actionError={actionErrors[item.publication_id] ?? null}
                 selectedPracticeId={selectedPracticeId}
                 selectedAudioItemId={selectedAudioItemId}
-                onPreview={(publicationId, audioItemId) => {
-                  void playPreview(publicationId, audioItemId);
+                onPreview={(publicationId, audioItemId, trackTitle) => {
+                  void playPreview(publicationId, audioItemId, trackTitle);
                 }}
                 onAcquire={(next) => {
                   void acquirePublication(next);
@@ -521,11 +531,77 @@ function StudioMusicCatalogOverlayBody({
         ) : null}
       </div>
 
+      {activePreviewKey ? (
+        <div className="sticky bottom-0 z-10 border-t border-white/10 bg-[#101827] px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:items-center">
+            <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
+              {previewTitle ?? "Трек"}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => seekPreview(previewCurrentTime - 15)}
+                className="rounded-md border border-white/15 px-2 py-1 text-xs font-semibold"
+              >
+                −15с
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const audio = audioRef.current;
+                  if (!audio) return;
+                  if (audio.paused) void audio.play();
+                  else audio.pause();
+                }}
+                className="rounded-md bg-[#7650bd] px-3 py-1 text-xs font-semibold text-white"
+              >
+                {previewPlaying ? "Пауза" : "Слушать"}
+              </button>
+              <button
+                type="button"
+                onClick={() => seekPreview(previewCurrentTime + 15)}
+                className="rounded-md border border-white/15 px-2 py-1 text-xs font-semibold"
+              >
+                +15с
+              </button>
+            </div>
+            <div className="flex min-w-0 items-center gap-2 text-xs text-[#c9d4e8] sm:w-[320px]">
+              <span>{formatTime(previewCurrentTime)}</span>
+              <input
+                aria-label="Позиция воспроизведения"
+                type="range"
+                min="0"
+                max={Math.max(previewDuration, 0)}
+                step="0.1"
+                value={Math.min(previewCurrentTime, Math.max(previewDuration, 0))}
+                onChange={(event) => seekPreview(Number(event.target.value))}
+                className="min-w-0 flex-1 accent-[#9d7ae8]"
+              />
+              <span>{formatTime(previewDuration)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <audio
         ref={audioRef}
         className="sr-only"
         preload="none"
         onEnded={stopPreview}
+        onError={() => {
+          setError("Музыка больше недоступна для воспроизведения.");
+          stopPreview();
+        }}
+        onPlay={() => setPreviewPlaying(true)}
+        onPause={() => setPreviewPlaying(false)}
+        onTimeUpdate={(event) => setPreviewCurrentTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) =>
+          setPreviewDuration(
+            Number.isFinite(event.currentTarget.duration)
+              ? event.currentTarget.duration
+              : 0,
+          )
+        }
       />
     </div>
   );
