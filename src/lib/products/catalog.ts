@@ -183,7 +183,7 @@ export async function getPublishedPracticeIdsForTopicKey(
     if (assignmentError) {
       const errorDetails =
         assignmentError && typeof assignmentError === "object"
-          ? (assignmentError as Record<string, unknown>)
+          ? (assignmentError as unknown as Record<string, unknown>)
           : {};
 
       console.error("[catalog] topic_practice_assignments_failed", {
