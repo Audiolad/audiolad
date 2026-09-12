@@ -74,6 +74,13 @@ const publishRoute = readFileSync(
   "utf8",
 );
 
+assert(
+  !topicSelector.includes("Уверенность и самоценность") &&
+    !topicSelector.includes("Уверенность и самооценка") &&
+    !topicSelector.includes("Тело и самочувствие") &&
+    !topicSelector.includes("Энергия и ресурс"),
+  "TopicSelector does not hardcode old compound labels",
+);
 assert(!topicSelector.includes("<input"), "TopicSelector has no free-text input");
 assert(!topicSelector.includes("allowCreate"), "TopicSelector has no create flow");
 assert(!topicSelector.includes("textarea"), "TopicSelector has no textarea");
@@ -107,7 +114,10 @@ assert(editPage.includes("topicFormData={topicFormData}"), "edit passes topic pr
 assert(!authorForm.includes("useEffect") || !authorForm.includes("listActiveTopics"), "no client useEffect topic fetch");
 
 assert(topicsRoute.includes("setPracticeTopics"), "save uses setPracticeTopics RPC wrapper");
-assert(syncLib.includes('rpc("set_practice_topics"'), "sync calls set_practice_topics RPC");
+assert(
+  syncLib.includes("set_practice_topics") && syncLib.includes("callAuthorUserRpc"),
+  "sync calls set_practice_topics RPC",
+);
 assert(
   !topicsRoute.includes('.from("practice_topics").insert'),
   "no direct insert into practice_topics",
@@ -119,7 +129,10 @@ assert(
 
 assert(authorForm.includes("syncProductTopics"), "form syncs topics on save");
 assert(authorForm.includes("getActiveTopicKeysForSync"), "archived keys excluded from sync payload");
-assert(authorForm.includes("assertPublishedTopicMinimum"), "publish checks topic minimum");
+assert(
+  authorForm.includes("topic_min_required"),
+  "publish checks topic minimum",
+);
 assert(publishRoute.includes("topic_min_required") || publishRoute.includes("mapped.code"), "publish maps topic errors");
 
 assert(topicFormData.includes("listActiveTopics"), "server loads active directory");

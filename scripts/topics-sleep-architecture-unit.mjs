@@ -90,7 +90,7 @@ assert.doesNotMatch(sleepSql, /UPDATE\s+public\.practices/i);
 assert.doesNotMatch(sleepSql, /Сон и расслабление/);
 
 const topicsDocs = read("docs/TOPICS.md");
-assert.match(topicsDocs, /`calm` \| Спокойствие \| 30/);
-assert.match(topicsDocs, /`sleep` \| Сон \| 35/);
+assert.match(topicsDocs, /`calm` \| Спокойствие \| 50/);
+assert.match(topicsDocs, /`sleep` \| Сон \| 60/);
 
 console.log("topics-sleep-architecture-unit: ok");

@@ -6,7 +6,8 @@ URL: `/topics/izobilie`
 ## Модель фильтрации
 
 **`topicKey: "money"` + ordered `practiceSlugAllowlist` (3 slug)**  
-`resolveTopicChips: false` – chips `money` остаются на `/catalog?topic=money`.
+`resolveTopicChips: false` – chips `money` остаются на `/catalog?topic=money`.  
+В справочнике практик есть отдельная тема `abundance` («Изобилие»); этот хаб её не подменяет и по-прежнему фильтрует `money` + allowlist.
 
 Analytics:
 
