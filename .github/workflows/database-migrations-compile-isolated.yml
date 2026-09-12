@@ -1,0 +1,50 @@
+name: Database Migrations Real Compile
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/database-migrations-compile-isolated.yml"
+      - "scripts/database-migrations-compile-isolated.mjs"
+      - "scripts/database-migrations-compile-workflow-unit.mjs"
+      - "scripts/lib/supabase-compile-prerequisites.sql"
+      - "supabase/baseline/**"
+      - "supabase/migrations/**"
+      - "supabase/tests/database_migrations_compile_analytics_smoke.sql"
+      - "deploy/scripts/lib/database-migrations-plan.mjs"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  database-migrations-real-compile:
+    name: Database Migrations Real Compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: supabase/postgres:15.14.1.171
+        env:
+          POSTGRES_DB: audiolad_migration_compile_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_migration_compile_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify disposable Supabase Postgres
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_migration_compile_isolated
+      - name: Execute real migration compile
+        env:
+          AUDIOLAD_MIGRATION_COMPILE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_migration_compile_isolated
+          PGPASSWORD: postgres
+        run: node scripts/database-migrations-compile-isolated.mjs
