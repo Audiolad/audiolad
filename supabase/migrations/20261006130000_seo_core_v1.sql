@@ -155,8 +155,10 @@ LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF NEW.primary_seo_query_id IS DISTINCT FROM OLD.primary_seo_query_id
-     AND current_setting('audiolad.allow_primary_seo_query_link', true) IS DISTINCT FROM 'on' THEN
+  IF (
+    (TG_OP = 'INSERT' AND NEW.primary_seo_query_id IS NOT NULL)
+    OR (TG_OP = 'UPDATE' AND NEW.primary_seo_query_id IS DISTINCT FROM OLD.primary_seo_query_id)
+  ) AND current_setting('audiolad.allow_primary_seo_query_link', true) IS DISTINCT FROM 'on' THEN
     RAISE EXCEPTION 'primary_seo_query_requires_rpc' USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
@@ -164,7 +166,7 @@ END;
 $$;
 
 CREATE TRIGGER practices_primary_seo_query_guard
-  BEFORE UPDATE OF primary_seo_query_id ON public.practices
+  BEFORE INSERT OR UPDATE ON public.practices
   FOR EACH ROW EXECUTE FUNCTION public.guard_practice_primary_seo_query();
 
 CREATE OR REPLACE FUNCTION public.expire_seo_query_reservation(
@@ -266,6 +268,10 @@ BEGIN
   SELECT * INTO v_practice FROM public.practices WHERE id = p_product_id FOR UPDATE;
   IF NOT FOUND OR v_practice.deleted_at IS NOT NULL THEN
     RAISE EXCEPTION 'practice_not_found' USING ERRCODE = 'P0002';
+  END IF;
+  IF v_practice.status <> 'draft'
+     OR v_practice.moderation_status NOT IN ('not_submitted', 'changes_requested') THEN
+    RAISE EXCEPTION 'seo_reservation_product_not_linkable' USING ERRCODE = 'P0001';
   END IF;
   IF v_practice.author_id IS DISTINCT FROM v_reservation.author_id
      OR NOT EXISTS (
@@ -382,9 +388,15 @@ ALTER TABLE public.seo_queries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.seo_query_reservations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY seo_clusters_select_authenticated ON public.seo_clusters
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated USING (
+    public.is_platform_staff(auth.uid())
+    OR EXISTS (SELECT 1 FROM public.author_members WHERE user_id = auth.uid() AND role IN ('owner', 'editor'))
+  );
 CREATE POLICY seo_queries_select_authenticated ON public.seo_queries
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated USING (
+    public.is_platform_staff(auth.uid())
+    OR EXISTS (SELECT 1 FROM public.author_members WHERE user_id = auth.uid() AND role IN ('owner', 'editor'))
+  );
 CREATE POLICY seo_query_reservations_select_owner_or_staff ON public.seo_query_reservations
   FOR SELECT TO authenticated USING (
     public.is_platform_staff(auth.uid())

@@ -23,6 +23,9 @@ function mapReservationError(error: unknown) {
   if (message.includes("seo_reservation_product_lifecycle_locked")) {
     return { error: "seo_reservation_product_lifecycle_locked", message: "Запрос нельзя освободить после отправки продукта на модерацию или публикации.", status: 409 };
   }
+  if (message.includes("seo_reservation_product_not_linkable")) {
+    return { error: "seo_reservation_product_not_linkable", message: "Связать запрос можно только с черновиком до отправки на модерацию.", status: 409 };
+  }
   return null;
 }
 
@@ -85,7 +88,8 @@ export async function PATCH(request: Request) {
       p_product_id: productId,
     });
     if (error) {
-      return NextResponse.json({ error: "seo_reservation_link_failed" }, { status: 400 });
+      const mapped = mapReservationError(error);
+      return NextResponse.json(mapped ?? { error: "seo_reservation_link_failed" }, { status: mapped?.status ?? 400 });
     }
     return NextResponse.json({ reservation: data });
   } catch (error) {
