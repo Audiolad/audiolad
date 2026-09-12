@@ -286,8 +286,8 @@ function testRecovery() {
     "recovery uses validated next path",
   );
   assert(
-    recovery.includes("buildResetPasswordRouteWithNext"),
-    "recovery builds reset route with next",
+    recovery.includes("buildRecoveryRouteWithNext"),
+    "recovery builds first-party landing route with next",
   );
   assert(
     forgotAction.includes("next: string | null"),

@@ -33,7 +33,9 @@ export async function requestPasswordRecoveryAction(input: {
   });
 
   if (error) {
-    console.error("password_recovery_request_error", error.message);
+    console.warn("password_recovery_request_failure", {
+      reason: "request_failed",
+    });
     return {
       ok: false,
       message: PASSWORD_RECOVERY_GENERIC_ERROR,

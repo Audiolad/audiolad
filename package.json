@@ -11,6 +11,7 @@
     "test:shared-audio-warmup": "npx tsx scripts/shared-audio-warmup-unit.mts",
     "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",
     "test:health-build": "npx tsx scripts/health-build-route-unit.mts",
+    "test:password-recovery-hardening": "npx tsx scripts/password-recovery-hardening-unit.mts",
     "test:production-pr-safety": "node scripts/production-pr-safety-guard-unit.mjs",
     "test:studio-provider-isolation": "node scripts/studio-provider-isolation-unit.mjs",
     "test:studio-audio-provider": "npx tsx scripts/studio-audio-provider-unit.mjs",

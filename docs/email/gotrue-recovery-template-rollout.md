@@ -24,7 +24,8 @@ npx tsx scripts/build-gotrue-email-templates.ts
 
 | Variable | Usage |
 |----------|--------|
-| `{{ .ConfirmationURL }}` | Full recovery link (includes redirect to app callback) |
+| `{{ .TokenHash }}` | Recovery bearer used only in the first-party URL fragment |
+| `{{ .RedirectTo }}` | GoTrue allow-list-validated first-party `/auth/recovery` URL |
 | `{{ .SiteURL }}` | `https://audiolad.ru` |
 | `{{ .Email }}` | Recipient (avoid exposing in UI copy) |
 
@@ -83,18 +84,38 @@ SMTP_ADMIN_EMAIL=no-reply@audiolad.ru
 After this app deploy, `resetPasswordForEmail` uses:
 
 ```text
-redirectTo=https://audiolad.ru/auth/callback?next=/auth/reset-password?next=<ultimate>
+redirectTo=https://audiolad.ru/auth/recovery?next=<safe-ultimate>
 ```
 
-Ensure `GOTRUE_URI_ALLOW_LIST` includes `https://audiolad.ru/**`.
+The recovery template must use exactly:
+
+```html
+{{ .RedirectTo }}#token_hash={{ .TokenHash }}&type=recovery
+```
+
+It must not use `{{ .ConfirmationURL }}` as a link or fallback. GoTrue
+v2.189.0 was verified to expose both `TokenHash` and allow-list-validated
+`RedirectTo`. The token is deliberately in the URL fragment: it is not sent
+to Audiolad, Nginx, application access logs or Referer headers. The app clears
+the fragment, stores it briefly in an HttpOnly staging cookie, and only
+`POST` after the user presses «Продолжить» calls
+`verifyOtp({ token_hash, type: "recovery" })`.
+
+Ensure `GOTRUE_URI_ALLOW_LIST` includes `https://audiolad.ru/auth/recovery`
+(or the already approved `https://audiolad.ru/**`). This is a separate
+production configuration check; do not change it as part of app deployment.
 
 ## Rollout steps (controlled)
 
 1. Backup `/opt/supabase/docker/.env` and `docker-compose.yml`.
 2. Run `npx tsx scripts/build-gotrue-email-templates.ts`.
 3. Copy `recovery.html` into `volumes/templates/`.
-4. Add `templates-server` service and auth env vars.
-5. `docker compose up -d --force-recreate --no-deps auth templates-server`
+4. Confirm `templates-server` serves the replaced file. GoTrue fetches this
+   template by URL for each send; a GoTrue restart is not normally required
+   for a content-only template replacement. Restarting either service is an
+   infrastructure operation and requires separate approval.
+5. If template-server caching prevents the new file being served, reload only
+   that service under a separately approved production change.
 6. Health: `docker ps`, `curl -fsS http://127.0.0.1:3000/api/health/build`
 7. One recovery E2E on an approved test mailbox (Yandex/Mail.ru).
 8. Check `docker logs supabase-auth` for SMTP/template fetch errors (no tokens).
