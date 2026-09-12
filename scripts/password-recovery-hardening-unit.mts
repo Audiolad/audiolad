@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
-  createRecoveryIntent,
-  hasValidRecoveryIntent,
-  RECOVERY_INTENT_COOKIE,
-} from "../src/lib/auth/recovery-intent";
+  createSignedRecoveryIntent,
+  getRecoveryIntentSecret,
+  isSignedRecoveryIntentValid,
+} from "../src/lib/auth/recovery-intent-crypto";
 import { buildPasswordRecoveryRedirectUrl } from "../src/lib/auth/recovery";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -21,6 +21,7 @@ const resetAction = read("src/app/(platform)/auth/reset-password/actions.ts");
 const resetLayout = read("src/app/(platform)/auth/reset-password/layout.tsx");
 const callback = read("src/app/(platform)/auth/callback/route.ts");
 const intent = read("src/lib/auth/recovery-intent.ts");
+const intentCrypto = read("src/lib/auth/recovery-intent-crypto.ts");
 
 // Redirect construction preserves valid local continuation only; the existing
 // navigation suite exercises external, protocol-relative and malformed input.
@@ -51,28 +52,27 @@ assert.match(landingAction, /clearStageCookie/);
 
 // The marker is server-signed, short-lived, and bound to the verified user
 // without putting any user id or bearer into the cookie value.
-assert.match(intent, /createHmac/);
+assert.match(intent, /getRecoveryIntentSecret/);
 assert.match(intent, /httpOnly: true/);
 assert.match(intent, /sameSite: "lax"/);
-assert.match(intent, /RECOVERY_INTENT_MAX_AGE_SECONDS = 10 \* 60/);
-assert.match(intent, /signIntent\(nonce, expiresAt, userId\)/);
+assert.match(intentCrypto, /RECOVERY_INTENT_MAX_AGE_SECONDS = 10 \* 60/);
+assert.match(intentCrypto, /signIntent\(secret, nonce, expiresAt, userId\)/);
 assert.doesNotMatch(intent, /MAX_BOT_TOKEN/);
+assert.match(intentCrypto, /createHmac/);
 
 const originalSecret = process.env.PASSWORD_RECOVERY_INTENT_SECRET;
 delete process.env.PASSWORD_RECOVERY_INTENT_SECRET;
-assert.throws(() => createRecoveryIntent("user-a"));
+assert.throws(() => getRecoveryIntentSecret());
 process.env.PASSWORD_RECOVERY_INTENT_SECRET = "test-only-recovery-intent-secret";
 
-const cookieFor = (value: string) => ({
-  get: (name: string) => name === RECOVERY_INTENT_COOKIE ? { value } : undefined,
-});
-const validIntent = createRecoveryIntent("user-a");
-assert.equal(hasValidRecoveryIntent(cookieFor(validIntent), "user-a"), true);
-assert.equal(hasValidRecoveryIntent(cookieFor(validIntent), "user-b"), false);
+const testSecret = getRecoveryIntentSecret();
+const validIntent = createSignedRecoveryIntent(testSecret, "user-a");
+assert.equal(isSignedRecoveryIntentValid(testSecret, validIntent, "user-a"), true);
+assert.equal(isSignedRecoveryIntentValid(testSecret, validIntent, "user-b"), false);
 const tamperedIntent = `${validIntent.startsWith("A") ? "B" : "A"}${validIntent.slice(1)}`;
-assert.equal(hasValidRecoveryIntent(cookieFor(tamperedIntent), "user-a"), false);
-const expiredIntent = createRecoveryIntent("user-a", 0);
-assert.equal(hasValidRecoveryIntent(cookieFor(expiredIntent), "user-a"), false);
+assert.equal(isSignedRecoveryIntentValid(testSecret, tamperedIntent, "user-a"), false);
+const expiredIntent = createSignedRecoveryIntent(testSecret, "user-a", 0);
+assert.equal(isSignedRecoveryIntentValid(testSecret, expiredIntent, "user-a"), false);
 if (originalSecret === undefined) {
   delete process.env.PASSWORD_RECOVERY_INTENT_SECRET;
 } else {

@@ -1,21 +1,20 @@
 import "server-only";
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createSignedRecoveryIntent,
+  getRecoveryIntentSecret,
+  isSignedRecoveryIntentValid,
+  RECOVERY_INTENT_MAX_AGE_SECONDS,
+} from "./recovery-intent-crypto";
+
 export const RECOVERY_STAGE_COOKIE = "audiolad_recovery_stage";
 export const RECOVERY_INTENT_COOKIE = "audiolad_recovery_intent";
 
 const RECOVERY_COOKIE_MAX_AGE_SECONDS = 10 * 60;
-const RECOVERY_INTENT_MAX_AGE_SECONDS = 10 * 60;
 
 type RecoveryStage = {
   tokenHash: string;
   next: string | null;
-};
-
-type RecoveryIntent = {
-  nonce: string;
-  expiresAt: number;
-  signature: string;
 };
 
 export type RecoveryCookieReader = {
@@ -30,20 +29,6 @@ function cookieOptions(path: string, maxAge = RECOVERY_COOKIE_MAX_AGE_SECONDS) {
     path,
     maxAge,
   };
-}
-
-function intentSecret(): string {
-  const secret = process.env.PASSWORD_RECOVERY_INTENT_SECRET;
-  if (!secret) {
-    throw new Error("password_recovery_intent_unavailable");
-  }
-  return secret;
-}
-
-function signIntent(nonce: string, expiresAt: number, userId: string): string {
-  return createHmac("sha256", intentSecret())
-    .update(`password-recovery-intent:${nonce}:${expiresAt}:${userId}`)
-    .digest("base64url");
 }
 
 function isTokenHash(value: string): boolean {
@@ -83,12 +68,7 @@ export function readRecoveryStage(
 }
 
 export function createRecoveryIntent(userId: string, now = Date.now()): string {
-  const nonce = randomBytes(18).toString("base64url");
-  const expiresAt = now + RECOVERY_INTENT_MAX_AGE_SECONDS * 1000;
-  const signature = signIntent(nonce, expiresAt, userId);
-  return Buffer.from(JSON.stringify({ nonce, expiresAt, signature } satisfies RecoveryIntent)).toString(
-    "base64url",
-  );
+  return createSignedRecoveryIntent(getRecoveryIntentSecret(), userId, now);
 }
 
 export function hasValidRecoveryIntent(
@@ -96,23 +76,13 @@ export function hasValidRecoveryIntent(
   userId: string,
   now = Date.now(),
 ): boolean {
-  const encoded = cookieStore.get(RECOVERY_INTENT_COOKIE)?.value;
-  if (!encoded) return false;
-
   try {
-    const { nonce, expiresAt, signature } = JSON.parse(
-      Buffer.from(encoded, "base64url").toString("utf8"),
-    ) as RecoveryIntent;
-    if (
-      typeof nonce !== "string" ||
-      typeof expiresAt !== "number" ||
-      typeof signature !== "string" ||
-      expiresAt <= now
-    ) {
-      return false;
-    }
-    const expected = signIntent(nonce, expiresAt, userId);
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    return isSignedRecoveryIntentValid(
+      getRecoveryIntentSecret(),
+      cookieStore.get(RECOVERY_INTENT_COOKIE)?.value,
+      userId,
+      now,
+    );
   } catch {
     return false;
   }
