@@ -72,7 +72,7 @@ export default function AuthorSeoOpportunitiesClient({
       method: "PATCH", headers: { "content-type": "application/json" },
       body: JSON.stringify({ author_id: authorId, reservation_id: reservationId, product_id: productId }),
     });
-    const payload = await response.json();
+    await response.json();
     setPendingId(null);
     if (!response.ok) return setMessage("Не удалось связать запрос с продуктом.");
     const product = products.find((item) => item.id === productId);
