@@ -46,6 +46,37 @@ for (const rpc of [
   assert(body.includes("analytics_product_event_facts"), `${rpc} uses shared facts`);
 }
 
+const practices = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_practices"));
+assert(practices.includes("p_limit") && practices.includes("p_offset"), "practice pagination retained");
+assert(practices.includes("'view_to_play'") && practices.includes("'play_to_complete'"), "practice sort whitelist retained");
+assert(practices.includes("LIMIT v_limit OFFSET v_offset"), "practice paging is applied");
+
+const authors = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_authors"));
+assert(authors.includes("published_practices") && authors.includes("LIMIT v_limit OFFSET v_offset"), "author totals and paging retained");
+
+const authorSummary = sql.slice(sql.indexOf("FUNCTION public.author_stats_summary"));
+assert(!authorSummary.includes("'author_page_views',0"), "author page views are not hardcoded");
+assert(!authorSummary.includes("'library_saves',0"), "library saves are not hardcoded");
+
+const authorProducts = sql.slice(sql.indexOf("FUNCTION public.author_stats_products"));
+assert(!authorProducts.includes("'gross_purchases',0"), "product finance is not hardcoded");
+assert(authorProducts.includes("author_canonical_sales_base"), "product finance projection retained");
+
+const authorSeries = sql.slice(sql.indexOf("FUNCTION public.author_stats_timeseries"));
+assert(!authorSeries.includes("'author_page_views',0"), "author timeseries page facts retained");
+assert(!authorSeries.includes("'library_saves',0"), "author timeseries save facts retained");
+
+const sources = sql.slice(sql.indexOf("FUNCTION public.author_stats_sources"));
+assert(sources.includes("referrer_domain"), "source referrer attribution retained");
+
+const adminSeries = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_timeseries"));
+assert(!adminSeries.includes("'registrations',0"), "admin timeseries registrations retained");
+assert(adminSeries.includes("v_max_points") && adminSeries.includes("v_granularity"), "admin timeseries bucketing retained");
+
+const acquisition = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_acquisition"));
+assert(!acquisition.includes("'registrations',0"), "acquisition registrations retained");
+assert(acquisition.includes("LIMIT v_limit OFFSET v_offset"), "acquisition paging retained");
+
 assert(sql.includes("REVOKE ALL ON FUNCTION public.analytics_product_event_facts"), "shared facts not browser callable");
 assert(sql.includes("TO service_role"), "service role receives explicit grants");
 assert(dates.includes('timeZone: "Europe/Moscow"'), "author period uses Moscow");

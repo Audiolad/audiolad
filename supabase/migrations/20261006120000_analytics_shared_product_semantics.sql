@@ -1,5 +1,4 @@
 BEGIN;
-BEGIN;
 
 -- Shared product-analytics facts. This is deliberately a function, rather than
 -- a view/materialization: it keeps the event predicate in one audited place and
