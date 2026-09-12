@@ -85,8 +85,9 @@ assert.deepEqual(
 assert.equal(isBottomNavNeutralPathname(KAK_VYLOZHIT_II_MUZYKU_PATH), true);
 assert.match(sitemapSource, /path: "\/kak-vylozhit-ii-muzyku", changeFrequency: "monthly", priority: 0.7/);
 assert.equal(KAK_VYLOZHIT_II_MUZYKU_FAQ[0].question, "Куда загрузить музыку, созданную ИИ?");
-assert.match(view, /личную фонотеку/);
-assert.match(view, /официальный релиз в YouTube Music/);
+assert.match(view, /личная библиотека/);
+assert.match(view, /публичный музыкальный релиз доставляется через дистрибьютора/);
+assert.match(view, /Где лучше выложить первую ИИ-композицию/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
 assert.doesNotMatch(view, /С чего начать/);
