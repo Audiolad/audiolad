@@ -13,7 +13,7 @@ import {
   planDatabaseMigrations,
 } from "../deploy/scripts/lib/database-migrations-plan.mjs";
 
-const databaseUrl = process.env.AUDIOLAD_MIGRATION_COMPILE_DATABASE_URL ?? "";
+const adminUrl = process.env.AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL ?? "";
 const expectedDatabase = "audiolad_migration_compile_isolated";
 const targetVersion = "20261006120200";
 const baselineEquivalentVersions = [
@@ -25,22 +25,23 @@ const baselineEquivalentVersions = [
   "20260711071529",
 ];
 
-function assertIsolatedTarget(value) {
+function isolatedUrl(value, database) {
   let url;
   try {
     url = new URL(value);
   } catch {
-    throw new Error("AUDIOLAD_MIGRATION_COMPILE_DATABASE_URL must be a PostgreSQL URL");
+    throw new Error("AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL must be a PostgreSQL URL");
   }
   if (!["postgres:", "postgresql:"].includes(url.protocol)
-    || !["127.0.0.1", "localhost"].includes(url.hostname)
-    || url.pathname !== `/${expectedDatabase}`) {
-    throw new Error(`migration compile only permits localhost/${expectedDatabase}`);
+    || !["127.0.0.1", "localhost"].includes(url.hostname)) {
+    throw new Error("migration compile only permits a localhost PostgreSQL URL");
   }
+  url.pathname = `/${database}`;
+  return url.toString();
 }
 
-function runPsql(args) {
-  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", ...args], {
+function runPsql(url, args) {
+  const result = spawnSync("psql", [url, "-v", "ON_ERROR_STOP=1", ...args], {
     encoding: "utf8",
     stdio: "inherit",
   });
@@ -55,13 +56,15 @@ function sqlLiteral(value) {
 function applyFile(label, file) {
   process.stdout.write(`Applying ${label}: ${file}\n`);
   try {
-    runPsql(["-f", file]);
+    runPsql(databaseUrl, ["-f", file]);
   } catch (error) {
     throw new Error(`SQL compile failed while applying ${label} (${file}): ${error.message}`);
   }
 }
 
-assertIsolatedTarget(databaseUrl);
+const validatedAdminUrl = isolatedUrl(adminUrl, "postgres");
+const databaseUrl = isolatedUrl(adminUrl, expectedDatabase);
+runPsql(validatedAdminUrl, ["-c", `CREATE DATABASE ${expectedDatabase};`]);
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const migrationDirectory = resolve(root, "supabase/migrations");
@@ -86,11 +89,11 @@ for (const version of baselineEquivalentVersions) {
 applyFile("Supabase prerequisites", resolve(root, "scripts/lib/supabase-compile-prerequisites.sql"));
 for (const file of baselineFiles) applyFile("baseline", file);
 
-runPsql([
+runPsql(databaseUrl, [
   "-c",
   "CREATE SCHEMA IF NOT EXISTS supabase_migrations; CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (version text PRIMARY KEY);",
 ]);
-runPsql([
+runPsql(databaseUrl, [
   "-c",
   `INSERT INTO supabase_migrations.schema_migrations (version) VALUES ${baselineEquivalentVersions.map((version) => `(${sqlLiteral(version)})`).join(", ")} ON CONFLICT DO NOTHING;`,
 ]);
@@ -105,7 +108,7 @@ const pending = new Set(plan.pending);
 for (const migration of migrations.files) {
   if (migration.version > targetVersion || !pending.has(migration.version)) continue;
   applyFile(`migration ${migration.version}`, migration.path);
-  runPsql([
+  runPsql(databaseUrl, [
     "-c",
     `INSERT INTO supabase_migrations.schema_migrations (version) VALUES (${sqlLiteral(migration.version)});`,
   ]);

@@ -75,7 +75,10 @@ path-scoped compile check. It uses the official disposable
 `supabase/postgres` image on the GitHub runner only; it has no production
 database URL, credentials, or persistent storage.
 
-The check first installs the documented Supabase prerequisites (`auth.users`,
+The service is initialized with the image's upstream default `postgres`
+database and `supabase_admin` role; the local-only driver then creates
+`audiolad_migration_compile_isolated` after the service is healthy. The check
+first installs the documented Supabase prerequisites (`auth.users`,
 `storage.buckets`, `storage.objects`, roles, and `auth.uid()`), then applies
 `0001`–`0005`. It registers these six baseline-equivalent versions in
 `supabase_migrations.schema_migrations` without executing them:
