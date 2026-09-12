@@ -26,11 +26,9 @@ jobs:
       postgres:
         image: supabase/postgres:15.14.1.171
         env:
-          POSTGRES_DB: audiolad_migration_compile_isolated
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U postgres -d audiolad_migration_compile_isolated"
+          --health-cmd "pg_isready -U supabase_admin -d postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 24
@@ -42,9 +40,9 @@ jobs:
         run: |
           set -euo pipefail
           psql --version
-          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_migration_compile_isolated
+          pg_isready --host 127.0.0.1 --port 5432 --username supabase_admin --dbname postgres
       - name: Execute real migration compile
         env:
-          AUDIOLAD_MIGRATION_COMPILE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_migration_compile_isolated
+          AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL: postgresql://supabase_admin:postgres@127.0.0.1:5432/postgres
           PGPASSWORD: postgres
         run: node scripts/database-migrations-compile-isolated.mjs
