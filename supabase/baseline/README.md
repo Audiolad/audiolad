@@ -93,8 +93,13 @@ first installs the documented Supabase prerequisites (`auth.users`,
 All remaining migrations are executed lexically through the target version;
 the driver obtains that ordered pending set through
 `database-migrations-plan.mjs` and fails if it encounters any unplanned
-history state. This exception list is limited to the baseline compatibility
-map above: no other migration SQL is silently skipped.
+history state. Before `20260714180000_unified_audio_product_foundation.sql`,
+the driver installs one documented legacy-data fixture: its own post-check
+requires `first-audio-course` to have the exact legacy `audio_url`, while the
+earlier seed creates that row with a null URL. The fixture provides that
+historical precondition; the migration itself is still executed. This
+exception list and fixture are limited to the baseline compatibility map
+above: no migration SQL is silently skipped.
 
 ## Известные архитектурные особенности (не исправляются baseline)
 

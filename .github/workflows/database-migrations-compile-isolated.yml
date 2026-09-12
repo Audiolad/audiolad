@@ -8,6 +8,7 @@ on:
       - "scripts/database-migrations-compile-isolated.mjs"
       - "scripts/database-migrations-compile-workflow-unit.mjs"
       - "scripts/lib/supabase-compile-prerequisites.sql"
+      - "scripts/lib/supabase-compile-pre-unified-audio-seed.sql"
       - "supabase/baseline/**"
       - "supabase/migrations/**"
       - "supabase/tests/database_migrations_compile_analytics_smoke.sql"
