@@ -27,6 +27,25 @@ export async function POST(request: Request) {
   return NextResponse.json({ query: data }, { status: 201 });
 }
 
+export async function PUT(request: Request) {
+  await requireAdminPermission("seo.manage");
+  const body = await request.json() as Record<string, unknown>;
+  const name = text(body.name);
+  if (!name) return NextResponse.json({ error: "cluster_name_required" }, { status: 400 });
+  const { data, error } = await createServiceRoleClient()
+    .from("seo_clusters")
+    .insert({
+      name,
+      canonical_query: text(body.canonical_query),
+      intent: text(body.intent),
+      recommended_format: text(body.recommended_format),
+    })
+    .select("id, name")
+    .single();
+  if (error) return NextResponse.json({ error: "seo_cluster_create_failed" }, { status: 400 });
+  return NextResponse.json({ cluster: data }, { status: 201 });
+}
+
 export async function PATCH(request: Request) {
   await requireAdminPermission("seo.manage");
   const body = await request.json() as Record<string, unknown>;
@@ -39,7 +58,12 @@ export async function PATCH(request: Request) {
   if (typeof body.frequency === "number" || body.frequency === null) update.frequency = body.frequency;
   const { data, error } = await createServiceRoleClient()
     .from("seo_queries").update(update).eq("id", id).select().single();
-  if (error) return NextResponse.json({ error: "seo_query_update_failed" }, { status: 400 });
+  if (error) {
+    return NextResponse.json(
+      { error: error.code === "23505" ? "normalized_query_duplicate" : "seo_query_update_failed" },
+      { status: 400 },
+    );
+  }
   return NextResponse.json({ query: data });
 }
 
