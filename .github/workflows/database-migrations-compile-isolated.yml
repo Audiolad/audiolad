@@ -9,6 +9,7 @@ on:
       - "scripts/database-migrations-compile-workflow-unit.mjs"
       - "scripts/lib/supabase-compile-prerequisites.sql"
       - "scripts/lib/supabase-compile-pre-unified-audio-seed.sql"
+      - "scripts/lib/supabase-compile-pre-personal-materials-optional-last-name.sql"
       - "supabase/baseline/**"
       - "supabase/migrations/**"
       - "supabase/tests/database_migrations_compile_analytics_smoke.sql"
@@ -36,10 +37,11 @@ jobs:
         ports:
           - 5432:5432
     steps:
+      # Do not set persist-credentials false: the orphan audiolad gitlink
+      # without .gitmodules breaks actions/checkout auth cleanup in that mode.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
       - name: Verify disposable Supabase Postgres
         run: |
           set -euo pipefail
