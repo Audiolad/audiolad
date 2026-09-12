@@ -190,7 +190,12 @@ Separate approved step:
 
 ```env
 AUDIOLAD_CORPORATE_EMAIL_DOMAINS=audiolad.ru
+PASSWORD_RECOVERY_INTENT_SECRET=<strong-random-secret>
 ```
+
+`PASSWORD_RECOVERY_INTENT_SECRET` is required before deploying the hardened
+recovery flow. Set it separately in the application production environment;
+never reuse `MAX_BOT_TOKEN` and never commit its value.
 
 Optional sender overrides:
 

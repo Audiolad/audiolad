@@ -12,6 +12,7 @@
     "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",
     "test:health-build": "npx tsx scripts/health-build-route-unit.mts",
     "test:password-recovery-hardening": "npx tsx scripts/password-recovery-hardening-unit.mts",
+    "test:password-recovery": "npx tsx scripts/password-recovery-navigation-unit.ts && npx tsx scripts/password-recovery-hardening-unit.mts && npx tsx scripts/email-template-unit.ts && node scripts/email-policy-unit.mjs",
     "test:production-pr-safety": "node scripts/production-pr-safety-guard-unit.mjs",
     "test:studio-provider-isolation": "node scripts/studio-provider-isolation-unit.mjs",
     "test:studio-audio-provider": "npx tsx scripts/studio-audio-provider-unit.mjs",

@@ -104,6 +104,17 @@ the fragment, stores it briefly in an HttpOnly staging cookie, and only
 Ensure `GOTRUE_URI_ALLOW_LIST` includes `https://audiolad.ru/auth/recovery`
 (or the already approved `https://audiolad.ru/**`). This is a separate
 production configuration check; do not change it as part of app deployment.
+The existing production wildcard covers this route, so no GoTrue allow-list
+change is expected if it remains active.
+
+## Required application secret before a future deploy
+
+Before deploying this recovery flow, separately set a strong random
+`PASSWORD_RECOVERY_INTENT_SECRET` in the **application** production
+environment. It signs the short-lived recovery-intent cookie and is required:
+the app fails closed when it is absent. Do not reuse `MAX_BOT_TOKEN`, a public
+Supabase key, or any other secret. Do not commit the value. This is not a
+GoTrue setting and does not require a GoTrue configuration change.
 
 ## Rollout steps (controlled)
 

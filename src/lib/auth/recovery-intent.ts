@@ -1,8 +1,6 @@
 import "server-only";
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-
 export const RECOVERY_STAGE_COOKIE = "audiolad_recovery_stage";
 export const RECOVERY_INTENT_COOKIE = "audiolad_recovery_intent";
 
@@ -20,6 +18,10 @@ type RecoveryIntent = {
   signature: string;
 };
 
+export type RecoveryCookieReader = {
+  get(name: string): { value: string } | undefined;
+};
+
 function cookieOptions(path: string, maxAge = RECOVERY_COOKIE_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
@@ -31,7 +33,7 @@ function cookieOptions(path: string, maxAge = RECOVERY_COOKIE_MAX_AGE_SECONDS) {
 }
 
 function intentSecret(): string {
-  const secret = process.env.MAX_BOT_TOKEN;
+  const secret = process.env.PASSWORD_RECOVERY_INTENT_SECRET;
   if (!secret) {
     throw new Error("password_recovery_intent_unavailable");
   }
@@ -62,7 +64,7 @@ export function createRecoveryStage(
 }
 
 export function readRecoveryStage(
-  cookieStore: Pick<ReadonlyRequestCookies, "get">,
+  cookieStore: RecoveryCookieReader,
 ): RecoveryStage | null {
   const value = cookieStore.get(RECOVERY_STAGE_COOKIE)?.value;
   if (!value) return null;
@@ -80,9 +82,9 @@ export function readRecoveryStage(
   }
 }
 
-export function createRecoveryIntent(userId: string): string {
+export function createRecoveryIntent(userId: string, now = Date.now()): string {
   const nonce = randomBytes(18).toString("base64url");
-  const expiresAt = Date.now() + RECOVERY_INTENT_MAX_AGE_SECONDS * 1000;
+  const expiresAt = now + RECOVERY_INTENT_MAX_AGE_SECONDS * 1000;
   const signature = signIntent(nonce, expiresAt, userId);
   return Buffer.from(JSON.stringify({ nonce, expiresAt, signature } satisfies RecoveryIntent)).toString(
     "base64url",
@@ -90,8 +92,9 @@ export function createRecoveryIntent(userId: string): string {
 }
 
 export function hasValidRecoveryIntent(
-  cookieStore: Pick<ReadonlyRequestCookies, "get">,
+  cookieStore: RecoveryCookieReader,
   userId: string,
+  now = Date.now(),
 ): boolean {
   const encoded = cookieStore.get(RECOVERY_INTENT_COOKIE)?.value;
   if (!encoded) return false;
@@ -104,7 +107,7 @@ export function hasValidRecoveryIntent(
       typeof nonce !== "string" ||
       typeof expiresAt !== "number" ||
       typeof signature !== "string" ||
-      expiresAt <= Date.now()
+      expiresAt <= now
     ) {
       return false;
     }

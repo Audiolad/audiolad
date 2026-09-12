@@ -116,7 +116,19 @@ export async function resetPasswordAction(input: {
     ...recoveryStageCookieOptions(),
     maxAge: 0,
   });
-  await supabase.auth.signOut({ scope: "local" });
+  const { error: signOutError } = await supabase.auth.signOut({
+    scope: "local",
+  });
+  if (signOutError) {
+    console.warn("password_reset_sign_out_failure", { reason: "sign_out_failed" });
+    return {
+      ok: false,
+      error: {
+        field: "form",
+        message: PASSWORD_RESET_GENERIC_ERROR,
+      },
+    };
+  }
   console.info("password_reset_update_success");
 
   return {

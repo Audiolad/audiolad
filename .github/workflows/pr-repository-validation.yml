@@ -47,6 +47,7 @@ jobs:
       - name: Validate PR repository
         working-directory: ${{ env.PR_WORKSPACE }}
         run: |
+          npm run test:password-recovery
           npm run test:database-migrations:ci
           npm run test:studio-render-worker-env
           npm run test:production-deploy-gha

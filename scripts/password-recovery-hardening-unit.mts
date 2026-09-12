@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import {
+  createRecoveryIntent,
+  hasValidRecoveryIntent,
+  RECOVERY_INTENT_COOKIE,
+} from "../src/lib/auth/recovery-intent";
+import { buildPasswordRecoveryRedirectUrl } from "../src/lib/auth/recovery";
+
 const root = path.resolve(import.meta.dirname, "..");
 const read = (...parts: string[]) => readFileSync(path.join(root, ...parts), "utf8");
 
@@ -11,6 +18,7 @@ const generatedTemplate = read("supabase/templates/recovery.html");
 const landing = read("src/app/(platform)/auth/recovery/page.tsx");
 const landingAction = read("src/app/(platform)/auth/recovery/actions.ts");
 const resetAction = read("src/app/(platform)/auth/reset-password/actions.ts");
+const resetLayout = read("src/app/(platform)/auth/reset-password/layout.tsx");
 const callback = read("src/app/(platform)/auth/callback/route.ts");
 const intent = read("src/lib/auth/recovery-intent.ts");
 
@@ -19,6 +27,11 @@ const intent = read("src/lib/auth/recovery-intent.ts");
 assert.match(recovery, /resolveValidatedNextPath/);
 assert.match(recovery, /\/auth\/recovery/);
 assert.doesNotMatch(recovery, /\/auth\/callback/);
+assert.equal(
+  buildPasswordRecoveryRedirectUrl("/my-practices?from=recovery"),
+  "https://audiolad.ru/auth/recovery?next=%2Fmy-practices%3Ffrom%3Drecovery",
+);
+assert.equal(buildPasswordRecoveryRedirectUrl("https://evil.example"), "https://audiolad.ru/auth/recovery");
 
 // GoTrue template variables were verified against v2.189.0 source/docs.
 assert.match(template, /\{\{ \.RedirectTo \}\}#token_hash=\{\{ \.TokenHash \}\}&type=recovery/);
@@ -36,14 +49,35 @@ assert.match(landingAction, /verifyOtp\(\{[\s\S]*token_hash:[\s\S]*type: "recove
 assert.match(landingAction, /RECOVERY_STAGE_COOKIE/);
 assert.match(landingAction, /clearStageCookie/);
 
-// The marker is server-signed, short-lived, HttpOnly, and bound to the
-// verified user without putting any user id or bearer into the cookie value.
+// The marker is server-signed, short-lived, and bound to the verified user
+// without putting any user id or bearer into the cookie value.
 assert.match(intent, /createHmac/);
 assert.match(intent, /httpOnly: true/);
 assert.match(intent, /sameSite: "lax"/);
 assert.match(intent, /RECOVERY_INTENT_MAX_AGE_SECONDS = 10 \* 60/);
 assert.match(intent, /signIntent\(nonce, expiresAt, userId\)/);
-assert.match(intent, /tokenHash/);
+assert.doesNotMatch(intent, /MAX_BOT_TOKEN/);
+
+const originalSecret = process.env.PASSWORD_RECOVERY_INTENT_SECRET;
+delete process.env.PASSWORD_RECOVERY_INTENT_SECRET;
+assert.throws(() => createRecoveryIntent("user-a"));
+process.env.PASSWORD_RECOVERY_INTENT_SECRET = "test-only-recovery-intent-secret";
+
+const cookieFor = (value: string) => ({
+  get: (name: string) => name === RECOVERY_INTENT_COOKIE ? { value } : undefined,
+});
+const validIntent = createRecoveryIntent("user-a");
+assert.equal(hasValidRecoveryIntent(cookieFor(validIntent), "user-a"), true);
+assert.equal(hasValidRecoveryIntent(cookieFor(validIntent), "user-b"), false);
+const tamperedIntent = `${validIntent.startsWith("A") ? "B" : "A"}${validIntent.slice(1)}`;
+assert.equal(hasValidRecoveryIntent(cookieFor(tamperedIntent), "user-a"), false);
+const expiredIntent = createRecoveryIntent("user-a", 0);
+assert.equal(hasValidRecoveryIntent(cookieFor(expiredIntent), "user-a"), false);
+if (originalSecret === undefined) {
+  delete process.env.PASSWORD_RECOVERY_INTENT_SECRET;
+} else {
+  process.env.PASSWORD_RECOVERY_INTENT_SECRET = originalSecret;
+}
 
 // Reset is impossible for an ordinary authenticated session: both getUser and
 // a valid recovery intent are required. Success clears both cookies and logs
@@ -51,11 +85,15 @@ assert.match(intent, /tokenHash/);
 assert.match(resetAction, /supabase\.auth\.getUser/);
 assert.match(resetAction, /hasValidRecoveryIntent/);
 assert.match(resetAction, /supabase\.auth\.updateUser/);
-assert.match(resetAction, /supabase\.auth\.signOut\(\{ scope: "local" \}\)/);
+assert.match(resetAction, /supabase\.auth\.signOut\(\{[\s\S]*scope: "local"/);
 assert.match(resetAction, /RECOVERY_INTENT_COOKIE/);
 assert.match(resetAction, /RECOVERY_STAGE_COOKIE/);
 assert.match(resetAction, /buildPostPasswordResetSignInHref/);
 assert.doesNotMatch(resetAction, /error\.message/);
+assert.match(resetAction, /signOutError/);
+assert.match(resetLayout, /hasValidRecoveryIntent/);
+assert.match(resetLayout, /supabase\.auth\.getUser/);
+assert.match(resetLayout, /if \(user && hasValidRecoveryIntent/);
 
 // Callback remains the PKCE path for all non-recovery consumers.
 assert.match(callback, /exchangeCodeForSession/);
