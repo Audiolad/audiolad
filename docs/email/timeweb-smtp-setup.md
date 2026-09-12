@@ -52,7 +52,7 @@ GOTRUE_SMTP_SENDER_NAME=АудиоЛад
 GOTRUE_MAILER_AUTOCONFIRM=true
 
 # Redirect allowlist (adjust to exact production URLs)
-GOTRUE_URI_ALLOW_LIST=https://audiolad.ru/auth/callback,https://audiolad.ru/auth/reset-password
+GOTRUE_URI_ALLOW_LIST=https://audiolad.ru/auth/callback,https://audiolad.ru/auth/recovery,https://audiolad.ru/auth/reset-password
 ```
 
 Replace fake/dev SMTP (`supabase-mail:2500`) only after test send succeeds.
@@ -74,7 +74,8 @@ Recovery preserves the user's original `next` destination (for example after che
 ```text
 /auth/sign-in?next=/my-practices?purchased=<slug>
   → /auth/forgot-password?next=...
-  → email link → /auth/callback?next=/auth/reset-password?next=...
+  → email link → /auth/recovery?next=...#token_hash=...
+  → explicit «Продолжить» → /auth/reset-password?next=...
   → /auth/reset-password?next=...
   → /auth/sign-in?reset=1&next=...
   → /my-practices?purchased=<slug>
@@ -82,11 +83,16 @@ Recovery preserves the user's original `next` destination (for example after che
 
 1. User opens `/auth/forgot-password?next=...`.
 2. App calls `resetPasswordForEmail` with `redirectTo`:
-   `https://audiolad.ru/auth/callback?next=/auth/reset-password?next=<ultimate>`
+   `https://audiolad.ru/auth/recovery?next=<safe-ultimate>`.
 3. GoTrue sends recovery email (when SMTP is real). Branded template: see `docs/email/gotrue-recovery-template-rollout.md`.
-4. User opens link → `/auth/callback` exchanges code → `/auth/reset-password?next=...`.
-5. User sets a new password via `updateUser`.
-6. App redirects to `/auth/sign-in?reset=1&next=...`; sign-in completes the chain.
+4. The email puts `TokenHash` in a fragment, so it is absent from server,
+   Nginx and Referer logs. The landing GET does not consume it.
+5. After an explicit «Продолжить», the server verifies
+   `verifyOtp({ token_hash, type: "recovery" })`, sets a short-lived signed
+   HttpOnly recovery intent, and opens `/auth/reset-password?next=...`.
+6. The reset action requires both that intent and the recovery session. On
+   success it clears recovery cookies, signs out, then redirects to
+   `/auth/sign-in?reset=1&next=...` so the success banner is visible.
 
 Ensure `GOTRUE_URI_ALLOW_LIST` includes callback and reset routes.
 
@@ -133,7 +139,8 @@ Do not change DNS during application rollout.
 1. Staging/local with copied env — never commit secrets.
 2. Create a test user with allowed domain or corporate `@audiolad.ru`.
 3. Trigger `/auth/forgot-password` for that account.
-4. Confirm message arrives, link opens callback, password reset succeeds.
+4. Confirm message arrives, the first-party recovery landing opens, explicit
+   continue verifies it, and password reset succeeds.
 5. Check GoTrue/auth logs for SMTP errors (do not log tokens).
 
 Rollback: restore previous SMTP env values and restart `supabase-auth`.
@@ -183,7 +190,12 @@ Separate approved step:
 
 ```env
 AUDIOLAD_CORPORATE_EMAIL_DOMAINS=audiolad.ru
+PASSWORD_RECOVERY_INTENT_SECRET=<strong-random-secret>
 ```
+
+`PASSWORD_RECOVERY_INTENT_SECRET` is required before deploying the hardened
+recovery flow. Set it separately in the application production environment;
+never reuse `MAX_BOT_TOKEN` and never commit its value.
 
 Optional sender overrides:
 
