@@ -120,7 +120,7 @@ const single = splitHomeTopicsIntoScrollRows([
 assert(single.firstRow.length === 1 && single.secondRow.length === 0, "single topic has one row");
 
 assert(
-  shouldWrapHomeTopicChip("Уверенность и самоценность"),
+  shouldWrapHomeTopicChip("Очень длинное название темы для переноса"),
   "long title gets wrap helper",
 );
 

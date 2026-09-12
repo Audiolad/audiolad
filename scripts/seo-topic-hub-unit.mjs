@@ -116,7 +116,7 @@ const pageData = {
   paidProducts: [],
   articles: [],
   listens: [],
-  platformTopicTitle: "Уверенность и самоценность",
+  platformTopicTitle: "Уверенность",
 };
 
 const metadata = buildTopicHubMetadata(pageData);
@@ -164,7 +164,7 @@ const femalePageData = {
   paidProducts: [],
   articles: [],
   listens: [],
-  platformTopicTitle: "Уверенность и самоценность",
+  platformTopicTitle: "Уверенность",
 };
 const femaleMeta = buildTopicHubMetadata(femalePageData);
 assert(
