@@ -576,6 +576,14 @@ function createStore(input: {
   };
   prices?: Map<string, { listenerEffectiveMinor: number | null }>;
   tracks?: Map<string, Array<{ id: string; title: string; durationSeconds: number | null }>>;
+  viewerAccess?: {
+    entitlements: Array<{
+      practice_id: string;
+      grant_source?: string | null;
+      revoked_at?: string | null;
+    }>;
+    authorMemberAuthorIds: string[];
+  };
 }): StudioMusicCatalogStore {
   return {
     async listPublicInventory({ filter, cursor, limit }) {
@@ -595,6 +603,14 @@ function createStore(input: {
         entitlements: mine.entitlements,
         authorMemberAuthorIds: mine.authorMemberAuthorIds,
       };
+    },
+    async loadViewerAccess() {
+      return (
+        input.viewerAccess ?? {
+          entitlements: [],
+          authorMemberAuthorIds: [],
+        }
+      );
     },
     async loadPublishedTracks(practiceIds) {
       return practiceIds.flatMap((id) =>
@@ -674,6 +690,140 @@ assert.equal("items" in guestFree.body && guestFree.body.items.length, 1);
 assert.equal(
   "items" in guestFree.body && guestFree.body.items[0]?.publication_id,
   freeListed.id,
+);
+
+const publicViewerEntitlement = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [freeListed],
+    viewerAccess: {
+      entitlements: [
+        {
+          practice_id: freeListed.id!,
+          grant_source: "free",
+          revoked_at: null,
+        },
+      ],
+      authorMemberAuthorIds: [],
+    },
+  }),
+});
+assert.equal(publicViewerEntitlement.status, 200);
+assert.equal(
+  "items" in publicViewerEntitlement.body &&
+    publicViewerEntitlement.body.items[0]?.ownership.can_use,
+  true,
+  "an authenticated public-catalog viewer must retain active Studio entitlement",
+);
+assert.equal(
+  "items" in publicViewerEntitlement.body &&
+    publicViewerEntitlement.body.items[0]?.ownership.can_acquire,
+  false,
+);
+
+const freeViewerEntitlement = await handleStudioMusicCatalog({
+  filter: "free",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [freeListed],
+    viewerAccess: {
+      entitlements: [
+        {
+          practice_id: freeListed.id!,
+          grant_source: "free",
+          revoked_at: null,
+        },
+      ],
+      authorMemberAuthorIds: [],
+    },
+  }),
+});
+assert.equal(freeViewerEntitlement.status, 200);
+assert.equal(
+  "items" in freeViewerEntitlement.body &&
+    freeViewerEntitlement.body.items[0]?.ownership.can_use,
+  true,
+);
+assert.equal(
+  "items" in freeViewerEntitlement.body &&
+    freeViewerEntitlement.body.items[0]?.ownership.can_acquire,
+  false,
+);
+
+const publicViewerAuthor = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [listedAllowed],
+    viewerAccess: { entitlements: [], authorMemberAuthorIds: ["author-1"] },
+  }),
+});
+assert.equal(publicViewerAuthor.status, 200);
+assert.equal(
+  "items" in publicViewerAuthor.body &&
+    publicViewerAuthor.body.items[0]?.ownership.is_author_member,
+  true,
+);
+assert.equal(
+  "items" in publicViewerAuthor.body &&
+    publicViewerAuthor.body.items[0]?.ownership.can_use,
+  true,
+);
+
+const freeViewerAuthor = await handleStudioMusicCatalog({
+  filter: "free",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [freeListed],
+    viewerAccess: { entitlements: [], authorMemberAuthorIds: ["author-1"] },
+  }),
+});
+assert.equal(freeViewerAuthor.status, 200);
+assert.equal(
+  "items" in freeViewerAuthor.body &&
+    freeViewerAuthor.body.items[0]?.ownership.is_author_member,
+  true,
+);
+assert.equal(
+  "items" in freeViewerAuthor.body &&
+    freeViewerAuthor.body.items[0]?.ownership.can_use,
+  true,
+);
+
+const acquireThenFreshReload = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [freeListed],
+    viewerAccess: {
+      entitlements: [
+        {
+          practice_id: freeListed.id!,
+          grant_source: "free",
+          revoked_at: null,
+        },
+      ],
+      authorMemberAuthorIds: [],
+    },
+  }),
+});
+assert.equal(acquireThenFreshReload.status, 200);
+assert.equal(
+  "items" in acquireThenFreshReload.body &&
+    acquireThenFreshReload.body.items[0]?.ownership.can_use,
+  true,
+  "a fresh public-catalog reload after free acquisition must remain available",
 );
 
 const listenerFreeStudioFixed = publication({
