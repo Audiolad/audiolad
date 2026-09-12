@@ -20,6 +20,11 @@ import {
   DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
 } from "@/lib/seo/distribyutor-ii-muzyki/content";
 import {
+  KAK_SOZDAT_II_MUZYKU_PATH,
+  KAK_SOZDAT_II_MUZYKU_SEO_DESCRIPTION,
+  KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
+} from "@/lib/seo/kak-sozdat-ii-muzyku/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -275,6 +280,30 @@ export function buildDistribyutorIiMuzykiMetadata(): Metadata {
       card: "summary",
       title: DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
       description: DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildKakSozdatIiMuzykuMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(KAK_SOZDAT_II_MUZYKU_PATH);
+
+  return {
+    title: KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
+    description: KAK_SOZDAT_II_MUZYKU_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
+      description: KAK_SOZDAT_II_MUZYKU_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
+      description: KAK_SOZDAT_II_MUZYKU_SEO_DESCRIPTION,
     },
   };
 }
