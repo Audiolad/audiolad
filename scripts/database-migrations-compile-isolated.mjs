@@ -24,6 +24,13 @@ const preMigrationFixtures = new Map([
       path: "scripts/lib/supabase-compile-pre-unified-audio-seed.sql",
     },
   ],
+  [
+    "20260721103000",
+    {
+      label: "pre-personal-materials optional-last-name fixture",
+      path: "scripts/lib/supabase-compile-pre-personal-materials-optional-last-name.sql",
+    },
+  ],
 ]);
 const baselineEquivalentVersions = [
   "20260710115506",

@@ -102,6 +102,12 @@ both historical preconditions; the migration itself is still executed. This
 exception list and fixture are limited to the baseline compatibility map
 above: no migration SQL is silently skipped.
 
+Before `20260721103000_personal_materials_optional_last_name.sql`, the driver
+also asserts that its real ten-argument draft-update function exists and its
+mistaken eleven-argument COMMENT identity does not. It creates only that
+eleven-argument no-op overload so the historical `COMMENT ON FUNCTION` can
+compile; the migration continues to define and validate the real function.
+
 ## Известные архитектурные особенности (не исправляются baseline)
 
 - `purchases.user_id` **без FK** на `auth.users` — как в production.
