@@ -35,9 +35,12 @@ for (const rpc of [
   "admin_analytics_p2_summary",
   "admin_analytics_p2_practices",
   "admin_analytics_p2_authors",
+  "admin_analytics_p2_timeseries",
+  "admin_analytics_p2_acquisition",
   "author_stats_summary",
   "author_stats_products",
   "author_stats_timeseries",
+  "author_stats_sources",
 ]) {
   const body = sql.slice(sql.indexOf(`FUNCTION public.${rpc}`));
   assert(body.includes("analytics_product_event_facts"), `${rpc} uses shared facts`);

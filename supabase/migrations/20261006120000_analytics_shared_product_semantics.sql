@@ -202,6 +202,35 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_tem
  SELECT jsonb_build_object('from',p_from,'to',p_to,'points',coalesce(jsonb_agg(jsonb_build_object('date',days.d::text,'practice_views',coalesce(a.views,0),'practice_unique_visitors',coalesce(a.visitors,0),'plays',coalesce(a.plays,0),'progress_25',coalesce(a.progress,0),'completions',coalesce(a.completions,0),'library_saves',0,'author_page_views',0,'author_page_unique_visitors',0) ORDER BY days.d),'[]'::jsonb)) FROM days LEFT JOIN a ON a.d=days.d;
 $$;
 
+CREATE OR REPLACE FUNCTION public.author_stats_sources(p_author_id uuid,p_from timestamptz DEFAULT NULL,p_to timestamptz DEFAULT NULL)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+ WITH buckets AS (SELECT unnest(ARRAY['direct','internal','telegram','vk','max','search','other_external','unknown']) bucket),
+ e AS (SELECT * FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,NULL,false)),
+ a AS (SELECT public.author_stats_source_bucket(utm_source,NULL) bucket,
+   count(*) FILTER(WHERE event_name='practice_view')::int views,
+   count(DISTINCT visitor_key) FILTER(WHERE event_name='practice_view')::int visitors,
+   count(*) FILTER(WHERE event_name='audio_play_started')::int plays FROM e GROUP BY 1)
+ SELECT jsonb_build_object('rows',coalesce(jsonb_agg(jsonb_build_object('bucket',buckets.bucket,'views',coalesce(a.views,0),'visitors',coalesce(a.visitors,0),'plays',coalesce(a.plays,0)) ORDER BY coalesce(a.visitors,0) DESC,buckets.bucket),'[]'::jsonb)) FROM buckets LEFT JOIN a ON a.bucket=buckets.bucket;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_analytics_p2_timeseries(
+ p_from timestamptz DEFAULT NULL,p_to timestamptz DEFAULT NULL,p_include_test boolean DEFAULT false,p_author_id uuid DEFAULT NULL,p_practice_id uuid DEFAULT NULL,p_utm_source text DEFAULT NULL,p_device_type text DEFAULT NULL
+) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+ WITH bounds AS (SELECT coalesce(p_from,now()-interval '29 days') f,coalesce(p_to,now()) t),
+ days AS (SELECT generate_series(date_trunc('day',f AT TIME ZONE 'Europe/Moscow'),date_trunc('day',(t-interval '1 microsecond') AT TIME ZONE 'Europe/Moscow'),interval '1 day')::date d FROM bounds),
+ e AS (SELECT * FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,p_practice_id,p_include_test) WHERE public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (nullif(btrim(coalesce(p_device_type,'')),'') IS NULL OR device_type=p_device_type)),
+ a AS (SELECT listening_day d,count(DISTINCT visitor_key)::int visitors,count(*) FILTER(WHERE event_name='practice_view')::int views,count(*) FILTER(WHERE event_name='audio_play_started')::int starts,count(DISTINCT visitor_key) FILTER(WHERE event_name='audio_play_started')::int listeners,count(*) FILTER(WHERE event_name='audio_completed')::int completions,count(*) FILTER(WHERE event_name='first_manual_library_save')::int saves FROM e GROUP BY listening_day)
+ SELECT jsonb_build_object('granularity','day','points',coalesce(jsonb_agg(jsonb_build_object('bucket',days.d::text,'visitors',coalesce(a.visitors,0),'registrations',0,'practice_views',coalesce(a.views,0),'play_starts',coalesce(a.starts,0),'listeners',coalesce(a.listeners,0),'completions',coalesce(a.completions,0),'saves',coalesce(a.saves,0)) ORDER BY days.d),'[]'::jsonb)) FROM days LEFT JOIN a ON a.d=days.d;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_analytics_p2_acquisition(
+ p_from timestamptz DEFAULT NULL,p_to timestamptz DEFAULT NULL,p_include_test boolean DEFAULT false,p_author_id uuid DEFAULT NULL,p_practice_id uuid DEFAULT NULL,p_utm_source text DEFAULT NULL,p_device_type text DEFAULT NULL,p_limit int DEFAULT 20,p_offset int DEFAULT 0
+) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+ WITH e AS (SELECT * FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,p_practice_id,p_include_test) WHERE public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (nullif(btrim(coalesce(p_device_type,'')),'') IS NULL OR device_type=p_device_type)),
+ a AS (SELECT btrim(coalesce(utm_source,'')) source,btrim(coalesce(utm_medium,'')) medium,btrim(coalesce(utm_campaign,'')) campaign,btrim(coalesce(utm_content,'')) content,count(DISTINCT session_id)::int sessions,count(DISTINCT visitor_key)::int visitors,count(*) FILTER(WHERE event_name='audio_play_started')::int starts,count(DISTINCT visitor_key) FILTER(WHERE event_name='audio_play_started')::int listeners,count(*) FILTER(WHERE event_name='first_manual_library_save')::int saves FROM e GROUP BY 1,2,3,4)
+ SELECT jsonb_build_object('attribution','session_touch','total',count(*)::int,'rows',coalesce(jsonb_agg(jsonb_build_object('utmSource',source,'utmMedium',medium,'utmCampaign',campaign,'utmContent',content,'label',public.admin_analytics_p2_utm_label(source,medium,campaign,content),'sessions',sessions,'visitors',visitors,'registrations',0,'playStarts',starts,'listeners',listeners,'saves',saves) ORDER BY sessions DESC,source),'[]'::jsonb)) FROM a;
+$$;
+
 REVOKE ALL ON FUNCTION public.analytics_product_event_facts(timestamptz,timestamptz,uuid,uuid,boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.analytics_product_event_facts(timestamptz,timestamptz,uuid,uuid,boolean) TO service_role;
 REVOKE ALL ON FUNCTION public.admin_analytics_p2_window_metrics(timestamptz,timestamptz,boolean,uuid,uuid,text,text) FROM PUBLIC, anon, authenticated;
@@ -210,6 +239,9 @@ REVOKE ALL ON FUNCTION public.admin_analytics_p2_summary(timestamptz,timestamptz
 GRANT EXECUTE ON FUNCTION public.admin_analytics_p2_summary(timestamptz,timestamptz,boolean,timestamptz,timestamptz,uuid,uuid,text,text) TO service_role;
 REVOKE ALL ON FUNCTION public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,int,int), public.admin_analytics_p2_authors(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,int,int) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,int,int), public.admin_analytics_p2_authors(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,int,int) TO service_role;
+REVOKE ALL ON FUNCTION public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text), public.admin_analytics_p2_acquisition(timestamptz,timestamptz,boolean,uuid,uuid,text,text,int,int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text), public.admin_analytics_p2_acquisition(timestamptz,timestamptz,boolean,uuid,uuid,text,text,int,int) TO service_role;
 REVOKE ALL ON FUNCTION public.author_stats_summary(uuid,timestamptz,timestamptz), public.author_stats_products(uuid,timestamptz,timestamptz), public.author_stats_timeseries(uuid,timestamptz,timestamptz) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.author_stats_summary(uuid,timestamptz,timestamptz), public.author_stats_products(uuid,timestamptz,timestamptz), public.author_stats_timeseries(uuid,timestamptz,timestamptz) TO service_role;
+REVOKE ALL ON FUNCTION public.author_stats_sources(uuid,timestamptz,timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.author_stats_summary(uuid,timestamptz,timestamptz), public.author_stats_products(uuid,timestamptz,timestamptz), public.author_stats_timeseries(uuid,timestamptz,timestamptz), public.author_stats_sources(uuid,timestamptz,timestamptz) TO service_role;
 COMMIT;
