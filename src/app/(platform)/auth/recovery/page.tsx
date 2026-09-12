@@ -21,22 +21,23 @@ function RecoveryLanding() {
 
   useEffect(() => {
     let active = true;
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const tokenHash = hash.get("token_hash");
-    const type = hash.get("type");
+    void Promise.resolve().then(async () => {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const tokenHash = hash.get("token_hash");
+      const type = hash.get("type");
 
-    // Remove the bearer from browser history before any network request.
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      // Remove the bearer from browser history before any network request.
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
 
-    if (!tokenHash || type !== "recovery") {
-      setError(PASSWORD_RESET_EXPIRED_MESSAGE);
-      return;
-    }
+      if (!tokenHash || type !== "recovery") {
+        if (active) setError(PASSWORD_RESET_EXPIRED_MESSAGE);
+        return;
+      }
 
-    void stageRecoveryTokenAction({
-      tokenHash,
-      next: searchParams.get("next"),
-    }).then((result) => {
+      const result = await stageRecoveryTokenAction({
+        tokenHash,
+        next: searchParams.get("next"),
+      });
       if (!active) return;
       if (!result.ok) {
         setError(result.message);
