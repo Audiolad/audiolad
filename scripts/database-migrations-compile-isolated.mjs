@@ -16,6 +16,15 @@ import {
 const adminUrl = process.env.AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL ?? "";
 const expectedDatabase = "audiolad_migration_compile_isolated";
 const targetVersion = "20261006120200";
+const preMigrationFixtures = new Map([
+  [
+    "20260714180000",
+    {
+      label: "pre-unified-audio legacy fixture",
+      path: "scripts/lib/supabase-compile-pre-unified-audio-seed.sql",
+    },
+  ],
+]);
 const baselineEquivalentVersions = [
   "20260710115506",
   "20260710122053",
@@ -107,6 +116,8 @@ if (plan.action !== "apply") throw new Error(`unexpected baseline migration plan
 const pending = new Set(plan.pending);
 for (const migration of migrations.files) {
   if (migration.version > targetVersion || !pending.has(migration.version)) continue;
+  const fixture = preMigrationFixtures.get(migration.version);
+  if (fixture) applyFile(fixture.label, resolve(root, fixture.path));
   applyFile(`migration ${migration.version}`, migration.path);
   runPsql(databaseUrl, [
     "-c",
