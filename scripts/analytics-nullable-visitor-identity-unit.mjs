@@ -58,6 +58,16 @@ for (const rpc of [
     `${rpc} counts unique people only when identity is known`,
   );
 }
+for (const rpc of [
+  "admin_analytics_p2_practices",
+  "admin_analytics_p2_authors",
+  "admin_analytics_p2_acquisition",
+]) {
+  assert(
+    /\bWITH included_events AS \(/.test(functionBody(foundation, rpc)),
+    `${rpc} retains its shared-facts CTE guard`,
+  );
+}
 
 const sources = functionBody(sql, "author_stats_sources");
 assert(!/FROM attributed\s+WHERE visitor_key IS NOT NULL/.test(sources), "source event counts retain unidentified events");
