@@ -64,6 +64,11 @@ assert.match(view, /Как зарабатывать на своей ИИ-муз�
 assert.match(view, /Спокойная инструментальная музыка для массажа/);
 assert.match(view, /10 треков примерно по 6 минут = около часа музыки/);
 assert.match(view, /личного некоммерческого использования/);
+for (const variant of ["Вариант 1", "Вариант 2", "Вариант 3", "Вариант 4"]) {
+  assert.match(view, new RegExp(variant));
+}
+assert.match(view, /Вариант 4"[^]*Выбран лучший/);
+assert.doesNotMatch(view, />and</);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
 assert.equal(KAK_SOZDAT_II_MUZYKU_FAQ.length, 8);
