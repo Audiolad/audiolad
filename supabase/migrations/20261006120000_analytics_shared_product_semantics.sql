@@ -84,18 +84,70 @@ CREATE OR REPLACE FUNCTION public.admin_analytics_p2_window_metrics(
   p_device_type text DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  WITH e AS (
+  WITH session_filter AS (
+    SELECT
+      nullif(btrim(coalesce(p_utm_source, '')), '') IS NOT NULL
+      OR nullif(btrim(coalesce(p_device_type, '')), '') IS NOT NULL AS active
+  ),
+  period_sessions AS (
+    SELECT s.*,
+      (s.is_staff OR s.is_test OR s.is_bot
+        OR coalesce(s.traffic_class, 'human') <> 'human'
+        OR public.is_test_analytics_session(s.utm_campaign, s.anonymous_id)) AS is_service,
+      public.admin_analytics_visitor_key(s.user_id, s.anonymous_id, s.started_at) AS session_visitor_key
+    FROM public.analytics_sessions s
+    WHERE (p_from IS NULL OR s.started_at >= p_from)
+      AND (p_to IS NULL OR s.started_at < p_to)
+      AND public.admin_analytics_p2_utm_matches(p_utm_source, s.utm_source)
+      AND (nullif(btrim(coalesce(p_device_type, '')), '') IS NULL OR s.device_type = p_device_type)
+  ),
+  included_sessions AS (
+    SELECT * FROM period_sessions WHERE p_include_test OR NOT is_service
+  ),
+  e AS (
     SELECT * FROM public.analytics_product_event_facts(
       p_from, p_to, p_author_id, p_practice_id, p_include_test
     )
     WHERE public.admin_analytics_p2_utm_matches(p_utm_source, utm_source)
       AND (nullif(btrim(coalesce(p_device_type, '')), '') IS NULL OR device_type = p_device_type)
+  ),
+  period_profiles AS (
+    SELECT p.id FROM public.profiles p
+    WHERE (p_from IS NULL OR p.created_at >= p_from)
+      AND (p_to IS NULL OR p.created_at < p_to)
+  ),
+  included_profiles AS (
+    SELECT pp.id FROM period_profiles pp CROSS JOIN session_filter sf
+    WHERE (
+      p_include_test OR (
+        NOT coalesce(public.is_platform_staff(pp.id), false)
+        AND NOT coalesce(public.is_analytics_test_user(pp.id), false)
+        AND (
+          NOT EXISTS (SELECT 1 FROM period_sessions ps WHERE ps.user_id = pp.id)
+          OR EXISTS (SELECT 1 FROM period_sessions ps WHERE ps.user_id = pp.id AND NOT ps.is_service)
+        )
+      )
+    )
+    AND (
+      NOT sf.active OR EXISTS (
+        SELECT 1 FROM included_sessions s WHERE s.user_id = pp.id
+      )
+    )
+    AND (
+      (p_author_id IS NULL AND p_practice_id IS NULL)
+      OR EXISTS (SELECT 1 FROM e WHERE e.user_id = pp.id)
+    )
   )
   SELECT jsonb_build_object(
-    'sessions', count(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL)::int,
-    'visitors', count(DISTINCT visitor_key)::int,
-    'registrations', 0,
-    'excluded_service_sessions', 0, 'excluded_service_visitors', 0,
+    'sessions', CASE WHEN p_author_id IS NULL AND p_practice_id IS NULL
+      THEN (SELECT count(*)::int FROM included_sessions)
+      ELSE count(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL)::int END,
+    'visitors', CASE WHEN p_author_id IS NULL AND p_practice_id IS NULL
+      THEN (SELECT count(DISTINCT session_visitor_key)::int FROM included_sessions)
+      ELSE count(DISTINCT visitor_key)::int END,
+    'registrations', (SELECT count(*)::int FROM included_profiles),
+    'excluded_service_sessions', (SELECT count(*)::int FROM period_sessions WHERE is_service),
+    'excluded_service_visitors', (SELECT count(DISTINCT session_visitor_key)::int FROM period_sessions WHERE is_service),
     'practice_views', count(*) FILTER (WHERE event_name = 'practice_view')::int,
     'play_starts', count(*) FILTER (WHERE event_name = 'audio_play_started')::int,
     'completions', count(*) FILTER (WHERE event_name = 'audio_completed')::int,
