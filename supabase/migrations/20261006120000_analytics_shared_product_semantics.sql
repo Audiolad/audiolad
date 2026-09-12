@@ -134,7 +134,7 @@ BEGIN
     WHERE public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (v_device IS NULL OR device_type=v_device)
   ),
   included_events AS (
-    SELECT * FROM period_events WHERE is_included
+    SELECT * FROM period_events
   ),
   period_profiles AS (
     SELECT p.id, p.created_at

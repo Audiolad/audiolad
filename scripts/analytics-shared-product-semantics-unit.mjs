@@ -12,6 +12,8 @@ const assert = (value, message) => {
 const sql = read("supabase/migrations/20261006120000_analytics_shared_product_semantics.sql");
 const dates = read("src/lib/author-stats/dates.ts");
 
+assert(!sql.includes("WHERE is_included"), "shared-facts consumers cannot use removed is_included column");
+
 // The SQL foundation is intentionally the only place where A–I eligibility is
 // decided: anonymous/authenticated humans are retained; test IDs/campaigns,
 // staff, bots, and own-author members are excluded; identity links remain in
