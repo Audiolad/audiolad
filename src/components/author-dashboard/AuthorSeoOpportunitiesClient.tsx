@@ -24,15 +24,20 @@ export default function AuthorSeoOpportunitiesClient({
   authorId, authorSlug, opportunities, products,
 }: Props) {
   const [query, setQuery] = useState("");
+  const [cluster, setCluster] = useState("");
+  const [format, setFormat] = useState("");
   const [items, setItems] = useState(opportunities);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
   const activeCount = items.filter((item) => item.reservationId && item.lifecycle !== "published").length;
-  const visible = useMemo(
-    () => items.filter((item) => item.queryText.toLowerCase().includes(query.trim().toLowerCase())),
-    [items, query],
-  );
+  const clusters = useMemo(() => [...new Set(items.map((item) => item.clusterName).filter((value): value is string => Boolean(value)))], [items]);
+  const formats = useMemo(() => [...new Set(items.map((item) => item.recommendedFormat).filter((value): value is string => Boolean(value)))], [items]);
+  const visible = useMemo(() => items.filter((item) =>
+    item.queryText.toLowerCase().includes(query.trim().toLowerCase())
+    && (!cluster || item.clusterName === cluster)
+    && (!format || item.recommendedFormat === format),
+  ), [items, query, cluster, format]);
 
   async function reserve(queryId: string) {
     setPendingId(queryId);
@@ -88,6 +93,10 @@ export default function AuthorSeoOpportunitiesClient({
         <p className="text-sm leading-6 text-[#4c3d78]">Выберите поисковый запрос, под который хотите создать аудиопродукт. Одновременно можно взять в работу до 5 запросов.</p>
         <p className="mt-3 text-sm font-semibold text-[#25135c]">Мои SEO-запросы: {activeCount} из 5</p>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по запросам" className="mt-4 min-h-11 w-full rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm outline-none focus:border-[#7042c5]" />
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <select value={cluster} onChange={(event) => setCluster(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все темы</option>{clusters.map((value) => <option key={value}>{value}</option>)}</select>
+          <select value={format} onChange={(event) => setFormat(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все форматы</option>{formats.map((value) => <option key={value}>{value}</option>)}</select>
+        </div>
         {message ? <p role="status" className="mt-3 text-sm font-medium text-[#4c3d78]">{message}</p> : null}
       </section>
 

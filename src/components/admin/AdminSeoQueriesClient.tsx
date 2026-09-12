@@ -17,9 +17,19 @@ function date(value: string | null) {
 export default function AdminSeoQueriesClient({ initialRows }: { initialRows: Row[] }) {
   const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [source, setSource] = useState("");
+  const [cluster, setCluster] = useState("");
   const [newQuery, setNewQuery] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const filtered = useMemo(() => rows.filter((row) => row.queryText.toLowerCase().includes(search.toLowerCase()) || row.normalizedQuery.includes(search.toLowerCase())), [rows, search]);
+  const clusters = useMemo(() => [...new Set(rows.map((row) => row.cluster).filter((value): value is string => Boolean(value)))], [rows]);
+  const sources = useMemo(() => [...new Set(rows.map((row) => row.source))], [rows]);
+  const filtered = useMemo(() => rows.filter((row) =>
+    (row.queryText.toLowerCase().includes(search.toLowerCase()) || row.normalizedQuery.includes(search.toLowerCase()))
+    && (!status || row.lifecycle === status)
+    && (!source || row.source === source)
+    && (!cluster || row.cluster === cluster),
+  ), [rows, search, status, source, cluster]);
 
   async function addQuery(event: React.FormEvent) {
     event.preventDefault();
@@ -42,7 +52,12 @@ export default function AdminSeoQueriesClient({ initialRows }: { initialRows: Ro
       <input value={newQuery} onChange={(event) => setNewQuery(event.target.value)} required placeholder="Добавить SEO-запрос вручную" className="min-h-11 flex-1 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
       <button className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white">Добавить</button>
     </form>
-    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" className="min-h-11 w-full rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
+    <div className="grid gap-2 sm:grid-cols-4">
+      <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
+      <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все статусы</option>{["Свободен", "В работе", "На модерации", "Опубликован"].map((value) => <option key={value}>{value}</option>)}</select>
+      <select value={source} onChange={(event) => setSource(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все источники</option>{sources.map((value) => <option key={value}>{value}</option>)}</select>
+      <select value={cluster} onChange={(event) => setCluster(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все кластеры</option>{clusters.map((value) => <option key={value}>{value}</option>)}</select>
+    </div>
     {notice ? <p role="status" className="text-sm text-[#4c3d78]">{notice}</p> : null}
     <div className="hidden overflow-x-auto rounded-[22px] border border-[#eadff8] bg-white md:block"><table className="min-w-full text-left text-sm"><thead className="bg-[#faf6ff] text-[#796ba0]"><tr>{["Запрос", "Normalized", "Частотность", "Источник", "Кластер", "Intent", "Формат", "Audio Fit", "Статус", "Автор / продукт", "Бронь", "Создан", ""].map((title) => <th key={title} className="px-3 py-3 font-medium">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.id} className="border-t border-[#f3edf9]"><td className="px-3 py-3 font-medium">{row.queryText}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "—"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "—"}</td><td className="px-3 py-3">{row.intent ?? "—"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "—"}</td><td className="px-3 py-3">{row.audioFit ?? "—"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? "—"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3">{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>)}</tbody></table></div>
     <div className="space-y-3 md:hidden">{filtered.map((row) => <article key={row.id} className="rounded-[22px] border border-[#eadff8] bg-white p-4"><h2 className="font-semibold text-[#25135c]">{row.queryText}</h2><p className="mt-1 text-xs text-[#796ba0]">{row.normalizedQuery}</p><div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]"><span>{row.lifecycle}</span><span>{row.frequency ?? "—"} частотность</span><span>{row.cluster ?? "Без кластера"}</span><span>{row.author ?? "Свободен"}</span></div></article>)}</div>
