@@ -31,6 +31,10 @@ assert.match(driver, /CREATE DATABASE \$\{expectedDatabase\}/);
 assert.match(driver, /20260714180000/);
 assert.match(driver, /20260721103000/);
 assert.match(driver, /postMigrationFixtures/);
+assert.match(
+  driver,
+  /postMigrationFixtures = new Map\(\[\s*\[\s*"20260721120000"/s,
+);
 assert.match(driver, /20261006120000/);
 assert.match(driver, /20261006120200/);
 assert.match(driver, /planDatabaseMigrations/);

@@ -33,7 +33,7 @@ const preMigrationFixtures = new Map([
 ]);
 const postMigrationFixtures = new Map([
   [
-    "20260721103000",
+    "20260721120000",
     {
       label: "post-personal-materials optional-last-name cleanup",
       path: "scripts/lib/supabase-compile-post-personal-materials-optional-last-name.sql",

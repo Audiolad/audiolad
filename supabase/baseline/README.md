@@ -107,7 +107,8 @@ also asserts that its real ten-argument draft-update function exists and its
 mistaken eleven-argument COMMENT identity does not. It creates only that
 eleven-argument no-op overload so the historical `COMMENT ON FUNCTION` can
 compile; the migration continues to define and validate the real function.
-Immediately after that migration, the disposable replay asserts both
+After `20260721120000_personal_materials_editable_after_activate.sql` (the
+last migration with the same mistaken COMMENT identity), the disposable replay asserts both
 signatures, drops only the temporary eleven-argument overload, and verifies
 the real ten-argument function remains.
 
