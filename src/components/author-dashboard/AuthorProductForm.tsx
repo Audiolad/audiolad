@@ -112,6 +112,11 @@ import {
   buildUnlockedProductIdentityFields,
 } from "@/lib/author-products/save-payload";
 import {
+  buildAuthorProductPriceFields,
+  parsePriceInputDraft,
+  validatePaidPriceInputDraft,
+} from "@/lib/author-products/price-input-draft";
+import {
   mergeServerAudioItems,
   mergeServerProductIntoForm,
   productDetailToFormSnapshot,
@@ -579,13 +584,7 @@ function buildProductSavePayload(
         MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
         ? form.studioMusicPricingMode
         : null,
-    studio_music_price:
-      form.productKind === PRODUCT_KIND.MUSIC &&
-      form.musicUsagePermission ===
-        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED &&
-      form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED
-        ? form.studioMusicPriceRubles
-        : null,
+    ...buildAuthorProductPriceFields(form),
     format:
       form.productKind === PRODUCT_KIND.MUSIC
         ? MUSIC_KIND_LABEL
@@ -594,10 +593,6 @@ function buildProductSavePayload(
           : resolveFormatForStorage(form.formatPreset, form.customFormat),
     is_free:
       form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree,
-    price:
-      form.productKind === PRODUCT_KIND.AUDIO_POST || form.isFree
-        ? 0
-        : form.price,
     is_catalog_listed: form.catalogVisibility === CATALOG_VISIBILITY.LISTED,
     catalog_visibility: form.catalogVisibility,
     promo_enabled: form.promoEnabled,
@@ -648,6 +643,12 @@ export default function AuthorProductForm({
       initialProduct,
       initialPublicationClass,
     ),
+  );
+  const [studioMusicPriceDraft, setStudioMusicPriceDraft] = useState(() =>
+    String(form.studioMusicPriceRubles),
+  );
+  const [listenerPriceDraft, setListenerPriceDraft] = useState(() =>
+    String(form.price),
   );
   const [audioItems, setAudioItems] = useState<AudioItemRow[]>(() => {
     if (initialProduct?.audio_items) {
@@ -736,6 +737,7 @@ export default function AuthorProductForm({
     seoAbout?: string;
     authorRecommendationsTitle?: string;
     studioMusicPrice?: string;
+    price?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -1296,9 +1298,14 @@ export default function AuthorProductForm({
       return null;
     }
 
-    setForm(
-      buildInitialForm(authors, initialAuthorSlug, productPayload.product),
+    const nextForm = buildInitialForm(
+      authors,
+      initialAuthorSlug,
+      productPayload.product,
     );
+    setForm(nextForm);
+    setStudioMusicPriceDraft(String(nextForm.studioMusicPriceRubles));
+    setListenerPriceDraft(String(nextForm.price));
     setAudioItems(productPayload.product.audio_items);
 
     if (topicsResponse.ok && topicsPayload.topics) {
@@ -1313,6 +1320,39 @@ export default function AuthorProductForm({
       setError(PRODUCT_UNDER_MODERATION_MESSAGE);
       return false;
     }
+
+    const studioMusicPrice =
+      form.productKind === PRODUCT_KIND.MUSIC &&
+      form.musicUsagePermission ===
+        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED &&
+      form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED
+        ? validatePaidPriceInputDraft(studioMusicPriceDraft)
+        : null;
+    const listenerPrice = !form.isFree
+      ? validatePaidPriceInputDraft(listenerPriceDraft)
+      : null;
+
+    if ((studioMusicPrice && !studioMusicPrice.ok) || (listenerPrice && !listenerPrice.ok)) {
+      setFieldErrors({
+        ...(studioMusicPrice && !studioMusicPrice.ok
+          ? { studioMusicPrice: "Укажите целую цену от 49 до 100 000 ₽." }
+          : {}),
+        ...(listenerPrice && !listenerPrice.ok
+          ? { price: "Укажите целую цену от 49 до 100 000 ₽." }
+          : {}),
+      });
+      requestScrollToFirstSubmitIssue();
+      return false;
+    }
+
+    const formForSave = {
+      ...form,
+      ...(studioMusicPrice?.ok
+        ? { studioMusicPriceRubles: studioMusicPrice.rubles }
+        : {}),
+      ...(listenerPrice?.ok ? { price: listenerPrice.rubles } : {}),
+    };
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -1345,7 +1385,11 @@ export default function AuthorProductForm({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          buildProductSavePayload(form, slugLocked, canConfigureAppreciation),
+          buildProductSavePayload(
+            formForSave,
+            slugLocked,
+            canConfigureAppreciation,
+          ),
         ),
       });
 
@@ -3009,17 +3053,26 @@ export default function AuthorProductForm({
                     className="mt-1"
                     checked={form.studioMusicPricingMode === option.value}
                     disabled={busy || !canEditPublicFields}
-                    onChange={() =>
+                    onChange={() => {
+                      const shouldSetDefaultPrice =
+                        option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
+                        !validatePaidPriceInputDraft(studioMusicPriceDraft).ok;
+
+                      if (shouldSetDefaultPrice) {
+                        setStudioMusicPriceDraft(
+                          String(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES),
+                        );
+                      }
+
                       setForm((current) => ({
                         ...current,
                         studioMusicPricingMode: option.value,
                         studioMusicPriceRubles:
-                          option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
-                          current.studioMusicPriceRubles < MIN_PAID_PRICE_RUB
+                          shouldSetDefaultPrice
                             ? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES
                             : current.studioMusicPriceRubles,
-                      }))
-                    }
+                      }));
+                    }}
                   />
                   <span className="block text-sm font-medium text-[#3f3560]">
                     {option.label}
@@ -3027,7 +3080,10 @@ export default function AuthorProductForm({
                 </label>
               ))}
             {form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED ? (
-              <label className="block">
+              <label
+                className="block"
+                data-submit-issue={fieldErrors.studioMusicPrice ? "" : undefined}
+              >
                 <span className="mb-1 block text-sm text-[#7d70a2]">
                   Цена для Студии, ₽
                 </span>
@@ -3037,16 +3093,23 @@ export default function AuthorProductForm({
                   min={MIN_PAID_PRICE_RUB}
                   max={MAX_PAID_PRICE_RUB}
                   step={1}
-                  value={form.studioMusicPriceRubles}
+                  value={studioMusicPriceDraft}
                   disabled={busy || !canEditPublicFields}
                   onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setForm((current) => ({
+                    const draft = event.target.value;
+                    const rubles = parsePriceInputDraft(draft);
+
+                    setStudioMusicPriceDraft(draft);
+                    setFieldErrors((current) => ({
                       ...current,
-                      studioMusicPriceRubles: Number.isInteger(next)
-                        ? next
-                        : current.studioMusicPriceRubles,
+                      studioMusicPrice: undefined,
                     }));
+                    if (rubles !== null) {
+                      setForm((current) => ({
+                        ...current,
+                        studioMusicPriceRubles: rubles,
+                      }));
+                    }
                   }}
                   className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
                 />
@@ -3183,7 +3246,8 @@ export default function AuthorProductForm({
             <button
               type="button"
               disabled={!canMutateContent || !canUsePaidPricing}
-              onClick={() =>
+              onClick={() => {
+                setListenerPriceDraft("99");
                 setForm((current) => ({
                   ...current,
                   isFree: false,
@@ -3195,8 +3259,8 @@ export default function AuthorProductForm({
                     listenerIsFree: false,
                     currentMode: current.studioMusicPricingMode,
                   }),
-                }))
-              }
+                }));
+              }}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 !form.isFree
                   ? "bg-[#7042c5] text-white"
@@ -3227,7 +3291,10 @@ export default function AuthorProductForm({
 
           {!form.isFree ? (
             <div className="mt-3 space-y-3">
-              <label className="block">
+              <label
+                className="block"
+                data-submit-issue={fieldErrors.price ? "" : undefined}
+              >
                 <span className="mb-1 block text-sm text-[#7d70a2]">
                   Полная цена, ₽
                 </span>
@@ -3237,17 +3304,28 @@ export default function AuthorProductForm({
                   min={MIN_PAID_PRICE_RUB}
                   max={MAX_PAID_PRICE_RUB}
                   step={1}
-                  value={form.price}
+                  value={listenerPriceDraft}
                   disabled={!canEditPublicFields}
                   onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setForm((current) => ({
+                    const draft = event.target.value;
+                    const rubles = parsePriceInputDraft(draft);
+
+                    setListenerPriceDraft(draft);
+                    setFieldErrors((current) => ({
                       ...current,
-                      price: Number.isInteger(next) ? next : current.price,
+                      price: undefined,
                     }));
+                    if (rubles !== null) {
+                      setForm((current) => ({ ...current, price: rubles }));
+                    }
                   }}
                   className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
                 />
+                {fieldErrors.price ? (
+                  <p className="mt-2 text-sm text-[#9b3d3d]">
+                    {fieldErrors.price}
+                  </p>
+                ) : null}
               </label>
               <div className="flex flex-wrap gap-2">
                 {PAID_PRICE_OPTIONS.map((price) => (
@@ -3255,9 +3333,10 @@ export default function AuthorProductForm({
                     key={price}
                     type="button"
                     disabled={!canEditPublicFields}
-                    onClick={() =>
-                      setForm((current) => ({ ...current, price }))
-                    }
+                    onClick={() => {
+                      setListenerPriceDraft(String(price));
+                      setForm((current) => ({ ...current, price }));
+                    }}
                     className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
                       form.price === price
                         ? "bg-[#7042c5] text-white"
