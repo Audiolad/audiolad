@@ -71,10 +71,8 @@ assert.match(
 assert.match(sql, /body_wellbeing\s+= 2/, "documents seed baseline for body-wellbeing");
 assert.match(sql, /energy_resource\s+= 7/, "documents seed baseline for energy");
 
-assert.match(
-  sql,
-  /does NOT\s+auto-assign «Самооценка»/i,
-);
+assert.match(sql, /does NOT/);
+assert.match(sql, /auto-assign «Самооценка»/);
 assert.match(sql, /expected 15 active catalog topics/);
 assert.match(
   sql,

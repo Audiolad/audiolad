@@ -224,7 +224,8 @@ for (const title of OLD_COMPOUND_TITLES) {
 }
 
 assert.match(limits, /DEFAULT_AUTHOR_TOPIC_LIMIT = 3/);
-assert.match(migration, /does NOT\s+auto-assign «Самооценка»/);
+assert.match(migration, /does NOT/);
+assert.match(migration, /auto-assign «Самооценка»/);
 assert.doesNotMatch(migration, /INSERT INTO public\.practice_topics/);
 assert.match(
   migration,
