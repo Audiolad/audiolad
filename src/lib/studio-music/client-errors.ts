@@ -48,6 +48,8 @@ export function mapStudioMusicAcquireClientError(code: string | undefined): stri
       return "Эта музыка не бесплатная.";
     case "practice_not_found":
       return "Музыка не найдена или временно недоступна.";
+    case "support_mutation_blocked":
+      return "В режиме поддержки нельзя получать музыку для Студии.";
     case "invalid_request":
       return "Не удалось получить музыку. Обновите каталог и попробуйте ещё раз.";
     default:

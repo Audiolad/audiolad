@@ -32,7 +32,11 @@ export function StudioMusicCatalogCard({
   actionError?: string | null;
   selectedPracticeId?: string | null;
   selectedAudioItemId?: string | null;
-  onPreview: (publicationId: string, audioItemId: string) => void;
+  onPreview: (
+    publicationId: string,
+    audioItemId: string,
+    trackTitle: string,
+  ) => void;
   onAcquire?: (item: StudioMusicCatalogItem) => void;
   onAdd?: (item: StudioMusicCatalogItem, audioItemId: string) => void;
 }) {
@@ -124,7 +128,11 @@ export function StudioMusicCatalogCard({
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onPreview(item.publication_id, primaryTrackId);
+                  onPreview(
+                    item.publication_id,
+                    primaryTrackId,
+                    item.tracks[0]?.title ?? item.title,
+                  );
                 }}
                 className="rounded-md bg-[#7650bd] px-3 py-1.5 text-xs font-semibold text-white"
               >
@@ -208,7 +216,7 @@ export function StudioMusicCatalogCard({
                   onClick={(event) => {
                     event.stopPropagation();
                     applyExpandClick("preview");
-                    onPreview(item.publication_id, track.id);
+                    onPreview(item.publication_id, track.id, track.title);
                   }}
                   className="rounded-md bg-[#7650bd] px-2 py-1 text-[11px] font-semibold text-white"
                 >

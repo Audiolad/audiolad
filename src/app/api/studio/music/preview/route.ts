@@ -43,8 +43,13 @@ export async function GET(request: Request) {
       publicationId: searchParams.get("publicationId"),
       audioItemId: searchParams.get("audioItemId"),
       userId: user?.id ?? null,
+      rangeHeader: request.headers.get("range"),
       store: createSupabaseStudioMusicPreviewStore(createServiceRoleClient()),
     });
+
+    if (result.type === "full") {
+      return result.response;
+    }
 
     if (result.type === "json") {
       if (studioMusicPreviewJsonContainsForbiddenFields(result.body)) {

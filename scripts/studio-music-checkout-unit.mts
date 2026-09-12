@@ -462,6 +462,10 @@ assert.equal(
   "Эта музыка не бесплатная.",
 );
 assert.equal(
+  mapStudioMusicAcquireClientError("support_mutation_blocked"),
+  "В режиме поддержки нельзя получать музыку для Студии.",
+);
+assert.equal(
   resolveStudioMusicCheckoutUiError({
     httpStatus: 201,
     paymentUrl: "https://pay.example/studio",
