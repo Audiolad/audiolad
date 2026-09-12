@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sql = readFileSync(
-  join(root, "supabase/migrations/20261006120100_analytics_nullable_visitor_identity.sql"),
+  join(root, "supabase/migrations/20261006120200_analytics_nullable_visitor_identity.sql"),
   "utf8",
 );
 const foundation = readFileSync(
