@@ -433,12 +433,12 @@ function StudioMusicCatalogOverlayBody({
 
   return (
     <div
-      className="studio-music-catalog-overlay fixed inset-0 z-40 flex flex-col overflow-y-auto bg-[#0b1019] text-[#e2e8f5]"
+      className="studio-music-catalog-overlay fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#0b1019] text-[#e2e8f5]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="studio-music-catalog-title"
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0b1019] px-4 py-3">
+      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0b1019] px-4 py-3">
         <h2
           id="studio-music-catalog-title"
           className="text-lg font-semibold text-white"
@@ -457,7 +457,7 @@ function StudioMusicCatalogOverlayBody({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 px-4 py-3">
+      <div className="shrink-0 flex flex-wrap gap-2 px-4 py-3">
         {visibleFilters.map((item) => (
           <button
             key={item.id}
@@ -479,7 +479,10 @@ function StudioMusicCatalogOverlayBody({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 px-4 pb-8">
+      <div
+        className="studio-music-catalog-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8"
+        data-testid="studio-music-catalog-scroll"
+      >
         {error ? (
           <p role="alert" className="mb-3 text-sm text-rose-200">
             {error}
@@ -532,7 +535,10 @@ function StudioMusicCatalogOverlayBody({
       </div>
 
       {activePreviewKey ? (
-        <div className="sticky bottom-0 z-10 border-t border-white/10 bg-[#101827] px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
+        <div
+          className="studio-music-catalog-player shrink-0 border-t border-white/10 bg-[#101827] px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)]"
+          data-testid="studio-music-catalog-player"
+        >
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:items-center">
             <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
               {previewTitle ?? "Трек"}

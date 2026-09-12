@@ -145,6 +145,11 @@ export type StudioMusicCatalogPage = {
   nextCursor: string | null;
 };
 
+export type StudioMusicCatalogViewerAccess = {
+  entitlements: StudioMusicCatalogEntitlement[];
+  authorMemberAuthorIds: string[];
+};
+
 export type StudioMusicCatalogStore = {
   listPublicInventory(input: {
     filter: "all" | "free";
@@ -155,12 +160,12 @@ export type StudioMusicCatalogStore = {
     userId: string;
     cursor: string | null;
     limit: number;
-  }): Promise<
-    StudioMusicCatalogPage & {
-      entitlements: StudioMusicCatalogEntitlement[];
-      authorMemberAuthorIds: string[];
-    }
-  >;
+  }): Promise<StudioMusicCatalogPage & StudioMusicCatalogViewerAccess>;
+  loadViewerAccess(input: {
+    userId: string;
+    practiceIds: string[];
+    authorIds: string[];
+  }): Promise<StudioMusicCatalogViewerAccess>;
   loadPublishedTracks(
     practiceIds: string[],
   ): Promise<PublishedAudioItemDetail[]>;
@@ -793,6 +798,21 @@ export async function handleStudioMusicCatalog(input: {
 
   const pagePractices = practices;
   const pageIds = pagePractices.map((practice) => String(practice.id));
+  if (input.userId && filter !== "mine") {
+    const viewerAccess = await input.store.loadViewerAccess({
+      userId: input.userId,
+      practiceIds: pageIds,
+      authorIds: [
+        ...new Set(
+          pagePractices
+            .map((practice) => practice.author_id?.trim() ?? "")
+            .filter(Boolean),
+        ),
+      ],
+    });
+    entitlements = viewerAccess.entitlements;
+    authorMemberAuthorIds = viewerAccess.authorMemberAuthorIds;
+  }
 
   const [tracks, prices] = await Promise.all([
     filter === "mine"
@@ -1056,6 +1076,47 @@ export function createSupabaseStudioMusicCatalogStore(
         ...page,
         entitlements,
         authorMemberAuthorIds,
+      };
+    },
+
+    async loadViewerAccess({ userId, practiceIds, authorIds }) {
+      if (practiceIds.length === 0) {
+        return { entitlements: [], authorMemberAuthorIds: [] };
+      }
+
+      const entitlementQuery = supabase
+        .from("studio_music_entitlements")
+        .select("practice_id, grant_source, revoked_at")
+        .eq("user_id", userId)
+        .is("revoked_at", null)
+        .in("practice_id", practiceIds);
+      const memberQuery =
+        authorIds.length > 0
+          ? supabase
+              .from("author_members")
+              .select("author_id")
+              .eq("user_id", userId)
+              .in("author_id", authorIds)
+          : Promise.resolve({ data: [], error: null });
+      const [entitlementResult, memberResult] = await Promise.all([
+        entitlementQuery,
+        memberQuery,
+      ]);
+
+      if (entitlementResult.error || memberResult.error) {
+        throw new Error("studio_music_viewer_access_lookup_failed");
+      }
+
+      return {
+        entitlements: (entitlementResult.data ??
+          []) as StudioMusicCatalogEntitlement[],
+        authorMemberAuthorIds: [
+          ...new Set(
+            (memberResult.data ?? [])
+              .map((row) => String(row.author_id ?? ""))
+              .filter(Boolean),
+          ),
+        ],
       };
     },
 

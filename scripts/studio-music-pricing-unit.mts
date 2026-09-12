@@ -431,6 +431,12 @@ function createStore(
         authorMemberAuthorIds: [],
       };
     },
+    async loadViewerAccess() {
+      return {
+        entitlements: [],
+        authorMemberAuthorIds: [],
+      };
+    },
     async loadPublishedTracks() {
       return [];
     },
