@@ -88,6 +88,12 @@ assert.equal(KAK_VYLOZHIT_II_MUZYKU_FAQ[0].question, "Куда загрузит�
 assert.match(view, /личная библиотека/);
 assert.match(view, /публичный музыкальный релиз доставляется через дистрибьютора/);
 assert.match(view, /Где лучше выложить первую ИИ-композицию/);
+assert.match(view, /куда теперь загрузить ИИ-музыку/);
+assert.match(view, /где именно вы хотите, чтобы люди нашли вашу музыку/);
+assert.match(view, /Не путайте трек и музыкальный продукт/);
+assert.match(view, /Собирайте каталог, а не просто загружайте файлы/);
+assert.match(view, /Можно ли выкладывать одну и ту же ИИ-музыку на разные площадки/);
+assert.match(view, /Нужно ли указывать, что музыка создана ИИ/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
 assert.doesNotMatch(view, /С чего начать/);
