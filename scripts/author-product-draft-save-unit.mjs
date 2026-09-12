@@ -385,7 +385,7 @@ assert.match(
 );
 assert.match(
   formSource,
-  /buildProductSavePayload\(form, slugLocked, canConfigureAppreciation\)/,
+  /buildProductSavePayload\(\s*formForSave,\s*slugLocked,\s*canConfigureAppreciation,\s*\)/,
 );
 assert.match(formSource, /buildListenerAppreciationOverrideField/);
 assert.match(formSource, /canConfigureProductAppreciation/);

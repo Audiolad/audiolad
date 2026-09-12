@@ -8,11 +8,19 @@ import {
 } from "../src/lib/author-products/price-input-draft";
 import { normalizeStudioMusicPricingForSave } from "../src/lib/studio-music/pricing";
 
-// A string draft keeps the native number input empty during intermediate edits.
-assert.equal(String(600), "600");
-assert.equal(parsePriceInputDraft(""), null);
-assert.equal(parsePriceInputDraft("1500"), 1500);
-assert.equal(parsePriceInputDraft("888"), 888);
+// String drafts keep native number inputs empty during intermediate edits.
+let studioDraft = String(600);
+studioDraft = "";
+assert.equal(studioDraft, "");
+assert.equal(parsePriceInputDraft(studioDraft), null);
+studioDraft = `${studioDraft}1500`;
+assert.equal(parsePriceInputDraft(studioDraft), 1500);
+
+let listenerDraft = String(499);
+listenerDraft = "";
+assert.equal(listenerDraft, "");
+listenerDraft = `${listenerDraft}888`;
+assert.equal(parsePriceInputDraft(listenerDraft), 888);
 
 // Empty, zero, out-of-range, fractional, and negative values cannot be saved.
 for (const value of ["", "0", "48", "100001", "49.5", "-49"]) {
