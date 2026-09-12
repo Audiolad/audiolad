@@ -25,6 +25,11 @@ import {
   KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
 } from "@/lib/seo/kak-sozdat-ii-muzyku/content";
 import {
+  KAK_VYLOZHIT_II_MUZYKU_PATH,
+  KAK_VYLOZHIT_II_MUZYKU_SEO_DESCRIPTION,
+  KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
+} from "@/lib/seo/kak-vylozhit-ii-muzyku/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -304,6 +309,30 @@ export function buildKakSozdatIiMuzykuMetadata(): Metadata {
       card: "summary",
       title: KAK_SOZDAT_II_MUZYKU_SEO_TITLE,
       description: KAK_SOZDAT_II_MUZYKU_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildKakVylozhitIiMuzykuMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(KAK_VYLOZHIT_II_MUZYKU_PATH);
+
+  return {
+    title: KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
+    description: KAK_VYLOZHIT_II_MUZYKU_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
+      description: KAK_VYLOZHIT_II_MUZYKU_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
+      description: KAK_VYLOZHIT_II_MUZYKU_SEO_DESCRIPTION,
     },
   };
 }
