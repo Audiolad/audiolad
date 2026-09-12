@@ -96,8 +96,9 @@ the driver obtains that ordered pending set through
 history state. Before `20260714180000_unified_audio_product_foundation.sql`,
 the driver installs one documented legacy-data fixture: its own post-check
 requires `first-audio-course` to have the exact legacy `audio_url`, while the
-earlier seed creates that row with a null URL. The fixture provides that
-historical precondition; the migration itself is still executed. This
+earlier seed creates that row with a null URL and a `990` price. Its
+post-check requires that same row to have a `99` price. The fixture provides
+both historical preconditions; the migration itself is still executed. This
 exception list and fixture are limited to the baseline compatibility map
 above: no migration SQL is silently skipped.
 

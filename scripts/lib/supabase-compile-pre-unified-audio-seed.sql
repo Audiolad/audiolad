@@ -12,6 +12,7 @@ BEGIN
     WHERE id = 'a8f4c2e1-9b3d-4f6a-8c7e-1d2f3a4b5c6d'
       AND slug = 'first-audio-course'
       AND audio_url IS NULL
+      AND price = 990
   ) THEN
     RAISE EXCEPTION 'expected first-audio-course legacy precondition is absent';
   END IF;
@@ -19,5 +20,7 @@ END
 $$;
 
 UPDATE public.practices
-SET audio_url = 'practices/a8f4c2e1-9b3d-4f6a-8c7e-1d2f3a4b5c6d/audio.mp3'
+SET
+  audio_url = 'practices/a8f4c2e1-9b3d-4f6a-8c7e-1d2f3a4b5c6d/audio.mp3',
+  price = 99
 WHERE id = 'a8f4c2e1-9b3d-4f6a-8c7e-1d2f3a4b5c6d';
