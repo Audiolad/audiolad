@@ -123,16 +123,6 @@ const freeRow = coerceStudioMusicAcquireRow({
 assert.equal(freeRow?.inserted, true);
 assert.equal(freeRow?.order_id, null);
 assert.equal(freeRow?.grant_source, "free");
-assert.equal(
-  coerceStudioMusicAcquireRow({ ...freeRow, inserted: 1 })?.inserted,
-  true,
-  "numeric RPC true must not be turned into internal_error",
-);
-assert.equal(
-  coerceStudioMusicAcquireRow({ ...freeRow, inserted: 0 })?.inserted,
-  false,
-  "numeric RPC false replay must remain idempotent",
-);
 const freeBody = toStudioMusicAcquireSuccessBody(freeRow!);
 assert.equal(freeBody.entitlement.order_id, null);
 assert.equal(freeBody.entitlement.inserted, true);

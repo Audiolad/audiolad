@@ -34,6 +34,7 @@ import {
   AUTHOR_SUPPORT_MUTATION_INVENTORY,
   listAuthorSupportInventoryRoutePatterns,
 } from "../src/lib/author-support/mutation-inventory.ts";
+import { mapStudioMusicAcquireClientError } from "../src/lib/studio-music/client-errors.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -774,6 +775,31 @@ assert.equal(
     "POST",
   ),
   true,
+);
+// Studio music licensing is a blocked support-mode mutation. The proxy must
+// return its structured 403 before the acquire route is reached, and the
+// Studio client must render the support-specific message rather than generic
+// acquisition failure.
+const studioMusicAcquirePath = "/api/studio/music/acquire";
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, studioMusicAcquirePath, "POST"),
+  true,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation("", studioMusicAcquirePath, "POST"),
+  false,
+);
+assert.match(
+  proxy,
+  /supportCookie &&\s*isAuthorSupportBlockedMutation\(\{[\s\S]*pathname,[\s\S]*method: request\.method/,
+);
+assert.match(
+  proxy,
+  /NextResponse\.json\(\s*\{ error: "support_mutation_blocked" \},\s*\{ status: 403 \}/,
+);
+assert.equal(
+  mapStudioMusicAcquireClientError("support_mutation_blocked"),
+  "В режиме поддержки нельзя получать музыку для Студии.",
 );
 
 // Allowed prefixes still allowed while support cookie is present.
