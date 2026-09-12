@@ -74,6 +74,13 @@ const publishRoute = readFileSync(
   "utf8",
 );
 
+assert(
+  !topicSelector.includes("Уверенность и самоценность") &&
+    !topicSelector.includes("Уверенность и самооценка") &&
+    !topicSelector.includes("Тело и самочувствие") &&
+    !topicSelector.includes("Энергия и ресурс"),
+  "TopicSelector does not hardcode old compound labels",
+);
 assert(!topicSelector.includes("<input"), "TopicSelector has no free-text input");
 assert(!topicSelector.includes("allowCreate"), "TopicSelector has no create flow");
 assert(!topicSelector.includes("textarea"), "TopicSelector has no textarea");

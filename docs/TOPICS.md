@@ -8,6 +8,7 @@
 - `supabase/migrations/20260825120000_topics_career_business_learning.sql` — Карьера / Бизнес / Обучение
 - `supabase/migrations/20260826120000_topics_spirituality.sql` — Духовность
 - `supabase/migrations/20260910120000_topics_sleep.sql` — Сон
+- `supabase/migrations/20261006120000_topics_single_word_catalog.sql` — однословный каталог, split/rename, Изобилие / Любовь / Самооценка
 
 Тема — отдельная грань каталога. Она не является классом публикации (`practice` | `course` | `audiobook` | `release` | `post`) и не добавляет `product_kind`. «Обучение» (`learning`) не равно `class=course`.
 
@@ -36,17 +37,32 @@
 | `key` / `slug` | `title` | `sort_order` |
 |----------------|---------|--------------|
 | `money` | Деньги | 10 |
-| `relationships` | Отношения | 20 |
-| `calm` | Спокойствие | 30 |
-| `sleep` | Сон | 35 |
-| `self-worth` | Уверенность и самоценность | 40 |
-| `body-wellbeing` | Тело и самочувствие | 50 |
-| `energy` | Энергия и ресурс | 60 |
-| `purpose` | Предназначение | 70 |
-| `career` | Карьера | 80 |
-| `business` | Бизнес | 90 |
-| `learning` | Обучение | 100 |
-| `spirituality` | Духовность | 110 |
+| `abundance` | Изобилие | 20 |
+| `love` | Любовь | 30 |
+| `relationships` | Отношения | 40 |
+| `calm` | Спокойствие | 50 |
+| `sleep` | Сон | 60 |
+| `self-worth` | Уверенность | 70 |
+| `self-esteem` | Самооценка | 80 |
+| `body-wellbeing` | Самочувствие | 90 |
+| `energy` | Энергия | 100 |
+| `purpose` | Предназначение | 110 |
+| `career` | Карьера | 120 |
+| `business` | Бизнес | 130 |
+| `learning` | Обучение | 140 |
+| `spirituality` | Духовность | 150 |
+
+Ключи существующих тем **не менялись**. Составные названия переименованы на месте (`title` only), связи `practice_topics` / `playlist_topics` сохранены:
+
+| Было (`title`) | Стало | `key` |
+|----------------|-------|-------|
+| Уверенность и самоценность / Уверенность и самооценка | Уверенность | `self-worth` |
+| Тело и самочувствие | Самочувствие | `body-wellbeing` |
+| Энергия и ресурс | Энергия | `energy` |
+
+Разделение «Уверенность / Самооценка»: существующие продукты остаются только на `self-worth` («Уверенность»). Тема `self-esteem` («Самооценка») добавляется в справочник, но **не** назначается автоматически — иначе счётчик тем продукта мог бы превысить лимит 3.
+
+SEO-хабы `/topics/izobilie` и `/topics/lyubov-k-sebe` остаются редакционными посадочными и **не заменяют** справочник. Выбираемые темы практик `abundance` и `love` — отдельные ключи каталога.
 
 Фильтры каталога и кабинет автора читают этот справочник через `listActiveTopics()` / `listTopicsWithCatalogCounts()`. Хардкод массива тем в UI запрещён. Счётчики каталога запрашивают `practice_topics` чанками по 50 `practice_id`; `/catalog` и мобильные фильтры используют `listTopicsWithCatalogCountsSafe()` и не падают целиком, если один чанк PostgREST не ответил. Главная уже оборачивает `listHomeTopicsWithCatalogCounts()` в `safeHomeSection`.
 
@@ -222,7 +238,7 @@ src/lib/topics/
 | Слой | Идентификатор | Пример |
 |------|---------------|--------|
 | Platform topic | `topics.key` | `self-worth` |
-| Platform title | `topics.title` | Уверенность и самоценность |
+| Platform title | `topics.title` | Уверенность |
 | SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya`, `besplatnye-meditatsii`, `meditatsii-na-dengi`, `izobilie` |
 | SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия / Бесплатные медитации / Медитации на деньги / Изобилие |
 | URL | `/topics/{hub.slug}` | `/topics/lyubov-k-sebe` |

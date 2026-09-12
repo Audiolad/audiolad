@@ -27,8 +27,8 @@ assert.doesNotMatch(sql, /Сон и расслабление|Расслабле�
 assert.doesNotMatch(sql, /Спокойствие/);
 
 assert.match(docs, /20260910120000_topics_sleep\.sql/);
-assert.match(docs, /`sleep` \| Сон \| 35/);
-assert.match(docs, /`calm` \| Спокойствие \| 30/);
+assert.match(docs, /`sleep` \| Сон \| 60/);
+assert.match(docs, /`calm` \| Спокойствие \| 50/);
 assert.doesNotMatch(docs, /Сон и расслабление/);
 assert.doesNotMatch(docs, /\| `relax` /);
 
