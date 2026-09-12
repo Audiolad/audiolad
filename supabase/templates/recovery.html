@@ -7,7 +7,7 @@
     <meta name="supported-color-schemes" content="light" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>Восстановление пароля</title>
-    <!-- AUDIOLAD_RECOVERY_TEMPLATE_VERSION: typography-v4-20260720 -->
+    <!-- AUDIOLAD_RECOVERY_TEMPLATE_VERSION: tokenhash-v5-20260912 -->
     <!--[if mso]>
       <noscript>
         <xml>
@@ -278,7 +278,7 @@
                         <v:roundrect
                           xmlns:v="urn:schemas-microsoft-com:vml"
                           xmlns:w="urn:schemas-microsoft-com:office:office"
-                          href="{{ .ConfirmationURL }}"
+                          href="{{ .RedirectTo }}#token_hash={{ .TokenHash }}&amp;type=recovery"
                           style="
                             height: 58px;
                             v-text-anchor: middle;
@@ -304,7 +304,7 @@
                       <!--[if !mso]><!-->
                       <a
                         class="email-button-link"
-                        href="{{ .ConfirmationURL }}"
+                        href="{{ .RedirectTo }}#token_hash={{ .TokenHash }}&amp;type=recovery"
                         target="_blank"
                         style="
                           display: inline-block;
@@ -322,8 +322,7 @@
                           background-color: #6633cc;
                           box-sizing: border-box;
                         "
-                        >Создать новый пароль</a
-                      >
+                        >Создать новый пароль</a>
                       <!--<![endif]-->
                     </td>
                   </tr>
@@ -377,9 +376,9 @@
                   "
                 >
                   <a
-                    href="{{ .ConfirmationURL }}"
+                    href="{{ .RedirectTo }}#token_hash={{ .TokenHash }}&amp;type=recovery"
                     style="color: #5e2ca5; text-decoration: underline"
-                    >{{ .ConfirmationURL }}</a
+                    >{{ .RedirectTo }}#token_hash={{ .TokenHash }}&amp;type=recovery</a
                   >
                 </p>
 

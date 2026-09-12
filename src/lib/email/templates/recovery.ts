@@ -13,7 +13,7 @@ import { escapeHtml } from "./escape-html";
 
 export const RECOVERY_EMAIL_SUBJECT = "Восстановление пароля в АудиоЛаде";
 export const RECOVERY_EMAIL_TEMPLATE_KEY = "recovery";
-export const RECOVERY_EMAIL_TEMPLATE_VERSION = "typography-v4-20260720";
+export const RECOVERY_EMAIL_TEMPLATE_VERSION = "tokenhash-v5-20260912";
 
 export type RecoveryEmailInput = {
   confirmationUrl: string;
@@ -143,7 +143,11 @@ export function renderRecoveryGoTrueTemplateHtml(siteOrigin?: string): string {
     logoUrl,
     versionComment: `AUDIOLAD_RECOVERY_TEMPLATE_VERSION: ${RECOVERY_EMAIL_TEMPLATE_VERSION}`,
     bodyHtml: renderRecoveryBodyHtml({
-      confirmationUrl: "{{ .ConfirmationURL }}",
+      // GoTrue v2.189.0 provides RedirectTo after allow-list validation and
+      // TokenHash for custom first-party flows. The fragment keeps the bearer
+      // credential out of HTTP requests, access logs and Referer headers.
+      confirmationUrl:
+        "{{ .RedirectTo }}#token_hash={{ .TokenHash }}&type=recovery",
       siteOrigin: origin,
     }),
     footerLines: [

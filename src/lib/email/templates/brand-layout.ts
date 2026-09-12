@@ -189,7 +189,11 @@ function assertAbsoluteHttpUrl(href: string): string {
   const trimmed = href.trim();
   // GoTrue/template placeholders (e.g. {{ .ConfirmationURL }}) are resolved
   // by the mailer before delivery; accept them alongside absolute http(s) URLs.
-  const isPlaceholder = /^\{\{[\s\S]+\}\}$/.test(trimmed);
+  const isPlaceholder =
+    /^\{\{[\s\S]+\}\}$/.test(trimmed) ||
+    /^\{\{ \.RedirectTo \}\}#token_hash=\{\{ \.TokenHash \}\}&type=recovery$/.test(
+      trimmed,
+    );
   const isAbsoluteHttp = /^https?:\/\//i.test(trimmed);
 
   if (!isAbsoluteHttp && !isPlaceholder) {

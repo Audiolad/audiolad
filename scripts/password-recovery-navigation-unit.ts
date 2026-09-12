@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   buildPasswordRecoveryRedirectUrl,
   buildPostPasswordResetSignInHref,
+  buildRecoveryRouteWithNext,
   buildResetPasswordRouteWithNext,
 } from "../src/lib/auth/recovery";
 import { resolveValidatedNextPath } from "../src/lib/auth/routes";
@@ -14,8 +15,8 @@ const ORIGIN = "https://audiolad.ru";
 
 process.env.NEXT_PUBLIC_APP_URL = ORIGIN;
 
-function decodeNextFromCallbackUrl(callbackUrl: string): string {
-  const url = new URL(callbackUrl);
+function decodeNext(urlValue: string): string {
+  const url = new URL(urlValue);
   return url.searchParams.get("next") ?? "";
 }
 
@@ -34,14 +35,10 @@ function runTests() {
   const checkoutNext =
     "/my-practices?purchased=provodnik-vnutrenniy-nastavnik";
 
-  // 1. Internal path preserved through callback redirectTo
-  const callbackUrl = buildPasswordRecoveryRedirectUrl(checkoutNext);
-  assert.equal(callbackUrl.startsWith(`${ORIGIN}/auth/callback?`), true);
-  const callbackNext = decodeNextFromCallbackUrl(callbackUrl);
-  assert.equal(
-    decodeUltimateNextFromResetRoute(callbackNext),
-    checkoutNext,
-  );
+  // 1. Internal path is preserved through the first-party recovery landing.
+  const recoveryUrl = buildPasswordRecoveryRedirectUrl(checkoutNext);
+  assert.equal(recoveryUrl.startsWith(`${ORIGIN}/auth/recovery?`), true);
+  assert.equal(decodeNext(recoveryUrl), checkoutNext);
 
   // 2. Query string fully preserved (no split into outer params)
   const resetRoute = buildResetPasswordRouteWithNext(checkoutNext);
@@ -71,11 +68,12 @@ function runTests() {
     buildPostPasswordResetSignInHref(null),
     "/auth/sign-in?reset=1",
   );
-  const defaultCallback = buildPasswordRecoveryRedirectUrl(null);
+  const defaultRecovery = buildPasswordRecoveryRedirectUrl(null);
   assert.equal(
-    decodeNextFromCallbackUrl(defaultCallback),
-    "/auth/reset-password",
+    defaultRecovery,
+    `${ORIGIN}/auth/recovery`,
   );
+  assert.equal(buildRecoveryRouteWithNext(null), "/auth/recovery");
 
   // 6. Malformed encoding rejected safely
   assert.equal(resolveValidatedNextPath("/ok%"), null);

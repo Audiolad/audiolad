@@ -12,7 +12,15 @@ import {
   validatePasswordConfirmation,
 } from "@/lib/auth/password";
 import { buildPostPasswordResetSignInHref } from "@/lib/auth/recovery";
+import {
+  hasValidRecoveryIntent,
+  RECOVERY_INTENT_COOKIE,
+  RECOVERY_STAGE_COOKIE,
+  recoveryIntentCookieOptions,
+  recoveryStageCookieOptions,
+} from "@/lib/auth/recovery-intent";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export type ResetPasswordFieldError = {
   field: "password" | "confirmPassword" | "form";
@@ -28,6 +36,7 @@ export async function resetPasswordAction(input: {
   confirmPassword: string;
   next: string | null;
 }): Promise<ResetPasswordActionResult> {
+  const cookieStore = await cookies();
   const supabase = await createClient();
 
   const {
@@ -35,6 +44,24 @@ export async function resetPasswordAction(input: {
   } = await supabase.auth.getUser();
 
   if (!user) {
+    cookieStore.set(RECOVERY_INTENT_COOKIE, "", {
+      ...recoveryIntentCookieOptions(),
+      maxAge: 0,
+    });
+    return {
+      ok: false,
+      error: {
+        field: "form",
+        message: PASSWORD_RESET_GENERIC_ERROR,
+      },
+    };
+  }
+
+  if (!hasValidRecoveryIntent(cookieStore, user.id)) {
+    cookieStore.set(RECOVERY_INTENT_COOKIE, "", {
+      ...recoveryIntentCookieOptions(),
+      maxAge: 0,
+    });
     return {
       ok: false,
       error: {
@@ -71,7 +98,7 @@ export async function resetPasswordAction(input: {
   });
 
   if (error) {
-    console.error("password_reset_update_error", error.message);
+    console.warn("password_reset_update_failure", { reason: "update_failed" });
     return {
       ok: false,
       error: {
@@ -80,6 +107,29 @@ export async function resetPasswordAction(input: {
       },
     };
   }
+
+  cookieStore.set(RECOVERY_INTENT_COOKIE, "", {
+    ...recoveryIntentCookieOptions(),
+    maxAge: 0,
+  });
+  cookieStore.set(RECOVERY_STAGE_COOKIE, "", {
+    ...recoveryStageCookieOptions(),
+    maxAge: 0,
+  });
+  const { error: signOutError } = await supabase.auth.signOut({
+    scope: "local",
+  });
+  if (signOutError) {
+    console.warn("password_reset_sign_out_failure", { reason: "sign_out_failed" });
+    return {
+      ok: false,
+      error: {
+        field: "form",
+        message: PASSWORD_RESET_GENERIC_ERROR,
+      },
+    };
+  }
+  console.info("password_reset_update_success");
 
   return {
     ok: true,
