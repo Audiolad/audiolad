@@ -194,7 +194,7 @@ assert.equal(assertTopicCountWithinLimit(4, 3).ok, false);
 assert.equal(assertPublishedTopicMinimum(0).ok, false);
 assert.equal(assertPublishedTopicMinimum(1).ok, true);
 
-const migration = read("supabase/migrations/20261006120000_topics_single_word_catalog.sql");
+const migration = read("supabase/migrations/20261006120100_topics_single_word_catalog.sql");
 const selector = read("src/components/author-products/TopicSelector.tsx");
 const topicForm = read("src/lib/author-products/topic-form-data.ts");
 const catalogFilter = read("src/components/catalog/TopicFilterBar.tsx");

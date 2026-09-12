@@ -1,4 +1,4 @@
--- Single-word catalog smoke (run on test DB after 20261006120000)
+-- Single-word catalog smoke (run on test DB after 20261006120100)
 -- Usage: psql -f supabase/tests/topics_single_word_catalog_smoke.sql
 
 BEGIN;

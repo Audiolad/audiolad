@@ -8,7 +8,7 @@
 - `supabase/migrations/20260825120000_topics_career_business_learning.sql` — Карьера / Бизнес / Обучение
 - `supabase/migrations/20260826120000_topics_spirituality.sql` — Духовность
 - `supabase/migrations/20260910120000_topics_sleep.sql` — Сон
-- `supabase/migrations/20261006120000_topics_single_word_catalog.sql` — однословный каталог, split/rename, Изобилие / Любовь / Самооценка
+- `supabase/migrations/20261006120100_topics_single_word_catalog.sql` — однословный каталог, split/rename, Изобилие / Любовь / Самооценка
 
 Тема — отдельная грань каталога. Она не является классом публикации (`practice` | `course` | `audiobook` | `release` | `post`) и не добавляет `product_kind`. «Обучение» (`learning`) не равно `class=course`.
 

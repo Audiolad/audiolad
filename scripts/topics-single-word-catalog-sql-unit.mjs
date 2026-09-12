@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const filename = "20261006120000_topics_single_word_catalog.sql";
+const filename = "20261006120100_topics_single_word_catalog.sql";
 const path = join(root, "supabase/migrations", filename);
 const sql = readFileSync(path, "utf8");
 const docs = readFileSync(join(root, "docs/TOPICS.md"), "utf8");
@@ -29,7 +29,21 @@ const EXPECTED_ORDER = [
 ];
 
 assert.equal(existsSync(path), true, "single-word catalog migration exists");
-assert.match(filename, /^20261006120000_/, "timestamp is 20261006120000");
+assert.match(filename, /^20261006120100_/, "timestamp is 20261006120100");
+assert.equal(
+  existsSync(
+    join(root, "supabase/migrations/20261006120000_analytics_shared_product_semantics.sql"),
+  ),
+  true,
+  "main analytics migration keeps 20261006120000",
+);
+assert.equal(
+  existsSync(
+    join(root, "supabase/migrations/20261006120000_topics_single_word_catalog.sql"),
+  ),
+  false,
+  "does not collide with 20261006120000",
+);
 assert.match(sql, /INSERT INTO public\.topics/);
 assert.match(sql, /ON CONFLICT \(key\) DO UPDATE/);
 assert.doesNotMatch(sql, /DELETE FROM public\.topics/i, "does not delete topic rows");
@@ -94,7 +108,7 @@ for (const [key, title, sortOrder] of EXPECTED_ORDER) {
 }
 
 assert.equal(EXPECTED_ORDER.length, 15, "15 topics in expected catalog");
-assert.match(docs, /20261006120000_topics_single_word_catalog\.sql/);
+assert.match(docs, /20261006120100_topics_single_word_catalog\.sql/);
 assert.doesNotMatch(docs, /\| `self-worth` \| Уверенность и самоценность/);
 assert.doesNotMatch(docs, /\| `self-worth` \| Уверенность и самооценка/);
 assert.doesNotMatch(docs, /\| `body-wellbeing` \| Тело и самочувствие/);
