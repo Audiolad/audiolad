@@ -20,6 +20,7 @@ const view = readFileSync("src/components/kak-vylozhit-ii-muzyku/KakVylozhitIiMu
 const page = readFileSync("src/app/(platform)/(listener)/kak-vylozhit-ii-muzyku/page.tsx", "utf8");
 const sitemapSource = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
 const contentSource = readFileSync("src/lib/seo/kak-vylozhit-ii-muzyku/content.ts", "utf8");
+const introCta = readFileSync("src/components/ai-music/AiMusicIntroCta.tsx", "utf8");
 
 const externalAnchors = [...view.matchAll(/<a\b[^>]*>/g)]
   .map((match) => match[0])
@@ -59,8 +60,8 @@ assert.ok(view.indexOf("<FormatsVisual") > view.indexOf('id="shag-5"'));
 assert.ok(view.indexOf("<AiMusicIntroCta") > view.indexOf('id="shag-7"'));
 
 assert.match(view, /AiMusicIntroCta paragraphs=/);
-assert.match(view, /href="\/"/);
-assert.match(view, /href="\/become-author"/);
+assert.match(introCta, /href="\/"/);
+assert.match(introCta, /href="\/become-author"/);
 for (const href of [
   'href="/kak-sozdat-ii-muzyku"',
   'href="/distribyutor-ii-muzyki"',
