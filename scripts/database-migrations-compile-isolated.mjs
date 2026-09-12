@@ -15,7 +15,6 @@ import {
 
 const adminUrl = process.env.AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL ?? "";
 const expectedDatabase = "audiolad_migration_compile_isolated";
-const targetVersion = "20261006120200";
 const preMigrationFixtures = new Map([
   [
     "20260714180000",
@@ -29,6 +28,15 @@ const preMigrationFixtures = new Map([
     {
       label: "pre-personal-materials optional-last-name fixture",
       path: "scripts/lib/supabase-compile-pre-personal-materials-optional-last-name.sql",
+    },
+  ],
+]);
+const postMigrationFixtures = new Map([
+  [
+    "20260721103000",
+    {
+      label: "post-personal-materials optional-last-name cleanup",
+      path: "scripts/lib/supabase-compile-post-personal-materials-optional-last-name.sql",
     },
   ],
 ]);
@@ -115,17 +123,19 @@ runPsql(databaseUrl, [
 ]);
 
 const plan = planDatabaseMigrations({
-  localVersions: migrations.versions.filter((version) => version <= targetVersion),
+  localVersions: migrations.versions,
   remoteVersions: baselineEquivalentVersions,
 });
 if (plan.action !== "apply") throw new Error(`unexpected baseline migration plan: ${plan.code}`);
 
 const pending = new Set(plan.pending);
 for (const migration of migrations.files) {
-  if (migration.version > targetVersion || !pending.has(migration.version)) continue;
-  const fixture = preMigrationFixtures.get(migration.version);
-  if (fixture) applyFile(fixture.label, resolve(root, fixture.path));
+  if (!pending.has(migration.version)) continue;
+  const preFixture = preMigrationFixtures.get(migration.version);
+  if (preFixture) applyFile(preFixture.label, resolve(root, preFixture.path));
   applyFile(`migration ${migration.version}`, migration.path);
+  const postFixture = postMigrationFixtures.get(migration.version);
+  if (postFixture) applyFile(postFixture.label, resolve(root, postFixture.path));
   runPsql(databaseUrl, [
     "-c",
     `INSERT INTO supabase_migrations.schema_migrations (version) VALUES (${sqlLiteral(migration.version)});`,
@@ -136,4 +146,6 @@ if (!pending.has("20261006120000") || !pending.has("20261006120200")) {
   throw new Error("analytics migrations were not included in the disposable replay");
 }
 applyFile("post-apply analytics smoke", resolve(root, "supabase/tests/database_migrations_compile_analytics_smoke.sql"));
-process.stdout.write(`REAL SQL COMPILE: passed through ${targetVersion} (${pending.size} incremental migrations)\n`);
+const latestVersion = migrations.versions.at(-1);
+if (!latestVersion) throw new Error("no local migrations found");
+process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);

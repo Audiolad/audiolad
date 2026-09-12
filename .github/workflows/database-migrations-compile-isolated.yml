@@ -10,6 +10,7 @@ on:
       - "scripts/lib/supabase-compile-prerequisites.sql"
       - "scripts/lib/supabase-compile-pre-unified-audio-seed.sql"
       - "scripts/lib/supabase-compile-pre-personal-materials-optional-last-name.sql"
+      - "scripts/lib/supabase-compile-post-personal-materials-optional-last-name.sql"
       - "supabase/baseline/**"
       - "supabase/migrations/**"
       - "supabase/tests/database_migrations_compile_analytics_smoke.sql"
