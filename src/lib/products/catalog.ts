@@ -37,6 +37,10 @@ import {
   GUEST_ORDINARY_CATALOG_VIEWER,
   type OrdinaryCatalogViewer,
 } from "@/lib/catalog/visibility-query";
+import {
+  chunkIds,
+  PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
+} from "@/lib/topics/queries";
 
 type CatalogPracticeRow = {
   id: string;
@@ -158,19 +162,58 @@ export async function getPublishedPracticeIdsForTopicKey(
     return [];
   }
 
-  const { data: assignmentRows, error: assignmentError } = await supabase
-    .from("practice_topics")
-    .select("practice_id")
-    .in("topic_id", topicIds)
-    .in("practice_id", [...publishedPracticeIds]);
+  const publishedPracticeIdChunks = chunkIds(
+    [...publishedPracticeIds],
+    PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
+  );
+  const assignmentPracticeIds = new Set<string>();
 
-  if (assignmentError) {
-    return [];
+  for (
+    let chunkIndex = 0;
+    chunkIndex < publishedPracticeIdChunks.length;
+    chunkIndex += 1
+  ) {
+    const practiceIdChunk = publishedPracticeIdChunks[chunkIndex];
+    const { data: assignmentRows, error: assignmentError } = await supabase
+      .from("practice_topics")
+      .select("practice_id")
+      .in("topic_id", topicIds)
+      .in("practice_id", practiceIdChunk);
+
+    if (assignmentError) {
+      const errorDetails =
+        assignmentError && typeof assignmentError === "object"
+          ? (assignmentError as Record<string, unknown>)
+          : {};
+
+      console.error("[catalog] topic_practice_assignments_failed", {
+        stage: "get_published_practice_ids_for_topic_key",
+        chunkIndex,
+        chunkSize: practiceIdChunk.length,
+        totalPracticeCount: publishedPracticeIds.size,
+        code:
+          typeof errorDetails.code === "string" ? errorDetails.code : null,
+        message:
+          typeof errorDetails.message === "string"
+            ? errorDetails.message
+            : null,
+        status:
+          typeof errorDetails.status === "string" ||
+          typeof errorDetails.status === "number"
+            ? errorDetails.status
+            : null,
+      });
+      return [];
+    }
+
+    for (const row of assignmentRows ?? []) {
+      if (typeof row.practice_id === "string") {
+        assignmentPracticeIds.add(row.practice_id);
+      }
+    }
   }
 
-  return [
-    ...new Set((assignmentRows ?? []).map((row) => row.practice_id as string)),
-  ];
+  return [...assignmentPracticeIds];
 }
 
 function normalizeAuthor(
