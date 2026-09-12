@@ -17,6 +17,7 @@ const AUTH_ROUTES = [
   "/auth/sign-in",
   "/auth/sign-up",
   "/auth/forgot-password",
+  "/auth/recovery",
   "/auth/reset-password",
 ] as const;
 

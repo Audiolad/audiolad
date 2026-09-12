@@ -164,7 +164,11 @@ async function testRecoveryTemplateStillWorks() {
   assert.match(html, /запросили восстановление пароля/);
 
   const gotrueHtml = renderRecoveryGoTrueTemplateHtml("https://audiolad.ru");
-  assert.match(gotrueHtml, /\{\{ \.ConfirmationURL \}\}/);
+  assert.match(
+    gotrueHtml,
+    /\{\{ \.RedirectTo \}\}#token_hash=\{\{ \.TokenHash \}\}&amp;type=recovery/,
+  );
+  assert.doesNotMatch(gotrueHtml, /ConfirmationURL/);
   assert.match(gotrueHtml, /\{\{ if \.UnsubscribeURL \}\}/);
 
   const rendered = await brandEmailTemplateRenderer.render({
