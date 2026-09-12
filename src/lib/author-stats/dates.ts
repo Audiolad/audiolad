@@ -20,7 +20,21 @@ export function getAuthorStatsPeriodBounds(period: AuthorStatsPeriodKey): {
 
   const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
   const now = new Date();
-  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const dateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const year = Number(dateParts.find((part) => part.type === "year")?.value);
+  const month = Number(dateParts.find((part) => part.type === "month")?.value);
+  const day = Number(dateParts.find((part) => part.type === "day")?.value);
+  const todayMoscowMidnight = new Date(
+    Date.UTC(year, month - 1, day, 0, 0, 0) - 3 * 60 * 60 * 1000,
+  );
+  const from = new Date(
+    todayMoscowMidnight.getTime() - (days - 1) * 24 * 60 * 60 * 1000,
+  );
 
   return {
     dateFrom: from.toISOString(),
