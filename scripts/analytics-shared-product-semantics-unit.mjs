@@ -49,11 +49,13 @@ for (const rpc of [
 }
 
 const practices = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_practices"));
+assert(/\bWITH included_events AS \(/.test(practices), "practices begins its CTE statement with WITH");
 assert(practices.includes("p_limit") && practices.includes("p_offset"), "practice pagination retained");
 assert(practices.includes("'view_to_play'") && practices.includes("'play_to_complete'"), "practice sort whitelist retained");
 assert(practices.includes("LIMIT v_limit OFFSET v_offset"), "practice paging is applied");
 
 const authors = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_authors"));
+assert(/\bWITH included_events AS \(/.test(authors), "authors begins its CTE statement with WITH");
 assert(authors.includes("published_practices") && authors.includes("LIMIT v_limit OFFSET v_offset"), "author totals and paging retained");
 
 const authorSummary = sql.slice(sql.indexOf("FUNCTION public.author_stats_summary"));
@@ -76,6 +78,7 @@ assert(!adminSeries.includes("'registrations',0"), "admin timeseries registratio
 assert(adminSeries.includes("v_max_points") && adminSeries.includes("v_granularity"), "admin timeseries bucketing retained");
 
 const acquisition = sql.slice(sql.indexOf("FUNCTION public.admin_analytics_p2_acquisition"));
+assert(/\bWITH included_events AS \(/.test(acquisition), "acquisition begins its CTE statement with WITH");
 assert(!acquisition.includes("'registrations',0"), "acquisition registrations retained");
 assert(acquisition.includes("LIMIT v_limit OFFSET v_offset"), "acquisition paging retained");
 

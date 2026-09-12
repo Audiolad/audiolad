@@ -594,7 +594,7 @@ BEGIN
     v_dir := 'desc';
   END IF;
 
-  included_events AS (
+  WITH included_events AS (
     SELECT practice_id,event_name,visitor_key FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,p_practice_id,v_include_test)
     WHERE practice_id IS NOT NULL AND public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (v_device IS NULL OR device_type=v_device)
   ),
@@ -731,7 +731,7 @@ BEGIN
     v_dir := 'desc';
   END IF;
 
-  included_events AS (
+  WITH included_events AS (
     SELECT author_id,event_name,visitor_key FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,p_practice_id,v_include_test)
     WHERE author_id IS NOT NULL AND public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (v_device IS NULL OR device_type=v_device)
   ),
@@ -852,7 +852,7 @@ DECLARE
   v_offset int := greatest(coalesce(p_offset, 0), 0);
   v_result jsonb;
 BEGIN
-  included_events AS (
+  WITH included_events AS (
     SELECT user_id,session_id,event_name,btrim(coalesce(utm_source,'')) AS utm_source,btrim(coalesce(utm_medium,'')) AS utm_medium,btrim(coalesce(utm_campaign,'')) AS utm_campaign,btrim(coalesce(utm_content,'')) AS utm_content,visitor_key
     FROM public.analytics_product_event_facts(p_from,p_to,p_author_id,p_practice_id,v_include_test)
     WHERE public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (v_device IS NULL OR device_type=v_device)
