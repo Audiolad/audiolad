@@ -22,6 +22,15 @@ const page = readFileSync("src/app/(platform)/(listener)/distribyutor-ii-muzyki/
 const sitemapSource = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
 const contentSource = readFileSync("src/lib/seo/distribyutor-ii-muzyki/content.ts", "utf8");
 const introCta = readFileSync("src/components/ai-music/AiMusicIntroCta.tsx", "utf8");
+const externalAnchors = [...view.matchAll(/<a\b[^>]*>/g)]
+  .map((match) => match[0])
+  .filter((anchor) => /\bhref\s*=\s*["']https:\/\/[^"']+["']/.test(anchor));
+
+for (const anchor of externalAnchors) {
+  assert.match(anchor, /\btarget\s*=\s*["_']_blank["_']/);
+  assert.match(anchor, /\brel\s*=\s*["']noopener noreferrer["']/);
+}
+
 const metadata = buildDistribyutorIiMuzykiMetadata();
 assert.equal(metadata.title, DISTRIBYUTOR_II_MUZYKI_SEO_TITLE);
 assert.equal(metadata.description, DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION);
