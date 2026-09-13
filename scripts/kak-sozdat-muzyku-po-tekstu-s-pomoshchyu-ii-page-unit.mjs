@@ -17,6 +17,8 @@ const view = readFileSync("src/components/kak-sozdat-muzyku-po-tekstu-s-pomoshch
 const page = readFileSync("src/app/(platform)/(listener)/kak-sozdat-muzyku-po-tekstu-s-pomoshchyu-ii/page.tsx", "utf8");
 const sitemap = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
 const anchors = [...view.matchAll(/<a\b[^>]*>/g)].map((match) => match[0]);
+const visual1 = view.match(/function TextTypesVisual\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+const visual3 = view.match(/function LyricsVisual\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
 for (const anchor of anchors) {
   assert.match(anchor, /target="_blank"/);
   assert.match(anchor, /rel="noopener noreferrer"/);
@@ -49,6 +51,10 @@ assert.deepEqual(KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_FAQ.map(({ question
 ]);
 assert.match(view, /ArticleFaqList items=\{KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_FAQ\}/);
 assert.ok(view.lastIndexOf('id="faq"') > view.lastIndexOf("<section", view.lastIndexOf('id="faq"')));
+assert.equal((visual1.match(/>ТЕКСТ</g) ?? []).length, 1);
+for (const value of ["Описание музыки", "Стиль + настроение + инструменты", "Инструментальный трек или песня", "Готовые слова", "Текст песни + музыкальное направление", "Музыка под текст", "sm:grid-cols-2"]) assert.match(visual1, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+for (const value of ["СЛОВА", "Что должно быть спето?", "МУЗЫКАЛЬНОЕ НАПРАВЛЕНИЕ", "Как это должно звучать?", "ВОКАЛ", "Как это должно быть исполнено?", "НЕСКОЛЬКО ВАРИАНТОВ ПЕСНИ"]) assert.match(visual3, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.doesNotMatch(visual3, /МУЗЫКАЛЬНОЕ НАПРАВЛЕНИЕ<\/b><br \/>ВОКАЛ/);
 
 for (const value of [
   'number="1"', 'number="2"', 'number="3"', 'number="4"',
@@ -59,11 +65,16 @@ for (const value of [
   "текст → музыкальная задача → несколько вариантов → выбор → уточнение → готовый трек",
   "КАК СОЗДАТЬ ИНСТРУМЕНТАЛЬНУЮ МУЗЫКУ ПО ОПИСАНИЮ",
   "КАК СОЗДАТЬ МУЗЫКУ ПОД ГОТОВЫЙ ТЕКСТ ПЕСНИ",
+  "ПРОВЕРЬТЕ ПРАВА ДО КОММЕРЧЕСКОГО ИСПОЛЬЗОВАНИЯ",
+  "ЧТО ДЕЛАТЬ С ГОТОВОЙ МУЗЫКОЙ ДАЛЬШЕ",
   "https://help.suno.com/en/articles/2415873",
+  "Стандартная генерация Suno v6 создаёт две песни общей стоимостью 10 credits.",
+  "Покупка платной подписки после создания трека на Free по умолчанию не даёт ему коммерческие права задним числом.",
   "Когда у вас получится первый удачный трек по текстовому описанию, загляните в АудиоЛад. Послушайте музыку и аудиопрактики, посмотрите, как оформлены продукты и какие возможности есть у авторов.",
   "Можно зарегистрироваться бесплатно, познакомиться с площадкой и понять, какие музыкальные и авторские аудиоформаты вы захотите создавать и развивать дальше.",
   "/kak-sozdat-ii-muzyku", "/kak-sozdat-pesnyu-s-pomoshchyu-ii", "/kak-vylozhit-ii-muzyku", "/distribyutor-ii-muzyki", "/kak-zarabatyvat-na-ii-muzyke-v-audiolad", "/kak-sozdat-muzyku-v-suno", "/v-kakoy-neyroseti-sozdat-muzyku",
 ]) assert.match(view, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.doesNotMatch(view, /если это остаётся текущим режимом/);
 
 for (const step of [
   "Определите, что у вас есть: описание музыки или готовый текст песни.",
