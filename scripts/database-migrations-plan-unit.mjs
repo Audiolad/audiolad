@@ -755,9 +755,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
-    "20261006140200",
     "20261007120000",
     "20261007130000",
+    "20261007140000",
   ]);
   assert.equal(plan.database_migrations_pending, 94);
 }
@@ -862,9 +862,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
-    "20261006140200",
     "20261007120000",
     "20261007130000",
+    "20261007140000",
   ]);
   assert.equal(plan.database_migrations_pending, 88);
 }
@@ -976,9 +976,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
-    "20261006140200",
     "20261007120000",
     "20261007130000",
+    "20261007140000",
   ]);
   assert.equal(plan.database_migrations_pending, 79);
 }
@@ -1096,15 +1096,45 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
 function testTopicsFunctionalScenariosAfterProductionMaxApply() {
   const productionMax = "20261007120000";
   const topicsVersion = "20261007130000";
+  const guestVersion = "20261007140000";
   const plan = planDatabaseMigrations({
-    localVersions: [productionMax, topicsVersion],
+    localVersions: [productionMax, topicsVersion, guestVersion],
     remoteVersions: [productionMax],
   });
 
-  assert.deepEqual(plan.pending, [topicsVersion]);
+  assert.deepEqual(plan.pending, [topicsVersion, guestVersion]);
   assert.ok(plan.pending.every((version) => version > productionMax));
   assert.equal(plan.action, "apply");
   assert.notEqual(plan.code, "database_migration_history_drift");
+
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  assert.equal(
+    listed.versions.includes("20261006140200"),
+    false,
+    "old guest stamp must not remain as a history hole",
+  );
+  assert.ok(listed.versions.includes(guestVersion));
+  assert.ok(listed.versions.includes(topicsVersion));
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20261007140000_studio_guest_free_catalog_music.sql",
+    ),
+  );
+  const livePlan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions: listed.versions.filter((version) => version <= productionMax),
+  });
+  assert.equal(livePlan.action, "apply");
+  assert.notEqual(livePlan.code, "database_migration_history_drift");
+  assert.equal(livePlan.code, "apply");
+  assert.ok(livePlan.pending.every((version) => version > productionMax));
+  assert.ok(livePlan.pending.includes(topicsVersion));
+  assert.ok(livePlan.pending.includes(guestVersion));
+  assert.equal(livePlan.pending.includes("20261006140200"), false);
 }
 
 function main() {

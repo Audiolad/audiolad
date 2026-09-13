@@ -17,7 +17,7 @@ const migrationsDir = join(repoRoot, "supabase/migrations");
 const pr4Name = "20261004120000_studio_catalog_project_assets.sql";
 const hotfixName = "20261004120100_studio_catalog_attach_asset_id.sql";
 const pr5Name = "20261004120200_studio_catalog_render_principal.sql";
-const guestFreeName = "20261006140200_studio_guest_free_catalog_music.sql";
+const guestFreeName = "20261007140000_studio_guest_free_catalog_music.sql";
 const guestModeName = "20260817190000_studio_guest_mode.sql";
 const previousLatest = "20261003120700_studio_music_independent_pricing.sql";
 const entitlementsName = "20261003120000_studio_music_entitlements.sql";
@@ -53,7 +53,7 @@ assert(new Set(versions).size === versions.length, "no duplicate timestamps");
 assert(versions.includes("20261004120000"), "20261004120000 is listed");
 assert(versions.includes("20261004120100"), "20261004120100 is listed");
 assert(versions.includes("20261004120200"), "20261004120200 is listed");
-assert(versions.includes("20261006140200"), "20261006140200 is listed");
+assert(versions.includes("20261007140000"), "20261007140000 is listed");
 
 const pr4 = readFileSync(join(migrationsDir, pr4Name), "utf8");
 const hotfix = readFileSync(join(migrationsDir, hotfixName), "utf8");
