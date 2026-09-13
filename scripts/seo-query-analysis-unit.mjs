@@ -41,7 +41,7 @@ assert.equal(validateSeoQueryApplyItem({ id: idA, intent: "music", recommended_f
 assert.equal(validateSeoQueryApplyItem({ id: idA, intent: "music", recommended_format: "Музыка", audio_fit: "invalid", analysis_status: "analyzed" }), null);
 assert.equal(validateSeoQueryApplyItem({ id: idA, intent: "music", recommended_format: "Музыка", audio_fit: "high", analysis_status: "not_analyzed" }), null);
 
-const migration = read("supabase/migrations/20261006150000_seo_query_analysis_review_gate.sql");
+const migration = read("supabase/migrations/20261007160000_seo_query_analysis_review_gate.sql");
 assert.match(migration, /CREATE OR REPLACE FUNCTION public\.reserve_seo_query/);
 assert.match(migration, /SELECT \* INTO v_query FROM public\.seo_queries WHERE id = p_query_id FOR UPDATE/);
 assert.match(migration, /IF v_query\.analysis_status <> 'analyzed'/);
