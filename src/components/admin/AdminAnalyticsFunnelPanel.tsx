@@ -24,13 +24,13 @@ export default function AdminAnalyticsFunnelPanel({
           { label: "Слушатели", value: overview.listeners },
           { label: "Дослушавшие", value: overview.completers },
           { label: "Вернувшиеся", value: overview.returningListeners },
-          { label: "WAL", value: overview.wal, previous: overview.previousWal },
-          { label: "MAL", value: overview.mal, previous: overview.previousMal },
+          { label: "WAL", value: overview.wal, previous: overview.previousWal, delta: overview.walDelta?.compactLabel ?? "—" },
+          { label: "MAL", value: overview.mal, previous: overview.previousMal, delta: overview.malDelta?.compactLabel ?? "—" },
         ].map((metric) => (
           <article key={metric.label} className="rounded-[18px] border border-[#d9c9f4] bg-white p-4 shadow-sm">
             <p className="text-xs text-[#796ba0]">{metric.label}</p>
             <p className="mt-1 text-2xl font-semibold text-[#25135c]">{metric.value.toLocaleString("ru-RU")}</p>
-            {metric.previous !== undefined ? <p className="mt-1 text-xs text-[#9485b4]">пред. окно: {metric.previous.toLocaleString("ru-RU")}</p> : <p className="mt-1 text-xs text-[#7042c5]">люди</p>}
+            {metric.previous !== undefined ? <p className="mt-1 text-xs text-[#9485b4]">{metric.delta} к пред. окну · {metric.previous.toLocaleString("ru-RU")}</p> : <p className="mt-1 text-xs text-[#7042c5]">люди</p>}
           </article>
         ))}
       </div>

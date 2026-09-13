@@ -339,6 +339,7 @@ function testEventCountsDifferFromUniquePeople() {
 function testOwnerOverviewSemantics() {
   psql(TEST_DB, `
 INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-07-10 10:00:00+00',false,false,false,'human'),
   ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','page_view','${PRACTICE_ONE}','2026-07-20 10:00:30+00',false,false,false,'human'),
   ('e2222222-2222-2222-2222-222222222222','p2anon2',NULL,'page_view','${PRACTICE_ONE}','2026-07-21 10:00:30+00',false,false,false,'human'),
   ('e3333333-3333-3333-3333-333333333333','p2anon3','${USER_HUMAN_TWO}','audio_play_started','${PRACTICE_THREE}','2026-07-23 10:02:00+00',false,false,false,'human'),
@@ -347,7 +348,8 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   const overview = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
   assertEqual(overview.real_visitors, 2, "overview real visitors use valid page views");
   assertEqual(overview.listeners, 3, "null identity event counted but not a person");
-  assertEqual(overview.new_listeners, 3, "first-ever listeners");
+  assertEqual(overview.new_listeners, 2, "first-ever listeners");
+  assertEqual(overview.returning_listeners, 1, "returning listener has a valid pre-period start");
   assertEqual(overview.repeat_listeners, 1, "two Moscow listening days is repeat");
   assertEqual(overview.wal, 3, "WAL current");
   assertEqual(overview.previous_wal, 0, "WAL previous");
@@ -356,6 +358,9 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   assertEqual(Math.round((overview.listeners / overview.practice_visitors) * 100), 100, "people conversion");
   assertEqual(Math.round((overview.completers / overview.listeners) * 100), 33, "people completion");
   assertEqual(overview.play_starts / overview.listeners, 2, "starts per listener");
+  const all = json(`SELECT public.analytics_owner_overview(NULL,NULL,false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(all.new_listeners, all.listeners, "all treats all listeners as new");
+  assertEqual(all.returning_listeners, 0, "all has no pre-period history");
 }
 
 function testPreviousWindow() {

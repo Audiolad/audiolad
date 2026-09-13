@@ -54,7 +54,7 @@ BEGIN
     SELECT DISTINCT visitor_key FROM product_facts WHERE event_name='audio_play_started' AND visitor_key IS NOT NULL
   ), historical_starts AS (
     SELECT visitor_key, occurred_at FROM public.analytics_overview_event_facts(NULL,p_from,NULL,NULL,p_include_test,NULL,NULL)
-    WHERE event_name='audio_play_started' AND visitor_key IS NOT NULL
+    WHERE p_from IS NOT NULL AND event_name='audio_play_started' AND visitor_key IS NOT NULL
   ), wal AS (
     SELECT count(DISTINCT visitor_key)::int n FROM public.analytics_overview_event_facts(v_to-interval '7 days',v_to,p_author_id,p_practice_id,p_include_test,p_utm_source,p_device_type)
     WHERE event_name='audio_play_started' AND visitor_key IS NOT NULL

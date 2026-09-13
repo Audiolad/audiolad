@@ -53,6 +53,7 @@ jobs:
           npm run test:production-pr-safety
           npm run test:production-deploy-gha
           npm run test:author-product-price-input
+          npm run test:platform-analytics-p2
           npm run build
           npm run typecheck
           npm run lint

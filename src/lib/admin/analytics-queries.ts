@@ -90,8 +90,10 @@ export type AdminAnalyticsProductOverview = {
   repeatListeners: number;
   wal: number;
   previousWal: number;
+  walDelta: AdminAnalyticsDelta | null;
   mal: number;
   previousMal: number;
+  malDelta: AdminAnalyticsDelta | null;
 };
 
 export type AdminAnalyticsTimeseriesPoint = {
@@ -347,6 +349,10 @@ function card(
   previous?: number | null,
   formatted?: string,
 ): AdminAnalyticsMetricCard {
+  const wal = asNonNegativeInt(raw.wal);
+  const previousWal = asNonNegativeInt(raw.previous_wal);
+  const mal = asNonNegativeInt(raw.mal);
+  const previousMal = asNonNegativeInt(raw.previous_mal);
   return {
     key,
     label,
@@ -548,10 +554,12 @@ function buildProductOverview(
     newListeners: asNonNegativeInt(raw.new_listeners),
     returningListeners: asNonNegativeInt(raw.returning_listeners),
     repeatListeners: asNonNegativeInt(raw.repeat_listeners),
-    wal: asNonNegativeInt(raw.wal),
-    previousWal: asNonNegativeInt(raw.previous_wal),
-    mal: asNonNegativeInt(raw.mal),
-    previousMal: asNonNegativeInt(raw.previous_mal),
+    wal,
+    previousWal,
+    walDelta: formatAdminDelta(wal, previousWal),
+    mal,
+    previousMal,
+    malDelta: formatAdminDelta(mal, previousMal),
   };
 }
 
