@@ -9,6 +9,7 @@ import {
   lineageBlockingReasons,
   parseDeployCommit,
   parseDistance,
+  readLiveProductionCommit,
   resolveProductionHealthUrl,
   validatePrSafetyInput,
 } from "./production-pr-safety-guard.mjs";
@@ -33,6 +34,54 @@ assert.throws(
 assert.equal(
   resolveProductionHealthUrl("https://test.example/health", true),
   "https://test.example/health",
+);
+
+const validHealth = await readLiveProductionCommit(
+  CANONICAL_PRODUCTION_HEALTH_URL,
+  async () => new Response(JSON.stringify({ status: "ok", deployCommit: prod }), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  }),
+);
+assert.deepEqual(validHealth, {
+  commit: prod,
+  httpStatus: 200,
+  contentType: "application/json",
+  reason: null,
+});
+const invalidJsonHealth = await readLiveProductionCommit(
+  CANONICAL_PRODUCTION_HEALTH_URL,
+  async () => new Response("untrusted arbitrary response body", {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  }),
+);
+assert.equal(invalidJsonHealth.reason, "health endpoint returned invalid JSON");
+assert.equal(invalidJsonHealth.contentType, "application/json");
+const httpFailureHealth = await readLiveProductionCommit(
+  CANONICAL_PRODUCTION_HEALTH_URL,
+  async () => new Response("untrusted arbitrary response body", {
+    status: 503,
+    headers: { "content-type": "text/html" },
+  }),
+);
+assert.equal(httpFailureHealth.reason, "health endpoint returned HTTP 503");
+assert.equal(httpFailureHealth.contentType, "text/html");
+const networkFailureHealth = await readLiveProductionCommit(
+  CANONICAL_PRODUCTION_HEALTH_URL,
+  async () => { throw new Error("untrusted network error"); },
+);
+assert.equal(networkFailureHealth.reason, "health endpoint could not be read");
+const missingCommitHealth = await readLiveProductionCommit(
+  CANONICAL_PRODUCTION_HEALTH_URL,
+  async () => new Response(JSON.stringify({ status: "ok", deployCommit: null }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  }),
+);
+assert.equal(
+  missingCommitHealth.reason,
+  "health endpoint did not provide a valid deployCommit",
 );
 
 const validInput = {
@@ -117,7 +166,11 @@ assert.deepEqual(
 const blocked = buildSummary({
   healthUrl: "https://example.test/api/health/build",
   prodSha: prod,
+  healthHttpStatus: 200,
+  healthContentType: "application/json",
+  healthReason: null,
   mainSha: main,
+  finalMainSha: main,
   prSha: pr,
   prodToMain: true,
   prodToPr: true,
@@ -130,8 +183,18 @@ const blocked = buildSummary({
   mainToPrMigrations: "A\tsupabase/migrations/20260830120400_example.sql",
   migrations: ["supabase/migrations/20260830120400_example.sql"],
   duplicateVersions: false,
+  duplicateMigrationVersions: "20260830120400",
+  migrationScanOk: true,
+  canCompare: true,
   repositoryChecks: [{ name: "migration validation", ok: true, detail: "passed" }],
-  reasons: ["PR is behind current main by 4 commits"],
+  reasons: [
+    "health endpoint returned invalid JSON",
+    "production is not an ancestor of current main",
+    "production is not an ancestor of this PR",
+    "PR is behind current main by 4 commits",
+    "main changed during check; rerun required",
+    "duplicate migration versions: 20260830120400",
+  ],
   ok: false,
 });
 
@@ -140,6 +203,54 @@ assert.match(blocked, /ORIGIN MAIN/);
 assert.match(blocked, /PR HEAD/);
 assert.match(blocked, /❌ BLOCK MERGE/);
 assert.match(blocked, /not\*\* a deploy approval/);
+assert.match(blocked, /\| decision \| BLOCK \|/);
+assert.match(blocked, /\| production_health_http \| 200 \|/);
+assert.match(blocked, /\| production_health_content_type \| application\/json \|/);
+assert.match(blocked, /\| production_is_ancestor_of_main \| true \|/);
+assert.match(blocked, /\| duplicate_migration_versions \| 20260830120400 \|/);
+for (const reason of [
+  "health endpoint returned invalid JSON",
+  "production is not an ancestor of current main",
+  "production is not an ancestor of this PR",
+  "PR is behind current main by 4 commits",
+  "main changed during check; rerun required",
+  "duplicate migration versions: 20260830120400",
+]) {
+  assert.match(blocked, new RegExp(reason));
+}
+assert.doesNotMatch(blocked, /untrusted arbitrary response body/);
+assert.doesNotMatch(blocked, /untrusted network error/);
+
+const safe = buildSummary({
+  healthUrl: CANONICAL_PRODUCTION_HEALTH_URL,
+  prodSha: prod,
+  healthHttpStatus: 200,
+  healthContentType: "application/json",
+  healthReason: null,
+  mainSha: main,
+  finalMainSha: main,
+  prSha: pr,
+  prodToMain: true,
+  prodToPr: true,
+  mainToPr: true,
+  prToMain: false,
+  mainChanged: false,
+  behind: 0,
+  ahead: 1,
+  mergeBase: main,
+  prodToMainMigrations: "_none_",
+  mainToPrMigrations: "_none_",
+  migrations: [],
+  duplicateVersions: false,
+  duplicateMigrationVersions: "",
+  migrationScanOk: true,
+  canCompare: true,
+  repositoryChecks: [{ name: "migration validation", ok: true, detail: "passed" }],
+  reasons: [],
+  ok: true,
+});
+assert.match(safe, /\| decision \| SAFE \|/);
+assert.match(safe, /✅ SAFE TO CONTINUE REVIEW/);
 
 const trustedWorkflow = readFileSync(
   ".github/workflows/production-pr-safety-trusted.yml",
@@ -191,6 +302,9 @@ assert.match(
   trustedWorkflow,
   /cd "\$\{OBJECT_STORE\}"\s+node "\$\{TRUSTED_DIR\}\/production-pr-safety-guard\.mjs"/,
 );
+const guardSource = readFileSync("scripts/production-pr-safety-guard.mjs", "utf8");
+assert.match(guardSource, /process\.stdout\.write\(summary\)/);
+assert.doesNotMatch(guardSource, /response\.text\(\)/);
 const trustedJob = trustedWorkflow.slice(
   trustedWorkflow.indexOf("  production-pr-safety-runner:"),
 );
