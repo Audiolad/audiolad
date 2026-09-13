@@ -1,4 +1,5 @@
 import { buildCheckoutResultQuery } from "@/lib/payments/checkout-token";
+import { TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH } from "@/lib/payments/payment-purpose";
 import {
   extractSafeTochkaErrorCode,
   extractSafeTochkaHttpStatus,
@@ -86,7 +87,7 @@ function buildReceiptItem(
   }
 
   return {
-    name: itemName.slice(0, 256),
+    name: itemName.slice(0, TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH),
     amount: unitAmountRubles,
     quantity: 1,
     paymentMethod: config.receiptPaymentMethod,

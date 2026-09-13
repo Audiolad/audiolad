@@ -443,7 +443,7 @@ function StudioMusicCatalogOverlayBody({
           id="studio-music-catalog-title"
           className="text-lg font-semibold text-white"
         >
-          Музыка для медитаций
+          Музыка для Студии
         </h2>
         <button
           type="button"
@@ -456,6 +456,10 @@ function StudioMusicCatalogOverlayBody({
           Закрыть
         </button>
       </div>
+
+      <p className="shrink-0 px-4 pb-1 text-sm text-[#97a4b8]">
+        Выберите музыку, получите лицензию и добавьте трек в проект.
+      </p>
 
       <div className="shrink-0 flex flex-wrap gap-2 px-4 py-3">
         {visibleFilters.map((item) => (

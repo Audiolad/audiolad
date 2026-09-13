@@ -76,7 +76,11 @@ assert.match(
   /studio-music-catalog-player shrink-0 border-t/,
 );
 assert.match(overlay, /data-testid="studio-music-catalog-player"/);
-assert.match(overlay, /Музыка для медитаций/);
+assert.match(overlay, /Музыка для Студии/);
+assert.match(
+  overlay,
+  /Выберите музыку, получите лицензию и добавьте трек в проект\./,
+);
 assert.match(overlay, /Вся/);
 assert.match(overlay, /Моя/);
 assert.match(overlay, /Бесплатно для Студии/);

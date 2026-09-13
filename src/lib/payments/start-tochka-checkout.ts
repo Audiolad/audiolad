@@ -8,7 +8,10 @@ import {
 } from "@/lib/payments/payment-api";
 import { createSignedCheckoutToken } from "@/lib/payments/checkout-token";
 import { decidePendingTochkaPayment } from "@/lib/payments/pending-tochka-payment";
-import { formatTochkaPaymentPurpose } from "@/lib/payments/payment-purpose";
+import {
+  formatStudioMusicLicensePurchaseName,
+  formatTochkaPaymentPurpose,
+} from "@/lib/payments/payment-purpose";
 import {
   createTochkaPaymentOperation,
   type CreateTochkaPaymentResult,
@@ -111,6 +114,12 @@ async function createTochkaPaymentForOrder(input: {
     }
 > {
   const checkoutToken = createSignedCheckoutToken(input.orderRow.id).token;
+  const purchaseName =
+    input.orderRow.order_kind === "studio_music_license"
+      ? formatStudioMusicLicensePurchaseName(
+          input.orderRow.practice_title_snapshot,
+        )
+      : input.orderRow.practice_title_snapshot;
 
   try {
     const tochkaPayment = await createTochkaPaymentOperation({
@@ -119,11 +128,13 @@ async function createTochkaPaymentForOrder(input: {
       amountMinor: input.orderRow.amount_minor,
       purpose: formatTochkaPaymentPurpose(
         input.orderRow.id,
-        input.orderRow.practice_title_snapshot,
+        purchaseName,
+        undefined,
+        input.orderRow.order_kind === "studio_music_license" ? "" : undefined,
       ),
       consumerId: input.userId,
       customerEmail: input.customerEmail,
-      itemName: input.orderRow.practice_title_snapshot,
+      itemName: purchaseName,
     });
 
     const persisted = await persistTochkaPaymentMetadata(

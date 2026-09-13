@@ -45,6 +45,12 @@ import {
   type StudioMusicCatalogItem,
 } from "../src/lib/studio-music/catalog";
 import {
+  formatStudioMusicLicensePurchaseName,
+  formatTochkaPaymentPurpose,
+  TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH,
+  TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH,
+} from "../src/lib/payments/payment-purpose";
+import {
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
   isStudioMusicLicenseCheckout,
@@ -224,6 +230,50 @@ assert.equal(
 const startPay = read("src/lib/payments/start-tochka-checkout.ts");
 assert.match(startPay, /createTochkaPaymentOperation/);
 assert.match(startPay, /getOrderSaleAccrualReady/);
+assert.match(startPay, /order_kind === "studio_music_license"/);
+assert.match(startPay, /formatStudioMusicLicensePurchaseName/);
+assert.match(startPay, /purpose: formatTochkaPaymentPurpose\(\s*input\.orderRow\.id,\s*purchaseName,/);
+assert.match(startPay, /itemName: purchaseName/);
+const tochkaClient = read("src/lib/payments/tochka-client.ts");
+assert.match(tochkaClient, /TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH/);
+
+// Studio Tochka labels preserve the Studio license prefix and order identity.
+const studioPurchaseName = formatStudioMusicLicensePurchaseName("Джаз для отдыха");
+assert.equal(
+  studioPurchaseName,
+  "Лицензия для Студии АудиоЛад: «Джаз для отдыха»",
+);
+const studioPurpose = formatTochkaPaymentPurpose(
+  ORDER_ID,
+  studioPurchaseName,
+  undefined,
+  "",
+);
+assert.match(studioPurpose, /Лицензия для Студии АудиоЛад: «Джаз для отдыха»/);
+assert.match(studioPurpose, /заказ bbbbbbbb/);
+
+const longStudioPurchaseName = formatStudioMusicLicensePurchaseName("Т".repeat(500));
+assert.equal(longStudioPurchaseName.length, TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH);
+assert.match(longStudioPurchaseName, /^Лицензия для Студии АудиоЛад: «/);
+assert.ok(longStudioPurchaseName.endsWith("»"));
+const longStudioPurpose = formatTochkaPaymentPurpose(
+  ORDER_ID,
+  longStudioPurchaseName,
+  undefined,
+  "",
+);
+assert.ok(longStudioPurpose.length <= TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH);
+assert.match(longStudioPurpose, /^Лицензия для Студии АудиоЛад: «/);
+
+// Ordinary purchase naming remains exactly the existing formatter output.
+assert.equal(
+  formatTochkaPaymentPurpose(ORDER_ID, "Джаз для отдыха"),
+  "АудиоЛад – Джаз для отдыха – заказ bbbbbbbb",
+);
+assert.doesNotMatch(
+  formatTochkaPaymentPurpose(ORDER_ID, "Джаз для отдыха"),
+  /Лицензия для Студии/,
+);
 
 const acquireRoute = read("src/app/api/studio/music/acquire/route.ts");
 assert.match(acquireRoute, /acquire_free_studio_music/);
@@ -423,12 +473,19 @@ assert.equal(
 // UX labels: Studio price is ×2, never listener price as Studio price
 assert.equal(
   formatStudioMusicBuyLabel(100000),
-  "Купить для Студии за 1\u00a0000\u00a0₽",
+  "Купить лицензию для Студии — 1\u00a0000\u00a0₽",
 );
-assert.notEqual(formatStudioMusicBuyLabel(100000), "Купить для Студии за 500\u00a0₽");
+assert.notEqual(
+  formatStudioMusicBuyLabel(100000),
+  "Купить лицензию для Студии — 500\u00a0₽",
+);
 assert.equal(
   resolveStudioMusicCatalogAction(catalogItem({ is_free: true })).label,
   STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
+);
+assert.equal(
+  STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
+  "Получить лицензию для Студии бесплатно",
 );
 assert.equal(STUDIO_MUSIC_LOADING_LABEL, "Загрузка…");
 
