@@ -192,10 +192,12 @@ function allowedIsolatedTarget(url) {
 function bootstrapSql() {
   return [
     readFileSync(licenseStubPath, "utf8"),
-    readFileSync(join(migrationsDir, guestModeName), "utf8"),
     readFileSync(join(migrationsDir, entitlementsName), "utf8"),
     readFileSync(join(migrationsDir, pricingName), "utf8"),
     readFileSync(studioStubPath, "utf8"),
+    // The production guest-mode migration extends the existing Studio tables.
+    // Create the isolated production-shaped base tables before applying it.
+    readFileSync(join(migrationsDir, guestModeName), "utf8"),
     readFileSync(join(migrationsDir, pr4Name), "utf8"),
     readFileSync(join(migrationsDir, hotfixName), "utf8"),
     readFileSync(join(migrationsDir, pr5Name), "utf8"),

@@ -5,7 +5,6 @@
 CREATE TABLE IF NOT EXISTS public.studio_projects (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id uuid NULL REFERENCES public.authors (id) ON DELETE RESTRICT,
-  guest_session_id uuid NULL,
   name text NOT NULL DEFAULT 'project',
   project_data jsonb NOT NULL DEFAULT
     '{"schemaVersion":2,"studioVersion":1,"editor":{"currentTime":0},"slots":[],"tracks":[]}'::jsonb,
@@ -16,6 +15,14 @@ CREATE TABLE IF NOT EXISTS public.studio_projects (
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz NULL,
   CONSTRAINT studio_projects_schema_version_check CHECK (schema_version = 2)
+);
+
+-- Guest-mode migration extends render jobs before catalog-attach migrations.
+CREATE TABLE IF NOT EXISTS public.studio_render_jobs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES public.studio_projects (id) ON DELETE RESTRICT,
+  author_id uuid NULL REFERENCES public.authors (id) ON DELETE RESTRICT,
+  status text NOT NULL DEFAULT 'queued'
 );
 
 -- Applied schema from 20260809150000 + later columns. id has NO DEFAULT.
