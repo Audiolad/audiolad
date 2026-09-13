@@ -58,7 +58,7 @@ for (const href of [
 
 assert.match(view, /Udio – для песен, вариантов и музыкальных экспериментов/);
 assert.match(view, /скачивание аудио, видео и стемов отключено/);
-assert.match(view, /не даёт коммерческую лицензию задним числом/);
+assert.match(view, /не даёт такие права задним числом/);
 assert.match(view, /самостоятельную музыку на DSP/);
 assert.match(view, /бесконечный персонализированный поток/);
 assert.match(view, /AiMusicIntroCta paragraphs=/);
