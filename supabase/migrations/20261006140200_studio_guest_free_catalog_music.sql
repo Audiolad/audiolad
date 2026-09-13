@@ -101,7 +101,22 @@ BEGIN
   WHERE project_id = p_project_id AND source_type = 'catalog'
     AND catalog_practice_id = p_practice_id AND catalog_audio_item_id = p_audio_item_id
     AND deleted_at IS NULL FOR UPDATE;
-  IF FOUND THEN RETURN v_asset; END IF;
+  IF FOUND THEN
+    -- Preserve PR5's legacy author-principal adoption and bind any
+    -- pre-existing guest reference only to this project's session.
+    IF v_project.author_id IS NOT NULL AND v_asset.catalog_access_user_id IS NULL THEN
+      UPDATE public.studio_project_assets
+      SET catalog_access_user_id = p_user_id
+      WHERE id = v_asset.id AND catalog_access_user_id IS NULL
+      RETURNING * INTO v_asset;
+    ELSIF v_guest_session_id IS NOT NULL AND v_asset.catalog_guest_session_id IS NULL THEN
+      UPDATE public.studio_project_assets
+      SET catalog_guest_session_id = v_guest_session_id
+      WHERE id = v_asset.id AND catalog_guest_session_id IS NULL
+      RETURNING * INTO v_asset;
+    END IF;
+    RETURN v_asset;
+  END IF;
 
   INSERT INTO public.studio_project_assets (
     id, project_id, source_id, storage_path, original_name, mime_type, size_bytes,
@@ -120,6 +135,17 @@ EXCEPTION WHEN unique_violation THEN
     AND catalog_practice_id = p_practice_id AND catalog_audio_item_id = p_audio_item_id
     AND deleted_at IS NULL FOR UPDATE;
   IF NOT FOUND THEN RAISE; END IF;
+  IF v_project.author_id IS NOT NULL AND v_asset.catalog_access_user_id IS NULL THEN
+    UPDATE public.studio_project_assets
+    SET catalog_access_user_id = p_user_id
+    WHERE id = v_asset.id AND catalog_access_user_id IS NULL
+    RETURNING * INTO v_asset;
+  ELSIF v_guest_session_id IS NOT NULL AND v_asset.catalog_guest_session_id IS NULL THEN
+    UPDATE public.studio_project_assets
+    SET catalog_guest_session_id = v_guest_session_id
+    WHERE id = v_asset.id AND catalog_guest_session_id IS NULL
+    RETURNING * INTO v_asset;
+  END IF;
   RETURN v_asset;
 END;
 $$;
