@@ -1093,18 +1093,28 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
   assert.notEqual(productionPlan.code, "database_migration_history_drift");
 }
 
-function testTopicsFunctionalScenariosAfterProductionMaxApply() {
+function testPostWavProductionPendingMigrationsApply() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
   const productionMax = "20261007120000";
-  const topicsVersion = "20261007130000";
+  const pendingVersions = ["20261007120100", "20261007130000"];
+
+  assert.ok(listed.versions.includes(productionMax));
+  assert.equal(listed.versions.includes("20261006140200"), false);
+  assert.equal(listed.versions.includes("20261006150000"), false);
+  assert.equal(listed.versions.includes("20261007120200"), false);
+
   const plan = planDatabaseMigrations({
-    localVersions: [productionMax, topicsVersion],
-    remoteVersions: [productionMax],
+    localVersions: listed.versions,
+    remoteVersions: listed.versions.filter((version) => version <= productionMax),
   });
 
-  assert.deepEqual(plan.pending, [topicsVersion]);
+  assert.deepEqual(plan.pending, pendingVersions);
+  assert.equal(plan.database_migrations_pending, 2);
   assert.ok(plan.pending.every((version) => version > productionMax));
   assert.equal(plan.action, "apply");
-  assert.notEqual(plan.code, "database_migration_history_drift");
+  assert.equal(plan.code, "apply");
 }
 
 function main() {
@@ -1123,7 +1133,7 @@ function main() {
   testProductionLikePendingAfterQuickOffersRestamp();
   testProductionLikePendingAfterPlaylistRestamp();
   testOrdinaryDeployAfterLatestMainHasNoHole();
-  testTopicsFunctionalScenariosAfterProductionMaxApply();
+  testPostWavProductionPendingMigrationsApply();
   testReissuedVisibilityAfterProductionMaxHasNoHole();
   console.log("database-migrations-plan-unit: all tests passed");
 }
