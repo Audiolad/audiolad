@@ -68,7 +68,7 @@ export default function CreateStudioWorkspaceForm() {
           />
         </label>
 
-        {state.error ? (
+        {!state.ok && state.error ? (
           <p className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
             {state.error}
           </p>
