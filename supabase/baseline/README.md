@@ -68,6 +68,50 @@ psql -d audiolad_baseline_test -f supabase/baseline/0005_required_seed.sql
 
 На новой базе после baseline **не запускать** миграции, объекты которых уже созданы, без отдельного плана совместимости.
 
+### Disposable CI replay
+
+`.github/workflows/database-migrations-compile-isolated.yml` is a separate,
+path-scoped compile check. It uses the official disposable
+`supabase/postgres` image on the GitHub runner only; it has no production
+database URL, credentials, or persistent storage.
+
+The service is initialized with the image's upstream default `postgres`
+database and `supabase_admin` role; the local-only driver then creates
+`audiolad_migration_compile_isolated` after the service is healthy. The check
+first installs the documented Supabase prerequisites (`auth.users`,
+`storage.buckets`, `storage.objects`, roles, and `auth.uid()`), then applies
+`0001`–`0005`. It registers these six baseline-equivalent versions in
+`supabase_migrations.schema_migrations` without executing them:
+
+- `20260710115506_create_user_library.sql`
+- `20260710122053_configure_starter_practices.sql`
+- `20260710123015_backfill_starter_practices.sql`
+- `20260710123518_require_zero_price_for_starter_grants.sql`
+- `20260710125301_grant_starter_practices_on_signup.sql`
+- `20260711071529_create_private_practice_audio_bucket.sql`
+
+All remaining migrations are executed lexically through the target version;
+the driver obtains that ordered pending set through
+`database-migrations-plan.mjs` and fails if it encounters any unplanned
+history state. Before `20260714180000_unified_audio_product_foundation.sql`,
+the driver installs one documented legacy-data fixture: its own post-check
+requires `first-audio-course` to have the exact legacy `audio_url`, while the
+earlier seed creates that row with a null URL and a `990` price. Its
+post-check requires that same row to have a `99` price. The fixture provides
+both historical preconditions; the migration itself is still executed. This
+exception list and fixture are limited to the baseline compatibility map
+above: no migration SQL is silently skipped.
+
+Before `20260721103000_personal_materials_optional_last_name.sql`, the driver
+also asserts that its real ten-argument draft-update function exists and its
+mistaken eleven-argument COMMENT identity does not. It creates only that
+eleven-argument no-op overload so the historical `COMMENT ON FUNCTION` can
+compile; the migration continues to define and validate the real function.
+After `20260721120000_personal_materials_editable_after_activate.sql` (the
+last migration with the same mistaken COMMENT identity), the disposable replay asserts both
+signatures, drops only the temporary eleven-argument overload, and verifies
+the real ten-argument function remains.
+
 ## Известные архитектурные особенности (не исправляются baseline)
 
 - `purchases.user_id` **без FK** на `auth.users` — как в production.
