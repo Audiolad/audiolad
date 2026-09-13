@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { readFileSync as readFileSyncCompat } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -85,6 +85,7 @@ assert.equal(MUSIC_STREAMS_BUCKET, "music-streams");
 const fixtureDirectory = await mkdtemp(path.join(tmpdir(), "audiolad-wav-master-"));
 try {
   const wavPath = path.join(fixtureDirectory, "real.wav");
+  const mp3SourcePath = path.join(fixtureDirectory, "real.mp3");
   const mp3Path = path.join(fixtureDirectory, "renamed.wav");
   const videoPath = path.join(fixtureDirectory, "video.mp4");
   await execFile("ffmpeg", [
@@ -93,8 +94,9 @@ try {
   ]);
   await execFile("ffmpeg", [
     "-y", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100",
-    "-t", "0.1", "-c:a", "libmp3lame", mp3Path,
+    "-t", "0.1", "-c:a", "libmp3lame", mp3SourcePath,
   ]);
+  await copyFile(mp3SourcePath, mp3Path);
   await execFile("ffmpeg", [
     "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:r=1",
     "-t", "0.1", "-an", "-c:v", "mpeg4", videoPath,
