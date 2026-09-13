@@ -67,9 +67,9 @@ import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import {
   CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
-  isSameCatalogSelection,
+  getAttachedCatalogMusicSelectionKeys,
+  isCatalogSelectionAttached,
   projectCatalogMusicExportUnavailable,
-  resolveActiveCatalogMusicSelection,
 } from "@/lib/studio/catalog-asset";
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
@@ -1282,10 +1282,10 @@ export default function StudioEditorShell({
     setMusicCatalogOverlayOpen(true);
   };
 
-  const selectedCatalogMusic = resolveActiveCatalogMusicSelection({
-    slots,
-    tracks,
-  });
+  const attachedCatalogMusicSelectionKeys = useMemo(
+    () => getAttachedCatalogMusicSelectionKeys(tracks),
+    [tracks],
+  );
   const catalogExportBlocked = projectCatalogMusicExportUnavailable(tracks);
 
   const attachCatalogToProject = async (practiceId: string, audioItemId: string) => {
@@ -1295,9 +1295,8 @@ export default function StudioEditorShell({
       return;
     }
     if (
-      isSameCatalogSelection({
-        selectedPracticeId: selectedCatalogMusic?.practiceId,
-        selectedAudioItemId: selectedCatalogMusic?.audioItemId,
+      isCatalogSelectionAttached({
+        attachedSelectionKeys: attachedCatalogMusicSelectionKeys,
         practiceId,
         audioItemId,
       })
@@ -2854,8 +2853,7 @@ export default function StudioEditorShell({
       <StudioMusicCatalogOverlay
         open={musicCatalogOverlayOpen}
         onClose={() => setMusicCatalogOverlayOpen(false)}
-        selectedPracticeId={selectedCatalogMusic?.practiceId ?? null}
-        selectedAudioItemId={selectedCatalogMusic?.audioItemId ?? null}
+        attachedCatalogSelectionKeys={attachedCatalogMusicSelectionKeys}
         attachingAudioItemId={attachingCatalogAudioItemId}
         onAdd={(practiceId, audioItemId) => {
           void attachCatalogToProject(practiceId, audioItemId);

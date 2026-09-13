@@ -261,6 +261,48 @@ export function isSameCatalogSelection(input: {
   );
 }
 
+export function catalogSelectionKey(
+  practiceId: string,
+  audioItemId: string,
+): string {
+  return `${practiceId}:${audioItemId}`;
+}
+
+export function getAttachedCatalogMusicSelectionKeys(
+  tracks: readonly {
+    sourceType?: string | null;
+    catalogPracticeId?: string | null;
+    catalogAudioItemId?: string | null;
+  }[],
+): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const track of tracks) {
+    if (
+      track.sourceType === STUDIO_CATALOG_ASSET_SOURCE &&
+      track.catalogPracticeId &&
+      track.catalogAudioItemId
+    ) {
+      keys.add(
+        catalogSelectionKey(
+          track.catalogPracticeId,
+          track.catalogAudioItemId,
+        ),
+      );
+    }
+  }
+  return keys;
+}
+
+export function isCatalogSelectionAttached(input: {
+  attachedSelectionKeys: ReadonlySet<string>;
+  practiceId: string;
+  audioItemId: string;
+}): boolean {
+  return input.attachedSelectionKeys.has(
+    catalogSelectionKey(input.practiceId, input.audioItemId),
+  );
+}
+
 export function resolveActiveCatalogMusicSelection(input: {
   slots: readonly { trackKind?: string | null; audioTrackId?: string | null }[];
   tracks: readonly {

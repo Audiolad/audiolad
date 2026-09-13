@@ -35,14 +35,12 @@ function previewKeyFor(publicationId: string, audioItemId: string) {
 
 function StudioMusicCatalogOverlayBody({
   onClose,
-  selectedPracticeId = null,
-  selectedAudioItemId = null,
+  attachedCatalogSelectionKeys,
   attachingAudioItemId = null,
   onAdd,
 }: {
   onClose: () => void;
-  selectedPracticeId?: string | null;
-  selectedAudioItemId?: string | null;
+  attachedCatalogSelectionKeys: ReadonlySet<string>;
   attachingAudioItemId?: string | null;
   onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
@@ -505,8 +503,7 @@ function StudioMusicCatalogOverlayBody({
                     : null
                 }
                 actionError={actionErrors[item.publication_id] ?? null}
-                selectedPracticeId={selectedPracticeId}
-                selectedAudioItemId={selectedAudioItemId}
+                attachedCatalogSelectionKeys={attachedCatalogSelectionKeys}
                 onPreview={(publicationId, audioItemId, trackTitle) => {
                   void playPreview(publicationId, audioItemId, trackTitle);
                 }}
@@ -616,15 +613,13 @@ function StudioMusicCatalogOverlayBody({
 export function StudioMusicCatalogOverlay({
   open,
   onClose,
-  selectedPracticeId = null,
-  selectedAudioItemId = null,
+  attachedCatalogSelectionKeys,
   attachingAudioItemId = null,
   onAdd,
 }: {
   open: boolean;
   onClose: () => void;
-  selectedPracticeId?: string | null;
-  selectedAudioItemId?: string | null;
+  attachedCatalogSelectionKeys: ReadonlySet<string>;
   attachingAudioItemId?: string | null;
   onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
@@ -635,8 +630,7 @@ export function StudioMusicCatalogOverlay({
   return (
     <StudioMusicCatalogOverlayBody
       onClose={onClose}
-      selectedPracticeId={selectedPracticeId}
-      selectedAudioItemId={selectedAudioItemId}
+      attachedCatalogSelectionKeys={attachedCatalogSelectionKeys}
       attachingAudioItemId={attachingAudioItemId}
       onAdd={onAdd}
     />

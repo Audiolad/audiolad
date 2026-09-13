@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { formatAudioDuration } from "@/lib/products/duration";
-import { isSameCatalogSelection } from "@/lib/studio/catalog-asset";
+import { isCatalogSelectionAttached } from "@/lib/studio/catalog-asset";
 import {
   nextStudioMusicAlbumExpanded,
   resolveStudioMusicCatalogAction,
@@ -19,8 +19,7 @@ export function StudioMusicCatalogCard({
   busy = false,
   attachingAudioItemId = null,
   actionError = null,
-  selectedPracticeId = null,
-  selectedAudioItemId = null,
+  attachedCatalogSelectionKeys,
   onPreview,
   onAcquire,
   onAdd,
@@ -30,8 +29,7 @@ export function StudioMusicCatalogCard({
   busy?: boolean;
   attachingAudioItemId?: string | null;
   actionError?: string | null;
-  selectedPracticeId?: string | null;
-  selectedAudioItemId?: string | null;
+  attachedCatalogSelectionKeys: ReadonlySet<string>;
   onPreview: (
     publicationId: string,
     audioItemId: string,
@@ -48,10 +46,9 @@ export function StudioMusicCatalogCard({
     `${item.publication_id}:${audioItemId}`;
 
   const canAdd = action.kind === "available" || action.kind === "own";
-  const isSelected = (audioItemId: string) =>
-    isSameCatalogSelection({
-      selectedPracticeId,
-      selectedAudioItemId,
+  const isAttached = (audioItemId: string) =>
+    isCatalogSelectionAttached({
+      attachedSelectionKeys: attachedCatalogSelectionKeys,
       practiceId: item.publication_id,
       audioItemId,
     });
@@ -173,18 +170,22 @@ export function StudioMusicCatalogCard({
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (isSelected(primaryTrackId)) {
+                  if (isAttached(primaryTrackId)) {
                     return;
                   }
                   onAdd?.(item, primaryTrackId);
                 }}
-                disabled={busy || attachingAudioItemId === primaryTrackId}
+                disabled={
+                  busy ||
+                  attachingAudioItemId === primaryTrackId ||
+                  isAttached(primaryTrackId)
+                }
                 aria-busy={attachingAudioItemId === primaryTrackId}
                 className="rounded-md border border-[#9d7ae8] px-3 py-1.5 text-xs font-semibold text-[#e8dcff] disabled:opacity-60"
               >
                 {attachingAudioItemId === primaryTrackId
                   ? STUDIO_MUSIC_LOADING_LABEL
-                  : isSelected(primaryTrackId)
+                  : isAttached(primaryTrackId)
                     ? STUDIO_MUSIC_ADDED_LABEL
                     : STUDIO_MUSIC_ADD_LABEL}
               </button>
@@ -230,20 +231,24 @@ export function StudioMusicCatalogCard({
                     onClick={(event) => {
                       event.stopPropagation();
                       applyExpandClick("add");
-                      if (isSelected(track.id)) {
+                      if (isAttached(track.id)) {
                         return;
                       }
                       onAdd?.(item, track.id);
                     }}
-                    disabled={busy || attachingAudioItemId === track.id}
+                    disabled={
+                      busy ||
+                      attachingAudioItemId === track.id ||
+                      isAttached(track.id)
+                    }
                     aria-busy={attachingAudioItemId === track.id}
                     className="rounded-md border border-[#9d7ae8] px-2 py-1 text-[11px] font-semibold text-[#e8dcff] disabled:opacity-60"
                   >
                     {attachingAudioItemId === track.id
                       ? STUDIO_MUSIC_LOADING_LABEL
-                      : isSelected(track.id)
+                      : isAttached(track.id)
                         ? STUDIO_MUSIC_ADDED_LABEL
-                        : "Добавить"}
+                        : STUDIO_MUSIC_ADD_LABEL}
                   </button>
                 ) : null}
               </div>

@@ -22,6 +22,8 @@ import {
   authorizeStudioCatalogUse,
   canAdoptCatalogAccessPrincipal,
   evaluateLiveCatalogRenderAccess,
+  getAttachedCatalogMusicSelectionKeys,
+  isCatalogSelectionAttached,
   isSameCatalogSelection,
   parseHttpByteRange,
   projectCatalogMusicExportUnavailable,
@@ -325,6 +327,56 @@ assert.deepEqual(
   { practiceId: PRACTICE_ID, audioItemId: AUDIO_ID },
 );
 
+const attachedCatalogMusicSelectionKeys = getAttachedCatalogMusicSelectionKeys([
+  {
+    sourceType: "catalog",
+    catalogPracticeId: PRACTICE_ID,
+    catalogAudioItemId: AUDIO_ID,
+  },
+  {
+    sourceType: "catalog",
+    catalogPracticeId: PRACTICE_ID,
+    catalogAudioItemId: OTHER_AUDIO,
+  },
+  {
+    sourceType: "upload",
+    catalogPracticeId: PRACTICE_ID,
+    catalogAudioItemId: "ignored",
+  },
+]);
+assert.equal(
+  isCatalogSelectionAttached({
+    attachedSelectionKeys: attachedCatalogMusicSelectionKeys,
+    practiceId: PRACTICE_ID,
+    audioItemId: AUDIO_ID,
+  }),
+  true,
+);
+assert.equal(
+  isCatalogSelectionAttached({
+    attachedSelectionKeys: attachedCatalogMusicSelectionKeys,
+    practiceId: PRACTICE_ID,
+    audioItemId: OTHER_AUDIO,
+  }),
+  true,
+);
+assert.equal(
+  isCatalogSelectionAttached({
+    attachedSelectionKeys: attachedCatalogMusicSelectionKeys,
+    practiceId: PRACTICE_ID,
+    audioItemId: "not-attached",
+  }),
+  false,
+);
+assert.equal(
+  isCatalogSelectionAttached({
+    attachedSelectionKeys: getAttachedCatalogMusicSelectionKeys([]),
+    practiceId: PRACTICE_ID,
+    audioItemId: AUDIO_ID,
+  }),
+  false,
+);
+
 const range = parseHttpByteRange("bytes=0-1023", 4096);
 assert.deepEqual(range, { kind: "partial", start: 0, end: 1023 });
 const headers = studioCatalogPartialContentHeaders({
@@ -395,8 +447,8 @@ const entitledAction = resolveStudioMusicCatalogAction({
   },
 });
 assert.equal(entitledAction.kind, "available");
-assert.equal(STUDIO_MUSIC_ADD_LABEL, "Добавить в проект");
-assert.equal(STUDIO_MUSIC_ADDED_LABEL, "Добавлено");
+assert.equal(STUDIO_MUSIC_ADD_LABEL, "Добавить трек");
+assert.equal(STUDIO_MUSIC_ADDED_LABEL, "Трек добавлен");
 assert.equal(STUDIO_MUSIC_FREE_ACQUIRE_LABEL, "Получить бесплатно");
 assert.match(formatStudioMusicBuyLabel(24900), /Купить для Студии за/);
 
