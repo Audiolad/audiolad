@@ -261,9 +261,11 @@ const longStudioPurpose = formatTochkaPaymentPurpose(
   longStudioPurchaseName,
   undefined,
   "",
+  true,
 );
 assert.ok(longStudioPurpose.length <= TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH);
 assert.match(longStudioPurpose, /^Лицензия для Студии АудиоЛад: «/);
+assert.match(longStudioPurpose, /заказ bbbbbbbb$/);
 
 // Ordinary purchase naming remains exactly the existing formatter output.
 assert.equal(

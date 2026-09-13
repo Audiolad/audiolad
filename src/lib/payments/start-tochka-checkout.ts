@@ -131,6 +131,7 @@ async function createTochkaPaymentForOrder(input: {
         purchaseName,
         undefined,
         input.orderRow.order_kind === "studio_music_license" ? "" : undefined,
+        input.orderRow.order_kind === "studio_music_license",
       ),
       consumerId: input.userId,
       customerEmail: input.customerEmail,

@@ -23,6 +23,7 @@ export function formatTochkaPaymentPurpose(
   productTitle: string,
   maxLength = TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH,
   prefix = BRAND_PREFIX,
+  preserveOrderSuffix = false,
 ): string {
   const title = productTitle.trim();
 
@@ -31,7 +32,8 @@ export function formatTochkaPaymentPurpose(
   }
 
   const fullShortId = shortOrderId(orderId, 8);
-  let orderSuffix = `${ORDER_SUFFIX_PREFIX}${fullShortId}`;
+  const fullOrderSuffix = `${ORDER_SUFFIX_PREFIX}${fullShortId}`;
+  let orderSuffix = fullOrderSuffix;
   let purpose = buildPurpose(title, orderSuffix, prefix);
 
   if (purpose.length <= maxLength) {
@@ -44,6 +46,17 @@ export function formatTochkaPaymentPurpose(
 
     if (purpose.length <= maxLength) {
       return purpose;
+    }
+  }
+
+  if (preserveOrderSuffix) {
+    const maxTitleLength = maxLength - prefix.length - fullOrderSuffix.length;
+    if (maxTitleLength > 0) {
+      return buildPurpose(
+        title.slice(0, maxTitleLength).trimEnd(),
+        fullOrderSuffix,
+        prefix,
+      );
     }
   }
 
