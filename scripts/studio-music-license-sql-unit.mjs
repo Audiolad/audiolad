@@ -22,6 +22,7 @@ const fulfillName = "20261003120400_fulfill_tochka_studio_music_license.sql";
 const financeName = "20261003120500_studio_music_canonical_sales.sql";
 const orderRevokeName = "20261003120600_studio_music_entitlement_order_revoke.sql";
 const pricingName = "20261003120700_studio_music_independent_pricing.sql";
+const legalName = "20261006140000_studio_music_legal_foundation_v1_2.sql";
 const previousLatest = "20261002120000_studio_duplicate_project_upload_state_ready.sql";
 const stubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/studio_music_license_smoke.sql");
@@ -42,6 +43,7 @@ const fulfill = readFileSync(join(migrationsDir, fulfillName), "utf8");
 const finance = readFileSync(join(migrationsDir, financeName), "utf8");
 const orderRevoke = readFileSync(join(migrationsDir, orderRevokeName), "utf8");
 const pricing = readFileSync(join(migrationsDir, pricingName), "utf8");
+const legal = readFileSync(join(migrationsDir, legalName), "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 
 assert(existsSync(join(migrationsDir, previousLatest)), "previous latest migration stays intact");
@@ -53,6 +55,7 @@ assert(existsSync(join(migrationsDir, fulfillName)), "fulfill replacement exists
 assert(existsSync(join(migrationsDir, financeName)), "finance helper exists");
 assert(existsSync(join(migrationsDir, orderRevokeName)), "order-specific revoke migration exists");
 assert(existsSync(join(migrationsDir, pricingName)), "independent Studio pricing migration exists");
+assert(existsSync(join(migrationsDir, legalName)), "Studio legal foundation migration exists");
 assert(existsSync(stubPath), "isolated stub exists");
 assert(existsSync(smokePath), "smoke SQL exists");
 
@@ -70,6 +73,7 @@ for (const stamp of [
   "20261003120500",
   "20261003120600",
   "20261003120700",
+  "20261006140000",
 ]) {
   assert(versions.includes(stamp), `${stamp} is listed`);
 }
@@ -148,6 +152,17 @@ assert(/acquisition_status IS DISTINCT FROM 'paid'/.test(pricing));
 assert(/v_listener_minor \* 2/.test(pricing));
 assert(/studio_music_price_minor/.test(pricing));
 assert(!/INSERT INTO public\.user_practices/.test(pricing));
+
+assert(/studio_license_terms_version/.test(legal));
+assert(/license_terms_version/.test(legal));
+assert(/studio_author_terms_not_accepted/.test(legal));
+assert(/author_has_accepted_current_terms/.test(legal));
+assert(/freeze_studio_entitlement_terms/.test(legal));
+assert(/studio-license-v1\.0/.test(legal));
+assert(/REVOKE ALL ON FUNCTION public\.create_studio_music_order_legal_legacy/.test(legal));
+assert(/REVOKE ALL ON FUNCTION public\.acquire_free_studio_music_legal_legacy/.test(legal));
+assert(/legacy Studio RPC must not be executable/.test(legal));
+assert(!/TRUNCATE/.test(legal));
 assert(!/DROP TABLE/.test(pricing));
 assert(!/TRUNCATE/.test(pricing));
 assert(/never user_practices/.test(fulfill));
@@ -182,6 +197,18 @@ assert(/PR3.1: free acquire must reject Studio fixed/.test(smoke));
 assert(/PR3.1: fixed Studio amount must be 60000/.test(smoke));
 assert(/PR3.1: paid order must reject Studio free/.test(smoke));
 assert(/PR3.1: paid listener \+ Studio free must allow free acquire/.test(smoke));
+assert(/terms: expected paid author-terms gate/.test(smoke));
+assert(/terms: expected free author-terms gate/.test(smoke));
+assert(/studio_author_terms_not_accepted/.test(smoke));
+assert(/Isolated fixture acceptance of current Author Terms/.test(smoke));
+assert(/paid order must freeze Studio terms/.test(smoke));
+assert(/paid entitlement must copy frozen Studio terms/.test(smoke));
+assert(/free entitlement must freeze Studio terms/.test(smoke));
+assert(/legacy Studio RPC privilege bypass/.test(smoke));
+assert(/pending order reuse must return original order/.test(smoke));
+assert(/reused pending order must retain frozen Studio terms/.test(smoke));
+assert(/studio-license-v1\.0/.test(smoke));
+assert(/46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12/.test(smoke));
 
 function dockerAvailable() {
   try {
@@ -233,6 +260,9 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, financeName), "utf8"),
     readFileSync(join(migrationsDir, orderRevokeName), "utf8"),
     readFileSync(join(migrationsDir, pricingName), "utf8"),
+    readFileSync(join(migrationsDir, "20260728140000_author_terms_acceptance.sql"), "utf8"),
+    readFileSync(join(migrationsDir, "20260914120000_author_terms_v1_1.sql"), "utf8"),
+    readFileSync(join(migrationsDir, legalName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

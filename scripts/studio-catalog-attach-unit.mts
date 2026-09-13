@@ -444,6 +444,7 @@ const entitledAction = resolveStudioMusicCatalogAction({
     is_owned: true,
     is_author_member: false,
     grant_source: "purchase",
+    acquisition_unavailable_reason: null,
   },
 });
 assert.equal(entitledAction.kind, "available");
