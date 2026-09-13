@@ -165,15 +165,6 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION '2: listener fulfill must write user_practices';
   END IF;
-  SELECT license_terms_version, license_terms_hash
-  INTO v_terms_version, v_terms_hash
-  FROM public.studio_music_entitlements
-  WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
-  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
-    RAISE EXCEPTION '4: paid entitlement must copy frozen Studio terms, got % %', v_terms_version, v_terms_hash;
-  END IF;
-
   IF public.has_studio_music_entitlement(listener, paid_music)
      OR public.can_use_music_in_studio(listener, paid_music) THEN
     RAISE EXCEPTION '2: listener purchase must not grant Studio';
@@ -207,6 +198,14 @@ BEGIN
   WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
   IF v_count <> 1 THEN
     RAISE EXCEPTION '4: expected one studio entitlement, got %', v_count;
+  END IF;
+  SELECT license_terms_version, license_terms_hash
+  INTO v_terms_version, v_terms_hash
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
+  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
+     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+    RAISE EXCEPTION '4: paid entitlement must copy frozen Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
   SELECT count(*) INTO v_count
