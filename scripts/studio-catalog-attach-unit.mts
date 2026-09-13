@@ -520,8 +520,14 @@ const entitledAction = resolveStudioMusicCatalogAction({
 assert.equal(entitledAction.kind, "available");
 assert.equal(STUDIO_MUSIC_ADD_LABEL, "Добавить трек");
 assert.equal(STUDIO_MUSIC_ADDED_LABEL, "Трек добавлен");
-assert.equal(STUDIO_MUSIC_FREE_ACQUIRE_LABEL, "Получить бесплатно");
-assert.match(formatStudioMusicBuyLabel(24900), /Купить для Студии за/);
+assert.equal(
+  STUDIO_MUSIC_FREE_ACQUIRE_LABEL,
+  "Получить лицензию для Студии бесплатно",
+);
+assert.equal(
+  formatStudioMusicBuyLabel(24900),
+  "Купить лицензию для Студии — 249\u00A0₽",
+);
 
 assert.equal(CATALOG_MUSIC_RENDER_NOT_AVAILABLE, "catalog_music_render_not_available");
 assert.equal(

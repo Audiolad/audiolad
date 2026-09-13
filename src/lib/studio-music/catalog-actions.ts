@@ -11,8 +11,9 @@ import {
   type StudioMusicCatalogItem,
 } from "./catalog";
 
-export const STUDIO_MUSIC_FREE_ACQUIRE_LABEL = "Получить бесплатно";
-export const STUDIO_MUSIC_BUY_LABEL = "Купить для Студии";
+export const STUDIO_MUSIC_FREE_ACQUIRE_LABEL =
+  "Получить лицензию для Студии бесплатно";
+export const STUDIO_MUSIC_BUY_LABEL = "Купить лицензию для Студии";
 export const STUDIO_MUSIC_LOADING_LABEL = "Загрузка…";
 export const STUDIO_MUSIC_ADD_LABEL = "Добавить трек";
 export const STUDIO_MUSIC_ADDED_LABEL = "Трек добавлен";
@@ -46,7 +47,7 @@ export function formatStudioMusicBuyLabel(
     return STUDIO_MUSIC_BUY_LABEL;
   }
 
-  return `Купить для Студии за ${formatRubles(rubles)}`;
+  return `${STUDIO_MUSIC_BUY_LABEL} — ${formatRubles(rubles)}`;
 }
 
 export function resolveStudioMusicCatalogAction(
