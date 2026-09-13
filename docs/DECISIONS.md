@@ -6,7 +6,7 @@
 
 ---
 
-## 2026-10-06 — Guest Studio: globally free catalog music
+## 2026-09-13 — Guest Studio: globally free catalog music
 
 **Контекст:** гостевой проект Студии уже изолирован `guest_session_id` и
 имеет один trial MP3, но общедоступная Studio-free музыка была доступна
