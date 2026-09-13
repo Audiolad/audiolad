@@ -2855,6 +2855,7 @@ export default function StudioEditorShell({
         onClose={() => setMusicCatalogOverlayOpen(false)}
         attachedCatalogSelectionKeys={attachedCatalogMusicSelectionKeys}
         attachingAudioItemId={attachingCatalogAudioItemId}
+        guestCanUseFreeMusic={accessMode === "guest"}
         onAdd={(practiceId, audioItemId) => {
           void attachCatalogToProject(practiceId, audioItemId);
         }}

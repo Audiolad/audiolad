@@ -17,8 +17,11 @@ const migrationsDir = join(repoRoot, "supabase/migrations");
 const pr4Name = "20261004120000_studio_catalog_project_assets.sql";
 const hotfixName = "20261004120100_studio_catalog_attach_asset_id.sql";
 const pr5Name = "20261004120200_studio_catalog_render_principal.sql";
+const guestFreeName = "20261006140200_studio_guest_free_catalog_music.sql";
+const guestModeName = "20260817190000_studio_guest_mode.sql";
 const previousLatest = "20261003120700_studio_music_independent_pricing.sql";
 const entitlementsName = "20261003120000_studio_music_entitlements.sql";
+const pricingName = "20261003120700_studio_music_independent_pricing.sql";
 const licenseStubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
 const studioStubPath = join(repoRoot, "scripts/lib/studio-catalog-attach-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/studio_catalog_attach_smoke.sql");
@@ -35,7 +38,9 @@ assert(existsSync(join(migrationsDir, previousLatest)), "previous latest migrati
 assert(existsSync(join(migrationsDir, pr4Name)), "PR4 catalog attach migration stays intact");
 assert(existsSync(join(migrationsDir, hotfixName)), "PR4.1 catalog attach id hotfix exists");
 assert(existsSync(join(migrationsDir, pr5Name)), "PR5 catalog render principal migration exists");
+assert(existsSync(join(migrationsDir, guestFreeName)), "guest-free catalog migration exists");
 assert(existsSync(join(migrationsDir, entitlementsName)), "entitlements migration exists");
+assert(existsSync(join(migrationsDir, pricingName)), "independent pricing migration exists");
 assert(existsSync(licenseStubPath), "license stub exists");
 assert(existsSync(studioStubPath), "catalog attach studio stub exists");
 assert(existsSync(smokePath), "catalog attach smoke SQL exists");
@@ -48,10 +53,12 @@ assert(new Set(versions).size === versions.length, "no duplicate timestamps");
 assert(versions.includes("20261004120000"), "20261004120000 is listed");
 assert(versions.includes("20261004120100"), "20261004120100 is listed");
 assert(versions.includes("20261004120200"), "20261004120200 is listed");
+assert(versions.includes("20261006140200"), "20261006140200 is listed");
 
 const pr4 = readFileSync(join(migrationsDir, pr4Name), "utf8");
 const hotfix = readFileSync(join(migrationsDir, hotfixName), "utf8");
 const pr5 = readFileSync(join(migrationsDir, pr5Name), "utf8");
+const guestFree = readFileSync(join(migrationsDir, guestFreeName), "utf8");
 const stub = readFileSync(studioStubPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 
@@ -129,6 +136,11 @@ assert(!/INSERT INTO storage\.objects/.test(pr5));
 assert(!/20261004120000/.test(pr5) || /Does not rewrite 20261004120000/.test(pr5));
 assert(/Forward-only/.test(pr5) || /forward-only/.test(pr5));
 assert(!/ALTER COLUMN id SET DEFAULT/.test(pr5));
+assert(/catalog_guest_session_id/.test(guestFree));
+assert(/is_globally_free_studio_music/.test(guestFree));
+assert(/catalog_visibility = 'listed'/.test(guestFree));
+assert(/p_user_id IS NOT NULL/.test(guestFree));
+assert(!/user_practices/.test(guestFree));
 
 function dockerAvailable() {
   const container = process.env.AUDIOLAD_SUPABASE_DB_CONTAINER || "supabase-db";
@@ -180,11 +192,14 @@ function allowedIsolatedTarget(url) {
 function bootstrapSql() {
   return [
     readFileSync(licenseStubPath, "utf8"),
+    readFileSync(join(migrationsDir, guestModeName), "utf8"),
     readFileSync(join(migrationsDir, entitlementsName), "utf8"),
+    readFileSync(join(migrationsDir, pricingName), "utf8"),
     readFileSync(studioStubPath, "utf8"),
     readFileSync(join(migrationsDir, pr4Name), "utf8"),
     readFileSync(join(migrationsDir, hotfixName), "utf8"),
     readFileSync(join(migrationsDir, pr5Name), "utf8"),
+    readFileSync(join(migrationsDir, guestFreeName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

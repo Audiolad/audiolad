@@ -20,6 +20,7 @@ import {
   CATALOG_MUSIC_UNAVAILABLE_MESSAGE,
   authorizeStudioCatalogAttachRefs,
   authorizeStudioCatalogUse,
+  authorizeGuestStudioCatalogUse,
   canAdoptCatalogAccessPrincipal,
   evaluateLiveCatalogRenderAccess,
   getAttachedCatalogMusicSelectionKeys,
@@ -88,6 +89,31 @@ assert.deepEqual(
 assert.deepEqual(
   authorizeStudioCatalogUse({ userId: null }),
   { ok: false, status: 401, code: "unauthenticated" },
+);
+assert.deepEqual(
+  authorizeGuestStudioCatalogUse({
+    isGuestProject: true,
+    projectGuestSessionId: "guest-1",
+    isGloballyFreeStudioMusic: true,
+  }),
+  { ok: true },
+);
+assert.equal(
+  authorizeGuestStudioCatalogUse({
+    isGuestProject: true,
+    assetGuestSessionId: "foreign-guest",
+    projectGuestSessionId: "guest-1",
+    isGloballyFreeStudioMusic: true,
+  }).ok,
+  false,
+);
+assert.equal(
+  authorizeGuestStudioCatalogUse({
+    isGuestProject: true,
+    projectGuestSessionId: "guest-1",
+    isGloballyFreeStudioMusic: false,
+  }).ok,
+  false,
 );
 
 assert.equal(
@@ -282,6 +308,50 @@ assert.deepEqual(
     requireAudioPath: false,
   }),
   { ok: false, code: CATALOG_MUSIC_UNAVAILABLE },
+);
+assert.equal(
+  evaluateLiveCatalogRenderAccess({
+    jobProjectId: PROJECT_ID,
+    snapshotAssetId: ASSET_ID,
+    snapshotPracticeId: PRACTICE_ID,
+    snapshotAudioItemId: AUDIO_ID,
+    live: {
+      id: ASSET_ID,
+      project_id: PROJECT_ID,
+      source_type: "catalog",
+      deleted_at: null,
+      catalog_practice_id: PRACTICE_ID,
+      catalog_audio_item_id: AUDIO_ID,
+      catalog_guest_session_id: "guest-1",
+    },
+    canUseMusicInStudio: false,
+    isGloballyFreeStudioMusic: true,
+    projectGuestSessionId: "guest-1",
+    requireAudioPath: false,
+  }).ok,
+  true,
+);
+assert.equal(
+  evaluateLiveCatalogRenderAccess({
+    jobProjectId: PROJECT_ID,
+    snapshotAssetId: ASSET_ID,
+    snapshotPracticeId: PRACTICE_ID,
+    snapshotAudioItemId: AUDIO_ID,
+    live: {
+      id: ASSET_ID,
+      project_id: PROJECT_ID,
+      source_type: "catalog",
+      deleted_at: null,
+      catalog_practice_id: PRACTICE_ID,
+      catalog_audio_item_id: AUDIO_ID,
+      catalog_guest_session_id: "guest-1",
+    },
+    canUseMusicInStudio: false,
+    isGloballyFreeStudioMusic: true,
+    projectGuestSessionId: "foreign-guest",
+    requireAudioPath: false,
+  }).ok,
+  false,
 );
 assert.deepEqual(
   evaluateLiveCatalogRenderAccess({

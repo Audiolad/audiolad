@@ -21,6 +21,8 @@ export type StudioCatalogQueueAsset = {
   catalog_practice_id?: string | null;
   catalog_audio_item_id?: string | null;
   catalog_access_user_id?: string | null;
+  catalog_guest_session_id?: string | null;
+  duration_seconds?: number | null;
 };
 
 export const PRACTICE_AUDIO_BUCKET = "practice-audio";
@@ -60,7 +62,7 @@ export async function loadLiveCatalogAssetRow(
   const { data, error } = await service
     .from("studio_project_assets")
     .select(
-      "id, project_id, source_type, deleted_at, catalog_practice_id, catalog_audio_item_id, catalog_access_user_id",
+      "id, project_id, source_type, deleted_at, catalog_practice_id, catalog_audio_item_id, catalog_access_user_id, catalog_guest_session_id",
     )
     .eq("id", assetId)
     .maybeSingle();
@@ -68,6 +70,31 @@ export async function loadLiveCatalogAssetRow(
     throw error;
   }
   return (data ?? null) as StudioCatalogRenderLiveRow | null;
+}
+
+async function loadProjectGuestSessionId(
+  service: SupabaseClient,
+  projectId: string,
+): Promise<string | null> {
+  const { data, error } = await service
+    .from("studio_projects")
+    .select("guest_session_id")
+    .eq("id", projectId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw error;
+  return typeof data?.guest_session_id === "string" ? data.guest_session_id : null;
+}
+
+async function isGloballyFreeStudioMusic(
+  service: SupabaseClient,
+  practiceId: string,
+): Promise<boolean> {
+  const { data, error } = await service.rpc("is_globally_free_studio_music", {
+    p_practice_id: practiceId,
+  });
+  if (error) throw error;
+  return data === true;
 }
 
 export async function loadCatalogAudioItem(
@@ -102,6 +129,13 @@ export async function assertLiveCatalogRenderAccess(
           live.catalog_practice_id,
         )
       : false;
+  const projectGuestSessionId = live?.catalog_guest_session_id
+    ? await loadProjectGuestSessionId(service, input.jobProjectId)
+    : null;
+  const globallyFree =
+    live?.catalog_guest_session_id && live.catalog_practice_id
+      ? await isGloballyFreeStudioMusic(service, live.catalog_practice_id)
+      : false;
   const audioItem = input.requireAudioPath
     ? await loadCatalogAudioItem(service, input.asset.audioItemId)
     : null;
@@ -112,6 +146,8 @@ export async function assertLiveCatalogRenderAccess(
     snapshotAudioItemId: input.asset.audioItemId,
     live,
     canUseMusicInStudio: canUse,
+    isGloballyFreeStudioMusic: globallyFree,
+    projectGuestSessionId,
     audioItem,
     requireAudioPath: input.requireAudioPath,
   });
@@ -223,6 +259,21 @@ export async function authorizeCatalogAssetsForStudioRender(input: {
   }
 
   for (const asset of catalogAssets) {
+    if (asset.catalog_guest_session_id) {
+      await assertLiveCatalogRenderAccess(input.service, {
+        jobProjectId: input.projectId,
+        asset: {
+          id: asset.id,
+          sourceType: "catalog",
+          practiceId: asset.catalog_practice_id ?? "",
+          audioItemId: asset.catalog_audio_item_id ?? "",
+          mimeType: "audio/mpeg",
+          durationSeconds: asset.duration_seconds ?? 0,
+        },
+        requireAudioPath: false,
+      });
+      continue;
+    }
     let principal = asset.catalog_access_user_id ?? null;
     if (!principal) {
       const currentCanUse =
@@ -278,6 +329,7 @@ export async function authorizeCatalogAssetsForStudioRender(input: {
         catalog_practice_id: asset.catalog_practice_id,
         catalog_audio_item_id: asset.catalog_audio_item_id,
         catalog_access_user_id: principal,
+        catalog_guest_session_id: asset.catalog_guest_session_id,
       },
       canUseMusicInStudio: canUse,
       requireAudioPath: false,

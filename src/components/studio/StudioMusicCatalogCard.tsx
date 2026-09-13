@@ -18,6 +18,7 @@ export function StudioMusicCatalogCard({
   activePreviewKey,
   busy = false,
   attachingAudioItemId = null,
+  guestCanUseFreeMusic = false,
   actionError = null,
   attachedCatalogSelectionKeys,
   onPreview,
@@ -28,6 +29,7 @@ export function StudioMusicCatalogCard({
   activePreviewKey: string | null;
   busy?: boolean;
   attachingAudioItemId?: string | null;
+  guestCanUseFreeMusic?: boolean;
   actionError?: string | null;
   attachedCatalogSelectionKeys: ReadonlySet<string>;
   onPreview: (
@@ -41,7 +43,7 @@ export function StudioMusicCatalogCard({
   const [expanded, setExpanded] = useState(false);
   const isAlbum = item.kind === "album";
   const primaryTrackId = item.tracks[0]?.id ?? null;
-  const action = resolveStudioMusicCatalogAction(item);
+  const action = resolveStudioMusicCatalogAction(item, { guestCanUseFreeMusic });
   const previewKeyFor = (audioItemId: string) =>
     `${item.publication_id}:${audioItemId}`;
 
