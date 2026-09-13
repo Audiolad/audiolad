@@ -45,6 +45,11 @@ import {
   KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_SEO_TITLE,
 } from "@/lib/seo/kak-sozdat-pesnyu-s-pomoshchyu-ii/content";
 import {
+  KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_PATH,
+  KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
+  KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_TITLE,
+} from "@/lib/seo/kak-sozdat-muzyku-po-tekstu-s-pomoshchyu-ii/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -420,6 +425,30 @@ export function buildKakSozdatPesnyuSPomoshchyuIiMetadata(): Metadata {
       card: "summary",
       title: KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_SEO_TITLE,
       description: KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildKakSozdatMuzykuPoTekstuSPomoshchyuIiMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_PATH);
+
+  return {
+    title: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_TITLE,
+    description: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_TITLE,
+      description: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_TITLE,
+      description: KAK_SOZDAT_MUZYKU_PO_TEKSTU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
     },
   };
 }
