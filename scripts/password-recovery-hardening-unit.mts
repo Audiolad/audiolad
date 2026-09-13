@@ -8,6 +8,7 @@ import {
   isSignedRecoveryIntentValid,
 } from "../src/lib/auth/recovery-intent-crypto";
 import { buildPasswordRecoveryRedirectUrl } from "../src/lib/auth/recovery";
+import { getRecoveryLandingState } from "../src/lib/auth/recovery-landing";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (...parts: string[]) => readFileSync(path.join(root, ...parts), "utf8");
@@ -15,7 +16,8 @@ const read = (...parts: string[]) => readFileSync(path.join(root, ...parts), "ut
 const recovery = read("src/lib/auth/recovery.ts");
 const template = read("src/lib/email/templates/recovery.ts");
 const generatedTemplate = read("supabase/templates/recovery.html");
-const landing = read("src/app/(platform)/auth/recovery/page.tsx");
+const landing = read("src/app/(platform)/auth/recovery/recovery-landing.tsx");
+const recoveryPage = read("src/app/(platform)/auth/recovery/page.tsx");
 const landingAction = read("src/app/(platform)/auth/recovery/actions.ts");
 const resetAction = read("src/app/(platform)/auth/reset-password/actions.ts");
 const resetLayout = read("src/app/(platform)/auth/reset-password/layout.tsx");
@@ -49,6 +51,80 @@ assert.doesNotMatch(landing, /verifyOtp/);
 assert.match(landingAction, /verifyOtp\(\{[\s\S]*token_hash:[\s\S]*type: "recovery"/);
 assert.match(landingAction, /RECOVERY_STAGE_COOKIE/);
 assert.match(landingAction, /clearStageCookie/);
+
+const validTokenHash = "a".repeat(20);
+
+// A fragment first stages the bearer, and a subsequent mount relies only on
+// the valid HttpOnly stage cookie. The pure state machine exercises the
+// remount regression without contacting Supabase.
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: validTokenHash,
+    type: "recovery",
+    hasStagedRecovery: false,
+    stagedSuccessfullyInMount: false,
+  }),
+  "stage",
+);
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: null,
+    type: null,
+    hasStagedRecovery: true,
+    stagedSuccessfullyInMount: false,
+  }),
+  "ready",
+);
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: null,
+    type: null,
+    hasStagedRecovery: false,
+    stagedSuccessfullyInMount: true,
+  }),
+  "ready",
+);
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: null,
+    type: null,
+    hasStagedRecovery: false,
+    stagedSuccessfullyInMount: false,
+  }),
+  "expired",
+);
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: "malformed",
+    type: "recovery",
+    hasStagedRecovery: false,
+    stagedSuccessfullyInMount: false,
+  }),
+  "expired",
+);
+assert.equal(
+  getRecoveryLandingState({
+    tokenHash: "malformed",
+    type: "recovery",
+    hasStagedRecovery: true,
+    stagedSuccessfullyInMount: false,
+  }),
+  "ready",
+);
+
+// The server shell serializes only a boolean; the HttpOnly stage's bearer
+// cannot be supplied to client props. GET/remount has no verify operation;
+// verification remains reachable only from the Continue click handler.
+assert.match(recoveryPage, /readRecoveryStage\(cookieStore\)/);
+assert.match(recoveryPage, /initialHasStagedRecovery=\{initialHasStagedRecovery\}/);
+assert.doesNotMatch(recoveryPage, /tokenHash/);
+assert.match(landing, /onClick=\{continueRecovery\}/);
+assert.match(landing, /verifyRecoveryTokenAction\(\)/);
+assert.equal(
+  landing.indexOf("verifyRecoveryTokenAction()") >
+    landing.indexOf("async function continueRecovery"),
+  true,
+);
 
 // The marker is server-signed, short-lived, and bound to the verified user
 // without putting any user id or bearer into the cookie value.
