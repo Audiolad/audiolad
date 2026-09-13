@@ -595,7 +595,6 @@ export function mapStudioMusicCatalogItem(input: {
   tracks: Array<{ id: string; title: string; durationSeconds: number | null }>;
   ownership: StudioMusicCatalogOwnership;
   listenerEffectiveMinor: number | null;
-  authorHasCurrentTerms?: boolean;
 }): StudioMusicCatalogItem {
   const tracks = [...input.tracks].map((track) => ({
     id: track.id,
@@ -609,7 +608,6 @@ export function mapStudioMusicCatalogItem(input: {
     commerciallyAccessible: isCommerciallyAccessibleStudioPublication(
       input.practice,
     ),
-      authorHasCurrentTerms: input.authorHasCurrentTerms,
   });
   const studioIsFree = acquisition.studio_is_free;
   const studioEffectiveMinor = acquisition.amount_minor;
@@ -861,7 +859,6 @@ export async function handleStudioMusicCatalog(input: {
       tracks: tracksByPractice.get(practiceId) ?? [],
       ownership,
       listenerEffectiveMinor,
-      authorHasCurrentTerms: !practice.author_id || authorsWithCurrentTerms.has(practice.author_id),
     });
   });
 

@@ -70,6 +70,7 @@ function catalogItem(
     is_owned: false,
     is_author_member: false,
     grant_source: null,
+    acquisition_unavailable_reason: null,
   };
   const isFree = overrides.is_free ?? false;
   const studioEffectiveMinor = overrides.studio_effective_minor ?? 100000;
@@ -250,6 +251,7 @@ const ownerItem = catalogItem({
     is_owned: false,
     is_author_member: true,
     grant_source: "owner",
+    acquisition_unavailable_reason: null,
   },
 });
 assert.equal(resolveStudioMusicCatalogAction(ownerItem).kind, "own");
