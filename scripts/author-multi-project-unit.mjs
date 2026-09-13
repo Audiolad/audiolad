@@ -37,6 +37,7 @@ function main() {
   // 1. Base account limit = 1
   const basic = resolveEffectiveAuthorProjectLimit({
     override: null,
+    unlimited: false,
     premiumEnabled: false,
   });
   assert.equal(basic.limit, 1);
@@ -45,17 +46,28 @@ function main() {
 
   // 2. Second project blocked at limit 1
   assert.equal(
-    shouldShowPremiumProjectUpsell({ used: 1, limit: 1, source: "default" }),
+    shouldShowPremiumProjectUpsell({
+      used: 1,
+      limit: 1,
+      unlimited: false,
+      source: "default",
+    }),
     true,
   );
   assert.match(
-    getAuthorProjectLimitReachedMessage({ used: 1, limit: 1, source: "default" }),
+    getAuthorProjectLimitReachedMessage({
+      used: 1,
+      limit: 1,
+      unlimited: false,
+      source: "default",
+    }),
     /базовом кабинете/,
   );
 
   // 3. Premium allows 3
   const premium = resolveEffectiveAuthorProjectLimit({
     override: null,
+    unlimited: false,
     premiumEnabled: true,
   });
   assert.equal(premium.limit, 3);
@@ -65,6 +77,7 @@ function main() {
   // 4. Individual override 5
   const override = resolveEffectiveAuthorProjectLimit({
     override: 5,
+    unlimited: false,
     premiumEnabled: false,
   });
   assert.equal(override.limit, 5);
@@ -78,6 +91,7 @@ function main() {
     shouldShowPremiumProjectUpsell({
       used: sergeyUsed,
       limit: 5,
+      unlimited: false,
       source: "override",
     }),
     false,
@@ -86,6 +100,7 @@ function main() {
   // 5b. Olga Nevskaya: keep existing 1 artist, allow 4 more, block a 6th
   const olga = resolveEffectiveAuthorProjectLimit({
     override: 5,
+    unlimited: false,
     premiumEnabled: false,
   });
   assert.equal(olga.limit, 5);
@@ -94,22 +109,57 @@ function main() {
   assert.equal(canCreateOwnedAuthorProject(4, 5), true);
   assert.equal(canCreateOwnedAuthorProject(5, 5), false);
   assert.equal(
-    shouldShowPremiumProjectUpsell({ used: 5, limit: 5, source: "override" }),
+    shouldShowPremiumProjectUpsell({
+      used: 5,
+      limit: 5,
+      unlimited: false,
+      source: "override",
+    }),
     false,
   );
   assert.match(
-    getAuthorProjectLimitReachedMessage({ used: 5, limit: 5, source: "override" }),
+    getAuthorProjectLimitReachedMessage({
+      used: 5,
+      limit: 5,
+      unlimited: false,
+      source: "override",
+    }),
     /5 из 5/,
   );
 
   // Ordinary author does not inherit Olga/Sergey override
   const ordinary = resolveEffectiveAuthorProjectLimit({
     override: null,
+    unlimited: false,
     premiumEnabled: false,
   });
   assert.equal(ordinary.limit, 1);
   assert.equal(ordinary.source, "default");
   assert.equal(ordinary.hasOverride, false);
+
+  // Platform owner's explicit entitlement is a real unbounded state: no
+  // numeric sentinel can turn 5+ owned projects back into a cap.
+  const ownerUnlimited = resolveEffectiveAuthorProjectLimit({
+    override: 5,
+    unlimited: true,
+    premiumEnabled: false,
+  });
+  assert.equal(ownerUnlimited.unlimited, true);
+  assert.equal(ownerUnlimited.limit, null);
+  assert.equal(canCreateOwnedAuthorProject(5, ownerUnlimited.limit, true), true);
+  assert.equal(canCreateOwnedAuthorProject(100, ownerUnlimited.limit, true), true);
+  assert.equal(
+    shouldShowPremiumProjectUpsell({
+      used: 100,
+      limit: ownerUnlimited.limit,
+      unlimited: ownerUnlimited.unlimited,
+      source: ownerUnlimited.source,
+    }),
+    false,
+  );
+
+  // A normal account remains blocked from creating a sixth project.
+  assert.equal(canCreateOwnedAuthorProject(5, 5, false), false);
 
   // 6. Selection isolation + cookie
   const selected = resolveSelectedAuthorWorkspace(projects, {
@@ -147,6 +197,15 @@ function main() {
   assert.match(migration, /protect_profiles_author_project_limit_columns/);
   assert.match(migration, /pg_advisory_xact_lock/);
 
+  const unlimitedMigration = read(
+    "supabase/migrations/20261006140100_owner_unlimited_author_projects.sql",
+  );
+  assert.match(unlimitedMigration, /author_projects_unlimited boolean/);
+  assert.match(unlimitedMigration, /IF NOT v_unlimited AND v_used >= v_limit/);
+  assert.match(unlimitedMigration, /'unlimited', v_unlimited/);
+  assert.match(unlimitedMigration, /normalize_contact_email\('1@audiolad\.ru'\)/);
+  assert.doesNotMatch(unlimitedMigration, /999999|MAX_SAFE_INTEGER|Infinity/);
+
   const olgaMigration = read(
     "supabase/migrations/20260821140000_olga_nevskaya_author_project_limit_override.sql",
   );
@@ -176,6 +235,7 @@ function main() {
   assert.match(switcher, /Текущий проект/);
   assert.match(switcher, /Создать проект/);
   assert.match(switcher, /Лимит проектов/);
+  assert.match(switcher, /Безлимит/);
 
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
   assert.match(form, /Продукт будет опубликован от проекта/);

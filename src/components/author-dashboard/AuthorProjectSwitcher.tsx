@@ -14,6 +14,7 @@ type ProjectsApiResponse = {
   limit_message?: string | null;
   owned_count?: number;
   limit?: number;
+  unlimited?: boolean;
   error?: string;
 };
 
@@ -37,6 +38,7 @@ export default function AuthorProjectSwitcher({
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [ownedCount, setOwnedCount] = useState<number | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
+  const [unlimited, setUnlimited] = useState(false);
   const [loading, setLoading] = useState(true);
   const [upsellOpen, setUpsellOpen] = useState(false);
 
@@ -60,6 +62,7 @@ export default function AuthorProjectSwitcher({
             typeof payload.owned_count === "number" ? payload.owned_count : null,
           );
           setLimit(typeof payload.limit === "number" ? payload.limit : null);
+          setUnlimited(payload.unlimited === true);
         }
       } catch {
         if (!cancelled) {
@@ -157,7 +160,11 @@ export default function AuthorProjectSwitcher({
           <span className="mt-0.5 block truncate text-[15px] font-semibold text-[#25135c]">
             {activeProject.name}
           </span>
-          {ownedCount != null && limit != null ? (
+          {ownedCount != null && unlimited ? (
+            <span className="mt-0.5 block text-xs text-[#8a7daf]">
+              Лимит проектов: Безлимит
+            </span>
+          ) : ownedCount != null && limit != null ? (
             <span className="mt-0.5 block text-xs text-[#8a7daf]">
               Лимит проектов: {ownedCount} из {limit}
             </span>
