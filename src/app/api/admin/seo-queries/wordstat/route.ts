@@ -1,140 +1,66 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminPermission } from "@/lib/admin/guard";
-import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import {
-  wordstatError,
-  wordstatHttpStatus,
-} from "@/lib/seo/wordstat/errors";
+  importWordstatIntakeItem,
+  readWordstatIntakeItems,
+  type WordstatIntakeRepository,
+} from "@/lib/seo-queries/wordstat-intake";
+import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
+import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-
-const MAX_IMPORT_ITEMS = 20;
-
-type IntakeItem = {
-  phrase: string;
-  count: number;
-};
 
 function readPhrase(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function readImportItems(value: unknown):
-  | { ok: true; items: IntakeItem[] }
-  | { ok: false; error: string } {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_IMPORT_ITEMS) {
-    return { ok: false, error: "invalid_import_items" };
-  }
-
-  const items: IntakeItem[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) {
-      return { ok: false, error: "invalid_import_item" };
-    }
-
-    const record = item as Record<string, unknown>;
-    const phrase = readPhrase(record.phrase);
-    if (!phrase || !Number.isInteger(record.count) || (record.count as number) < 0) {
-      return { ok: false, error: "invalid_import_item" };
-    }
-    items.push({ phrase, count: record.count as number });
-  }
-
-  return { ok: true, items };
-}
-
-async function refreshExistingQuery(
-  normalizedQuery: string,
-  frequency: number,
-  frequencyCheckedAt: string,
-) {
+function createWordstatIntakeRepository(): WordstatIntakeRepository {
   const supabase = createServiceRoleClient();
-  const { data: existing, error: lookupError } = await supabase
-    .from("seo_queries")
-    .select("id")
-    .eq("normalized_query", normalizedQuery)
-    .maybeSingle();
-
-  if (lookupError || !existing) {
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from("seo_queries")
-    .update({ frequency, frequency_checked_at: frequencyCheckedAt })
-    .eq("id", existing.id)
-    .select("id, frequency")
-    .single();
-
-  return error || !data ? null : data;
-}
-
-async function importItem(item: IntakeItem) {
-  const supabase = createServiceRoleClient();
-  // Database normalization is authoritative for conflict detection.
-  const { data: normalizedQuery, error: normalizeError } = await supabase.rpc(
-    "normalize_seo_query",
-    { p_query: item.phrase },
-  );
-  if (normalizeError || typeof normalizedQuery !== "string" || !normalizedQuery) {
-    return { phrase: item.phrase, frequency: item.count, status: "error" as const };
-  }
-
-  const frequencyCheckedAt = new Date().toISOString();
-  const refreshed = await refreshExistingQuery(
-    normalizedQuery,
-    item.count,
-    frequencyCheckedAt,
-  );
-  if (refreshed) {
-    return {
-      id: refreshed.id,
-      phrase: item.phrase,
-      frequency: refreshed.frequency,
-      status: "refreshed" as const,
-    };
-  }
-
-  const { data: created, error: insertError } = await supabase
-    .from("seo_queries")
-    .insert({
-      query_text: item.phrase,
-      source: "wordstat",
-      frequency: item.count,
-      frequency_checked_at: frequencyCheckedAt,
-      analysis_status: "not_analyzed",
-    })
-    .select("id, frequency")
-    .single();
-
-  if (!insertError && created) {
-    return {
-      id: created.id,
-      phrase: item.phrase,
-      frequency: created.frequency,
-      status: "created" as const,
-    };
-  }
-
-  // A concurrent intake can win after the lookup. Refresh that row, without
-  // changing any of its classification, reservation, or product metadata.
-  if (insertError?.code === "23505") {
-    const racedRefresh = await refreshExistingQuery(
-      normalizedQuery,
-      item.count,
-      frequencyCheckedAt,
-    );
-    if (racedRefresh) {
-      return {
-        id: racedRefresh.id,
-        phrase: item.phrase,
-        frequency: racedRefresh.frequency,
-        status: "refreshed" as const,
-      };
-    }
-  }
-
-  return { phrase: item.phrase, frequency: item.count, status: "error" as const };
+  return {
+    async normalize(phrase) {
+      const { data, error } = await supabase.rpc("normalize_seo_query", {
+        p_query: phrase,
+      });
+      return error || typeof data !== "string" || !data ? null : data;
+    },
+    async findByNormalized(normalizedQuery) {
+      const { data, error } = await supabase
+        .from("seo_queries")
+        .select("id")
+        .eq("normalized_query", normalizedQuery)
+        .maybeSingle();
+      if (error) return undefined;
+      return data ? { id: data.id } : null;
+    },
+    async refresh(id, frequency, frequencyCheckedAt) {
+      const { data, error } = await supabase
+        .from("seo_queries")
+        .update({ frequency, frequency_checked_at: frequencyCheckedAt })
+        .eq("id", id)
+        .select("id, frequency")
+        .single();
+      return error || !data ? null : { id: data.id, frequency: data.frequency };
+    },
+    async create({ queryText, source, frequency, frequencyCheckedAt, analysisStatus }) {
+      const { data, error } = await supabase
+        .from("seo_queries")
+        .insert({
+          query_text: queryText,
+          source,
+          frequency,
+          frequency_checked_at: frequencyCheckedAt,
+          analysis_status: analysisStatus,
+        })
+        .select("id, frequency")
+        .single();
+      if (data && !error) {
+        return { status: "created" as const, query: { id: data.id, frequency: data.frequency } };
+      }
+      return error?.code === "23505"
+        ? { status: "conflict" as const }
+        : { status: "error" as const };
+    },
+  };
 }
 
 /**
@@ -177,12 +103,15 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const parsed = readImportItems(body.items);
+  const parsed = readWordstatIntakeItems(body.items);
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const results = await Promise.all(parsed.items.map(importItem));
+  const repository = createWordstatIntakeRepository();
+  const results = await Promise.all(
+    parsed.items.map((item) => importWordstatIntakeItem(item, repository)),
+  );
   const created = results.filter((item) => item.status === "created").length;
   const refreshed = results.filter((item) => item.status === "refreshed").length;
   const errors = results.filter((item) => item.status === "error").length;
