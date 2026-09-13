@@ -408,8 +408,14 @@ SELECT id,'${anonymousId}','audio_play_started','${PRACTICE_ONE}','2026-07-22 13
   assertExcluded("test-only", "owner-test-isolated", "false,true,false,'human'");
   assertExcluded("bot-only", "owner-bot-isolated", "false,false,true,'human'");
   assertExcluded("traffic-class-only", "owner-traffic-isolated", "false,false,false,'bot'");
-  assertExcluded("test-anonymous-only", "manual-owner-overview-isolated", "false,false,false,'human'");
-  assertExcluded("test-session-only", "owner-session-isolated", "false,false,false,'human'", "analytics_dev_fixture");
+  const testAnonymousId = "manual-owner-overview-isolated";
+  assertEqual(scalar(`SELECT public.is_test_anonymous_id('${testAnonymousId}')::text`), "true", "test-anonymous precondition: direct predicate");
+  assertEqual(scalar(`SELECT public.is_test_analytics_session('owner_overview_control','${testAnonymousId}')::text`), "false", "test-anonymous precondition: session predicate");
+  assertExcluded("test-anonymous-only", testAnonymousId, "false,false,false,'human'", "owner_overview_control");
+  const testSessionAnonId = "owner-session-isolated";
+  assertEqual(scalar(`SELECT public.is_test_anonymous_id('${testSessionAnonId}')::text`), "false", "test-session precondition: direct predicate");
+  assertEqual(scalar(`SELECT public.is_test_analytics_session('analytics_dev_fixture','${testSessionAnonId}')::text`), "true", "test-session precondition: session predicate");
+  assertExcluded("test-session-only", testSessionAnonId, "false,false,false,'human'", "analytics_dev_fixture");
   const nullableBefore = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
   psql(TEST_DB, `INSERT INTO public.analytics_events(event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES ('audio_play_started','${PRACTICE_ONE}','2026-07-22 14:00:00+00',false,false,false,'human');`);
   const nullableAfter = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
