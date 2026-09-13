@@ -12,7 +12,18 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTAINER = process.env.AUDIOLAD_SUPABASE_DB_CONTAINER || "supabase-db";
+const DATABASE_URL = process.env.AUDIOLAD_ANALYTICS_P2_DATABASE_URL?.trim() || null;
 const TEST_DB = "audiolad_analytics_p2_test";
+
+function localhostDatabaseUrl() {
+  if (!DATABASE_URL) return null;
+  const parsed = new URL(DATABASE_URL);
+  if (!["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
+    throw new Error("analytics P2 SQL tests only permit a localhost PostgreSQL URL");
+  }
+  return parsed;
+}
+const LOCAL_DATABASE_URL = localhostDatabaseUrl();
 
 // Europe/Moscow days 2026-07-20 .. 2026-07-24 (UTC+3, no DST).
 const FROM = "2026-07-19T21:00:00Z";
@@ -40,6 +51,14 @@ function assertEqual(actual, expected, label) {
 }
 
 function psql(database, sql, { tuples = false } = {}) {
+  if (LOCAL_DATABASE_URL) {
+    const url = new URL(LOCAL_DATABASE_URL);
+    url.pathname = `/${database}`;
+    const args = [url.toString(), "-v", "ON_ERROR_STOP=1"];
+    if (tuples) args.push("-At");
+    args.push("-c", sql);
+    return execFileSync("psql", args, { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
+  }
   const args = [
     "exec",
     "-i",
@@ -58,6 +77,13 @@ function psql(database, sql, { tuples = false } = {}) {
 }
 
 function psqlFile(database, absolutePath) {
+  if (LOCAL_DATABASE_URL) {
+    const url = new URL(LOCAL_DATABASE_URL);
+    url.pathname = `/${database}`;
+    return execFileSync("psql", [url.toString(), "-v", "ON_ERROR_STOP=1"], {
+      encoding: "utf8", input: readFileSync(absolutePath, "utf8"), maxBuffer: 20 * 1024 * 1024,
+    });
+  }
   return execFileSync(
     "docker",
     ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1"],
