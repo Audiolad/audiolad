@@ -37,7 +37,7 @@ assert.equal(
 );
 assert.equal(
   AUTHOR_TERMS_APPROVED_META.contentHash,
-  "e42a0121cdcd2f3203207a3897368b7364f47ff108fc8738b1148260f2fb0102",
+  "8984e194ba6f3c1ed6c7bd5d92e8c1ff4a3c858e440633844423fa370fb005ee",
 );
 assert.equal(AUTHOR_TERMS_APPROVED_META.publicPath, "/author-terms");
 assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes("\u2014"), "em-dash forbidden");

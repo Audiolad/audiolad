@@ -14,7 +14,7 @@ INSERT INTO public.author_terms_versions (
   'Авторские условия сотрудничества платформы «АудиоЛад»',
   '2026-09-13T00:00:00+03:00',
   '2026-09-13T00:00:00+03:00',
-  'e42a0121cdcd2f3203207a3897368b7364f47ff108fc8738b1148260f2fb0102',
+  '8984e194ba6f3c1ed6c7bd5d92e8c1ff4a3c858e440633844423fa370fb005ee',
   'author-terms',
   true
 );
@@ -47,6 +47,15 @@ ALTER FUNCTION public.create_studio_music_order(uuid, uuid, bigint)
 ALTER FUNCTION public.acquire_free_studio_music(uuid)
   RENAME TO acquire_free_studio_music_legal_legacy;
 
+-- ACLs survive ALTER FUNCTION ... RENAME. The renamed functions are internal
+-- helpers only; granting them would bypass the current-author-terms gate.
+REVOKE ALL ON FUNCTION public.create_studio_music_order_legal_legacy(uuid, uuid, bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_studio_music_order_legal_legacy(uuid, uuid, bigint) FROM anon;
+REVOKE ALL ON FUNCTION public.create_studio_music_order_legal_legacy(uuid, uuid, bigint) FROM authenticated;
+REVOKE ALL ON FUNCTION public.acquire_free_studio_music_legal_legacy(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.acquire_free_studio_music_legal_legacy(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.acquire_free_studio_music_legal_legacy(uuid) FROM authenticated;
+
 CREATE OR REPLACE FUNCTION public.create_studio_music_order(
   p_practice_id uuid, p_idempotency_key uuid, p_expected_amount_minor bigint DEFAULT NULL
 )
@@ -55,25 +64,25 @@ RETURNS TABLE (
   currency text, order_kind text, created_at timestamptz
 )
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_author_id uuid;
+DECLARE v_author_id uuid; v_legacy record;
 BEGIN
   SELECT author_id INTO v_author_id FROM public.practices WHERE id = p_practice_id;
   IF NOT public.author_has_accepted_current_terms(v_author_id) THEN
     RAISE EXCEPTION 'studio_author_terms_not_accepted' USING ERRCODE = 'P0001';
   END IF;
-  PERFORM *
+  SELECT * INTO v_legacy
   FROM public.create_studio_music_order_legal_legacy(
     p_practice_id, p_idempotency_key, p_expected_amount_minor
   );
   UPDATE public.orders SET
     studio_license_terms_version = coalesce(studio_license_terms_version, 'studio-license-v1.0'),
-    studio_license_terms_hash = coalesce(studio_license_terms_hash, '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b')
-  WHERE idempotency_key = p_idempotency_key::text;
+    studio_license_terms_hash = coalesce(studio_license_terms_hash, '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd')
+  WHERE id = v_legacy.order_id;
   RETURN QUERY
     SELECT o.id, o.practice_id, o.practice_slug_snapshot, o.status, o.amount_minor,
       o.currency, o.order_kind, o.created_at
     FROM public.orders o
-    WHERE o.idempotency_key = p_idempotency_key::text;
+    WHERE o.id = v_legacy.order_id;
 END;
 $$;
 
@@ -102,7 +111,7 @@ BEGIN
       FROM public.orders WHERE id = NEW.order_id;
   ELSIF NEW.grant_source = 'free' THEN
     NEW.license_terms_version := 'studio-license-v1.0';
-    NEW.license_terms_hash := '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b';
+    NEW.license_terms_hash := '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd';
   END IF;
   RETURN NEW;
 END;
@@ -119,5 +128,22 @@ REVOKE ALL ON FUNCTION public.create_studio_music_order(uuid, uuid, bigint) FROM
 GRANT EXECUTE ON FUNCTION public.create_studio_music_order(uuid, uuid, bigint) TO authenticated;
 REVOKE ALL ON FUNCTION public.acquire_free_studio_music(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.acquire_free_studio_music(uuid) TO authenticated;
+
+DO $$
+BEGIN
+  IF has_function_privilege('PUBLIC', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('PUBLIC', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Post-check failed: legacy Studio RPC must not be executable';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.create_studio_music_order(uuid,uuid,bigint)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.acquire_free_studio_music(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Post-check failed: wrapped Studio RPC must be executable by authenticated';
+  END IF;
+END
+$$;
 
 COMMIT;

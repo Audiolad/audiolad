@@ -121,6 +121,16 @@ assert.doesNotMatch(access, /from\(["']user_practices["']\)/);
 assert.doesNotMatch(access, /canListen/);
 assert.doesNotMatch(access, /audio_item_id/);
 
+const licenseTerms = read("src/lib/studio-music/license-terms.ts");
+const offer = read("src/app/(platform)/offer/page.tsx");
+assert.match(licenseTerms, /STUDIO_LICENSE_OFFER/);
+assert.match(licenseTerms, /STUDIO_LICENSE_TERMS_CANONICAL_TEXT/);
+assert.match(offer, /import \{ STUDIO_LICENSE_OFFER \}/);
+assert.match(offer, /STUDIO_LICENSE_OFFER\.definitions/);
+assert.match(offer, /STUDIO_LICENSE_OFFER\.paragraphs\.map/);
+assert.match(offer, /STUDIO_LICENSE_OFFER\.forbidden/);
+assert.doesNotMatch(offer, /сообщать для всеобщего сведения/);
+
 const listenAccess = read("src/lib/products/access.ts");
 assert.doesNotMatch(listenAccess, /studio_music_entitlements/);
 assert.doesNotMatch(listenAccess, /studio_music_license/);

@@ -14,6 +14,7 @@ DECLARE
   key1 uuid := 'f1111111-1111-4111-8111-111111111111';
   key2 uuid := 'f2222222-2222-4222-8222-222222222222';
   key3 uuid := 'f3333333-3333-4333-8333-333333333333';
+  key4 uuid := 'f4444444-4444-4444-8444-444444444444';
   pay1 uuid := '11111111-1111-4111-8111-111111111111';
   pay2 uuid := '12222222-2222-4222-8222-222222222222';
   ev1 uuid := '21111111-1111-4111-8111-111111111111';
@@ -28,6 +29,7 @@ DECLARE
   listen_order uuid;
   v_order uuid;
   v_order2 uuid;
+  v_reused_order uuid;
   v_order_b uuid;
   v_free_paid_order uuid;
   v_grant jsonb;
@@ -95,6 +97,18 @@ BEGIN
     owner_user,
     'Isolated fixture acceptance of current Author Terms.'
   );
+  IF has_function_privilege('authenticated', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('PUBLIC', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
+     OR has_function_privilege('PUBLIC', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'terms: legacy Studio RPC privilege bypass';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.create_studio_music_order(uuid,uuid,bigint)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.acquire_free_studio_music(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'terms: wrapped Studio RPC must remain executable';
+  END IF;
 
   -- 1. paid music + permission → Studio amount = 2 × effective (500 RUB = 50000, studio 100000)
   PERFORM set_config('request.jwt.claim.sub', buyer::text, true);
@@ -111,8 +125,23 @@ BEGIN
   INTO v_terms_version, v_terms_hash
   FROM public.orders WHERE id = v_order;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
     RAISE EXCEPTION '1: paid order must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
+  END IF;
+
+  -- A new idempotency key may resolve the existing pending order. The wrapper
+  -- must return and freeze that exact legacy-selected row, not search by key4.
+  SELECT order_id INTO v_reused_order
+  FROM public.create_studio_music_order(paid_music, key4, NULL);
+  IF v_reused_order IS DISTINCT FROM v_order THEN
+    RAISE EXCEPTION '1: pending order reuse must return original order';
+  END IF;
+  SELECT studio_license_terms_version, studio_license_terms_hash
+  INTO v_terms_version, v_terms_hash
+  FROM public.orders WHERE id = v_reused_order;
+  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
+     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
+    RAISE EXCEPTION '1: reused pending order must retain frozen Studio terms';
   END IF;
 
   -- expected-amount race
@@ -204,7 +233,7 @@ BEGIN
   FROM public.studio_music_entitlements
   WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
     RAISE EXCEPTION '4: paid entitlement must copy frozen Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
@@ -338,7 +367,7 @@ BEGIN
   FROM public.studio_music_entitlements
   WHERE user_id = buyer AND practice_id = free_music AND revoked_at IS NULL;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
     RAISE EXCEPTION '11: free entitlement must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 

@@ -159,6 +159,9 @@ assert(/studio_author_terms_not_accepted/.test(legal));
 assert(/author_has_accepted_current_terms/.test(legal));
 assert(/freeze_studio_entitlement_terms/.test(legal));
 assert(/studio-license-v1\.0/.test(legal));
+assert(/REVOKE ALL ON FUNCTION public\.create_studio_music_order_legal_legacy/.test(legal));
+assert(/REVOKE ALL ON FUNCTION public\.acquire_free_studio_music_legal_legacy/.test(legal));
+assert(/legacy Studio RPC must not be executable/.test(legal));
 assert(!/TRUNCATE/.test(legal));
 assert(!/DROP TABLE/.test(pricing));
 assert(!/TRUNCATE/.test(pricing));
@@ -201,8 +204,11 @@ assert(/Isolated fixture acceptance of current Author Terms/.test(smoke));
 assert(/paid order must freeze Studio terms/.test(smoke));
 assert(/paid entitlement must copy frozen Studio terms/.test(smoke));
 assert(/free entitlement must freeze Studio terms/.test(smoke));
+assert(/legacy Studio RPC privilege bypass/.test(smoke));
+assert(/pending order reuse must return original order/.test(smoke));
+assert(/reused pending order must retain frozen Studio terms/.test(smoke));
 assert(/studio-license-v1\.0/.test(smoke));
-assert(/40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b/.test(smoke));
+assert(/319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd/.test(smoke));
 
 function dockerAvailable() {
   try {
