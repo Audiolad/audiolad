@@ -46,6 +46,7 @@ import {
 } from "../src/lib/studio-music/catalog";
 import {
   formatStudioMusicLicensePurchaseName,
+  formatStudioMusicLicensePaymentPurpose,
   formatTochkaPaymentPurpose,
   TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH,
   TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH,
@@ -232,8 +233,8 @@ assert.match(startPay, /createTochkaPaymentOperation/);
 assert.match(startPay, /getOrderSaleAccrualReady/);
 assert.match(startPay, /order_kind === "studio_music_license"/);
 assert.match(startPay, /formatStudioMusicLicensePurchaseName/);
-assert.match(startPay, /purpose: formatTochkaPaymentPurpose\(\s*input\.orderRow\.id,\s*purchaseName,/);
-assert.match(startPay, /itemName: purchaseName/);
+assert.match(startPay, /formatStudioMusicLicensePaymentPurpose/);
+assert.match(startPay, /itemName,/);
 const tochkaClient = read("src/lib/payments/tochka-client.ts");
 assert.match(tochkaClient, /TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH/);
 
@@ -243,29 +244,40 @@ assert.equal(
   studioPurchaseName,
   "Лицензия для Студии АудиоЛад: «Джаз для отдыха»",
 );
-const studioPurpose = formatTochkaPaymentPurpose(
+const studioPurpose = formatStudioMusicLicensePaymentPurpose(
   ORDER_ID,
-  studioPurchaseName,
-  undefined,
-  "",
+  "Джаз для отдыха",
 );
-assert.match(studioPurpose, /Лицензия для Студии АудиоЛад: «Джаз для отдыха»/);
-assert.match(studioPurpose, /заказ bbbbbbbb/);
+assert.equal(
+  studioPurpose,
+  "Лицензия для Студии АудиоЛад: «Джаз для отдыха» – заказ bbbbbbbb",
+);
 
 const longStudioPurchaseName = formatStudioMusicLicensePurchaseName("Т".repeat(500));
 assert.equal(longStudioPurchaseName.length, TOCHKA_RECEIPT_ITEM_NAME_MAX_LENGTH);
 assert.match(longStudioPurchaseName, /^Лицензия для Студии АудиоЛад: «/);
 assert.ok(longStudioPurchaseName.endsWith("»"));
-const longStudioPurpose = formatTochkaPaymentPurpose(
+const longStudioPurpose = formatStudioMusicLicensePaymentPurpose(
   ORDER_ID,
-  longStudioPurchaseName,
-  undefined,
-  "",
-  true,
+  "Т".repeat(500),
 );
+const studioPurposePrefix = "Лицензия для Студии АудиоЛад: «";
+const studioOrderSuffix = "» – заказ bbbbbbbb";
 assert.ok(longStudioPurpose.length <= TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH);
 assert.match(longStudioPurpose, /^Лицензия для Студии АудиоЛад: «/);
-assert.match(longStudioPurpose, /заказ bbbbbbbb$/);
+assert.match(longStudioPurpose, /» – заказ bbbbbbbb$/);
+assert.equal(
+  longStudioPurpose.lastIndexOf("»"),
+  longStudioPurpose.indexOf(" – заказ ") - 1,
+);
+assert.equal(
+  longStudioPurpose,
+  `${studioPurposePrefix}${"Т".repeat(
+    TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH -
+      studioPurposePrefix.length -
+      studioOrderSuffix.length,
+  )}${studioOrderSuffix}`,
+);
 
 // Ordinary purchase naming remains exactly the existing formatter output.
 assert.equal(

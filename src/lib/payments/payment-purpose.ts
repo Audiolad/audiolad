@@ -13,17 +13,14 @@ function shortOrderId(orderId: string, length = 8): string {
 function buildPurpose(
   productTitle: string,
   orderSuffix: string,
-  prefix = BRAND_PREFIX,
 ): string {
-  return `${prefix}${productTitle}${orderSuffix}`;
+  return `${BRAND_PREFIX}${productTitle}${orderSuffix}`;
 }
 
 export function formatTochkaPaymentPurpose(
   orderId: string,
   productTitle: string,
   maxLength = TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH,
-  prefix = BRAND_PREFIX,
-  preserveOrderSuffix = false,
 ): string {
   const title = productTitle.trim();
 
@@ -32,9 +29,8 @@ export function formatTochkaPaymentPurpose(
   }
 
   const fullShortId = shortOrderId(orderId, 8);
-  const fullOrderSuffix = `${ORDER_SUFFIX_PREFIX}${fullShortId}`;
-  let orderSuffix = fullOrderSuffix;
-  let purpose = buildPurpose(title, orderSuffix, prefix);
+  let orderSuffix = `${ORDER_SUFFIX_PREFIX}${fullShortId}`;
+  let purpose = buildPurpose(title, orderSuffix);
 
   if (purpose.length <= maxLength) {
     return purpose;
@@ -42,37 +38,26 @@ export function formatTochkaPaymentPurpose(
 
   for (let idLength = 7; idLength >= 4; idLength -= 1) {
     orderSuffix = `${ORDER_SUFFIX_PREFIX}${fullShortId.slice(0, idLength)}`;
-    purpose = buildPurpose(title, orderSuffix, prefix);
+    purpose = buildPurpose(title, orderSuffix);
 
     if (purpose.length <= maxLength) {
       return purpose;
     }
   }
 
-  if (preserveOrderSuffix) {
-    const maxTitleLength = maxLength - prefix.length - fullOrderSuffix.length;
-    if (maxTitleLength > 0) {
-      return buildPurpose(
-        title.slice(0, maxTitleLength).trimEnd(),
-        fullOrderSuffix,
-        prefix,
-      );
-    }
-  }
-
-  purpose = buildPurpose(title, "", prefix);
+  purpose = buildPurpose(title, "");
 
   if (purpose.length <= maxLength) {
     return purpose;
   }
 
-  const maxTitleLength = maxLength - prefix.length;
+  const maxTitleLength = maxLength - BRAND_PREFIX.length;
 
   if (maxTitleLength <= 0) {
-    return prefix.trimEnd();
+    return BRAND_PREFIX.trimEnd();
   }
 
-  return buildPurpose(title.slice(0, maxTitleLength).trimEnd(), "", prefix);
+  return buildPurpose(title.slice(0, maxTitleLength).trimEnd(), "");
 }
 
 /**
@@ -104,4 +89,30 @@ export function formatStudioMusicLicensePurchaseName(
   return `${STUDIO_MUSIC_LICENSE_PREFIX}«${title
     .slice(0, maxTitleLength)
     .trimEnd()}»`;
+}
+
+export function formatStudioMusicLicensePaymentPurpose(
+  orderId: string,
+  productTitle: string,
+  maxLength = TOCHKA_PAYMENT_PURPOSE_MAX_LENGTH,
+): string {
+  const title = productTitle.trim();
+  if (!title) {
+    throw new Error("tochka_payment_purpose_title_missing");
+  }
+
+  const orderSuffix = `${ORDER_SUFFIX_PREFIX}${shortOrderId(orderId, 8)}`;
+  const maxTitleLength =
+    maxLength -
+    STUDIO_MUSIC_LICENSE_PREFIX.length -
+    "«»".length -
+    orderSuffix.length;
+
+  if (maxTitleLength <= 0) {
+    throw new Error("tochka_payment_purpose_limit_too_small");
+  }
+
+  return `${STUDIO_MUSIC_LICENSE_PREFIX}«${title
+    .slice(0, maxTitleLength)
+    .trimEnd()}»${orderSuffix}`;
 }
