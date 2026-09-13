@@ -85,6 +85,11 @@ import {
   PROMO_RECOMMENDATION_TITLE_MAX_LENGTH,
 } from "@/lib/products/promo-recommendation";
 import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
+import { uploadMusicMasterDirect } from "@/lib/author-products/music-master-upload-client";
+import {
+  MUSIC_MASTER_SIZE_HINT,
+  validateMusicMasterFileClient,
+} from "@/lib/author-products/music-master-upload-contract";
 import {
   PRODUCT_AUDIO_SIZE_HINT,
   PRODUCT_CONTENT_LIMITS,
@@ -2238,8 +2243,15 @@ export default function AuthorProductForm({
     }
   }
 
-  async function uploadAudio(audioId: string, file: File) {
-    const validationError = validateMp3FileClient(file);
+  async function uploadAudio(
+    audioId: string,
+    file: File,
+    mode: "legacy" | "master" = "legacy",
+  ) {
+    const isMusicMaster = mode === "master";
+    const validationError = isMusicMaster
+      ? validateMusicMasterFileClient(file)
+      : validateMp3FileClient(file);
 
     if (validationError) {
       setAudioUploadErrors((current) => ({
@@ -2276,7 +2288,9 @@ export default function AuthorProductForm({
       if (!ensured) {
         setAudioUploadErrors((current) => ({
           ...current,
-          [audioId]: "Не удалось загрузить MP3.",
+          [audioId]: isMusicMaster
+            ? "Не удалось загрузить WAV-мастер."
+            : "Не удалось загрузить MP3.",
         }));
         return;
       }
@@ -2288,11 +2302,17 @@ export default function AuthorProductForm({
         ensured.audioItems,
       );
 
-      const result = await uploadAuthorProductAudioDirect({
-        practiceId: id,
-        audioId: targetAudioId,
-        file,
-      });
+      const result = isMusicMaster
+        ? await uploadMusicMasterDirect({
+            practiceId: id,
+            audioId: targetAudioId,
+            file,
+          })
+        : await uploadAuthorProductAudioDirect({
+            practiceId: id,
+            audioId: targetAudioId,
+            file,
+          });
 
       if (!result.ok) {
         setAudioUploadErrors((current) => ({
@@ -2306,23 +2326,30 @@ export default function AuthorProductForm({
         return;
       }
 
-      applyServerProductPreservingDraft(result.product);
-      setAudioPreviewVersions((current) => ({
-        ...current,
-        [targetAudioId]: (current[targetAudioId] ?? 0) + 1,
-      }));
-      setMessage("Аудио загружено.");
-      void loadAudioPreview(id, targetAudioId);
-      await autofillAudioTitleFromFile(
-        targetAudioId,
-        file,
-        currentTitle,
-        slotNumber,
-      );
+      if ("message" in result) {
+        await reloadSavedProduct(id);
+        setMessage(result.message);
+      } else {
+        applyServerProductPreservingDraft(result.product);
+        setAudioPreviewVersions((current) => ({
+          ...current,
+          [targetAudioId]: (current[targetAudioId] ?? 0) + 1,
+        }));
+        setMessage("Аудио загружено.");
+        void loadAudioPreview(id, targetAudioId);
+        await autofillAudioTitleFromFile(
+          targetAudioId,
+          file,
+          currentTitle,
+          slotNumber,
+        );
+      }
     } catch {
       setAudioUploadErrors((current) => ({
         ...current,
-        [audioId]: "Не удалось загрузить MP3.",
+        [audioId]: isMusicMaster
+          ? "Не удалось загрузить WAV-мастер."
+          : "Не удалось загрузить MP3.",
       }));
     } finally {
       setUploadingAudioId(null);
@@ -3953,9 +3980,25 @@ export default function AuthorProductForm({
                       ) : null}
                     </div>
                   ) : null}
+                  {form.productKind === PRODUCT_KIND.MUSIC && audioItem.music_master ? (
+                    <p className="mt-2 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
+                      {audioItem.music_master.lifecycleState === "verified" &&
+                      ["queued", "processing"].includes(audioItem.music_master.transcodeStatus ?? "")
+                        ? "Файл загружен. Подготавливаем версию для прослушивания…"
+                        : audioItem.music_master.lifecycleState === "uploading"
+                          ? "Загрузка WAV-мастера ещё не завершена."
+                          : audioItem.music_master.lifecycleState === "rejected"
+                            ? "WAV-мастер не прошёл проверку."
+                            : "WAV-мастер отменён."}
+                    </p>
+                  ) : null}
                 </div>
 
-                <p className="text-sm leading-5 text-[#7d70a2]">{PRODUCT_AUDIO_SIZE_HINT}</p>
+                <p className="text-sm leading-5 text-[#7d70a2]">
+                  {form.productKind === PRODUCT_KIND.MUSIC
+                    ? `${MUSIC_MASTER_SIZE_HINT}. MP3 для текущего прослушивания загружается отдельно.`
+                    : PRODUCT_AUDIO_SIZE_HINT}
+                </p>
 
                 {audioItem.audio_path && practiceId && !audioItem.id.startsWith("temp-") ? (
                   <div className="mt-3">
@@ -3994,8 +4037,45 @@ export default function AuthorProductForm({
                       {uploadingAudioId === audioItem.id
                         ? "Загрузка…"
                         : audioItem.audio_path
-                          ? "Заменить MP3"
-                          : "Загрузить MP3"}
+                          ? form.productKind === PRODUCT_KIND.MUSIC
+                            ? "Заменить WAV-мастер"
+                            : "Заменить MP3"
+                          : form.productKind === PRODUCT_KIND.MUSIC
+                            ? "Загрузить WAV-мастер"
+                            : "Загрузить MP3"}
+                      <input
+                        type="file"
+                        accept={
+                          form.productKind === PRODUCT_KIND.MUSIC
+                            ? "audio/wav,audio/x-wav,audio/wave,.wav"
+                            : "audio/mpeg,.mp3"
+                        }
+                        className="hidden"
+                        disabled={
+                          uploadingAudioId === audioItem.id ||
+                          deletingAudioFileId === audioItem.id
+                        }
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) {
+                            void uploadAudio(
+                              audioItem.id,
+                              file,
+                              form.productKind === PRODUCT_KIND.MUSIC
+                                ? "master"
+                                : "legacy",
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+
+                  {form.productKind === PRODUCT_KIND.MUSIC &&
+                  !(contentLockedAfterSale && audioItem.audio_path) ? (
+                    <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
+                      {audioItem.audio_path ? "Заменить legacy MP3" : "Загрузить legacy MP3"}
                       <input
                         type="file"
                         accept="audio/mpeg,.mp3"
@@ -4007,13 +4087,11 @@ export default function AuthorProductForm({
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           event.target.value = "";
-                          if (file) {
-                            void uploadAudio(audioItem.id, file);
-                          }
+                          if (file) void uploadAudio(audioItem.id, file, "legacy");
                         }}
                       />
                     </label>
-                  )}
+                  ) : null}
 
                   {audioItem.audio_path && !contentLockedAfterSale ? (
                     <button

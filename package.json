@@ -120,6 +120,7 @@
     "test:author-product-draft-save": "npx tsx scripts/author-product-draft-save-unit.mjs && NODE_OPTIONS='--require ./scripts/author-practice-access-cjs-stub.cjs --import ./scripts/author-practice-access-test-register.mjs' npx tsx scripts/author-product-save-access-unit.mts",
     "test:author-product-price-input": "npx tsx scripts/author-product-price-input-unit.mts",
     "test:author-product-direct-audio-upload": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-product-direct-audio-upload-unit.mts",
+    "test:music-wav-master-foundation": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-wav-master-foundation-unit.mts",
     "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs && node scripts/author-support-sql-unit.mjs && node scripts/author-support-sql-integration.mjs && npm run test:author-product-edit-page-access && npm run test:author-product-draft-save",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",
