@@ -30,6 +30,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     match: (path) => path.startsWith("/admin/author-applications"),
   },
   {
+    href: "/admin/authors/new",
+    label: "Создать студию",
+    requiredPermission: "authors.manage",
+    match: (path) => path.startsWith("/admin/authors"),
+  },
+  {
     href: "/admin/commercial-applications",
     label: "Коммерческие заявки",
     requiredPermission: "authors.view",
