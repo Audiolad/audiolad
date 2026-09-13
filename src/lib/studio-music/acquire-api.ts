@@ -30,6 +30,7 @@ export type StudioMusicAcquireErrorCode =
   | "invalid_request"
   | "practice_not_found"
   | "practice_not_free"
+  | "author_terms_not_accepted"
   | "internal_error";
 
 export function parseStudioMusicAcquireRequest(
@@ -44,7 +45,11 @@ export function parseStudioMusicAcquireRequest(
     "amount" in body ||
     "amount_minor" in body ||
     "order_id" in body ||
-    "orderId" in body
+    "orderId" in body ||
+    "licenseTermsVersion" in body ||
+    "license_terms_version" in body ||
+    "licenseTermsHash" in body ||
+    "license_terms_hash" in body
   ) {
     return { ok: false, error: "invalid_request" };
   }
@@ -76,6 +81,9 @@ export function mapStudioMusicAcquireRpcError(message: string): {
 
   if (normalized.includes("practice_not_free")) {
     return { status: 409, error: "practice_not_free" };
+  }
+  if (normalized.includes("studio_author_terms_not_accepted")) {
+    return { status: 409, error: "author_terms_not_accepted" };
   }
 
   if (

@@ -653,6 +653,9 @@ function assertNoDuplicates(ids: string[]) {
         ]),
       );
     },
+    async loadAuthorsWithCurrentTerms() {
+      return new Set(["author-1"]);
+    },
   };
 
   const first = await handleStudioMusicCatalog({

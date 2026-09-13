@@ -27,7 +27,7 @@ assert.ok(
     "о продаже цифровых аудиопродуктов и предоставлении доступа к авторским аудиоматериалам на сайте «АудиоЛад»",
   ),
 );
-assert.ok(offer.includes("Последнее обновление: 2 сентября 2026 года"));
+assert.ok(offer.includes("Последнее обновление: 13 сентября 2026 года"));
 assert.ok(
   offer.includes(
     "заключении договора в отношении цифровых аудиопродуктов и",
@@ -59,8 +59,8 @@ assert.ok(!offer.includes("GetCourse"));
 const terms = read("src/lib/author-terms/approved-content.ts");
 assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes(EM_DASH), "author terms must not use em-dash");
 assert.ok(AUTHOR_TERMS_APPROVED_TEXT.includes(EN_DASH), "author terms keep en-dash");
-assert.ok(terms.includes('version: "1.1"'));
-assert.ok(terms.includes("2026-09-02T00:00:00+03:00"));
+assert.ok(terms.includes('version: "1.2"'));
+assert.ok(terms.includes("2026-09-13T00:00:00+03:00"));
 assert.ok(terms.includes("7.5. Платёж со стоимостью, самостоятельно определяемой слушателем"));
 assert.ok(terms.includes("6.4. Коммерческие условия и индивидуальные параметры Автора применяются также к платежам слушателей"));
 

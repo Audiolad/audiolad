@@ -448,6 +448,9 @@ function createStore(
         practiceIds.map((id) => [id, { listenerEffectiveMinor: 30000 }]),
       );
     },
+    async loadAuthorsWithCurrentTerms() {
+      return new Set(["author-1"]);
+    },
   };
 }
 
