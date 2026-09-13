@@ -9,6 +9,10 @@ on:
       - "scripts/studio-music-license-unit.mjs"
       - "scripts/lib/studio-music-license-sql-stub.sql"
       - "src/lib/studio-music/access.ts"
+      - "src/lib/studio-music/license-terms.ts"
+      - "src/lib/studio-music/acquire-api.ts"
+      - "src/lib/studio-music/checkout-api.ts"
+      - "src/lib/author-terms/**"
       - "src/lib/author-products/sale-lock.ts"
       - "supabase/migrations/20261003120000_studio_music_entitlements.sql"
       - "supabase/migrations/20261003120100_studio_music_license_orders.sql"
@@ -18,6 +22,7 @@ on:
       - "supabase/migrations/20261003120500_studio_music_canonical_sales.sql"
       - "supabase/migrations/20261003120600_studio_music_entitlement_order_revoke.sql"
       - "supabase/migrations/20261003120700_studio_music_independent_pricing.sql"
+      - "supabase/migrations/20261006140000_studio_music_legal_foundation_v1_2.sql"
       - "supabase/tests/studio_music_license_smoke.sql"
 
 permissions:

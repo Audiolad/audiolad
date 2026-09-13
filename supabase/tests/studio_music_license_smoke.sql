@@ -41,6 +41,8 @@ DECLARE
   v_fulfill jsonb;
   v_locked boolean;
   v_err text;
+  v_terms_version text;
+  v_terms_hash text;
 BEGIN
   INSERT INTO auth.users (id) VALUES (owner_user), (buyer), (listener), (new_user);
   INSERT INTO public.authors (id, name) VALUES (author, 'Musician');
@@ -64,6 +66,36 @@ BEGIN
     (album_music, 'A', 0),
     (album_music, 'B', 1);
 
+  -- Current Author Terms acceptance is mandatory for every NEW Studio license.
+  PERFORM set_config('request.jwt.claim.sub', buyer::text, true);
+  BEGIN
+    PERFORM public.create_studio_music_order(paid_music, key1, NULL);
+    RAISE EXCEPTION 'terms: expected paid author-terms gate';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%studio_author_terms_not_accepted%' THEN
+        RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
+      END IF;
+  END;
+  BEGIN
+    PERFORM public.acquire_free_studio_music(free_music);
+    RAISE EXCEPTION 'terms: expected free author-terms gate';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%studio_author_terms_not_accepted%' THEN
+        RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
+      END IF;
+  END;
+  INSERT INTO public.author_terms_acceptances (
+    author_id, terms_version_id, accepted_by_user_id, acceptance_text
+  ) VALUES (
+    author,
+    (SELECT id FROM public.author_terms_versions
+      WHERE document_key = 'author-terms' AND is_current IS TRUE),
+    owner_user,
+    'Isolated fixture acceptance of current Author Terms.'
+  );
+
   -- 1. paid music + permission → Studio amount = 2 × effective (500 RUB = 50000, studio 100000)
   PERFORM set_config('request.jwt.claim.sub', buyer::text, true);
 
@@ -74,6 +106,13 @@ BEGIN
   IF v_kind IS DISTINCT FROM 'studio_music_license'
      OR v_amount IS DISTINCT FROM 100000 THEN
     RAISE EXCEPTION '1: studio amount must be 2x effective, got % %', v_kind, v_amount;
+  END IF;
+  SELECT studio_license_terms_version, studio_license_terms_hash
+  INTO v_terms_version, v_terms_hash
+  FROM public.orders WHERE id = v_order;
+  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
+     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+    RAISE EXCEPTION '1: paid order must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
   -- expected-amount race
@@ -125,6 +164,14 @@ BEGIN
   WHERE user_id = listener AND practice_id = paid_music;
   IF v_count <> 1 THEN
     RAISE EXCEPTION '2: listener fulfill must write user_practices';
+  END IF;
+  SELECT license_terms_version, license_terms_hash
+  INTO v_terms_version, v_terms_hash
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
+  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
+     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+    RAISE EXCEPTION '4: paid entitlement must copy frozen Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
   IF public.has_studio_music_entitlement(listener, paid_music)
@@ -286,6 +333,14 @@ BEGIN
   WHERE user_id = buyer AND practice_id = free_music AND revoked_at IS NULL;
   IF v_count <> 1 THEN
     RAISE EXCEPTION '11: expected one free entitlement';
+  END IF;
+  SELECT license_terms_version, license_terms_hash
+  INTO v_terms_version, v_terms_hash
+  FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = free_music AND revoked_at IS NULL;
+  IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
+     OR v_terms_hash IS DISTINCT FROM '40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b' THEN
+    RAISE EXCEPTION '11: free entitlement must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
   -- 12. free entitlement survives later permission off

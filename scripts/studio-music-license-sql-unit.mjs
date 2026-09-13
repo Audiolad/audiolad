@@ -194,6 +194,15 @@ assert(/PR3.1: free acquire must reject Studio fixed/.test(smoke));
 assert(/PR3.1: fixed Studio amount must be 60000/.test(smoke));
 assert(/PR3.1: paid order must reject Studio free/.test(smoke));
 assert(/PR3.1: paid listener \+ Studio free must allow free acquire/.test(smoke));
+assert(/terms: expected paid author-terms gate/.test(smoke));
+assert(/terms: expected free author-terms gate/.test(smoke));
+assert(/studio_author_terms_not_accepted/.test(smoke));
+assert(/Isolated fixture acceptance of current Author Terms/.test(smoke));
+assert(/paid order must freeze Studio terms/.test(smoke));
+assert(/paid entitlement must copy frozen Studio terms/.test(smoke));
+assert(/free entitlement must freeze Studio terms/.test(smoke));
+assert(/studio-license-v1\.0/.test(smoke));
+assert(/40b6e783a0b94692cd4e8bfffa8e70bd6b15c24c13f00d821bcb38d3a5e26b7b/.test(smoke));
 
 function dockerAvailable() {
   try {
