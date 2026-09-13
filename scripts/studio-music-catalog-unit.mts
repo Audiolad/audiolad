@@ -584,6 +584,7 @@ function createStore(input: {
     }>;
     authorMemberAuthorIds: string[];
   };
+  authorsWithCurrentTerms?: Set<string>;
 }): StudioMusicCatalogStore {
   return {
     async listPublicInventory({ filter, cursor, limit }) {
@@ -640,6 +641,9 @@ function createStore(input: {
         );
       }
       return prices;
+    },
+    async loadAuthorsWithCurrentTerms() {
+      return input.authorsWithCurrentTerms ?? new Set(["author-1"]);
     },
   };
 }
@@ -722,6 +726,56 @@ assert.equal(
   "items" in publicViewerEntitlement.body &&
     publicViewerEntitlement.body.items[0]?.ownership.can_acquire,
   false,
+);
+
+const blockedWithoutCurrentAuthorTerms = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [listedAllowed],
+    authorsWithCurrentTerms: new Set(),
+  }),
+});
+assert.equal(blockedWithoutCurrentAuthorTerms.status, 200);
+assert.equal(
+  "items" in blockedWithoutCurrentAuthorTerms.body &&
+    blockedWithoutCurrentAuthorTerms.body.items[0]?.ownership
+      .acquisition_unavailable_reason,
+  "author_terms_not_accepted",
+);
+assert.equal(
+  "items" in blockedWithoutCurrentAuthorTerms.body &&
+    blockedWithoutCurrentAuthorTerms.body.items[0]?.ownership.can_acquire,
+  false,
+);
+
+const entitledWithoutCurrentAuthorTerms = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    publicItems: [listedAllowed],
+    authorsWithCurrentTerms: new Set(),
+    viewerAccess: {
+      entitlements: [
+        {
+          practice_id: listedAllowed.id!,
+          grant_source: "purchase",
+          revoked_at: null,
+        },
+      ],
+      authorMemberAuthorIds: [],
+    },
+  }),
+});
+assert.equal(entitledWithoutCurrentAuthorTerms.status, 200);
+assert.equal(
+  "items" in entitledWithoutCurrentAuthorTerms.body &&
+    entitledWithoutCurrentAuthorTerms.body.items[0]?.ownership.can_use,
+  true,
 );
 
 const freeViewerEntitlement = await handleStudioMusicCatalog({
