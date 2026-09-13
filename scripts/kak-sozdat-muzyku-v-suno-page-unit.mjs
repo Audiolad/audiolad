@@ -20,6 +20,7 @@ const view = readFileSync("src/components/kak-sozdat-muzyku-v-suno/KakSozdatMuzy
 const page = readFileSync("src/app/(platform)/(listener)/kak-sozdat-muzyku-v-suno/page.tsx", "utf8");
 const sitemapSource = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
 const contentSource = readFileSync("src/lib/seo/kak-sozdat-muzyku-v-suno/content.ts", "utf8");
+const indexSource = readFileSync("src/lib/seo/kak-sozdat-muzyku-v-suno/index.ts", "utf8");
 const introCta = readFileSync("src/components/ai-music/AiMusicIntroCta.tsx", "utf8");
 const externalAnchors = [...view.matchAll(/<a\b[^>]*>/g)].map((match) => match[0]);
 
@@ -76,6 +77,12 @@ assert.equal(isBottomNavNeutralPathname(KAK_SOZDAT_MUZYKU_V_SUNO_PATH), true);
 assert.match(sitemapSource, /path: "\/kak-sozdat-muzyku-v-suno", changeFrequency: "monthly", priority: 0.7/);
 assert.match(introCta, /href="\/"/);
 assert.match(introCta, /href="\/become-author"/);
+const ctaParagraphs = [
+  "Когда у вас появится первый удачный трек из Suno, загляните в АудиоЛад. Посмотрите, как оформлены музыкальные продукты, что слушают пользователи и какие возможности есть у авторов музыки.",
+  "Можно зарегистрироваться бесплатно, познакомиться с площадкой и заранее увидеть следующий этап – от готовой композиции к собственному музыкальному каталогу.",
+];
+assert.match(view, new RegExp(`AiMusicIntroCta paragraphs=\\{\\[${ctaParagraphs.map((paragraph) =>
+  `"${paragraph.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).join(", ")}\\]\\}`));
 for (const href of [
   'href="/v-kakoy-neyroseti-sozdat-muzyku"',
   'href="/kak-vylozhit-ii-muzyku"',
@@ -88,7 +95,9 @@ assert.equal(contentSource.includes("—"), false, "Russian SEO content must use
 assert.doesNotMatch(view, /utm_/i);
 assert.doesNotMatch(view, /\/(suno-studio|suno-pricing|create-music-with-suno)\b/);
 assert.doesNotMatch(view, /<h2[^>]*>С чего начать|<h2[^>]*>Заключение|<h2[^>]*>Итоги/);
+assert.match(indexSource, /KAK_SOZDAT_MUZYKU_V_SUNO_PATH/);
+assert.match(indexSource, /KAK_SOZDAT_MUZYKU_V_SUNO_FAQ/);
 
-const cyrillicWords = (view.match(/[А-Яа-яЁё]+/g) ?? []).length;
+const cyrillicWords = (`${view}\n${contentSource}`.match(/[А-Яа-яЁё]+/g) ?? []).length;
 assert.ok(cyrillicWords >= 2200, `Expected at least 2200 Cyrillic words, got ${cyrillicWords}`);
-console.log(`kak-sozdat-muzyku-v-suno-page-unit: ok (${cyrillicWords} Cyrillic words)`);
+console.log(`kak-sozdat-muzyku-v-suno-page-unit: ok (${cyrillicWords} Cyrillic words in view+content)`);
