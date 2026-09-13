@@ -756,8 +756,8 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261006140000",
     "20261006140100",
     "20261006140200",
-    "20261006150000",
     "20261007120000",
+    "20261007130000",
   ]);
   assert.equal(plan.database_migrations_pending, 94);
 }
@@ -863,8 +863,8 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261006140000",
     "20261006140100",
     "20261006140200",
-    "20261006150000",
     "20261007120000",
+    "20261007130000",
   ]);
   assert.equal(plan.database_migrations_pending, 88);
 }
@@ -977,8 +977,8 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261006140000",
     "20261006140100",
     "20261006140200",
-    "20261006150000",
     "20261007120000",
+    "20261007130000",
   ]);
   assert.equal(plan.database_migrations_pending, 79);
 }
@@ -1093,6 +1093,20 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
   assert.notEqual(productionPlan.code, "database_migration_history_drift");
 }
 
+function testTopicsFunctionalScenariosAfterProductionMaxApply() {
+  const productionMax = "20261007120000";
+  const topicsVersion = "20261007130000";
+  const plan = planDatabaseMigrations({
+    localVersions: [productionMax, topicsVersion],
+    remoteVersions: [productionMax],
+  });
+
+  assert.deepEqual(plan.pending, [topicsVersion]);
+  assert.ok(plan.pending.every((version) => version > productionMax));
+  assert.equal(plan.action, "apply");
+  assert.notEqual(plan.code, "database_migration_history_drift");
+}
+
 function main() {
   testNormalizeAndFilenames();
   testParseTableAndJson();
@@ -1109,6 +1123,7 @@ function main() {
   testProductionLikePendingAfterQuickOffersRestamp();
   testProductionLikePendingAfterPlaylistRestamp();
   testOrdinaryDeployAfterLatestMainHasNoHole();
+  testTopicsFunctionalScenariosAfterProductionMaxApply();
   testReissuedVisibilityAfterProductionMaxHasNoHole();
   console.log("database-migrations-plan-unit: all tests passed");
 }
