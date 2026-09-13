@@ -70,6 +70,10 @@ jobs:
           npm run test:production-deploy-gha
           npm run test:author-product-price-input
           npm run test:platform-analytics-p2
+          npm run test:seo-core-v1
+          npm run test:seo-wordstat-intake
+          npm run test:wordstat
+          npm run test:seo-query-analysis
           npm run build
           npm run typecheck
           npm run lint

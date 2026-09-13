@@ -33,6 +33,7 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
       supabase
         .from("seo_queries")
         .select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
+        .eq("analysis_status", "analyzed")
         .order("created_at", { ascending: false }),
       supabase
         .from("seo_query_reservations")
