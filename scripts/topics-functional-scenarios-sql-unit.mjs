@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const filename = "20261006150000_topics_functional_scenarios.sql";
+const filename = "20261007130000_topics_functional_scenarios.sql";
 const path = join(root, "supabase/migrations", filename);
 const sql = readFileSync(path, "utf8");
 const docs = readFileSync(join(root, "docs/TOPICS.md"), "utf8");
@@ -22,7 +22,7 @@ const EXPECTED_TOPICS = [
 ];
 
 assert.equal(existsSync(path), true, "functional scenario migration exists");
-assert.match(filename, /^20261006150000_/, "migration timestamp is unique");
+assert.match(filename, /^20261007130000_/, "migration timestamp is unique");
 assert.match(sql, /INSERT INTO public\.topics/);
 assert.match(sql, /ON CONFLICT \(key\) DO NOTHING/);
 assert.doesNotMatch(sql, /UPDATE\s+public\.topics/i, "existing topic rows are unchanged");
