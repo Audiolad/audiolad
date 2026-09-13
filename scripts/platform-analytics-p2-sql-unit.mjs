@@ -388,6 +388,34 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   const all = json(`SELECT public.analytics_owner_overview(NULL,NULL,false,NULL,NULL,NULL,NULL)::text;`);
   assertEqual(all.new_listeners, all.listeners, "all treats all listeners as new");
   assertEqual(all.returning_listeners, 0, "all has no pre-period history");
+  function assertExcluded(label, anonymousId, flags, campaign = null) {
+    const before = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+    psql(TEST_DB, `
+WITH session_row AS (
+  INSERT INTO public.analytics_sessions(anonymous_id,started_at,last_seen_at,utm_campaign,device_type,is_staff,is_test,is_bot,traffic_class)
+  VALUES ('${anonymousId}','2026-07-22 13:00:00+00','2026-07-22 13:00:00+00',${campaign ? `'${campaign}'` : 'NULL'},'desktop',${flags})
+  RETURNING id
+)
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class)
+SELECT id,'${anonymousId}','audio_play_started','${PRACTICE_ONE}','2026-07-22 13:01:00+00',${flags} FROM session_row;
+`);
+    const after = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+    assertEqual(after.listeners, before.listeners, `${label}: listeners excluded`);
+    assertEqual(after.play_starts, before.play_starts, `${label}: starts excluded`);
+    psql(TEST_DB, `DELETE FROM public.analytics_events WHERE anonymous_session_id='${anonymousId}'; DELETE FROM public.analytics_sessions WHERE anonymous_id='${anonymousId}';`);
+  }
+  assertExcluded("staff-only", "owner-staff-isolated", "true,false,false,'human'");
+  assertExcluded("test-only", "owner-test-isolated", "false,true,false,'human'");
+  assertExcluded("bot-only", "owner-bot-isolated", "false,false,true,'human'");
+  assertExcluded("traffic-class-only", "owner-traffic-isolated", "false,false,false,'bot'");
+  assertExcluded("test-anonymous-only", "manual-owner-overview-isolated", "false,false,false,'human'");
+  assertExcluded("test-session-only", "owner-session-isolated", "false,false,false,'human'", "analytics_dev_fixture");
+  const nullableBefore = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  psql(TEST_DB, `INSERT INTO public.analytics_events(event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES ('audio_play_started','${PRACTICE_ONE}','2026-07-22 14:00:00+00',false,false,false,'human');`);
+  const nullableAfter = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(nullableAfter.listeners, nullableBefore.listeners, "nullable identity does not add a listener");
+  assertEqual(nullableAfter.play_starts, nullableBefore.play_starts + 1, "nullable identity event adds one start");
+  psql(TEST_DB, `DELETE FROM public.analytics_events WHERE occurred_at='2026-07-22 14:00:00+00' AND event_name='audio_play_started' AND session_id IS NULL;`);
   const authorOne = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_ONE}',NULL,NULL,NULL)::text;`);
   assertEqual(authorOne.repeat_listeners, 0, "many starts on one Moscow day are not repeat listeners");
   psql(TEST_DB, `
