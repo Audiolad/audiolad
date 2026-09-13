@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-10-06 — Guest Studio: globally free catalog music
+
+**Контекст:** гостевой проект Студии уже изолирован `guest_session_id` и
+имеет один trial MP3, но общедоступная Studio-free музыка была доступна
+только после создания `auth.users`-entitlement.
+
+**Решение:**
+
+- Гость может прикреплять, загружать после reload, слушать и рендерить
+  только published, listed music/release с `platform_reuse_allowed` и
+  канонически free Studio-pricing.
+- Это не entitlement: ссылка catalog asset хранит
+  `catalog_guest_session_id`, полученный только из owning guest project.
+  Авторский `catalog_access_user_id` и его `can_use_music_in_studio`
+  путь не меняются.
+- Каждый playback/hydration/render повторно проверяет session binding и
+  `is_globally_free_studio_music`. Paid, unlisted, personal-entitlement
+  и listener `user_practices` не открывают этот guest path.
+- Каталог и render snapshot не выдают `audio_path`, storage path, signed
+  URL либо principal; аудио по-прежнему приходит через same-origin stream
+  proxy с Range.
+
+**Принято:** владелец продукта (задание guest free Studio music).
+
+---
+
 ## 2026-10-03 — Studio music license foundation (PR1)
 
 **Контекст:** MVP «Музыка для медитаций в Студии» нуждается в постоянном
