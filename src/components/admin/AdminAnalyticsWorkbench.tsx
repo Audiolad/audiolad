@@ -329,7 +329,10 @@ export default function AdminAnalyticsWorkbench({
         filterNotes={summary.filterNotes}
       />
 
-      <AdminAnalyticsFunnelPanel overview={summary.productOverview} />
+      <AdminAnalyticsFunnelPanel
+        overview={summary.productOverview}
+        hasProductFilter={Boolean(summary.filters.authorId || summary.filters.practiceId)}
+      />
 
       <section aria-labelledby="admin-additional-kpi-heading" className="space-y-3">
         <h3 id="admin-additional-kpi-heading" className="text-[19px] font-semibold">

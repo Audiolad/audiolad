@@ -73,9 +73,9 @@ function main() {
   assert(queries.includes("funnelEvents"), "event funnel");
   assert(queries.includes("funnelPeople"), "people funnel");
   assert(queries.includes("session_touch"), "utm attribution");
-  assert(queries.includes("practiceVisitors = asNonNegativeInt(people.practice_visitors)"), "practice visitors source");
-  assert(queries.includes("listeners = asNonNegativeInt(people.listeners)"), "listeners source");
-  assert(queries.includes("completers = asNonNegativeInt(people.completers)"), "completers source");
+  assert(queries.includes("practiceVisitors = asNonNegativeInt(raw.practice_visitors)"), "practice visitors source");
+  assert(queries.includes("listeners = asNonNegativeInt(raw.listeners)"), "listeners source");
+  assert(queries.includes("completers = asNonNegativeInt(raw.completers)"), "completers source");
   assert(queries.includes("formatAdminPercent(listeners, practiceVisitors)"), "view-to-start is people ratio");
   assert(queries.includes("formatAdminPercent(completers, listeners)"), "completion is people ratio");
   assert(queries.includes("formatAdminDecimal(playStarts, listeners)"), "starts per listener formula");
@@ -89,7 +89,7 @@ function main() {
   assert(funnel.includes('suffix: "события"'), "event cards explicitly labeled");
   assert(funnel.includes(">люди</p>"), "people cards explicitly labeled");
   assert(queries.includes('if (denominator <= 0 || numerator <= 0) {\n    return "0";'), "starts per listener zero safe");
-  assert(workbench.includes("<AdminAnalyticsFunnelPanel overview={summary.productOverview} />"), "funnel is primary");
+  assert(workbench.includes("overview={summary.productOverview}"), "funnel is primary");
   assert(workbench.includes("Дополнительные показатели"), "existing supporting KPIs retained");
   assert(page.includes("authorId"), "author filter in URL");
   assert(page.includes("practiceId"), "practice filter in URL");

@@ -123,6 +123,11 @@ CREATE TABLE public.platform_user_roles (
   role_code text REFERENCES public.platform_roles(code),
   PRIMARY KEY (user_id, role_code)
 );
+CREATE TABLE public.author_members (
+  author_id uuid REFERENCES public.authors(id),
+  user_id uuid REFERENCES auth.users(id),
+  PRIMARY KEY (author_id, user_id)
+);
 INSERT INTO public.platform_roles(code) VALUES ('owner'), ('admin');
 INSERT INTO public.platform_permissions(code) VALUES ('admin_panel.access');
 INSERT INTO public.platform_role_permissions VALUES ('owner','admin_panel.access'), ('admin','admin_panel.access');
@@ -191,6 +196,9 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20260725161000_admin_analytics_dashboard_snapshot_p1.sql"));
   psqlFile(TEST_DB, migration("20260725162000_unlink_analytics_identity.sql"));
   psqlFile(TEST_DB, migration("20260725180000_admin_analytics_p2_dashboard.sql"));
+  psqlFile(TEST_DB, migration("20261006120000_analytics_shared_product_semantics.sql"));
+  psqlFile(TEST_DB, migration("20261006120200_analytics_nullable_visitor_identity.sql"));
+  psqlFile(TEST_DB, migration("20261006120300_analytics_owner_overview.sql"));
 }
 
 /**
@@ -326,6 +334,28 @@ function testEventCountsDifferFromUniquePeople() {
     snapshot.events.play_starts > snapshot.people.listeners,
     `play_starts (${snapshot.events.play_starts}) must exceed unique listeners (${snapshot.people.listeners})`,
   );
+}
+
+function testOwnerOverviewSemantics() {
+  psql(TEST_DB, `
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','page_view','${PRACTICE_ONE}','2026-07-20 10:00:30+00',false,false,false,'human'),
+  ('e2222222-2222-2222-2222-222222222222','p2anon2',NULL,'page_view','${PRACTICE_ONE}','2026-07-21 10:00:30+00',false,false,false,'human'),
+  ('e3333333-3333-3333-3333-333333333333','p2anon3','${USER_HUMAN_TWO}','audio_play_started','${PRACTICE_THREE}','2026-07-23 10:02:00+00',false,false,false,'human'),
+  (NULL,NULL,NULL,'audio_play_started','${PRACTICE_ONE}','2026-07-23 11:00:00+00',false,false,false,'human');
+`);
+  const overview = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(overview.real_visitors, 2, "overview real visitors use valid page views");
+  assertEqual(overview.listeners, 3, "null identity event counted but not a person");
+  assertEqual(overview.new_listeners, 3, "first-ever listeners");
+  assertEqual(overview.repeat_listeners, 1, "two Moscow listening days is repeat");
+  assertEqual(overview.wal, 3, "WAL current");
+  assertEqual(overview.previous_wal, 0, "WAL previous");
+  assertEqual(overview.mal, 3, "MAL current");
+  assertEqual(overview.previous_mal, 0, "MAL previous");
+  assertEqual(Math.round((overview.listeners / overview.practice_visitors) * 100), 100, "people conversion");
+  assertEqual(Math.round((overview.completers / overview.listeners) * 100), 33, "people completion");
+  assertEqual(overview.play_starts / overview.listeners, 2, "starts per listener");
 }
 
 function testPreviousWindow() {
@@ -615,6 +645,7 @@ function main() {
   setup();
   testSummaryMatchesDirectSql();
   testEventCountsDifferFromUniquePeople();
+  testOwnerOverviewSemantics();
   testPreviousWindow();
   testServiceTrafficFilter();
   testProductAndSessionFilters();
