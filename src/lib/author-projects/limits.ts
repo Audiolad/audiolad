@@ -6,7 +6,8 @@ import {
 export type AuthorProjectLimitSource = "override" | "premium" | "default";
 
 export type AuthorProjectLimitResolution = {
-  limit: number;
+  limit: number | null;
+  unlimited: boolean;
   source: AuthorProjectLimitSource;
   premiumEnabled: boolean;
   hasOverride: boolean;
@@ -17,6 +18,7 @@ export type AuthorProjectLimitResolution = {
  */
 export function resolveEffectiveAuthorProjectLimit(input: {
   override: number | null | undefined;
+  unlimited: boolean | null | undefined;
   premiumEnabled: boolean | null | undefined;
 }): AuthorProjectLimitResolution {
   const override =
@@ -27,9 +29,20 @@ export function resolveEffectiveAuthorProjectLimit(input: {
       : null;
   const premiumEnabled = input.premiumEnabled === true;
 
+  if (input.unlimited === true) {
+    return {
+      limit: null,
+      unlimited: true,
+      source: "override",
+      premiumEnabled,
+      hasOverride: true,
+    };
+  }
+
   if (override != null) {
     return {
       limit: override,
+      unlimited: false,
       source: "override",
       premiumEnabled,
       hasOverride: true,
@@ -39,6 +52,7 @@ export function resolveEffectiveAuthorProjectLimit(input: {
   if (premiumEnabled) {
     return {
       limit: PREMIUM_AUTHOR_PROJECT_LIMIT,
+      unlimited: false,
       source: "premium",
       premiumEnabled,
       hasOverride: false,
@@ -47,14 +61,19 @@ export function resolveEffectiveAuthorProjectLimit(input: {
 
   return {
     limit: DEFAULT_AUTHOR_PROJECT_LIMIT,
+    unlimited: false,
     source: "default",
     premiumEnabled,
     hasOverride: false,
   };
 }
 
-export function canCreateOwnedAuthorProject(used: number, limit: number): boolean {
-  return used < limit && limit >= 1;
+export function canCreateOwnedAuthorProject(
+  used: number,
+  limit: number | null,
+  unlimited = false,
+): boolean {
+  return unlimited || (limit !== null && used < limit && limit >= 1);
 }
 
 /**
@@ -63,10 +82,13 @@ export function canCreateOwnedAuthorProject(used: number, limit: number): boolea
  */
 export function shouldShowPremiumProjectUpsell(input: {
   used: number;
-  limit: number;
+  limit: number | null;
+  unlimited: boolean;
   source: AuthorProjectLimitSource;
 }): boolean {
-  if (canCreateOwnedAuthorProject(input.used, input.limit)) {
+  if (
+    canCreateOwnedAuthorProject(input.used, input.limit, input.unlimited)
+  ) {
     return false;
   }
 
@@ -75,7 +97,8 @@ export function shouldShowPremiumProjectUpsell(input: {
 
 export function getAuthorProjectLimitReachedMessage(input: {
   used: number;
-  limit: number;
+  limit: number | null;
+  unlimited: boolean;
   source: AuthorProjectLimitSource;
 }): string {
   if (shouldShowPremiumProjectUpsell(input)) {

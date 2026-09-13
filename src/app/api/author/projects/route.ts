@@ -27,6 +27,7 @@ export async function GET() {
       projects: summary.projects,
       owned_count: summary.ownedCount,
       limit: summary.limit,
+      unlimited: summary.unlimited,
       source: summary.source,
       premium_enabled: summary.premiumEnabled,
       has_override: summary.hasOverride,
@@ -103,6 +104,7 @@ export async function POST(request: Request) {
         },
         used: created.used,
         limit: created.limit,
+        unlimited: created.unlimited,
       },
       { status: 201 },
     );

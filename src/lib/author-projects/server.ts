@@ -16,7 +16,8 @@ import {
 export type AuthorProjectsSummary = {
   projects: AuthorWorkspace[];
   ownedCount: number;
-  limit: number;
+  limit: number | null;
+  unlimited: boolean;
   source: AuthorProjectLimitResolution["source"];
   premiumEnabled: boolean;
   hasOverride: boolean;
@@ -30,11 +31,14 @@ export async function loadAuthorProjectLimitFields(
   userId: string,
 ): Promise<{
   override: number | null;
+  unlimited: boolean;
   premiumEnabled: boolean;
 }> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("author_project_limit_override, author_premium_enabled")
+    .select(
+      "author_project_limit_override, author_projects_unlimited, author_premium_enabled",
+    )
     .eq("id", userId)
     .maybeSingle();
 
@@ -51,6 +55,7 @@ export async function loadAuthorProjectLimitFields(
 
   return {
     override,
+    unlimited: data?.author_projects_unlimited === true,
     premiumEnabled: data?.author_premium_enabled === true,
   };
 }
@@ -66,10 +71,15 @@ export async function getAuthorProjectsSummary(
 
   const ownedCount = projects.filter((project) => project.role === "owner").length;
   const resolution = resolveEffectiveAuthorProjectLimit(limitFields);
-  const canCreate = canCreateOwnedAuthorProject(ownedCount, resolution.limit);
+  const canCreate = canCreateOwnedAuthorProject(
+    ownedCount,
+    resolution.limit,
+    resolution.unlimited,
+  );
   const showPremiumUpsell = shouldShowPremiumProjectUpsell({
     used: ownedCount,
     limit: resolution.limit,
+    unlimited: resolution.unlimited,
     source: resolution.source,
   });
 
@@ -77,6 +87,7 @@ export async function getAuthorProjectsSummary(
     projects,
     ownedCount,
     limit: resolution.limit,
+    unlimited: resolution.unlimited,
     source: resolution.source,
     premiumEnabled: resolution.premiumEnabled,
     hasOverride: resolution.hasOverride,
@@ -87,6 +98,7 @@ export async function getAuthorProjectsSummary(
       : getAuthorProjectLimitReachedMessage({
           used: ownedCount,
           limit: resolution.limit,
+          unlimited: resolution.unlimited,
           source: resolution.source,
         }),
   };
@@ -103,7 +115,8 @@ export type CreateAuthorProjectResult = {
   slug: string;
   name: string;
   used: number;
-  limit: number;
+  limit: number | null;
+  unlimited: boolean;
 };
 
 export async function createAuthorProjectViaRpc(
@@ -147,7 +160,8 @@ export async function createAuthorProjectViaRpc(
     slug?: string;
     name?: string;
     used?: number;
-    limit?: number;
+    limit?: number | null;
+    unlimited?: boolean;
   } | null;
 
   if (
@@ -156,7 +170,8 @@ export async function createAuthorProjectViaRpc(
     !payload.slug ||
     !payload.name ||
     typeof payload.used !== "number" ||
-    typeof payload.limit !== "number"
+    (payload.limit !== null && typeof payload.limit !== "number") ||
+    typeof payload.unlimited !== "boolean"
   ) {
     throw new AuthorAccessError("internal_error", 500);
   }
@@ -166,6 +181,7 @@ export async function createAuthorProjectViaRpc(
     slug: payload.slug,
     name: payload.name,
     used: payload.used,
-    limit: payload.limit,
+    limit: payload.limit ?? null,
+    unlimited: payload.unlimited,
   };
 }

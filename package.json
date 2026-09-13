@@ -154,6 +154,7 @@
     "test:listener-welcome": "npx tsx scripts/listener-welcome-unit.mts",
     "test:help-center-support": "npx tsx scripts/help-center-support-unit.mjs",
     "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs",
+    "test:author-multi-project": "npx tsx scripts/author-multi-project-unit.mjs && node scripts/author-multi-project-sql-unit.mjs",
     "test:author-canonical-sales": "npx tsx scripts/author-canonical-sales-unit.mjs && npx tsx scripts/author-sale-email-outbox-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-finance-sales-route-unit.mts && node scripts/author-canonical-sales-sql-unit.mjs",
     "run:author-sale-email-outbox": "npx tsx scripts/process-author-sale-email-outbox.ts",
     "test:author-product-moderation-email": "npx tsx scripts/author-product-moderation-email-unit.mjs && node scripts/author-product-moderation-email-sql-unit.mjs",
