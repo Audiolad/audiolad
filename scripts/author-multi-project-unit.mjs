@@ -198,7 +198,7 @@ function main() {
   assert.match(migration, /pg_advisory_xact_lock/);
 
   const unlimitedMigration = read(
-    "supabase/migrations/20261006140000_owner_unlimited_author_projects.sql",
+    "supabase/migrations/20261006140100_owner_unlimited_author_projects.sql",
   );
   assert.match(unlimitedMigration, /author_projects_unlimited boolean/);
   assert.match(unlimitedMigration, /IF NOT v_unlimited AND v_used >= v_limit/);

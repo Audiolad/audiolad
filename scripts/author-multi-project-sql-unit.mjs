@@ -49,7 +49,7 @@ function main() {
   const unlimitedMigration = readFileSync(
     path.join(
       ROOT,
-      "supabase/migrations/20261006140000_owner_unlimited_author_projects.sql",
+      "supabase/migrations/20261006140100_owner_unlimited_author_projects.sql",
     ),
     "utf8",
   );

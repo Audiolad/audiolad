@@ -754,8 +754,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261006130000",
     "20261006130100",
     "20261006140000",
+    "20261006140100",
   ]);
-  assert.equal(plan.database_migrations_pending, 90);
+  assert.equal(plan.database_migrations_pending, 91);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -857,8 +858,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261006130000",
     "20261006130100",
     "20261006140000",
+    "20261006140100",
   ]);
-  assert.equal(plan.database_migrations_pending, 84);
+  assert.equal(plan.database_migrations_pending, 85);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -967,8 +969,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261006130000",
     "20261006130100",
     "20261006140000",
+    "20261006140100",
   ]);
-  assert.equal(plan.database_migrations_pending, 75);
+  assert.equal(plan.database_migrations_pending, 76);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
