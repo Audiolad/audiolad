@@ -76,7 +76,7 @@ BEGIN
   );
   UPDATE public.orders SET
     studio_license_terms_version = coalesce(studio_license_terms_version, 'studio-license-v1.0'),
-    studio_license_terms_hash = coalesce(studio_license_terms_hash, '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd')
+    studio_license_terms_hash = coalesce(studio_license_terms_hash, '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12')
   WHERE id = v_legacy.order_id;
   RETURN QUERY
     SELECT o.id, o.practice_id, o.practice_slug_snapshot, o.status, o.amount_minor,
@@ -111,7 +111,7 @@ BEGIN
       FROM public.orders WHERE id = NEW.order_id;
   ELSIF NEW.grant_source = 'free' THEN
     NEW.license_terms_version := 'studio-license-v1.0';
-    NEW.license_terms_hash := '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd';
+    NEW.license_terms_hash := '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12';
   END IF;
   RETURN NEW;
 END;

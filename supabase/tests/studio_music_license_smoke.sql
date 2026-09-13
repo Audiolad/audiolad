@@ -125,7 +125,7 @@ BEGIN
   INTO v_terms_version, v_terms_hash
   FROM public.orders WHERE id = v_order;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
+     OR v_terms_hash IS DISTINCT FROM '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12' THEN
     RAISE EXCEPTION '1: paid order must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
@@ -140,7 +140,7 @@ BEGIN
   INTO v_terms_version, v_terms_hash
   FROM public.orders WHERE id = v_reused_order;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
+     OR v_terms_hash IS DISTINCT FROM '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12' THEN
     RAISE EXCEPTION '1: reused pending order must retain frozen Studio terms';
   END IF;
 
@@ -233,7 +233,7 @@ BEGIN
   FROM public.studio_music_entitlements
   WHERE user_id = buyer AND practice_id = paid_music AND revoked_at IS NULL;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
+     OR v_terms_hash IS DISTINCT FROM '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12' THEN
     RAISE EXCEPTION '4: paid entitlement must copy frozen Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 
@@ -367,7 +367,7 @@ BEGIN
   FROM public.studio_music_entitlements
   WHERE user_id = buyer AND practice_id = free_music AND revoked_at IS NULL;
   IF v_terms_version IS DISTINCT FROM 'studio-license-v1.0'
-     OR v_terms_hash IS DISTINCT FROM '319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd' THEN
+     OR v_terms_hash IS DISTINCT FROM '46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12' THEN
     RAISE EXCEPTION '11: free entitlement must freeze Studio terms, got % %', v_terms_version, v_terms_hash;
   END IF;
 

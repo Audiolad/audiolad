@@ -208,7 +208,7 @@ assert(/legacy Studio RPC privilege bypass/.test(smoke));
 assert(/pending order reuse must return original order/.test(smoke));
 assert(/reused pending order must retain frozen Studio terms/.test(smoke));
 assert(/studio-license-v1\.0/.test(smoke));
-assert(/319b96448b058d959e682d47c87745b906b58b8d17996e5278f44b26800014dd/.test(smoke));
+assert(/46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12/.test(smoke));
 
 function dockerAvailable() {
   try {
