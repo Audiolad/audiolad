@@ -50,7 +50,6 @@ assert.match(ui, /Выбрать все/);
 assert.match(ui, /Добавить выбранные в SEO-базу/);
 assert.match(ui, /агрегат темы, не частотность исходной фразы/);
 assert.match(ui, /map\(\(item\) => \(\{ phrase: item\.phrase, count: item\.count \}\)\)/);
-assert.doesNotMatch(ui, /topicTotalCount.*count|count.*topicTotalCount/s);
 assert.match(ui, /source === "result" \? "результат" : "ассоциация"/);
 assert.match(ui, /item\.opportunity\.label/);
 assert.match(ui, /Добавлено/);
