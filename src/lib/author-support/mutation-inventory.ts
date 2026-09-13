@@ -53,6 +53,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/products/[id]/audio/[audioId]/upload/start/route.ts",
         "src/app/api/author/products/[id]/audio/[audioId]/upload/finalize/route.ts",
         "src/app/api/author/products/[id]/audio/[audioId]/upload/abandon/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/master/start/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/master/finalize/route.ts",
+        "src/app/api/author/products/[id]/audio/[audioId]/master/abandon/route.ts",
       ],
     },
     {
