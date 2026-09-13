@@ -121,6 +121,33 @@ UNIQUE `(practice_id, user_id)`. Это только VISIBILITY: пользов�
 | `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music` \| `audio_post`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером. Phase 1: legacy shadow рядом с `publication_class`. |
 | `music_usage_permission` | text NULL | для `practice` и `audio_post` всегда NULL; для `music` при публикации обязательно `listen_only` \| `platform_reuse_allowed` |
 
+#### Music WAV master foundation (Slice 1)
+
+Migration `20261007120000_music_wav_master_foundation.sql` adds an isolated,
+versioned music-master pipeline. `audio_items` remains the logical track and
+its existing `audio_path` stays the sole listener/public playback pointer.
+
+- `music_audio_assets` holds immutable verified masters and future stream
+  derivatives: item relation, optional source-asset link, role, private
+  bucket/path, accepted MIME, original name, verified size/duration and
+  lifecycle (`uploading`, `verified`, `rejected`, `abandoned`).
+- `audio_items.active_music_delivery_asset_id` is an intentionally NULL
+  future pointer; its trigger only permits a verified `stream` asset for the
+  same item. Slice 1 never writes it.
+- `music_transcode_jobs` is a separate durable queue bound to one master
+  asset. States: `queued`, `processing`, `ready`, `failed`; a partial unique
+  index permits at most one queued/processing job per source asset. Lease and
+  safe-error columns are reserved for a later worker.
+- Private buckets: `music-masters` accepts WAV variants up to 300 MiB;
+  `music-streams` reserves private MP3 delivery. Neither has browser
+  `storage.objects` policies or public reads. The server issues master upload
+  tokens only after author/product checks.
+
+Finalization materializes the private master server-side, uses `ffprobe` for
+the authoritative positive duration, then atomically marks the asset verified
+and queues the job. No stream object, FFmpeg worker, public playback change,
+or legacy backfill is part of Slice 1.
+
 #### publication_class (2026-08-25, Phase 1)
 
 Миграция: `20260825133000_practice_publication_class.sql`.

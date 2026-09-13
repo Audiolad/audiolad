@@ -126,6 +126,49 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   updated_at
 `;
 
+async function loadMusicMasterStatus(
+  audioItemIds: string[],
+): Promise<Map<string, NonNullable<AudioItemRow["music_master"]>>> {
+  if (audioItemIds.length === 0) return new Map();
+  const service = createServiceRoleClient();
+  const { data: assets, error: assetError } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, lifecycle_state")
+    .in("audio_item_id", audioItemIds)
+    .eq("asset_role", "master")
+    .order("created_at", { ascending: false });
+  if (assetError) {
+    console.error("music_master_status_lookup_failed", assetError.message);
+    return new Map();
+  }
+  const latestByAudioItem = new Map<string, { id: string; audio_item_id: string; lifecycle_state: "uploading" | "verified" | "rejected" | "abandoned" }>();
+  for (const asset of assets ?? []) {
+    if (!latestByAudioItem.has(asset.audio_item_id)) {
+      latestByAudioItem.set(asset.audio_item_id, asset);
+    }
+  }
+  const assetIds = [...latestByAudioItem.values()].map((asset) => asset.id);
+  const { data: jobs } = assetIds.length
+    ? await service
+        .from("music_transcode_jobs")
+        .select("source_asset_id, status")
+        .in("source_asset_id", assetIds)
+        .in("status", ["queued", "processing", "ready", "failed"])
+        .order("created_at", { ascending: false })
+    : { data: [] };
+  const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
+  return new Map(
+    [...latestByAudioItem.values()].map((asset) => [
+      asset.audio_item_id,
+      {
+        assetId: asset.id,
+        lifecycleState: asset.lifecycle_state,
+        transcodeStatus: jobsBySource.get(asset.id) ?? null,
+      },
+    ]),
+  );
+}
+
 export async function listAuthorProducts(
   supabase: SupabaseClient,
   authorId: string,
@@ -229,9 +272,16 @@ export async function getAuthorProductDetail(
       loadAuthorPracticeSeoContent(supabase, practiceId),
     ]);
 
+  const musicMasterStatus = practiceRow.product_kind === PRODUCT_KIND.MUSIC
+    ? await loadMusicMasterStatus((audioItems ?? []).map((item) => item.id))
+    : new Map();
+
   return {
     practice: practiceRow,
-    audio_items: (audioItems ?? []) as AudioItemRow[],
+    audio_items: (audioItems ?? []).map((item) => ({
+      ...item,
+      music_master: musicMasterStatus.get(item.id) ?? null,
+    })) as AudioItemRow[],
     gallery_slides: gallerySlides,
     seo_content: seoContent,
     contentLockedAfterSale,
