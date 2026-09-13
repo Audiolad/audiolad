@@ -58,6 +58,7 @@
     "test:seo-article-runtime": "node scripts/seo-article-runtime.mjs",
     "test:articles-directory": "npx tsx scripts/articles-directory-unit.mjs",
     "test:platform-rbac": "npx tsx scripts/platform-rbac-unit.mjs",
+    "test:studio-author-provisioning": "node scripts/studio-author-provisioning-unit.mjs",
     "test:playlists-stage1": "npx tsx scripts/playlists-stage1-validation-smoke.mjs",
     "test:playlists-stage2": "npx tsx scripts/playlists-stage2-validation-smoke.mjs && npm run test:playlist-items-sortable",
     "test:playlist-items-sortable": "npx tsx scripts/playlist-items-sortable-unit.mjs && npx tsx scripts/playlists-pr4-validation-smoke.mjs && npx tsx scripts/playlist-editorial-composition-list-unit.mts",
