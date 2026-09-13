@@ -349,10 +349,6 @@ function card(
   previous?: number | null,
   formatted?: string,
 ): AdminAnalyticsMetricCard {
-  const wal = asNonNegativeInt(raw.wal);
-  const previousWal = asNonNegativeInt(raw.previous_wal);
-  const mal = asNonNegativeInt(raw.mal);
-  const previousMal = asNonNegativeInt(raw.previous_mal);
   return {
     key,
     label,
@@ -539,6 +535,10 @@ function buildProductOverview(
   const practiceViews = asNonNegativeInt(raw.practice_views);
   const playStarts = asNonNegativeInt(raw.play_starts);
   const completions = asNonNegativeInt(raw.completions);
+  const wal = asNonNegativeInt(raw.wal);
+  const previousWal = asNonNegativeInt(raw.previous_wal);
+  const mal = asNonNegativeInt(raw.mal);
+  const previousMal = asNonNegativeInt(raw.previous_mal);
 
   return {
     realVisitors,
