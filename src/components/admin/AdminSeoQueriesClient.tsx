@@ -22,9 +22,45 @@ type WordstatResults = {
   topicTotalCount: number | null;
   suggestions: WordstatSuggestion[];
 };
+type ReviewSuggestion = {
+  intent: string;
+  recommended_format: string | null;
+  audio_fit: string;
+  recommended_disposition: "analyzed" | "not_applicable";
+  confidence: string;
+  reasons: string[];
+};
+type ReviewItem = {
+  id: string;
+  query_text: string;
+  frequency: number | null;
+  suggested: ReviewSuggestion;
+};
 
 function date(value: string | null) {
   return value ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "—";
+}
+
+function readReviewItem(value: unknown): ReviewItem | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const suggested = item.suggested;
+  if (!suggested || typeof suggested !== "object") return null;
+  const recommendation = suggested as Record<string, unknown>;
+  if (
+    typeof item.id !== "string" || typeof item.query_text !== "string"
+    || (item.frequency !== null && typeof item.frequency !== "number")
+    || typeof recommendation.intent !== "string"
+    || (recommendation.recommended_format !== null && typeof recommendation.recommended_format !== "string")
+    || typeof recommendation.audio_fit !== "string"
+    || (recommendation.recommended_disposition !== "analyzed" && recommendation.recommended_disposition !== "not_applicable")
+    || typeof recommendation.confidence !== "string" || !Array.isArray(recommendation.reasons)
+    || !recommendation.reasons.every((reason) => typeof reason === "string")
+  ) return null;
+  return {
+    id: item.id, query_text: item.query_text, frequency: item.frequency as number | null,
+    suggested: recommendation as unknown as ReviewSuggestion,
+  };
 }
 
 export default function AdminSeoQueriesClient({ initialRows, clusters: initialClusters }: { initialRows: Row[]; clusters: Cluster[] }) {
@@ -46,7 +82,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   const [wordstatBusy, setWordstatBusy] = useState(false);
   const [wordstatNotice, setWordstatNotice] = useState<string | null>(null);
   const [selectedAnalysisIds, setSelectedAnalysisIds] = useState<Set<string>>(new Set());
-  const [reviewItems, setReviewItems] = useState<Array<Record<string, unknown>>>([]);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
   const clusters = useMemo(() => [...new Set(rows.map((row) => row.cluster).filter((value): value is string => Boolean(value)))], [rows]);
@@ -57,7 +93,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     && (!analysisStatus || row.analysisStatus === analysisStatus)
     && (!source || row.source === source)
     && (!cluster || row.cluster === cluster),
-  ), [rows, search, status, source, cluster]);
+  ), [rows, search, status, analysisStatus, source, cluster]);
 
   async function addQuery(event: React.FormEvent) {
     event.preventDefault();
@@ -172,18 +208,24 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     const payload = await response.json();
     setAnalysisBusy(false);
     if (!response.ok) return setAnalysisSummary("Не удалось подготовить рекомендации.");
-    setReviewItems((payload.results ?? []).filter((item: Record<string, unknown>) => item.status === "ready_for_review"));
+    setReviewItems((Array.isArray(payload.results) ? payload.results : [])
+      .filter((item: unknown) => typeof item === "object" && item !== null && (item as Record<string, unknown>).status === "ready_for_review")
+      .map(readReviewItem)
+      .filter((item): item is ReviewItem => item !== null));
     setAnalysisSummary("Рекомендации подготовлены. Перед сохранением проверьте их.");
   }
 
-  function setReviewValue(id: string, key: string, value: string) {
-    setReviewItems((current) => current.map((item) => item.id === id ? { ...item, suggested: { ...(item.suggested as Record<string, unknown>), [key]: value || null } } : item));
+  function setReviewValue(id: string, key: "intent" | "recommended_format" | "audio_fit", value: string) {
+    setReviewItems((current) => current.map((item) => item.id === id ? {
+      ...item,
+      suggested: { ...item.suggested, [key]: value || null } as ReviewSuggestion,
+    } : item));
   }
 
   async function applyReview(id: string, analysis_status: "analyzed" | "not_applicable") {
     const item = reviewItems.find((candidate) => candidate.id === id);
     if (!item) return;
-    const suggested = item.suggested as Record<string, unknown>;
+    const suggested = item.suggested;
     setAnalysisBusy(true);
     const response = await fetch("/api/admin/seo-queries/analyze", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: [{ id, intent: suggested.intent, recommended_format: suggested.recommended_format, audio_fit: suggested.audio_fit, analysis_status }] }) });
     const payload = await response.json();
@@ -240,7 +282,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     <section className="rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] p-4">
       <button type="button" disabled={analysisBusy || selectedAnalysisIds.size === 0} onClick={() => analyzeSelected()} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Анализировать выбранные</button>
       {analysisSummary ? <p role="status" className="mt-2 text-sm text-[#4c3d78]">{analysisSummary}</p> : null}
-      {reviewItems.map((item) => { const suggested = item.suggested as Record<string, string | null>; return <article key={item.id as string} className="mt-3 rounded-xl border border-[#eadff8] bg-white p-3 text-sm"><p className="font-semibold">{item.query_text as string} · {typeof item.frequency === "number" ? item.frequency : "—"}</p><p className="mt-1 text-xs text-[#796ba0]">Уверенность: {suggested.confidence ?? "—"}. {(suggested.reasons as unknown as string[])?.join(" ")}</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={suggested.intent ?? ""} onChange={(event) => setReviewValue(item.id as string, "intent", event.target.value)}>{["listen_audio", "music", "practice", "how_to", "informational", "experience_story", "specific_content", "transactional", "navigation", "realtime", "other"].map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id as string, "recommended_format", event.target.value)}><option value="">—</option>{["Медитация", "Энергопрактика", "Лекция", "Аудиокурс", "Подкаст", "Музыка", "Аудиокнига", "Сеанс", "Сон", "Молитва", "Свой формат"].map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.audio_fit ?? ""} onChange={(event) => setReviewValue(item.id as string, "audio_fit", event.target.value)}>{["high", "medium", "low", "none"].map((value) => <option key={value}>{value}</option>)}</select></div><p className="mt-2">Рекомендация: {suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p><div className="mt-2 flex gap-3"><button type="button" onClick={() => applyReview(item.id as string, "analyzed")} className="font-semibold text-[#7042c5]">Допустить авторам</button><button type="button" onClick={() => applyReview(item.id as string, "not_applicable")} className="font-semibold text-[#7042c5]">Не подходит</button></div></article>; })}
+      {reviewItems.map((item) => { const { suggested } = item; const queryText = String(item.query_text ?? ""); const frequency = typeof item.frequency === "number" ? String(item.frequency) : "—"; const reasons = Array.isArray(suggested.reasons) ? suggested.reasons.join(" ") : ""; return <article key={item.id} className="mt-3 rounded-xl border border-[#eadff8] bg-white p-3 text-sm"><p className="font-semibold">{queryText} · {frequency}</p><p className="mt-1 text-xs text-[#796ba0]">Уверенность: {suggested.confidence}. {reasons}</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={suggested.intent} onChange={(event) => setReviewValue(item.id, "intent", event.target.value)}>{["listen_audio", "music", "practice", "how_to", "informational", "experience_story", "specific_content", "transactional", "navigation", "realtime", "other"].map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id, "recommended_format", event.target.value)}><option value="">—</option>{["Медитация", "Энергопрактика", "Лекция", "Аудиокурс", "Подкаст", "Музыка", "Аудиокнига", "Сеанс", "Сон", "Молитва", "Свой формат"].map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.audio_fit} onChange={(event) => setReviewValue(item.id, "audio_fit", event.target.value)}>{[{ value: "high", label: "Высокий" }, { value: "medium", label: "Средний" }, { value: "low", label: "Низкий" }, { value: "none", label: "Не подходит" }].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><p className="mt-2">Рекомендация: {suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p><div className="mt-2 flex gap-3"><button type="button" onClick={() => applyReview(item.id, "analyzed")} className="font-semibold text-[#7042c5]">Допустить авторам</button><button type="button" onClick={() => applyReview(item.id, "not_applicable")} className="font-semibold text-[#7042c5]">Не подходит</button></div></article>; })}
     </section>
     {editingId ? (() => {
       const row = rows.find((item) => item.id === editingId);
