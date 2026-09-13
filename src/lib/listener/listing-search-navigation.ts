@@ -10,6 +10,8 @@ export type ListingSearchRouter = {
 /**
  * Query-only listing navigation. Always `{ scroll: false }` — never jump
  * the document when search/filter state is the only change.
+ * Desktop window leftovers from Link/Next scroll are cleared by
+ * `DesktopShellWindowScrollGuard`, not by flipping this to `scroll: true`.
  */
 export function replaceListingSearch(
   router: ListingSearchRouter,

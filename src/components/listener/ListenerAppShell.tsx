@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
 import CatalogMobileFiltersSlot from "@/components/catalog/CatalogMobileFiltersSlot";
 import DesktopShellSearch from "@/components/listener/DesktopShellSearch";
+import DesktopShellWindowScrollGuard from "@/components/listener/DesktopShellWindowScrollGuard";
 import DesktopPlayerBar from "@/components/listener/DesktopPlayerBar";
 import DesktopRightColumn from "@/components/listener/DesktopRightColumn";
 import DesktopSidebar from "@/components/listener/DesktopSidebar";
@@ -51,6 +52,9 @@ export function ListenerAppShell({
       className="listener-app-shell bg-platform-surface text-[#25135c] xl:flex xl:min-h-dvh xl:h-dvh xl:flex-col xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-5"
       initialSidebarPinned={initialSidebarPinned}
     >
+      <Suspense fallback={null}>
+        <DesktopShellWindowScrollGuard />
+      </Suspense>
       <div className={bodyClassName}>
         {config.showDesktopSidebar ? (
           <div className="listener-app-shell__sidebar-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
