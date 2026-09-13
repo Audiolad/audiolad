@@ -10,6 +10,18 @@ type Row = {
   reservationId: string | null; clusterId: string | null;
 };
 type Cluster = { id: string; name: string };
+type WordstatSuggestion = {
+  phrase: string;
+  count: number;
+  source: "result" | "association";
+  opportunity: { color: "green" | "yellow" | "red"; label: string; description: string };
+};
+type WordstatResults = {
+  region: { id: string; label: string };
+  periodLabel: string;
+  topicTotalCount: number | null;
+  suggestions: WordstatSuggestion[];
+};
 
 function date(value: string | null) {
   return value ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "—";
@@ -26,6 +38,12 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   const [newCluster, setNewCluster] = useState("");
   const [editingId, setEditingId] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [wordstatSeed, setWordstatSeed] = useState("");
+  const [wordstatResults, setWordstatResults] = useState<WordstatResults | null>(null);
+  const [selectedWordstatPhrases, setSelectedWordstatPhrases] = useState<Set<string>>(new Set());
+  const [importedWordstatPhrases, setImportedWordstatPhrases] = useState<Set<string>>(new Set());
+  const [wordstatBusy, setWordstatBusy] = useState(false);
+  const [wordstatNotice, setWordstatNotice] = useState<string | null>(null);
   const clusters = useMemo(() => [...new Set(rows.map((row) => row.cluster).filter((value): value is string => Boolean(value)))], [rows]);
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source))], [rows]);
   const filtered = useMemo(() => rows.filter((row) =>
@@ -76,6 +94,63 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     setNotice("Бронь снята.");
   }
 
+  async function searchWordstat(event: React.FormEvent) {
+    event.preventDefault();
+    setWordstatBusy(true);
+    setWordstatNotice(null);
+    const response = await fetch("/api/admin/seo-queries/wordstat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phrase: wordstatSeed }),
+    });
+    const payload = await response.json();
+    setWordstatBusy(false);
+    if (!response.ok) {
+      setWordstatResults(null);
+      return setWordstatNotice(payload.error ?? "Не удалось выполнить поиск в Wordstat.");
+    }
+    setWordstatResults(payload);
+    setSelectedWordstatPhrases(new Set());
+    setImportedWordstatPhrases(new Set());
+  }
+
+  function toggleWordstatSelection(phrase: string) {
+    setSelectedWordstatPhrases((current) => {
+      const next = new Set(current);
+      if (next.has(phrase)) next.delete(phrase);
+      else next.add(phrase);
+      return next;
+    });
+  }
+
+  function selectAllWordstat() {
+    setSelectedWordstatPhrases(
+      new Set(wordstatResults?.suggestions.map((item) => item.phrase) ?? []),
+    );
+  }
+
+  async function importWordstatSelections() {
+    if (!wordstatResults || selectedWordstatPhrases.size === 0) return;
+    setWordstatBusy(true);
+    setWordstatNotice(null);
+    const items = wordstatResults.suggestions
+      .filter((item) => selectedWordstatPhrases.has(item.phrase))
+      .map((item) => ({ phrase: item.phrase, count: item.count }));
+    const response = await fetch("/api/admin/seo-queries/wordstat", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    const payload = await response.json();
+    setWordstatBusy(false);
+    if (!response.ok) return setWordstatNotice(payload.error ?? "Не удалось добавить выбранные запросы.");
+    const imported = payload.results
+      .filter((item: { status: string }) => item.status === "created" || item.status === "refreshed")
+      .map((item: { phrase: string }) => item.phrase);
+    setImportedWordstatPhrases((current) => new Set([...current, ...imported]));
+    setWordstatNotice(`Добавлено: ${payload.summary.created}; обновлено: ${payload.summary.refreshed}; ошибок: ${payload.summary.errors}.`);
+  }
+
   return <div className="space-y-5">
     <form onSubmit={addQuery} className="flex flex-col gap-2 rounded-[22px] border border-[#eadff8] bg-white p-4 sm:flex-row">
       <input value={newQuery} onChange={(event) => setNewQuery(event.target.value)} required placeholder="Добавить SEO-запрос вручную" className="min-h-11 flex-1 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
@@ -85,6 +160,30 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
       <input value={newCluster} onChange={(event) => setNewCluster(event.target.value)} required placeholder="Создать кластер" className="min-h-11 flex-1 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
       <button className="min-h-11 rounded-full border border-[#bda6e1] px-5 text-sm font-semibold text-[#7042c5]">Создать кластер</button>
     </form>
+    <section className="rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] p-4">
+      <h3 className="text-base font-semibold text-[#25135c]">Найти запросы в Wordstat</h3>
+      <form onSubmit={searchWordstat} className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input value={wordstatSeed} onChange={(event) => setWordstatSeed(event.target.value)} required placeholder="Введите исходную фразу" className="min-h-11 flex-1 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
+        <button disabled={wordstatBusy} className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white disabled:opacity-60">{wordstatBusy ? "Поиск…" : "Найти запросы"}</button>
+      </form>
+      {wordstatNotice ? <p role="status" className="mt-3 text-sm text-[#4c3d78]">{wordstatNotice}</p> : null}
+      {wordstatResults ? <div className="mt-4 space-y-3">
+        <p className="text-sm text-[#5f5484]">Период: {wordstatResults.periodLabel}. Регион: {wordstatResults.region.label}.</p>
+        <p className="text-sm text-[#5f5484]">Всего по теме: {wordstatResults.topicTotalCount ?? "—"} <span className="text-xs">(агрегат темы, не частотность исходной фразы)</span></p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={selectAllWordstat} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5]">Выбрать все</button>
+          <button type="button" disabled={wordstatBusy || selectedWordstatPhrases.size === 0} onClick={importWordstatSelections} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Добавить выбранные в SEO-базу</button>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-[#eadff8] bg-white">
+          <table className="min-w-full text-left text-sm"><thead className="bg-[#f4edff] text-[#796ba0]"><tr><th className="px-3 py-2"> </th><th className="px-3 py-2">Запрос</th><th className="px-3 py-2">Частотность</th><th className="px-3 py-2">Источник</th><th className="px-3 py-2">Оценка</th></tr></thead><tbody>
+            {wordstatResults.suggestions.map((item) => {
+              const imported = importedWordstatPhrases.has(item.phrase);
+              return <tr key={`${item.source}-${item.phrase}`} className={`border-t border-[#f3edf9] ${imported ? "bg-[#f3faf1]" : ""}`}><td className="px-3 py-2"><input aria-label={`Выбрать ${item.phrase}`} type="checkbox" checked={selectedWordstatPhrases.has(item.phrase)} onChange={() => toggleWordstatSelection(item.phrase)} /></td><td className="px-3 py-2 font-medium">{item.phrase}{imported ? <span className="ml-2 text-xs text-[#2f6b2a]">Добавлено</span> : null}</td><td className="px-3 py-2">{item.count}</td><td className="px-3 py-2">{item.source === "result" ? "результат" : "ассоциация"}</td><td className="px-3 py-2"><span className={item.opportunity.color === "green" ? "text-[#2f6b2a]" : item.opportunity.color === "yellow" ? "text-[#7a5b12]" : "text-[#8b2d2d]"} title={item.opportunity.description}>{item.opportunity.label}</span></td></tr>;
+            })}
+          </tbody></table>
+        </div>
+      </div> : null}
+    </section>
     <div className="grid gap-2 sm:grid-cols-4">
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
       <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все статусы</option>{["Свободен", "В работе", "На модерации", "Опубликован"].map((value) => <option key={value}>{value}</option>)}</select>
