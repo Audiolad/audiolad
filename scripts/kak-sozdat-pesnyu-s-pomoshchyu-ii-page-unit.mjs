@@ -31,6 +31,16 @@ assert.equal(metadata.robots?.follow, true);
 assert.equal(KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_PAGE_H1, KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_SEO_TITLE);
 assert.match(page, /buildAiMusicHubPageJsonLd/);
 assert.equal(KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_FAQ.length, 8);
+assert.deepEqual(KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_FAQ.map(({ question }) => question), [
+  "Можно ли создать песню с помощью ИИ бесплатно?",
+  "Может ли ИИ написать текст песни?",
+  "Можно ли использовать свой текст песни?",
+  "Можно ли создать песню со своим голосом?",
+  "Можно ли сделать песню, если я вообще не умею петь?",
+  "Какой ИИ лучше использовать для создания песни?",
+  "Можно ли продавать песню, созданную ИИ?",
+  "Нужно ли указывать, что песня создана с помощью ИИ?",
+]);
 assert.match(view, /ArticleFaqList items=\{KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_FAQ\}/);
 assert.ok(view.lastIndexOf('id="faq"') > view.lastIndexOf("<section"));
 assert.deepEqual([...view.matchAll(/data-visual-block=\{number\}/g)].length, 1);
@@ -49,6 +59,24 @@ const graph = buildAiMusicHubPageJsonLd({
 assert.deepEqual(graph.map((node) => node["@type"]).filter((type) => ["WebPage", "Article", "BreadcrumbList", "FAQPage"].includes(type)), ["WebPage", "Article", "BreadcrumbList", "FAQPage"]);
 assert.equal(isBottomNavNeutralPathname(KAK_SOZDAT_PESNYU_S_POMOSHCHYU_II_PATH), true);
 assert.match(sitemap, /path: "\/kak-sozdat-pesnyu-s-pomoshchyu-ii", changeFrequency: "monthly", priority: 0.7/);
+for (const step of [
+  "Определите тему и настроение.",
+  "Решите, кто пишет текст.",
+  "Выберите музыкальный стиль.",
+  "Определите характер вокала.",
+  "Соберите описание песни.",
+  "Создайте несколько вариантов.",
+  "Сравните текст, мелодию, вокал и структуру.",
+  "Доработайте лучший.",
+  "Проверьте права на текст, голос и музыку.",
+  "Подготовьте песню к публикации.",
+]) assert.match(view, new RegExp(step.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+for (const lock of [
+  "идея → текст → музыка → вокал → генерация → выбор → доработка → готовая песня",
+  "Сделай красивую поп-песню.",
+  "На кухне осталась твоя синяя чашка.",
+  "Voice model",
+]) assert.match(view, new RegExp(lock.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 for (const url of ["11362369", "13924481", "2415873", "2416769", "9601665", "2746945", "2425729", "12683565"]) assert.match(view, new RegExp(url));
 assert.match(view, /Если вам интересно работать с аудиоформатами дальше, загляните в АудиоЛад\./);
 assert.match(view, /Можно зарегистрироваться бесплатно, познакомиться с площадкой и посмотреть, какие музыкальные и авторские аудиоформаты вы захотите создавать дальше\./);
