@@ -66,7 +66,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     pathname === "/kak-sozdat-ii-muzyku" ||
     pathname === "/kak-vylozhit-ii-muzyku" ||
     pathname === "/v-kakoy-neyroseti-sozdat-muzyku" ||
-    pathname === "/kak-sozdat-muzyku-v-suno"
+    pathname === "/kak-sozdat-muzyku-v-suno" ||
+    pathname === "/kak-sozdat-pesnyu-s-pomoshchyu-ii"
   );
 }
 
