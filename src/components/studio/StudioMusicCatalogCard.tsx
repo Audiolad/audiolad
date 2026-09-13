@@ -165,6 +165,15 @@ export function StudioMusicCatalogCard({
                 {busy ? STUDIO_MUSIC_LOADING_LABEL : action.label}
               </button>
             ) : null}
+            {action.kind === "unavailable" ? (
+              <button
+                type="button"
+                disabled
+                className="rounded-md border border-[#9d7ae8] px-3 py-1.5 text-xs font-semibold text-[#e8dcff] opacity-60"
+              >
+                {action.label}
+              </button>
+            ) : null}
             {canAdd && !isAlbum && primaryTrackId ? (
               <button
                 type="button"
@@ -194,6 +203,21 @@ export function StudioMusicCatalogCard({
           {actionError ? (
             <p role="alert" className="text-xs text-rose-200 md:text-right">
               {actionError}
+            </p>
+          ) : null}
+          {action.kind === "unavailable" ? (
+            <p className="text-xs text-[#c9d4e8] md:text-right">
+              Автор ещё не подтвердил обновлённые условия использования музыки в
+              Студии. Получение лицензии временно недоступно.
+            </p>
+          ) : null}
+          {(action.kind === "free" || action.kind === "paid") ? (
+            <p className="text-[11px] text-[#9ba7bb] md:text-right">
+              Получая Лицензию для Студии, вы принимаете условия{" "}
+              <a href="/offer#studio-license" className="underline">
+                Публичной оферты
+              </a>
+              .{isAlbum ? " Одна лицензия открывает для использования в Студии все треки этого альбома." : ""}
             </p>
           ) : null}
         </div>

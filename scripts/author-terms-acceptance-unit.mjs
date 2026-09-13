@@ -25,11 +25,11 @@ function sha256(text) {
 }
 
 // 1) current edition published in code
-assert.equal(AUTHOR_TERMS_TOC.length, 25);
-assert.equal(AUTHOR_TERMS_APPROVED_META.version, "1.1");
-assert.equal(AUTHOR_TERMS_APPROVED_META.versionId, "7b95bb3d-9047-4a2b-9546-0e6b5af6bb26");
-assert.equal(AUTHOR_TERMS_APPROVED_META.publishedAt, "2026-09-02T00:00:00+03:00");
-assert.equal(AUTHOR_TERMS_APPROVED_META.effectiveAt, "2026-09-02T00:00:00+03:00");
+assert.equal(AUTHOR_TERMS_TOC.length, 26);
+assert.equal(AUTHOR_TERMS_APPROVED_META.version, "1.2");
+assert.equal(AUTHOR_TERMS_APPROVED_META.versionId, "9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902");
+assert.equal(AUTHOR_TERMS_APPROVED_META.publishedAt, "2026-09-13T00:00:00+03:00");
+assert.equal(AUTHOR_TERMS_APPROVED_META.effectiveAt, "2026-09-13T00:00:00+03:00");
 assert.match(AUTHOR_TERMS_APPROVED_META.contentHash, /^[0-9a-f]{64}$/);
 assert.equal(
   sha256(AUTHOR_TERMS_APPROVED_TEXT),
@@ -37,7 +37,7 @@ assert.equal(
 );
 assert.equal(
   AUTHOR_TERMS_APPROVED_META.contentHash,
-  "594f1f8db5c2e4e90d71adf158c7f54937d037938164143701c49ceb7d77e89d",
+  "8984e194ba6f3c1ed6c7bd5d92e8c1ff4a3c858e440633844423fa370fb005ee",
 );
 assert.equal(AUTHOR_TERMS_APPROVED_META.publicPath, "/author-terms");
 assert.ok(!AUTHOR_TERMS_APPROVED_TEXT.includes("\u2014"), "em-dash forbidden");
@@ -104,8 +104,8 @@ assert.ok(
 const sectionHeadings = blocks.filter(
   (b) => b.type === "heading" && typeof b.id === "string" && b.id.startsWith("section-"),
 );
-assert.equal(sectionHeadings.length, 25);
-for (let n = 1; n <= 25; n += 1) {
+assert.equal(sectionHeadings.length, 26);
+for (let n = 1; n <= 26; n += 1) {
   const matches = sectionHeadings.filter((b) => b.id === `section-${n}`);
   assert.equal(matches.length, 1, `section-${n} must appear exactly once`);
 }
@@ -181,11 +181,11 @@ assert.ok(
   ),
 );
 
-// current edition 1.1 is published by a later data migration
+// current edition 1.2 is published by a later data migration
 const currentMigration = readFileSync(
   path.join(
     root,
-    "supabase/migrations/20260914120000_author_terms_v1_1.sql",
+    "supabase/migrations/20261006140000_studio_music_legal_foundation_v1_2.sql",
   ),
   "utf8",
 );
@@ -196,6 +196,8 @@ assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.publishedAt));
 assert.ok(currentMigration.includes(AUTHOR_TERMS_APPROVED_META.effectiveAt));
 assert.ok(currentMigration.includes("is_current = false"));
 assert.ok(!currentMigration.includes("CREATE TABLE"));
+assert.ok(currentMigration.includes("author_terms_acceptances"));
+assert.ok(currentMigration.includes("studio_author_terms_not_accepted"));
 
 const page = readFileSync(
   path.join(root, "src/app/(platform)/author-terms/page.tsx"),

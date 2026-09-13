@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import LegalPageShell from "@/components/legal/LegalPageShell";
+import { STUDIO_LICENSE_OFFER } from "@/lib/studio-music/license-terms";
 
 export const metadata: Metadata = {
   title: "Публичная оферта – АудиоЛад",
@@ -75,7 +76,7 @@ export default function OfferPage() {
           </p>
 
           <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-            Последнее обновление: 2 сентября 2026 года
+            Последнее обновление: 13 сентября 2026 года
           </p>
 
           <Section id="section-1" title="1. Общие положения">
@@ -115,7 +116,9 @@ export default function OfferPage() {
             <p className={bodyClassName}>
               <strong className="font-semibold text-[#25135c]">1.4.</strong>{" "}
               Оплата выбранного цифрового аудиопродукта означает полное и
-              безоговорочное принятие Покупателем условий настоящей оферты.
+              безоговорочное принятие Покупателем условий настоящей оферты, за
+              исключением порядка принятия Лицензии для Студии АудиоЛад,
+              установленного соответствующим разделом.
             </p>
 
             <p className={bodyClassName}>
@@ -264,7 +267,11 @@ export default function OfferPage() {
             <p className={bodyClassName}>
               <strong className="font-semibold text-[#25135c]">4.3.</strong>{" "}
               Договор считается заключённым с момента подтверждения успешной
-              оплаты.
+              оплаты, кроме Лицензии для Студии АудиоЛад: для неё платный
+              порядок оформления и последующая успешная оплата означают
+              принятие условий; действие по бесплатному получению также
+              означает их принятие, а бесплатная лицензия возникает без
+              платежа после успешного предоставления права использования.
             </p>
 
             <p className={bodyClassName}>
@@ -386,11 +393,15 @@ export default function OfferPage() {
             <p className={bodyClassName}>
               <strong className="font-semibold text-[#25135c]">7.2.</strong>{" "}
               Покупателю предоставляется право использования приобретённого
-              цифрового аудиопродукта исключительно для личного использования.
+              цифрового аудиопродукта исключительно для личного использования,
+              за исключением случаев и в объёме, прямо предусмотренных разделом
+              «Лицензия для Студии АудиоЛад».
             </p>
 
             <p className={bodyClassName}>
-              Без письменного согласия Продавца запрещается:
+              Без письменного согласия Продавца запрещается, за исключением
+              случаев и в объёме, прямо предусмотренных разделом «Лицензия для
+              Студии АудиоЛад»:
             </p>
 
             <BulletList
@@ -402,6 +413,14 @@ export default function OfferPage() {
                 "использовать цифровые аудиопродукты в коммерческих целях.",
               ]}
             />
+          </Section>
+
+          <Section id="studio-license" title="Лицензия для Студии АудиоЛад">
+            <p className={bodyClassName}>{STUDIO_LICENSE_OFFER.definitions}</p>
+            {STUDIO_LICENSE_OFFER.paragraphs.map((paragraph) => (
+              <p key={paragraph} className={bodyClassName}>{paragraph}</p>
+            ))}
+            <BulletList items={[...STUDIO_LICENSE_OFFER.forbidden]} />
           </Section>
 
           <Section id="section-8" title="8. Обновление цифровых аудиопродуктов">

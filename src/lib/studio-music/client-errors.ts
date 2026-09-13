@@ -25,6 +25,8 @@ export function mapStudioMusicCheckoutClientError(code: string | undefined): str
       return "Музыка не найдена или временно недоступна.";
     case "practice_not_for_sale":
       return "Эту музыку сейчас нельзя купить для Студии.";
+    case "author_terms_not_accepted":
+      return "Автор ещё не подтвердил обновлённые условия использования музыки в Студии. Получение лицензии временно недоступно.";
     case "order_already_paid":
       return "Этот платёж уже завершён. Обновите каталог.";
     case "order_not_payable":
@@ -48,6 +50,8 @@ export function mapStudioMusicAcquireClientError(code: string | undefined): stri
       return "Эта музыка не бесплатная.";
     case "practice_not_found":
       return "Музыка не найдена или временно недоступна.";
+    case "author_terms_not_accepted":
+      return "Автор ещё не подтвердил обновлённые условия использования музыки в Студии. Получение лицензии временно недоступно.";
     case "support_mutation_blocked":
       return "В режиме поддержки нельзя получать музыку для Студии.";
     case "invalid_request":
