@@ -12,7 +12,18 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTAINER = process.env.AUDIOLAD_SUPABASE_DB_CONTAINER || "supabase-db";
+const DATABASE_URL = process.env.AUDIOLAD_ANALYTICS_P2_DATABASE_URL?.trim() || null;
 const TEST_DB = "audiolad_analytics_p2_test";
+
+function localhostDatabaseUrl() {
+  if (!DATABASE_URL) return null;
+  const parsed = new URL(DATABASE_URL);
+  if (!["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
+    throw new Error("analytics P2 SQL tests only permit a localhost PostgreSQL URL");
+  }
+  return parsed;
+}
+const LOCAL_DATABASE_URL = localhostDatabaseUrl();
 
 // Europe/Moscow days 2026-07-20 .. 2026-07-24 (UTC+3, no DST).
 const FROM = "2026-07-19T21:00:00Z";
@@ -40,6 +51,14 @@ function assertEqual(actual, expected, label) {
 }
 
 function psql(database, sql, { tuples = false } = {}) {
+  if (LOCAL_DATABASE_URL) {
+    const url = new URL(LOCAL_DATABASE_URL);
+    url.pathname = `/${database}`;
+    const args = [url.toString(), "-v", "ON_ERROR_STOP=1"];
+    if (tuples) args.push("-At");
+    args.push("-c", sql);
+    return execFileSync("psql", args, { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
+  }
   const args = [
     "exec",
     "-i",
@@ -58,6 +77,13 @@ function psql(database, sql, { tuples = false } = {}) {
 }
 
 function psqlFile(database, absolutePath) {
+  if (LOCAL_DATABASE_URL) {
+    const url = new URL(LOCAL_DATABASE_URL);
+    url.pathname = `/${database}`;
+    return execFileSync("psql", [url.toString(), "-v", "ON_ERROR_STOP=1"], {
+      encoding: "utf8", input: readFileSync(absolutePath, "utf8"), maxBuffer: 20 * 1024 * 1024,
+    });
+  }
   return execFileSync(
     "docker",
     ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1"],
@@ -122,6 +148,11 @@ CREATE TABLE public.platform_user_roles (
   user_id uuid REFERENCES auth.users(id),
   role_code text REFERENCES public.platform_roles(code),
   PRIMARY KEY (user_id, role_code)
+);
+CREATE TABLE public.author_members (
+  author_id uuid REFERENCES public.authors(id),
+  user_id uuid REFERENCES auth.users(id),
+  PRIMARY KEY (author_id, user_id)
 );
 INSERT INTO public.platform_roles(code) VALUES ('owner'), ('admin');
 INSERT INTO public.platform_permissions(code) VALUES ('admin_panel.access');
@@ -191,6 +222,9 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20260725161000_admin_analytics_dashboard_snapshot_p1.sql"));
   psqlFile(TEST_DB, migration("20260725162000_unlink_analytics_identity.sql"));
   psqlFile(TEST_DB, migration("20260725180000_admin_analytics_p2_dashboard.sql"));
+  psqlFile(TEST_DB, migration("20261006120000_analytics_shared_product_semantics.sql"));
+  psqlFile(TEST_DB, migration("20261006120200_analytics_nullable_visitor_identity.sql"));
+  psqlFile(TEST_DB, migration("20261006120400_analytics_owner_overview.sql"));
 }
 
 /**
@@ -326,6 +360,91 @@ function testEventCountsDifferFromUniquePeople() {
     snapshot.events.play_starts > snapshot.people.listeners,
     `play_starts (${snapshot.events.play_starts}) must exceed unique listeners (${snapshot.people.listeners})`,
   );
+}
+
+function testOwnerOverviewSemantics() {
+  psql(TEST_DB, `
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-07-12 10:00:00+00',false,false,false,'human'),
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-06-10 10:00:00+00',false,false,false,'human'),
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','page_view','${PRACTICE_ONE}','2026-07-20 10:00:30+00',false,false,false,'human'),
+  ('e2222222-2222-2222-2222-222222222222','p2anon2',NULL,'page_view','${PRACTICE_ONE}','2026-07-21 10:00:30+00',false,false,false,'human'),
+  ('e3333333-3333-3333-3333-333333333333','p2anon3','${USER_HUMAN_TWO}','audio_play_started','${PRACTICE_THREE}','2026-07-23 10:02:00+00',false,false,false,'human'),
+  (NULL,NULL,NULL,'audio_play_started','${PRACTICE_THREE}','2026-07-23 11:00:00+00',false,false,false,'human');
+`);
+  const overview = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(overview.real_visitors, 2, "overview real visitors use valid page views");
+  assertEqual(overview.listeners, 3, "null identity event counted but not a person");
+  assertEqual(overview.new_listeners, 2, "first-ever listeners");
+  assertEqual(overview.returning_listeners, 1, "returning listener has a valid pre-period start");
+  assertEqual(overview.repeat_listeners, 1, "two Moscow listening days is repeat");
+  assertEqual(overview.wal, 3, "WAL current");
+  assertEqual(overview.previous_wal, 1, "WAL previous consecutive window");
+  assertEqual(overview.mal, 3, "MAL current");
+  assertEqual(overview.previous_mal, 1, "MAL previous consecutive window");
+  assertEqual(Math.round((overview.listeners / overview.practice_visitors) * 100), 100, "people conversion");
+  assertEqual(Math.round((overview.completers / overview.listeners) * 100), 33, "people completion");
+  assertEqual(overview.play_starts / overview.listeners, 2, "starts per listener");
+  const all = json(`SELECT public.analytics_owner_overview(NULL,NULL,false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(all.new_listeners, all.listeners, "all treats all listeners as new");
+  assertEqual(all.returning_listeners, 0, "all has no pre-period history");
+  function assertExcluded(label, anonymousId, flags, campaign = null) {
+    const before = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+    psql(TEST_DB, `
+WITH session_row AS (
+  INSERT INTO public.analytics_sessions(anonymous_id,started_at,last_seen_at,utm_campaign,device_type,is_staff,is_test,is_bot,traffic_class)
+  VALUES ('${anonymousId}','2026-07-22 13:00:00+00','2026-07-22 13:00:00+00',${campaign ? `'${campaign}'` : 'NULL'},'desktop',${flags})
+  RETURNING id
+)
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class)
+SELECT id,'${anonymousId}','audio_play_started','${PRACTICE_ONE}','2026-07-22 13:01:00+00',${flags} FROM session_row;
+`);
+    const after = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+    assertEqual(after.listeners, before.listeners, `${label}: listeners excluded`);
+    assertEqual(after.play_starts, before.play_starts, `${label}: starts excluded`);
+    psql(TEST_DB, `DELETE FROM public.analytics_events WHERE anonymous_session_id='${anonymousId}'; DELETE FROM public.analytics_sessions WHERE anonymous_id='${anonymousId}';`);
+  }
+  assertExcluded("staff-only", "owner-staff-isolated", "true,false,false,'human'");
+  assertExcluded("test-only", "owner-test-isolated", "false,true,false,'human'");
+  assertExcluded("bot-only", "owner-bot-isolated", "false,false,true,'human'");
+  assertExcluded("traffic-class-only", "owner-traffic-isolated", "false,false,false,'bot'");
+  const testAnonymousId = "manual-owner-overview-isolated";
+  assertEqual(scalar(`SELECT public.is_test_anonymous_id('${testAnonymousId}')::text`), "true", "test-anonymous precondition: direct predicate");
+  assertEqual(scalar(`SELECT public.is_test_analytics_session('owner_overview_control','${testAnonymousId}')::text`), "false", "test-anonymous precondition: session predicate");
+  assertExcluded("test-anonymous-only", testAnonymousId, "false,false,false,'human'", "owner_overview_control");
+  const testSessionAnonId = "owner-session-isolated";
+  assertEqual(scalar(`SELECT public.is_test_anonymous_id('${testSessionAnonId}')::text`), "false", "test-session precondition: direct predicate");
+  assertEqual(scalar(`SELECT public.is_test_analytics_session('analytics_dev_fixture','${testSessionAnonId}')::text`), "true", "test-session precondition: session predicate");
+  assertExcluded("test-session-only", testSessionAnonId, "false,false,false,'human'", "analytics_dev_fixture");
+  const nullableBefore = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  psql(TEST_DB, `INSERT INTO public.analytics_events(event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES ('audio_play_started','${PRACTICE_ONE}','2026-07-22 14:00:00+00',false,false,false,'human');`);
+  const nullableAfter = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(nullableAfter.listeners, nullableBefore.listeners, "nullable identity does not add a listener");
+  assertEqual(nullableAfter.play_starts, nullableBefore.play_starts + 1, "nullable identity event adds one start");
+  psql(TEST_DB, `DELETE FROM public.analytics_events WHERE occurred_at='2026-07-22 14:00:00+00' AND event_name='audio_play_started' AND session_id IS NULL;`);
+  const authorOne = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_ONE}',NULL,NULL,NULL)::text;`);
+  assertEqual(authorOne.repeat_listeners, 0, "many starts on one Moscow day are not repeat listeners");
+  psql(TEST_DB, `
+INSERT INTO public.author_members(author_id,user_id) VALUES ('${AUTHOR_ONE}','${USER_HUMAN_ONE}');
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_FOUR}','2026-07-23 12:00:00+00',false,false,false,'human'),
+  ('e4444444-4444-4444-4444-444444444444','p2anonstaff','${USER_STAFF}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',true,false,false,'staff'),
+  ('e5555555-5555-5555-5555-555555555555','p2anontester','${USER_TEST}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,true,false,'test'),
+  (NULL,'test-overview',NULL,'audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,false,true,'bot');
+`);
+  const ownExcluded = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_ONE}',NULL,NULL,NULL)::text;`);
+  const otherIncluded = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_TWO}',NULL,NULL,NULL)::text;`);
+  assertEqual(ownExcluded.listeners, 1, "author member own product activity excluded");
+  assertEqual(otherIncluded.listeners, 2, "same member activity on other author included");
+  psql(TEST_DB, `
+DELETE FROM public.analytics_events
+WHERE occurred_at IN (
+  '2026-06-10 10:00:00+00', '2026-07-12 10:00:00+00',
+  '2026-07-20 10:00:30+00', '2026-07-21 10:00:30+00',
+  '2026-07-23 10:02:00+00', '2026-07-23 11:00:00+00', '2026-07-23 12:00:00+00'
+);
+DELETE FROM public.author_members WHERE author_id = '${AUTHOR_ONE}' AND user_id = '${USER_HUMAN_ONE}';
+`);
 }
 
 function testPreviousWindow() {
@@ -618,6 +737,7 @@ function main() {
   testPreviousWindow();
   testServiceTrafficFilter();
   testProductAndSessionFilters();
+  testOwnerOverviewSemantics();
   testTimeseriesZeroFillAndAdditivity();
   testPracticesPaginationAndHref();
   testDivisionSafeSorts();

@@ -52,6 +52,7 @@ function main() {
   const queries = read("src/lib/admin/analytics-queries.ts");
   const funnel = read("src/components/admin/AdminAnalyticsFunnelPanel.tsx");
   const page = read("src/app/(platform)/admin/page.tsx");
+  const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
 
   assert(periodSrc.includes("resolvePreviousAdminAnalyticsPeriodRange"), "prev period");
   assert(periodSrc.includes("formatAdminDelta"), "delta helper");
@@ -72,11 +73,34 @@ function main() {
   assert(queries.includes("funnelEvents"), "event funnel");
   assert(queries.includes("funnelPeople"), "people funnel");
   assert(queries.includes("session_touch"), "utm attribution");
-  assert(funnel.includes("события") || funnel.includes("События"), "events labeled");
-  assert(funnel.includes("люди") || funnel.includes("Люди"), "people labeled");
+  assert(queries.includes("practiceVisitors = asNonNegativeInt(raw.practice_visitors)"), "practice visitors source");
+  assert(queries.includes("listeners = asNonNegativeInt(raw.listeners)"), "listeners source");
+  assert(queries.includes("completers = asNonNegativeInt(raw.completers)"), "completers source");
+  assert(queries.includes("formatAdminPercent(listeners, practiceVisitors)"), "view-to-start is people ratio");
+  assert(queries.includes("formatAdminPercent(completers, listeners)"), "completion is people ratio");
+  assert(queries.includes("formatAdminDecimal(playStarts, listeners)"), "starts per listener formula");
+  assert(funnel.includes("Посетители практик"), "practice visitors label");
+  assert(funnel.includes("Начали слушать"), "listeners label");
+  assert(funnel.includes("Дослушали"), "completers label");
+  assert(funnel.includes("Просмотры практик"), "practice views activity label");
+  assert(funnel.includes("Запуски"), "starts activity label");
+  assert(funnel.includes("Дослушивания"), "completions activity label");
+  assert(funnel.includes("События и интенсивность использования"), "events distinguished from people");
+  assert(funnel.includes('suffix: "события"'), "event cards explicitly labeled");
+  assert(funnel.includes(">люди</p>"), "people cards explicitly labeled");
+  assert(queries.includes('if (denominator <= 0 || numerator <= 0) {\n    return "0";'), "starts per listener zero safe");
+  assert(workbench.includes("overview={summary.productOverview}"), "funnel is primary");
+  assert(workbench.includes("Дополнительные показатели"), "existing supporting KPIs retained");
   assert(page.includes("authorId"), "author filter in URL");
   assert(page.includes("practiceId"), "practice filter in URL");
   assert(page.includes("utmSource"), "utm filter in URL");
+  assert(periodSrc.includes('"today"') && periodSrc.includes('"yesterday"'), "daily period contract");
+  assert(periodSrc.includes('"7d"') && periodSrc.includes('"30d"') && periodSrc.includes('"all"'), "range period contract");
+  assert(queries.includes('service.rpc("admin_analytics_p2_summary"'), "summary RPC remains server-side");
+  assert(read("src/lib/supabase/client.ts").includes("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"), "browser has publishable key only");
+  assert(!read("src/lib/supabase/client.ts").includes("SUPABASE_SERVICE_ROLE_KEY"), "browser has no service role");
+  const previousContract = queries.slice(queries.indexOf("previous?: {"), queries.indexOf("} | null;"));
+  assert(!previousContract.includes("completers"), "previous RPC contract is not invented");
 
   // Ensure we don't silently mix conversion types in funnel save step docs
   assert(
