@@ -63,7 +63,13 @@ assert.match(server, /inspectAudioMediaFile/);
 assert.match(server, /isVerifiedMusicMasterMedia/);
 assert.match(server, /objectSize !== input\.fileSize/);
 assert.match(server, /finalize_music_master_asset/);
-assert.doesNotMatch(server, /audio_path:/);
+const finalizeBlock = server.slice(
+  server.indexOf("export async function finalizeMusicMasterDirectUpload"),
+  server.indexOf("export async function abandonMusicMasterDirectUpload"),
+);
+assert.match(finalizeBlock, /throw new MusicMasterUploadError\("invalid_file_type", 400\)/);
+assert.doesNotMatch(finalizeBlock, /\.from\("audio_items"\)\s*\.update/);
+assert.doesNotMatch(finalizeBlock, /audio_path:/);
 assert.match(client, new RegExp(`from\\(MUSIC_MASTERS_BUCKET\\)`));
 assert.match(client, /contentType: "audio\/wav"/);
 assert.doesNotMatch(client, /contentType: input\.file\.type/);
