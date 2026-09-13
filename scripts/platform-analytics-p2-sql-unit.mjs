@@ -365,11 +365,12 @@ function testEventCountsDifferFromUniquePeople() {
 function testOwnerOverviewSemantics() {
   psql(TEST_DB, `
 INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
-  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-07-10 10:00:00+00',false,false,false,'human'),
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-07-12 10:00:00+00',false,false,false,'human'),
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_ONE}','2026-06-10 10:00:00+00',false,false,false,'human'),
   ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','page_view','${PRACTICE_ONE}','2026-07-20 10:00:30+00',false,false,false,'human'),
   ('e2222222-2222-2222-2222-222222222222','p2anon2',NULL,'page_view','${PRACTICE_ONE}','2026-07-21 10:00:30+00',false,false,false,'human'),
   ('e3333333-3333-3333-3333-333333333333','p2anon3','${USER_HUMAN_TWO}','audio_play_started','${PRACTICE_THREE}','2026-07-23 10:02:00+00',false,false,false,'human'),
-  (NULL,NULL,NULL,'audio_play_started','${PRACTICE_ONE}','2026-07-23 11:00:00+00',false,false,false,'human');
+  (NULL,NULL,NULL,'audio_play_started','${PRACTICE_THREE}','2026-07-23 11:00:00+00',false,false,false,'human');
 `);
   const overview = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
   assertEqual(overview.real_visitors, 2, "overview real visitors use valid page views");
@@ -378,15 +379,29 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   assertEqual(overview.returning_listeners, 1, "returning listener has a valid pre-period start");
   assertEqual(overview.repeat_listeners, 1, "two Moscow listening days is repeat");
   assertEqual(overview.wal, 3, "WAL current");
-  assertEqual(overview.previous_wal, 0, "WAL previous");
+  assertEqual(overview.previous_wal, 1, "WAL previous consecutive window");
   assertEqual(overview.mal, 3, "MAL current");
-  assertEqual(overview.previous_mal, 0, "MAL previous");
+  assertEqual(overview.previous_mal, 1, "MAL previous consecutive window");
   assertEqual(Math.round((overview.listeners / overview.practice_visitors) * 100), 100, "people conversion");
   assertEqual(Math.round((overview.completers / overview.listeners) * 100), 33, "people completion");
   assertEqual(overview.play_starts / overview.listeners, 2, "starts per listener");
   const all = json(`SELECT public.analytics_owner_overview(NULL,NULL,false,NULL,NULL,NULL,NULL)::text;`);
   assertEqual(all.new_listeners, all.listeners, "all treats all listeners as new");
   assertEqual(all.returning_listeners, 0, "all has no pre-period history");
+  const authorOne = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_ONE}',NULL,NULL,NULL)::text;`);
+  assertEqual(authorOne.repeat_listeners, 0, "many starts on one Moscow day are not repeat listeners");
+  psql(TEST_DB, `
+INSERT INTO public.author_members(author_id,user_id) VALUES ('${AUTHOR_ONE}','${USER_HUMAN_ONE}');
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_TWO}','2026-07-23 12:00:00+00',false,false,false,'human'),
+  ('e4444444-4444-4444-4444-444444444444','p2anonstaff','${USER_STAFF}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',true,false,false,'staff'),
+  ('e5555555-5555-5555-5555-555555555555','p2anontester','${USER_TEST}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,true,false,'test'),
+  (NULL,'test-overview',NULL,'audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,false,true,'bot');
+`);
+  const ownExcluded = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_ONE}',NULL,NULL,NULL)::text;`);
+  const otherIncluded = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_TWO}',NULL,NULL,NULL)::text;`);
+  assertEqual(ownExcluded.listeners, 1, "author member own product activity excluded");
+  assertEqual(otherIncluded.listeners, 2, "same member activity on other author included");
 }
 
 function testPreviousWindow() {
@@ -676,10 +691,10 @@ function main() {
   setup();
   testSummaryMatchesDirectSql();
   testEventCountsDifferFromUniquePeople();
-  testOwnerOverviewSemantics();
   testPreviousWindow();
   testServiceTrafficFilter();
   testProductAndSessionFilters();
+  testOwnerOverviewSemantics();
   testTimeseriesZeroFillAndAdditivity();
   testPracticesPaginationAndHref();
   testDivisionSafeSorts();
