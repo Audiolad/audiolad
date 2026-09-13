@@ -1,32 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { classifySeoQuery } from "@/lib/seo-queries/classifier";
 import {
-  classifySeoQuery,
-  SEO_QUERY_AUDIO_FITS,
-  SEO_QUERY_FORMATS,
-  SEO_QUERY_INTENTS,
-} from "@/lib/seo-queries/classifier";
+  parseSeoQueryIds,
+  SEO_QUERY_ANALYSIS_MAX_ITEMS,
+  validateSeoQueryApplyItem,
+} from "@/lib/seo-queries/analysis-validation";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_ITEMS = 20;
-
-function uniqueIds(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_ITEMS) return null;
-  const ids = [...new Set(value)];
-  return ids.every((id) => typeof id === "string" && UUID.test(id)) ? ids : null;
-}
-
-function nullableString(value: unknown): string | null | undefined {
-  return value === null ? null : typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
 
 export async function POST(request: Request) {
   await requireAdminPermission("seo.manage");
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "invalid_request" }, { status: 400 }); }
-  const ids = uniqueIds(body.query_ids);
+  const ids = parseSeoQueryIds(body.query_ids);
   if (!ids) return NextResponse.json({ error: "invalid_query_ids" }, { status: 400 });
 
   const { data, error } = await createServiceRoleClient()
@@ -59,35 +46,28 @@ export async function PUT(request: Request) {
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "invalid_request" }, { status: 400 }); }
   const items = body.items;
-  if (!Array.isArray(items) || items.length < 1 || items.length > MAX_ITEMS) return NextResponse.json({ error: "invalid_items" }, { status: 400 });
+  if (!Array.isArray(items) || items.length < 1 || items.length > SEO_QUERY_ANALYSIS_MAX_ITEMS) return NextResponse.json({ error: "invalid_items" }, { status: 400 });
   const ids = items.map((item) => item && typeof item === "object" ? (item as Record<string, unknown>).id : null);
-  if (!uniqueIds(ids)) return NextResponse.json({ error: "invalid_items" }, { status: 400 });
+  if (!parseSeoQueryIds(ids)) return NextResponse.json({ error: "invalid_items" }, { status: 400 });
 
   const supabase = createServiceRoleClient();
   const results: Array<Record<string, unknown>> = [];
-  for (const input of items as Record<string, unknown>[]) {
-    const id = input.id as string;
-    const intent = nullableString(input.intent);
-    const recommendedFormat = nullableString(input.recommended_format);
-    const audioFit = nullableString(input.audio_fit);
-    const analysisStatus = input.analysis_status;
-    if (
-      intent === undefined || !SEO_QUERY_INTENTS.includes(intent as typeof SEO_QUERY_INTENTS[number])
-      || recommendedFormat === undefined || (recommendedFormat !== null && !SEO_QUERY_FORMATS.includes(recommendedFormat as typeof SEO_QUERY_FORMATS[number]))
-      || audioFit === undefined || !SEO_QUERY_AUDIO_FITS.includes(audioFit as typeof SEO_QUERY_AUDIO_FITS[number])
-      || (analysisStatus !== "analyzed" && analysisStatus !== "not_applicable")
-    ) {
+  for (const input of items) {
+    const parsed = validateSeoQueryApplyItem(input);
+    const id = input && typeof input === "object" && typeof (input as Record<string, unknown>).id === "string" ? (input as Record<string, unknown>).id : null;
+    if (!parsed) {
       results.push({ id, status: "invalid_item" });
       continue;
     }
+    const { id: queryId, intent, recommendedFormat, audioFit, analysisStatus } = parsed;
     const { data: reservation } = await supabase
-      .from("seo_query_reservations").select("id").eq("query_id", id).in("status", ["active", "used"]).maybeSingle();
-    if (reservation) { results.push({ id, status: "reservation_conflict" }); continue; }
+      .from("seo_query_reservations").select("id").eq("query_id", queryId).in("status", ["active", "used"]).maybeSingle();
+    if (reservation) { results.push({ id: queryId, status: "reservation_conflict" }); continue; }
     const { data, error } = await supabase.from("seo_queries").update({
       intent, recommended_format: recommendedFormat, audio_fit: audioFit, analysis_status: analysisStatus,
-    }).eq("id", id).eq("analysis_status", "not_analyzed").select("id, intent, recommended_format, audio_fit, analysis_status").maybeSingle();
-    if (error) { results.push({ id, status: "error" }); continue; }
-    results.push(data ? { ...data, status: "applied" } : { id, status: "already_reviewed" });
+    }).eq("id", queryId).eq("analysis_status", "not_analyzed").select("id, intent, recommended_format, audio_fit, analysis_status").maybeSingle();
+    if (error) { results.push({ id: queryId, status: "error" }); continue; }
+    results.push(data ? { ...data, status: "applied" } : { id: queryId, status: "already_reviewed" });
   }
   const summary = {
     analyzed: results.filter((item) => item.status === "applied" && item.analysis_status === "analyzed").length,

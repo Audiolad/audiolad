@@ -1,36 +1,21 @@
-export const SEO_QUERY_INTENTS = [
-  "listen_audio",
-  "music",
-  "practice",
-  "how_to",
-  "informational",
-  "experience_story",
-  "specific_content",
-  "transactional",
-  "navigation",
-  "realtime",
-  "other",
-] as const;
+import type {
+  SeoQueryAudioFit,
+  SeoQueryDisposition,
+  SeoQueryFormat,
+  SeoQueryIntent,
+} from "./analysis-taxonomy";
 
-export const SEO_QUERY_AUDIO_FITS = ["high", "medium", "low", "none"] as const;
-export const SEO_QUERY_FORMATS = [
-  "Медитация",
-  "Энергопрактика",
-  "Лекция",
-  "Аудиокурс",
-  "Подкаст",
-  "Музыка",
-  "Аудиокнига",
-  "Сеанс",
-  "Сон",
-  "Молитва",
-  "Свой формат",
-] as const;
-
-export type SeoQueryIntent = (typeof SEO_QUERY_INTENTS)[number];
-export type SeoQueryAudioFit = (typeof SEO_QUERY_AUDIO_FITS)[number];
-export type SeoQueryFormat = (typeof SEO_QUERY_FORMATS)[number];
-export type SeoQueryDisposition = "analyzed" | "not_applicable";
+export {
+  SEO_QUERY_AUDIO_FITS,
+  SEO_QUERY_FORMATS,
+  SEO_QUERY_INTENTS,
+} from "./analysis-taxonomy";
+export type {
+  SeoQueryAudioFit,
+  SeoQueryDisposition,
+  SeoQueryFormat,
+  SeoQueryIntent,
+} from "./analysis-taxonomy";
 
 export type SeoQueryClassification = {
   intent: SeoQueryIntent;
@@ -46,8 +31,11 @@ function has(text: string, expression: RegExp) { return expression.test(text); }
 /** Pure conservative recommendation. Persistence and final review remain admin-only. */
 export function classifySeoQuery({ queryText }: { queryText: string }): SeoQueryClassification {
   const text = queryText.toLowerCase().trim();
-  if (has(text, /(купить|цена|стоимость|заказать|скачать|войти|регистрация|адрес|контакты)/)) {
-    return { intent: "transactional", recommendedFormat: null, audioFit: "none", recommendedDisposition: "not_applicable", confidence: "high", reasons: ["Коммерческий или навигационный запрос не является аудио-возможностью."] };
+  if (has(text, /(войти|вход|логин|регистрация|личный кабинет|официальный сайт|адрес|контакты)/)) {
+    return { intent: "navigation", recommendedFormat: null, audioFit: "none", recommendedDisposition: "not_applicable", confidence: "high", reasons: ["Навигационный запрос не является аудио-возможностью."] };
+  }
+  if (has(text, /(купить|цена|стоимость|заказать|скачать)/)) {
+    return { intent: "transactional", recommendedFormat: null, audioFit: "none", recommendedDisposition: "not_applicable", confidence: "high", reasons: ["Коммерческий запрос не является аудио-возможностью."] };
   }
   if (has(text, /(сейчас|сегодня|завтра|погода|курс валют|новости|онлайн трансляция)/)) {
     return { intent: "realtime", recommendedFormat: null, audioFit: "none", recommendedDisposition: "not_applicable", confidence: "high", reasons: ["Запрос зависит от текущих данных."] };
@@ -79,5 +67,5 @@ export function classifySeoQuery({ queryText }: { queryText: string }): SeoQuery
   if (has(text, /(слушать|слушать онлайн|аудио|с голосом|без голоса)/)) {
     return { intent: "listen_audio", recommendedFormat: null, audioFit: "high", recommendedDisposition: "analyzed", confidence: "medium", reasons: ["Есть явное намерение слушать аудио."] };
   }
-  return { intent: "other", recommendedFormat: null, audioFit: "low", recommendedDisposition: "analyzed", confidence: "low", reasons: ["Явного аудио-намерения не обнаружено; требуется решение администратора."] };
+  return { intent: "other", recommendedFormat: null, audioFit: "low", recommendedDisposition: "not_applicable", confidence: "low", reasons: ["Явного аудио-намерения не обнаружено; требуется решение администратора."] };
 }
