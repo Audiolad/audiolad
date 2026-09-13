@@ -144,6 +144,7 @@
     "test:distribyutor-ii-muzyki": "npx tsx scripts/distribyutor-ii-muzyki-page-unit.mjs",
     "test:kak-sozdat-ii-muzyku": "npx tsx scripts/kak-sozdat-ii-muzyku-page-unit.mjs",
     "test:kak-vylozhit-ii-muzyku": "npx tsx scripts/kak-vylozhit-ii-muzyku-page-unit.mjs",
+    "test:v-kakoy-neyroseti-sozdat-muzyku": "npx tsx scripts/v-kakoy-neyroseti-sozdat-muzyku-page-unit.mjs",
     "test:author-contacts": "npx tsx scripts/author-contacts-unit.mjs && node scripts/author-contacts-sql-unit.mjs",
     "test:quick-offers": "npx tsx scripts/quick-offers-unit.mjs",
     "test:retired-meditation-solutions-landing": "npx tsx scripts/retired-meditation-solutions-landing-unit.mts",

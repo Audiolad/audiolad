@@ -64,7 +64,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     pathname === "/kak-zarabatyvat-na-ii-muzyke-v-audiolad" ||
     pathname === "/distribyutor-ii-muzyki" ||
     pathname === "/kak-sozdat-ii-muzyku" ||
-    pathname === "/kak-vylozhit-ii-muzyku"
+    pathname === "/kak-vylozhit-ii-muzyku" ||
+    pathname === "/v-kakoy-neyroseti-sozdat-muzyku"
   );
 }
 

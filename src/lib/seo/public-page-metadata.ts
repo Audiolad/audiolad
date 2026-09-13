@@ -30,6 +30,11 @@ import {
   KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
 } from "@/lib/seo/kak-vylozhit-ii-muzyku/content";
 import {
+  V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_PATH,
+  V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_DESCRIPTION,
+  V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_TITLE,
+} from "@/lib/seo/v-kakoy-neyroseti-sozdat-muzyku/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -333,6 +338,30 @@ export function buildKakVylozhitIiMuzykuMetadata(): Metadata {
       card: "summary",
       title: KAK_VYLOZHIT_II_MUZYKU_SEO_TITLE,
       description: KAK_VYLOZHIT_II_MUZYKU_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildVKakoyNeyrosetiSozdatMuzykuMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_PATH);
+
+  return {
+    title: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_TITLE,
+    description: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_TITLE,
+      description: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_TITLE,
+      description: V_KAKOY_NEYROSETI_SOZDAT_MUZYKU_SEO_DESCRIPTION,
     },
   };
 }
