@@ -55,6 +55,7 @@ export type StudioMusicCheckoutErrorCode =
   | "invalid_request"
   | "practice_not_found"
   | "practice_not_for_sale"
+  | "author_terms_not_accepted"
   | "already_studio_entitled"
   | "pending_order_exists"
   | "price_changed"
@@ -144,6 +145,9 @@ export function mapStudioMusicCheckoutRpcError(message: string): {
 
   if (normalized.includes("already_studio_entitled")) {
     return { status: 409, error: "already_studio_entitled" };
+  }
+  if (normalized.includes("studio_author_terms_not_accepted")) {
+    return { status: 409, error: "author_terms_not_accepted" };
   }
 
   if (normalized.includes("already_owned")) {

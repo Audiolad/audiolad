@@ -22,7 +22,8 @@ export type StudioMusicCatalogActionKind =
   | "available"
   | "own"
   | "free"
-  | "paid";
+  | "paid"
+  | "unavailable";
 
 export type StudioMusicCatalogAction = {
   kind: StudioMusicCatalogActionKind;
@@ -72,6 +73,9 @@ export function resolveStudioMusicCatalogAction(
   }
 
   if (!item.ownership.can_acquire) {
+    if (item.ownership.acquisition_unavailable_reason === "author_terms_not_accepted") {
+      return { kind: "unavailable", label: "Лицензия временно недоступна" };
+    }
     return { kind: "none", label: "" };
   }
 

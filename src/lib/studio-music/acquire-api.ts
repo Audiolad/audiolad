@@ -30,6 +30,7 @@ export type StudioMusicAcquireErrorCode =
   | "invalid_request"
   | "practice_not_found"
   | "practice_not_free"
+  | "author_terms_not_accepted"
   | "internal_error";
 
 export function parseStudioMusicAcquireRequest(
@@ -76,6 +77,9 @@ export function mapStudioMusicAcquireRpcError(message: string): {
 
   if (normalized.includes("practice_not_free")) {
     return { status: 409, error: "practice_not_free" };
+  }
+  if (normalized.includes("studio_author_terms_not_accepted")) {
+    return { status: 409, error: "author_terms_not_accepted" };
   }
 
   if (

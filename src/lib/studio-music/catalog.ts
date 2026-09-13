@@ -94,6 +94,7 @@ export type StudioMusicCatalogOwnership = {
   is_owned: boolean;
   is_author_member: boolean;
   grant_source: StudioMusicGrantSource | null;
+  acquisition_unavailable_reason: "author_terms_not_accepted" | null;
 };
 
 export type StudioMusicCatalogTrack = {
@@ -175,6 +176,7 @@ export type StudioMusicCatalogStore = {
     userId: string | null,
     visitorId: string | null,
   ): Promise<Map<string, { listenerEffectiveMinor: number | null }>>;
+  loadAuthorsWithCurrentTerms(authorIds: string[]): Promise<Set<string>>;
 };
 
 const UUID_PATTERN =
@@ -439,6 +441,7 @@ export function resolveStudioMusicOwnership(input: {
   entitlement?: StudioMusicCatalogEntitlement | null;
   isAuthorMember?: boolean;
   commerciallyAccessible?: boolean;
+  authorHasCurrentTerms?: boolean;
 }): StudioMusicCatalogOwnership {
   const isOwned = hasStudioMusicEntitlement(input.entitlement);
   const isAuthorMember = input.isAuthorMember === true;
@@ -446,8 +449,10 @@ export function resolveStudioMusicOwnership(input: {
     entitlement: input.entitlement,
     isAuthorMember,
   });
+  const authorTermsBlocked = input.authorHasCurrentTerms === false;
   const canAcquire =
     !canUse &&
+    !authorTermsBlocked &&
     canAcquireStudioMusic(input.practice, {
       commerciallyAccessible: input.commerciallyAccessible,
     });
@@ -461,6 +466,8 @@ export function resolveStudioMusicOwnership(input: {
       entitlement: input.entitlement,
       isAuthorMember,
     }),
+    acquisition_unavailable_reason:
+      !canUse && authorTermsBlocked ? "author_terms_not_accepted" : null,
   };
 }
 
@@ -588,6 +595,7 @@ export function mapStudioMusicCatalogItem(input: {
   tracks: Array<{ id: string; title: string; durationSeconds: number | null }>;
   ownership: StudioMusicCatalogOwnership;
   listenerEffectiveMinor: number | null;
+  authorHasCurrentTerms?: boolean;
 }): StudioMusicCatalogItem {
   const tracks = [...input.tracks].map((track) => ({
     id: track.id,
@@ -601,6 +609,7 @@ export function mapStudioMusicCatalogItem(input: {
     commerciallyAccessible: isCommerciallyAccessibleStudioPublication(
       input.practice,
     ),
+      authorHasCurrentTerms: input.authorHasCurrentTerms,
   });
   const studioIsFree = acquisition.studio_is_free;
   const studioEffectiveMinor = acquisition.amount_minor;
@@ -814,7 +823,8 @@ export async function handleStudioMusicCatalog(input: {
     authorMemberAuthorIds = viewerAccess.authorMemberAuthorIds;
   }
 
-  const [tracks, prices] = await Promise.all([
+  const authorIds = [...new Set(pagePractices.map((practice) => practice.author_id).filter((id): id is string => Boolean(id)))];
+  const [tracks, prices, authorsWithCurrentTerms] = await Promise.all([
     filter === "mine"
       ? input.store.loadTracksForMine(pageIds)
       : input.store.loadPublishedTracks(pageIds),
@@ -823,6 +833,7 @@ export async function handleStudioMusicCatalog(input: {
       input.userId,
       input.visitorId ?? null,
     ),
+    input.store.loadAuthorsWithCurrentTerms(authorIds),
   ]);
   const tracksByPractice = groupPublishedAudioItemsByPractice(tracks);
 
@@ -840,6 +851,7 @@ export async function handleStudioMusicCatalog(input: {
       entitlement,
       isAuthorMember,
       commerciallyAccessible,
+      authorHasCurrentTerms: !practice.author_id || authorsWithCurrentTerms.has(practice.author_id),
     });
     const listenerEffectiveMinor =
       prices.get(practiceId)?.listenerEffectiveMinor ?? null;
@@ -849,6 +861,7 @@ export async function handleStudioMusicCatalog(input: {
       tracks: tracksByPractice.get(practiceId) ?? [],
       ownership,
       listenerEffectiveMinor,
+      authorHasCurrentTerms: !practice.author_id || authorsWithCurrentTerms.has(practice.author_id),
     });
   });
 
@@ -1148,6 +1161,17 @@ export function createSupabaseStudioMusicCatalogStore(
         }),
       );
       return prices;
+    },
+    async loadAuthorsWithCurrentTerms(authorIds) {
+      if (authorIds.length === 0) return new Set();
+      const { data, error } = await supabase
+        .from("author_terms_acceptances")
+        .select("author_id, author_terms_versions!inner(is_current, document_key)")
+        .in("author_id", authorIds)
+        .eq("author_terms_versions.is_current", true)
+        .eq("author_terms_versions.document_key", "author-terms");
+      if (error) throw new Error("studio_music_author_terms_lookup_failed");
+      return new Set((data ?? []).map((row) => String(row.author_id)));
     },
   };
 }
