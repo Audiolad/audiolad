@@ -393,7 +393,7 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   psql(TEST_DB, `
 INSERT INTO public.author_members(author_id,user_id) VALUES ('${AUTHOR_ONE}','${USER_HUMAN_ONE}');
 INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
-  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_TWO}','2026-07-23 12:00:00+00',false,false,false,'human'),
+  ('e1111111-1111-1111-1111-111111111111','p2anon1','${USER_HUMAN_ONE}','audio_play_started','${PRACTICE_FOUR}','2026-07-23 12:00:00+00',false,false,false,'human'),
   ('e4444444-4444-4444-4444-444444444444','p2anonstaff','${USER_STAFF}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',true,false,false,'staff'),
   ('e5555555-5555-5555-5555-555555555555','p2anontester','${USER_TEST}','audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,true,false,'test'),
   (NULL,'test-overview',NULL,'audio_play_started','${PRACTICE_ONE}','2026-07-23 12:00:00+00',false,false,true,'bot');
