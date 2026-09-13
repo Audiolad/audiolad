@@ -50,6 +50,20 @@ pipeline writes with the full target Git SHA. Missing or malformed metadata
 returns `deployCommit: null`; the workflow blocks rather than guessing from
 the Next build ID or release directory name.
 
+## Diagnostics
+
+The trusted guard writes the same safe diagnostic summary to both the GitHub
+step summary and the ordinary job log before it returns a verdict. This makes
+API-accessible logs sufficient to diagnose a `BLOCK MERGE` result.
+
+The output includes main, final-main, PR, and production commit SHAs; health
+HTTP status and content type; a classified health reason; lineage results;
+migration scan and duplicate versions; the decision; and every blocking
+reason. It deliberately never prints tokens, cookies, arbitrary HTTP headers,
+or an unexpected health response body. Invalid JSON, non-success HTTP
+responses, network failures, and missing or malformed `deployCommit` values
+are logged only as classified reasons.
+
 ## What it never does
 
 - no SSH or self-hosted runner;
