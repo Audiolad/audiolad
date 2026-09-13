@@ -97,7 +97,11 @@ export function parseStudioMusicCheckoutRequest(
     "amount" in body ||
     "source" in body ||
     "paymentLinkId" in body ||
-    "payment_link_id" in body
+    "payment_link_id" in body ||
+    "licenseTermsVersion" in body ||
+    "license_terms_version" in body ||
+    "licenseTermsHash" in body ||
+    "license_terms_hash" in body
   ) {
     return { ok: false, error: "invalid_request" };
   }

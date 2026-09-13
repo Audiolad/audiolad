@@ -61,7 +61,8 @@ BEGIN
   IF NOT public.author_has_accepted_current_terms(v_author_id) THEN
     RAISE EXCEPTION 'studio_author_terms_not_accepted' USING ERRCODE = 'P0001';
   END IF;
-  PERFORM public.create_studio_music_order_legal_legacy(
+  PERFORM *
+  FROM public.create_studio_music_order_legal_legacy(
     p_practice_id, p_idempotency_key, p_expected_amount_minor
   );
   UPDATE public.orders SET

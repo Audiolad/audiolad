@@ -45,7 +45,11 @@ export function parseStudioMusicAcquireRequest(
     "amount" in body ||
     "amount_minor" in body ||
     "order_id" in body ||
-    "orderId" in body
+    "orderId" in body ||
+    "licenseTermsVersion" in body ||
+    "license_terms_version" in body ||
+    "licenseTermsHash" in body ||
+    "license_terms_hash" in body
   ) {
     return { ok: false, error: "invalid_request" };
   }
