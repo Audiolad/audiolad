@@ -14,8 +14,8 @@ import {
 export const STUDIO_MUSIC_FREE_ACQUIRE_LABEL = "Получить бесплатно";
 export const STUDIO_MUSIC_BUY_LABEL = "Купить для Студии";
 export const STUDIO_MUSIC_LOADING_LABEL = "Загрузка…";
-export const STUDIO_MUSIC_ADD_LABEL = "Добавить в проект";
-export const STUDIO_MUSIC_ADDED_LABEL = "Добавлено";
+export const STUDIO_MUSIC_ADD_LABEL = "Добавить трек";
+export const STUDIO_MUSIC_ADDED_LABEL = "Трек добавлен";
 
 export type StudioMusicCatalogActionKind =
   | "none"
