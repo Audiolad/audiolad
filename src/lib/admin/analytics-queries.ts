@@ -74,6 +74,28 @@ export type AdminAnalyticsFunnelStep = {
   conversionHint?: string | null;
 };
 
+export type AdminAnalyticsProductOverview = {
+  realVisitors: number;
+  practiceVisitors: number;
+  listeners: number;
+  completers: number;
+  practiceViews: number;
+  playStarts: number;
+  completions: number;
+  conversionToListening: string;
+  completionByListeners: string;
+  startsPerListener: string;
+  newListeners: number;
+  returningListeners: number;
+  repeatListeners: number;
+  wal: number;
+  previousWal: number;
+  walDelta: AdminAnalyticsDelta | null;
+  mal: number;
+  previousMal: number;
+  malDelta: AdminAnalyticsDelta | null;
+};
+
 export type AdminAnalyticsTimeseriesPoint = {
   bucket: string;
   visitors: number;
@@ -172,6 +194,7 @@ export type AdminAnalyticsDashboard = {
   excludedTestSessions: number;
   audience: AdminAnalyticsMetricCard[];
   kpi: AdminAnalyticsKpiCard[];
+  productOverview: AdminAnalyticsProductOverview;
   funnelEvents: AdminAnalyticsFunnelStep[];
   funnelPeople: AdminAnalyticsFunnelStep[];
   purchasesPlaceholder: string;
@@ -369,24 +392,10 @@ function buildKpi(
   points: AdminAnalyticsTimeseriesPoint[],
 ): AdminAnalyticsKpiCard[] {
   const prev = summary.previous ?? null;
-  const visitors = asNonNegativeInt(summary.audience?.visitors);
   const registrations = asNonNegativeInt(summary.audience?.registrations);
-  const playStarts = asNonNegativeInt(summary.events?.play_starts);
-  const completions = asNonNegativeInt(summary.events?.completions);
   const saves = asNonNegativeInt(summary.events?.saves);
 
   return [
-    {
-      key: "visitors",
-      label: "Посетители",
-      value: visitors,
-      kind: "unique_person",
-      kindLabel: metricKindLabel("unique_person"),
-      formula: "COUNT(DISTINCT visitor_key)",
-      hint: `${METRIKA_DIFF_TOOLTIP} Уникальные люди по visitor_key.`,
-      delta: formatAdminDelta(visitors, prev?.visitors),
-      sparkline: points.map((point) => point.visitors),
-    },
     {
       key: "registrations",
       label: "Регистрации",
@@ -397,28 +406,6 @@ function buildKpi(
       hint: "Новые профили за период (БД, не клиентская цель).",
       delta: formatAdminDelta(registrations, prev?.registrations),
       sparkline: points.map((point) => point.registrations),
-    },
-    {
-      key: "playStarts",
-      label: "Запуски",
-      value: playStarts,
-      kind: "event",
-      kindLabel: metricKindLabel("event"),
-      formula: "COUNT(audio_play_started)",
-      hint: "События запуска аудио.",
-      delta: formatAdminDelta(playStarts, prev?.play_starts),
-      sparkline: points.map((point) => point.playStarts),
-    },
-    {
-      key: "completions",
-      label: "Дослушивания",
-      value: completions,
-      kind: "event",
-      kindLabel: metricKindLabel("event"),
-      formula: "COUNT(audio_completed)",
-      hint: "События дослушивания.",
-      delta: formatAdminDelta(completions, prev?.completions),
-      sparkline: points.map((point) => point.completions),
     },
     {
       key: "saves",
@@ -525,6 +512,54 @@ function buildFunnelLines(summary: SummarySnapshot): {
         listeners,
       ),
     ],
+  };
+}
+
+function formatAdminDecimal(numerator: number, denominator: number): string {
+  if (denominator <= 0 || numerator <= 0) {
+    return "0";
+  }
+
+  return (numerator / denominator).toLocaleString("ru-RU", {
+    maximumFractionDigits: 1,
+  });
+}
+
+function buildProductOverview(
+  raw: Record<string, unknown>,
+): AdminAnalyticsProductOverview {
+  const realVisitors = asNonNegativeInt(raw.real_visitors);
+  const practiceVisitors = asNonNegativeInt(raw.practice_visitors);
+  const listeners = asNonNegativeInt(raw.listeners);
+  const completers = asNonNegativeInt(raw.completers);
+  const practiceViews = asNonNegativeInt(raw.practice_views);
+  const playStarts = asNonNegativeInt(raw.play_starts);
+  const completions = asNonNegativeInt(raw.completions);
+  const wal = asNonNegativeInt(raw.wal);
+  const previousWal = asNonNegativeInt(raw.previous_wal);
+  const mal = asNonNegativeInt(raw.mal);
+  const previousMal = asNonNegativeInt(raw.previous_mal);
+
+  return {
+    realVisitors,
+    practiceVisitors,
+    listeners,
+    completers,
+    practiceViews,
+    playStarts,
+    completions,
+    conversionToListening: formatAdminPercent(listeners, practiceVisitors),
+    completionByListeners: formatAdminPercent(completers, listeners),
+    startsPerListener: formatAdminDecimal(playStarts, listeners),
+    newListeners: asNonNegativeInt(raw.new_listeners),
+    returningListeners: asNonNegativeInt(raw.returning_listeners),
+    repeatListeners: asNonNegativeInt(raw.repeat_listeners),
+    wal,
+    previousWal,
+    walDelta: formatAdminDelta(wal, previousWal),
+    mal,
+    previousMal,
+    malDelta: formatAdminDelta(mal, previousMal),
   };
 }
 
@@ -800,18 +835,19 @@ export async function getAdminAnalyticsSummaryBundle(
   const generatedAt = new Date().toISOString();
   const service = createServiceRoleClient();
 
-  const [summaryRes, timeseriesRes, filterOptions] = await Promise.all([
+  const [summaryRes, overviewRes, timeseriesRes, filterOptions] = await Promise.all([
     service.rpc("admin_analytics_p2_summary", {
       ...sharedFilters,
       p_prev_from: previous?.from ?? null,
       p_prev_to: previous?.to ?? null,
     }),
+    service.rpc("analytics_owner_overview", sharedFilters),
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
-  if (summaryRes.error) {
-    console.error("admin_analytics_p2_summary_failed", summaryRes.error.message);
+  if (summaryRes.error || overviewRes.error) {
+    console.error("admin_analytics_summary_failed", summaryRes.error?.message ?? overviewRes.error?.message);
     throw new Error("admin_analytics_dashboard_failed");
   }
 
@@ -840,6 +876,7 @@ export async function getAdminAnalyticsSummaryBundle(
     ),
     audience: buildAudience(summary),
     kpi: buildKpi(summary, points),
+    productOverview: buildProductOverview((overviewRes.data ?? {}) as Record<string, unknown>),
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,
     purchasesPlaceholder:

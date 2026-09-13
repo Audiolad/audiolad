@@ -4,10 +4,12 @@ DO $$
 DECLARE
   starts integer;
   listeners integer;
+  overview jsonb;
 BEGIN
   IF to_regprocedure('public.analytics_product_event_facts(timestamptz,timestamptz,uuid,uuid,boolean)') IS NULL
     OR to_regprocedure('public.admin_analytics_p2_summary(timestamptz,timestamptz,boolean,timestamptz,timestamptz,uuid,uuid,text,text)') IS NULL
-    OR to_regprocedure('public.author_stats_summary(uuid,timestamptz,timestamptz)') IS NULL THEN
+    OR to_regprocedure('public.author_stats_summary(uuid,timestamptz,timestamptz)') IS NULL
+    OR to_regprocedure('public.analytics_owner_overview(timestamptz,timestamptz,boolean,uuid,uuid,text,text)') IS NULL THEN
     RAISE EXCEPTION 'required analytics function is missing';
   END IF;
 
@@ -35,6 +37,12 @@ BEGIN
 
   IF starts <> 2 OR listeners <> 0 THEN
     RAISE EXCEPTION 'nullable visitor identity smoke failed: starts %, listeners %', starts, listeners;
+  END IF;
+
+  SELECT public.analytics_owner_overview(NULL, NULL, false, NULL, NULL, NULL, NULL)
+  INTO overview;
+  IF overview IS NULL THEN
+    RAISE EXCEPTION 'analytics_owner_overview runtime smoke failed';
   END IF;
 END
 $$;
