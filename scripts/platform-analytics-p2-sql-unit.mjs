@@ -224,7 +224,7 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20260725180000_admin_analytics_p2_dashboard.sql"));
   psqlFile(TEST_DB, migration("20261006120000_analytics_shared_product_semantics.sql"));
   psqlFile(TEST_DB, migration("20261006120200_analytics_nullable_visitor_identity.sql"));
-  psqlFile(TEST_DB, migration("20261006120300_analytics_owner_overview.sql"));
+  psqlFile(TEST_DB, migration("20261006120400_analytics_owner_overview.sql"));
 }
 
 /**
