@@ -329,9 +329,14 @@ export default function AdminAnalyticsWorkbench({
         filterNotes={summary.filterNotes}
       />
 
-      <AdminAnalyticsKpiStrip items={summary.kpi} onOpen={openDrill} />
+      <AdminAnalyticsFunnelPanel overview={summary.productOverview} />
 
-      <AdminAnalyticsDefinitions />
+      <section aria-labelledby="admin-additional-kpi-heading" className="space-y-3">
+        <h3 id="admin-additional-kpi-heading" className="text-[19px] font-semibold">
+          Дополнительные показатели
+        </h3>
+        <AdminAnalyticsKpiStrip items={summary.kpi} onOpen={openDrill} />
+      </section>
 
       <section aria-labelledby="admin-audience-heading" className="space-y-3">
         <h3 id="admin-audience-heading" className="text-[19px] font-semibold">
@@ -340,11 +345,7 @@ export default function AdminAnalyticsWorkbench({
         <AdminAnalyticsMetricCards metrics={summary.audience} />
       </section>
 
-      <AdminAnalyticsFunnelPanel
-        events={summary.funnelEvents}
-        people={summary.funnelPeople}
-        purchasesPlaceholder={summary.purchasesPlaceholder}
-      />
+      <AdminAnalyticsDefinitions />
 
       <AdminAnalyticsTimeseriesChart
         points={summary.timeseries.points}

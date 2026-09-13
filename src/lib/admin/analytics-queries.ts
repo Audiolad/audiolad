@@ -74,6 +74,18 @@ export type AdminAnalyticsFunnelStep = {
   conversionHint?: string | null;
 };
 
+export type AdminAnalyticsProductOverview = {
+  practiceVisitors: number;
+  listeners: number;
+  completers: number;
+  practiceViews: number;
+  playStarts: number;
+  completions: number;
+  conversionToListening: string;
+  completionByListeners: string;
+  startsPerListener: string;
+};
+
 export type AdminAnalyticsTimeseriesPoint = {
   bucket: string;
   visitors: number;
@@ -172,6 +184,7 @@ export type AdminAnalyticsDashboard = {
   excludedTestSessions: number;
   audience: AdminAnalyticsMetricCard[];
   kpi: AdminAnalyticsKpiCard[];
+  productOverview: AdminAnalyticsProductOverview;
   funnelEvents: AdminAnalyticsFunnelStep[];
   funnelPeople: AdminAnalyticsFunnelStep[];
   purchasesPlaceholder: string;
@@ -369,24 +382,10 @@ function buildKpi(
   points: AdminAnalyticsTimeseriesPoint[],
 ): AdminAnalyticsKpiCard[] {
   const prev = summary.previous ?? null;
-  const visitors = asNonNegativeInt(summary.audience?.visitors);
   const registrations = asNonNegativeInt(summary.audience?.registrations);
-  const playStarts = asNonNegativeInt(summary.events?.play_starts);
-  const completions = asNonNegativeInt(summary.events?.completions);
   const saves = asNonNegativeInt(summary.events?.saves);
 
   return [
-    {
-      key: "visitors",
-      label: "Посетители",
-      value: visitors,
-      kind: "unique_person",
-      kindLabel: metricKindLabel("unique_person"),
-      formula: "COUNT(DISTINCT visitor_key)",
-      hint: `${METRIKA_DIFF_TOOLTIP} Уникальные люди по visitor_key.`,
-      delta: formatAdminDelta(visitors, prev?.visitors),
-      sparkline: points.map((point) => point.visitors),
-    },
     {
       key: "registrations",
       label: "Регистрации",
@@ -397,28 +396,6 @@ function buildKpi(
       hint: "Новые профили за период (БД, не клиентская цель).",
       delta: formatAdminDelta(registrations, prev?.registrations),
       sparkline: points.map((point) => point.registrations),
-    },
-    {
-      key: "playStarts",
-      label: "Запуски",
-      value: playStarts,
-      kind: "event",
-      kindLabel: metricKindLabel("event"),
-      formula: "COUNT(audio_play_started)",
-      hint: "События запуска аудио.",
-      delta: formatAdminDelta(playStarts, prev?.play_starts),
-      sparkline: points.map((point) => point.playStarts),
-    },
-    {
-      key: "completions",
-      label: "Дослушивания",
-      value: completions,
-      kind: "event",
-      kindLabel: metricKindLabel("event"),
-      formula: "COUNT(audio_completed)",
-      hint: "События дослушивания.",
-      delta: formatAdminDelta(completions, prev?.completions),
-      sparkline: points.map((point) => point.completions),
     },
     {
       key: "saves",
@@ -525,6 +502,41 @@ function buildFunnelLines(summary: SummarySnapshot): {
         listeners,
       ),
     ],
+  };
+}
+
+function formatAdminDecimal(numerator: number, denominator: number): string {
+  if (denominator <= 0 || numerator <= 0) {
+    return "0";
+  }
+
+  return (numerator / denominator).toLocaleString("ru-RU", {
+    maximumFractionDigits: 1,
+  });
+}
+
+function buildProductOverview(
+  summary: SummarySnapshot,
+): AdminAnalyticsProductOverview {
+  const events = summary.events ?? {};
+  const people = summary.people ?? {};
+  const practiceVisitors = asNonNegativeInt(people.practice_visitors);
+  const listeners = asNonNegativeInt(people.listeners);
+  const completers = asNonNegativeInt(people.completers);
+  const practiceViews = asNonNegativeInt(events.practice_views);
+  const playStarts = asNonNegativeInt(events.play_starts);
+  const completions = asNonNegativeInt(events.completions);
+
+  return {
+    practiceVisitors,
+    listeners,
+    completers,
+    practiceViews,
+    playStarts,
+    completions,
+    conversionToListening: formatAdminPercent(listeners, practiceVisitors),
+    completionByListeners: formatAdminPercent(completers, listeners),
+    startsPerListener: formatAdminDecimal(playStarts, listeners),
   };
 }
 
@@ -840,6 +852,7 @@ export async function getAdminAnalyticsSummaryBundle(
     ),
     audience: buildAudience(summary),
     kpi: buildKpi(summary, points),
+    productOverview: buildProductOverview(summary),
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,
     purchasesPlaceholder:

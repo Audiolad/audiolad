@@ -1,66 +1,9 @@
-import type { AdminAnalyticsFunnelStep } from "@/lib/admin/analytics-queries";
-
-function FunnelColumn({
-  title,
-  subtitle,
-  steps,
-}: {
-  title: string;
-  subtitle: string;
-  steps: AdminAnalyticsFunnelStep[];
-}) {
-  const max = Math.max(...steps.map((step) => step.value), 1);
-
-  return (
-    <div className="rounded-[22px] border border-[#eadff8] bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-[#25135c]">{title}</h3>
-      <p className="mt-1 text-sm text-[#796ba0]">{subtitle}</p>
-
-      <ul className="mt-4 space-y-3">
-        {steps.map((step) => {
-          const width = Math.max(8, Math.round((step.value / max) * 100));
-
-          return (
-            <li key={step.key}>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="font-medium text-[#25135c]">{step.label}</span>
-                <span className="text-[#7042c5]">
-                  {step.value.toLocaleString("ru-RU")}
-                  <span className="ml-1 text-xs text-[#9485b4]">
-                    {step.kindLabel}
-                  </span>
-                </span>
-              </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#f3ecfb]">
-                <div
-                  className="h-full rounded-full bg-[#7042c5]"
-                  style={{ width: `${width}%` }}
-                />
-              </div>
-              {step.conversionFromPrevious ? (
-                <p
-                  className="mt-1 text-xs text-[#796ba0]"
-                  title={step.conversionHint ?? undefined}
-                >
-                  от пред. этапа: {step.conversionFromPrevious}
-                </p>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
+import type { AdminAnalyticsProductOverview } from "@/lib/admin/analytics-queries";
 
 export default function AdminAnalyticsFunnelPanel({
-  events,
-  people,
-  purchasesPlaceholder,
+  overview,
 }: {
-  events: AdminAnalyticsFunnelStep[];
-  people: AdminAnalyticsFunnelStep[];
-  purchasesPlaceholder: string;
+  overview: AdminAnalyticsProductOverview;
 }) {
   return (
     <section aria-labelledby="admin-funnel-heading" className="space-y-4">
@@ -69,27 +12,73 @@ export default function AdminAnalyticsFunnelPanel({
           Продуктовая воронка
         </h2>
         <p className="mt-1 text-sm text-[#796ba0]">
-          Две линии: события и уникальные люди. Не смешиваем типы измерений.
+          Уникальные люди с подтверждённым visitor_key.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <FunnelColumn
-          title="События"
-          subtitle="Сколько раз произошло действие"
-          steps={events}
-        />
-        <FunnelColumn
-          title="Люди"
-          subtitle="Сколько уникальных visitor_key"
-          steps={people}
-        />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          { label: "Посетители практик", value: overview.practiceVisitors },
+          { label: "Начали слушать", value: overview.listeners },
+          { label: "Дослушали", value: overview.completers },
+        ].map((metric) => (
+          <article
+            key={metric.label}
+            className="rounded-[22px] border border-[#d9c9f4] bg-white p-5 shadow-sm"
+          >
+            <p className="text-sm text-[#796ba0]">{metric.label}</p>
+            <p className="mt-2 text-3xl font-semibold text-[#25135c]">
+              {metric.value.toLocaleString("ru-RU")}
+            </p>
+            <p className="mt-2 text-xs font-medium text-[#7042c5]">люди</p>
+          </article>
+        ))}
       </div>
 
-      <div className="rounded-[22px] border border-dashed border-[#eadff8] bg-[#fcfaff] p-4 text-sm text-[#796ba0]">
-        <p className="font-medium text-[#25135c]">Купили</p>
-        <p className="mt-1">{purchasesPlaceholder}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <p className="rounded-xl bg-[#f6f0ff] px-4 py-3 text-sm text-[#5d4f7d]">
+          В прослушивание: <strong>{overview.conversionToListening}</strong>
+        </p>
+        <p className="rounded-xl bg-[#f6f0ff] px-4 py-3 text-sm text-[#5d4f7d]">
+          Дослушали: <strong>{overview.completionByListeners}</strong>
+        </p>
       </div>
+
+      <section aria-labelledby="admin-activity-heading" className="space-y-3">
+        <div>
+          <h3 id="admin-activity-heading" className="text-[19px] font-semibold">
+            Активность
+          </h3>
+          <p className="mt-1 text-sm text-[#796ba0]">
+            События и интенсивность использования, а не уникальные люди.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Просмотры практик", value: overview.practiceViews, suffix: "события" },
+            { label: "Запуски", value: overview.playStarts, suffix: "события" },
+            { label: "Дослушивания", value: overview.completions, suffix: "события" },
+            {
+              label: "Запусков на слушателя",
+              value: overview.startsPerListener,
+              suffix: "события / человек",
+            },
+          ].map((metric) => (
+            <article
+              key={metric.label}
+              className="rounded-[18px] border border-[#eadff8] bg-white p-4 shadow-sm"
+            >
+              <p className="text-sm text-[#796ba0]">{metric.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-[#7042c5]">
+                {typeof metric.value === "number"
+                  ? metric.value.toLocaleString("ru-RU")
+                  : metric.value}
+              </p>
+              <p className="mt-2 text-xs text-[#9485b4]">{metric.suffix}</p>
+            </article>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }
