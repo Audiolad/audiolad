@@ -212,9 +212,8 @@ const reloadedTopicKeys = options
   .filter((option) => savePayload.includes(option.key))
   .map((option) => option.key)
   .sort();
-assert.deepEqual(
-  reloadedTopicKeys,
-  savePayload,
+assert(
+  JSON.stringify(reloadedTopicKeys) === JSON.stringify(savePayload),
   "new topic keys survive save/load through the active topic directory",
 );
 assert(
