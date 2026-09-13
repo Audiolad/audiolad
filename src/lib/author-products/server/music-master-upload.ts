@@ -257,13 +257,16 @@ export async function abandonMusicMasterDirectUpload(input: {
   if (!asset || asset.audio_item_id !== input.audioId || asset.storage_path !== input.uploadPath) {
     throw new MusicMasterUploadError("not_found", 404);
   }
-  if (asset.lifecycle_state !== "uploading") {
+  if (
+    asset.lifecycle_state !== "uploading" &&
+    asset.lifecycle_state !== "rejected"
+  ) {
     throw new MusicMasterUploadError("invalid_request", 409);
   }
   await service.storage.from(MUSIC_MASTERS_BUCKET).remove([input.uploadPath]);
   const { error } = await service.from("music_audio_assets")
     .update({ lifecycle_state: "abandoned", updated_at: new Date().toISOString() })
     .eq("id", input.assetId)
-    .eq("lifecycle_state", "uploading");
+    .in("lifecycle_state", ["uploading", "rejected"]);
   if (error) throw new MusicMasterUploadError("internal_error", 500);
 }
