@@ -208,7 +208,8 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     const payload = await response.json();
     setAnalysisBusy(false);
     if (!response.ok) return setAnalysisSummary("Не удалось подготовить рекомендации.");
-    setReviewItems((Array.isArray(payload.results) ? payload.results : [])
+    const results: unknown[] = Array.isArray(payload.results) ? payload.results : [];
+    setReviewItems(results
       .filter((item: unknown) => typeof item === "object" && item !== null && (item as Record<string, unknown>).status === "ready_for_review")
       .map(readReviewItem)
       .filter((item): item is ReviewItem => item !== null));
