@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import {
-  createStudioWorkspace,
-  CREATE_STUDIO_WORKSPACE_INITIAL_STATE,
-} from "@/app/(platform)/admin/authors/new/actions";
+import { createStudioWorkspace } from "@/app/(platform)/admin/authors/new/actions";
+import { CREATE_STUDIO_WORKSPACE_INITIAL_STATE } from "@/lib/admin/studio-author-workspace-form-state";
 
 export default function CreateStudioWorkspaceForm() {
   const [state, action, pending] = useActionState(
