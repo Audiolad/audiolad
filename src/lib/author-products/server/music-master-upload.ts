@@ -21,11 +21,12 @@ import {
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
-  probeStudioAudioFile,
+  inspectAudioMediaFile,
   removeTempFile,
   studioAudioTempPath,
   writeStreamToTempFile,
 } from "@/lib/studio/server/audio-duration";
+import type { AudioMediaInspection } from "@/lib/studio/server/audio-duration";
 
 export class MusicMasterUploadError extends Error {
   constructor(
@@ -45,6 +46,18 @@ type MusicAsset = {
   storage_path: string;
   lifecycle_state: string;
 };
+
+export function isVerifiedMusicMasterMedia(
+  media: AudioMediaInspection | null,
+): media is AudioMediaInspection & { durationSeconds: number } {
+  return Boolean(
+    media &&
+      media.formatNames.some((format) => format === "wav" || format === "wave") &&
+      media.hasAudioStream &&
+      media.durationSeconds &&
+      media.durationSeconds > 0,
+  );
+}
 
 async function loadMusicAudioItem(
   supabase: SupabaseClient,
@@ -203,21 +216,23 @@ export async function finalizeMusicMasterDirectUpload(input: {
       throw new MusicMasterUploadError("upload_not_complete", 409);
     }
     const tempPath = await materializeMusicMaster(input.uploadPath);
-    let duration: number | null;
+    let media: Awaited<ReturnType<typeof inspectAudioMediaFile>>;
     try {
       if ((await stat(tempPath)).size !== objectSize) {
         throw new MusicMasterUploadError("upload_not_complete", 409);
       }
-      duration = await probeStudioAudioFile(tempPath);
+      media = await inspectAudioMediaFile(tempPath);
     } finally {
       await removeTempFile(tempPath);
     }
-    if (!duration || duration <= 0) throw new MusicMasterUploadError("invalid_audio_duration", 400);
+    if (!isVerifiedMusicMasterMedia(media)) {
+      throw new MusicMasterUploadError("invalid_file_type", 400);
+    }
 
     const { error: finalizeError } = await service.rpc("finalize_music_master_asset", {
       p_asset_id: input.assetId,
       p_size_bytes: objectSize,
-      p_duration_seconds: Math.round(duration),
+      p_duration_seconds: Math.round(media.durationSeconds),
     });
     if (finalizeError) throw new MusicMasterUploadError("internal_error", 500);
     await recordAuthorSupportAudit({

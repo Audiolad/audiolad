@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { readFileSync as readFileSyncCompat } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   MAX_MUSIC_MASTER_BYTES,
@@ -11,9 +15,12 @@ import {
   isOwnedMusicMasterStoragePath,
   validateMusicMasterDescriptor,
 } from "../src/lib/author-products/music-master-upload-contract";
+import { isVerifiedMusicMasterMedia } from "../src/lib/author-products/server/music-master-upload";
+import { inspectAudioMediaFile } from "../src/lib/studio/server/audio-duration";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (file: string) => readFileSync(path.join(root, file), "utf8");
+const read = (file: string) => readFileSyncCompat(path.join(root, file), "utf8");
+const execFile = promisify(execFileCallback);
 const practiceId = "11111111-1111-1111-1111-111111111111";
 const audioId = "22222222-2222-2222-2222-222222222222";
 const assetId = "33333333-3333-3333-3333-333333333333";
@@ -22,6 +29,7 @@ const pathValue = buildMusicMasterStoragePath(practiceId, audioId, assetId);
 assert.equal(MAX_MUSIC_MASTER_BYTES, 300 * 1024 * 1024);
 assert.equal(validateMusicMasterDescriptor({ name: "master.WAV", type: "audio/wav", size: 1 }), null);
 assert.equal(validateMusicMasterDescriptor({ name: "master.wav", type: "audio/x-wav", size: 1 }), null);
+assert.equal(validateMusicMasterDescriptor({ name: "master.wav", type: "application/octet-stream", size: 1 }), null);
 assert.equal(validateMusicMasterDescriptor({ name: "master.mp3", type: "audio/mpeg", size: 1 }), "invalid_file_type");
 assert.equal(validateMusicMasterDescriptor({ name: "master.wav", type: "audio/wav", size: MAX_MUSIC_MASTER_BYTES + 1 }), "invalid_file_size");
 assert.equal(isOwnedMusicMasterStoragePath(pathValue, practiceId, audioId, assetId), true);
@@ -51,11 +59,14 @@ assert.match(server, /practice\.product_kind/);
 assert.match(server, /productKind !== "music"/);
 assert.match(server, /getPracticeSaleLock/);
 assert.match(server, /createSignedUploadUrl\(storagePath, \{ upsert: false \}\)/);
-assert.match(server, /probeStudioAudioFile/);
+assert.match(server, /inspectAudioMediaFile/);
+assert.match(server, /isVerifiedMusicMasterMedia/);
 assert.match(server, /objectSize !== input\.fileSize/);
 assert.match(server, /finalize_music_master_asset/);
 assert.doesNotMatch(server, /audio_path:/);
 assert.match(client, new RegExp(`from\\(MUSIC_MASTERS_BUCKET\\)`));
+assert.match(client, /contentType: "audio\/wav"/);
+assert.doesNotMatch(client, /contentType: input\.file\.type/);
 assert.match(client, /upsert: false/);
 assert.match(form, /Загрузить WAV-мастер/);
 assert.match(form, /Файл загружен\. Подготавливаем версию для прослушивания…/);
@@ -64,5 +75,36 @@ assert.match(legacyServer, /PRACTICE_AUDIO_BUCKET/);
 assert.doesNotMatch(signedAudio, /music-masters|music-streams/);
 assert.equal(MUSIC_MASTERS_BUCKET, "music-masters");
 assert.equal(MUSIC_STREAMS_BUCKET, "music-streams");
+
+const fixtureDirectory = await mkdtemp(path.join(tmpdir(), "audiolad-wav-master-"));
+try {
+  const wavPath = path.join(fixtureDirectory, "real.wav");
+  const mp3Path = path.join(fixtureDirectory, "renamed.wav");
+  const videoPath = path.join(fixtureDirectory, "video.mp4");
+  await execFile("ffmpeg", [
+    "-y", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100",
+    "-t", "0.1", "-c:a", "pcm_s16le", wavPath,
+  ]);
+  await execFile("ffmpeg", [
+    "-y", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100",
+    "-t", "0.1", "-c:a", "libmp3lame", mp3Path,
+  ]);
+  await execFile("ffmpeg", [
+    "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:r=1",
+    "-t", "0.1", "-an", "-c:v", "mpeg4", videoPath,
+  ]);
+
+  const wav = await inspectAudioMediaFile(wavPath);
+  const renamedMp3 = await inspectAudioMediaFile(mp3Path);
+  const videoOnly = await inspectAudioMediaFile(videoPath);
+  assert.ok(wav?.formatNames.includes("wav"));
+  assert.equal(wav?.hasAudioStream, true);
+  assert.equal(isVerifiedMusicMasterMedia(wav), true, "real WAV accepted");
+  assert.equal(isVerifiedMusicMasterMedia(renamedMp3), false, "MP3 renamed .wav rejected");
+  assert.equal(videoOnly?.hasAudioStream, false);
+  assert.equal(isVerifiedMusicMasterMedia(videoOnly), false, "video-only media rejected");
+} finally {
+  await rm(fixtureDirectory, { recursive: true, force: true });
+}
 
 console.log("music-wav-master-foundation-unit: ok");

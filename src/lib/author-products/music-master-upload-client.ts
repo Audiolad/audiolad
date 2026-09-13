@@ -95,7 +95,9 @@ export async function uploadMusicMasterDirect(input: {
         started.signedUpload.path,
         started.signedUpload.token,
         input.file,
-        { contentType: input.file.type || "audio/wav", upsert: false },
+        // Descriptor MIME can be empty/octet-stream in browsers; Storage only
+        // accepts WAV variants, so the signed PUT always declares canonical WAV.
+        { contentType: "audio/wav", upsert: false },
       );
     if (uploadError) {
       await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
