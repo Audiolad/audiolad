@@ -2326,7 +2326,7 @@ export default function AuthorProductForm({
         return;
       }
 
-      if (isMusicMaster) {
+      if ("message" in result) {
         await reloadSavedProduct(id);
         setMessage(result.message);
       } else {

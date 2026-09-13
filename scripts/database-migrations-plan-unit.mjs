@@ -755,6 +755,7 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
+    "20261007120000",
   ]);
   assert.equal(plan.database_migrations_pending, 91);
 }
@@ -859,6 +860,7 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
+    "20261007120000",
   ]);
   assert.equal(plan.database_migrations_pending, 85);
 }
@@ -970,6 +972,7 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261006130100",
     "20261006140000",
     "20261006140100",
+    "20261007120000",
   ]);
   assert.equal(plan.database_migrations_pending, 76);
 }
