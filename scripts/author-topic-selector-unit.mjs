@@ -144,6 +144,9 @@ const options = [
   { key: "love", title: "Любовь", isActive: true },
   { key: "health", title: "Здоровье", isActive: true },
   { key: "work", title: "Работа", isActive: true },
+  { key: "study", title: "Учёба", isActive: true },
+  { key: "learning", title: "Обучение", isActive: true },
+  { key: "desires", title: "Желания", isActive: true },
 ];
 const archived = [{ key: "legacy", title: "Старая тема", isActive: false, isArchived: true }];
 const limit = 3;
@@ -201,6 +204,26 @@ assert(
 assert(
   authorForm.includes("reloadSavedProduct") && authorForm.includes("/topics"),
   "reload fetches topics after save",
+);
+
+const newTopicKeys = ["work", "study", "desires"];
+const savePayload = newTopicKeys.map((key) => key.trim().toLowerCase()).sort();
+const reloadedTopicKeys = options
+  .filter((option) => savePayload.includes(option.key))
+  .map((option) => option.key)
+  .sort();
+assert(
+  JSON.stringify(reloadedTopicKeys) === JSON.stringify(savePayload),
+  "new topic keys survive save/load through the active topic directory",
+);
+assert(
+  options.some((option) => option.key === "learning" && option.title === "Обучение") &&
+    options.some((option) => option.key === "study" && option.title === "Учёба"),
+  "Учёба and Обучение remain distinct author options",
+);
+assert(
+  options.some((option) => option.key === "desires" && option.title === "Желания"),
+  "only plural Желания is an author option",
 );
 
 console.log("author-topic-selector-unit: ok");
