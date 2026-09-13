@@ -225,6 +225,10 @@ ${reasons}
 `;
 }
 
+export function writeDiagnostics(summary, output = process.stdout) {
+  output.write(summary);
+}
+
 export async function readLiveProductionCommit(
   resolvedHealthUrl,
   fetchImplementation = fetch,
@@ -428,7 +432,7 @@ async function main() {
     ok: reasons.length === 0,
   });
 
-  process.stdout.write(summary);
+  writeDiagnostics(summary);
   if (summaryPath) {
     await (await import("node:fs/promises")).appendFile(summaryPath, summary);
   }

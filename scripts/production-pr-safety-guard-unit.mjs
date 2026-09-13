@@ -12,6 +12,7 @@ import {
   readLiveProductionCommit,
   resolveProductionHealthUrl,
   validatePrSafetyInput,
+  writeDiagnostics,
 } from "./production-pr-safety-guard.mjs";
 import { resolveTrustedCommitStatus } from "./production-pr-safety-status.mjs";
 
@@ -252,6 +253,31 @@ const safe = buildSummary({
 assert.match(safe, /\| decision \| SAFE \|/);
 assert.match(safe, /✅ SAFE TO CONTINUE REVIEW/);
 
+let ordinaryLog = "";
+writeDiagnostics(safe, {
+  write(value) {
+    ordinaryLog += value;
+  },
+});
+writeDiagnostics(blocked, {
+  write(value) {
+    ordinaryLog += value;
+  },
+});
+assert.match(ordinaryLog, /\| decision \| SAFE \|/);
+assert.match(ordinaryLog, /\| decision \| BLOCK \|/);
+for (const reason of [
+  "health endpoint returned invalid JSON",
+  "production is not an ancestor of current main",
+  "production is not an ancestor of this PR",
+  "PR is behind current main by 4 commits",
+  "main changed during check; rerun required",
+  "duplicate migration versions: 20260830120400",
+]) {
+  assert.match(ordinaryLog, new RegExp(reason));
+}
+assert.doesNotMatch(ordinaryLog, /untrusted arbitrary response body/);
+
 const trustedWorkflow = readFileSync(
   ".github/workflows/production-pr-safety-trusted.yml",
   "utf8",
@@ -303,7 +329,7 @@ assert.match(
   /cd "\$\{OBJECT_STORE\}"\s+node "\$\{TRUSTED_DIR\}\/production-pr-safety-guard\.mjs"/,
 );
 const guardSource = readFileSync("scripts/production-pr-safety-guard.mjs", "utf8");
-assert.match(guardSource, /process\.stdout\.write\(summary\)/);
+assert.match(guardSource, /writeDiagnostics\(summary\)/);
 assert.doesNotMatch(guardSource, /response\.text\(\)/);
 const trustedJob = trustedWorkflow.slice(
   trustedWorkflow.indexOf("  production-pr-safety-runner:"),
