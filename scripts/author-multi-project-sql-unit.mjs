@@ -37,11 +37,6 @@ function psql(sql) {
 }
 
 function main() {
-  if (process.env.AUDIOLAD_TEST_DATABASE !== "1") {
-    console.log("author-multi-project-sql-unit: skipped (set AUDIOLAD_TEST_DATABASE=1)");
-    return;
-  }
-
   const migration = readFileSync(
     path.join(
       ROOT,
@@ -50,6 +45,31 @@ function main() {
     "utf8",
   );
   assert.match(migration, /create_author_project/);
+
+  const unlimitedMigration = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20261006140000_owner_unlimited_author_projects.sql",
+    ),
+    "utf8",
+  );
+  assert.match(unlimitedMigration, /author_projects_unlimited boolean/);
+  assert.match(
+    unlimitedMigration,
+    /IF NOT v_unlimited AND v_used >= v_limit/,
+  );
+  assert.match(unlimitedMigration, /'limit', CASE WHEN v_unlimited THEN NULL ELSE v_limit END/);
+  assert.match(unlimitedMigration, /'unlimited', v_unlimited/);
+  assert.match(
+    unlimitedMigration,
+    /normalize_contact_email\('1@audiolad\.ru'\)/,
+  );
+  assert.doesNotMatch(unlimitedMigration, /999999|MAX_SAFE_INTEGER|Infinity/);
+
+  if (process.env.AUDIOLAD_TEST_DATABASE !== "1") {
+    console.log("author-multi-project-sql-unit: SQL runtime checks skipped (set AUDIOLAD_TEST_DATABASE=1)");
+    return;
+  }
 
   const olgaMigration = readFileSync(
     path.join(
