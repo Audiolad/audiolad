@@ -142,7 +142,11 @@ for (const migration of migrations.files) {
   ]);
 }
 
-if (!pending.has("20261006120000") || !pending.has("20261006120200")) {
+if (
+  !pending.has("20261006120000") ||
+  !pending.has("20261006120200") ||
+  !pending.has("20261006120300")
+) {
   throw new Error("analytics migrations were not included in the disposable replay");
 }
 applyFile("post-apply analytics smoke", resolve(root, "supabase/tests/database_migrations_compile_analytics_smoke.sql"));
