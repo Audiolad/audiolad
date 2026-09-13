@@ -27,6 +27,11 @@ function shortSha(sha) {
   return sha ? sha.slice(0, 12) : "unknown";
 }
 
+function lineageValue(value, canCompare) {
+  if (!canCompare) return "unknown";
+  return value ? "true" : "false";
+}
+
 function git(args, options = {}) {
   return execFileSync("git", args, {
     encoding: "utf8",
@@ -157,12 +162,31 @@ export function buildSummary(input) {
 
 Health endpoint: \`${input.healthUrl}\`
 
+## Safe diagnostics
+
+| Field | Value |
+|---|---|
+| main_sha | ${input.mainSha || "unavailable"} |
+| final_main_sha | ${input.finalMainSha || "unavailable"} |
+| pr_sha | ${input.prSha || "unavailable"} |
+| production_health_http | ${input.healthHttpStatus ?? "unavailable"} |
+| production_health_content_type | ${input.healthContentType ?? "unavailable"} |
+| production_commit | ${input.prodSha ?? "unavailable"} |
+| production_health_reason | ${input.healthReason ?? "none"} |
+| production_is_ancestor_of_main | ${lineageValue(input.prodToMain, input.canCompare)} |
+| production_is_ancestor_of_pr | ${lineageValue(input.prodToPr, input.canCompare)} |
+| main_is_ancestor_of_pr | ${lineageValue(input.mainToPr, input.canCompare)} |
+| main_changed_during_check | ${input.mainChanged ? "true" : "false"} |
+| migration_scan | ${input.migrationScanOk ? "ok" : "failed"} |
+| duplicate_migration_versions | ${input.duplicateMigrationVersions || "none"} |
+| decision | ${input.ok ? "SAFE" : "BLOCK"} |
+
 ## Lineage
 
-${input.prodToMain ? "✅" : "❌"} PROD → MAIN  
-${input.prodToPr ? "✅" : "❌"} PROD → PR  
-${input.mainToPr ? "✅" : "❌"} MAIN → PR  
-${input.prToMain ? "✅" : "❌"} PR → MAIN  
+${lineageValue(input.prodToMain, input.canCompare)} PROD → MAIN<br>
+${lineageValue(input.prodToPr, input.canCompare)} PROD → PR<br>
+${lineageValue(input.mainToPr, input.canCompare)} MAIN → PR<br>
+${lineageValue(input.prToMain, input.canCompare)} PR → MAIN<br>
 Merge base: \`${input.mergeBase ?? "unavailable"}\`  
 PR is ${input.behind ?? "unknown"} commits behind current main.  
 PR is ${input.ahead ?? "unknown"} commits ahead of current main.
@@ -201,21 +225,54 @@ ${reasons}
 `;
 }
 
-async function readLiveProductionCommit(resolvedHealthUrl) {
+export function writeDiagnostics(summary, output = process.stdout) {
+  output.write(summary);
+}
+
+export async function readLiveProductionCommit(
+  resolvedHealthUrl,
+  fetchImplementation = fetch,
+) {
   try {
-    const response = await fetch(resolvedHealthUrl, {
+    const response = await fetchImplementation(resolvedHealthUrl, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(15_000),
     });
+    const contentType = response.headers.get("content-type")?.split(";")[0].trim() ||
+      "missing";
     if (!response.ok) {
-      return { commit: null, reason: `health endpoint returned HTTP ${response.status}` };
+      return {
+        commit: null,
+        httpStatus: response.status,
+        contentType,
+        reason: `health endpoint returned HTTP ${response.status}`,
+      };
     }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      return {
+        commit: null,
+        httpStatus: response.status,
+        contentType,
+        reason: "health endpoint returned invalid JSON",
+      };
+    }
+    const commit = parseDeployCommit(payload);
     return {
-      commit: parseDeployCommit(await response.json()),
-      reason: null,
+      commit,
+      httpStatus: response.status,
+      contentType,
+      reason: commit ? null : "health endpoint did not provide a valid deployCommit",
     };
   } catch {
-    return { commit: null, reason: "health endpoint could not be read" };
+    return {
+      commit: null,
+      httpStatus: null,
+      contentType: null,
+      reason: "health endpoint could not be read",
+    };
   }
 }
 
@@ -336,6 +393,9 @@ async function main() {
   const summary = buildSummary({
     healthUrl: resolvedHealthUrl,
     prodSha,
+    healthHttpStatus: live.httpStatus,
+    healthContentType: live.contentType,
+    healthReason: live.reason,
     mainSha,
     prSha,
     workflowSha,
@@ -352,6 +412,11 @@ async function main() {
     mainToPrMigrations: canCompare ? diffNameStatus(mainSha, prSha) : null,
     migrations,
     duplicateVersions,
+    duplicateMigrationVersions: duplicateScan.duplicates
+      .map(({ version }) => version)
+      .join(", "),
+    migrationScanOk: duplicateScan.ok,
+    canCompare,
     repositoryChecks: [
       {
         name: "trusted static migration version scan",
@@ -367,10 +432,9 @@ async function main() {
     ok: reasons.length === 0,
   });
 
+  writeDiagnostics(summary);
   if (summaryPath) {
     await (await import("node:fs/promises")).appendFile(summaryPath, summary);
-  } else {
-    console.log(summary);
   }
 
   const statusState = reasons.length === 0 ? "success" : "failure";

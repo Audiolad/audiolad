@@ -50,6 +50,7 @@ jobs:
           npm run test:password-recovery
           npm run test:database-migrations:ci
           npm run test:studio-render-worker-env
+          npm run test:production-pr-safety
           npm run test:production-deploy-gha
           npm run test:author-product-price-input
           npm run build
