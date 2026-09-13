@@ -17,7 +17,9 @@ DECLARE
   v_actor_user_id uuid := auth.uid();
   v_name text := btrim(coalesce(p_name, ''));
   v_slug text := btrim(coalesce(p_slug, ''));
+  v_owner_email text;
   v_author_id uuid;
+  v_constraint_name text;
 BEGIN
   IF v_actor_user_id IS NULL
     OR NOT public.has_platform_permission(v_actor_user_id, 'authors.manage') THEN
@@ -32,13 +34,27 @@ BEGIN
     RAISE EXCEPTION 'invalid_studio_slug' USING ERRCODE = '22023';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_owner_user_id) THEN
+  SELECT u.email
+  INTO v_owner_email
+  FROM auth.users AS u
+  WHERE u.id = p_owner_user_id;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'owner_user_not_found' USING ERRCODE = 'P0002';
   END IF;
 
-  INSERT INTO public.authors (name, slug, author_type, access_status)
-  VALUES (v_name, v_slug, 'studio', 'free')
-  RETURNING id INTO v_author_id;
+  BEGIN
+    INSERT INTO public.authors (name, slug, author_type, access_status)
+    VALUES (v_name, v_slug, 'studio', 'free')
+    RETURNING id INTO v_author_id;
+  EXCEPTION
+    WHEN unique_violation THEN
+      GET STACKED DIAGNOSTICS v_constraint_name = CONSTRAINT_NAME;
+      IF v_constraint_name = 'authors_slug_key' THEN
+        RAISE EXCEPTION 'studio_slug_taken' USING ERRCODE = '23505';
+      END IF;
+      RAISE;
+  END;
 
   INSERT INTO public.author_members (author_id, user_id, role)
   VALUES (v_author_id, p_owner_user_id, 'owner');
@@ -54,7 +70,10 @@ BEGIN
     'studio_author_workspace_provisioned',
     v_actor_user_id,
     p_owner_user_id,
-    'studio_author_workspace',
+    CASE
+      WHEN nullif(btrim(v_owner_email), '') IS NULL THEN 'studio_author_workspace'
+      ELSE encode(digest(lower(btrim(v_owner_email)), 'sha256'), 'hex')
+    END,
     jsonb_build_object(
       'author_id', v_author_id,
       'slug', v_slug,
@@ -71,16 +90,13 @@ BEGIN
     'name', v_name,
     'owner_user_id', p_owner_user_id
   );
-EXCEPTION
-  WHEN unique_violation THEN
-    RAISE EXCEPTION 'studio_slug_taken' USING ERRCODE = '23505';
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.provision_studio_author_workspace(text, text, uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.provision_studio_author_workspace(text, text, uuid)
-  TO authenticated, service_role;
+  TO authenticated;
 
 COMMENT ON FUNCTION public.provision_studio_author_workspace(text, text, uuid) IS
   'Platform authors.manage-only atomic Studio workspace provisioner: author, owner membership, and audit row.';
