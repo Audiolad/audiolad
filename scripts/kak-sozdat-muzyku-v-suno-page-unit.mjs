@@ -43,6 +43,7 @@ assert.match(page, /buildAiMusicHubPageJsonLd/);
 const visualNumbers = [...view.matchAll(/<\w+Visual\s*\/>/g)].map((match) => match[0]);
 assert.deepEqual(visualNumbers, ["<WorkflowVisual />", "<ModesVisual />", "<EditVisual />", "<ProductVisual />"]);
 assert.deepEqual([...view.matchAll(/data-visual-block=\{number\}/g)].length, 1);
+assert.match(view, />Lyrics \+ Style \+ Instrumental \+ Title</);
 for (const caption of [
   "Создание музыки в Suno удобнее воспринимать как последовательность итераций, а не как одну случайную генерацию.",
   "Начинающему удобно сначала почувствовать логику Suno в Simple Mode, а затем переходить к более точной настройке в Custom.",
@@ -90,6 +91,22 @@ for (const href of [
   'href="/kak-zarabatyvat-na-ii-muzyke-v-audiolad"',
 ]) assert.match(view, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 assert.match(view, /https:\/\/suno\.com\/terms/);
+for (const sourceUrl of [
+  "https://help.suno.com/en/articles/13924737",
+  "https://help.suno.com/en/articles/13924481",
+  "https://help.suno.com/en/articles/2462273",
+  "https://help.suno.com/en/articles/3726721",
+  "https://help.suno.com/en/articles/2415873",
+  "https://help.suno.com/en/articles/13926081",
+  "https://help.suno.com/en/articles/13876865",
+  "https://help.suno.com/en/articles/9601665",
+  "https://help.suno.com/en/articles/2425729",
+]) assert.match(view, new RegExp(sourceUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+for (const format of ["MP3", "WAV", "MIDI", "stems"]) {
+  assert.match(view, new RegExp(format, "i"));
+}
+assert.match(view, /сохраняете права и право собственности на эти оригинальные слова/);
+assert.match(view, /не расширяет автоматически коммерческие права на всю созданную песню/);
 assert.equal(view.includes("—"), false, "Russian content must use medium dash");
 assert.equal(contentSource.includes("—"), false, "Russian SEO content must use medium dash");
 assert.doesNotMatch(view, /utm_/i);
