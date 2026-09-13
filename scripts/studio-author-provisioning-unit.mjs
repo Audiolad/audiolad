@@ -14,6 +14,41 @@ const action = read("src/app/(platform)/admin/authors/new/actions.ts");
 const provisioner = read("src/lib/admin/studio-author-provisioning.ts");
 const page = read("src/app/(platform)/admin/authors/new/page.tsx");
 const form = read("src/components/admin/CreateStudioWorkspaceForm.tsx");
+const formState = read("src/lib/admin/studio-author-workspace-form-state.ts");
+
+// A "use server" module may expose runtime exports only as async functions.
+assert.match(action, /^"use server";/);
+assert.doesNotMatch(
+  action,
+  /(?:export\s+)?(?:const|let|var)\s+CREATE_STUDIO_WORKSPACE_INITIAL_STATE\b/,
+);
+assert.doesNotMatch(action, /\bCREATE_STUDIO_WORKSPACE_INITIAL_STATE\b/);
+assert.doesNotMatch(formState, /^"use server";/);
+assert.match(
+  formState,
+  /export\s+const\s+CREATE_STUDIO_WORKSPACE_INITIAL_STATE\s*:/,
+);
+assert.match(formState, /export\s+type\s+CreateStudioWorkspaceActionState\b/);
+assert.match(
+  form,
+  /import\s+\{\s*CREATE_STUDIO_WORKSPACE_INITIAL_STATE\s*\}\s+from\s+["']@\/lib\/admin\/studio-author-workspace-form-state["']/,
+);
+assert.doesNotMatch(
+  form,
+  /CREATE_STUDIO_WORKSPACE_INITIAL_STATE\s*\}\s+from\s+["']@\/app\/\(platform\)\/admin\/authors\/new\/actions["']/,
+);
+assert.match(
+  action,
+  /export\s+async\s+function\s+createStudioWorkspace\b/,
+);
+assert.doesNotMatch(action, /export\s+(?:const|let|var|class)\b/);
+assert.doesNotMatch(action, /export\s+default\b/);
+assert.deepEqual(
+  [...action.matchAll(/export\s+(async\s+)?function\s+(\w+)/g)].map(
+    ([, asyncKeyword, name]) => ({ async: Boolean(asyncKeyword), name }),
+  ),
+  [{ async: true, name: "createStudioWorkspace" }],
+);
 
 // A user without authors.manage is rejected both at the server action and DB boundary.
 assert.match(action, /requireAdminPermission\("authors\.manage"\)/);
