@@ -99,10 +99,10 @@ BEGIN
   );
   IF has_function_privilege('authenticated', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
-     OR has_function_privilege('PUBLIC', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
+     OR has_function_privilege('public', 'public.create_studio_music_order_legal_legacy(uuid,uuid,bigint)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE')
-     OR has_function_privilege('PUBLIC', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE') THEN
+     OR has_function_privilege('public', 'public.acquire_free_studio_music_legal_legacy(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'terms: legacy Studio RPC privilege bypass';
   END IF;
   IF NOT has_function_privilege('authenticated', 'public.create_studio_music_order(uuid,uuid,bigint)', 'EXECUTE')
