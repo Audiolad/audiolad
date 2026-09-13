@@ -402,6 +402,15 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   const otherIncluded = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,'${AUTHOR_TWO}',NULL,NULL,NULL)::text;`);
   assertEqual(ownExcluded.listeners, 1, "author member own product activity excluded");
   assertEqual(otherIncluded.listeners, 2, "same member activity on other author included");
+  psql(TEST_DB, `
+DELETE FROM public.analytics_events
+WHERE occurred_at IN (
+  '2026-06-10 10:00:00+00', '2026-07-12 10:00:00+00',
+  '2026-07-20 10:00:30+00', '2026-07-21 10:00:30+00',
+  '2026-07-23 10:02:00+00', '2026-07-23 11:00:00+00', '2026-07-23 12:00:00+00'
+);
+DELETE FROM public.author_members WHERE author_id = '${AUTHOR_ONE}' AND user_id = '${USER_HUMAN_ONE}';
+`);
 }
 
 function testPreviousWindow() {
