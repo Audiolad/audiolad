@@ -80,6 +80,28 @@ export function authorizeStudioCatalogUse(input: {
   };
 }
 
+/**
+ * A guest never receives an entitlement. Its project-scoped permission is
+ * limited to music the server has independently classified as globally free.
+ */
+export function authorizeGuestStudioCatalogUse(input: {
+  isGuestProject: boolean;
+  assetGuestSessionId?: string | null;
+  projectGuestSessionId?: string | null;
+  isGloballyFreeStudioMusic: boolean;
+}): StudioCatalogAttachDecision {
+  if (
+    !input.isGuestProject ||
+    !input.projectGuestSessionId ||
+    (input.assetGuestSessionId != null &&
+      input.assetGuestSessionId !== input.projectGuestSessionId) ||
+    !input.isGloballyFreeStudioMusic
+  ) {
+    return { ok: false, status: 403, code: "catalog_music_unavailable" };
+  }
+  return { ok: true };
+}
+
 export function authorizeStudioCatalogAttachRefs(input: {
   practiceId: string;
   audioItemId: string;
@@ -381,6 +403,7 @@ export type StudioCatalogRenderLiveRow = {
   catalog_practice_id?: string | null;
   catalog_audio_item_id?: string | null;
   catalog_access_user_id?: string | null;
+  catalog_guest_session_id?: string | null;
 };
 
 export type StudioCatalogRenderAudioItem = {
@@ -400,6 +423,8 @@ export function evaluateLiveCatalogRenderAccess(input: {
   snapshotAudioItemId?: string | null;
   live: StudioCatalogRenderLiveRow | null;
   canUseMusicInStudio: boolean;
+  isGloballyFreeStudioMusic?: boolean;
+  projectGuestSessionId?: string | null;
   audioItem?: StudioCatalogRenderAudioItem | null;
   requireAudioPath?: boolean;
 }): StudioCatalogRenderAccessDecision {
@@ -428,10 +453,13 @@ export function evaluateLiveCatalogRenderAccess(input: {
   ) {
     return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
   }
-  if (!live.catalog_access_user_id) {
-    return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
-  }
-  if (!input.canUseMusicInStudio) {
+  const authorAccess =
+    Boolean(live.catalog_access_user_id) && input.canUseMusicInStudio;
+  const guestAccess =
+    Boolean(live.catalog_guest_session_id) &&
+    live.catalog_guest_session_id === input.projectGuestSessionId &&
+    input.isGloballyFreeStudioMusic === true;
+  if (!authorAccess && !guestAccess) {
     return { ok: false, code: CATALOG_MUSIC_UNAVAILABLE };
   }
   if (input.requireAudioPath) {
@@ -448,11 +476,11 @@ export function evaluateLiveCatalogRenderAccess(input: {
     }
     return {
       ok: true,
-      catalogAccessUserId: live.catalog_access_user_id,
+      catalogAccessUserId: live.catalog_access_user_id ?? "",
       audioPath,
     };
   }
-  return { ok: true, catalogAccessUserId: live.catalog_access_user_id };
+  return { ok: true, catalogAccessUserId: live.catalog_access_user_id ?? "" };
 }
 
 export function canAdoptCatalogAccessPrincipal(input: {

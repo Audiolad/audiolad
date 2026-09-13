@@ -37,11 +37,13 @@ function StudioMusicCatalogOverlayBody({
   onClose,
   attachedCatalogSelectionKeys,
   attachingAudioItemId = null,
+  guestCanUseFreeMusic = false,
   onAdd,
 }: {
   onClose: () => void;
   attachedCatalogSelectionKeys: ReadonlySet<string>;
   attachingAudioItemId?: string | null;
+  guestCanUseFreeMusic?: boolean;
   onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -502,6 +504,7 @@ function StudioMusicCatalogOverlayBody({
                     ? attachingAudioItemId
                     : null
                 }
+                guestCanUseFreeMusic={guestCanUseFreeMusic}
                 actionError={actionErrors[item.publication_id] ?? null}
                 attachedCatalogSelectionKeys={attachedCatalogSelectionKeys}
                 onPreview={(publicationId, audioItemId, trackTitle) => {
@@ -615,12 +618,14 @@ export function StudioMusicCatalogOverlay({
   onClose,
   attachedCatalogSelectionKeys,
   attachingAudioItemId = null,
+  guestCanUseFreeMusic = false,
   onAdd,
 }: {
   open: boolean;
   onClose: () => void;
   attachedCatalogSelectionKeys: ReadonlySet<string>;
   attachingAudioItemId?: string | null;
+  guestCanUseFreeMusic?: boolean;
   onAdd?: (practiceId: string, audioItemId: string) => void;
 }) {
   if (!open) {
@@ -632,6 +637,7 @@ export function StudioMusicCatalogOverlay({
       onClose={onClose}
       attachedCatalogSelectionKeys={attachedCatalogSelectionKeys}
       attachingAudioItemId={attachingAudioItemId}
+      guestCanUseFreeMusic={guestCanUseFreeMusic}
       onAdd={onAdd}
     />
   );

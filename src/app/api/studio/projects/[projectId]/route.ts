@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const assets = await listStudioAssets(projectId);
     return NextResponse.json({
       project: toStudioProjectDto(project),
-      assets: await toListedStudioAssetDtos(assets),
+      assets: await toListedStudioAssetDtos(projectId, assets),
     }, {
       headers: {
         "Cache-Control": "private, no-store",

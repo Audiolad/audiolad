@@ -7,6 +7,7 @@ import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 import {
   authorizeStudioCatalogAttachRefs,
+  authorizeGuestStudioCatalogUse,
   authorizeStudioCatalogUse,
   parseHttpByteRange,
   resolveStudioCatalogAssetTitle,
@@ -81,6 +82,17 @@ async function canUseCatalogMusic(
   return data === true;
 }
 
+async function isGloballyFreeStudioMusic(
+  service: ReturnType<typeof createServiceRoleClient>,
+  practiceId: string,
+): Promise<boolean> {
+  const { data, error } = await service.rpc("is_globally_free_studio_music", {
+    p_practice_id: practiceId,
+  });
+  if (error) throw new StudioApiError("internal_error", 500);
+  return data === true;
+}
+
 async function loadCatalogRefs(
   service: ReturnType<typeof createServiceRoleClient>,
   practiceId: string,
@@ -115,8 +127,8 @@ export async function attachStudioCatalogAsset(input: {
   practiceId: string;
   audioItemId: string;
 }) {
-  const { user } = await requireAuthenticatedUser();
-  const { service } = await requireStudioProjectAccess(input.projectId);
+  const projectAccess = await requireStudioProjectAccess(input.projectId);
+  const { service } = projectAccess;
   const { practice, audioItem } = await loadCatalogRefs(
     service,
     input.practiceId,
@@ -132,18 +144,31 @@ export async function attachStudioCatalogAsset(input: {
     throw new StudioApiError(refs.code, refs.status);
   }
 
-  const canUse = await canUseCatalogMusic(service, user.id, input.practiceId);
-  const access = authorizeStudioCatalogUse({
-    userId: user.id,
-    isAuthorMember: canUse,
-  });
+  const userId =
+    projectAccess.ownerKind === "author"
+      ? (await requireAuthenticatedUser()).user.id
+      : null;
+  const access =
+    projectAccess.ownerKind === "author"
+      ? authorizeStudioCatalogUse({
+          userId,
+          isAuthorMember: await canUseCatalogMusic(service, userId!, input.practiceId),
+        })
+      : authorizeGuestStudioCatalogUse({
+          isGuestProject: true,
+          projectGuestSessionId: projectAccess.guestSessionId,
+          isGloballyFreeStudioMusic: await isGloballyFreeStudioMusic(
+            service,
+            input.practiceId,
+          ),
+        });
   if (!access.ok) {
     throw new StudioApiError(access.code, access.status);
   }
 
   const { data, error } = await service.rpc("attach_studio_catalog_project_asset", {
     p_project_id: input.projectId,
-    p_user_id: user.id,
+    p_user_id: userId,
     p_practice_id: input.practiceId,
     p_audio_item_id: input.audioItemId,
     p_original_name: resolveStudioCatalogAssetTitle(audioItem!),
@@ -162,13 +187,13 @@ export async function attachStudioCatalogAsset(input: {
 }
 
 export async function toListedStudioAssetDtos(
+  projectId: string,
   assets: StudioProjectAssetRow[],
 ) {
+  const projectAccess = await requireStudioProjectAccess(projectId);
   let userId: string | null = null;
-  try {
+  if (projectAccess.ownerKind === "author") {
     userId = (await requireAuthenticatedUser()).user.id;
-  } catch {
-    userId = null;
   }
   const service = createServiceRoleClient();
   return Promise.all(
@@ -180,6 +205,7 @@ export async function toListedStudioAssetDtos(
         service,
         userId,
         asset,
+        projectAccess.guestSessionId,
       );
       const dto = toStudioAssetDto(asset, null, { available });
       if (studioCatalogAssetDtoContainsForbiddenFields(dto)) {
@@ -194,12 +220,22 @@ export async function resolveStudioCatalogAssetAvailability(
   service: ReturnType<typeof createServiceRoleClient>,
   userId: string | null,
   asset: StudioProjectAssetRow,
+  projectGuestSessionId: string | null = null,
 ): Promise<boolean> {
   if (asset.source_type !== "catalog" || !asset.catalog_practice_id) {
     return true;
   }
   if (!userId) {
-    return false;
+    const decision = authorizeGuestStudioCatalogUse({
+      isGuestProject: true,
+      assetGuestSessionId: asset.catalog_guest_session_id,
+      projectGuestSessionId,
+      isGloballyFreeStudioMusic: await isGloballyFreeStudioMusic(
+        service,
+        asset.catalog_practice_id,
+      ),
+    });
+    return decision.ok;
   }
   const { data, error } = await service.rpc("can_use_music_in_studio", {
     p_user_id: userId,
@@ -230,8 +266,8 @@ export async function assertCatalogAssetReadyForPlayback(
     throw new StudioApiError("not_found", 404);
   }
 
-  const { user } = await requireAuthenticatedUser();
-  const { service } = await requireStudioProjectAccess(projectId);
+  const projectAccess = await requireStudioProjectAccess(projectId);
+  const { service } = projectAccess;
   const { practice, audioItem } = await loadCatalogRefs(
     service,
     asset.catalog_practice_id,
@@ -247,12 +283,26 @@ export async function assertCatalogAssetReadyForPlayback(
     throw new StudioApiError("catalog_music_unavailable", 403);
   }
 
-  const canUse = await canUseCatalogMusic(service, user.id, asset.catalog_practice_id);
-  const access = authorizeStudioCatalogUse({
-    userId: user.id,
-    isAuthorMember: canUse,
-    forPlayback: true,
-  });
+  const userId =
+    projectAccess.ownerKind === "author"
+      ? (await requireAuthenticatedUser()).user.id
+      : null;
+  const access =
+    projectAccess.ownerKind === "author"
+      ? authorizeStudioCatalogUse({
+          userId,
+          isAuthorMember: await canUseCatalogMusic(service, userId!, asset.catalog_practice_id),
+          forPlayback: true,
+        })
+      : authorizeGuestStudioCatalogUse({
+          isGuestProject: true,
+          assetGuestSessionId: asset.catalog_guest_session_id,
+          projectGuestSessionId: projectAccess.guestSessionId,
+          isGloballyFreeStudioMusic: await isGloballyFreeStudioMusic(
+            service,
+            asset.catalog_practice_id,
+          ),
+        });
   if (!access.ok) {
     throw new StudioApiError(access.code, access.status);
   }
@@ -262,7 +312,7 @@ export async function assertCatalogAssetReadyForPlayback(
     throw new StudioApiError("catalog_music_unavailable", 403);
   }
 
-  return { user, service, audioPath, audioItem };
+  return { service, audioPath, audioItem };
 }
 
 export async function createStudioCatalogPlaybackDescriptor(

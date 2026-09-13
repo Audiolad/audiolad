@@ -57,6 +57,7 @@ export function resolveStudioMusicCatalogAction(
     | "studio_effective_minor"
     | "ownership"
   >,
+  options?: { guestCanUseFreeMusic?: boolean },
 ): StudioMusicCatalogAction {
   if (item.ownership.can_use) {
     if (item.ownership.is_author_member && !item.ownership.is_owned) {
@@ -80,6 +81,12 @@ export function resolveStudioMusicCatalogAction(
   }
 
   const studioIsFree = item.studio_is_free ?? item.is_free;
+  if (studioIsFree && options?.guestCanUseFreeMusic) {
+    return {
+      kind: "available",
+      label: STUDIO_MUSIC_DISPLAY_LABEL.AVAILABLE,
+    };
+  }
   if (studioIsFree) {
     return {
       kind: "free",
