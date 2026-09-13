@@ -30,6 +30,6 @@ assert.match(docs, /20260910120000_topics_sleep\.sql/);
 assert.match(docs, /`sleep` \| Сон \| 60/);
 assert.match(docs, /`calm` \| Спокойствие \| 50/);
 assert.doesNotMatch(docs, /Сон и расслабление/);
-assert.doesNotMatch(docs, /\| `relax` /);
+assert.match(docs, /\| `relax` \| Релакс \| 170/);
 
 console.log("topics-sleep-sql-unit: ok");

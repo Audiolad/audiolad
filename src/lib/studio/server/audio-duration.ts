@@ -30,17 +30,54 @@ export function studioAudioTempPath(mimeType: string): string {
   return join(tmpdir(), `audiolad-studio-${randomUUID()}.${extension}`);
 }
 
-export async function probeStudioAudioFile(path: string): Promise<number | null> {
+export type AudioMediaInspection = {
+  formatNames: string[];
+  durationSeconds: number | null;
+  hasAudioStream: boolean;
+  audioCodecNames: string[];
+};
+
+/**
+ * Reads container and stream metadata without imposing a product-specific
+ * codec policy. Callers decide which container kinds their contract accepts.
+ */
+export async function inspectAudioMediaFile(
+  path: string,
+): Promise<AudioMediaInspection | null> {
   try {
     const { stdout } = await execFileAsync("ffprobe", [
-      "-v", "error", "-show_entries", "format=duration",
-      "-of", "default=noprint_wrappers=1:nokey=1", path,
+      "-v", "error",
+      "-show_entries", "format=format_name,duration:stream=codec_type,codec_name",
+      "-of", "json",
+      path,
     ]);
-    const duration = Number.parseFloat(stdout.trim());
-    return Number.isFinite(duration) && duration > 0 ? duration : null;
+    const parsed = JSON.parse(stdout) as {
+      format?: { format_name?: string; duration?: string };
+      streams?: Array<{ codec_type?: string; codec_name?: string }>;
+    };
+    const duration = Number.parseFloat(parsed.format?.duration ?? "");
+    const audioStreams = (parsed.streams ?? []).filter(
+      (stream) => stream.codec_type === "audio",
+    );
+    return {
+      formatNames: (parsed.format?.format_name ?? "")
+        .split(",")
+        .map((name) => name.trim().toLowerCase())
+        .filter(Boolean),
+      durationSeconds:
+        Number.isFinite(duration) && duration > 0 ? duration : null,
+      hasAudioStream: audioStreams.length > 0,
+      audioCodecNames: audioStreams
+        .map((stream) => stream.codec_name?.trim().toLowerCase())
+        .filter((codec): codec is string => Boolean(codec)),
+    };
   } catch {
     return null;
   }
+}
+
+export async function probeStudioAudioFile(path: string): Promise<number | null> {
+  return (await inspectAudioMediaFile(path))?.durationSeconds ?? null;
 }
 
 export async function writeStreamToTempFile(

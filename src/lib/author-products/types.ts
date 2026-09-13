@@ -70,6 +70,11 @@ export type AudioItemRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  music_master?: {
+    assetId: string;
+    lifecycleState: "uploading" | "verified" | "rejected" | "abandoned";
+    transcodeStatus: "queued" | "processing" | "ready" | "failed" | null;
+  } | null;
 };
 
 export type PracticeRow = {

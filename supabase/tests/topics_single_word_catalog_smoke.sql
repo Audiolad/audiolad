@@ -1,4 +1,4 @@
--- Single-word catalog smoke (run on test DB after 20261006120100)
+-- Product topic catalog smoke (run on test DB after 20261006150000)
 -- Usage: psql -f supabase/tests/topics_single_word_catalog_smoke.sql
 
 BEGIN;
@@ -28,11 +28,19 @@ BEGIN
       'career',
       'business',
       'learning',
-      'spirituality'
+      'spirituality',
+      'rest',
+      'relax',
+      'work',
+      'concentration',
+      'study',
+      'creativity',
+      'sport',
+      'desires'
     );
 
-  IF v_active_count <> 15 THEN
-    RAISE EXCEPTION 'smoke failed: expected 15 catalog topics, got %', v_active_count;
+  IF v_active_count <> 23 THEN
+    RAISE EXCEPTION 'smoke failed: expected 23 catalog topics, got %', v_active_count;
   END IF;
 
   IF NOT EXISTS (
@@ -47,6 +55,26 @@ BEGIN
     WHERE key = 'self-esteem' AND title = 'Самооценка' AND is_active = true
   ) THEN
     RAISE EXCEPTION 'smoke failed: Самооценка missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.topics
+    WHERE key = 'learning' AND title = 'Обучение' AND is_active = true
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.topics
+    WHERE key = 'study' AND title = 'Учёба' AND is_active = true
+  ) THEN
+    RAISE EXCEPTION 'smoke failed: Учёба and Обучение must both exist';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.topics
+    WHERE key = 'desires' AND title = 'Желания' AND is_active = true
+  ) OR EXISTS (
+    SELECT 1 FROM public.topics
+    WHERE title = 'Желание'
+  ) THEN
+    RAISE EXCEPTION 'smoke failed: only plural Желания is valid';
   END IF;
 
   SELECT count(*)

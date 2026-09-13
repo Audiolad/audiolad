@@ -35,6 +35,14 @@ const EXPECTED_CATALOG = [
   { key: "business", title: "Бизнес", sortOrder: 130 },
   { key: "learning", title: "Обучение", sortOrder: 140 },
   { key: "spirituality", title: "Духовность", sortOrder: 150 },
+  { key: "rest", title: "Отдых", sortOrder: 160 },
+  { key: "relax", title: "Релакс", sortOrder: 170 },
+  { key: "work", title: "Работа", sortOrder: 180 },
+  { key: "concentration", title: "Концентрация", sortOrder: 190 },
+  { key: "study", title: "Учёба", sortOrder: 200 },
+  { key: "creativity", title: "Творчество", sortOrder: 210 },
+  { key: "sport", title: "Спорт", sortOrder: 220 },
+  { key: "desires", title: "Желания", sortOrder: 230 },
 ];
 
 const OLD_COMPOUND_TITLES = [
@@ -80,7 +88,7 @@ function toggleTopic(value, key, options, limit) {
   return [...value, key];
 }
 
-assert.equal(EXPECTED_CATALOG.length, 15, "15 topics in order");
+assert.equal(EXPECTED_CATALOG.length, 23, "23 topics in order");
 assert.deepEqual(
   EXPECTED_CATALOG.map((topic) => topic.title),
   [
@@ -99,6 +107,14 @@ assert.deepEqual(
     "Бизнес",
     "Обучение",
     "Духовность",
+    "Отдых",
+    "Релакс",
+    "Работа",
+    "Концентрация",
+    "Учёба",
+    "Творчество",
+    "Спорт",
+    "Желания",
   ],
   "UI titles match the product order",
 );
@@ -108,6 +124,15 @@ assert.equal(byKey.get("abundance")?.title, "Изобилие", "Изобили�
 assert.equal(byKey.get("love")?.title, "Любовь", "Любовь selectable");
 assert.equal(byKey.get("self-worth")?.title, "Уверенность");
 assert.equal(byKey.get("self-esteem")?.title, "Самооценка");
+assert.equal(byKey.get("learning")?.title, "Обучение", "Обучение remains selectable");
+assert.equal(byKey.get("study")?.title, "Учёба", "Учёба is independently selectable");
+assert.notEqual(
+  byKey.get("learning")?.key,
+  byKey.get("study")?.key,
+  "Учёба and Обучение are independent keys",
+);
+assert.equal(byKey.get("desires")?.title, "Желания", "Желания remains plural");
+assert.equal(byKey.has("desire"), false, "singular Желание is not a topic");
 assert.notEqual(
   byKey.get("self-worth")?.key,
   byKey.get("self-esteem")?.key,
@@ -163,6 +188,21 @@ assert.ok(
   options.some((topic) => topic.key === "body-wellbeing" && topic.title === "Самочувствие"),
 );
 assert.ok(options.some((topic) => topic.key === "energy" && topic.title === "Энергия"));
+for (const [key, title] of [
+  ["rest", "Отдых"],
+  ["relax", "Релакс"],
+  ["work", "Работа"],
+  ["concentration", "Концентрация"],
+  ["study", "Учёба"],
+  ["creativity", "Творчество"],
+  ["sport", "Спорт"],
+  ["desires", "Желания"],
+]) {
+  assert.ok(
+    options.some((topic) => topic.key === key && topic.title === title),
+    `${title} is an allowed topic option`,
+  );
+}
 assert.equal(
   options.filter((topic) => OLD_COMPOUND_TITLES.includes(topic.title)).length,
   0,
