@@ -8,25 +8,8 @@ import {
   validateStudioProvisionInput,
 } from "@/lib/admin/studio-author-provisioning";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import type { CreateStudioWorkspaceActionState } from "@/lib/admin/studio-author-workspace-form-state";
 import { createClient } from "@/lib/supabase/server";
-
-export type CreateStudioWorkspaceActionState =
-  | { ok: false; error: string }
-  | {
-      ok: true;
-      message: string;
-      workspace: {
-        authorId: string;
-        slug: string;
-        name: string;
-        owner: { id: string; email: string | null; displayName: string | null };
-      };
-    };
-
-export const CREATE_STUDIO_WORKSPACE_INITIAL_STATE: CreateStudioWorkspaceActionState = {
-  ok: false,
-  error: "",
-};
 
 export async function createStudioWorkspace(
   _previousState: CreateStudioWorkspaceActionState,
