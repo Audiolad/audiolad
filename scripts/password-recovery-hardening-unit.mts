@@ -68,6 +68,15 @@ assert.equal(
 );
 assert.equal(
   getRecoveryLandingState({
+    tokenHash: validTokenHash,
+    type: "recovery",
+    hasStagedRecovery: true,
+    stagedSuccessfullyInMount: false,
+  }),
+  "stage",
+);
+assert.equal(
+  getRecoveryLandingState({
     tokenHash: null,
     type: null,
     hasStagedRecovery: true,
@@ -120,6 +129,7 @@ assert.match(recoveryPage, /initialHasStagedRecovery=\{initialHasStagedRecovery\
 assert.doesNotMatch(recoveryPage, /tokenHash/);
 assert.match(landing, /onClick=\{continueRecovery\}/);
 assert.match(landing, /verifyRecoveryTokenAction\(\)/);
+assert.doesNotMatch(landing, /useState\(initialHasStagedRecovery\)/);
 assert.equal(
   landing.indexOf("verifyRecoveryTokenAction()") >
     landing.indexOf("async function continueRecovery"),

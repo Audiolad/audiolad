@@ -19,7 +19,7 @@ export default function RecoveryLanding({
   const router = useRouter();
   const searchParams = useSearchParams();
   const stagedSuccessfullyRef = useRef(false);
-  const [ready, setReady] = useState(initialHasStagedRecovery);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
 
