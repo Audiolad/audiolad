@@ -287,7 +287,11 @@ BEGIN
   -- ------------------------------------------------------------------
   -- Sale-lock current-audio coverage (canonical practice_is_content_locked)
   -- ------------------------------------------------------------------
-  INSERT INTO auth.users (id) VALUES (v_buyer)
+  -- Compile stub auth.users may lack email columns referenced by sync triggers.
+  ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email text;
+  ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
+  INSERT INTO auth.users (id, email, email_confirmed_at)
+  VALUES (v_buyer, 'slice3-sale-lock-buyer@example.com', now())
   ON CONFLICT (id) DO NOTHING;
 
   -- Reset item to a delivered active-WAV state with no legacy path.
