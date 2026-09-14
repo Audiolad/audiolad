@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   const { data: order, error: orderError } = await serviceRoleClient
     .from("orders")
     .select(
-      "id, status, practice_slug_snapshot, practice_title_snapshot, order_kind, target_access_level",
+      "id, status, practice_slug_snapshot, practice_title_snapshot, order_kind, target_access_level, amount_minor, currency",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -112,6 +112,14 @@ export async function GET(request: Request) {
       typeof (order as { target_access_level?: unknown }).target_access_level ===
       "number"
         ? (order as { target_access_level: number }).target_access_level
+        : null,
+    amountMinor:
+      typeof (order as { amount_minor?: unknown }).amount_minor === "number"
+        ? (order as { amount_minor: number }).amount_minor
+        : null,
+    currency:
+      typeof (order as { currency?: unknown }).currency === "string"
+        ? (order as { currency: string }).currency
         : null,
   });
 

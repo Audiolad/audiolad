@@ -176,9 +176,6 @@ export default function AuthorCreateProjectForm() {
         open={offerOpen}
         onClose={() => setOfferOpen(false)}
         surface="author_create_project_form"
-        onPurchaseSucceeded={() => {
-          setOfferOpen(false);
-        }}
       />
     </>
   );

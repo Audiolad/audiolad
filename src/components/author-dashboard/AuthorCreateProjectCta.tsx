@@ -87,9 +87,6 @@ export default function AuthorCreateProjectCta() {
         open={offerOpen}
         onClose={() => setOfferOpen(false)}
         surface="author_dashboard_cta"
-        onPurchaseSucceeded={() => {
-          router.push("/author-dashboard/projects/new");
-        }}
       />
     </>
   );

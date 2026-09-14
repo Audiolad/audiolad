@@ -219,9 +219,6 @@ export default function AuthorProjectSwitcher({
         open={upsellOpen}
         onClose={() => setUpsellOpen(false)}
         surface="author_project_switcher"
-        onPurchaseSucceeded={() => {
-          router.push("/author-dashboard/projects/new");
-        }}
       />
     </div>
   );

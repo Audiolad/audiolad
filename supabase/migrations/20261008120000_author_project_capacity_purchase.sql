@@ -147,15 +147,41 @@ ALTER TABLE public.orders
     )
   );
 
+ALTER TABLE public.orders
+  DROP CONSTRAINT IF EXISTS orders_practice_id_by_kind_check;
+
+ALTER TABLE public.orders
+  ADD CONSTRAINT orders_practice_id_by_kind_check
+  CHECK (
+    (
+      order_kind = 'author_project_capacity'
+      AND practice_id IS NULL
+    )
+    OR (
+      order_kind IN (
+        'product_purchase',
+        'course_upgrade',
+        'studio_music_license'
+      )
+      AND practice_id IS NOT NULL
+    )
+  );
+
+COMMENT ON CONSTRAINT orders_practice_id_by_kind_check ON public.orders IS
+  'practice_id required for product_purchase/course_upgrade/studio_music_license; NULL only for author_project_capacity.';
+
 COMMENT ON COLUMN public.orders.order_kind IS
   'product_purchase | course_upgrade | studio_music_license | author_project_capacity (one-time permanent project slots; practice_id NULL).';
 
-CREATE UNIQUE INDEX IF NOT EXISTS orders_one_pending_author_project_capacity_per_user_idx
-  ON public.orders (user_id)
+DROP INDEX IF EXISTS public.orders_one_pending_author_project_capacity_per_user_idx;
+DROP INDEX IF EXISTS public.orders_one_pending_author_project_capacity_per_user_sku_idx;
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_one_pending_author_project_capacity_per_user_sku_idx
+  ON public.orders (user_id, practice_slug_snapshot)
   WHERE status = 'pending' AND order_kind = 'author_project_capacity';
 
-COMMENT ON INDEX public.orders_one_pending_author_project_capacity_per_user_idx IS
-  'At most one live pending author_project_capacity charge per user.';
+COMMENT ON INDEX public.orders_one_pending_author_project_capacity_per_user_sku_idx IS
+  'At most one live pending author_project_capacity charge per user+SKU (practice_slug_snapshot).';
 
 -- Allow platform capacity orders without author_id_snapshot.
 CREATE OR REPLACE FUNCTION public.orders_enforce_author_id_snapshot()
@@ -518,6 +544,43 @@ BEGIN
     RAISE EXCEPTION 'unlimited_account' USING ERRCODE = 'P0001';
   END IF;
 
+  -- Serialize same-user same-SKU creates; different SKUs do not block each other.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_user_id::text || ':apc:' || v_package.sku, 91081)
+  );
+
+  -- Resume an existing pending order for this user+SKU (new Idempotency-Key allowed).
+  SELECT o.*
+  INTO v_existing
+  FROM public.orders AS o
+  WHERE o.user_id = v_user_id
+    AND o.order_kind = 'author_project_capacity'
+    AND o.status = 'pending'
+    AND o.practice_slug_snapshot = v_package.sku
+  ORDER BY o.created_at ASC
+  LIMIT 1
+  FOR UPDATE;
+
+  IF FOUND THEN
+    IF v_existing.amount_minor IS DISTINCT FROM v_package.amount_minor
+       OR v_existing.currency IS DISTINCT FROM 'RUB'
+       OR v_existing.practice_slug_snapshot IS DISTINCT FROM v_package.sku THEN
+      RAISE EXCEPTION 'pending_order_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+      v_existing.id,
+      v_existing.status,
+      v_existing.amount_minor,
+      v_existing.currency,
+      v_existing.order_kind,
+      v_existing.practice_slug_snapshot,
+      v_package.slots,
+      v_existing.created_at;
+    RETURN;
+  END IF;
+
   BEGIN
     INSERT INTO public.orders (
       user_id,
@@ -575,13 +638,32 @@ BEGIN
         RETURN;
       END IF;
 
-      IF EXISTS (
-        SELECT 1 FROM public.orders AS o
-        WHERE o.user_id = v_user_id
-          AND o.order_kind = 'author_project_capacity'
-          AND o.status = 'pending'
-      ) THEN
-        RAISE EXCEPTION 'pending_order_exists' USING ERRCODE = 'P0001';
+      SELECT o.*
+      INTO v_existing
+      FROM public.orders AS o
+      WHERE o.user_id = v_user_id
+        AND o.order_kind = 'author_project_capacity'
+        AND o.status = 'pending'
+        AND o.practice_slug_snapshot = v_package.sku
+      ORDER BY o.created_at ASC
+      LIMIT 1;
+
+      IF FOUND THEN
+        IF v_existing.amount_minor IS DISTINCT FROM v_package.amount_minor
+           OR v_existing.currency IS DISTINCT FROM 'RUB' THEN
+          RAISE EXCEPTION 'pending_order_mismatch' USING ERRCODE = 'P0001';
+        END IF;
+
+        order_id := v_existing.id;
+        status := v_existing.status;
+        amount_minor := v_existing.amount_minor;
+        currency := v_existing.currency;
+        order_kind := v_existing.order_kind;
+        sku := v_existing.practice_slug_snapshot;
+        slots := v_package.slots;
+        created_at := v_existing.created_at;
+        RETURN NEXT;
+        RETURN;
       END IF;
 
       RAISE;
@@ -606,7 +688,7 @@ GRANT EXECUTE ON FUNCTION public.create_author_project_capacity_order(text, uuid
   TO authenticated;
 
 COMMENT ON FUNCTION public.create_author_project_capacity_order(text, uuid) IS
-  'audiolad:author-project-capacity-order:v1; server SKU catalog only; ignores client amount/slots/author_id; one pending per user';
+  'audiolad:author-project-capacity-order:v2; server SKU catalog; resume pending by user+SKU; one pending per user+SKU';
 
 CREATE OR REPLACE FUNCTION public.grant_author_project_capacity_for_order(
   p_order_id uuid
@@ -672,6 +754,28 @@ BEGIN
     AND p.status = 'succeeded'
   ORDER BY p.confirmed_at DESC NULLS LAST, p.created_at DESC
   LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'succeeded_payment_required' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_payment.order_id IS DISTINCT FROM v_order.id THEN
+    RAISE EXCEPTION 'payment_order_mismatch' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_payment.status IS DISTINCT FROM 'succeeded' THEN
+    RAISE EXCEPTION 'succeeded_payment_required' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_payment.amount_minor IS DISTINCT FROM v_order.amount_minor THEN
+    RAISE EXCEPTION 'payment_amount_mismatch' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_payment.currency IS DISTINCT FROM v_order.currency
+     OR v_payment.currency IS DISTINCT FROM 'RUB'
+     OR v_order.currency IS DISTINCT FROM 'RUB' THEN
+    RAISE EXCEPTION 'payment_currency_mismatch' USING ERRCODE = 'P0001';
+  END IF;
 
   SELECT coalesce(pr.author_project_slots_purchased, 0)
   INTO v_before
@@ -739,7 +843,7 @@ GRANT EXECUTE ON FUNCTION public.grant_author_project_capacity_for_order(uuid)
   TO service_role;
 
 COMMENT ON FUNCTION public.grant_author_project_capacity_for_order(uuid) IS
-  'audiolad:author-project-capacity-grant:v1; idempotent by order_id; increments profiles.author_project_slots_purchased once';
+  'audiolad:author-project-capacity-grant:v2; requires succeeded payment matching order amount/currency; UNIQUE(order_id) idempotent';
 
 CREATE OR REPLACE FUNCTION public.fulfill_tochka_payment_transactional(
   p_webhook_event_id uuid,
@@ -1526,6 +1630,17 @@ BEGIN
   END IF;
   IF public.is_platform_analytics_event('author_project_capacity_purchase_succeeded') IS NOT TRUE THEN
     RAISE EXCEPTION 'Post-check failed: capacity analytics events not allowlisted';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'orders_practice_id_by_kind_check'
+      AND conrelid = 'public.orders'::regclass
+  ) THEN
+    RAISE EXCEPTION 'Post-check failed: orders_practice_id_by_kind_check missing';
+  END IF;
+  IF to_regclass('public.orders_one_pending_author_project_capacity_per_user_sku_idx') IS NULL THEN
+    RAISE EXCEPTION 'Post-check failed: pending capacity user+SKU unique index missing';
   END IF;
 END;
 $$;

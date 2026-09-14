@@ -17,6 +17,8 @@ import {
   type CheckoutOrderStatus,
   type CheckoutStatusResponseBody,
 } from "@/lib/payments/checkout-status-api";
+import { trackAuthorProjectCapacityEvent } from "@/lib/author-projects/capacity-analytics";
+import { resolveAuthorProjectCapacityPackage } from "@/lib/author-projects/capacity-catalog";
 
 type ViewState =
   | "checking"
@@ -79,6 +81,7 @@ export default function CheckoutResultClient() {
 
   const inFlightRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const capacitySucceededTrackedRef = useRef(false);
 
   const studioLicense = isStudioMusicLicenseCheckout(status?.orderKind);
   const capacityPurchase = isAuthorProjectCapacityCheckout(status?.orderKind);
@@ -114,6 +117,46 @@ export default function CheckoutResultClient() {
     setIsPolling(true);
     setPollGeneration((value) => value + 1);
   }, []);
+
+  useEffect(() => {
+    if (viewState !== "paid_authenticated" || !capacityPurchase) {
+      return;
+    }
+    if (capacitySucceededTrackedRef.current) {
+      return;
+    }
+    capacitySucceededTrackedRef.current = true;
+
+    const pack = resolveAuthorProjectCapacityPackage(status?.practiceSlug ?? "");
+    const properties: Record<string, string | number | boolean | null> = {
+      surface: "checkout_result",
+    };
+    if (status?.practiceSlug) {
+      properties.sku = status.practiceSlug;
+    }
+    if (pack) {
+      // slots are the identity of the trusted SKU snapshot, not a client price guess
+      properties.package = pack.slots;
+    }
+    if (typeof status?.amountMinor === "number") {
+      properties.amount = status.amountMinor;
+    }
+    if (status?.currency) {
+      properties.currency = status.currency;
+    }
+
+    void trackAuthorProjectCapacityEvent(
+      "author_project_capacity_purchase_succeeded",
+      properties,
+      "/checkout/result",
+    );
+  }, [
+    viewState,
+    capacityPurchase,
+    status?.practiceSlug,
+    status?.amountMinor,
+    status?.currency,
+  ]);
 
   useEffect(() => {
     if (!hasCheckoutParams || !orderId || !checkoutToken) {

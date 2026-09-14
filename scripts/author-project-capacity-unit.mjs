@@ -222,6 +222,36 @@ function main() {
   assert.match(migration, /unlimited_account/);
   assert.doesNotMatch(migration, /в месяц|ежемесяч|продлен/i);
 
+  // Hardening: pending unique per user+SKU, resume same SKU, grant payment gates
+  assert.match(
+    migration,
+    /orders_one_pending_author_project_capacity_per_user_sku_idx/,
+  );
+  assert.match(
+    migration,
+    /ON public\.orders \(user_id, practice_slug_snapshot\)/,
+  );
+  assert.match(migration, /Resume an existing pending order/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /succeeded_payment_required/);
+  assert.match(migration, /payment_amount_mismatch/);
+  assert.match(migration, /payment_currency_mismatch/);
+  assert.match(migration, /payment_order_mismatch/);
+  assert.match(migration, /orders_practice_id_by_kind_check/);
+  assert.match(
+    migration,
+    /order_kind IN \(\s*'product_purchase',\s*'course_upgrade',\s*'studio_music_license'\s*\)\s*AND practice_id IS NOT NULL/s,
+  );
+  assert.match(
+    migration,
+    /order_kind = 'author_project_capacity'\s*AND practice_id IS NULL/s,
+  );
+  // Grant must check NOT FOUND after selecting succeeded payment
+  assert.match(
+    migration,
+    /AND p\.status = 'succeeded'[\s\S]*?IF NOT FOUND THEN[\s\S]*?succeeded_payment_required/,
+  );
+
   const dialog = read(
     "src/components/author-dashboard/AuthorProjectCapacityOfferDialog.tsx",
   );
@@ -232,6 +262,46 @@ function main() {
   assert.doesNotMatch(dialog, /в месяц|ежемесяч|продлен/i);
   assert.match(dialog, /без подписки/i);
   assert.match(dialog, /Разовая оплата/);
+  assert.doesNotMatch(dialog, /kind:\s*"success"/);
+  assert.doesNotMatch(dialog, /onPurchaseSucceeded/);
+  assert.match(dialog, /window\.location\.assign/);
+
+  const checkoutResult = read(
+    "src/app/(platform)/checkout/result/CheckoutResultClient.tsx",
+  );
+  assert.match(
+    checkoutResult,
+    /author_project_capacity_purchase_succeeded/,
+  );
+  assert.match(checkoutResult, /capacitySucceededTrackedRef/);
+  assert.match(checkoutResult, /paid_authenticated/);
+  assert.match(checkoutResult, /Готово — проекты добавлены навсегда/);
+  assert.match(checkoutResult, /Создать новый проект/);
+
+  const statusApi = read("src/lib/payments/checkout-status-api.ts");
+  assert.match(statusApi, /amountMinor/);
+  assert.match(statusApi, /currency/);
+
+  const statusRoute = read("src/app/api/checkout/status/route.ts");
+  assert.match(statusRoute, /amount_minor/);
+  assert.match(statusRoute, /currency/);
+
+  // Call sites no longer wire unreachable dialog success callbacks
+  for (const rel of [
+    "src/components/author-dashboard/AuthorCreateProjectCta.tsx",
+    "src/components/author-dashboard/AuthorProjectSwitcher.tsx",
+    "src/components/author-dashboard/AuthorCreateProjectForm.tsx",
+  ]) {
+    assert.doesNotMatch(read(rel), /onPurchaseSucceeded/);
+  }
+
+  // Documented behavioural contracts (static SQL analysis — no production DB)
+  assert.match(
+    migration,
+    /practice_slug_snapshot = v_package\.sku/,
+  );
+  assert.match(migration, /already_granted/);
+  assert.match(migration, /ON CONFLICT \(order_id\) DO NOTHING/);
 
   const cta = read("src/components/author-dashboard/AuthorCreateProjectCta.tsx");
   assert.match(cta, /Создать новый проект/);
