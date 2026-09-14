@@ -79,15 +79,16 @@ BEGIN
         RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
       END IF;
   END;
+  -- FREE Studio acquire must succeed without current source-author terms.
+  -- Clean up so later step 11 can still assert a fresh insert.
   BEGIN
     PERFORM public.acquire_free_studio_music(free_music);
-    RAISE EXCEPTION 'terms: expected free author-terms gate';
   EXCEPTION
     WHEN others THEN
-      IF SQLERRM NOT LIKE '%studio_author_terms_not_accepted%' THEN
-        RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
-      END IF;
+      RAISE EXCEPTION 'terms: free acquire must not require author terms, got %', SQLERRM;
   END;
+  DELETE FROM public.studio_music_entitlements
+  WHERE user_id = buyer AND practice_id = free_music;
   INSERT INTO public.author_terms_acceptances (
     author_id, terms_version_id, accepted_by_user_id, acceptance_text
   ) VALUES (

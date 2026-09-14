@@ -23,6 +23,7 @@ const financeName = "20261003120500_studio_music_canonical_sales.sql";
 const orderRevokeName = "20261003120600_studio_music_entitlement_order_revoke.sql";
 const pricingName = "20261003120700_studio_music_independent_pricing.sql";
 const legalName = "20261006140000_studio_music_legal_foundation_v1_2.sql";
+const freeNoTermsName = "20261007140100_acquire_free_studio_music_without_author_terms.sql";
 const previousLatest = "20261002120000_studio_duplicate_project_upload_state_ready.sql";
 const stubPath = join(repoRoot, "scripts/lib/studio-music-license-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/studio_music_license_smoke.sql");
@@ -74,6 +75,7 @@ for (const stamp of [
   "20261003120600",
   "20261003120700",
   "20261006140000",
+  "20261007140100",
 ]) {
   assert(versions.includes(stamp), `${stamp} is listed`);
 }
@@ -157,6 +159,13 @@ assert(/studio_license_terms_version/.test(legal));
 assert(/license_terms_version/.test(legal));
 assert(/studio_author_terms_not_accepted/.test(legal));
 assert(/author_has_accepted_current_terms/.test(legal));
+const freeNoTerms = readFileSync(join(migrationsDir, freeNoTermsName), "utf8");
+assert(existsSync(join(migrationsDir, freeNoTermsName)), "FREE acquire without author-terms migration exists");
+assert(/CREATE OR REPLACE FUNCTION public\.acquire_free_studio_music/.test(freeNoTerms));
+assert(/acquire_free_studio_music_legal_legacy/.test(freeNoTerms));
+assert(!/author_has_accepted_current_terms/.test(freeNoTerms));
+assert(/create_studio_music_order/.test(legal));
+assert(/IF NOT public\.author_has_accepted_current_terms/.test(legal));
 assert(/freeze_studio_entitlement_terms/.test(legal));
 assert(/studio-license-v1\.0/.test(legal));
 assert(/REVOKE ALL ON FUNCTION public\.create_studio_music_order_legal_legacy/.test(legal));
@@ -198,7 +207,8 @@ assert(/PR3.1: fixed Studio amount must be 60000/.test(smoke));
 assert(/PR3.1: paid order must reject Studio free/.test(smoke));
 assert(/PR3.1: paid listener \+ Studio free must allow free acquire/.test(smoke));
 assert(/terms: expected paid author-terms gate/.test(smoke));
-assert(/terms: expected free author-terms gate/.test(smoke));
+assert(/terms: free acquire must not require author terms/.test(smoke));
+assert(!/terms: expected free author-terms gate/.test(smoke));
 assert(/studio_author_terms_not_accepted/.test(smoke));
 assert(/Isolated fixture acceptance of current Author Terms/.test(smoke));
 assert(/paid order must freeze Studio terms/.test(smoke));
@@ -263,6 +273,7 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, "20260728140000_author_terms_acceptance.sql"), "utf8"),
     readFileSync(join(migrationsDir, "20260914120000_author_terms_v1_1.sql"), "utf8"),
     readFileSync(join(migrationsDir, legalName), "utf8"),
+    readFileSync(join(migrationsDir, freeNoTermsName), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }

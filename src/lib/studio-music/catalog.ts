@@ -18,6 +18,7 @@ import {
 } from "@/lib/products/public-audio-items";
 
 import {
+  canAcquireFreeStudioMusic,
   canAcquireStudioMusic,
   canUseMusicInStudio,
   hasStudioMusicEntitlement,
@@ -449,13 +450,21 @@ export function resolveStudioMusicOwnership(input: {
     entitlement: input.entitlement,
     isAuthorMember,
   });
+  // Author music terms gate applies to PAID Studio acquisition only.
+  // FREE Studio music (canonical studio pricing mode = free) may be acquired
+  // without current source-author terms; platform_reuse_allowed and other
+  // eligibility gates still apply via canAcquireStudioMusic / canAcquireFreeStudioMusic.
   const authorTermsBlocked = input.authorHasCurrentTerms === false;
-  const canAcquire =
-    !canUse &&
-    !authorTermsBlocked &&
-    canAcquireStudioMusic(input.practice, {
-      commerciallyAccessible: input.commerciallyAccessible,
-    });
+  const baseEligible = canAcquireStudioMusic(input.practice, {
+    commerciallyAccessible: input.commerciallyAccessible,
+  });
+  const studioFreeEligible = canAcquireFreeStudioMusic(input.practice, {
+    commerciallyAccessible: input.commerciallyAccessible,
+  });
+  // Terms only block PAID Studio acquisition that would otherwise be eligible.
+  const termsBlockPaidAcquisition =
+    authorTermsBlocked && baseEligible && !studioFreeEligible;
+  const canAcquire = !canUse && !termsBlockPaidAcquisition && baseEligible;
 
   return {
     can_acquire: canAcquire,
@@ -467,7 +476,9 @@ export function resolveStudioMusicOwnership(input: {
       isAuthorMember,
     }),
     acquisition_unavailable_reason:
-      !canUse && authorTermsBlocked ? "author_terms_not_accepted" : null,
+      !canUse && termsBlockPaidAcquisition
+        ? "author_terms_not_accepted"
+        : null,
   };
 }
 
