@@ -8,7 +8,10 @@ import {
 import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
-import { loadDiscoveryContextForPhrases } from "@/lib/seo-queries/author-discovery-repository";
+import {
+  loadDiscoveryContextForPhrases,
+  loadRankedAnalyzedQueriesForSeed,
+} from "@/lib/seo-queries/author-discovery-repository";
 import {
   assertAuthorSeoDiscoveryEnabled,
   isAuthorSeoDiscoveryEnabled,
@@ -26,9 +29,52 @@ function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
 }
 
+function databaseMatchStatus(input: {
+  authorId: string;
+  reservation: {
+    authorId: string;
+    status: string;
+    id: string;
+    productTitle: string | null;
+  } | null;
+}): {
+  status: "available" | "occupied" | "own";
+  statusLabel: "Свободен" | "Занят" | "У вас в работе";
+  canReserve: boolean;
+  reservationId: string | null;
+  productTitle: string | null;
+} {
+  const reservation = input.reservation;
+  if (reservation && (reservation.status === "active" || reservation.status === "used")) {
+    if (reservation.authorId === input.authorId) {
+      return {
+        status: "own",
+        statusLabel: "У вас в работе",
+        canReserve: false,
+        reservationId: reservation.id,
+        productTitle: reservation.productTitle,
+      };
+    }
+    return {
+      status: "occupied",
+      statusLabel: "Занят",
+      canReserve: false,
+      reservationId: null,
+      productTitle: null,
+    };
+  }
+  return {
+    status: "available",
+    statusLabel: "Свободен",
+    canReserve: true,
+    reservationId: null,
+    productTitle: null,
+  };
+}
+
 /**
- * Author Wordstat search + SEO DB reconciliation (closed beta).
- * Client sends only { author_id, phrase }. Frequency per result is suggestion.count.
+ * Closed-beta discovery: ranked analyzed database matches + Wordstat additions.
+ * Client sends only { author_id, phrase }.
  */
 export async function POST(request: Request) {
   try {
@@ -54,6 +100,50 @@ export async function POST(request: Request) {
 
     const { user } = await requireAuthorMembership(authorId);
     assertAuthorSeoDiscoveryEnabled(authorId);
+
+    let databaseMatches: Array<Record<string, unknown>> = [];
+    let seedNormalized: string | null = null;
+    const databaseNormalized = new Set<string>();
+    try {
+      const ranked = await loadRankedAnalyzedQueriesForSeed({
+        authorId,
+        seedPhrase: phrase,
+      });
+      seedNormalized = ranked.seedNormalized;
+      databaseMatches = ranked.matches.map((item) => {
+        databaseNormalized.add(item.normalizedQuery);
+        const status = databaseMatchStatus({
+          authorId,
+          reservation: item.reservation,
+        });
+        return {
+          phrase: item.queryText,
+          frequency: item.frequency ?? 0,
+          status: status.status,
+          statusLabel: status.statusLabel,
+          queryId: item.id,
+          reservationId: status.reservationId,
+          productTitle: status.productTitle,
+          canReserve: status.canReserve,
+          canPropose: false,
+          source: "database" as const,
+        };
+      });
+    } catch (loadError) {
+      console.error(
+        "author_seo_discovery_database_error",
+        loadError instanceof Error ? loadError.message : "unknown",
+      );
+      return NextResponse.json(
+        {
+          error: "Не удалось подобрать запросы из базы АудиоЛада. Попробуйте ещё раз.",
+          code: "seo_discovery_database_failed",
+        },
+        { status: 500 },
+      );
+    }
+
+    if (seedNormalized) databaseNormalized.add(seedNormalized);
 
     const wordstat = await fetchWordstatSuggestions(phrase, { userId: user.id });
     if (!wordstat.ok) {
@@ -92,6 +182,17 @@ export async function POST(request: Request) {
       const reservation = query
         ? context.reservationByQueryId.get(query.id) ?? null
         : null;
+
+      // Hide not_applicable from Wordstat additions.
+      if (query?.analysisStatus === "not_applicable") continue;
+
+      // Do not duplicate analyzed queries already shown in the database block.
+      if (query?.analysisStatus === "analyzed") {
+        if (normalized && databaseNormalized.has(normalized)) continue;
+        // Analyzed but not in top-7: still skip "missing" framing — omit from bottom.
+        continue;
+      }
+
       results.push(
         reconcileAuthorDiscoverySuggestion({
           suggestion: { phrase: suggestion.phrase, count: suggestion.count },
@@ -109,6 +210,7 @@ export async function POST(request: Request) {
       phrase: wordstat.data.phrase,
       region: wordstat.data.region,
       periodLabel: wordstat.data.periodLabel,
+      databaseMatches,
       results,
     });
   } catch (error) {

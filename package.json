@@ -278,7 +278,8 @@
     "test:mozhno-li-zarabotat-na-ii-muzyke": "npx tsx scripts/mozhno-li-zarabotat-na-ii-muzyke-page-unit.mjs",
     "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs",
     "test:kak-zarabotat-na-muzyke-iz-suno": "npx tsx scripts/kak-zarabotat-na-muzyke-iz-suno-page-unit.mjs",
-    "test:author-seo-discovery": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-discovery-unit.mjs"
+    "test:author-seo-discovery": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-discovery-unit.mjs",
+    "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

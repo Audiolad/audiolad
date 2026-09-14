@@ -50,6 +50,7 @@ export default function AuthorSeoOpportunitiesClient({
 
   const [discoverPhrase, setDiscoverPhrase] = useState("");
   const [discoverySeedPhrase, setDiscoverySeedPhrase] = useState<string | null>(null);
+  const [databaseMatches, setDatabaseMatches] = useState<DiscoveryResult[]>([]);
   const [discoverResults, setDiscoverResults] = useState<DiscoveryResult[]>([]);
   const [discoverMessage, setDiscoverMessage] = useState<string | null>(null);
   const [discoverPending, setDiscoverPending] = useState(false);
@@ -87,7 +88,8 @@ export default function AuthorSeoOpportunitiesClient({
           ? { ...item, reservationId: payload.reservation.id, expiresAt: payload.reservation.expires_at, lifecycle: "in_progress" as const }
           : item);
       }
-      const discovery = discoverResults.find((item) => item.queryId === queryId);
+      const discovery = databaseMatches.find((item) => item.queryId === queryId)
+        ?? discoverResults.find((item) => item.queryId === queryId);
       if (!discovery) return current;
       return [
         {
@@ -108,6 +110,16 @@ export default function AuthorSeoOpportunitiesClient({
         ...current,
       ];
     });
+    setDatabaseMatches((current) => current.map((item) => item.queryId === queryId
+      ? {
+          ...item,
+          status: "own",
+          statusLabel: "У вас в работе",
+          canReserve: false,
+          canPropose: false,
+          reservationId: payload.reservation.id,
+        }
+      : item));
     setDiscoverResults((current) => current.map((item) => item.queryId === queryId
       ? {
           ...item,
@@ -162,6 +174,7 @@ export default function AuthorSeoOpportunitiesClient({
     setDiscoverPending(true);
     setDiscoverMessage(null);
     setDiscoverResults([]);
+    setDatabaseMatches([]);
     setDiscoverySeedPhrase(null);
     const response = await fetch("/api/author/seo/discovery", {
       method: "POST",
@@ -186,8 +199,11 @@ export default function AuthorSeoOpportunitiesClient({
         ? payload.phrase.trim()
         : phrase;
     setDiscoverySeedPhrase(seed);
+    setDatabaseMatches(Array.isArray(payload.databaseMatches) ? payload.databaseMatches : []);
     setDiscoverResults(Array.isArray(payload.results) ? payload.results : []);
-    if (!payload.results?.length) {
+    const dbCount = Array.isArray(payload.databaseMatches) ? payload.databaseMatches.length : 0;
+    const wsCount = Array.isArray(payload.results) ? payload.results.length : 0;
+    if (!dbCount && !wsCount) {
       setDiscoverMessage("Подходящих запросов не найдено.");
     }
   }
@@ -228,22 +244,22 @@ export default function AuthorSeoOpportunitiesClient({
       ? {
           ...row,
           status: "proposed",
-          statusLabel: "Отправлен на проверку",
+          statusLabel: "На проверке",
           canPropose: false,
           canReserve: false,
           queryId: payload.queryId ?? row.queryId,
         }
       : row));
-    setDiscoverMessage(payload.message ?? "Запрос отправлен на проверку");
+    setDiscoverMessage(payload.message ?? "Запрос отправлен на проверку.");
   }
 
   return (
     <div className="space-y-5">
       {discoveryEnabled ? (
       <section className="rounded-[24px] border border-[#d7c4f5] bg-white p-5">
-        <h2 className="text-lg font-semibold text-[#25135c]">Найти SEO-тему</h2>
+        <h2 className="text-lg font-semibold text-[#25135c]">Что ищут слушатели</h2>
         <p className="mt-2 text-sm leading-6 text-[#4c3d78]">
-          Введите тему или поисковый запрос — покажем варианты из Wordstat и их статус в АудиоЛаде.
+          Введите одну тему — сначала покажем проверенные запросы из базы АудиоЛада, затем дополнительные варианты из Яндекса.
         </p>
         <form onSubmit={runDiscovery} className="mt-4 space-y-3">
           <label className="block text-sm font-medium text-[#25135c]">
@@ -264,57 +280,90 @@ export default function AuthorSeoOpportunitiesClient({
           </button>
         </form>
         {discoverMessage ? <p role="status" className="mt-3 text-sm font-medium text-[#4c3d78]">{discoverMessage}</p> : null}
-        {discoverResults.length > 0 ? (
-          <div className="mt-4 grid gap-3">
-            {discoverResults.map((item) => {
-              const proposeKey = item.phrase;
-              const proposing = proposePendingKey === proposeKey;
-              return (
-                <article key={item.phrase} className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-[#25135c]">{item.phrase}</h3>
-                      <p className="mt-1 text-sm text-[#5f5484]">{formatMonthlyFrequency(item.frequency)}</p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">{item.statusLabel}</span>
-                  </div>
-                  {item.status === "own" && item.productTitle ? (
-                    <p className="mt-2 text-sm text-[#5f5484]">Продукт: {item.productTitle}</p>
-                  ) : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {item.canReserve && item.queryId ? (
-                      <button
-                        type="button"
-                        disabled={pendingId === item.queryId || activeCount >= 5}
-                        onClick={() => reserve(item.queryId!, true)}
-                        className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
-                      >
-                        Взять в работу
-                      </button>
-                    ) : null}
-                    {item.canPropose ? (
-                      <button
-                        type="button"
-                        disabled={proposing}
-                        onClick={() => propose(item)}
-                        className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] bg-white px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50"
-                      >
-                        {proposing ? "Отправляем…" : "Предложить запрос"}
-                      </button>
-                    ) : null}
-                    {item.status === "proposed" ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex min-h-10 items-center rounded-full border border-[#d7c4f5] bg-white px-4 text-sm font-semibold text-[#796ba0] disabled:opacity-70"
-                      >
-                        Отправлен на проверку
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
+
+        {(databaseMatches.length > 0 || discoverResults.length > 0 || discoverySeedPhrase) ? (
+          <div className="mt-5 space-y-6">
+            <div>
+              <h3 className="text-base font-semibold text-[#25135c]">Подходящие запросы из базы АудиоЛада</h3>
+              <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+                Эти запросы уже проверены АудиоЛадом. Свободный запрос можно сразу взять в работу.
+              </p>
+              {databaseMatches.length === 0 ? (
+                <p className="mt-3 text-sm text-[#796ba0]">В базе АудиоЛада пока нет подходящих проверенных запросов.</p>
+              ) : (
+                <div className="mt-3 grid gap-3">
+                  {databaseMatches.map((item) => (
+                    <article key={`db-${item.queryId ?? item.phrase}`} className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-base font-semibold text-[#25135c]">{item.phrase}</h4>
+                          <p className="mt-1 text-sm text-[#5f5484]">{formatMonthlyFrequency(item.frequency)}</p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">{item.statusLabel}</span>
+                      </div>
+                      {item.status === "own" && item.productTitle ? (
+                        <p className="mt-2 text-sm text-[#5f5484]">Продукт: {item.productTitle}</p>
+                      ) : null}
+                      {item.canReserve && item.queryId ? (
+                        <button
+                          type="button"
+                          disabled={pendingId === item.queryId || activeCount >= 5}
+                          onClick={() => reserve(item.queryId!, true)}
+                          className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                        >
+                          Взять в работу
+                        </button>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-base font-semibold text-[#25135c]">Дополнительные варианты из Яндекса</h3>
+              <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+                Эти запросы найдены в Wordstat. Запросы, которых ещё нет в проверенной базе АудиоЛада, можно отправить на проверку.
+              </p>
+              {discoverResults.length === 0 ? (
+                <p className="mt-3 text-sm text-[#796ba0]">Дополнительных вариантов из Яндекса сейчас нет.</p>
+              ) : (
+                <div className="mt-3 grid gap-3">
+                  {discoverResults.map((item) => {
+                    const proposeKey = item.phrase;
+                    const proposing = proposePendingKey === proposeKey;
+                    return (
+                      <article key={`ws-${item.phrase}`} className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-base font-semibold text-[#25135c]">{item.phrase}</h4>
+                            <p className="mt-1 text-sm text-[#5f5484]">{formatMonthlyFrequency(item.frequency)}</p>
+                          </div>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">{item.statusLabel}</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.canPropose ? (
+                            <div className="space-y-1">
+                              <button
+                                type="button"
+                                disabled={proposing}
+                                onClick={() => propose(item)}
+                                className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] bg-white px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50"
+                              >
+                                {proposing ? "Отправляем…" : "Отправить на проверку"}
+                              </button>
+                              <p className="text-xs leading-5 text-[#796ba0]">
+                                После проверки запрос можно будет взять в работу, если он свободен.
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
       </section>

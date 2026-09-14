@@ -1,0 +1,1545 @@
+{
+  "generatedAt": "2026-09-14T16:25:00.303Z",
+  "sourceCollectedAt": "2026-09-14T16:23:50.787Z",
+  "researchNotes": "Wordstat topSuggestions (read-only). Hard gate: frequency 50–1500, classifySeoQuery analyzed, audioFit not low/none, no specific_content, natural audio-first phrases, no truncated endings, no ultra-broad heads / brands / works.",
+  "qualityGate": {
+    "minFrequency": 50,
+    "maxFrequency": 1500,
+    "requireAnalyzed": true,
+    "forbidSpecificContent": true,
+    "forbidTruncatedEndings": true
+  },
+  "stats": {
+    "collected": 643,
+    "rejects": {
+      "frequency": 344,
+      "classifier": 6,
+      "audio_fit": 0,
+      "specific_content": 0,
+      "hard_block": 95,
+      "brand_work": 2,
+      "ultra_broad": 0,
+      "truncated": 0,
+      "unnatural": 18,
+      "no_usecase": 77
+    },
+    "approved_pool": 101,
+    "selected": 100,
+    "groups": {
+      "jazz": 38,
+      "background": 28,
+      "sleep": 3,
+      "practice": 19,
+      "music_other": 11,
+      "story": 1
+    },
+    "min": 55,
+    "median": 480,
+    "max": 1449,
+    "duplicates_in_raw": 0,
+    "specific_content": 0,
+    "truncated": 0
+  },
+  "queries": [
+    {
+      "query_text": "музыка для работы и поднятия настроения",
+      "frequency": 1449,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для работы"
+    },
+    {
+      "query_text": "музыка для йоги и медитации",
+      "frequency": 1432,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для йоги"
+    },
+    {
+      "query_text": "спокойная музыка для отдыха",
+      "frequency": 1354,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "слушать фоновую музыку для кафе",
+      "frequency": 1311,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "музыка для кафе"
+    },
+    {
+      "query_text": "музыка для сна и отдыха",
+      "frequency": 1292,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "утренняя медитация для женщин",
+      "frequency": 1289,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "practice",
+      "recommended_format": "Медитация",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный сигнал медитации или практики."
+      ],
+      "from_seed": "утренняя медитация"
+    },
+    {
+      "query_text": "фоновая музыка для кафе и ресторанов слушать",
+      "frequency": 1219,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для кафе"
+    },
+    {
+      "query_text": "лучшая музыка для отдыха",
+      "frequency": 1054,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "аффирмации на здоровье слушать",
+      "frequency": 1034,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "музыка для концентрации мозга",
+      "frequency": 1026,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для концентрации работы мозга",
+      "frequency": 988,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для занятий йогой",
+      "frequency": 984,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для йоги"
+    },
+    {
+      "query_text": "музыка для мозга и концентрации внимания",
+      "frequency": 971,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "аффирмации исцеления слушать",
+      "frequency": 958,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "спокойная музыка для концентрации",
+      "frequency": 902,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "фоновая музыка для концентрации",
+      "frequency": 868,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "джаз музыка для кафе",
+      "frequency": 844,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для кафе"
+    },
+    {
+      "query_text": "лучшая музыка для йоги",
+      "frequency": 808,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для йоги"
+    },
+    {
+      "query_text": "как быстро заснуть при бессоннице",
+      "frequency": 801,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "how_to",
+      "recommended_format": "Лекция",
+      "audio_fit": "medium",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Вопрос предполагает объяснение или инструкцию."
+      ],
+      "from_seed": "медитация для сна"
+    },
+    {
+      "query_text": "аффирмация на деньги слушать",
+      "frequency": 796,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "музыка для работы отдыха",
+      "frequency": 785,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "слушать джаз для кафе",
+      "frequency": 778,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "музыка для учебы и концентрации внимания",
+      "frequency": 774,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "аффирмация на здоровье и исцеление слушать",
+      "frequency": 750,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "аффирмации на успех слушать",
+      "frequency": 720,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "музыка для концентрации внимания на работе",
+      "frequency": 719,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "джаз для отдыха",
+      "frequency": 715,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для отдыха"
+    },
+    {
+      "query_text": "музыка для отдыха слушать",
+      "frequency": 706,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "музыка для йоги тренировок",
+      "frequency": 668,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для йоги"
+    },
+    {
+      "query_text": "аффирмация благодарности слушать",
+      "frequency": 654,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "утренние медитации слушать",
+      "frequency": 632,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "practice",
+      "recommended_format": "Медитация",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный сигнал медитации или практики."
+      ],
+      "from_seed": "утренняя медитация"
+    },
+    {
+      "query_text": "джаз для работы",
+      "frequency": 629,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    },
+    {
+      "query_text": "спокойная музыка для сна и отдыха",
+      "frequency": 628,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "фоновая музыка для отдыха",
+      "frequency": 619,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "джаз для кафе и ресторанов слушать",
+      "frequency": 608,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "музыка для отдыха и расслабления",
+      "frequency": 584,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "медитативная музыка для сна",
+      "frequency": 581,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "медитация для сна"
+    },
+    {
+      "query_text": "медитация для засыпания",
+      "frequency": 579,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "practice",
+      "recommended_format": "Медитация",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный сигнал медитации или практики."
+      ],
+      "from_seed": "медитация для сна"
+    },
+    {
+      "query_text": "легкий джаз для кафе",
+      "frequency": 577,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "легкий джаз"
+    },
+    {
+      "query_text": "музыка для йоги и медитации слушать",
+      "frequency": 569,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для йоги"
+    },
+    {
+      "query_text": "лучшая музыка для сна и отдыха",
+      "frequency": 562,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "спокойная музыка для концентрации внимания",
+      "frequency": 561,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "аффирмации богатства слушать",
+      "frequency": 556,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "джаз спокойный слушать",
+      "frequency": 534,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойный джаз"
+    },
+    {
+      "query_text": "слушать музыку для концентрации",
+      "frequency": 526,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для отдыха и души",
+      "frequency": 521,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "слушать спокойную инструментальную музыку",
+      "frequency": 510,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "классическая музыка для концентрации",
+      "frequency": 487,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "джаз музыка для кафе и ресторанов",
+      "frequency": 480,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "лучшая музыка для сна и отдыха усыпляющая",
+      "frequency": 480,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "легкий джаз ресторан",
+      "frequency": 467,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "легкий джаз"
+    },
+    {
+      "query_text": "красивая музыка для отдыха",
+      "frequency": 466,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "легкий джаз для ресторанов и кафе",
+      "frequency": 454,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "легкий джаз"
+    },
+    {
+      "query_text": "классическая музыка для концентрации внимания",
+      "frequency": 445,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "слушать музыку для концентрации внимания",
+      "frequency": 441,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для отдыха на природе",
+      "frequency": 432,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "фоновая музыка для концентрации внимания",
+      "frequency": 422,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для релакса и отдыха",
+      "frequency": 420,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "джаз музыка для отдыха",
+      "frequency": 410,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для отдыха"
+    },
+    {
+      "query_text": "музыка для отдыха и медитаций",
+      "frequency": 407,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "расслабляющая музыка для отдыха",
+      "frequency": 402,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для отдыха"
+    },
+    {
+      "query_text": "классическая музыка для концентрации и работы",
+      "frequency": 381,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "утренние медитации для энергии",
+      "frequency": 367,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "practice",
+      "recommended_format": "Медитация",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный сигнал медитации или практики."
+      ],
+      "from_seed": "утренняя медитация"
+    },
+    {
+      "query_text": "smooth jazz слушать",
+      "frequency": 339,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "smooth jazz"
+    },
+    {
+      "query_text": "вечерний джаз слушать",
+      "frequency": 310,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "вечерний джаз"
+    },
+    {
+      "query_text": "утренняя медитация на день",
+      "frequency": 309,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "practice",
+      "recommended_format": "Медитация",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный сигнал медитации или практики."
+      ],
+      "from_seed": "утренняя медитация"
+    },
+    {
+      "query_text": "музыка для работы учебы и концентрации",
+      "frequency": 306,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "музыка для концентрации"
+    },
+    {
+      "query_text": "музыка для работы джаз",
+      "frequency": 300,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    },
+    {
+      "query_text": "спокойная инструментальная музыка для души",
+      "frequency": 299,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "джаз фоновый для кафе",
+      "frequency": 285,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "спокойная инструментальная музыка без слов для души",
+      "frequency": 232,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "джаз кафе фоновая музыка",
+      "frequency": 222,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "слушать спокойную инструментальную музыку для души",
+      "frequency": 204,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "джаз фоновая музыка для кафе",
+      "frequency": 202,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "слушать легкий джаз для кафе",
+      "frequency": 202,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "слушать спокойную инструментальную музыку без слов",
+      "frequency": 194,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "слушать фоновый джаз",
+      "frequency": 178,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "фоновая музыка для ресторана джаз",
+      "frequency": 173,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "слушать музыку джаз для кафе",
+      "frequency": 169,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "слушать легкий джаз для кафе и ресторанов",
+      "frequency": 157,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "слушать музыку джаз для кафе и ресторанов",
+      "frequency": 151,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "легкая музыка для кафе джаз",
+      "frequency": 147,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для кафе"
+    },
+    {
+      "query_text": "фоновый джаз для кафе и ресторанов",
+      "frequency": 147,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "слушать джаз для работы",
+      "frequency": 146,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    },
+    {
+      "query_text": "музыка для фона джаз",
+      "frequency": 131,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз фоном"
+    },
+    {
+      "query_text": "красивая инструментальная спокойная музыка для души",
+      "frequency": 115,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "вечерний джаз кафе",
+      "frequency": 107,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "вечерний джаз"
+    },
+    {
+      "query_text": "легкий джаз для отдыха",
+      "frequency": 105,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для отдыха"
+    },
+    {
+      "query_text": "спокойная инструментальная музыка для сна",
+      "frequency": 100,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойная инструментальная музыка"
+    },
+    {
+      "query_text": "фоновая музыка для кафе и ресторанов джаз",
+      "frequency": 92,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "джаз для работы кафе",
+      "frequency": 89,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    },
+    {
+      "query_text": "спокойный джаз в кафе",
+      "frequency": 86,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "спокойный джаз"
+    },
+    {
+      "query_text": "аудиоистории слушать",
+      "frequency": 85,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аудиоистории слушать"
+    },
+    {
+      "query_text": "джаз фоновая музыка слушать",
+      "frequency": 84,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "фоновый джаз"
+    },
+    {
+      "query_text": "музыка саксофона для релаксации",
+      "frequency": 81,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "саксофон для релаксации"
+    },
+    {
+      "query_text": "послушать релакс музыку для успокоения нервов",
+      "frequency": 75,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "listen_audio",
+      "recommended_format": null,
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "medium",
+      "classifier_reasons": [
+        "Есть явное намерение слушать аудио."
+      ],
+      "from_seed": "аффирмации слушать"
+    },
+    {
+      "query_text": "джаз музыка для работы учебы",
+      "frequency": 68,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    },
+    {
+      "query_text": "джаз для учебы и отдыха",
+      "frequency": 57,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для отдыха"
+    },
+    {
+      "query_text": "легкий джаз для приятного отдыха",
+      "frequency": 57,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для отдыха"
+    },
+    {
+      "query_text": "фоновая музыка для работы джаз",
+      "frequency": 55,
+      "source": "wordstat",
+      "frequency_checked_at": "2026-09-14T16:23:50.787Z",
+      "intent": "music",
+      "recommended_format": "Музыка",
+      "audio_fit": "high",
+      "analysis_status": "analyzed",
+      "confidence": "high",
+      "classifier_reasons": [
+        "Есть явный музыкальный сигнал."
+      ],
+      "from_seed": "джаз для работы"
+    }
+  ]
+}
