@@ -271,7 +271,8 @@
     "test:avatar-mobile-upload": "npx tsx scripts/avatar-mobile-upload-unit.mjs",
     "test:kak-prodat-muzyku-sozdannuyu-ii": "npx tsx scripts/kak-prodat-muzyku-sozdannuyu-ii-page-unit.mjs",
     "test:mozhno-li-zarabotat-na-ii-muzyke": "npx tsx scripts/mozhno-li-zarabotat-na-ii-muzyke-page-unit.mjs",
-    "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs"
+    "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs",
+    "test:kak-zarabotat-na-muzyke-iz-suno": "npx tsx scripts/kak-zarabotat-na-muzyke-iz-suno-page-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

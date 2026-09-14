@@ -72,7 +72,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     pathname === "/kak-sozdat-fonovuyu-muzyku-s-pomoshchyu-ii" ||
     pathname === "/kak-prodat-muzyku-sozdannuyu-ii" ||
     pathname === "/mozhno-li-zarabotat-na-ii-muzyke" ||
-    pathname === "/kuda-vykladyvat-muzyku-iz-suno"
+    pathname === "/kuda-vykladyvat-muzyku-iz-suno" ||
+    pathname === "/kak-zarabotat-na-muzyke-iz-suno"
   );
 }
 
