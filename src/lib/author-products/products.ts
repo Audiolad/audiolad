@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { coercePracticeRow } from "./types";
 import { slugifyTitle } from "./utils";
+import { isVerifiedMusicStreamAsset } from "@/lib/listen/music-delivery";
 
 const PRACTICE_DETAIL_SELECT = `
   id,
@@ -129,6 +130,58 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
 `;
 
 
+
+function asMusicStreamCandidate(asset: {
+  audio_item_id: string;
+  asset_role: string;
+  lifecycle_state: string;
+  storage_bucket: string;
+  storage_path?: string | null;
+}) {
+  return {
+    audioItemId: asset.audio_item_id,
+    assetRole: asset.asset_role,
+    lifecycleState: asset.lifecycle_state,
+    storageBucket: asset.storage_bucket,
+    storagePath: asset.storage_path ?? "",
+  };
+}
+
+async function loadValidatedActiveDeliveryItemIds(
+  items: Array<{
+    id: string;
+    active_music_delivery_asset_id?: string | null;
+  }>,
+): Promise<Set<string>> {
+  const withPointer = items.filter((item) => item.active_music_delivery_asset_id);
+  if (withPointer.length === 0) return new Set();
+  const service = createServiceRoleClient();
+  const ids = withPointer
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+    .in("id", ids);
+  if (error) {
+    console.error("active_stream_validation_lookup_failed", error.message);
+    return new Set();
+  }
+  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
+  const valid = new Set<string>();
+  for (const item of withPointer) {
+    const asset = byId.get(item.active_music_delivery_asset_id as string);
+    if (
+      asset
+      && asset.id === item.active_music_delivery_asset_id
+      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
+    ) {
+      valid.add(item.id);
+    }
+  }
+  return valid;
+}
+
 async function loadActiveStreamDurations(
   items: Array<{
     id: string;
@@ -148,22 +201,24 @@ async function loadActiveStreamDurations(
     .filter((id): id is string => Boolean(id));
   const { data, error } = await service
     .from("music_audio_assets")
-    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, duration_seconds")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, duration_seconds")
     .in("id", ids);
   if (error) {
     console.error("active_stream_duration_lookup_failed", error.message);
     return new Map();
   }
   const out = new Map<string, number>();
-  for (const asset of data ?? []) {
+  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
+  for (const item of need) {
+    const asset = byId.get(item.active_music_delivery_asset_id as string);
     if (
-      asset.asset_role === "stream"
-      && asset.lifecycle_state === "verified"
-      && asset.storage_bucket === "music-streams"
+      asset
+      && asset.id === item.active_music_delivery_asset_id
+      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
       && typeof asset.duration_seconds === "number"
       && asset.duration_seconds > 0
     ) {
-      out.set(asset.audio_item_id, asset.duration_seconds);
+      out.set(item.id, asset.duration_seconds);
     }
   }
   return out;
@@ -229,7 +284,7 @@ async function loadMusicMasterStatus(
         .order("created_at", { ascending: false })
     : { data: [] };
   const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
-  const activeByItem = new Map(items.map((item) => [item.id, Boolean(item.active_music_delivery_asset_id)]));
+  const validatedActive = await loadValidatedActiveDeliveryItemIds(items);
   const statusByItem = new Map(
     [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,
@@ -237,14 +292,14 @@ async function loadMusicMasterStatus(
         assetId: asset.id,
         lifecycleState: asset.lifecycle_state,
         transcodeStatus: jobsBySource.get(asset.id) ?? null,
-        hasActiveDelivery: activeByItem.get(asset.audio_item_id) ?? false,
+        hasActiveDelivery: validatedActive.has(asset.audio_item_id),
       },
     ]),
   );
   // Active stream can remain after desired master is cleared; still surface playable delivery.
   for (const item of items) {
     if (statusByItem.has(item.id)) continue;
-    if (!item.active_music_delivery_asset_id) continue;
+    if (!validatedActive.has(item.id) || !item.active_music_delivery_asset_id) continue;
     statusByItem.set(item.id, {
       assetId: item.active_music_delivery_asset_id,
       lifecycleState: "verified",

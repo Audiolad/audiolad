@@ -20,7 +20,11 @@ import {
   MUSIC_KIND_LABEL,
 } from "./product-kind";
 import { minutesFromSeconds } from "./utils";
-import { hasPlayableAuthorAudioPreview } from "@/lib/listen/music-delivery";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  hasValidatedMusicPublishSource,
+  isVerifiedMusicStreamAsset,
+} from "@/lib/listen/music-delivery";
 
 export type PublishValidationResult =
   | { ok: true }
@@ -148,9 +152,8 @@ export function validateAudioItemsStructure(
     const audioNumber = index + 1;
     const isMusic = isMusicProductKind(practice.product_kind);
     const playable = isMusic
-      ? hasPlayableAuthorAudioPreview({
+      ? hasValidatedMusicPublishSource({
           audioPath: item.audio_path,
-          activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
           hasActiveDelivery: item.music_master?.hasActiveDelivery,
         })
       : Boolean(item.audio_path?.trim());
@@ -444,10 +447,46 @@ export async function syncPracticeAudioCompatibility(
   );
 
   const itemsWithMp3 = sortedItems.filter((item) => item.audio_path?.trim());
+  const activeIds = sortedItems
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const validatedActiveItemIds = new Set<string>();
+  if (activeIds.length > 0) {
+    const service = createServiceRoleClient();
+    const { data: assets, error: assetError } = await service
+      .from("music_audio_assets")
+      .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+      .in("id", activeIds);
+    if (assetError) {
+      throw new Error("audio_items_lookup_failed");
+    }
+    const byId = new Map((assets ?? []).map((asset) => [asset.id, asset]));
+    for (const item of sortedItems) {
+      const asset = item.active_music_delivery_asset_id
+        ? byId.get(item.active_music_delivery_asset_id)
+        : undefined;
+      if (
+        asset
+        && asset.id === item.active_music_delivery_asset_id
+        && isVerifiedMusicStreamAsset(
+          {
+            audioItemId: asset.audio_item_id,
+            assetRole: asset.asset_role,
+            lifecycleState: asset.lifecycle_state,
+            storageBucket: asset.storage_bucket,
+            storagePath: asset.storage_path ?? "",
+          },
+          item.id,
+        )
+      ) {
+        validatedActiveItemIds.add(item.id);
+      }
+    }
+  }
   const itemsWithPlayableDuration = sortedItems.filter(
     (item) =>
       Boolean(item.audio_path?.trim())
-      || Boolean(item.active_music_delivery_asset_id),
+      || validatedActiveItemIds.has(item.id),
   );
 
   const firstAudioPath = itemsWithMp3[0]?.audio_path?.trim() ?? null;

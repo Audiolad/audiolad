@@ -11,6 +11,7 @@ import {
   MUSIC_DELIVERY_READY_TEXT,
   MUSIC_DELIVERY_UNSUPPORTED_TEXT,
   hasPlayableAuthorAudioPreview,
+  hasValidatedMusicPublishSource,
   musicCabinetStatus,
   resolveMusicCatalogPreviewMode,
   resolveMusicListenSource,
@@ -130,10 +131,23 @@ assert.equal(
   "ready",
 );
 assert.equal(hasPlayableAuthorAudioPreview({ audioPath: "a.mp3" }), true);
-assert.equal(hasPlayableAuthorAudioPreview({ activeMusicDeliveryAssetId: "stream-1" }), true);
+assert.equal(hasPlayableAuthorAudioPreview({ activeMusicDeliveryAssetId: "stream-1" }), false);
 assert.equal(hasPlayableAuthorAudioPreview({ hasActiveDelivery: true }), true);
 assert.equal(hasPlayableAuthorAudioPreview({ audioPath: "  " }), false);
 assert.equal(hasPlayableAuthorAudioPreview({}), false);
+assert.equal(
+  hasValidatedMusicPublishSource({ audioPath: null, hasActiveDelivery: false }),
+  false,
+);
+assert.equal(
+  hasValidatedMusicPublishSource({
+    audioPath: null,
+    hasActiveDelivery: true,
+  }),
+  true,
+);
+assert.match(products, /loadValidatedActiveDeliveryItemIds/);
+assert.match(products, /isVerifiedMusicStreamAsset/);
 
 const stream = {
   audioItemId: "item-1",

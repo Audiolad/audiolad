@@ -106,16 +106,20 @@ export type MusicCabinetStatus = {
   text: string;
 };
 
+export function hasValidatedMusicPublishSource(input: {
+  audioPath?: string | null;
+  hasActiveDelivery?: boolean | null;
+}): boolean {
+  return Boolean(input.audioPath?.trim() || input.hasActiveDelivery === true);
+}
+
 export function hasPlayableAuthorAudioPreview(input: {
   audioPath?: string | null;
   activeMusicDeliveryAssetId?: string | null;
   hasActiveDelivery?: boolean | null;
 }): boolean {
-  return Boolean(
-    input.audioPath?.trim()
-      || input.activeMusicDeliveryAssetId
-      || input.hasActiveDelivery,
-  );
+  void input.activeMusicDeliveryAssetId;
+  return hasValidatedMusicPublishSource(input);
 }
 
 export function musicCabinetStatus(input: {

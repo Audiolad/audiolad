@@ -89,10 +89,15 @@ const publishSmoke = readFileSync(join(repoRoot, "supabase/tests/music_publish_p
 assert(versions.includes("20261007170000"), "publish playable version listed");
 assert(/duration_seconds = CASE/.test(publishMig), "promote copies stream duration");
 assert(/v_practice\.product_kind = 'music'/.test(publishMig), "moderation ready music branch");
-assert(/active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "active delivery accepted");
-assert(/OR active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "publish duration sum includes active");
+assert(/music_item_has_validated_active_delivery/.test(publishMig), "validated delivery helper");
+assert(/asset\.storage_bucket = 'music-streams'/.test(publishMig), "readiness joins music-streams");
+assert(/asset\.lifecycle_state = 'verified'/.test(publishMig), "readiness requires verified stream");
+assert(/NULLIF\(btrim\(COALESCE\(asset\.storage_path/.test(publishMig), "readiness requires storage path");
+assert(/music_item_has_validated_active_delivery\(ai\.id\)/.test(publishMig), "publish duration uses validated delivery");
+assert(!/OR active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "bare pointer is not sufficient");
 assert(/Backfill duration for already-promoted/.test(publishMig), "duration backfill present");
 assert(/music WAV active stream must be moderation-ready/.test(publishSmoke), "publish smoke covers WAV ready");
 assert(/music WAV processing without active must fail incomplete_audio/.test(publishSmoke), "publish smoke covers processing fail");
+assert(/invalidated stream must fail incomplete_audio/.test(publishSmoke), "publish smoke covers post-assignment invalidation");
 
 process.stdout.write("music-delivery-sql-unit: ok\n");

@@ -79,6 +79,48 @@ BEGIN
   -- music WAV active stream must be moderation-ready.
   PERFORM public.assert_practice_moderation_ready(v_practice);
 
+  -- post-assignment invalidation: verified STREAM is not covered by
+  -- verified_music_master_immutable (masters only). If the UPDATE is allowed,
+  -- readiness must fail while the active pointer remains. If an invariant
+  -- blocks the UPDATE, prove the rejection and keep readiness passing.
+  v_raised := false;
+  v_detail := NULL;
+  BEGIN
+    UPDATE public.music_audio_assets
+    SET lifecycle_state = 'rejected',
+        verified_at = NULL
+    WHERE id = v_stream;
+  EXCEPTION
+    WHEN others THEN
+      GET STACKED DIAGNOSTICS v_detail = MESSAGE_TEXT;
+      v_raised := true;
+  END;
+
+  IF (SELECT active_music_delivery_asset_id FROM public.audio_items WHERE id = v_audio)
+       IS DISTINCT FROM v_stream THEN
+    RAISE EXCEPTION 'post-assignment invalidation must leave the active pointer in place';
+  END IF;
+
+  IF v_raised THEN
+    RAISE NOTICE 'stream mutation blocked after assignment: %', v_detail;
+    PERFORM public.assert_practice_moderation_ready(v_practice);
+  ELSE
+    v_raised := false;
+    BEGIN
+      PERFORM public.assert_practice_moderation_ready(v_practice);
+    EXCEPTION
+      WHEN others THEN
+        GET STACKED DIAGNOSTICS v_detail = PG_EXCEPTION_DETAIL;
+        v_raised := true;
+        IF v_detail IS DISTINCT FROM 'incomplete_audio' THEN
+          RAISE EXCEPTION 'invalidated stream must fail incomplete_audio, got %', v_detail;
+        END IF;
+    END;
+    IF NOT v_raised THEN
+      RAISE EXCEPTION 'invalidated stream must fail incomplete_audio';
+    END IF;
+  END IF;
+
   -- ready job + verified stream, but no active pointer, must still fail incomplete_audio.
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class

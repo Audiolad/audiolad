@@ -97,6 +97,31 @@ WHERE item.active_music_delivery_asset_id = stream.id
   AND stream.duration_seconds > 0
   AND (item.duration_seconds IS NULL OR item.duration_seconds <= 0);
 
+
+CREATE OR REPLACE FUNCTION public.music_item_has_validated_active_delivery(p_audio_item_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.audio_items AS item
+    JOIN public.music_audio_assets AS asset
+      ON asset.id = item.active_music_delivery_asset_id
+    WHERE item.id = p_audio_item_id
+      AND asset.audio_item_id = item.id
+      AND asset.asset_role = 'stream'
+      AND asset.lifecycle_state = 'verified'
+      AND asset.storage_bucket = 'music-streams'
+      AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.music_item_has_validated_active_delivery(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.music_item_has_validated_active_delivery(uuid) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.assert_practice_moderation_ready(p_practice_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -304,8 +329,18 @@ BEGIN
           )
           OR (
             v_practice.product_kind = 'music'
-            AND ai.active_music_delivery_asset_id IS NOT NULL
-            AND COALESCE(ai.duration_seconds, 0) > 0
+            AND public.music_item_has_validated_active_delivery(ai.id)
+            AND EXISTS (
+              SELECT 1
+              FROM public.music_audio_assets AS asset
+              WHERE asset.id = ai.active_music_delivery_asset_id
+                AND asset.audio_item_id = ai.id
+                AND asset.asset_role = 'stream'
+                AND asset.lifecycle_state = 'verified'
+                AND asset.storage_bucket = 'music-streams'
+                AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+                AND COALESCE(ai.duration_seconds, asset.duration_seconds, 0) > 0
+            )
           )
         )
     ) THEN
@@ -389,13 +424,16 @@ BEGIN
   ORDER BY position
   LIMIT 1;
 
-  -- Include music items delivered only via active verified stream (audio_path may be NULL).
-  SELECT COALESCE(sum(duration_seconds), 0) INTO v_seconds
-  FROM public.audio_items
-  WHERE practice_id = p_practice_id
+  -- Include music items delivered only via validated current stream (audio_path may be NULL).
+  SELECT COALESCE(sum(ai.duration_seconds), 0) INTO v_seconds
+  FROM public.audio_items AS ai
+  WHERE ai.practice_id = p_practice_id
     AND (
-      NULLIF(btrim(audio_path), '') IS NOT NULL
-      OR active_music_delivery_asset_id IS NOT NULL
+      NULLIF(btrim(ai.audio_path), '') IS NOT NULL
+      OR (
+        v_practice.product_kind = 'music'
+        AND public.music_item_has_validated_active_delivery(ai.id)
+      )
     );
 
   v_minutes := CASE

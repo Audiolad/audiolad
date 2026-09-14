@@ -17,7 +17,7 @@ import {
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
 import { isAudioPostProductKind, isMusicProductKind } from "@/lib/author-products/product-kind";
-import { hasPlayableAuthorAudioPreview } from "@/lib/listen/music-delivery";
+import { hasValidatedMusicPublishSource } from "@/lib/listen/music-delivery";
 import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
 
 export type DatabaseModerationReadyCheck = {
@@ -140,9 +140,8 @@ export function evaluateDatabaseModerationReady(
           if (isMusicProductKind(practice.product_kind)) {
             return !(
               durationOk
-              && hasPlayableAuthorAudioPreview({
+              && hasValidatedMusicPublishSource({
                 audioPath: item.audio_path,
-                activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
                 hasActiveDelivery: item.music_master?.hasActiveDelivery,
               })
             );

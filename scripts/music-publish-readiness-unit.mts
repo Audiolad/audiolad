@@ -177,6 +177,35 @@ const nonMusic = practice({ product_kind: "practice", publication_class: "audio_
   assert.equal(validateAudioItemsStructure(music, [item]).ok, false);
 }
 
+// 7b. bare pointer without validated delivery FAIL
+{
+  const item = track({
+    audio_path: null,
+    active_music_delivery_asset_id: "stream-1",
+    duration_seconds: 42,
+    music_master: {
+      assetId: "master-1",
+      lifecycleState: "verified",
+      transcodeStatus: "ready",
+      hasActiveDelivery: false,
+    },
+  });
+  const result = validateAudioItemsStructure(music, [item]);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, "missing_audio_file");
+  }
+  assert.equal(
+    evaluateDatabaseModerationReady({
+      practice: music,
+      audioItems: [item],
+      accessStatus: "full",
+      activeTopicCount: 0,
+    }).ok,
+    false,
+  );
+}
+
 // 8. non-music MP3 unchanged
 {
   const item = track({
@@ -228,7 +257,7 @@ const nonMusic = practice({ product_kind: "practice", publication_class: "audio_
 }
 
 const publish = read("src/lib/author-products/publish.ts");
-assert.match(publish, /hasPlayableAuthorAudioPreview/);
+assert.match(publish, /hasValidatedMusicPublishSource/);
 assert.match(publish, /Загрузите аудио для трека/);
 assert.match(publish, /active_music_delivery_asset_id/);
 assert.match(publish, /itemsWithPlayableDuration/);

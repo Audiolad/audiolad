@@ -4029,10 +4029,7 @@ export default function AuthorProductForm({
                     {form.productKind === PRODUCT_KIND.MUSIC
                       ? musicCabinetStatus({
                           hasLegacyAudioPath: Boolean(audioItem.audio_path),
-                          hasActiveDelivery: audioItemHasPlayablePreview(audioItem) && Boolean(
-                            audioItem.active_music_delivery_asset_id
-                              || audioItem.music_master?.hasActiveDelivery,
-                          ),
+                          hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
                           lifecycleState: audioItem.music_master?.lifecycleState,
                           transcodeStatus: audioItem.music_master?.transcodeStatus,
                         }).text
