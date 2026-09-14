@@ -122,6 +122,40 @@ $$;
 REVOKE ALL ON FUNCTION public.music_item_has_validated_active_delivery(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.music_item_has_validated_active_delivery(uuid) TO authenticated, service_role;
 
+
+CREATE OR REPLACE FUNCTION public.music_item_effective_publish_duration_seconds(p_audio_item_id uuid)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(
+    CASE
+      WHEN COALESCE(item.duration_seconds, 0) > 0 THEN item.duration_seconds
+    END,
+    CASE
+      WHEN public.music_item_has_validated_active_delivery(item.id)
+        AND COALESCE(asset.duration_seconds, 0) > 0
+      THEN asset.duration_seconds
+    END,
+    0
+  )
+  FROM public.audio_items AS item
+  LEFT JOIN public.music_audio_assets AS asset
+    ON asset.id = item.active_music_delivery_asset_id
+   AND asset.audio_item_id = item.id
+   AND asset.asset_role = 'stream'
+   AND asset.lifecycle_state = 'verified'
+   AND asset.storage_bucket = 'music-streams'
+   AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+  WHERE item.id = p_audio_item_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.music_item_effective_publish_duration_seconds(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.music_item_effective_publish_duration_seconds(uuid)
+  TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.assert_practice_moderation_ready(p_practice_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -424,8 +458,12 @@ BEGIN
   ORDER BY position
   LIMIT 1;
 
-  -- Include music items delivered only via validated current stream (audio_path may be NULL).
-  SELECT COALESCE(sum(ai.duration_seconds), 0) INTO v_seconds
+  -- Canonical effective duration: positive audio_items.duration_seconds,
+  -- else positive duration of the current validated music-streams asset.
+  SELECT COALESCE(
+    sum(public.music_item_effective_publish_duration_seconds(ai.id)),
+    0
+  ) INTO v_seconds
   FROM public.audio_items AS ai
   WHERE ai.practice_id = p_practice_id
     AND (
