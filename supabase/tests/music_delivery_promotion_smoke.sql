@@ -428,11 +428,22 @@ BEGIN
   END IF;
 
   -- H. first-ever audio under lock is still allowed.
+  -- Clear delivered state while unlocked, then re-apply the paid lock.
+  DELETE FROM public.orders WHERE id = v_order;
   UPDATE public.audio_items
   SET audio_path = NULL,
       desired_music_master_asset_id = NULL,
       active_music_delivery_asset_id = NULL
   WHERE id = v_audio;
+  INSERT INTO public.orders (
+    id, user_id, practice_id, status, amount_minor, currency,
+    practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
+    base_price_minor_snapshot, author_id_snapshot, idempotency_key, order_kind, paid_at
+  ) VALUES (
+    v_order, v_buyer, v_practice, 'paid', 10000, 'RUB',
+    'Slice3 Delivery', 'slice3-music-delivery-smoke', 10000,
+    10000, v_author, 'slice3-sale-lock-order-h', 'product_purchase', now()
+  );
   IF public.activate_music_direct_mp3_delivery(
     v_audio, 'legacy/first-ever.mp3', 33, 'first.mp3', 3333, 'draft'
   ) IS NOT TRUE THEN
