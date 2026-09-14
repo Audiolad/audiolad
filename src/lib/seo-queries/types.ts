@@ -7,7 +7,6 @@ export type SeoQueryLifecycle =
 export type SeoQueryOpportunity = {
   id: string;
   queryText: string;
-  normalizedQuery: string;
   source: string;
   frequency: number | null;
   clusterName: string | null;

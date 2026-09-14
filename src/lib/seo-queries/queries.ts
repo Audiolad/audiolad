@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { isEffectiveSeoReservation } from "./reservation-effective";
 import type { SeoQueryLifecycle, SeoQueryOpportunity } from "./types";
 
 type ReservationRow = {
@@ -32,7 +33,7 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     await Promise.all([
       supabase
         .from("seo_queries")
-        .select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
+        .select("id, query_text, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
         .eq("analysis_status", "analyzed")
         .order("created_at", { ascending: false }),
       supabase
@@ -45,7 +46,17 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     throw new Error("seo_queries_load_failed");
   }
 
-  const allReservations = (reservations ?? []) as ReservationRow[];
+  const now = new Date();
+  const allReservations = ((reservations ?? []) as ReservationRow[]).filter((item) =>
+    isEffectiveSeoReservation(
+      {
+        status: item.status,
+        productId: item.product_id,
+        expiresAt: item.expires_at,
+      },
+      now,
+    ),
+  );
   const productIds = allReservations
     .map((item) => item.product_id)
     .filter((id): id is string => Boolean(id));
@@ -70,7 +81,6 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     return {
       id: row.id as string,
       queryText: row.query_text as string,
-      normalizedQuery: row.normalized_query as string,
       source: row.source as string,
       frequency: typeof row.frequency === "number" ? row.frequency : null,
       clusterName: typeof cluster?.name === "string" ? cluster.name : null,
