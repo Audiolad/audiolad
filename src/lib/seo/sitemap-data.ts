@@ -57,6 +57,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/kak-sozdat-fonovuyu-muzyku-s-pomoshchyu-ii", changeFrequency: "monthly", priority: 0.7 },
   { path: "/kak-prodat-muzyku-sozdannuyu-ii", changeFrequency: "monthly", priority: 0.7 },
   { path: "/mozhno-li-zarabotat-na-ii-muzyke", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/kuda-vykladyvat-muzyku-iz-suno", changeFrequency: "monthly", priority: 0.7 },
   // Temporary production-test: /kak-zarabatyvat-na-ii-muzyke-v-audiolad excluded from sitemap.
   { path: "/studio/meditation", changeFrequency: "monthly", priority: 0.7 },
   { path: "/help", changeFrequency: "weekly", priority: 0.5 },
