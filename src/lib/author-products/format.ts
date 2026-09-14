@@ -21,6 +21,7 @@ export const PRODUCT_PRESET_FORMATS = [
   "Цикл практик",
   "Сборник",
   "Аудиокнига",
+  "Аудиоистория",
 ] as const;
 
 /**
