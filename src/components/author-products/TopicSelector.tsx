@@ -69,7 +69,7 @@ export default function TopicSelector({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-[#7d70a2]">
           {hint ??
-            `Выберите до ${limit} тем, которые лучше всего описывают эту практику.`}
+            `Выберите до ${limit} тем, которые лучше всего описывают этот аудиопродукт.`}
         </p>
         <p className="text-sm font-medium text-[#5f3f9d]">
           Выбрано {activeSelectedCount} из {limit}
