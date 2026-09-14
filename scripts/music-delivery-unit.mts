@@ -10,6 +10,7 @@ import {
   MUSIC_DELIVERY_PREPARING_WITH_CURRENT_TEXT,
   MUSIC_DELIVERY_READY_TEXT,
   MUSIC_DELIVERY_UNSUPPORTED_TEXT,
+  hasPlayableAuthorAudioPreview,
   musicCabinetStatus,
   resolveMusicCatalogPreviewMode,
   resolveMusicListenSource,
@@ -38,6 +39,28 @@ assert.doesNotMatch(form, /Загрузить WAV-мастер/);
 assert.doesNotMatch(form, /Загрузить legacy MP3/);
 assert.doesNotMatch(form, /Заменить legacy MP3/);
 assert.match(form, /Загрузить MP3/);
+assert.match(form, /hasPlayableAuthorAudioPreview/);
+assert.match(form, /authorAudioPreviewFingerprint/);
+assert.match(form, /audioPreviewSourceKey/);
+assert.match(form, /audioPreviewFingerprints/);
+assert.match(form, /AUDIO_PREVIEW_SOFT_ERROR/);
+assert.match(form, /<audio/);
+assert.match(form, /controls/);
+assert.doesNotMatch(form, /music-masters/);
+assert.doesNotMatch(preview, /music-masters/);
+assert.match(preview, /resolveMusicListenSource/);
+assert.match(preview, /MUSIC_STREAMS|music-streams|source\.bucket/);
+assert.doesNotMatch(form, /eslint-disable-next-line react-hooks\/exhaustive-deps/);
+
+const statusIdx = form.indexOf("musicCabinetStatus({");
+const playerIdx = form.indexOf("<audio");
+const hintIdx = form.indexOf("? MUSIC_DELIVERY_UPLOAD_HINT");
+const replaceIdx = form.lastIndexOf("MUSIC_DELIVERY_REPLACE_LABEL");
+assert.ok(statusIdx > 0 && playerIdx > statusIdx, "A/B player after status");
+assert.ok(hintIdx > playerIdx, "hint after player");
+assert.ok(replaceIdx > hintIdx, "buttons after hint");
+assert.match(form, /audioItemHasPlayablePreview\(audioItem\) && practiceId/);
+assert.match(products, /Active stream can remain after desired master is cleared/);
 
 assert.equal(resolveMusicUploadMode({ name: "a.wav", type: "audio/wav" }), "master");
 assert.equal(resolveMusicUploadMode({ name: "a.mp3", type: "audio/mpeg" }), "legacy");
@@ -88,6 +111,29 @@ assert.equal(
   }).text,
   MUSIC_DELIVERY_FAILED_TEXT,
 );
+assert.equal(
+  musicCabinetStatus({
+    hasLegacyAudioPath: false,
+    hasActiveDelivery: false,
+    lifecycleState: "verified",
+    transcodeStatus: "ready",
+  }).kind,
+  "preparing",
+);
+assert.equal(
+  musicCabinetStatus({
+    hasLegacyAudioPath: true,
+    hasActiveDelivery: false,
+    lifecycleState: null,
+    transcodeStatus: null,
+  }).kind,
+  "ready",
+);
+assert.equal(hasPlayableAuthorAudioPreview({ audioPath: "a.mp3" }), true);
+assert.equal(hasPlayableAuthorAudioPreview({ activeMusicDeliveryAssetId: "stream-1" }), true);
+assert.equal(hasPlayableAuthorAudioPreview({ hasActiveDelivery: true }), true);
+assert.equal(hasPlayableAuthorAudioPreview({ audioPath: "  " }), false);
+assert.equal(hasPlayableAuthorAudioPreview({}), false);
 
 const stream = {
   audioItemId: "item-1",

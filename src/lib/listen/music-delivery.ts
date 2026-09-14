@@ -106,6 +106,18 @@ export type MusicCabinetStatus = {
   text: string;
 };
 
+export function hasPlayableAuthorAudioPreview(input: {
+  audioPath?: string | null;
+  activeMusicDeliveryAssetId?: string | null;
+  hasActiveDelivery?: boolean | null;
+}): boolean {
+  return Boolean(
+    input.audioPath?.trim()
+      || input.activeMusicDeliveryAssetId
+      || input.hasActiveDelivery,
+  );
+}
+
 export function musicCabinetStatus(input: {
   hasLegacyAudioPath: boolean;
   hasActiveDelivery: boolean;
@@ -113,13 +125,14 @@ export function musicCabinetStatus(input: {
   transcodeStatus: string | null | undefined;
 }): MusicCabinetStatus {
   const processing = ["queued", "processing"].includes(input.transcodeStatus ?? "");
+  const hasPlayable = Boolean(input.hasActiveDelivery || input.hasLegacyAudioPath);
   if (input.lifecycleState === "uploading") {
     return { kind: "uploading", text: MUSIC_DELIVERY_PREPARING_TEXT };
   }
   if (input.lifecycleState === "rejected") {
     return { kind: "rejected", text: MUSIC_DELIVERY_FAILED_TEXT };
   }
-  if (processing && input.hasActiveDelivery) {
+  if (processing && hasPlayable) {
     return { kind: "preparing_with_current", text: MUSIC_DELIVERY_PREPARING_WITH_CURRENT_TEXT };
   }
   if (processing) {
@@ -128,10 +141,11 @@ export function musicCabinetStatus(input: {
   if (input.transcodeStatus === "failed") {
     return { kind: "failed", text: MUSIC_DELIVERY_FAILED_TEXT };
   }
-  if (input.hasActiveDelivery || input.transcodeStatus === "ready") {
-    return { kind: "ready", text: MUSIC_DELIVERY_READY_TEXT };
+  // Job "ready" alone is not a playable source — wait until active delivery or audio_path exists.
+  if (input.transcodeStatus === "ready" && !hasPlayable) {
+    return { kind: "preparing", text: MUSIC_DELIVERY_PREPARING_TEXT };
   }
-  if (input.hasLegacyAudioPath) {
+  if (hasPlayable) {
     return { kind: "ready", text: MUSIC_DELIVERY_READY_TEXT };
   }
   return { kind: "empty", text: MUSIC_DELIVERY_EMPTY_TEXT };

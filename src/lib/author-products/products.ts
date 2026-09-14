@@ -189,7 +189,7 @@ async function loadMusicMasterStatus(
     : { data: [] };
   const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
   const activeByItem = new Map(items.map((item) => [item.id, Boolean(item.active_music_delivery_asset_id)]));
-  return new Map(
+  const statusByItem = new Map(
     [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,
       {
@@ -200,6 +200,18 @@ async function loadMusicMasterStatus(
       },
     ]),
   );
+  // Active stream can remain after desired master is cleared; still surface playable delivery.
+  for (const item of items) {
+    if (statusByItem.has(item.id)) continue;
+    if (!item.active_music_delivery_asset_id) continue;
+    statusByItem.set(item.id, {
+      assetId: item.active_music_delivery_asset_id,
+      lifecycleState: "verified",
+      transcodeStatus: null,
+      hasActiveDelivery: true,
+    });
+  }
+  return statusByItem;
 }
 
 export async function listAuthorProducts(
