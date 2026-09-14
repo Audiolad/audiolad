@@ -90,8 +90,12 @@ assert(!topicSelector.includes("MAX_TOPICS"), "limit is not hardcoded in UI");
 assert(topicSelector.includes("Выбрано"), "counter is present");
 assert(topicSelector.includes("из {limit}"), "counter uses limit prop");
 assert(
-  topicSelector.includes("эту практику"),
-  "default hint remains product/practice oriented",
+  topicSelector.includes("этот аудиопродукт"),
+  "default hint remains product-oriented",
+);
+assert(
+  !topicSelector.includes("эту практику"),
+  "default hint no longer says эту практику",
 );
 assert(
   topicSelector.includes("hint"),
