@@ -21,3 +21,9 @@ export const PASSWORD_RESET_EXPIRED_MESSAGE =
 
 export const PASSWORD_RESET_GENERIC_ERROR =
   "Не удалось обновить пароль. Попробуйте ещё раз.";
+
+export const PASSWORD_RECOVERY_VERIFY_TEMPORARY_ERROR =
+  "Не удалось завершить проверку ссылки. Попробуйте ещё раз. Если ошибка повторится, запросите новую ссылку.";
+
+export const PASSWORD_RECOVERY_VERIFY_TRANSPORT_ERROR =
+  "Не удалось получить подтверждение проверки ссылки. Запросите новую ссылку для восстановления пароля.";
