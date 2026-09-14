@@ -67,4 +67,19 @@ assert(/L stale complete must not change current MP3 delivery/.test(smoke));
 assert(/M verified retry must not grow job count/.test(smoke));
 assert(/N delayed finalize\(C\) must not steal desired from D/.test(smoke));
 
+
+assert(/audio_item_has_existing_music_current_audio/.test(sql));
+assert(/PRODUCT_CONTENT_LOCKED_AFTER_SALE/.test(sql));
+assert(/practice_is_content_locked_after_sale/.test(sql));
+assert(/audio_item_has_delivered_music_audio/.test(sql));
+assert(/A user_practices must lock practice/.test(smoke));
+assert(/B studio entitlement must lock practice/.test(smoke));
+assert(/C paid order must lock practice/.test(smoke));
+assert(/D revoked studio entitlement alone must not lock/.test(smoke));
+assert(/E activate must raise under paid lock/.test(smoke));
+assert(/F finalize must raise under paid lock/.test(smoke));
+assert(/H first-ever MP3 under lock must succeed/.test(smoke));
+assert(/I locked promote must not replace delivered stream A/.test(smoke));
+assert(/J blocked promote should clear stale desired/.test(smoke));
+
 process.stdout.write("music-delivery-sql-unit: ok\n");

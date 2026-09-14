@@ -1,11 +1,48 @@
 BEGIN;
 
 -- Slice 3: current desired master + atomic public-delivery promotion.
--- Does not rewrite audio_items.audio_path. Does not add Storage policies.
+-- Extends sale-lock current-audio semantics to music pointers + service-role RPCs.
+-- Does not add Storage policies.
 
 ALTER TABLE public.audio_items
   ADD COLUMN IF NOT EXISTS desired_music_master_asset_id uuid NULL
     REFERENCES public.music_audio_assets(id) ON DELETE SET NULL;
+
+CREATE OR REPLACE FUNCTION public.audio_item_has_existing_music_current_audio(
+  p_audio_path text,
+  p_active_music_delivery_asset_id uuid,
+  p_desired_music_master_asset_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    (p_audio_path IS NOT NULL AND btrim(p_audio_path) <> '')
+    OR p_active_music_delivery_asset_id IS NOT NULL
+    OR p_desired_music_master_asset_id IS NOT NULL;
+$$;
+
+COMMENT ON FUNCTION public.audio_item_has_existing_music_current_audio(text, uuid, uuid) IS
+  'audiolad:music-current-audio:v1; true when path, active stream, or desired master is set';
+
+CREATE OR REPLACE FUNCTION public.audio_item_has_delivered_music_audio(
+  p_audio_path text,
+  p_active_music_delivery_asset_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    (p_audio_path IS NOT NULL AND btrim(p_audio_path) <> '')
+    OR p_active_music_delivery_asset_id IS NOT NULL;
+$$;
+
+COMMENT ON FUNCTION public.audio_item_has_delivered_music_audio(text, uuid) IS
+  'audiolad:music-delivered-audio:v1; listener-visible current delivery via path or active stream';
 
 CREATE OR REPLACE FUNCTION public.guard_desired_music_master_asset()
 RETURNS trigger
@@ -59,6 +96,93 @@ CREATE TRIGGER guard_music_delivery_pointer_roles_trigger
   ON public.audio_items
   FOR EACH ROW EXECUTE FUNCTION public.guard_music_delivery_pointer_roles();
 
+-- Extend canonical audio_items sale-lock trigger for music current-audio semantics.
+-- Reuses practice_is_content_locked_after_sale (user_practices + paid orders +
+-- non-revoked studio_music_entitlements).
+CREATE OR REPLACE FUNCTION public.guard_audio_items_content_sale_lock()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_practice_id uuid;
+  v_locked boolean;
+  v_old_existing boolean;
+BEGIN
+  v_practice_id := COALESCE(NEW.practice_id, OLD.practice_id);
+  v_locked := public.practice_is_content_locked_after_sale(v_practice_id);
+
+  IF NOT v_locked THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF NEW.practice_id IS DISTINCT FROM OLD.practice_id THEN
+    RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  v_old_existing := public.audio_item_has_existing_music_current_audio(
+    OLD.audio_path,
+    OLD.active_music_delivery_asset_id,
+    OLD.desired_music_master_asset_id
+  );
+
+  -- Path: allow true first fill only when no existing current audio.
+  IF NEW.audio_path IS DISTINCT FROM OLD.audio_path THEN
+    IF v_old_existing
+      OR NOT (
+        NEW.audio_path IS NOT NULL
+        AND btrim(NEW.audio_path) <> ''
+      ) THEN
+      RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  -- Active: allow first delivery only; never clear/replace an existing delivery.
+  IF NEW.active_music_delivery_asset_id IS DISTINCT FROM OLD.active_music_delivery_asset_id THEN
+    IF OLD.active_music_delivery_asset_id IS NOT NULL
+      OR (OLD.audio_path IS NOT NULL AND btrim(OLD.audio_path) <> '')
+      OR NEW.active_music_delivery_asset_id IS NULL THEN
+      RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  -- Desired: allow first claim or clear of a stale desired; block replace.
+  IF NEW.desired_music_master_asset_id IS DISTINCT FROM OLD.desired_music_master_asset_id THEN
+    IF NEW.desired_music_master_asset_id IS NULL THEN
+      NULL; -- clearing stale desired under lock is allowed
+    ELSIF v_old_existing THEN
+      RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  IF OLD.status = 'published'
+     AND NEW.status IS DISTINCT FROM 'published' THEN
+    RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS guard_audio_items_content_sale_lock_trigger ON public.audio_items;
+CREATE TRIGGER guard_audio_items_content_sale_lock_trigger
+  BEFORE UPDATE OR DELETE ON public.audio_items
+  FOR EACH ROW
+  EXECUTE FUNCTION public.guard_audio_items_content_sale_lock();
+
 CREATE OR REPLACE FUNCTION public.promote_music_item_delivery(
   p_audio_item_id uuid,
   p_stream_asset_id uuid
@@ -69,11 +193,48 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_item public.audio_items;
+  v_stream public.music_audio_assets;
   v_updated integer;
 BEGIN
   IF p_audio_item_id IS NULL OR p_stream_asset_id IS NULL THEN
     RETURN false;
   END IF;
+
+  SELECT * INTO v_item
+  FROM public.audio_items
+  WHERE id = p_audio_item_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  SELECT * INTO v_stream
+  FROM public.music_audio_assets
+  WHERE id = p_stream_asset_id;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  -- Sale-lock after replacement WAV started: never replace delivered audio.
+  -- Job may still become ready; clear stale desired for durable cabinet state.
+  IF public.practice_is_content_locked_after_sale(v_item.practice_id)
+    AND public.audio_item_has_delivered_music_audio(
+      v_item.audio_path,
+      v_item.active_music_delivery_asset_id
+    )
+    AND v_item.active_music_delivery_asset_id IS DISTINCT FROM p_stream_asset_id
+  THEN
+    IF v_item.desired_music_master_asset_id IS NOT NULL THEN
+      UPDATE public.audio_items
+      SET desired_music_master_asset_id = NULL,
+          updated_at = now()
+      WHERE id = p_audio_item_id
+        AND desired_music_master_asset_id IS NOT NULL;
+    END IF;
+    RETURN false;
+  END IF;
+
   UPDATE public.audio_items AS item
   SET active_music_delivery_asset_id = p_stream_asset_id,
       updated_at = now()
@@ -103,6 +264,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_asset public.music_audio_assets;
+  v_item public.audio_items;
 BEGIN
   SELECT * INTO v_asset
   FROM public.music_audio_assets
@@ -121,6 +283,24 @@ BEGIN
 
   -- Only the real uploading → verified transition may claim desired + enqueue.
   IF v_asset.lifecycle_state = 'uploading' THEN
+    SELECT * INTO v_item
+    FROM public.audio_items
+    WHERE id = v_asset.audio_item_id
+    FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'music_asset_not_found' USING ERRCODE = 'P0002';
+    END IF;
+
+    IF public.practice_is_content_locked_after_sale(v_item.practice_id)
+      AND public.audio_item_has_existing_music_current_audio(
+        v_item.audio_path,
+        v_item.active_music_delivery_asset_id,
+        v_item.desired_music_master_asset_id
+      ) THEN
+      RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+        USING ERRCODE = 'P0001';
+    END IF;
+
     UPDATE public.music_audio_assets
     SET size_bytes = p_size_bytes,
         duration_seconds = p_duration_seconds,
@@ -166,6 +346,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_item public.audio_items;
   v_updated integer;
 BEGIN
   IF p_audio_item_id IS NULL
@@ -178,6 +359,24 @@ BEGIN
     OR p_status IS NULL
     OR btrim(p_status) = '' THEN
     RETURN false;
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.audio_items
+  WHERE id = p_audio_item_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  IF public.practice_is_content_locked_after_sale(v_item.practice_id)
+    AND public.audio_item_has_existing_music_current_audio(
+      v_item.audio_path,
+      v_item.active_music_delivery_asset_id,
+      v_item.desired_music_master_asset_id
+    ) THEN
+    RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'
+      USING ERRCODE = 'P0001';
   END IF;
 
   UPDATE public.audio_items

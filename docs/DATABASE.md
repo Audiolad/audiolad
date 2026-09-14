@@ -184,7 +184,11 @@ verified retry with matching metadata is idempotent: it returns the asset and
 does not change desired/active or create another job. Direct music MP3 finalize
 uses service-role `activate_music_direct_mp3_delivery`, which atomically sets
 `audio_path` and clears both desired and active pointers so a later stale WAV
-completion cannot take delivery back. Public listen signs the active stream
+completion cannot take delivery back. Both activate and uploading→verified
+finalize reuse `practice_is_content_locked_after_sale` and block replacement when
+any current audio exists (`audio_path`, active stream, or desired master).
+Locked promotion of a replacement stream leaves the delivered active stream
+unchanged and clears the stale desired pointer. Public listen signs the active stream
 when it is valid and otherwise falls back to `audio_path` in `practice-audio`.
 Masters are never signed. Stale `complete_music_transcode_job` may still mark
 the job `ready`, but promotion is a no-op when the source is no longer desired.

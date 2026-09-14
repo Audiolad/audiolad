@@ -120,11 +120,38 @@ export function isOwnedVersionedProductAudioPath(
   );
 }
 
+export type MusicCurrentAudioPointers = {
+  audioPath?: string | null | undefined;
+  activeMusicDeliveryAssetId?: string | null | undefined;
+  desiredMusicMasterAssetId?: string | null | undefined;
+};
+
+/** True when a music item already has any current/existing audio representation. */
+export function hasExistingMusicCurrentAudio(
+  pointers: MusicCurrentAudioPointers,
+): boolean {
+  const path = typeof pointers.audioPath === "string" ? pointers.audioPath.trim() : "";
+  return Boolean(
+    path ||
+      pointers.activeMusicDeliveryAssetId ||
+      pointers.desiredMusicMasterAssetId,
+  );
+}
+
+/** Legacy non-music replacement lock: locked && existing audio_path. */
 export function shouldBlockProductAudioReplacement(
   locked: boolean,
   existingAudioPath: string | null | undefined,
 ): boolean {
   return Boolean(locked && existingAudioPath);
+}
+
+/** Music replacement lock: locked && (path | active | desired). */
+export function shouldBlockMusicAudioReplacement(
+  locked: boolean,
+  pointers: MusicCurrentAudioPointers,
+): boolean {
+  return Boolean(locked && hasExistingMusicCurrentAudio(pointers));
 }
 
 export function canAbandonProductAudioUploadPath(input: {
