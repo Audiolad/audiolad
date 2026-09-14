@@ -751,6 +751,194 @@ assert.equal(
   false,
 );
 
+
+// FREE Studio music must be acquirable without current source-author terms.
+const freeWithoutCurrentAuthorTerms = resolveStudioMusicOwnership({
+  practice: freeListed,
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: false,
+});
+assert.equal(freeWithoutCurrentAuthorTerms.can_acquire, true);
+assert.equal(freeWithoutCurrentAuthorTerms.acquisition_unavailable_reason, null);
+
+const freeWithCurrentAuthorTerms = resolveStudioMusicOwnership({
+  practice: freeListed,
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: true,
+});
+assert.equal(freeWithCurrentAuthorTerms.can_acquire, true);
+assert.equal(freeWithCurrentAuthorTerms.acquisition_unavailable_reason, null);
+
+// PAID without terms remains blocked.
+const paidWithoutCurrentAuthorTerms = resolveStudioMusicOwnership({
+  practice: listedAllowed,
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: false,
+});
+assert.equal(paidWithoutCurrentAuthorTerms.can_acquire, false);
+assert.equal(
+  paidWithoutCurrentAuthorTerms.acquisition_unavailable_reason,
+  "author_terms_not_accepted",
+);
+
+const paidWithCurrentAuthorTerms = resolveStudioMusicOwnership({
+  practice: listedAllowed,
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: true,
+});
+assert.equal(paidWithCurrentAuthorTerms.can_acquire, true);
+assert.equal(paidWithCurrentAuthorTerms.acquisition_unavailable_reason, null);
+
+// FREE but not platform_reuse_allowed → unavailable (not a terms reason).
+const freeListenOnly = resolveStudioMusicOwnership({
+  practice: publication({
+    ...freeListed,
+    music_usage_permission: "listen_only",
+  }),
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: false,
+});
+assert.equal(freeListenOnly.can_acquire, false);
+assert.equal(freeListenOnly.acquisition_unavailable_reason, null);
+
+// FREE unpublished / deleted → unavailable.
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: publication({ ...freeListed, status: "draft" }),
+    commerciallyAccessible: true,
+    authorHasCurrentTerms: false,
+  }).can_acquire,
+  false,
+);
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: publication({
+      ...freeListed,
+      deleted_at: "2026-09-01T00:00:00.000Z",
+    }),
+    commerciallyAccessible: true,
+    authorHasCurrentTerms: false,
+  }).can_acquire,
+  false,
+);
+
+// FREE but commercial accessibility disabled → unavailable.
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: freeListed,
+    commerciallyAccessible: false,
+    authorHasCurrentTerms: false,
+  }).can_acquire,
+  false,
+);
+
+// Listener-free + Studio fixed paid → PAID for Studio; terms still required.
+const listenerFreeStudioPaid = publication({
+  is_free: true,
+  price: 0,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+  studio_music_price_minor: 19900,
+});
+const listenerFreeStudioPaidNoTerms = resolveStudioMusicOwnership({
+  practice: listenerFreeStudioPaid,
+  commerciallyAccessible: true,
+  authorHasCurrentTerms: false,
+});
+assert.equal(listenerFreeStudioPaidNoTerms.can_acquire, false);
+assert.equal(
+  listenerFreeStudioPaidNoTerms.acquisition_unavailable_reason,
+  "author_terms_not_accepted",
+);
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: listenerFreeStudioPaid,
+    commerciallyAccessible: true,
+    authorHasCurrentTerms: true,
+  }).can_acquire,
+  true,
+);
+
+// Existing entitlement / author-own use without terms remains usable.
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: freeListed,
+    entitlement: { revoked_at: null, grant_source: "free" },
+    authorHasCurrentTerms: false,
+  }).can_use,
+  true,
+);
+assert.equal(
+  resolveStudioMusicOwnership({
+    practice: listedAllowed,
+    isAuthorMember: true,
+    authorHasCurrentTerms: false,
+  }).can_use,
+  true,
+);
+
+// Catalog handler: FREE without source-author terms → can_acquire for any viewer path.
+const freeCatalogNoTerms = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: "user-ordinary",
+  store: createStore({
+    publicItems: [freeListed, listedAllowed],
+    authorsWithCurrentTerms: new Set(),
+  }),
+});
+assert.equal(freeCatalogNoTerms.status, 200);
+assert.equal(
+  "items" in freeCatalogNoTerms.body &&
+    freeCatalogNoTerms.body.items.find((i) => i.publication_id === freeListed.id)
+      ?.ownership.can_acquire,
+  true,
+);
+assert.equal(
+  "items" in freeCatalogNoTerms.body &&
+    freeCatalogNoTerms.body.items.find((i) => i.publication_id === freeListed.id)
+      ?.ownership.acquisition_unavailable_reason,
+  null,
+);
+assert.equal(
+  "items" in freeCatalogNoTerms.body &&
+    freeCatalogNoTerms.body.items.find((i) => i.publication_id === listedAllowed.id)
+      ?.ownership.can_acquire,
+  false,
+);
+assert.equal(
+  "items" in freeCatalogNoTerms.body &&
+    freeCatalogNoTerms.body.items.find((i) => i.publication_id === listedAllowed.id)
+      ?.ownership.acquisition_unavailable_reason,
+  "author_terms_not_accepted",
+);
+
+// Guest catalog (no userId): ownership flags still computed from source-author terms.
+const guestCatalogNoTerms = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  userId: null,
+  store: createStore({
+    publicItems: [freeListed, listedAllowed],
+    authorsWithCurrentTerms: new Set(),
+  }),
+});
+assert.equal(guestCatalogNoTerms.status, 200);
+assert.equal(
+  "items" in guestCatalogNoTerms.body &&
+    guestCatalogNoTerms.body.items.find((i) => i.publication_id === freeListed.id)
+      ?.ownership.can_acquire,
+  true,
+);
+assert.equal(
+  "items" in guestCatalogNoTerms.body &&
+    guestCatalogNoTerms.body.items.find((i) => i.publication_id === listedAllowed.id)
+      ?.ownership.can_acquire,
+  false,
+);
+
+
 const entitledWithoutCurrentAuthorTerms = await handleStudioMusicCatalog({
   filter: "all",
   cursor: null,
