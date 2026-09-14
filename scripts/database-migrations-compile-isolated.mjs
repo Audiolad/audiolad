@@ -164,7 +164,7 @@ applyFile(
   "post-apply music delivery promotion smoke",
   resolve(root, "supabase/tests/music_delivery_promotion_smoke.sql"),
 );
-if (!pending.has("20261007170000")) {
+if (!pending.has("20261007180000")) {
   throw new Error("music publish playable audio migration was not included in the disposable replay");
 }
 applyFile(

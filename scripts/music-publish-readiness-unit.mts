@@ -262,7 +262,7 @@ assert.match(publish, /Загрузите аудио для трека/);
 assert.match(publish, /active_music_delivery_asset_id/);
 assert.match(publish, /itemsWithPlayableDuration/);
 
-const mig = read("supabase/migrations/20261007170000_music_publish_playable_audio.sql");
+const mig = read("supabase/migrations/20261007180000_music_publish_playable_audio.sql");
 assert.match(mig, /assert_practice_moderation_ready/);
 assert.match(mig, /publish_audio_product/);
 assert.match(mig, /promote_music_item_delivery/);

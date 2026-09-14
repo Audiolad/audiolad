@@ -83,10 +83,10 @@ assert(/I locked promote must not replace delivered stream A/.test(smoke));
 assert(/J blocked promote should clear stale desired/.test(smoke));
 
 
-const publishMigName = "20261007170000_music_publish_playable_audio.sql";
+const publishMigName = "20261007180000_music_publish_playable_audio.sql";
 const publishMig = readFileSync(join(repoRoot, "supabase/migrations", publishMigName), "utf8");
 const publishSmoke = readFileSync(join(repoRoot, "supabase/tests/music_publish_playable_smoke.sql"), "utf8");
-assert(versions.includes("20261007170000"), "publish playable version listed");
+assert(versions.includes("20261007180000"), "publish playable version listed");
 assert(/duration_seconds = CASE/.test(publishMig), "promote copies stream duration");
 assert(/v_practice\.product_kind = 'music'/.test(publishMig), "moderation ready music branch");
 assert(/music_item_has_validated_active_delivery/.test(publishMig), "validated delivery helper");

@@ -172,7 +172,7 @@ assert.doesNotMatch(
 );
 
 const publishMig = readFileSync(
-  path.join(root, "supabase/migrations/20261007170000_music_publish_playable_audio.sql"),
+  path.join(root, "supabase/migrations/20261007180000_music_publish_playable_audio.sql"),
   "utf8",
 );
 assert.match(publishMig, /product_kind = 'music'/);

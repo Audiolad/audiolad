@@ -1,4 +1,4 @@
--- Disposable music publish/readiness smoke after 20261007170000. Localhost only.
+-- Disposable music publish/readiness smoke after 20261007180000. Localhost only.
 BEGIN;
 
 DO $$
