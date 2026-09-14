@@ -5,9 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  buildAuthorProjectCapacityPaidHref,
   buildLibraryPurchasedHref,
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
+  isAuthorProjectCapacityCheckout,
   isStudioMusicLicenseCheckout,
 } from "@/lib/payments/checkout-result-cta";
 import {
@@ -79,12 +81,15 @@ export default function CheckoutResultClient() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const studioLicense = isStudioMusicLicenseCheckout(status?.orderKind);
+  const capacityPurchase = isAuthorProjectCapacityCheckout(status?.orderKind);
   const libraryHref = useMemo(
     () =>
-      studioLicense
-        ? buildStudioMusicPaidHref()
-        : buildLibraryPurchasedHref(status?.practiceSlug ?? null),
-    [status?.practiceSlug, studioLicense],
+      capacityPurchase
+        ? buildAuthorProjectCapacityPaidHref()
+        : studioLicense
+          ? buildStudioMusicPaidHref()
+          : buildLibraryPurchasedHref(status?.practiceSlug ?? null),
+    [status?.practiceSlug, studioLicense, capacityPurchase],
   );
   const listenHref = useMemo(
     () =>
@@ -242,6 +247,18 @@ export default function CheckoutResultClient() {
   }
 
   if (viewState === "paid_authenticated") {
+    if (capacityPurchase) {
+      return (
+        <ResultCard
+          title="Готово — проекты добавлены навсегда."
+          description="Оплата была разовой, без подписки. Можно сразу создать новый проект."
+          actionHref={libraryHref}
+          actionLabel="Создать новый проект"
+          secondaryHref="/author-dashboard"
+          secondaryLabel="В кабинет автора"
+        />
+      );
+    }
     return studioLicense ? (
       <ResultCard
         title="Оплата прошла. Музыка доступна в Студии."

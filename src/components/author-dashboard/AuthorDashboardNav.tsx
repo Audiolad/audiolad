@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
+import AuthorCreateProjectCta from "@/components/author-dashboard/AuthorCreateProjectCta";
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
@@ -232,6 +233,7 @@ export default function AuthorDashboardNav({
       >
         <AuthorProjectSwitcher currentSlug={authorSlug} />
       </Suspense>
+      <AuthorCreateProjectCta />
       <nav className="flex flex-wrap gap-2">
         {items.map((item) => {
           const Icon = item.icon;
