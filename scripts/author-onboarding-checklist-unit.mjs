@@ -22,9 +22,13 @@ import {
   buildAuthorOnboardingStorageKey,
   evaluateAuthorOnboardingChecklist,
   focusProductSuitabilityScore,
+  getAuthorOnboardingJourneyProgress,
+  hasAnyPublishedAuthorProduct,
   isAuthorProfileMinimumComplete,
   isFreeOnboardingReadyForCommercial,
+  parseAuthorOnboardingShellCollapsedPreference,
   parseAuthorOnboardingUiPreference,
+  resolveAuthorOpportunitiesShellExpanded,
   selectFocusProduct,
   serializeAuthorOnboardingUiPreference,
 } from "../src/lib/author-dashboard/onboarding-checklist.ts";
@@ -539,6 +543,89 @@ function testUiPreferenceStorage() {
     collapsed: false,
     dismissed: false,
   });
+
+  assert.equal(parseAuthorOnboardingShellCollapsedPreference(null), null);
+  assert.equal(parseAuthorOnboardingShellCollapsedPreference("not-json"), null);
+  assert.equal(
+    parseAuthorOnboardingShellCollapsedPreference(
+      JSON.stringify({ dismissed: true }),
+    ),
+    null,
+  );
+  assert.equal(
+    parseAuthorOnboardingShellCollapsedPreference(
+      JSON.stringify({ collapsed: true, dismissed: false }),
+    ),
+    true,
+  );
+  assert.equal(
+    parseAuthorOnboardingShellCollapsedPreference(
+      JSON.stringify({ collapsed: false, dismissed: false }),
+    ),
+    false,
+  );
+}
+
+function testAuthorOpportunitiesShell() {
+  assert.equal(
+    hasAnyPublishedAuthorProduct({
+      publishedProductId: null,
+      commercial: { publishedPaidProductId: null },
+    }),
+    false,
+  );
+  assert.equal(
+    hasAnyPublishedAuthorProduct({
+      publishedProductId: "free-1",
+      commercial: { publishedPaidProductId: null },
+    }),
+    true,
+  );
+  assert.equal(
+    hasAnyPublishedAuthorProduct({
+      publishedProductId: null,
+      commercial: { publishedPaidProductId: "paid-1" },
+    }),
+    true,
+  );
+
+  assert.deepEqual(
+    getAuthorOnboardingJourneyProgress({
+      completedCount: 2,
+      totalCount: 5,
+      commercial: { completedCount: 1, totalCount: 5 },
+    }),
+    { completedCount: 3, totalCount: 10 },
+  );
+
+  assert.equal(
+    resolveAuthorOpportunitiesShellExpanded({
+      hasPublishedProduct: false,
+      manualCollapsed: null,
+    }),
+    true,
+  );
+  assert.equal(
+    resolveAuthorOpportunitiesShellExpanded({
+      hasPublishedProduct: true,
+      manualCollapsed: null,
+    }),
+    false,
+  );
+  assert.equal(
+    resolveAuthorOpportunitiesShellExpanded({
+      hasPublishedProduct: true,
+      manualCollapsed: false,
+    }),
+    true,
+  );
+  assert.equal(
+    resolveAuthorOpportunitiesShellExpanded({
+      hasPublishedProduct: false,
+      manualCollapsed: true,
+    }),
+    false,
+  );
 }
 
 function testSourceGuards() {
@@ -567,6 +654,13 @@ function testSourceGuards() {
   assert.match(onboardingApi, /requireAuthorMembership/);
   assert.match(onboardingApi, /loadAuthorOnboardingChecklistState/);
   assert.match(onboardingApi, /syncAuthorOnboardingUiState/);
+
+  const preferenceStore = read(
+    "src/lib/author-dashboard/onboarding-preference-store.ts",
+  );
+  assert.match(preferenceStore, /readOnboardingShellCollapsedPreference/);
+  assert.match(preferenceStore, /writeOnboardingShellCollapsedPreference/);
+  assert.match(preferenceStore, /parseAuthorOnboardingShellCollapsedPreference/);
   assert.doesNotMatch(onboardingApi, /force_expanded/);
 
   const checklistUi = read(
@@ -1108,6 +1202,7 @@ function main() {
   testFreeProductGate();
   testPreparePublishPromotionAndComplete();
   testUiPreferenceStorage();
+  testAuthorOpportunitiesShell();
   testSourceGuards();
   testCommercialScenarios();
   testOptionalPayoutChecklistDisplay();
