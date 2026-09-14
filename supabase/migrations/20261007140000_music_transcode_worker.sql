@@ -156,6 +156,8 @@ BEGIN
   WHERE id = p_job_id
     AND status = 'processing'
     AND lease_token = p_lease_token
+    AND lease_expires_at IS NOT NULL
+    AND lease_expires_at > now()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -184,7 +186,9 @@ BEGIN
   FOR UPDATE;
   IF NOT FOUND
     OR v_job.status <> 'processing'
-    OR v_job.lease_token IS DISTINCT FROM p_lease_token THEN
+    OR v_job.lease_token IS DISTINCT FROM p_lease_token
+    OR v_job.lease_expires_at IS NULL
+    OR v_job.lease_expires_at <= now() THEN
     RETURN false;
   END IF;
   IF NOT EXISTS (
@@ -209,6 +213,8 @@ BEGIN
   WHERE id = p_job_id
     AND status = 'processing'
     AND lease_token = p_lease_token
+    AND lease_expires_at IS NOT NULL
+    AND lease_expires_at > now()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -243,7 +249,9 @@ BEGIN
   FOR UPDATE;
   IF NOT FOUND
     OR v_job.status <> 'processing'
-    OR v_job.lease_token IS DISTINCT FROM p_lease_token THEN
+    OR v_job.lease_token IS DISTINCT FROM p_lease_token
+    OR v_job.lease_expires_at IS NULL
+    OR v_job.lease_expires_at <= now() THEN
     RETURN false;
   END IF;
   v_permanent := v_job.attempt_count >= p_max_attempts;
@@ -261,6 +269,8 @@ BEGIN
   WHERE id = p_job_id
     AND status = 'processing'
     AND lease_token = p_lease_token
+    AND lease_expires_at IS NOT NULL
+    AND lease_expires_at > now()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -290,6 +300,8 @@ BEGIN
   WHERE id = p_job_id
     AND status = 'processing'
     AND lease_token = p_lease_token
+    AND lease_expires_at IS NOT NULL
+    AND lease_expires_at > now()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;

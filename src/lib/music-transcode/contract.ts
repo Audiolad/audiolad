@@ -113,7 +113,15 @@ export type MusicStreamAssetLike = {
   storage_bucket: string;
   storage_path: string;
   lifecycle_state: string;
+  accepted_mime_type: string;
+  size_bytes: number | string | null;
+  duration_seconds: number | string | null;
 };
+
+export function positiveMusicAssetNumber(value: number | string | null | undefined): number {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export function canReuseVerifiedStreamAsset(
   asset: MusicStreamAssetLike,
@@ -126,6 +134,9 @@ export function canReuseVerifiedStreamAsset(
     && asset.source_asset_id === expected.sourceAssetId
     && asset.audio_item_id === expected.audioItemId
     && asset.storage_path === expected.storagePath
+    && asset.accepted_mime_type === MUSIC_STREAM_MIME
+    && positiveMusicAssetNumber(asset.size_bytes) > 0
+    && positiveMusicAssetNumber(asset.duration_seconds) > 0
   );
 }
 

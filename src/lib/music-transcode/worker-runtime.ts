@@ -165,18 +165,27 @@ export async function loadVerifiedMusicMaster(
   return master;
 }
 
+export async function loadStreamAssetAtPath(
+  service: SupabaseClient,
+  storagePath: string,
+): Promise<MusicStreamAssetLike | null> {
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id,audio_item_id,source_asset_id,asset_role,storage_bucket,storage_path,lifecycle_state,accepted_mime_type,size_bytes,duration_seconds")
+    .eq("storage_path", storagePath)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return data as MusicStreamAssetLike;
+}
+
 export async function findReusableStreamAsset(
   service: SupabaseClient,
   master: MasterRow,
   storagePath: string,
 ): Promise<MusicStreamAssetLike | null> {
-  const { data, error } = await service
-    .from("music_audio_assets")
-    .select("id,audio_item_id,source_asset_id,asset_role,storage_bucket,storage_path,lifecycle_state")
-    .eq("storage_path", storagePath)
-    .maybeSingle();
-  if (error || !data) return null;
-  const asset = data as MusicStreamAssetLike;
+  const asset = await loadStreamAssetAtPath(service, storagePath);
+  if (!asset) return null;
   if (!canReuseVerifiedStreamAsset(asset, {
     audioItemId: master.audio_item_id,
     sourceAssetId: master.id,
@@ -202,6 +211,90 @@ async function assertLeaseHeld(
   if (data !== true) throw new MusicTranscodeAbortedError();
 }
 
+async function validatePrivateStreamObject(
+  service: SupabaseClient,
+  asset: MusicStreamAssetLike,
+  sourceDurationSeconds: number,
+  signal: AbortSignal,
+): Promise<{ sizeBytes: number; durationSeconds: number } | null> {
+  const workspace = join(tmpdir(), `audiolad-music-stream-check-${randomUUID()}`);
+  try {
+    await mkdir(workspace, { recursive: true });
+    const tempPath = join(workspace, "mp3-256.mp3");
+    const { data: blob, error } = await service.storage
+      .from(MUSIC_STREAMS_BUCKET)
+      .download(asset.storage_path);
+    if (error || !blob) return null;
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    if (buffer.byteLength <= 0) return null;
+    const recordedSize = asNumber(asset.size_bytes);
+    if (recordedSize > 0 && buffer.byteLength !== recordedSize) return null;
+    await writeFile(tempPath, buffer);
+    try {
+      const validated = await validateMusicStreamFile(tempPath, sourceDurationSeconds, signal);
+      return {
+        sizeBytes: validated.sizeBytes,
+        durationSeconds: validated.durationSeconds,
+      };
+    } catch (error) {
+      if (error instanceof MusicTranscodeAbortedError) throw error;
+      return null;
+    }
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+}
+
+async function uploadMusicStreamObject(
+  service: SupabaseClient,
+  storagePath: string,
+  outputPath: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const stream = createReadStream(outputPath);
+  const onAbort = () => stream.destroy();
+  signal.addEventListener("abort", onAbort);
+  try {
+    if (signal.aborted) throw new MusicTranscodeAbortedError();
+    const { error: uploadError } = await service.storage
+      .from(MUSIC_STREAMS_BUCKET)
+      .upload(storagePath, stream, {
+        contentType: MUSIC_STREAM_MIME,
+        upsert: true,
+        duplex: "half",
+      });
+    if (signal.aborted) throw new MusicTranscodeAbortedError();
+    if (uploadError) throw new MusicTranscodeCodedError("upload_failed");
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    stream.destroy();
+  }
+}
+
+async function repairStreamAssetRow(
+  service: SupabaseClient,
+  existing: MusicStreamAssetLike,
+  master: MasterRow,
+  storagePath: string,
+  validated: { sizeBytes: number; durationSeconds: number },
+): Promise<void> {
+  const { error } = await service
+    .from("music_audio_assets")
+    .update({
+      accepted_mime_type: MUSIC_STREAM_MIME,
+      size_bytes: validated.sizeBytes,
+      duration_seconds: validated.durationSeconds,
+      original_file_name: musicStreamOriginalFileName(master.original_file_name),
+      lifecycle_state: "verified",
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", existing.id)
+    .eq("storage_path", storagePath)
+    .eq("source_asset_id", master.id);
+  if (error) throw new MusicTranscodeCodedError("upload_failed");
+}
+
 export async function executeClaimedMusicTranscodeJob(
   service: SupabaseClient,
   job: ClaimedMusicTranscodeJob,
@@ -211,12 +304,20 @@ export async function executeClaimedMusicTranscodeJob(
   const storagePath = buildMusicStreamStoragePath(master.audio_item_id, master.id);
   const existing = await findReusableStreamAsset(service, master, storagePath);
   if (existing) {
-    await assertLeaseHeld(service, job, signal);
-    return {
-      outputAssetId: existing.id,
-      sizeBytes: asNumber(master.size_bytes),
-      durationSeconds: asNumber(master.duration_seconds),
-    };
+    const stored = await validatePrivateStreamObject(
+      service,
+      existing,
+      asNumber(master.duration_seconds),
+      signal,
+    );
+    if (stored) {
+      await assertLeaseHeld(service, job, signal);
+      return {
+        outputAssetId: existing.id,
+        sizeBytes: stored.sizeBytes,
+        durationSeconds: stored.durationSeconds,
+      };
+    }
   }
 
   const workspace = join(tmpdir(), `audiolad-music-transcode-${randomUUID()}`);
@@ -246,20 +347,29 @@ export async function executeClaimedMusicTranscodeJob(
       signal,
     );
     await assertLeaseHeld(service, job, signal);
-
-    const { error: uploadError } = await service.storage
-      .from(MUSIC_STREAMS_BUCKET)
-      .upload(storagePath, createReadStream(outputPath), {
-        contentType: MUSIC_STREAM_MIME,
-        upsert: true,
-      });
-    if (uploadError) throw new MusicTranscodeCodedError("upload_failed");
+    await uploadMusicStreamObject(service, storagePath, outputPath, signal);
     await assertLeaseHeld(service, job, signal);
 
-    const reusedAfterUpload = await findReusableStreamAsset(service, master, storagePath);
-    if (reusedAfterUpload) {
+    if (existing) {
+      await repairStreamAssetRow(service, existing, master, storagePath, validated);
       return {
-        outputAssetId: reusedAfterUpload.id,
+        outputAssetId: existing.id,
+        sizeBytes: validated.sizeBytes,
+        durationSeconds: validated.durationSeconds,
+      };
+    }
+
+    const raced = await loadStreamAssetAtPath(service, storagePath);
+    if (raced) {
+      if (!canReuseVerifiedStreamAsset(raced, {
+        audioItemId: master.audio_item_id,
+        sourceAssetId: master.id,
+        storagePath,
+      })) {
+        throw new MusicTranscodeCodedError("output_invalid");
+      }
+      return {
+        outputAssetId: raced.id,
         sizeBytes: validated.sizeBytes,
         durationSeconds: validated.durationSeconds,
       };
@@ -283,10 +393,14 @@ export async function executeClaimedMusicTranscodeJob(
       .select("id")
       .single();
     if (insert.error || !insert.data) {
-      const raced = await findReusableStreamAsset(service, master, storagePath);
-      if (raced) {
+      const racedInsert = await loadStreamAssetAtPath(service, storagePath);
+      if (racedInsert && canReuseVerifiedStreamAsset(racedInsert, {
+        audioItemId: master.audio_item_id,
+        sourceAssetId: master.id,
+        storagePath,
+      })) {
         return {
-          outputAssetId: raced.id,
+          outputAssetId: racedInsert.id,
           sizeBytes: validated.sizeBytes,
           durationSeconds: validated.durationSeconds,
         };
@@ -302,4 +416,3 @@ export async function executeClaimedMusicTranscodeJob(
     await rm(workspace, { recursive: true, force: true });
   }
 }
-

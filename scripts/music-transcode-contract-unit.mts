@@ -44,6 +44,9 @@ const reusable = canReuseVerifiedStreamAsset({
   storage_bucket: MUSIC_STREAMS_BUCKET,
   storage_path: storagePath,
   lifecycle_state: "verified",
+  accepted_mime_type: MUSIC_STREAM_MIME,
+  size_bytes: 4096,
+  duration_seconds: 10,
 }, { audioItemId, sourceAssetId: sourceId, storagePath });
 assert.equal(reusable, true);
 assert.equal(canReuseVerifiedStreamAsset({
@@ -54,6 +57,21 @@ assert.equal(canReuseVerifiedStreamAsset({
   storage_bucket: MUSIC_STREAMS_BUCKET,
   storage_path: storagePath,
   lifecycle_state: "verified",
+  accepted_mime_type: MUSIC_STREAM_MIME,
+  size_bytes: 4096,
+  duration_seconds: 10,
+}, { audioItemId, sourceAssetId: sourceId, storagePath }), false);
+assert.equal(canReuseVerifiedStreamAsset({
+  id: "stream-3",
+  audio_item_id: audioItemId,
+  source_asset_id: sourceId,
+  asset_role: "stream",
+  storage_bucket: MUSIC_STREAMS_BUCKET,
+  storage_path: storagePath,
+  lifecycle_state: "verified",
+  accepted_mime_type: MUSIC_STREAM_MIME,
+  size_bytes: 0,
+  duration_seconds: 10,
 }, { audioItemId, sourceAssetId: sourceId, storagePath }), false);
 
 const runtime = read("src/lib/music-transcode/worker-runtime.ts");
@@ -62,6 +80,10 @@ assert.doesNotMatch(runtime, /active_music_delivery_asset_id\s*=/);
 assert.doesNotMatch(runtime, /audio_path\s*:/);
 assert.match(runtime, /MUSIC_STREAMS_BUCKET/);
 assert.match(runtime, /upsert: true/);
+assert.match(runtime, /duplex: "half"/);
+assert.match(runtime, /validatePrivateStreamObject/);
+assert.match(runtime, /repairStreamAssetRow/);
+assert.doesNotMatch(runtime, /createSignedUrl/);
 assert.doesNotMatch(runtime, /loudnorm|dynaudnorm|volume=|loudness/);
 assert.equal(MUSIC_TRANSCODE_RETRY_MESSAGE.includes("повторно"), true);
 assert.equal(MUSIC_TRANSCODE_FAILED_MESSAGE.includes("Не удалось"), true);
@@ -70,6 +92,7 @@ const ffmpeg = read("src/lib/music-transcode/ffmpeg.ts");
 assert.match(ffmpeg, /libmp3lame/);
 assert.match(ffmpeg, /MUSIC_STREAM_BITRATE/);
 assert.match(ffmpeg, /-vn/);
+assert.match(ffmpeg, /probe\.bitrate == null/);
 assert.doesNotMatch(ffmpeg, /loudnorm|dynaudnorm|acompressor|equalizer/);
 
 const signed = read("src/lib/listen/signed-audio.ts");

@@ -35,6 +35,8 @@ assert(/renew_music_transcode_job_lease/.test(sql));
 assert(/complete_music_transcode_job/.test(sql));
 assert(/fail_music_transcode_job/.test(sql));
 assert(/release_music_transcode_job/.test(sql));
+assert((sql.match(/lease_expires_at > now\(\)/g) || []).length >= 4, "lease expiry guards on renew/complete/fail/release");
+assert(/lease_expires_at IS NOT NULL/.test(sql));
 assert(/REVOKE ALL ON FUNCTION public\.claim_music_transcode_job/.test(sql));
 assert(/GRANT EXECUTE ON FUNCTION public\.claim_music_transcode_job/.test(sql));
 assert(/TO service_role/.test(sql));

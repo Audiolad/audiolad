@@ -158,7 +158,12 @@ job with `FOR UPDATE SKIP LOCKED`, renew/release the lease, recover stale
 processing rows, and complete or fail with safe error text only.
 
 The worker writes the MP3 256 kbps derivative to private `music-streams` at
-`<audio_item_id>/<source_asset_id>/mp3-256.mp3`. It never sets
+`<audio_item_id>/<source_asset_id>/mp3-256.mp3`. Reuse of an existing verified
+stream row first checks DB identity, then downloads the private object and
+re-runs ffprobe. A matching identity with a missing or invalid object is
+repaired in place (same asset id and path). Renew/complete/fail/release
+require a still-valid lease (`lease_expires_at > now()`); expired rows go
+through `recover_stale_music_transcode_jobs`. It never sets
 `audio_items.active_music_delivery_asset_id` or `audio_items.audio_path`.
 Public playback stays on the legacy pointer until a later delivery slice.
 

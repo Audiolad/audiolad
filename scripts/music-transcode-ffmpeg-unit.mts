@@ -32,9 +32,14 @@ try {
   assert.equal(probe?.hasAudioStream, true);
   assert.equal(probe?.hasVideoStream, false);
   assert.ok(probe?.audioCodecNames.includes("mp3"));
-  if (probe?.bitrate != null) {
-    assert.ok(probe.bitrate >= 240000 && probe.bitrate <= 272000, `bitrate=${probe.bitrate}`);
+  if (probe == null || probe.bitrate == null) {
+    throw new Error("ffprobe bitrate missing");
   }
+  assert.ok(probe.bitrate >= 240000 && probe.bitrate <= 272000, `bitrate=${probe.bitrate}`);
+  if (validated.bitrate == null) {
+    throw new Error("validated bitrate missing");
+  }
+  assert.ok(validated.bitrate >= 240000 && validated.bitrate <= 272000, `validated.bitrate=${validated.bitrate}`);
 } finally {
   await rm(fixtureDirectory, { recursive: true, force: true });
 }

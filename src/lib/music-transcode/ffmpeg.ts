@@ -172,8 +172,9 @@ export function isValidMusicStreamProbe(
   if (!probe.audioCodecNames.includes("mp3")) return false;
   if (probe.formatNames.includes("wav") || probe.formatNames.includes("wave")) return false;
   if (!durationWithinTolerance(probe.durationSeconds, sourceDurationSeconds)) return false;
-  if (probe.bitrate != null
-    && (probe.bitrate < MUSIC_STREAM_BITRATE_MIN || probe.bitrate > MUSIC_STREAM_BITRATE_MAX)) {
+  if (probe.bitrate == null
+    || probe.bitrate < MUSIC_STREAM_BITRATE_MIN
+    || probe.bitrate > MUSIC_STREAM_BITRATE_MAX) {
     return false;
   }
   return true;

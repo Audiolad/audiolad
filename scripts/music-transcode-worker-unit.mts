@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { MusicTranscodeAbortedError } from "../src/lib/music-transcode/ffmpeg";
 import { MusicTranscodeCodedError } from "../src/lib/music-transcode/worker-runtime";
 import {
   createMusicTranscodeWorker,
@@ -136,6 +137,51 @@ assert.equal(parseClaimedMusicTranscodeJob({ id: "j1" }), null);
   });
   await runUntil(port, () => port.completed.includes("reuse"));
   assert.deepEqual(port.completed, ["reuse"]);
+}
+
+{
+  const claimed = job("lost-hb");
+  let started = false;
+  let aborted = false;
+  const port = createPort({
+    claimQueue: [claimed],
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_job, signal) {
+      started = true;
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) {
+          aborted = true;
+          resolve();
+          return;
+        }
+        signal.addEventListener("abort", () => {
+          aborted = true;
+          resolve();
+        });
+      });
+      throw new MusicTranscodeAbortedError();
+    },
+  });
+  const worker = createMusicTranscodeWorker(port, {
+    idleIntervalMs: 10,
+    heartbeatIntervalMs: 20,
+    heartbeatRetryMs: 20,
+    leaseHoldMs: 10_000,
+    shutdownDrainMs: 200,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  const start = Date.now();
+  while (!started && Date.now() - start < 1000) await delay(5);
+  while (!aborted && Date.now() - start < 1500) await delay(10);
+  worker.requestShutdown();
+  await running;
+  assert.equal(started, true);
+  assert.equal(aborted, true);
+  assert.equal(port.completed.length, 0);
+  assert.equal(port.failed.length, 0);
 }
 
 {

@@ -14,6 +14,7 @@ on:
       - "supabase/baseline/**"
       - "supabase/migrations/**"
       - "supabase/tests/database_migrations_compile_analytics_smoke.sql"
+      - "supabase/tests/music_transcode_worker_smoke.sql"
       - "deploy/scripts/lib/database-migrations-plan.mjs"
       - "package.json"
 
