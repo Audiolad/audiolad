@@ -266,7 +266,8 @@
     "test:supabase-auth-cookie": "npx tsx scripts/supabase-auth-cookie-unit.mjs",
     "test:guest-resume-session-gate": "node scripts/guest-resume-session-gate-unit.mjs",
     "run:studio-guest-cleanup": "npx tsx scripts/run-studio-guest-cleanup.mts",
-    "test:avatar-mobile-upload": "npx tsx scripts/avatar-mobile-upload-unit.mjs"
+    "test:avatar-mobile-upload": "npx tsx scripts/avatar-mobile-upload-unit.mjs",
+    "test:kak-prodat-muzyku-sozdannuyu-ii": "npx tsx scripts/kak-prodat-muzyku-sozdannuyu-ii-page-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

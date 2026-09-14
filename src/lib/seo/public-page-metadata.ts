@@ -55,6 +55,11 @@ import {
   KAK_SOZDAT_FONOVUYU_MUZYKU_S_POMOSHCHYU_II_SEO_TITLE,
 } from "@/lib/seo/kak-sozdat-fonovuyu-muzyku-s-pomoshchyu-ii/content";
 import {
+  KAK_PRODAT_MUZYKU_SOZDANNUYU_II_PATH,
+  KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_DESCRIPTION,
+  KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
+} from "@/lib/seo/kak-prodat-muzyku-sozdannuyu-ii/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -478,6 +483,31 @@ export function buildKakSozdatFonovuyuMuzykuSPomoshchyuIiMetadata(): Metadata {
       card: "summary",
       title: KAK_SOZDAT_FONOVUYU_MUZYKU_S_POMOSHCHYU_II_SEO_TITLE,
       description: KAK_SOZDAT_FONOVUYU_MUZYKU_S_POMOSHCHYU_II_SEO_DESCRIPTION,
+    },
+  };
+}
+
+
+export function buildKakProdatMuzykuSozdannuyuIiMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(KAK_PRODAT_MUZYKU_SOZDANNUYU_II_PATH);
+
+  return {
+    title: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
+    description: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
+      description: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
+      description: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_DESCRIPTION,
     },
   };
 }
