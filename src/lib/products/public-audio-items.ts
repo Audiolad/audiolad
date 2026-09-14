@@ -1,12 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/author-products/publication-class";
-import {
-  hasPublicTrackPlayableAudio,
-  isVerifiedMusicStreamAsset,
-  type MusicStreamCandidate,
-} from "@/lib/listen/music-delivery";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { hasPublicTrackPlayableAudio } from "@/lib/listen/music-delivery";
+import { loadValidatedActiveMusicDeliveryItemIds } from "@/lib/listen/validated-active-music-delivery";
 
 export type PublicAudioItem = {
   id: string;
@@ -55,63 +51,6 @@ export function shouldLoadPublicAudioItemsOnProductPage(
   return !isCoursePublication(publicationClass, productKind);
 }
 
-function asMusicStreamCandidate(asset: {
-  audio_item_id: string;
-  asset_role: string;
-  lifecycle_state: string;
-  storage_bucket: string;
-  storage_path: string | null;
-}): MusicStreamCandidate {
-  return {
-    audioItemId: asset.audio_item_id,
-    assetRole: asset.asset_role,
-    lifecycleState: asset.lifecycle_state,
-    storageBucket: asset.storage_bucket,
-    storagePath: asset.storage_path ?? "",
-  };
-}
-
-async function loadValidatedActiveDeliveryItemIds(
-  items: Array<{
-    id: string;
-    active_music_delivery_asset_id?: string | null;
-  }>,
-): Promise<Set<string>> {
-  const withPointer = items.filter((item) => item.active_music_delivery_asset_id);
-  if (withPointer.length === 0) return new Set();
-
-  const service = createServiceRoleClient();
-  const ids = withPointer
-    .map((item) => item.active_music_delivery_asset_id)
-    .filter((id): id is string => Boolean(id));
-
-  const { data, error } = await service
-    .from("music_audio_assets")
-    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
-    .in("id", ids);
-
-  if (error) {
-    console.error("public_active_stream_validation_lookup_failed", error.message);
-    return new Set();
-  }
-
-  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
-  const valid = new Set<string>();
-
-  for (const item of withPointer) {
-    const asset = byId.get(item.active_music_delivery_asset_id as string);
-    if (
-      asset
-      && asset.id === item.active_music_delivery_asset_id
-      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
-    ) {
-      valid.add(item.id);
-    }
-  }
-
-  return valid;
-}
-
 export async function loadPublicAudioItems(
   supabase: SupabaseClient,
   input: LoadPublicAudioItemsInput,
@@ -152,7 +91,7 @@ export async function loadPublicAudioItems(
   const rows = (data ?? []) as AudioItemRow[];
   const validatedActive =
     input.productKind === "music"
-      ? await loadValidatedActiveDeliveryItemIds(rows)
+      ? await loadValidatedActiveMusicDeliveryItemIds(rows)
       : new Set<string>();
 
   return rows.map((item) => ({
