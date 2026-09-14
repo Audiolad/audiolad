@@ -122,6 +122,25 @@ export function hasPlayableAuthorAudioPreview(input: {
   return hasValidatedMusicPublishSource(input);
 }
 
+/** Public/product presentation: path or validated active delivery — never bare pointer alone. */
+export function hasPublicTrackPlayableAudio(input: {
+  audioPath?: string | null;
+  hasActiveDelivery?: boolean | null;
+}): boolean {
+  return hasValidatedMusicPublishSource(input);
+}
+
+/** Product CTA: legacy practices.audio_url OR any playable public track. */
+export function hasProductPlayableAudio(input: {
+  practiceAudioUrl?: string | null;
+  tracksHavePlayableAudio?: boolean;
+}): boolean {
+  const legacy =
+    typeof input.practiceAudioUrl === "string" &&
+    input.practiceAudioUrl.trim().length > 0;
+  return legacy || input.tracksHavePlayableAudio === true;
+}
+
 export function musicCabinetStatus(input: {
   hasLegacyAudioPath: boolean;
   hasActiveDelivery: boolean;

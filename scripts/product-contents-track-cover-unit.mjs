@@ -67,6 +67,11 @@ assert(
 );
 
 assert(
+  publicAudioItems.includes("hasPlayableAudio"),
+  "PublicAudioItem exposes playable boolean without private paths",
+);
+
+assert(
   contentsSection.includes("ProductContentsInteractiveList"),
   "contents section delegates interactive list to client component",
 );
