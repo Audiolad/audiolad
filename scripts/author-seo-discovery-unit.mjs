@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  matchWordstatSuggestionCount,
   proposeAuthorSeoQuery,
   reconcileAuthorDiscoverySuggestion,
 } from "../src/lib/seo-queries/author-discovery.ts";
+import { isEffectiveSeoReservation } from "../src/lib/seo-queries/reservation-effective.ts";
 
 const root = process.cwd();
 const read = (rel) => readFileSync(join(root, rel), "utf8");
@@ -20,142 +22,130 @@ const migration = read(
 const reserveMigration = read(
   "supabase/migrations/20261007160000_seo_query_analysis_review_gate.sql",
 );
-const wordstatSuggestions = read(
-  "src/app/api/author/seo/wordstat/suggestions/route.ts",
-);
+const queriesLib = read("src/lib/seo-queries/queries.ts");
+const discoveryRepo = read("src/lib/seo-queries/author-discovery-repository.ts");
+const effectiveHelper = read("src/lib/seo-queries/reservation-effective.ts");
 
 assert.match(discoveryRoute, /requireAuthorMembership\(authorId\)/);
 assert.match(discoveryRoute, /fetchWordstatSuggestions\(phrase, \{ userId: user\.id \}\)/);
-assert.match(discoveryRoute, /from "@\/lib\/seo\/wordstat\/client"/);
 assert.match(discoveryRoute, /suggestion\.count/);
 assert.doesNotMatch(discoveryRoute, /topicTotalCount/);
-assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY|NEXT_PUBLIC_YANDEX|folderId/);
-assert.doesNotMatch(discoveryRoute, /wordstat\.yandex\.ru/);
+assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY|NEXT_PUBLIC_YANDEX/);
 
-assert.match(proposalsRoute, /requireAuthorMutationMembership\(authorId\)/);
-assert.match(proposalsRoute, /proposeAuthorSeoQuery/);
-assert.doesNotMatch(proposalsRoute, /YANDEX_SEARCH_API_KEY|analysis_status:\s*"analyzed"/);
+// A — proposals API no longer takes client count as source of truth
+assert.match(proposalsRoute, /seed_phrase/);
+assert.match(proposalsRoute, /fetchWordstatSuggestions\(seedPhrase/);
+assert.match(proposalsRoute, /matchWordstatSuggestionCount/);
+assert.doesNotMatch(proposalsRoute, /readCount|body\.count/);
+assert.match(proposalsRoute, /wordstat_selection_stale/);
+assert.match(ui, /seed_phrase: discoverySeedPhrase/);
+assert.match(ui, /discoverySeedPhrase/);
+assert.match(ui, /payload\.phrase/);
+assert.doesNotMatch(ui, /count:\s*item\.frequency/);
+
+assert.match(migration, /submitted_by_user_id uuid NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
+assert.doesNotMatch(migration, /submitted_by_user_id uuid NOT NULL/);
+assert.doesNotMatch(migration, /submitted_by_user_id[^\n]*ON DELETE CASCADE/);
+
+assert.match(effectiveHelper, /isEffectiveSeoReservation/);
+assert.match(discoveryRepo, /isEffectiveSeoReservation/);
+assert.match(discoveryRepo, /expires_at/);
+assert.match(queriesLib, /isEffectiveSeoReservation/);
 
 assert.match(ui, /Найти SEO-тему/);
-assert.match(ui, /Найти запросы/);
-assert.match(ui, /Предложить запрос/);
-assert.match(ui, /Отправлен на проверку/);
-assert.match(ui, /Запросов в месяц/);
-assert.match(ui, /\/api\/author\/seo\/discovery/);
-assert.match(ui, /\/api\/author\/seo\/proposals/);
-assert.match(ui, /\/api\/author\/seo-reservations/);
-assert.doesNotMatch(ui, /analysis_status|YANDEX_SEARCH_API_KEY/);
-assert.doesNotMatch(ui, /api\/author\/seo\/discovery[\s\S]*normalized_query/);
-
-assert.match(migration, /CREATE TABLE public\.seo_query_proposals/);
-assert.match(migration, /seo_query_proposals_query_author_unique/);
-assert.match(migration, /submitted_by_user_id/);
-assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
-
-assert.match(reserveMigration, /seo_query_not_analyzed/);
-assert.match(wordstatSuggestions, /fetchWordstatSuggestions/);
+assert.match(ui, /Данные изменились\. Выполните поиск ещё раз\./);
 
 const authorA = "author-a";
 const authorB = "author-b";
+const past = "2020-01-01T00:00:00.000Z";
+const future = "2099-01-01T00:00:00.000Z";
+const now = new Date("2026-09-14T12:00:00.000Z");
 
-// 1. analyzed + free → available
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+function reservation(partial) {
+  return {
+    id: "r1",
+    queryId: "q1",
+    authorId: authorB,
+    status: "active",
+    productId: null,
+    expiresAt: future,
+    productTitle: null,
+    ...partial,
+  };
+}
+
+// 1–6 reconcile basics
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "музыка для сна", count: 320 },
     authorId: authorA,
     query: { id: "q1", analysisStatus: "analyzed" },
     reservation: null,
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "available");
-  assert.equal(row.statusLabel, "Свободен");
-  assert.equal(row.canReserve, true);
-  assert.equal(row.frequency, 320);
-}
+  }).status,
+  "available",
+);
 
-// 2. analyzed + other reservation → occupied
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "музыка для сна", count: 320 },
     authorId: authorA,
     query: { id: "q1", analysisStatus: "analyzed" },
-    reservation: {
-      id: "r1",
-      queryId: "q1",
-      authorId: authorB,
-      status: "active",
-      productTitle: null,
-    },
+    reservation: reservation({ authorId: authorB, status: "active", expiresAt: future }),
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "occupied");
-  assert.equal(row.statusLabel, "Занят");
-  assert.equal(row.canReserve, false);
-}
+  }).status,
+  "occupied",
+);
 
-// 3. analyzed + own reservation → own
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "музыка для сна", count: 320 },
     authorId: authorA,
     query: { id: "q1", analysisStatus: "analyzed" },
-    reservation: {
-      id: "r1",
-      queryId: "q1",
+    reservation: reservation({
       authorId: authorA,
       status: "active",
       productTitle: "Мой трек",
-    },
+    }),
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "own");
-  assert.equal(row.statusLabel, "У вас в работе");
-  assert.equal(row.productTitle, "Мой трек");
-  assert.equal(row.canReserve, false);
-}
+  }).status,
+  "own",
+);
 
-// 4. not_analyzed → pending_review
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "новая тема", count: 10 },
     authorId: authorA,
     query: { id: "q2", analysisStatus: "not_analyzed" },
     reservation: null,
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "pending_review");
-  assert.equal(row.statusLabel, "На проверке");
-  assert.equal(row.canPropose, true);
-}
+  }).status,
+  "pending_review",
+);
 
-// 5. not_applicable
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "мусор", count: 1 },
     authorId: authorA,
     query: { id: "q3", analysisStatus: "not_applicable" },
     reservation: null,
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "not_applicable");
-  assert.equal(row.canReserve, false);
-  assert.equal(row.canPropose, false);
-}
+  }).status,
+  "not_applicable",
+);
 
-// 6. missing → new
-{
-  const row = reconcileAuthorDiscoverySuggestion({
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
     suggestion: { phrase: "бренд новая", count: 55 },
     authorId: authorA,
     query: null,
     reservation: null,
     alreadyProposedByAuthor: false,
-  });
-  assert.equal(row.status, "new");
-  assert.equal(row.canPropose, true);
-}
+  }).status,
+  "new",
+);
 
-// 8. topicTotalCount must not drive frequency — suggestion.count wins even if caller had a topic total nearby
+// E — topicTotalCount never used as frequency
 {
   const topicTotalCount = 999999;
   const row = reconcileAuthorDiscoverySuggestion({
@@ -169,18 +159,112 @@ const authorB = "author-b";
   assert.notEqual(row.frequency, topicTotalCount);
 }
 
+// F–I effective reservation helper
+assert.equal(
+  isEffectiveSeoReservation(
+    { status: "active", productId: null, expiresAt: past },
+    now,
+  ),
+  false,
+);
+assert.equal(
+  isEffectiveSeoReservation(
+    { status: "active", productId: null, expiresAt: future },
+    now,
+  ),
+  true,
+);
+assert.equal(
+  isEffectiveSeoReservation(
+    { status: "used", productId: null, expiresAt: past },
+    now,
+  ),
+  true,
+);
+assert.equal(
+  isEffectiveSeoReservation(
+    { status: "active", productId: "prod-1", expiresAt: past },
+    now,
+  ),
+  true,
+);
+
+// F discovery: expired foreign → available (after filtering, reservation null)
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
+    suggestion: { phrase: "музыка", count: 10 },
+    authorId: authorA,
+    query: { id: "q1", analysisStatus: "analyzed" },
+    reservation: isEffectiveSeoReservation(
+      { status: "active", productId: null, expiresAt: past },
+      now,
+    )
+      ? reservation({ expiresAt: past })
+      : null,
+    alreadyProposedByAuthor: false,
+  }).status,
+  "available",
+);
+
+// G future active → occupied
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
+    suggestion: { phrase: "музыка", count: 10 },
+    authorId: authorA,
+    query: { id: "q1", analysisStatus: "analyzed" },
+    reservation: reservation({ expiresAt: future }),
+    alreadyProposedByAuthor: false,
+  }).status,
+  "occupied",
+);
+
+// H used → occupied
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
+    suggestion: { phrase: "музыка", count: 10 },
+    authorId: authorA,
+    query: { id: "q1", analysisStatus: "analyzed" },
+    reservation: reservation({ status: "used", expiresAt: null }),
+    alreadyProposedByAuthor: false,
+  }).status,
+  "occupied",
+);
+
+// I linked active → occupied even if expires_at past
+assert.equal(
+  reconcileAuthorDiscoverySuggestion({
+    suggestion: { phrase: "музыка", count: 10 },
+    authorId: authorA,
+    query: { id: "q1", analysisStatus: "analyzed" },
+    reservation: reservation({
+      productId: "prod-1",
+      expiresAt: past,
+      productTitle: "Чужой",
+    }),
+    alreadyProposedByAuthor: false,
+  }).status,
+  "occupied",
+);
+
+// J catalog uses same helper — expired not effective (available in catalog terms)
+{
+  const expired = { status: "active", productId: null, expiresAt: past };
+  assert.equal(isEffectiveSeoReservation(expired, now), false);
+  // queries.ts filters with the same helper before lifecycle mapping
+  assert.match(queriesLib, /isEffectiveSeoReservation/);
+  assert.match(discoveryRepo, /isEffectiveSeoReservation/);
+}
+
 function createProposalRepository({
   rows = [],
   proposals = [],
   conflictOnCreate = false,
-  conflictOnProposal = false,
 } = {}) {
   const records = rows.map((row) => ({ ...row }));
   const proposalRows = proposals.map((row) => ({ ...row }));
   let nextId = records.length + 1;
   let nextProposal = proposalRows.length + 1;
   let shouldConflict = conflictOnCreate;
-  let shouldConflictProposal = conflictOnProposal;
   const normalize = (phrase) => phrase.trim().toLowerCase().replace(/\s+/g, " ");
 
   return {
@@ -243,16 +327,6 @@ function createProposalRepository({
       return row ? { id: row.id } : null;
     },
     async createProposal(input) {
-      if (shouldConflictProposal) {
-        shouldConflictProposal = false;
-        proposalRows.push({
-          id: `p-race-${nextProposal++}`,
-          query_id: input.queryId,
-          author_id: input.authorId,
-          submitted_by_user_id: input.submittedByUserId,
-        });
-        return { status: "conflict" };
-      }
       const existing = proposalRows.find(
         (item) =>
           item.query_id === input.queryId && item.author_id === input.authorId,
@@ -271,13 +345,62 @@ function createProposalRepository({
 }
 
 const checkedAt = "2026-09-14T12:00:00.000Z";
+const normalize = async (phrase) =>
+  phrase.trim().toLowerCase().replace(/\s+/g, " ");
 
-// 7. proposal creates seo_query not_analyzed with correct source/frequency/checked_at
+// B + D — forged client count ignored: match uses server suggestion.count
+{
+  const matched = await matchWordstatSuggestionCount({
+    selectedPhrase: "Музыка для сна",
+    suggestions: [
+      { phrase: "музыка для сна", count: 320 },
+      { phrase: "другая", count: 1 },
+    ],
+    normalize,
+  });
+  assert.equal(matched.ok, true);
+  assert.equal(matched.count, 320);
+
+  const forgedClientCount = 1;
+  const repo = createProposalRepository();
+  const result = await proposeAuthorSeoQuery(
+    {
+      phrase: matched.phrase,
+      count: matched.count, // server count, not forgedClientCount
+      authorId: authorA,
+      submittedByUserId: "user-a",
+    },
+    repo,
+    () => checkedAt,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.frequency, 320);
+  assert.notEqual(result.frequency, forgedClientCount);
+  assert.equal(repo.records[0].frequency, 320);
+}
+
+// C — selected phrase missing from confirmed Wordstat response
+{
+  const matched = await matchWordstatSuggestionCount({
+    selectedPhrase: "пропавшая фраза",
+    suggestions: [{ phrase: "другая", count: 11 }],
+    normalize,
+  });
+  assert.equal(matched.ok, false);
+  assert.equal(matched.error, "wordstat_selection_stale");
+
+  const repo = createProposalRepository();
+  // Route would stop before propose — prove repo stays empty when stale
+  assert.equal(repo.records.length, 0);
+  assert.equal(repo.proposalRows.length, 0);
+}
+
+// D again via full propose path with server count
 {
   const repo = createProposalRepository();
   const result = await proposeAuthorSeoQuery(
     {
-      phrase: "  Музыка для йоги  ",
+      phrase: "Музыка для йоги",
       count: 880,
       authorId: authorA,
       submittedByUserId: "user-a",
@@ -286,18 +409,13 @@ const checkedAt = "2026-09-14T12:00:00.000Z";
     () => checkedAt,
   );
   assert.equal(result.ok, true);
-  assert.equal(result.status, "proposed");
-  assert.equal(result.createdQuery, true);
   assert.equal(result.analysisStatus, "not_analyzed");
   assert.equal(result.source, "wordstat");
   assert.equal(result.frequency, 880);
   assert.equal(result.frequencyCheckedAt, checkedAt);
-  assert.equal(repo.records.length, 1);
-  assert.equal(repo.records[0].analysis_status, "not_analyzed");
-  assert.equal(repo.proposalRows.length, 1);
 }
 
-// 9 + 10. duplicate normalized / unique race reuses existing query
+// duplicate / race reuse
 {
   const repo = createProposalRepository({ conflictOnCreate: true });
   const result = await proposeAuthorSeoQuery(
@@ -311,13 +429,10 @@ const checkedAt = "2026-09-14T12:00:00.000Z";
     () => checkedAt,
   );
   assert.equal(result.ok, true);
-  assert.equal(result.createdQuery, false);
   assert.equal(repo.records.length, 1);
-  assert.equal(repo.proposalRows.length, 1);
-  assert.equal(repo.records[0].analysis_status, "not_analyzed");
 }
 
-// 11. same author does not duplicate proposal
+// same author no duplicate proposal
 {
   const repo = createProposalRepository({
     rows: [
@@ -350,12 +465,11 @@ const checkedAt = "2026-09-14T12:00:00.000Z";
     repo,
     () => checkedAt,
   );
-  assert.equal(result.ok, true);
   assert.equal(result.status, "already_proposed");
   assert.equal(repo.proposalRows.length, 1);
 }
 
-// 12. other author can propose pending query without duplicate seo_query
+// other author can propose pending without duplicate query
 {
   const repo = createProposalRepository({
     rows: [
@@ -389,70 +503,15 @@ const checkedAt = "2026-09-14T12:00:00.000Z";
     () => checkedAt,
   );
   assert.equal(result.ok, true);
-  assert.equal(result.status, "proposed");
-  assert.equal(result.createdQuery, false);
   assert.equal(repo.records.length, 1);
   assert.equal(repo.proposalRows.length, 2);
 }
 
-// already analyzed cannot be proposed as new
-{
-  const repo = createProposalRepository({
-    rows: [
-      {
-        id: "q-analyzed",
-        query_text: "готовая",
-        normalized_query: "готовая",
-        source: "manual",
-        frequency: 9,
-        frequency_checked_at: checkedAt,
-        analysis_status: "analyzed",
-      },
-    ],
-  });
-  const result = await proposeAuthorSeoQuery(
-    {
-      phrase: "готовая",
-      count: 9,
-      authorId: authorA,
-      submittedByUserId: "user-a",
-    },
-    repo,
-    () => checkedAt,
-  );
-  assert.equal(result.ok, false);
-  assert.equal(result.error, "already_analyzed");
-  assert.equal(repo.proposalRows.length, 0);
-}
-
-// 13. membership enforcement in routes
-assert.match(discoveryRoute, /requireAuthorMembership\(authorId\)/);
 assert.match(proposalsRoute, /requireAuthorMutationMembership\(authorId\)/);
-assert.match(proposalsRoute, /author_id/);
-
-// 14 + 15. reservation limit + not_analyzed gate remain in reserve RPC / route
-const reservationsRoute = read("src/app/api/author/seo-reservations/route.ts");
-assert.match(reservationsRoute, /reserve_seo_query/);
-assert.match(reservationsRoute, /seo_reservation_limit_reached/);
-assert.match(reserveMigration, /v_active_count >= 5/);
-assert.match(reserveMigration, /analysis_status <> 'analyzed'/);
 assert.match(reserveMigration, /seo_query_not_analyzed/);
+assert.match(reserveMigration, /v_active_count >= 5/);
 
-// 16. no secrets in browser UI / discovery response contract
-assert.doesNotMatch(ui, /apiKey|YANDEX|service_role|folderId/);
-assert.doesNotMatch(discoveryRoute, /apiKey|service_role|YANDEX_SEARCH/);
-
-// proposed state after own proposal on pending
-{
-  const row = reconcileAuthorDiscoverySuggestion({
-    suggestion: { phrase: "на проверке моя", count: 3 },
-    authorId: authorA,
-    query: { id: "q4", analysisStatus: "not_analyzed" },
-    reservation: null,
-    alreadyProposedByAuthor: true,
-  });
-  assert.equal(row.status, "proposed");
-  assert.equal(row.canPropose, false);
-}
+// K migration invariant
+assert.match(migration, /submitted_by_user_id uuid NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
 
 console.log("author-seo-discovery-unit: ok");

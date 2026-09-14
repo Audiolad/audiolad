@@ -8,6 +8,7 @@ import type {
   DiscoveryQueryRow,
   DiscoveryReservationRow,
 } from "./author-discovery";
+import { isEffectiveSeoReservation } from "./reservation-effective";
 
 function mapQuery(row: {
   id: string;
@@ -144,7 +145,7 @@ export async function loadDiscoveryContextForPhrases(input: {
     });
     const { data: reservations, error } = await supabase
       .from("seo_query_reservations")
-      .select("id, query_id, author_id, status, product_id")
+      .select("id, query_id, author_id, status, product_id, expires_at")
       .in("query_id", queryIds)
       .in("status", ["active", "used"]);
     if (error) throw new Error("seo_discovery_reservations_load_failed");
@@ -166,16 +167,32 @@ export async function loadDiscoveryContextForPhrases(input: {
       }
     }
 
+    const now = new Date();
     for (const row of reservations ?? []) {
+      const productId =
+        typeof row.product_id === "string" ? row.product_id : null;
+      const expiresAt =
+        typeof row.expires_at === "string" ? row.expires_at : null;
+      if (
+        !isEffectiveSeoReservation(
+          {
+            status: row.status as string,
+            productId,
+            expiresAt,
+          },
+          now,
+        )
+      ) {
+        continue;
+      }
       reservationByQueryId.set(row.query_id as string, {
         id: row.id as string,
         queryId: row.query_id as string,
         authorId: row.author_id as string,
         status: row.status as string,
-        productTitle:
-          typeof row.product_id === "string"
-            ? productTitleById.get(row.product_id) ?? null
-            : null,
+        productId,
+        expiresAt,
+        productTitle: productId ? productTitleById.get(productId) ?? null : null,
       });
     }
   }

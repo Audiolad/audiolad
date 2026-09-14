@@ -4,7 +4,7 @@ CREATE TABLE public.seo_query_proposals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   query_id uuid NOT NULL REFERENCES public.seo_queries(id) ON DELETE CASCADE,
   author_id uuid NOT NULL REFERENCES public.authors(id) ON DELETE CASCADE,
-  submitted_by_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  submitted_by_user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT seo_query_proposals_query_author_unique UNIQUE (query_id, author_id)
 );

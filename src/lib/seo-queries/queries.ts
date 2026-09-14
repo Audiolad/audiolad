@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { isEffectiveSeoReservation } from "./reservation-effective";
 import type { SeoQueryLifecycle, SeoQueryOpportunity } from "./types";
 
 type ReservationRow = {
@@ -45,7 +46,17 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     throw new Error("seo_queries_load_failed");
   }
 
-  const allReservations = (reservations ?? []) as ReservationRow[];
+  const now = new Date();
+  const allReservations = ((reservations ?? []) as ReservationRow[]).filter((item) =>
+    isEffectiveSeoReservation(
+      {
+        status: item.status,
+        productId: item.product_id,
+        expiresAt: item.expires_at,
+      },
+      now,
+    ),
+  );
   const productIds = allReservations
     .map((item) => item.product_id)
     .filter((id): id is string => Boolean(id));

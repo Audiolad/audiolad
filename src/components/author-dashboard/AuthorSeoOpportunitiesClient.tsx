@@ -48,6 +48,7 @@ export default function AuthorSeoOpportunitiesClient({
   const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
 
   const [discoverPhrase, setDiscoverPhrase] = useState("");
+  const [discoverySeedPhrase, setDiscoverySeedPhrase] = useState<string | null>(null);
   const [discoverResults, setDiscoverResults] = useState<DiscoveryResult[]>([]);
   const [discoverMessage, setDiscoverMessage] = useState<string | null>(null);
   const [discoverPending, setDiscoverPending] = useState(false);
@@ -161,6 +162,7 @@ export default function AuthorSeoOpportunitiesClient({
     setDiscoverPending(true);
     setDiscoverMessage(null);
     setDiscoverResults([]);
+    setDiscoverySeedPhrase(null);
     const response = await fetch("/api/author/seo/discovery", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -172,6 +174,11 @@ export default function AuthorSeoOpportunitiesClient({
       setDiscoverMessage(payload.error ?? "Не удалось найти запросы.");
       return;
     }
+    const seed =
+      typeof payload.phrase === "string" && payload.phrase.trim()
+        ? payload.phrase.trim()
+        : phrase;
+    setDiscoverySeedPhrase(seed);
     setDiscoverResults(Array.isArray(payload.results) ? payload.results : []);
     if (!payload.results?.length) {
       setDiscoverMessage("Подходящих запросов не найдено.");
@@ -180,6 +187,10 @@ export default function AuthorSeoOpportunitiesClient({
 
   async function propose(item: DiscoveryResult) {
     const key = item.phrase;
+    if (!discoverySeedPhrase) {
+      setDiscoverMessage("Данные изменились. Выполните поиск ещё раз.");
+      return;
+    }
     setProposePendingKey(key);
     setDiscoverMessage(null);
     const response = await fetch("/api/author/seo/proposals", {
@@ -187,14 +198,16 @@ export default function AuthorSeoOpportunitiesClient({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         author_id: authorId,
+        seed_phrase: discoverySeedPhrase,
         phrase: item.phrase,
-        count: item.frequency,
       }),
     });
     const payload = await response.json();
     setProposePendingKey(null);
     if (!response.ok) {
-      setDiscoverMessage(payload.error === "already_analyzed"
+      setDiscoverMessage(payload.error === "wordstat_selection_stale"
+        ? (payload.message ?? "Данные изменились. Выполните поиск ещё раз.")
+        : payload.error === "already_analyzed"
         ? "Этот запрос уже есть в базе возможностей."
         : payload.error === "not_applicable"
           ? "Этот запрос не подходит для SEO-возможностей."

@@ -40,6 +40,8 @@ export type DiscoveryReservationRow = {
   queryId: string;
   authorId: string;
   status: string;
+  productId: string | null;
+  expiresAt: string | null;
   productTitle: string | null;
 };
 
@@ -165,6 +167,43 @@ export type AuthorProposalRepository = {
     submittedByUserId: string;
   }): Promise<{ status: "created"; id: string } | { status: "conflict" } | { status: "error" }>;
 };
+
+
+export type WordstatSuggestionMatchInput = {
+  selectedPhrase: string;
+  suggestions: WordstatSuggestionLike[];
+  normalize: (phrase: string) => Promise<string | null>;
+};
+
+export type WordstatSuggestionMatchResult =
+  | { ok: true; phrase: string; count: number }
+  | { ok: false; error: "normalize_failed" | "wordstat_selection_stale" };
+
+/**
+ * Confirm a client-selected phrase against a fresh server Wordstat suggestion list
+ * using canonical normalize_seo_query. Frequency comes only from suggestion.count.
+ */
+export async function matchWordstatSuggestionCount(
+  input: WordstatSuggestionMatchInput,
+): Promise<WordstatSuggestionMatchResult> {
+  const selectedNormalized = await input.normalize(input.selectedPhrase);
+  if (!selectedNormalized) {
+    return { ok: false, error: "normalize_failed" };
+  }
+
+  for (const suggestion of input.suggestions) {
+    const normalized = await input.normalize(suggestion.phrase);
+    if (!normalized) continue;
+    if (normalized === selectedNormalized) {
+      if (!Number.isInteger(suggestion.count) || suggestion.count < 0) {
+        return { ok: false, error: "wordstat_selection_stale" };
+      }
+      return { ok: true, phrase: suggestion.phrase, count: suggestion.count };
+    }
+  }
+
+  return { ok: false, error: "wordstat_selection_stale" };
+}
 
 export type AuthorProposeInput = {
   phrase: string;
