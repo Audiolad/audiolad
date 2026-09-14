@@ -27,6 +27,9 @@ assert.match(workflow, /supabase-compile-pre-personal-materials-optional-last-na
 assert.match(workflow, /supabase-compile-post-personal-materials-optional-last-name\.sql/);
 assert.match(driver, /applyFile\("Supabase prerequisites"/);
 assert.match(driver, /applyFile\("post-apply analytics smoke"/);
+assert.match(workflow, /supabase\/tests\/music_transcode_worker_smoke\.sql/);
+assert.match(driver, /music_transcode_worker_smoke\.sql/);
+assert.match(driver, /20261007140000/);
 assert.match(driver, /CREATE DATABASE \$\{expectedDatabase\}/);
 assert.match(driver, /20260714180000/);
 assert.match(driver, /20260721103000/);

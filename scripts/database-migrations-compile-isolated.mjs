@@ -150,6 +150,13 @@ if (
   throw new Error("analytics migrations were not included in the disposable replay");
 }
 applyFile("post-apply analytics smoke", resolve(root, "supabase/tests/database_migrations_compile_analytics_smoke.sql"));
+if (!pending.has("20261007140000")) {
+  throw new Error("music transcode worker migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply music transcode worker smoke",
+  resolve(root, "supabase/tests/music_transcode_worker_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);
