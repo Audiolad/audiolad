@@ -178,10 +178,16 @@ master. Stale completions of an older master return false and leave the
 current pointer. Failed transcodes do not touch the pointer. Browser roles
 cannot update either pointer column; service-role `complete_music_transcode_job`
 promotes in the same transaction after the job becomes ready.
-`finalize_music_master_asset` now points `desired_music_master_asset_id` at the
-new verified master without clearing the live stream. Public listen signs the
-active stream when it is valid and otherwise falls back to `audio_path` in
-`practice-audio`. Masters are never signed.
+`finalize_music_master_asset` sets `desired_music_master_asset_id` only on the
+real `uploading → verified` transition and enqueues the first job then. A
+verified retry with matching metadata is idempotent: it returns the asset and
+does not change desired/active or create another job. Direct music MP3 finalize
+uses service-role `activate_music_direct_mp3_delivery`, which atomically sets
+`audio_path` and clears both desired and active pointers so a later stale WAV
+completion cannot take delivery back. Public listen signs the active stream
+when it is valid and otherwise falls back to `audio_path` in `practice-audio`.
+Masters are never signed. Stale `complete_music_transcode_job` may still mark
+the job `ready`, but promotion is a no-op when the source is no longer desired.
 
 
 #### publication_class (2026-08-25, Phase 1)

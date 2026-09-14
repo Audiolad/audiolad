@@ -18,6 +18,12 @@ DECLARE
   v_job public.music_transcode_jobs;
   v_ok boolean;
   v_active uuid;
+  v_desired uuid;
+  v_path text;
+  v_jobs_before integer;
+  v_jobs_after integer;
+  v_master_c uuid := '461b0001-0000-4000-8000-000000000017';
+  v_master_d uuid := '461b0001-0000-4000-8000-000000000018';
   v_fn text;
 BEGIN
   IF to_regprocedure('public.promote_music_item_delivery(uuid,uuid)') IS NULL THEN
@@ -160,6 +166,112 @@ BEGIN
   -- I. service_role can via RPC (already used above)
   IF public.promote_music_item_delivery(v_audio, v_stream_b) IS NOT TRUE THEN
     RAISE EXCEPTION 'I service_role promote of current stream must remain true';
+  END IF;
+
+  -- J. processing WAV A, then direct MP3 B becomes current and clears pointers
+  UPDATE public.audio_items
+  SET desired_music_master_asset_id = v_master_a,
+      active_music_delivery_asset_id = v_stream_b,
+      audio_path = 'legacy/track.mp3'
+  WHERE id = v_audio;
+  DELETE FROM public.music_transcode_jobs WHERE source_asset_id = v_master_a;
+  INSERT INTO public.music_transcode_jobs (source_asset_id, status, attempt_count)
+  VALUES (v_master_a, 'queued', 0);
+  SELECT * INTO v_job FROM public.claim_music_transcode_job(1800, 3);
+  IF v_job.id IS NULL OR v_job.source_asset_id IS DISTINCT FROM v_master_a THEN
+    RAISE EXCEPTION 'J expected claimed job for master A';
+  END IF;
+
+  IF to_regprocedure('public.activate_music_direct_mp3_delivery(uuid,text,numeric,text,bigint,text)') IS NULL THEN
+    RAISE EXCEPTION 'missing activate_music_direct_mp3_delivery';
+  END IF;
+  IF has_function_privilege('anon', 'public.activate_music_direct_mp3_delivery(uuid,text,numeric,text,bigint,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.activate_music_direct_mp3_delivery(uuid,text,numeric,text,bigint,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.activate_music_direct_mp3_delivery(uuid,text,numeric,text,bigint,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'activate rpc grants are not hardened';
+  END IF;
+
+  IF public.activate_music_direct_mp3_delivery(
+    v_audio, 'legacy/replaced-b.mp3', 42, 'replaced-b.mp3', 12345, 'draft'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'J direct MP3 activation must succeed';
+  END IF;
+  SELECT active_music_delivery_asset_id, desired_music_master_asset_id, audio_path
+    INTO v_active, v_desired, v_path
+  FROM public.audio_items WHERE id = v_audio;
+  IF v_active IS NOT NULL OR v_desired IS NOT NULL OR v_path IS DISTINCT FROM 'legacy/replaced-b.mp3' THEN
+    RAISE EXCEPTION 'J MP3 activation must clear pointers and set audio_path';
+  END IF;
+
+  -- K. late stream A promote cannot override current MP3
+  IF public.promote_music_item_delivery(v_audio, v_stream_a) IS NOT FALSE THEN
+    RAISE EXCEPTION 'K stale stream A must not promote after MP3 current';
+  END IF;
+  SELECT active_music_delivery_asset_id, audio_path INTO v_active, v_path
+  FROM public.audio_items WHERE id = v_audio;
+  IF v_active IS NOT NULL OR v_path IS DISTINCT FROM 'legacy/replaced-b.mp3' THEN
+    RAISE EXCEPTION 'K MP3 delivery must remain after rejected promote';
+  END IF;
+
+  -- L. stale complete may mark job ready but must not change active
+  v_ok := public.complete_music_transcode_job(v_job.id, v_job.lease_token, v_stream_a);
+  SELECT active_music_delivery_asset_id, audio_path INTO v_active, v_path
+  FROM public.audio_items WHERE id = v_audio;
+  IF v_active IS NOT NULL OR v_path IS DISTINCT FROM 'legacy/replaced-b.mp3' THEN
+    RAISE EXCEPTION 'L stale complete must not change current MP3 delivery';
+  END IF;
+
+  -- M. finalize idempotency: first uploading→verified claims desired; verified retry does not steal
+  UPDATE public.audio_items
+  SET audio_path = 'legacy/track.mp3',
+      desired_music_master_asset_id = NULL,
+      active_music_delivery_asset_id = NULL
+  WHERE id = v_audio;
+  INSERT INTO public.music_audio_assets (
+    id, audio_item_id, source_asset_id, asset_role, lifecycle_state, storage_bucket, storage_path,
+    original_file_name, accepted_mime_type, size_bytes, duration_seconds, verified_at
+  ) VALUES (
+    v_master_c, v_audio, NULL, 'master', 'uploading', 'music-masters',
+    'practices/'||v_practice||'/audio/'||v_audio||'/masters/'||v_master_c||'.wav',
+    'c.wav', 'audio/wav', NULL, NULL, NULL
+  );
+  PERFORM public.finalize_music_master_asset(v_master_c, 2000, 15);
+  SELECT desired_music_master_asset_id INTO v_desired FROM public.audio_items WHERE id = v_audio;
+  IF v_desired IS DISTINCT FROM v_master_c THEN
+    RAISE EXCEPTION 'M first finalize C must set desired=C';
+  END IF;
+  SELECT count(*)::integer INTO v_jobs_before FROM public.music_transcode_jobs WHERE source_asset_id = v_master_c;
+  IF v_jobs_before <> 1 THEN
+    RAISE EXCEPTION 'M first finalize must create one job for C';
+  END IF;
+  PERFORM public.finalize_music_master_asset(v_master_c, 2000, 15);
+  SELECT count(*)::integer INTO v_jobs_after FROM public.music_transcode_jobs WHERE source_asset_id = v_master_c;
+  IF v_jobs_after <> 1 THEN
+    RAISE EXCEPTION 'M verified retry must not grow job count';
+  END IF;
+  SELECT desired_music_master_asset_id INTO v_desired FROM public.audio_items WHERE id = v_audio;
+  IF v_desired IS DISTINCT FROM v_master_c THEN
+    RAISE EXCEPTION 'M verified retry must leave desired=C';
+  END IF;
+
+  -- N. finalize D then delayed retry finalize C must not steal desired
+  INSERT INTO public.music_audio_assets (
+    id, audio_item_id, source_asset_id, asset_role, lifecycle_state, storage_bucket, storage_path,
+    original_file_name, accepted_mime_type, size_bytes, duration_seconds, verified_at
+  ) VALUES (
+    v_master_d, v_audio, NULL, 'master', 'uploading', 'music-masters',
+    'practices/'||v_practice||'/audio/'||v_audio||'/masters/'||v_master_d||'.wav',
+    'd.wav', 'audio/wav', NULL, NULL, NULL
+  );
+  PERFORM public.finalize_music_master_asset(v_master_d, 2100, 16);
+  SELECT desired_music_master_asset_id INTO v_desired FROM public.audio_items WHERE id = v_audio;
+  IF v_desired IS DISTINCT FROM v_master_d THEN
+    RAISE EXCEPTION 'N finalize D must set desired=D';
+  END IF;
+  PERFORM public.finalize_music_master_asset(v_master_c, 2000, 15);
+  SELECT desired_music_master_asset_id INTO v_desired FROM public.audio_items WHERE id = v_audio;
+  IF v_desired IS DISTINCT FROM v_master_d THEN
+    RAISE EXCEPTION 'N delayed finalize(C) must not steal desired from D';
   END IF;
 END
 $$;

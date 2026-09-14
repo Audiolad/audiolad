@@ -378,7 +378,11 @@ main() {
     exit 1
   fi
   if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_WORKER_ENSURE"; then
-    log_warn "music_transcode_worker_ensure_failed"
+    log_error "music_transcode_worker_ensure_failed"
+    send_deploy_alert "deploy_failed" "Music transcode worker ensure failed for $RELEASE_NAME"
+    # Cutover already completed: do not roll back healthy web/nginx.
+    # Fail the workflow so Production Deploy cannot report SUCCESS with a dead worker.
+    exit 1
   fi
 
   rm -f "$RELEASE_DIR/.deploy-inflight"

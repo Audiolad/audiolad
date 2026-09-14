@@ -54,4 +54,17 @@ assert(/G current B stream must promote/.test(smoke));
 assert(/H authenticated must not update delivery pointer/.test(smoke));
 assert(/I service_role promote of current stream must remain true/.test(smoke));
 
+
+assert(/activate_music_direct_mp3_delivery/.test(sql));
+assert(/desired_music_master_asset_id = NULL/.test(sql));
+assert(/active_music_delivery_asset_id = NULL/.test(sql));
+assert(/Only the real uploading/.test(sql) || /lifecycle_state = 'uploading'/.test(sql));
+assert(/Idempotent verified retry/.test(sql) || /RETURN v_asset;\s*END;/.test(sql));
+assert(/REVOKE ALL ON FUNCTION public\.activate_music_direct_mp3_delivery/.test(sql));
+assert(/J direct MP3 activation must succeed/.test(smoke));
+assert(/K stale stream A must not promote after MP3 current/.test(smoke));
+assert(/L stale complete must not change current MP3 delivery/.test(smoke));
+assert(/M verified retry must not grow job count/.test(smoke));
+assert(/N delayed finalize\(C\) must not steal desired from D/.test(smoke));
+
 process.stdout.write("music-delivery-sql-unit: ok\n");

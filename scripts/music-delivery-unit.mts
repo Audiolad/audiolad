@@ -151,22 +151,49 @@ assert.deepEqual(
   { kind: "stream", bucket: "music-streams", path: stream.storagePath },
 );
 
+
+assert.deepEqual(
+  resolveMusicListenSource({
+    productKind: "music",
+    audioItemId: "item-1",
+    audioPath: "legacy/replaced-b.mp3",
+    activeStream: null,
+  }),
+  { kind: "legacy", bucket: "practice-audio", path: "legacy/replaced-b.mp3" },
+);
+assert.deepEqual(
+  resolveMusicListenSource({
+    productKind: "music",
+    audioItemId: "item-1",
+    audioPath: "legacy/old.mp3",
+    activeStream: stream,
+  }),
+  { kind: "stream", bucket: "music-streams", path: stream.storagePath },
+);
+
 assert.match(signed, /resolveMusicListenSource/);
 assert.match(read("src/lib/listen/music-delivery.ts"), /MUSIC_STREAMS_BUCKET/);
 assert.doesNotMatch(signed, /from\("music-masters"\)/);
 assert.match(preview, /resolveMusicListenSource/);
 assert.match(products, /desired_music_master_asset_id/);
 assert.match(products, /hasActiveDelivery/);
+assert.match(products, /Current direct-MP3 mode/);
+assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /activate_music_direct_mp3_delivery/);
 
 assert.match(ecosystem, /name: "audiolad-music-transcode-worker"/);
 assert.match(ecosystem, /cwd: "\/var\/www\/audiolad-deploy\/current"/);
 assert.match(ecosystem, /args: "scripts\/run-music-transcode-worker\.mts"/);
 assert.match(ensure, /audiolad-music-transcode-worker/);
-assert.match(ensure, /PM2_BIN.*describe/);
+assert.match(ensure, /pm2_status|jlist/);
+assert.match(ensure, /music_transcode_worker_already_online/);
+assert.match(ensure, /music_transcode_worker_recover/);
+assert.match(ensure, /music_transcode_worker_not_online/);
 assert.match(deploy, /assert_music_transcode_worker_release_tree/);
 assert.match(deploy, /music_transcode_worker_ecosystem_missing/);
 assert.match(deploy, /ensure-music-transcode-worker\.sh/);
-assert.match(deploy, /log_warn "music_transcode_worker_ensure_failed"/);
+assert.match(deploy, /log_error "music_transcode_worker_ensure_failed"/);
+assert.match(deploy, /Music transcode worker ensure failed/);
+assert.doesNotMatch(deploy, /log_warn "music_transcode_worker_ensure_failed"/);
 assert.match(studio, /audiolad-studio-render-worker/);
 assert.match(worker, /audiolad-music-transcode-worker/);
 assert.doesNotMatch(worker, /Do not add this process to/);

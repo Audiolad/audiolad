@@ -119,6 +119,7 @@ BEGIN
     RAISE EXCEPTION 'invalid_music_asset' USING ERRCODE = '22023';
   END IF;
 
+  -- Only the real uploading → verified transition may claim desired + enqueue.
   IF v_asset.lifecycle_state = 'uploading' THEN
     UPDATE public.music_audio_assets
     SET size_bytes = p_size_bytes,
@@ -128,22 +129,70 @@ BEGIN
         updated_at = now()
     WHERE id = p_asset_id
     RETURNING * INTO v_asset;
-  ELSIF v_asset.size_bytes <> p_size_bytes
+
+    UPDATE public.audio_items
+    SET desired_music_master_asset_id = v_asset.id,
+        updated_at = now()
+    WHERE id = v_asset.audio_item_id;
+
+    INSERT INTO public.music_transcode_jobs (source_asset_id, status)
+    VALUES (p_asset_id, 'queued')
+    ON CONFLICT (source_asset_id) WHERE status IN ('queued', 'processing')
+    DO NOTHING;
+
+    RETURN v_asset;
+  END IF;
+
+  -- Idempotent verified retry: return asset, do not touch desired/active/jobs.
+  IF v_asset.size_bytes <> p_size_bytes
     OR v_asset.duration_seconds <> p_duration_seconds THEN
     RAISE EXCEPTION 'music_asset_metadata_mismatch' USING ERRCODE = '22023';
   END IF;
+  RETURN v_asset;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.activate_music_direct_mp3_delivery(
+  p_audio_item_id uuid,
+  p_audio_path text,
+  p_duration_seconds numeric,
+  p_original_file_name text,
+  p_file_size_bytes bigint,
+  p_status text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_updated integer;
+BEGIN
+  IF p_audio_item_id IS NULL
+    OR p_audio_path IS NULL
+    OR btrim(p_audio_path) = ''
+    OR p_duration_seconds IS NULL
+    OR p_duration_seconds <= 0
+    OR p_file_size_bytes IS NULL
+    OR p_file_size_bytes <= 0
+    OR p_status IS NULL
+    OR btrim(p_status) = '' THEN
+    RETURN false;
+  END IF;
 
   UPDATE public.audio_items
-  SET desired_music_master_asset_id = v_asset.id,
+  SET audio_path = p_audio_path,
+      duration_seconds = p_duration_seconds,
+      original_file_name = p_original_file_name,
+      file_size_bytes = p_file_size_bytes,
+      status = p_status,
+      desired_music_master_asset_id = NULL,
+      active_music_delivery_asset_id = NULL,
       updated_at = now()
-  WHERE id = v_asset.audio_item_id;
+  WHERE id = p_audio_item_id
+  RETURNING 1 INTO v_updated;
 
-  INSERT INTO public.music_transcode_jobs (source_asset_id, status)
-  VALUES (p_asset_id, 'queued')
-  ON CONFLICT (source_asset_id) WHERE status IN ('queued', 'processing')
-  DO NOTHING;
-
-  RETURN v_asset;
+  RETURN v_updated IS NOT NULL;
 END;
 $$;
 
@@ -220,6 +269,11 @@ GRANT EXECUTE ON FUNCTION public.promote_music_item_delivery(uuid, uuid)
 REVOKE ALL ON FUNCTION public.finalize_music_master_asset(uuid, bigint, numeric)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.finalize_music_master_asset(uuid, bigint, numeric)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION public.activate_music_direct_mp3_delivery(uuid, text, numeric, text, bigint, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.activate_music_direct_mp3_delivery(uuid, text, numeric, text, bigint, text)
   TO service_role;
 
 REVOKE ALL ON FUNCTION public.complete_music_transcode_job(uuid, uuid, uuid)

@@ -331,38 +331,72 @@ export async function finalizeProductAudioDirectUpload(input: {
   }
 
   const previousPath = audioItem.audio_path;
-  const now = new Date().toISOString();
-  const { data: updatedAudioItem, error: updateError } = await supabase
-    .from("audio_items")
-    .update({
-      audio_path: uploadPath,
-      duration_seconds: inspected.durationSeconds,
-      original_file_name: input.fileName,
-      file_size_bytes: inspected.sizeBytes,
-      status: practice.status === "published" ? "published" : "draft",
-      updated_at: now,
-    })
-    .eq("id", input.audioId)
-    .eq("practice_id", input.practiceId)
-    .select("id")
-    .maybeSingle();
+  const nextStatus = practice.status === "published" ? "published" : "draft";
+  const isMusicProduct = practice.product_kind === "music";
 
-  if (updateError) {
-    await deletePracticeAudioPaths([uploadPath]);
-    if (isProductContentLockedDbError(updateError)) {
-      throw new ProductAudioUploadError(
-        PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-        409,
-        PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
-      );
+  if (isMusicProduct) {
+    const service = createServiceRoleClient();
+    const { data: activated, error: activateError } = await service.rpc(
+      "activate_music_direct_mp3_delivery",
+      {
+        p_audio_item_id: input.audioId,
+        p_audio_path: uploadPath,
+        p_duration_seconds: inspected.durationSeconds,
+        p_original_file_name: input.fileName,
+        p_file_size_bytes: inspected.sizeBytes,
+        p_status: nextStatus,
+      },
+    );
+    if (activateError) {
+      await deletePracticeAudioPaths([uploadPath]);
+      if (isProductContentLockedDbError(activateError)) {
+        throw new ProductAudioUploadError(
+          PRODUCT_CONTENT_LOCKED_AFTER_SALE,
+          409,
+          PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
+        );
+      }
+      console.error("author_music_direct_mp3_activate_error", activateError.message);
+      throw new ProductAudioUploadError("internal_error", 500);
     }
-    console.error("author_audio_direct_path_update_error", updateError.message);
-    throw new ProductAudioUploadError("internal_error", 500);
-  }
+    if (activated !== true) {
+      await deletePracticeAudioPaths([uploadPath]);
+      throw new ProductAudioUploadError("update_failed", 500);
+    }
+  } else {
+    const now = new Date().toISOString();
+    const { data: updatedAudioItem, error: updateError } = await supabase
+      .from("audio_items")
+      .update({
+        audio_path: uploadPath,
+        duration_seconds: inspected.durationSeconds,
+        original_file_name: input.fileName,
+        file_size_bytes: inspected.sizeBytes,
+        status: nextStatus,
+        updated_at: now,
+      })
+      .eq("id", input.audioId)
+      .eq("practice_id", input.practiceId)
+      .select("id")
+      .maybeSingle();
 
-  if (!updatedAudioItem?.id) {
-    await deletePracticeAudioPaths([uploadPath]);
-    throw new ProductAudioUploadError("update_failed", 500);
+    if (updateError) {
+      await deletePracticeAudioPaths([uploadPath]);
+      if (isProductContentLockedDbError(updateError)) {
+        throw new ProductAudioUploadError(
+          PRODUCT_CONTENT_LOCKED_AFTER_SALE,
+          409,
+          PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
+        );
+      }
+      console.error("author_audio_direct_path_update_error", updateError.message);
+      throw new ProductAudioUploadError("internal_error", 500);
+    }
+
+    if (!updatedAudioItem?.id) {
+      await deletePracticeAudioPaths([uploadPath]);
+      throw new ProductAudioUploadError("update_failed", 500);
+    }
   }
 
   if (previousPath && previousPath !== uploadPath) {

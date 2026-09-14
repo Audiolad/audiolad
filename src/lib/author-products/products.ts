@@ -131,6 +131,7 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
 async function loadMusicMasterStatus(
   items: Array<{
     id: string;
+    audio_path?: string | null;
     desired_music_master_asset_id?: string | null;
     active_music_delivery_asset_id?: string | null;
   }>,
@@ -160,10 +161,19 @@ async function loadMusicMasterStatus(
   const desiredById = new Map((assets ?? []).filter((asset) => desiredIds.includes(asset.id)).map((asset) => [asset.id, asset]));
   const chosenByAudioItem = new Map<string, { id: string; audio_item_id: string; lifecycle_state: "uploading" | "verified" | "rejected" | "abandoned" }>();
   for (const item of items) {
-    const desired = item.desired_music_master_asset_id
-      ? desiredById.get(item.desired_music_master_asset_id)
-      : undefined;
-    const chosen = desired ?? latestByAudioItem.get(item.id);
+    if (item.desired_music_master_asset_id) {
+      const desired = desiredById.get(item.desired_music_master_asset_id);
+      if (desired) {
+        chosenByAudioItem.set(item.id, desired);
+      }
+      continue;
+    }
+    // Current direct-MP3 mode: do not surface historical master pipeline status.
+    if (item.audio_path?.trim()) {
+      continue;
+    }
+    // Pre-Slice3 WAV-only rows may lack desired; fall back to latest master.
+    const chosen = latestByAudioItem.get(item.id);
     if (chosen) {
       chosenByAudioItem.set(item.id, chosen);
     }

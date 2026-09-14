@@ -353,5 +353,8 @@ assert.doesNotMatch(
   read("src/lib/author-products/moderation-actions.ts"),
   /direct-audio-upload/,
 );
+assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /activate_music_direct_mp3_delivery/);
+assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /assertSaleLockAllowsMutation/);
+
 
 console.log("author-product-direct-audio-upload-unit: ok");
