@@ -316,6 +316,51 @@ export default function AiMusicHubPageView() {
         <Paragraphs items={AI_MUSIC_HUB_SUNO_TEXT} />
       </Section>
 
+      <Section id="ai-music-materials" title="Полезные материалы по ИИ-музыке">
+        <ul className="mt-5 space-y-3 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+          <li>
+            <Link href="/kak-sozdat-ii-muzyku" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Как создать ИИ-музыку
+            </Link>
+          </li>
+          <li>
+            <Link href="/kak-sozdat-muzyku-v-suno" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Как создать музыку в Суно
+            </Link>
+          </li>
+          <li>
+            <Link href="/kak-vylozhit-ii-muzyku" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Как выложить ИИ-музыку
+            </Link>
+          </li>
+          <li>
+            <Link href="/kuda-vykladyvat-muzyku-iz-suno" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Куда выкладывать музыку из Суно
+            </Link>
+          </li>
+          <li>
+            <Link href="/distribyutor-ii-muzyki" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Дистрибьютор ИИ-музыки
+            </Link>
+          </li>
+          <li>
+            <Link href="/kak-prodat-muzyku-sozdannuyu-ii" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Как продать музыку, созданную ИИ
+            </Link>
+          </li>
+          <li>
+            <Link href="/mozhno-li-zarabotat-na-ii-muzyke" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Можно ли заработать на ИИ-музыке
+            </Link>
+          </li>
+          <li>
+            <Link href="/kak-zarabotat-na-muzyke-iz-suno" className="font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f]">
+              Как заработать на музыке из Суно
+            </Link>
+          </li>
+        </ul>
+      </Section>
+
       <section
         className="mt-16 max-w-3xl rounded-[28px] border border-[#eadff8] bg-[#faf7ff] px-5 py-8 sm:mt-20 sm:px-7 sm:py-10"
         aria-labelledby="ai-music-final-cta-heading"
