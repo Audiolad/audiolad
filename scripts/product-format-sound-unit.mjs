@@ -176,6 +176,25 @@ assert.equal(
   true,
   "picker presets include Звук",
 );
+assert.equal(
+  PRODUCT_PRESET_FORMATS.includes("Аудиоистория"),
+  true,
+  "picker presets include Аудиоистория",
+);
+assert.equal(
+  isPresetFormat("Аудиоистория"),
+  true,
+  "Аудиоистория is a recognized preset",
+);
+assert.deepEqual(parsePracticeFormat("Аудиоистория"), {
+  preset: "Аудиоистория",
+  customFormat: "",
+});
+assert.equal(
+  resolveFormatForStorage("Аудиоистория", ""),
+  "Аудиоистория",
+  "Аудиоистория stores as its Russian label",
+);
 assert.equal(SOUND_FORMAT, "Звук");
 assert.notEqual(SOUND_FORMAT, "Звуки");
 assert.notEqual(SOUND_FORMAT, "Белый шум");
