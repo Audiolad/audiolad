@@ -146,6 +146,7 @@
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
     "test:become-author-page-order": "node scripts/become-author-page-order-unit.mjs",
     "test:ai-music-hub": "npx tsx scripts/ai-music-hub-page-unit.mjs",
+    "test:ai-music-cluster-internal-links": "npx tsx scripts/ai-music-cluster-internal-links-unit.mjs",
     "test:distribyutor-ii-muzyki": "npx tsx scripts/distribyutor-ii-muzyki-page-unit.mjs",
     "test:kak-sozdat-ii-muzyku": "npx tsx scripts/kak-sozdat-ii-muzyku-page-unit.mjs",
     "test:kak-vylozhit-ii-muzyku": "npx tsx scripts/kak-vylozhit-ii-muzyku-page-unit.mjs",
