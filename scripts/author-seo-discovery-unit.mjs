@@ -24,6 +24,7 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
 const proposalsRoute = read("src/app/api/author/seo/proposals/route.ts");
 const ui = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
+const panel = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
 const migration = read(
   "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
 );
@@ -46,10 +47,10 @@ assert.match(proposalsRoute, /fetchWordstatSuggestions\(seedPhrase/);
 assert.match(proposalsRoute, /matchWordstatSuggestionCount/);
 assert.doesNotMatch(proposalsRoute, /readCount|body\.count/);
 assert.match(proposalsRoute, /wordstat_selection_stale/);
-assert.match(ui, /seed_phrase: discoverySeedPhrase/);
-assert.match(ui, /discoverySeedPhrase/);
-assert.match(ui, /payload\.phrase/);
-assert.doesNotMatch(ui, /count:\s*item\.frequency/);
+assert.match(panel, /seed_phrase: discoverySeedPhrase/);
+assert.match(panel, /discoverySeedPhrase/);
+assert.match(panel, /payload\.phrase/);
+assert.doesNotMatch(panel, /count:\s*item\.frequency/);
 
 assert.match(migration, /submitted_by_user_id uuid NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
 assert.doesNotMatch(migration, /submitted_by_user_id uuid NOT NULL/);
@@ -60,15 +61,15 @@ assert.match(discoveryRepo, /isEffectiveSeoReservation/);
 assert.match(discoveryRepo, /expires_at/);
 assert.match(queriesLib, /isEffectiveSeoReservation/);
 
-assert.match(ui, /Найти запросы/);
-assert.match(ui, /Запросов в месяц/);
-assert.doesNotMatch(ui, /normalized:/);
-assert.match(ui, /\/api\/author\/seo\/discovery/);
-assert.match(ui, /\/api\/author\/seo\/proposals/);
-assert.match(ui, /\/api\/author\/seo-reservations/);
-assert.match(ui, /Отправить на проверку/);
-assert.match(ui, /Взять в работу/);
-assert.match(ui, /Данные изменились\. Выполните поиск ещё раз\./);
+assert.match(panel, /Найти запросы/);
+assert.match(panel, /Запросов в месяц/);
+assert.doesNotMatch(panel, /normalized:/);
+assert.match(panel, /\/api\/author\/seo\/discovery/);
+assert.match(panel, /\/api\/author\/seo\/proposals/);
+assert.match(panel, /\/api\/author\/seo-reservations/);
+assert.match(panel, /Отправить на проверку/);
+assert.match(panel, /Взять в работу/);
+assert.match(panel, /Данные изменились\. Выполните поиск ещё раз\./);
 
 const authorA = "author-a";
 const authorB = "author-b";
@@ -551,16 +552,37 @@ assert.match(page, /discoveryEnabled/);
 assert.match(page, /Что ищут слушатели/);
 
 assert.match(ui, /discoveryEnabled/);
-assert.match(ui, /Найти запросы/);
+assert.match(panel, /Найти запросы/);
 
 const dash = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
 assert.match(dash, /isAuthorSeoDiscoveryEnabled/);
-assert.match(dash, /Что ищут слушатели/);
-assert.match(dash, /Бета/);
+assert.match(dash, /AuthorSeoDiscoveryPanel/);
+assert.match(dash, /variant="dashboard"/);
+assert.doesNotMatch(dash, /seo-opportunities\?author=/);
+assert.doesNotMatch(dash, /href=\{\`\/author-dashboard\/seo-opportunities/);
 
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
 assert.match(nav, /isAuthorSeoDiscoveryEnabled/);
 assert.match(nav, /Что ищут слушатели/);
+
+// Shared panel: dashboard + opportunities variants
+assert.match(panel, /variant === "dashboard"/);
+assert.match(panel, /Найдите тему для нового аудиопродукта/);
+assert.match(panel, /Что ищут слушатели/);
+assert.match(panel, /Бета/);
+assert.match(panel, /Подходящие запросы из базы АудиоЛада/);
+assert.match(panel, /Дополнительные варианты из Яндекса/);
+
+// Dashboard embeds panel before opportunities section
+assert.match(dash, /author-seo-discovery-panel/);
+const dashPanelIdx = dash.indexOf("AuthorSeoDiscoveryPanel");
+const dashOppIdx = dash.indexOf("Возможности для авторов");
+assert.ok(dashPanelIdx > 0 && dashPanelIdx < dashOppIdx, "discovery panel before opportunities");
+
+// Opportunities page still embeds the same panel
+assert.match(ui, /AuthorSeoDiscoveryPanel/);
+assert.match(ui, /variant="opportunities"/);
+assert.match(ui, /discoveryEnabled/);
 
 // products not required for discovery UI
 assert.doesNotMatch(ui, /products\.length === 0[\s\S]{0,80}discoveryEnabled/);
