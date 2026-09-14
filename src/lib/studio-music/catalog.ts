@@ -32,11 +32,12 @@ import {
   formatListenerCatalogPriceLabel,
   formatStudioUseCatalogPriceLabel,
   isStudioMusicFreeForCatalog,
+  resolveStoredStudioMusicPricingMode,
   resolveStudioMusicAcquisition,
   type StudioMusicPricingMode,
 } from "./pricing";
 
-export const STUDIO_MUSIC_CATALOG_FILTERS = ["all", "mine", "free"] as const;
+export const STUDIO_MUSIC_CATALOG_FILTERS = ["all", "mine", "free", "paid"] as const;
 export type StudioMusicCatalogFilter =
   (typeof STUDIO_MUSIC_CATALOG_FILTERS)[number];
 
@@ -154,14 +155,16 @@ export type StudioMusicCatalogViewerAccess = {
 
 export type StudioMusicCatalogStore = {
   listPublicInventory(input: {
-    filter: "all" | "free";
+    filter: "all" | "free" | "paid";
     cursor: string | null;
     limit: number;
+    q?: string | null;
   }): Promise<StudioMusicCatalogPage>;
   listMine(input: {
     userId: string;
     cursor: string | null;
     limit: number;
+    q?: string | null;
   }): Promise<StudioMusicCatalogPage & StudioMusicCatalogViewerAccess>;
   loadViewerAccess(input: {
     userId: string;
@@ -239,6 +242,57 @@ export function studioMusicCatalogFreeOrFilter(): string {
     "and(studio_music_pricing_mode.is.null,price.is.null)",
     "and(studio_music_pricing_mode.is.null,price.lte.0)",
   ].join(",");
+}
+
+/**
+ * PostgREST `or` for filter=paid: explicit Studio fixed/auto modes, or
+ * legacy NULL mode with paid listener price. Studio-free rows are excluded.
+ * Does not treat listener is_free alone as Studio-paid.
+ */
+export function studioMusicCatalogPaidOrFilter(): string {
+  return [
+    "and(studio_music_pricing_mode.eq.fixed,studio_music_price_minor.gt.0)",
+    "studio_music_pricing_mode.eq.auto_2x_listener",
+    "and(studio_music_pricing_mode.is.null,is_free.eq.false,price.gt.0)",
+  ].join(",");
+}
+
+export function parseStudioMusicCatalogQuery(
+  value: string | null | undefined,
+): string | null {
+  if (value == null) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function studioMusicCatalogSearchWords(
+  query: string | null | undefined,
+): string[] {
+  const parsed = parseStudioMusicCatalogQuery(query);
+  if (!parsed) {
+    return [];
+  }
+  return parsed.split(/\s+/).map((part) => part.trim()).filter(Boolean);
+}
+
+export function escapeStudioMusicCatalogIlikePattern(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
+
+export function matchesStudioMusicCatalogSearch(
+  practice: Pick<StudioMusicCatalogPublication, "title" | "subtitle">,
+  words: string[],
+): boolean {
+  if (words.length === 0) {
+    return true;
+  }
+  const haystack = `${practice.title ?? ""} ${practice.subtitle ?? ""}`.toLocaleLowerCase("ru-RU");
+  return words.every((word) => haystack.includes(word.toLocaleLowerCase("ru-RU")));
 }
 
 export function isStudioMusicListedVisibilityRow(practice: {
@@ -387,6 +441,36 @@ export function isFreePublicStudioMusicInventory(
     isPublicStudioMusicInventory(practice, options) &&
     isStudioMusicFreeForCatalog(practice, options)
   );
+}
+
+/**
+ * Public Studio vitrine paid slice: same inventory gates as all/free,
+ * Studio acquisition is not free (Studio pricing, not listener is_free).
+ */
+export function isPaidPublicStudioMusicInventory(
+  practice: StudioMusicCatalogPublication,
+  options?: { commerciallyAccessible?: boolean },
+): boolean {
+  if (!isPublicStudioMusicInventory(practice, options)) {
+    return false;
+  }
+  if (isStudioMusicFreeForCatalog(practice, options)) {
+    return false;
+  }
+  const mode = resolveStoredStudioMusicPricingMode(practice);
+  if (mode === "fixed") {
+    const minor = practice.studio_music_price_minor;
+    return (
+      minor != null &&
+      Number.isFinite(minor) &&
+      Number.isInteger(minor) &&
+      minor > 0
+    );
+  }
+  if (mode === "auto_2x_listener") {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -755,6 +839,7 @@ export async function handleStudioMusicCatalog(input: {
   filter: string | null;
   cursor: string | null;
   limit: string | null;
+  q?: string | null;
   userId: string | null;
   visitorId?: string | null;
   store: StudioMusicCatalogStore;
@@ -773,6 +858,8 @@ export async function handleStudioMusicCatalog(input: {
     return { status: 400, body: { error: "invalid_cursor" } };
   }
 
+  const searchQuery = parseStudioMusicCatalogQuery(input.q);
+  const searchWords = studioMusicCatalogSearchWords(searchQuery);
   const limit = parseStudioMusicCatalogLimit(input.limit);
   const authenticated = Boolean(input.userId);
 
@@ -786,31 +873,42 @@ export async function handleStudioMusicCatalog(input: {
       userId: input.userId,
       cursor: input.cursor,
       limit,
+      q: searchQuery,
     });
     entitlements = mine.entitlements;
     authorMemberAuthorIds = mine.authorMemberAuthorIds;
-    practices = mine.practices.filter((practice) =>
-      isMineStudioMusicPublication({
-        practice,
-        entitlement: findEntitlement(entitlements, String(practice.id ?? "")),
-        isAuthorMember: Boolean(
-          practice.author_id &&
-            authorMemberAuthorIds.includes(practice.author_id),
-        ),
-      }),
+    practices = mine.practices.filter(
+      (practice) =>
+        isMineStudioMusicPublication({
+          practice,
+          entitlement: findEntitlement(entitlements, String(practice.id ?? "")),
+          isAuthorMember: Boolean(
+            practice.author_id &&
+              authorMemberAuthorIds.includes(practice.author_id),
+          ),
+        }) && matchesStudioMusicCatalogSearch(practice, searchWords),
     );
     nextCursor = mine.nextCursor;
   } else {
+    const publicFilter =
+      filter === "free" ? "free" : filter === "paid" ? "paid" : "all";
     const inventory = await input.store.listPublicInventory({
-      filter: filter === "free" ? "free" : "all",
+      filter: publicFilter,
       cursor: input.cursor,
       limit,
+      q: searchQuery,
     });
-    practices = inventory.practices.filter((practice) =>
-      filter === "free"
-        ? isFreePublicStudioMusicInventory(practice)
-        : isPublicStudioMusicInventory(practice),
-    );
+    practices = inventory.practices.filter((practice) => {
+      const inventoryOk =
+        filter === "free"
+          ? isFreePublicStudioMusicInventory(practice)
+          : filter === "paid"
+            ? isPaidPublicStudioMusicInventory(practice)
+            : isPublicStudioMusicInventory(practice);
+      return (
+        inventoryOk && matchesStudioMusicCatalogSearch(practice, searchWords)
+      );
+    });
     nextCursor = inventory.nextCursor;
   }
 
@@ -887,6 +985,21 @@ export async function handleStudioMusicCatalog(input: {
   }
 
   return { status: 200, body };
+}
+
+
+function applyStudioMusicCatalogSearch<T extends { or: (filters: string) => T }>(
+  query: T,
+  q: string | null | undefined,
+): T {
+  const words = studioMusicCatalogSearchWords(q);
+  let next = query;
+  for (const word of words) {
+    const pattern = `%${escapeStudioMusicCatalogIlikePattern(word)}%`;
+    const quoted = quoteStudioMusicFilterValue(pattern);
+    next = next.or(`title.ilike.${quoted},subtitle.ilike.${quoted}`);
+  }
+  return next;
 }
 
 const PRACTICE_SELECT = `
@@ -991,7 +1104,7 @@ export function createSupabaseStudioMusicCatalogStore(
   supabase: SupabaseClient,
 ): StudioMusicCatalogStore {
   return {
-    async listPublicInventory({ filter, cursor, limit }) {
+    async listPublicInventory({ filter, cursor, limit, q = null }) {
       let query = supabase
         .from("practices")
         .select(PRACTICE_SELECT)
@@ -1007,7 +1120,11 @@ export function createSupabaseStudioMusicCatalogStore(
       if (filter === "free") {
         query = query.or(studioMusicCatalogFreeOrFilter());
       }
+      if (filter === "paid") {
+        query = query.or(studioMusicCatalogPaidOrFilter());
+      }
 
+      query = applyStudioMusicCatalogSearch(query, q);
       query = applyStudioMusicCatalogKeyset(query, cursor, limit);
 
       const { data, error } = await query;
@@ -1023,7 +1140,7 @@ export function createSupabaseStudioMusicCatalogStore(
       );
     },
 
-    async listMine({ userId, cursor, limit }) {
+    async listMine({ userId, cursor, limit, q = null }) {
       const [entitlementResult, memberResult] = await Promise.all([
         supabase
           .from("studio_music_entitlements")
@@ -1082,6 +1199,7 @@ export function createSupabaseStudioMusicCatalogStore(
         query = query.in("author_id", authorMemberAuthorIds);
       }
 
+      query = applyStudioMusicCatalogSearch(query, q);
       query = applyStudioMusicCatalogKeyset(query, cursor, limit);
 
       const { data, error } = await query;

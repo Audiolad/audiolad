@@ -25,9 +25,12 @@ const FILTERS: Array<{
   authOnly?: boolean;
 }> = [
   { id: "all", label: "Вся" },
-  { id: "mine", label: "Моя", authOnly: true },
+  { id: "paid", label: "Платная" },
   { id: "free", label: "Бесплатно для Студии" },
+  { id: "mine", label: "Моя", authOnly: true },
 ];
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 function previewKeyFor(publicationId: string, audioItemId: string) {
   return `${publicationId}:${audioItemId}`;
@@ -60,6 +63,8 @@ function StudioMusicCatalogOverlayBody({
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [busyPublicationId, setBusyPublicationId] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const stopPreview = () => {
     const audio = audioRef.current;
@@ -76,6 +81,15 @@ function StudioMusicCatalogOverlayBody({
   };
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [searchInput]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadCatalog(cursor: string | null) {
@@ -88,6 +102,9 @@ function StudioMusicCatalogOverlayBody({
         });
         if (cursor) {
           params.set("cursor", cursor);
+        }
+        if (debouncedQuery) {
+          params.set("q", debouncedQuery);
         }
         const response = await fetch(
           `/api/studio/music/catalog?${params.toString()}`,
@@ -125,7 +142,7 @@ function StudioMusicCatalogOverlayBody({
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [filter, debouncedQuery]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -410,6 +427,9 @@ function StudioMusicCatalogOverlayBody({
         limit: "20",
         cursor: nextCursor,
       });
+      if (debouncedQuery) {
+        params.set("q", debouncedQuery);
+      }
       const response = await fetch(
         `/api/studio/music/catalog?${params.toString()}`,
         { cache: "no-store" },
@@ -483,6 +503,41 @@ function StudioMusicCatalogOverlayBody({
         ))}
       </div>
 
+      <div className="shrink-0 px-4 pb-3">
+        <label className="relative block">
+          <span className="sr-only">Поиск музыки</span>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setItems([]);
+              setNextCursor(null);
+            }}
+            placeholder="Поиск музыки"
+            autoComplete="off"
+            enterKeyHint="search"
+            data-testid="studio-music-catalog-search"
+            className="h-11 w-full rounded-xl border border-white/15 bg-[#101827] px-4 pr-12 text-sm text-white placeholder:text-[#97a4b8] outline-none focus:border-[#7650bd]"
+          />
+          {searchInput.trim() ? (
+            <button
+              type="button"
+              aria-label="Очистить поиск"
+              data-testid="studio-music-catalog-search-clear"
+              onClick={() => {
+                setSearchInput("");
+                setItems([]);
+                setNextCursor(null);
+              }}
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg text-sm font-semibold text-[#c9d4e8]"
+            >
+              ✕
+            </button>
+          ) : null}
+        </label>
+      </div>
+
       <div
         className="studio-music-catalog-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8"
         data-testid="studio-music-catalog-scroll"
@@ -492,8 +547,12 @@ function StudioMusicCatalogOverlayBody({
             {error}
           </p>
         ) : null}
-        {items.length === 0 && !loading ? (
-          <p className="text-sm text-[#97a4b8]">Пока нет музыки в этом разделе.</p>
+        {items.length === 0 && !loading && !error ? (
+          <p className="text-sm text-[#97a4b8]">
+            {debouncedQuery
+              ? "Ничего не найдено"
+              : "Пока нет музыки в этом разделе."}
+          </p>
         ) : (
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
             {items.map((item) => (

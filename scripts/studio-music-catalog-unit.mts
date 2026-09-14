@@ -22,13 +22,18 @@ import {
   paginateStudioMusicCatalogItems,
   parseStudioMusicCatalogFilter,
   parseStudioMusicCatalogLimit,
+  parseStudioMusicCatalogQuery,
   resolveStudioMusicDisplayLabel,
   resolveStudioMusicKind,
   resolveStudioMusicOwnership,
   studioMusicCatalogDtoContainsForbiddenFields,
   studioMusicCatalogSortTimestamp,
   studioMusicCatalogFreeOrFilter,
+  studioMusicCatalogPaidOrFilter,
+  studioMusicCatalogSearchWords,
   studioMusicListedVisibilityOrFilter,
+  matchesStudioMusicCatalogSearch,
+  isPaidPublicStudioMusicInventory,
   takeStudioMusicCatalogPage,
   type StudioMusicCatalogPublication,
   type StudioMusicCatalogStore,
@@ -69,7 +74,14 @@ function publication(
 assert.equal(parseStudioMusicCatalogFilter("all"), "all");
 assert.equal(parseStudioMusicCatalogFilter("MINE"), "mine");
 assert.equal(parseStudioMusicCatalogFilter("free"), "free");
-assert.equal(parseStudioMusicCatalogFilter("paid"), null);
+assert.equal(parseStudioMusicCatalogFilter("paid"), "paid");
+assert.equal(parseStudioMusicCatalogFilter("unknown"), null);
+assert.equal(parseStudioMusicCatalogQuery("  "), null);
+assert.equal(parseStudioMusicCatalogQuery(null), null);
+assert.equal(parseStudioMusicCatalogQuery("  Рассвет  "), "Рассвет");
+assert.deepEqual(studioMusicCatalogSearchWords("тихий рассвет"), ["тихий", "рассвет"]);
+assert.deepEqual(studioMusicCatalogSearchWords("   "), []);
+
 assert.equal(parseStudioMusicCatalogLimit("20"), 20);
 assert.equal(parseStudioMusicCatalogLimit("99"), 50);
 
@@ -587,20 +599,31 @@ function createStore(input: {
   authorsWithCurrentTerms?: Set<string>;
 }): StudioMusicCatalogStore {
   return {
-    async listPublicInventory({ filter, cursor, limit }) {
-      const rows = (input.publicItems ?? []).filter((item) =>
-        filter === "free" ? isFreePublicStudioMusicInventory(item) : true,
-      );
+    async listPublicInventory({ filter, cursor, limit, q = null }) {
+      const words = studioMusicCatalogSearchWords(q);
+      const rows = (input.publicItems ?? []).filter((item) => {
+        if (filter === "free" && !isFreePublicStudioMusicInventory(item)) {
+          return false;
+        }
+        if (filter === "paid" && !isPaidPublicStudioMusicInventory(item)) {
+          return false;
+        }
+        return matchesStudioMusicCatalogSearch(item, words);
+      });
       return pagePublications(rows, cursor, limit);
     },
-    async listMine({ cursor, limit }) {
+    async listMine({ cursor, limit, q = null }) {
       const mine = input.mine ?? {
         practices: [],
         entitlements: [],
         authorMemberAuthorIds: [],
       };
+      const words = studioMusicCatalogSearchWords(q);
+      const practices = mine.practices.filter((item) =>
+        matchesStudioMusicCatalogSearch(item, words),
+      );
       return {
-        ...pagePublications(mine.practices, cursor, limit),
+        ...pagePublications(practices, cursor, limit),
         entitlements: mine.entitlements,
         authorMemberAuthorIds: mine.authorMemberAuthorIds,
       };
@@ -1190,6 +1213,139 @@ const revoked = await handleStudioMusicCatalog({
 assert.equal(revoked.status, 200);
 assert.equal("items" in revoked.body && revoked.body.items.length, 0);
 
+
+const paidFixed = publication({
+  id: "33333333-3333-4333-8333-333333333333",
+  is_free: true,
+  price: 0,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+  studio_music_price_minor: 99000,
+  title: "Платный фикс",
+  subtitle: "для студии",
+});
+const paidAuto = publication({
+  id: "44444444-4444-4444-8444-444444444444",
+  is_free: false,
+  price: 200,
+  studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,
+  studio_music_price_minor: null,
+  title: "Авто удвоение",
+});
+const paidLegacy = publication({
+  id: "55555555-5555-4555-8555-555555555555",
+  is_free: false,
+  price: 350,
+  studio_music_pricing_mode: null,
+  studio_music_price_minor: null,
+  title: "Легаси платный",
+});
+assert.equal(isPaidPublicStudioMusicInventory(paidFixed), true);
+assert.equal(isPaidPublicStudioMusicInventory(paidAuto), true);
+assert.equal(isPaidPublicStudioMusicInventory(paidLegacy), true);
+assert.equal(isPaidPublicStudioMusicInventory(freeListed), false);
+assert.equal(isPaidPublicStudioMusicInventory(listedAllowed), true);
+assert.equal(
+  isPaidPublicStudioMusicInventory(
+    publication({
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+      studio_music_price_minor: 0,
+    }),
+  ),
+  false,
+);
+
+const paidOr = studioMusicCatalogPaidOrFilter();
+assert.match(paidOr, /studio_music_pricing_mode\.eq\.fixed,studio_music_price_minor\.gt\.0/);
+assert.match(paidOr, /studio_music_pricing_mode\.eq\.auto_2x_listener/);
+assert.match(paidOr, /studio_music_pricing_mode\.is\.null,is_free\.eq\.false,price\.gt\.0/);
+
+assert.equal(
+  matchesStudioMusicCatalogSearch({ title: "Тихий Рассвет", subtitle: "утро" }, ["тихий", "рассвет"]),
+  true,
+);
+assert.equal(
+  matchesStudioMusicCatalogSearch({ title: "Тихий Рассвет", subtitle: null }, ["вечер"]),
+  false,
+);
+assert.equal(
+  matchesStudioMusicCatalogSearch({ title: "Альбом", subtitle: "Кириллица тест" }, ["кириллица"]),
+  true,
+);
+
+const guestPaid = await handleStudioMusicCatalog({
+  filter: "paid",
+  cursor: null,
+  limit: "20",
+  userId: null,
+  store: createStore({
+    publicItems: [listedAllowed, freeListed, paidFixed, paidAuto, paidLegacy],
+  }),
+});
+assert.equal(guestPaid.status, 200);
+assert.equal("items" in guestPaid.body && guestPaid.body.items.length, 4);
+assert.equal(
+  "items" in guestPaid.body &&
+    guestPaid.body.items.every((item) => item.publication_id !== freeListed.id),
+  true,
+);
+
+const searchTitle = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  q: "  Рассвет  ",
+  userId: null,
+  store: createStore({ publicItems: [listedAllowed, freeListed, paidFixed] }),
+});
+assert.equal(searchTitle.status, 200);
+assert.equal("items" in searchTitle.body && searchTitle.body.items.length, 1);
+assert.equal(
+  "items" in searchTitle.body && searchTitle.body.items[0]?.title,
+  "Рассвет",
+);
+
+const searchMulti = await handleStudioMusicCatalog({
+  filter: "paid",
+  cursor: null,
+  limit: "20",
+  q: "платный фикс",
+  userId: null,
+  store: createStore({ publicItems: [listedAllowed, freeListed, paidFixed, paidAuto] }),
+});
+assert.equal(searchMulti.status, 200);
+assert.equal("items" in searchMulti.body && searchMulti.body.items.length, 1);
+assert.equal(
+  "items" in searchMulti.body && searchMulti.body.items[0]?.title,
+  "Платный фикс",
+);
+
+const searchEmpty = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  q: "   ",
+  userId: null,
+  store: createStore({ publicItems: [listedAllowed, freeListed] }),
+});
+assert.equal(searchEmpty.status, 200);
+assert.equal("items" in searchEmpty.body && searchEmpty.body.items.length, 2);
+
+const searchMiss = await handleStudioMusicCatalog({
+  filter: "all",
+  cursor: null,
+  limit: "20",
+  q: "неттакоготрека",
+  userId: null,
+  store: createStore({ publicItems: [listedAllowed, freeListed] }),
+});
+assert.equal(searchMiss.status, 200);
+assert.equal("items" in searchMiss.body && searchMiss.body.items.length, 0);
+
+const routeSource = read("src/app/api/studio/music/catalog/route.ts");
+assert.match(routeSource, /searchParams\.get\(["']q["']\)/);
+
 const catalogSource = read("src/lib/studio-music/catalog.ts");
 assert.doesNotMatch(catalogSource, /from\(["']user_practices["']\)/);
 assert.doesNotMatch(catalogSource, /\/api\/catalog[/'"`]/);
@@ -1201,6 +1357,9 @@ assert.match(catalogSource, /studio_music_pricing_mode/);
 assert.match(catalogSource, /resolvePracticePriceRpc/);
 assert.match(catalogSource, /studioMusicListedVisibilityOrFilter/);
 assert.match(catalogSource, /studioMusicCatalogFreeOrFilter/);
+assert.match(catalogSource, /studioMusicCatalogPaidOrFilter/);
+assert.match(catalogSource, /parseStudioMusicCatalogQuery/);
+assert.match(catalogSource, /applyStudioMusicCatalogSearch/);
 assert.match(catalogSource, /studioMusicCatalogFetchLimit/);
 assert.doesNotMatch(catalogSource, /\.eq\(\s*["']catalog_visibility["']\s*,\s*["']listed["']\s*\)/);
 assert.doesNotMatch(
@@ -1212,6 +1371,11 @@ const overlay = read("src/components/studio/StudioMusicCatalogOverlay.tsx");
 assert.doesNotMatch(overlay, /\*\s*2/);
 assert.doesNotMatch(overlay, /studio_effective_minor\s*\*/);
 assert.match(overlay, /\/api\/studio\/music\/catalog/);
+assert.match(overlay, /params\.set\(["']q["'], debouncedQuery\)/);
+assert.match(overlay, /Платная/);
+assert.match(overlay, /Поиск музыки/);
+assert.match(overlay, /Ничего не найдено/);
+assert.match(overlay, /SEARCH_DEBOUNCE_MS/);
 assert.match(overlay, /\/api\/studio\/music\/preview/);
 assert.doesNotMatch(overlay, /\/api\/catalog\/play/);
 

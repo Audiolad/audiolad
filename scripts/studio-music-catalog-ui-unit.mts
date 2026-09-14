@@ -82,8 +82,17 @@ assert.match(
   /Выберите музыку, получите лицензию и добавьте трек в проект\./,
 );
 assert.match(overlay, /Вся/);
+assert.match(overlay, /Платная/);
 assert.match(overlay, /Моя/);
 assert.match(overlay, /Бесплатно для Студии/);
+assert.match(overlay, /id: "all"[\s\S]*id: "paid"[\s\S]*id: "free"[\s\S]*id: "mine"/);
+assert.match(overlay, /Поиск музыки/);
+assert.match(overlay, /data-testid="studio-music-catalog-search"/);
+assert.match(overlay, /data-testid="studio-music-catalog-search-clear"/);
+assert.match(overlay, /Ничего не найдено/);
+assert.match(overlay, /SEARCH_DEBOUNCE_MS = 300/);
+assert.match(overlay, /params\.set\(["']q["'], debouncedQuery\)/);
+assert.match(overlay, /\[filter, debouncedQuery\]/);
 assert.doesNotMatch(overlay, /label: "Бесплатная"/);
 assert.doesNotMatch(overlay, /sm:grid-cols-2/);
 assert.match(overlay, /max-w-5xl/);
