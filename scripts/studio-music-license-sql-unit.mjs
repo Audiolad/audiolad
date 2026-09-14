@@ -153,6 +153,14 @@ assert(/acquisition_status IS DISTINCT FROM 'free'/.test(pricing));
 assert(/acquisition_status IS DISTINCT FROM 'paid'/.test(pricing));
 assert(/v_listener_minor \* 2/.test(pricing));
 assert(/studio_music_price_minor/.test(pricing));
+
+const minLicense = readFileSync(join(migrationsDir, "20261007200000_studio_music_min_license_price.sql"), "utf8");
+assert(/GREATEST\(v_amount, 49900\)/.test(minLicense));
+assert(/GREATEST\(v_listener_minor \* 2, 49900\)/.test(minLicense));
+assert(/NOT VALID/.test(minLicense));
+assert(/practices_studio_music_price_minor_check/.test(minLicense));
+assert(!/UPDATE public\.practices[\s\S]*studio_music_price_minor\s*=/.test(minLicense));
+
 assert(!/INSERT INTO public\.user_practices/.test(pricing));
 
 assert(/studio_license_terms_version/.test(legal));

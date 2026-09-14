@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   canAcquireFreeStudioMusic,
   canAcquirePaidStudioMusic,
+  applyStudioMusicLicenseFloorMinor,
   studioLicenseAmountMinor,
 } from "../src/lib/studio-music/access";
 import {
@@ -21,8 +22,11 @@ import {
   nextStudioMusicAlbumExpanded,
   resolveStudioMusicCatalogAction,
 } from "../src/lib/studio-music/catalog-actions";
+import { MIN_PAID_PRICE_RUB } from "../src/lib/pricing/money";
 import {
   DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+  MIN_STUDIO_MUSIC_PRICE_MINOR,
+  MIN_STUDIO_MUSIC_PRICE_RUBLES,
   inferLegacyStudioMusicPricingMode,
   normalizeStudioMusicPricingForSave,
   resolveStudioMusicAcquisition,
@@ -147,12 +151,13 @@ const paidAuto = resolveStudioMusicAcquisition({
 assert.equal(paidAuto.amount_minor, 60000);
 assert.equal(paidAuto.amount_minor, studioLicenseAmountMinor(30000));
 
-// 5. listener PAID + promotion → AUTO uses 2× current effective
+// 5. listener PAID + promotion → AUTO uses 2× current effective, then floor 499
 const promoAuto = resolveStudioMusicAcquisition({
   practice: publication({ price: 500 }),
   listenerEffectiveMinor: 20000,
 });
-assert.equal(promoAuto.amount_minor, 40000);
+assert.equal(promoAuto.amount_minor, 49900);
+assert.equal(promoAuto.amount_minor, studioLicenseAmountMinor(20000));
 assert.notEqual(promoAuto.amount_minor, studioLicenseAmountMinor(50000));
 
 // 6. FIXED: listener promotion does not change fixed Studio price
@@ -338,6 +343,36 @@ assert.equal(
   false,
 );
 assert.equal(
+  normalizeStudioMusicPricingForSave({
+    productKind: "music",
+    musicUsagePermission: "platform_reuse_allowed",
+    listenerIsFree: false,
+    mode: "fixed",
+    priceRubles: 498,
+  }).ok,
+  false,
+);
+assert.deepEqual(
+  normalizeStudioMusicPricingForSave({
+    productKind: "music",
+    musicUsagePermission: "platform_reuse_allowed",
+    listenerIsFree: false,
+    mode: "fixed",
+    priceRubles: 499,
+  }),
+  { ok: true, mode: "fixed", priceMinor: 49900 },
+);
+assert.deepEqual(
+  normalizeStudioMusicPricingForSave({
+    productKind: "music",
+    musicUsagePermission: "platform_reuse_allowed",
+    listenerIsFree: false,
+    mode: "fixed",
+    priceRubles: 500,
+  }),
+  { ok: true, mode: "fixed", priceMinor: 50000 },
+);
+assert.equal(
   studioMusicPricingModeAfterListenerFlip({
     reuseAllowed: true,
     listenerIsFree: true,
@@ -345,7 +380,10 @@ assert.equal(
   }),
   null,
 );
-assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, 600);
+assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, 499);
+assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, MIN_STUDIO_MUSIC_PRICE_RUBLES);
+assert.equal(MIN_STUDIO_MUSIC_PRICE_MINOR, 49900);
+assert.equal(MIN_PAID_PRICE_RUB, 49);
 assert.equal(studioMusicPriceMinorToRubles(null), 0);
 assert.equal(studioMusicPriceMinorToRubles(60000), 600);
 
@@ -563,5 +601,105 @@ assert.match(form, /70%/);
 assert.match(form, /studioMusicPricingModeAfterListenerFlip/);
 assert.doesNotMatch(card, /practice-audio\//);
 assert.doesNotMatch(overlay, /\/api\/catalog\/play/);
+
+
+// Studio license floor 499 ₽
+assert.equal(studioLicenseAmountMinor(4900), 49900); // 49 → 499
+assert.equal(studioLicenseAmountMinor(9900), 49900); // 99 → 499
+assert.equal(studioLicenseAmountMinor(19900), 49900); // 199 → 499
+assert.equal(studioLicenseAmountMinor(24900), 49900); // 249 → 499
+assert.equal(studioLicenseAmountMinor(25000), 50000); // 250 → 500
+assert.equal(studioLicenseAmountMinor(29900), 59800); // 299 → 598
+assert.equal(applyStudioMusicLicenseFloorMinor(19900), 49900);
+assert.equal(applyStudioMusicLicenseFloorMinor(88800), 88800);
+
+const legacyFixedFloor = resolveStudioMusicAcquisition({
+  practice: publication({
+    is_free: true,
+    price: 0,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+    studio_music_price_minor: 19900,
+  }),
+  listenerEffectiveMinor: null,
+});
+assert.equal(legacyFixedFloor.status, "paid");
+assert.equal(legacyFixedFloor.amount_minor, 49900);
+
+const fixed499 = resolveStudioMusicAcquisition({
+  practice: publication({
+    is_free: true,
+    price: 0,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+    studio_music_price_minor: 49900,
+  }),
+  listenerEffectiveMinor: null,
+});
+assert.equal(fixed499.amount_minor, 49900);
+
+const fixed888 = resolveStudioMusicAcquisition({
+  practice: publication({
+    is_free: true,
+    price: 0,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+    studio_music_price_minor: 88800,
+  }),
+  listenerEffectiveMinor: null,
+});
+assert.equal(fixed888.amount_minor, 88800);
+
+const autoBelowFloor = resolveStudioMusicAcquisition({
+  practice: publication({
+    is_free: false,
+    price: 99,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,
+  }),
+  listenerEffectiveMinor: 9900,
+});
+assert.equal(autoBelowFloor.amount_minor, 49900);
+
+const autoAboveFloor = resolveStudioMusicAcquisition({
+  practice: publication({
+    is_free: false,
+    price: 299,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,
+  }),
+  listenerEffectiveMinor: 29900,
+});
+assert.equal(autoAboveFloor.amount_minor, 59800);
+
+const mappedLegacyFixed = mapStudioMusicCatalogItem({
+  practice: publication({
+    is_free: true,
+    price: 0,
+    studio_music_pricing_mode: STUDIO_MUSIC_PRICING_MODE.FIXED,
+    studio_music_price_minor: 19900,
+  }),
+  tracks: [{ id: "t1", title: "A", durationSeconds: 80 }],
+  ownership: ownership(),
+  listenerEffectiveMinor: null,
+});
+assert.equal(mappedLegacyFixed.studio_effective_minor, 49900);
+
+assert.match(
+  read("src/components/author-dashboard/AuthorProductForm.tsx"),
+  /min=\{MIN_STUDIO_MUSIC_PRICE_RUBLES\}/,
+);
+assert.match(
+  read("src/components/author-dashboard/AuthorProductForm.tsx"),
+  /Минимальная цена лицензии для Студии/,
+);
+assert.match(
+  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  /GREATEST\(v_amount, 49900\)/,
+);
+assert.match(
+  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  /GREATEST\(v_listener_minor \* 2, 49900\)/,
+);
+assert.match(
+  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  /NOT VALID/,
+);
+
 
 console.log("studio-music-pricing-unit: ok");

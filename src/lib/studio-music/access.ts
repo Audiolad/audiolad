@@ -16,6 +16,12 @@ export type StudioMusicGrantSource =
 
 export const STUDIO_PRICE_MULTIPLIER = 2;
 
+/** Canonical minimum Studio license price in whole rubles (independent of listener MIN_PAID_PRICE_RUB). */
+export const MIN_STUDIO_MUSIC_PRICE_RUBLES = 499;
+
+/** Canonical minimum Studio license price in kopecks. */
+export const MIN_STUDIO_MUSIC_PRICE_MINOR = MIN_STUDIO_MUSIC_PRICE_RUBLES * 100;
+
 export type StudioMusicPublicationInput = {
   id?: string | null;
   status?: string | null;
@@ -49,6 +55,10 @@ export function isStudioMusicPublication(
   );
 }
 
+export function applyStudioMusicLicenseFloorMinor(amountMinor: number): number {
+  return Math.max(amountMinor, MIN_STUDIO_MUSIC_PRICE_MINOR);
+}
+
 export function studioLicenseAmountMinor(
   listenerEffectiveMinor: number | null | undefined,
 ): number | null {
@@ -60,7 +70,9 @@ export function studioLicenseAmountMinor(
     return null;
   }
 
-  return listenerEffectiveMinor * STUDIO_PRICE_MULTIPLIER;
+  return applyStudioMusicLicenseFloorMinor(
+    listenerEffectiveMinor * STUDIO_PRICE_MULTIPLIER,
+  );
 }
 
 export function hasStudioMusicEntitlement(

@@ -155,6 +155,7 @@ import {
 import { formatRubles } from "@/lib/products/price-format";
 import {
   DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+  MIN_STUDIO_MUSIC_PRICE_RUBLES,
   STUDIO_MUSIC_PRICING_MODE,
   defaultStudioMusicPricingModeForForm,
   studioMusicPricingModeAfterListenerFlip,
@@ -3176,7 +3177,7 @@ export default function AuthorProductForm({
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={MIN_PAID_PRICE_RUB}
+                  min={MIN_STUDIO_MUSIC_PRICE_RUBLES}
                   max={MAX_PAID_PRICE_RUB}
                   step={1}
                   value={studioMusicPriceDraft}
@@ -3207,7 +3208,8 @@ export default function AuthorProductForm({
               </label>
             ) : null}
             <p className="text-sm leading-5 text-[#7d70a2]">
-              Покупатель получает постоянное право использовать эту музыку в
+              Минимальная цена лицензии для Студии — {MIN_STUDIO_MUSIC_PRICE_RUBLES}{' '}
+              ₽. Покупатель получает постоянное право использовать эту музыку в
               Студии. Автор получает 70% с каждой продажи.
             </p>
           </fieldset>
