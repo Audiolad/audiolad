@@ -70,6 +70,11 @@ import {
   KUDA_VYKLADYVAT_MUZYKU_IZ_SUNO_SEO_TITLE,
 } from "@/lib/seo/kuda-vykladyvat-muzyku-iz-suno/content";
 import {
+  KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_PATH,
+  KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_DESCRIPTION,
+  KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_TITLE,
+} from "@/lib/seo/kak-zarabotat-na-muzyke-iz-suno/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -569,6 +574,32 @@ export function buildKudaVykladyvatMuzykuIzSunoMetadata(): Metadata {
       card: "summary",
       title: KUDA_VYKLADYVAT_MUZYKU_IZ_SUNO_SEO_TITLE,
       description: KUDA_VYKLADYVAT_MUZYKU_IZ_SUNO_SEO_DESCRIPTION,
+    },
+  };
+}
+
+
+
+export function buildKakZarabotatNaMuzykeIzSunoMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_PATH);
+
+  return {
+    title: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_TITLE,
+    description: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_TITLE,
+      description: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_TITLE,
+      description: KAK_ZARABOTAT_NA_MUZYKE_IZ_SUNO_SEO_DESCRIPTION,
     },
   };
 }

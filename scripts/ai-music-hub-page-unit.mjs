@@ -187,7 +187,7 @@ function testCopyAndEconomics() {
   );
   assert.equal(
     AI_MUSIC_HUB_SUNO_HEADING,
-    "А если музыка создана в Suno или Udio?",
+    "А если музыка создана в Суно (Suno) или Udio?",
   );
   assert.match(AI_MUSIC_HUB_AUTHORS_HEADING, /авторы медитаций/);
   assert.equal(AI_MUSIC_HUB_CLOSING_HEADING, "Попробуйте прямо сейчас");
