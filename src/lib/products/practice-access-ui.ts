@@ -14,6 +14,7 @@ import {
 } from "@/lib/products/paths";
 import { formatPracticePrice } from "@/lib/products/price-format";
 import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
+import { hasProductPlayableAudio } from "@/lib/listen/music-delivery";
 
 type PracticePricing = {
   price: number | null;
@@ -418,6 +419,7 @@ function buildCommercialPresentation(input: {
   isAuthenticated: boolean;
   purchaseSurface?: "practice_page" | "preview";
   isCourse?: boolean;
+  hasPlayableAudio?: boolean;
 }): Pick<
   PracticeAccessPresentation,
   | "statusBadge"
@@ -433,6 +435,7 @@ function buildCommercialPresentation(input: {
     isAuthenticated,
     purchaseSurface = "practice_page",
     isCourse = false,
+    hasPlayableAudio,
   } = input;
   const effectivePrice =
     typeof practice.displayPrice === "number" &&
@@ -447,7 +450,9 @@ function buildCommercialPresentation(input: {
   const listenHref = buildListenPath(authorSlug, practice.slug, {
     autoplay: true,
   });
-  const audioReady = hasAudioReady(practice.audio_url);
+  const audioReady =
+    hasPlayableAudio ??
+    hasProductPlayableAudio({ practiceAudioUrl: practice.audio_url });
   const listenLabel = isGuestListenEntry ? "Начать слушать" : PLAY_ACTION_LABEL;
 
   if (access.reason === "admin") {
@@ -679,6 +684,11 @@ export function buildPracticeAccessPresentation(input: {
   promoPreviewMode?: boolean;
   /** Course publication: entitled learner CTA opens the outline, not storefront. */
   isCourse?: boolean;
+  /**
+   * Server-computed: legacy practices.audio_url OR any public track with
+   * audio_path / validated active music stream. Prefer this over audio_url alone.
+   */
+  hasPlayableAudio?: boolean;
 }): PracticeAccessPresentation {
   const {
     access,
@@ -691,8 +701,11 @@ export function buildPracticeAccessPresentation(input: {
     publishListenerViewMode = false,
     promoPreviewMode = false,
     isCourse = false,
+    hasPlayableAudio,
   } = input;
-  const audioReady = hasAudioReady(practice.audio_url);
+  const audioReady =
+    hasPlayableAudio ??
+    hasProductPlayableAudio({ practiceAudioUrl: practice.audio_url });
   const showProductAbout = !(
     isCourse &&
     access.hasEntitlement &&
@@ -718,6 +731,7 @@ export function buildPracticeAccessPresentation(input: {
       paymentsConfigured,
       isAuthenticated: false,
       isCourse,
+      hasPlayableAudio: audioReady,
     });
     const libraryAction = resolveLibraryAction({
       access: listenerAccess,
@@ -781,6 +795,7 @@ export function buildPracticeAccessPresentation(input: {
       isAuthenticated: false,
       purchaseSurface: "preview",
       isCourse,
+      hasPlayableAudio: audioReady,
     });
     const libraryAction = resolveLibraryAction({
       access: commercialAccess,
@@ -825,6 +840,7 @@ export function buildPracticeAccessPresentation(input: {
     paymentsConfigured,
     isAuthenticated,
     isCourse,
+    hasPlayableAudio: audioReady,
   });
 
   if (isAuthorOwner) {

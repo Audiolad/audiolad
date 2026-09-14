@@ -43,6 +43,7 @@ import {
   buildPracticeAccessPresentation,
   canUseBuyerPreviewMode,
 } from "@/lib/products/practice-access-ui";
+import { hasProductPlayableAudio } from "@/lib/listen/music-delivery";
 import {
   isPracticePublished,
   resolveProductAccess,
@@ -565,6 +566,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     }
   }
 
+  const hasPlayableAudio = hasProductPlayableAudio({
+    practiceAudioUrl: practice.audio_url,
+    tracksHavePlayableAudio: publicAudioItems.some((item) => item.hasPlayableAudio),
+  });
+
   const presentation = buildPracticeAccessPresentation({
     access,
     practice: {
@@ -587,6 +593,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       practice.publication_class,
       practice.product_kind,
     ),
+    hasPlayableAudio,
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);

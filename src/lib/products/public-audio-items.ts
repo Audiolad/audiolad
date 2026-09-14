@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/author-products/publication-class";
+import {
+  hasPublicTrackPlayableAudio,
+  isVerifiedMusicStreamAsset,
+  type MusicStreamCandidate,
+} from "@/lib/listen/music-delivery";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type PublicAudioItem = {
   id: string;
@@ -11,6 +17,8 @@ export type PublicAudioItem = {
   coverUrl: string | null;
   coverImage: unknown;
   updatedAt: string | null;
+  /** Server-only playable flag; never exposes storage paths or asset ids. */
+  hasPlayableAudio: boolean;
 };
 
 type AudioItemRow = {
@@ -23,6 +31,8 @@ type AudioItemRow = {
   cover_image: unknown;
   updated_at: string | null;
   status: string;
+  audio_path: string | null;
+  active_music_delivery_asset_id: string | null;
 };
 
 type LoadPublicAudioItemsInput = {
@@ -45,6 +55,63 @@ export function shouldLoadPublicAudioItemsOnProductPage(
   return !isCoursePublication(publicationClass, productKind);
 }
 
+function asMusicStreamCandidate(asset: {
+  audio_item_id: string;
+  asset_role: string;
+  lifecycle_state: string;
+  storage_bucket: string;
+  storage_path: string | null;
+}): MusicStreamCandidate {
+  return {
+    audioItemId: asset.audio_item_id,
+    assetRole: asset.asset_role,
+    lifecycleState: asset.lifecycle_state,
+    storageBucket: asset.storage_bucket,
+    storagePath: asset.storage_path ?? "",
+  };
+}
+
+async function loadValidatedActiveDeliveryItemIds(
+  items: Array<{
+    id: string;
+    active_music_delivery_asset_id?: string | null;
+  }>,
+): Promise<Set<string>> {
+  const withPointer = items.filter((item) => item.active_music_delivery_asset_id);
+  if (withPointer.length === 0) return new Set();
+
+  const service = createServiceRoleClient();
+  const ids = withPointer
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+    .in("id", ids);
+
+  if (error) {
+    console.error("public_active_stream_validation_lookup_failed", error.message);
+    return new Set();
+  }
+
+  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
+  const valid = new Set<string>();
+
+  for (const item of withPointer) {
+    const asset = byId.get(item.active_music_delivery_asset_id as string);
+    if (
+      asset
+      && asset.id === item.active_music_delivery_asset_id
+      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
+    ) {
+      valid.add(item.id);
+    }
+  }
+
+  return valid;
+}
+
 export async function loadPublicAudioItems(
   supabase: SupabaseClient,
   input: LoadPublicAudioItemsInput,
@@ -61,7 +128,7 @@ export async function loadPublicAudioItems(
   let query = supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, cover_url, cover_image, updated_at, status",
+      "id, title, description, position, duration_seconds, cover_url, cover_image, updated_at, status, audio_path, active_music_delivery_asset_id",
     )
     .eq("practice_id", input.practiceId)
     .order("position", { ascending: true });
@@ -82,7 +149,13 @@ export async function loadPublicAudioItems(
     throw new Error("public_audio_items_lookup_failed");
   }
 
-  return ((data ?? []) as AudioItemRow[]).map((item) => ({
+  const rows = (data ?? []) as AudioItemRow[];
+  const validatedActive =
+    input.productKind === "music"
+      ? await loadValidatedActiveDeliveryItemIds(rows)
+      : new Set<string>();
+
+  return rows.map((item) => ({
     id: item.id,
     title: item.title.trim(),
     description:
@@ -94,6 +167,10 @@ export async function loadPublicAudioItems(
     coverUrl: item.cover_url?.trim() || null,
     coverImage: item.cover_image ?? null,
     updatedAt: item.updated_at ?? null,
+    hasPlayableAudio: hasPublicTrackPlayableAudio({
+      audioPath: item.audio_path,
+      hasActiveDelivery: validatedActive.has(item.id),
+    }),
   }));
 }
 
