@@ -55,7 +55,9 @@ function containment(seed: Set<string>, candidate: Set<string>): number {
 
 /**
  * Score one analyzed query against a seed. Higher is better.
- * Exact normalized match always wins; frequency is a weak secondary signal.
+ * Exact normalized match always wins.
+ * Non-exact rows require real lexical relevance (>=1 meaningful token overlap);
+ * intent/format/audio_fit/frequency only boost after that gate.
  */
 export function scoreAnalyzedQueryAgainstSeed(input: {
   seedNormalized: string;
@@ -81,10 +83,15 @@ export function scoreAnalyzedQueryAgainstSeed(input: {
   const contain = containment(seedSet, candSet);
   const jac = jaccard(seedSet, candSet);
 
+  // Lexical gate: without meaningful token overlap, intent/format/freq cannot create relevance.
+  if (overlap < 1) {
+    return { score: 0, reasons: ["no_lexical_overlap"] };
+  }
+
   score += overlap * 120;
   score += Math.round(contain * 220);
   score += Math.round(jac * 180);
-  if (overlap > 0) reasons.push(`token_overlap:${overlap}`);
+  reasons.push(`token_overlap:${overlap}`);
   if (contain > 0) reasons.push(`containment:${contain.toFixed(2)}`);
   if (jac > 0) reasons.push(`jaccard:${jac.toFixed(2)}`);
 
@@ -109,7 +116,7 @@ export function scoreAnalyzedQueryAgainstSeed(input: {
   }
 
   const freq = typeof query.frequency === "number" && query.frequency > 0 ? query.frequency : 0;
-  // Weak secondary — log-ish, never dominates token relevance.
+  // Weak secondary — only after lexical relevance.
   score += Math.min(25, Math.floor(Math.log10(freq + 1) * 10));
   if (freq > 0) reasons.push(`frequency:${freq}`);
 

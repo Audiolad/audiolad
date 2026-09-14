@@ -362,18 +362,8 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
     if (candidates.size >= ANALYZED_CANDIDATE_LIMIT) break;
   }
 
-  if (candidates.size === 0) {
-    const { data, error } = await supabase
-      .from("seo_queries")
-      .select(
-        "id, query_text, normalized_query, frequency, intent, recommended_format, audio_fit, analysis_status, seo_clusters(name)",
-      )
-      .eq("analysis_status", "analyzed")
-      .order("frequency", { ascending: false })
-      .limit(80);
-    if (error) throw new Error("seo_discovery_analyzed_fallback_load_failed");
-    await ingestRows(data as Array<Record<string, unknown>> | null);
-  }
+  // No top-frequency fallback: if nothing matched by exact/token ILIKE,
+  // leave candidates empty so the DB block stays empty for the author.
 
   const seedClass = classifySeoQuery({ queryText: input.seedPhrase });
   const ranked = rankAnalyzedQueriesForSeed({
