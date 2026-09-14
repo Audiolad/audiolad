@@ -92,7 +92,6 @@ export default function AuthorSeoOpportunitiesClient({
         {
           id: queryId,
           queryText: discovery.phrase,
-          normalizedQuery: "",
           source: "wordstat",
           frequency: discovery.frequency,
           clusterName: null,
@@ -332,12 +331,11 @@ export default function AuthorSeoOpportunitiesClient({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
-                  <p className="mt-1 text-xs text-[#796ba0]">normalized: {item.normalizedQuery}</p>
                 </div>
                 <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">{lifecycleLabel(item.lifecycle)}</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#5f5484]">
-                {item.frequency !== null ? <span>Частотность: {item.frequency}</span> : null}
+                {item.frequency !== null ? <span>{formatMonthlyFrequency(item.frequency)}</span> : null}
                 {item.clusterName ? <span>Тема: {item.clusterName}</span> : null}
                 {item.recommendedFormat ? <span>Формат: {item.recommendedFormat}</span> : null}
               </div>

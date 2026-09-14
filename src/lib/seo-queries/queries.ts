@@ -33,7 +33,7 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     await Promise.all([
       supabase
         .from("seo_queries")
-        .select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
+        .select("id, query_text, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
         .eq("analysis_status", "analyzed")
         .order("created_at", { ascending: false }),
       supabase
@@ -81,7 +81,6 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     return {
       id: row.id as string,
       queryText: row.query_text as string,
-      normalizedQuery: row.normalized_query as string,
       source: row.source as string,
       frequency: typeof row.frequency === "number" ? row.frequency : null,
       clusterName: typeof cluster?.name === "string" ? cluster.name : null,

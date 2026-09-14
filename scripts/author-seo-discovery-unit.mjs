@@ -53,6 +53,13 @@ assert.match(discoveryRepo, /expires_at/);
 assert.match(queriesLib, /isEffectiveSeoReservation/);
 
 assert.match(ui, /Найти SEO-тему/);
+assert.match(ui, /Запросов в месяц/);
+assert.doesNotMatch(ui, /normalized:/);
+assert.match(ui, /\/api\/author\/seo\/discovery/);
+assert.match(ui, /\/api\/author\/seo\/proposals/);
+assert.match(ui, /\/api\/author\/seo-reservations/);
+assert.match(ui, /Предложить запрос/);
+assert.match(ui, /Взять в работу/);
 assert.match(ui, /Данные изменились\. Выполните поиск ещё раз\./);
 
 const authorA = "author-a";
