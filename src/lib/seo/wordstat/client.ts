@@ -236,9 +236,13 @@ export function classifyWordstatHttpError(input: {
   status: number | null;
   requestError?: WordstatRequestError;
   body?: unknown;
-}): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" | "INVALID_QUERY" {
+}): "TIMEOUT" | "UPSTREAM_ERROR" | "RATE_LIMITED" | "INVALID_QUERY" | "AUTH_FAILED" {
   if (input.requestError === "timeout") {
     return "TIMEOUT";
+  }
+
+  if (input.status === 401 || input.status === 403) {
+    return "AUTH_FAILED";
   }
 
   if (input.status === 429) {

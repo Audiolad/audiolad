@@ -100,7 +100,7 @@ export default function AuthorOpportunitiesClient({ view }: Props) {
 
   return (
     <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={view.authorSlug} />
+      <AuthorDashboardNav authorSlug={view.authorSlug} authorId={view.authorId} />
 
       <SectionCard tone="accent">
         <p className="text-sm font-semibold uppercase tracking-[0.04em] text-[#8c7dab]">

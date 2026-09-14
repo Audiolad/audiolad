@@ -8,6 +8,7 @@ import {
   requireAuthenticatedUser,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
 
 export const dynamic = "force-dynamic";
@@ -24,16 +25,23 @@ export default async function AuthorSeoOpportunitiesPage({
   if (workspaces.length === 0) redirect("/become-author");
   const workspace = workspaces.find((item) => item.slug === params.author) ?? workspaces[0];
   const { supabase } = await requireAuthorMembership(workspace.id);
+  const discoveryEnabled = isAuthorSeoDiscoveryEnabled(workspace.id);
   const [opportunities, authorProducts] = await Promise.all([
     listSeoOpportunitiesForAuthor(workspace.id),
     listAuthorProducts(supabase, workspace.id),
   ]);
 
+  const title = discoveryEnabled ? "Что ищут слушатели" : "SEO-возможности";
+  const subtitle = discoveryEnabled
+    ? "Поиск тем в Wordstat и SEO-запросы для новых аудиопродуктов"
+    : "Запросы для новых аудиопродуктов";
+
   return (
-    <AuthorShell title="SEO-возможности" subtitle="Запросы для новых аудиопродуктов" internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}>
+    <AuthorShell title={title} subtitle={subtitle} internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}>
       <AuthorSeoOpportunitiesClient
         authorId={workspace.id}
         authorSlug={workspace.slug}
+        discoveryEnabled={discoveryEnabled}
         opportunities={opportunities}
         products={authorProducts
           .filter((product) => product.status === "draft")

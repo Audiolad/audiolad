@@ -5,6 +5,8 @@ export const WORDSTAT_ERROR_MESSAGES: Record<WordstatErrorCode, string> = {
     "Подбор запросов временно недоступен. Вы можете заполнить запрос вручную.",
   NOT_CONFIGURED:
     "Подбор запросов временно недоступен. Вы можете заполнить запрос вручную.",
+  AUTH_FAILED:
+    "Подбор запросов временно недоступен из-за ошибки доступа к Яндексу. Попробуйте позже или заполните запрос вручную.",
   RATE_LIMITED: "Слишком много запросов подряд. Попробуйте немного позже.",
   TIMEOUT:
     "Не удалось получить данные Яндекса вовремя. Попробуйте ещё раз или заполните запрос вручную.",
@@ -61,6 +63,7 @@ export function wordstatHttpStatus(code: WordstatErrorCode): number {
       return 429;
     case "WORDSTAT_DISABLED":
     case "NOT_CONFIGURED":
+    case "AUTH_FAILED":
       return 503;
     case "TIMEOUT":
     case "UPSTREAM_ERROR":

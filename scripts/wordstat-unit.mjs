@@ -858,6 +858,8 @@ assert.equal(
   "UPSTREAM_ERROR",
 );
 assert.equal(classifyWordstatHttpError({ status: 429 }), "RATE_LIMITED");
+assert.equal(classifyWordstatHttpError({ status: 401 }), "AUTH_FAILED");
+assert.equal(classifyWordstatHttpError({ status: 403 }), "AUTH_FAILED");
 assert.equal(classifyWordstatHttpError({ status: 500 }), "UPSTREAM_ERROR");
 assert.equal(
   classifyWordstatHttpError({ status: null, requestError: "timeout" }),

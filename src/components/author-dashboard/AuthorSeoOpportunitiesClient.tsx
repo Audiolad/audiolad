@@ -10,6 +10,7 @@ type ProductOption = { id: string; title: string };
 type Props = {
   authorId: string;
   authorSlug: string;
+  discoveryEnabled?: boolean;
   opportunities: SeoQueryOpportunity[];
   products: ProductOption[];
 };
@@ -37,7 +38,7 @@ function formatMonthlyFrequency(value: number) {
 }
 
 export default function AuthorSeoOpportunitiesClient({
-  authorId, authorSlug, opportunities, products,
+  authorId, authorSlug, discoveryEnabled = false, opportunities, products,
 }: Props) {
   const [query, setQuery] = useState("");
   const [cluster, setCluster] = useState("");
@@ -170,7 +171,14 @@ export default function AuthorSeoOpportunitiesClient({
     const payload = await response.json();
     setDiscoverPending(false);
     if (!response.ok) {
-      setDiscoverMessage(payload.error ?? "Не удалось найти запросы.");
+      const code = typeof payload.code === "string" ? payload.code : "";
+      if (code === "seo_discovery_beta_disabled") {
+        setDiscoverMessage("Эта функция пока доступна только в закрытой бете.");
+      } else if (typeof payload.error === "string" && payload.error.trim()) {
+        setDiscoverMessage(payload.error);
+      } else {
+        setDiscoverMessage("Не удалось найти запросы.");
+      }
       return;
     }
     const seed =
@@ -231,6 +239,7 @@ export default function AuthorSeoOpportunitiesClient({
 
   return (
     <div className="space-y-5">
+      {discoveryEnabled ? (
       <section className="rounded-[24px] border border-[#d7c4f5] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">Найти SEO-тему</h2>
         <p className="mt-2 text-sm leading-6 text-[#4c3d78]">
@@ -309,6 +318,7 @@ export default function AuthorSeoOpportunitiesClient({
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <section className="rounded-[24px] border border-[#d7c4f5] bg-[#faf6ff] p-5">
         <p className="text-sm leading-6 text-[#4c3d78]">Выберите поисковый запрос, под который хотите создать аудиопродукт. Одновременно можно взять в работу до 5 запросов.</p>

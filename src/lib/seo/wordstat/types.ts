@@ -57,6 +57,7 @@ export type WordstatSuggestionsPayload = {
 export type WordstatErrorCode =
   | "WORDSTAT_DISABLED"
   | "NOT_CONFIGURED"
+  | "AUTH_FAILED"
   | "RATE_LIMITED"
   | "TIMEOUT"
   | "UPSTREAM_ERROR"

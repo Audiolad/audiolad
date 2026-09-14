@@ -185,7 +185,7 @@ export default function AuthorStatusClient({ authorId, authorSlug, view }: Props
 
   return (
     <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={authorSlug} />
+      <AuthorDashboardNav authorSlug={authorSlug} authorId={authorId} />
 
       {showStarterAsCurrent ? (
         <StatusCard title={AUTHOR_STATUS_COPY.starterTitle} tone="accent">

@@ -9,6 +9,10 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
 import { loadDiscoveryContextForPhrases } from "@/lib/seo-queries/author-discovery-repository";
+import {
+  assertAuthorSeoDiscoveryEnabled,
+  isAuthorSeoDiscoveryEnabled,
+} from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import {
   WORDSTAT_ERROR_MESSAGES,
@@ -23,7 +27,7 @@ function readString(body: Record<string, unknown>, key: string): string {
 }
 
 /**
- * Author Wordstat search + SEO DB reconciliation.
+ * Author Wordstat search + SEO DB reconciliation (closed beta).
  * Client sends only { author_id, phrase }. Frequency per result is suggestion.count.
  */
 export async function POST(request: Request) {
@@ -41,7 +45,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
+    if (!isAuthorSeoDiscoveryEnabled(authorId)) {
+      return NextResponse.json(
+        { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+        { status: 403 },
+      );
+    }
+
     const { user } = await requireAuthorMembership(authorId);
+    assertAuthorSeoDiscoveryEnabled(authorId);
 
     const wordstat = await fetchWordstatSuggestions(phrase, { userId: user.id });
     if (!wordstat.ok) {
@@ -51,14 +63,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const suggestions = wordstat.data.suggestions;
-    const context = await loadDiscoveryContextForPhrases({
-      authorId,
-      phrases: suggestions.map((item) => item.phrase),
-    });
+    let context;
+    try {
+      context = await loadDiscoveryContextForPhrases({
+        authorId,
+        phrases: wordstat.data.suggestions.map((item) => item.phrase),
+      });
+    } catch (loadError) {
+      console.error(
+        "author_seo_discovery_context_error",
+        loadError instanceof Error ? loadError.message : "unknown",
+      );
+      return NextResponse.json(
+        {
+          error: "Не удалось сопоставить результаты с SEO-базой. Попробуйте ещё раз.",
+          code: "seo_discovery_context_failed",
+        },
+        { status: 500 },
+      );
+    }
 
     const results = [];
-    for (const suggestion of suggestions) {
+    for (const suggestion of wordstat.data.suggestions) {
       const normalized = await context.normalize(suggestion.phrase);
       const query = normalized
         ? context.queryByNormalized.get(normalized) ?? null
@@ -89,9 +115,18 @@ export async function POST(request: Request) {
     if (error instanceof AuthorAccessError) {
       return handleAuthorRouteError(error);
     }
+    if (
+      error instanceof Error &&
+      error.message === "seo_discovery_beta_disabled"
+    ) {
+      return NextResponse.json(
+        { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+        { status: 403 },
+      );
+    }
     console.error(
       "author_seo_discovery_error",
-      error instanceof Error ? error.name : "unknown",
+      error instanceof Error ? error.message : "unknown",
     );
     const fallback = wordstatError("UPSTREAM_ERROR");
     return NextResponse.json(
