@@ -762,8 +762,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20261007140100",
     "20261007150000",
     "20261007160000",
+    "20261007170000",
   ]);
-  assert.equal(plan.database_migrations_pending, 98);
+  assert.equal(plan.database_migrations_pending, 99);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -873,8 +874,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20261007140100",
     "20261007150000",
     "20261007160000",
+    "20261007170000",
   ]);
-  assert.equal(plan.database_migrations_pending, 92);
+  assert.equal(plan.database_migrations_pending, 93);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -991,8 +993,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20261007140100",
     "20261007150000",
     "20261007160000",
+    "20261007170000",
   ]);
-  assert.equal(plan.database_migrations_pending, 83);
+  assert.equal(plan.database_migrations_pending, 84);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
@@ -1110,7 +1113,7 @@ function testPostWavProductionPendingMigrationsApply() {
     join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
   );
   const productionMax = "20261007120000";
-  const pendingVersions = ["20261007120100", "20261007130000", "20261007140000", "20261007140100", "20261007150000", "20261007160000"];
+  const pendingVersions = ["20261007120100", "20261007130000", "20261007140000", "20261007140100", "20261007150000", "20261007160000", "20261007170000"];
 
   assert.ok(listed.versions.includes(productionMax));
   assert.equal(listed.versions.includes("20261006140200"), false);
@@ -1118,6 +1121,7 @@ function testPostWavProductionPendingMigrationsApply() {
   assert.equal(listed.versions.includes("20261007120200"), false);
   assert.ok(listed.versions.includes("20261007150000"));
   assert.ok(listed.versions.includes("20261007160000"));
+  assert.ok(listed.versions.includes("20261007170000"));
 
   const plan = planDatabaseMigrations({
     localVersions: listed.versions,
@@ -1125,7 +1129,7 @@ function testPostWavProductionPendingMigrationsApply() {
   });
 
   assert.deepEqual(plan.pending, pendingVersions);
-  assert.equal(plan.database_migrations_pending, 6);
+  assert.equal(plan.database_migrations_pending, 7);
   assert.ok(plan.pending.every((version) => version > productionMax));
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
@@ -1140,8 +1144,8 @@ function testCurrentProductionAfterTopicsStudioRepair() {
     localVersions: listed.versions,
     remoteVersions: listed.versions.filter((version) => version <= productionMax),
   });
-  assert.deepEqual(plan.pending, ["20261007140000", "20261007140100", "20261007150000", "20261007160000"]);
-  assert.equal(plan.database_migrations_pending, 4);
+  assert.deepEqual(plan.pending, ["20261007140000", "20261007140100", "20261007150000", "20261007160000", "20261007170000"]);
+  assert.equal(plan.database_migrations_pending, 5);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
 }
@@ -1155,8 +1159,8 @@ function testCurrentProductionAfterSlice2() {
     localVersions: listed.versions,
     remoteVersions: listed.versions.filter((version) => version <= productionMax),
   });
-  assert.deepEqual(plan.pending, ["20261007140100", "20261007150000", "20261007160000"]);
-  assert.equal(plan.database_migrations_pending, 3);
+  assert.deepEqual(plan.pending, ["20261007140100", "20261007150000", "20261007160000", "20261007170000"]);
+  assert.equal(plan.database_migrations_pending, 4);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
 }
@@ -1170,8 +1174,8 @@ function testCurrentProductionAfterStudioFreeMusic() {
     localVersions: listed.versions,
     remoteVersions: listed.versions.filter((version) => version <= productionMax),
   });
-  assert.deepEqual(plan.pending, ["20261007150000", "20261007160000"]);
-  assert.equal(plan.database_migrations_pending, 2);
+  assert.deepEqual(plan.pending, ["20261007150000", "20261007160000", "20261007170000"]);
+  assert.equal(plan.database_migrations_pending, 3);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
 }
@@ -1185,7 +1189,22 @@ function testCurrentProductionAfterMusicDelivery() {
     localVersions: listed.versions,
     remoteVersions: listed.versions.filter((version) => version <= productionMax),
   });
-  assert.deepEqual(plan.pending, ["20261007160000"]);
+  assert.deepEqual(plan.pending, ["20261007160000", "20261007170000"]);
+  assert.equal(plan.database_migrations_pending, 2);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+}
+
+function testCurrentProductionAfterSeoQueryAnalysis() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const productionMax = "20261007160000";
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions: listed.versions.filter((version) => version <= productionMax),
+  });
+  assert.deepEqual(plan.pending, ["20261007170000"]);
   assert.equal(plan.database_migrations_pending, 1);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
@@ -1212,6 +1231,7 @@ function main() {
   testCurrentProductionAfterSlice2();
   testCurrentProductionAfterStudioFreeMusic();
   testCurrentProductionAfterMusicDelivery();
+  testCurrentProductionAfterSeoQueryAnalysis();
   testReissuedVisibilityAfterProductionMaxHasNoHole();
   console.log("database-migrations-plan-unit: all tests passed");
 }
