@@ -60,6 +60,11 @@ import {
   KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
 } from "@/lib/seo/kak-prodat-muzyku-sozdannuyu-ii/content";
 import {
+  MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_PATH,
+  MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_DESCRIPTION,
+  MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_TITLE,
+} from "@/lib/seo/mozhno-li-zarabotat-na-ii-muzyke/content";
+import {
   STUDIO_MEDITATION_PATH,
   STUDIO_MEDITATION_SEO_DESCRIPTION,
   STUDIO_MEDITATION_SEO_TITLE,
@@ -508,6 +513,31 @@ export function buildKakProdatMuzykuSozdannuyuIiMetadata(): Metadata {
       card: "summary",
       title: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_TITLE,
       description: KAK_PRODAT_MUZYKU_SOZDANNUYU_II_SEO_DESCRIPTION,
+    },
+  };
+}
+
+
+export function buildMozhnoLiZarabotatNaIiMuzykeMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_PATH);
+
+  return {
+    title: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_TITLE,
+    description: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_DESCRIPTION,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_TITLE,
+      description: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_DESCRIPTION,
+      url: canonical,
+      type: "article",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_TITLE,
+      description: MOZHNO_LI_ZARABOTAT_NA_II_MUZYKE_SEO_DESCRIPTION,
     },
   };
 }
