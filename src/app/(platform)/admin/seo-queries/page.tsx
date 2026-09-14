@@ -10,7 +10,7 @@ export default async function AdminSeoQueriesPage() {
   const supabase = createServiceRoleClient();
   await supabase.rpc("expire_seo_query_reservation", {});
   const [{ data: queries }, { data: reservations }, { data: clusters }] = await Promise.all([
-    supabase.from("seo_queries").select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, created_at, seo_clusters(id, name)").order("created_at", { ascending: false }),
+    supabase.from("seo_queries").select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, analysis_status, created_at, seo_clusters(id, name)").order("created_at", { ascending: false }),
     supabase.from("seo_query_reservations").select("id, query_id, author_id, product_id, reserved_at, expires_at, status, authors(name), practices(title, status, moderation_status)").in("status", ["active", "used"]),
     supabase.from("seo_clusters").select("id, name").order("name"),
   ]);
@@ -26,6 +26,7 @@ export default async function AdminSeoQueriesPage() {
       source: item.source as string, frequency: typeof item.frequency === "number" ? item.frequency : null,
       cluster: typeof cluster?.name === "string" ? cluster.name : null, clusterId: typeof cluster?.id === "string" ? cluster.id : null, intent: item.intent as string | null,
       recommendedFormat: item.recommended_format as string | null, audioFit: item.audio_fit as string | null,
+      analysisStatus: item.analysis_status as "not_analyzed" | "analyzed" | "not_applicable",
       lifecycle: lifecycleLabel(lifecycle), author: author?.name as string | null, product: product?.title as string | null,
       reservedAt: reservation?.reserved_at as string | null, expiresAt: reservation?.expires_at as string | null,
       createdAt: item.created_at as string, reservationId: reservation?.id as string | null,
