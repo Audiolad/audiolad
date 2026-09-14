@@ -60,13 +60,13 @@ assert.match(discoveryRepo, /isEffectiveSeoReservation/);
 assert.match(discoveryRepo, /expires_at/);
 assert.match(queriesLib, /isEffectiveSeoReservation/);
 
-assert.match(ui, /Найти SEO-тему/);
+assert.match(ui, /Найти запросы/);
 assert.match(ui, /Запросов в месяц/);
 assert.doesNotMatch(ui, /normalized:/);
 assert.match(ui, /\/api\/author\/seo\/discovery/);
 assert.match(ui, /\/api\/author\/seo\/proposals/);
 assert.match(ui, /\/api\/author\/seo-reservations/);
-assert.match(ui, /Предложить запрос/);
+assert.match(ui, /Отправить на проверку/);
 assert.match(ui, /Взять в работу/);
 assert.match(ui, /Данные изменились\. Выполните поиск ещё раз\./);
 
@@ -551,7 +551,7 @@ assert.match(page, /discoveryEnabled/);
 assert.match(page, /Что ищут слушатели/);
 
 assert.match(ui, /discoveryEnabled/);
-assert.match(ui, /Найти SEO-тему/);
+assert.match(ui, /Найти запросы/);
 
 const dash = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
 assert.match(dash, /isAuthorSeoDiscoveryEnabled/);
