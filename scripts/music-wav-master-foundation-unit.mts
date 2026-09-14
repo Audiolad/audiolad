@@ -74,11 +74,13 @@ assert.match(client, new RegExp(`from\\(MUSIC_MASTERS_BUCKET\\)`));
 assert.match(client, /contentType: "audio\/wav"/);
 assert.doesNotMatch(client, /contentType: input\.file\.type/);
 assert.match(client, /upsert: false/);
-assert.match(form, /Загрузить WAV-мастер/);
-assert.match(form, /Файл загружен\. Подготавливаем версию для прослушивания…/);
-assert.match(form, /Загрузить legacy MP3/);
+assert.match(form, /MUSIC_DELIVERY_UPLOAD_LABEL/);
+assert.match(form, /musicCabinetStatus/);
+assert.doesNotMatch(form, /Загрузить WAV-мастер/);
+assert.doesNotMatch(form, /Загрузить legacy MP3/);
 assert.match(legacyServer, /PRACTICE_AUDIO_BUCKET/);
-assert.doesNotMatch(signedAudio, /music-masters|music-streams/);
+assert.match(signedAudio, /resolveMusicListenSource/);
+assert.doesNotMatch(signedAudio, /from\("music-masters"\)/);
 assert.equal(MUSIC_MASTERS_BUCKET, "music-masters");
 assert.equal(MUSIC_STREAMS_BUCKET, "music-streams");
 

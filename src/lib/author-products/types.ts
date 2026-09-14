@@ -70,10 +70,13 @@ export type AudioItemRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  active_music_delivery_asset_id?: string | null;
+  desired_music_master_asset_id?: string | null;
   music_master?: {
     assetId: string;
     lifecycleState: "uploading" | "verified" | "rejected" | "abandoned";
     transcodeStatus: "queued" | "processing" | "ready" | "failed" | null;
+    hasActiveDelivery: boolean;
   } | null;
 };
 

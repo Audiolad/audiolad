@@ -157,6 +157,13 @@ applyFile(
   "post-apply music transcode worker smoke",
   resolve(root, "supabase/tests/music_transcode_worker_smoke.sql"),
 );
+if (!pending.has("20261007150000")) {
+  throw new Error("music delivery promotion migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply music delivery promotion smoke",
+  resolve(root, "supabase/tests/music_delivery_promotion_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);

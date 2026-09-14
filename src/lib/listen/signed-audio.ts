@@ -17,6 +17,11 @@ import {
 import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 import { buildListenApiBase } from "@/lib/products/paths";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  resolveMusicCatalogPreviewMode,
+  resolveMusicListenSource,
+  type MusicStreamCandidate,
+} from "@/lib/listen/music-delivery";
 
 function listenApiBaseFromRequest(
   request: Request,
@@ -35,6 +40,54 @@ function listenApiBaseFromRequest(
   }
 
   return buildListenApiBase(authorSlug, productSlug);
+}
+
+
+async function loadActiveMusicStream(
+  audioItemId: string,
+  activeAssetId: string | null | undefined,
+): Promise<MusicStreamCandidate | null> {
+  if (!activeAssetId) return null;
+  const serviceRole = createServiceRoleClient();
+  const { data, error } = await serviceRole
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+    .eq("id", activeAssetId)
+    .maybeSingle();
+  if (error) {
+    console.error("listen_music_stream_lookup_error", error.message);
+    return null;
+  }
+  if (!data || data.audio_item_id !== audioItemId) return null;
+  return {
+    audioItemId: data.audio_item_id,
+    assetRole: data.asset_role,
+    lifecycleState: data.lifecycle_state,
+    storageBucket: data.storage_bucket,
+    storagePath: data.storage_path,
+  };
+}
+
+async function signListenStoragePath(
+  bucket: string,
+  path: string,
+) {
+  const serviceRole = createServiceRoleClient();
+  const { data: signedData, error: signedError } = await serviceRole.storage
+    .from(bucket)
+    .createSignedUrl(path, LISTEN_SIGNED_URL_TTL_SECONDS);
+  if (signedError || !signedData?.signedUrl) {
+    console.error("listen_audio_sign_error", signedError?.message);
+    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
+  }
+  const url = normalizeStorageSignedUrl(signedData.signedUrl);
+  if (!url) {
+    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
+  }
+  return NextResponse.json({
+    url,
+    expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
+  });
 }
 
 export async function serveListenSignedAudio(
@@ -181,7 +234,7 @@ export async function serveListenSignedAudio(
   const { data: audioItem, error: audioLookupError } = await storageClient
     .from("audio_items")
     .select(
-      "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms",
+      "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms, active_music_delivery_asset_id",
     )
     .eq("id", audioId)
     .eq("practice_id", practice.id)
@@ -221,12 +274,26 @@ export async function serveListenSignedAudio(
       duration_seconds: null,
       preview_start_ms: null,
       preview_end_ms: null,
+      active_music_delivery_asset_id: null,
     };
   } else {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  if (!audioPath) {
+  const activeStream = audioItem?.id
+    ? await loadActiveMusicStream(
+        audioItem.id,
+        audioItem.active_music_delivery_asset_id,
+      )
+    : null;
+  const listenSource = resolveMusicListenSource({
+    productKind: practice.product_kind ?? "",
+    audioItemId: audioId,
+    audioPath,
+    activeStream,
+  });
+
+  if (!audioPath && listenSource.kind === "missing") {
     return NextResponse.json({ error: "audio_missing" }, { status: 404 });
   }
 
@@ -235,19 +302,30 @@ export async function serveListenSignedAudio(
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const window = resolvePreviewClipWindow(previewRow ?? {});
-    const clipUrl = buildListenPreviewClipPath(
-      listenApiBaseFromRequest(request, authorSlug, productSlug),
-      audioId,
-    );
-
-    return NextResponse.json({
-      url: clipUrl,
-      expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
-      preview_clip: true,
-      preview_start_ms: window.startMs,
-      preview_end_ms: window.endMs,
+    const previewMode = resolveMusicCatalogPreviewMode({
+      productKind: practice.product_kind ?? "",
+      audioItemId: audioId,
+      audioPath,
+      activeStream,
     });
+    if (previewMode === "clip") {
+      const window = resolvePreviewClipWindow(previewRow ?? {});
+      const clipUrl = buildListenPreviewClipPath(
+        listenApiBaseFromRequest(request, authorSlug, productSlug),
+        audioId,
+      );
+      return NextResponse.json({
+        url: clipUrl,
+        expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
+        preview_clip: true,
+        preview_start_ms: window.startMs,
+        preview_end_ms: window.endMs,
+      });
+    }
+    if (previewMode.kind === "missing") {
+      return NextResponse.json({ error: "audio_missing" }, { status: 404 });
+    }
+    return signListenStoragePath(previewMode.bucket, previewMode.path);
   }
 
   if (
@@ -263,23 +341,8 @@ export async function serveListenSignedAudio(
     }
   }
 
-  const { data: signedData, error: signedError } = await storageClient.storage
-    .from("practice-audio")
-    .createSignedUrl(audioPath, LISTEN_SIGNED_URL_TTL_SECONDS);
-
-  if (signedError || !signedData?.signedUrl) {
-    console.error("listen_audio_sign_error", signedError?.message);
-    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
+  if (listenSource.kind === "missing") {
+    return NextResponse.json({ error: "audio_missing" }, { status: 404 });
   }
-
-  const url = normalizeStorageSignedUrl(signedData.signedUrl);
-
-  if (!url) {
-    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    url,
-    expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
-  });
+  return signListenStoragePath(listenSource.bucket, listenSource.path);
 }

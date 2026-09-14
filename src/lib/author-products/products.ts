@@ -123,12 +123,19 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   is_preview,
   status,
   created_at,
-  updated_at
+  updated_at,
+  active_music_delivery_asset_id,
+  desired_music_master_asset_id
 `;
 
 async function loadMusicMasterStatus(
-  audioItemIds: string[],
+  items: Array<{
+    id: string;
+    desired_music_master_asset_id?: string | null;
+    active_music_delivery_asset_id?: string | null;
+  }>,
 ): Promise<Map<string, NonNullable<AudioItemRow["music_master"]>>> {
+  const audioItemIds = items.map((item) => item.id);
   if (audioItemIds.length === 0) return new Map();
   const service = createServiceRoleClient();
   const { data: assets, error: assetError } = await service
@@ -147,7 +154,21 @@ async function loadMusicMasterStatus(
       latestByAudioItem.set(asset.audio_item_id, asset);
     }
   }
-  const assetIds = [...latestByAudioItem.values()].map((asset) => asset.id);
+  const desiredIds = items
+    .map((item) => item.desired_music_master_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const desiredById = new Map((assets ?? []).filter((asset) => desiredIds.includes(asset.id)).map((asset) => [asset.id, asset]));
+  const chosenByAudioItem = new Map<string, { id: string; audio_item_id: string; lifecycle_state: "uploading" | "verified" | "rejected" | "abandoned" }>();
+  for (const item of items) {
+    const desired = item.desired_music_master_asset_id
+      ? desiredById.get(item.desired_music_master_asset_id)
+      : undefined;
+    const chosen = desired ?? latestByAudioItem.get(item.id);
+    if (chosen) {
+      chosenByAudioItem.set(item.id, chosen);
+    }
+  }
+  const assetIds = [...chosenByAudioItem.values()].map((asset) => asset.id);
   const { data: jobs } = assetIds.length
     ? await service
         .from("music_transcode_jobs")
@@ -157,13 +178,15 @@ async function loadMusicMasterStatus(
         .order("created_at", { ascending: false })
     : { data: [] };
   const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
+  const activeByItem = new Map(items.map((item) => [item.id, Boolean(item.active_music_delivery_asset_id)]));
   return new Map(
-    [...latestByAudioItem.values()].map((asset) => [
+    [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,
       {
         assetId: asset.id,
         lifecycleState: asset.lifecycle_state,
         transcodeStatus: jobsBySource.get(asset.id) ?? null,
+        hasActiveDelivery: activeByItem.get(asset.audio_item_id) ?? false,
       },
     ]),
   );
@@ -273,7 +296,7 @@ export async function getAuthorProductDetail(
     ]);
 
   const musicMasterStatus = practiceRow.product_kind === PRODUCT_KIND.MUSIC
-    ? await loadMusicMasterStatus((audioItems ?? []).map((item) => item.id))
+    ? await loadMusicMasterStatus(audioItems ?? [])
     : new Map();
 
   return {

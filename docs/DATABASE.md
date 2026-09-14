@@ -167,6 +167,22 @@ through `recover_stale_music_transcode_jobs`. It never sets
 `audio_items.active_music_delivery_asset_id` or `audio_items.audio_path`.
 Public playback stays on the legacy pointer until a later delivery slice.
 
+#### Music delivery promotion (Slice 3)
+
+Migration `20261007150000_music_delivery_promotion.sql` adds
+`audio_items.desired_music_master_asset_id` (verified master of the same item)
+and `promote_music_item_delivery(audio_item_id, stream_asset_id)`. Promotion
+sets `active_music_delivery_asset_id` only when the stream is a verified
+`music-streams` object whose `source_asset_id` equals the current desired
+master. Stale completions of an older master return false and leave the
+current pointer. Failed transcodes do not touch the pointer. Browser roles
+cannot update either pointer column; service-role `complete_music_transcode_job`
+promotes in the same transaction after the job becomes ready.
+`finalize_music_master_asset` now points `desired_music_master_asset_id` at the
+new verified master without clearing the live stream. Public listen signs the
+active stream when it is valid and otherwise falls back to `audio_path` in
+`practice-audio`. Masters are never signed.
+
 
 #### publication_class (2026-08-25, Phase 1)
 

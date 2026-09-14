@@ -86,10 +86,15 @@ import {
 } from "@/lib/products/promo-recommendation";
 import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
 import { uploadMusicMasterDirect } from "@/lib/author-products/music-master-upload-client";
+import { validateMusicMasterFileClient } from "@/lib/author-products/music-master-upload-contract";
 import {
-  MUSIC_MASTER_SIZE_HINT,
-  validateMusicMasterFileClient,
-} from "@/lib/author-products/music-master-upload-contract";
+  MUSIC_DELIVERY_REPLACE_LABEL,
+  MUSIC_DELIVERY_UNSUPPORTED_TEXT,
+  MUSIC_DELIVERY_UPLOAD_HINT,
+  MUSIC_DELIVERY_UPLOAD_LABEL,
+  musicCabinetStatus,
+  resolveMusicUploadMode,
+} from "@/lib/listen/music-delivery";
 import {
   PRODUCT_AUDIO_SIZE_HINT,
   PRODUCT_CONTENT_LIMITS,
@@ -918,7 +923,9 @@ export default function AuthorProductForm({
     }
 
     const itemsToPreview = audioItems.filter(
-      (item) => item.audio_path && !item.id.startsWith("temp-"),
+      (item) =>
+        !item.id.startsWith("temp-") &&
+        (Boolean(item.audio_path) || Boolean(item.music_master?.hasActiveDelivery)),
     );
 
     if (itemsToPreview.length === 0) {
@@ -2249,6 +2256,13 @@ export default function AuthorProductForm({
     mode: "legacy" | "master" = "legacy",
   ) {
     const isMusicMaster = mode === "master";
+    if (form.productKind === PRODUCT_KIND.MUSIC && resolveMusicUploadMode(file) == null) {
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: MUSIC_DELIVERY_UNSUPPORTED_TEXT,
+      }));
+      return;
+    }
     const validationError = isMusicMaster
       ? validateMusicMasterFileClient(file)
       : validateMp3FileClient(file);
@@ -3967,7 +3981,16 @@ export default function AuthorProductForm({
               <div className="mt-4 space-y-3">
                 <div className="text-sm text-[#5f5484]">
                   <p className="font-medium text-[#3f3560]">
-                    {audioItem.audio_path ? "MP3 загружен" : "MP3 ещё не загружен"}
+                    {form.productKind === PRODUCT_KIND.MUSIC
+                      ? musicCabinetStatus({
+                          hasLegacyAudioPath: Boolean(audioItem.audio_path),
+                          hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
+                          lifecycleState: audioItem.music_master?.lifecycleState,
+                          transcodeStatus: audioItem.music_master?.transcodeStatus,
+                        }).text
+                      : audioItem.audio_path
+                        ? "MP3 загружен"
+                        : "MP3 ещё не загружен"}
                   </p>
                   {audioItem.audio_path ? (
                     <div className="mt-2 space-y-1">
@@ -3980,27 +4003,15 @@ export default function AuthorProductForm({
                       ) : null}
                     </div>
                   ) : null}
-                  {form.productKind === PRODUCT_KIND.MUSIC && audioItem.music_master ? (
-                    <p className="mt-2 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
-                      {audioItem.music_master.lifecycleState === "verified" &&
-                      ["queued", "processing"].includes(audioItem.music_master.transcodeStatus ?? "")
-                        ? "Файл загружен. Подготавливаем версию для прослушивания…"
-                        : audioItem.music_master.lifecycleState === "uploading"
-                          ? "Загрузка WAV-мастера ещё не завершена."
-                          : audioItem.music_master.lifecycleState === "rejected"
-                            ? "WAV-мастер не прошёл проверку."
-                            : "WAV-мастер отменён."}
-                    </p>
-                  ) : null}
                 </div>
 
                 <p className="text-sm leading-5 text-[#7d70a2]">
                   {form.productKind === PRODUCT_KIND.MUSIC
-                    ? `${MUSIC_MASTER_SIZE_HINT}. MP3 для текущего прослушивания загружается отдельно.`
+                    ? MUSIC_DELIVERY_UPLOAD_HINT
                     : PRODUCT_AUDIO_SIZE_HINT}
                 </p>
 
-                {audioItem.audio_path && practiceId && !audioItem.id.startsWith("temp-") ? (
+                {(audioItem.audio_path || audioItem.music_master?.hasActiveDelivery) && practiceId && !audioItem.id.startsWith("temp-") ? (
                   <div className="mt-3">
                     {audioPreviewLoading[audioItem.id] ? (
                       <p className="text-sm text-[#7d70a2]">
@@ -4036,18 +4047,18 @@ export default function AuthorProductForm({
                     >
                       {uploadingAudioId === audioItem.id
                         ? "Загрузка…"
-                        : audioItem.audio_path
-                          ? form.productKind === PRODUCT_KIND.MUSIC
-                            ? "Заменить WAV-мастер"
-                            : "Заменить MP3"
-                          : form.productKind === PRODUCT_KIND.MUSIC
-                            ? "Загрузить WAV-мастер"
+                        : form.productKind === PRODUCT_KIND.MUSIC
+                          ? audioItem.audio_path || audioItem.music_master
+                            ? MUSIC_DELIVERY_REPLACE_LABEL
+                            : MUSIC_DELIVERY_UPLOAD_LABEL
+                          : audioItem.audio_path
+                            ? "Заменить MP3"
                             : "Загрузить MP3"}
                       <input
                         type="file"
                         accept={
                           form.productKind === PRODUCT_KIND.MUSIC
-                            ? "audio/wav,audio/x-wav,audio/wave,.wav"
+                            ? "audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
                             : "audio/mpeg,.mp3"
                         }
                         className="hidden"
@@ -4058,40 +4069,24 @@ export default function AuthorProductForm({
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           event.target.value = "";
-                          if (file) {
-                            void uploadAudio(
-                              audioItem.id,
-                              file,
-                              form.productKind === PRODUCT_KIND.MUSIC
-                                ? "master"
-                                : "legacy",
-                            );
+                          if (!file) return;
+                          if (form.productKind === PRODUCT_KIND.MUSIC) {
+                            const mode = resolveMusicUploadMode(file);
+                            if (!mode) {
+                              setAudioUploadErrors((current) => ({
+                                ...current,
+                                [audioItem.id]: MUSIC_DELIVERY_UNSUPPORTED_TEXT,
+                              }));
+                              return;
+                            }
+                            void uploadAudio(audioItem.id, file, mode);
+                            return;
                           }
+                          void uploadAudio(audioItem.id, file, "legacy");
                         }}
                       />
                     </label>
                   )}
-
-                  {form.productKind === PRODUCT_KIND.MUSIC &&
-                  !(contentLockedAfterSale && audioItem.audio_path) ? (
-                    <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
-                      {audioItem.audio_path ? "Заменить legacy MP3" : "Загрузить legacy MP3"}
-                      <input
-                        type="file"
-                        accept="audio/mpeg,.mp3"
-                        className="hidden"
-                        disabled={
-                          uploadingAudioId === audioItem.id ||
-                          deletingAudioFileId === audioItem.id
-                        }
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = "";
-                          if (file) void uploadAudio(audioItem.id, file, "legacy");
-                        }}
-                      />
-                    </label>
-                  ) : null}
 
                   {audioItem.audio_path && !contentLockedAfterSale ? (
                     <button

@@ -1,6 +1,6 @@
 /**
- * Long-lived music transcode queue consumer. Do not add this process to
- * production PM2 in Slice 2; the entrypoint is for later runtime wiring.
+ * Long-lived music transcode queue consumer. Production PM2 name is
+ * audiolad-music-transcode-worker via deploy/music-transcode-worker.ecosystem.config.cjs.
  */
 import { createClient } from "@supabase/supabase-js";
 import {
