@@ -370,11 +370,11 @@ BEGIN
   INSERT INTO public.orders (
     id, user_id, practice_id, status, amount_minor, currency,
     practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
-    author_id_snapshot, idempotency_key, order_kind, paid_at
+    base_price_minor_snapshot, author_id_snapshot, idempotency_key, order_kind, paid_at
   ) VALUES (
     v_order, v_buyer, v_practice, 'paid', 10000, 'RUB',
     'Slice3 Delivery', 'slice3-music-delivery-smoke', 10000,
-    v_author, 'slice3-sale-lock-order', 'product_purchase', now()
+    10000, v_author, 'slice3-sale-lock-order', 'product_purchase', now()
   );
   IF NOT public.practice_is_content_locked_after_sale(v_practice) THEN
     RAISE EXCEPTION 'C paid order must lock practice';
@@ -457,11 +457,11 @@ BEGIN
   INSERT INTO public.orders (
     id, user_id, practice_id, status, amount_minor, currency,
     practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
-    author_id_snapshot, idempotency_key, order_kind, paid_at
+    base_price_minor_snapshot, author_id_snapshot, idempotency_key, order_kind, paid_at
   ) VALUES (
     v_order, v_buyer, v_practice, 'paid', 10000, 'RUB',
     'Slice3 Delivery', 'slice3-music-delivery-smoke', 10000,
-    v_author, 'slice3-sale-lock-order-i', 'product_purchase', now()
+    10000, v_author, 'slice3-sale-lock-order-i', 'product_purchase', now()
   );
   IF public.promote_music_item_delivery(v_audio, v_stream_b) IS NOT FALSE THEN
     RAISE EXCEPTION 'I locked promote must not replace delivered stream A';
