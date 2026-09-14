@@ -43,6 +43,12 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "guest_mp3_downloaded",
   "guest_registration_gate_shown",
   "guest_auth_cta_clicked",
+  "author_project_create_clicked",
+  "author_project_capacity_offer_viewed",
+  "author_project_capacity_package_selected",
+  "author_project_capacity_checkout_started",
+  "author_project_capacity_purchase_succeeded",
+  "author_project_capacity_purchase_failed",
 ] as const;
 
 export type PlatformAnalyticsEventName =

@@ -1,3 +1,4 @@
+import { AUTHOR_PROJECT_CAPACITY_ORDER_KIND } from "@/lib/author-projects/capacity-catalog";
 import { STUDIO_MUSIC_ORDER_KIND } from "@/lib/studio-music/access";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 
@@ -15,6 +16,16 @@ export function isStudioMusicLicenseCheckout(
   return orderKind === STUDIO_MUSIC_ORDER_KIND;
 }
 
+export function isAuthorProjectCapacityCheckout(
+  orderKind?: string | null,
+): boolean {
+  return orderKind === AUTHOR_PROJECT_CAPACITY_ORDER_KIND;
+}
+
+export function buildAuthorProjectCapacityPaidHref(): string {
+  return "/author-dashboard/projects/new";
+}
+
 export function buildStudioMusicPaidHref(): string {
   return "/studio";
 }
@@ -26,6 +37,10 @@ export function buildPaidAuthenticatedPrimaryHref(input: {
 }): string {
   if (isStudioMusicLicenseCheckout(input.orderKind)) {
     return buildStudioMusicPaidHref();
+  }
+
+  if (isAuthorProjectCapacityCheckout(input.orderKind)) {
+    return buildAuthorProjectCapacityPaidHref();
   }
 
   const authorSlug = input.authorSlug?.trim() ?? "";

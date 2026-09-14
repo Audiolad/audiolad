@@ -33,6 +33,9 @@ export async function GET() {
       has_override: summary.hasOverride,
       can_create: summary.canCreate,
       show_premium_upsell: summary.showPremiumUpsell,
+      show_capacity_offer: summary.showCapacityOffer,
+      purchased_slots: summary.purchasedSlots,
+      base_limit: summary.baseLimit,
       limit_message: summary.limitMessage,
     });
   } catch (error) {
@@ -119,7 +122,8 @@ export async function POST(request: Request) {
         {
           error: error.code,
           message:
-            "Лимит проектов исчерпан. Увеличьте лимит в Premium или обратитесь к администратору.",
+            "Лимит проектов исчерпан. Можно один раз добавить проекты — без подписки и без срока действия.",
+          show_capacity_offer: true,
         },
         { status: 403 },
       );

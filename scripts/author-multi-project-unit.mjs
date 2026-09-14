@@ -63,6 +63,15 @@ function main() {
     }),
     /базовом кабинете/,
   );
+  assert.match(
+    getAuthorProjectLimitReachedMessage({
+      used: 1,
+      limit: 1,
+      unlimited: false,
+      source: "default",
+    }),
+    /один раз добавить проекты/,
+  );
 
   // 3. Premium allows 3
   const premium = resolveEffectiveAuthorProjectLimit({
@@ -108,6 +117,8 @@ function main() {
   assert.equal(canCreateOwnedAuthorProject(1, 5), true);
   assert.equal(canCreateOwnedAuthorProject(4, 5), true);
   assert.equal(canCreateOwnedAuthorProject(5, 5), false);
+  // Override accounts at cap still get the one-time capacity offer
+  // (not a Premium subscription stub).
   assert.equal(
     shouldShowPremiumProjectUpsell({
       used: 5,
@@ -115,7 +126,7 @@ function main() {
       unlimited: false,
       source: "override",
     }),
-    false,
+    true,
   );
   assert.match(
     getAuthorProjectLimitReachedMessage({
@@ -160,6 +171,17 @@ function main() {
 
   // A normal account remains blocked from creating a sixth project.
   assert.equal(canCreateOwnedAuthorProject(5, 5, false), false);
+
+  // Purchased capacity stacks on the free base limit.
+  const withPurchase = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: false,
+    premiumEnabled: false,
+    purchasedSlots: 5,
+  });
+  assert.equal(withPurchase.limit, 6);
+  assert.equal(withPurchase.purchasedSlots, 5);
+  assert.equal(canCreateOwnedAuthorProject(1, withPurchase.limit), true);
 
   // 6. Selection isolation + cookie
   const selected = resolveSelectedAuthorWorkspace(projects, {
@@ -233,9 +255,10 @@ function main() {
     "src/components/author-dashboard/AuthorProjectSwitcher.tsx",
   );
   assert.match(switcher, /Текущий проект/);
-  assert.match(switcher, /Создать проект/);
+  assert.match(switcher, /Создать новый проект/);
   assert.match(switcher, /Лимит проектов/);
   assert.match(switcher, /Безлимит/);
+  assert.match(switcher, /AuthorProjectCapacityOfferDialog/);
 
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
   assert.match(form, /Продукт будет опубликован от проекта/);

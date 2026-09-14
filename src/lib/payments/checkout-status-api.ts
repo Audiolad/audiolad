@@ -13,6 +13,9 @@ export type CheckoutStatusResponseBody = {
   authenticated: boolean;
   orderKind?: string | null;
   targetAccessLevel?: number | null;
+  /** Order snapshot amount in minor units when present. */
+  amountMinor?: number | null;
+  currency?: string | null;
 };
 
 export type CheckoutStatusErrorCode = "invalid_request" | "invalid_token";
@@ -49,6 +52,8 @@ export function toCheckoutStatusBody(input: {
   authenticated: boolean;
   orderKind?: string | null;
   targetAccessLevel?: number | null;
+  amountMinor?: number | null;
+  currency?: string | null;
 }): CheckoutStatusResponseBody {
   const normalizedStatus = normalizeCheckoutOrderStatus(input.status);
 
@@ -67,6 +72,15 @@ export function toCheckoutStatusBody(input: {
       typeof input.targetAccessLevel === "number" &&
       Number.isInteger(input.targetAccessLevel)
         ? input.targetAccessLevel
+        : null,
+    amountMinor:
+      typeof input.amountMinor === "number" &&
+      Number.isFinite(input.amountMinor)
+        ? Math.trunc(input.amountMinor)
+        : null,
+    currency:
+      typeof input.currency === "string" && input.currency.trim()
+        ? input.currency.trim().toUpperCase()
         : null,
   };
 }
