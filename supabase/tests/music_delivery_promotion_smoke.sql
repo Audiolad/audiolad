@@ -168,13 +168,17 @@ BEGIN
     RAISE EXCEPTION 'I service_role promote of current stream must remain true';
   END IF;
 
-  -- J. processing WAV A, then direct MP3 B becomes current and clears pointers
+  -- J. processing WAV A, then direct MP3 B becomes current and clears pointers.
+  -- Case F requeues master B after a non-permanent fail; clear leftover queued
+  -- jobs so claim cannot steal B ahead of the fresh A job.
   UPDATE public.audio_items
   SET desired_music_master_asset_id = v_master_a,
       active_music_delivery_asset_id = v_stream_b,
       audio_path = 'legacy/track.mp3'
   WHERE id = v_audio;
-  DELETE FROM public.music_transcode_jobs WHERE source_asset_id = v_master_a;
+  DELETE FROM public.music_transcode_jobs
+  WHERE source_asset_id IN (v_master_a, v_master_b)
+    AND status IN ('queued', 'processing');
   INSERT INTO public.music_transcode_jobs (source_asset_id, status, attempt_count)
   VALUES (v_master_a, 'queued', 0);
   SELECT * INTO v_job FROM public.claim_music_transcode_job(1800, 3);
