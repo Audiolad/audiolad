@@ -11,6 +11,7 @@ DECLARE
   v_master uuid := '461c0001-0000-4000-8000-000000000004';
   v_master_ready uuid := '461c0001-0000-4000-8000-000000000024';
   v_stream uuid := '461c0001-0000-4000-8000-000000000005';
+  v_stream_ready uuid := '461c0001-0000-4000-8000-000000000025';
   v_raised boolean;
   v_detail text;
   v_duration numeric;
@@ -78,7 +79,7 @@ BEGIN
   -- music WAV active stream must be moderation-ready.
   PERFORM public.assert_practice_moderation_ready(v_practice);
 
-  -- ready job without active must fail incomplete_audio.
+  -- ready job + verified stream, but no active pointer, must still fail incomplete_audio.
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class
   ) VALUES (
@@ -90,16 +91,21 @@ BEGIN
   INSERT INTO public.music_audio_assets (
     id, audio_item_id, source_asset_id, asset_role, lifecycle_state, storage_bucket, storage_path,
     original_file_name, accepted_mime_type, size_bytes, duration_seconds, verified_at
-  ) VALUES (
-    v_master_ready, v_audio_ready, NULL, 'master', 'verified', 'music-masters',
-    'practices/'||v_practice_ready||'/audio/'||v_audio_ready||'/masters/'||v_master_ready||'.wav',
-    'b.wav', 'audio/wav', 2048, 33, now()
-  );
+  ) VALUES
+    (v_master_ready, v_audio_ready, NULL, 'master', 'verified', 'music-masters',
+     'practices/'||v_practice_ready||'/audio/'||v_audio_ready||'/masters/'||v_master_ready||'.wav',
+     'b.wav', 'audio/wav', 2048, 33, now()),
+    (v_stream_ready, v_audio_ready, v_master_ready, 'stream', 'verified', 'music-streams',
+     v_audio_ready||'/'||v_master_ready||'/mp3-256.mp3',
+     'mp3-256.mp3', 'audio/mpeg', 900, 33, now());
   UPDATE public.audio_items
   SET desired_music_master_asset_id = v_master_ready
   WHERE id = v_audio_ready;
-  INSERT INTO public.music_transcode_jobs (source_asset_id, status)
-  VALUES (v_master_ready, 'ready');
+  INSERT INTO public.music_transcode_jobs (
+    source_asset_id, status, output_asset_id, completed_at, attempt_count
+  ) VALUES (
+    v_master_ready, 'ready', v_stream_ready, now(), 1
+  );
 
   v_raised := false;
   BEGIN
