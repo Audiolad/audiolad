@@ -30,6 +30,7 @@ import type {
 import { coercePracticeRow } from "./types";
 import { slugifyTitle } from "./utils";
 import { isVerifiedMusicStreamAsset } from "@/lib/listen/music-delivery";
+import { loadValidatedActiveMusicDeliveryItemIds } from "@/lib/listen/validated-active-music-delivery";
 
 const PRACTICE_DETAIL_SELECT = `
   id,
@@ -131,6 +132,7 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
 
 
 
+
 function asMusicStreamCandidate(asset: {
   audio_item_id: string;
   asset_role: string;
@@ -145,41 +147,6 @@ function asMusicStreamCandidate(asset: {
     storageBucket: asset.storage_bucket,
     storagePath: asset.storage_path ?? "",
   };
-}
-
-async function loadValidatedActiveDeliveryItemIds(
-  items: Array<{
-    id: string;
-    active_music_delivery_asset_id?: string | null;
-  }>,
-): Promise<Set<string>> {
-  const withPointer = items.filter((item) => item.active_music_delivery_asset_id);
-  if (withPointer.length === 0) return new Set();
-  const service = createServiceRoleClient();
-  const ids = withPointer
-    .map((item) => item.active_music_delivery_asset_id)
-    .filter((id): id is string => Boolean(id));
-  const { data, error } = await service
-    .from("music_audio_assets")
-    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
-    .in("id", ids);
-  if (error) {
-    console.error("active_stream_validation_lookup_failed", error.message);
-    return new Set();
-  }
-  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
-  const valid = new Set<string>();
-  for (const item of withPointer) {
-    const asset = byId.get(item.active_music_delivery_asset_id as string);
-    if (
-      asset
-      && asset.id === item.active_music_delivery_asset_id
-      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
-    ) {
-      valid.add(item.id);
-    }
-  }
-  return valid;
 }
 
 async function loadActiveStreamDurations(
@@ -284,7 +251,7 @@ async function loadMusicMasterStatus(
         .order("created_at", { ascending: false })
     : { data: [] };
   const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
-  const validatedActive = await loadValidatedActiveDeliveryItemIds(items);
+  const validatedActive = await loadValidatedActiveMusicDeliveryItemIds(items);
   const statusByItem = new Map(
     [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,

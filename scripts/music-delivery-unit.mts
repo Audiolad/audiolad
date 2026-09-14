@@ -146,8 +146,9 @@ assert.equal(
   }),
   true,
 );
-assert.match(products, /loadValidatedActiveDeliveryItemIds/);
-assert.match(products, /isVerifiedMusicStreamAsset/);
+assert.match(products, /loadValidatedActiveMusicDeliveryItemIds/);
+const validatedHelper = read("src/lib/listen/validated-active-music-delivery.ts");
+assert.match(validatedHelper, /isVerifiedMusicStreamAsset/);
 
 const stream = {
   audioItemId: "item-1",
