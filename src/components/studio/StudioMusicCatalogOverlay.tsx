@@ -221,6 +221,9 @@ function StudioMusicCatalogOverlayBody({
       filter,
       limit: "20",
     });
+    if (debouncedQuery) {
+      params.set("q", debouncedQuery);
+    }
     const response = await fetch(
       `/api/studio/music/catalog?${params.toString()}`,
       { cache: "no-store" },

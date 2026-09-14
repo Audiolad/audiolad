@@ -92,6 +92,11 @@ assert.match(overlay, /data-testid="studio-music-catalog-search-clear"/);
 assert.match(overlay, /Ничего не найдено/);
 assert.match(overlay, /SEARCH_DEBOUNCE_MS = 300/);
 assert.match(overlay, /params\.set\(["']q["'], debouncedQuery\)/);
+// refreshPublication must keep server search context (q) after acquire/price_changed
+assert.match(
+  overlay,
+  /const refreshPublication = async \(publicationId: string\) => \{[\s\S]*?if \(debouncedQuery\) \{[\s\S]*?params\.set\(["']q["'], debouncedQuery\);[\s\S]*?const response = await fetch/,
+);
 assert.match(overlay, /\[filter, debouncedQuery\]/);
 assert.doesNotMatch(overlay, /label: "Бесплатная"/);
 assert.doesNotMatch(overlay, /sm:grid-cols-2/);
