@@ -1,8 +1,15 @@
 "use client";
 
 import BottomNav from "@/components/BottomNav";
+import {
+  applyRecoveryContinueOutcome,
+} from "@/lib/auth/recovery-continue";
 import { getRecoveryLandingState } from "@/lib/auth/recovery-landing";
-import { PASSWORD_RESET_EXPIRED_MESSAGE } from "@/lib/auth/recovery-messages";
+import {
+  PASSWORD_RESET_EXPIRED_MESSAGE,
+  PASSWORD_RECOVERY_VERIFY_TEMPORARY_ERROR,
+  PASSWORD_RECOVERY_VERIFY_TRANSPORT_ERROR,
+} from "@/lib/auth/recovery-messages";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +19,12 @@ import {
   stageRecoveryTokenAction,
   verifyRecoveryTokenAction,
 } from "./actions";
+
+const continueMessages = {
+  temporary: PASSWORD_RECOVERY_VERIFY_TEMPORARY_ERROR,
+  expired: PASSWORD_RESET_EXPIRED_MESSAGE,
+  transport: PASSWORD_RECOVERY_VERIFY_TRANSPORT_ERROR,
+};
 
 export default function RecoveryLanding({
   initialHasStagedRecovery,
@@ -81,14 +94,40 @@ export default function RecoveryLanding({
   async function continueRecovery() {
     setIsVerifying(true);
     setError("");
-    const result = await verifyRecoveryTokenAction();
-    if (!result.ok || !result.destination) {
-      setError(result.ok ? PASSWORD_RESET_EXPIRED_MESSAGE : result.message);
+    try {
+      const result = await verifyRecoveryTokenAction();
+      const outcome =
+        !result.ok || !result.destination
+          ? {
+              kind: "action_error" as const,
+              message: result.ok
+                ? PASSWORD_RESET_EXPIRED_MESSAGE
+                : result.message,
+              retryable:
+                !result.ok &&
+                result.message === PASSWORD_RECOVERY_VERIFY_TEMPORARY_ERROR,
+            }
+          : {
+              kind: "success" as const,
+              destination: result.destination,
+            };
+      const ui = applyRecoveryContinueOutcome(outcome, continueMessages);
+      setReady(ui.ready);
+      setError(ui.error);
+      if (ui.shouldNavigateTo) {
+        router.replace(ui.shouldNavigateTo);
+        router.refresh();
+      }
+    } catch {
+      const ui = applyRecoveryContinueOutcome(
+        { kind: "transport_error" },
+        continueMessages,
+      );
+      setReady(ui.ready);
+      setError(ui.error);
+    } finally {
       setIsVerifying(false);
-      return;
     }
-    router.replace(result.destination);
-    router.refresh();
   }
 
   return (
@@ -110,7 +149,25 @@ export default function RecoveryLanding({
             {isVerifying ? "Проверяем…" : "Продолжить"}
           </button>
         )}
-        {error ? <p className="mt-6 text-center text-sm text-[#7d70a2]"><Link href="/auth/forgot-password" className="font-semibold text-[#7042c5]">Запросить новую ссылку</Link></p> : null}
+        {error ? (
+          <div className="mt-6 space-y-3 text-center text-sm text-[#7d70a2]">
+            {ready ? (
+              <button
+                type="button"
+                disabled={isVerifying}
+                onClick={continueRecovery}
+                className="font-semibold text-[#7042c5]"
+              >
+                Попробовать ещё раз
+              </button>
+            ) : null}
+            <p>
+              <Link href="/auth/forgot-password" className="font-semibold text-[#7042c5]">
+                Запросить новую ссылку
+              </Link>
+            </p>
+          </div>
+        ) : null}
         <BottomNav />
       </div>
     </main>
