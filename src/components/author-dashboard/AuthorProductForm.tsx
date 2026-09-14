@@ -92,6 +92,7 @@ import {
   MUSIC_DELIVERY_UNSUPPORTED_TEXT,
   MUSIC_DELIVERY_UPLOAD_HINT,
   MUSIC_DELIVERY_UPLOAD_LABEL,
+  hasPlayableAuthorAudioPreview,
   musicCabinetStatus,
   resolveMusicUploadMode,
 } from "@/lib/listen/music-delivery";
@@ -368,6 +369,23 @@ function formatFileSize(bytes: number): string {
 
 const AUDIO_PREVIEW_SOFT_ERROR =
   "Аудиофайл загружен, но предпрослушивание пока недоступно. Обновите страницу.";
+
+function authorAudioPreviewFingerprint(item: AudioItemRow): string {
+  return [
+    item.id,
+    item.audio_path?.trim() || "",
+    item.active_music_delivery_asset_id || "",
+    item.music_master?.hasActiveDelivery ? "1" : "0",
+  ].join("|");
+}
+
+function audioItemHasPlayablePreview(item: AudioItemRow): boolean {
+  return hasPlayableAuthorAudioPreview({
+    audioPath: item.audio_path,
+    activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
+    hasActiveDelivery: item.music_master?.hasActiveDelivery,
+  });
+}
 
 const AUDIO_TITLE_SAVE_ERROR =
   "MP3 загружен, но название аудио не удалось сохранить. Введите его вручную.";
@@ -774,6 +792,7 @@ export default function AuthorProductForm({
     null,
   );
   const audioPreviewRequestIds = useRef<Record<string, number>>({});
+  const audioPreviewFingerprints = useRef<Record<string, string>>({});
   const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
   const pendingFocusAudioIdRef = useRef<string | null>(null);
   const addAudioInFlightRef = useRef(false);
@@ -917,19 +936,43 @@ export default function AuthorProductForm({
     [],
   );
 
+  const audioPreviewSourceKey = audioItems
+    .map((item) => authorAudioPreviewFingerprint(item))
+    .join("\n");
+
   useEffect(() => {
     if (!practiceId) {
       return;
     }
 
     const itemsToPreview = audioItems.filter(
-      (item) =>
-        !item.id.startsWith("temp-") &&
-        (Boolean(item.audio_path) || Boolean(item.music_master?.hasActiveDelivery)),
+      (item) => !item.id.startsWith("temp-") && audioItemHasPlayablePreview(item),
     );
+    const playableIds = new Set(itemsToPreview.map((item) => item.id));
 
-    if (itemsToPreview.length === 0) {
-      return;
+    for (const audioId of Object.keys(audioPreviewFingerprints.current)) {
+      if (playableIds.has(audioId)) {
+        continue;
+      }
+      delete audioPreviewFingerprints.current[audioId];
+      setAudioPreviewUrls((current) => {
+        if (!(audioId in current)) return current;
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewErrors((current) => {
+        if (!(audioId in current)) return current;
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewLoading((current) => {
+        if (!(audioId in current)) return current;
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
     }
 
     let cancelled = false;
@@ -940,6 +983,15 @@ export default function AuthorProductForm({
       }
 
       for (const item of itemsToPreview) {
+        const fingerprint = authorAudioPreviewFingerprint(item);
+        if (audioPreviewFingerprints.current[item.id] === fingerprint) {
+          continue;
+        }
+        audioPreviewFingerprints.current[item.id] = fingerprint;
+        setAudioPreviewVersions((current) => ({
+          ...current,
+          [item.id]: (current[item.id] ?? 0) + 1,
+        }));
         void loadAudioPreview(practiceId, item.id);
       }
     });
@@ -947,9 +999,7 @@ export default function AuthorProductForm({
     return () => {
       cancelled = true;
     };
-    // Initial preview load for existing MP3 on page open; upload/replace calls loadAudioPreview directly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practiceId]);
+  }, [practiceId, audioPreviewSourceKey, loadAudioPreview, audioItems]);
 
   useEffect(() => {
     const current = serializeProductEditorBaseline(form, audioItems);
@@ -2345,12 +2395,7 @@ export default function AuthorProductForm({
         setMessage(result.message);
       } else {
         applyServerProductPreservingDraft(result.product);
-        setAudioPreviewVersions((current) => ({
-          ...current,
-          [targetAudioId]: (current[targetAudioId] ?? 0) + 1,
-        }));
         setMessage("Аудио загружено.");
-        void loadAudioPreview(id, targetAudioId);
         await autofillAudioTitleFromFile(
           targetAudioId,
           file,
@@ -4005,13 +4050,7 @@ export default function AuthorProductForm({
                   ) : null}
                 </div>
 
-                <p className="text-sm leading-5 text-[#7d70a2]">
-                  {form.productKind === PRODUCT_KIND.MUSIC
-                    ? MUSIC_DELIVERY_UPLOAD_HINT
-                    : PRODUCT_AUDIO_SIZE_HINT}
-                </p>
-
-                {(audioItem.audio_path || audioItem.music_master?.hasActiveDelivery) && practiceId && !audioItem.id.startsWith("temp-") ? (
+                {audioItemHasPlayablePreview(audioItem) && practiceId && !audioItem.id.startsWith("temp-") ? (
                   <div className="mt-3">
                     {audioPreviewLoading[audioItem.id] ? (
                       <p className="text-sm text-[#7d70a2]">
@@ -4029,11 +4068,17 @@ export default function AuthorProductForm({
                         controls
                         preload="none"
                         src={audioPreviewUrls[audioItem.id]}
-                        className="mt-2 w-full"
+                        className="w-full"
                       />
                     ) : null}
                   </div>
                 ) : null}
+
+                <p className="text-sm leading-5 text-[#7d70a2]">
+                  {form.productKind === PRODUCT_KIND.MUSIC
+                    ? MUSIC_DELIVERY_UPLOAD_HINT
+                    : PRODUCT_AUDIO_SIZE_HINT}
+                </p>
 
                 <div className="flex flex-wrap gap-2">
                   {contentLockedAfterSale && audioItem.audio_path ? null : (

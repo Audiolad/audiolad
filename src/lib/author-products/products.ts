@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { coercePracticeRow } from "./types";
 import { slugifyTitle } from "./utils";
+import { isVerifiedMusicStreamAsset } from "@/lib/listen/music-delivery";
 
 const PRACTICE_DETAIL_SELECT = `
   id,
@@ -128,6 +129,101 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   desired_music_master_asset_id
 `;
 
+
+
+function asMusicStreamCandidate(asset: {
+  audio_item_id: string;
+  asset_role: string;
+  lifecycle_state: string;
+  storage_bucket: string;
+  storage_path?: string | null;
+}) {
+  return {
+    audioItemId: asset.audio_item_id,
+    assetRole: asset.asset_role,
+    lifecycleState: asset.lifecycle_state,
+    storageBucket: asset.storage_bucket,
+    storagePath: asset.storage_path ?? "",
+  };
+}
+
+async function loadValidatedActiveDeliveryItemIds(
+  items: Array<{
+    id: string;
+    active_music_delivery_asset_id?: string | null;
+  }>,
+): Promise<Set<string>> {
+  const withPointer = items.filter((item) => item.active_music_delivery_asset_id);
+  if (withPointer.length === 0) return new Set();
+  const service = createServiceRoleClient();
+  const ids = withPointer
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+    .in("id", ids);
+  if (error) {
+    console.error("active_stream_validation_lookup_failed", error.message);
+    return new Set();
+  }
+  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
+  const valid = new Set<string>();
+  for (const item of withPointer) {
+    const asset = byId.get(item.active_music_delivery_asset_id as string);
+    if (
+      asset
+      && asset.id === item.active_music_delivery_asset_id
+      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
+    ) {
+      valid.add(item.id);
+    }
+  }
+  return valid;
+}
+
+async function loadActiveStreamDurations(
+  items: Array<{
+    id: string;
+    duration_seconds?: number | null;
+    active_music_delivery_asset_id?: string | null;
+  }>,
+): Promise<Map<string, number>> {
+  const need = items.filter(
+    (item) =>
+      item.active_music_delivery_asset_id
+      && !(item.duration_seconds && item.duration_seconds > 0),
+  );
+  if (need.length === 0) return new Map();
+  const service = createServiceRoleClient();
+  const ids = need
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, duration_seconds")
+    .in("id", ids);
+  if (error) {
+    console.error("active_stream_duration_lookup_failed", error.message);
+    return new Map();
+  }
+  const out = new Map<string, number>();
+  const byId = new Map((data ?? []).map((asset) => [asset.id, asset]));
+  for (const item of need) {
+    const asset = byId.get(item.active_music_delivery_asset_id as string);
+    if (
+      asset
+      && asset.id === item.active_music_delivery_asset_id
+      && isVerifiedMusicStreamAsset(asMusicStreamCandidate(asset), item.id)
+      && typeof asset.duration_seconds === "number"
+      && asset.duration_seconds > 0
+    ) {
+      out.set(item.id, asset.duration_seconds);
+    }
+  }
+  return out;
+}
+
 async function loadMusicMasterStatus(
   items: Array<{
     id: string;
@@ -188,18 +284,30 @@ async function loadMusicMasterStatus(
         .order("created_at", { ascending: false })
     : { data: [] };
   const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
-  const activeByItem = new Map(items.map((item) => [item.id, Boolean(item.active_music_delivery_asset_id)]));
-  return new Map(
+  const validatedActive = await loadValidatedActiveDeliveryItemIds(items);
+  const statusByItem = new Map(
     [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,
       {
         assetId: asset.id,
         lifecycleState: asset.lifecycle_state,
         transcodeStatus: jobsBySource.get(asset.id) ?? null,
-        hasActiveDelivery: activeByItem.get(asset.audio_item_id) ?? false,
+        hasActiveDelivery: validatedActive.has(asset.audio_item_id),
       },
     ]),
   );
+  // Active stream can remain after desired master is cleared; still surface playable delivery.
+  for (const item of items) {
+    if (statusByItem.has(item.id)) continue;
+    if (!validatedActive.has(item.id) || !item.active_music_delivery_asset_id) continue;
+    statusByItem.set(item.id, {
+      assetId: item.active_music_delivery_asset_id,
+      lifecycleState: "verified",
+      transcodeStatus: null,
+      hasActiveDelivery: true,
+    });
+  }
+  return statusByItem;
 }
 
 export async function listAuthorProducts(
@@ -309,12 +417,21 @@ export async function getAuthorProductDetail(
     ? await loadMusicMasterStatus(audioItems ?? [])
     : new Map();
 
+  const durationByActiveStream = await loadActiveStreamDurations(audioItems ?? []);
+
   return {
     practice: practiceRow,
-    audio_items: (audioItems ?? []).map((item) => ({
-      ...item,
-      music_master: musicMasterStatus.get(item.id) ?? null,
-    })) as AudioItemRow[],
+    audio_items: (audioItems ?? []).map((item) => {
+      const hydratedDuration =
+        item.duration_seconds && item.duration_seconds > 0
+          ? item.duration_seconds
+          : durationByActiveStream.get(item.id) ?? item.duration_seconds;
+      return {
+        ...item,
+        duration_seconds: hydratedDuration ?? null,
+        music_master: musicMasterStatus.get(item.id) ?? null,
+      };
+    }) as AudioItemRow[],
     gallery_slides: gallerySlides,
     seo_content: seoContent,
     contentLockedAfterSale,

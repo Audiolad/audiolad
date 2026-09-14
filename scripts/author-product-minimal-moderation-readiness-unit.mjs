@@ -130,4 +130,52 @@ assert.doesNotMatch(
   /async function (?:submitForModeration|publishProduct)\(\) \{[\s\S]*topicMinimumCheck/,
 );
 
+
+const musicPractice = practice({
+  id: "music-1",
+  product_kind: "music",
+  publication_class: "release",
+  title: "Музыка",
+});
+const wavReady = audio(1, {
+  practice_id: "music-1",
+  audio_path: null,
+  active_music_delivery_asset_id: "stream-1",
+  duration_seconds: 42,
+  music_master: {
+    assetId: "master-1",
+    lifecycleState: "verified",
+    transcodeStatus: "ready",
+    hasActiveDelivery: true,
+  },
+});
+assert.equal(
+  evaluatePublishReadiness(musicPractice, [wavReady], { activeTopicCount: 0 }).ok,
+  true,
+);
+assert.equal(
+  evaluateDatabaseModerationReady({
+    practice: musicPractice,
+    audioItems: [wavReady],
+    accessStatus: "full",
+    activeTopicCount: 0,
+  }).ok,
+  true,
+);
+assert.doesNotMatch(
+  evaluatePublishReadiness(
+    musicPractice,
+    [audio(1, { practice_id: "music-1", audio_path: null })],
+    { activeTopicCount: 0 },
+  ).firstFailure?.message ?? "",
+  /Загрузите MP3-файл/,
+);
+
+const publishMig = readFileSync(
+  path.join(root, "supabase/migrations/20261007180000_music_publish_playable_audio.sql"),
+  "utf8",
+);
+assert.match(publishMig, /product_kind = 'music'/);
+assert.match(publishMig, /active_music_delivery_asset_id/);
+
 console.log("author-product-minimal-moderation-readiness-unit: ok");

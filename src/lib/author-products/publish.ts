@@ -20,6 +20,11 @@ import {
   MUSIC_KIND_LABEL,
 } from "./product-kind";
 import { minutesFromSeconds } from "./utils";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  hasValidatedMusicPublishSource,
+  isVerifiedMusicStreamAsset,
+} from "@/lib/listen/music-delivery";
 
 export type PublishValidationResult =
   | { ok: true }
@@ -145,12 +150,21 @@ export function validateAudioItemsStructure(
     }
 
     const audioNumber = index + 1;
+    const isMusic = isMusicProductKind(practice.product_kind);
+    const playable = isMusic
+      ? hasValidatedMusicPublishSource({
+          audioPath: item.audio_path,
+          hasActiveDelivery: item.music_master?.hasActiveDelivery,
+        })
+      : Boolean(item.audio_path?.trim());
 
-    if (!item.audio_path?.trim()) {
+    if (!playable) {
       return {
         ok: false,
         code: "missing_audio_file",
-        message: `Загрузите MP3-файл для аудио ${audioNumber}.`,
+        message: isMusic
+          ? `Загрузите аудио для трека ${audioNumber}.`
+          : `Загрузите MP3-файл для аудио ${audioNumber}.`,
       };
     }
 
@@ -158,7 +172,9 @@ export function validateAudioItemsStructure(
       return {
         ok: false,
         code: "missing_audio_duration",
-        message: `Не удалось определить длительность аудио ${audioNumber}.`,
+        message: isMusic
+          ? `Не удалось определить длительность трека ${audioNumber}.`
+          : `Не удалось определить длительность аудио ${audioNumber}.`,
       };
     }
   }
@@ -418,7 +434,7 @@ export async function syncPracticeAudioCompatibility(
 
   const { data: audioItems, error: audioError } = await supabase
     .from("audio_items")
-    .select("id, audio_path, duration_seconds, position")
+    .select("id, audio_path, duration_seconds, position, active_music_delivery_asset_id")
     .eq("practice_id", practiceId)
     .order("position", { ascending: true });
 
@@ -431,9 +447,50 @@ export async function syncPracticeAudioCompatibility(
   );
 
   const itemsWithMp3 = sortedItems.filter((item) => item.audio_path?.trim());
+  const activeIds = sortedItems
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const validatedActiveItemIds = new Set<string>();
+  if (activeIds.length > 0) {
+    const service = createServiceRoleClient();
+    const { data: assets, error: assetError } = await service
+      .from("music_audio_assets")
+      .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+      .in("id", activeIds);
+    if (assetError) {
+      throw new Error("audio_items_lookup_failed");
+    }
+    const byId = new Map((assets ?? []).map((asset) => [asset.id, asset]));
+    for (const item of sortedItems) {
+      const asset = item.active_music_delivery_asset_id
+        ? byId.get(item.active_music_delivery_asset_id)
+        : undefined;
+      if (
+        asset
+        && asset.id === item.active_music_delivery_asset_id
+        && isVerifiedMusicStreamAsset(
+          {
+            audioItemId: asset.audio_item_id,
+            assetRole: asset.asset_role,
+            lifecycleState: asset.lifecycle_state,
+            storageBucket: asset.storage_bucket,
+            storagePath: asset.storage_path ?? "",
+          },
+          item.id,
+        )
+      ) {
+        validatedActiveItemIds.add(item.id);
+      }
+    }
+  }
+  const itemsWithPlayableDuration = sortedItems.filter(
+    (item) =>
+      Boolean(item.audio_path?.trim())
+      || validatedActiveItemIds.has(item.id),
+  );
 
   const firstAudioPath = itemsWithMp3[0]?.audio_path?.trim() ?? null;
-  const totalDurationSeconds = itemsWithMp3.reduce(
+  const totalDurationSeconds = itemsWithPlayableDuration.reduce(
     (sum, item) => sum + (item.duration_seconds ?? 0),
     0,
   );

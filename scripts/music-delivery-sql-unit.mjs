@@ -82,4 +82,27 @@ assert(/H first-ever MP3 under lock must succeed/.test(smoke));
 assert(/I locked promote must not replace delivered stream A/.test(smoke));
 assert(/J blocked promote should clear stale desired/.test(smoke));
 
+
+const publishMigName = "20261007180000_music_publish_playable_audio.sql";
+const publishMig = readFileSync(join(repoRoot, "supabase/migrations", publishMigName), "utf8");
+const publishSmoke = readFileSync(join(repoRoot, "supabase/tests/music_publish_playable_smoke.sql"), "utf8");
+assert(versions.includes("20261007180000"), "publish playable version listed");
+assert(/duration_seconds = CASE/.test(publishMig), "promote copies stream duration");
+assert(/v_practice\.product_kind = 'music'/.test(publishMig), "moderation ready music branch");
+assert(/music_item_has_validated_active_delivery/.test(publishMig), "validated delivery helper");
+assert(/asset\.storage_bucket = 'music-streams'/.test(publishMig), "readiness joins music-streams");
+assert(/asset\.lifecycle_state = 'verified'/.test(publishMig), "readiness requires verified stream");
+assert(/NULLIF\(btrim\(COALESCE\(asset\.storage_path/.test(publishMig), "readiness requires storage path");
+assert(/music_item_has_validated_active_delivery\(ai\.id\)/.test(publishMig), "publish duration uses validated delivery");
+assert(/music_item_effective_publish_duration_seconds/.test(publishMig), "effective publish duration helper");
+assert(/sum\(public\.music_item_effective_publish_duration_seconds\(ai\.id\)\)/.test(publishMig), "publish sums effective duration");
+assert(!/SELECT COALESCE\(sum\(ai\.duration_seconds\), 0\)/.test(publishMig), "publish no longer sums bare ai.duration_seconds");
+assert(!/OR active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "bare pointer is not sufficient");
+assert(/Backfill duration for already-promoted/.test(publishMig), "duration backfill present");
+assert(/music WAV active stream must be moderation-ready/.test(publishSmoke), "publish smoke covers WAV ready");
+assert(/music WAV processing without active must fail incomplete_audio/.test(publishSmoke), "publish smoke covers processing fail");
+assert(/invalidated stream must fail incomplete_audio/.test(publishSmoke), "publish smoke covers post-assignment invalidation");
+assert(/stream-only null item duration publish must set duration_minutes=1/.test(publishSmoke), "publish smoke covers stream-only duration");
+assert(/mixed MP3\+WAV publish duration_minutes must be 2/.test(publishSmoke), "publish smoke covers mixed duration");
+
 process.stdout.write("music-delivery-sql-unit: ok\n");
