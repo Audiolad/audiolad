@@ -14,6 +14,12 @@ import {
   isAuthorSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
+  countActiveAuthorSeoReservations,
+  isSeoActiveReservationLimitReached,
+  nextActiveReservationCountAfterReserve,
+  SEO_ACTIVE_RESERVATION_LIMIT,
+} from "../src/lib/seo-queries/types.ts";
+import {
   SEO_DISCOVERY_IN_CHUNK_SIZE,
   chunkList,
 } from "../src/lib/seo-queries/author-discovery-repository.ts";
@@ -24,6 +30,7 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
 const proposalsRoute = read("src/app/api/author/seo/proposals/route.ts");
 const ui = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
+const panel = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
 const migration = read(
   "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
 );
@@ -46,10 +53,10 @@ assert.match(proposalsRoute, /fetchWordstatSuggestions\(seedPhrase/);
 assert.match(proposalsRoute, /matchWordstatSuggestionCount/);
 assert.doesNotMatch(proposalsRoute, /readCount|body\.count/);
 assert.match(proposalsRoute, /wordstat_selection_stale/);
-assert.match(ui, /seed_phrase: discoverySeedPhrase/);
-assert.match(ui, /discoverySeedPhrase/);
-assert.match(ui, /payload\.phrase/);
-assert.doesNotMatch(ui, /count:\s*item\.frequency/);
+assert.match(panel, /seed_phrase: discoverySeedPhrase/);
+assert.match(panel, /discoverySeedPhrase/);
+assert.match(panel, /payload\.phrase/);
+assert.doesNotMatch(panel, /count:\s*item\.frequency/);
 
 assert.match(migration, /submitted_by_user_id uuid NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
 assert.doesNotMatch(migration, /submitted_by_user_id uuid NOT NULL/);
@@ -60,15 +67,15 @@ assert.match(discoveryRepo, /isEffectiveSeoReservation/);
 assert.match(discoveryRepo, /expires_at/);
 assert.match(queriesLib, /isEffectiveSeoReservation/);
 
-assert.match(ui, /Найти запросы/);
-assert.match(ui, /Запросов в месяц/);
-assert.doesNotMatch(ui, /normalized:/);
-assert.match(ui, /\/api\/author\/seo\/discovery/);
-assert.match(ui, /\/api\/author\/seo\/proposals/);
-assert.match(ui, /\/api\/author\/seo-reservations/);
-assert.match(ui, /Отправить на проверку/);
-assert.match(ui, /Взять в работу/);
-assert.match(ui, /Данные изменились\. Выполните поиск ещё раз\./);
+assert.match(panel, /Найти запросы/);
+assert.match(panel, /Запросов в месяц/);
+assert.doesNotMatch(panel, /normalized:/);
+assert.match(panel, /\/api\/author\/seo\/discovery/);
+assert.match(panel, /\/api\/author\/seo\/proposals/);
+assert.match(panel, /\/api\/author\/seo-reservations/);
+assert.match(panel, /Отправить на проверку/);
+assert.match(panel, /Взять в работу/);
+assert.match(panel, /Данные изменились\. Выполните поиск ещё раз\./);
 
 const authorA = "author-a";
 const authorB = "author-b";
@@ -551,16 +558,37 @@ assert.match(page, /discoveryEnabled/);
 assert.match(page, /Что ищут слушатели/);
 
 assert.match(ui, /discoveryEnabled/);
-assert.match(ui, /Найти запросы/);
+assert.match(panel, /Найти запросы/);
 
 const dash = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
 assert.match(dash, /isAuthorSeoDiscoveryEnabled/);
-assert.match(dash, /Что ищут слушатели/);
-assert.match(dash, /Бета/);
+assert.match(dash, /AuthorSeoDiscoveryPanel/);
+assert.match(dash, /variant="dashboard"/);
+assert.doesNotMatch(dash, /seo-opportunities\?author=/);
+assert.doesNotMatch(dash, /href=\{\`\/author-dashboard\/seo-opportunities/);
 
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
 assert.match(nav, /isAuthorSeoDiscoveryEnabled/);
 assert.match(nav, /Что ищут слушатели/);
+
+// Shared panel: dashboard + opportunities variants
+assert.match(panel, /variant === "dashboard"/);
+assert.match(panel, /Найдите тему для нового аудиопродукта/);
+assert.match(panel, /Что ищут слушатели/);
+assert.match(panel, /Бета/);
+assert.match(panel, /Подходящие запросы из базы АудиоЛада/);
+assert.match(panel, /Дополнительные варианты из Яндекса/);
+
+// Dashboard embeds panel before opportunities section
+assert.match(dash, /author-seo-discovery-panel/);
+const dashPanelIdx = dash.indexOf("AuthorSeoDiscoveryPanel");
+const dashOppIdx = dash.indexOf("Возможности для авторов");
+assert.ok(dashPanelIdx > 0 && dashPanelIdx < dashOppIdx, "discovery panel before opportunities");
+
+// Opportunities page still embeds the same panel
+assert.match(ui, /AuthorSeoDiscoveryPanel/);
+assert.match(ui, /variant="opportunities"/);
+assert.match(ui, /discoveryEnabled/);
 
 // products not required for discovery UI
 assert.doesNotMatch(ui, /products\.length === 0[\s\S]{0,80}discoveryEnabled/);
@@ -584,5 +612,85 @@ assert.equal(chunkList(seventeen).length, 3);
 assert.equal(chunkList(seventeen)[0].length, 8);
 assert.equal(chunkList(seventeen)[2].length, 1);
 assert.deepEqual(chunkList([]), [[]]);
+
+// --- Dashboard canonical active reservation count (A–K) ---
+const dashPage = read("src/app/(platform)/author-dashboard/page.tsx");
+assert.match(dashPage, /listSeoOpportunitiesForAuthor/);
+assert.match(dashPage, /countActiveAuthorSeoReservations/);
+assert.match(dashPage, /seoActiveReservationCounts/);
+assert.match(dashPage, /isAuthorSeoDiscoveryEnabled/);
+assert.doesNotMatch(dashPage, /\/api\/author\/seo\/discovery/);
+assert.doesNotMatch(dashPage, /\/api\/author\/seo\/proposals/);
+assert.doesNotMatch(dashPage, /fetchWordstatSuggestions/);
+assert.doesNotMatch(dashPage, /wordstat/i);
+
+assert.match(dash, /seoActiveReservationCounts/);
+assert.match(dash, /seoActiveReservationCounts\[selectedAuthor\.id\] \?\? 0/);
+assert.doesNotMatch(dash, /activeReservationCount=\{0\}/);
+
+// A — count 0 → reserve not limited
+assert.equal(isSeoActiveReservationLimitReached(0), false);
+assert.equal(countActiveAuthorSeoReservations([]), 0);
+
+// B — count 5 → reserve disabled before any POST
+assert.equal(isSeoActiveReservationLimitReached(5), true);
+assert.equal(SEO_ACTIVE_RESERVATION_LIMIT, 5);
+assert.match(panel, /isSeoActiveReservationLimitReached\(effectiveActiveCount\)/);
+
+// C — 4 → successful reserve → 5 → limit reached
+assert.equal(nextActiveReservationCountAfterReserve(4, true), 5);
+assert.equal(isSeoActiveReservationLimitReached(nextActiveReservationCountAfterReserve(4, true)), true);
+
+// D — failed reserve does not bump
+assert.equal(nextActiveReservationCountAfterReserve(4, false), 4);
+assert.match(panel, /nextActiveReservationCountAfterReserve\(current\.local, true\)/);
+assert.match(panel, /if \(!response\.ok\)/);
+// increment only on success path (helper called with true after ok check)
+const reserveFn = panel.slice(panel.indexOf("async function reserve"), panel.indexOf("async function runDiscovery"));
+assert.ok(reserveFn.indexOf("if (!response.ok)") < reserveFn.indexOf("nextActiveReservationCountAfterReserve"), "fail returns before increment");
+
+// Canonical filter: published / no reservationId excluded; in_progress counted
+assert.equal(
+  countActiveAuthorSeoReservations([
+    { reservationId: "r1", lifecycle: "in_progress" },
+    { reservationId: "r2", lifecycle: "moderation" },
+    { reservationId: "r3", lifecycle: "published" },
+    { reservationId: null, lifecycle: "available" },
+  ]),
+  2,
+);
+
+// E/F — multi-workspace: panel gated by selectedAuthor.id; key remounts per author
+assert.match(dash, /isAuthorSeoDiscoveryEnabled\(selectedAuthor\.id\)/);
+assert.match(dash, /key=\{selectedAuthor\.id\}/);
+assert.match(dash, /seoActiveReservationCounts\[selectedAuthor\.id\]/);
+
+// G — seo-opportunities uses canonical counter
+assert.match(ui, /countActiveAuthorSeoReservations\(items\)/);
+assert.match(ui, /activeReservationCount=\{activeCount\}/);
+assert.match(page, /listSeoOpportunitiesForAuthor/);
+
+// H — dashboard client does not call discovery/proposals/Wordstat on load
+assert.doesNotMatch(dash, /\/api\/author\/seo\/discovery/);
+assert.doesNotMatch(dash, /\/api\/author\/seo\/proposals/);
+assert.doesNotMatch(dash, /wordstat/i);
+// products fetch only
+assert.match(dash, /\/api\/author\/products/);
+
+// I — beta gate Aurafon only (already covered) + dashboard page filters betaAuthors
+assert.match(dashPage, /betaAuthors|isAuthorSeoDiscoveryEnabled\(author\.id\)/);
+
+// J — single shared panel
+assert.match(dash, /AuthorSeoDiscoveryPanel/);
+assert.match(ui, /AuthorSeoDiscoveryPanel/);
+assert.equal(
+  read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx").includes("async function runDiscovery"),
+  true,
+);
+assert.doesNotMatch(ui, /async function runDiscovery/);
+assert.doesNotMatch(dash, /async function runDiscovery/);
+
+// K — chunk size 8 regression (asserted above)
+assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
 
 console.log("author-seo-discovery-unit: ok");

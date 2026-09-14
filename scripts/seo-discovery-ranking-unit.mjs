@@ -247,7 +247,7 @@ assert.match(discoveryRoute, /fetchWordstatSuggestions/);
 // Wordstat block still returned even when DB empty — route always calls Wordstat
 assert.match(discoveryRoute, /const wordstat = await fetchWordstatSuggestions/);
 
-const ui = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
+const ui = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
 assert.match(ui, /Подходящие запросы из базы АудиоЛада/);
 assert.match(ui, /Дополнительные варианты из Яндекса/);
 assert.match(ui, /Отправить на проверку/);
