@@ -16,7 +16,8 @@ import {
   evaluateCourseLessonsReadiness,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
-import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
+import { isAudioPostProductKind, isMusicProductKind } from "@/lib/author-products/product-kind";
+import { hasPlayableAuthorAudioPreview } from "@/lib/listen/music-delivery";
 import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
 
 export type DatabaseModerationReadyCheck = {
@@ -133,12 +134,21 @@ export function evaluateDatabaseModerationReady(
       "incomplete_audio",
       "Полнота аудиозаписей",
       !isCourse &&
-        input.audioItems.some(
-          (item) =>
-            !item.audio_path?.trim() ||
-            !item.duration_seconds ||
-            item.duration_seconds <= 0,
-        )
+        input.audioItems.some((item) => {
+          const durationOk =
+            Boolean(item.duration_seconds) && item.duration_seconds! > 0;
+          if (isMusicProductKind(practice.product_kind)) {
+            return !(
+              durationOk
+              && hasPlayableAuthorAudioPreview({
+                audioPath: item.audio_path,
+                activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
+                hasActiveDelivery: item.music_master?.hasActiveDelivery,
+              })
+            );
+          }
+          return !item.audio_path?.trim() || !durationOk;
+        })
         ? "У одной или нескольких аудиозаписей нет файла или длительности."
         : null,
     ),

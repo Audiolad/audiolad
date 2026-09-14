@@ -82,4 +82,17 @@ assert(/H first-ever MP3 under lock must succeed/.test(smoke));
 assert(/I locked promote must not replace delivered stream A/.test(smoke));
 assert(/J blocked promote should clear stale desired/.test(smoke));
 
+
+const publishMigName = "20261007170000_music_publish_playable_audio.sql";
+const publishMig = readFileSync(join(repoRoot, "supabase/migrations", publishMigName), "utf8");
+const publishSmoke = readFileSync(join(repoRoot, "supabase/tests/music_publish_playable_smoke.sql"), "utf8");
+assert(versions.includes("20261007170000"), "publish playable version listed");
+assert(/duration_seconds = CASE/.test(publishMig), "promote copies stream duration");
+assert(/v_practice\.product_kind = 'music'/.test(publishMig), "moderation ready music branch");
+assert(/active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "active delivery accepted");
+assert(/OR active_music_delivery_asset_id IS NOT NULL/.test(publishMig), "publish duration sum includes active");
+assert(/Backfill duration for already-promoted/.test(publishMig), "duration backfill present");
+assert(/music WAV active stream must be moderation-ready/.test(publishSmoke), "publish smoke covers WAV ready");
+assert(/music WAV processing without active must fail incomplete_audio/.test(publishSmoke), "publish smoke covers processing fail");
+
 process.stdout.write("music-delivery-sql-unit: ok\n");

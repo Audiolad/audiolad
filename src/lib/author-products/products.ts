@@ -128,6 +128,47 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   desired_music_master_asset_id
 `;
 
+
+async function loadActiveStreamDurations(
+  items: Array<{
+    id: string;
+    duration_seconds?: number | null;
+    active_music_delivery_asset_id?: string | null;
+  }>,
+): Promise<Map<string, number>> {
+  const need = items.filter(
+    (item) =>
+      item.active_music_delivery_asset_id
+      && !(item.duration_seconds && item.duration_seconds > 0),
+  );
+  if (need.length === 0) return new Map();
+  const service = createServiceRoleClient();
+  const ids = need
+    .map((item) => item.active_music_delivery_asset_id)
+    .filter((id): id is string => Boolean(id));
+  const { data, error } = await service
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, duration_seconds")
+    .in("id", ids);
+  if (error) {
+    console.error("active_stream_duration_lookup_failed", error.message);
+    return new Map();
+  }
+  const out = new Map<string, number>();
+  for (const asset of data ?? []) {
+    if (
+      asset.asset_role === "stream"
+      && asset.lifecycle_state === "verified"
+      && asset.storage_bucket === "music-streams"
+      && typeof asset.duration_seconds === "number"
+      && asset.duration_seconds > 0
+    ) {
+      out.set(asset.audio_item_id, asset.duration_seconds);
+    }
+  }
+  return out;
+}
+
 async function loadMusicMasterStatus(
   items: Array<{
     id: string;
@@ -321,12 +362,21 @@ export async function getAuthorProductDetail(
     ? await loadMusicMasterStatus(audioItems ?? [])
     : new Map();
 
+  const durationByActiveStream = await loadActiveStreamDurations(audioItems ?? []);
+
   return {
     practice: practiceRow,
-    audio_items: (audioItems ?? []).map((item) => ({
-      ...item,
-      music_master: musicMasterStatus.get(item.id) ?? null,
-    })) as AudioItemRow[],
+    audio_items: (audioItems ?? []).map((item) => {
+      const hydratedDuration =
+        item.duration_seconds && item.duration_seconds > 0
+          ? item.duration_seconds
+          : durationByActiveStream.get(item.id) ?? item.duration_seconds;
+      return {
+        ...item,
+        duration_seconds: hydratedDuration ?? null,
+        music_master: musicMasterStatus.get(item.id) ?? null,
+      };
+    }) as AudioItemRow[],
     gallery_slides: gallerySlides,
     seo_content: seoContent,
     contentLockedAfterSale,

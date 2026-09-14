@@ -20,6 +20,7 @@ import {
   MUSIC_KIND_LABEL,
 } from "./product-kind";
 import { minutesFromSeconds } from "./utils";
+import { hasPlayableAuthorAudioPreview } from "@/lib/listen/music-delivery";
 
 export type PublishValidationResult =
   | { ok: true }
@@ -145,12 +146,22 @@ export function validateAudioItemsStructure(
     }
 
     const audioNumber = index + 1;
+    const isMusic = isMusicProductKind(practice.product_kind);
+    const playable = isMusic
+      ? hasPlayableAuthorAudioPreview({
+          audioPath: item.audio_path,
+          activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
+          hasActiveDelivery: item.music_master?.hasActiveDelivery,
+        })
+      : Boolean(item.audio_path?.trim());
 
-    if (!item.audio_path?.trim()) {
+    if (!playable) {
       return {
         ok: false,
         code: "missing_audio_file",
-        message: `Загрузите MP3-файл для аудио ${audioNumber}.`,
+        message: isMusic
+          ? `Загрузите аудио для трека ${audioNumber}.`
+          : `Загрузите MP3-файл для аудио ${audioNumber}.`,
       };
     }
 
@@ -158,7 +169,9 @@ export function validateAudioItemsStructure(
       return {
         ok: false,
         code: "missing_audio_duration",
-        message: `Не удалось определить длительность аудио ${audioNumber}.`,
+        message: isMusic
+          ? `Не удалось определить длительность трека ${audioNumber}.`
+          : `Не удалось определить длительность аудио ${audioNumber}.`,
       };
     }
   }
@@ -418,7 +431,7 @@ export async function syncPracticeAudioCompatibility(
 
   const { data: audioItems, error: audioError } = await supabase
     .from("audio_items")
-    .select("id, audio_path, duration_seconds, position")
+    .select("id, audio_path, duration_seconds, position, active_music_delivery_asset_id")
     .eq("practice_id", practiceId)
     .order("position", { ascending: true });
 
@@ -431,9 +444,14 @@ export async function syncPracticeAudioCompatibility(
   );
 
   const itemsWithMp3 = sortedItems.filter((item) => item.audio_path?.trim());
+  const itemsWithPlayableDuration = sortedItems.filter(
+    (item) =>
+      Boolean(item.audio_path?.trim())
+      || Boolean(item.active_music_delivery_asset_id),
+  );
 
   const firstAudioPath = itemsWithMp3[0]?.audio_path?.trim() ?? null;
-  const totalDurationSeconds = itemsWithMp3.reduce(
+  const totalDurationSeconds = itemsWithPlayableDuration.reduce(
     (sum, item) => sum + (item.duration_seconds ?? 0),
     0,
   );
