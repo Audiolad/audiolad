@@ -50,7 +50,7 @@ BEGIN
     'draft', true, 0, 'music', 'release'
   );
   INSERT INTO public.audio_items (id, practice_id, title, position, audio_path)
-  VALUES (v_audio, v_practice, 'Track', 0, 'legacy/track.mp3');
+  VALUES (v_audio, v_practice, 'Track', 1, 'legacy/track.mp3');
 
   INSERT INTO public.music_audio_assets (
     id, audio_item_id, source_asset_id, asset_role, storage_bucket, storage_path,
