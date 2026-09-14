@@ -9,6 +9,7 @@ import {
   proposeAuthorSeoQuery,
 } from "@/lib/seo-queries/author-discovery";
 import { createAuthorProposalRepository } from "@/lib/seo-queries/author-discovery-repository";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -46,6 +47,13 @@ export async function POST(request: Request) {
     const phrase = readString(body, "phrase");
     if (!authorId || !seedPhrase || !phrase) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    if (!isAuthorSeoDiscoveryEnabled(authorId)) {
+      return NextResponse.json(
+        { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+        { status: 403 },
+      );
     }
 
     const { user } = await requireAuthorMutationMembership(authorId);

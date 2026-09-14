@@ -9,6 +9,10 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "../src/lib/seo-queries/author-discovery.ts";
 import { isEffectiveSeoReservation } from "../src/lib/seo-queries/reservation-effective.ts";
+import {
+  AURAFON_AUTHOR_ID,
+  isAuthorSeoDiscoveryEnabled,
+} from "../src/lib/seo-queries/discovery-beta.ts";
 
 const root = process.cwd();
 const read = (rel) => readFileSync(join(root, rel), "utf8");
@@ -520,5 +524,48 @@ assert.match(reserveMigration, /v_active_count >= 5/);
 
 // K migration invariant
 assert.match(migration, /submitted_by_user_id uuid NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
+
+
+// --- Closed beta gate (Aurafon only) ---
+const otherAuthorId = "00000000-0000-4000-8000-000000000099";
+assert.equal(isAuthorSeoDiscoveryEnabled(AURAFON_AUTHOR_ID), true);
+assert.equal(isAuthorSeoDiscoveryEnabled(otherAuthorId), false);
+assert.equal(isAuthorSeoDiscoveryEnabled(""), false);
+assert.equal(isAuthorSeoDiscoveryEnabled(null), false);
+
+const discoveryBeta = read("src/lib/seo-queries/discovery-beta.ts");
+assert.match(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
+assert.match(discoveryRoute, /isAuthorSeoDiscoveryEnabled/);
+assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
+assert.match(discoveryRoute, /seo_discovery_context_failed/);
+assert.match(proposalsRoute, /isAuthorSeoDiscoveryEnabled/);
+assert.match(proposalsRoute, /seo_discovery_beta_disabled/);
+
+const page = read("src/app/(platform)/author-dashboard/seo-opportunities/page.tsx");
+assert.match(page, /isAuthorSeoDiscoveryEnabled/);
+assert.match(page, /discoveryEnabled/);
+assert.match(page, /Что ищут слушатели/);
+
+assert.match(ui, /discoveryEnabled/);
+assert.match(ui, /Найти SEO-тему/);
+
+const dash = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
+assert.match(dash, /isAuthorSeoDiscoveryEnabled/);
+assert.match(dash, /Что ищут слушатели/);
+assert.match(dash, /Бета/);
+
+const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
+assert.match(nav, /isAuthorSeoDiscoveryEnabled/);
+assert.match(nav, /Что ищут слушатели/);
+
+// products not required for discovery UI
+assert.doesNotMatch(ui, /products\.length === 0[\s\S]{0,80}discoveryEnabled/);
+assert.match(ui, /discoveryEnabled \? \(/);
+
+// AUTH_FAILED taxonomy present
+const wordstatErrors = read("src/lib/seo/wordstat/errors.ts");
+assert.match(wordstatErrors, /AUTH_FAILED/);
+assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY/);
+assert.doesNotMatch(proposalsRoute, /YANDEX_SEARCH_API_KEY/);
 
 console.log("author-seo-discovery-unit: ok");

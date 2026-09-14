@@ -6,6 +6,7 @@ import { Suspense } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function ProfileIcon() {
   return (
@@ -145,16 +146,19 @@ function DocumentsIcon() {
 
 type AuthorDashboardNavProps = {
   authorSlug?: string;
+  authorId?: string;
 };
 
 export default function AuthorDashboardNav({
   authorSlug,
+  authorId,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
   const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
+  const discoveryEnabled = isAuthorSeoDiscoveryEnabled(authorId);
 
   const items = [
     {
@@ -183,7 +187,7 @@ export default function AuthorDashboardNav({
     },
     {
       href: `/author-dashboard/seo-opportunities${authorQuery}`,
-      label: "SEO-возможности",
+      label: discoveryEnabled ? "Что ищут слушатели" : "SEO-возможности",
       icon: SeoIcon,
       active: pathname.startsWith("/author-dashboard/seo-opportunities"),
     },

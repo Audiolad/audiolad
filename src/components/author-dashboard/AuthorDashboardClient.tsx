@@ -6,6 +6,7 @@ import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { useEffect, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
 import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
@@ -235,7 +236,7 @@ export default function AuthorDashboardClient({
 
   return (
     <div>
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
       <AuthorTermsRequiredBanner
         authorId={selectedAuthor.id}
@@ -263,6 +264,29 @@ export default function AuthorDashboardClient({
           </Link>
         </div>
       </section>
+
+      {isAuthorSeoDiscoveryEnabled(selectedAuthor.id) ? (
+        <section className="mt-4 rounded-[22px] border border-[#d7c4f5] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">Бета</p>
+              <h2 className="mt-1 text-[17px] font-semibold text-[#25135c]">
+                Что ищут слушатели
+              </h2>
+              <p className="mt-1 text-sm leading-5 text-[#5f5484]">
+                Найдите темы в Wordstat, предложите новый SEO-запрос или возьмите
+                готовый в работу. Продукты для этого не обязательны.
+              </p>
+            </div>
+            <Link
+              href={`/author-dashboard/seo-opportunities?author=${encodeURIComponent(selectedAuthor.slug)}`}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white"
+            >
+              Открыть
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <AuthorOnboardingChecklist
         key={selectedAuthor.id}
