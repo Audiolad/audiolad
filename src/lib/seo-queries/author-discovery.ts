@@ -15,8 +15,7 @@ export type AuthorDiscoveryLabel =
   | "У вас в работе"
   | "На проверке"
   | "Не подходит для SEO-возможностей"
-  | "Новый запрос"
-  | "Отправлен на проверку";
+  | "Нет в базе АудиоЛада";
 
 export type AuthorDiscoveryResult = {
   phrase: string;
@@ -56,8 +55,8 @@ const STATUS_LABEL: Record<AuthorDiscoveryStatus, AuthorDiscoveryLabel> = {
   own: "У вас в работе",
   pending_review: "На проверке",
   not_applicable: "Не подходит для SEO-возможностей",
-  new: "Новый запрос",
-  proposed: "Отправлен на проверку",
+  new: "Нет в базе АудиоЛада",
+  proposed: "На проверке",
 };
 
 function result(
@@ -105,13 +104,8 @@ export function reconcileAuthorDiscoverySuggestion(input: {
   }
 
   if (query.analysisStatus === "not_analyzed") {
-    if (alreadyProposedByAuthor) {
-      return result(phrase, frequency, "proposed", { queryId: query.id });
-    }
-    return result(phrase, frequency, "pending_review", {
-      queryId: query.id,
-      canPropose: true,
-    });
+    // Already in review gate — never allow a second proposal from discovery.
+    return result(phrase, frequency, "pending_review", { queryId: query.id });
   }
 
   if (query.analysisStatus !== "analyzed") {

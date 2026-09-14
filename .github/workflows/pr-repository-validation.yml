@@ -75,6 +75,7 @@ jobs:
           npm run test:wordstat
           npm run test:seo-query-analysis
           npm run test:author-seo-discovery
+          npm run test:seo-discovery-ranking
           npm run build
           npm run typecheck
           npm run lint

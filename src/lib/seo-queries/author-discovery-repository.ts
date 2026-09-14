@@ -9,6 +9,12 @@ import type {
   DiscoveryReservationRow,
 } from "./author-discovery";
 import { isEffectiveSeoReservation } from "./reservation-effective";
+import { classifySeoQuery } from "./classifier";
+import {
+  rankAnalyzedQueriesForSeed,
+  tokenizeSeoPhrase,
+  type RankableSeoQuery,
+} from "./discovery-ranking";
 
 
 /** PostgREST GET `.in()` with many long Cyrillic values can 502 via edge nginx. */
@@ -258,5 +264,192 @@ export async function loadDiscoveryContextForPhrases(input: {
     queryByNormalized,
     reservationByQueryId,
     proposedQueryIds,
+  };
+}
+
+const ANALYZED_CANDIDATE_LIMIT = 250;
+
+/**
+ * Load analyzed SEO queries relevant to a seed without a full-table scan when possible:
+ * exact normalized match + token ILIKE filters, then deterministic in-memory ranking.
+ */
+export async function loadRankedAnalyzedQueriesForSeed(input: {
+  authorId: string;
+  seedPhrase: string;
+}): Promise<{
+  seedNormalized: string | null;
+  matches: Array<
+    RankableSeoQuery & {
+      score: number;
+      reasons: string[];
+      reservation: DiscoveryReservationRow | null;
+    }
+  >;
+}> {
+  const supabase = createServiceRoleClient();
+  const { data: normalizedRaw, error: normalizeError } = await supabase.rpc(
+    "normalize_seo_query",
+    { p_query: input.seedPhrase },
+  );
+  const seedNormalized =
+    !normalizeError && typeof normalizedRaw === "string" && normalizedRaw
+      ? normalizedRaw
+      : null;
+
+  const tokens = tokenizeSeoPhrase(seedNormalized || input.seedPhrase);
+  const candidates = new Map<string, RankableSeoQuery>();
+
+  async function ingestRows(rows: Array<Record<string, unknown>> | null) {
+    for (const row of rows ?? []) {
+      const id = row.id as string;
+      if (!id || candidates.has(id)) continue;
+      const cluster = Array.isArray(row.seo_clusters)
+        ? row.seo_clusters[0]
+        : row.seo_clusters;
+      candidates.set(id, {
+        id,
+        queryText: row.query_text as string,
+        normalizedQuery: row.normalized_query as string,
+        frequency: typeof row.frequency === "number" ? row.frequency : null,
+        intent: typeof row.intent === "string" ? row.intent : null,
+        recommendedFormat:
+          typeof row.recommended_format === "string"
+            ? row.recommended_format
+            : null,
+        audioFit: typeof row.audio_fit === "string" ? row.audio_fit : null,
+        clusterName:
+          cluster && typeof (cluster as { name?: string }).name === "string"
+            ? (cluster as { name: string }).name
+            : null,
+        analysisStatus: row.analysis_status as string,
+      });
+    }
+  }
+
+  if (seedNormalized) {
+    const { data, error } = await supabase
+      .from("seo_queries")
+      .select(
+        "id, query_text, normalized_query, frequency, intent, recommended_format, audio_fit, analysis_status, seo_clusters(name)",
+      )
+      .eq("analysis_status", "analyzed")
+      .eq("normalized_query", seedNormalized)
+      .limit(5);
+    if (error) throw new Error("seo_discovery_analyzed_exact_load_failed");
+    await ingestRows(data as Array<Record<string, unknown>> | null);
+  }
+
+  for (const batch of chunkList(tokens, 4)) {
+    if (batch.length === 0) continue;
+    const orFilter = batch
+      .map((token) => {
+        const safe = token.replace(/[%(),]/g, "");
+        return safe ? `normalized_query.ilike.%${safe}%` : "";
+      })
+      .filter(Boolean)
+      .join(",");
+    if (!orFilter) continue;
+    const { data, error } = await supabase
+      .from("seo_queries")
+      .select(
+        "id, query_text, normalized_query, frequency, intent, recommended_format, audio_fit, analysis_status, seo_clusters(name)",
+      )
+      .eq("analysis_status", "analyzed")
+      .or(orFilter)
+      .limit(ANALYZED_CANDIDATE_LIMIT);
+    if (error) throw new Error("seo_discovery_analyzed_token_load_failed");
+    await ingestRows(data as Array<Record<string, unknown>> | null);
+    if (candidates.size >= ANALYZED_CANDIDATE_LIMIT) break;
+  }
+
+  if (candidates.size === 0) {
+    const { data, error } = await supabase
+      .from("seo_queries")
+      .select(
+        "id, query_text, normalized_query, frequency, intent, recommended_format, audio_fit, analysis_status, seo_clusters(name)",
+      )
+      .eq("analysis_status", "analyzed")
+      .order("frequency", { ascending: false })
+      .limit(80);
+    if (error) throw new Error("seo_discovery_analyzed_fallback_load_failed");
+    await ingestRows(data as Array<Record<string, unknown>> | null);
+  }
+
+  const seedClass = classifySeoQuery({ queryText: input.seedPhrase });
+  const ranked = rankAnalyzedQueriesForSeed({
+    seedPhrase: input.seedPhrase,
+    seedNormalized,
+    queries: [...candidates.values()],
+    seedIntentHint: seedClass.intent,
+    seedFormatHint: seedClass.recommendedFormat,
+  });
+
+  const queryIds = ranked.map((item) => item.id);
+  const reservationByQueryId = new Map<string, DiscoveryReservationRow>();
+  if (queryIds.length > 0) {
+    await supabase.rpc("expire_seo_query_reservation", {
+      p_author_id: input.authorId,
+    });
+    for (const batch of chunkList(queryIds)) {
+      if (batch.length === 0) continue;
+      const { data: reservations, error } = await supabase
+        .from("seo_query_reservations")
+        .select("id, query_id, author_id, status, product_id, expires_at")
+        .in("query_id", batch)
+        .in("status", ["active", "used"]);
+      if (error) throw new Error("seo_discovery_reservations_load_failed");
+      const productIds = (reservations ?? [])
+        .map((row) => row.product_id as string | null)
+        .filter((id): id is string => Boolean(id));
+      const productTitleById = new Map<string, string>();
+      if (productIds.length > 0) {
+        for (const productBatch of chunkList([...new Set(productIds)])) {
+          const { data: products, error: productError } = await supabase
+            .from("practices")
+            .select("id, title")
+            .in("id", productBatch);
+          if (productError) throw new Error("seo_discovery_products_load_failed");
+          for (const product of products ?? []) {
+            if (typeof product.title === "string") {
+              productTitleById.set(product.id as string, product.title);
+            }
+          }
+        }
+      }
+      const now = new Date();
+      for (const row of reservations ?? []) {
+        const productId =
+          typeof row.product_id === "string" ? row.product_id : null;
+        const expiresAt =
+          typeof row.expires_at === "string" ? row.expires_at : null;
+        if (
+          !isEffectiveSeoReservation(
+            { status: row.status as string, productId, expiresAt },
+            now,
+          )
+        ) {
+          continue;
+        }
+        reservationByQueryId.set(row.query_id as string, {
+          id: row.id as string,
+          queryId: row.query_id as string,
+          authorId: row.author_id as string,
+          status: row.status as string,
+          productId,
+          expiresAt,
+          productTitle: productId
+            ? productTitleById.get(productId) ?? null
+            : null,
+        });
+      }
+    }
+  }
+
+  return {
+    seedNormalized,
+    matches: ranked.map((item) => ({
+      ...item,
+      reservation: reservationByQueryId.get(item.id) ?? null,
+    })),
   };
 }
