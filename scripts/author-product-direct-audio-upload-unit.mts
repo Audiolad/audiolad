@@ -274,8 +274,11 @@ assert.match(server, /recordAuthorSupportAudit/);
 assert.match(server, /product_track_updated/);
 assert.match(
   server,
-  /status: practice\.status === "published" \? "published" : "draft"/,
+  /const nextStatus = practice\.status === "published" \? "published" : "draft"/,
 );
+assert.match(server, /status: nextStatus|p_status: nextStatus/);
+assert.match(server, /product_kind === "music"/);
+assert.match(server, /activate_music_direct_mp3_delivery/);
 assert.doesNotMatch(server, /file\.arrayBuffer/);
 assert.doesNotMatch(server, /response\.arrayBuffer/);
 assert.doesNotMatch(server, /Buffer\.from\(await /);
