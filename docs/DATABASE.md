@@ -167,6 +167,32 @@ through `recover_stale_music_transcode_jobs`. It never sets
 `audio_items.active_music_delivery_asset_id` or `audio_items.audio_path`.
 Public playback stays on the legacy pointer until a later delivery slice.
 
+#### Music delivery promotion (Slice 3)
+
+Migration `20261007150000_music_delivery_promotion.sql` adds
+`audio_items.desired_music_master_asset_id` (verified master of the same item)
+and `promote_music_item_delivery(audio_item_id, stream_asset_id)`. Promotion
+sets `active_music_delivery_asset_id` only when the stream is a verified
+`music-streams` object whose `source_asset_id` equals the current desired
+master. Stale completions of an older master return false and leave the
+current pointer. Failed transcodes do not touch the pointer. Browser roles
+cannot update either pointer column; service-role `complete_music_transcode_job`
+promotes in the same transaction after the job becomes ready.
+`finalize_music_master_asset` sets `desired_music_master_asset_id` only on the
+real `uploading → verified` transition and enqueues the first job then. A
+verified retry with matching metadata is idempotent: it returns the asset and
+does not change desired/active or create another job. Direct music MP3 finalize
+uses service-role `activate_music_direct_mp3_delivery`, which atomically sets
+`audio_path` and clears both desired and active pointers so a later stale WAV
+completion cannot take delivery back. Both activate and uploading→verified
+finalize reuse `practice_is_content_locked_after_sale` and block replacement when
+any current audio exists (`audio_path`, active stream, or desired master).
+Locked promotion of a replacement stream leaves the delivered active stream
+unchanged and clears the stale desired pointer. Public listen signs the active stream
+when it is valid and otherwise falls back to `audio_path` in `practice-audio`.
+Masters are never signed. Stale `complete_music_transcode_job` may still mark
+the job `ready`, but promotion is a no-op when the source is no longer desired.
+
 
 #### publication_class (2026-08-25, Phase 1)
 

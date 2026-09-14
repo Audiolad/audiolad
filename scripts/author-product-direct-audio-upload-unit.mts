@@ -17,6 +17,8 @@ import {
   canAbandonProductAudioUploadPath,
   isAllowedProductMp3Type,
   isOwnedVersionedProductAudioPath,
+  hasExistingMusicCurrentAudio,
+  shouldBlockMusicAudioReplacement,
   shouldBlockProductAudioReplacement,
   validateProductMp3Descriptor,
   validateProductMp3FileClient,
@@ -173,10 +175,15 @@ assert.equal(shouldBlockProductAudioReplacement(true, livePath), true);
 assert.equal(
   shouldBlockProductAudioReplacement(true, null),
   false,
-  "first-fill of empty audio_path remains allowed",
 );
 assert.equal(shouldBlockProductAudioReplacement(false, livePath), false);
-
+assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: "a", desiredMusicMasterAssetId: null }), true);
+assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: "d" }), true);
+assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: null }), false);
+assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, activeMusicDeliveryAssetId: "a" }), true);
+assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, desiredMusicMasterAssetId: "d" }), true);
+assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: null }), false);
+assert.equal(shouldBlockMusicAudioReplacement(false, { audioPath: null, activeMusicDeliveryAssetId: "a" }), false);
 assert.equal(
   canAbandonProductAudioUploadPath({
     uploadPath: ownedPath,
@@ -222,6 +229,8 @@ const legacyRoute = read(
   "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
 );
 const server = read("src/lib/author-products/server/direct-audio-upload.ts");
+assert.match(server, /shouldBlockMusicAudioReplacement/);
+assert.match(server, /active_music_delivery_asset_id, desired_music_master_asset_id/);
 const inventory = read("src/lib/author-support/mutation-inventory.ts");
 const migration = read(
   "supabase/migrations/20260930120000_practice_audio_bucket_300mib.sql",
@@ -274,8 +283,11 @@ assert.match(server, /recordAuthorSupportAudit/);
 assert.match(server, /product_track_updated/);
 assert.match(
   server,
-  /status: practice\.status === "published" \? "published" : "draft"/,
+  /const nextStatus = practice\.status === "published" \? "published" : "draft"/,
 );
+assert.match(server, /status: nextStatus|p_status: nextStatus/);
+assert.match(server, /product_kind === "music"/);
+assert.match(server, /activate_music_direct_mp3_delivery/);
 assert.doesNotMatch(server, /file\.arrayBuffer/);
 assert.doesNotMatch(server, /response\.arrayBuffer/);
 assert.doesNotMatch(server, /Buffer\.from\(await /);
@@ -353,5 +365,8 @@ assert.doesNotMatch(
   read("src/lib/author-products/moderation-actions.ts"),
   /direct-audio-upload/,
 );
+assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /activate_music_direct_mp3_delivery/);
+assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /assertSaleLockAllowsMutation/);
+
 
 console.log("author-product-direct-audio-upload-unit: ok");

@@ -91,6 +91,24 @@ assert_author_appreciation_reconcile_release_tree() {
   return "$missing"
 }
 
+assert_music_transcode_worker_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required=(
+    "$release_dir/deploy/music-transcode-worker.ecosystem.config.cjs"
+    "$release_dir/deploy/scripts/ensure-music-transcode-worker.sh"
+    "$release_dir/scripts/run-music-transcode-worker.mts"
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "music_transcode_worker_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 COMMIT_REF="${1:-}"
 DEPLOY_LOG_FILE="$DEPLOY_LOG_DIR/deploy-$(date -u +"%Y%m%d-%H%M%S").log"
 OLD_ACTIVE_PORT=""
@@ -178,6 +196,11 @@ main() {
   if ! assert_author_appreciation_reconcile_release_tree "$RELEASE_DIR"; then
     log_error "author_appreciation_getcourse_reconcile_artifact_missing"
     send_deploy_alert "deploy_failed" "Reconcile deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
+    log_error "music_transcode_worker_artifact_missing"
+    send_deploy_alert "deploy_failed" "Music transcode worker artifact missing for $RELEASE_NAME"
     exit 1
   fi
 
@@ -341,6 +364,26 @@ main() {
   log_info "previous_process_stopped app=${OLD_ACTIVE_PM2_APP} port=${OLD_ACTIVE_PORT}"
   stop_pm2_app_safe "$OLD_ACTIVE_PM2_APP" "$OLD_ACTIVE_PORT"
   pm2 save
+
+  MUSIC_WORKER_ECOSYSTEM="$RELEASE_DIR/deploy/music-transcode-worker.ecosystem.config.cjs"
+  MUSIC_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-music-transcode-worker.sh"
+  if [[ ! -f "$MUSIC_WORKER_ECOSYSTEM" ]]; then
+    log_error "music_transcode_worker_ecosystem_missing"
+    send_deploy_alert "deploy_failed" "Music transcode worker ecosystem missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if [[ ! -x "$MUSIC_WORKER_ENSURE" ]]; then
+    log_error "music_transcode_worker_ensure_missing"
+    send_deploy_alert "deploy_failed" "Music transcode worker ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_WORKER_ENSURE"; then
+    log_error "music_transcode_worker_ensure_failed"
+    send_deploy_alert "deploy_failed" "Music transcode worker ensure failed for $RELEASE_NAME"
+    # Cutover already completed: do not roll back healthy web/nginx.
+    # Fail the workflow so Production Deploy cannot report SUCCESS with a dead worker.
+    exit 1
+  fi
 
   rm -f "$RELEASE_DIR/.deploy-inflight"
   unset CANDIDATE_RELEASE_DIR

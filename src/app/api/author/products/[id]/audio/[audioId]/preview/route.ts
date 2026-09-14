@@ -4,6 +4,8 @@ import {
   handleAuthorRouteError,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { resolveMusicListenSource } from "@/lib/listen/music-delivery";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -59,7 +61,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const { data: audioItem, error: audioLookupError } = await supabase
       .from("audio_items")
-      .select("id, audio_path")
+      .select("id, audio_path, active_music_delivery_asset_id")
       .eq("id", audioId)
       .eq("practice_id", id)
       .maybeSingle();
@@ -69,13 +71,47 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    if (!audioItem?.id || !audioItem.audio_path?.trim()) {
+    if (!audioItem?.id) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    const { data, error: signedError } = await supabase.storage
-      .from("practice-audio")
-      .createSignedUrl(audioItem.audio_path, PREVIEW_EXPIRES_IN);
+    const { data: practice } = await supabase
+      .from("practices")
+      .select("product_kind")
+      .eq("id", id)
+      .maybeSingle();
+
+    const service = createServiceRoleClient();
+    let activeStream = null;
+    if (audioItem.active_music_delivery_asset_id) {
+      const { data: asset } = await service
+        .from("music_audio_assets")
+        .select("audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path")
+        .eq("id", audioItem.active_music_delivery_asset_id)
+        .maybeSingle();
+      if (asset) {
+        activeStream = {
+          audioItemId: asset.audio_item_id,
+          assetRole: asset.asset_role,
+          lifecycleState: asset.lifecycle_state,
+          storageBucket: asset.storage_bucket,
+          storagePath: asset.storage_path,
+        };
+      }
+    }
+    const source = resolveMusicListenSource({
+      productKind: practice?.product_kind ?? "",
+      audioItemId: audioItem.id,
+      audioPath: audioItem.audio_path,
+      activeStream,
+    });
+    if (source.kind === "missing") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    const { data, error: signedError } = await service.storage
+      .from(source.bucket)
+      .createSignedUrl(source.path, PREVIEW_EXPIRES_IN);
 
     if (signedError || !data?.signedUrl) {
       console.error("author_audio_preview_sign_error", signedError?.message);
