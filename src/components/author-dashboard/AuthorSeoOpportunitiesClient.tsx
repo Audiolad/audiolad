@@ -5,7 +5,11 @@ import { useMemo, useState } from "react";
 
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
 import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
-import { lifecycleLabel } from "@/lib/seo-queries/types";
+import {
+  countActiveAuthorSeoReservations,
+  lifecycleLabel,
+  SEO_ACTIVE_RESERVATION_LIMIT,
+} from "@/lib/seo-queries/types";
 
 type ProductOption = { id: string; title: string };
 type Props = {
@@ -37,7 +41,7 @@ export default function AuthorSeoOpportunitiesClient({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
 
-  const activeCount = items.filter((item) => item.reservationId && item.lifecycle !== "published").length;
+  const activeCount = countActiveAuthorSeoReservations(items);
   const clusters = useMemo(() => [...new Set(items.map((item) => item.clusterName).filter((value): value is string => Boolean(value)))], [items]);
   const formats = useMemo(() => [...new Set(items.map((item) => item.recommendedFormat).filter((value): value is string => Boolean(value)))], [items]);
   const visible = useMemo(() => items.filter((item) =>
@@ -142,7 +146,7 @@ export default function AuthorSeoOpportunitiesClient({
 
       <section className="rounded-[24px] border border-[#d7c4f5] bg-[#faf6ff] p-5">
         <p className="text-sm leading-6 text-[#4c3d78]">Выберите поисковый запрос, под который хотите создать аудиопродукт. Одновременно можно взять в работу до 5 запросов.</p>
-        <p className="mt-3 text-sm font-semibold text-[#25135c]">Мои SEO-запросы: {activeCount} из 5</p>
+        <p className="mt-3 text-sm font-semibold text-[#25135c]">Мои SEO-запросы: {activeCount} из {SEO_ACTIVE_RESERVATION_LIMIT}</p>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по запросам" className="mt-4 min-h-11 w-full rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm outline-none focus:border-[#7042c5]" />
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <select value={cluster} onChange={(event) => setCluster(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все темы</option>{clusters.map((value) => <option key={value}>{value}</option>)}</select>
@@ -182,7 +186,7 @@ export default function AuthorSeoOpportunitiesClient({
                   <button type="button" disabled={!selectedProducts[item.reservationId] || pendingId === item.reservationId} onClick={() => link(item.reservationId!, selectedProducts[item.reservationId!]!)} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50">Связать</button>
                 </> : null}
                 {item.lifecycle === "in_progress" && item.reservationId ? <button type="button" disabled={pendingId === item.reservationId} onClick={() => release(item.reservationId!)} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50">Освободить</button> : null}
-              </div> : isAvailable ? <button type="button" disabled={pendingId === item.id || activeCount >= 5} onClick={() => reserve(item.id)} className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50">Взять в работу</button> : null}
+              </div> : isAvailable ? <button type="button" disabled={pendingId === item.id || activeCount >= SEO_ACTIVE_RESERVATION_LIMIT} onClick={() => reserve(item.id)} className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50">Взять в работу</button> : null}
             </article>;
           })}
         </div>

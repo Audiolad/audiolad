@@ -2,6 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 
+import {
+  isSeoActiveReservationLimitReached,
+  nextActiveReservationCountAfterReserve,
+} from "@/lib/seo-queries/types";
+
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
   frequency: number;
@@ -119,7 +124,10 @@ export default function AuthorSeoDiscoveryPanel({
           : item,
       ),
     );
-    setActiveCountSync((current) => ({ ...current, local: current.local + 1 }));
+    setActiveCountSync((current) => ({
+      ...current,
+      local: nextActiveReservationCountAfterReserve(current.local, true),
+    }));
     if (match) {
       onReserved?.({
         queryId,
@@ -303,7 +311,7 @@ export default function AuthorSeoDiscoveryPanel({
                     {item.canReserve && item.queryId ? (
                       <button
                         type="button"
-                        disabled={pendingId === item.queryId || effectiveActiveCount >= 5}
+                        disabled={pendingId === item.queryId || isSeoActiveReservationLimitReached(effectiveActiveCount)}
                         onClick={() => reserve(item.queryId!)}
                         className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
                       >

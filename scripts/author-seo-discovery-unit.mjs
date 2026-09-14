@@ -14,6 +14,12 @@ import {
   isAuthorSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
+  countActiveAuthorSeoReservations,
+  isSeoActiveReservationLimitReached,
+  nextActiveReservationCountAfterReserve,
+  SEO_ACTIVE_RESERVATION_LIMIT,
+} from "../src/lib/seo-queries/types.ts";
+import {
   SEO_DISCOVERY_IN_CHUNK_SIZE,
   chunkList,
 } from "../src/lib/seo-queries/author-discovery-repository.ts";
@@ -606,5 +612,85 @@ assert.equal(chunkList(seventeen).length, 3);
 assert.equal(chunkList(seventeen)[0].length, 8);
 assert.equal(chunkList(seventeen)[2].length, 1);
 assert.deepEqual(chunkList([]), [[]]);
+
+// --- Dashboard canonical active reservation count (A–K) ---
+const dashPage = read("src/app/(platform)/author-dashboard/page.tsx");
+assert.match(dashPage, /listSeoOpportunitiesForAuthor/);
+assert.match(dashPage, /countActiveAuthorSeoReservations/);
+assert.match(dashPage, /seoActiveReservationCounts/);
+assert.match(dashPage, /isAuthorSeoDiscoveryEnabled/);
+assert.doesNotMatch(dashPage, /\/api\/author\/seo\/discovery/);
+assert.doesNotMatch(dashPage, /\/api\/author\/seo\/proposals/);
+assert.doesNotMatch(dashPage, /fetchWordstatSuggestions/);
+assert.doesNotMatch(dashPage, /wordstat/i);
+
+assert.match(dash, /seoActiveReservationCounts/);
+assert.match(dash, /seoActiveReservationCounts\[selectedAuthor\.id\] \?\? 0/);
+assert.doesNotMatch(dash, /activeReservationCount=\{0\}/);
+
+// A — count 0 → reserve not limited
+assert.equal(isSeoActiveReservationLimitReached(0), false);
+assert.equal(countActiveAuthorSeoReservations([]), 0);
+
+// B — count 5 → reserve disabled before any POST
+assert.equal(isSeoActiveReservationLimitReached(5), true);
+assert.equal(SEO_ACTIVE_RESERVATION_LIMIT, 5);
+assert.match(panel, /isSeoActiveReservationLimitReached\(effectiveActiveCount\)/);
+
+// C — 4 → successful reserve → 5 → limit reached
+assert.equal(nextActiveReservationCountAfterReserve(4, true), 5);
+assert.equal(isSeoActiveReservationLimitReached(nextActiveReservationCountAfterReserve(4, true)), true);
+
+// D — failed reserve does not bump
+assert.equal(nextActiveReservationCountAfterReserve(4, false), 4);
+assert.match(panel, /nextActiveReservationCountAfterReserve\(current\.local, true\)/);
+assert.match(panel, /if \(!response\.ok\)/);
+// increment only on success path (helper called with true after ok check)
+const reserveFn = panel.slice(panel.indexOf("async function reserve"), panel.indexOf("async function runDiscovery"));
+assert.ok(reserveFn.indexOf("if (!response.ok)") < reserveFn.indexOf("nextActiveReservationCountAfterReserve"), "fail returns before increment");
+
+// Canonical filter: published / no reservationId excluded; in_progress counted
+assert.equal(
+  countActiveAuthorSeoReservations([
+    { reservationId: "r1", lifecycle: "in_progress" },
+    { reservationId: "r2", lifecycle: "moderation" },
+    { reservationId: "r3", lifecycle: "published" },
+    { reservationId: null, lifecycle: "available" },
+  ]),
+  2,
+);
+
+// E/F — multi-workspace: panel gated by selectedAuthor.id; key remounts per author
+assert.match(dash, /isAuthorSeoDiscoveryEnabled\(selectedAuthor\.id\)/);
+assert.match(dash, /key=\{selectedAuthor\.id\}/);
+assert.match(dash, /seoActiveReservationCounts\[selectedAuthor\.id\]/);
+
+// G — seo-opportunities uses canonical counter
+assert.match(ui, /countActiveAuthorSeoReservations\(items\)/);
+assert.match(ui, /activeReservationCount=\{activeCount\}/);
+assert.match(page, /listSeoOpportunitiesForAuthor/);
+
+// H — dashboard client does not call discovery/proposals/Wordstat on load
+assert.doesNotMatch(dash, /\/api\/author\/seo\/discovery/);
+assert.doesNotMatch(dash, /\/api\/author\/seo\/proposals/);
+assert.doesNotMatch(dash, /wordstat/i);
+// products fetch only
+assert.match(dash, /\/api\/author\/products/);
+
+// I — beta gate Aurafon only (already covered) + dashboard page filters betaAuthors
+assert.match(dashPage, /betaAuthors|isAuthorSeoDiscoveryEnabled\(author\.id\)/);
+
+// J — single shared panel
+assert.match(dash, /AuthorSeoDiscoveryPanel/);
+assert.match(ui, /AuthorSeoDiscoveryPanel/);
+assert.equal(
+  read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx").includes("async function runDiscovery"),
+  true,
+);
+assert.doesNotMatch(ui, /async function runDiscovery/);
+assert.doesNotMatch(dash, /async function runDiscovery/);
+
+// K — chunk size 8 regression (asserted above)
+assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
 
 console.log("author-seo-discovery-unit: ok");

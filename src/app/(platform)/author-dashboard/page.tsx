@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import AuthorDashboardClient from "@/components/author-dashboard/AuthorDashboardClient";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
+import { countActiveAuthorSeoReservations } from "@/lib/seo-queries/types";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +69,20 @@ export default async function AuthorDashboardPage() {
     return <NoAuthorAccess />;
   }
 
+  // Canonical active reservation counts only for closed-beta discovery workspaces.
+  // Uses the same listSeoOpportunitiesForAuthor + count filter as /seo-opportunities.
+  const seoActiveReservationCounts: Record<string, number> = {};
+  const betaAuthors = authors.filter((author) => isAuthorSeoDiscoveryEnabled(author.id));
+  if (betaAuthors.length > 0) {
+    await Promise.all(
+      betaAuthors.map(async (author) => {
+        const opportunities = await listSeoOpportunitiesForAuthor(author.id);
+        seoActiveReservationCounts[author.id] =
+          countActiveAuthorSeoReservations(opportunities);
+      }),
+    );
+  }
+
   return (
     <AuthorShell
       title="Кабинет автора"
@@ -80,7 +97,10 @@ export default async function AuthorDashboardPage() {
       }
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка кабинета…</p>}>
-        <AuthorDashboardClient authors={authors} />
+        <AuthorDashboardClient
+          authors={authors}
+          seoActiveReservationCounts={seoActiveReservationCounts}
+        />
       </Suspense>
     </AuthorShell>
   );

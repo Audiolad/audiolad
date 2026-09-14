@@ -37,6 +37,8 @@ import {
 
 type AuthorDashboardClientProps = {
   authors: AuthorWorkspace[];
+  /** Canonical effective active SEO reservation counts keyed by author workspace id (beta only). */
+  seoActiveReservationCounts?: Record<string, number>;
 };
 
 function PlusIcon() {
@@ -167,6 +169,7 @@ function ProductCard({
 
 export default function AuthorDashboardClient({
   authors,
+  seoActiveReservationCounts = {},
 }: AuthorDashboardClientProps) {
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,7 +255,7 @@ export default function AuthorDashboardClient({
             key={selectedAuthor.id}
             authorId={selectedAuthor.id}
             variant="dashboard"
-            activeReservationCount={0}
+            activeReservationCount={seoActiveReservationCounts[selectedAuthor.id] ?? 0}
           />
         </div>
       ) : null}
