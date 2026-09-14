@@ -204,8 +204,10 @@ function present(input: {
   assert.match(accessUi, /hasPlayableAudio\?:/);
   assert.match(publicItems, /hasPlayableAudio/);
   assert.match(publicItems, /active_music_delivery_asset_id/);
-  assert.match(publicItems, /isVerifiedMusicStreamAsset/);
+  assert.match(publicItems, /loadValidatedActiveMusicDeliveryItemIds/);
   assert.match(publicItems, /hasPublicTrackPlayableAudio/);
+  const validatedHelper = read("src/lib/listen/validated-active-music-delivery.ts");
+  assert.match(validatedHelper, /isVerifiedMusicStreamAsset/);
   assert.doesNotMatch(publicItems, /music-masters/);
   // Do not leak private paths into PublicAudioItem type fields
   const typeBlock = publicItems.slice(

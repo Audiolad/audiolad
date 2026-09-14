@@ -6,6 +6,7 @@ import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/le
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { chooseCatalogPreviewAudioRow } from "@/lib/catalog/catalog-preview-audio-choice";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { resolvePlayableAudioItemRows } from "@/lib/listen/validated-active-music-delivery";
 import {
   fromAudioPreviewWindowColumns,
   resolvePlaybackPreviewWindow,
@@ -56,6 +57,7 @@ type PreviewAudioRow = {
   position: number;
   duration_seconds: number | null;
   audio_path: string | null;
+  active_music_delivery_asset_id?: string | null;
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string | null;
@@ -70,6 +72,7 @@ async function loadCatalogPreviewSession(
   authorSlug: string,
   productSlug: string,
   audioItemId?: string | null,
+  options?: { serviceRole?: SupabaseClient },
 ): Promise<
   | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: "not_found" | "unavailable" | "no_audio" | "error" }
@@ -103,7 +106,7 @@ async function loadCatalogPreviewSession(
   const { data: audioItems, error: audioError } = await supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status, is_preview, preview_start_ms, preview_end_ms",
+      "id, title, description, position, duration_seconds, audio_path, active_music_delivery_asset_id, cover_url, cover_image, updated_at, status, is_preview, preview_start_ms, preview_end_ms",
     )
     .eq("practice_id", practice.id)
     .eq("status", "published")
@@ -113,8 +116,10 @@ async function loadCatalogPreviewSession(
     return { ok: false, reason: "error" };
   }
 
-  const rows = ((audioItems ?? []) as PreviewAudioRow[]).filter((item) =>
-    Boolean(item.audio_path?.trim()),
+  const rows = await resolvePlayableAudioItemRows(
+    (audioItems ?? []) as PreviewAudioRow[],
+    practice.product_kind,
+    { serviceRole: options?.serviceRole },
   );
 
   const isCourse =
@@ -236,7 +241,10 @@ export async function loadCatalogPlaySession(
   authorSlug: string,
   productSlug: string,
   userId: string | null,
-  options?: { audioItemId?: string | null },
+  options?: {
+    audioItemId?: string | null;
+    serviceRole?: SupabaseClient;
+  },
 ): Promise<
   | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: "not_found" | "unavailable" | "no_audio" | "error" }
@@ -246,7 +254,10 @@ export async function loadCatalogPlaySession(
     authorSlug,
     productSlug,
     userId,
-    { forceStartAtBeginning: true },
+    {
+      forceStartAtBeginning: true,
+      serviceRole: options?.serviceRole,
+    },
   );
 
   if (entitled.ok) {
@@ -269,5 +280,6 @@ export async function loadCatalogPlaySession(
     authorSlug,
     productSlug,
     options?.audioItemId,
+    { serviceRole: options?.serviceRole },
   );
 }
