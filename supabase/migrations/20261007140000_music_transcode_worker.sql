@@ -81,7 +81,9 @@ BEGIN
           ELSE 'Не удалось подготовить версию для прослушивания.'
         END,
         updated_at = now()
-    WHERE status = 'processing' AND lease_expires_at < now()
+    WHERE status = 'processing'
+      AND lease_expires_at IS NOT NULL
+      AND lease_expires_at <= clock_timestamp()
     RETURNING 1
   )
   SELECT count(*) INTO v_count FROM recovered;
@@ -121,7 +123,7 @@ BEGIN
       attempt_count = attempt_count + 1,
       started_at = COALESCE(started_at, now()),
       lease_token = gen_random_uuid(),
-      lease_expires_at = now() + make_interval(secs => p_lease_seconds),
+      lease_expires_at = clock_timestamp() + make_interval(secs => p_lease_seconds),
       error_code = NULL,
       error_message_safe = NULL,
       updated_at = now()
@@ -151,13 +153,13 @@ BEGIN
     RAISE EXCEPTION 'invalid_lease' USING ERRCODE = '22023';
   END IF;
   UPDATE public.music_transcode_jobs
-  SET lease_expires_at = now() + make_interval(secs => p_lease_seconds),
+  SET lease_expires_at = clock_timestamp() + make_interval(secs => p_lease_seconds),
       updated_at = now()
   WHERE id = p_job_id
     AND status = 'processing'
     AND lease_token = p_lease_token
     AND lease_expires_at IS NOT NULL
-    AND lease_expires_at > now()
+    AND lease_expires_at > clock_timestamp()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -188,7 +190,7 @@ BEGIN
     OR v_job.status <> 'processing'
     OR v_job.lease_token IS DISTINCT FROM p_lease_token
     OR v_job.lease_expires_at IS NULL
-    OR v_job.lease_expires_at <= now() THEN
+    OR v_job.lease_expires_at <= clock_timestamp() THEN
     RETURN false;
   END IF;
   IF NOT EXISTS (
@@ -214,7 +216,7 @@ BEGIN
     AND status = 'processing'
     AND lease_token = p_lease_token
     AND lease_expires_at IS NOT NULL
-    AND lease_expires_at > now()
+    AND lease_expires_at > clock_timestamp()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -251,7 +253,7 @@ BEGIN
     OR v_job.status <> 'processing'
     OR v_job.lease_token IS DISTINCT FROM p_lease_token
     OR v_job.lease_expires_at IS NULL
-    OR v_job.lease_expires_at <= now() THEN
+    OR v_job.lease_expires_at <= clock_timestamp() THEN
     RETURN false;
   END IF;
   v_permanent := v_job.attempt_count >= p_max_attempts;
@@ -270,7 +272,7 @@ BEGIN
     AND status = 'processing'
     AND lease_token = p_lease_token
     AND lease_expires_at IS NOT NULL
-    AND lease_expires_at > now()
+    AND lease_expires_at > clock_timestamp()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;
@@ -301,7 +303,7 @@ BEGIN
     AND status = 'processing'
     AND lease_token = p_lease_token
     AND lease_expires_at IS NOT NULL
-    AND lease_expires_at > now()
+    AND lease_expires_at > clock_timestamp()
   RETURNING 1 INTO v_updated;
   RETURN v_updated IS NOT NULL;
 END;

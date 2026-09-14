@@ -241,6 +241,50 @@ BEGIN
     RAISE EXCEPTION 'ready job without verified matching stream must be impossible';
   END IF;
 
+  -- Same transaction: now() is frozen, clock_timestamp() is not.
+  -- A lease that expires after pg_sleep stays > now() and would pass a
+  -- transaction_timestamp guard, but must fail a wall-clock guard.
+  INSERT INTO public.music_transcode_jobs (source_asset_id, status)
+  VALUES (v_master, 'queued');
+  SELECT * INTO v_job FROM public.claim_music_transcode_job(1800, 3);
+  IF v_job.id IS NULL OR v_job.status <> 'processing' THEN
+    RAISE EXCEPTION 'wall-clock fixture claim failed';
+  END IF;
+  UPDATE public.music_transcode_jobs
+  SET lease_expires_at = clock_timestamp() + interval '200 milliseconds'
+  WHERE id = v_job.id;
+  PERFORM pg_sleep(0.5);
+  SELECT * INTO v_job FROM public.music_transcode_jobs WHERE id = v_job.id;
+  IF v_job.lease_expires_at <= now() THEN
+    RAISE EXCEPTION 'fixture must keep expiry after frozen now() so a now() guard would still pass';
+  END IF;
+  IF v_job.lease_expires_at > clock_timestamp() THEN
+    RAISE EXCEPTION 'fixture must be expired against wall clock after pg_sleep';
+  END IF;
+  IF public.renew_music_transcode_job_lease(v_job.id, v_job.lease_token, 1800) IS NOT FALSE THEN
+    RAISE EXCEPTION 'renew after wall-clock expiry must be false';
+  END IF;
+  IF public.complete_music_transcode_job(v_job.id, v_job.lease_token, v_stream) IS NOT FALSE THEN
+    RAISE EXCEPTION 'complete after wall-clock expiry must be false';
+  END IF;
+  IF public.fail_music_transcode_job(v_job.id, v_job.lease_token, 'transcode_failed', '', 3) IS NOT FALSE THEN
+    RAISE EXCEPTION 'fail after wall-clock expiry must be false';
+  END IF;
+  IF public.release_music_transcode_job(v_job.id, v_job.lease_token) IS NOT FALSE THEN
+    RAISE EXCEPTION 'release after wall-clock expiry must be false';
+  END IF;
+  SELECT * INTO v_job FROM public.music_transcode_jobs WHERE id = v_job.id;
+  IF v_job.status <> 'processing' THEN
+    RAISE EXCEPTION 'wall-clock expired job must stay processing until recover, got %', v_job.status;
+  END IF;
+  IF public.recover_stale_music_transcode_jobs(3) < 1 THEN
+    RAISE EXCEPTION 'recover must take wall-clock expired job';
+  END IF;
+  SELECT * INTO v_job FROM public.music_transcode_jobs WHERE id = v_job.id;
+  IF v_job.status <> 'queued' OR v_job.lease_token IS NOT NULL OR v_job.lease_expires_at IS NOT NULL THEN
+    RAISE EXCEPTION 'wall-clock stale recovery must requeue and clear lease';
+  END IF;
+
   BEGIN
     EXECUTE 'SET ROLE service_role';
     PERFORM public.recover_stale_music_transcode_jobs(3);
