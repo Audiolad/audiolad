@@ -157,6 +157,15 @@ assert(/studio_license_terms_version/.test(legal));
 assert(/license_terms_version/.test(legal));
 assert(/studio_author_terms_not_accepted/.test(legal));
 assert(/author_has_accepted_current_terms/.test(legal));
+const freeNoTerms = readFileSync(
+  join(migrationsDir, "20261007140100_acquire_free_studio_music_without_author_terms.sql"),
+  "utf8",
+);
+assert(/CREATE OR REPLACE FUNCTION public\.acquire_free_studio_music/.test(freeNoTerms));
+assert(/acquire_free_studio_music_legal_legacy/.test(freeNoTerms));
+assert(!/author_has_accepted_current_terms/.test(freeNoTerms));
+assert(/create_studio_music_order/.test(legal));
+assert(/IF NOT public\.author_has_accepted_current_terms/.test(legal));
 assert(/freeze_studio_entitlement_terms/.test(legal));
 assert(/studio-license-v1\.0/.test(legal));
 assert(/REVOKE ALL ON FUNCTION public\.create_studio_music_order_legal_legacy/.test(legal));
@@ -198,7 +207,8 @@ assert(/PR3.1: fixed Studio amount must be 60000/.test(smoke));
 assert(/PR3.1: paid order must reject Studio free/.test(smoke));
 assert(/PR3.1: paid listener \+ Studio free must allow free acquire/.test(smoke));
 assert(/terms: expected paid author-terms gate/.test(smoke));
-assert(/terms: expected free author-terms gate/.test(smoke));
+assert(/terms: free acquire must not require author terms/.test(smoke));
+assert(!/terms: expected free author-terms gate/.test(smoke));
 assert(/studio_author_terms_not_accepted/.test(smoke));
 assert(/Isolated fixture acceptance of current Author Terms/.test(smoke));
 assert(/paid order must freeze Studio terms/.test(smoke));

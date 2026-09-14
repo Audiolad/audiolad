@@ -79,14 +79,12 @@ BEGIN
         RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
       END IF;
   END;
+  -- FREE Studio acquire must succeed without current source-author terms.
   BEGIN
     PERFORM public.acquire_free_studio_music(free_music);
-    RAISE EXCEPTION 'terms: expected free author-terms gate';
   EXCEPTION
     WHEN others THEN
-      IF SQLERRM NOT LIKE '%studio_author_terms_not_accepted%' THEN
-        RAISE EXCEPTION 'terms: expected studio_author_terms_not_accepted, got %', SQLERRM;
-      END IF;
+      RAISE EXCEPTION 'terms: free acquire must not require author terms, got %', SQLERRM;
   END;
   INSERT INTO public.author_terms_acceptances (
     author_id, terms_version_id, accepted_by_user_id, acceptance_text
