@@ -15,6 +15,7 @@ import {
   isStudioMusicListedVisibilityRow,
   studioMusicCatalogFetchLimit,
   studioMusicCatalogFreeOrFilter,
+  studioMusicCatalogPaidOrFilter,
   studioMusicListedVisibilityOrFilter,
   takeStudioMusicCatalogPage,
   type StudioMusicCatalogPublication,
@@ -115,7 +116,7 @@ function matchPostgrestClause(
     return values.includes(String(row[inMatch[1]] ?? ""));
   }
 
-  const match = clause.match(/^([a-z_]+)\.(eq|is|lte|lt)\.(.+)$/);
+  const match = clause.match(/^([a-z_]+)\.(eq|is|lte|lt|gt|ilike)\.(.+)$/);
   if (!match) {
     return false;
   }
@@ -144,6 +145,15 @@ function matchPostgrestClause(
     return String(actual ?? "") === expected;
   }
 
+  if (operator === "ilike") {
+    const haystack = String(actual ?? "").toLocaleLowerCase("ru-RU");
+    let pattern = expected.toLocaleLowerCase("ru-RU");
+    if (pattern.startsWith("%") && pattern.endsWith("%") && pattern.length >= 2) {
+      pattern = pattern.slice(1, -1);
+    }
+    return haystack.includes(pattern);
+  }
+
   if (operator === "lte") {
     if (actual == null || typeof actual !== "number") {
       return false;
@@ -152,6 +162,15 @@ function matchPostgrestClause(
     return Number.isFinite(limit) && actual <= limit;
   }
 
+  if (operator === "gt") {
+    if (actual == null || typeof actual !== "number") {
+      return false;
+    }
+    const limit = Number(expected);
+    return Number.isFinite(limit) && actual > limit;
+  }
+
+  // cursor id/timestamp comparisons use string lt
   return String(actual ?? "") < expected;
 }
 
@@ -846,5 +865,132 @@ function assertNoDuplicates(ids: string[]) {
     ["mode-free-paid-listener", "mode-null-free-listener"],
   );
 }
+
+
+{
+  const paidPredicate = studioMusicCatalogPaidOrFilter();
+  const rows = [
+    publication(1, {
+      title: "paid-fixed",
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "fixed",
+      studio_music_price_minor: 50000,
+    }),
+    publication(2, {
+      title: "paid-auto",
+      is_free: false,
+      price: 100,
+      studio_music_pricing_mode: "auto_2x_listener",
+    }),
+    publication(3, {
+      title: "paid-legacy",
+      is_free: false,
+      price: 200,
+      studio_music_pricing_mode: null,
+    }),
+    publication(4, {
+      title: "studio-free",
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "free",
+    }),
+    publication(5, {
+      title: "fixed-zero",
+      is_free: true,
+      price: 0,
+      studio_music_pricing_mode: "fixed",
+      studio_music_price_minor: 0,
+    }),
+  ];
+  const recording = createRecordingSupabase({ practices: rows });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const page = await store.listPublicInventory({
+    filter: "paid",
+    cursor: null,
+    limit: 20,
+  });
+  assert.ok(
+    recording.practiceOrFilters[0]?.includes(paidPredicate),
+    `production paid filter missing: ${JSON.stringify(recording.practiceOrFilters[0])}`,
+  );
+  assert.deepEqual(
+    [...page.practices.map((practice) => practice.title)].sort(),
+    ["paid-auto", "paid-fixed", "paid-legacy"],
+  );
+}
+
+{
+  const rows = [
+    publication(1, { title: "Северный ветер", subtitle: "альбом утро" }),
+    publication(2, { title: "Южный дождь", subtitle: "вечер" }),
+    publication(3, { title: "Север и Юг", subtitle: "сборник" }),
+  ];
+  const recording = createRecordingSupabase({ practices: rows });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const page = await store.listPublicInventory({
+    filter: "all",
+    cursor: null,
+    limit: 20,
+    q: "северный ветер",
+  });
+  assert.ok(
+    recording.practiceOrFilters[0]?.some((filter) =>
+      filter.includes("title.ilike.") && filter.includes("subtitle.ilike."),
+    ),
+    `search ors missing: ${JSON.stringify(recording.practiceOrFilters[0])}`,
+  );
+  assert.deepEqual(
+    page.practices.map((practice) => practice.title),
+    ["Северный ветер"],
+  );
+
+  const page2 = await store.listPublicInventory({
+    filter: "all",
+    cursor: null,
+    limit: 20,
+    q: "  ",
+  });
+  assert.equal(page2.practices.length, 3);
+}
+
+{
+  const rows = Array.from({ length: 6 }, (_, index) =>
+    publication(index + 1, {
+      title: index < 4 ? `Поиск-${index + 1}` : `Другое-${index + 1}`,
+      subtitle: index < 4 ? "кириллица" : "misc",
+      published_at: `2026-05-0${6 - index}T00:00:00.000Z`,
+    }),
+  );
+  const recording = createRecordingSupabase({ practices: rows });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const first = await store.listPublicInventory({
+    filter: "all",
+    cursor: null,
+    limit: 2,
+    q: "кириллица",
+  });
+  assert.equal(first.practices.length, 2);
+  assert.ok(first.nextCursor);
+  const second = await store.listPublicInventory({
+    filter: "all",
+    cursor: first.nextCursor,
+    limit: 2,
+    q: "кириллица",
+  });
+  assert.equal(second.practices.length, 2);
+  const titles = [
+    ...first.practices.map((p) => p.title),
+    ...second.practices.map((p) => p.title),
+  ];
+  assert.deepEqual(titles.sort(), ["Поиск-1", "Поиск-2", "Поиск-3", "Поиск-4"]);
+  assert.equal(
+    titles.every((title) => String(title).startsWith("Поиск-")),
+    true,
+  );
+}
+
+assert.match(catalogSource, /studioMusicCatalogPaidOrFilter/);
+assert.match(catalogSource, /applyStudioMusicCatalogSearch/);
 
 console.log("studio-music-catalog-pagination-unit: ok");

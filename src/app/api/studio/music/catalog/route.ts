@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       filter: searchParams.get("filter"),
       cursor: searchParams.get("cursor"),
       limit: searchParams.get("limit"),
+      q: searchParams.get("q"),
       userId: user?.id ?? null,
       visitorId,
       store: createSupabaseStudioMusicCatalogStore(createServiceRoleClient()),
