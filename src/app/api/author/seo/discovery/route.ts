@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     }
     console.error(
       "author_seo_discovery_error",
-      error instanceof Error ? error.name : "unknown",
+      error instanceof Error ? error.message : "unknown",
     );
     const fallback = wordstatError("UPSTREAM_ERROR");
     return NextResponse.json(

@@ -13,6 +13,10 @@ import {
   AURAFON_AUTHOR_ID,
   isAuthorSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
+import {
+  SEO_DISCOVERY_IN_CHUNK_SIZE,
+  chunkList,
+} from "../src/lib/seo-queries/author-discovery-repository.ts";
 
 const root = process.cwd();
 const read = (rel) => readFileSync(join(root, rel), "utf8");
@@ -562,10 +566,23 @@ assert.match(nav, /Что ищут слушатели/);
 assert.doesNotMatch(ui, /products\.length === 0[\s\S]{0,80}discoveryEnabled/);
 assert.match(ui, /discoveryEnabled \? \(/);
 
+// Chunked PostgREST .in() to avoid edge nginx 502 on long Cyrillic filters
+assert.match(discoveryRepo, /SEO_DISCOVERY_IN_CHUNK_SIZE/);
+assert.match(discoveryRepo, /chunkList\(/);
+assert.match(discoveryRepo, /for \(const batch of chunkList\(uniqueNormalized\)\)/);
+assert.match(discoveryRepo, /for \(const batch of chunkList\(queryIds\)\)/);
+
 // AUTH_FAILED taxonomy present
 const wordstatErrors = read("src/lib/seo/wordstat/errors.ts");
 assert.match(wordstatErrors, /AUTH_FAILED/);
 assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY/);
 assert.doesNotMatch(proposalsRoute, /YANDEX_SEARCH_API_KEY/);
+
+assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
+const seventeen = Array.from({ length: 17 }, (_, i) => `фраза номер ${i} для теста чанков`);
+assert.equal(chunkList(seventeen).length, 3);
+assert.equal(chunkList(seventeen)[0].length, 8);
+assert.equal(chunkList(seventeen)[2].length, 1);
+assert.deepEqual(chunkList([]), [[]]);
 
 console.log("author-seo-discovery-unit: ok");

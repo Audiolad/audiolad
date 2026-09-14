@@ -10,6 +10,19 @@ import type {
 } from "./author-discovery";
 import { isEffectiveSeoReservation } from "./reservation-effective";
 
+
+/** PostgREST GET `.in()` with many long Cyrillic values can 502 via edge nginx. */
+export const SEO_DISCOVERY_IN_CHUNK_SIZE = 8;
+
+export function chunkList<T>(items: T[], size: number = SEO_DISCOVERY_IN_CHUNK_SIZE): T[][] {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks.length > 0 ? chunks : [[]];
+}
+
 function mapQuery(row: {
   id: string;
   analysis_status: string;
@@ -124,16 +137,19 @@ export async function loadDiscoveryContextForPhrases(input: {
 
   const queryByNormalized = new Map<string, DiscoveryQueryRow>();
   if (uniqueNormalized.length > 0) {
-    const { data: queries, error } = await supabase
-      .from("seo_queries")
-      .select("id, normalized_query, analysis_status")
-      .in("normalized_query", uniqueNormalized);
-    if (error) throw new Error("seo_discovery_queries_load_failed");
-    for (const row of queries ?? []) {
-      queryByNormalized.set(row.normalized_query as string, {
-        id: row.id as string,
-        analysisStatus: row.analysis_status as string,
-      });
+    for (const batch of chunkList(uniqueNormalized)) {
+      if (batch.length === 0) continue;
+      const { data: queries, error } = await supabase
+        .from("seo_queries")
+        .select("id, normalized_query, analysis_status")
+        .in("normalized_query", batch);
+      if (error) throw new Error("seo_discovery_queries_load_failed");
+      for (const row of queries ?? []) {
+        queryByNormalized.set(row.normalized_query as string, {
+          id: row.id as string,
+          analysisStatus: row.analysis_status as string,
+        });
+      }
     }
   }
 
@@ -143,32 +159,56 @@ export async function loadDiscoveryContextForPhrases(input: {
     await supabase.rpc("expire_seo_query_reservation", {
       p_author_id: input.authorId,
     });
-    const { data: reservations, error } = await supabase
-      .from("seo_query_reservations")
-      .select("id, query_id, author_id, status, product_id, expires_at")
-      .in("query_id", queryIds)
-      .in("status", ["active", "used"]);
-    if (error) throw new Error("seo_discovery_reservations_load_failed");
+    const reservations: Array<{
+      id: string;
+      query_id: string;
+      author_id: string;
+      status: string;
+      product_id: string | null;
+      expires_at: string | null;
+    }> = [];
+    for (const batch of chunkList(queryIds)) {
+      if (batch.length === 0) continue;
+      const { data, error } = await supabase
+        .from("seo_query_reservations")
+        .select("id, query_id, author_id, status, product_id, expires_at")
+        .in("query_id", batch)
+        .in("status", ["active", "used"]);
+      if (error) throw new Error("seo_discovery_reservations_load_failed");
+      for (const row of data ?? []) {
+        reservations.push({
+          id: row.id as string,
+          query_id: row.query_id as string,
+          author_id: row.author_id as string,
+          status: row.status as string,
+          product_id: (row.product_id as string | null) ?? null,
+          expires_at: (row.expires_at as string | null) ?? null,
+        });
+      }
+    }
 
-    const productIds = (reservations ?? [])
-      .map((row) => row.product_id as string | null)
+    const productIds = reservations
+      .map((row) => row.product_id)
       .filter((id): id is string => Boolean(id));
     const productTitleById = new Map<string, string>();
     if (productIds.length > 0) {
-      const { data: products, error: productError } = await supabase
-        .from("practices")
-        .select("id, title")
-        .in("id", productIds);
-      if (productError) throw new Error("seo_discovery_products_load_failed");
-      for (const product of products ?? []) {
-        if (typeof product.title === "string") {
-          productTitleById.set(product.id as string, product.title);
+      for (const batch of chunkList([...new Set(productIds)])) {
+        if (batch.length === 0) continue;
+        const { data: products, error: productError } = await supabase
+          .from("practices")
+          .select("id, title")
+          .in("id", batch);
+        if (productError) throw new Error("seo_discovery_products_load_failed");
+        for (const product of products ?? []) {
+          if (typeof product.title === "string") {
+            productTitleById.set(product.id as string, product.title);
+          }
         }
       }
     }
 
     const now = new Date();
-    for (const row of reservations ?? []) {
+    for (const row of reservations) {
       const productId =
         typeof row.product_id === "string" ? row.product_id : null;
       const expiresAt =
@@ -199,14 +239,17 @@ export async function loadDiscoveryContextForPhrases(input: {
 
   const proposedQueryIds = new Set<string>();
   if (queryIds.length > 0) {
-    const { data: proposals, error } = await supabase
-      .from("seo_query_proposals")
-      .select("query_id")
-      .eq("author_id", input.authorId)
-      .in("query_id", queryIds);
-    if (error) throw new Error("seo_discovery_proposals_load_failed");
-    for (const row of proposals ?? []) {
-      proposedQueryIds.add(row.query_id as string);
+    for (const batch of chunkList(queryIds)) {
+      if (batch.length === 0) continue;
+      const { data: proposals, error } = await supabase
+        .from("seo_query_proposals")
+        .select("query_id")
+        .eq("author_id", input.authorId)
+        .in("query_id", batch);
+      if (error) throw new Error("seo_discovery_proposals_load_failed");
+      for (const row of proposals ?? []) {
+        proposedQueryIds.add(row.query_id as string);
+      }
     }
   }
 
