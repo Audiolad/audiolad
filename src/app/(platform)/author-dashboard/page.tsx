@@ -72,11 +72,16 @@ export default async function AuthorDashboardPage() {
   // Canonical active reservation counts only for closed-beta discovery workspaces.
   // Uses the same listSeoOpportunitiesForAuthor + count filter as /seo-opportunities.
   const seoActiveReservationCounts: Record<string, number> = {};
+  const seoAnalyzedOpportunitiesByAuthorId: Record<
+    string,
+    Awaited<ReturnType<typeof listSeoOpportunitiesForAuthor>>
+  > = {};
   const betaAuthors = authors.filter((author) => isAuthorSeoDiscoveryEnabled(author.id));
   if (betaAuthors.length > 0) {
     await Promise.all(
       betaAuthors.map(async (author) => {
         const opportunities = await listSeoOpportunitiesForAuthor(author.id);
+        seoAnalyzedOpportunitiesByAuthorId[author.id] = opportunities;
         seoActiveReservationCounts[author.id] =
           countActiveAuthorSeoReservations(opportunities);
       }),
@@ -100,6 +105,7 @@ export default async function AuthorDashboardPage() {
         <AuthorDashboardClient
           authors={authors}
           seoActiveReservationCounts={seoActiveReservationCounts}
+          seoAnalyzedOpportunitiesByAuthorId={seoAnalyzedOpportunitiesByAuthorId}
         />
       </Suspense>
     </AuthorShell>

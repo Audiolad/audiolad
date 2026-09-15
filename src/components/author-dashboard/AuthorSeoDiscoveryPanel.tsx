@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
+import type { AuthorSeoPromptRelatedCandidate } from "@/lib/seo-queries/author-seo-product-prompt";
 import {
   isSeoActiveReservationLimitReached,
   nextActiveReservationCountAfterReserve,
@@ -32,6 +34,8 @@ type Props = {
   /** dashboard = search-first Aurafon home copy; opportunities = existing SEO page heading */
   variant: "dashboard" | "opportunities";
   activeReservationCount: number;
+  /** Analyzed SEO opportunities for related-query ranking (no Wordstat). */
+  analyzedOpportunities?: AuthorSeoPromptRelatedCandidate[];
   onReserved?: (event: AuthorSeoDiscoveryReservedEvent) => void;
 };
 
@@ -47,6 +51,7 @@ export default function AuthorSeoDiscoveryPanel({
   authorId,
   variant,
   activeReservationCount,
+  analyzedOpportunities = [],
   onReserved,
 }: Props) {
   const [discoverPhrase, setDiscoverPhrase] = useState("");
@@ -317,6 +322,13 @@ export default function AuthorSeoDiscoveryPanel({
                       >
                         Взять в работу
                       </button>
+                    ) : null}
+                    {item.status === "own" && item.queryId && item.reservationId ? (
+                      <AuthorSeoPromptBuilder
+                        primaryQueryText={item.phrase}
+                        primaryQueryId={item.queryId}
+                        analyzedOpportunities={analyzedOpportunities}
+                      />
                     ) : null}
                   </article>
                 ))}
