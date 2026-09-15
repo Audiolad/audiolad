@@ -9,16 +9,15 @@ import {
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
   AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE,
-  SEO_PROMPT_EMPTY_PRODUCT_FACTS,
   SEO_PROMPT_EMPTY_RELATED,
   SEO_PROMPT_SECONDARY_CANDIDATE_LIMIT,
   SEO_PROMPT_SECONDARY_SELECT_LIMIT,
   buildAuthorSeoProductPrompt,
   canBuildAuthorSeoProductPrompt,
   clampSecondarySeoSelection,
-  formatProductContentForPrompt,
-  formatProductFactsForPrompt,
+  formatProductSourceForPrompt,
   formatRelatedQueriesForPrompt,
+  getAuthorSeoProductSourceGuidance,
   hasUnsafeSecondarySeoModifier,
   intentsIncompatible,
   isStrictSecondarySeoCandidate,
@@ -214,11 +213,17 @@ assert.match(builderUi, /selectionFull && !checked/);
 assert.match(builderUi, /Выбрано:/);
 
 // H / I — prompt only selected
+const SAMPLE_SOURCE = [
+  "Часть 1. Мягкий вступительный джазовый мотив на рояле.",
+  "Часть 2. Лёгкий саксофон без ударных, спокойный темп.",
+  "Часть 3. Завершение на тихих аккордах без слов.",
+].join("\n");
+
 const withTwo = buildAuthorSeoProductPrompt({
   seoQuery: "лёгкий джаз",
   productType: "Музыка",
   relatedQueries: ["лёгкий джаз слушать онлайн", "слушать лёгкий джаз"],
-  productContent: "Спокойный джаз без слов для вечернего отдыха.",
+  productSource: SAMPLE_SOURCE,
 });
 assert.match(withTwo, /ДОПОЛНИТЕЛЬНЫЕ SEO-ЗАПРОСЫ:\nлёгкий джаз слушать онлайн\nслушать лёгкий джаз/);
 assert.doesNotMatch(withTwo, /джаз для кафе/);
@@ -226,7 +231,7 @@ const withNone = buildAuthorSeoProductPrompt({
   seoQuery: "лёгкий джаз",
   productType: "Музыка",
   relatedQueries: [],
-  productContent: "Спокойный джаз без слов для вечернего отдыха.",
+  productSource: SAMPLE_SOURCE,
 });
 assert.match(withNone, /ДОПОЛНИТЕЛЬНЫЕ SEO-ЗАПРОСЫ:\nне указаны/);
 assert.equal(formatRelatedQueriesForPrompt([]), SEO_PROMPT_EMPTY_RELATED);
@@ -246,18 +251,6 @@ assert.ok(!jazzSecondary.some((item) => /скачать|бесплатно|бе�
 // N — reservation lifecycle untouched in this slice
 assert.doesNotMatch(promptLib, /reserve_seo_query|release_seo_query|link_seo_reservation/);
 
-// PRODUCT_FACTS + generate disabled
-assert.match(
-  buildAuthorSeoProductPrompt({
-    seoQuery: "x",
-    productType: "Музыка",
-    relatedQueries: [],
-    productFacts: "10 треков",
-    productContent: "Короткое содержание для проверки фактов.",
-  }),
-  /10 треков/,
-);
-assert.equal(formatProductFactsForPrompt(""), SEO_PROMPT_EMPTY_PRODUCT_FACTS);
 assert.match(builderUi, /disabled=\{!canGenerate\}/);
 assert.match(builderUi, /navigator\.clipboard\.writeText\(prompt\)/);
 assert.match(builderUi, /Как работать с промптом/);
@@ -266,35 +259,31 @@ assert.match(discoveryPanel, /AuthorSeoPromptBuilder/);
 assert.match(dash, /seoAnalyzedOpportunitiesByAuthorId/);
 assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
 assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("{{RELATED_QUERIES}}"));
+assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("{{PRODUCT_SOURCE}}"));
 
+// --- PRODUCT_SOURCE single-field regressions ---
+// A — UI no longer has «Краткие сведения»
+assert.doesNotMatch(builderUi, /Краткие сведения о продукте/);
+assert.doesNotMatch(builderUi, /Содержание продукта/);
+assert.match(builderUi, /Материал продукта/);
 
-// --- PRODUCT_CONTENT regressions (ground packaging in real product content) ---
-const SAMPLE_CONTENT = [
-  "Часть 1. Мягкий вступительный джазовый мотив на рояле.",
-  "Часть 2. Лёгкий саксофон без ударных, спокойный темп.",
-  "Часть 3. Завершение на тихих аккордах без слов.",
-].join("\n");
+// B — no productFacts state
+assert.doesNotMatch(builderUi, /productFacts/);
+assert.doesNotMatch(builderUi, /setProductFacts/);
+assert.doesNotMatch(promptLib, /productFacts|PRODUCT_FACTS|formatProductFactsForPrompt|SEO_PROMPT_EMPTY_PRODUCT_FACTS/);
 
-// A — template has PRODUCT_CONTENT block + grounding
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /СОДЕРЖАНИЕ ПРОДУКТА:\n\{\{PRODUCT_CONTENT\}\}/);
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /главный фактический источник/);
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /КРАТКИЕ СВЕДЕНИЯ О ПРОДУКТЕ:\n\{\{PRODUCT_FACTS\}\}/);
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /примерно 900–1000 символов, оптимально около 950/);
+// C — template without PRODUCT_FACTS
+assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /PRODUCT_FACTS|\{\{PRODUCT_FACTS\}\}/);
+assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /КРАТКИЕ СВЕДЕНИЯ/);
 
-// B — type-specific rules present
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /если продукт – медитация или аудиопрактика/);
-assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /Если это музыка, используй подходящие формулировки/);
-
-// C — canBuild gate
-assert.equal(canBuildAuthorSeoProductPrompt({ productType: "", productContent: SAMPLE_CONTENT }), false);
-assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productContent: "" }), false);
-assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productContent: "   " }), false);
-assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productContent: SAMPLE_CONTENT }), true);
-
-// D — empty content throws; whitespace-only throws
+// D / E — builder requires productSource; empty/whitespace throws
+assert.equal(canBuildAuthorSeoProductPrompt({ productType: "", productSource: SAMPLE_SOURCE }), false);
+assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productSource: "" }), false);
+assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productSource: "   " }), false);
+assert.equal(canBuildAuthorSeoProductPrompt({ productType: "Музыка", productSource: SAMPLE_SOURCE }), true);
 assert.throws(
-  () => formatProductContentForPrompt(""),
-  (err) => err instanceof Error && err.message === "seo_prompt_missing_product_content",
+  () => formatProductSourceForPrompt(""),
+  (err) => err instanceof Error && err.message === "seo_prompt_missing_product_source",
 );
 assert.throws(
   () =>
@@ -302,52 +291,92 @@ assert.throws(
       seoQuery: "лёгкий джаз",
       productType: "Музыка",
       relatedQueries: [],
-      productContent: "   ",
+      productSource: "   ",
     }),
-  (err) => err instanceof Error && err.message === "seo_prompt_missing_product_content",
+  (err) => err instanceof Error && err.message === "seo_prompt_missing_product_source",
 );
 
-// E — content inserted verbatim (no truncation), including long text
-const longContent = ("строка содержания продукта. ".repeat(80)).trim();
-assert.ok(longContent.length > 1200);
+// F — template PRODUCT_SOURCE block + critical grounding
+assert.match(
+  AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE,
+  /ИСХОДНЫЙ МАТЕРИАЛ ПРОДУКТА:\n\{\{PRODUCT_SOURCE\}\}/,
+);
+assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /Используй исходный материал как главный источник фактов/);
+assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /Не придумывай:/);
+assert.match(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /примерно 900–1000 символов, оптимально около 950/);
+
+// G — verbatim, no truncation
+const longSource = ("строка материала продукта. ".repeat(80)).trim();
+assert.ok(longSource.length > 1200);
 const grounded = buildAuthorSeoProductPrompt({
   seoQuery: "лёгкий джаз",
   productType: "Музыка",
   relatedQueries: ["лёгкий джаз слушать онлайн"],
-  productFacts: "3 части, без слов",
-  productContent: longContent,
+  productSource: longSource,
 });
-assert.ok(grounded.includes(longContent));
-assert.match(grounded, /СОДЕРЖАНИЕ ПРОДУКТА:\n/);
-assert.ok(grounded.indexOf(longContent) > grounded.indexOf("СОДЕРЖАНИЕ ПРОДУКТА:"));
-assert.equal(formatProductContentForPrompt(`  ${SAMPLE_CONTENT}  `), SAMPLE_CONTENT);
+assert.ok(grounded.includes(longSource));
+assert.ok(grounded.indexOf(longSource) > grounded.indexOf("ИСХОДНЫЙ МАТЕРИАЛ ПРОДУКТА:"));
+assert.equal(formatProductSourceForPrompt(`  ${SAMPLE_SOURCE}  `), SAMPLE_SOURCE);
 
-// F — UI: required content field, rename, helper, generate gate, how-to step 1
-assert.match(builderUi, /Содержание продукта/);
-assert.match(builderUi, /Краткие сведения о продукте/);
-assert.match(builderUi, /productContent/);
-assert.match(builderUi, /rows=\{12\}/);
-assert.match(builderUi, /canBuildAuthorSeoProductPrompt/);
+// H — generate disabled without type or source
+assert.match(builderUi, /canBuildAuthorSeoProductPrompt\(\{ productType, productSource \}\)/);
 assert.match(builderUi, /disabled=\{!canGenerate\}/);
-assert.match(builderUi, /Добавьте содержание продукта, чтобы SEO-описание соответствовало реальному аудио/);
-assert.match(builderUi, /1\. Добавьте содержание продукта/);
-assert.match(builderUi, /2\. Сформируйте и скопируйте промпт/);
-assert.match(builderUi, /3\. Откройте любую нейросеть/);
-assert.doesNotMatch(builderUi, /disabled=\{!productType\.trim\(\)\}/);
 
-// G — no AI / Wordstat / server for prompt path (doc comment may mention Wordstat)
+// I / J / K — dynamic guidance for real canonical labels
+assert.ok(types.includes("Музыка"));
+assert.ok(types.includes("Медитация"));
+assert.ok(types.includes("Лекция") || types.includes("Авторский аудиоподкаст"));
+assert.ok(types.includes("Аудиокурс"));
+
+const musicGuide = getAuthorSeoProductSourceGuidance("Музыка");
+assert.match(musicGuide.helper, /стиль/);
+assert.match(musicGuide.helper, /настроение/);
+assert.match(musicGuide.helper, /инструменты/);
+assert.match(musicGuide.helper, /вокал/);
+
+const practiceGuide = getAuthorSeoProductSourceGuidance("Медитация");
+assert.match(practiceGuide.helper, /текст|сценарий/i);
+assert.match(practiceGuide.helper, /структур/i);
+
+const spokenLabel = types.includes("Лекция") ? "Лекция" : "Авторский аудиоподкаст";
+const spokenGuide = getAuthorSeoProductSourceGuidance(spokenLabel);
+assert.match(spokenGuide.helper, /тезис|расшифровк|текст/i);
+
+const courseGuide = getAuthorSeoProductSourceGuidance("Аудиокурс");
+assert.match(courseGuide.helper, /программ|модул/i);
+
+const fallbackGuide = getAuthorSeoProductSourceGuidance("");
+assert.match(fallbackGuide.helper, /текст, сценарий, структуру, основные тезисы/);
+assert.notEqual(musicGuide.helper, practiceGuide.helper);
+assert.notEqual(musicGuide.helper, courseGuide.helper);
+
+assert.match(builderUi, /getAuthorSeoProductSourceGuidance/);
+assert.match(builderUi, /sourceGuidance\.helper/);
+assert.match(builderUi, /sourceGuidance\.placeholder/);
+assert.match(builderUi, /data-testid="author-seo-product-source-guidance"/);
+
+// L — large-material hint (attach full text/file separately to the LLM)
+assert.match(builderUi, /Полный текст или файл при/);
+assert.match(builderUi, /можно отдельно приложить к нейросети/);
+
+// M — no file input/upload/storage
+assert.doesNotMatch(builderUi, /type=["']file["']/);
+assert.doesNotMatch(builderUi, /<input[^>]*type=\{?["']file["']\}?/);
+assert.doesNotMatch(builderUi, /new FormData|multipart\/form-data|createObjectURL/);
+assert.doesNotMatch(builderUi, /onUpload|fileUpload|FileReader/);
+
+// N — builder still without fetch/API
 assert.doesNotMatch(builderUi, /openai|anthropic|grok\.xai|fetchWordstat|\/api\/author\/seo/i);
 assert.doesNotMatch(promptLib, /fetch\(|fetchWordstat|openai\.com|createCompletion/i);
 assert.match(promptLib, /No AI API \/ Wordstat \/ network/);
 
-// H — sample content lands in prompt body
-const withSample = buildAuthorSeoProductPrompt({
-  seoQuery: "лёгкий джаз",
-  productType: "Музыка",
-  relatedQueries: [],
-  productContent: SAMPLE_CONTENT,
-});
-assert.ok(withSample.includes("Мягкий вступительный джазовый мотив на рояле"));
-assert.ok(withSample.includes("Лёгкий саксофон без ударных"));
+// O — sample source lands; UI order type → source → secondary
+assert.ok(withTwo.includes("Мягкий вступительный джазовый мотив на рояле"));
+const typeIdx = builderUi.indexOf("Тип продукта");
+const sourceIdx = builderUi.indexOf("Материал продукта");
+const secondaryIdx = builderUi.indexOf('data-testid="author-seo-secondary-queries"');
+assert.ok(typeIdx >= 0 && sourceIdx > typeIdx && secondaryIdx > sourceIdx, "UI order type → source → secondary");
+assert.match(builderUi, /1\. Добавьте материал продукта/);
+assert.doesNotMatch(builderUi, /productContent|PRODUCT_CONTENT/);
 
 console.log("author-seo-prompt-builder-unit: ok");

@@ -36,48 +36,68 @@ const UNSAFE_SECONDARY_MODIFIERS = [
   "download",
 ] as const;
 
-export const SEO_PROMPT_EMPTY_PRODUCT_FACTS =
-  "Краткие сведения не указаны. Не придумывай конкретную длительность, количество треков, инструменты, голос, структуру или свойства продукта, которых нет в исходных данных.";
-
 /** Single source of truth for the packaging prompt body (placeholders filled by buildAuthorSeoProductPrompt). */
 export const AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE = `Ты – SEO-редактор русскоязычной аудиоплатформы АудиоЛад.
 
-Нужно полностью подготовить SEO-упаковку аудиопродукта на основе выбранного поискового запроса.
-
-ОСНОВНОЙ SEO-ЗАПРОС:
-{{SEO_QUERY}}
+Нужно полностью подготовить SEO-упаковку аудиопродукта на основе реального исходного материала продукта и выбранных поисковых запросов.
 
 ТИП ПРОДУКТА:
 {{PRODUCT_TYPE}}
 
+ИСХОДНЫЙ МАТЕРИАЛ ПРОДУКТА:
+{{PRODUCT_SOURCE}}
+
+КРИТИЧНО:
+
+Описание должно рассказывать именно об этом продукте.
+
+Используй исходный материал как главный источник фактов о продукте.
+
+SEO-запросы нужны для поисковой оптимизации, но они не должны менять смысл и содержание продукта.
+
+Не придумывай:
+
+– темы, которых нет в исходном материале;
+
+– инструменты и стиль музыки, если они не указаны;
+
+– количество треков;
+
+– длительность;
+
+– наличие или отсутствие голоса;
+
+– структуру практики или курса;
+
+– свойства и результаты, которых автор не описал.
+
+Если какой-либо SEO-запрос не соответствует содержанию продукта, не пытайся искусственно подгонять под него текст.
+
+ОСНОВНОЙ SEO-ЗАПРОС:
+{{SEO_QUERY}}
+
 ДОПОЛНИТЕЛЬНЫЕ SEO-ЗАПРОСЫ:
 {{RELATED_QUERIES}}
 
-КРАТКИЕ СВЕДЕНИЯ О ПРОДУКТЕ:
-{{PRODUCT_FACTS}}
+Исходный материал продукта – главный фактический источник для описания страницы.
 
-СОДЕРЖАНИЕ ПРОДУКТА:
-{{PRODUCT_CONTENT}}
-
-Содержание продукта – главный фактический источник для описания страницы.
-
-SEO-запросы определяют поисковую тему и формулировки, но не должны подменять реальное содержание продукта.
+SEO-запросы определяют поисковую тему и формулировки, но не должны подменять реальный исходный материал.
 
 При подготовке текстов:
 
-– внимательно изучи содержание продукта;
+– внимательно изучи исходный материал продукта;
 
 – отрази в основном описании именно то, что человек реально услышит или получит;
 
-– естественно соедини содержание продукта с основным и дополнительными SEO-запросами;
+– естественно соедини исходный материал с основным и дополнительными SEO-запросами;
 
 – не придумывай темы, свойства, инструменты, сюжет, упражнения, результаты или детали, которых нет в исходных данных;
 
-– если SEO-запрос и фактическое содержание частично расходятся, не выдумывай соответствие: формулируй текст только в рамках реально предоставленного содержания.
+– если SEO-запрос и фактический материал частично расходятся, не выдумывай соответствие: формулируй текст только в рамках реально предоставленного материала.
 
 Если дополнительные запросы указаны, используй наиболее подходящие из них естественно и по смыслу. Не пытайся вставить каждый запрос любой ценой.
 
-Главный принцип: основной SEO-запрос должен быть центральной темой всей страницы и естественно присутствовать в названии, основном описании, SEO-заголовке, SEO-описании и других подходящих блоках, но только в рамках реального содержания продукта.
+Главный принцип: основной SEO-запрос должен быть центральной темой всей страницы и естественно присутствовать в названии, основном описании, SEO-заголовке, SEO-описании и других подходящих блоках, но только в рамках реального исходного материала продукта.
 
 Правила по типу продукта:
 
@@ -125,7 +145,7 @@ SEO-запросы определяют поисковую тему и форм�
 
 Основное описание должно быть одновременно SEO-оптимизированным и содержательно точным.
 
-Основой описания является предоставленное СОДЕРЖАНИЕ ПРОДУКТА.
+Основой описания является предоставленный ИСХОДНЫЙ МАТЕРИАЛ ПРОДУКТА.
 
 Не создавай абстрактное описание только по поисковым запросам.
 
@@ -552,33 +572,125 @@ export function clampSecondarySeoSelection(
   return selectedIds.slice(0, Math.max(0, limit));
 }
 
-export function formatProductFactsForPrompt(productFacts: string): string {
-  const trimmed = productFacts.trim();
-  return trimmed.length > 0 ? trimmed : SEO_PROMPT_EMPTY_PRODUCT_FACTS;
-}
-
-/** Product content is required and inserted verbatim into the prompt (no truncation). */
-export function formatProductContentForPrompt(productContent: string): string {
-  const trimmed = productContent.trim();
+/** Product source (script, text, outline, music facts) — required, inserted verbatim (no truncation). */
+export function formatProductSourceForPrompt(productSource: string): string {
+  const trimmed = productSource.trim();
   if (!trimmed) {
-    throw new Error("seo_prompt_missing_product_content");
+    throw new Error("seo_prompt_missing_product_source");
   }
   return trimmed;
 }
 
 export function canBuildAuthorSeoProductPrompt(input: {
   productType: string;
-  productContent: string;
+  productSource: string;
 }): boolean {
-  return Boolean(input.productType.trim() && input.productContent.trim());
+  return Boolean(input.productType.trim() && input.productSource.trim());
+}
+
+export type AuthorSeoProductSourceGuidance = {
+  helper: string;
+  placeholder: string;
+};
+
+const PRACTICE_SOURCE_HELPER =
+  "Вставьте текст или сценарий практики. Если полного текста нет – добавьте структуру, основные этапы и ключевые формулировки.";
+const SPOKEN_SOURCE_HELPER =
+  "Добавьте текст, расшифровку или основные тезисы: о чём этот материал, какие темы и идеи в нём раскрываются.";
+const COURSE_SOURCE_HELPER =
+  "Добавьте программу курса, названия модулей, основные темы и ключевые идеи.";
+const MUSIC_SOURCE_HELPER =
+  "Опишите реальную музыку: стиль, настроение, инструменты, наличие или отсутствие вокала, характер звучания, количество композиций – если оно уже известно – и другие реальные особенности.";
+const GENERIC_SOURCE_HELPER =
+  "Добавьте текст, сценарий, структуру, основные тезисы или другое описание реального содержания продукта.";
+
+/**
+ * Dynamic helper/placeholder for the single «Материал продукта» field.
+ * Uses existing canonical product-type labels only — no second catalog.
+ */
+export function getAuthorSeoProductSourceGuidance(
+  productType: string,
+): AuthorSeoProductSourceGuidance {
+  const label = productType.trim();
+  const lower = label.toLocaleLowerCase("ru-RU");
+
+  const isMusic =
+    label === "Музыка" ||
+    label === "Музыкальный трек" ||
+    label === "Музыкальный альбом" ||
+    label === "Медитативная музыка" ||
+    label === "Звук" ||
+    lower.includes("музык");
+
+  const isPractice =
+    label === "Медитация" ||
+    label === "Аудиопрактика" ||
+    label === "Энергетическая практика" ||
+    label === "Визуализация" ||
+    label === "Цикл практик" ||
+    (lower.includes("практик") && !lower.includes("программ")) ||
+    lower.includes("медитац") ||
+    lower.includes("сеанс");
+
+  const isCourse =
+    label === "Аудиокурс" ||
+    label === "Программа аудиопрактик" ||
+    label === "Сборник" ||
+    lower.includes("курс") ||
+    lower.includes("программ");
+
+  const isSpoken =
+    label === "Авторский аудиоподкаст" ||
+    label === "Лекция" ||
+    label === "Аудиоистория" ||
+    label === "Аудиопост" ||
+    label === "Аудиоэфир" ||
+    label === "Аудиокнига" ||
+    lower.includes("подкаст") ||
+    lower.includes("лекц") ||
+    lower.includes("истори") ||
+    lower.includes("эфир");
+
+  if (isMusic) {
+    return {
+      helper: MUSIC_SOURCE_HELPER,
+      placeholder:
+        "Например: альбом из 10 инструментальных композиций, лёгкий джаз без вокала, рояль и саксофон, спокойное вечернее звучание.",
+    };
+  }
+  if (isPractice) {
+    return {
+      helper: PRACTICE_SOURCE_HELPER,
+      placeholder:
+        "Вставьте текст или сценарий практики: этапы, ключевые формулировки, дыхание, паузы.",
+    };
+  }
+  if (isCourse) {
+    return {
+      helper: COURSE_SOURCE_HELPER,
+      placeholder:
+        "Добавьте программу: модули, темы занятий, ключевые идеи и порядок прохождения.",
+    };
+  }
+  if (isSpoken) {
+    return {
+      helper: SPOKEN_SOURCE_HELPER,
+      placeholder:
+        "Добавьте текст, расшифровку или тезисы: о чём материал и какие идеи раскрываются.",
+    };
+  }
+  return {
+    helper: GENERIC_SOURCE_HELPER,
+    placeholder:
+      "Вставьте текст, сценарий, структуру, тезисы или другое описание реального содержания продукта.",
+  };
 }
 
 export function buildAuthorSeoProductPrompt(input: {
   seoQuery: string;
   productType: string;
   relatedQueries: string[];
-  productFacts?: string;
-  productContent: string;
+  productSource: string;
 }): string {
   const seoQuery = input.seoQuery.trim();
   const productType = input.productType.trim();
@@ -593,6 +705,5 @@ export function buildAuthorSeoProductPrompt(input: {
     .replaceAll("{{SEO_QUERY}}", seoQuery)
     .replaceAll("{{PRODUCT_TYPE}}", productType)
     .replaceAll("{{RELATED_QUERIES}}", formatRelatedQueriesForPrompt(input.relatedQueries))
-    .replaceAll("{{PRODUCT_FACTS}}", formatProductFactsForPrompt(input.productFacts ?? ""))
-    .replaceAll("{{PRODUCT_CONTENT}}", formatProductContentForPrompt(input.productContent));
+    .replaceAll("{{PRODUCT_SOURCE}}", formatProductSourceForPrompt(input.productSource));
 }
