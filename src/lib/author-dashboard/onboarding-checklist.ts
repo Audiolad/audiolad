@@ -169,6 +169,68 @@ export function serializeAuthorOnboardingUiPreference(
   });
 }
 
+/** True when the author has any published free or paid product. */
+export function hasAnyPublishedAuthorProduct(checklist: {
+  publishedProductId: string | null;
+  commercial: { publishedPaidProductId: string | null };
+}): boolean {
+  return Boolean(
+    checklist.publishedProductId || checklist.commercial.publishedPaidProductId,
+  );
+}
+
+/** Combined free + commercial step progress for the outer shell label. */
+export function getAuthorOnboardingJourneyProgress(checklist: {
+  completedCount: number;
+  totalCount: number;
+  commercial: { completedCount: number; totalCount: number };
+}): { completedCount: number; totalCount: number } {
+  return {
+    completedCount:
+      checklist.completedCount + checklist.commercial.completedCount,
+    totalCount: checklist.totalCount + checklist.commercial.totalCount,
+  };
+}
+
+/**
+ * Outer shell default: expanded until the author has a published product.
+ * `manualCollapsed` is null when localStorage has no explicit collapsed boolean.
+ */
+export function resolveAuthorOpportunitiesShellExpanded(input: {
+  hasPublishedProduct: boolean;
+  manualCollapsed: boolean | null;
+}): boolean {
+  if (input.manualCollapsed === null) {
+    return !input.hasPublishedProduct;
+  }
+
+  return !input.manualCollapsed;
+}
+
+/**
+ * Read outer-shell collapsed preference.
+ * Returns null when unset so defaults can follow published-product status.
+ */
+export function parseAuthorOnboardingShellCollapsedPreference(
+  raw: string | null,
+): boolean | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthorOnboardingUiPreference>;
+
+    if (typeof parsed.collapsed !== "boolean") {
+      return null;
+    }
+
+    return parsed.collapsed;
+  } catch {
+    return null;
+  }
+}
+
 export function isAuthorProfileMinimumComplete(
   profile: AuthorOnboardingProfileInput,
 ): boolean {
