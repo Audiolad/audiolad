@@ -10,11 +10,24 @@ import type {
   TopicWithCatalogCount,
 } from "./types";
 
+import {
+  POSTGREST_IN_FILTER_CHUNK_SIZE,
+  chunkIds as chunkIdsShared,
+} from "@/lib/supabase/chunk";
+
+/** Alias of POSTGREST_IN_FILTER_CHUNK_SIZE for existing catalog/topics call sites. */
+export const PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE =
+  POSTGREST_IN_FILTER_CHUNK_SIZE;
+
+export function chunkIds<T>(
+  ids: readonly T[],
+  chunkSize: number = PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
+): T[][] {
+  return chunkIdsShared(ids, chunkSize);
+}
+
 const TOPIC_SELECT =
   "id, key, slug, title, description, sort_order, is_active, show_on_home, created_at, updated_at";
-
-/** PostgREST `.in(practice_id, …)` URL/payload limit — 93 UUIDs 502 nginx in prod. */
-export const PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE = 50;
 
 type PracticeTopicAssignmentRow = {
   practice_id?: string;
@@ -29,19 +42,6 @@ type SupabaseLikeError = {
   hint?: string;
   status?: number | string;
 };
-
-export function chunkIds<T>(
-  ids: readonly T[],
-  chunkSize: number = PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
-): T[][] {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < ids.length; index += chunkSize) {
-    chunks.push(ids.slice(index, index + chunkSize));
-  }
-
-  return chunks;
-}
 
 function extractSupabaseLikeError(error: unknown): SupabaseLikeError {
   if (!error || typeof error !== "object") {

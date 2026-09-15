@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  POSTGREST_IN_FILTER_CHUNK_SIZE,
+  chunkIds,
+} from "@/lib/supabase/chunk";
+
 import { isCoursePublication } from "@/lib/author-products/publication-class";
 import { hasPublicTrackPlayableAudio } from "@/lib/listen/music-delivery";
 import { loadValidatedActiveMusicDeliveryItemIds } from "@/lib/listen/validated-active-music-delivery";
@@ -126,20 +131,40 @@ export async function loadPublishedAudioSummaries(
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("audio_items")
-    .select("practice_id, duration_seconds")
-    .in("practice_id", practiceIds)
-    .eq("status", "published");
+  const chunks = chunkIds(practiceIds, POSTGREST_IN_FILTER_CHUNK_SIZE);
+  const rows: Array<{
+    practiceId: string;
+    durationSeconds: number | null;
+  }> = [];
 
-  if (error) {
-    throw new Error("published_audio_summaries_lookup_failed");
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    const { data, error } = await supabase
+      .from("audio_items")
+      .select("practice_id, duration_seconds")
+      .in("practice_id", chunk)
+      .eq("status", "published");
+
+    if (error) {
+      console.error("published_audio_summaries_lookup_failed", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: practiceIds.length,
+        code: typeof error.code === "string" ? error.code : null,
+        message: typeof error.message === "string" ? error.message : null,
+      });
+      throw new Error("published_audio_summaries_lookup_failed");
+    }
+
+    for (const row of data ?? []) {
+      rows.push({
+        practiceId: row.practice_id as string,
+        durationSeconds: row.duration_seconds as number | null,
+      });
+    }
   }
 
-  return (data ?? []).map((row) => ({
-    practiceId: row.practice_id as string,
-    durationSeconds: row.duration_seconds as number | null,
-  }));
+  return rows;
 }
 
 export type PublishedAudioItemDetail = {
@@ -187,22 +212,42 @@ export async function loadPublishedAudioItemsByPracticeIds(
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("audio_items")
-    .select(
-      "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
-    )
-    .in("practice_id", practiceIds)
-    .eq("status", "published")
-    .order("position", { ascending: true });
+  const chunks = chunkIds(practiceIds, POSTGREST_IN_FILTER_CHUNK_SIZE);
+  const rows: PublishedAudioItemDetailRow[] = [];
 
-  if (error) {
-    throw new Error("published_audio_items_by_practice_lookup_failed");
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    const { data, error } = await supabase
+      .from("audio_items")
+      .select(
+        "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
+      )
+      .in("practice_id", chunk)
+      .eq("status", "published")
+      .order("position", { ascending: true });
+
+    if (error) {
+      console.error("published_audio_items_by_practice_lookup_failed", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: practiceIds.length,
+        code: typeof error.code === "string" ? error.code : null,
+        message: typeof error.message === "string" ? error.message : null,
+      });
+      throw new Error("published_audio_items_by_practice_lookup_failed");
+    }
+
+    rows.push(...((data ?? []) as PublishedAudioItemDetailRow[]));
   }
 
-  return ((data ?? []) as PublishedAudioItemDetailRow[]).map(
-    mapPublishedAudioItemDetail,
-  );
+  return rows
+    .map(mapPublishedAudioItemDetail)
+    .sort((left, right) => {
+      if (left.practiceId !== right.practiceId) {
+        return left.practiceId.localeCompare(right.practiceId);
+      }
+      return left.position - right.position;
+    });
 }
 
 export async function loadPublishedAudioItemsByIds(
@@ -213,21 +258,34 @@ export async function loadPublishedAudioItemsByIds(
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("audio_items")
-    .select(
-      "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
-    )
-    .in("id", audioItemIds)
-    .eq("status", "published");
+  const chunks = chunkIds(audioItemIds, POSTGREST_IN_FILTER_CHUNK_SIZE);
+  const rows: PublishedAudioItemDetailRow[] = [];
 
-  if (error) {
-    throw new Error("published_audio_items_by_id_lookup_failed");
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    const { data, error } = await supabase
+      .from("audio_items")
+      .select(
+        "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
+      )
+      .in("id", chunk)
+      .eq("status", "published");
+
+    if (error) {
+      console.error("published_audio_items_by_id_lookup_failed", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: audioItemIds.length,
+        code: typeof error.code === "string" ? error.code : null,
+        message: typeof error.message === "string" ? error.message : null,
+      });
+      throw new Error("published_audio_items_by_id_lookup_failed");
+    }
+
+    rows.push(...((data ?? []) as PublishedAudioItemDetailRow[]));
   }
 
-  return ((data ?? []) as PublishedAudioItemDetailRow[]).map(
-    mapPublishedAudioItemDetail,
-  );
+  return rows.map(mapPublishedAudioItemDetail);
 }
 
 export function groupPublishedAudioItemsByPractice(
