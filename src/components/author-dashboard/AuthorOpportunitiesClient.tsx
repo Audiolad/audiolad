@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -95,13 +97,12 @@ function progressLabel(state: OpportunitiesProgressState): string {
   return "Доступно позже";
 }
 
-export default function AuthorOpportunitiesClient({ view }: Props) {
+/** Canonical opportunities content — reused by hub page and dashboard nested panel. */
+export function AuthorOpportunitiesContent({ view }: Props) {
   const { primaryCta } = view;
 
   return (
-    <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={view.authorSlug} authorId={view.authorId} />
-
+    <div className="space-y-6" data-author-opportunities-content="true">
       <SectionCard tone="accent">
         <p className="text-sm font-semibold uppercase tracking-[0.04em] text-[#8c7dab]">
           Возможности для авторов
@@ -231,6 +232,15 @@ export default function AuthorOpportunitiesClient({ view }: Props) {
         </Link>
         .
       </p>
+    </div>
+  );
+}
+
+export default function AuthorOpportunitiesClient({ view }: Props) {
+  return (
+    <div className="space-y-6">
+      <AuthorDashboardNav authorSlug={view.authorSlug} authorId={view.authorId} />
+      <AuthorOpportunitiesContent view={view} />
     </div>
   );
 }

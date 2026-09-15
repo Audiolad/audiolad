@@ -207,14 +207,53 @@ function primary(input) {
   assert.doesNotMatch(nav, /opportunities/);
 
   const home = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
-  assert.match(home, /Возможности для авторов/);
-  assert.match(home, /Посмотреть возможности/);
-  assert.match(
+  assert.doesNotMatch(home, /Посмотреть возможности/);
+  assert.doesNotMatch(
     home,
     /\/author-dashboard\/opportunities\?author=/,
-    "dashboard entry links into opportunities hub with author query",
+    "dashboard no longer has a standalone opportunities entry card",
   );
+  assert.doesNotMatch(home, /Возможности для авторов/);
   assert.match(home, /AuthorOnboardingChecklist/);
+
+  const checklistUi = read(
+    "src/components/author-dashboard/AuthorOnboardingChecklist.tsx",
+  );
+  assert.match(checklistUi, /AuthorOpportunitiesNestedPanel/);
+  assert.match(
+    checklistUi,
+    /<AuthorOpportunitiesNestedPanel key=\{authorId\} authorId=\{authorId\} \/>/,
+  );
+
+  const nested = read(
+    "src/components/author-dashboard/AuthorOpportunitiesNestedPanel.tsx",
+  );
+  assert.match(nested, /data-author-opportunities-nested="true"/);
+  assert.match(nested, /Возможности для авторов/);
+  assert.match(nested, /AuthorOpportunitiesContent/);
+  assert.match(nested, /\/api\/author\/opportunities\?author_id=/);
+  assert.match(nested, /useState\(false\)/);
+  assert.doesNotMatch(nested, /localStorage/);
+  assert.doesNotMatch(nested, /writeOnboardingShellCollapsedPreference/);
+
+  const opportunitiesClient = read(
+    "src/components/author-dashboard/AuthorOpportunitiesClient.tsx",
+  );
+  assert.match(opportunitiesClient, /export function AuthorOpportunitiesContent/);
+  assert.match(
+    opportunitiesClient,
+    /data-author-opportunities-content="true"/,
+  );
+  assert.match(opportunitiesClient, /AuthorDashboardNav/);
+  assert.match(
+    opportunitiesClient,
+    /<AuthorOpportunitiesContent view=\{view\} \/>/,
+  );
+
+  const opportunitiesApi = read("src/app/api/author/opportunities/route.ts");
+  assert.match(opportunitiesApi, /loadAuthorOpportunitiesView/);
+  assert.match(opportunitiesApi, /requireAuthorMembership/);
+  assert.match(opportunitiesApi, /author_id/);
 
   const promotion = read(
     "src/components/author-dashboard/AuthorPromotionClient.tsx",

@@ -678,6 +678,11 @@ function testSourceGuards() {
   assert.match(checklistUi, /resolveAuthorOpportunitiesShellExpanded/);
   assert.match(checklistUi, /hasAnyPublishedAuthorProduct/);
   assert.match(checklistUi, /getAuthorOnboardingJourneyProgress/);
+  assert.match(checklistUi, /AuthorOpportunitiesNestedPanel/);
+  assert.match(
+    checklistUi,
+    /<AuthorOpportunitiesNestedPanel key=\{authorId\} authorId=\{authorId\} \/>/,
+  );
   assert.match(
     checklistUi,
     /onShow=\{\(\) => setLocalShow\(\(current\) => \(\{ \.\.\.current, free: true \}\)\)\}/,
@@ -698,7 +703,8 @@ function testSourceGuards() {
   const dashboard = read(
     "src/components/author-dashboard/AuthorDashboardClient.tsx",
   );
-  assert.match(dashboard, /Возможности для авторов/);
+  assert.doesNotMatch(dashboard, /Возможности для авторов/);
+  assert.doesNotMatch(dashboard, /Посмотреть возможности/);
   assert.match(dashboard, /AuthorOnboardingChecklist/);
   assert.match(dashboard, /AuthorAccessStatusBanner/);
   assert.match(dashboard, /AuthorTermsRequiredBanner/);
