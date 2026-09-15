@@ -784,7 +784,7 @@ export default function AuthorOnboardingChecklist({
           className="border-t border-[#eadff8] px-5 pb-5 pt-4"
         >
           {shellBody}
-          <AuthorOpportunitiesNestedPanel authorId={authorId} />
+          <AuthorOpportunitiesNestedPanel key={authorId} authorId={authorId} />
         </div>
       ) : null}
     </section>

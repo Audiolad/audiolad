@@ -681,7 +681,7 @@ function testSourceGuards() {
   assert.match(checklistUi, /AuthorOpportunitiesNestedPanel/);
   assert.match(
     checklistUi,
-    /<AuthorOpportunitiesNestedPanel authorId=\{authorId\} \/>/,
+    /<AuthorOpportunitiesNestedPanel key=\{authorId\} authorId=\{authorId\} \/>/,
   );
   assert.match(
     checklistUi,

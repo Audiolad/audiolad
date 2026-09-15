@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { AuthorOpportunitiesContent } from "@/components/author-dashboard/AuthorOpportunitiesClient";
 import type { AuthorOpportunitiesViewModel } from "@/lib/author-dashboard/opportunities";
@@ -33,19 +33,13 @@ function NestedChevron({ expanded }: { expanded: boolean }) {
 /**
  * Nested opportunities hub inside the outer onboarding shell.
  * Always mounts collapsed; expanded state is not persisted.
+ * Remount via key={authorId} from the parent when the author changes.
  */
 export default function AuthorOpportunitiesNestedPanel({ authorId }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<AuthorOpportunitiesViewModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setExpanded(false);
-    setView(null);
-    setError(null);
-    setLoading(false);
-  }, [authorId]);
 
   async function loadView() {
     setLoading(true);

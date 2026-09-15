@@ -222,7 +222,7 @@ function primary(input) {
   assert.match(checklistUi, /AuthorOpportunitiesNestedPanel/);
   assert.match(
     checklistUi,
-    /<AuthorOpportunitiesNestedPanel authorId=\{authorId\} \/>/,
+    /<AuthorOpportunitiesNestedPanel key=\{authorId\} authorId=\{authorId\} \/>/,
   );
 
   const nested = read(
