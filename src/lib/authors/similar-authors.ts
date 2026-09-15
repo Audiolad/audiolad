@@ -10,6 +10,10 @@ import {
 } from "@/lib/fixtures/test-fixture-marker";
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
+import {
+  POSTGREST_IN_FILTER_CHUNK_SIZE,
+  chunkIds,
+} from "@/lib/supabase/chunk";
 
 export type SimilarAuthorCard = {
   id: string;
@@ -30,6 +34,44 @@ type AuthorCandidateRow = {
   productCount: number;
   overlapScore: number;
 };
+
+type TopicKeyRow = {
+  topics?:
+    | { key?: string | null }
+    | Array<{ key?: string | null }>
+    | null;
+};
+
+function topicKeyFromRow(row: TopicKeyRow): string | null {
+  const topic = Array.isArray(row.topics) ? row.topics[0] : row.topics;
+  const key = topic?.key;
+  return typeof key === "string" && key.length > 0 ? key : null;
+}
+
+function logTopicsChunkError(details: {
+  table: "author_topics" | "practice_topics";
+  stage: string;
+  chunkIndex: number;
+  chunkSize: number;
+  totalIds: number;
+  error: unknown;
+}) {
+  const errorDetails =
+    details.error && typeof details.error === "object"
+      ? (details.error as Record<string, unknown>)
+      : {};
+
+  console.error("[similar-authors] topics_chunk_failed", {
+    table: details.table,
+    stage: details.stage,
+    chunkIndex: details.chunkIndex,
+    chunkSize: details.chunkSize,
+    totalIds: details.totalIds,
+    code: typeof errorDetails.code === "string" ? errorDetails.code : null,
+    message:
+      typeof errorDetails.message === "string" ? errorDetails.message : null,
+  });
+}
 
 export async function findSimilarAuthors(
   supabase: SupabaseClient,
@@ -127,21 +169,45 @@ export async function findSimilarAuthors(
   const authorTopicSet = new Set(authorTopicKeys);
 
   if (authorTopicSet.size > 0) {
-    const { data: authorTopicRows } = await supabase
-      .from("author_topics")
-      .select("author_id, topics!inner (key)")
-      .in("author_id", candidateIds);
+    const authorIdChunks = chunkIds(
+      candidateIds,
+      POSTGREST_IN_FILTER_CHUNK_SIZE,
+    );
 
-    for (const row of authorTopicRows ?? []) {
-      const topic = Array.isArray(row.topics) ? row.topics[0] : row.topics;
-      const candidate = authorScores.get(row.author_id as string);
+    for (
+      let chunkIndex = 0;
+      chunkIndex < authorIdChunks.length;
+      chunkIndex += 1
+    ) {
+      const authorIdChunk = authorIdChunks[chunkIndex];
+      const { data: authorTopicRows, error: authorTopicsError } = await supabase
+        .from("author_topics")
+        .select("author_id, topics!inner (key)")
+        .in("author_id", authorIdChunk);
 
-      if (!candidate || !topic?.key) {
+      if (authorTopicsError) {
+        logTopicsChunkError({
+          table: "author_topics",
+          stage: "find_similar_authors_author_topics",
+          chunkIndex,
+          chunkSize: authorIdChunk.length,
+          totalIds: candidateIds.length,
+          error: authorTopicsError,
+        });
         continue;
       }
 
-      if (authorTopicSet.has(topic.key as string)) {
-        candidate.overlapScore += 1;
+      for (const row of authorTopicRows ?? []) {
+        const key = topicKeyFromRow(row as TopicKeyRow);
+        const candidate = authorScores.get(row.author_id as string);
+
+        if (!candidate || !key) {
+          continue;
+        }
+
+        if (authorTopicSet.has(key)) {
+          candidate.overlapScore += 1;
+        }
       }
     }
   }
@@ -149,31 +215,57 @@ export async function findSimilarAuthors(
   const practiceIds = (publishedPractices ?? []).map((row) => row.id as string);
 
   if (authorTopicSet.size > 0 && practiceIds.length > 0) {
-    const { data: practiceTopicRows } = await supabase
-      .from("practice_topics")
-      .select("practice_id, topics!inner (key)")
-      .in("practice_id", practiceIds);
-
     const practiceAuthorMap = new Map(
       (publishedPractices ?? []).map((row) => [
         row.id as string,
         row.author_id as string,
       ]),
     );
+    const practiceIdChunks = chunkIds(
+      practiceIds,
+      POSTGREST_IN_FILTER_CHUNK_SIZE,
+    );
 
-    for (const row of practiceTopicRows ?? []) {
-      const topic = Array.isArray(row.topics) ? row.topics[0] : row.topics;
-      const candidateAuthorId = practiceAuthorMap.get(row.practice_id as string);
-      const candidate = candidateAuthorId
-        ? authorScores.get(candidateAuthorId)
-        : undefined;
+    for (
+      let chunkIndex = 0;
+      chunkIndex < practiceIdChunks.length;
+      chunkIndex += 1
+    ) {
+      const practiceIdChunk = practiceIdChunks[chunkIndex];
+      const { data: practiceTopicRows, error: practiceTopicsError } =
+        await supabase
+          .from("practice_topics")
+          .select("practice_id, topics!inner (key)")
+          .in("practice_id", practiceIdChunk);
 
-      if (!candidate || !topic?.key) {
+      if (practiceTopicsError) {
+        logTopicsChunkError({
+          table: "practice_topics",
+          stage: "find_similar_authors_practice_topics",
+          chunkIndex,
+          chunkSize: practiceIdChunk.length,
+          totalIds: practiceIds.length,
+          error: practiceTopicsError,
+        });
         continue;
       }
 
-      if (authorTopicSet.has(topic.key as string)) {
-        candidate.overlapScore += 1;
+      for (const row of practiceTopicRows ?? []) {
+        const key = topicKeyFromRow(row as TopicKeyRow);
+        const candidateAuthorId = practiceAuthorMap.get(
+          row.practice_id as string,
+        );
+        const candidate = candidateAuthorId
+          ? authorScores.get(candidateAuthorId)
+          : undefined;
+
+        if (!candidate || !key) {
+          continue;
+        }
+
+        if (authorTopicSet.has(key)) {
+          candidate.overlapScore += 1;
+        }
       }
     }
   }
