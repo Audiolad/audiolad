@@ -1,6 +1,8 @@
 import {
   buildAuthorOnboardingStorageKey,
+  parseAuthorOnboardingShellCollapsedPreference,
   parseAuthorOnboardingUiPreference,
+  serializeAuthorOnboardingUiPreference,
 } from "@/lib/author-dashboard/onboarding-checklist";
 
 /**
@@ -28,6 +30,48 @@ export function clearLegacyOnboardingPreference(authorId: string): void {
 
   try {
     window.localStorage.removeItem(buildAuthorOnboardingStorageKey(authorId));
+  } catch {
+    // Ignore quota / private mode failures.
+  }
+}
+
+/** null = no explicit outer-shell preference stored. */
+export function readOnboardingShellCollapsedPreference(
+  authorId: string,
+): boolean | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return parseAuthorOnboardingShellCollapsedPreference(
+      window.localStorage.getItem(buildAuthorOnboardingStorageKey(authorId)),
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function writeOnboardingShellCollapsedPreference(
+  authorId: string,
+  collapsed: boolean,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const key = buildAuthorOnboardingStorageKey(authorId);
+    const current = parseAuthorOnboardingUiPreference(
+      window.localStorage.getItem(key),
+    );
+    window.localStorage.setItem(
+      key,
+      serializeAuthorOnboardingUiPreference({
+        collapsed,
+        dismissed: current.dismissed,
+      }),
+    );
   } catch {
     // Ignore quota / private mode failures.
   }

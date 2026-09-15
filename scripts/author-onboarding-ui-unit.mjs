@@ -671,6 +671,13 @@ function testSourceGuards() {
   assert.match(checklistUi, /Свернуть/);
   assert.match(checklistUi, /Скрыть сейчас/);
   assert.match(checklistUi, /data-onboarding-zone="compact"/);
+  assert.match(checklistUi, /data-onboarding-shell="true"/);
+  assert.match(checklistUi, /Возможности автора/);
+  assert.match(checklistUi, /aria-expanded=\{shellExpanded\}/);
+  assert.match(checklistUi, /writeOnboardingShellCollapsedPreference/);
+  assert.match(checklistUi, /resolveAuthorOpportunitiesShellExpanded/);
+  assert.match(checklistUi, /hasAnyPublishedAuthorProduct/);
+  assert.match(checklistUi, /getAuthorOnboardingJourneyProgress/);
   assert.match(
     checklistUi,
     /onShow=\{\(\) => setLocalShow\(\(current\) => \(\{ \.\.\.current, free: true \}\)\)\}/,

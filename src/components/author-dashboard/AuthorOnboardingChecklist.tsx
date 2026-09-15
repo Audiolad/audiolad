@@ -8,12 +8,17 @@ import {
   type CommercialOnboardingStepState,
 } from "@/lib/author-dashboard/commercial-onboarding";
 import {
+  getAuthorOnboardingJourneyProgress,
+  hasAnyPublishedAuthorProduct,
+  resolveAuthorOpportunitiesShellExpanded,
   type AuthorOnboardingChecklistState,
   type AuthorOnboardingStepState,
 } from "@/lib/author-dashboard/onboarding-checklist";
 import {
   clearLegacyOnboardingPreference,
   readLegacyOnboardingDismissed,
+  readOnboardingShellCollapsedPreference,
+  writeOnboardingShellCollapsedPreference,
 } from "@/lib/author-dashboard/onboarding-preference-store";
 import {
   shouldBridgeLegacyOnboardingDismiss,
@@ -55,6 +60,28 @@ function LockIcon() {
         d="M6.5 9V6.8a3.5 3.5 0 0 1 7 0V9M5.5 9h9v7.5h-9V9Z"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+
+function ShellChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={`h-5 w-5 shrink-0 text-[#7042c5] transition-transform duration-200 ${
+        expanded ? "rotate-180" : ""
+      }`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 7.5 10 12.5 15 7.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -410,6 +437,7 @@ export default function AuthorOnboardingChecklist({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shellExpanded, setShellExpanded] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -446,6 +474,13 @@ export default function AuthorOnboardingChecklist({
         if (!nextChecklist || !nextUi) {
           return;
         }
+
+        setShellExpanded(
+          resolveAuthorOpportunitiesShellExpanded({
+            hasPublishedProduct: hasAnyPublishedAuthorProduct(nextChecklist),
+            manualCollapsed: readOnboardingShellCollapsedPreference(authorId),
+          }),
+        );
 
         const bridgeKinds = shouldBridgeLegacyOnboardingDismiss({
           dismissed: readLegacyOnboardingDismissed(authorId),
@@ -684,20 +719,24 @@ export default function AuthorOnboardingChecklist({
     </section>
   );
 
-  if (bothServerCompact) {
-    return (
-      <div className="mt-4 space-y-2" data-onboarding-zone="compact">
-        {freeSection}
-        {commercialSection}
-      </div>
-    );
+  const journeyProgress = getAuthorOnboardingJourneyProgress(checklist);
+  const shellTitle = `Возможности автора · ${journeyProgress.completedCount} из ${journeyProgress.totalCount} выполнено`;
+
+  function toggleShell() {
+    setShellExpanded((current) => {
+      const next = !current;
+      writeOnboardingShellCollapsedPreference(authorId, !next);
+      return next;
+    });
   }
 
-  return (
-    <section
-      className="mt-6 overflow-hidden rounded-[24px] border border-[#eadff8] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(91,62,145,0.06)]"
-      aria-labelledby="author-onboarding-title"
-    >
+  const shellBody = bothServerCompact ? (
+    <div className="space-y-2" data-onboarding-zone="compact">
+      {freeSection}
+      {commercialSection}
+    </div>
+  ) : (
+    <>
       <div className="min-w-0">
         <h2
           id="author-onboarding-title"
@@ -715,6 +754,37 @@ export default function AuthorOnboardingChecklist({
         {freeSection}
         {commercialSection}
       </div>
+    </>
+  );
+
+  return (
+    <section
+      className="mt-6 overflow-hidden rounded-[24px] border border-[#eadff8] bg-white shadow-[0_8px_22px_rgba(91,62,145,0.06)]"
+      aria-labelledby="author-opportunities-shell-title"
+      data-onboarding-shell="true"
+    >
+      <button
+        type="button"
+        id="author-opportunities-shell-title"
+        aria-expanded={shellExpanded}
+        aria-controls="author-opportunities-shell-panel"
+        onClick={toggleShell}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        <span className="min-w-0 break-words text-[16px] font-semibold text-[#2f2548]">
+          {shellTitle}
+        </span>
+        <ShellChevron expanded={shellExpanded} />
+      </button>
+
+      {shellExpanded ? (
+        <div
+          id="author-opportunities-shell-panel"
+          className="border-t border-[#eadff8] px-5 pb-5 pt-4"
+        >
+          {shellBody}
+        </div>
+      ) : null}
     </section>
   );
 }
