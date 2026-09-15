@@ -78,6 +78,13 @@ import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { normalizeStudioMusicPricingForSave } from "@/lib/studio-music/pricing";
+import {
+  findConflictingStudioFreeSlotProduct,
+  isStudioFreeSlotUniqueViolation,
+  practiceOccupiesStudioFreeSlot,
+  studioFreeSlotTakenResponseBody,
+  wouldOccupyStudioFreeSlotAfterNormalizedSave,
+} from "@/lib/studio-music/free-slot";
 import { slugifyTitle } from "@/lib/author-products/utils";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
@@ -675,6 +682,73 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.studio_music_price_minor = studioPricing.priceMinor;
     }
 
+    {
+      const nextAuthorIdForSlot =
+        typeof updates.author_id === "string" && updates.author_id
+          ? updates.author_id
+          : practice.author_id;
+      const nextPermissionForSlot =
+        "music_usage_permission" in updates
+          ? (updates.music_usage_permission as string | null)
+          : practice.music_usage_permission;
+      const nextModeForSlot =
+        "studio_music_pricing_mode" in updates
+          ? (updates.studio_music_pricing_mode as string | null)
+          : practice.studio_music_pricing_mode;
+      const nextIsFreeForSlot =
+        typeof updates.is_free === "boolean"
+          ? updates.is_free
+          : practice.is_free;
+      const nextPriceForSlot =
+        "price" in updates
+          ? (updates.price as number | null)
+          : practice.price;
+
+      const occupies =
+        wouldOccupyStudioFreeSlotAfterNormalizedSave({
+          musicUsagePermission: nextPermissionForSlot,
+          studioMusicPricingMode: nextModeForSlot,
+        }) ||
+        practiceOccupiesStudioFreeSlot({
+          deleted_at: practice.deleted_at,
+          music_usage_permission: nextPermissionForSlot,
+          studio_music_pricing_mode: nextModeForSlot,
+          is_free: nextIsFreeForSlot,
+          price: nextPriceForSlot,
+        });
+
+      const currentlyOccupies = practiceOccupiesStudioFreeSlot({
+        deleted_at: practice.deleted_at,
+        music_usage_permission: practice.music_usage_permission,
+        studio_music_pricing_mode: practice.studio_music_pricing_mode,
+        is_free: practice.is_free,
+        price: practice.price,
+      });
+      const authorIdChanging = nextAuthorIdForSlot !== practice.author_id;
+      // Re-save of an existing FREE product on the same author must stay allowed.
+      const mustCheckSlot =
+        occupies && (!currentlyOccupies || authorIdChanging);
+
+      if (mustCheckSlot) {
+        let conflict;
+        try {
+          conflict = await findConflictingStudioFreeSlotProduct(supabase, {
+            authorId: nextAuthorIdForSlot,
+            excludePracticeId: id,
+          });
+        } catch {
+          console.error("studio_free_slot_lookup_failed", id);
+          return NextResponse.json({ error: "internal_error" }, { status: 500 });
+        }
+
+        if (conflict) {
+          return NextResponse.json(studioFreeSlotTakenResponseBody(conflict), {
+            status: 409,
+          });
+        }
+      }
+    }
+
     const appreciationPatch = resolveAppreciationOverridePatch({
       present: "listener_appreciation_override" in body,
       override: (body as { listener_appreciation_override?: unknown })
@@ -921,6 +995,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (updateError) {
+      if (isStudioFreeSlotUniqueViolation(updateError)) {
+        return NextResponse.json(studioFreeSlotTakenResponseBody(), {
+          status: 409,
+        });
+      }
       console.error("author_product_update_error", {
         practiceId: id,
         code: updateError.code ?? "internal_error",
