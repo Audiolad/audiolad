@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import AuthorOpportunitiesNestedPanel from "@/components/author-dashboard/AuthorOpportunitiesNestedPanel";
 import {
   isCommercialOnboardingChecklistStepId,
   type CommercialOnboardingStepState,
@@ -783,6 +784,7 @@ export default function AuthorOnboardingChecklist({
           className="border-t border-[#eadff8] px-5 pb-5 pt-4"
         >
           {shellBody}
+          <AuthorOpportunitiesNestedPanel key={authorId} authorId={authorId} />
         </div>
       ) : null}
     </section>
