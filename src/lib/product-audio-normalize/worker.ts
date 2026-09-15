@@ -39,6 +39,10 @@ export type ProductNormalizeCleanupDecision = {
   finalStatus: string | null;
   cleanupSource: boolean;
   cleanupTarget: boolean;
+  cleanupPrevious: boolean;
+  previousAudioPath: string | null;
+  sourceStoragePath: string | null;
+  targetStoragePath: string | null;
 };
 
 export type ProductNormalizeWorkerPort = {
@@ -52,7 +56,7 @@ export type ProductNormalizeWorkerPort = {
   completeJob: (
     job: ClaimedProductNormalizeJob,
     result: ProductNormalizeExecuteResult,
-  ) => Promise<{ applied: boolean; cleanupPaths: string[] }>;
+  ) => Promise<ProductNormalizeCleanupDecision>;
   failJob: (
     job: ClaimedProductNormalizeJob,
     error: unknown,
@@ -269,12 +273,13 @@ export function createProductAudioNormalizeWorker(
             continue;
           }
           const completion = await port.completeJob(job, result);
-          await port.cleanupPaths(completion.cleanupPaths);
+          await port.cleanupPaths(port.pathsForCleanupDecision(job, completion));
           logger.info(
             JSON.stringify({
               event: "product_audio_normalize_job_finished",
               jobId: job.id,
-              applied: completion.applied,
+              outcome: completion.outcome,
+              applied: completion.outcome === "applied" || completion.outcome === "already_ready",
             }),
           );
         } catch (error) {

@@ -301,6 +301,11 @@ BEGIN
 END;
 $$;
 
+
+DROP FUNCTION IF EXISTS public.complete_product_audio_normalize_job(uuid, uuid, text, integer, bigint, text, text);
+DROP FUNCTION IF EXISTS public.fail_product_audio_normalize_job(uuid, uuid, text, text, integer);
+DROP FUNCTION IF EXISTS public.resolve_product_audio_normalize_job_interrupt(uuid, uuid, integer);
+
 CREATE OR REPLACE FUNCTION public.complete_product_audio_normalize_job(
   p_job_id uuid,
   p_lease_token uuid,
@@ -311,7 +316,11 @@ CREATE OR REPLACE FUNCTION public.complete_product_audio_normalize_job(
   p_status text DEFAULT 'draft'
 )
 RETURNS TABLE (
-  applied boolean,
+  outcome text,
+  final_status text,
+  cleanup_source boolean,
+  cleanup_target boolean,
+  cleanup_previous boolean,
   previous_audio_path text,
   source_storage_path text,
   target_storage_path text
@@ -321,6 +330,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_audio_item_id uuid;
   v_job public.product_audio_normalize_jobs;
   v_item public.audio_items;
   v_previous text;
@@ -331,20 +341,97 @@ BEGIN
     OR p_duration_seconds <= 0
     OR p_file_size_bytes IS NULL
     OR p_file_size_bytes <= 0 THEN
-    RETURN QUERY SELECT false, NULL::text, NULL::text, NULL::text;
+    RETURN QUERY SELECT
+      'invalid'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
+
+  -- Canonical lock order: audio_item → job.
+  SELECT audio_item_id INTO v_audio_item_id
+  FROM public.product_audio_normalize_jobs
+  WHERE id = p_job_id;
+  IF v_audio_item_id IS NULL THEN
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.audio_items
+  WHERE id = v_audio_item_id
+  FOR UPDATE;
 
   SELECT * INTO v_job
   FROM public.product_audio_normalize_jobs
   WHERE id = p_job_id
   FOR UPDATE;
-  IF NOT FOUND
-    OR v_job.status <> 'processing'
-    OR v_job.lease_token IS DISTINCT FROM p_lease_token
-    OR v_job.lease_expires_at IS NULL
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  -- Idempotent: commit succeeded earlier, client lost response.
+  IF v_job.status = 'ready' THEN
+    RETURN QUERY SELECT
+      'already_ready'::text,
+      'ready'::text,
+      true,
+      false,
+      (v_job.previous_audio_path IS NOT NULL
+        AND v_job.previous_audio_path IS DISTINCT FROM v_item.audio_path),
+      v_job.previous_audio_path,
+      v_job.source_storage_path,
+      v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'superseded' THEN
+    RETURN QUERY SELECT
+      'superseded'::text, 'superseded'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'failed' THEN
+    RETURN QUERY SELECT
+      'failed'::text, 'failed'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'queued' THEN
+    RETURN QUERY SELECT
+      'expired_requeued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  -- status = processing
+  IF v_job.lease_token IS DISTINCT FROM p_lease_token THEN
+    RETURN QUERY SELECT
+      'foreign_lease'::text, 'processing'::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  IF v_job.lease_expires_at IS NULL
     OR v_job.lease_expires_at <= clock_timestamp() THEN
-    RETURN QUERY SELECT false, NULL::text, NULL::text, NULL::text;
+    -- Same token but lease expired: requeue for retry; keep source.
+    UPDATE public.product_audio_normalize_jobs
+    SET status = 'queued',
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        error_code = NULL,
+        error_message_safe = NULL,
+        updated_at = now()
+    WHERE id = v_job.id;
+    RETURN QUERY SELECT
+      'expired_requeued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
@@ -352,12 +439,6 @@ BEGIN
     RAISE EXCEPTION 'target_path_mismatch' USING ERRCODE = '22023';
   END IF;
 
-  SELECT * INTO v_item
-  FROM public.audio_items
-  WHERE id = v_job.audio_item_id
-  FOR UPDATE;
-
-  -- Stale completion: a newer upload superseded this job.
   IF v_item.desired_product_audio_normalize_job_id IS DISTINCT FROM v_job.id THEN
     UPDATE public.product_audio_normalize_jobs
     SET status = 'superseded',
@@ -368,7 +449,9 @@ BEGIN
         error_message_safe = 'Заменено новой загрузкой.',
         updated_at = now()
     WHERE id = v_job.id;
-    RETURN QUERY SELECT false, NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN QUERY SELECT
+      'superseded'::text, 'superseded'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
@@ -394,7 +477,15 @@ BEGIN
       updated_at = now()
   WHERE id = v_job.id;
 
-  RETURN QUERY SELECT true, v_previous, v_job.source_storage_path, v_job.target_storage_path;
+  RETURN QUERY SELECT
+    'applied'::text,
+    'ready'::text,
+    true,
+    false,
+    (v_previous IS NOT NULL AND v_previous IS DISTINCT FROM p_target_storage_path),
+    v_previous,
+    v_job.source_storage_path,
+    v_job.target_storage_path;
 END;
 $$;
 
@@ -406,45 +497,106 @@ CREATE OR REPLACE FUNCTION public.fail_product_audio_normalize_job(
   p_max_attempts integer DEFAULT 3
 )
 RETURNS TABLE (
+  outcome text,
   final_status text,
   cleanup_source boolean,
-  cleanup_target boolean
+  cleanup_target boolean,
+  cleanup_previous boolean,
+  previous_audio_path text,
+  source_storage_path text,
+  target_storage_path text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_audio_item_id uuid;
   v_job public.product_audio_normalize_jobs;
+  v_item public.audio_items;
   v_permanent boolean;
 BEGIN
   IF p_lease_token IS NULL THEN
-    RETURN QUERY SELECT NULL::text, false, false;
+    RETURN QUERY SELECT
+      'invalid'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
   IF p_max_attempts < 1 OR p_max_attempts > 10 THEN
     RAISE EXCEPTION 'invalid_max_attempts' USING ERRCODE = '22023';
   END IF;
 
+  SELECT audio_item_id INTO v_audio_item_id
+  FROM public.product_audio_normalize_jobs
+  WHERE id = p_job_id;
+  IF v_audio_item_id IS NULL THEN
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.audio_items
+  WHERE id = v_audio_item_id
+  FOR UPDATE;
+
   SELECT * INTO v_job
   FROM public.product_audio_normalize_jobs
   WHERE id = p_job_id
   FOR UPDATE;
-  IF NOT FOUND
-    OR v_job.status <> 'processing'
-    OR v_job.lease_token IS DISTINCT FROM p_lease_token
-    OR v_job.lease_expires_at IS NULL
-    OR v_job.lease_expires_at <= clock_timestamp() THEN
-    RETURN QUERY SELECT NULL::text, false, false;
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
 
-  -- Desired pointer already moved on: treat as superseded.
-  IF EXISTS (
-    SELECT 1 FROM public.audio_items ai
-    WHERE ai.id = v_job.audio_item_id
-      AND ai.desired_product_audio_normalize_job_id IS DISTINCT FROM v_job.id
-  ) THEN
+  -- Complete already committed; do not roll back to failed.
+  IF v_job.status = 'ready' THEN
+    RETURN QUERY SELECT
+      'already_ready'::text,
+      'ready'::text,
+      true,
+      false,
+      (v_job.previous_audio_path IS NOT NULL
+        AND v_job.previous_audio_path IS DISTINCT FROM v_item.audio_path),
+      v_job.previous_audio_path,
+      v_job.source_storage_path,
+      v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'superseded' THEN
+    RETURN QUERY SELECT
+      'superseded'::text, 'superseded'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'failed' THEN
+    RETURN QUERY SELECT
+      'failed'::text, 'failed'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'queued' THEN
+    RETURN QUERY SELECT
+      'expired_requeued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  -- processing
+  IF v_job.lease_token IS DISTINCT FROM p_lease_token THEN
+    RETURN QUERY SELECT
+      'foreign_lease'::text, 'processing'::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  IF v_item.desired_product_audio_normalize_job_id IS DISTINCT FROM v_job.id THEN
     UPDATE public.product_audio_normalize_jobs
     SET status = 'superseded',
         lease_token = NULL,
@@ -454,7 +606,46 @@ BEGIN
         error_message_safe = 'Заменено новой загрузкой.',
         updated_at = now()
     WHERE id = v_job.id;
-    RETURN QUERY SELECT 'superseded'::text, true, true;
+    RETURN QUERY SELECT
+      'superseded'::text, 'superseded'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    RETURN;
+  END IF;
+
+  -- Expired lease with matching token: treat as requeue/terminal without guessing.
+  IF v_job.lease_expires_at IS NULL
+    OR v_job.lease_expires_at <= clock_timestamp() THEN
+    IF v_job.attempt_count < p_max_attempts THEN
+      UPDATE public.product_audio_normalize_jobs
+      SET status = 'queued',
+          lease_token = NULL,
+          lease_expires_at = NULL,
+          error_code = NULL,
+          error_message_safe = NULL,
+          updated_at = now()
+      WHERE id = v_job.id;
+      RETURN QUERY SELECT
+        'expired_requeued'::text, 'queued'::text, false, true, false,
+        NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    ELSE
+      UPDATE public.product_audio_normalize_jobs
+      SET status = 'failed',
+          lease_token = NULL,
+          lease_expires_at = NULL,
+          completed_at = COALESCE(completed_at, now()),
+          error_code = 'worker_lease_expired',
+          error_message_safe = 'Не удалось подготовить аудиофайл.',
+          updated_at = now()
+      WHERE id = v_job.id;
+      UPDATE public.audio_items
+      SET desired_product_audio_normalize_job_id = NULL,
+          updated_at = now()
+      WHERE id = v_job.audio_item_id
+        AND desired_product_audio_normalize_job_id = v_job.id;
+      RETURN QUERY SELECT
+        'failed'::text, 'failed'::text, true, true, false,
+        NULL::text, v_job.source_storage_path, v_job.target_storage_path;
+    END IF;
     RETURN;
   END IF;
 
@@ -481,10 +672,13 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.audio_item_id
       AND desired_product_audio_normalize_job_id = v_job.id;
-    RETURN QUERY SELECT 'failed'::text, true, true;
+    RETURN QUERY SELECT
+      'failed'::text, 'failed'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   ELSE
-    -- Retry: keep SOURCE; orphan/partial target may be removed.
-    RETURN QUERY SELECT 'queued'::text, false, true;
+    RETURN QUERY SELECT
+      'queued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   END IF;
 END;
 $$;
@@ -520,7 +714,6 @@ BEGIN
 END;
 $$;
 
-
 CREATE OR REPLACE FUNCTION public.resolve_product_audio_normalize_job_interrupt(
   p_job_id uuid,
   p_lease_token uuid,
@@ -530,42 +723,59 @@ RETURNS TABLE (
   outcome text,
   final_status text,
   cleanup_source boolean,
-  cleanup_target boolean
+  cleanup_target boolean,
+  cleanup_previous boolean,
+  previous_audio_path text,
+  source_storage_path text,
+  target_storage_path text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_audio_item_id uuid;
   v_job public.product_audio_normalize_jobs;
-  v_desired uuid;
-  v_permanent boolean;
+  v_item public.audio_items;
 BEGIN
   IF p_lease_token IS NULL THEN
-    RETURN QUERY SELECT 'invalid'::text, NULL::text, false, false;
+    RETURN QUERY SELECT
+      'invalid'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
   IF p_max_attempts < 1 OR p_max_attempts > 10 THEN
     RAISE EXCEPTION 'invalid_max_attempts' USING ERRCODE = '22023';
   END IF;
 
+  SELECT audio_item_id INTO v_audio_item_id
+  FROM public.product_audio_normalize_jobs
+  WHERE id = p_job_id;
+  IF v_audio_item_id IS NULL THEN
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.audio_items
+  WHERE id = v_audio_item_id
+  FOR UPDATE;
+
   SELECT * INTO v_job
   FROM public.product_audio_normalize_jobs
   WHERE id = p_job_id
   FOR UPDATE;
   IF NOT FOUND THEN
-    RETURN QUERY SELECT 'missing'::text, NULL::text, false, false;
+    RETURN QUERY SELECT
+      'missing'::text, NULL::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
 
-  SELECT desired_product_audio_normalize_job_id INTO v_desired
-  FROM public.audio_items
-  WHERE id = v_job.audio_item_id
-  FOR UPDATE;
-
-  -- Already superseded (enqueue B won) or desired no longer this job.
   IF v_job.status = 'superseded'
-    OR v_desired IS DISTINCT FROM v_job.id THEN
+    OR v_item.desired_product_audio_normalize_job_id IS DISTINCT FROM v_job.id THEN
     IF v_job.status <> 'superseded' THEN
       UPDATE public.product_audio_normalize_jobs
       SET status = 'superseded',
@@ -578,44 +788,49 @@ BEGIN
       WHERE id = v_job.id
         AND status IN ('queued', 'processing');
     END IF;
-    RETURN QUERY SELECT 'superseded'::text, 'superseded'::text, true, true;
+    RETURN QUERY SELECT
+      'superseded'::text, 'superseded'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
   IF v_job.status = 'ready' THEN
-    RETURN QUERY SELECT 'ready'::text, 'ready'::text, false, false;
+    RETURN QUERY SELECT
+      'already_ready'::text,
+      'ready'::text,
+      true,
+      false,
+      (v_job.previous_audio_path IS NOT NULL
+        AND v_job.previous_audio_path IS DISTINCT FROM v_item.audio_path),
+      v_job.previous_audio_path,
+      v_job.source_storage_path,
+      v_job.target_storage_path;
     RETURN;
   END IF;
 
   IF v_job.status = 'failed' THEN
-    RETURN QUERY SELECT 'failed'::text, 'failed'::text, true, true;
+    RETURN QUERY SELECT
+      'failed'::text, 'failed'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
   IF v_job.status = 'queued' THEN
-    -- Already requeued (stale recovery elsewhere). Keep source for next claim.
-    RETURN QUERY SELECT 'requeued'::text, 'queued'::text, false, true;
+    RETURN QUERY SELECT
+      'expired_requeued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
-  -- status = processing
   IF v_job.lease_token IS DISTINCT FROM p_lease_token THEN
-    -- Another attempt/worker owns the lease. Do not delete their objects.
-    RETURN QUERY SELECT 'foreign_lease'::text, 'processing'::text, false, false;
+    RETURN QUERY SELECT
+      'foreign_lease'::text, 'processing'::text, false, false, false,
+      NULL::text, NULL::text, NULL::text;
     RETURN;
   END IF;
-
-  -- Same lease still processing: voluntary interrupt / abort while lease valid
-  -- or expired under this token → release back to queue (or terminal if maxed).
-  v_permanent := v_job.attempt_count >= p_max_attempts
-    AND (
-      v_job.lease_expires_at IS NULL
-      OR v_job.lease_expires_at <= clock_timestamp()
-    );
 
   IF v_job.lease_expires_at IS NOT NULL
     AND v_job.lease_expires_at > clock_timestamp() THEN
-    -- Lease still valid: soft release for abort (same as release RPC).
     UPDATE public.product_audio_normalize_jobs
     SET status = 'queued',
         lease_token = NULL,
@@ -623,11 +838,12 @@ BEGIN
         attempt_count = GREATEST(0, attempt_count - 1),
         updated_at = now()
     WHERE id = v_job.id;
-    RETURN QUERY SELECT 'released'::text, 'queued'::text, false, true;
+    RETURN QUERY SELECT
+      'released'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
 
-  -- Lease expired under this token.
   IF v_job.attempt_count < p_max_attempts THEN
     UPDATE public.product_audio_normalize_jobs
     SET status = 'queued',
@@ -637,7 +853,9 @@ BEGIN
         error_message_safe = NULL,
         updated_at = now()
     WHERE id = v_job.id;
-    RETURN QUERY SELECT 'requeued'::text, 'queued'::text, false, true;
+    RETURN QUERY SELECT
+      'expired_requeued'::text, 'queued'::text, false, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   ELSE
     UPDATE public.product_audio_normalize_jobs
     SET status = 'failed',
@@ -653,7 +871,9 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.audio_item_id
       AND desired_product_audio_normalize_job_id = v_job.id;
-    RETURN QUERY SELECT 'failed'::text, 'failed'::text, true, true;
+    RETURN QUERY SELECT
+      'failed'::text, 'failed'::text, true, true, false,
+      NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   END IF;
 END;
 $$;

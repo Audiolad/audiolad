@@ -199,30 +199,7 @@ export function createProductAudioNormalizeWorkerPort(
         p_status: result.productStatus,
       });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
-      const applied = Boolean(row && (row as { applied?: unknown }).applied === true);
-      const previous =
-        row && typeof (row as { previous_audio_path?: unknown }).previous_audio_path === "string"
-          ? (row as { previous_audio_path: string }).previous_audio_path
-          : null;
-      const sourcePath =
-        row && typeof (row as { source_storage_path?: unknown }).source_storage_path === "string"
-          ? (row as { source_storage_path: string }).source_storage_path
-          : job.source_storage_path;
-      const targetPath =
-        row && typeof (row as { target_storage_path?: unknown }).target_storage_path === "string"
-          ? (row as { target_storage_path: string }).target_storage_path
-          : job.target_storage_path;
-
-      const cleanup: string[] = [];
-      if (applied) {
-        cleanup.push(sourcePath);
-        if (previous && previous !== targetPath) cleanup.push(previous);
-      } else {
-        // Stale / not applied: remove orphan target; keep old delivery; drop source best-effort.
-        cleanup.push(targetPath, sourcePath);
-      }
-      return { applied, cleanupPaths: cleanup };
+      return parseCleanupDecision(data, "complete");
     },
 
     async failJob(job, error) {
@@ -246,7 +223,20 @@ export function createProductAudioNormalizeWorkerPort(
         },
       );
       if (rpcError) throw rpcError;
-      return parseCleanupDecision(data);
+      const decision = parseCleanupDecision(data, "fail");
+      if (decision.outcome === "unknown" || decision.outcome === "invalid") {
+        const resolved = await service.rpc(
+          "resolve_product_audio_normalize_job_interrupt",
+          {
+            p_job_id: job.id,
+            p_lease_token: job.lease_token,
+            p_max_attempts: maxAttempts,
+          },
+        );
+        if (resolved.error) throw resolved.error;
+        return parseCleanupDecision(resolved.data, "interrupt");
+      }
+      return decision;
     },
 
     async resolveInterrupt(job) {
@@ -263,9 +253,23 @@ export function createProductAudioNormalizeWorkerPort(
     },
 
     pathsForCleanupDecision(job, decision) {
+      // Never invent deletes: only server-returned flags + explicit paths.
       const paths: string[] = [];
-      if (decision.cleanupSource) paths.push(job.source_storage_path);
-      if (decision.cleanupTarget) paths.push(job.target_storage_path);
+      const source =
+        decision.sourceStoragePath ??
+        (decision.cleanupSource ? job.source_storage_path : null);
+      const target =
+        decision.targetStoragePath ??
+        (decision.cleanupTarget ? job.target_storage_path : null);
+      if (decision.cleanupSource && source) paths.push(source);
+      if (decision.cleanupTarget && target) paths.push(target);
+      if (
+        decision.cleanupPrevious &&
+        decision.previousAudioPath &&
+        decision.previousAudioPath !== target
+      ) {
+        paths.push(decision.previousAudioPath);
+      }
       return paths;
     },
 
@@ -291,6 +295,10 @@ function parseCleanupDecision(
       finalStatus: null,
       cleanupSource: false,
       cleanupTarget: false,
+      cleanupPrevious: false,
+      previousAudioPath: null,
+      sourceStoragePath: null,
+      targetStoragePath: null,
     };
   }
   const rec = row as Record<string, unknown>;
@@ -304,5 +312,12 @@ function parseCleanupDecision(
     finalStatus: typeof rec.final_status === "string" ? rec.final_status : null,
     cleanupSource: rec.cleanup_source === true,
     cleanupTarget: rec.cleanup_target === true,
+    cleanupPrevious: rec.cleanup_previous === true,
+    previousAudioPath:
+      typeof rec.previous_audio_path === "string" ? rec.previous_audio_path : null,
+    sourceStoragePath:
+      typeof rec.source_storage_path === "string" ? rec.source_storage_path : null,
+    targetStoragePath:
+      typeof rec.target_storage_path === "string" ? rec.target_storage_path : null,
   };
 }

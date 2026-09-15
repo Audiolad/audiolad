@@ -62,4 +62,18 @@ assert(/guard_product_audio_normalize_pointer_roles/.test(sql));
 assert(/product_audio_normalize_pointer_forbidden/.test(sql));
 assert(/GRANT EXECUTE ON FUNCTION public\.resolve_product_audio_normalize_job_interrupt/.test(sql));
 
+
+assert(/outcome text/.test(sql), "complete returns outcome");
+assert(/cleanup_previous boolean/.test(sql), "complete returns cleanup_previous");
+assert(/Canonical lock order: audio_item/.test(sql));
+assert(/already_ready/.test(sql));
+assert(/foreign_lease/.test(sql));
+assert(/expired_requeued/.test(sql));
+assert(/DROP FUNCTION IF EXISTS public\.complete_product_audio_normalize_job/.test(sql));
+
+
+// enqueue already locks audio_item before mutating jobs (canonical order).
+assert(/SELECT \* INTO v_item[\s\S]*FOR UPDATE;[\s\S]*UPDATE public\.product_audio_normalize_jobs/.test(sql));
+assert(/FROM public\.audio_items[\s\S]*FOR UPDATE;[\s\S]*FROM public\.product_audio_normalize_jobs[\s\S]*FOR UPDATE/.test(sql));
+
 console.log("product-audio-normalize-sql-unit: ok");
