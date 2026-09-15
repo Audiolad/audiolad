@@ -169,4 +169,11 @@ assert.match(shell, /getAttachedCatalogMusicSelectionKeys\(tracks\)/);
 assert.match(shell, /attachedCatalogSelectionKeys=\{attachedCatalogMusicSelectionKeys\}/);
 assert.doesNotMatch(shell, /selectedCatalogMusic/);
 
+assert.match(card, /STUDIO_LICENSE_BENEFIT_LINE/);
+assert.match(card, /STUDIO_LICENSE_DETAILS_LINK_LABEL/);
+assert.match(overlay, /StudioMusicLicenseInfoModal/);
+assert.match(overlay, /STUDIO_LICENSE_GUEST_FREE_HINT/);
+const licenseCopy = read("src/lib/studio-music/license-ui-copy.ts");
+assert.match(licenseCopy, /Бессрочная лицензия/);
+assert.match(licenseCopy, /Любое количество проектов/);
 console.log("studio-music-catalog-ui-unit: ok");

@@ -461,7 +461,7 @@ const resultClient = read(
 );
 assert.match(resultClient, /\/api\/checkout\/status/);
 assert.match(resultClient, /isStudioMusicLicenseCheckout/);
-assert.match(resultClient, /Музыка доступна в Студии/);
+assert.match(resultClient, /STUDIO_LICENSE_CHECKOUT_PAID_TITLE|Оплата прошла\. Лицензия получена/);
 assert.match(resultClient, /Открыть Студию/);
 assert.match(resultClient, /Слушать сейчас/);
 assert.doesNotMatch(resultClient, /window\.location\.assign/);
@@ -554,3 +554,12 @@ assert.equal(
 );
 
 console.log("studio-music-checkout-unit: ok");
+
+const checkoutResult = read(
+  "src/app/(platform)/checkout/result/CheckoutResultClient.tsx",
+);
+assert.match(checkoutResult, /STUDIO_LICENSE_CHECKOUT_PAID_TITLE|Оплата прошла\. Лицензия получена/);
+assert.match(checkoutResult, /любом количестве своих проектов|STUDIO_LICENSE_CHECKOUT_PAID_DESCRIPTION/);
+assert.match(checkoutResult, /Оплата прошла\. Доступ открыт\./);
+assert.match(checkoutResult, /Готово — проекты добавлены навсегда/);
+

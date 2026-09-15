@@ -19,6 +19,12 @@ import {
 } from "@/lib/payments/checkout-status-api";
 import { trackAuthorProjectCapacityEvent } from "@/lib/author-projects/capacity-analytics";
 import { resolveAuthorProjectCapacityPackage } from "@/lib/author-projects/capacity-catalog";
+import {
+  STUDIO_LICENSE_CHECKOUT_PAID_DESCRIPTION,
+  STUDIO_LICENSE_CHECKOUT_PAID_TITLE,
+  STUDIO_LICENSE_CHECKOUT_PAID_UNAUTH_DESCRIPTION,
+  STUDIO_LICENSE_CHECKOUT_PAID_UNAUTH_TITLE,
+} from "@/lib/studio-music/license-ui-copy";
 
 type ViewState =
   | "checking"
@@ -304,8 +310,8 @@ export default function CheckoutResultClient() {
     }
     return studioLicense ? (
       <ResultCard
-        title="Оплата прошла. Музыка доступна в Студии."
-        description="Лицензия для Студии открыта. Вернитесь в каталог музыки, чтобы использовать её в проекте."
+        title={STUDIO_LICENSE_CHECKOUT_PAID_TITLE}
+        description={STUDIO_LICENSE_CHECKOUT_PAID_DESCRIPTION}
         actionHref={listenHref}
         actionLabel="Открыть Студию"
       />
@@ -324,8 +330,8 @@ export default function CheckoutResultClient() {
   if (viewState === "paid_unauthenticated") {
     return studioLicense ? (
       <ResultCard
-        title="Оплата получена"
-        description="Музыка добавлена в ваш аккаунт. Войдите, чтобы открыть её в Студии."
+        title={STUDIO_LICENSE_CHECKOUT_PAID_UNAUTH_TITLE}
+        description={STUDIO_LICENSE_CHECKOUT_PAID_UNAUTH_DESCRIPTION}
         actionHref={signInHref}
         actionLabel="Войти и открыть Студию"
       />
