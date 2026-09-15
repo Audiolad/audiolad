@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { StudioMusicCatalogCard } from "@/components/studio/StudioMusicCatalogCard";
+import { StudioMusicLicenseInfoModal } from "@/components/studio/StudioMusicLicenseInfoModal";
 import { buildBuySignInHref } from "@/lib/auth/buy-sign-in";
 import {
   markStudioMusicCatalogItemAvailable,
@@ -18,6 +19,10 @@ import {
   resolveStudioMusicCheckoutUiError,
 } from "@/lib/studio-music/client-errors";
 import { STUDIO_MUSIC_GRANT_SOURCE } from "@/lib/studio-music/access";
+import {
+  STUDIO_LICENSE_FREE_ACQUIRED_NOTICE,
+  STUDIO_LICENSE_GUEST_FREE_HINT,
+} from "@/lib/studio-music/license-ui-copy";
 
 const FILTERS: Array<{
   id: StudioMusicCatalogFilter;
@@ -63,6 +68,8 @@ function StudioMusicCatalogOverlayBody({
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [busyPublicationId, setBusyPublicationId] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [acquireNotices, setAcquireNotices] = useState<Record<string, string>>({});
+  const [licenseInfoOpen, setLicenseInfoOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -300,6 +307,10 @@ function StudioMusicCatalogOverlayBody({
             grantSource: STUDIO_MUSIC_GRANT_SOURCE.FREE,
           }),
         );
+        setAcquireNotices((current) => ({
+          ...current,
+          [item.publication_id]: STUDIO_LICENSE_FREE_ACQUIRED_NOTICE,
+        }));
         await refreshPublication(item.publication_id);
         return;
       }
@@ -545,6 +556,11 @@ function StudioMusicCatalogOverlayBody({
         className="studio-music-catalog-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8"
         data-testid="studio-music-catalog-scroll"
       >
+        {guestCanUseFreeMusic ? (
+          <p className="mb-3 text-[11px] leading-5 text-[#9ba7bb]">
+            {STUDIO_LICENSE_GUEST_FREE_HINT}
+          </p>
+        ) : null}
         {error ? (
           <p role="alert" className="mb-3 text-sm text-rose-200">
             {error}
@@ -572,6 +588,7 @@ function StudioMusicCatalogOverlayBody({
                 }
                 guestCanUseFreeMusic={guestCanUseFreeMusic}
                 actionError={actionErrors[item.publication_id] ?? null}
+                acquireNotice={acquireNotices[item.publication_id] ?? null}
                 attachedCatalogSelectionKeys={attachedCatalogSelectionKeys}
                 onPreview={(publicationId, audioItemId, trackTitle) => {
                   void playPreview(publicationId, audioItemId, trackTitle);
@@ -582,6 +599,7 @@ function StudioMusicCatalogOverlayBody({
                 onAdd={(next, audioItemId) => {
                   onAdd?.(next.publication_id, audioItemId);
                 }}
+                onOpenLicenseInfo={() => setLicenseInfoOpen(true)}
               />
             ))}
           </div>
@@ -674,6 +692,10 @@ function StudioMusicCatalogOverlayBody({
               : 0,
           )
         }
+      />
+      <StudioMusicLicenseInfoModal
+        open={licenseInfoOpen}
+        onClose={() => setLicenseInfoOpen(false)}
       />
     </div>
   );

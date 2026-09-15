@@ -12,6 +12,12 @@ import {
   STUDIO_MUSIC_LOADING_LABEL,
 } from "@/lib/studio-music/catalog-actions";
 import type { StudioMusicCatalogItem } from "@/lib/studio-music/catalog";
+import {
+  STUDIO_LICENSE_ALBUM_HINT,
+  STUDIO_LICENSE_BENEFIT_LINE,
+  STUDIO_LICENSE_DETAILS_LINK_LABEL,
+  STUDIO_LICENSE_OWNED_BENEFIT_LINE,
+} from "@/lib/studio-music/license-ui-copy";
 
 export function StudioMusicCatalogCard({
   item,
@@ -24,6 +30,8 @@ export function StudioMusicCatalogCard({
   onPreview,
   onAcquire,
   onAdd,
+  onOpenLicenseInfo,
+  acquireNotice = null,
 }: {
   item: StudioMusicCatalogItem;
   activePreviewKey: string | null;
@@ -31,6 +39,7 @@ export function StudioMusicCatalogCard({
   attachingAudioItemId?: string | null;
   guestCanUseFreeMusic?: boolean;
   actionError?: string | null;
+  acquireNotice?: string | null;
   attachedCatalogSelectionKeys: ReadonlySet<string>;
   onPreview: (
     publicationId: string,
@@ -39,6 +48,7 @@ export function StudioMusicCatalogCard({
   ) => void;
   onAcquire?: (item: StudioMusicCatalogItem) => void;
   onAdd?: (item: StudioMusicCatalogItem, audioItemId: string) => void;
+  onOpenLicenseInfo?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isAlbum = item.kind === "album";
@@ -121,6 +131,28 @@ export function StudioMusicCatalogCard({
               </p>
             </div>
           )}
+          {(action.kind === "free" || action.kind === "paid") ? (
+            <p className="text-[11px] font-medium text-[#c6b6ef] md:text-right">
+              {STUDIO_LICENSE_BENEFIT_LINE}
+            </p>
+          ) : null}
+          {(action.kind === "available" || action.kind === "own") ? (
+            <p className="text-[11px] font-medium text-[#c6b6ef] md:text-right">
+              {STUDIO_LICENSE_OWNED_BENEFIT_LINE}
+            </p>
+          ) : null}
+          {onOpenLicenseInfo ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenLicenseInfo();
+              }}
+              className="text-left text-[11px] font-semibold text-[#d8c8fb] underline md:text-right"
+            >
+              {STUDIO_LICENSE_DETAILS_LINK_LABEL}
+            </button>
+          ) : null}
           <div className="flex flex-wrap gap-2 md:justify-end">
             {!isAlbum && primaryTrackId ? (
               <button
@@ -219,7 +251,12 @@ export function StudioMusicCatalogCard({
               <a href="/offer#studio-license" className="underline">
                 Публичной оферты
               </a>
-              .{isAlbum ? " Одна лицензия открывает для использования в Студии все треки этого альбома." : ""}
+              .{isAlbum ? ` ${STUDIO_LICENSE_ALBUM_HINT}` : ""}
+            </p>
+          ) : null}
+          {acquireNotice ? (
+            <p className="text-[11px] text-[#9bdab5] md:text-right" role="status">
+              {acquireNotice}
             </p>
           ) : null}
         </div>

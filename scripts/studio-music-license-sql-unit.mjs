@@ -161,6 +161,19 @@ assert(/NOT VALID/.test(minLicense));
 assert(/practices_studio_music_price_minor_check/.test(minLicense));
 assert(!/UPDATE public\.practices[\s\S]*studio_music_price_minor\s*=/.test(minLicense));
 
+const licenseV11 = readFileSync(join(migrationsDir, "20261008120200_studio_license_terms_v1_1.sql"), "utf8");
+assert(existsSync(join(migrationsDir, "20261008120200_studio_license_terms_v1_1.sql")), "Studio license v1.1 migration exists");
+assert(/studio-license-v1\.1/.test(licenseV11));
+assert(/036269bf83b4ba8b453604f7a2aeb9de6c0dc9528beb60e4ce76e16fb335846c/.test(licenseV11));
+assert(/freeze_studio_entitlement_terms/.test(licenseV11));
+assert(/create_studio_music_order/.test(licenseV11));
+assert(/coalesce\(studio_license_terms_version, 'studio-license-v1\.1'\)/.test(licenseV11));
+assert(!/UPDATE public\.studio_music_entitlements/.test(licenseV11));
+assert(/Does NOT UPDATE existing rows/.test(licenseV11) || /Historical orders\/entitlements/.test(licenseV11));
+assert(/studio-license-v1\.0/.test(legal));
+assert(/46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12/.test(legal));
+
+
 assert(!/INSERT INTO public\.user_practices/.test(pricing));
 
 assert(/studio_license_terms_version/.test(legal));
@@ -225,8 +238,10 @@ assert(/free entitlement must freeze Studio terms/.test(smoke));
 assert(/legacy Studio RPC privilege bypass/.test(smoke));
 assert(/pending order reuse must return original order/.test(smoke));
 assert(/reused pending order must retain frozen Studio terms/.test(smoke));
-assert(/studio-license-v1\.0/.test(smoke));
-assert(/46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12/.test(smoke));
+assert(/studio-license-v1\.1/.test(smoke));
+assert(/036269bf83b4ba8b453604f7a2aeb9de6c0dc9528beb60e4ce76e16fb335846c/.test(smoke));
+assert(/studio-license-v1\.0/.test(legal));
+assert(/46d186eae0798e28a0f8c979ccd0b0b23d0fa57828828b33aefa0a6046d9df12/.test(legal));
 
 function dockerAvailable() {
   try {
@@ -282,6 +297,7 @@ function bootstrapSql() {
     readFileSync(join(migrationsDir, "20260914120000_author_terms_v1_1.sql"), "utf8"),
     readFileSync(join(migrationsDir, legalName), "utf8"),
     readFileSync(join(migrationsDir, freeNoTermsName), "utf8"),
+    readFileSync(join(migrationsDir, "20261008120200_studio_license_terms_v1_1.sql"), "utf8"),
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 }
