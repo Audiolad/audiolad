@@ -5,9 +5,17 @@ import {
 import { formatRubles } from "@/lib/products/price-format";
 
 import {
+  applyStudioMusicLicenseFloorMinor,
   canAcquireStudioMusic,
+  MIN_STUDIO_MUSIC_PRICE_MINOR,
+  MIN_STUDIO_MUSIC_PRICE_RUBLES,
   studioLicenseAmountMinor,
   type StudioMusicPublicationInput,
+} from "./access";
+
+export {
+  MIN_STUDIO_MUSIC_PRICE_MINOR,
+  MIN_STUDIO_MUSIC_PRICE_RUBLES,
 } from "./access";
 
 export const STUDIO_MUSIC_PRICING_MODE = {
@@ -166,7 +174,7 @@ export function resolveStudioMusicAcquisition(input: {
       status: STUDIO_MUSIC_ACQUISITION_STATUS.PAID,
       pricing_mode: mode,
       studio_is_free: false,
-      amount_minor: fixedMinor,
+      amount_minor: applyStudioMusicLicenseFloorMinor(fixedMinor),
       listener_is_free: listenerIsFree,
       listener_effective_minor: listenerIsFree ? null : listenerEffectiveMinor,
     };
@@ -269,7 +277,11 @@ export function normalizeStudioMusicPricingForSave(input: {
       rubles = input.priceMinor / 100;
     }
 
-    if (rubles == null || !validatePaidPriceRubles(rubles).ok) {
+    if (
+      rubles == null ||
+      !validatePaidPriceRubles(rubles).ok ||
+      rubles < MIN_STUDIO_MUSIC_PRICE_RUBLES
+    ) {
       return { ok: false, code: STUDIO_MUSIC_PRICING_ERROR.INVALID_PRICE };
     }
 
@@ -315,8 +327,8 @@ export function studioMusicPricingModeAfterListenerFlip(input: {
   return input.currentMode;
 }
 
-/** Placeholder in the author form when the author picks a fixed Studio price. */
-export const DEFAULT_STUDIO_MUSIC_FIXED_RUBLES = 600;
+/** Default fixed Studio license price in the author form (canonical minimum). */
+export const DEFAULT_STUDIO_MUSIC_FIXED_RUBLES = MIN_STUDIO_MUSIC_PRICE_RUBLES;
 
 export function studioMusicPriceMinorToRubles(
   minor: number | null | undefined,
