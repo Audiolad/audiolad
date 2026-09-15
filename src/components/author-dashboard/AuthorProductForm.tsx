@@ -126,6 +126,7 @@ import {
   buildAuthorProductPriceFields,
   parsePriceInputDraft,
   validatePaidPriceInputDraft,
+  validateStudioMusicPaidPriceInputDraft,
 } from "@/lib/author-products/price-input-draft";
 import {
   mergeServerAudioItems,
@@ -1389,7 +1390,7 @@ export default function AuthorProductForm({
       form.musicUsagePermission ===
         MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED &&
       form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED
-        ? validatePaidPriceInputDraft(studioMusicPriceDraft)
+        ? validateStudioMusicPaidPriceInputDraft(studioMusicPriceDraft)
         : null;
     const listenerPrice = !form.isFree
       ? validatePaidPriceInputDraft(listenerPriceDraft)
@@ -1398,7 +1399,7 @@ export default function AuthorProductForm({
     if ((studioMusicPrice && !studioMusicPrice.ok) || (listenerPrice && !listenerPrice.ok)) {
       setFieldErrors({
         ...(studioMusicPrice && !studioMusicPrice.ok
-          ? { studioMusicPrice: "Укажите целую цену от 49 до 100 000 ₽." }
+          ? { studioMusicPrice: "Укажите целую цену от 499 до 100 000 ₽." }
           : {}),
         ...(listenerPrice && !listenerPrice.ok
           ? { price: "Укажите целую цену от 49 до 100 000 ₽." }
@@ -3143,7 +3144,7 @@ export default function AuthorProductForm({
                     onChange={() => {
                       const shouldSetDefaultPrice =
                         option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
-                        !validatePaidPriceInputDraft(studioMusicPriceDraft).ok;
+                        !validateStudioMusicPaidPriceInputDraft(studioMusicPriceDraft).ok;
 
                       if (shouldSetDefaultPrice) {
                         setStudioMusicPriceDraft(

@@ -154,7 +154,7 @@ assert(/acquisition_status IS DISTINCT FROM 'paid'/.test(pricing));
 assert(/v_listener_minor \* 2/.test(pricing));
 assert(/studio_music_price_minor/.test(pricing));
 
-const minLicense = readFileSync(join(migrationsDir, "20261007200000_studio_music_min_license_price.sql"), "utf8");
+const minLicense = readFileSync(join(migrationsDir, "20261008120100_studio_music_min_license_price.sql"), "utf8");
 assert(/GREATEST\(v_amount, 49900\)/.test(minLicense));
 assert(/GREATEST\(v_listener_minor \* 2, 49900\)/.test(minLicense));
 assert(/NOT VALID/.test(minLicense));

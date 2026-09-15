@@ -18,6 +18,7 @@ import {
   type CreateTochkaPaymentResult,
 } from "@/lib/payments/tochka-client";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
+import { AUTHOR_PROJECT_CAPACITY_ORDER_KIND } from "@/lib/author-projects/capacity-catalog";
 import { getOrderSaleAccrualReady } from "@/lib/author-sales/queries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -117,9 +118,13 @@ async function createTochkaPaymentForOrder(input: {
   const checkoutToken = createSignedCheckoutToken(input.orderRow.id).token;
   const isStudioMusicLicense =
     input.orderRow.order_kind === "studio_music_license";
+  const isAuthorProjectCapacity =
+    input.orderRow.order_kind === AUTHOR_PROJECT_CAPACITY_ORDER_KIND;
   const itemName = isStudioMusicLicense
     ? formatStudioMusicLicensePurchaseName(input.orderRow.practice_title_snapshot)
-    : input.orderRow.practice_title_snapshot;
+    : isAuthorProjectCapacity
+      ? `АудиоЛад: ${input.orderRow.practice_title_snapshot || "дополнительные проекты"}`
+      : input.orderRow.practice_title_snapshot;
 
   try {
     const tochkaPayment = await createTochkaPaymentOperation({
@@ -131,10 +136,15 @@ async function createTochkaPaymentForOrder(input: {
             input.orderRow.id,
             input.orderRow.practice_title_snapshot,
           )
-        : formatTochkaPaymentPurpose(
-            input.orderRow.id,
-            input.orderRow.practice_title_snapshot,
-          ),
+        : isAuthorProjectCapacity
+          ? formatTochkaPaymentPurpose(
+              input.orderRow.id,
+              input.orderRow.practice_title_snapshot || "Дополнительные проекты",
+            )
+          : formatTochkaPaymentPurpose(
+              input.orderRow.id,
+              input.orderRow.practice_title_snapshot,
+            ),
       consumerId: input.userId,
       customerEmail: input.customerEmail,
       itemName,
@@ -230,7 +240,10 @@ export async function startTochkaCheckoutForPendingOrder(input: {
     price_minor_snapshot: priceMinor,
   };
 
-  if (orderRow.amount_minor > 0) {
+  const skipAuthorAccrualGate =
+    orderRow.order_kind === AUTHOR_PROJECT_CAPACITY_ORDER_KIND;
+
+  if (orderRow.amount_minor > 0 && !skipAuthorAccrualGate) {
     const accrualReady = await getOrderSaleAccrualReady(orderRow.id);
     if (!accrualReady.ready) {
       console.error(

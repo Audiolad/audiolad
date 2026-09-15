@@ -1,4 +1,5 @@
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
+import { MIN_STUDIO_MUSIC_PRICE_RUBLES } from "@/lib/studio-music/access";
 
 /**
  * Keeps a money input editable while its contents are temporarily incomplete.
@@ -24,6 +25,19 @@ export function validatePaidPriceInputDraft(
   }
 
   return { ok: true, rubles };
+}
+
+
+export function validateStudioMusicPaidPriceInputDraft(
+  value: string,
+): { ok: true; rubles: number } | { ok: false } {
+  const paid = validatePaidPriceInputDraft(value);
+
+  if (!paid.ok || paid.rubles < MIN_STUDIO_MUSIC_PRICE_RUBLES) {
+    return { ok: false };
+  }
+
+  return paid;
 }
 
 export function buildAuthorProductPriceFields(input: {

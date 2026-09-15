@@ -5,6 +5,7 @@ import {
   buildAuthorProductPriceFields,
   parsePriceInputDraft,
   validatePaidPriceInputDraft,
+  validateStudioMusicPaidPriceInputDraft,
 } from "../src/lib/author-products/price-input-draft";
 import { normalizeStudioMusicPricingForSave } from "../src/lib/studio-music/pricing";
 
@@ -64,5 +65,28 @@ assert.deepEqual(
   }),
   { ok: true, mode: "fixed", priceMinor: 188800 },
 );
+
+
+// Studio FIXED draft rejects listener-legal prices below the Studio floor.
+for (const value of ["", "0", "48", "49", "498", "100001", "49.5", "-499"]) {
+  assert.deepEqual(
+    validateStudioMusicPaidPriceInputDraft(value),
+    { ok: false },
+    value,
+  );
+}
+assert.deepEqual(validateStudioMusicPaidPriceInputDraft("499"), {
+  ok: true,
+  rubles: 499,
+});
+assert.deepEqual(validateStudioMusicPaidPriceInputDraft("1888"), {
+  ok: true,
+  rubles: 1888,
+});
+// Listener draft still allows 49–498; Studio draft does not.
+assert.deepEqual(validatePaidPriceInputDraft("49"), { ok: true, rubles: 49 });
+assert.deepEqual(validatePaidPriceInputDraft("498"), { ok: true, rubles: 498 });
+assert.deepEqual(validateStudioMusicPaidPriceInputDraft("49"), { ok: false });
+assert.deepEqual(validateStudioMusicPaidPriceInputDraft("498"), { ok: false });
 
 console.log("author-product-price-input-unit: ok");

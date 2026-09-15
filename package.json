@@ -123,8 +123,8 @@
     "test:author-product-direct-audio-upload": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-product-direct-audio-upload-unit.mts",
     "test:music-wav-master-foundation": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-wav-master-foundation-unit.mts",
     "test:music-transcode-worker": "node scripts/music-transcode-sql-unit.mjs && npx tsx scripts/music-transcode-contract-unit.mts && npx tsx scripts/music-transcode-worker-unit.mts && npx tsx scripts/music-transcode-ffmpeg-unit.mts",
-        "test:wav-music-session-tracks": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/wav-music-session-tracks-unit.mts",
-"test:public-music-stream-playback": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/public-music-stream-playback-unit.mts",
+    "test:wav-music-session-tracks": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/wav-music-session-tracks-unit.mts",
+    "test:public-music-stream-playback": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/public-music-stream-playback-unit.mts",
     "test:music-delivery": "node scripts/music-delivery-sql-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-delivery-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-publish-readiness-unit.mts",
     "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs && node scripts/author-support-sql-unit.mjs && node scripts/author-support-sql-integration.mjs && npm run test:author-product-edit-page-access && npm run test:author-product-draft-save",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
@@ -279,7 +279,8 @@
     "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs",
     "test:kak-zarabotat-na-muzyke-iz-suno": "npx tsx scripts/kak-zarabotat-na-muzyke-iz-suno-page-unit.mjs",
     "test:author-seo-discovery": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-discovery-unit.mjs",
-    "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs"
+    "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs",
+    "test:author-project-capacity": "npx tsx scripts/author-project-capacity-unit.mjs && npx tsx scripts/author-multi-project-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -689,15 +689,27 @@ assert.match(
   /Минимальная цена лицензии для Студии/,
 );
 assert.match(
-  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  read("src/components/author-dashboard/AuthorProductForm.tsx"),
+  /validateStudioMusicPaidPriceInputDraft/,
+);
+assert.match(
+  read("src/components/author-dashboard/AuthorProductForm.tsx"),
+  /Укажите целую цену от 499 до 100 000/,
+);
+assert.doesNotMatch(
+  read("src/components/author-dashboard/AuthorProductForm.tsx"),
+  /studioMusicPrice: "Укажите целую цену от 49 до 100 000/,
+);
+assert.match(
+  read("supabase/migrations/20261008120100_studio_music_min_license_price.sql"),
   /GREATEST\(v_amount, 49900\)/,
 );
 assert.match(
-  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  read("supabase/migrations/20261008120100_studio_music_min_license_price.sql"),
   /GREATEST\(v_listener_minor \* 2, 49900\)/,
 );
 assert.match(
-  read("supabase/migrations/20261007200000_studio_music_min_license_price.sql"),
+  read("supabase/migrations/20261008120100_studio_music_min_license_price.sql"),
   /NOT VALID/,
 );
 

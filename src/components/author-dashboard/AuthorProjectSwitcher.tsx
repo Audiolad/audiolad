@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import AuthorProjectCapacityOfferDialog from "@/components/author-dashboard/AuthorProjectCapacityOfferDialog";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { setAuthorProjectCookieClient } from "@/lib/author-projects/selection";
 
@@ -11,7 +11,7 @@ type ProjectsApiResponse = {
   projects?: AuthorWorkspace[];
   can_create?: boolean;
   show_premium_upsell?: boolean;
-  limit_message?: string | null;
+  show_capacity_offer?: boolean;
   owned_count?: number;
   limit?: number;
   unlimited?: boolean;
@@ -34,8 +34,6 @@ export default function AuthorProjectSwitcher({
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<AuthorWorkspace[]>([]);
   const [canCreate, setCanCreate] = useState(true);
-  const [showPremiumUpsell, setShowPremiumUpsell] = useState(false);
-  const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [ownedCount, setOwnedCount] = useState<number | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
   const [unlimited, setUnlimited] = useState(false);
@@ -56,8 +54,6 @@ export default function AuthorProjectSwitcher({
         if (!cancelled) {
           setProjects(payload.projects ?? []);
           setCanCreate(payload.can_create !== false);
-          setShowPremiumUpsell(payload.show_premium_upsell === true);
-          setLimitMessage(payload.limit_message ?? null);
           setOwnedCount(
             typeof payload.owned_count === "number" ? payload.owned_count : null,
           );
@@ -151,7 +147,7 @@ export default function AuthorProjectSwitcher({
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full min-w-0 items-center justify-between gap-3 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-left shadow-[0_6px_16px_rgba(91,62,145,0.04)]"
+        className="flex w-full min-w-0 items-center justify-between gap-3 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-left shadow-[0_6px_16px_rgba(91,62,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         <span className="min-w-0">
           <span className="block text-xs font-medium text-[#7d70a2]">
@@ -211,65 +207,19 @@ export default function AuthorProjectSwitcher({
               type="button"
               role="menuitem"
               onClick={handleCreateClick}
-              className="flex w-full items-center rounded-[14px] px-3 py-2.5 text-left text-sm font-semibold text-[#7042c5] hover:bg-[#f6f0ff]"
+              className="flex w-full items-center rounded-[14px] px-3 py-2.5 text-left text-sm font-semibold text-[#7042c5] hover:bg-[#f6f0ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              + Создать проект
+              ＋ Создать новый проект
             </button>
           </div>
         </div>
       ) : null}
 
-      {upsellOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={`${menuId}-upsell-title`}
-          onClick={() => setUpsellOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_24px_60px_rgba(40,20,80,0.22)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2
-              id={`${menuId}-upsell-title`}
-              className="text-[18px] font-semibold text-[#25135c]"
-            >
-              Лимит проектов
-            </h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#5f5484]">
-              {showPremiumUpsell
-                ? [
-                    "В базовом кабинете доступен один авторский проект.",
-                    "В Premium можно создать до трёх проектов и управлять ими из одного аккаунта.",
-                  ].join("\n")
-                : limitMessage ?? "Лимит проектов исчерпан."}
-            </p>
-            {showPremiumUpsell ? (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[#d7c4f5] bg-[#faf6ff] px-4 py-3 text-sm text-[#7d70a2]">
-                Покупка Premium пока недоступна. Администратор может увеличить
-                лимит вручную.
-              </div>
-            ) : null}
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setUpsellOpen(false)}
-                className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
-              >
-                Понятно
-              </button>
-              <Link
-                href="/author-dashboard"
-                className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
-                onClick={() => setUpsellOpen(false)}
-              >
-                В кабинет
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <AuthorProjectCapacityOfferDialog
+        open={upsellOpen}
+        onClose={() => setUpsellOpen(false)}
+        surface="author_project_switcher"
+      />
     </div>
   );
 }

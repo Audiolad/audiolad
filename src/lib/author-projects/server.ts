@@ -9,7 +9,7 @@ import {
   canCreateOwnedAuthorProject,
   getAuthorProjectLimitReachedMessage,
   resolveEffectiveAuthorProjectLimit,
-  shouldShowPremiumProjectUpsell,
+  shouldShowCapacityPurchaseOffer,
   type AuthorProjectLimitResolution,
 } from "@/lib/author-projects/limits";
 
@@ -21,8 +21,11 @@ export type AuthorProjectsSummary = {
   source: AuthorProjectLimitResolution["source"];
   premiumEnabled: boolean;
   hasOverride: boolean;
+  baseLimit: number;
+  purchasedSlots: number;
   canCreate: boolean;
   showPremiumUpsell: boolean;
+  showCapacityOffer: boolean;
   limitMessage: string | null;
 };
 
@@ -33,16 +36,41 @@ export async function loadAuthorProjectLimitFields(
   override: number | null;
   unlimited: boolean;
   premiumEnabled: boolean;
+  purchasedSlots: number;
 }> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "author_project_limit_override, author_projects_unlimited, author_premium_enabled",
+      "author_project_limit_override, author_projects_unlimited, author_premium_enabled, author_project_slots_purchased",
     )
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
+    // Column may be missing before migration lands in a local DB; fall back.
+    if (/author_project_slots_purchased/i.test(error.message)) {
+      const legacy = await supabase
+        .from("profiles")
+        .select(
+          "author_project_limit_override, author_projects_unlimited, author_premium_enabled",
+        )
+        .eq("id", userId)
+        .maybeSingle();
+      if (legacy.error) {
+        console.error("author_project_limit_lookup_error", legacy.error.message);
+        throw new AuthorAccessError("internal_error", 500);
+      }
+      const overrideRaw = legacy.data?.author_project_limit_override;
+      return {
+        override:
+          typeof overrideRaw === "number" && Number.isFinite(overrideRaw)
+            ? overrideRaw
+            : null,
+        unlimited: legacy.data?.author_projects_unlimited === true,
+        premiumEnabled: legacy.data?.author_premium_enabled === true,
+        purchasedSlots: 0,
+      };
+    }
     console.error("author_project_limit_lookup_error", error.message);
     throw new AuthorAccessError("internal_error", 500);
   }
@@ -52,11 +80,19 @@ export async function loadAuthorProjectLimitFields(
     typeof overrideRaw === "number" && Number.isFinite(overrideRaw)
       ? overrideRaw
       : null;
+  const purchasedRaw = data?.author_project_slots_purchased;
+  const purchasedSlots =
+    typeof purchasedRaw === "number" &&
+    Number.isFinite(purchasedRaw) &&
+    purchasedRaw > 0
+      ? Math.floor(purchasedRaw)
+      : 0;
 
   return {
     override,
     unlimited: data?.author_projects_unlimited === true,
     premiumEnabled: data?.author_premium_enabled === true,
+    purchasedSlots,
   };
 }
 
@@ -76,11 +112,10 @@ export async function getAuthorProjectsSummary(
     resolution.limit,
     resolution.unlimited,
   );
-  const showPremiumUpsell = shouldShowPremiumProjectUpsell({
+  const showCapacityOffer = shouldShowCapacityPurchaseOffer({
     used: ownedCount,
     limit: resolution.limit,
     unlimited: resolution.unlimited,
-    source: resolution.source,
   });
 
   return {
@@ -91,8 +126,11 @@ export async function getAuthorProjectsSummary(
     source: resolution.source,
     premiumEnabled: resolution.premiumEnabled,
     hasOverride: resolution.hasOverride,
+    baseLimit: resolution.baseLimit,
+    purchasedSlots: resolution.purchasedSlots,
     canCreate,
-    showPremiumUpsell,
+    showPremiumUpsell: showCapacityOffer,
+    showCapacityOffer,
     limitMessage: canCreate
       ? null
       : getAuthorProjectLimitReachedMessage({
