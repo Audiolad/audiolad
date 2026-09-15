@@ -140,4 +140,14 @@ const musicContract = readFileSync(path.join(root, "src/lib/music-transcode/cont
 assert.match(musicContract, /MUSIC_STREAM_BITRATE/);
 assert.doesNotMatch(musicContract, /product_audio_normalize/);
 
+
+const directUpload = readFileSync(path.join(root, "src/lib/author-products/server/direct-audio-upload.ts"), "utf8");
+assert.match(directUpload, /validateProductMp3Descriptor/);
+assert.match(directUpload, /live author upload stays MP3-only/);
+assert.equal(/validateProductAudioSourceDescriptor/.test(directUpload), false, "live start/finalize must not accept M4A/AAC in Slice 1");
+
+const runtime = readFileSync(path.join(root, "src/lib/product-audio-normalize/worker-runtime.ts"), "utf8");
+assert.match(runtime, /upsert:\s*false/);
+assert.equal(/upsert:\s*true/.test(runtime), false, "stale worker must not overwrite another attempt");
+
 console.log("product-audio-normalize-contract-unit: ok");

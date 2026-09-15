@@ -65,6 +65,11 @@ export type ProductNormalizeWorkerPort = {
   resolveInterrupt: (
     job: ClaimedProductNormalizeJob,
   ) => Promise<ProductNormalizeCleanupDecision>;
+  /**
+   * Remove existing job.target_storage_path only while this attempt owns the
+   * current lease. Must no-op (and not remove) if lease check is false.
+   */
+  cleanupStaleTarget: (job: ClaimedProductNormalizeJob) => Promise<void>;
   cleanupPaths: (paths: readonly string[]) => Promise<void>;
   pathsForCleanupDecision: (
     job: ClaimedProductNormalizeJob,
@@ -123,6 +128,17 @@ export function parseClaimedProductNormalizeJob(
     lease_token: row.lease_token,
     attempt_count: typeof row.attempt_count === "number" ? row.attempt_count : 0,
   };
+}
+
+function isProductNormalizeAbort(error: unknown, aborted: boolean): boolean {
+  if (aborted) return true;
+  if (error instanceof ProductNormalizeAbortedError) return true;
+  return (
+    typeof error === "object" &&
+    error != null &&
+    "name" in error &&
+    (error as { name: string }).name === "ProductNormalizeAbortedError"
+  );
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -266,14 +282,52 @@ export function createProductAudioNormalizeWorker(
         });
 
         try {
+          const applyDecision = async (
+            decision: ProductNormalizeCleanupDecision,
+          ) => {
+            await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
+          };
+
+          const ownedBeforeCleanup = await port.renewLease(job);
+          if (!ownedBeforeCleanup || jobAbort.signal.aborted) {
+            await applyDecision(await port.resolveInterrupt(job));
+            continue;
+          }
+          try {
+            await port.cleanupStaleTarget(job);
+          } catch (cleanupError) {
+            if (isProductNormalizeAbort(cleanupError, jobAbort.signal.aborted)) {
+              await applyDecision(await port.resolveInterrupt(job));
+            } else {
+              const decision = await port.failJob(job, cleanupError);
+              await applyDecision(decision);
+              logger.error(
+                JSON.stringify({
+                  event: "product_audio_normalize_stale_target_cleanup_failed",
+                  jobId: job.id,
+                  finalStatus: decision.finalStatus,
+                  error:
+                    cleanupError instanceof Error
+                      ? cleanupError.message
+                      : "unknown_error",
+                }),
+              );
+            }
+            continue;
+          }
+          const ownedAfterCleanup = await port.renewLease(job);
+          if (!ownedAfterCleanup || jobAbort.signal.aborted) {
+            await applyDecision(await port.resolveInterrupt(job));
+            continue;
+          }
+
           const result = await port.executeJob(job, jobAbort.signal);
           if (jobAbort.signal.aborted) {
-            const decision = await port.resolveInterrupt(job);
-            await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
+            await applyDecision(await port.resolveInterrupt(job));
             continue;
           }
           const completion = await port.completeJob(job, result);
-          await port.cleanupPaths(port.pathsForCleanupDecision(job, completion));
+          await applyDecision(completion);
           logger.info(
             JSON.stringify({
               event: "product_audio_normalize_job_finished",
@@ -283,10 +337,7 @@ export function createProductAudioNormalizeWorker(
             }),
           );
         } catch (error) {
-          if (
-            error instanceof ProductNormalizeAbortedError ||
-            jobAbort.signal.aborted
-          ) {
+          if (isProductNormalizeAbort(error, jobAbort.signal.aborted)) {
             const decision = await port.resolveInterrupt(job);
             await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
           } else {

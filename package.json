@@ -284,7 +284,7 @@
     "test:author-seo-prompt-builder": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-prompt-builder-unit.mjs",
     "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs",
     "test:author-project-capacity": "npx tsx scripts/author-project-capacity-unit.mjs && npx tsx scripts/author-multi-project-unit.mjs",
-    "test:product-audio-normalize": "node scripts/product-audio-normalize-sql-unit.mjs && npx tsx scripts/product-audio-normalize-contract-unit.mts && npx tsx scripts/product-audio-normalize-worker-unit.mts && npx tsx scripts/product-audio-normalize-ffmpeg-unit.mts",
+    "test:product-audio-normalize": "node scripts/product-audio-normalize-sql-unit.mjs && npx tsx scripts/product-audio-normalize-contract-unit.mts && npx tsx scripts/product-audio-normalize-worker-unit.mts && npx tsx scripts/product-audio-normalize-retry-race-unit.mts && npx tsx scripts/product-audio-normalize-ffmpeg-unit.mts",
     "worker:product-audio-normalize": "npx tsx scripts/run-product-audio-normalize-worker.mts"
   },
   "dependencies": {

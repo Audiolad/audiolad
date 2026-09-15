@@ -404,8 +404,9 @@ BEGIN
   END IF;
 
   IF v_job.status = 'queued' THEN
+    -- Retry/requeue: job is claimable again. Never cleanup shared target/source here.
     RETURN QUERY SELECT
-      'expired_requeued'::text, 'queued'::text, false, true, false,
+      'expired_requeued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
@@ -430,7 +431,7 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.id;
     RETURN QUERY SELECT
-      'expired_requeued'::text, 'queued'::text, false, true, false,
+      'expired_requeued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
@@ -583,7 +584,7 @@ BEGIN
 
   IF v_job.status = 'queued' THEN
     RETURN QUERY SELECT
-      'expired_requeued'::text, 'queued'::text, false, true, false,
+      'expired_requeued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
@@ -625,7 +626,7 @@ BEGIN
           updated_at = now()
       WHERE id = v_job.id;
       RETURN QUERY SELECT
-        'expired_requeued'::text, 'queued'::text, false, true, false,
+        'expired_requeued'::text, 'queued'::text, false, false, false,
         NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     ELSE
       UPDATE public.product_audio_normalize_jobs
@@ -677,7 +678,7 @@ BEGIN
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   ELSE
     RETURN QUERY SELECT
-      'queued'::text, 'queued'::text, false, true, false,
+      'queued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   END IF;
 END;
@@ -817,7 +818,7 @@ BEGIN
 
   IF v_job.status = 'queued' THEN
     RETURN QUERY SELECT
-      'expired_requeued'::text, 'queued'::text, false, true, false,
+      'expired_requeued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
@@ -839,7 +840,7 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.id;
     RETURN QUERY SELECT
-      'released'::text, 'queued'::text, false, true, false,
+      'released'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
     RETURN;
   END IF;
@@ -854,7 +855,7 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.id;
     RETURN QUERY SELECT
-      'expired_requeued'::text, 'queued'::text, false, true, false,
+      'expired_requeued'::text, 'queued'::text, false, false, false,
       NULL::text, v_job.source_storage_path, v_job.target_storage_path;
   ELSE
     UPDATE public.product_audio_normalize_jobs

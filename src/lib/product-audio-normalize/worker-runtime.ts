@@ -36,6 +36,62 @@ export class ProductNormalizeCodedError extends Error {
   }
 }
 
+export function isStorageObjectAbsentError(error: unknown): boolean {
+  if (error == null) return false;
+  const rec =
+    typeof error === "object" ? (error as Record<string, unknown>) : null;
+  const status = String(
+    rec?.statusCode ?? rec?.status ?? rec?.code ?? "",
+  ).toLowerCase();
+  const message = String(
+    rec?.message ?? rec?.error ?? (error instanceof Error ? error.message : error),
+  ).toLowerCase();
+  if (status === "404" || status === "not_found" || status === "not found") {
+    return true;
+  }
+  return (
+    message.includes("not found") ||
+    message.includes("not exist") ||
+    message.includes("no such file") ||
+    message.includes("object not found") ||
+    message.includes("does not exist")
+  );
+}
+
+/** Check lease immediately before a mutating Storage action. */
+export async function assertProductNormalizeLeaseOwned(
+  assertLease: () => Promise<boolean>,
+): Promise<void> {
+  const owned = await assertLease();
+  if (!owned) throw new ProductNormalizeAbortedError();
+}
+
+/**
+ * Remove a previous attempt's shared target only while THIS lease is current.
+ * Object-not-found is success. Real Storage errors fail the attempt for retry.
+ */
+export async function removeStaleTargetIfLeaseOwned(args: {
+  assertLease: () => Promise<boolean>;
+  remove: () => Promise<{ error: unknown | null }>;
+}): Promise<"cleaned" | "absent"> {
+  await assertProductNormalizeLeaseOwned(args.assertLease);
+  const { error } = await args.remove();
+  if (!error) return "cleaned";
+  if (isStorageObjectAbsentError(error)) return "absent";
+  throw new ProductNormalizeCodedError("stale_target_cleanup_failed");
+}
+
+/** Upload delivery MP3 only while THIS lease is current. upsert must stay false. */
+export async function uploadDeliveryIfLeaseOwned(args: {
+  assertLease: () => Promise<boolean>;
+  upload: () => Promise<void>;
+}): Promise<"uploaded"> {
+  await assertProductNormalizeLeaseOwned(args.assertLease);
+  await args.upload();
+  await assertProductNormalizeLeaseOwned(args.assertLease);
+  return "uploaded";
+}
+
 async function loadPracticeStatus(
   service: SupabaseClient,
   practiceId: string,
@@ -130,7 +186,23 @@ export async function executeClaimedProductNormalizeJob(
       throw new ProductNormalizeOutputInvalidError();
     }
 
-    await uploadPracticeMp3(service, job.target_storage_path, outputPath, signal);
+    await uploadDeliveryIfLeaseOwned({
+      assertLease: async () => {
+        if (signal.aborted) return false;
+        const { data, error } = await service.rpc(
+          "renew_product_audio_normalize_job_lease",
+          {
+            p_job_id: job.id,
+            p_lease_token: job.lease_token,
+            p_lease_seconds: PRODUCT_AUDIO_NORMALIZE_LEASE_SECONDS,
+          },
+        );
+        if (error) throw error;
+        return data === true;
+      },
+      upload: () =>
+        uploadPracticeMp3(service, job.target_storage_path, outputPath, signal),
+    });
     cleanupPaths.push(job.target_storage_path);
 
     const productStatus = await loadPracticeStatus(service, job.practice_id);
@@ -182,6 +254,27 @@ export function createProductAudioNormalizeWorkerPort(
       );
       if (error) throw error;
       return data === true;
+    },
+
+    async cleanupStaleTarget(job) {
+      await removeStaleTargetIfLeaseOwned({
+        assertLease: async () => {
+          const { data, error } = await service.rpc(
+            "renew_product_audio_normalize_job_lease",
+            {
+              p_job_id: job.id,
+              p_lease_token: job.lease_token,
+              p_lease_seconds: leaseSeconds,
+            },
+          );
+          if (error) throw error;
+          return data === true;
+        },
+        remove: async () =>
+          service.storage
+            .from(PRACTICE_AUDIO_BUCKET)
+            .remove([job.target_storage_path]),
+      });
     },
 
     async executeJob(job, signal) {

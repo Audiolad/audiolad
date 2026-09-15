@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { ProductNormalizeAbortedError } from "../src/lib/product-audio-normalize/ffmpeg";
 import {
   createProductAudioNormalizeWorker,
   parseClaimedProductNormalizeJob,
@@ -61,13 +62,15 @@ function pathsFor(
 
 assert.equal(parseClaimedProductNormalizeJob(null), null);
 
-async function runOnce(port: ProductNormalizeWorkerPort) {
-  await createProductAudioNormalizeWorker(port, {
-    maxJobs: 1,
-    heartbeatIntervalMs: 5,
-    leaseHoldMs: 1,
-    logger: { info() {}, error() {} },
-  }).run();
+function successResult(job: ClaimedProductNormalizeJob): ProductNormalizeExecuteResult {
+  return {
+    targetStoragePath: job.target_storage_path,
+    sizeBytes: 10,
+    durationSeconds: 2,
+    originalFileName: "t.m4a",
+    productStatus: "draft",
+    cleanupPaths: [],
+  };
 }
 
 function claimOnce(job: ClaimedProductNormalizeJob) {
@@ -79,41 +82,67 @@ function claimOnce(job: ClaimedProductNormalizeJob) {
   };
 }
 
+function makePort(
+  job: ClaimedProductNormalizeJob,
+  overrides: Partial<ProductNormalizeWorkerPort>,
+): ProductNormalizeWorkerPort {
+  return {
+    async recoverStaleJobs() {},
+    claimJob: claimOnce(job),
+    async renewLease() {
+      return true;
+    },
+    async cleanupStaleTarget() {},
+    async executeJob() {
+      return successResult(job);
+    },
+    async completeJob() {
+      throw new Error("no");
+    },
+    async failJob() {
+      throw new Error("no");
+    },
+    async resolveInterrupt() {
+      throw new Error("no");
+    },
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths() {},
+    ...overrides,
+  };
+}
+
+async function runOnce(port: ProductNormalizeWorkerPort) {
+  await createProductAudioNormalizeWorker(port, {
+    maxJobs: 1,
+    heartbeatIntervalMs: 60_000,
+    leaseHoldMs: 60_000,
+    logger: { info() {}, error() {} },
+  }).run();
+}
+
 // 1) Applied success: source+previous cleaned, live target kept.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 10,
-        durationSeconds: 2,
-        originalFileName: "t.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      } satisfies ProductNormalizeExecuteResult;
-    },
-    async completeJob() {
-      return decision({
-        outcome: "applied",
-        finalStatus: "ready",
-        cleanupSource: true,
-        cleanupTarget: false,
-        cleanupPrevious: true,
-        previousAudioPath: job.previous_audio_path,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({
+          outcome: "applied",
+          finalStatus: "ready",
+          cleanupSource: true,
+          cleanupTarget: false,
+          cleanupPrevious: true,
+          previousAudioPath: job.previous_audio_path,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
   assert.deepEqual(
     cleaned[0].sort(),
     [job.source_storage_path, job.previous_audio_path!].sort(),
@@ -121,37 +150,25 @@ function claimOnce(job: ClaimedProductNormalizeJob) {
   assert.equal(cleaned[0].includes(job.target_storage_path), false);
 }
 
-// 2) Foreign lease complete: delete NOTHING (no blind !applied cleanup).
+// 2) Foreign lease complete: delete NOTHING.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 10,
-        durationSeconds: 2,
-        originalFileName: "t.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      return decision({
-        outcome: "foreign_lease",
-        finalStatus: "processing",
-        cleanupSource: false,
-        cleanupTarget: false,
-      });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({
+          outcome: "foreign_lease",
+          finalStatus: "processing",
+          cleanupSource: false,
+          cleanupTarget: false,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
   assert.deepEqual(cleaned[0], []);
 }
 
@@ -159,35 +176,23 @@ function claimOnce(job: ClaimedProductNormalizeJob) {
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 10,
-        durationSeconds: 2,
-        originalFileName: "t.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      return decision({
-        outcome: "superseded",
-        finalStatus: "superseded",
-        cleanupSource: true,
-        cleanupTarget: true,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({
+          outcome: "superseded",
+          finalStatus: "superseded",
+          cleanupSource: true,
+          cleanupTarget: true,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
   assert.deepEqual(
     cleaned[0].sort(),
     [job.source_storage_path, job.target_storage_path].sort(),
@@ -195,77 +200,53 @@ function claimOnce(job: ClaimedProductNormalizeJob) {
   assert.equal(cleaned[0].includes(job.previous_audio_path!), false);
 }
 
-// 4) Expired requeue: source remains.
+// 4) Expired requeue: source AND shared target remain (post-RPC cleanup_target=false).
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 10,
-        durationSeconds: 2,
-        originalFileName: "t.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      return decision({
-        outcome: "expired_requeued",
-        finalStatus: "queued",
-        cleanupSource: false,
-        cleanupTarget: true,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
-  assert.deepEqual(cleaned[0], [job.target_storage_path]);
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({
+          outcome: "expired_requeued",
+          finalStatus: "queued",
+          cleanupSource: false,
+          cleanupTarget: false,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.deepEqual(cleaned[0], []);
 }
 
 // 5) already_ready / response-lost: live target never deleted; source+previous ok.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 10,
-        durationSeconds: 2,
-        originalFileName: "t.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      return decision({
-        outcome: "already_ready",
-        finalStatus: "ready",
-        cleanupSource: true,
-        cleanupTarget: false,
-        cleanupPrevious: true,
-        previousAudioPath: job.previous_audio_path,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({
+          outcome: "already_ready",
+          finalStatus: "ready",
+          cleanupSource: true,
+          cleanupTarget: false,
+          cleanupPrevious: true,
+          previousAudioPath: job.previous_audio_path,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
   assert.deepEqual(
     cleaned[0].sort(),
     [job.source_storage_path, job.previous_audio_path!].sort(),
@@ -273,89 +254,255 @@ function claimOnce(job: ClaimedProductNormalizeJob) {
   assert.equal(cleaned[0].includes(job.target_storage_path), false);
 }
 
-// 6) Transient fail → queued: source kept.
+// 6) Transient fail → queued: source AND target kept for next claim.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() { throw new Error("normalize_failed"); },
-    async completeJob() { throw new Error("no"); },
-    async failJob() {
-      return decision({
-        outcome: "queued",
-        finalStatus: "queued",
-        cleanupSource: false,
-        cleanupTarget: true,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
-  assert.deepEqual(cleaned[0], [job.target_storage_path]);
+  await runOnce(
+    makePort(job, {
+      async executeJob() {
+        throw new Error("normalize_failed");
+      },
+      async failJob() {
+        return decision({
+          outcome: "queued",
+          finalStatus: "queued",
+          cleanupSource: false,
+          cleanupTarget: false,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.deepEqual(cleaned[0], []);
 }
 
 // 7) Fail after already_ready (response lost then fail): target kept.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() { throw new Error("network_after_commit"); },
-    async completeJob() { throw new Error("no"); },
-    async failJob() {
-      return decision({
-        outcome: "already_ready",
-        finalStatus: "ready",
-        cleanupSource: true,
-        cleanupTarget: false,
-        cleanupPrevious: true,
-        previousAudioPath: job.previous_audio_path,
-        sourceStoragePath: job.source_storage_path,
-        targetStoragePath: job.target_storage_path,
-      });
-    },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async executeJob() {
+        throw new Error("network_after_commit");
+      },
+      async failJob() {
+        return decision({
+          outcome: "already_ready",
+          finalStatus: "ready",
+          cleanupSource: true,
+          cleanupTarget: false,
+          cleanupPrevious: true,
+          previousAudioPath: job.previous_audio_path,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
   assert.equal(cleaned[0].includes(job.target_storage_path), false);
   assert.ok(cleaned[0].includes(job.source_storage_path));
 }
 
-// 8) Missing/invalid → cleanup NOTHING (no client guessing).
+// 8) Missing/invalid → cleanup NOTHING.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
-  await runOnce({
-    async recoverStaleJobs() {},
-    claimJob: claimOnce(job),
-    async renewLease() { return true; },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 1,
-        durationSeconds: 1,
-        originalFileName: "x.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      return decision({ outcome: "missing" });
-    },
-    async failJob() { throw new Error("no"); },
-    async resolveInterrupt() { throw new Error("no"); },
-    pathsForCleanupDecision: pathsFor,
-    async cleanupPaths(paths) { cleaned.push([...paths]); },
-  });
+  await runOnce(
+    makePort(job, {
+      async completeJob() {
+        return decision({ outcome: "missing" });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.deepEqual(cleaned[0], []);
+}
+
+// Released interrupt: no shared-target cleanup.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob();
+  await runOnce(
+    makePort(job, {
+      async executeJob() {
+        throw new ProductNormalizeAbortedError();
+      },
+      async resolveInterrupt() {
+        return decision({
+          outcome: "released",
+          finalStatus: "queued",
+          cleanupSource: false,
+          cleanupTarget: false,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.deepEqual(cleaned[0], []);
+}
+
+// Terminal failed cleanup remains source+target.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob();
+  await runOnce(
+    makePort(job, {
+      async executeJob() {
+        throw new Error("normalize_failed");
+      },
+      async failJob() {
+        return decision({
+          outcome: "failed",
+          finalStatus: "failed",
+          cleanupSource: true,
+          cleanupTarget: true,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.deepEqual(
+    cleaned[0].sort(),
+    [job.source_storage_path, job.target_storage_path].sort(),
+  );
+}
+
+// Next attempt removes stale target only while owning current lease.
+{
+  const job = baseJob();
+  let staleCleanup = 0;
+  let uploaded = 0;
+  await runOnce(
+    makePort(job, {
+      async cleanupStaleTarget() {
+        staleCleanup += 1;
+      },
+      async executeJob() {
+        uploaded += 1;
+        return successResult(job);
+      },
+      async completeJob() {
+        return decision({
+          outcome: "applied",
+          finalStatus: "ready",
+          cleanupSource: true,
+          cleanupTarget: false,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+    }),
+  );
+  assert.equal(staleCleanup, 1);
+  assert.equal(uploaded, 1);
+}
+
+// Foreign lease during pre-attempt cleanup: remove NOT executed, execute/upload skipped.
+{
+  const job = baseJob();
+  let removed = 0;
+  let executed = 0;
+  await runOnce(
+    makePort(job, {
+      async renewLease() {
+        return false;
+      },
+      async cleanupStaleTarget() {
+        removed += 1;
+      },
+      async executeJob() {
+        executed += 1;
+        return successResult(job);
+      },
+      async resolveInterrupt() {
+        return decision({
+          outcome: "foreign_lease",
+          finalStatus: "processing",
+        });
+      },
+    }),
+  );
+  assert.equal(removed, 0);
+  assert.equal(executed, 0);
+}
+
+// cleanupStaleTarget throws abort: no execute, interrupt resolution, no target delete from retry flags.
+{
+  const job = baseJob();
+  let executed = 0;
+  const cleaned: string[][] = [];
+  await runOnce(
+    makePort(job, {
+      async cleanupStaleTarget() {
+        throw new ProductNormalizeAbortedError();
+      },
+      async executeJob() {
+        executed += 1;
+        return successResult(job);
+      },
+      async resolveInterrupt() {
+        return decision({
+          outcome: "foreign_lease",
+          finalStatus: "processing",
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.equal(executed, 0);
+  assert.deepEqual(cleaned[0], []);
+}
+
+// Stale-target Storage error → fail/retry, source kept, execute skipped.
+{
+  const job = baseJob();
+  let executed = 0;
+  const cleaned: string[][] = [];
+  await runOnce(
+    makePort(job, {
+      async cleanupStaleTarget() {
+        throw new Error("stale_target_cleanup_failed");
+      },
+      async executeJob() {
+        executed += 1;
+        return successResult(job);
+      },
+      async failJob() {
+        return decision({
+          outcome: "queued",
+          finalStatus: "queued",
+          cleanupSource: false,
+          cleanupTarget: false,
+          sourceStoragePath: job.source_storage_path,
+          targetStoragePath: job.target_storage_path,
+        });
+      },
+      async cleanupPaths(paths) {
+        cleaned.push([...paths]);
+      },
+    }),
+  );
+  assert.equal(executed, 0);
   assert.deepEqual(cleaned[0], []);
 }
 

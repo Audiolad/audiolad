@@ -76,4 +76,15 @@ assert(/DROP FUNCTION IF EXISTS public\.complete_product_audio_normalize_job/.te
 assert(/SELECT \* INTO v_item[\s\S]*FOR UPDATE;[\s\S]*UPDATE public\.product_audio_normalize_jobs/.test(sql));
 assert(/FROM public\.audio_items[\s\S]*FOR UPDATE;[\s\S]*FROM public\.product_audio_normalize_jobs[\s\S]*FOR UPDATE/.test(sql));
 
+
+assert(/'expired_requeued'::text, 'queued'::text, false, false, false/.test(sql), "expired_requeued must not cleanup shared target");
+assert(/'queued'::text, 'queued'::text, false, false, false/.test(sql), "retry queued must not cleanup shared target");
+assert(/'released'::text, 'queued'::text, false, false, false/.test(sql), "released must not cleanup shared target");
+assert(!/'expired_requeued'::text, 'queued'::text, false, true, false/.test(sql), "no expired_requeued target cleanup");
+assert(!/'released'::text, 'queued'::text, false, true, false/.test(sql), "no released target cleanup");
+assert(/'failed'::text, 'failed'::text, true, true, false/.test(sql), "terminal failed still cleans source+target");
+assert(/'superseded'::text, 'superseded'::text, true, true, false/.test(sql), "superseded still cleans source+target");
+assert(/SET audio_path = p_target_storage_path/.test(sql), "applied complete points audio_path at this attempt MP3");
+assert(/Retry\/requeue: job is claimable again/.test(sql));
+
 console.log("product-audio-normalize-sql-unit: ok");
