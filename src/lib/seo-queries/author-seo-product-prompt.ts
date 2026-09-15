@@ -328,20 +328,30 @@ export function hasUnsafeSecondarySeoModifier(queryText: string): boolean {
   return UNSAFE_SECONDARY_MODIFIERS.some((mod) => normalized.includes(mod));
 }
 
-function intentsIncompatible(
+/**
+ * Intent/format are NOT a hard inequality gate.
+ * There is no canonical compatibility matrix in SEO Core, and pairs like
+ * music ↔ listen_audio on the same lexical backbone are valid for one product page.
+ * Keep these helpers for a future proven incompatibility signal only; today they
+ * never reject on mere primary !== candidate (lexical backbone is the strict gate).
+ */
+export function intentsIncompatible(
   primary: string | null | undefined,
   candidate: string | null | undefined,
 ): boolean {
-  if (!primary?.trim() || !candidate?.trim()) return false;
-  return primary.trim() !== candidate.trim();
+  // Reserved for a future proven matrix; unused today by design.
+  void primary;
+  void candidate;
+  return false;
 }
 
-function formatsIncompatible(
+export function formatsIncompatible(
   primary: string | null | undefined,
   candidate: string | null | undefined,
 ): boolean {
-  if (!primary?.trim() || !candidate?.trim()) return false;
-  return primary.trim() !== candidate.trim();
+  void primary;
+  void candidate;
+  return false;
 }
 
 export function isStrictSecondarySeoCandidate(input: {
@@ -358,8 +368,6 @@ export function isStrictSecondarySeoCandidate(input: {
 }): boolean {
   if (input.score <= 0) return false;
   if (hasUnsafeSecondarySeoModifier(input.queryText)) return false;
-  if (intentsIncompatible(input.primaryIntent, input.candidateIntent)) return false;
-  if (formatsIncompatible(input.primaryFormat, input.candidateFormat)) return false;
 
   const seedTokens = input.primaryTokens.filter(Boolean);
   if (seedTokens.length === 0) return false;
@@ -377,15 +385,21 @@ export function isStrictSecondarySeoCandidate(input: {
       && input.primaryClusterName.trim() === input.candidateClusterName.trim(),
   );
 
+  let lexicalOk = false;
   if (sameCluster) {
     // Same analyzed cluster is a strong signal, but still require real lexical overlap.
-    return hit >= 1 && containment >= (seedTokens.length <= 2 ? 1 : 0.5);
+    lexicalOk = hit >= 1 && containment >= (seedTokens.length <= 2 ? 1 : 0.5);
+  } else if (seedTokens.length <= 2) {
+    lexicalOk = hit === seedTokens.length;
+  } else {
+    lexicalOk = containment >= 0.8;
   }
+  if (!lexicalOk) return false;
 
-  if (seedTokens.length <= 2) {
-    return hit === seedTokens.length;
-  }
-  return containment >= 0.8;
+  // Soft secondary signal only — never treat music≠listen_audio as automatic reject.
+  if (intentsIncompatible(input.primaryIntent, input.candidateIntent)) return false;
+  if (formatsIncompatible(input.primaryFormat, input.candidateFormat)) return false;
+  return true;
 }
 
 /** Suggest up to 5 strict secondary candidates (author picks at most 2 for the prompt). */

@@ -18,9 +18,12 @@ import {
   formatProductFactsForPrompt,
   formatRelatedQueriesForPrompt,
   hasUnsafeSecondarySeoModifier,
+  intentsIncompatible,
+  isStrictSecondarySeoCandidate,
   listAuthorSeoPromptProductTypeOptions,
   suggestSecondarySeoQueriesForPrompt,
 } from "../src/lib/seo-queries/author-seo-product-prompt.ts";
+import { tokenizeSeoPhrase } from "../src/lib/seo-queries/discovery-ranking.ts";
 import { SEO_DISCOVERY_IN_CHUNK_SIZE } from "../src/lib/seo-queries/author-discovery-repository.ts";
 
 const root = process.cwd();
@@ -67,10 +70,104 @@ const jazzCandidates = [
 const jazzSecondary = suggestSecondarySeoQueriesForPrompt({
   primaryQueryText: "лёгкий джаз",
   primaryQueryId: "p",
+  primaryIntent: "music",
+  primaryFormat: "Музыка",
   candidates: jazzCandidates,
 });
 
-// A
+// Compatibility gate: music ↔ listen_audio must NOT auto-reject
+assert.equal(intentsIncompatible("music", "listen_audio"), false);
+assert.equal(intentsIncompatible("music", "music"), false);
+
+// A — music primary + listen_audio secondary with full lexical backbone
+assert.equal(
+  isStrictSecondarySeoCandidate({
+    primaryTokens: tokenizeSeoPhrase("лёгкий джаз"),
+    primaryIntent: "music",
+    primaryFormat: "Музыка",
+    candidateTokens: tokenizeSeoPhrase("лёгкий джаз слушать онлайн"),
+    candidateIntent: "listen_audio",
+    candidateFormat: "Музыка",
+    score: 500,
+    queryText: "лёгкий джаз слушать онлайн",
+  }),
+  true,
+  "A: лёгкий джаз + listen_audio secondary must be eligible",
+);
+assert.ok(
+  suggestSecondarySeoQueriesForPrompt({
+    primaryQueryText: "лёгкий джаз",
+    primaryQueryId: "p",
+    primaryIntent: "music",
+    primaryFormat: "Музыка",
+    candidates: [
+      { id: "p", queryText: "лёгкий джаз", frequency: 800, intent: "music", recommendedFormat: "Музыка" },
+      {
+        id: "a1",
+        queryText: "лёгкий джаз слушать онлайн",
+        frequency: 350,
+        intent: "listen_audio",
+        recommendedFormat: "Музыка",
+      },
+    ],
+  }).some((item) => item.queryText === "лёгкий джаз слушать онлайн"),
+  "A via suggest: listen_audio secondary eligible",
+);
+
+// B — compatible listen intent variant
+assert.equal(
+  isStrictSecondarySeoCandidate({
+    primaryTokens: tokenizeSeoPhrase("лёгкий джаз"),
+    primaryIntent: "music",
+    candidateTokens: tokenizeSeoPhrase("слушать лёгкий джаз"),
+    candidateIntent: "listen_audio",
+    score: 400,
+    queryText: "слушать лёгкий джаз",
+  }),
+  true,
+  "B: слушать лёгкий джаз eligible with listen_audio",
+);
+
+// C — cafe scenario rejected by lexical backbone
+assert.equal(
+  isStrictSecondarySeoCandidate({
+    primaryTokens: tokenizeSeoPhrase("лёгкий джаз"),
+    primaryIntent: "music",
+    candidateTokens: tokenizeSeoPhrase("джаз для кафе"),
+    candidateIntent: "ambient",
+    score: 200,
+    queryText: "джаз для кафе",
+  }),
+  false,
+  "C: джаз для кафе not eligible",
+);
+
+// D — yoga/meditation vs dances rejected by lexical backbone
+assert.equal(
+  isStrictSecondarySeoCandidate({
+    primaryTokens: tokenizeSeoPhrase("музыка для танцев"),
+    candidateTokens: tokenizeSeoPhrase("музыка для йоги и медитации"),
+    score: 200,
+    queryText: "музыка для йоги и медитации",
+  }),
+  false,
+  "D: yoga/meditation not eligible for танцев",
+);
+
+// E — unsafe modifiers
+assert.equal(hasUnsafeSecondarySeoModifier("лёгкий джаз скачать бесплатно"), true);
+assert.equal(
+  isStrictSecondarySeoCandidate({
+    primaryTokens: tokenizeSeoPhrase("лёгкий джаз"),
+    candidateTokens: tokenizeSeoPhrase("лёгкий джаз скачать бесплатно"),
+    score: 500,
+    queryText: "лёгкий джаз скачать бесплатно",
+  }),
+  false,
+  "E: unsafe скачать/бесплатно not eligible",
+);
+
+// A (integration list)
 assert.ok(
   jazzSecondary.some((item) => item.queryText === "лёгкий джаз слушать онлайн"),
   "лёгкий джаз слушать онлайн should be eligible",
