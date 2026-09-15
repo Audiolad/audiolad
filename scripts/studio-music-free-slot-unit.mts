@@ -10,12 +10,12 @@ import {
   isStudioFreeSlotUniqueViolation,
   practiceOccupiesStudioFreeSlot,
   wouldOccupyStudioFreeSlotAfterNormalizedSave,
-} from "../src/lib/studio-music/free-slot.ts";
+} from "../src/lib/studio-music/free-slot";
 import {
   classifyProductSaveError,
   getProductSaveErrorMessage,
-} from "../src/lib/author-products/save-errors.ts";
-import { normalizeStudioMusicPricingForSave } from "../src/lib/studio-music/pricing.ts";
+} from "../src/lib/author-products/save-errors";
+import { normalizeStudioMusicPricingForSave } from "../src/lib/studio-music/pricing";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 

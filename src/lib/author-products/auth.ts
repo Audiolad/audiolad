@@ -452,6 +452,7 @@ export async function requirePracticeAccess(practiceId: string) {
         published_at: string | null;
         use_shared_cover: boolean;
         is_free?: boolean | null;
+        price?: number | null;
         product_kind?: string | null;
         publication_class?: string | null;
         music_usage_permission?: string | null;
@@ -506,6 +507,7 @@ export async function requirePracticeAccess(practiceId: string) {
       published_at: string | null;
       use_shared_cover: boolean;
       is_free?: boolean | null;
+      price?: number | null;
       product_kind?: string | null;
       publication_class?: string | null;
       music_usage_permission?: string | null;
