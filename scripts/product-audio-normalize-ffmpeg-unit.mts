@@ -65,6 +65,16 @@ try {
   await assert.rejects(() => assertValidProductSourceFile(junkPath, "m4a"));
   await assert.rejects(() => assertValidProductSourceFile(jpegPath, "m4a"));
 
+
+  const aacInMp4AsAac = path.join(fixtureDirectory, "mp4-as.aac");
+  await execFile("cp", [m4aPath, aacInMp4AsAac]);
+  await assert.rejects(
+    () => assertValidProductSourceFile(aacInMp4AsAac, "aac"),
+    (err: unknown) =>
+      err instanceof ProductNormalizeSourceInvalidError && err.code === "container_mismatch",
+    "AAC codec inside MP4 renamed .aac rejected",
+  );
+
   const videoProbe = await probeProductAudioFile(videoPath);
   assert.equal(validateProductSourceProbe("m4a", videoProbe), "has_video");
 

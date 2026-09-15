@@ -24,6 +24,7 @@ import {
 import {
   parseClaimedProductNormalizeJob,
   type ClaimedProductNormalizeJob,
+  type ProductNormalizeCleanupDecision,
   type ProductNormalizeExecuteResult,
   type ProductNormalizeWorkerPort,
 } from "./worker";
@@ -245,20 +246,27 @@ export function createProductAudioNormalizeWorkerPort(
         },
       );
       if (rpcError) throw rpcError;
-      await service.storage
-        .from(PRACTICE_AUDIO_BUCKET)
-        .remove([job.source_storage_path, job.target_storage_path])
-        .catch(() => undefined);
-      return data === true;
+      return parseCleanupDecision(data);
     },
 
-    async releaseJob(job) {
-      const { data, error } = await service.rpc("release_product_audio_normalize_job", {
-        p_job_id: job.id,
-        p_lease_token: job.lease_token,
-      });
+    async resolveInterrupt(job) {
+      const { data, error } = await service.rpc(
+        "resolve_product_audio_normalize_job_interrupt",
+        {
+          p_job_id: job.id,
+          p_lease_token: job.lease_token,
+          p_max_attempts: maxAttempts,
+        },
+      );
       if (error) throw error;
-      return data === true;
+      return parseCleanupDecision(data, "interrupt");
+    },
+
+    pathsForCleanupDecision(job, decision) {
+      const paths: string[] = [];
+      if (decision.cleanupSource) paths.push(job.source_storage_path);
+      if (decision.cleanupTarget) paths.push(job.target_storage_path);
+      return paths;
     },
 
     async cleanupPaths(paths) {
@@ -269,5 +277,32 @@ export function createProductAudioNormalizeWorkerPort(
         console.error("product_audio_normalize_cleanup_error", error.message);
       }
     },
+  };
+}
+
+function parseCleanupDecision(
+  data: unknown,
+  fallbackOutcome = "unknown",
+): ProductNormalizeCleanupDecision {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") {
+    return {
+      outcome: fallbackOutcome,
+      finalStatus: null,
+      cleanupSource: false,
+      cleanupTarget: false,
+    };
+  }
+  const rec = row as Record<string, unknown>;
+  return {
+    outcome:
+      typeof rec.outcome === "string"
+        ? rec.outcome
+        : typeof rec.final_status === "string"
+          ? rec.final_status
+          : fallbackOutcome,
+    finalStatus: typeof rec.final_status === "string" ? rec.final_status : null,
+    cleanupSource: rec.cleanup_source === true,
+    cleanupTarget: rec.cleanup_target === true,
   };
 }

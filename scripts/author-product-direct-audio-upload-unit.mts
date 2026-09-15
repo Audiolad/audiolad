@@ -322,9 +322,12 @@ assert.ok(
   "failed finalize deletes only the new upload object",
 );
 assert.match(finalizeBlock, /shouldBlockProductAudioReplacement|assertSaleLockAllowsMutation/);
-assert.match(finalizeBlock, /isOwnedVersionedProductAudioPath|requireOwnedVersionedPath|requireOwnedUploadPath/);
-assert.match(finalizeBlock, /enqueue_product_audio_normalize_job/);
-assert.match(finalizeBlock, /normalize_queued/);
+assert.match(finalizeBlock, /isOwnedVersionedProductAudioPath|requireOwnedDeliveryPath|requireOwnedVersionedPath/);
+assert.doesNotMatch(finalizeBlock, /enqueue_product_audio_normalize_job/);
+assert.doesNotMatch(finalizeBlock, /normalize_queued/);
+assert.doesNotMatch(server, /validateProductAudioSourceDescriptor/);
+assert.match(server, /validateProductMp3Descriptor/);
+assert.doesNotMatch(server, /buildVersionedProductAudioSourcePath/);
 assert.doesNotMatch(
   finalizeBlock.slice(0, dbUpdate),
   /deletePracticeAudioPaths\(\[previousPath\]\)/,

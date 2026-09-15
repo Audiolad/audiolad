@@ -55,4 +55,11 @@ assert(!/REFERENCES public\.music_audio_assets/.test(sql));
 assert(!/FROM public\.music_transcode_jobs/.test(sql));
 assert(!/FROM public\.music_audio_assets/.test(sql));
 
+
+assert(/cleanup_source boolean/.test(sql), "fail RPC returns cleanup_source");
+assert(/resolve_product_audio_normalize_job_interrupt/.test(sql));
+assert(/guard_product_audio_normalize_pointer_roles/.test(sql));
+assert(/product_audio_normalize_pointer_forbidden/.test(sql));
+assert(/GRANT EXECUTE ON FUNCTION public\.resolve_product_audio_normalize_job_interrupt/.test(sql));
+
 console.log("product-audio-normalize-sql-unit: ok");

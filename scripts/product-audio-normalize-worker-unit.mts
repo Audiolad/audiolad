@@ -4,6 +4,7 @@ import {
   createProductAudioNormalizeWorker,
   parseClaimedProductNormalizeJob,
   type ClaimedProductNormalizeJob,
+  type ProductNormalizeCleanupDecision,
   type ProductNormalizeExecuteResult,
   type ProductNormalizeWorkerPort,
 } from "../src/lib/product-audio-normalize/worker";
@@ -28,12 +29,19 @@ function baseJob(overrides: Partial<ClaimedProductNormalizeJob> = {}): ClaimedPr
   };
 }
 
-assert.equal(parseClaimedProductNormalizeJob(null), null);
-assert.equal(
-  parseClaimedProductNormalizeJob(baseJob())?.source_format,
-  "m4a",
-);
+function pathsFor(
+  job: ClaimedProductNormalizeJob,
+  decision: ProductNormalizeCleanupDecision,
+): string[] {
+  const paths: string[] = [];
+  if (decision.cleanupSource) paths.push(job.source_storage_path);
+  if (decision.cleanupTarget) paths.push(job.target_storage_path);
+  return paths;
+}
 
+assert.equal(parseClaimedProductNormalizeJob(null), null);
+
+// Success: applied cleanup excludes live target, includes source+previous via completeJob.
 {
   const cleaned: string[][] = [];
   const job = baseJob();
@@ -55,95 +63,37 @@ assert.equal(
         durationSeconds: 10,
         originalFileName: job.source_original_filename,
         productStatus: "draft",
-        cleanupPaths: [job.target_storage_path],
+        cleanupPaths: [],
       } satisfies ProductNormalizeExecuteResult;
     },
-    async completeJob(_job, result) {
+    async completeJob() {
       return {
         applied: true,
-        cleanupPaths: [
-          job.source_storage_path,
-          job.previous_audio_path!,
-          result.targetStoragePath,
-        ].filter((p) => p !== result.targetStoragePath),
+        cleanupPaths: [job.source_storage_path, job.previous_audio_path!],
       };
     },
     async failJob() {
-      return true;
+      throw new Error("unexpected fail");
     },
-    async releaseJob() {
-      return true;
+    async resolveInterrupt() {
+      throw new Error("unexpected interrupt");
     },
+    pathsForCleanupDecision: pathsFor,
     async cleanupPaths(paths) {
       cleaned.push([...paths]);
     },
   };
-
-  const worker = createProductAudioNormalizeWorker(port, {
+  await createProductAudioNormalizeWorker(port, {
     maxJobs: 1,
-    idleIntervalMs: 10,
     logger: { info() {}, error() {} },
-  });
-  await worker.run();
-  assert.equal(cleaned.length, 1);
-  assert.ok(cleaned[0].includes(job.source_storage_path));
-  assert.ok(cleaned[0].includes(job.previous_audio_path!));
-  assert.equal(cleaned[0].includes(job.target_storage_path), false);
+  }).run();
+  assert.deepEqual(cleaned[0].sort(), [job.source_storage_path, job.previous_audio_path!].sort());
 }
 
+// Transient fail → queued: SOURCE retained, target cleaned.
 {
   const cleaned: string[][] = [];
-  const job = baseJob({ id: "99999999-9999-4999-8999-999999999999" });
-  let claimed = true;
-  const port: ProductNormalizeWorkerPort = {
-    async recoverStaleJobs() {},
-    async claimJob() {
-      if (!claimed) return null;
-      claimed = false;
-      return job;
-    },
-    async renewLease() {
-      return true;
-    },
-    async executeJob() {
-      return {
-        targetStoragePath: job.target_storage_path,
-        sizeBytes: 100,
-        durationSeconds: 5,
-        originalFileName: "x.m4a",
-        productStatus: "draft",
-        cleanupPaths: [],
-      };
-    },
-    async completeJob() {
-      // Stale: B already desired; A must not swap — cleanup target+source only.
-      return {
-        applied: false,
-        cleanupPaths: [job.target_storage_path, job.source_storage_path],
-      };
-    },
-    async failJob() {
-      return true;
-    },
-    async releaseJob() {
-      return true;
-    },
-    async cleanupPaths(paths) {
-      cleaned.push([...paths]);
-    },
-  };
-  const worker = createProductAudioNormalizeWorker(port, {
-    maxJobs: 1,
-    logger: { info() {}, error() {} },
-  });
-  await worker.run();
-  assert.deepEqual(cleaned[0].sort(), [job.source_storage_path, job.target_storage_path].sort());
-  assert.equal(cleaned[0].includes(job.previous_audio_path!), false);
-}
-
-{
-  let failed = false;
-  const job = baseJob();
+  const job = baseJob({ attempt_count: 1 });
   let claimed = true;
   const port: ProductNormalizeWorkerPort = {
     async recoverStaleJobs() {},
@@ -159,23 +109,249 @@ assert.equal(
       throw new Error("normalize_failed");
     },
     async completeJob() {
-      throw new Error("should_not_complete");
+      throw new Error("no complete");
     },
     async failJob() {
-      failed = true;
-      return true;
+      return {
+        outcome: "queued",
+        finalStatus: "queued",
+        cleanupSource: false,
+        cleanupTarget: true,
+      };
     },
-    async releaseJob() {
-      return false;
+    async resolveInterrupt() {
+      throw new Error("unexpected interrupt");
     },
-    async cleanupPaths() {},
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths(paths) {
+      cleaned.push([...paths]);
+    },
   };
-  const worker = createProductAudioNormalizeWorker(port, {
+  await createProductAudioNormalizeWorker(port, {
     maxJobs: 1,
     logger: { info() {}, error() {} },
-  });
-  await worker.run();
-  assert.equal(failed, true);
+  }).run();
+  assert.deepEqual(cleaned[0], [job.target_storage_path]);
+  assert.equal(cleaned[0].includes(job.source_storage_path), false);
+}
+
+// Terminal fail: source + target cleaned; previous delivery not in fail cleanup.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob({ attempt_count: 3 });
+  let claimed = true;
+  const port: ProductNormalizeWorkerPort = {
+    async recoverStaleJobs() {},
+    async claimJob() {
+      if (!claimed) return null;
+      claimed = false;
+      return job;
+    },
+    async renewLease() {
+      return true;
+    },
+    async executeJob() {
+      throw new Error("normalize_failed");
+    },
+    async completeJob() {
+      throw new Error("no complete");
+    },
+    async failJob() {
+      return {
+        outcome: "failed",
+        finalStatus: "failed",
+        cleanupSource: true,
+        cleanupTarget: true,
+      };
+    },
+    async resolveInterrupt() {
+      throw new Error("unexpected interrupt");
+    },
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths(paths) {
+      cleaned.push([...paths]);
+    },
+  };
+  await createProductAudioNormalizeWorker(port, {
+    maxJobs: 1,
+    logger: { info() {}, error() {} },
+  }).run();
+  assert.deepEqual(
+    cleaned[0].sort(),
+    [job.source_storage_path, job.target_storage_path].sort(),
+  );
+  assert.equal(cleaned[0].includes(job.previous_audio_path!), false);
+}
+
+// Lease lost / superseded interrupt: cleanup A source+target, not previous delivery.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob();
+  let claimed = true;
+  const port: ProductNormalizeWorkerPort = {
+    async recoverStaleJobs() {},
+    async claimJob() {
+      if (!claimed) return null;
+      claimed = false;
+      return job;
+    },
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_job, signal) {
+      // Simulate lease heartbeat abort before work finishes.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (signal.aborted) {
+        const { ProductNormalizeAbortedError } = await import(
+          "../src/lib/product-audio-normalize/ffmpeg"
+        );
+        throw new ProductNormalizeAbortedError();
+      }
+      return {
+        targetStoragePath: job.target_storage_path,
+        sizeBytes: 1,
+        durationSeconds: 1,
+        originalFileName: "x.m4a",
+        productStatus: "draft",
+        cleanupPaths: [],
+      };
+    },
+    async completeJob() {
+      throw new Error("no complete");
+    },
+    async failJob() {
+      throw new Error("no fail");
+    },
+    async resolveInterrupt() {
+      return {
+        outcome: "superseded",
+        finalStatus: "superseded",
+        cleanupSource: true,
+        cleanupTarget: true,
+      };
+    },
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths(paths) {
+      cleaned.push([...paths]);
+    },
+  };
+  await createProductAudioNormalizeWorker(port, {
+    maxJobs: 1,
+    heartbeatIntervalMs: 5,
+    leaseHoldMs: 1,
+    logger: { info() {}, error() {} },
+  }).run();
+  assert.ok(cleaned.length >= 1);
+  const last = cleaned[cleaned.length - 1];
+  assert.deepEqual(last.sort(), [job.source_storage_path, job.target_storage_path].sort());
+  assert.equal(last.includes(job.previous_audio_path!), false);
+}
+
+// Transient lease loss / requeue: SOURCE not deleted.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob();
+  let claimed = true;
+  const port: ProductNormalizeWorkerPort = {
+    async recoverStaleJobs() {},
+    async claimJob() {
+      if (!claimed) return null;
+      claimed = false;
+      return job;
+    },
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_job, signal) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (signal.aborted) {
+        const { ProductNormalizeAbortedError } = await import(
+          "../src/lib/product-audio-normalize/ffmpeg"
+        );
+        throw new ProductNormalizeAbortedError();
+      }
+      throw new Error("unreachable");
+    },
+    async completeJob() {
+      throw new Error("no");
+    },
+    async failJob() {
+      throw new Error("no");
+    },
+    async resolveInterrupt() {
+      return {
+        outcome: "requeued",
+        finalStatus: "queued",
+        cleanupSource: false,
+        cleanupTarget: true,
+      };
+    },
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths(paths) {
+      cleaned.push([...paths]);
+    },
+  };
+  await createProductAudioNormalizeWorker(port, {
+    maxJobs: 1,
+    heartbeatIntervalMs: 5,
+    leaseHoldMs: 1,
+    logger: { info() {}, error() {} },
+  }).run();
+  const last = cleaned[cleaned.length - 1];
+  assert.deepEqual(last, [job.target_storage_path]);
+}
+
+// Foreign lease: delete nothing.
+{
+  const cleaned: string[][] = [];
+  const job = baseJob();
+  let claimed = true;
+  const port: ProductNormalizeWorkerPort = {
+    async recoverStaleJobs() {},
+    async claimJob() {
+      if (!claimed) return null;
+      claimed = false;
+      return job;
+    },
+    async renewLease() {
+      return false;
+    },
+    async executeJob(_job, signal) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (signal.aborted) {
+        const { ProductNormalizeAbortedError } = await import(
+          "../src/lib/product-audio-normalize/ffmpeg"
+        );
+        throw new ProductNormalizeAbortedError();
+      }
+      throw new Error("unreachable");
+    },
+    async completeJob() {
+      throw new Error("no");
+    },
+    async failJob() {
+      throw new Error("no");
+    },
+    async resolveInterrupt() {
+      return {
+        outcome: "foreign_lease",
+        finalStatus: "processing",
+        cleanupSource: false,
+        cleanupTarget: false,
+      };
+    },
+    pathsForCleanupDecision: pathsFor,
+    async cleanupPaths(paths) {
+      cleaned.push([...paths]);
+    },
+  };
+  await createProductAudioNormalizeWorker(port, {
+    maxJobs: 1,
+    heartbeatIntervalMs: 5,
+    leaseHoldMs: 1,
+    logger: { info() {}, error() {} },
+  }).run();
+  assert.deepEqual(cleaned[cleaned.length - 1], []);
 }
 
 console.log("product-audio-normalize-worker-unit: ok");

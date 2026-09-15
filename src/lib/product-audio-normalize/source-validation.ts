@@ -47,10 +47,10 @@ export function validateProductSourceProbe(
     return "ok";
   }
 
-  // raw .aac — ADTS / AAC elementary
-  const containerOk =
-    [...AAC_CONTAINERS].some((name) => formats.has(name)) ||
-    [...M4A_CONTAINERS].some((name) => formats.has(name));
+  // raw .aac — ADTS / AAC elementary only (MP4/MOV under .aac is reject).
+  const hasM4aFamily = [...M4A_CONTAINERS].some((name) => formats.has(name));
+  if (hasM4aFamily) return "container_mismatch";
+  const containerOk = [...AAC_CONTAINERS].some((name) => formats.has(name));
   if (!containerOk) return "container_mismatch";
   if (formats.has("wav") || formats.has("wave") || formats.has("mp3")) {
     return "container_mismatch";

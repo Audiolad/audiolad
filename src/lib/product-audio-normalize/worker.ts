@@ -34,6 +34,13 @@ export type ProductNormalizeWorkerLogger = {
   error: (message: string) => void;
 };
 
+export type ProductNormalizeCleanupDecision = {
+  outcome: string;
+  finalStatus: string | null;
+  cleanupSource: boolean;
+  cleanupTarget: boolean;
+};
+
 export type ProductNormalizeWorkerPort = {
   recoverStaleJobs: () => Promise<void>;
   claimJob: () => Promise<ClaimedProductNormalizeJob | null>;
@@ -46,9 +53,19 @@ export type ProductNormalizeWorkerPort = {
     job: ClaimedProductNormalizeJob,
     result: ProductNormalizeExecuteResult,
   ) => Promise<{ applied: boolean; cleanupPaths: string[] }>;
-  failJob: (job: ClaimedProductNormalizeJob, error: unknown) => Promise<boolean>;
-  releaseJob: (job: ClaimedProductNormalizeJob) => Promise<boolean>;
+  failJob: (
+    job: ClaimedProductNormalizeJob,
+    error: unknown,
+  ) => Promise<ProductNormalizeCleanupDecision>;
+  /** Server-authoritative interrupt / lease-loss resolution. */
+  resolveInterrupt: (
+    job: ClaimedProductNormalizeJob,
+  ) => Promise<ProductNormalizeCleanupDecision>;
   cleanupPaths: (paths: readonly string[]) => Promise<void>;
+  pathsForCleanupDecision: (
+    job: ClaimedProductNormalizeJob,
+    decision: ProductNormalizeCleanupDecision,
+  ) => string[];
 };
 
 export type ProductNormalizeWorkerOptions = {
@@ -247,7 +264,8 @@ export function createProductAudioNormalizeWorker(
         try {
           const result = await port.executeJob(job, jobAbort.signal);
           if (jobAbort.signal.aborted) {
-            await port.releaseJob(job);
+            const decision = await port.resolveInterrupt(job);
+            await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
             continue;
           }
           const completion = await port.completeJob(job, result);
@@ -264,13 +282,16 @@ export function createProductAudioNormalizeWorker(
             error instanceof ProductNormalizeAbortedError ||
             jobAbort.signal.aborted
           ) {
-            await port.releaseJob(job);
+            const decision = await port.resolveInterrupt(job);
+            await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
           } else {
-            await port.failJob(job, error);
+            const decision = await port.failJob(job, error);
+            await port.cleanupPaths(port.pathsForCleanupDecision(job, decision));
             logger.error(
               JSON.stringify({
                 event: "product_audio_normalize_job_failed",
                 jobId: job.id,
+                finalStatus: decision.finalStatus,
                 error: error instanceof Error ? error.message : "unknown_error",
               }),
             );

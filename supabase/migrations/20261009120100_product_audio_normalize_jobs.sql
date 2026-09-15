@@ -405,18 +405,22 @@ CREATE OR REPLACE FUNCTION public.fail_product_audio_normalize_job(
   p_error_message_safe text,
   p_max_attempts integer DEFAULT 3
 )
-RETURNS boolean
+RETURNS TABLE (
+  final_status text,
+  cleanup_source boolean,
+  cleanup_target boolean
+)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_job public.product_audio_normalize_jobs;
-  v_updated integer;
   v_permanent boolean;
 BEGIN
   IF p_lease_token IS NULL THEN
-    RETURN false;
+    RETURN QUERY SELECT NULL::text, false, false;
+    RETURN;
   END IF;
   IF p_max_attempts < 1 OR p_max_attempts > 10 THEN
     RAISE EXCEPTION 'invalid_max_attempts' USING ERRCODE = '22023';
@@ -431,10 +435,11 @@ BEGIN
     OR v_job.lease_token IS DISTINCT FROM p_lease_token
     OR v_job.lease_expires_at IS NULL
     OR v_job.lease_expires_at <= clock_timestamp() THEN
-    RETURN false;
+    RETURN QUERY SELECT NULL::text, false, false;
+    RETURN;
   END IF;
 
-  -- If already superseded via desired pointer, mark superseded and stop.
+  -- Desired pointer already moved on: treat as superseded.
   IF EXISTS (
     SELECT 1 FROM public.audio_items ai
     WHERE ai.id = v_job.audio_item_id
@@ -449,7 +454,8 @@ BEGIN
         error_message_safe = 'Заменено новой загрузкой.',
         updated_at = now()
     WHERE id = v_job.id;
-    RETURN true;
+    RETURN QUERY SELECT 'superseded'::text, true, true;
+    RETURN;
   END IF;
 
   v_permanent := v_job.attempt_count >= p_max_attempts;
@@ -467,8 +473,7 @@ BEGIN
         ELSE 'Не удалось подготовить аудиофайл. Попробуем обработать повторно.'
       END,
       updated_at = now()
-  WHERE id = v_job.id
-  RETURNING 1 INTO v_updated;
+  WHERE id = v_job.id;
 
   IF v_permanent THEN
     UPDATE public.audio_items
@@ -476,9 +481,11 @@ BEGIN
         updated_at = now()
     WHERE id = v_job.audio_item_id
       AND desired_product_audio_normalize_job_id = v_job.id;
+    RETURN QUERY SELECT 'failed'::text, true, true;
+  ELSE
+    -- Retry: keep SOURCE; orphan/partial target may be removed.
+    RETURN QUERY SELECT 'queued'::text, false, true;
   END IF;
-
-  RETURN v_updated IS NOT NULL;
 END;
 $$;
 
@@ -513,6 +520,168 @@ BEGIN
 END;
 $$;
 
+
+CREATE OR REPLACE FUNCTION public.resolve_product_audio_normalize_job_interrupt(
+  p_job_id uuid,
+  p_lease_token uuid,
+  p_max_attempts integer DEFAULT 3
+)
+RETURNS TABLE (
+  outcome text,
+  final_status text,
+  cleanup_source boolean,
+  cleanup_target boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_job public.product_audio_normalize_jobs;
+  v_desired uuid;
+  v_permanent boolean;
+BEGIN
+  IF p_lease_token IS NULL THEN
+    RETURN QUERY SELECT 'invalid'::text, NULL::text, false, false;
+    RETURN;
+  END IF;
+  IF p_max_attempts < 1 OR p_max_attempts > 10 THEN
+    RAISE EXCEPTION 'invalid_max_attempts' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO v_job
+  FROM public.product_audio_normalize_jobs
+  WHERE id = p_job_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT 'missing'::text, NULL::text, false, false;
+    RETURN;
+  END IF;
+
+  SELECT desired_product_audio_normalize_job_id INTO v_desired
+  FROM public.audio_items
+  WHERE id = v_job.audio_item_id
+  FOR UPDATE;
+
+  -- Already superseded (enqueue B won) or desired no longer this job.
+  IF v_job.status = 'superseded'
+    OR v_desired IS DISTINCT FROM v_job.id THEN
+    IF v_job.status <> 'superseded' THEN
+      UPDATE public.product_audio_normalize_jobs
+      SET status = 'superseded',
+          lease_token = NULL,
+          lease_expires_at = NULL,
+          completed_at = COALESCE(completed_at, now()),
+          error_code = COALESCE(error_code, 'superseded'),
+          error_message_safe = COALESCE(error_message_safe, 'Заменено новой загрузкой.'),
+          updated_at = now()
+      WHERE id = v_job.id
+        AND status IN ('queued', 'processing');
+    END IF;
+    RETURN QUERY SELECT 'superseded'::text, 'superseded'::text, true, true;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'ready' THEN
+    RETURN QUERY SELECT 'ready'::text, 'ready'::text, false, false;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'failed' THEN
+    RETURN QUERY SELECT 'failed'::text, 'failed'::text, true, true;
+    RETURN;
+  END IF;
+
+  IF v_job.status = 'queued' THEN
+    -- Already requeued (stale recovery elsewhere). Keep source for next claim.
+    RETURN QUERY SELECT 'requeued'::text, 'queued'::text, false, true;
+    RETURN;
+  END IF;
+
+  -- status = processing
+  IF v_job.lease_token IS DISTINCT FROM p_lease_token THEN
+    -- Another attempt/worker owns the lease. Do not delete their objects.
+    RETURN QUERY SELECT 'foreign_lease'::text, 'processing'::text, false, false;
+    RETURN;
+  END IF;
+
+  -- Same lease still processing: voluntary interrupt / abort while lease valid
+  -- or expired under this token → release back to queue (or terminal if maxed).
+  v_permanent := v_job.attempt_count >= p_max_attempts
+    AND (
+      v_job.lease_expires_at IS NULL
+      OR v_job.lease_expires_at <= clock_timestamp()
+    );
+
+  IF v_job.lease_expires_at IS NOT NULL
+    AND v_job.lease_expires_at > clock_timestamp() THEN
+    -- Lease still valid: soft release for abort (same as release RPC).
+    UPDATE public.product_audio_normalize_jobs
+    SET status = 'queued',
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        attempt_count = GREATEST(0, attempt_count - 1),
+        updated_at = now()
+    WHERE id = v_job.id;
+    RETURN QUERY SELECT 'released'::text, 'queued'::text, false, true;
+    RETURN;
+  END IF;
+
+  -- Lease expired under this token.
+  IF v_job.attempt_count < p_max_attempts THEN
+    UPDATE public.product_audio_normalize_jobs
+    SET status = 'queued',
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        error_code = NULL,
+        error_message_safe = NULL,
+        updated_at = now()
+    WHERE id = v_job.id;
+    RETURN QUERY SELECT 'requeued'::text, 'queued'::text, false, true;
+  ELSE
+    UPDATE public.product_audio_normalize_jobs
+    SET status = 'failed',
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        completed_at = COALESCE(completed_at, now()),
+        error_code = 'worker_lease_expired',
+        error_message_safe = 'Не удалось подготовить аудиофайл.',
+        updated_at = now()
+    WHERE id = v_job.id;
+    UPDATE public.audio_items
+    SET desired_product_audio_normalize_job_id = NULL,
+        updated_at = now()
+    WHERE id = v_job.audio_item_id
+      AND desired_product_audio_normalize_job_id = v_job.id;
+    RETURN QUERY SELECT 'failed'::text, 'failed'::text, true, true;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.guard_product_audio_normalize_pointer_roles()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+    AND NEW.desired_product_audio_normalize_job_id IS DISTINCT FROM OLD.desired_product_audio_normalize_job_id
+    AND (
+      current_setting('role', true) IN ('anon', 'authenticated')
+      OR current_user IN ('anon', 'authenticated')
+    ) THEN
+    RAISE EXCEPTION 'product_audio_normalize_pointer_forbidden' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS guard_product_audio_normalize_pointer_roles_trigger ON public.audio_items;
+CREATE TRIGGER guard_product_audio_normalize_pointer_roles_trigger
+  BEFORE UPDATE OF desired_product_audio_normalize_job_id
+  ON public.audio_items
+  FOR EACH ROW EXECUTE FUNCTION public.guard_product_audio_normalize_pointer_roles();
+
 REVOKE ALL ON FUNCTION public.enqueue_product_audio_normalize_job(uuid, uuid, text, text, text, bigint, text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.recover_stale_product_audio_normalize_jobs(integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.claim_product_audio_normalize_job(integer, integer) FROM PUBLIC, anon, authenticated;
@@ -520,6 +689,7 @@ REVOKE ALL ON FUNCTION public.renew_product_audio_normalize_job_lease(uuid, uuid
 REVOKE ALL ON FUNCTION public.complete_product_audio_normalize_job(uuid, uuid, text, integer, bigint, text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.fail_product_audio_normalize_job(uuid, uuid, text, text, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.release_product_audio_normalize_job(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.resolve_product_audio_normalize_job_interrupt(uuid, uuid, integer) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.enqueue_product_audio_normalize_job(uuid, uuid, text, text, text, bigint, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.recover_stale_product_audio_normalize_jobs(integer) TO service_role;
@@ -528,5 +698,6 @@ GRANT EXECUTE ON FUNCTION public.renew_product_audio_normalize_job_lease(uuid, u
 GRANT EXECUTE ON FUNCTION public.complete_product_audio_normalize_job(uuid, uuid, text, integer, bigint, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.fail_product_audio_normalize_job(uuid, uuid, text, text, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_product_audio_normalize_job(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.resolve_product_audio_normalize_job_interrupt(uuid, uuid, integer) TO service_role;
 
 COMMIT;

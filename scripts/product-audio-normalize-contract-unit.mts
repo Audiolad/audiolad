@@ -115,6 +115,18 @@ assert.equal(
   "ok",
 );
 
+assert.equal(
+  validateProductSourceProbe("aac", {
+    formatNames: ["mp4", "mov"],
+    durationSeconds: 3,
+    hasAudioStream: true,
+    hasVideoStream: false,
+    audioCodecNames: ["aac"],
+  }),
+  "container_mismatch",
+  "AAC codec inside MP4 renamed .aac must reject",
+);
+
 const form = readFileSync(path.join(root, "src/components/author-dashboard/AuthorProductForm.tsx"), "utf8");
 assert.ok(form.includes("audio/mpeg") || form.includes(".mp3"), "UI still MP3-oriented");
 assert.equal(form.toLowerCase().includes('accept=".m4a'), false);
