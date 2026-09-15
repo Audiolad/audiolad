@@ -579,11 +579,16 @@ assert.match(panel, /Бета/);
 assert.match(panel, /Подходящие запросы из базы АудиоЛада/);
 assert.match(panel, /Дополнительные варианты из Яндекса/);
 
-// Dashboard embeds panel before opportunities section
+// Dashboard embeds panel before onboarding shell (opportunities nested inside)
 assert.match(dash, /author-seo-discovery-panel/);
 const dashPanelIdx = dash.indexOf("AuthorSeoDiscoveryPanel");
-const dashOppIdx = dash.indexOf("Возможности для авторов");
-assert.ok(dashPanelIdx > 0 && dashPanelIdx < dashOppIdx, "discovery panel before opportunities");
+const dashChecklistIdx = dash.indexOf("AuthorOnboardingChecklist");
+assert.ok(
+  dashPanelIdx > 0 && dashPanelIdx < dashChecklistIdx,
+  "discovery panel before onboarding checklist",
+);
+assert.doesNotMatch(dash, /Посмотреть возможности/);
+assert.doesNotMatch(dash, /Возможности для авторов/);
 
 // Opportunities page still embeds the same panel
 assert.match(ui, /AuthorSeoDiscoveryPanel/);
