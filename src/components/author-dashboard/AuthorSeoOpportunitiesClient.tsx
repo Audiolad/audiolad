@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
+import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
 import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
 import {
   countActiveAuthorSeoReservations,
@@ -108,6 +109,7 @@ export default function AuthorSeoOpportunitiesClient({
           authorId={authorId}
           variant="opportunities"
           activeReservationCount={activeCount}
+          analyzedOpportunities={items}
           onReserved={(event) => {
             setItems((current) => {
               const exists = current.some((item) => item.id === event.queryId);
@@ -187,6 +189,13 @@ export default function AuthorSeoOpportunitiesClient({
                 </> : null}
                 {item.lifecycle === "in_progress" && item.reservationId ? <button type="button" disabled={pendingId === item.reservationId} onClick={() => release(item.reservationId!)} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50">Освободить</button> : null}
               </div> : isAvailable ? <button type="button" disabled={pendingId === item.id || activeCount >= SEO_ACTIVE_RESERVATION_LIMIT} onClick={() => reserve(item.id)} className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50">Взять в работу</button> : null}
+              {discoveryEnabled && own && item.lifecycle === "in_progress" && item.reservationId ? (
+                <AuthorSeoPromptBuilder
+                  primaryQueryText={item.queryText}
+                  primaryQueryId={item.id}
+                  analyzedOpportunities={items}
+                />
+              ) : null}
             </article>;
           })}
         </div>

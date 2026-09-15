@@ -280,6 +280,7 @@
     "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs",
     "test:kak-zarabotat-na-muzyke-iz-suno": "npx tsx scripts/kak-zarabotat-na-muzyke-iz-suno-page-unit.mjs",
     "test:author-seo-discovery": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-discovery-unit.mjs",
+    "test:author-seo-prompt-builder": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-prompt-builder-unit.mjs",
     "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs",
     "test:author-project-capacity": "npx tsx scripts/author-project-capacity-unit.mjs && npx tsx scripts/author-multi-project-unit.mjs"
   },
