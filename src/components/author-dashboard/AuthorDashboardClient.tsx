@@ -39,6 +39,19 @@ type AuthorDashboardClientProps = {
   authors: AuthorWorkspace[];
   /** Canonical effective active SEO reservation counts keyed by author workspace id (beta only). */
   seoActiveReservationCounts?: Record<string, number>;
+  /** Analyzed opportunities for SEO prompt related-query ranking (beta only). */
+  seoAnalyzedOpportunitiesByAuthorId?: Record<
+    string,
+    Array<{
+      id: string;
+      queryText: string;
+      frequency: number | null;
+      intent: string | null;
+      recommendedFormat: string | null;
+      audioFit: string | null;
+      clusterName: string | null;
+    }>
+  >;
 };
 
 function PlusIcon() {
@@ -170,6 +183,7 @@ function ProductCard({
 export default function AuthorDashboardClient({
   authors,
   seoActiveReservationCounts = {},
+  seoAnalyzedOpportunitiesByAuthorId = {},
 }: AuthorDashboardClientProps) {
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -256,6 +270,7 @@ export default function AuthorDashboardClient({
             authorId={selectedAuthor.id}
             variant="dashboard"
             activeReservationCount={seoActiveReservationCounts[selectedAuthor.id] ?? 0}
+            analyzedOpportunities={seoAnalyzedOpportunitiesByAuthorId[selectedAuthor.id] ?? []}
           />
         </div>
       ) : null}
