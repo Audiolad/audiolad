@@ -1,4 +1,8 @@
 import { getProductFieldErrorMessage } from "@/lib/author-products/limits";
+import {
+  STUDIO_FREE_SLOT_TAKEN,
+  STUDIO_FREE_SLOT_TAKEN_MESSAGE,
+} from "@/lib/studio-music/free-slot";
 
 export const PRODUCT_SAVE_ERROR_FALLBACK =
   "Не удалось сохранить аудиопродукт. Попробуйте ещё раз.";
@@ -81,6 +85,7 @@ const SUPPORT_SESSION_CODES = new Set([
 ]);
 
 const CONFLICT_CODES = new Set([
+  STUDIO_FREE_SLOT_TAKEN,
   "slug_taken",
   "product_kind_locked_after_publish",
   "PRODUCT_KIND_LOCKED_AFTER_PUBLISH",
@@ -217,6 +222,11 @@ export function getProductSaveErrorMessage(input: {
     case "support_blocked":
       return PRODUCT_SAVE_SUPPORT_BLOCKED_MESSAGE;
     case "conflict":
+      if (input.error === STUDIO_FREE_SLOT_TAKEN) {
+        return (
+          safeMessage ?? STUDIO_FREE_SLOT_TAKEN_MESSAGE
+        );
+      }
       return safeMessage ?? PRODUCT_SAVE_CONFLICT_MESSAGE;
     case "audio_relation":
       return PRODUCT_SAVE_AUDIO_RELATION_MESSAGE;
