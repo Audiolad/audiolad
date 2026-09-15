@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 
 import {
   buildAuthorSeoProductPrompt,
+  canBuildAuthorSeoProductPrompt,
+  getAuthorSeoProductSourceGuidance,
   listAuthorSeoPromptProductTypeOptions,
   SEO_PROMPT_SECONDARY_SELECT_LIMIT,
   suggestSecondarySeoQueriesForPrompt,
@@ -20,6 +22,7 @@ type Props = {
  * Inline Aurafon-beta SEO packaging prompt builder.
  * Deterministic only — no external AI or discovery network calls.
  * Secondary queries are author-selected (max 2), not reservations.
+ * Single client-side productSource grounds the prompt (no persistence / upload).
  */
 export default function AuthorSeoPromptBuilder({
   primaryQueryText,
@@ -28,12 +31,17 @@ export default function AuthorSeoPromptBuilder({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [productType, setProductType] = useState("");
-  const [productFacts, setProductFacts] = useState("");
+  const [productSource, setProductSource] = useState("");
   const [selectedSecondaryIds, setSelectedSecondaryIds] = useState<string[]>([]);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const productTypeOptions = useMemo(() => listAuthorSeoPromptProductTypeOptions(), []);
+
+  const sourceGuidance = useMemo(
+    () => getAuthorSeoProductSourceGuidance(productType),
+    [productType],
+  );
 
   const secondarySuggestions = useMemo(
     () =>
@@ -52,6 +60,8 @@ export default function AuthorSeoPromptBuilder({
       .filter((value): value is string => Boolean(value));
   }, [secondarySuggestions, selectedSecondaryIds]);
 
+  const canGenerate = canBuildAuthorSeoProductPrompt({ productType, productSource });
+
   function toggleSecondary(id: string) {
     setPrompt(null);
     setCopyStatus(null);
@@ -67,13 +77,13 @@ export default function AuthorSeoPromptBuilder({
   }
 
   function handleGenerate() {
-    if (!productType.trim()) return;
+    if (!canGenerate) return;
     setCopyStatus(null);
     const next = buildAuthorSeoProductPrompt({
       seoQuery: primaryQueryText,
       productType,
       relatedQueries: selectedRelatedQueries,
-      productFacts,
+      productSource,
     });
     setPrompt(next);
   }
@@ -108,8 +118,9 @@ export default function AuthorSeoPromptBuilder({
           <div>
             <h3 className="text-base font-semibold text-[#25135c]">SEO-упаковка продукта</h3>
             <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
-              АудиоЛад подготовит промпт на основе выбранного поискового запроса. Скопируйте его и
-              вставьте в любую нейросеть, чтобы получить тексты для карточки продукта.
+              АудиоЛад подготовит промпт на основе выбранного поискового запроса и материала
+              продукта. Скопируйте его и вставьте в любую нейросеть, чтобы получить тексты для
+              карточки.
             </p>
           </div>
 
@@ -139,6 +150,45 @@ export default function AuthorSeoPromptBuilder({
               ))}
             </select>
           </label>
+
+          <label
+            className="block text-sm font-medium text-[#25135c]"
+            data-testid="author-seo-product-source"
+          >
+            Материал продукта
+            <span className="mt-1 block text-xs font-normal leading-5 text-[#796ba0]">
+              Добавьте текст, сценарий, программу или кратко опишите содержание продукта. АудиоЛад
+              включит этот материал в промпт, чтобы нейросеть описывала именно ваш продукт, а не
+              придумывала его.
+            </span>
+            <span
+              className="mt-2 block text-xs font-normal leading-5 text-[#5f5484]"
+              data-testid="author-seo-product-source-guidance"
+            >
+              {sourceGuidance.helper}
+            </span>
+            <textarea
+              value={productSource}
+              onChange={(event) => {
+                setProductSource(event.target.value);
+                setPrompt(null);
+                setCopyStatus(null);
+              }}
+              rows={12}
+              placeholder={sourceGuidance.placeholder}
+              className="mt-2 w-full rounded-xl border border-[#d7c4f5] bg-white px-3 py-2 text-sm outline-none focus:border-[#7042c5]"
+            />
+            <span className="mt-2 block text-xs font-normal leading-5 text-[#796ba0]">
+              Если материала много, добавьте программу и основные тезисы. Полный текст или файл при
+              необходимости можно отдельно приложить к нейросети вместе с этим промптом.
+            </span>
+          </label>
+
+          {!productSource.trim() ? (
+            <p className="text-sm text-[#796ba0]" role="status">
+              Добавьте материал продукта, чтобы SEO-описание опиралось на реальный продукт.
+            </p>
+          ) : null}
 
           {productType.trim() ? (
             <div data-testid="author-seo-secondary-queries">
@@ -193,24 +243,9 @@ export default function AuthorSeoPromptBuilder({
             </div>
           ) : null}
 
-          <label className="block text-sm font-medium text-[#25135c]">
-            Что будет внутри продукта
-            <textarea
-              value={productFacts}
-              onChange={(event) => {
-                setProductFacts(event.target.value);
-                setPrompt(null);
-                setCopyStatus(null);
-              }}
-              rows={3}
-              placeholder="Например: 10 композиций без слов, спокойный джаз, общая продолжительность около 45 минут."
-              className="mt-2 w-full rounded-xl border border-[#d7c4f5] bg-white px-3 py-2 text-sm outline-none focus:border-[#7042c5]"
-            />
-          </label>
-
           <button
             type="button"
-            disabled={!productType.trim()}
+            disabled={!canGenerate}
             onClick={handleGenerate}
             className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
@@ -247,20 +282,24 @@ export default function AuthorSeoPromptBuilder({
             <h4 className="text-sm font-semibold text-[#25135c]">Как работать с промптом</h4>
             <ol className="mt-2 space-y-2 text-sm leading-6 text-[#4c3d78]">
               <li>
-                <span className="font-semibold text-[#25135c]">1. Скопируйте промпт</span>
-                <span className="block">Нажмите кнопку «Скопировать промпт».</span>
-              </li>
-              <li>
-                <span className="font-semibold text-[#25135c]">2. Откройте любую нейросеть</span>
+                <span className="font-semibold text-[#25135c]">1. Добавьте материал продукта</span>
                 <span className="block">
-                  Вставьте промпт в ChatGPT, Grok, Claude или другой удобный сервис и отправьте его.
+                  Вставьте текст, сценарий, программу, тезисы или описание музыки — один источник
+                  фактов о продукте.
                 </span>
               </li>
               <li>
-                <span className="font-semibold text-[#25135c]">3. Перенесите готовые тексты</span>
+                <span className="font-semibold text-[#25135c]">2. Сформируйте и скопируйте промпт</span>
                 <span className="block">
-                  Скопируйте полученные название, подназвание, описание, SEO-поля, рекомендации и
-                  вопросы с ответами в соответствующие поля продукта в АудиоЛаде.
+                  Выберите тип продукта и дополнительные запросы, затем нажмите «Сформировать
+                  SEO-промпт» и «Скопировать промпт».
+                </span>
+              </li>
+              <li>
+                <span className="font-semibold text-[#25135c]">3. Откройте любую нейросеть</span>
+                <span className="block">
+                  Вставьте промпт в ChatGPT, Grok, Claude или другой сервис, получите готовые тексты и
+                  перенесите их в карточку продукта АудиоЛада.
                 </span>
               </li>
             </ol>
