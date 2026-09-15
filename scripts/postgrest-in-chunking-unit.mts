@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  loadPublishedAudioItemsByIds,
   loadPublishedAudioItemsByPracticeIds,
   loadPublishedAudioSummaries,
 } from "../src/lib/products/public-audio-items";
@@ -176,21 +177,30 @@ function getCalls(client: SupabaseClient) {
 
 // --- loadPublishedAudioItemsByPracticeIds ---
 {
+  // Two chunks; positions intentionally interleaved across chunks so a
+  // practiceId-primary sort would fail while global position sort passes.
   const ids = Array.from({ length: 51 }, (_, i) => idAt(i));
   const client = createMockSupabase({
     onIn: (call) => {
       assert.ok(call.ids.length <= 50);
       return {
-        data: call.ids.map((practice_id, index) => ({
-          id: idAt(index, "11111111-1111-4111-8111-"),
-          practice_id,
-          title: "Track",
-          position: index,
-          duration_seconds: 10,
-          cover_url: null,
-          cover_image: null,
-          updated_at: null,
-        })),
+        data: call.ids.map((practice_id) => {
+          const n = Number.parseInt(practice_id.slice(-12), 10);
+          // Chunk 0 (n=0..49): even positions descending-ish via 100-n
+          // Chunk 1 (n=50): position 0 — must sort before many chunk-0 rows
+          // if order is global by position only.
+          const position = n === 50 ? 0 : 100 - n;
+          return {
+            id: idAt(n, "11111111-1111-4111-8111-"),
+            practice_id,
+            title: `Track-${n}`,
+            position,
+            duration_seconds: 10,
+            cover_url: null,
+            cover_image: null,
+            updated_at: null,
+          };
+        }),
         error: null,
       };
     },
@@ -201,6 +211,56 @@ function getCalls(client: SupabaseClient) {
     [50, 1],
   );
   assert.equal(rows.length, 51);
+  const positions = rows.map((row) => row.position);
+  const sorted = [...positions].sort((a, b) => a - b);
+  assert.deepEqual(positions, sorted);
+  // First row must be the n=50 track (position 0), which lives in chunk 2 —
+  // proving practiceId is not the primary sort key.
+  assert.equal(rows[0]?.practiceId, ids[50]);
+  assert.equal(rows[0]?.position, 0);
+  // A practiceId-primary sort would place ids[0] first; ensure it does not.
+  assert.notEqual(rows[0]?.practiceId, ids[0]);
+}
+
+// --- loadPublishedAudioItemsByIds ---
+{
+  const ids = Array.from({ length: 51 }, (_, i) => idAt(i, "aaaaaaaa-aaaa-4aaa-8aaa-"));
+  const client = createMockSupabase({
+    onIn: (call) => {
+      assert.equal(call.table, "audio_items");
+      assert.equal(call.column, "id");
+      assert.ok(call.ids.length <= 50);
+      return {
+        data: call.ids.map((id) => {
+          const n = Number.parseInt(id.slice(-12), 10);
+          return {
+            id,
+            practice_id: idAt(n),
+            title: `ById-${n}`,
+            position: n,
+            duration_seconds: 5,
+            cover_url: null,
+            cover_image: null,
+            updated_at: null,
+          };
+        }),
+        error: null,
+      };
+    },
+  });
+  const rows = await loadPublishedAudioItemsByIds(client, ids);
+  assert.deepEqual(
+    getCalls(client).map((c) => c.ids.length),
+    [50, 1],
+  );
+  assert.equal(rows.length, 51);
+  // Existing semantics: no extra sort — chunk concat order (same as request chunks).
+  assert.equal(rows[0]?.id, ids[0]);
+  assert.equal(rows[50]?.id, ids[50]);
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ids,
+  );
 }
 
 // --- loadPricePromotionsForPractices ---

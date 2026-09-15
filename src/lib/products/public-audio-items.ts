@@ -242,12 +242,7 @@ export async function loadPublishedAudioItemsByPracticeIds(
 
   return rows
     .map(mapPublishedAudioItemDetail)
-    .sort((left, right) => {
-      if (left.practiceId !== right.practiceId) {
-        return left.practiceId.localeCompare(right.practiceId);
-      }
-      return left.position - right.position;
-    });
+    .sort((left, right) => left.position - right.position);
 }
 
 export async function loadPublishedAudioItemsByIds(
