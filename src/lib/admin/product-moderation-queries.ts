@@ -1,5 +1,9 @@
 import type { AdminProductModerationFilterKey } from "@/lib/admin/product-moderation-status";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  hasListenTrackPlayableSource,
+  loadValidatedActiveMusicDeliveryItemIds,
+} from "@/lib/listen/validated-active-music-delivery";
 
 export type AdminProductModerationListItem = {
   id: string;
@@ -224,6 +228,38 @@ export async function listAdminProductModerationQueue(input: {
   });
 }
 
+
+async function mapModerationAudioItems(
+  audioItems: Array<{
+    id: string;
+    title: string | null;
+    position: number | null;
+    duration_seconds: number | null;
+    audio_path: string | null;
+    active_music_delivery_asset_id?: string | null;
+    status: string | null;
+  }>,
+  productKind: string,
+): Promise<AdminProductModerationAudioItem[]> {
+  const validatedActive =
+    productKind === "music"
+      ? await loadValidatedActiveMusicDeliveryItemIds(audioItems)
+      : new Set<string>();
+
+  return audioItems.map((item) => ({
+    id: item.id,
+    title: item.title?.trim() || "Без названия",
+    position: typeof item.position === "number" ? item.position : 0,
+    durationSeconds:
+      typeof item.duration_seconds === "number" ? item.duration_seconds : null,
+    hasAudioFile: hasListenTrackPlayableSource({
+      audioPath: item.audio_path,
+      hasActiveDelivery: validatedActive.has(item.id),
+    }),
+    status: item.status || "draft",
+  }));
+}
+
 export async function getAdminProductModerationDetail(
   practiceId: string,
 ): Promise<AdminProductModerationDetail | null> {
@@ -287,7 +323,7 @@ export async function getAdminProductModerationDetail(
     await Promise.all([
       supabase
         .from("audio_items")
-        .select("id, title, position, duration_seconds, audio_path, status")
+        .select("id, title, position, duration_seconds, audio_path, active_music_delivery_asset_id, status")
         .eq("practice_id", practiceId)
         .order("position", { ascending: true }),
       supabase
@@ -414,17 +450,18 @@ export async function getAdminProductModerationDetail(
     authorSlug: (author?.slug as string) || "",
     authorCanBypass: author?.can_bypass_product_moderation === true,
     topicTitles,
-    audioItems: (audioItems ?? []).map((item) => ({
-      id: item.id as string,
-      title: (item.title as string) || "Без названия",
-      position: typeof item.position === "number" ? item.position : 0,
-      durationSeconds:
-        typeof item.duration_seconds === "number" ? item.duration_seconds : null,
-      hasAudioFile: Boolean(
-        typeof item.audio_path === "string" && item.audio_path.trim(),
-      ),
-      status: (item.status as string) || "draft",
-    })),
+    audioItems: await mapModerationAudioItems(
+      (audioItems ?? []) as Array<{
+        id: string;
+        title: string | null;
+        position: number | null;
+        duration_seconds: number | null;
+        audio_path: string | null;
+        active_music_delivery_asset_id?: string | null;
+        status: string | null;
+      }>,
+      (practice.product_kind as string) || "practice",
+    ),
     events: mappedEvents,
     submittedByUserId: submittedEvent?.actorUserId ?? null,
   };
