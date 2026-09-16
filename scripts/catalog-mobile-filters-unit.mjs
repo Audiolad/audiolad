@@ -26,7 +26,7 @@ const listingApi = read("src/app/api/catalog/route.ts");
 
 assert.match(layout, /CatalogMobileFiltersSlot/, "fixed chrome mounts filters");
 assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
-assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
+assert.match(layout, /Темы|CatalogMobileFilters/, "filters sit in the search row");
 assert.match(
   layout,
   /<MobileTopChrome variant=["']catalog["']/,
@@ -138,10 +138,10 @@ assert.match(
 );
 assert.match(page, /buildCatalogHref/, "page still uses buildCatalogHref");
 
-assert.match(filters, /data-catalog-mobile-filters-button/, "Фильтры button is marked");
+assert.match(filters, /data-catalog-mobile-filters-button/, "Темы button is marked");
 assert.match(filters, /data-catalog-mobile-filters-sheet/, "sheet is marked");
 assert.match(filters, /AddToPlaylistSheet|role="dialog"/, "sheet is a dialog");
-assert.match(filters, /Тематика/, "sheet has topic group");
+assert.match(filters, /Темы/, "sheet has topic group");
 assert.match(filters, /Доступ/, "sheet has access group");
 assert.match(filters, /Тип/, "sheet has kind group");
 assert.match(filters, /CATALOG_ACCESS_FILTER_OPTIONS/, "sheet uses shared access options");
@@ -154,6 +154,11 @@ assert.doesNotMatch(filterUi, /Релизы/, "public class chips never say Ре
 assert.match(filterUi, /value: "release"/, "internal class value stays release");
 assert.match(filterUi, /Посты/, "class includes posts");
 assert.match(filters, /buildCatalogHref/, "sheet options use buildCatalogHref");
+assert.match(
+  filters,
+  /section:\s*listingFromUrl\.section/,
+  "Темы preserve the selected catalog section",
+);
 assert.match(filters, /q: searchQuery/, "sheet keeps the current search query");
 assert.doesNotMatch(filters, /buildCatalogHref\s*=/, "sheet does not redefine hrefs");
 assert.doesNotMatch(filters, /from "next\/link"/, "sheet chips are not links");

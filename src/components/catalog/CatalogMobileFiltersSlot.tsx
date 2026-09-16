@@ -21,7 +21,7 @@ export default function CatalogMobileFiltersSlot() {
           aria-hidden="true"
           className="inline-flex h-[52px] shrink-0 items-center rounded-[18px] border border-[#ded1f1] bg-white px-3 text-sm font-medium text-[#7042c5]"
         >
-          Фильтры
+          Темы
         </span>
       }
     >

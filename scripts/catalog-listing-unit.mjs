@@ -83,6 +83,7 @@ assert(parseCatalogListingLimit("0") === 1, "limit min 1");
 const parsed = parseCatalogListingQuery({
   q: "  деньги  ",
   topic: "Money",
+  section: "music",
   access: "free",
   class: "practice",
   sort: "price_desc",
@@ -91,6 +92,15 @@ const parsed = parseCatalogListingQuery({
 });
 assert(parsed.q === "деньги", "q normalized");
 assert(parsed.topic === "money", "topic normalized");
+assert(parsed.section === "music", "catalog section parsed");
+assert(
+  parseCatalogListingQuery({ section: "unknown" }).section === null,
+  "unknown catalog section is ignored",
+);
+assert(
+  parseCatalogListingQuery({ section: "books" }).section === null,
+  "books stay hidden from the public catalog for now",
+);
 assert(
   parseCatalogListingQuery({ topic: "money,sleep,calm" }).topic === "money,sleep,calm",
   "listing keeps a comma topic list",
@@ -108,6 +118,16 @@ assert(parsed.access === "free", "access parsed");
 assert(parsed.class === "practice", "class parsed");
 assert(parsed.sort === "price_desc", "sort parsed");
 assert(parsed.limit === CATALOG_LISTING_PAGE_SIZE, "page size 20");
+assert(
+  buildCatalogListingApiUrl(parsed).includes("section=music"),
+  "listing API preserves catalog section",
+);
+assert(
+  buildCatalogHref({ section: "meditations", topic: "sleep" }).includes(
+    "section=meditations",
+  ),
+  "catalog href preserves catalog section",
+);
 assert(
   parseCatalogListingQuery({ kind: "music" }).class === "release",
   "legacy kind query maps to class",

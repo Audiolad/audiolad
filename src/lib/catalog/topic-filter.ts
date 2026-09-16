@@ -1,3 +1,5 @@
+import { parsePublicCatalogSection } from "@/lib/catalog/catalog-sections";
+
 const TOPIC_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export const CATALOG_TOPIC_FILTER_MAX = 3;
@@ -115,6 +117,7 @@ export function countCatalogFilterGroups(input: {
 export type CatalogHrefOptions = {
   q?: string | null;
   topic?: string | null;
+  section?: string | null;
   access?: string | null;
   class?: string | null;
   kind?: string | null;
@@ -162,6 +165,7 @@ function normalizeCatalogHrefFilter(
 export function buildCatalogHref(options?: CatalogHrefOptions): string {
   const normalizedQuery = normalizeCatalogHrefQuery(options?.q);
   const topicKey = options?.topic?.trim().toLowerCase() || null;
+  const section = parsePublicCatalogSection(options?.section);
   const access = normalizeCatalogHrefFilter(options?.access, DEFAULT_CATALOG_ACCESS);
   const rawClass = options?.class ?? options?.kind;
   const mappedClass = rawClass
@@ -181,6 +185,10 @@ export function buildCatalogHref(options?: CatalogHrefOptions): string {
 
   if (topicKey) {
     params.set("topic", topicKey);
+  }
+
+  if (section) {
+    params.set("section", section);
   }
 
   if (access) {
@@ -203,14 +211,14 @@ export function buildCatalogHref(options?: CatalogHrefOptions): string {
 export function buildCatalogTopicHref(
   topicKey: string | null,
   q?: string | null,
-  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">,
+  listing?: Pick<CatalogHrefOptions, "section" | "access" | "class" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({ topic: topicKey, q, ...listing });
 }
 
 export function buildCatalogClearSearchHref(
   topicKey: string | null,
-  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">,
+  listing?: Pick<CatalogHrefOptions, "section" | "access" | "class" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({ topic: topicKey, ...listing });
 }
