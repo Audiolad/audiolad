@@ -33,13 +33,29 @@ assert.doesNotMatch(
 );
 assert.match(
   page,
-  /data-catalog-promo|CatalogPromoCarousel/,
-  "catalog page mounts promo with a data attribute hook",
+  /CatalogSectionCards/,
+  "catalog page mounts public section cards",
+);
+const sectionCards = read("src/components/catalog/CatalogSectionCards.tsx");
+assert.match(
+  sectionCards,
+  /grid-cols-4/,
+  "catalog section cards stay in one four-column row",
 );
 assert.match(
-  read("src/components/catalog/CatalogPromoCarousel.tsx"),
-  /data-catalog-promo-id/,
-  "promo data attribute is present",
+  sectionCards,
+  /aspect-square/,
+  "mobile catalog section cards are square",
+);
+assert.match(
+  sectionCards,
+  /aspect-\[43\/24\]/,
+  "desktop catalog section cards use the 1376x768 ratio",
+);
+assert.doesNotMatch(
+  page,
+  /CatalogPromoCarousel/,
+  "catalog promo carousel is replaced by catalog sections",
 );
 assert.doesNotMatch(
   page,

@@ -181,13 +181,25 @@ assert.doesNotMatch(
   /Опубликованные аудиопродукты авторов платформы/,
   "default catalog no longer shows the intro text",
 );
-assert.match(page, /showCatalogPromo/, "unfiltered catalog names the promo gate");
 assert.match(
   page,
-  /!isSearchActive && !isTopicFiltered/,
-  "promo is hidden during search and topic filters",
+  /CatalogSectionCards/,
+  "catalog mounts section cards below the search chrome",
 );
-assert.match(page, /CatalogPromoCarousel/, "unfiltered catalog mounts the promo carousel");
+const sectionCards = read("src/components/catalog/CatalogSectionCards.tsx");
+assert.match(sectionCards, /grid-cols-4/, "four catalog sections stay in one row");
+assert.match(sectionCards, /aspect-square/, "mobile catalog sections are square");
+assert.match(
+  sectionCards,
+  /aspect-\[43\/24\]/,
+  "desktop catalog sections use the wide artwork",
+);
+assert.doesNotMatch(
+  page,
+  /CatalogPromoCarousel/,
+  "catalog no longer mounts the promo carousel",
+);
+
 assert.doesNotMatch(
   page,
   /AuthorListCard|searchPublishedCatalogAuthors|catalog-search-authors-heading/,
@@ -209,26 +221,14 @@ const promoConfig = read("src/lib/catalog/catalog-promo.ts");
 assert.match(
   promoCarousel,
   /data-catalog-promo-id/,
-  "promo slides expose data-catalog-promo-id",
+  "retained promo component still exposes promo id",
 );
 assert.match(
   promoCarousel,
   /data-catalog-promo-position/,
-  "promo slides expose data-catalog-promo-position",
+  "retained promo component still exposes promo position",
 );
-assert.match(
-  promoCarousel,
-  /mt-0 xl:mt-1\.5/,
-  "promo has no mobile top slack above the 4.8:1 slide",
-);
-assert.doesNotMatch(
-  promoCarousel,
-  /mt-1 xl:mt-1\.5/,
-  "old mt-1 mobile promo slack is gone",
-);
-assert.match(promoCarousel, /aspect-\[4\.8\/1\]/, "promo slide ratio stays 4.8:1");
-assert.match(promoCarousel, /object-contain/, "promo images stay contain");
-assert.match(promoConfig, /export type CatalogPromo/, "CatalogPromo is a typed entity");
+assert.match(promoConfig, /export type CatalogPromo/, "CatalogPromo remains typed");
 assert.match(promoConfig, /startsAt\?/, "promo config reserves startsAt");
 assert.match(promoConfig, /endsAt\?/, "promo config reserves endsAt");
 assert.match(promoConfig, /audience\?/, "promo config reserves audience");
@@ -236,8 +236,9 @@ assert.match(promoConfig, /experimentKey\?/, "promo config reserves experimentKe
 assert.doesNotMatch(
   promoConfig,
   /createClient|from\(|supabase/i,
-  "promo MVP is typed config, not SQL or API",
+  "promo config remains config-only",
 );
+
 assert.doesNotMatch(
   page,
   /data-catalog-desktop-filters/,

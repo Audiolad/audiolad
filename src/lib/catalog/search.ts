@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { CatalogSection } from "@/lib/catalog/catalog-sections";
+
 import {
   isFixtureMarkedPractice,
   isPublicCatalogPracticeRow,
@@ -166,6 +168,7 @@ async function loadPracticesMatchingFields(
   supabase: SupabaseClient,
   pattern: string,
   practiceIdsForTopic: string[] | null,
+  catalogSection: CatalogSection | null,
   limit: number,
   viewer: OrdinaryCatalogViewer,
 ): Promise<CatalogPracticeSearchRow[]> {
@@ -176,6 +179,10 @@ async function loadPracticesMatchingFields(
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .or(buildPracticeFieldsOrIlikeFilter(pattern));
+
+  if (catalogSection) {
+    query = query.eq("catalog_section", catalogSection);
+  }
 
   if (practiceIdsForTopic) {
     query = query.in("id", practiceIdsForTopic);
@@ -194,6 +201,7 @@ async function loadPracticesMatchingAuthors(
   supabase: SupabaseClient,
   authorIds: string[],
   practiceIdsForTopic: string[] | null,
+  catalogSection: CatalogSection | null,
   limit: number,
   viewer: OrdinaryCatalogViewer,
 ): Promise<CatalogPracticeSearchRow[]> {
@@ -208,6 +216,10 @@ async function loadPracticesMatchingAuthors(
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .in("author_id", authorIds);
+
+  if (catalogSection) {
+    query = query.eq("catalog_section", catalogSection);
+  }
 
   if (practiceIdsForTopic) {
     query = query.in("id", practiceIdsForTopic);
@@ -225,6 +237,7 @@ async function loadPracticesMatchingAuthors(
 export type CatalogProductSearchOptions = {
   query: string;
   topicKey?: string | null;
+  catalogSection?: CatalogSection | null;
   limit?: number;
   viewer?: CatalogProductViewer;
 };
@@ -248,6 +261,7 @@ export async function searchPublishedCatalogProducts(
 
   const resultLimit = options.limit ?? CATALOG_SEARCH_RESULT_LIMIT;
   const topicKey = options.topicKey?.trim().toLowerCase() || null;
+  const catalogSection = options.catalogSection ?? null;
   const viewer = options.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
 
@@ -270,6 +284,7 @@ export async function searchPublishedCatalogProducts(
       supabase,
       normalizedQuery,
       practiceIdsForTopic,
+      catalogSection,
       resultLimit,
       viewer,
     ),
@@ -280,6 +295,7 @@ export async function searchPublishedCatalogProducts(
     supabase,
     matchingAuthorIds,
     practiceIdsForTopic,
+    catalogSection,
     resultLimit,
     viewer,
   );

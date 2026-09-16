@@ -1,4 +1,8 @@
 import {
+  parsePublicCatalogSection,
+  type PublicCatalogSection,
+} from "@/lib/catalog/catalog-sections";
+import {
   CATALOG_PUBLICATION_CLASSES,
   isPublicationClass,
   type CatalogCard,
@@ -56,6 +60,7 @@ export type CatalogListingItem = {
 export type CatalogListingQuery = {
   q: string;
   topic: string | null;
+  section: PublicCatalogSection | null;
   access: CatalogAccessFilter;
   class: CatalogClassFilter;
   sort: CatalogSort;
@@ -132,6 +137,7 @@ export function parseCatalogListingLimit(
 export function parseCatalogListingQuery(params: {
   q?: string | null;
   topic?: string | null;
+  section?: string | null;
   access?: string | null;
   class?: string | null;
   kind?: string | null;
@@ -144,6 +150,7 @@ export function parseCatalogListingQuery(params: {
   return {
     q: normalizeCatalogSearchQuery(params.q).slice(0, CATALOG_SEARCH_MAX_LENGTH),
     topic: normalizeCatalogTopicParam(params.topic),
+    section: parsePublicCatalogSection(params.section),
     access: parseCatalogAccessFilter(params.access),
     class: parseCatalogClassFilter(params.class ?? params.kind),
     sort: parseCatalogSort(params.sort),
@@ -195,6 +202,10 @@ export function buildCatalogListingApiUrl(
 
   if (query.topic) {
     params.set("topic", query.topic);
+  }
+
+  if (query.section) {
+    params.set("section", query.section);
   }
 
   if (query.access && query.access !== "all") {

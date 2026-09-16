@@ -47,3 +47,28 @@ export function resolveCatalogSectionFilter(
 
   return "all";
 }
+
+export const PUBLIC_CATALOG_SECTION_CARDS = [
+  { value: "music", label: "Музыка", asset: "music" },
+  { value: "meditations", label: "Практики", asset: "practices" },
+  { value: "education", label: "Обучение", asset: "education" },
+  { value: "stories", label: "Истории", asset: "stories" },
+] as const;
+
+export type PublicCatalogSection =
+  (typeof PUBLIC_CATALOG_SECTION_CARDS)[number]["value"];
+
+export function isPublicCatalogSection(
+  value: string | null | undefined,
+): value is PublicCatalogSection {
+  return PUBLIC_CATALOG_SECTION_CARDS.some(
+    (section) => section.value === value,
+  );
+}
+
+export function parsePublicCatalogSection(
+  value: string | null | undefined,
+): PublicCatalogSection | null {
+  const normalized = value?.trim().toLowerCase();
+  return isPublicCatalogSection(normalized) ? normalized : null;
+}

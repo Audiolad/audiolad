@@ -165,6 +165,7 @@ export default function CatalogMobileFilters({
       router,
       buildCatalogHref({
         q: searchQuery || null,
+        section: listingFromUrl.section,
         topic: serializeCatalogTopicParam(draftTopics),
         access: draftAccess,
         class: draftClass,
@@ -182,6 +183,7 @@ export default function CatalogMobileFilters({
       router,
       buildCatalogHref({
         q: searchQuery || null,
+        section: listingFromUrl.section,
         topic: null,
         access: "all",
         class: "all",
@@ -211,7 +213,7 @@ export default function CatalogMobileFilters({
         <div className="shrink-0 border-b border-[#f0e7fa] px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <h2 id={titleId} className="text-[22px] font-semibold">
-              Фильтры
+              Темы
             </h2>
             <div className="flex items-center gap-1">
               <button
@@ -235,8 +237,8 @@ export default function CatalogMobileFilters({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          <section aria-label="Тематика">
-            <h3 className="text-sm font-semibold text-[#25135c]">Тематика</h3>
+          <section aria-label="Темы">
+            <h3 className="text-sm font-semibold text-[#25135c]">Темы</h3>
             <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
               <FilterChip
                 label="Все"
@@ -311,7 +313,7 @@ export default function CatalogMobileFilters({
         onClick={openSheet}
         className="inline-flex h-[52px] shrink-0 items-center rounded-[18px] border border-[#ded1f1] bg-white px-3 text-sm font-medium text-[#7042c5] shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        Фильтры
+        Темы
         {activeFilterCount > 0 ? (
           <span
             data-catalog-mobile-filters-count

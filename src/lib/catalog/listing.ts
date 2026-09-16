@@ -340,11 +340,13 @@ export async function listPublishedCatalog(
     ? await searchPublishedCatalogProducts(supabase, {
         query: query.q,
         topicKey: query.topic,
+        catalogSection: query.section,
         limit: CATALOG_LISTING_SEARCH_LIMIT,
         viewer,
       })
     : await getPublishedCatalogProducts(supabase, {
         topicKey: query.topic,
+        catalogSection: query.section,
         productKind: productKindHint,
         viewer,
       });
