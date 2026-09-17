@@ -26,7 +26,7 @@
    * measured chrome px — never apply these to the measured chrome itself.
    */
   --mobile-top-chrome-fallback-catalog: calc(
-    max(0.75rem, env(safe-area-inset-top, 0px)) + 52px + 0.75rem
+    max(0.75rem, env(safe-area-inset-top, 0px)) + 52px
   );
   --mobile-top-chrome-fallback-playlists: calc(
     max(0.25rem, env(safe-area-inset-top, 0px)) + 52px

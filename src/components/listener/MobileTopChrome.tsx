@@ -9,7 +9,7 @@ import {
 } from "@/lib/listener/mobile-top-chrome";
 
 const VARIANT_CHROME_CLASS: Record<MobileTopChromeVariant, string> = {
-  catalog: "px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-3",
+  catalog: "px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-0",
   playlists: "px-5 pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0",
   library: "pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0",
 };
