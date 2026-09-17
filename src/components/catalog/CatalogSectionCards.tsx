@@ -26,7 +26,7 @@ export default function CatalogSectionCards({
     <nav
       aria-label="Разделы каталога"
       data-catalog-section-cards
-      className="mt-2.5 xl:mt-1.5"
+      className="mt-0 xl:mt-1.5"
     >
       <div className="grid grid-cols-4 gap-1 sm:gap-2 xl:gap-3">
         {PUBLIC_CATALOG_SECTION_CARDS.map((section) => {
