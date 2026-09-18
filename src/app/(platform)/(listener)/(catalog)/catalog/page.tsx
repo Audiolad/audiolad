@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
+import CatalogSectionCards from "@/components/catalog/CatalogSectionCards";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
-import { listCatalogPromos } from "@/lib/catalog/catalog-promo";
 import {
   CATALOG_LISTING_PAGE_SIZE,
   listPublishedCatalog,
@@ -30,6 +29,7 @@ type CatalogPageProps = {
     q?: string;
     topic?: string;
     need?: string;
+    section?: string;
     access?: string;
     class?: string;
     kind?: string;
@@ -59,12 +59,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const listingQuery = parseCatalogListingQuery({
     q: searchQuery,
     topic: topicSearchParam,
+    section: params.section,
     access: params.access,
     class: params.class,
     kind: params.kind,
     sort: params.sort,
     limit: CATALOG_LISTING_PAGE_SIZE,
   });
+  const activeSection = listingQuery.section;
   const canLoadDefaultListingInParallel = !isSearchActive && !topicSearchParam;
 
   const visitorId = await readPriceVisitorId();
@@ -94,6 +96,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     topic: activeTopicParam,
   };
   const listingState = {
+    section: activeSection,
     access: resolvedListingQuery.access,
     class: resolvedListingQuery.class,
     sort: resolvedListingQuery.sort,
@@ -105,10 +108,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;
-  const showCatalogPromo = !isSearchActive && !isTopicFiltered;
+  const isSectionFiltered = activeSection !== null;
   const isAccessFiltered = resolvedListingQuery.access !== "all";
   const isClassFiltered = resolvedListingQuery.class !== "all";
-  const isListingFiltered = isTopicFiltered || isAccessFiltered || isClassFiltered;
+  const isListingFiltered =
+    isTopicFiltered ||
+    isSectionFiltered ||
+    isAccessFiltered ||
+    isClassFiltered;
   const clearSearchHref = buildCatalogClearSearchHref(activeTopicParam, listingState);
   const catalogRootHref = buildCatalogHref({
     q: searchQuery || null,
@@ -116,6 +123,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const signInReturnPath = buildCatalogHref({
     q: searchQuery || null,
     topic: activeTopicParam,
+    section: activeSection,
     access: resolvedListingQuery.access,
     class: resolvedListingQuery.class,
     sort: resolvedListingQuery.sort,
@@ -124,6 +132,17 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   return (
     <>
       <h1 className="sr-only">Каталог</h1>
+
+      <CatalogSectionCards
+        activeSection={activeSection}
+        query={{
+          q: searchQuery || null,
+          topic: activeTopicParam,
+          access: resolvedListingQuery.access,
+          class: resolvedListingQuery.class,
+          sort: resolvedListingQuery.sort,
+        }}
+      />
 
       {isSearchActive ? (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">
@@ -147,8 +166,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             ? `Аудиопродукты на темы «${activeTopicTitle}».`
             : `Аудиопродукты на тему «${activeTopicTitle}».`}
         </p>
-      ) : showCatalogPromo ? (
-        <CatalogPromoCarousel promos={listCatalogPromos()} />
       ) : null}
 
       {hasAnyProducts ? (
@@ -156,6 +173,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           key={[
             resolvedListingQuery.q,
             resolvedListingQuery.topic,
+            resolvedListingQuery.section,
             resolvedListingQuery.access,
             resolvedListingQuery.class,
             resolvedListingQuery.sort,

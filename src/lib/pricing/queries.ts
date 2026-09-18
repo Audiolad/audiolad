@@ -14,6 +14,10 @@ import {
   type ResolvedPracticePrice,
 } from "@/lib/pricing/types";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
+import {
+  POSTGREST_IN_FILTER_CHUNK_SIZE,
+  chunkIds,
+} from "@/lib/supabase/chunk";
 
 export async function loadPricePromotionsForPractices(
   supabase: SupabaseClient,
@@ -25,27 +29,41 @@ export async function loadPricePromotionsForPractices(
     return result;
   }
 
-  const { data, error } = await supabase
-    .from("practice_price_promotions")
-    .select(PRICE_PROMOTION_SELECT)
-    .in("practice_id", practiceIds)
-    .eq("is_active", true);
+  const chunks = chunkIds(practiceIds, POSTGREST_IN_FILTER_CHUNK_SIZE);
 
-  if (error) {
-    console.error("price_promotions_load_error", error.message);
-    return result;
-  }
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    const { data, error } = await supabase
+      .from("practice_price_promotions")
+      .select(PRICE_PROMOTION_SELECT)
+      .in("practice_id", chunk)
+      .eq("is_active", true);
 
-  for (const row of data ?? []) {
-    const mapped = mapPricePromotionRow(row as Parameters<typeof mapPricePromotionRow>[0]);
-
-    if (!mapped) {
+    if (error) {
+      console.error("price_promotions_load_error", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: practiceIds.length,
+        code: typeof error.code === "string" ? error.code : null,
+        message: typeof error.message === "string" ? error.message : null,
+      });
+      // Fail-open: keep promotions collected from successful chunks.
       continue;
     }
 
-    const list = result.get(mapped.practiceId) ?? [];
-    list.push(mapped);
-    result.set(mapped.practiceId, list);
+    for (const row of data ?? []) {
+      const mapped = mapPricePromotionRow(
+        row as Parameters<typeof mapPricePromotionRow>[0],
+      );
+
+      if (!mapped) {
+        continue;
+      }
+
+      const list = result.get(mapped.practiceId) ?? [];
+      list.push(mapped);
+      result.set(mapped.practiceId, list);
+    }
   }
 
   return result;
@@ -109,70 +127,113 @@ export async function loadPersonalPromotionStartsForPractices(input: {
     return result;
   }
 
-  const { data: promotions, error: promotionsError } = await input.supabase
-    .from("practice_price_promotions")
-    .select("id, practice_id")
-    .in("practice_id", input.practiceIds)
-    .eq("promotion_type", "personal_countdown")
-    .eq("is_active", true);
-
-  if (promotionsError) {
-    console.error("price_promotion_ids_load_error", promotionsError.message);
-    return result;
-  }
-
+  const practiceChunks = chunkIds(
+    input.practiceIds,
+    POSTGREST_IN_FILTER_CHUNK_SIZE,
+  );
   const promotionIds: string[] = [];
   const practiceByPromotion = new Map<string, string>();
 
-  for (const row of promotions ?? []) {
-    const promotionId = row.id as string;
-    const practiceId = row.practice_id as string;
+  for (
+    let chunkIndex = 0;
+    chunkIndex < practiceChunks.length;
+    chunkIndex += 1
+  ) {
+    const chunk = practiceChunks[chunkIndex];
+    const { data: promotions, error: promotionsError } = await input.supabase
+      .from("practice_price_promotions")
+      .select("id, practice_id")
+      .in("practice_id", chunk)
+      .eq("promotion_type", "personal_countdown")
+      .eq("is_active", true);
 
-    if (!promotionId || !practiceId) {
+    if (promotionsError) {
+      console.error("price_promotion_ids_load_error", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: input.practiceIds.length,
+        code:
+          typeof promotionsError.code === "string"
+            ? promotionsError.code
+            : null,
+        message:
+          typeof promotionsError.message === "string"
+            ? promotionsError.message
+            : null,
+      });
       continue;
     }
 
-    promotionIds.push(promotionId);
-    practiceByPromotion.set(promotionId, practiceId);
+    for (const row of promotions ?? []) {
+      const promotionId = row.id as string;
+      const practiceId = row.practice_id as string;
+
+      if (!promotionId || !practiceId) {
+        continue;
+      }
+
+      promotionIds.push(promotionId);
+      practiceByPromotion.set(promotionId, practiceId);
+    }
   }
 
   if (promotionIds.length === 0) {
     return result;
   }
 
-  let query = input.supabase
-    .from("practice_price_promotion_starts")
-    .select(PRICE_PROMOTION_START_SELECT)
-    .in("promotion_id", promotionIds);
+  const promotionChunks = chunkIds(
+    promotionIds,
+    POSTGREST_IN_FILTER_CHUNK_SIZE,
+  );
 
-  if (input.visitorId && input.userId) {
-    query = query.or(`visitor_id.eq.${input.visitorId},user_id.eq.${input.userId}`);
-  } else if (input.visitorId) {
-    query = query.eq("visitor_id", input.visitorId);
-  } else if (input.userId) {
-    query = query.eq("user_id", input.userId);
-  }
+  for (
+    let chunkIndex = 0;
+    chunkIndex < promotionChunks.length;
+    chunkIndex += 1
+  ) {
+    const chunk = promotionChunks[chunkIndex];
+    let query = input.supabase
+      .from("practice_price_promotion_starts")
+      .select(PRICE_PROMOTION_START_SELECT)
+      .in("promotion_id", chunk);
 
-  const { data, error } = await query;
+    if (input.visitorId && input.userId) {
+      query = query.or(
+        `visitor_id.eq.${input.visitorId},user_id.eq.${input.userId}`,
+      );
+    } else if (input.visitorId) {
+      query = query.eq("visitor_id", input.visitorId);
+    } else if (input.userId) {
+      query = query.eq("user_id", input.userId);
+    }
 
-  if (error) {
-    console.error("price_promotion_starts_load_error", error.message);
-    return result;
-  }
+    const { data, error } = await query;
 
-  for (const row of data ?? []) {
-    const mapped = mapPersonalPromotionStart(
-      row as Parameters<typeof mapPersonalPromotionStart>[0],
-    );
-    const practiceId = practiceByPromotion.get(mapped.promotionId);
-
-    if (!practiceId) {
+    if (error) {
+      console.error("price_promotion_starts_load_error", {
+        chunkIndex,
+        chunkSize: chunk.length,
+        totalIds: promotionIds.length,
+        code: typeof error.code === "string" ? error.code : null,
+        message: typeof error.message === "string" ? error.message : null,
+      });
       continue;
     }
 
-    const list = result.get(practiceId) ?? [];
-    list.push(mapped);
-    result.set(practiceId, list);
+    for (const row of data ?? []) {
+      const mapped = mapPersonalPromotionStart(
+        row as Parameters<typeof mapPersonalPromotionStart>[0],
+      );
+      const practiceId = practiceByPromotion.get(mapped.promotionId);
+
+      if (!practiceId) {
+        continue;
+      }
+
+      const list = result.get(practiceId) ?? [];
+      list.push(mapped);
+      result.set(practiceId, list);
+    }
   }
 
   return result;

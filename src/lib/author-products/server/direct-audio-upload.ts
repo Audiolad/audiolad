@@ -12,11 +12,12 @@ import {
   buildVersionedProductAudioPath,
   canAbandonProductAudioUploadPath,
   isOwnedVersionedProductAudioPath,
+  isOwnedVersionedProductAudioSourcePath,
   shouldBlockMusicAudioReplacement,
   shouldBlockProductAudioReplacement,
   validateProductMp3Descriptor,
   type MusicCurrentAudioPointers,
-} from "@/lib/author-products/mp3-upload-contract";
+} from "@/lib/author-products/product-audio-upload-contract";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import {
@@ -118,7 +119,7 @@ async function assertSaleLockAllowsMutation(
   }
 }
 
-function requireOwnedVersionedPath(
+function requireOwnedDeliveryPath(
   uploadPath: string,
   practiceId: string,
   audioId: string,
@@ -128,6 +129,22 @@ function requireOwnedVersionedPath(
     throw new ProductAudioUploadError("invalid_request", 400);
   }
   return trimmed;
+}
+
+/** Allows abandoning delivery or leftover source objects from foundation tests. */
+function requireOwnedUploadPath(
+  uploadPath: string,
+  practiceId: string,
+  audioId: string,
+): string {
+  const trimmed = uploadPath.trim();
+  if (
+    isOwnedVersionedProductAudioPath(trimmed, practiceId, audioId) ||
+    isOwnedVersionedProductAudioSourcePath(trimmed, practiceId, audioId)
+  ) {
+    return trimmed;
+  }
+  throw new ProductAudioUploadError("invalid_request", 400);
 }
 
 async function createSignedUpload(storagePath: string): Promise<ProductSignedUpload> {
@@ -275,6 +292,7 @@ export async function startProductAudioDirectUpload(input: {
   );
   await assertSaleLockAllowsMutation(input.practiceId, audioItem, practice.product_kind);
 
+  // Slice 1 foundation: live author upload stays MP3-only until worker lifecycle + UI.
   const validation = validateProductMp3Descriptor({
     name: input.fileName,
     type: input.mimeType,
@@ -311,7 +329,7 @@ export async function finalizeProductAudioDirectUpload(input: {
     input.practiceId,
     input.audioId,
   );
-  const uploadPath = requireOwnedVersionedPath(
+  const uploadPath = requireOwnedDeliveryPath(
     input.uploadPath,
     input.practiceId,
     input.audioId,
@@ -454,7 +472,11 @@ export async function abandonProductAudioDirectUpload(input: {
     input.practiceId,
     input.audioId,
   );
-  const uploadPath = input.uploadPath.trim();
+  const uploadPath = requireOwnedUploadPath(
+    input.uploadPath,
+    input.practiceId,
+    input.audioId,
+  );
 
   if (
     !canAbandonProductAudioUploadPath({

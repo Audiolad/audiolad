@@ -54,6 +54,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     match: (path) => path.startsWith("/admin/product-moderation"),
   },
   {
+    href: "/admin/catalog-sections",
+    label: "Разделы каталога",
+    requiredPermission: "products.view",
+    match: (path) => path.startsWith("/admin/catalog-sections"),
+  },
+  {
     href: "/admin/seo-queries",
     label: "SEO-запросы",
     requiredPermission: "seo.manage",

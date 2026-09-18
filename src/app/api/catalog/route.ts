@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const query = parseCatalogListingQuery({
     q: searchParams.get("q"),
     topic: searchParams.get("topic"),
+    section: searchParams.get("section"),
     access: searchParams.get("access"),
     class: searchParams.get("class"),
     kind: searchParams.get("kind"),

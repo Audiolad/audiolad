@@ -21,6 +21,10 @@ import { formatRubles, getProductPriceLabel } from "@/lib/products/price-format"
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { isProgramFormat } from "@/lib/products/practice-access-ui";
 import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
+import {
+  POSTGREST_IN_FILTER_CHUNK_SIZE,
+  chunkIds,
+} from "@/lib/supabase/chunk";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
 import {
   PRICE_SURFACES,
@@ -175,15 +179,31 @@ export async function loadAuthorPublicPageData(
   const audioCountMap = new Map<string, number>();
 
   if (practiceIds.length > 0) {
-    const { data: audioRows } = await supabase
-      .from("audio_items")
-      .select("practice_id")
-      .in("practice_id", practiceIds)
-      .eq("status", "published");
+    const chunks = chunkIds(practiceIds, POSTGREST_IN_FILTER_CHUNK_SIZE);
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      const chunk = chunks[chunkIndex];
+      const { data: audioRows, error: audioError } = await supabase
+        .from("audio_items")
+        .select("practice_id")
+        .in("practice_id", chunk)
+        .eq("status", "published");
 
-    for (const row of audioRows ?? []) {
-      const practiceId = row.practice_id as string;
-      audioCountMap.set(practiceId, (audioCountMap.get(practiceId) ?? 0) + 1);
+      if (audioError) {
+        console.error("author_public_page_audio_counts_failed", {
+          chunkIndex,
+          chunkSize: chunk.length,
+          totalIds: practiceIds.length,
+          code: typeof audioError.code === "string" ? audioError.code : null,
+          message:
+            typeof audioError.message === "string" ? audioError.message : null,
+        });
+        continue;
+      }
+
+      for (const row of audioRows ?? []) {
+        const practiceId = row.practice_id as string;
+        audioCountMap.set(practiceId, (audioCountMap.get(practiceId) ?? 0) + 1);
+      }
     }
   }
 

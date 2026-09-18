@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { CatalogSection } from "@/lib/catalog/catalog-sections";
+
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
 import {
   getAudioPostDisplayLabel,
@@ -112,6 +114,7 @@ export type CatalogProductViewer = OrdinaryCatalogViewer & CatalogPriceViewer;
 
 export type CatalogQueryOptions = {
   topicKey?: string | null;
+  catalogSection?: CatalogSection | null;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
   productKind?: ProductKind | null;
   /**
@@ -351,6 +354,10 @@ export async function getPublishedCatalogProducts(
 
   if (options?.productKind) {
     query = query.eq("product_kind", options.productKind);
+  }
+
+  if (options?.catalogSection) {
+    query = query.eq("catalog_section", options.catalogSection);
   }
 
   if (practiceIdsForTopic) {
