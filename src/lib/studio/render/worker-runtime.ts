@@ -18,7 +18,10 @@ import {
   snapshotHasCatalogMusic,
   StudioCatalogMusicUnavailableError,
 } from "./catalog-source";
-import { buildStudioRenderTimeline } from "./timeline";
+import {
+  assertStudioRenderTimelineSafe,
+  StudioRenderTimelineGuardError,
+} from "./timeline-guard";
 import {
   assertStudioRenderDiskSpace,
   createStudioRenderTempWorkspace,
@@ -101,6 +104,7 @@ export function createStudioRenderWorkerPort(
 export type StudioRenderExecuteDeps = {
   renderToMp3?: typeof renderStudioProjectToMp3;
   assertDiskSpace?: typeof assertStudioRenderDiskSpace;
+  assertTimeline?: typeof assertStudioRenderTimelineSafe;
   sweepStale?: typeof sweepStaleStudioRenderTempDirs;
   createWorkspace?: typeof createStudioRenderTempWorkspace;
   removeWorkspace?: typeof removeStudioRenderTempWorkspace;
@@ -115,11 +119,12 @@ export async function executeClaimedStudioRenderJob(
 ): Promise<StudioRenderExecuteResult> {
   const sweepStale = deps.sweepStale ?? sweepStaleStudioRenderTempDirs;
   const assertDiskSpace = deps.assertDiskSpace ?? assertStudioRenderDiskSpace;
+  const assertTimeline = deps.assertTimeline ?? assertStudioRenderTimelineSafe;
   const createWorkspace = deps.createWorkspace ?? createStudioRenderTempWorkspace;
   const removeWorkspace = deps.removeWorkspace ?? removeStudioRenderTempWorkspace;
   await sweepStale();
   const snapshot = job.project_snapshot;
-  const timelineDurationSeconds = buildStudioRenderTimeline(snapshot).durationSeconds;
+  const timelineDurationSeconds = assertTimeline(snapshot);
   await assertDiskSpace({ durationSeconds: timelineDurationSeconds });
   const workspace = await createWorkspace({ jobId: job.id });
   try {
@@ -269,18 +274,23 @@ export async function failClaimedStudioRenderJob(
     (error instanceof StudioCatalogMusicUnavailableError)
     || (error instanceof Error && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE);
   const diskSpace = error instanceof StudioRenderDiskSpaceError;
+  const timelineGuard = error instanceof StudioRenderTimelineGuardError;
   const errorCode = catalogUnavailable
     ? CATALOG_MUSIC_UNAVAILABLE
     : diskSpace
       ? error.code
-      : error instanceof StudioRenderDurationError
+      : timelineGuard
         ? error.code
-        : "render_failed";
+        : error instanceof StudioRenderDurationError
+          ? error.code
+          : "render_failed";
   const errorMessageSafe = catalogUnavailable
     ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE
     : diskSpace
       ? "Недостаточно места на диске для экспорта. Попробуйте позже или сократите проект."
-      : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
+      : timelineGuard
+        ? "Некорректная длительность проекта для экспорта. Проверьте расположение клипов на таймлайне."
+        : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
   console.error(JSON.stringify({
     event: "studio_render_failed",
     jobId: job.id,

@@ -1,6 +1,7 @@
 import { getStudioRenderClipSourceDuration, sortStudioClipsByStart } from "../clip-math";
 import { resolveStudioPlaybackClipFades } from "../fade-math";
 import { STUDIO_VOICE_PRESET_CONFIG, type StudioVoicePreset } from "../voice-preset-dsp";
+import { assertStudioRenderTimelineSafe } from "./timeline-guard";
 import { buildStudioRenderTimeline } from "./timeline";
 import type { StudioRenderInput } from "./types";
 
@@ -48,6 +49,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   if (timeline.tracks.length === 0 || timeline.durationSeconds <= 0) {
     throw new Error("Studio project has no audible clips to render.");
   }
+  assertStudioRenderTimelineSafe(input.snapshot);
 
   const assetsById = new Map(input.snapshot.assets.map((asset) => [asset.id, asset]));
   const assetInputPaths: string[] = [];
@@ -85,7 +87,10 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
     const orderIndexById = new Map(
       orderedClips.map((orderedClip, orderIndex) => [orderedClip.id, orderIndex]),
     );
-    track.clips.forEach((clip, clipIndex) => {
+    const originalIndexById = new Map(
+      track.clips.map((clip, clipIndex) => [clip.id, clipIndex]),
+    );
+    orderedClips.forEach((clip, clipIndex) => {
       const gap = clip.startTime - cursor;
       if (gap > 0) {
         const gapLabel = `gap_${trackIndex}_${clipIndex}`;
@@ -96,7 +101,7 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
       }
       const asset = assetsById.get(clip.assetId);
       if (!asset) throw new Error(`Unknown asset ${clip.assetId}.`);
-      const inputIndex = clipInputIndexes[trackIndex][clipIndex];
+      const inputIndex = clipInputIndexes[trackIndex][originalIndexById.get(clip.id) ?? clipIndex];
       const label = `clip_${trackIndex}_${clipIndex}`;
       const sourceTrim = getStudioRenderClipSourceDuration(clip, asset.durationSeconds);
       const filterParts: string[] = [];
@@ -186,7 +191,16 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   return { filterComplex: filters.join(";"), assetInputPaths, irPresets, durationSeconds: timeline.durationSeconds };
 }
 
-export function studioRenderFfmpegOutputArgs(outputPath: string): string[] {
+export function studioRenderFfmpegOutputArgs(
+  outputPath: string,
+  durationSeconds?: number,
+): string[] {
+  const boundedDuration =
+    typeof durationSeconds === "number"
+    && Number.isFinite(durationSeconds)
+    && durationSeconds > 0
+      ? ["-t", durationSeconds.toFixed(6)]
+      : [];
   return [
     "-map", "[out]",
     "-c:a", "libmp3lame",
@@ -194,6 +208,7 @@ export function studioRenderFfmpegOutputArgs(outputPath: string): string[] {
     "-ar", "44100",
     "-ac", "2",
     "-write_xing", "0",
+    ...boundedDuration,
     "-y",
     outputPath,
   ];

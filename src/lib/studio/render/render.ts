@@ -197,7 +197,7 @@ async function renderStudioProject(
       ...irPaths.flatMap((path) => ["-i", path]),
       "-filter_complex", graph.filterComplex,
       ...(options.format === "mp3"
-        ? studioRenderFfmpegOutputArgs(outputPath)
+        ? studioRenderFfmpegOutputArgs(outputPath, graph.durationSeconds)
         : ["-map", "[out]", "-c:a", "pcm_f32le", "-ar", "44100", "-ac", "2", "-y", outputPath]),
     ];
     const stderr = await runStudioRenderChild(ffmpegPath, args, { signal: options.signal });
