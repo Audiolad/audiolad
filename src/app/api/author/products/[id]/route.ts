@@ -79,12 +79,10 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { normalizeStudioMusicPricingForSave } from "@/lib/studio-music/pricing";
 import {
-  findConflictingStudioFreeSlotProduct,
-  isStudioFreeSlotUniqueViolation,
-  practiceOccupiesStudioFreeSlot,
-  studioFreeSlotTakenResponseBody,
-  wouldOccupyStudioFreeSlotAfterNormalizedSave,
-} from "@/lib/studio-music/free-slot";
+  isStudioNewFreeDisabledViolation,
+  studioNewFreeDisabledResponseBody,
+  wouldCreateNewStudioFreeState,
+} from "@/lib/studio-music/new-free-policy";
 import { slugifyTitle } from "@/lib/author-products/utils";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
@@ -683,69 +681,50 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     {
-      const nextAuthorIdForSlot =
+      const nextAuthorIdForPolicy =
         typeof updates.author_id === "string" && updates.author_id
           ? updates.author_id
           : practice.author_id;
-      const nextPermissionForSlot =
+      const nextPermissionForPolicy =
         "music_usage_permission" in updates
           ? (updates.music_usage_permission as string | null)
           : practice.music_usage_permission;
-      const nextModeForSlot =
+      const nextModeForPolicy =
         "studio_music_pricing_mode" in updates
           ? (updates.studio_music_pricing_mode as string | null)
           : practice.studio_music_pricing_mode;
-      const nextIsFreeForSlot =
+      const nextIsFreeForPolicy =
         typeof updates.is_free === "boolean"
           ? updates.is_free
           : practice.is_free;
-      const nextPriceForSlot =
+      const nextPriceForPolicy =
         "price" in updates
           ? (updates.price as number | null)
           : practice.price;
 
-      const occupies =
-        wouldOccupyStudioFreeSlotAfterNormalizedSave({
-          musicUsagePermission: nextPermissionForSlot,
-          studioMusicPricingMode: nextModeForSlot,
-        }) ||
-        practiceOccupiesStudioFreeSlot({
-          deleted_at: practice.deleted_at,
-          music_usage_permission: nextPermissionForSlot,
-          studio_music_pricing_mode: nextModeForSlot,
-          is_free: nextIsFreeForSlot,
-          price: nextPriceForSlot,
+      if (
+        wouldCreateNewStudioFreeState({
+          oldRow: {
+            deleted_at: practice.deleted_at,
+            author_id: practice.author_id,
+            music_usage_permission: practice.music_usage_permission,
+            studio_music_pricing_mode: practice.studio_music_pricing_mode,
+            is_free: practice.is_free,
+            price: practice.price,
+          },
+          newRow: {
+            deleted_at: practice.deleted_at,
+            author_id: nextAuthorIdForPolicy,
+            music_usage_permission: nextPermissionForPolicy,
+            studio_music_pricing_mode: nextModeForPolicy,
+            is_free: nextIsFreeForPolicy,
+            price: nextPriceForPolicy,
+          },
+        })
+      ) {
+        return NextResponse.json(studioNewFreeDisabledResponseBody(), {
+          status: 409,
         });
-
-      const currentlyOccupies = practiceOccupiesStudioFreeSlot({
-        deleted_at: practice.deleted_at,
-        music_usage_permission: practice.music_usage_permission,
-        studio_music_pricing_mode: practice.studio_music_pricing_mode,
-        is_free: practice.is_free,
-        price: practice.price,
-      });
-      const authorIdChanging = nextAuthorIdForSlot !== practice.author_id;
-      // Re-save of an existing FREE product on the same author must stay allowed.
-      const mustCheckSlot =
-        occupies && (!currentlyOccupies || authorIdChanging);
-
-      if (mustCheckSlot) {
-        let conflict;
-        try {
-          conflict = await findConflictingStudioFreeSlotProduct(supabase, {
-            authorId: nextAuthorIdForSlot,
-            excludePracticeId: id,
-          });
-        } catch {
-          console.error("studio_free_slot_lookup_failed", id);
-          return NextResponse.json({ error: "internal_error" }, { status: 500 });
-        }
-
-        if (conflict) {
-          return NextResponse.json(studioFreeSlotTakenResponseBody(conflict), {
-            status: 409,
-          });
-        }
       }
     }
 
@@ -995,8 +974,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (updateError) {
-      if (isStudioFreeSlotUniqueViolation(updateError)) {
-        return NextResponse.json(studioFreeSlotTakenResponseBody(), {
+      if (isStudioNewFreeDisabledViolation(updateError)) {
+        return NextResponse.json(studioNewFreeDisabledResponseBody(), {
           status: 409,
         });
       }

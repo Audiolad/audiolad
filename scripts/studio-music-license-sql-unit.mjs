@@ -163,7 +163,7 @@ assert(!/UPDATE public\.practices[\s\S]*studio_music_price_minor\s*=/.test(minLi
 
 const licenseV11 = readFileSync(join(migrationsDir, "20261008120200_studio_license_terms_v1_1.sql"), "utf8");
 assert(existsSync(join(migrationsDir, "20261008120200_studio_license_terms_v1_1.sql")), "Studio license v1.1 migration exists");
-assert(existsSync(join(migrationsDir, "20261008120300_studio_one_free_music_per_author.sql")), "one free per author migration exists");
+assert(existsSync(join(migrationsDir, "20261009120300_studio_disable_new_free_music.sql")), "disable new free studio migration exists");
 assert(/studio-license-v1\.1/.test(licenseV11));
 assert(/036269bf83b4ba8b453604f7a2aeb9de6c0dc9528beb60e4ce76e16fb335846c/.test(licenseV11));
 assert(/freeze_studio_entitlement_terms/.test(licenseV11));

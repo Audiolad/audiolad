@@ -179,13 +179,13 @@ assert.equal(
   "support_blocked",
 );
 assert.equal(classifyProductSaveError({ error: "slug_taken", status: 409 }), "conflict");
-assert.equal(classifyProductSaveError({ error: "studio_free_slot_taken", status: 409 }), "conflict");
+assert.equal(classifyProductSaveError({ error: "studio_new_free_disabled", status: 409 }), "conflict");
 assert.match(
-  getProductSaveErrorMessage({ error: "studio_free_slot_taken", status: 409 }),
-  /один продукт/,
+  getProductSaveErrorMessage({ error: "studio_new_free_disabled", status: 409 }),
+  /платн/,
 );
 assert.doesNotMatch(
-  getProductSaveErrorMessage({ error: "studio_free_slot_taken", status: 409 }),
+  getProductSaveErrorMessage({ error: "studio_new_free_disabled", status: 409 }),
   /бесплатный трек/,
 );
 
