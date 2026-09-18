@@ -20,7 +20,10 @@ import {
   compareStudioRenderRelease,
   formatStudioRenderWorkerBootLog,
 } from "../src/lib/studio/render/worker-release";
-import { createStudioRenderWorkerPort } from "../src/lib/studio/render/worker-runtime";
+import {
+  createStudioRenderWorkerPort,
+  sweepStaleStudioRenderTempDirs,
+} from "../src/lib/studio/render/worker-runtime";
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -43,6 +46,14 @@ async function main() {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
   const port = createStudioRenderWorkerPort(service);
+  const sweep = await sweepStaleStudioRenderTempDirs();
+  console.log(JSON.stringify({
+    event: "studio_render_temp_sweep",
+    scanned: sweep.scanned,
+    removed: sweep.removed.length,
+    skippedActive: sweep.skippedActive.length,
+    skippedFresh: sweep.skippedFresh.length,
+  }));
   const boot = await captureStudioRenderBootRelease();
   const bootComparison = await compareStudioRenderRelease({ boot });
   console.log(formatStudioRenderWorkerBootLog(bootComparison));

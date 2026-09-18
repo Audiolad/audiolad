@@ -1,8 +1,6 @@
 import { createReadStream } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -20,6 +18,14 @@ import {
   snapshotHasCatalogMusic,
   StudioCatalogMusicUnavailableError,
 } from "./catalog-source";
+import { buildStudioRenderTimeline } from "./timeline";
+import {
+  assertStudioRenderDiskSpace,
+  createStudioRenderTempWorkspace,
+  removeStudioRenderTempWorkspace,
+  StudioRenderDiskSpaceError,
+  sweepStaleStudioRenderTempDirs,
+} from "./temp-workspace";
 import { renderOutputPath } from "./storage";
 import type { StudioRenderSnapshot } from "./types";
 import { isStudioRenderCatalogAsset, isStudioRenderFileAsset } from "./types";
@@ -94,6 +100,10 @@ export function createStudioRenderWorkerPort(
 
 export type StudioRenderExecuteDeps = {
   renderToMp3?: typeof renderStudioProjectToMp3;
+  assertDiskSpace?: typeof assertStudioRenderDiskSpace;
+  sweepStale?: typeof sweepStaleStudioRenderTempDirs;
+  createWorkspace?: typeof createStudioRenderTempWorkspace;
+  removeWorkspace?: typeof removeStudioRenderTempWorkspace;
 };
 
 export async function executeClaimedStudioRenderJob(
@@ -103,10 +113,16 @@ export async function executeClaimedStudioRenderJob(
   leaseSeconds = STUDIO_RENDER_LEASE_SECONDS,
   deps: StudioRenderExecuteDeps = {},
 ): Promise<StudioRenderExecuteResult> {
-  const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
+  const sweepStale = deps.sweepStale ?? sweepStaleStudioRenderTempDirs;
+  const assertDiskSpace = deps.assertDiskSpace ?? assertStudioRenderDiskSpace;
+  const createWorkspace = deps.createWorkspace ?? createStudioRenderTempWorkspace;
+  const removeWorkspace = deps.removeWorkspace ?? removeStudioRenderTempWorkspace;
+  await sweepStale();
+  const snapshot = job.project_snapshot;
+  const timelineDurationSeconds = buildStudioRenderTimeline(snapshot).durationSeconds;
+  await assertDiskSpace({ durationSeconds: timelineDurationSeconds });
+  const workspace = await createWorkspace({ jobId: job.id });
   try {
-    await mkdir(workspace, { recursive: true });
-    const snapshot = job.project_snapshot;
     const paths = new Map<string, string>();
     for (const asset of snapshot.assets) {
       if (isStudioRenderCatalogAsset(asset)) {
@@ -194,7 +210,7 @@ export async function executeClaimedStudioRenderJob(
     }
     return { sizeBytes: result.sizeBytes };
   } finally {
-    await rm(workspace, { recursive: true, force: true });
+    await removeWorkspace(workspace);
   }
 }
 
@@ -252,14 +268,19 @@ export async function failClaimedStudioRenderJob(
   const catalogUnavailable =
     (error instanceof StudioCatalogMusicUnavailableError)
     || (error instanceof Error && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE);
+  const diskSpace = error instanceof StudioRenderDiskSpaceError;
   const errorCode = catalogUnavailable
     ? CATALOG_MUSIC_UNAVAILABLE
-    : error instanceof StudioRenderDurationError
+    : diskSpace
       ? error.code
-      : "render_failed";
+      : error instanceof StudioRenderDurationError
+        ? error.code
+        : "render_failed";
   const errorMessageSafe = catalogUnavailable
     ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE
-    : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
+    : diskSpace
+      ? "Недостаточно места на диске для экспорта. Попробуйте позже или сократите проект."
+      : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
   console.error(JSON.stringify({
     event: "studio_render_failed",
     jobId: job.id,
@@ -289,3 +310,5 @@ export async function failClaimedStudioRenderJob(
   }
   return true;
 }
+
+export { sweepStaleStudioRenderTempDirs, StudioRenderDiskSpaceError } from "./temp-workspace";

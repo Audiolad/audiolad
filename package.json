@@ -28,7 +28,7 @@
     "test:studio-render-jobs-schema": "npx tsx scripts/studio-render-jobs-schema-unit.mts",
     "test:studio-render-export": "node scripts/studio-render-export-unit.mjs",
     "test:studio-render-worker-env": "npx tsx scripts/studio-render-worker-env-unit.mts",
-    "test:studio-render-worker": "npx tsx scripts/studio-render-worker-env-unit.mts && npx tsx scripts/studio-render-worker-release-unit.mts && npx tsx scripts/studio-render-worker-unit.mts && npx tsx scripts/studio-catalog-music-render-unit.mts",
+    "test:studio-render-worker": "npx tsx scripts/studio-render-worker-env-unit.mts && npx tsx scripts/studio-render-worker-release-unit.mts && npx tsx scripts/studio-render-worker-unit.mts && npx tsx scripts/studio-catalog-music-render-unit.mts && npx tsx scripts/studio-render-temp-workspace-unit.mts",
     "test:audiobook-fragment-storage": "node scripts/audiobook-fragment-storage-unit.mjs",
     "test:audiobook-storage-key": "npx tsx scripts/audiobook-storage-key-unit.mts",
     "test:audiobook-recorder": "node scripts/audiobook-recorder-unit.mjs",
@@ -288,7 +288,8 @@
     "test:product-audio-normalize": "node scripts/product-audio-normalize-sql-unit.mjs && npx tsx scripts/product-audio-normalize-contract-unit.mts && npx tsx scripts/product-audio-normalize-worker-unit.mts && npx tsx scripts/product-audio-normalize-retry-race-unit.mts && npx tsx scripts/product-audio-normalize-ffmpeg-unit.mts",
     "worker:product-audio-normalize": "npx tsx scripts/run-product-audio-normalize-worker.mts",
     "test:studio-music-new-free-policy": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-music-new-free-policy-unit.mts",
-    "test:studio-music-new-free-policy-sql": "node scripts/studio-music-new-free-policy-sql-unit.mjs"
+    "test:studio-music-new-free-policy-sql": "node scripts/studio-music-new-free-policy-sql-unit.mjs",
+    "test:studio-render-temp-workspace": "npx tsx scripts/studio-render-temp-workspace-unit.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
