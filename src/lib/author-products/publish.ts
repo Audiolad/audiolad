@@ -19,6 +19,11 @@ import {
   isMusicProductKind,
   MUSIC_KIND_LABEL,
 } from "./product-kind";
+import {
+  AUDIO_PREPARE_PUBLISH_FAILED,
+  AUDIO_PREPARE_PUBLISH_PROCESSING,
+  isAudioPrepareInFlight,
+} from "@/lib/author-products/audio-prepare-status";
 import { minutesFromSeconds } from "./utils";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -151,6 +156,13 @@ export function validateAudioItemsStructure(
 
     const audioNumber = index + 1;
     const isMusic = isMusicProductKind(practice.product_kind);
+    if (!isMusic && isAudioPrepareInFlight(item.audio_prepare_status)) {
+      return {
+        ok: false,
+        code: "audio_preparing",
+        message: AUDIO_PREPARE_PUBLISH_PROCESSING,
+      };
+    }
     const playable = isMusic
       ? hasValidatedMusicPublishSource({
           audioPath: item.audio_path,
@@ -159,12 +171,19 @@ export function validateAudioItemsStructure(
       : Boolean(item.audio_path?.trim());
 
     if (!playable) {
+      if (!isMusic && item.audio_prepare_status === "failed") {
+        return {
+          ok: false,
+          code: "audio_prepare_failed",
+          message: AUDIO_PREPARE_PUBLISH_FAILED,
+        };
+      }
       return {
         ok: false,
         code: "missing_audio_file",
         message: isMusic
           ? `Загрузите аудио для трека ${audioNumber}.`
-          : `Загрузите MP3-файл для аудио ${audioNumber}.`,
+          : `Загрузите аудиофайл для аудио ${audioNumber}.`,
       };
     }
 

@@ -10,11 +10,15 @@ import {
   MAX_PRODUCT_AUDIO_BYTES,
   PRACTICE_AUDIO_BUCKET,
   buildVersionedProductAudioPath,
+  buildVersionedProductAudioSourcePath,
   canAbandonProductAudioUploadPath,
+  detectProductAudioSourceFormat,
   isOwnedVersionedProductAudioPath,
   isOwnedVersionedProductAudioSourcePath,
+  parseProductAudioSourcePath,
   shouldBlockMusicAudioReplacement,
   shouldBlockProductAudioReplacement,
+  validateProductAudioSourceDescriptor,
   validateProductMp3Descriptor,
   type MusicCurrentAudioPointers,
 } from "@/lib/author-products/product-audio-upload-contract";
@@ -277,6 +281,62 @@ export async function deletePracticeAudioPaths(paths: readonly string[]) {
   }
 }
 
+
+export const AUDIO_PREPARING_CODE = "audio_preparing" as const;
+export const AUDIO_PREPARING_MESSAGE =
+  "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.";
+
+/** True when desired normalize job is still queued|processing. */
+export async function isProductAudioNormalizeInFlight(
+  practiceId: string,
+  audioId: string,
+): Promise<boolean> {
+  const service = createServiceRoleClient();
+  const { data: item, error: itemError } = await service
+    .from("audio_items")
+    .select("desired_product_audio_normalize_job_id")
+    .eq("id", audioId)
+    .eq("practice_id", practiceId)
+    .maybeSingle();
+  if (itemError) {
+    console.error("author_audio_prepare_inflight_lookup_error", itemError.message);
+    throw new ProductAudioUploadError("internal_error", 500);
+  }
+  const jobId = item?.desired_product_audio_normalize_job_id;
+  if (!jobId || typeof jobId !== "string") {
+    return false;
+  }
+  const { data: job, error: jobError } = await service
+    .from("product_audio_normalize_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .eq("practice_id", practiceId)
+    .eq("audio_item_id", audioId)
+    .maybeSingle();
+  if (jobError) {
+    console.error("author_audio_prepare_job_lookup_error", jobError.message);
+    throw new ProductAudioUploadError("internal_error", 500);
+  }
+  return job?.status === "queued" || job?.status === "processing";
+}
+
+function collectNormalizeCleanupPaths(payload: unknown, neverDelete: readonly string[]): string[] {
+  if (!payload || typeof payload !== "object") return [];
+  const rec = payload as Record<string, unknown>;
+  const out: string[] = [];
+  for (const key of ["cleanup_source_paths", "cleanup_target_paths"] as const) {
+    const arr = rec[key];
+    if (!Array.isArray(arr)) continue;
+    for (const path of arr) {
+      if (typeof path !== "string" || !path.trim()) continue;
+      if (neverDelete.some((blocked) => blocked === path)) continue;
+      out.push(path);
+    }
+  }
+  return out;
+}
+
+
 export async function startProductAudioDirectUpload(input: {
   practiceId: string;
   audioId: string;
@@ -292,12 +352,15 @@ export async function startProductAudioDirectUpload(input: {
   );
   await assertSaleLockAllowsMutation(input.practiceId, audioItem, practice.product_kind);
 
-  // Slice 1 foundation: live author upload stays MP3-only until worker lifecycle + UI.
-  const validation = validateProductMp3Descriptor({
+  const isMusic = practice.product_kind === "music";
+  const descriptor = {
     name: input.fileName,
     type: input.mimeType,
     size: input.fileSize,
-  });
+  };
+  const validation = isMusic
+    ? validateProductMp3Descriptor(descriptor)
+    : validateProductAudioSourceDescriptor(descriptor);
   if (validation === "invalid_file_type") {
     throw new ProductAudioUploadError("invalid_file_type", 400);
   }
@@ -305,11 +368,21 @@ export async function startProductAudioDirectUpload(input: {
     throw new ProductAudioUploadError("invalid_file_size", 400);
   }
 
-  const uploadPath = buildVersionedProductAudioPath(
-    input.practiceId,
-    input.audioId,
-    randomUUID(),
-  );
+  const format = detectProductAudioSourceFormat(input.fileName);
+  if (!format || (isMusic && format !== "mp3")) {
+    throw new ProductAudioUploadError("invalid_file_type", 400);
+  }
+
+  const versionId = randomUUID();
+  const uploadPath =
+    format === "mp3"
+      ? buildVersionedProductAudioPath(input.practiceId, input.audioId, versionId)
+      : buildVersionedProductAudioSourcePath(
+          input.practiceId,
+          input.audioId,
+          versionId,
+          format,
+        );
   const signedUpload = await createSignedUpload(uploadPath);
   return { upload_path: signedUpload.path, signedUpload };
 }
@@ -329,6 +402,29 @@ export async function finalizeProductAudioDirectUpload(input: {
     input.practiceId,
     input.audioId,
   );
+
+  const sourceParsed = parseProductAudioSourcePath(input.uploadPath);
+  if (
+    sourceParsed &&
+    isOwnedVersionedProductAudioSourcePath(
+      input.uploadPath.trim(),
+      input.practiceId,
+      input.audioId,
+    )
+  ) {
+    return finalizeOrdinarySourceNormalize({
+      practiceId: input.practiceId,
+      audioId: input.audioId,
+      uploadPath: input.uploadPath.trim(),
+      fileName: input.fileName,
+      fileSize: input.fileSize,
+      sourceFormat: sourceParsed.format,
+      productKind: practice.product_kind,
+      audioItem,
+      supabase,
+    });
+  }
+
   const uploadPath = requireOwnedDeliveryPath(
     input.uploadPath,
     input.practiceId,
@@ -405,38 +501,48 @@ export async function finalizeProductAudioDirectUpload(input: {
       throw new ProductAudioUploadError("update_failed", 500);
     }
   } else {
-    const now = new Date().toISOString();
-    const { data: updatedAudioItem, error: updateError } = await supabase
-      .from("audio_items")
-      .update({
-        audio_path: uploadPath,
-        duration_seconds: inspected.durationSeconds,
-        original_file_name: input.fileName,
-        file_size_bytes: inspected.sizeBytes,
-        status: nextStatus,
-        updated_at: now,
-      })
-      .eq("id", input.audioId)
-      .eq("practice_id", input.practiceId)
-      .select("id")
-      .maybeSingle();
-
-    if (updateError) {
+    const service = createServiceRoleClient();
+    const { data: activatedPayload, error: activateError } = await service.rpc(
+      "activate_product_direct_mp3_delivery",
+      {
+        p_audio_item_id: input.audioId,
+        p_practice_id: input.practiceId,
+        p_audio_path: uploadPath,
+        p_duration_seconds: inspected.durationSeconds,
+        p_original_file_name: input.fileName,
+        p_file_size_bytes: inspected.sizeBytes,
+        p_status: nextStatus,
+      },
+    );
+    if (activateError) {
       await deletePracticeAudioPaths([uploadPath]);
-      if (isProductContentLockedDbError(updateError)) {
+      if (isProductContentLockedDbError(activateError)) {
         throw new ProductAudioUploadError(
           PRODUCT_CONTENT_LOCKED_AFTER_SALE,
           409,
           PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
         );
       }
-      console.error("author_audio_direct_path_update_error", updateError.message);
+      console.error(
+        "author_product_direct_mp3_activate_error",
+        activateError.message,
+      );
       throw new ProductAudioUploadError("internal_error", 500);
     }
-
-    if (!updatedAudioItem?.id) {
+    const activated =
+      activatedPayload &&
+      typeof activatedPayload === "object" &&
+      (activatedPayload as { activated?: unknown }).activated === true;
+    if (!activated) {
       await deletePracticeAudioPaths([uploadPath]);
       throw new ProductAudioUploadError("update_failed", 500);
+    }
+    const normalizeCleanup = collectNormalizeCleanupPaths(activatedPayload, [
+      uploadPath,
+      previousPath ?? "",
+    ].filter(Boolean));
+    if (normalizeCleanup.length > 0) {
+      await deletePracticeAudioPaths(normalizeCleanup);
     }
   }
 
@@ -458,6 +564,138 @@ export async function finalizeProductAudioDirectUpload(input: {
   return {
     product: await getAuthorProductDetail(supabase, input.practiceId),
     duration_seconds: inspected.durationSeconds,
+  };
+}
+
+async function finalizeOrdinarySourceNormalize(input: {
+  practiceId: string;
+  audioId: string;
+  uploadPath: string;
+  fileName: string;
+  fileSize: number;
+  sourceFormat: "m4a" | "aac" | "wav";
+  productKind: string | null | undefined;
+  audioItem: OwnedAudioItem;
+  supabase: SupabaseClient;
+}) {
+  if (input.productKind === "music") {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("invalid_file_type", 400);
+  }
+
+  const detected = detectProductAudioSourceFormat(input.fileName);
+  if (detected !== input.sourceFormat) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("invalid_file_type", 400);
+  }
+
+  const validation = validateProductAudioSourceDescriptor({
+    name: input.fileName,
+    type: input.sourceFormat === "wav"
+      ? "audio/wav"
+      : input.sourceFormat === "m4a"
+        ? "audio/mp4"
+        : "audio/aac",
+    size: input.fileSize,
+  });
+  if (validation === "invalid_file_type") {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("invalid_file_type", 400);
+  }
+  if (validation === "invalid_file_size") {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("invalid_file_size", 400);
+  }
+
+  try {
+    await assertSaleLockAllowsMutation(
+      input.practiceId,
+      input.audioItem,
+      input.productKind,
+    );
+  } catch (error) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw error;
+  }
+
+  const object = await readPracticeAudioObjectInfo(input.uploadPath);
+  if (!object) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("upload_not_complete", 409);
+  }
+  if (object.size > MAX_PRODUCT_AUDIO_BYTES) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("invalid_file_size", 413);
+  }
+  if (object.size !== input.fileSize) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    throw new ProductAudioUploadError("upload_not_complete", 409);
+  }
+
+  const targetPath = buildVersionedProductAudioPath(
+    input.practiceId,
+    input.audioId,
+    randomUUID(),
+  );
+  const service = createServiceRoleClient();
+  const { data: enqueuePayload, error: enqueueError } = await service.rpc(
+    "enqueue_product_audio_normalize_job",
+    {
+      p_practice_id: input.practiceId,
+      p_audio_item_id: input.audioId,
+      p_source_storage_path: input.uploadPath,
+      p_source_format: input.sourceFormat,
+      p_source_original_filename: input.fileName,
+      p_source_file_size_bytes: object.size,
+      p_target_storage_path: targetPath,
+      p_previous_audio_path: input.audioItem.audio_path,
+    },
+  );
+  const enqueueJob =
+    enqueuePayload &&
+    typeof enqueuePayload === "object" &&
+    (enqueuePayload as { job?: unknown }).job &&
+    typeof (enqueuePayload as { job: unknown }).job === "object"
+      ? (enqueuePayload as { job: Record<string, unknown> }).job
+      : null;
+  if (enqueueError || !enqueueJob) {
+    await deletePracticeAudioPaths([input.uploadPath]);
+    if (enqueueError && isProductContentLockedDbError(enqueueError)) {
+      throw new ProductAudioUploadError(
+        PRODUCT_CONTENT_LOCKED_AFTER_SALE,
+        409,
+        PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
+      );
+    }
+    console.error(
+      "author_product_normalize_enqueue_error",
+      enqueueError?.message,
+    );
+    throw new ProductAudioUploadError("internal_error", 500);
+  }
+
+  const supersededCleanup = collectNormalizeCleanupPaths(enqueuePayload, [
+    input.uploadPath,
+    targetPath,
+    input.audioItem.audio_path ?? "",
+  ].filter(Boolean));
+  if (supersededCleanup.length > 0) {
+    await deletePracticeAudioPaths(supersededCleanup);
+  }
+
+  await recordAuthorSupportAudit({
+    action: "product_track_updated",
+    resourceType: "audio_item",
+    resourceId: input.audioId,
+    metadata: {
+      practice_id: input.practiceId,
+      changed_fields: ["desired_product_audio_normalize_job_id"],
+    },
+  });
+
+  return {
+    product: await getAuthorProductDetail(input.supabase, input.practiceId),
+    duration_seconds: null,
   };
 }
 
@@ -487,6 +725,30 @@ export async function abandonProductAudioDirectUpload(input: {
     })
   ) {
     throw new ProductAudioUploadError("invalid_request", 400);
+  }
+
+  // After enqueue, audio-sources belong to the normalize job lifecycle.
+  // Client abandon (including lost finalize response) must not delete them.
+  if (parseProductAudioSourcePath(uploadPath)) {
+    const service = createServiceRoleClient();
+    const { data: ownedJob, error: jobLookupError } = await service
+      .from("product_audio_normalize_jobs")
+      .select("id")
+      .eq("practice_id", input.practiceId)
+      .eq("audio_item_id", input.audioId)
+      .eq("source_storage_path", uploadPath)
+      .limit(1)
+      .maybeSingle();
+    if (jobLookupError) {
+      console.error(
+        "author_product_abandon_normalize_lookup_error",
+        jobLookupError.message,
+      );
+      throw new ProductAudioUploadError("internal_error", 500);
+    }
+    if (ownedJob?.id) {
+      return;
+    }
   }
 
   await deletePracticeAudioPaths([uploadPath]);

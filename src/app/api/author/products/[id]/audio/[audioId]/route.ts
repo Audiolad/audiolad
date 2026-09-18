@@ -21,6 +21,11 @@ import {
 } from "@/lib/author-products/sale-lock";
 import { normalizeClearableTextField } from "@/lib/author-products/text-fields";
 import { removeTrackCoverFiles } from "@/lib/author-products/utils";
+import {
+  AUDIO_PREPARING_CODE,
+  AUDIO_PREPARING_MESSAGE,
+  isProductAudioNormalizeInFlight,
+} from "@/lib/author-products/server/direct-audio-upload";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -189,6 +194,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     if (!audioItem?.id) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    if (await isProductAudioNormalizeInFlight(id, audioId)) {
+      return NextResponse.json(
+        { error: AUDIO_PREPARING_CODE, message: AUDIO_PREPARING_MESSAGE },
+        { status: 409 },
+      );
     }
 
     if (audioItem.audio_path) {

@@ -1,3 +1,8 @@
+import {
+  AUDIO_PREPARE_PUBLISH_FAILED,
+  AUDIO_PREPARE_PUBLISH_PROCESSING,
+  isAudioPrepareInFlight,
+} from "@/lib/author-products/audio-prepare-status";
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
  * (latest: supabase/migrations/20260924120000_course_access_levels_moderation_readiness.sql).
@@ -146,9 +151,24 @@ export function evaluateDatabaseModerationReady(
               })
             );
           }
+          if (isAudioPrepareInFlight(item.audio_prepare_status)) {
+            return true;
+          }
+          if (item.audio_prepare_status === "failed" && !item.audio_path?.trim()) {
+            return true;
+          }
           return !item.audio_path?.trim() || !durationOk;
         })
-        ? "У одной или нескольких аудиозаписей нет файла или длительности."
+        ? input.audioItems.some((item) =>
+            isAudioPrepareInFlight(item.audio_prepare_status),
+          )
+          ? AUDIO_PREPARE_PUBLISH_PROCESSING
+          : input.audioItems.some(
+              (item) =>
+                item.audio_prepare_status === "failed" && !item.audio_path?.trim(),
+            )
+            ? AUDIO_PREPARE_PUBLISH_FAILED
+            : "У одной или нескольких аудиозаписей нет файла или длительности."
         : null,
     ),
   ];

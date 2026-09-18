@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { parseAuthorAudioTitle } from "@/lib/author-products/audio-title";
+import { mapProductNormalizeJobToPrepareStatus } from "@/lib/author-products/audio-prepare-status";
 import {
   AuthorAccessError,
   requirePracticeAccess,
@@ -64,7 +65,7 @@ const FILE_SELECT =
 const CTA_SELECT =
   "publication_id, title, description, button_text, url, enabled, created_at, updated_at";
 const AUDIO_ASSET_SELECT =
-  "id, title, duration_seconds, original_file_name, audio_path, preview_start_ms, preview_end_ms, status";
+  "id, title, duration_seconds, original_file_name, audio_path, preview_start_ms, preview_end_ms, status, desired_product_audio_normalize_job_id";
 
 export { CourseBuilderError, isCourseBuilderError };
 
@@ -318,8 +319,34 @@ async function loadAudioAssets(
     throw new CourseBuilderError("internal_error", 500);
   }
 
+  const jobIds = (data ?? [])
+    .map((row) => (row as { desired_product_audio_normalize_job_id?: string | null }).desired_product_audio_normalize_job_id)
+    .filter((id): id is string => Boolean(id));
+  const prepareByItem = new Map<string, NonNullable<CourseBuilderAudioAsset["audio_prepare_status"]>>();
+  if (jobIds.length > 0) {
+    const service = createServiceRoleClient();
+    const jobs = await service
+      .from("product_audio_normalize_jobs")
+      .select("id, audio_item_id, status")
+      .in("id", jobIds);
+    for (const job of jobs.data ?? []) {
+      const status = mapProductNormalizeJobToPrepareStatus(
+        typeof job.status === "string" ? job.status : null,
+      );
+      if (status && typeof job.audio_item_id === "string") {
+        prepareByItem.set(job.audio_item_id, status);
+      }
+    }
+  }
   for (const row of data ?? []) {
-    map.set(row.id, row as CourseBuilderAudioAsset);
+    const { desired_product_audio_normalize_job_id: _jobId, ...safe } = row as typeof row & {
+      desired_product_audio_normalize_job_id?: string | null;
+    };
+    void _jobId;
+    map.set(row.id, {
+      ...(safe as CourseBuilderAudioAsset),
+      audio_prepare_status: prepareByItem.get(row.id) ?? null,
+    });
   }
 
   return map;

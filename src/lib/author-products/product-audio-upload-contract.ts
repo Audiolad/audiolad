@@ -1,7 +1,7 @@
 /**
  * Author product audio SOURCE input contract (non-music).
  * Delivery remains canonical MP3 at audio_items.audio_path in practice-audio.
- * Visible author UI stays MP3-only until a later slice enables accept.
+ * Live author UI accepts MP3, WAV, M4A and AAC. Delivery remains MP3.
  */
 
 export const PRACTICE_AUDIO_BUCKET = "practice-audio";
@@ -14,13 +14,15 @@ export const PRODUCT_AUDIO_MAX_MB = MAX_PRODUCT_AUDIO_BYTES / (1024 * 1024);
 export const PRODUCT_AUDIO_TOO_LARGE_MESSAGE =
   "Размер аудиофайла не должен превышать 300 МБ.";
 
-/** Visible author UI copy — stays MP3-only until UI slice. */
 export const PRODUCT_AUDIO_WRONG_TYPE_MESSAGE =
-  "Загрузите аудиофайл в формате MP3.";
+  "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.";
 
-export const PRODUCT_AUDIO_SIZE_HINT = `MP3 · до ${PRODUCT_AUDIO_MAX_MB} МБ`;
+export const PRODUCT_AUDIO_SIZE_HINT = `MP3, WAV, M4A, AAC · до ${PRODUCT_AUDIO_MAX_MB} МБ`;
 
-export type ProductAudioSourceFormat = "mp3" | "m4a" | "aac";
+export const PRODUCT_AUDIO_FILE_ACCEPT =
+  ".mp3,.MP3,.wav,.WAV,.m4a,.M4A,.aac,.AAC,audio/mpeg,audio/mp3,audio/x-mpeg,audio/x-mp3,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/mp4,audio/x-m4a,audio/m4a,audio/aac,audio/x-aac";
+
+export type ProductAudioSourceFormat = "mp3" | "wav" | "m4a" | "aac";
 
 export const PRODUCT_AUDIO_DELIVERY_BITRATE_KBPS = 192;
 export const PRODUCT_AUDIO_DELIVERY_BITRATE = "192k";
@@ -40,6 +42,14 @@ export const ALLOWED_PRODUCT_M4A_MIME_TYPES = [
   "application/octet-stream",
 ] as const;
 
+export const ALLOWED_PRODUCT_WAV_MIME_TYPES = [
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/vnd.wave",
+  "application/octet-stream",
+] as const;
+
 export const ALLOWED_PRODUCT_AAC_MIME_TYPES = [
   "audio/aac",
   "audio/x-aac",
@@ -52,11 +62,13 @@ export const PRODUCT_AUDIO_SIGNED_UPLOAD_MIME_BY_FORMAT: Record<
   string
 > = {
   mp3: "audio/mpeg",
+  wav: "audio/wav",
   m4a: "audio/mp4",
   aac: "audio/aac",
 };
 
 const MP3_MIME_SET = new Set<string>(ALLOWED_PRODUCT_MP3_MIME_TYPES);
+const WAV_MIME_SET = new Set<string>(ALLOWED_PRODUCT_WAV_MIME_TYPES);
 const M4A_MIME_SET = new Set<string>(ALLOWED_PRODUCT_M4A_MIME_TYPES);
 const AAC_MIME_SET = new Set<string>(ALLOWED_PRODUCT_AAC_MIME_TYPES);
 
@@ -69,7 +81,7 @@ const VERSIONED_PRODUCT_AUDIO_PATH = new RegExp(
 );
 
 const VERSIONED_PRODUCT_AUDIO_SOURCE_PATH = new RegExp(
-  `^practices/(${UUID_PATTERN})/audio-sources/(${UUID_PATTERN})-(${UUID_PATTERN})\\.(m4a|aac)$`,
+  `^practices/(${UUID_PATTERN})/audio-sources/(${UUID_PATTERN})-(${UUID_PATTERN})\\.(m4a|aac|wav)$`,
   "i",
 );
 
@@ -94,6 +106,7 @@ export function detectProductAudioSourceFormat(
 ): ProductAudioSourceFormat | null {
   const ext = extensionOf(name);
   if (ext === ".mp3") return "mp3";
+  if (ext === ".wav") return "wav";
   if (ext === ".m4a") return "m4a";
   if (ext === ".aac") return "aac";
   return null;
@@ -123,6 +136,7 @@ function mimeAllowedForFormat(
   const normalized = (mime ?? "").trim().toLowerCase();
   if (!normalized) return true;
   if (format === "mp3") return MP3_MIME_SET.has(normalized);
+  if (format === "wav") return WAV_MIME_SET.has(normalized);
   if (format === "m4a") return M4A_MIME_SET.has(normalized);
   return AAC_MIME_SET.has(normalized);
 }
@@ -156,7 +170,7 @@ export function validateProductMp3Descriptor(
   return null;
 }
 
-/** Server-side source descriptor (MP3 | M4A | AAC). UI still uses MP3-only helpers. */
+/** Server-side source descriptor (MP3 | WAV | M4A | AAC). */
 export function validateProductAudioSourceDescriptor(
   file: ProductAudioDescriptor,
   maxBytes: number = MAX_PRODUCT_AUDIO_BYTES,
@@ -174,6 +188,15 @@ export function validateProductMp3FileClient(
   file: ProductAudioDescriptor,
 ): string | null {
   const code = validateProductMp3Descriptor(file);
+  if (code === "invalid_file_type") return PRODUCT_AUDIO_WRONG_TYPE_MESSAGE;
+  if (code === "invalid_file_size") return PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
+  return null;
+}
+
+export function validateProductAudioFileClient(
+  file: ProductAudioDescriptor,
+): string | null {
+  const code = validateProductAudioSourceDescriptor(file);
   if (code === "invalid_file_type") return PRODUCT_AUDIO_WRONG_TYPE_MESSAGE;
   if (code === "invalid_file_size") return PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
   return null;
@@ -231,7 +254,7 @@ export function parseProductAudioSourcePath(uploadPath: string): {
   const match = VERSIONED_PRODUCT_AUDIO_SOURCE_PATH.exec(uploadPath.trim());
   if (!match) return null;
   const format = match[4].toLowerCase();
-  if (format !== "m4a" && format !== "aac") return null;
+  if (format !== "m4a" && format !== "aac" && format !== "wav") return null;
   return {
     practiceId: match[1],
     audioId: match[2],

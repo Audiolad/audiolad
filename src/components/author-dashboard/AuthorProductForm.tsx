@@ -97,15 +97,22 @@ import {
   resolveMusicUploadMode,
 } from "@/lib/listen/music-delivery";
 import {
+  PRODUCT_AUDIO_FILE_ACCEPT,
   PRODUCT_AUDIO_SIZE_HINT,
   PRODUCT_CONTENT_LIMITS,
   getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
-  validateMp3FileClient,
+  validateOrdinaryProductAudioFileClient,
   validateStoredFormatLength,
   type ProductFieldErrorCode,
 } from "@/lib/author-products/limits";
+import {
+  AUDIO_PREPARE_FAILED_MESSAGE,
+  AUDIO_PREPARE_PROCESSING_HINT,
+  AUDIO_PREPARE_PROCESSING_STATUS,
+  isAudioPrepareInFlight,
+} from "@/lib/author-products/audio-prepare-status";
 import {
   applyProductEditorSaveToDirty,
   isProductEditorDirty,
@@ -391,7 +398,7 @@ function audioItemHasPlayablePreview(item: AudioItemRow): boolean {
 }
 
 const AUDIO_TITLE_SAVE_ERROR =
-  "MP3 загружен, но название аудио не удалось сохранить. Введите его вручную.";
+  "Аудио загружено, но название аудио не удалось сохранить. Введите его вручную.";
 
 const AUDIO_TITLE_TRUNCATED_NOTICE =
   "Название аудио сокращено до 100 символов. Вы можете отредактировать его вручную.";
@@ -413,7 +420,7 @@ function deriveTitleFromFilename(fileName: string): {
   title: string;
   truncated: boolean;
 } {
-  const withoutExtension = fileName.trim().replace(/\.mp3$/i, "").trim();
+  const withoutExtension = fileName.trim().replace(/\.(mp3|wav|m4a|aac)$/i, "").trim();
 
   if (!withoutExtension) {
     return { title: "", truncated: false };
@@ -828,6 +835,22 @@ export default function AuthorProductForm({
   function requestScrollToFirstSubmitIssue() {
     setSubmitIssueScrollKey((key) => key + 1);
   }
+
+  useEffect(() => {
+    if (form.productKind === PRODUCT_KIND.MUSIC || !practiceId) {
+      return;
+    }
+    const pending = audioItems.some((item) =>
+      isAudioPrepareInFlight(item.audio_prepare_status),
+    );
+    if (!pending) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void reloadSavedProduct(practiceId);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [audioItems, form.productKind, practiceId]);
 
   useEffect(() => {
     const audioId = pendingFocusAudioIdRef.current;
@@ -2262,6 +2285,16 @@ export default function AuthorProductForm({
   }
 
   async function deleteAudioItem(audioId: string, hasFile: boolean) {
+    const target = audioItems.find((item) => item.id === audioId);
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC &&
+      isAudioPrepareInFlight(target?.audio_prepare_status)
+    ) {
+      setError(
+        "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.",
+      );
+      return;
+    }
     if (audioItems.length <= 1) {
       setError("У продукта должно остаться хотя бы одно аудио.");
       return;
@@ -2318,7 +2351,7 @@ export default function AuthorProductForm({
     }
     const validationError = isMusicMaster
       ? validateMusicMasterFileClient(file)
-      : validateMp3FileClient(file);
+      : validateOrdinaryProductAudioFileClient(file);
 
     if (validationError) {
       setAudioUploadErrors((current) => ({
@@ -2357,7 +2390,7 @@ export default function AuthorProductForm({
           ...current,
           [audioId]: isMusicMaster
             ? "Не удалось загрузить WAV-мастер."
-            : "Не удалось загрузить MP3.",
+            : "Не удалось загрузить аудио.",
         }));
         return;
       }
@@ -2411,7 +2444,7 @@ export default function AuthorProductForm({
         ...current,
         [audioId]: isMusicMaster
           ? "Не удалось загрузить WAV-мастер."
-          : "Не удалось загрузить MP3.",
+          : "Не удалось загрузить аудио.",
       }));
     } finally {
       setUploadingAudioId(null);
@@ -2419,7 +2452,17 @@ export default function AuthorProductForm({
   }
 
   async function deleteAudioFile(audioId: string) {
-    if (!window.confirm("Удалить MP3?")) {
+    const target = audioItems.find((item) => item.id === audioId);
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC &&
+      isAudioPrepareInFlight(target?.audio_prepare_status)
+    ) {
+      setError(
+        "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.",
+      );
+      return;
+    }
+    if (!window.confirm("Удалить аудио?")) {
       return;
     }
 
@@ -2438,7 +2481,7 @@ export default function AuthorProductForm({
       if (!ensured) {
         setAudioUploadErrors((current) => ({
           ...current,
-          [audioId]: "Не удалось удалить MP3.",
+          [audioId]: "Не удалось удалить аудио.",
         }));
         return;
       }
@@ -2474,7 +2517,7 @@ export default function AuthorProductForm({
         } catch {
           setAudioUploadErrors((current) => ({
             ...current,
-            [audioId]: "Не удалось удалить MP3.",
+            [audioId]: "Не удалось удалить аудио.",
           }));
           return;
         }
@@ -2490,7 +2533,7 @@ export default function AuthorProductForm({
               response.status,
               payload?.message,
             ) ||
-            "Не удалось удалить MP3.",
+            "Не удалось удалить аудио.",
         }));
         return;
       }
@@ -2512,11 +2555,11 @@ export default function AuthorProductForm({
         return next;
       });
       delete audioPreviewRequestIds.current[targetAudioId];
-      setMessage("MP3 удалён.");
+      setMessage("Аудио удалено.");
     } catch {
       setAudioUploadErrors((current) => ({
         ...current,
-        [audioId]: "Не удалось удалить MP3.",
+        [audioId]: "Не удалось удалить аудио.",
       }));
     } finally {
       setDeletingAudioFileId(null);
@@ -4059,10 +4102,17 @@ export default function AuthorProductForm({
                           lifecycleState: audioItem.music_master?.lifecycleState,
                           transcodeStatus: audioItem.music_master?.transcodeStatus,
                         }).text
-                      : audioItem.audio_path
-                        ? "MP3 загружен"
-                        : "MP3 ещё не загружен"}
+                      : isAudioPrepareInFlight(audioItem.audio_prepare_status)
+                        ? AUDIO_PREPARE_PROCESSING_STATUS
+                        : audioItem.audio_prepare_status === "failed"
+                          ? AUDIO_PREPARE_FAILED_MESSAGE
+                        : audioItem.audio_path
+                          ? "Аудио загружено"
+                          : "Аудио ещё не загружено"}
                   </p>
+                  {isAudioPrepareInFlight(audioItem.audio_prepare_status) ? (
+                    <p className="mt-2">{AUDIO_PREPARE_PROCESSING_HINT}</p>
+                  ) : null}
                   {audioItem.audio_path ? (
                     <div className="mt-2 space-y-1">
                       {audioItem.original_file_name ? (
@@ -4122,15 +4172,15 @@ export default function AuthorProductForm({
                           ? audioItem.audio_path || audioItem.music_master
                             ? MUSIC_DELIVERY_REPLACE_LABEL
                             : MUSIC_DELIVERY_UPLOAD_LABEL
-                          : audioItem.audio_path
-                            ? "Заменить MP3"
-                            : "Загрузить MP3"}
+                          : audioItem.audio_path || isAudioPrepareInFlight(audioItem.audio_prepare_status)
+                            ? "Заменить аудио"
+                            : "Загрузить аудио"}
                       <input
                         type="file"
                         accept={
                           form.productKind === PRODUCT_KIND.MUSIC
                             ? "audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
-                            : "audio/mpeg,.mp3"
+                            : PRODUCT_AUDIO_FILE_ACCEPT
                         }
                         className="hidden"
                         disabled={
@@ -4159,7 +4209,10 @@ export default function AuthorProductForm({
                     </label>
                   )}
 
-                  {audioItem.audio_path && !contentLockedAfterSale ? (
+                  {audioItem.audio_path &&
+                  !contentLockedAfterSale &&
+                  (form.productKind === PRODUCT_KIND.MUSIC ||
+                    !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
                     <button
                       type="button"
                       disabled={
@@ -4171,11 +4224,14 @@ export default function AuthorProductForm({
                     >
                       {deletingAudioFileId === audioItem.id
                         ? "Удаление…"
-                        : "Удалить MP3"}
+                        : "Удалить аудио"}
                     </button>
                   ) : null}
 
-                  {audioItems.length > 1 && !contentLockedAfterSale ? (
+                  {audioItems.length > 1 &&
+                  !contentLockedAfterSale &&
+                  (form.productKind === PRODUCT_KIND.MUSIC ||
+                    !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
                     <button
                       type="button"
                       disabled={

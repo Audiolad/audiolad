@@ -1,8 +1,10 @@
 import {
   PRACTICE_AUDIO_BUCKET,
   PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
-  validateProductMp3FileClient,
-} from "@/lib/author-products/mp3-upload-contract";
+  canonicalProductAudioUploadMime,
+  detectProductAudioSourceFormat,
+  validateProductAudioFileClient,
+} from "@/lib/author-products/product-audio-upload-contract";
 import type { AuthorProductDetail } from "@/lib/author-products/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -90,7 +92,7 @@ export async function uploadAuthorProductAudioDirect(input: {
   audioId: string;
   file: File;
 }): Promise<AuthorProductAudioUploadResult> {
-  const validationError = validateProductMp3FileClient(input.file);
+  const validationError = validateProductAudioFileClient(input.file);
   if (validationError) {
     return {
       ok: false,
@@ -138,7 +140,12 @@ export async function uploadAuthorProductAudioDirect(input: {
         started.signedUpload.path,
         started.signedUpload.token,
         input.file,
-        { contentType: "audio/mpeg", upsert: false },
+        {
+          contentType: canonicalProductAudioUploadMime(
+            detectProductAudioSourceFormat(input.file.name) ?? "mp3",
+          ),
+          upsert: false,
+        },
       );
 
     if (storageError) {

@@ -56,6 +56,8 @@ try {
   assert.ok(m4aOk.durationSeconds > 0);
   const aacOk = await assertValidProductSourceFile(aacPath, "aac");
   assert.ok(aacOk.durationSeconds > 0);
+  const wavOk = await assertValidProductSourceFile(wavPath, "wav");
+  assert.ok(wavOk.durationSeconds > 0);
 
   await assert.rejects(
     () => assertValidProductSourceFile(wavAsM4a, "m4a"),
@@ -87,6 +89,21 @@ try {
   const validatedAac = await validateProductDeliveryMp3File(outFromAac, aacOk.durationSeconds);
   assert.ok(validatedAac.sizeBytes > 0);
   assert.ok(Math.abs(validatedAac.durationSeconds - aacOk.durationSeconds) < 0.5);
+
+  const outFromWav = path.join(fixtureDirectory, "from-wav.mp3");
+  await normalizeProductSourceToMp3(wavPath, outFromWav);
+  const validatedWav = await validateProductDeliveryMp3File(outFromWav, wavOk.durationSeconds);
+  assert.ok(validatedWav.sizeBytes > 0);
+  const mp3AsWav = path.join(fixtureDirectory, "fake.wav");
+  await execFile("ffmpeg", [
+    "-y", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100",
+    "-t", "1", "-c:a", "libmp3lame", mp3AsWav.replace(/\.wav$/, ".mp3"),
+  ]);
+  await execFile("cp", [m4aPath, mp3AsWav]);
+  await assert.rejects(
+    () => assertValidProductSourceFile(mp3AsWav, "wav"),
+    (err: unknown) => err instanceof ProductNormalizeSourceInvalidError,
+  );
 } finally {
   await rm(fixtureDirectory, { recursive: true, force: true });
 }

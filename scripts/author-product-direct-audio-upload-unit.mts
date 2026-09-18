@@ -47,7 +47,7 @@ function fakeFile({
 
 assert.equal(MAX_PRODUCT_AUDIO_BYTES, 300 * 1024 * 1024);
 assert.equal(MAX_AUDIO_BYTES, 50 * 1024 * 1024);
-assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3 · до 300 МБ");
+assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3, WAV, M4A, AAC · до 300 МБ");
 assert.equal(
   PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
   "Размер аудиофайла не должен превышать 300 МБ.",
@@ -104,7 +104,7 @@ assert.equal(
   validateProductMp3FileClient(
     fakeFile({ name: "track.wav", type: "audio/mpeg" }),
   ),
-  "Загрузите аудиофайл в формате MP3.",
+  "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.",
 );
 assert.equal(
   validateProductMp3Descriptor({
@@ -239,7 +239,7 @@ const publish = read("src/lib/author-products/publish.ts");
 const moderation = read("src/lib/author-products/moderation.ts");
 
 assert.match(form, /uploadAuthorProductAudioDirect/);
-assert.match(form, /validateMp3FileClient/);
+assert.match(form, /validateOrdinaryProductAudioFileClient/);
 assert.match(form, /applyServerProductPreservingDraft/);
 assert.match(form, /PRODUCT_AUDIO_SIZE_HINT|до 300 МБ/);
 assert.doesNotMatch(form, /formData\.set\("file"/);
@@ -251,7 +251,7 @@ assert.doesNotMatch(
 
 assert.match(client, /uploadToSignedUrl/);
 assert.match(client, /PRACTICE_AUDIO_BUCKET/);
-assert.match(client, /contentType: "audio\/mpeg"/);
+assert.match(client, /canonicalProductAudioUploadMime/);
 assert.match(client, /upload\/start/);
 assert.match(client, /upload\/finalize/);
 assert.match(client, /upload\/abandon/);
@@ -305,31 +305,39 @@ const finalizeBlock = server.slice(
   server.indexOf("export async function abandonProductAudioDirectUpload"),
 );
 const inspectCall = finalizeBlock.indexOf("inspectUploadedProductMp3");
-const dbUpdate = finalizeBlock.indexOf('.from("audio_items")');
+const productActivate = finalizeBlock.indexOf("activate_product_direct_mp3_delivery");
+const musicActivate = finalizeBlock.indexOf("activate_music_direct_mp3_delivery");
 const previousDelete = finalizeBlock.indexOf(
   "if (previousPath && previousPath !== uploadPath)",
 );
 const failedInspectCleanup = finalizeBlock.indexOf(
   "await deletePracticeAudioPaths([uploadPath]);",
 );
-assert.ok(inspectCall >= 0 && dbUpdate > inspectCall, "DB update after ffprobe");
+assert.ok(inspectCall >= 0, "ffprobe before activate");
+assert.ok(productActivate > inspectCall, "ordinary MP3 uses atomic activate RPC after ffprobe");
+assert.ok(musicActivate >= 0, "music MP3 still uses activate_music_direct_mp3_delivery");
 assert.ok(
-  previousDelete > dbUpdate,
-  "old Storage object deleted only after successful DB update",
+  previousDelete > productActivate,
+  "old Storage object deleted only after successful activate",
 );
 assert.ok(
-  failedInspectCleanup >= 0 && failedInspectCleanup < dbUpdate,
+  failedInspectCleanup >= 0 && failedInspectCleanup < productActivate,
   "failed finalize deletes only the new upload object",
 );
 assert.match(finalizeBlock, /shouldBlockProductAudioReplacement|assertSaleLockAllowsMutation/);
 assert.match(finalizeBlock, /isOwnedVersionedProductAudioPath|requireOwnedDeliveryPath|requireOwnedVersionedPath/);
-assert.doesNotMatch(finalizeBlock, /enqueue_product_audio_normalize_job/);
-assert.doesNotMatch(finalizeBlock, /normalize_queued/);
-assert.doesNotMatch(server, /validateProductAudioSourceDescriptor/);
-assert.match(server, /validateProductMp3Descriptor/);
-assert.doesNotMatch(server, /buildVersionedProductAudioSourcePath/);
+assert.match(finalizeBlock, /enqueue_product_audio_normalize_job/);
+assert.match(finalizeBlock, /cleanup_source_paths|collectNormalizeCleanupPaths/);
 assert.doesNotMatch(
-  finalizeBlock.slice(0, dbUpdate),
+  finalizeBlock,
+  /\.from\("audio_items"\)\s*\.update\([\s\S]*audio_path:\s*uploadPath/,
+);
+assert.match(server, /finalizeOrdinarySourceNormalize/);
+assert.match(server, /validateProductAudioSourceDescriptor/);
+assert.match(server, /validateProductMp3Descriptor/);
+assert.match(server, /buildVersionedProductAudioSourcePath/);
+assert.doesNotMatch(
+  finalizeBlock.slice(0, productActivate),
   /deletePracticeAudioPaths\(\[previousPath\]\)/,
 );
 
@@ -338,6 +346,10 @@ const abandonBlock = server.slice(
 );
 assert.match(abandonBlock, /canAbandonProductAudioUploadPath/);
 assert.doesNotMatch(abandonBlock, /audio_path: /);
+assert.match(abandonBlock, /parseProductAudioSourcePath/);
+assert.match(abandonBlock, /source_storage_path/);
+assert.match(abandonBlock, /product_audio_normalize_jobs/);
+assert.match(abandonBlock, /ownedJob/);
 
 assert.match(legacyRoute, /MAX_AUDIO_BYTES/);
 assert.match(legacyRoute, /50 MiB|MAX_AUDIO_BYTES/);
@@ -375,3 +387,24 @@ assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /ass
 
 
 console.log("author-product-direct-audio-upload-unit: ok");
+
+// LIVE_ROUTING_RACE_HARDENING
+assert.match(server, /activate_product_direct_mp3_delivery/);
+assert.match(server, /isProductAudioNormalizeInFlight/);
+assert.match(server, /AUDIO_PREPARING_CODE/);
+assert.match(server, /AUDIO_PREPARING_MESSAGE/);
+assert.match(read("src/app/api/author/products/[id]/audio/[audioId]/file/route.ts"), /isProductAudioNormalizeInFlight/);
+assert.match(read("src/app/api/author/products/[id]/audio/[audioId]/file/route.ts"), /AUDIO_PREPARING_CODE/);
+assert.match(read("src/app/api/author/products/[id]/audio/[audioId]/route.ts"), /isProductAudioNormalizeInFlight/);
+assert.match(read("src/app/api/author/products/[id]/audio/[audioId]/route.ts"), /AUDIO_PREPARING_CODE/);
+const formUi = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(formUi, /isAudioPrepareInFlight\(target\?\.audio_prepare_status\)/);
+assert.match(formUi, /!isAudioPrepareInFlight\(audioItem\.audio_prepare_status\)/);
+
+const wavMig = read("supabase/migrations/20261009120400_practice_audio_allow_wav_normalize.sql");
+assert.match(wavMig, /activate_product_direct_mp3_delivery/);
+assert.match(wavMig, /RETURNS jsonb/);
+assert.match(wavMig, /cleanup_source_paths/);
+assert.match(wavMig, /v_old\.status = 'queued'/);
+assert.match(wavMig, /REVOKE ALL ON FUNCTION public\.activate_product_direct_mp3_delivery/);
+console.log("author-product-direct-audio-upload-unit: race hardening ok");

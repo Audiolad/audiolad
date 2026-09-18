@@ -30,14 +30,15 @@ const versionId = "33333333-3333-4333-8333-333333333333";
 
 assert.equal(PRODUCT_AUDIO_DELIVERY_BITRATE_KBPS, 192);
 assert.equal(PRODUCT_AUDIO_DELIVERY_BITRATE, "192k");
-assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3 · до 300 МБ");
-assert.equal(PRODUCT_AUDIO_WRONG_TYPE_MESSAGE, "Загрузите аудиофайл в формате MP3.");
+assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3, WAV, M4A, AAC · до 300 МБ");
+assert.equal(PRODUCT_AUDIO_WRONG_TYPE_MESSAGE, "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.");
 assert.ok(ALLOWED_PRODUCT_MP3_MIME_TYPES.includes("application/octet-stream"));
 
 assert.equal(detectProductAudioSourceFormat("track.mp3"), "mp3");
 assert.equal(detectProductAudioSourceFormat("track.M4A"), "m4a");
 assert.equal(detectProductAudioSourceFormat("track.AAC"), "aac");
-assert.equal(detectProductAudioSourceFormat("track.wav"), null);
+assert.equal(detectProductAudioSourceFormat("track.wav"), "wav");
+assert.equal(detectProductAudioSourceFormat("track.WAV"), "wav");
 
 assert.equal(validateProductMp3Descriptor({ name: "a.mp3", type: "audio/mpeg", size: 10 }), null);
 assert.equal(validateProductMp3Descriptor({ name: "a.m4a", type: "audio/mp4", size: 10 }), "invalid_file_type");
@@ -50,7 +51,7 @@ assert.equal(validateProductAudioSourceDescriptor({ name: "a.aac", type: "audio/
 assert.equal(validateProductAudioSourceDescriptor({ name: "a.AAC", type: "audio/x-aac", size: 10 }), null);
 assert.equal(validateProductAudioSourceDescriptor({ name: "a.m4a", type: "application/octet-stream", size: 10 }), null);
 assert.equal(validateProductAudioSourceDescriptor({ name: "a.mp3", type: "audio/mp4", size: 10 }), "invalid_file_type");
-assert.equal(validateProductAudioSourceDescriptor({ name: "a.wav", type: "audio/wav", size: 10 }), "invalid_file_type");
+assert.equal(validateProductAudioSourceDescriptor({ name: "a.wav", type: "audio/wav", size: 10 }), null);
 assert.equal(validateProductAudioSourceDescriptor({ name: "a.m4a", type: "audio/mpeg", size: 10 }), "invalid_file_type");
 assert.equal(isAllowedProductMp3Type("x.mp3", "audio/mpeg"), true);
 assert.equal(isAllowedProductAudioSourceType("x.m4a", "audio/mp4"), true);
@@ -116,6 +117,26 @@ assert.equal(
 );
 
 assert.equal(
+  validateProductSourceProbe("wav", {
+    formatNames: ["wav", "wave"],
+    durationSeconds: 8,
+    hasAudioStream: true,
+    hasVideoStream: false,
+    audioCodecNames: ["pcm_s16le"],
+  }),
+  "ok",
+);
+assert.equal(
+  validateProductSourceProbe("wav", {
+    formatNames: ["mp3"],
+    durationSeconds: 8,
+    hasAudioStream: true,
+    hasVideoStream: false,
+    audioCodecNames: ["mp3"],
+  }),
+  "container_mismatch",
+);
+assert.equal(
   validateProductSourceProbe("aac", {
     formatNames: ["mp4", "mov"],
     durationSeconds: 3,
@@ -128,11 +149,12 @@ assert.equal(
 );
 
 const form = readFileSync(path.join(root, "src/components/author-dashboard/AuthorProductForm.tsx"), "utf8");
-assert.ok(form.includes("audio/mpeg") || form.includes(".mp3"), "UI still MP3-oriented");
-assert.equal(form.toLowerCase().includes('accept=".m4a'), false);
-assert.equal(form.toLowerCase().includes('accept=".aac'), false);
-assert.equal(/accept=["'][^"']*\.m4a/.test(form), false);
-assert.equal(/accept=["'][^"']*\.aac/.test(form), false);
+assert.match(form, /PRODUCT_AUDIO_FILE_ACCEPT/);
+assert.match(form, /Загрузить аудио/);
+assert.match(form, /Заменить аудио/);
+assert.match(form, /Аудио ещё не загружено/);
+assert.match(form, /AUDIO_PREPARE_PROCESSING_STATUS/);
+assert.doesNotMatch(form, /Загрузить MP3/);
 
 const personal = readFileSync(path.join(root, "src/lib/personal-materials/audio-format.ts"), "utf8");
 assert.match(personal, /m4a/i);
@@ -142,9 +164,10 @@ assert.doesNotMatch(musicContract, /product_audio_normalize/);
 
 
 const directUpload = readFileSync(path.join(root, "src/lib/author-products/server/direct-audio-upload.ts"), "utf8");
-assert.match(directUpload, /validateProductMp3Descriptor/);
-assert.match(directUpload, /live author upload stays MP3-only/);
-assert.equal(/validateProductAudioSourceDescriptor/.test(directUpload), false, "live start/finalize must not accept M4A/AAC in Slice 1");
+assert.match(directUpload, /validateProductAudioSourceDescriptor/);
+assert.match(directUpload, /enqueue_product_audio_normalize_job/);
+assert.match(directUpload, /buildVersionedProductAudioSourcePath/);
+assert.doesNotMatch(directUpload, /live author upload stays MP3-only/);
 
 const runtime = readFileSync(path.join(root, "src/lib/product-audio-normalize/worker-runtime.ts"), "utf8");
 assert.match(runtime, /upsert:\s*false/);

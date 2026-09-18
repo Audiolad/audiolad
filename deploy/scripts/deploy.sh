@@ -109,6 +109,24 @@ assert_music_transcode_worker_release_tree() {
   return "$missing"
 }
 
+assert_product_audio_normalize_worker_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required=(
+    "$release_dir/deploy/product-audio-normalize-worker.ecosystem.config.cjs"
+    "$release_dir/deploy/scripts/ensure-product-audio-normalize-worker.sh"
+    "$release_dir/scripts/run-product-audio-normalize-worker.mts"
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "product_audio_normalize_worker_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 COMMIT_REF="${1:-}"
 DEPLOY_LOG_FILE="$DEPLOY_LOG_DIR/deploy-$(date -u +"%Y%m%d-%H%M%S").log"
 OLD_ACTIVE_PORT=""
@@ -201,6 +219,12 @@ main() {
   if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
     log_error "music_transcode_worker_artifact_missing"
     send_deploy_alert "deploy_failed" "Music transcode worker artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+
+  if ! assert_product_audio_normalize_worker_release_tree "$RELEASE_DIR"; then
+    log_error "product_audio_normalize_worker_artifact_missing"
+    send_deploy_alert "deploy_failed" "Product audio normalize worker artifact missing for $RELEASE_NAME"
     exit 1
   fi
 
@@ -382,6 +406,24 @@ main() {
     send_deploy_alert "deploy_failed" "Music transcode worker ensure failed for $RELEASE_NAME"
     # Cutover already completed: do not roll back healthy web/nginx.
     # Fail the workflow so Production Deploy cannot report SUCCESS with a dead worker.
+    exit 1
+  fi
+
+  PRODUCT_AUDIO_WORKER_ECOSYSTEM="$RELEASE_DIR/deploy/product-audio-normalize-worker.ecosystem.config.cjs"
+  PRODUCT_AUDIO_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-product-audio-normalize-worker.sh"
+  if [[ ! -f "$PRODUCT_AUDIO_WORKER_ECOSYSTEM" ]]; then
+    log_error "product_audio_normalize_worker_ecosystem_missing"
+    send_deploy_alert "deploy_failed" "Product audio normalize worker ecosystem missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if [[ ! -x "$PRODUCT_AUDIO_WORKER_ENSURE" ]]; then
+    log_error "product_audio_normalize_worker_ensure_missing"
+    send_deploy_alert "deploy_failed" "Product audio normalize worker ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$PRODUCT_AUDIO_WORKER_ENSURE"; then
+    log_error "product_audio_normalize_worker_ensure_failed"
+    send_deploy_alert "deploy_failed" "Product audio normalize worker ensure failed for $RELEASE_NAME"
     exit 1
   fi
 

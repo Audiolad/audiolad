@@ -11,6 +11,7 @@ export type ProductSourceProbe = {
 const M4A_CONTAINERS = new Set(["mp4", "mov", "m4a", "isom"]);
 const AAC_CODECS = new Set(["aac", "mp4a"]);
 const AAC_CONTAINERS = new Set(["aac", "adts"]);
+const WAV_CONTAINERS = new Set(["wav", "wave"]);
 
 export type ProductSourceValidationCode =
   | "ok"
@@ -44,6 +45,22 @@ export function validateProductSourceProbe(
     }
     const codecOk = [...AAC_CODECS].some((name) => codecs.has(name));
     if (!codecOk) return "codec_mismatch";
+    return "ok";
+  }
+
+  if (format === "wav") {
+    const containerOk = [...WAV_CONTAINERS].some((name) => formats.has(name));
+    if (!containerOk) return "container_mismatch";
+    if (
+      formats.has("mp3") ||
+      formats.has("mp4") ||
+      formats.has("mov") ||
+      formats.has("m4a") ||
+      formats.has("aac") ||
+      formats.has("adts")
+    ) {
+      return "container_mismatch";
+    }
     return "ok";
   }
 

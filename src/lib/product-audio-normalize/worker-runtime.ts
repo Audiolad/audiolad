@@ -153,7 +153,7 @@ export async function executeClaimedProductNormalizeJob(
     await mkdir(workspace, { recursive: true });
     const sourcePath = join(
       workspace,
-      `source.${job.source_format === "m4a" ? "m4a" : "aac"}`,
+      `source.${job.source_format}`,
     );
     const outputPath = join(workspace, "delivery.mp3");
     await downloadPracticeObject(service, job.source_storage_path, sourcePath);

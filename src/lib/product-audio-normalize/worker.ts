@@ -11,7 +11,7 @@ export type ClaimedProductNormalizeJob = {
   practice_id: string;
   audio_item_id: string;
   source_storage_path: string;
-  source_format: "m4a" | "aac";
+  source_format: "m4a" | "aac" | "wav";
   source_original_filename: string;
   source_file_size_bytes: number;
   target_storage_path: string;
@@ -77,6 +77,10 @@ export type ProductNormalizeWorkerPort = {
   ) => string[];
 };
 
+export type ProductNormalizeReleaseCheck = () => Promise<{
+  state: "CURRENT" | "STALE" | "UNKNOWN";
+}>;
+
 export type ProductNormalizeWorkerOptions = {
   idleIntervalMs?: number;
   heartbeatIntervalMs?: number;
@@ -86,6 +90,7 @@ export type ProductNormalizeWorkerOptions = {
   maxJobs?: number;
   now?: () => number;
   logger?: ProductNormalizeWorkerLogger;
+  checkRelease?: ProductNormalizeReleaseCheck;
 };
 
 export type ProductNormalizeWorker = {
@@ -105,7 +110,9 @@ export function parseClaimedProductNormalizeJob(
     typeof row.practice_id !== "string" ||
     typeof row.audio_item_id !== "string" ||
     typeof row.source_storage_path !== "string" ||
-    (row.source_format !== "m4a" && row.source_format !== "aac") ||
+    (row.source_format !== "m4a" &&
+      row.source_format !== "aac" &&
+      row.source_format !== "wav") ||
     typeof row.source_original_filename !== "string" ||
     typeof row.target_storage_path !== "string" ||
     typeof row.lease_token !== "string" ||
@@ -254,6 +261,28 @@ export function createProductAudioNormalizeWorker(
       let processed = 0;
       await port.recoverStaleJobs();
       while (!stopping) {
+        if (options.checkRelease) {
+          try {
+            const comparison = await options.checkRelease();
+            if (comparison.state === "STALE") {
+              logger.info(
+                JSON.stringify({
+                  event: "product_audio_normalize_release_mismatch",
+                }),
+              );
+              stopping = true;
+              break;
+            }
+          } catch (error) {
+            logger.info(
+              JSON.stringify({
+                event: "product_audio_normalize_release_guard_unavailable",
+                reason:
+                  error instanceof Error ? error.message : "release_check_failed",
+              }),
+            );
+          }
+        }
         if (maxJobs != null && processed >= maxJobs) break;
         const job = await port.claimJob();
         if (!job) {

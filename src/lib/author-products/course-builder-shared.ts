@@ -2,7 +2,18 @@ import {
   MAX_AUDIO_BYTES,
   getAudioUploadErrorMessage,
 } from "@/lib/author-products/limits";
-import { isAllowedProductMp3Type } from "@/lib/author-products/mp3-upload-contract";
+import {
+  PRODUCT_AUDIO_FILE_ACCEPT,
+  PRODUCT_AUDIO_SIZE_HINT,
+  PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
+  PRODUCT_AUDIO_WRONG_TYPE_MESSAGE,
+  validateProductAudioFileClient,
+} from "@/lib/author-products/product-audio-upload-contract";
+import {
+  AUDIO_PREPARE_PUBLISH_PROCESSING,
+  isAudioPrepareInFlight,
+  type AudioPrepareStatus,
+} from "@/lib/author-products/audio-prepare-status";
 import {
   PRODUCT_KIND,
   normalizeProductKind,
@@ -47,16 +58,14 @@ export {
 export { MAX_AUDIO_BYTES, PUBLICATION_FILE_MAX_PDF_BYTES };
 
 const COURSE_BUILDER_PDF_MAX_MB = PUBLICATION_FILE_MAX_PDF_BYTES / (1024 * 1024);
-const COURSE_BUILDER_AUDIO_MAX_MB = MAX_AUDIO_BYTES / (1024 * 1024);
-
 export const COURSE_BUILDER_PDF_HINT = `PDF — до ${COURSE_BUILDER_PDF_MAX_MB} МБ`;
-export const COURSE_BUILDER_AUDIO_HINT = `Аудио — до ${COURSE_BUILDER_AUDIO_MAX_MB} МБ`;
+export const COURSE_BUILDER_AUDIO_HINT = PRODUCT_AUDIO_SIZE_HINT;
 export const COURSE_BUILDER_PDF_TOO_LARGE =
   `PDF-файл должен быть не больше ${COURSE_BUILDER_PDF_MAX_MB} МБ.`;
 export const COURSE_BUILDER_PDF_WRONG_TYPE = "Можно загрузить только PDF-файл.";
-export const COURSE_BUILDER_AUDIO_TOO_LARGE =
-  `Аудиофайл должен быть не больше ${COURSE_BUILDER_AUDIO_MAX_MB} МБ.`;
-export const COURSE_BUILDER_AUDIO_WRONG_TYPE = "Загрузите аудиофайл в формате MP3.";
+export const COURSE_BUILDER_AUDIO_TOO_LARGE = PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
+export const COURSE_BUILDER_AUDIO_WRONG_TYPE = PRODUCT_AUDIO_WRONG_TYPE_MESSAGE;
+export const COURSE_BUILDER_AUDIO_ACCEPT = PRODUCT_AUDIO_FILE_ACCEPT;
 
 export function validateCourseBuilderPdfFile(file: {
   type: string;
@@ -82,15 +91,7 @@ export function getCourseBuilderPdfErrorMessage(
 }
 
 export function validateCourseBuilderAudioFile(file: File): string | null {
-  if (!isAllowedProductMp3Type(file.name, file.type)) {
-    return COURSE_BUILDER_AUDIO_WRONG_TYPE;
-  }
-
-  if (file.size <= 0 || file.size > MAX_AUDIO_BYTES) {
-    return COURSE_BUILDER_AUDIO_TOO_LARGE;
-  }
-
-  return null;
+  return validateProductAudioFileClient(file);
 }
 
 export function getCourseBuilderAudioUploadError(
@@ -143,6 +144,7 @@ export type CourseBuilderAudioAsset = {
   preview_start_ms?: number | null;
   preview_end_ms?: number | null;
   status?: string | null;
+  audio_prepare_status?: AudioPrepareStatus | null;
 };
 
 export type CourseBuilderFileAsset = {
@@ -221,7 +223,8 @@ export type CourseLessonReadinessFailure = {
     | typeof COURSE_PUBLISH_MISSING_LESSONS_CODE
     | typeof COURSE_PUBLISH_EMPTY_LESSON_CODE
     | typeof COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE
-    | typeof COURSE_PUBLISH_MISSING_FILE_CODE;
+    | typeof COURSE_PUBLISH_MISSING_FILE_CODE
+    | "audio_preparing";
   message: string;
   lessonTitle: string | null;
   lessonId: string | null;
@@ -290,13 +293,18 @@ export function isValidCourseTextBlock(payload: unknown): boolean {
 
 export function isValidCourseAudioAsset(
   audio:
-    | Pick<CourseBuilderAudioAsset, "title" | "audio_path" | "duration_seconds">
+    | Pick<
+        CourseBuilderAudioAsset,
+        "title" | "audio_path" | "duration_seconds" | "audio_prepare_status"
+      >
     | null
     | undefined,
 ): boolean {
+  if (!audio || isAudioPrepareInFlight(audio.audio_prepare_status)) {
+    return false;
+  }
   return Boolean(
-    audio &&
-      audio.title?.trim() &&
+    audio.title?.trim() &&
       audio.audio_path?.trim() &&
       audio.duration_seconds &&
       audio.duration_seconds > 0,
@@ -367,6 +375,21 @@ export function evaluateCourseLessonsReadiness(
 
   for (const lesson of list) {
     const blocks = lesson.blocks ?? [];
+    if (
+      blocks.some(
+        (block) =>
+          block.type === "audio" &&
+          isAudioPrepareInFlight(block.audio?.audio_prepare_status),
+      )
+    ) {
+      return {
+        ok: false,
+        code: "audio_preparing",
+        message: AUDIO_PREPARE_PUBLISH_PROCESSING,
+        lessonTitle: lesson.title?.trim() || null,
+        lessonId: lesson.id ?? null,
+      };
+    }
     const hasValidBlock = blocks.some((block) => {
       if (block.type === "text") {
         return isValidCourseTextBlock(block.payload);
