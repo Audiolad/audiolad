@@ -1,9 +1,9 @@
 import "server-only";
 
 import {
-  isStudioClipDurationAllowed,
-  isStudioClipGapAllowed,
-  isStudioClipStartTimeAllowed,
+  assertStudioProjectTimelineLimit,
+  StudioClipGeometryInvalidError,
+  StudioProjectTimelineLimitError,
 } from "../clip-geometry-limits";
 import { STUDIO_LIMITS } from "../limits";
 import {
@@ -211,31 +211,52 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
       ) {
         throw new StudioApiError("invalid_clip", 422);
       }
-      if (
-        !isStudioClipStartTimeAllowed(clip.startTime)
-        || !isStudioClipDurationAllowed(clip.duration)
-      ) {
-        throw new StudioApiError("clip_geometry_too_large", 422);
-      }
       clipIds.add(clip.id);
       clips.push(clip);
     }
 
     // Preserve intentional gaps while rejecting overlap after ripple edits.
     clips.sort((left, right) => Number(left.startTime) - Number(right.startTime));
-    for (let index = 0; index < clips.length; index += 1) {
-      const previousEnd = index === 0
-        ? 0
-        : Number(clips[index - 1].startTime) + Number(clips[index - 1].duration);
+    for (let index = 1; index < clips.length; index += 1) {
+      const previous = clips[index - 1];
       const current = clips[index];
-      const start = Number(current.startTime);
-      if (index > 0 && start < previousEnd) {
+      if (
+        Number(current.startTime) <
+        Number(previous.startTime) + Number(previous.duration)
+      ) {
         throw new StudioApiError("invalid_ripple_layout", 422);
       }
-      if (!isStudioClipGapAllowed(start - previousEnd)) {
-        throw new StudioApiError("clip_geometry_too_large", 422);
-      }
     }
+  }
+
+  try {
+    assertStudioProjectTimelineLimit(
+      value.tracks.map((track) => {
+        if (!isRecord(track) || !Array.isArray(track.clips)) {
+          throw new StudioApiError("invalid_track", 422);
+        }
+        return {
+          clips: track.clips.map((clip) => {
+            if (!isRecord(clip)) {
+              throw new StudioApiError("invalid_clip", 422);
+            }
+            return {
+              startTime: Number(clip.startTime),
+              duration: Number(clip.duration),
+            };
+          }),
+        };
+      }),
+    );
+  } catch (error) {
+    if (error instanceof StudioApiError) throw error;
+    if (error instanceof StudioProjectTimelineLimitError) {
+      throw new StudioApiError("project_timeline_too_long", 422);
+    }
+    if (error instanceof StudioClipGeometryInvalidError) {
+      throw new StudioApiError("invalid_clip", 422);
+    }
+    throw error;
   }
 
   return {

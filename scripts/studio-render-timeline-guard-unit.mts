@@ -6,8 +6,13 @@ import { join } from "node:path";
 
 import {
   MAX_STUDIO_AUDIO_DURATION_SECONDS,
+  MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
   MAX_STUDIO_TRACKS,
 } from "../src/lib/studio/limits";
+import {
+  assertStudioProjectTimelineLimit,
+  getStudioProjectTimelineEndSeconds,
+} from "../src/lib/studio/clip-geometry-limits";
 import {
   buildStudioRenderFilterGraph,
   studioRenderFfmpegOutputArgs,
@@ -88,7 +93,8 @@ function commandAvailable(name: string): boolean {
 
 async function main() {
   assert.equal(MAX_STUDIO_TRACKS, 5);
-  // No approved product project-timeline duration limit — do not assert a derived 5×3h ceiling.
+  assert.equal(MAX_STUDIO_PROJECT_TIMELINE_SECONDS, 10_800);
+  assert.equal(MAX_STUDIO_PROJECT_TIMELINE_SECONDS, MAX_STUDIO_AUDIO_DURATION_SECONDS);
 
   // Normal project
   const normal = snapshot([{ startTime: 0, duration: 2 }]);
@@ -104,9 +110,53 @@ async function main() {
   assert.ok(outArgs.includes("2.000000"));
   assert.ok(outArgs.includes("192k"));
 
-  // ms/sec boundary: 10800s asset and clip OK; 10800.01 rejected at asset field via guard on asset
-  const atMax = snapshot([{ startTime: 0, duration: MAX_STUDIO_AUDIO_DURATION_SECONDS }], MAX_STUDIO_AUDIO_DURATION_SECONDS);
-  assert.equal(assertStudioRenderTimelineSafe(atMax), MAX_STUDIO_AUDIO_DURATION_SECONDS);
+  // Boundary: exactly 10800s end is allowed
+  const atExact = snapshot(
+    [{ startTime: 0, duration: MAX_STUDIO_PROJECT_TIMELINE_SECONDS }],
+    MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
+  );
+  assert.equal(getStudioProjectTimelineEndSeconds(atExact.tracks), MAX_STUDIO_PROJECT_TIMELINE_SECONDS);
+  assert.equal(assertStudioProjectTimelineLimit(atExact.tracks), MAX_STUDIO_PROJECT_TIMELINE_SECONDS);
+  assert.equal(assertStudioRenderTimelineSafe(atExact), MAX_STUDIO_PROJECT_TIMELINE_SECONDS);
+
+  const atExactOffset = snapshot(
+    [{ startTime: 10_799, duration: 1 }],
+    MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
+  );
+  assert.equal(getStudioProjectTimelineEndSeconds(atExactOffset.tracks), 10_800);
+  assert.equal(assertStudioRenderTimelineSafe(atExactOffset), 10_800);
+
+  // 10800 + ε rejected via shared project timeline limit (not startTime-only)
+  const overByEpsilon = snapshot(
+    [{ startTime: 0, duration: MAX_STUDIO_PROJECT_TIMELINE_SECONDS + 0.001 }],
+    MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
+  );
+  assert.throws(
+    () => assertStudioProjectTimelineLimit(overByEpsilon.tracks),
+    (error: unknown) =>
+      error instanceof Error && error.name === "StudioProjectTimelineLimitError",
+  );
+  assert.throws(
+    () => assertStudioRenderTimelineSafe(overByEpsilon),
+    (error: unknown) =>
+      error instanceof Error
+      && error.name === "StudioRenderTimelineGuardError"
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_timeline_too_long",
+  );
+
+  // startTime=10799, duration=2 → end 10801 > 3h
+  const overNearEnd = snapshot(
+    [{ startTime: 10_799, duration: 2 }],
+    MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
+  );
+  assert.equal(getStudioProjectTimelineEndSeconds(overNearEnd.tracks), 10_801);
+  assert.throws(
+    () => assertStudioRenderTimelineSafe(overNearEnd),
+    (error: unknown) =>
+      error instanceof Error
+      && error.name === "StudioRenderTimelineGuardError"
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_timeline_too_long",
+  );
 
   // NaN / Infinity / negative
   for (const bad of [
@@ -135,7 +185,7 @@ async function main() {
     (error: unknown) =>
       error instanceof Error
       && error.name === "StudioRenderTimelineGuardError"
-      && (error as StudioRenderTimelineGuardError).code === "studio_render_gap_too_large",
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_timeline_too_long",
   );
   assert.throws(
     () => buildStudioRenderFilterGraph({
@@ -145,43 +195,30 @@ async function main() {
     (error: unknown) => error instanceof Error && error.name === "StudioRenderTimelineGuardError",
   );
 
-  // Pathological duration vs short asset
+  // Pathological duration → project end >> 3h (shared timeline limit)
   const pathologicalDuration = snapshot([{ startTime: 0, duration: 625_000 }], 3);
   assert.throws(
     () => assertStudioRenderTimelineSafe(pathologicalDuration),
     (error: unknown) =>
       error instanceof Error
       && error.name === "StudioRenderTimelineGuardError"
-      && (error as StudioRenderTimelineGuardError).code === "studio_render_clip_exceeds_asset",
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_timeline_too_long",
   );
 
-  // Legal: two sequential max-length clips on one track (gap 0, startTime at 10800)
-  const legalLong = snapshot(
+  // Two sequential max clips would make 6h — rejected by project timeline max
+  const twoMaxClips = snapshot(
     [
-      { startTime: 0, duration: MAX_STUDIO_AUDIO_DURATION_SECONDS },
-      { startTime: MAX_STUDIO_AUDIO_DURATION_SECONDS, duration: MAX_STUDIO_AUDIO_DURATION_SECONDS },
+      { startTime: 0, duration: MAX_STUDIO_PROJECT_TIMELINE_SECONDS },
+      { startTime: MAX_STUDIO_PROJECT_TIMELINE_SECONDS, duration: 1 },
     ],
-    MAX_STUDIO_AUDIO_DURATION_SECONDS,
-  );
-  assert.equal(
-    assertStudioRenderTimelineSafe(legalLong),
-    MAX_STUDIO_AUDIO_DURATION_SECONDS * 2,
-  );
-
-  // Gap larger than per-asset max rejected (shared with persistence)
-  const bigGap = snapshot(
-    [
-      { startTime: 0, duration: 1 },
-      { startTime: MAX_STUDIO_AUDIO_DURATION_SECONDS + 2, duration: 1 },
-    ],
-    3,
+    MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
   );
   assert.throws(
-    () => assertStudioRenderTimelineSafe(bigGap),
+    () => assertStudioRenderTimelineSafe(twoMaxClips),
     (error: unknown) =>
       error instanceof Error
       && error.name === "StudioRenderTimelineGuardError"
-      && (error as StudioRenderTimelineGuardError).code === "studio_render_gap_too_large",
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_timeline_too_long",
   );
 
   // Production MP3 output args always include -t; missing/invalid duration throws

@@ -1,9 +1,9 @@
 import { getStudioClipEnd } from "./clip-math";
 
 import {
-  isStudioClipDurationAllowed,
-  isStudioClipGapAllowed,
-  isStudioClipStartTimeAllowed,
+  assertStudioProjectTimelineLimit,
+  StudioClipGeometryInvalidError,
+  StudioProjectTimelineLimitError,
 } from "./clip-geometry-limits";
 import {
   parseStudioVoicePreset,
@@ -32,7 +32,8 @@ export type StudioPersistenceErrorCode =
   | "invalid_asset_duration"
   | "missing_asset_duration"
   | "clip_exceeds_asset_duration"
-  | "clip_geometry_too_large";
+  | "clip_geometry_too_large"
+  | "project_timeline_too_long";
 
 export class StudioPersistenceError extends Error {
   constructor(
@@ -184,12 +185,6 @@ function parseClip(value: unknown, path: string): StudioPersistedClip {
   ) {
     fail("invalid_clip", path);
   }
-  if (!isStudioClipStartTimeAllowed(clip.startTime as number)) {
-    fail("clip_geometry_too_large", path);
-  }
-  if (!isStudioClipDurationAllowed(clip.duration as number)) {
-    fail("clip_geometry_too_large", path);
-  }
 
   return {
     id: clip.id,
@@ -339,11 +334,6 @@ function validateRelationships(
       if (index > 0 && clip.startTime < getStudioClipEnd(track.clips[index - 1])) {
         fail("overlapping_clips", `tracks.${track.id}.clips.${clip.id}`);
       }
-      const previousEnd = index > 0 ? getStudioClipEnd(track.clips[index - 1]) : 0;
-      const gap = clip.startTime - previousEnd;
-      if (!isStudioClipGapAllowed(gap)) {
-        fail("clip_geometry_too_large", `tracks.${track.id}.clips.${clip.id}`);
-      }
     }
   }
 
@@ -389,6 +379,17 @@ export function validateStudioProjectDocument(
   const tracks = document.tracks.map((track, index) => parseTrack(track, `tracks[${index}]`));
   validateRelationships(slots, tracks);
   validateAssetDurations(tracks, assetDurations);
+  try {
+    assertStudioProjectTimelineLimit(tracks);
+  } catch (error) {
+    if (error instanceof StudioProjectTimelineLimitError) {
+      fail("project_timeline_too_long", "tracks");
+    }
+    if (error instanceof StudioClipGeometryInvalidError) {
+      fail("invalid_clip", "tracks");
+    }
+    throw error;
+  }
 
   return {
     schemaVersion: STUDIO_PROJECT_SCHEMA_VERSION,
