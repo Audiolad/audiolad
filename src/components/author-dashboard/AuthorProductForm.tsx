@@ -2284,6 +2284,16 @@ export default function AuthorProductForm({
   }
 
   async function deleteAudioItem(audioId: string, hasFile: boolean) {
+    const target = audioItems.find((item) => item.id === audioId);
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC &&
+      isAudioPrepareInFlight(target?.audio_prepare_status)
+    ) {
+      setError(
+        "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.",
+      );
+      return;
+    }
     if (audioItems.length <= 1) {
       setError("У продукта должно остаться хотя бы одно аудио.");
       return;
@@ -2441,6 +2451,16 @@ export default function AuthorProductForm({
   }
 
   async function deleteAudioFile(audioId: string) {
+    const target = audioItems.find((item) => item.id === audioId);
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC &&
+      isAudioPrepareInFlight(target?.audio_prepare_status)
+    ) {
+      setError(
+        "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.",
+      );
+      return;
+    }
     if (!window.confirm("Удалить аудио?")) {
       return;
     }
@@ -4166,7 +4186,10 @@ export default function AuthorProductForm({
                     </label>
                   )}
 
-                  {audioItem.audio_path && !contentLockedAfterSale ? (
+                  {audioItem.audio_path &&
+                  !contentLockedAfterSale &&
+                  (form.productKind === PRODUCT_KIND.MUSIC ||
+                    !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
                     <button
                       type="button"
                       disabled={
@@ -4182,7 +4205,10 @@ export default function AuthorProductForm({
                     </button>
                   ) : null}
 
-                  {audioItems.length > 1 && !contentLockedAfterSale ? (
+                  {audioItems.length > 1 &&
+                  !contentLockedAfterSale &&
+                  (form.productKind === PRODUCT_KIND.MUSIC ||
+                    !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
                     <button
                       type="button"
                       disabled={

@@ -281,6 +281,62 @@ export async function deletePracticeAudioPaths(paths: readonly string[]) {
   }
 }
 
+
+export const AUDIO_PREPARING_CODE = "audio_preparing" as const;
+export const AUDIO_PREPARING_MESSAGE =
+  "Аудио ещё обрабатывается. Дождитесь завершения или загрузите другой файл.";
+
+/** True when desired normalize job is still queued|processing. */
+export async function isProductAudioNormalizeInFlight(
+  practiceId: string,
+  audioId: string,
+): Promise<boolean> {
+  const service = createServiceRoleClient();
+  const { data: item, error: itemError } = await service
+    .from("audio_items")
+    .select("desired_product_audio_normalize_job_id")
+    .eq("id", audioId)
+    .eq("practice_id", practiceId)
+    .maybeSingle();
+  if (itemError) {
+    console.error("author_audio_prepare_inflight_lookup_error", itemError.message);
+    throw new ProductAudioUploadError("internal_error", 500);
+  }
+  const jobId = item?.desired_product_audio_normalize_job_id;
+  if (!jobId || typeof jobId !== "string") {
+    return false;
+  }
+  const { data: job, error: jobError } = await service
+    .from("product_audio_normalize_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .eq("practice_id", practiceId)
+    .eq("audio_item_id", audioId)
+    .maybeSingle();
+  if (jobError) {
+    console.error("author_audio_prepare_job_lookup_error", jobError.message);
+    throw new ProductAudioUploadError("internal_error", 500);
+  }
+  return job?.status === "queued" || job?.status === "processing";
+}
+
+function collectNormalizeCleanupPaths(payload: unknown, neverDelete: readonly string[]): string[] {
+  if (!payload || typeof payload !== "object") return [];
+  const rec = payload as Record<string, unknown>;
+  const out: string[] = [];
+  for (const key of ["cleanup_source_paths", "cleanup_target_paths"] as const) {
+    const arr = rec[key];
+    if (!Array.isArray(arr)) continue;
+    for (const path of arr) {
+      if (typeof path !== "string" || !path.trim()) continue;
+      if (neverDelete.some((blocked) => blocked === path)) continue;
+      out.push(path);
+    }
+  }
+  return out;
+}
+
+
 export async function startProductAudioDirectUpload(input: {
   practiceId: string;
   audioId: string;
@@ -445,38 +501,48 @@ export async function finalizeProductAudioDirectUpload(input: {
       throw new ProductAudioUploadError("update_failed", 500);
     }
   } else {
-    const now = new Date().toISOString();
-    const { data: updatedAudioItem, error: updateError } = await supabase
-      .from("audio_items")
-      .update({
-        audio_path: uploadPath,
-        duration_seconds: inspected.durationSeconds,
-        original_file_name: input.fileName,
-        file_size_bytes: inspected.sizeBytes,
-        status: nextStatus,
-        updated_at: now,
-      })
-      .eq("id", input.audioId)
-      .eq("practice_id", input.practiceId)
-      .select("id")
-      .maybeSingle();
-
-    if (updateError) {
+    const service = createServiceRoleClient();
+    const { data: activatedPayload, error: activateError } = await service.rpc(
+      "activate_product_direct_mp3_delivery",
+      {
+        p_audio_item_id: input.audioId,
+        p_practice_id: input.practiceId,
+        p_audio_path: uploadPath,
+        p_duration_seconds: inspected.durationSeconds,
+        p_original_file_name: input.fileName,
+        p_file_size_bytes: inspected.sizeBytes,
+        p_status: nextStatus,
+      },
+    );
+    if (activateError) {
       await deletePracticeAudioPaths([uploadPath]);
-      if (isProductContentLockedDbError(updateError)) {
+      if (isProductContentLockedDbError(activateError)) {
         throw new ProductAudioUploadError(
           PRODUCT_CONTENT_LOCKED_AFTER_SALE,
           409,
           PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
         );
       }
-      console.error("author_audio_direct_path_update_error", updateError.message);
+      console.error(
+        "author_product_direct_mp3_activate_error",
+        activateError.message,
+      );
       throw new ProductAudioUploadError("internal_error", 500);
     }
-
-    if (!updatedAudioItem?.id) {
+    const activated =
+      activatedPayload &&
+      typeof activatedPayload === "object" &&
+      (activatedPayload as { activated?: unknown }).activated === true;
+    if (!activated) {
       await deletePracticeAudioPaths([uploadPath]);
       throw new ProductAudioUploadError("update_failed", 500);
+    }
+    const normalizeCleanup = collectNormalizeCleanupPaths(activatedPayload, [
+      uploadPath,
+      previousPath ?? "",
+    ].filter(Boolean));
+    if (normalizeCleanup.length > 0) {
+      await deletePracticeAudioPaths(normalizeCleanup);
     }
   }
 
@@ -572,7 +638,7 @@ async function finalizeOrdinarySourceNormalize(input: {
     randomUUID(),
   );
   const service = createServiceRoleClient();
-  const { data: job, error: enqueueError } = await service.rpc(
+  const { data: enqueuePayload, error: enqueueError } = await service.rpc(
     "enqueue_product_audio_normalize_job",
     {
       p_practice_id: input.practiceId,
@@ -585,7 +651,14 @@ async function finalizeOrdinarySourceNormalize(input: {
       p_previous_audio_path: input.audioItem.audio_path,
     },
   );
-  if (enqueueError || !job) {
+  const enqueueJob =
+    enqueuePayload &&
+    typeof enqueuePayload === "object" &&
+    (enqueuePayload as { job?: unknown }).job &&
+    typeof (enqueuePayload as { job: unknown }).job === "object"
+      ? (enqueuePayload as { job: Record<string, unknown> }).job
+      : null;
+  if (enqueueError || !enqueueJob) {
     await deletePracticeAudioPaths([input.uploadPath]);
     if (enqueueError && isProductContentLockedDbError(enqueueError)) {
       throw new ProductAudioUploadError(
@@ -599,6 +672,15 @@ async function finalizeOrdinarySourceNormalize(input: {
       enqueueError?.message,
     );
     throw new ProductAudioUploadError("internal_error", 500);
+  }
+
+  const supersededCleanup = collectNormalizeCleanupPaths(enqueuePayload, [
+    input.uploadPath,
+    targetPath,
+    input.audioItem.audio_path ?? "",
+  ].filter(Boolean));
+  if (supersededCleanup.length > 0) {
+    await deletePracticeAudioPaths(supersededCleanup);
   }
 
   await recordAuthorSupportAudit({
@@ -643,6 +725,30 @@ export async function abandonProductAudioDirectUpload(input: {
     })
   ) {
     throw new ProductAudioUploadError("invalid_request", 400);
+  }
+
+  // After enqueue, audio-sources belong to the normalize job lifecycle.
+  // Client abandon (including lost finalize response) must not delete them.
+  if (parseProductAudioSourcePath(uploadPath)) {
+    const service = createServiceRoleClient();
+    const { data: ownedJob, error: jobLookupError } = await service
+      .from("product_audio_normalize_jobs")
+      .select("id")
+      .eq("practice_id", input.practiceId)
+      .eq("audio_item_id", input.audioId)
+      .eq("source_storage_path", uploadPath)
+      .limit(1)
+      .maybeSingle();
+    if (jobLookupError) {
+      console.error(
+        "author_product_abandon_normalize_lookup_error",
+        jobLookupError.message,
+      );
+      throw new ProductAudioUploadError("internal_error", 500);
+    }
+    if (ownedJob?.id) {
+      return;
+    }
   }
 
   await deletePracticeAudioPaths([uploadPath]);
