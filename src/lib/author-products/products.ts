@@ -4,6 +4,10 @@ import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-build
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  mapProductNormalizeJobToPrepareStatus,
+  type AudioPrepareStatus,
+} from "@/lib/author-products/audio-prepare-status";
 import { loadAuthorPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
 import {
@@ -127,7 +131,8 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   created_at,
   updated_at,
   active_music_delivery_asset_id,
-  desired_music_master_asset_id
+  desired_music_master_asset_id,
+  desired_product_audio_normalize_job_id
 `;
 
 
@@ -337,6 +342,38 @@ export async function listAuthorProducts(
   }));
 }
 
+
+async function loadOrdinaryAudioPrepareStatuses(
+  items: Array<{
+    id: string;
+    desired_product_audio_normalize_job_id?: string | null;
+  }>,
+): Promise<Map<string, AudioPrepareStatus>> {
+  const ids = items
+    .map((item) => item.desired_product_audio_normalize_job_id)
+    .filter((id): id is string => Boolean(id));
+  const map = new Map<string, AudioPrepareStatus>();
+  if (ids.length === 0) return map;
+  const service = createServiceRoleClient();
+  const { data, error } = await service
+    .from("product_audio_normalize_jobs")
+    .select("id, audio_item_id, status")
+    .in("id", ids);
+  if (error) {
+    console.error("product_audio_prepare_status_lookup_failed", error.message);
+    return map;
+  }
+  for (const job of data ?? []) {
+    const status = mapProductNormalizeJobToPrepareStatus(
+      typeof job.status === "string" ? job.status : null,
+    );
+    if (status && typeof job.audio_item_id === "string") {
+      map.set(job.audio_item_id, status);
+    }
+  }
+  return map;
+}
+
 export async function getAuthorProductDetail(
   supabase: SupabaseClient,
   practiceId: string,
@@ -385,6 +422,10 @@ export async function getAuthorProductDetail(
     : new Map();
 
   const durationByActiveStream = await loadActiveStreamDurations(audioItems ?? []);
+  const prepareByItem =
+    practiceRow.product_kind === PRODUCT_KIND.MUSIC
+      ? new Map<string, AudioPrepareStatus>()
+      : await loadOrdinaryAudioPrepareStatuses(audioItems ?? []);
 
   return {
     practice: practiceRow,
@@ -393,10 +434,18 @@ export async function getAuthorProductDetail(
         item.duration_seconds && item.duration_seconds > 0
           ? item.duration_seconds
           : durationByActiveStream.get(item.id) ?? item.duration_seconds;
+      const {
+        desired_product_audio_normalize_job_id: _desiredJobId,
+        ...safeItem
+      } = item as typeof item & {
+        desired_product_audio_normalize_job_id?: string | null;
+      };
+      void _desiredJobId;
       return {
-        ...item,
+        ...safeItem,
         duration_seconds: hydratedDuration ?? null,
         music_master: musicMasterStatus.get(item.id) ?? null,
+        audio_prepare_status: prepareByItem.get(item.id) ?? null,
       };
     }) as AudioItemRow[],
     gallery_slides: gallerySlides,
@@ -547,7 +596,18 @@ export async function createDraftProduct(
 
   return {
     practice: coercePracticeRow(practice as PracticeRow),
-    audio_items: [audioItem as AudioItemRow],
+    audio_items: [
+      (() => {
+        const {
+          desired_product_audio_normalize_job_id: _jobId,
+          ...safeItem
+        } = audioItem as typeof audioItem & {
+          desired_product_audio_normalize_job_id?: string | null;
+        };
+        void _jobId;
+        return { ...safeItem, audio_prepare_status: null };
+      })() as AudioItemRow,
+    ],
     gallery_slides: [],
     seo_content: {
       usageItems: [],

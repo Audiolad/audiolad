@@ -78,6 +78,7 @@ export type AudioItemRow = {
     transcodeStatus: "queued" | "processing" | "ready" | "failed" | null;
     hasActiveDelivery: boolean;
   } | null;
+  audio_prepare_status?: "queued" | "processing" | "failed" | null;
 };
 
 export type PracticeRow = {

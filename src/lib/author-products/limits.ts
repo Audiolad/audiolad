@@ -1,6 +1,7 @@
 import {
   PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
   PRODUCT_AUDIO_WRONG_TYPE_MESSAGE,
+  validateProductAudioFileClient,
   validateProductMp3FileClient,
 } from "@/lib/author-products/mp3-upload-contract";
 import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
@@ -12,12 +13,17 @@ export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 
 export {
   MAX_PRODUCT_AUDIO_BYTES,
+  PRODUCT_AUDIO_FILE_ACCEPT,
   PRODUCT_AUDIO_SIZE_HINT,
   PRODUCT_AUDIO_TOO_LARGE_MESSAGE,
 } from "@/lib/author-products/mp3-upload-contract";
 
 export function validateMp3FileClient(file: File): string | null {
   return validateProductMp3FileClient(file);
+}
+
+export function validateOrdinaryProductAudioFileClient(file: File): string | null {
+  return validateProductAudioFileClient(file);
 }
 
 export function getAudioUploadErrorMessage(

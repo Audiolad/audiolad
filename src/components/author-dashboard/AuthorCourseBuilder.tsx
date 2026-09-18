@@ -29,7 +29,15 @@ import {
   type CourseBuilderSnapshot,
   type CourseCompletionCtaDto,
   type CoursePublishContentSnapshot,
+  COURSE_BUILDER_AUDIO_ACCEPT,
 } from "@/lib/author-products/course-builder-shared";
+import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
+import {
+  AUDIO_PREPARE_FAILED_MESSAGE,
+  AUDIO_PREPARE_PROCESSING_HINT,
+  AUDIO_PREPARE_PROCESSING_STATUS,
+  isAudioPrepareInFlight,
+} from "@/lib/author-products/audio-prepare-status";
 import {
   COURSE_STOREFRONT_PREVIEW_AUDIO_LABEL,
   COURSE_STOREFRONT_PREVIEW_CLEAR_LABEL,
@@ -155,8 +163,10 @@ export default function AuthorCourseBuilder({
   );
 
   const loadSnapshot = useCallback(
-    async (id: string) => {
-      setLoading(true);
+    async (id: string, options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
@@ -191,6 +201,24 @@ export default function AuthorCourseBuilder({
     loadedForIdRef.current = practiceId;
     void loadSnapshot(practiceId);
   }, [loadSnapshot, practiceId]);
+
+  useEffect(() => {
+    if (!practiceId) {
+      return;
+    }
+    const pending = lessons.some((lesson) =>
+      lesson.blocks.some((block) =>
+        isAudioPrepareInFlight(block.audio?.audio_prepare_status),
+      ),
+    );
+    if (!pending) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void loadSnapshot(practiceId, { silent: true });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [lessons, loadSnapshot, practiceId]);
 
   const persistLessonOrder = useCallback(
     async (nextLessons: CourseBuilderLessonDto[]) => {
@@ -819,29 +847,24 @@ function AuthorCourseLessonEditor({
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", file);
-    const response = await fetch(
-      `/api/author/products/${practiceId}/audio/${block.asset_id}/upload`,
-      { method: "POST", body: formData },
-    );
-    const payload = (await response.json()) as {
-      duration_seconds?: number;
-      error?: string;
-      message?: string;
-    };
-
-    if (!response.ok) {
+    const result = await uploadAuthorProductAudioDirect({
+      practiceId,
+      audioId: block.asset_id,
+      file,
+    });
+    if (!result.ok) {
       onError(
         getCourseBuilderAudioUploadError(
-          payload.error,
-          response.status,
-          payload.message,
+          result.error,
+          result.status,
+          result.message,
         ),
       );
       return;
     }
-
+    const uploaded = result.product.audio_items.find(
+      (item) => item.id === block.asset_id,
+    );
     onLessonChange({
       ...lesson,
       blocks: lesson.blocks.map((item) =>
@@ -851,9 +874,12 @@ function AuthorCourseLessonEditor({
               audio: item.audio
                 ? {
                     ...item.audio,
-                    duration_seconds: payload.duration_seconds ?? item.audio.duration_seconds,
-                    audio_path: item.audio.audio_path ?? "uploaded",
-                    original_file_name: file.name,
+                    duration_seconds:
+                      uploaded?.duration_seconds ?? item.audio.duration_seconds,
+                    audio_path: uploaded?.audio_path ?? item.audio.audio_path,
+                    original_file_name:
+                      uploaded?.original_file_name ?? file.name,
+                    audio_prepare_status: uploaded?.audio_prepare_status ?? null,
                   }
                 : item.audio,
             }
@@ -1002,14 +1028,26 @@ function AuthorCourseLessonEditor({
                   }
                 />
                 <p className="text-sm text-[#7d70a2]">
-                  {block.audio?.original_file_name ?? "Файл не загружен"} ·{" "}
-                  {formatDurationLong(block.audio?.duration_seconds ?? null)}
+                  {isAudioPrepareInFlight(block.audio?.audio_prepare_status)
+                    ? AUDIO_PREPARE_PROCESSING_STATUS
+                    : block.audio?.audio_prepare_status === "failed"
+                      ? AUDIO_PREPARE_FAILED_MESSAGE
+                      : block.audio?.original_file_name ?? "Аудио ещё не загружено"}{" "}
+                  · {formatDurationLong(block.audio?.duration_seconds ?? null)}
                 </p>
+                {isAudioPrepareInFlight(block.audio?.audio_prepare_status) ? (
+                  <p className="text-sm text-[#7d70a2]">
+                    {AUDIO_PREPARE_PROCESSING_HINT}
+                  </p>
+                ) : null}
                 <label className="inline-flex cursor-pointer rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">
-                  {block.audio?.audio_path ? "Заменить MP3" : "Загрузить MP3"}
+                  {block.audio?.audio_path ||
+                  isAudioPrepareInFlight(block.audio?.audio_prepare_status)
+                    ? "Заменить аудио"
+                    : "Загрузить аудио"}
                   <input
                     type="file"
-                    accept="audio/mpeg,.mp3"
+                    accept={COURSE_BUILDER_AUDIO_ACCEPT}
                     className="hidden"
                     disabled={disabled}
                     onChange={(event) => {

@@ -3,6 +3,7 @@
  * Phase 2A Author Course Builder: visibility, APIs, DnD, CTA, publish gate.
  */
 import assert from "node:assert/strict";
+import { MAX_PRODUCT_AUDIO_BYTES } from "../src/lib/author-products/product-audio-upload-contract.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -154,7 +155,9 @@ assert.doesNotMatch(
   /requireCourseBuilderMutationAccess/,
   "published courses can configure storefront preview without unpublishing",
 );
-assert.match(builder, /\/api\/author\/products\/\$\{.*\}\/audio\/\$\{.*\}\/upload/);
+assert.match(builder, /uploadAuthorProductAudioDirect/);
+assert.match(builder, /Загрузить аудио/);
+assert.doesNotMatch(builder, /Загрузить MP3/);
 assert.match(builder, /\/api\/author\/products\/\$\{practiceId\}\/course\/files\//);
 assert.doesNotMatch(builder, /promo_/);
 assert.doesNotMatch(builder, /@dnd-kit/);
@@ -689,14 +692,17 @@ assert.doesNotMatch(catalogCard, /AuthorCourseBuilder/);
 assert.doesNotMatch(catalogCard, /course_lessons/);
 
 assert.equal(COURSE_BUILDER_PDF_HINT, "PDF — до 10 МБ");
-assert.equal(COURSE_BUILDER_AUDIO_HINT, "Аудио — до 50 МБ");
+assert.equal(COURSE_BUILDER_AUDIO_HINT, "MP3, WAV, M4A, AAC · до 300 МБ");
 assert.equal(COURSE_BUILDER_PDF_TOO_LARGE, "PDF-файл должен быть не больше 10 МБ.");
 assert.equal(COURSE_BUILDER_PDF_WRONG_TYPE, "Можно загрузить только PDF-файл.");
 assert.equal(
   COURSE_BUILDER_AUDIO_TOO_LARGE,
-  "Аудиофайл должен быть не больше 50 МБ.",
+  "Размер аудиофайла не должен превышать 300 МБ.",
 );
-assert.equal(COURSE_BUILDER_AUDIO_WRONG_TYPE, "Загрузите аудиофайл в формате MP3.");
+assert.equal(
+  COURSE_BUILDER_AUDIO_WRONG_TYPE,
+  "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.",
+);
 assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 10 * 1024 * 1024);
 assert.equal(PUBLICATION_FILE_LIMITS.maxPdfBytes, PUBLICATION_FILE_MAX_PDF_BYTES);
 assert.equal(MAX_AUDIO_BYTES, 50 * 1024 * 1024);
@@ -820,22 +826,34 @@ assert.equal(
     fakeAudioFile({ size: PUBLICATION_FILE_MAX_PDF_BYTES }),
   ),
   null,
-  "audio under 50 MB accepted",
+  "audio under product limit accepted",
 );
 assert.equal(
   validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_AUDIO_BYTES })),
   null,
-  "audio at 50 MB accepted",
+  "audio at former 50 MB still accepted under 300 MB product contract",
 );
 assert.equal(
-  validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_AUDIO_BYTES + 1 })),
+  validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_PRODUCT_AUDIO_BYTES })),
+  null,
+  "audio at 300 MB accepted",
+);
+assert.equal(
+  validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_PRODUCT_AUDIO_BYTES + 1 })),
   COURSE_BUILDER_AUDIO_TOO_LARGE,
 );
 assert.equal(
   validateCourseBuilderAudioFile(
     fakeAudioFile({ name: "lesson.wav", type: "audio/wav", size: 1024 }),
   ),
-  COURSE_BUILDER_AUDIO_WRONG_TYPE,
+  null,
+  "WAV accepted for ordinary course audio",
+);
+assert.equal(
+  validateCourseBuilderAudioFile(
+    fakeAudioFile({ name: "lesson.m4a", type: "audio/mp4", size: 1024 }),
+  ),
+  null,
 );
 assert.equal(
   getCourseBuilderAudioUploadError("invalid_file_size", 400),
@@ -857,7 +875,7 @@ const authorAudioLimits = read("src/lib/author-products/limits.ts");
 const personalLimits = read("src/lib/personal-materials/types.ts");
 assert.match(studioProvider, /MAX_STUDIO_PROJECT_BYTES/);
 assert.doesNotMatch(studioEditor, /COURSE_BUILDER_AUDIO_TOO_LARGE/);
-assert.match(authorForm, /validateMp3FileClient/);
+assert.match(authorForm, /validateOrdinaryProductAudioFileClient/);
 assert.match(authorForm, /getAudioUploadErrorMessage/);
 assert.match(authorForm, /uploadAuthorProductAudioDirect/);
 assert.doesNotMatch(authorForm, /validateCourseBuilderAudioFile/);
@@ -868,6 +886,10 @@ assert.match(
 );
 assert.match(
   read("src/lib/author-products/mp3-upload-contract.ts"),
+  /PRODUCT_AUDIO_TOO_LARGE_MESSAGE/,
+);
+assert.match(
+  read("src/lib/author-products/product-audio-upload-contract.ts"),
   /Размер аудиофайла не должен превышать 300 МБ/,
 );
 assert.match(personalLimits, /maxPdfBytes: 20 \* 1024 \* 1024/);

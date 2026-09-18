@@ -1,6 +1,7 @@
 /**
  * Product audio M4A/AAC → MP3 normalize worker CLI.
- * Foundation only: NOT wired into PM2 / production deploy lifecycle in Slice 1.
+ * Production PM2 name is audiolad-product-audio-normalize-worker via
+ * deploy/product-audio-normalize-worker.ecosystem.config.cjs.
  *
  * Usage:
  *   npx tsx scripts/run-product-audio-normalize-worker.mts
@@ -19,6 +20,11 @@ import {
   PRODUCT_AUDIO_NORMALIZE_SHUTDOWN_DRAIN_MS as CONTRACT_DRAIN,
 } from "../src/lib/product-audio-normalize/contract";
 import { createProductAudioNormalizeWorkerPort } from "../src/lib/product-audio-normalize/worker-runtime";
+import {
+  captureProductAudioNormalizeBootRelease,
+  compareProductAudioNormalizeRelease,
+  formatProductAudioNormalizeWorkerBootLog,
+} from "../src/lib/product-audio-normalize/worker-release";
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -44,6 +50,9 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const port = createProductAudioNormalizeWorkerPort(service);
+  const boot = await captureProductAudioNormalizeBootRelease();
+  const bootComparison = await compareProductAudioNormalizeRelease({ boot });
+  console.log(formatProductAudioNormalizeWorkerBootLog(bootComparison));
   const maxJobsRaw = process.env.PRODUCT_AUDIO_NORMALIZE_MAX_JOBS;
   const maxJobs =
     maxJobsRaw && Number.isFinite(Number(maxJobsRaw))
@@ -60,6 +69,7 @@ async function main() {
       CONTRACT_DRAIN,
     ),
     maxJobs,
+    checkRelease: () => compareProductAudioNormalizeRelease({ boot }),
   });
 
   const onSignal = (signal: NodeJS.Signals) => {

@@ -1,6 +1,6 @@
 /**
  * Compatibility shim. Prefer `product-audio-upload-contract` for source formats.
- * Visible author UI remains MP3-only via the re-exported client helpers.
+ * Prefer product-audio-upload-contract for live ordinary formats.
  */
 export {
   PRACTICE_AUDIO_BUCKET,
@@ -16,6 +16,8 @@ export {
   isProductMp3SizeAllowed,
   validateProductMp3Descriptor,
   validateProductMp3FileClient,
+  validateProductAudioFileClient,
+  PRODUCT_AUDIO_FILE_ACCEPT,
   buildVersionedProductAudioPath,
   isOwnedVersionedProductAudioPath,
   hasExistingMusicCurrentAudio,
