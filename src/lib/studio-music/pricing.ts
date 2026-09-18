@@ -302,9 +302,10 @@ export function defaultStudioMusicPricingModeForForm(input: {
   if (!input.reuseAllowed) {
     return null;
   }
-  return input.listenerIsFree
-    ? STUDIO_MUSIC_PRICING_MODE.FREE
-    : STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER;
+  // New Studio reuse is paid-only. Listener-free products default to FIXED 499₽;
+  // listener-paid may still pick AUTO_2X (floor 499) in the form.
+  void input.listenerIsFree;
+  return STUDIO_MUSIC_PRICING_MODE.FIXED;
 }
 
 export function studioMusicPricingModeAfterListenerFlip(input: {
@@ -315,12 +316,15 @@ export function studioMusicPricingModeAfterListenerFlip(input: {
   if (!input.reuseAllowed) {
     return null;
   }
+  // AUTO is invalid for listener-free; fall back to FIXED (never FREE).
   if (
     input.listenerIsFree &&
     input.currentMode === STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER
   ) {
-    return null;
+    return STUDIO_MUSIC_PRICING_MODE.FIXED;
   }
+  // Leaving a grandfathered FREE when listener flips is allowed only if the
+  // author keeps FREE explicitly; new defaults never invent FREE.
   if (!input.currentMode) {
     return defaultStudioMusicPricingModeForForm(input);
   }

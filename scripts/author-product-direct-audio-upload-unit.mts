@@ -401,7 +401,7 @@ const formUi = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(formUi, /isAudioPrepareInFlight\(target\?\.audio_prepare_status\)/);
 assert.match(formUi, /!isAudioPrepareInFlight\(audioItem\.audio_prepare_status\)/);
 
-const wavMig = read("supabase/migrations/20261009120300_practice_audio_allow_wav_normalize.sql");
+const wavMig = read("supabase/migrations/20261009120400_practice_audio_allow_wav_normalize.sql");
 assert.match(wavMig, /activate_product_direct_mp3_delivery/);
 assert.match(wavMig, /RETURNS jsonb/);
 assert.match(wavMig, /cleanup_source_paths/);

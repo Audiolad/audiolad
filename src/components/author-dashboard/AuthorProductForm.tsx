@@ -169,6 +169,7 @@ import {
   studioMusicPricingModeAfterListenerFlip,
   type StudioMusicPricingMode,
 } from "@/lib/studio-music/pricing";
+import { STUDIO_NEW_FREE_POLICY_COPY } from "@/lib/studio-music/new-free-policy";
 import {
   createDefaultListeningNoticeFormState,
   DEFAULT_LISTENING_NOTICE_TEXT,
@@ -3109,20 +3110,31 @@ export default function AuthorProductForm({
                   className="mt-1"
                   checked={form.musicUsagePermission === value}
                   disabled={busy}
-                  onChange={() =>
+                  onChange={() => {
+                    if (
+                      value === MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
+                    ) {
+                      const nextMode = defaultStudioMusicPricingModeForForm({
+                        reuseAllowed: true,
+                        listenerIsFree: form.isFree,
+                      });
+                      setStudioMusicPriceDraft(
+                        String(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES),
+                      );
+                      setForm((current) => ({
+                        ...current,
+                        musicUsagePermission: value,
+                        studioMusicPricingMode: nextMode,
+                        studioMusicPriceRubles: DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+                      }));
+                      return;
+                    }
                     setForm((current) => ({
                       ...current,
                       musicUsagePermission: value,
-                      studioMusicPricingMode:
-                        value ===
-                        MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
-                          ? defaultStudioMusicPricingModeForForm({
-                              reuseAllowed: true,
-                              listenerIsFree: current.isFree,
-                            })
-                          : null,
-                    }))
-                  }
+                      studioMusicPricingMode: null,
+                    }));
+                  }}
                 />
                 <span>
                   <span className="block text-sm font-medium text-[#3f3560]">
@@ -3148,12 +3160,23 @@ export default function AuthorProductForm({
               Разрешите другим авторам использовать вашу музыку при создании
               медитаций и практик.
             </p>
+            <p className="text-sm leading-5 text-[#7d70a2]">
+              {STUDIO_NEW_FREE_POLICY_COPY.newProductsPaidOnly}
+            </p>
+            {form.studioMusicPricingMode === STUDIO_MUSIC_PRICING_MODE.FREE ? (
+              <p className="text-sm leading-5 text-[#7d70a2]">
+                {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredKept}{" "}
+                {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredExplain}
+              </p>
+            ) : null}
             {(
               [
                 {
                   value: STUDIO_MUSIC_PRICING_MODE.FREE,
-                  label: "Бесплатно для Студии",
-                  show: true,
+                  label: "Бесплатно — сохранено ранее",
+                  show:
+                    form.studioMusicPricingMode ===
+                    STUDIO_MUSIC_PRICING_MODE.FREE,
                 },
                 {
                   value: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,

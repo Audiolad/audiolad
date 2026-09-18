@@ -179,6 +179,16 @@ assert.equal(
   "support_blocked",
 );
 assert.equal(classifyProductSaveError({ error: "slug_taken", status: 409 }), "conflict");
+assert.equal(classifyProductSaveError({ error: "studio_new_free_disabled", status: 409 }), "conflict");
+assert.match(
+  getProductSaveErrorMessage({ error: "studio_new_free_disabled", status: 409 }),
+  /платн/,
+);
+assert.doesNotMatch(
+  getProductSaveErrorMessage({ error: "studio_new_free_disabled", status: 409 }),
+  /бесплатный трек/,
+);
+
 assert.equal(
   classifyProductSaveError({ error: "audio_relation_failed", status: 500 }),
   "audio_relation",
