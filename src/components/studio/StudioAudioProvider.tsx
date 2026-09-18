@@ -390,7 +390,7 @@ function syncTrackMediaPlayback(
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
       const { previous, next } = studioClipTimelineNeighbors(track.clips, clip);
-      const enterHandoff = resolveStudioClipEnterHandoff({ clip, previous });
+      const enterHandoff = resolveStudioClipEnterHandoff({ clip, previous, next });
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
       if (enterHandoff === "from-silence") {

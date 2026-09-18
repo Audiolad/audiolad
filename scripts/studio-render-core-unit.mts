@@ -507,7 +507,13 @@ async function main() {
       snapshot: splitFadeInSnapshot,
       localAssetPaths: fixturePaths,
     }).filterComplex;
+    const leftFadeInComplement = splitFadeInGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
     const rightFadeInFilter = splitFadeInGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(
+      leftFadeInComplement,
+      /afade=t=out:st=0\.190000:d=0\.010000:curve=tri/,
+      "right-only fade-in gets complementary left tech fade-out",
+    );
     assert.match(rightFadeInFilter, /afade=t=in:st=0:d=0\.500000:curve=tri/);
     assert.doesNotMatch(rightFadeInFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
     const splitFadeInRendered = await renderFixturePcm(
@@ -516,7 +522,12 @@ async function main() {
       splitFadeInSnapshot,
       fixturePaths,
     );
-    assert(framePeak(splitFadeInRendered.samples, Math.round(0.2 * RATE)) < 0.05, "authored fade-in starts near 0");
+    const fiSeam = Math.round(0.2 * RATE);
+    assert(
+      framePeak(splitFadeInRendered.samples, fiSeam - Math.round(0.001 * RATE)) < 0.05,
+      "left complementary tech fade-out reaches ~0 just before seam",
+    );
+    assert(framePeak(splitFadeInRendered.samples, fiSeam) < 0.05, "authored fade-in starts near 0 at seam");
     assert(
       Math.abs(framePeak(splitFadeInRendered.samples, Math.round(0.45 * RATE)) - 0.125) < 0.02,
       "authored fade-in mid point ~0.5 gain on 0.25 amplitude",
@@ -540,13 +551,20 @@ async function main() {
       localAssetPaths: fixturePaths,
     }).filterComplex;
     const leftFadeOutFilter = splitFadeOutGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const rightFadeOutComplement = splitFadeOutGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
     assert.match(leftFadeOutFilter, /afade=t=out:st=0\.300000:d=0\.500000:curve=tri/);
+    assert.match(
+      rightFadeOutComplement,
+      /afade=t=in:st=0:d=0\.010000:curve=tri/,
+      "left-only fade-out gets complementary right tech fade-in",
+    );
     const splitFadeOutRendered = await renderFixturePcm(
       root,
       "contiguous-split-authored-fade-out",
       splitFadeOutSnapshot,
       fixturePaths,
     );
+    const foSeam = Math.round(0.8 * RATE);
     assert(
       Math.abs(framePeak(splitFadeOutRendered.samples, Math.round(0.3 * RATE)) - 0.25) < 0.02,
       "before authored fade-out stays full",
@@ -556,9 +574,37 @@ async function main() {
       "authored fade-out mid point",
     );
     assert(
-      framePeak(splitFadeOutRendered.samples, Math.round(0.8 * RATE) - 1) < 0.05,
+      framePeak(splitFadeOutRendered.samples, foSeam - 1) < 0.05,
       "authored fade-out reaches near 0 at left end",
     );
+    assert(
+      framePeak(splitFadeOutRendered.samples, foSeam) < 0.05,
+      "complementary tech fade-in starts near 0 at seam",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, foSeam + Math.round(0.01 * RATE)) - 0.25) < 0.03,
+      "complementary tech fade-in reaches full after 10 ms",
+    );
+
+    // Both authored on contiguous seam: no complementary technical ramps.
+    const bothAuthoredSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-both", startTime: 0, offset: 0, duration: 0.5, fadeInDuration: 0, fadeOutDuration: 0.2 },
+        { id: "split-right-both", startTime: 0.5, offset: 0.5, duration: 0.5, fadeInDuration: 0.2, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const bothGraph = buildStudioRenderFilterGraph({
+      snapshot: bothAuthoredSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const bothLeftFilter = bothGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const bothRightFilter = bothGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(bothLeftFilter, /afade=t=out:st=0\.300000:d=0\.200000:curve=tri/);
+    assert.doesNotMatch(bothLeftFilter, /afade=t=out:st=0\.490000:d=0\.010000:curve=tri/);
+    assert.match(bothRightFilter, /afade=t=in:st=0:d=0\.200000:curve=tri/);
+    assert.doesNotMatch(bothRightFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
 
     const fadeCases = [
       {

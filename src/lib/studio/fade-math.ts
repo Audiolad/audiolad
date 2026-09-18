@@ -91,17 +91,22 @@ export function isStudioContiguousSourceSeam(
   );
 }
 
+export type StudioClipBoundaryNeighbor = StudioClipBoundaryGeometry &
+  Partial<StudioClipFades>;
+
 export type StudioPlaybackFadeBoundaries = {
   clip: StudioClipBoundaryGeometry;
-  previous?: StudioClipBoundaryGeometry | null;
-  next?: StudioClipBoundaryGeometry | null;
+  previous?: StudioClipBoundaryNeighbor | null;
+  next?: StudioClipBoundaryNeighbor | null;
 };
 
 /**
  * Playback/render fades with boundary-aware technical de-click:
  * - silence / project edge / non-contiguous hard cut → technical ramp
- * - contiguous same-source split seam → no artificial in/out dip
- * - authored user fades always win when longer than technical
+ * - untouched contiguous seam (both authored edges 0) → flat / flat
+ * - one-sided authored fade on a contiguous seam → complementary 10 ms
+ *   technical ramp on the opposite side (avoids 1→0 / 0→1 clicks)
+ * - both sides authored → authored values
  * Authored fadeInDuration/fadeOutDuration in project_data stay unchanged.
  */
 export function resolveStudioPlaybackClipFades(
@@ -120,39 +125,60 @@ export function resolveStudioPlaybackClipFades(
     offset: 0,
     duration,
   };
-  const skipTechnicalIn = Boolean(
-    boundaries?.previous &&
-      isStudioContiguousSourceSeam(boundaries.previous, clip),
+  const previous = boundaries?.previous ?? null;
+  const next = boundaries?.next ?? null;
+  const contiguousPrev = Boolean(
+    previous && isStudioContiguousSourceSeam(previous, clip),
   );
-  const skipTechnicalOut = Boolean(
-    boundaries?.next && isStudioContiguousSourceSeam(clip, boundaries.next),
+  const contiguousNext = Boolean(
+    next && isStudioContiguousSourceSeam(clip, next),
   );
-  return clampStudioClipFades(
-    {
-      fadeInDuration: skipTechnicalIn
-        ? clamped.fadeInDuration
-        : Math.max(clamped.fadeInDuration, technical),
-      fadeOutDuration: skipTechnicalOut
-        ? clamped.fadeOutDuration
-        : Math.max(clamped.fadeOutDuration, technical),
-    },
-    duration,
-  );
+
+  let fadeInDuration = clamped.fadeInDuration;
+  let fadeOutDuration = clamped.fadeOutDuration;
+
+  if (!contiguousPrev) {
+    fadeInDuration = Math.max(fadeInDuration, technical);
+  } else if (fadeInDuration <= 0) {
+    const previousFadeOut = finiteNonNegative(previous?.fadeOutDuration);
+    if (previousFadeOut > 0) {
+      // Left authored fade-out → complementary technical fade-in on right.
+      fadeInDuration = technical;
+    }
+  }
+
+  if (!contiguousNext) {
+    fadeOutDuration = Math.max(fadeOutDuration, technical);
+  } else if (fadeOutDuration <= 0) {
+    const nextFadeIn = finiteNonNegative(next?.fadeInDuration);
+    if (nextFadeIn > 0) {
+      // Right authored fade-in → complementary technical fade-out on left.
+      fadeOutDuration = technical;
+    }
+  }
+
+  return clampStudioClipFades({ fadeInDuration, fadeOutDuration }, duration);
 }
 
 export type StudioClipEnterHandoff = "flat" | "fade-in" | "from-silence";
 
 /**
  * How preview should open when entering `clip` from `previous`.
- * Contiguous same-source seams stay flat only when the right clip has no
- * authored fade-in; an explicit fade-in must still ramp 0→1.
+ * Flat only for untouched contiguous seams; authored or complementary
+ * fade-in both open from 0.
  */
 export function resolveStudioClipEnterHandoff(input: {
   clip: StudioClipBoundaryGeometry & Partial<StudioClipFades>;
-  previous?: StudioClipBoundaryGeometry | null;
+  previous?: StudioClipBoundaryNeighbor | null;
+  next?: StudioClipBoundaryNeighbor | null;
 }): StudioClipEnterHandoff {
   if (input.previous && isStudioContiguousSourceSeam(input.previous, input.clip)) {
-    return finiteNonNegative(input.clip.fadeInDuration) > 0 ? "fade-in" : "flat";
+    const fades = resolveStudioPlaybackClipFades(input.clip, input.clip.duration, {
+      clip: input.clip,
+      previous: input.previous,
+      next: input.next ?? null,
+    });
+    return fades.fadeInDuration > 0 ? "fade-in" : "flat";
   }
   return "from-silence";
 }

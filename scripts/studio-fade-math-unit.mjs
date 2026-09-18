@@ -142,6 +142,16 @@ const rightFadesAuthored = resolveStudioPlaybackClipFades(
   { clip: rightWithFadeIn, previous: split.left, next: null },
 );
 assert.equal(rightFadesAuthored.fadeInDuration, 0.5);
+const leftComplementary = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: rightWithFadeIn,
+});
+assert.equal(
+  leftComplementary.fadeOutDuration,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  "right-only authored fade-in needs complementary left tech fade-out",
+);
 assert.equal(
   getStudioFadeEnvelope(0, rightWithFadeIn.duration, rightFadesAuthored),
   0,
@@ -163,6 +173,25 @@ const leftFadesAuthored = resolveStudioPlaybackClipFades(
 );
 assert.equal(leftFadesAuthored.fadeOutDuration, 0.5);
 assert.equal(leftFadesAuthored.fadeInDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+const rightComplementary = resolveStudioPlaybackClipFades(split.right, split.right.duration, {
+  clip: split.right,
+  previous: leftWithFadeOut,
+  next: null,
+});
+assert.equal(
+  rightComplementary.fadeInDuration,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  "left-only authored fade-out needs complementary right tech fade-in",
+);
+assert.equal(
+  resolveStudioClipEnterHandoff({
+    clip: split.right,
+    previous: leftWithFadeOut,
+    next: null,
+  }),
+  "fade-in",
+  "complementary tech fade-in is not a flat handoff",
+);
 assert.equal(
   getStudioFadeEnvelope(leftWithFadeOut.duration - 0.5, leftWithFadeOut.duration, leftFadesAuthored),
   1,
@@ -175,6 +204,22 @@ assert.equal(
   getStudioFadeEnvelope(leftWithFadeOut.duration, leftWithFadeOut.duration, leftFadesAuthored),
   0,
 );
+
+const bothAuthoredLeft = { ...split.left, fadeInDuration: 0, fadeOutDuration: 0.4 };
+const bothAuthoredRight = { ...split.right, fadeInDuration: 0.3, fadeOutDuration: 0 };
+const bothLeft = resolveStudioPlaybackClipFades(bothAuthoredLeft, bothAuthoredLeft.duration, {
+  clip: bothAuthoredLeft,
+  previous: null,
+  next: bothAuthoredRight,
+});
+const bothRight = resolveStudioPlaybackClipFades(bothAuthoredRight, bothAuthoredRight.duration, {
+  clip: bothAuthoredRight,
+  previous: bothAuthoredLeft,
+  next: null,
+});
+assert.equal(bothLeft.fadeOutDuration, 0.4);
+assert.equal(bothRight.fadeInDuration, 0.3);
+
 assert.equal(
   resolveStudioClipEnterHandoff({ clip: split.right, previous: null }),
   "from-silence",
