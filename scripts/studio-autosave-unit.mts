@@ -183,6 +183,141 @@ assert.equal(
   "navigation flush refuses to settle after a save error",
 );
 
+
+// Race: assets unblock -> pending debounce with stale asset-uploading -> flushAndWait
+// must save immediately instead of clearing the timer and returning false.
+{
+  let raceSnapshot: StudioAutosaveSnapshot = {
+    name: "Race",
+    document: document(50),
+    blocked: "assets",
+  };
+  const raceCalls: Array<{ expectedRevision: number; name: string }> = [];
+  let resolveRace: ((value: { revision: number }) => void) | null = null;
+  const race = new StudioAutosaveController({
+    getSnapshot: () => raceSnapshot,
+    timers: fakeTimers,
+    debounceMs: 1500,
+    update: (input) => {
+      raceCalls.push({ expectedRevision: input.expectedRevision, name: input.name });
+      return new Promise((resolve) => {
+        resolveRace = resolve;
+      });
+    },
+  });
+  race.hydrate({ revision: 10, name: "Race", document: document(), complete: true });
+  race.markDirty();
+  assert.equal(race.getState().status, "asset-uploading", "blocked assets set asset-uploading");
+  assert.equal(timers.size, 0, "blocked schedule arms no debounce timer");
+
+  raceSnapshot = {
+    name: "Race ready",
+    document: document(51),
+    blocked: undefined,
+  };
+  race.notifyAssetBound();
+  assert.equal(timers.size, 1, "unblocked notifyAssetBound arms debounce");
+  assert.notEqual(
+    race.getState().status,
+    "asset-uploading",
+    "unblocked schedule clears stale asset-uploading before debounce",
+  );
+  assert.equal(raceCalls.length, 0, "debounce has not fired yet");
+
+  const flushed = race.flushAndWait();
+  assert.equal(timers.size, 0, "flushAndWait clears the pending debounce timer");
+  assert.equal(raceCalls.length, 1, "flushAndWait immediately PUTs after assets are saved");
+  assert.equal(raceCalls[0].name, "Race ready");
+  assert.equal(race.getState().status, "saving");
+  (resolveRace as unknown as (value: { revision: number }) => void)({ revision: 11 });
+  await tick();
+  assert.equal(await flushed, true, "flushAndWait resolves true after the revision save");
+  assert.equal(race.getState().status, "saved");
+  assert.equal(race.getState().revision, 11);
+  assert.equal(race.getState().dirty, false);
+}
+
+// flushAndWait while assets are still uploading waits, then saves after notifyAssetBound.
+{
+  let waitSnapshot: StudioAutosaveSnapshot = {
+    name: "Wait",
+    document: document(60),
+    blocked: "assets",
+  };
+  const waitCalls: Array<{ name: string }> = [];
+  let resolveWait: ((value: { revision: number }) => void) | null = null;
+  const waiting = new StudioAutosaveController({
+    getSnapshot: () => waitSnapshot,
+    timers: fakeTimers,
+    debounceMs: 1500,
+    update: (input) => {
+      waitCalls.push({ name: input.name });
+      return new Promise((resolve) => {
+        resolveWait = resolve;
+      });
+    },
+  });
+  waiting.hydrate({ revision: 1, name: "Wait", document: document(), complete: true });
+  waiting.markDirty();
+  const pendingFlush = waiting.flushAndWait();
+  assert.equal(waitCalls.length, 0, "still-uploading flush does not PUT yet");
+  assert.equal(waiting.getState().status, "asset-uploading");
+
+  waitSnapshot = {
+    name: "Wait saved",
+    document: document(61),
+  };
+  waiting.notifyAssetBound();
+  assert.equal(waitCalls.length, 1, "waiter skips debounce and saves as soon as assets bind");
+  assert.equal(waitCalls[0].name, "Wait saved");
+  (resolveWait as unknown as (value: { revision: number }) => void)({ revision: 2 });
+  await tick();
+  assert.equal(await pendingFlush, true, "one Create MP3 click can wait through upload+save");
+  assert.equal(waiting.getState().revision, 2);
+}
+
+// Asset error must fail flush as a recoverable error, not a "please wait" hang.
+{
+  let errorSnapshot: StudioAutosaveSnapshot = {
+    name: "Asset err",
+    document: document(70),
+    blocked: "asset-error",
+  };
+  const errored = new StudioAutosaveController({
+    getSnapshot: () => errorSnapshot,
+    timers: fakeTimers,
+    update: async () => ({ revision: 99 }),
+  });
+  errored.hydrate({ revision: 1, name: "Asset err", document: document(), complete: true });
+  errored.markDirty();
+  assert.equal(errored.getState().status, "error");
+  assert.equal(
+    await errored.flushAndWait(),
+    false,
+    "asset-error flush returns false immediately",
+  );
+  assert.equal(errored.getState().status, "error");
+
+  // Retry path: uploading -> saved -> Create MP3 flush succeeds on the first click.
+  errorSnapshot = {
+    name: "Asset err",
+    document: document(70),
+    blocked: "assets",
+  };
+  errored.notifyAssetBound();
+  assert.equal(errored.getState().status, "asset-uploading");
+  const afterRetryFlush = errored.flushAndWait();
+  errorSnapshot = {
+    name: "Asset fixed",
+    document: document(71),
+  };
+  errored.notifyAssetBound();
+  await tick();
+  assert.equal(await afterRetryFlush, true, "retry then one flush saves revision");
+  assert.equal(errored.getState().revision, 99);
+  assert.equal(errored.getState().status, "saved");
+}
+
 assert(states.includes("saving") && states.includes("saved") && states.includes("conflict"));
 const shell = await readFile(
   new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url), "utf8",
@@ -204,6 +339,21 @@ assert.match(shell, /assetPersistenceStatus !== "saved"/);
 assert.match(shell, /useRouter/);
 assert.match(shell, /flushAndWait\(\)/);
 assert.match(shell, /navigationInProgressRef/);
+assert.match(shell, /createMp3Disabled/);
+assert.match(shell, /hasAssetPersistenceError/);
+assert.match(shell, /exportPhase === "flushing"/);
+assert.match(shell, /Сохраняем проект…/);
+assert.match(shell, /Не удалось сохранить аудио/);
+assert.match(shell, /Нажмите «Повторить» у дорожки/);
+assert.doesNotMatch(
+  shell,
+  /throw new Error\("Сначала дождитесь сохранения проекта и аудиофайлов\."\)/,
+  "export no longer uses the misleading wait message as the primary failure",
+);
+assert.match(
+  shell,
+  /Не удалось сохранить проект\. Нажмите «Сохранить» и попробуйте снова\./,
+);
 assert.match(
   shell,
   /href="\/studio\/projects"\s+onClick=\{\(event\) => void navigateToMyProjects\(event\)\}/,

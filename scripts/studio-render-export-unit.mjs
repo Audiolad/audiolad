@@ -49,6 +49,12 @@ const catalogSource = read("src/lib/studio/render/catalog-source.ts");
 assert.match(catalogSource, /practice-audio/);
 assert.doesNotMatch(render, /practice-audio/);
 assert.match(shell, /Создаём MP3/);
+
+assert.match(shell, /createMp3Disabled/);
+assert.match(shell, /hasAssetPersistenceError/);
+assert.match(shell, /Сохраняем проект…/);
+assert.doesNotMatch(shell, /throw new Error\("Сначала дождитесь сохранения проекта и аудиофайлов\."\)/);
+
 assert.match(shell, /Скачать MP3/);
 assert.match(shell, /studio-mp3-render-sweep/);
 assert.match(shell, /relative h-10 overflow-hidden/);

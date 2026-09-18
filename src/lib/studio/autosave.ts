@@ -133,12 +133,47 @@ export class StudioAutosaveController {
   /**
    * Immediately persists outstanding edits and resolves only after they are
    * saved, or when saving can no longer make progress.
+   *
+   * Re-reads getSnapshot() so a stale status (for example asset-uploading left
+   * behind after assets already became saved) cannot cancel a pending debounce
+   * and then refuse the flush. While assets are still uploading, waiters stay
+   * pending until uploads finish and the project revision is saved.
    */
   flushAndWait(): Promise<boolean> {
     this.clearTimer();
+    if (!this.enabled || this.conflict) {
+      return Promise.resolve(false);
+    }
+
+    const snapshot = this.options.getSnapshot();
+    if (snapshot.blocked === "partial") {
+      this.status = "partial-disabled";
+      this.emit();
+      return Promise.resolve(false);
+    }
+    if (snapshot.blocked === "asset-error") {
+      this.status = "error";
+      this.emit();
+      return Promise.resolve(false);
+    }
+    if (snapshot.blocked === "assets") {
+      // Still uploading: keep settle waiters until notifyAssetBound unblocks.
+      this.status = "asset-uploading";
+      const settled = new Promise<boolean>((resolve) => {
+        this.settleWaiters.push(resolve);
+      });
+      this.emit();
+      return settled;
+    }
+
+    // Snapshot is no longer blocked — drop a stale asset-uploading status that
+    // schedule() may have left while arming the debounce timer.
+    if (this.status === "asset-uploading") {
+      this.status = this.inFlight ? "saving" : "saved";
+    }
+
     const state = this.getState();
-    if (!this.enabled || this.conflict || state.status === "error" ||
-      state.status === "asset-uploading" || state.status === "partial-disabled") {
+    if (state.status === "error" || state.status === "partial-disabled") {
       return Promise.resolve(false);
     }
     if (!state.dirty && !state.isInFlight && state.status === "saved") {
@@ -178,6 +213,15 @@ export class StudioAutosaveController {
         ? "partial-disabled"
         : snapshot.blocked === "asset-error" ? "error" : "asset-uploading";
       this.emit();
+      return;
+    }
+    // Assets just became ready: clear stale asset-uploading before debounce/UI.
+    if (this.status === "asset-uploading") {
+      this.status = "saved";
+    }
+    // A flushAndWait waiter must not sit behind the debounce window.
+    if (this.settleWaiters.length) {
+      this.saveNow();
       return;
     }
     this.timer = this.timers.setTimeout(() => {
@@ -256,8 +300,10 @@ export class StudioAutosaveController {
   private emit() {
     this.options.onChange?.(this.getState());
     const state = this.getState();
+    // asset-uploading is progress, not failure: keep flushAndWait pending until
+    // uploads finish and the project document is saved (or a terminal error).
     if (state.status === "error" || state.status === "conflict" ||
-      state.status === "asset-uploading" || state.status === "partial-disabled") {
+      state.status === "partial-disabled") {
       this.resolveSettleWaiters(false);
     } else if (!state.dirty && !state.isInFlight && state.status === "saved") {
       this.resolveSettleWaiters(true);
