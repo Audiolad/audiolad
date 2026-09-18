@@ -573,6 +573,7 @@ export default function StudioEditorShell({
   const [showGuestRenderGate, setShowGuestRenderGate] = useState(false);
   const guestCompletedTrackedRef = useRef(false);
   const [renderBusy, setRenderBusy] = useState(false);
+  const [exportPhase, setExportPhase] = useState<"idle" | "flushing" | "queuing">("idle");
   const [renderError, setRenderError] = useState<string | null>(null);
   const failedRenderJob =
     renderJob?.status === "failed"
@@ -1925,6 +1926,34 @@ export default function StudioEditorShell({
     : saveHasDirtyChanges
       ? "Сохранить"
       : "Сохранено";
+  const failedAssetTracks = tracks.filter(
+    (track) => track.assetPersistenceStatus === "error",
+  );
+  const hasAssetPersistenceError = failedAssetTracks.length > 0;
+  const assetUploadInProgress = tracks.some(
+    (track) =>
+      track.assetPersistenceStatus === "pending" ||
+      track.assetPersistenceStatus === "uploading",
+  );
+  const createMp3Disabled = saveIsUnavailable || catalogExportBlocked || renderBusy ||
+    renderJob?.status === "queued" || renderJob?.status === "processing" ||
+    (accessMode === "guest" && guestRenderConsumed) || hasAssetPersistenceError;
+  const createMp3Title = hasAssetPersistenceError
+    ? "Сначала повторите сохранение аудио на дорожке с ошибкой"
+    : catalogExportBlocked
+      ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE
+      : assetUploadInProgress || autosaveState?.status === "asset-uploading"
+        ? "Дождётся сохранения аудио и проекта, затем поставит MP3 в очередь"
+        : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь";
+  const createMp3Label = exportPhase === "flushing"
+    ? (assetUploadInProgress || autosaveState?.status === "asset-uploading"
+      ? "Сохранение аудио…"
+      : "Сохраняем проект…")
+    : renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ||
+        exportPhase === "queuing"
+      ? "Создаём MP3..."
+      : "Создать MP3";
+
   const queueRender = async () => {
     const projectId = persistedHydration?.project.id;
     const controller = controllerRef.current;
@@ -1933,12 +1962,47 @@ export default function StudioEditorShell({
       setRenderError(CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE);
       return;
     }
+    if (hasAssetPersistenceError) {
+      const names = failedAssetTracks.map((track) => track.fileName).join(", ");
+      setRenderError(
+        failedAssetTracks.length === 1
+          ? `Не удалось сохранить аудио «${names}». Нажмите «Повторить» у дорожки, затем снова «Создать MP3».`
+          : `Не удалось сохранить аудио (${names}). Нажмите «Повторить» у дорожек, затем снова «Создать MP3».`,
+      );
+      return;
+    }
     setRenderError(null);
     setRenderBusy(true);
+    setExportPhase("flushing");
     try {
       if (!(await controller.flushAndWait())) {
-        throw new Error("Сначала дождитесь сохранения проекта и аудиофайлов.");
+        const failedNow = tracksRef.current.filter(
+          (track) => track.assetPersistenceStatus === "error",
+        );
+        if (failedNow.length > 0) {
+          const names = failedNow.map((track) => track.fileName).join(", ");
+          throw new Error(
+            failedNow.length === 1
+              ? `Не удалось сохранить аудио «${names}». Нажмите «Повторить» у дорожки, затем снова «Создать MP3».`
+              : `Не удалось сохранить аудио (${names}). Нажмите «Повторить» у дорожек, затем снова «Создать MP3».`,
+          );
+        }
+        const state = controller.getState();
+        if (state.status === "error") {
+          throw new Error(
+            "Не удалось сохранить проект. Нажмите «Сохранить» и попробуйте снова.",
+          );
+        }
+        if (state.status === "conflict" || state.status === "partial-disabled") {
+          throw new Error(
+            state.status === "conflict"
+              ? "Проект изменён в другой вкладке. Обновите страницу, чтобы продолжить."
+              : "Проект открыт не полностью. Сохранение отключено.",
+          );
+        }
+        throw new Error("Не удалось сохранить проект и аудиофайлы перед экспортом.");
       }
+      setExportPhase("queuing");
       const job = await queueStudioRender(projectId);
       setRenderJob(job);
       if (accessMode === "guest") {
@@ -1958,6 +2022,7 @@ export default function StudioEditorShell({
       }
     } finally {
       setRenderBusy(false);
+      setExportPhase("idle");
     }
   };
 
@@ -2367,15 +2432,15 @@ export default function StudioEditorShell({
                 <>
                 <button
                   type="button"
-                  disabled={saveIsUnavailable || catalogExportBlocked || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
+                  disabled={createMp3Disabled}
                   onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }}
-                  title={catalogExportBlocked ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"}
+                  title={createMp3Title}
                   className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-2 text-sm text-[#eadfff] disabled:opacity-45 lg:px-3"
                 >
                   {renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? (
                     <span aria-hidden className="studio-mp3-render-sweep pointer-events-none absolute inset-0" />
                   ) : null}
-                  <span className="relative z-10">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</span>
+                  <span className="relative z-10">{createMp3Label}</span>
                 </button>
                 {catalogExportBlocked ? (
                   <span className="hidden max-w-[12rem] text-[11px] leading-tight text-[#d8c8fb] lg:inline">
