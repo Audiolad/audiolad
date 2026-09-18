@@ -40,7 +40,7 @@ import {
 import {
   clampStudioClipFades,
   getStudioFadeEnvelope,
-  isStudioContiguousSourceSeam,
+  resolveStudioClipEnterHandoff,
   resolveStudioPlaybackClipFades,
   STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
   type StudioClipFades,
@@ -295,12 +295,12 @@ function scheduleClipEnvelope(
   elapsedClipTime: number,
   startAt: number,
   options: {
-    openFromSilence: boolean;
+    enterHandoff: "flat" | "fade-in" | "from-silence";
     previous: StudioClip | null;
     next: StudioClip | null;
   },
 ) {
-  // Playback uses technical edge ramps; authored fades in project_data stay 0.
+  // Playback uses technical edge ramps; authored fades in project_data stay as set.
   const fades = resolveStudioPlaybackClipFades(clip, clip.duration, {
     clip,
     previous: options.previous,
@@ -308,8 +308,11 @@ function scheduleClipEnvelope(
   });
   const fadeGain = envelopeGain.gain;
   fadeGain.cancelScheduledValues(startAt);
-  if (options.openFromSilence) {
-    // Seek/start from silence: keep output closed until the ramp opens.
+  if (options.enterHandoff === "flat") {
+    // Untouched contiguous split: keep full gain (no technical 0→1 dip).
+    fadeGain.setValueAtTime(1, startAt);
+  } else {
+    // Hard enter or authored fade-in on the seam: open from 0 and ramp.
     fadeGain.setValueAtTime(0, startAt);
     if (fades.fadeInDuration > elapsedClipTime) {
       fadeGain.linearRampToValueAtTime(
@@ -326,10 +329,6 @@ function scheduleClipEnvelope(
         fadeGain.setValueAtTime(target, startAt);
       }
     }
-  } else {
-    // Contiguous same-source handoff: do not force a 0→1 dip at the seam.
-    const target = getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades);
-    fadeGain.setValueAtTime(target > 0 ? target : 1, startAt);
   }
   const fadeOutStart = clip.duration - fades.fadeOutDuration;
   if (fades.fadeOutDuration > 0 && fadeOutStart > elapsedClipTime) {
@@ -391,13 +390,25 @@ function syncTrackMediaPlayback(
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
       const { previous, next } = studioClipTimelineNeighbors(track.clips, clip);
-      const contiguousFromPrevious = Boolean(
-        previous && isStudioContiguousSourceSeam(previous, clip),
-      );
+      const enterHandoff = resolveStudioClipEnterHandoff({ clip, previous });
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
-      if (contiguousFromPrevious) {
-        // Same asset continues across a split: keep gain open, seek only on drift.
+      if (enterHandoff === "from-silence") {
+        // Hard enter: seek while muted, then open through technical/user envelope.
+        runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
+        runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+        if (plan.seekTo != null) {
+          seekStudioMediaElement(media, plan.seekTo);
+        }
+        scheduleClipEnvelope(
+          runtime.envelopeGain,
+          clip,
+          plan.elapsedClipTime,
+          contextTime,
+          { enterHandoff, previous, next },
+        );
+      } else {
+        // Contiguous same-source seam: keep media rolling; flat or authored fade-in.
         if (
           plan.seekTo != null &&
           shouldCorrectStudioMediaDrift(media.currentTime, plan.seekTo)
@@ -409,21 +420,7 @@ function syncTrackMediaPlayback(
           clip,
           plan.elapsedClipTime,
           contextTime,
-          { openFromSilence: false, previous, next },
-        );
-      } else {
-        // Seek while muted, then open through the technical/user envelope.
-        runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
-        runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
-        if (plan.seekTo != null) {
-          seekStudioMediaElement(media, plan.seekTo);
-        }
-        scheduleClipEnvelope(
-          runtime.envelopeGain,
-          clip,
-          plan.elapsedClipTime,
-          contextTime,
-          { openFromSilence: true, previous, next },
+          { enterHandoff, previous, next },
         );
       }
       runtime.activeClipId = clip.id;

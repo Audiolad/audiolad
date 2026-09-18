@@ -7,6 +7,7 @@ import {
   getStudioDefaultFadeDuration,
   getStudioFadeEnvelope,
   isStudioContiguousSourceSeam,
+  resolveStudioClipEnterHandoff,
   resolveStudioPlaybackClipFades,
   STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
 } from "../src/lib/studio/fade-math.ts";
@@ -123,5 +124,60 @@ const gappedFades = resolveStudioPlaybackClipFades(split.left, split.left.durati
   next: gappedRight,
 });
 assert.equal(gappedFades.fadeOutDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: split.right, previous: split.left }),
+  "flat",
+  "untouched contiguous seam stays flat",
+);
+const rightWithFadeIn = { ...split.right, fadeInDuration: 0.5, fadeOutDuration: 0 };
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: rightWithFadeIn, previous: split.left }),
+  "fade-in",
+  "authored fade-in on contiguous seam must ramp",
+);
+const rightFadesAuthored = resolveStudioPlaybackClipFades(
+  rightWithFadeIn,
+  rightWithFadeIn.duration,
+  { clip: rightWithFadeIn, previous: split.left, next: null },
+);
+assert.equal(rightFadesAuthored.fadeInDuration, 0.5);
+assert.equal(
+  getStudioFadeEnvelope(0, rightWithFadeIn.duration, rightFadesAuthored),
+  0,
+);
+assert.equal(
+  getStudioFadeEnvelope(0.25, rightWithFadeIn.duration, rightFadesAuthored),
+  0.5,
+);
+assert.equal(
+  getStudioFadeEnvelope(0.5, rightWithFadeIn.duration, rightFadesAuthored),
+  1,
+);
+
+const leftWithFadeOut = { ...split.left, fadeInDuration: 0, fadeOutDuration: 0.5 };
+const leftFadesAuthored = resolveStudioPlaybackClipFades(
+  leftWithFadeOut,
+  leftWithFadeOut.duration,
+  { clip: leftWithFadeOut, previous: null, next: split.right },
+);
+assert.equal(leftFadesAuthored.fadeOutDuration, 0.5);
+assert.equal(leftFadesAuthored.fadeInDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration - 0.5, leftWithFadeOut.duration, leftFadesAuthored),
+  1,
+);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration - 0.25, leftWithFadeOut.duration, leftFadesAuthored),
+  0.5,
+);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration, leftWithFadeOut.duration, leftFadesAuthored),
+  0,
+);
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: split.right, previous: null }),
+  "from-silence",
+);
 
 console.log("studio-fade-math-unit: ok");

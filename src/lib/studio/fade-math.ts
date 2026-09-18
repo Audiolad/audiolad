@@ -140,3 +140,20 @@ export function resolveStudioPlaybackClipFades(
   );
 }
 
+export type StudioClipEnterHandoff = "flat" | "fade-in" | "from-silence";
+
+/**
+ * How preview should open when entering `clip` from `previous`.
+ * Contiguous same-source seams stay flat only when the right clip has no
+ * authored fade-in; an explicit fade-in must still ramp 0→1.
+ */
+export function resolveStudioClipEnterHandoff(input: {
+  clip: StudioClipBoundaryGeometry & Partial<StudioClipFades>;
+  previous?: StudioClipBoundaryGeometry | null;
+}): StudioClipEnterHandoff {
+  if (input.previous && isStudioContiguousSourceSeam(input.previous, input.clip)) {
+    return finiteNonNegative(input.clip.fadeInDuration) > 0 ? "fade-in" : "flat";
+  }
+  return "from-silence";
+}
+

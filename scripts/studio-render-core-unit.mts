@@ -494,6 +494,72 @@ async function main() {
       "exact seam frame must not dip from fake fade-out/fade-in",
     );
 
+    // Contiguous split + authored right fade-in: preview/FFmpeg must ramp 0→1 over 0.5s.
+    const splitFadeInSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-fi", startTime: 0, offset: 0, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+        { id: "split-right-fi", startTime: 0.2, offset: 0.2, duration: 0.8, fadeInDuration: 0.5, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitFadeInGraph = buildStudioRenderFilterGraph({
+      snapshot: splitFadeInSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const rightFadeInFilter = splitFadeInGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(rightFadeInFilter, /afade=t=in:st=0:d=0\.500000:curve=tri/);
+    assert.doesNotMatch(rightFadeInFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    const splitFadeInRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-authored-fade-in",
+      splitFadeInSnapshot,
+      fixturePaths,
+    );
+    assert(framePeak(splitFadeInRendered.samples, Math.round(0.2 * RATE)) < 0.05, "authored fade-in starts near 0");
+    assert(
+      Math.abs(framePeak(splitFadeInRendered.samples, Math.round(0.45 * RATE)) - 0.125) < 0.02,
+      "authored fade-in mid point ~0.5 gain on 0.25 amplitude",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeInRendered.samples, Math.round(0.7 * RATE)) - 0.25) < 0.02,
+      "authored fade-in reaches full after 0.5s",
+    );
+
+    // Contiguous split + authored left fade-out: must ramp 1→0 over 0.5s on the left half.
+    const splitFadeOutSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-fo", startTime: 0, offset: 0, duration: 0.8, fadeInDuration: 0, fadeOutDuration: 0.5 },
+        { id: "split-right-fo", startTime: 0.8, offset: 0.8, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitFadeOutGraph = buildStudioRenderFilterGraph({
+      snapshot: splitFadeOutSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const leftFadeOutFilter = splitFadeOutGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    assert.match(leftFadeOutFilter, /afade=t=out:st=0\.300000:d=0\.500000:curve=tri/);
+    const splitFadeOutRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-authored-fade-out",
+      splitFadeOutSnapshot,
+      fixturePaths,
+    );
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, Math.round(0.3 * RATE)) - 0.25) < 0.02,
+      "before authored fade-out stays full",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, Math.round(0.55 * RATE)) - 0.125) < 0.02,
+      "authored fade-out mid point",
+    );
+    assert(
+      framePeak(splitFadeOutRendered.samples, Math.round(0.8 * RATE) - 1) < 0.05,
+      "authored fade-out reaches near 0 at left end",
+    );
+
     const fadeCases = [
       {
         name: "fade-in",

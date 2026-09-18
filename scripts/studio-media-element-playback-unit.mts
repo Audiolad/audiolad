@@ -337,10 +337,11 @@ async function testProviderAndHydrationContracts() {
   assert.match(fadeMath, /resolveStudioPlaybackClipFades/);
   assert.match(fadeMath, /isStudioContiguousSourceSeam/);
   assert.match(provider, /resolveStudioPlaybackClipFades/);
-  assert.match(provider, /isStudioContiguousSourceSeam/);
-  assert.match(provider, /Seek while muted/);
-  assert.match(provider, /openFromSilence: false/);
-  assert.match(provider, /openFromSilence: true/);
+  assert.match(provider, /resolveStudioClipEnterHandoff/);
+  assert.match(provider, /enterHandoff === "from-silence"/);
+  assert.match(provider, /enterHandoff === "flat"/);
+  assert.match(provider, /authored fade-in/);
+  assert.match(fadeMath, /resolveStudioClipEnterHandoff/);
   assert.match(
     provider,
     /do not pretend this path is a soft de-click/,
