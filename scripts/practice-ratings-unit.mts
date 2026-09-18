@@ -541,7 +541,7 @@ function testClientContracts() {
   );
   assert.equal(
     RATING_NOT_ELIGIBLE_COPY,
-    "Послушайте аудио хотя бы 30 секунд, чтобы поставить оценку.",
+    "Послушайте аудио хотя бы 40 секунд, чтобы оставить свой отклик.",
   );
   assert.doesNotMatch(RATING_NOT_ELIGIBLE_COPY, /практик/i);
   assert.equal(RATING_THANKS_COPY, "Спасибо за ваш отклик 🙏");
