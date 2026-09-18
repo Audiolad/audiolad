@@ -193,14 +193,13 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
 
 export function studioRenderFfmpegOutputArgs(
   outputPath: string,
-  durationSeconds?: number,
+  durationSeconds: number,
 ): string[] {
-  const boundedDuration =
-    typeof durationSeconds === "number"
-    && Number.isFinite(durationSeconds)
-    && durationSeconds > 0
-      ? ["-t", durationSeconds.toFixed(6)]
-      : [];
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    throw new Error(
+      `studioRenderFfmpegOutputArgs requires a finite positive durationSeconds (got ${String(durationSeconds)}).`,
+    );
+  }
   return [
     "-map", "[out]",
     "-c:a", "libmp3lame",
@@ -208,7 +207,7 @@ export function studioRenderFfmpegOutputArgs(
     "-ar", "44100",
     "-ac", "2",
     "-write_xing", "0",
-    ...boundedDuration,
+    "-t", durationSeconds.toFixed(6),
     "-y",
     outputPath,
   ];

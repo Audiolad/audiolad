@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  isStudioClipDurationAllowed,
+  isStudioClipGapAllowed,
+  isStudioClipStartTimeAllowed,
+} from "../clip-geometry-limits";
 import { STUDIO_LIMITS } from "../limits";
 import {
   STUDIO_SCHEMA_VERSION,
@@ -206,20 +211,29 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
       ) {
         throw new StudioApiError("invalid_clip", 422);
       }
+      if (
+        !isStudioClipStartTimeAllowed(clip.startTime)
+        || !isStudioClipDurationAllowed(clip.duration)
+      ) {
+        throw new StudioApiError("clip_geometry_too_large", 422);
+      }
       clipIds.add(clip.id);
       clips.push(clip);
     }
 
     // Preserve intentional gaps while rejecting overlap after ripple edits.
     clips.sort((left, right) => Number(left.startTime) - Number(right.startTime));
-    for (let index = 1; index < clips.length; index += 1) {
-      const previous = clips[index - 1];
+    for (let index = 0; index < clips.length; index += 1) {
+      const previousEnd = index === 0
+        ? 0
+        : Number(clips[index - 1].startTime) + Number(clips[index - 1].duration);
       const current = clips[index];
-      if (
-        Number(current.startTime) <
-        Number(previous.startTime) + Number(previous.duration)
-      ) {
+      const start = Number(current.startTime);
+      if (index > 0 && start < previousEnd) {
         throw new StudioApiError("invalid_ripple_layout", 422);
+      }
+      if (!isStudioClipGapAllowed(start - previousEnd)) {
+        throw new StudioApiError("clip_geometry_too_large", 422);
       }
     }
   }

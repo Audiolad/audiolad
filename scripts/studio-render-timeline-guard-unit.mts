@@ -6,7 +6,6 @@ import { join } from "node:path";
 
 import {
   MAX_STUDIO_AUDIO_DURATION_SECONDS,
-  MAX_STUDIO_RENDER_TIMELINE_SECONDS,
   MAX_STUDIO_TRACKS,
 } from "../src/lib/studio/limits";
 import {
@@ -89,7 +88,7 @@ function commandAvailable(name: string): boolean {
 
 async function main() {
   assert.equal(MAX_STUDIO_TRACKS, 5);
-  assert.equal(MAX_STUDIO_RENDER_TIMELINE_SECONDS, MAX_STUDIO_AUDIO_DURATION_SECONDS * MAX_STUDIO_TRACKS);
+  // No approved product project-timeline duration limit — do not assert a derived 5×3h ceiling.
 
   // Normal project
   const normal = snapshot([{ startTime: 0, duration: 2 }]);
@@ -156,8 +155,7 @@ async function main() {
       && (error as StudioRenderTimelineGuardError).code === "studio_render_clip_exceeds_asset",
   );
 
-  // Legal long-but-supported: two sequential max assets on one track would need 2*10800
-  // startTime=10800 with duration=10800 and asset=10800 → timeline 21600 ≤ 54000
+  // Legal: two sequential max-length clips on one track (gap 0, startTime at 10800)
   const legalLong = snapshot(
     [
       { startTime: 0, duration: MAX_STUDIO_AUDIO_DURATION_SECONDS },
@@ -170,26 +168,35 @@ async function main() {
     MAX_STUDIO_AUDIO_DURATION_SECONDS * 2,
   );
 
-  // Over derived ceiling
-  const tooLong = snapshot(
-    [{ startTime: 0, duration: MAX_STUDIO_RENDER_TIMELINE_SECONDS + 1 }],
-    MAX_STUDIO_RENDER_TIMELINE_SECONDS + 1,
+  // Gap larger than per-asset max rejected (shared with persistence)
+  const bigGap = snapshot(
+    [
+      { startTime: 0, duration: 1 },
+      { startTime: MAX_STUDIO_AUDIO_DURATION_SECONDS + 2, duration: 1 },
+    ],
+    3,
   );
   assert.throws(
-    () => assertStudioRenderTimelineSafe(tooLong),
-    (error: unknown) => {
-      if (!(error instanceof Error) || error.name !== "StudioRenderTimelineGuardError") return false;
-      const code = (error as StudioRenderTimelineGuardError).code;
-      return code === "studio_render_timeline_invalid" || code === "studio_render_timeline_too_long";
-    },
+    () => assertStudioRenderTimelineSafe(bigGap),
+    (error: unknown) =>
+      error instanceof Error
+      && error.name === "StudioRenderTimelineGuardError"
+      && (error as StudioRenderTimelineGuardError).code === "studio_render_gap_too_large",
   );
 
-  // Finite output args always when duration provided
+  // Production MP3 output args always include -t; missing/invalid duration throws
   assert.deepEqual(
     studioRenderFfmpegOutputArgs("/tmp/a.mp3", 1.5).filter((part, index, all) =>
       part === "-t" || all[index - 1] === "-t"
     ),
     ["-t", "1.500000"],
+  );
+  assert.throws(() => studioRenderFfmpegOutputArgs("/tmp/a.mp3", 0));
+  assert.throws(() => studioRenderFfmpegOutputArgs("/tmp/a.mp3", Number.NaN));
+  assert.throws(() =>
+    (studioRenderFfmpegOutputArgs as (path: string, durationSeconds?: number) => string[])(
+      "/tmp/a.mp3",
+    ),
   );
 
   if (commandAvailable("ffmpeg") && commandAvailable("ffprobe")) {

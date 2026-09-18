@@ -3,23 +3,14 @@ export const STUDIO_ASSETS_BUCKET = "studio-draft-assets" as const;
 export const MAX_STUDIO_AUDIO_DURATION_SECONDS = 10_800;
 export const MAX_STUDIO_ASSET_BYTES = 314_572_800;
 export const MAX_STUDIO_PROJECT_BYTES = 750 * 1024 * 1024;
-/** Concurrent track/slot cap enforced by Studio editor UI. */
+/** Concurrent track/slot cap enforced by Studio editor UI (not a timeline duration). */
 export const MAX_STUDIO_TRACKS = 5;
-/**
- * Derived render ceiling: MAX_STUDIO_TRACKS full-length assets end-to-end.
- * Not a separate product duration — composition of the existing 3h asset
- * limit and 5-track UI cap. Stops pathological startTime/gap silence from
- * asking FFmpeg for 100+ hour / multi‑GB MP3 output.
- */
-export const MAX_STUDIO_RENDER_TIMELINE_SECONDS =
-  MAX_STUDIO_AUDIO_DURATION_SECONDS * MAX_STUDIO_TRACKS;
 
 export const STUDIO_LIMITS = {
   maxAudioDurationSeconds: MAX_STUDIO_AUDIO_DURATION_SECONDS,
   maxAssetBytes: MAX_STUDIO_ASSET_BYTES,
   maxProjectAssetBytes: MAX_STUDIO_PROJECT_BYTES,
   maxTracks: MAX_STUDIO_TRACKS,
-  maxRenderTimelineSeconds: MAX_STUDIO_RENDER_TIMELINE_SECONDS,
 } as const;
 
 export const STUDIO_AUDIO_TOO_LONG_MESSAGE =

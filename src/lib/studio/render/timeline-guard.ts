@@ -1,15 +1,16 @@
 import { sortStudioClipsByStart } from "../clip-math";
 import {
-  MAX_STUDIO_AUDIO_DURATION_SECONDS,
-  MAX_STUDIO_RENDER_TIMELINE_SECONDS,
-  MAX_STUDIO_TRACKS,
-} from "../limits";
+  isStudioClipDurationAllowed,
+  isStudioClipGapAllowed,
+  isStudioClipOffsetAllowed,
+  isStudioClipStartTimeAllowed,
+} from "../clip-geometry-limits";
+import { MAX_STUDIO_AUDIO_DURATION_SECONDS } from "../limits";
 import { buildStudioRenderTimeline } from "./timeline";
 import type { StudioRenderSnapshot } from "./types";
 
 export type StudioRenderTimelineGuardCode =
   | "studio_render_timeline_invalid"
-  | "studio_render_timeline_too_long"
   | "studio_render_clip_exceeds_asset"
   | "studio_render_gap_too_large";
 
@@ -33,9 +34,9 @@ function assertFiniteNonNegative(value: number, label: string): void {
 }
 
 /**
- * Server-side invariants before FFmpeg. Uses existing Studio limits only:
- * per-asset max (3h) and UI max tracks (5) → max timeline 5×3h.
- * Rejects pathological startTime/gaps and clip.duration above the 3h cap.
+ * Server-side invariants before FFmpeg.
+ * Caps clip startTime / duration / gaps by the existing per-asset Studio max (3h).
+ * There is no approved product project-timeline duration limit yet — do not invent one.
  * Allows geometric clip.duration slightly past available source (silence pad).
  */
 export function assertStudioRenderTimelineSafe(snapshot: StudioRenderSnapshot): number {
@@ -63,15 +64,25 @@ export function assertStudioRenderTimelineSafe(snapshot: StudioRenderSnapshot): 
       assertFiniteNonNegative(clip.startTime, "clip.startTime");
       assertFiniteNonNegative(clip.offset, "clip.offset");
       assertFiniteNonNegative(clip.duration, "clip.duration");
+      if (!isStudioClipOffsetAllowed(clip.offset)) {
+        throw new StudioRenderTimelineGuardError(
+          "studio_render_timeline_invalid",
+          `Clip ${clip.id} offset is invalid.`,
+        );
+      }
       if (!(clip.duration > 0)) {
         throw new StudioRenderTimelineGuardError(
           "studio_render_timeline_invalid",
           `Clip ${clip.id} duration must be positive.`,
         );
       }
-      // Geometric clip.duration may slightly exceed available source (silence pad).
-      // Cap geometry by the existing per-asset Studio max, not raw asset length.
-      if (clip.duration > MAX_STUDIO_AUDIO_DURATION_SECONDS) {
+      if (!isStudioClipStartTimeAllowed(clip.startTime)) {
+        throw new StudioRenderTimelineGuardError(
+          "studio_render_gap_too_large",
+          `Clip ${clip.id} startTime ${clip.startTime}s exceeds Studio max ${MAX_STUDIO_AUDIO_DURATION_SECONDS}s.`,
+        );
+      }
+      if (!isStudioClipDurationAllowed(clip.duration)) {
         throw new StudioRenderTimelineGuardError(
           "studio_render_clip_exceeds_asset",
           `Clip ${clip.id} duration ${clip.duration}s exceeds Studio max ${MAX_STUDIO_AUDIO_DURATION_SECONDS}s.`,
@@ -84,7 +95,7 @@ export function assertStudioRenderTimelineSafe(snapshot: StudioRenderSnapshot): 
         );
       }
       const gap = clip.startTime - previousEnd;
-      if (gap > MAX_STUDIO_AUDIO_DURATION_SECONDS) {
+      if (!isStudioClipGapAllowed(gap)) {
         throw new StudioRenderTimelineGuardError(
           "studio_render_gap_too_large",
           `Clip ${clip.id} gap/startTime ${gap}s exceeds Studio max ${MAX_STUDIO_AUDIO_DURATION_SECONDS}s.`,
@@ -100,12 +111,6 @@ export function assertStudioRenderTimelineSafe(snapshot: StudioRenderSnapshot): 
     throw new StudioRenderTimelineGuardError(
       "studio_render_timeline_invalid",
       "Studio render timeline duration must be finite and positive.",
-    );
-  }
-  if (durationSeconds > MAX_STUDIO_RENDER_TIMELINE_SECONDS) {
-    throw new StudioRenderTimelineGuardError(
-      "studio_render_timeline_too_long",
-      `Studio render timeline ${durationSeconds}s exceeds derived max ${MAX_STUDIO_RENDER_TIMELINE_SECONDS}s (${MAX_STUDIO_TRACKS}×${MAX_STUDIO_AUDIO_DURATION_SECONDS}s).`,
     );
   }
   return durationSeconds;

@@ -123,6 +123,36 @@ assert.throws(
   }),
   (error: unknown) => error instanceof StudioApiError && error.code === "invalid_clip",
 );
+
+// Pathological clip.startTime must not persist (root cause of ~14GiB renders)
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{
+      ...validProjectData.tracks[0],
+      clips: [{
+        ...validProjectData.tracks[0].clips[0],
+        startTime: 625_000,
+        duration: 3,
+      }],
+    }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "clip_geometry_too_large",
+);
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{
+      ...validProjectData.tracks[0],
+      clips: [{
+        ...validProjectData.tracks[0].clips[0],
+        startTime: 0,
+        duration: 625_000,
+      }],
+    }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "clip_geometry_too_large",
+);
 assert.throws(
   () => parseStudioProjectData({
     ...validProjectData,
