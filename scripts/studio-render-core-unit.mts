@@ -9,6 +9,7 @@ import { createStudioVoicePresetImpulseWav } from "../src/lib/studio/render/ir";
 import { buildStudioRenderTimeline } from "../src/lib/studio/render/timeline";
 import { getStudioRenderClipSourceDuration } from "../src/lib/studio/clip-math";
 import { buildStudioRenderFilterGraph } from "../src/lib/studio/render/ffmpeg";
+import { STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS } from "../src/lib/studio/fade-math";
 import {
   renderStudioProjectToMp3,
   renderStudioProjectToPcmWav,
@@ -361,12 +362,16 @@ async function main() {
     // independent of MP3 encoder delay and the preset convolution path.
     const fixtureAssets = [asset(ASSET_VOICE, "constant.wav"), asset(ASSET_MUSIC, "music.wav")];
     const fixturePaths = new Map([[ASSET_VOICE, constantPath], [ASSET_MUSIC, musicPath]]);
+    const afterTech = Math.round(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS * RATE) + 100;
     const clipCases = [
       {
         name: "zero",
         clips: [{ id: "zero", startTime: 0, offset: 0, duration: 0.25, fadeInDuration: 0, fadeOutDuration: 0 }],
         duration: 0.25,
-        verify: (samples: Float32Array) => assert(Math.abs(framePeak(samples, 100) - 0.25) < 1e-6),
+        verify: (samples: Float32Array) => {
+          assert(framePeak(samples, 0) < 0.05, "zero-fade clip opens with technical de-click");
+          assert(Math.abs(framePeak(samples, afterTech) - 0.25) < 1e-6);
+        },
       },
       {
         name: "delayed",
@@ -374,7 +379,8 @@ async function main() {
         duration: 0.75,
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, 0, Math.round(0.5 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + 100) - 0.25) < 1e-6);
+          assert(framePeak(samples, Math.round(0.5 * RATE)) < 0.05, "gap→clip uses de-click");
+          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
       {
@@ -386,7 +392,7 @@ async function main() {
         duration: 0.75,
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, Math.round(0.25 * RATE), Math.round(0.5 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + 100) - 0.25) < 1e-6);
+          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
       {
@@ -400,7 +406,7 @@ async function main() {
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, Math.round(0.2 * RATE), Math.round(0.3 * RATE)), 0);
           assert.equal(sampleRangePeak(samples, Math.round(0.5 * RATE), Math.round(0.6 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.6 * RATE) + 100) - 0.25) < 1e-6);
+          assert(Math.abs(framePeak(samples, Math.round(0.6 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
     ] as const;
@@ -426,7 +432,27 @@ async function main() {
       trimSnapshot,
       new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
     );
-    assert(Math.abs(framePeak(trimmed.samples, 10) - (0.5 + 10 / RATE)) < 1e-5, "offset must trim source PCM");
+    const trimProbe = Math.round(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS * RATE) + 10;
+    assert(
+      Math.abs(framePeak(trimmed.samples, trimProbe) - (0.5 + trimProbe / RATE)) < 1e-5,
+      "offset must trim source PCM after technical fade-in",
+    );
+    assert.match(
+      buildStudioRenderFilterGraph({
+        snapshot: trimSnapshot,
+        localAssetPaths: new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
+      }).filterComplex,
+      /afade=t=in:st=0:d=0\.010000:curve=tri/,
+      "export applies technical fade-in when authored fadeInDuration is 0",
+    );
+    assert.match(
+      buildStudioRenderFilterGraph({
+        snapshot: trimSnapshot,
+        localAssetPaths: new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
+      }).filterComplex,
+      /afade=t=out:st=0\.240000:d=0\.010000:curve=tri/,
+      "export applies technical fade-out when authored fadeOutDuration is 0",
+    );
 
     const fadeCases = [
       {
@@ -461,6 +487,31 @@ async function main() {
         expectedRevision: 7,
         assets: fixtureAssets,
       });
+      const fadeGraph = buildStudioRenderFilterGraph({
+        snapshot: fadeSnapshot,
+        localAssetPaths: fixturePaths,
+      }).filterComplex;
+      if (fadeCase.fadeInDuration > STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS) {
+        assert.match(
+          fadeGraph,
+          new RegExp(`afade=t=in:st=0:d=${fadeCase.fadeInDuration.toFixed(6)}:curve=tri`),
+          `${fadeCase.name} keeps user fade-in without doubling`,
+        );
+        assert.doesNotMatch(
+          fadeGraph,
+          /afade=t=in:st=0:d=0\.010000:curve=tri/,
+          `${fadeCase.name} must not also apply technical fade-in`,
+        );
+      }
+      if (fadeCase.fadeOutDuration > STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS) {
+        assert.match(
+          fadeGraph,
+          new RegExp(
+            `afade=t=out:st=${(1 - fadeCase.fadeOutDuration).toFixed(6)}:d=${fadeCase.fadeOutDuration.toFixed(6)}:curve=tri`,
+          ),
+          `${fadeCase.name} keeps user fade-out without doubling`,
+        );
+      }
       const faded = await renderFixturePcm(root, fadeCase.name, fadeSnapshot, fixturePaths);
       for (const [seconds, expected] of fadeCase.measurements) {
         assert(
@@ -744,6 +795,8 @@ async function main() {
     assert.match(olgaGraph.filterComplex, /apad,atrim=duration=5\.400000/);
     assert.doesNotMatch(olgaGraph.filterComplex, /apad=whole_dur=/);
     assert.match(olgaGraph.filterComplex, /atrim=start=0\.000000:duration=5\.000000/);
+    assert.match(olgaGraph.filterComplex, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    assert.match(olgaGraph.filterComplex, /afade=t=out:st=5\.390000:d=0\.010000:curve=tri/);
     const olgaRendered = await renderFixturePcm(
       root,
       "olga-like-short-source",

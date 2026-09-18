@@ -6,6 +6,8 @@ import {
   clampStudioClipFades,
   getStudioDefaultFadeDuration,
   getStudioFadeEnvelope,
+  resolveStudioPlaybackClipFades,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
 } from "../src/lib/studio/fade-math.ts";
 
 assert.deepEqual(clampStudioClipFades({}, 10), {
@@ -53,5 +55,36 @@ assert.equal(getStudioFadeEnvelope(1, 10, { fadeInDuration: 2, fadeOutDuration: 
 assert.equal(getStudioFadeEnvelope(5, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 1);
 assert.equal(getStudioFadeEnvelope(8.5, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 0.5);
 assert.equal(getStudioFadeEnvelope(10, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 0);
+
+assert.equal(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, 0.01);
+
+const techZero = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0, fadeOutDuration: 0 },
+  10,
+);
+assert.deepEqual(techZero, {
+  fadeInDuration: STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  fadeOutDuration: STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+});
+
+const userWins = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0.5, fadeOutDuration: 0.25 },
+  10,
+);
+assert.deepEqual(userWins, { fadeInDuration: 0.5, fadeOutDuration: 0.25 });
+
+const shortClip = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0, fadeOutDuration: 0 },
+  0.012,
+);
+assert.ok(Math.abs(shortClip.fadeInDuration - 0.006) < 1e-9);
+assert.ok(Math.abs(shortClip.fadeOutDuration - 0.006) < 1e-9);
+assert.ok(
+  Math.abs(getStudioFadeEnvelope(0, 10, techZero)) < 1e-12,
+  "technical fade-in starts at gain 0",
+);
+assert.ok(
+  Math.abs(getStudioFadeEnvelope(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS / 2, 10, techZero) - 0.5) < 1e-9,
+);
 
 console.log("studio-fade-math-unit: ok");

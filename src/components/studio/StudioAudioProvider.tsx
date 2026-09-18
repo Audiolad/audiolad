@@ -40,6 +40,8 @@ import {
 import {
   clampStudioClipFades,
   getStudioFadeEnvelope,
+  resolveStudioPlaybackClipFades,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
   type StudioClipFades,
 } from "@/lib/studio/fade-math";
 import { MAX_STUDIO_PROJECT_BYTES } from "@/lib/studio/limits";
@@ -291,18 +293,26 @@ function scheduleClipEnvelope(
   elapsedClipTime: number,
   startAt: number,
 ) {
-  const fades = clampStudioClipFades(clip, clip.duration);
+  // Playback uses technical edge ramps; authored fades in project_data stay 0.
+  const fades = resolveStudioPlaybackClipFades(clip, clip.duration);
   const fadeGain = envelopeGain.gain;
   fadeGain.cancelScheduledValues(startAt);
-  fadeGain.setValueAtTime(
-    getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades),
-    startAt,
-  );
+  // Always open from silence so a seek/start cannot leak a non-zero sample.
+  fadeGain.setValueAtTime(0, startAt);
   if (fades.fadeInDuration > elapsedClipTime) {
     fadeGain.linearRampToValueAtTime(
       1,
       startAt + (fades.fadeInDuration - elapsedClipTime),
     );
+  } else {
+    const remaining = Math.max(clip.duration - elapsedClipTime, 0);
+    const openRamp = Math.min(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, remaining);
+    const target = getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades);
+    if (openRamp > 0 && target > 0) {
+      fadeGain.linearRampToValueAtTime(target, startAt + openRamp);
+    } else {
+      fadeGain.setValueAtTime(target, startAt);
+    }
   }
   const fadeOutStart = clip.duration - fades.fadeOutDuration;
   if (fadeOutStart > elapsedClipTime) {
@@ -335,13 +345,25 @@ function syncTrackMediaPlayback(
   media.loop = plan.loop;
 
   if (plan.envelope === "silence") {
-    runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
-    runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+    const gain = runtime.envelopeGain.gain;
+    gain.cancelScheduledValues(contextTime);
+    const from = Number.isFinite(gain.value) ? Math.max(gain.value, 0) : 0;
+    gain.setValueAtTime(from, contextTime);
+    gain.linearRampToValueAtTime(
+      0,
+      contextTime + STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+    );
     runtime.sources.clear();
     runtime.activeClipId = null;
   } else if (plan.enteredClip) {
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
+      // Seek while muted, then open through the technical/user envelope.
+      runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
+      runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+      if (plan.seekTo != null) {
+        seekStudioMediaElement(media, plan.seekTo);
+      }
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
       scheduleClipEnvelope(
@@ -352,11 +374,10 @@ function syncTrackMediaPlayback(
       );
       runtime.activeClipId = clip.id;
     }
-  }
-
-  if (plan.seekTo != null) {
+  } else if (plan.seekTo != null) {
     seekStudioMediaElement(media, plan.seekTo);
   }
+
   if (plan.wantPlaying) {
     if (media.paused) {
       void media.play().catch(() => {
@@ -671,11 +692,17 @@ export function StudioAudioProvider({
   const stopSources = useCallback(() => {
     const contextTime = audioContextRef.current?.currentTime ?? 0;
     for (const runtime of trackRuntimesRef.current.values()) {
+      const gain = runtime.envelopeGain.gain;
+      gain.cancelScheduledValues(contextTime);
+      const from = Number.isFinite(gain.value) ? Math.max(gain.value, 0) : 0;
+      gain.setValueAtTime(from, contextTime);
+      gain.linearRampToValueAtTime(
+        0,
+        contextTime + STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+      );
       if (!runtime.mediaElement.paused) {
         runtime.mediaElement.pause();
       }
-      runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
-      runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
       runtime.sources.clear();
       runtime.activeClipId = null;
     }

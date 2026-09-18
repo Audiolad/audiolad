@@ -1,4 +1,5 @@
 import { getStudioRenderClipSourceDuration } from "../clip-math";
+import { resolveStudioPlaybackClipFades } from "../fade-math";
 import { STUDIO_VOICE_PRESET_CONFIG, type StudioVoicePreset } from "../voice-preset-dsp";
 import { buildStudioRenderTimeline } from "./timeline";
 import type { StudioRenderInput } from "./types";
@@ -108,12 +109,16 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
           "aformat=sample_rates=44100:channel_layouts=stereo",
         );
       }
-      if (clip.fadeInDuration > 0) {
-        filterParts.push(`afade=t=in:st=0:d=${seconds(clip.fadeInDuration)}:curve=tri`);
-      }
-      if (clip.fadeOutDuration > 0) {
+      // Technical de-click is applied here without mutating project_data fades.
+      const playbackFades = resolveStudioPlaybackClipFades(clip, clip.duration);
+      if (playbackFades.fadeInDuration > 0) {
         filterParts.push(
-          `afade=t=out:st=${seconds(clip.duration - clip.fadeOutDuration)}:d=${seconds(clip.fadeOutDuration)}:curve=tri`,
+          `afade=t=in:st=0:d=${seconds(playbackFades.fadeInDuration)}:curve=tri`,
+        );
+      }
+      if (playbackFades.fadeOutDuration > 0) {
+        filterParts.push(
+          `afade=t=out:st=${seconds(clip.duration - playbackFades.fadeOutDuration)}:d=${seconds(playbackFades.fadeOutDuration)}:curve=tri`,
         );
       }
       if (sourceTrim > 0 && inputIndex >= 0) {

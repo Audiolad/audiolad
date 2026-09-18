@@ -324,6 +324,28 @@ async function testProviderAndHydrationContracts() {
   assert.doesNotMatch(playbackRoute, /downloadStudioProjectAsset|arrayBuffer/);
   assert.match(renderWorker, /arrayBuffer/);
   assert.match(ir, /AudioBuffer/);
+
+  const fadeMath = await readFile(
+    new URL("../src/lib/studio/fade-math.ts", import.meta.url),
+    "utf8",
+  );
+  const ffmpeg = await readFile(
+    new URL("../src/lib/studio/render/ffmpeg.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(fadeMath, /STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS = 0\.01/);
+  assert.match(fadeMath, /resolveStudioPlaybackClipFades/);
+  assert.match(provider, /resolveStudioPlaybackClipFades/);
+  assert.match(provider, /Seek while muted/);
+  assert.match(
+    provider,
+    /envelopeGain\.gain\.setValueAtTime\(0, contextTime\);\s*if \(plan\.seekTo != null\)/,
+  );
+  assert.match(provider, /fadeGain\.setValueAtTime\(0, startAt\)/);
+  assert.match(ffmpeg, /resolveStudioPlaybackClipFades\(clip, clip\.duration\)/);
+  assert.match(ffmpeg, /playbackFades\.fadeInDuration/);
+  assert.match(provider, /fadeInDuration: 0/);
+  assert.match(provider, /fadeOutDuration: 0/);
 }
 
 testClipSyncMath();

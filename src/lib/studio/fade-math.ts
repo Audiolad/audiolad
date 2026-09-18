@@ -53,3 +53,36 @@ export function getStudioFadeEnvelope(
       : 1;
   return Math.min(Math.max(Math.min(fadeInGain, fadeOutGain), 0), 1);
 }
+
+/**
+ * Invisible DSP anti-click ramp at clip edges (preview + FFmpeg).
+ * Not stored in project_data and not shown as a user fade handle.
+ * 10 ms is long enough to remove a hard 0→1 amplitude discontinuity on speech
+ * without a subjectively audible artistic fade.
+ */
+export const STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS = 0.01;
+
+/**
+ * Playback/render fades: raise each edge to at least the technical ramp when
+ * the authored fade is shorter, then re-clamp so in+out still fit the clip.
+ * Authored fadeInDuration/fadeOutDuration in project_data stay unchanged.
+ */
+export function resolveStudioPlaybackClipFades(
+  fades: Partial<StudioClipFades>,
+  clipDuration: number,
+): StudioClipFades {
+  const clamped = clampStudioClipFades(fades, clipDuration);
+  const duration = finiteNonNegative(clipDuration);
+  if (duration <= 0) {
+    return clamped;
+  }
+  const technical = Math.min(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, duration / 2);
+  return clampStudioClipFades(
+    {
+      fadeInDuration: Math.max(clamped.fadeInDuration, technical),
+      fadeOutDuration: Math.max(clamped.fadeOutDuration, technical),
+    },
+    duration,
+  );
+}
+
