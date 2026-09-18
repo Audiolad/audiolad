@@ -454,6 +454,46 @@ async function main() {
       "export applies technical fade-out when authored fadeOutDuration is 0",
     );
 
+    // Contiguous split of one asset: no amplitude dip / double de-click at the seam.
+    const splitSeamSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left", startTime: 0, offset: 0, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+        { id: "split-right", startTime: 0.2, offset: 0.2, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitGraph = buildStudioRenderFilterGraph({
+      snapshot: splitSeamSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const leftClipFilter = splitGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const rightClipFilter = splitGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(leftClipFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    assert.doesNotMatch(leftClipFilter, /afade=t=out/);
+    assert.doesNotMatch(rightClipFilter, /afade=t=in/);
+    assert.match(rightClipFilter, /afade=t=out:st=0\.190000:d=0\.010000:curve=tri/);
+    const splitRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-seam",
+      splitSeamSnapshot,
+      fixturePaths,
+    );
+    const seam = Math.round(0.2 * RATE);
+    const seamWindowPeak = sampleRangePeak(
+      splitRendered.samples,
+      seam - Math.round(0.005 * RATE),
+      seam + Math.round(0.005 * RATE),
+    );
+    assert(
+      Math.abs(seamWindowPeak - 0.25) < 0.02,
+      `contiguous split seam must stay flat, got peak ${seamWindowPeak}`,
+    );
+    assert(
+      Math.abs(framePeak(splitRendered.samples, seam) - 0.25) < 0.02,
+      "exact seam frame must not dip from fake fade-out/fade-in",
+    );
+
     const fadeCases = [
       {
         name: "fade-in",

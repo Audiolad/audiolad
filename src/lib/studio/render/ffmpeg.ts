@@ -1,4 +1,4 @@
-import { getStudioRenderClipSourceDuration } from "../clip-math";
+import { getStudioRenderClipSourceDuration, sortStudioClipsByStart } from "../clip-math";
 import { resolveStudioPlaybackClipFades } from "../fade-math";
 import { STUDIO_VOICE_PRESET_CONFIG, type StudioVoicePreset } from "../voice-preset-dsp";
 import { buildStudioRenderTimeline } from "./timeline";
@@ -81,6 +81,10 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   timeline.tracks.forEach(({ track, audibleEnd }, trackIndex) => {
     let cursor = 0;
     const timelineParts: string[] = [];
+    const orderedClips = sortStudioClipsByStart(track.clips);
+    const orderIndexById = new Map(
+      orderedClips.map((orderedClip, orderIndex) => [orderedClip.id, orderIndex]),
+    );
     track.clips.forEach((clip, clipIndex) => {
       const gap = clip.startTime - cursor;
       if (gap > 0) {
@@ -109,8 +113,13 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
           "aformat=sample_rates=44100:channel_layouts=stereo",
         );
       }
-      // Technical de-click is applied here without mutating project_data fades.
-      const playbackFades = resolveStudioPlaybackClipFades(clip, clip.duration);
+      // Boundary-aware technical de-click; contiguous split seams stay flat.
+      const orderIndex = orderIndexById.get(clip.id) ?? clipIndex;
+      const playbackFades = resolveStudioPlaybackClipFades(clip, clip.duration, {
+        clip,
+        previous: orderIndex > 0 ? orderedClips[orderIndex - 1] : null,
+        next: orderIndex + 1 < orderedClips.length ? orderedClips[orderIndex + 1] : null,
+      });
       if (playbackFades.fadeInDuration > 0) {
         filterParts.push(
           `afade=t=in:st=0:d=${seconds(playbackFades.fadeInDuration)}:curve=tri`,

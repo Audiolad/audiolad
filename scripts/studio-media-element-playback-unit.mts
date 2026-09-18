@@ -335,15 +335,23 @@ async function testProviderAndHydrationContracts() {
   );
   assert.match(fadeMath, /STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS = 0\.01/);
   assert.match(fadeMath, /resolveStudioPlaybackClipFades/);
+  assert.match(fadeMath, /isStudioContiguousSourceSeam/);
   assert.match(provider, /resolveStudioPlaybackClipFades/);
+  assert.match(provider, /isStudioContiguousSourceSeam/);
   assert.match(provider, /Seek while muted/);
+  assert.match(provider, /openFromSilence: false/);
+  assert.match(provider, /openFromSilence: true/);
   assert.match(
     provider,
-    /envelopeGain\.gain\.setValueAtTime\(0, contextTime\);\s*if \(plan\.seekTo != null\)/,
+    /do not pretend this path is a soft de-click/,
   );
-  assert.match(provider, /fadeGain\.setValueAtTime\(0, startAt\)/);
-  assert.match(ffmpeg, /resolveStudioPlaybackClipFades\(clip, clip\.duration\)/);
+  assert.doesNotMatch(
+    provider,
+    /stopSources[\s\S]{0,400}linearRampToValueAtTime\(\s*0,\s*contextTime \+ STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS/,
+  );
+  assert.match(ffmpeg, /resolveStudioPlaybackClipFades\(clip, clip\.duration/);
   assert.match(ffmpeg, /playbackFades\.fadeInDuration/);
+  assert.match(ffmpeg, /orderedClips/);
   assert.match(provider, /fadeInDuration: 0/);
   assert.match(provider, /fadeOutDuration: 0/);
 }

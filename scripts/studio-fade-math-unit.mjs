@@ -6,9 +6,11 @@ import {
   clampStudioClipFades,
   getStudioDefaultFadeDuration,
   getStudioFadeEnvelope,
+  isStudioContiguousSourceSeam,
   resolveStudioPlaybackClipFades,
   STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
 } from "../src/lib/studio/fade-math.ts";
+import { splitStudioClip } from "../src/lib/studio/clip-math.ts";
 
 assert.deepEqual(clampStudioClipFades({}, 10), {
   fadeInDuration: 0,
@@ -86,5 +88,40 @@ assert.ok(
 assert.ok(
   Math.abs(getStudioFadeEnvelope(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS / 2, 10, techZero) - 0.5) < 1e-9,
 );
+
+const source = {
+  id: "whole",
+  startTime: 0,
+  offset: 0,
+  duration: 4,
+  fadeInDuration: 0,
+  fadeOutDuration: 0,
+};
+const split = splitStudioClip(source, 2, "right");
+assert.ok(split);
+assert.equal(isStudioContiguousSourceSeam(split.left, split.right), true);
+const leftFades = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: split.right,
+});
+const rightFades = resolveStudioPlaybackClipFades(split.right, split.right.duration, {
+  clip: split.right,
+  previous: split.left,
+  next: null,
+});
+assert.equal(leftFades.fadeInDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+assert.equal(leftFades.fadeOutDuration, 0, "contiguous seam must not tech fade-out");
+assert.equal(rightFades.fadeInDuration, 0, "contiguous seam must not tech fade-in");
+assert.equal(rightFades.fadeOutDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+
+const gappedRight = { ...split.right, startTime: split.right.startTime + 0.05 };
+assert.equal(isStudioContiguousSourceSeam(split.left, gappedRight), false);
+const gappedFades = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: gappedRight,
+});
+assert.equal(gappedFades.fadeOutDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
 
 console.log("studio-fade-math-unit: ok");

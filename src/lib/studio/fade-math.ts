@@ -62,14 +62,52 @@ export function getStudioFadeEnvelope(
  */
 export const STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS = 0.01;
 
+/** Timeline/source continuity tolerance for split seams (seconds). */
+export const STUDIO_CONTIGUOUS_SEAM_EPSILON_SECONDS = 0.001;
+
+export type StudioClipBoundaryGeometry = {
+  startTime: number;
+  offset: number;
+  duration: number;
+};
+
 /**
- * Playback/render fades: raise each edge to at least the technical ramp when
- * the authored fade is shorter, then re-clamp so in+out still fit the clip.
+ * True when right continues left without a timeline gap and without a source
+ * jump — the geometry `splitStudioClip` produces for one asset.
+ */
+export function isStudioContiguousSourceSeam(
+  left: StudioClipBoundaryGeometry,
+  right: StudioClipBoundaryGeometry,
+  epsilonSeconds = STUDIO_CONTIGUOUS_SEAM_EPSILON_SECONDS,
+): boolean {
+  const eps = finiteNonNegative(epsilonSeconds);
+  const leftEnd = finiteNonNegative(left.startTime) + finiteNonNegative(left.duration);
+  const leftSourceEnd = finiteNonNegative(left.offset) + finiteNonNegative(left.duration);
+  const rightStart = finiteNonNegative(right.startTime);
+  const rightOffset = finiteNonNegative(right.offset);
+  return (
+    Math.abs(rightStart - leftEnd) <= eps &&
+    Math.abs(rightOffset - leftSourceEnd) <= eps
+  );
+}
+
+export type StudioPlaybackFadeBoundaries = {
+  clip: StudioClipBoundaryGeometry;
+  previous?: StudioClipBoundaryGeometry | null;
+  next?: StudioClipBoundaryGeometry | null;
+};
+
+/**
+ * Playback/render fades with boundary-aware technical de-click:
+ * - silence / project edge / non-contiguous hard cut → technical ramp
+ * - contiguous same-source split seam → no artificial in/out dip
+ * - authored user fades always win when longer than technical
  * Authored fadeInDuration/fadeOutDuration in project_data stay unchanged.
  */
 export function resolveStudioPlaybackClipFades(
   fades: Partial<StudioClipFades>,
   clipDuration: number,
+  boundaries?: StudioPlaybackFadeBoundaries,
 ): StudioClipFades {
   const clamped = clampStudioClipFades(fades, clipDuration);
   const duration = finiteNonNegative(clipDuration);
@@ -77,10 +115,26 @@ export function resolveStudioPlaybackClipFades(
     return clamped;
   }
   const technical = Math.min(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, duration / 2);
+  const clip = boundaries?.clip ?? {
+    startTime: 0,
+    offset: 0,
+    duration,
+  };
+  const skipTechnicalIn = Boolean(
+    boundaries?.previous &&
+      isStudioContiguousSourceSeam(boundaries.previous, clip),
+  );
+  const skipTechnicalOut = Boolean(
+    boundaries?.next && isStudioContiguousSourceSeam(clip, boundaries.next),
+  );
   return clampStudioClipFades(
     {
-      fadeInDuration: Math.max(clamped.fadeInDuration, technical),
-      fadeOutDuration: Math.max(clamped.fadeOutDuration, technical),
+      fadeInDuration: skipTechnicalIn
+        ? clamped.fadeInDuration
+        : Math.max(clamped.fadeInDuration, technical),
+      fadeOutDuration: skipTechnicalOut
+        ? clamped.fadeOutDuration
+        : Math.max(clamped.fadeOutDuration, technical),
     },
     duration,
   );
