@@ -24,6 +24,9 @@ on:
       - "supabase/migrations/20261003120700_studio_music_independent_pricing.sql"
       - "supabase/migrations/20261006140000_studio_music_legal_foundation_v1_2.sql"
       - "supabase/tests/studio_music_license_smoke.sql"
+      - "scripts/studio-music-new-free-policy-sql-unit.mjs"
+      - "supabase/migrations/20261009120300_studio_disable_new_free_music.sql"
+      - "supabase/tests/studio_disable_new_free_music_smoke.sql"
 
 permissions:
   contents: read
@@ -62,3 +65,12 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:studio-music-license:isolated
+
+      - name: Execute new Studio paid-only policy SQL
+        env:
+          AUDIOLAD_STUDIO_MUSIC_ISOLATED: "1"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:studio-music-new-free-policy-sql

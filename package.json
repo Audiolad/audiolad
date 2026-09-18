@@ -237,7 +237,7 @@
     "test:studio-catalog-attach": "npx tsx scripts/studio-catalog-attach-unit.mts && node scripts/studio-catalog-attach-sql-unit.mjs && npm run test:studio-catalog-music-render",
     "test:studio-catalog-attach:isolated": "AUDIOLAD_STUDIO_CATALOG_ATTACH_ISOLATED=1 node scripts/studio-catalog-attach-sql-unit.mjs",
     "test:studio-music-catalog": "npx tsx scripts/studio-music-catalog-unit.mts && npx tsx scripts/studio-music-catalog-preview-unit.mts && npx tsx scripts/studio-music-catalog-ui-unit.mts && npx tsx scripts/studio-music-catalog-pagination-unit.mts && npm run test:studio-music-checkout && npm run test:studio-music-pricing && npm run test:studio-catalog-attach",
-    "test:studio-music-pricing": "npx tsx scripts/studio-music-pricing-unit.mts",
+    "test:studio-music-pricing": "npx tsx scripts/studio-music-pricing-unit.mts && npm run test:studio-music-new-free-policy && npm run test:studio-music-new-free-policy-sql",
     "test:studio-music-checkout": "npx tsx scripts/studio-music-checkout-unit.mts",
     "test:practice-access-links": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/practice-access-links-unit.mjs && npx tsx scripts/author-practice-access-links-unit.mjs && node scripts/practice-access-links-sql-unit.mjs",
     "test:practice-access-links:isolated": "AUDIOLAD_PRACTICE_ACCESS_LINKS_ISOLATED=1 node scripts/practice-access-links-sql-unit.mjs",
@@ -286,7 +286,9 @@
     "test:seo-discovery-ranking": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-discovery-ranking-unit.mjs",
     "test:author-project-capacity": "npx tsx scripts/author-project-capacity-unit.mjs && npx tsx scripts/author-multi-project-unit.mjs",
     "test:product-audio-normalize": "node scripts/product-audio-normalize-sql-unit.mjs && npx tsx scripts/product-audio-normalize-contract-unit.mts && npx tsx scripts/product-audio-normalize-worker-unit.mts && npx tsx scripts/product-audio-normalize-retry-race-unit.mts && npx tsx scripts/product-audio-normalize-ffmpeg-unit.mts",
-    "worker:product-audio-normalize": "npx tsx scripts/run-product-audio-normalize-worker.mts"
+    "worker:product-audio-normalize": "npx tsx scripts/run-product-audio-normalize-worker.mts",
+    "test:studio-music-new-free-policy": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-music-new-free-policy-unit.mts",
+    "test:studio-music-new-free-policy-sql": "node scripts/studio-music-new-free-policy-sql-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

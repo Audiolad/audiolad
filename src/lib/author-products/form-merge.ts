@@ -11,10 +11,12 @@ import {
 } from "@/lib/author-products/product-kind";
 import {
   defaultStudioMusicPricingModeForForm,
+  STUDIO_MUSIC_PRICING_MODE,
   studioMusicPriceMinorToRubles,
   studioMusicPricingModeAfterListenerFlip,
   type StudioMusicPricingMode,
 } from "@/lib/studio-music/pricing";
+import { isEffectiveStudioFreeProduct } from "@/lib/studio-music/new-free-policy";
 import {
   parsePublicationClass,
   type PublicationClass,
@@ -113,15 +115,23 @@ export function productDetailToFormSnapshot(
         practice.studio_music_pricing_mode === "auto_2x_listener" ||
         practice.studio_music_pricing_mode === "fixed"
           ? practice.studio_music_pricing_mode
-          : defaultStudioMusicPricingModeForForm({
-              reuseAllowed:
-                productKind === "music" &&
-                (normalizeMusicUsagePermission(practice.music_usage_permission) ??
-                  MUSIC_USAGE_PERMISSION.LISTEN_ONLY) ===
-                  MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
-              listenerIsFree:
-                productKind === "audio_post" || practice.is_free === true,
-            }),
+          : isEffectiveStudioFreeProduct({
+                deleted_at: practice.deleted_at,
+                music_usage_permission: practice.music_usage_permission,
+                studio_music_pricing_mode: practice.studio_music_pricing_mode,
+                is_free: practice.is_free,
+                price: practice.price,
+              })
+            ? STUDIO_MUSIC_PRICING_MODE.FREE
+            : defaultStudioMusicPricingModeForForm({
+                reuseAllowed:
+                  productKind === "music" &&
+                  (normalizeMusicUsagePermission(practice.music_usage_permission) ??
+                    MUSIC_USAGE_PERMISSION.LISTEN_ONLY) ===
+                    MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+                listenerIsFree:
+                  productKind === "audio_post" || practice.is_free === true,
+              }),
     }),
     studioMusicPriceRubles: studioMusicPriceMinorToRubles(
       practice.studio_music_price_minor,

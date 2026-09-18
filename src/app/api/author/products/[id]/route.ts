@@ -78,6 +78,11 @@ import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { normalizeStudioMusicPricingForSave } from "@/lib/studio-music/pricing";
+import {
+  isStudioNewFreeDisabledViolation,
+  studioNewFreeDisabledResponseBody,
+  wouldCreateNewStudioFreeState,
+} from "@/lib/studio-music/new-free-policy";
 import { slugifyTitle } from "@/lib/author-products/utils";
 import { hasPermission } from "@/lib/auth/platform-access";
 import {
@@ -675,6 +680,54 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.studio_music_price_minor = studioPricing.priceMinor;
     }
 
+    {
+      const nextAuthorIdForPolicy =
+        typeof updates.author_id === "string" && updates.author_id
+          ? updates.author_id
+          : practice.author_id;
+      const nextPermissionForPolicy =
+        "music_usage_permission" in updates
+          ? (updates.music_usage_permission as string | null)
+          : practice.music_usage_permission;
+      const nextModeForPolicy =
+        "studio_music_pricing_mode" in updates
+          ? (updates.studio_music_pricing_mode as string | null)
+          : practice.studio_music_pricing_mode;
+      const nextIsFreeForPolicy =
+        typeof updates.is_free === "boolean"
+          ? updates.is_free
+          : practice.is_free;
+      const nextPriceForPolicy =
+        "price" in updates
+          ? (updates.price as number | null)
+          : practice.price;
+
+      if (
+        wouldCreateNewStudioFreeState({
+          oldRow: {
+            deleted_at: practice.deleted_at,
+            author_id: practice.author_id,
+            music_usage_permission: practice.music_usage_permission,
+            studio_music_pricing_mode: practice.studio_music_pricing_mode,
+            is_free: practice.is_free,
+            price: practice.price,
+          },
+          newRow: {
+            deleted_at: practice.deleted_at,
+            author_id: nextAuthorIdForPolicy,
+            music_usage_permission: nextPermissionForPolicy,
+            studio_music_pricing_mode: nextModeForPolicy,
+            is_free: nextIsFreeForPolicy,
+            price: nextPriceForPolicy,
+          },
+        })
+      ) {
+        return NextResponse.json(studioNewFreeDisabledResponseBody(), {
+          status: 409,
+        });
+      }
+    }
+
     const appreciationPatch = resolveAppreciationOverridePatch({
       present: "listener_appreciation_override" in body,
       override: (body as { listener_appreciation_override?: unknown })
@@ -921,6 +974,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (updateError) {
+      if (isStudioNewFreeDisabledViolation(updateError)) {
+        return NextResponse.json(studioNewFreeDisabledResponseBody(), {
+          status: 409,
+        });
+      }
       console.error("author_product_update_error", {
         practiceId: id,
         code: updateError.code ?? "internal_error",

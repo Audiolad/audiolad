@@ -378,7 +378,7 @@ assert.equal(
     listenerIsFree: true,
     currentMode: STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER,
   }),
-  null,
+  STUDIO_MUSIC_PRICING_MODE.FIXED,
 );
 assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, 499);
 assert.equal(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES, MIN_STUDIO_MUSIC_PRICE_RUBLES);
@@ -594,7 +594,7 @@ assert.match(card, /Треки/);
 assert.match(card, /Прослушивание|listener_price_label/);
 assert.match(card, /studio_price_label/);
 assert.match(form, /Использование в Студии АудиоЛада/);
-assert.match(form, /Бесплатно для Студии/);
+assert.match(form, /Бесплатно — сохранено ранее/);
 assert.match(form, /Автоматическая цена/);
 assert.match(form, /Своя цена/);
 assert.match(form, /70%/);
