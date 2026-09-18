@@ -8,7 +8,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
 const migName = "20261009120300_studio_disable_new_free_music.sql";
 const migPath = join(migrationsDir, migName);
-const smokePath = join(repoRoot, "supabase/tests/studio_disable_new_free_music_smoke.sql");
+const smokePath = join(
+  repoRoot,
+  "supabase/tests/studio_disable_new_free_music_smoke.sql",
+);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -17,15 +20,29 @@ function assert(condition, message) {
 assert(existsSync(migPath), "migration exists");
 assert(existsSync(smokePath), "smoke exists");
 const mig = readFileSync(migPath, "utf8");
-const body = mig.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+const body = mig
+  .split("\n")
+  .filter((l) => !l.trim().startsWith("--"))
+  .join("\n");
 assert(mig.includes("studio_new_free_disabled"), "marker");
-assert(mig.includes("IS NOT DISTINCT FROM 'platform_reuse_allowed'"), "null-safe permission compare");
-assert(mig.includes("COALESCE(public.practice_is_effective_studio_free"), "null-safe guard coalesce");
+assert(
+  mig.includes("IS NOT DISTINCT FROM 'platform_reuse_allowed'"),
+  "null-safe permission compare",
+);
+assert(
+  mig.includes("COALESCE(public.practice_is_effective_studio_free"),
+  "null-safe guard coalesce",
+);
 assert(mig.includes("CREATE TRIGGER practices_no_new_studio_free_trg"), "trigger");
 assert(!/UNIQUE/i.test(body), "no unique index");
 assert(!/UPDATE\s+public\.practices/i.test(body), "no practices update");
 assert(!/studio_music_entitlements/i.test(body), "no entitlements");
-assert(!existsSync(join(migrationsDir, "20261008120300_studio_one_free_music_per_author.sql")), "old migration removed");
+assert(
+  !existsSync(
+    join(migrationsDir, "20261008120300_studio_one_free_music_per_author.sql"),
+  ),
+  "old migration removed",
+);
 
 const versions = readdirSync(migrationsDir)
   .filter((n) => n.endsWith(".sql"))
@@ -33,6 +50,16 @@ const versions = readdirSync(migrationsDir)
   .filter(Boolean);
 assert(versions.includes("20261009120300"), "stamp listed");
 assert(versions.includes("20261009120200"), "previous stamp remains");
+
+const smoke = readFileSync(smokePath, "utf8");
+assert(
+  !/INSERT INTO public\.practices[\s\S]*'legacy free 1'/.test(smoke),
+  "smoke must not INSERT pre-migration grandfather rows",
+);
+assert(
+  smoke.includes("grandfather_inventory_intact"),
+  "smoke verifies pre-seeded inventory",
+);
 
 const isolated = process.env.AUDIOLAD_STUDIO_MUSIC_ISOLATED === "1";
 if (!isolated) {
@@ -79,6 +106,67 @@ CREATE TABLE public.practices (
 `,
   dbName,
 );
+
+// Seed grandfathered production-like FREE rows BEFORE migration/trigger.
+// IDs match supabase/tests/studio_disable_new_free_music_smoke.sql.
+psql(
+  `
+INSERT INTO public.practices (
+  id, author_id, title, deleted_at, music_usage_permission,
+  studio_music_pricing_mode, is_free, price, product_kind, status
+) VALUES
+  (
+    '11111111-1111-1111-1111-111111111111',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'legacy free 1',
+    NULL,
+    'platform_reuse_allowed',
+    'free',
+    true,
+    0,
+    'music',
+    'published'
+  ),
+  (
+    '22222222-2222-2222-2222-222222222222',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'legacy free 2',
+    NULL,
+    'platform_reuse_allowed',
+    'free',
+    true,
+    0,
+    'music',
+    'published'
+  ),
+  (
+    '66666666-6666-6666-6666-666666666666',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'legacy null free',
+    NULL,
+    'platform_reuse_allowed',
+    NULL,
+    true,
+    0,
+    'music',
+    'published'
+  ),
+  (
+    '55555555-5555-5555-5555-555555555555',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'xfer free',
+    NULL,
+    'platform_reuse_allowed',
+    'free',
+    true,
+    0,
+    'music',
+    'draft'
+  );
+`,
+  dbName,
+);
+
 psqlFile(migPath, dbName);
 psqlFile(smokePath, dbName);
 console.log("studio-music-new-free-policy-sql-unit: isolated-ok");

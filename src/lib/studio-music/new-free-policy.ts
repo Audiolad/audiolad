@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { MUSIC_USAGE_PERMISSION } from "@/lib/author-products/product-kind";
 import { STUDIO_MUSIC_PRICING_MODE } from "@/lib/studio-music/pricing";
 
@@ -122,9 +120,3 @@ export function studioNewFreeDisabledResponseBody() {
   };
 }
 
-/** Unused client kept for future service lookups; policy is row-local. */
-export async function assertNoNewStudioFreeRequired(
-  _supabase: SupabaseClient,
-): Promise<void> {
-  return;
-}

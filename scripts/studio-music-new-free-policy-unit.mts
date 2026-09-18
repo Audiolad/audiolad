@@ -251,4 +251,10 @@ assert.equal(
   true,
 );
 
+const policySrc = readFileSync(
+  join(repoRoot, "src/lib/studio-music/new-free-policy.ts"),
+  "utf8",
+);
+assert.doesNotMatch(policySrc, /assertNoNewStudioFreeRequired|SupabaseClient/);
+
 console.log("studio-music-new-free-policy-unit: ok");
