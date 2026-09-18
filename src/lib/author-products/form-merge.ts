@@ -11,10 +11,12 @@ import {
 } from "@/lib/author-products/product-kind";
 import {
   defaultStudioMusicPricingModeForForm,
+  STUDIO_MUSIC_PRICING_MODE,
   studioMusicPriceMinorToRubles,
   studioMusicPricingModeAfterListenerFlip,
   type StudioMusicPricingMode,
 } from "@/lib/studio-music/pricing";
+import { isEffectiveStudioFreeProduct } from "@/lib/studio-music/new-free-policy";
 import {
   parsePublicationClass,
   type PublicationClass,

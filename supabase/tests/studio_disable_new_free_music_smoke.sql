@@ -74,13 +74,11 @@ BEGIN
   SET deleted_at = NULL, studio_music_pricing_mode = 'fixed', is_free = false, price = 599
   WHERE id = p2;
 
-  -- FREE author transfer rejected (use remaining free-like via explicit free on p4 seeded)
+  -- listen-only / unset permission free music drafts are NOT Studio FREE configs
   INSERT INTO public.practices (id, author_id, title, deleted_at, music_usage_permission, studio_music_pricing_mode, is_free, price, product_kind, status)
-  VALUES (p4, author_a, 'still free', NULL, 'platform_reuse_allowed', 'free', true, 0, 'music', 'draft');
-  -- Wait - INSERT free is rejected! Need to disable trigger temporarily to seed, OR insert as paid then... can't create free.
-  -- For transfer test: use p2 after we made it paid. Seed by temporarily bypass? 
-  -- Better: insert paid then we can't get free. The smoke already has p1 converted to paid and p2 paid.
-  -- Re-seed grandfathered free by disabling trigger briefly is OK in smoke for transfer case.
+  VALUES (p4, author_a, 'listen only free draft', NULL, NULL, NULL, true, 0, 'music', 'draft');
+
+  -- Seed a FREE Studio row for transfer test (bypass guard; mirrors grandfathered inventory)
   ALTER TABLE public.practices DISABLE TRIGGER practices_no_new_studio_free_trg;
   INSERT INTO public.practices (id, author_id, title, deleted_at, music_usage_permission, studio_music_pricing_mode, is_free, price, product_kind, status)
   VALUES (p5, author_a, 'xfer free', NULL, 'platform_reuse_allowed', 'free', true, 0, 'music', 'draft');

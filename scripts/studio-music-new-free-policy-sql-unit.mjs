@@ -19,6 +19,8 @@ assert(existsSync(smokePath), "smoke exists");
 const mig = readFileSync(migPath, "utf8");
 const body = mig.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
 assert(mig.includes("studio_new_free_disabled"), "marker");
+assert(mig.includes("IS NOT DISTINCT FROM 'platform_reuse_allowed'"), "null-safe permission compare");
+assert(mig.includes("COALESCE(public.practice_is_effective_studio_free"), "null-safe guard coalesce");
 assert(mig.includes("CREATE TRIGGER practices_no_new_studio_free_trg"), "trigger");
 assert(!/UNIQUE/i.test(body), "no unique index");
 assert(!/UPDATE\s+public\.practices/i.test(body), "no practices update");

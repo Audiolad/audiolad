@@ -12,20 +12,23 @@ CREATE OR REPLACE FUNCTION public.practice_is_effective_studio_free(
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT
+  -- Comparisons must never yield NULL: PL/pgSQL `IF NOT NULL` does not early-return
+  -- and would incorrectly reject listen-only / unset-permission free music drafts.
+  SELECT (
     p_deleted_at IS NULL
-    AND p_music_usage_permission = 'platform_reuse_allowed'
+    AND p_music_usage_permission IS NOT DISTINCT FROM 'platform_reuse_allowed'
     AND (
-      p_studio_music_pricing_mode = 'free'
+      p_studio_music_pricing_mode IS NOT DISTINCT FROM 'free'
       OR (
         p_studio_music_pricing_mode IS NULL
         AND (
-          p_is_free IS TRUE
+          COALESCE(p_is_free, false) IS TRUE
           OR p_price IS NULL
-          OR p_price <= 0
+          OR COALESCE(p_price, 0) <= 0
         )
       )
-    );
+    )
+  );
 $$;
 
 COMMENT ON FUNCTION public.practice_is_effective_studio_free(timestamptz, text, text, boolean, numeric) IS
@@ -41,22 +44,22 @@ DECLARE
   v_new_free boolean := false;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
-    v_old_free := public.practice_is_effective_studio_free(
+    v_old_free := COALESCE(public.practice_is_effective_studio_free(
       OLD.deleted_at,
       OLD.music_usage_permission,
       OLD.studio_music_pricing_mode,
       OLD.is_free,
       OLD.price
-    );
+    ), false);
   END IF;
 
-  v_new_free := public.practice_is_effective_studio_free(
+  v_new_free := COALESCE(public.practice_is_effective_studio_free(
     NEW.deleted_at,
     NEW.music_usage_permission,
     NEW.studio_music_pricing_mode,
     NEW.is_free,
     NEW.price
-  );
+  ), false);
 
   -- Not becoming / staying FREE: always OK (includes FREE→PAID and soft-delete).
   IF NOT v_new_free THEN
