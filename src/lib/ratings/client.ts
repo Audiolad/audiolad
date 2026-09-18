@@ -5,7 +5,7 @@ import type {
 } from "@/lib/ratings/types";
 
 export const RATING_NOT_ELIGIBLE_COPY =
-  "Послушайте аудио хотя бы 30 секунд, чтобы поставить оценку.";
+  "Послушайте аудио хотя бы 40 секунд, чтобы оставить свой отклик.";
 
 export const RATING_THANKS_COPY = "Спасибо за ваш отклик 🙏";
 
