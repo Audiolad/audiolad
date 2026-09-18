@@ -9,6 +9,7 @@ import { createStudioVoicePresetImpulseWav } from "../src/lib/studio/render/ir";
 import { buildStudioRenderTimeline } from "../src/lib/studio/render/timeline";
 import { getStudioRenderClipSourceDuration } from "../src/lib/studio/clip-math";
 import { buildStudioRenderFilterGraph } from "../src/lib/studio/render/ffmpeg";
+import { STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS } from "../src/lib/studio/fade-math";
 import {
   renderStudioProjectToMp3,
   renderStudioProjectToPcmWav,
@@ -361,12 +362,16 @@ async function main() {
     // independent of MP3 encoder delay and the preset convolution path.
     const fixtureAssets = [asset(ASSET_VOICE, "constant.wav"), asset(ASSET_MUSIC, "music.wav")];
     const fixturePaths = new Map([[ASSET_VOICE, constantPath], [ASSET_MUSIC, musicPath]]);
+    const afterTech = Math.round(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS * RATE) + 100;
     const clipCases = [
       {
         name: "zero",
         clips: [{ id: "zero", startTime: 0, offset: 0, duration: 0.25, fadeInDuration: 0, fadeOutDuration: 0 }],
         duration: 0.25,
-        verify: (samples: Float32Array) => assert(Math.abs(framePeak(samples, 100) - 0.25) < 1e-6),
+        verify: (samples: Float32Array) => {
+          assert(framePeak(samples, 0) < 0.05, "zero-fade clip opens with technical de-click");
+          assert(Math.abs(framePeak(samples, afterTech) - 0.25) < 1e-6);
+        },
       },
       {
         name: "delayed",
@@ -374,7 +379,8 @@ async function main() {
         duration: 0.75,
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, 0, Math.round(0.5 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + 100) - 0.25) < 1e-6);
+          assert(framePeak(samples, Math.round(0.5 * RATE)) < 0.05, "gap→clip uses de-click");
+          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
       {
@@ -386,7 +392,7 @@ async function main() {
         duration: 0.75,
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, Math.round(0.25 * RATE), Math.round(0.5 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + 100) - 0.25) < 1e-6);
+          assert(Math.abs(framePeak(samples, Math.round(0.5 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
       {
@@ -400,7 +406,7 @@ async function main() {
         verify: (samples: Float32Array) => {
           assert.equal(sampleRangePeak(samples, Math.round(0.2 * RATE), Math.round(0.3 * RATE)), 0);
           assert.equal(sampleRangePeak(samples, Math.round(0.5 * RATE), Math.round(0.6 * RATE)), 0);
-          assert(Math.abs(framePeak(samples, Math.round(0.6 * RATE) + 100) - 0.25) < 1e-6);
+          assert(Math.abs(framePeak(samples, Math.round(0.6 * RATE) + afterTech) - 0.25) < 1e-6);
         },
       },
     ] as const;
@@ -426,7 +432,179 @@ async function main() {
       trimSnapshot,
       new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
     );
-    assert(Math.abs(framePeak(trimmed.samples, 10) - (0.5 + 10 / RATE)) < 1e-5, "offset must trim source PCM");
+    const trimProbe = Math.round(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS * RATE) + 10;
+    assert(
+      Math.abs(framePeak(trimmed.samples, trimProbe) - (0.5 + trimProbe / RATE)) < 1e-5,
+      "offset must trim source PCM after technical fade-in",
+    );
+    assert.match(
+      buildStudioRenderFilterGraph({
+        snapshot: trimSnapshot,
+        localAssetPaths: new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
+      }).filterComplex,
+      /afade=t=in:st=0:d=0\.010000:curve=tri/,
+      "export applies technical fade-in when authored fadeInDuration is 0",
+    );
+    assert.match(
+      buildStudioRenderFilterGraph({
+        snapshot: trimSnapshot,
+        localAssetPaths: new Map([[ASSET_VOICE, rampPath], [ASSET_MUSIC, musicPath]]),
+      }).filterComplex,
+      /afade=t=out:st=0\.240000:d=0\.010000:curve=tri/,
+      "export applies technical fade-out when authored fadeOutDuration is 0",
+    );
+
+    // Contiguous split of one asset: no amplitude dip / double de-click at the seam.
+    const splitSeamSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left", startTime: 0, offset: 0, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+        { id: "split-right", startTime: 0.2, offset: 0.2, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitGraph = buildStudioRenderFilterGraph({
+      snapshot: splitSeamSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const leftClipFilter = splitGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const rightClipFilter = splitGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(leftClipFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    assert.doesNotMatch(leftClipFilter, /afade=t=out/);
+    assert.doesNotMatch(rightClipFilter, /afade=t=in/);
+    assert.match(rightClipFilter, /afade=t=out:st=0\.190000:d=0\.010000:curve=tri/);
+    const splitRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-seam",
+      splitSeamSnapshot,
+      fixturePaths,
+    );
+    const seam = Math.round(0.2 * RATE);
+    const seamWindowPeak = sampleRangePeak(
+      splitRendered.samples,
+      seam - Math.round(0.005 * RATE),
+      seam + Math.round(0.005 * RATE),
+    );
+    assert(
+      Math.abs(seamWindowPeak - 0.25) < 0.02,
+      `contiguous split seam must stay flat, got peak ${seamWindowPeak}`,
+    );
+    assert(
+      Math.abs(framePeak(splitRendered.samples, seam) - 0.25) < 0.02,
+      "exact seam frame must not dip from fake fade-out/fade-in",
+    );
+
+    // Contiguous split + authored right fade-in: preview/FFmpeg must ramp 0→1 over 0.5s.
+    const splitFadeInSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-fi", startTime: 0, offset: 0, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+        { id: "split-right-fi", startTime: 0.2, offset: 0.2, duration: 0.8, fadeInDuration: 0.5, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitFadeInGraph = buildStudioRenderFilterGraph({
+      snapshot: splitFadeInSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const leftFadeInComplement = splitFadeInGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const rightFadeInFilter = splitFadeInGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(
+      leftFadeInComplement,
+      /afade=t=out:st=0\.190000:d=0\.010000:curve=tri/,
+      "right-only fade-in gets complementary left tech fade-out",
+    );
+    assert.match(rightFadeInFilter, /afade=t=in:st=0:d=0\.500000:curve=tri/);
+    assert.doesNotMatch(rightFadeInFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    const splitFadeInRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-authored-fade-in",
+      splitFadeInSnapshot,
+      fixturePaths,
+    );
+    const fiSeam = Math.round(0.2 * RATE);
+    assert(
+      framePeak(splitFadeInRendered.samples, fiSeam - Math.round(0.001 * RATE)) < 0.05,
+      "left complementary tech fade-out reaches ~0 just before seam",
+    );
+    assert(framePeak(splitFadeInRendered.samples, fiSeam) < 0.05, "authored fade-in starts near 0 at seam");
+    assert(
+      Math.abs(framePeak(splitFadeInRendered.samples, Math.round(0.45 * RATE)) - 0.125) < 0.02,
+      "authored fade-in mid point ~0.5 gain on 0.25 amplitude",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeInRendered.samples, Math.round(0.7 * RATE)) - 0.25) < 0.02,
+      "authored fade-in reaches full after 0.5s",
+    );
+
+    // Contiguous split + authored left fade-out: must ramp 1→0 over 0.5s on the left half.
+    const splitFadeOutSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-fo", startTime: 0, offset: 0, duration: 0.8, fadeInDuration: 0, fadeOutDuration: 0.5 },
+        { id: "split-right-fo", startTime: 0.8, offset: 0.8, duration: 0.2, fadeInDuration: 0, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const splitFadeOutGraph = buildStudioRenderFilterGraph({
+      snapshot: splitFadeOutSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const leftFadeOutFilter = splitFadeOutGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const rightFadeOutComplement = splitFadeOutGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(leftFadeOutFilter, /afade=t=out:st=0\.300000:d=0\.500000:curve=tri/);
+    assert.match(
+      rightFadeOutComplement,
+      /afade=t=in:st=0:d=0\.010000:curve=tri/,
+      "left-only fade-out gets complementary right tech fade-in",
+    );
+    const splitFadeOutRendered = await renderFixturePcm(
+      root,
+      "contiguous-split-authored-fade-out",
+      splitFadeOutSnapshot,
+      fixturePaths,
+    );
+    const foSeam = Math.round(0.8 * RATE);
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, Math.round(0.3 * RATE)) - 0.25) < 0.02,
+      "before authored fade-out stays full",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, Math.round(0.55 * RATE)) - 0.125) < 0.02,
+      "authored fade-out mid point",
+    );
+    assert(
+      framePeak(splitFadeOutRendered.samples, foSeam - 1) < 0.05,
+      "authored fade-out reaches near 0 at left end",
+    );
+    assert(
+      framePeak(splitFadeOutRendered.samples, foSeam) < 0.05,
+      "complementary tech fade-in starts near 0 at seam",
+    );
+    assert(
+      Math.abs(framePeak(splitFadeOutRendered.samples, foSeam + Math.round(0.01 * RATE)) - 0.25) < 0.03,
+      "complementary tech fade-in reaches full after 10 ms",
+    );
+
+    // Both authored on contiguous seam: no complementary technical ramps.
+    const bothAuthoredSnapshot = createStudioRenderSnapshot({
+      project: fixtureProject([
+        { id: "split-left-both", startTime: 0, offset: 0, duration: 0.5, fadeInDuration: 0, fadeOutDuration: 0.2 },
+        { id: "split-right-both", startTime: 0.5, offset: 0.5, duration: 0.5, fadeInDuration: 0.2, fadeOutDuration: 0 },
+      ]),
+      expectedRevision: 7,
+      assets: fixtureAssets,
+    });
+    const bothGraph = buildStudioRenderFilterGraph({
+      snapshot: bothAuthoredSnapshot,
+      localAssetPaths: fixturePaths,
+    }).filterComplex;
+    const bothLeftFilter = bothGraph.split("[clip_0_0]")[0].split(";").at(-1) ?? "";
+    const bothRightFilter = bothGraph.split("[clip_0_1]")[0].split(";").at(-1) ?? "";
+    assert.match(bothLeftFilter, /afade=t=out:st=0\.300000:d=0\.200000:curve=tri/);
+    assert.doesNotMatch(bothLeftFilter, /afade=t=out:st=0\.490000:d=0\.010000:curve=tri/);
+    assert.match(bothRightFilter, /afade=t=in:st=0:d=0\.200000:curve=tri/);
+    assert.doesNotMatch(bothRightFilter, /afade=t=in:st=0:d=0\.010000:curve=tri/);
 
     const fadeCases = [
       {
@@ -461,6 +639,31 @@ async function main() {
         expectedRevision: 7,
         assets: fixtureAssets,
       });
+      const fadeGraph = buildStudioRenderFilterGraph({
+        snapshot: fadeSnapshot,
+        localAssetPaths: fixturePaths,
+      }).filterComplex;
+      if (fadeCase.fadeInDuration > STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS) {
+        assert.match(
+          fadeGraph,
+          new RegExp(`afade=t=in:st=0:d=${fadeCase.fadeInDuration.toFixed(6)}:curve=tri`),
+          `${fadeCase.name} keeps user fade-in without doubling`,
+        );
+        assert.doesNotMatch(
+          fadeGraph,
+          /afade=t=in:st=0:d=0\.010000:curve=tri/,
+          `${fadeCase.name} must not also apply technical fade-in`,
+        );
+      }
+      if (fadeCase.fadeOutDuration > STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS) {
+        assert.match(
+          fadeGraph,
+          new RegExp(
+            `afade=t=out:st=${(1 - fadeCase.fadeOutDuration).toFixed(6)}:d=${fadeCase.fadeOutDuration.toFixed(6)}:curve=tri`,
+          ),
+          `${fadeCase.name} keeps user fade-out without doubling`,
+        );
+      }
       const faded = await renderFixturePcm(root, fadeCase.name, fadeSnapshot, fixturePaths);
       for (const [seconds, expected] of fadeCase.measurements) {
         assert(
@@ -744,6 +947,8 @@ async function main() {
     assert.match(olgaGraph.filterComplex, /apad,atrim=duration=5\.400000/);
     assert.doesNotMatch(olgaGraph.filterComplex, /apad=whole_dur=/);
     assert.match(olgaGraph.filterComplex, /atrim=start=0\.000000:duration=5\.000000/);
+    assert.match(olgaGraph.filterComplex, /afade=t=in:st=0:d=0\.010000:curve=tri/);
+    assert.match(olgaGraph.filterComplex, /afade=t=out:st=5\.390000:d=0\.010000:curve=tri/);
     const olgaRendered = await renderFixturePcm(
       root,
       "olga-like-short-source",

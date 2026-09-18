@@ -324,6 +324,37 @@ async function testProviderAndHydrationContracts() {
   assert.doesNotMatch(playbackRoute, /downloadStudioProjectAsset|arrayBuffer/);
   assert.match(renderWorker, /arrayBuffer/);
   assert.match(ir, /AudioBuffer/);
+
+  const fadeMath = await readFile(
+    new URL("../src/lib/studio/fade-math.ts", import.meta.url),
+    "utf8",
+  );
+  const ffmpeg = await readFile(
+    new URL("../src/lib/studio/render/ffmpeg.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(fadeMath, /STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS = 0\.01/);
+  assert.match(fadeMath, /resolveStudioPlaybackClipFades/);
+  assert.match(fadeMath, /isStudioContiguousSourceSeam/);
+  assert.match(provider, /resolveStudioPlaybackClipFades/);
+  assert.match(provider, /resolveStudioClipEnterHandoff/);
+  assert.match(provider, /enterHandoff === "from-silence"/);
+  assert.match(provider, /enterHandoff === "flat"/);
+  assert.match(provider, /authored fade-in/);
+  assert.match(fadeMath, /resolveStudioClipEnterHandoff/);
+  assert.match(
+    provider,
+    /do not pretend this path is a soft de-click/,
+  );
+  assert.doesNotMatch(
+    provider,
+    /stopSources[\s\S]{0,400}linearRampToValueAtTime\(\s*0,\s*contextTime \+ STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS/,
+  );
+  assert.match(ffmpeg, /resolveStudioPlaybackClipFades\(clip, clip\.duration/);
+  assert.match(ffmpeg, /playbackFades\.fadeInDuration/);
+  assert.match(ffmpeg, /orderedClips/);
+  assert.match(provider, /fadeInDuration: 0/);
+  assert.match(provider, /fadeOutDuration: 0/);
 }
 
 testClipSyncMath();

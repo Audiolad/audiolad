@@ -40,6 +40,9 @@ import {
 import {
   clampStudioClipFades,
   getStudioFadeEnvelope,
+  resolveStudioClipEnterHandoff,
+  resolveStudioPlaybackClipFades,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
   type StudioClipFades,
 } from "@/lib/studio/fade-math";
 import { MAX_STUDIO_PROJECT_BYTES } from "@/lib/studio/limits";
@@ -83,6 +86,7 @@ import {
 import {
   findActiveStudioClip,
   planStudioMediaElementSync,
+  shouldCorrectStudioMediaDrift,
 } from "@/lib/studio/media-element-sync";
 import {
   applyStudioMediaElementSrcRefresh,
@@ -290,22 +294,44 @@ function scheduleClipEnvelope(
   clip: StudioClip,
   elapsedClipTime: number,
   startAt: number,
+  options: {
+    enterHandoff: "flat" | "fade-in" | "from-silence";
+    previous: StudioClip | null;
+    next: StudioClip | null;
+  },
 ) {
-  const fades = clampStudioClipFades(clip, clip.duration);
+  // Playback uses technical edge ramps; authored fades in project_data stay as set.
+  const fades = resolveStudioPlaybackClipFades(clip, clip.duration, {
+    clip,
+    previous: options.previous,
+    next: options.next,
+  });
   const fadeGain = envelopeGain.gain;
   fadeGain.cancelScheduledValues(startAt);
-  fadeGain.setValueAtTime(
-    getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades),
-    startAt,
-  );
-  if (fades.fadeInDuration > elapsedClipTime) {
-    fadeGain.linearRampToValueAtTime(
-      1,
-      startAt + (fades.fadeInDuration - elapsedClipTime),
-    );
+  if (options.enterHandoff === "flat") {
+    // Untouched contiguous split: keep full gain (no technical 0→1 dip).
+    fadeGain.setValueAtTime(1, startAt);
+  } else {
+    // Hard enter or authored fade-in on the seam: open from 0 and ramp.
+    fadeGain.setValueAtTime(0, startAt);
+    if (fades.fadeInDuration > elapsedClipTime) {
+      fadeGain.linearRampToValueAtTime(
+        1,
+        startAt + (fades.fadeInDuration - elapsedClipTime),
+      );
+    } else {
+      const remaining = Math.max(clip.duration - elapsedClipTime, 0);
+      const openRamp = Math.min(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, remaining);
+      const target = getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades);
+      if (openRamp > 0 && target > 0) {
+        fadeGain.linearRampToValueAtTime(target, startAt + openRamp);
+      } else {
+        fadeGain.setValueAtTime(target, startAt);
+      }
+    }
   }
   const fadeOutStart = clip.duration - fades.fadeOutDuration;
-  if (fadeOutStart > elapsedClipTime) {
+  if (fades.fadeOutDuration > 0 && fadeOutStart > elapsedClipTime) {
     fadeGain.setValueAtTime(1, startAt + (fadeOutStart - elapsedClipTime));
   }
   if (fades.fadeOutDuration > 0) {
@@ -314,6 +340,21 @@ function scheduleClipEnvelope(
       startAt + (clip.duration - elapsedClipTime),
     );
   }
+}
+
+function studioClipTimelineNeighbors(
+  clips: readonly StudioClip[],
+  clip: StudioClip,
+): { previous: StudioClip | null; next: StudioClip | null } {
+  const ordered = sortStudioClipsByStart(clips);
+  const index = ordered.findIndex((item) => item.id === clip.id);
+  if (index < 0) {
+    return { previous: null, next: null };
+  }
+  return {
+    previous: index > 0 ? ordered[index - 1] ?? null : null,
+    next: index + 1 < ordered.length ? ordered[index + 1] ?? null : null,
+  };
 }
 
 function syncTrackMediaPlayback(
@@ -335,28 +376,59 @@ function syncTrackMediaPlayback(
   media.loop = plan.loop;
 
   if (plan.envelope === "silence") {
-    runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
-    runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+    const gain = runtime.envelopeGain.gain;
+    gain.cancelScheduledValues(contextTime);
+    const from = Number.isFinite(gain.value) ? Math.max(gain.value, 0) : 0;
+    gain.setValueAtTime(from, contextTime);
+    gain.linearRampToValueAtTime(
+      0,
+      contextTime + STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+    );
     runtime.sources.clear();
     runtime.activeClipId = null;
   } else if (plan.enteredClip) {
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
+      const { previous, next } = studioClipTimelineNeighbors(track.clips, clip);
+      const enterHandoff = resolveStudioClipEnterHandoff({ clip, previous, next });
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
-      scheduleClipEnvelope(
-        runtime.envelopeGain,
-        clip,
-        plan.elapsedClipTime,
-        contextTime,
-      );
+      if (enterHandoff === "from-silence") {
+        // Hard enter: seek while muted, then open through technical/user envelope.
+        runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
+        runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
+        if (plan.seekTo != null) {
+          seekStudioMediaElement(media, plan.seekTo);
+        }
+        scheduleClipEnvelope(
+          runtime.envelopeGain,
+          clip,
+          plan.elapsedClipTime,
+          contextTime,
+          { enterHandoff, previous, next },
+        );
+      } else {
+        // Contiguous same-source seam: keep media rolling; flat or authored fade-in.
+        if (
+          plan.seekTo != null &&
+          shouldCorrectStudioMediaDrift(media.currentTime, plan.seekTo)
+        ) {
+          seekStudioMediaElement(media, plan.seekTo);
+        }
+        scheduleClipEnvelope(
+          runtime.envelopeGain,
+          clip,
+          plan.elapsedClipTime,
+          contextTime,
+          { enterHandoff, previous, next },
+        );
+      }
       runtime.activeClipId = clip.id;
     }
-  }
-
-  if (plan.seekTo != null) {
+  } else if (plan.seekTo != null) {
     seekStudioMediaElement(media, plan.seekTo);
   }
+
   if (plan.wantPlaying) {
     if (media.paused) {
       void media.play().catch(() => {
@@ -669,6 +741,8 @@ export function StudioAudioProvider({
   }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
+    // Immediate mute+pause: a scheduled gain ramp cannot audibly finish after
+    // mediaElement.pause(), so do not pretend this path is a soft de-click.
     const contextTime = audioContextRef.current?.currentTime ?? 0;
     for (const runtime of trackRuntimesRef.current.values()) {
       if (!runtime.mediaElement.paused) {

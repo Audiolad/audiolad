@@ -6,7 +6,12 @@ import {
   clampStudioClipFades,
   getStudioDefaultFadeDuration,
   getStudioFadeEnvelope,
+  isStudioContiguousSourceSeam,
+  resolveStudioClipEnterHandoff,
+  resolveStudioPlaybackClipFades,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
 } from "../src/lib/studio/fade-math.ts";
+import { splitStudioClip } from "../src/lib/studio/clip-math.ts";
 
 assert.deepEqual(clampStudioClipFades({}, 10), {
   fadeInDuration: 0,
@@ -53,5 +58,171 @@ assert.equal(getStudioFadeEnvelope(1, 10, { fadeInDuration: 2, fadeOutDuration: 
 assert.equal(getStudioFadeEnvelope(5, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 1);
 assert.equal(getStudioFadeEnvelope(8.5, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 0.5);
 assert.equal(getStudioFadeEnvelope(10, 10, { fadeInDuration: 2, fadeOutDuration: 3 }), 0);
+
+assert.equal(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS, 0.01);
+
+const techZero = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0, fadeOutDuration: 0 },
+  10,
+);
+assert.deepEqual(techZero, {
+  fadeInDuration: STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  fadeOutDuration: STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+});
+
+const userWins = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0.5, fadeOutDuration: 0.25 },
+  10,
+);
+assert.deepEqual(userWins, { fadeInDuration: 0.5, fadeOutDuration: 0.25 });
+
+const shortClip = resolveStudioPlaybackClipFades(
+  { fadeInDuration: 0, fadeOutDuration: 0 },
+  0.012,
+);
+assert.ok(Math.abs(shortClip.fadeInDuration - 0.006) < 1e-9);
+assert.ok(Math.abs(shortClip.fadeOutDuration - 0.006) < 1e-9);
+assert.ok(
+  Math.abs(getStudioFadeEnvelope(0, 10, techZero)) < 1e-12,
+  "technical fade-in starts at gain 0",
+);
+assert.ok(
+  Math.abs(getStudioFadeEnvelope(STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS / 2, 10, techZero) - 0.5) < 1e-9,
+);
+
+const source = {
+  id: "whole",
+  startTime: 0,
+  offset: 0,
+  duration: 4,
+  fadeInDuration: 0,
+  fadeOutDuration: 0,
+};
+const split = splitStudioClip(source, 2, "right");
+assert.ok(split);
+assert.equal(isStudioContiguousSourceSeam(split.left, split.right), true);
+const leftFades = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: split.right,
+});
+const rightFades = resolveStudioPlaybackClipFades(split.right, split.right.duration, {
+  clip: split.right,
+  previous: split.left,
+  next: null,
+});
+assert.equal(leftFades.fadeInDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+assert.equal(leftFades.fadeOutDuration, 0, "contiguous seam must not tech fade-out");
+assert.equal(rightFades.fadeInDuration, 0, "contiguous seam must not tech fade-in");
+assert.equal(rightFades.fadeOutDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+
+const gappedRight = { ...split.right, startTime: split.right.startTime + 0.05 };
+assert.equal(isStudioContiguousSourceSeam(split.left, gappedRight), false);
+const gappedFades = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: gappedRight,
+});
+assert.equal(gappedFades.fadeOutDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: split.right, previous: split.left }),
+  "flat",
+  "untouched contiguous seam stays flat",
+);
+const rightWithFadeIn = { ...split.right, fadeInDuration: 0.5, fadeOutDuration: 0 };
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: rightWithFadeIn, previous: split.left }),
+  "fade-in",
+  "authored fade-in on contiguous seam must ramp",
+);
+const rightFadesAuthored = resolveStudioPlaybackClipFades(
+  rightWithFadeIn,
+  rightWithFadeIn.duration,
+  { clip: rightWithFadeIn, previous: split.left, next: null },
+);
+assert.equal(rightFadesAuthored.fadeInDuration, 0.5);
+const leftComplementary = resolveStudioPlaybackClipFades(split.left, split.left.duration, {
+  clip: split.left,
+  previous: null,
+  next: rightWithFadeIn,
+});
+assert.equal(
+  leftComplementary.fadeOutDuration,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  "right-only authored fade-in needs complementary left tech fade-out",
+);
+assert.equal(
+  getStudioFadeEnvelope(0, rightWithFadeIn.duration, rightFadesAuthored),
+  0,
+);
+assert.equal(
+  getStudioFadeEnvelope(0.25, rightWithFadeIn.duration, rightFadesAuthored),
+  0.5,
+);
+assert.equal(
+  getStudioFadeEnvelope(0.5, rightWithFadeIn.duration, rightFadesAuthored),
+  1,
+);
+
+const leftWithFadeOut = { ...split.left, fadeInDuration: 0, fadeOutDuration: 0.5 };
+const leftFadesAuthored = resolveStudioPlaybackClipFades(
+  leftWithFadeOut,
+  leftWithFadeOut.duration,
+  { clip: leftWithFadeOut, previous: null, next: split.right },
+);
+assert.equal(leftFadesAuthored.fadeOutDuration, 0.5);
+assert.equal(leftFadesAuthored.fadeInDuration, STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS);
+const rightComplementary = resolveStudioPlaybackClipFades(split.right, split.right.duration, {
+  clip: split.right,
+  previous: leftWithFadeOut,
+  next: null,
+});
+assert.equal(
+  rightComplementary.fadeInDuration,
+  STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  "left-only authored fade-out needs complementary right tech fade-in",
+);
+assert.equal(
+  resolveStudioClipEnterHandoff({
+    clip: split.right,
+    previous: leftWithFadeOut,
+    next: null,
+  }),
+  "fade-in",
+  "complementary tech fade-in is not a flat handoff",
+);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration - 0.5, leftWithFadeOut.duration, leftFadesAuthored),
+  1,
+);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration - 0.25, leftWithFadeOut.duration, leftFadesAuthored),
+  0.5,
+);
+assert.equal(
+  getStudioFadeEnvelope(leftWithFadeOut.duration, leftWithFadeOut.duration, leftFadesAuthored),
+  0,
+);
+
+const bothAuthoredLeft = { ...split.left, fadeInDuration: 0, fadeOutDuration: 0.4 };
+const bothAuthoredRight = { ...split.right, fadeInDuration: 0.3, fadeOutDuration: 0 };
+const bothLeft = resolveStudioPlaybackClipFades(bothAuthoredLeft, bothAuthoredLeft.duration, {
+  clip: bothAuthoredLeft,
+  previous: null,
+  next: bothAuthoredRight,
+});
+const bothRight = resolveStudioPlaybackClipFades(bothAuthoredRight, bothAuthoredRight.duration, {
+  clip: bothAuthoredRight,
+  previous: bothAuthoredLeft,
+  next: null,
+});
+assert.equal(bothLeft.fadeOutDuration, 0.4);
+assert.equal(bothRight.fadeInDuration, 0.3);
+
+assert.equal(
+  resolveStudioClipEnterHandoff({ clip: split.right, previous: null }),
+  "from-silence",
+);
 
 console.log("studio-fade-math-unit: ok");
