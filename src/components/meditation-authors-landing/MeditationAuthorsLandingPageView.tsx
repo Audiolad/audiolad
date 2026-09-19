@@ -69,13 +69,16 @@ function VisualSlot({
 
   if (visual.src) {
     return (
-      <figure className={frameClassName}>
+      <figure
+        className={frameClassName}
+        style={{ aspectRatio: `${visual.width} / ${visual.height}` }}
+      >
         <Image
           src={visual.src}
           alt={visual.alt}
           width={visual.width}
           height={visual.height}
-          className="h-auto w-full object-cover"
+          className="h-full w-full object-cover"
           sizes="(max-width: 1023px) 100vw, 52vw"
           priority={priority}
           loading={priority ? undefined : "lazy"}
@@ -302,13 +305,6 @@ export default function MeditationAuthorsLandingPageView() {
               className="rounded-[24px] border border-[#e8def5] bg-white px-5 py-5 shadow-[0_10px_24px_rgba(90,60,145,0.05)]"
               data-mal-monetization-card={card.id}
             >
-              <div
-                className="mb-4 flex aspect-[4/3] items-center justify-center rounded-[18px] border border-dashed border-[#d8c8ee] bg-[#faf7ff] px-3 text-center text-xs leading-5 text-[#7d70a2]"
-                role="img"
-                aria-label={`Визуал: ${card.title}`}
-              >
-                Слот: {card.title}
-              </div>
               <h3 className="text-lg font-semibold tracking-tight text-[#25135c]">
                 {card.title}
               </h3>

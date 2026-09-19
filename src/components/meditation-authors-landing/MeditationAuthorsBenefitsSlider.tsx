@@ -21,7 +21,7 @@ function BenefitVisual({ benefit }: { benefit: MeditationAuthorsBenefit }) {
         alt=""
         width={benefit.width}
         height={benefit.height}
-        className="h-auto w-full object-cover"
+        className="h-full w-full object-cover"
         sizes="(max-width: 768px) 86vw, 28rem"
         loading="lazy"
         draggable={false}
@@ -130,7 +130,7 @@ export default function MeditationAuthorsBenefitsSlider() {
           >
             <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[#e8def5] bg-white shadow-[0_12px_30px_rgba(90,60,145,0.06)]">
               <div
-                className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#efe6f8]"
+                className="relative w-full overflow-hidden border-b border-[#efe6f8]"
                 style={{ aspectRatio: `${benefit.width} / ${benefit.height}` }}
               >
                 <BenefitVisual benefit={benefit} />

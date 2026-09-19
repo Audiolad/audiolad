@@ -69,20 +69,42 @@ function testPathAndCopy() {
   assert.match(MEDITATION_AUTHORS_LANDING_DATE_PUBLISHED, /^\d{4}-\d{2}-\d{2}$/);
 }
 
-function testPlaceholdersOnly() {
+function testFinalAssetsWired() {
+  const expectedVisualSrc = {
+    hero: "/images/meditation-authors-landing/hero.webp",
+    studio: "/images/meditation-authors-landing/studio.webp",
+    "author-space": "/images/meditation-authors-landing/author-space.webp",
+    "listener-intro": "/images/meditation-authors-landing/listener-intro.webp",
+    "search-funnel": "/images/meditation-authors-landing/search-funnel.webp",
+    "final-cta": "/images/meditation-authors-landing/final-cta.webp",
+  };
   for (const visual of MEDITATION_AUTHORS_LANDING_VISUALS) {
     assert.equal(
       visual.src,
-      null,
-      `Visual ${visual.id} must stay a placeholder until final assets arrive`,
+      expectedVisualSrc[visual.id],
+      `Visual ${visual.id} src mismatch`,
     );
+    const assetPath = path.join(ROOT, "public", visual.src.replace(/^\//, ""));
+    assert.ok(existsSync(assetPath), `missing asset file for ${visual.id}: ${assetPath}`);
   }
+
+  const expectedBenefitSrc = {
+    "author-page": "/images/meditation-authors-landing/benefit-01-author-page.webp",
+    publish: "/images/meditation-authors-landing/benefit-02-publish.webp",
+    studio: "/images/meditation-authors-landing/benefit-03-studio.webp",
+    "free-paid": "/images/meditation-authors-landing/benefit-04-free-paid.webp",
+    search: "/images/meditation-authors-landing/benefit-05-search.webp",
+    programs: "/images/meditation-authors-landing/benefit-06-programs.webp",
+    earn: "/images/meditation-authors-landing/benefit-07-earn.webp",
+  };
   for (const benefit of MEDITATION_AUTHORS_LANDING_BENEFITS) {
     assert.equal(
       benefit.src,
-      null,
-      `Benefit ${benefit.id} must stay a placeholder until final assets arrive`,
+      expectedBenefitSrc[benefit.id],
+      `Benefit ${benefit.id} src mismatch`,
     );
+    const assetPath = path.join(ROOT, "public", benefit.src.replace(/^\//, ""));
+    assert.ok(existsSync(assetPath), `missing asset file for ${benefit.id}: ${assetPath}`);
   }
 }
 
@@ -167,6 +189,8 @@ function testPageWiring() {
   assert.match(view, /mal-final-cta/);
   assert.match(view, /mal-studio/);
   assert.ok(primaryMatches >= 1);
+  assert.doesNotMatch(view, /Слот: \{card\.title\}/);
+  assert.match(view, /hero\.webp|MEDITATION_AUTHORS_LANDING_VISUALS/);
 
   // Headings present via constants usage
   for (const token of [
@@ -197,7 +221,7 @@ function testNoBakedMarketingInImages() {
 
 const tests = [
   ["path and copy", testPathAndCopy],
-  ["placeholders only", testPlaceholdersOnly],
+  ["final assets wired", testFinalAssetsWired],
   ["metadata", testMetadata],
   ["json-ld", testJsonLd],
   ["files exist", testFilesExist],
