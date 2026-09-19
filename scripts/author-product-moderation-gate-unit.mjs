@@ -84,10 +84,16 @@ const canonical = read(
 );
 assert.match(canonical, /author_canonical_sales/);
 
-// Form: ordinary author submit CTA; no direct publish CTA label for drafts.
+// Form + actions section: ordinary author submit CTA; no direct publish CTA label for drafts.
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
-assert.match(form, /Отправить на модерацию/);
+const actions = read(
+  "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
+);
+assert.match(form, /AuthorProductFormActions/);
+assert.match(actions, /Отправить на модерацию/);
 assert.doesNotMatch(form, /Предпросмотр и публикация/);
+assert.doesNotMatch(actions, /Предпросмотр и публикация/);
 assert.match(form, /canBypassProductModeration/);
+assert.match(actions, /canBypassProductModeration/);
 
 console.log("author-product-moderation-gate-unit: ok");

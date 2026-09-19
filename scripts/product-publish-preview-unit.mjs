@@ -465,7 +465,15 @@ function testSourceContracts() {
   assert.match(form, /shouldOpenPublishPreviewFromForm/);
   assert.match(form, /window\.open\("about:blank", "_blank"\)/);
   assert.match(form, /previewTab\?\.close\(\)/);
-  assert.match(form, /Предпросмотр/);
+  assert.match(
+    form,
+    /AuthorProductFormActions/,
+    "form wires extracted actions section",
+  );
+  const formActions = read(
+    "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
+  );
+  assert.match(formActions, /Предпросмотр/);
   assert.match(
     form,
     /shouldOpenPublishPreviewFromForm\(\{\s*publishedAt: form\.publishedAt,\s*canBypassProductModeration,/,

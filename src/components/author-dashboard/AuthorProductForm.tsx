@@ -9,6 +9,11 @@ import AuthorCourseBuilder from "@/components/author-dashboard/AuthorCourseBuild
 import { AuthorPracticeAccessLinks } from "@/components/author-dashboard/AuthorPracticeAccessLinks";
 import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGallery";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
+import { AuthorProductCharCounter as CharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
+import AuthorProductFormActions from "@/components/author-dashboard/product-form-sections/AuthorProductFormActions";
+import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
+import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
+import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
@@ -37,7 +42,6 @@ import {
 import {
   PRODUCT_UNDER_MODERATION_MESSAGE,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
-  canWithdrawPracticeFromModeration,
   getVisibleAuthorProductStatus,
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
@@ -79,11 +83,6 @@ import {
   resolveCreateClassification,
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
-import {
-  PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH,
-  PROMO_RECOMMENDATION_TEXT_MAX_LENGTH,
-  PROMO_RECOMMENDATION_TITLE_MAX_LENGTH,
-} from "@/lib/products/promo-recommendation";
 import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
 import { uploadMusicMasterDirect } from "@/lib/author-products/music-master-upload-client";
 import { validateMusicMasterFileClient } from "@/lib/author-products/music-master-upload-contract";
@@ -188,14 +187,6 @@ type PracticeContext = {
   practiceId: string;
   audioItems: AudioItemRow[];
 };
-
-function CharCounter({ value, max }: { value: string; max: number }) {
-  return (
-    <p className="mt-1 text-right text-xs text-[#7d70a2]">
-      {value.length} / {max}
-    </p>
-  );
-}
 
 function AudioPostTypePicker({
   formatPreset,
@@ -2572,49 +2563,14 @@ export default function AuthorProductForm({
         <AuthorAccessStatusBanner accessStatus={selectedAuthorAccessStatus} />
       ) : null}
 
-      {contentLockedAfterSale ? (
-        <p className="rounded-[18px] border border-[#e4d7f4] bg-[#f8f4ff] px-4 py-3 text-sm text-[#5f5484]">
-          Этот продукт уже приобретён слушателями. Его можно снять с публикации,
-          но удалить продукт или аудиоматериалы нельзя.
-        </p>
-      ) : null}
-
-      {message ? (
-        <p className="rounded-[18px] border border-[#d7ebdf] bg-[#f3fbf6] px-4 py-3 text-sm text-[#2f7a55]">
-          {message}
-        </p>
-      ) : null}
-
-      {error ? (
-        <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-          {error}
-        </p>
-      ) : null}
-
-      {isSubmitted ? (
-        <div className="rounded-[18px] border border-[#c9d7f5] bg-[#f3f6ff] px-4 py-3 text-sm text-[#35518f]">
-          <p className="font-semibold">На модерации</p>
-          <p className="mt-1 leading-5">
-            Продукт отправлен на модерацию. Пока проверка не завершена, основные
-            данные и аудиоматериалы нельзя изменять.
-          </p>
-        </div>
-      ) : null}
-
-      {needsChanges ? (
-        <div className="rounded-[18px] border border-[#f0d7a8] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a16]">
-          <p className="font-semibold">Требуются изменения</p>
-          {form.moderationReviewComment ? (
-            <p className="mt-2 whitespace-pre-wrap leading-5">
-              {form.moderationReviewComment}
-            </p>
-          ) : null}
-          <p className="mt-2 leading-5">
-            Внесите необходимые изменения и повторно отправьте продукт на
-            модерацию.
-          </p>
-        </div>
-      ) : null}
+      <AuthorProductFormStatusNotices
+        contentLockedAfterSale={contentLockedAfterSale}
+        message={message}
+        error={error}
+        isSubmitted={isSubmitted}
+        needsChanges={needsChanges}
+        moderationReviewComment={form.moderationReviewComment}
+      />
 
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3676,209 +3632,81 @@ export default function AuthorProductForm({
         form.publicationClass,
         form.productKind,
       ) ? (
-      <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
-        <h2 className="text-[20px] font-semibold">
-          Рекомендации перед прослушиванием
-        </h2>
-
-        <div className="rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
-          <label className="flex cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              checked={form.listeningNoticeEnabled}
-              disabled={busy}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  listeningNoticeEnabled: event.target.checked,
-                }))
-              }
-              className="mt-1 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
-            />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-[#3f3560]">
-                Показывать рекомендации на странице продукта
-              </span>
-              <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
-                Блок отображается на публичной странице продукта и на экране
-                прослушивания.
-              </span>
-            </span>
-          </label>
-        </div>
-
-        <div
-          className={`space-y-4 ${form.listeningNoticeEnabled ? "" : "pointer-events-none opacity-50"}`}
-        >
-          <label
-            className="block"
-            data-submit-issue={
-              fieldErrors.listeningNoticeTitle ? "" : undefined
-            }
-          >
-            <span className="mb-2 block text-sm font-medium">Заголовок</span>
-            <input
-              value={form.listeningNoticeTitle}
-              maxLength={PRODUCT_CONTENT_LIMITS.listeningNoticeTitle}
-              disabled={!form.listeningNoticeEnabled || busy}
-              onChange={(event) => {
-                setFieldErrors((current) => ({
-                  ...current,
-                  listeningNoticeTitle: undefined,
-                }));
-                setForm((current) => ({
-                  ...current,
-                  listeningNoticeTitle: event.target.value,
-                }));
-              }}
-              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-            />
-            <CharCounter
-              value={form.listeningNoticeTitle}
-              max={PRODUCT_CONTENT_LIMITS.listeningNoticeTitle}
-            />
-            {fieldErrors.listeningNoticeTitle ? (
-              <p className="mt-2 text-sm text-[#9b3d3d]">
-                {fieldErrors.listeningNoticeTitle}
-              </p>
-            ) : null}
-          </label>
-
-          <label
-            className="block"
-            data-submit-issue={
-              fieldErrors.listeningNoticeText ? "" : undefined
-            }
-          >
-            <span className="mb-2 block text-sm font-medium">
-              Текст рекомендаций
-            </span>
-            <textarea
-              value={form.listeningNoticeText}
-              maxLength={PRODUCT_CONTENT_LIMITS.listeningNoticeText}
-              disabled={!form.listeningNoticeEnabled || busy}
-              onChange={(event) => {
-                setFieldErrors((current) => ({
-                  ...current,
-                  listeningNoticeText: undefined,
-                }));
-                setForm((current) => ({
-                  ...current,
-                  listeningNoticeText: event.target.value,
-                }));
-              }}
-              rows={5}
-              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-            />
-            <CharCounter
-              value={form.listeningNoticeText}
-              max={PRODUCT_CONTENT_LIMITS.listeningNoticeText}
-            />
-            {fieldErrors.listeningNoticeText ? (
-              <p className="mt-2 text-sm text-[#9b3d3d]">
-                {fieldErrors.listeningNoticeText}
-              </p>
-            ) : null}
-          </label>
-
-          <button
-            type="button"
-            disabled={!form.listeningNoticeEnabled || busy}
-            onClick={() =>
-              setForm((current) => ({
-                ...current,
-                listeningNoticeTitle: DEFAULT_LISTENING_NOTICE_TITLE,
-                listeningNoticeText: DEFAULT_LISTENING_NOTICE_TEXT,
-              }))
-            }
-            className="text-sm font-semibold text-[#7042c5] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Вернуть стандартный текст
-          </button>
-        </div>
-      </section>
+      <AuthorProductListeningNoticeSection
+        enabled={form.listeningNoticeEnabled}
+        title={form.listeningNoticeTitle}
+        text={form.listeningNoticeText}
+        titleError={fieldErrors.listeningNoticeTitle}
+        textError={fieldErrors.listeningNoticeText}
+        busy={busy}
+        onEnabledChange={(enabled) =>
+          setForm((current) => ({
+            ...current,
+            listeningNoticeEnabled: enabled,
+          }))
+        }
+        onTitleChange={(listeningNoticeTitle) =>
+          setForm((current) => ({
+            ...current,
+            listeningNoticeTitle,
+          }))
+        }
+        onTextChange={(listeningNoticeText) =>
+          setForm((current) => ({
+            ...current,
+            listeningNoticeText,
+          }))
+        }
+        onClearTitleError={() =>
+          setFieldErrors((current) => ({
+            ...current,
+            listeningNoticeTitle: undefined,
+          }))
+        }
+        onClearTextError={() =>
+          setFieldErrors((current) => ({
+            ...current,
+            listeningNoticeText: undefined,
+          }))
+        }
+        onResetDefaults={() =>
+          setForm((current) => ({
+            ...current,
+            listeningNoticeTitle: DEFAULT_LISTENING_NOTICE_TITLE,
+            listeningNoticeText: DEFAULT_LISTENING_NOTICE_TEXT,
+          }))
+        }
+      />
       ) : null}
 
       {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
-        <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
-          <h2 className="text-[20px] font-semibold">
-            Рекомендация после прослушивания
-          </h2>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
-            <input
-              type="checkbox"
-              checked={form.promoEnabled}
-              disabled={busy}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  promoEnabled: event.target.checked,
-                }))
-              }
-              className="mt-1 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
-            />
-            <span className="text-sm font-medium text-[#3f3560]">
-              Показывать рекомендацию
-            </span>
-          </label>
-          <div className={`space-y-4 ${form.promoEnabled ? "" : "pointer-events-none opacity-50"}`}>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium">Заголовок</span>
-              <input
-                value={form.promoTitle}
-                maxLength={PROMO_RECOMMENDATION_TITLE_MAX_LENGTH}
-                disabled={!form.promoEnabled || busy}
-                onChange={(event) => setForm((current) => ({ ...current, promoTitle: event.target.value }))}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-              />
-              <CharCounter value={form.promoTitle} max={PROMO_RECOMMENDATION_TITLE_MAX_LENGTH} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium">Текст</span>
-              <textarea
-                value={form.promoText}
-                maxLength={PROMO_RECOMMENDATION_TEXT_MAX_LENGTH}
-                disabled={!form.promoEnabled || busy}
-                onChange={(event) => setForm((current) => ({ ...current, promoText: event.target.value }))}
-                rows={4}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-              />
-              <CharCounter value={form.promoText} max={PROMO_RECOMMENDATION_TEXT_MAX_LENGTH} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium">Текст кнопки</span>
-              <input
-                value={form.promoButtonText}
-                maxLength={PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH}
-                disabled={!form.promoEnabled || busy}
-                onChange={(event) => setForm((current) => ({ ...current, promoButtonText: event.target.value }))}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-              />
-              <CharCounter value={form.promoButtonText} max={PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium">Ссылка</span>
-              <input
-                type="url"
-                value={form.promoUrl}
-                disabled={!form.promoEnabled || busy}
-                onChange={(event) => setForm((current) => ({ ...current, promoUrl: event.target.value }))}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-                placeholder="https://"
-              />
-            </label>
-            <label className="flex cursor-pointer items-start gap-3 text-sm text-[#5f5484]">
-              <input
-                type="checkbox"
-                checked={form.promoOpenInNewTab}
-                disabled={!form.promoEnabled || busy}
-                onChange={(event) => setForm((current) => ({ ...current, promoOpenInNewTab: event.target.checked }))}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
-              />
-              Открывать ссылку в новой вкладке
-            </label>
-          </div>
-        </section>
+        <AuthorProductPostListenPromoSection
+          promoEnabled={form.promoEnabled}
+          promoTitle={form.promoTitle}
+          promoText={form.promoText}
+          promoButtonText={form.promoButtonText}
+          promoUrl={form.promoUrl}
+          promoOpenInNewTab={form.promoOpenInNewTab}
+          busy={busy}
+          onPromoEnabledChange={(promoEnabled) =>
+            setForm((current) => ({ ...current, promoEnabled }))
+          }
+          onPromoTitleChange={(promoTitle) =>
+            setForm((current) => ({ ...current, promoTitle }))
+          }
+          onPromoTextChange={(promoText) =>
+            setForm((current) => ({ ...current, promoText }))
+          }
+          onPromoButtonTextChange={(promoButtonText) =>
+            setForm((current) => ({ ...current, promoButtonText }))
+          }
+          onPromoUrlChange={(promoUrl) =>
+            setForm((current) => ({ ...current, promoUrl }))
+          }
+          onPromoOpenInNewTabChange={(promoOpenInNewTab) =>
+            setForm((current) => ({ ...current, promoOpenInNewTab }))
+          }
+        />
       ) : null}
 
       {isCourse ? null : (
@@ -4318,173 +4146,34 @@ export default function AuthorProductForm({
         }}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <button
-          type="button"
-          disabled={busy || !canEditPublicFields}
-          onClick={() => void saveDraft()}
-          className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-        >
-          {isPublished || isUnpublished || form.publishedAt
-            ? "Сохранить изменения"
-            : "Сохранить черновик"}
-        </button>
-
-        {isPublished ? (
-          <>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void unpublishProduct()}
-              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
-            >
-              Снять с публикации
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canMutateContent}
-              onClick={() => void startEditingProduct()}
-              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
-            >
-              Снять и редактировать
-            </button>
-          </>
-        ) : null}
-
-        {isUnpublished ? (
-          <>
-            <button
-              type="button"
-              disabled={busy || !canMutateContent}
-              onClick={() => void startEditingProduct()}
-              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
-            >
-              Перейти к редактированию
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canMutateContent || !publishPreviewPath}
-              onClick={() => void openPublishPreviewTab()}
-              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-            >
-              Предпросмотр
-            </button>
-            <button
-              type="button"
-              disabled={busy || publishing || !canMutateContent}
-              onClick={() => void publishProduct()}
-              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
-            >
-              {publishing ? "Публикуем…" : "Опубликовать снова"}
-            </button>
-          </>
-        ) : null}
-
-        {isDraft && canBypassProductModeration ? (
-          <>
-            <button
-              type="button"
-              disabled={busy || publishing || !canMutateContent}
-              onClick={() => void openPublishPreviewTab()}
-              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-            >
-              Предпросмотр
-            </button>
-            <button
-              type="button"
-              disabled={busy || publishing || !canMutateContent}
-              onClick={() => void publishProduct()}
-              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
-            >
-              {publishing ? "Публикуем…" : "Опубликовать"}
-            </button>
-          </>
-        ) : null}
-
-        {isDraft && !canBypassProductModeration ? (
-          <>
-            <button
-              type="button"
-              disabled={busy || !canEditPublicFields}
-              onClick={() => void openPublishPreviewTab()}
-              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-            >
-              Предпросмотр
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canEditPublicFields}
-              onClick={() => void submitForModeration()}
-              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
-            >
-              Отправить на модерацию
-            </button>
-          </>
-        ) : null}
-
-        {needsChanges ? (
-          <button
-            type="button"
-            disabled={busy || !canEditPublicFields}
-            onClick={() => void submitForModeration()}
-            className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
-          >
-            Повторно отправить на модерацию
-          </button>
-        ) : null}
-
-        {error &&
-        ((isDraft && !canBypassProductModeration) || needsChanges) ? (
-          <p
-            data-submit-issue
-            className="w-full rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]"
-          >
-            {error}
-          </p>
-        ) : null}
-
-        {isSubmitted &&
-        canWithdrawPracticeFromModeration({
-          moderationStatus: form.moderationStatus,
-        }) ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void withdrawFromModeration()}
-            className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-          >
-            Отозвать с модерации
-          </button>
-        ) : null}
-
-        {isPublished && publicPath ? (
-          <Link
-            href={publicPath}
-            className="rounded-[22px] border border-[#c6afe6] px-5 py-4 text-center font-semibold text-[#7042c5]"
-          >
-            Открыть публичную карточку
-          </Link>
-        ) : null}
-
-        {mode === "edit" && practiceId && !deleteLockedAfterPaidPurchase ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void deleteProduct()}
-            className="rounded-[22px] border border-[#f2c7c7] px-5 py-4 font-semibold text-[#9b3d3d] disabled:opacity-60"
-          >
-            Удалить продукт
-          </button>
-        ) : null}
-
-        {mode === "edit" && practiceId && deleteLockedAfterPaidPurchase ? (
-          <p className="w-full text-sm text-[#9b3d3d]">
-            Удалить этот продукт нельзя, потому что его уже приобрели
-            пользователи. Вы можете снять продукт с публикации – новые покупки
-            прекратятся, а прежние покупатели сохранят доступ.
-          </p>
-        ) : null}
-      </div>
+      <AuthorProductFormActions
+        mode={mode}
+        busy={busy}
+        publishing={publishing}
+        canEditPublicFields={canEditPublicFields}
+        canMutateContent={canMutateContent}
+        canBypassProductModeration={canBypassProductModeration}
+        isPublished={isPublished}
+        isUnpublished={isUnpublished}
+        isDraft={isDraft}
+        isSubmitted={isSubmitted}
+        needsChanges={needsChanges}
+        publishedAt={form.publishedAt}
+        moderationStatus={form.moderationStatus}
+        practiceId={practiceId}
+        publicPath={publicPath}
+        publishPreviewPath={publishPreviewPath}
+        deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
+        error={error}
+        onSaveDraft={() => void saveDraft()}
+        onUnpublish={() => void unpublishProduct()}
+        onStartEditing={() => void startEditingProduct()}
+        onOpenPublishPreview={() => void openPublishPreviewTab()}
+        onPublish={() => void publishProduct()}
+        onSubmitForModeration={() => void submitForModeration()}
+        onWithdrawFromModeration={() => void withdrawFromModeration()}
+        onDeleteProduct={() => void deleteProduct()}
+      />
 
       {selectedAuthor ? (
         <p className="text-xs text-[#7d70a2]">

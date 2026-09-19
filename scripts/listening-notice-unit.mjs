@@ -299,12 +299,19 @@ function testWiring() {
   );
 
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
+  const listeningSection = read(
+    "src/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection.tsx",
+  );
   assert(
-    form.includes("Рекомендации перед прослушиванием"),
+    form.includes("AuthorProductListeningNoticeSection"),
+    "author form wires listening notice section",
+  );
+  assert(
+    listeningSection.includes("Рекомендации перед прослушиванием"),
     "author form section present",
   );
   assert(
-    form.includes("Вернуть стандартный текст"),
+    listeningSection.includes("Вернуть стандартный текст"),
     "reset to default control present",
   );
 

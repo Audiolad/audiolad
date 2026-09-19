@@ -336,17 +336,25 @@ function testUiRepublishSkipsPatch() {
   );
   assert.ok(saveIf >= 0 && saveCall > saveIf && publishFetch > saveCall);
 
-  const unpublishedBlockStart = form.indexOf("{isUnpublished ? (");
-  const unpublishedBlockEnd = form.indexOf(
+  const actions = read(
+    "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
+  );
+  assert.match(form, /AuthorProductFormActions/);
+  assert.match(
+    form,
+    /onPublish=\{\(\) => void publishProduct\(\)\}/,
+  );
+  const unpublishedBlockStart = actions.indexOf("{isUnpublished ? (");
+  const unpublishedBlockEnd = actions.indexOf(
     "{isDraft && canBypassProductModeration ? (",
     unpublishedBlockStart + 1,
   );
-  const unpublishedBlock = form.slice(
+  const unpublishedBlock = actions.slice(
     unpublishedBlockStart,
     unpublishedBlockEnd,
   );
   assert.match(unpublishedBlock, /Опубликовать снова/);
-  assert.match(unpublishedBlock, /void publishProduct\(\)/);
+  assert.match(unpublishedBlock, /void onPublish\(\)/);
   assert.doesNotMatch(unpublishedBlock, /void saveProduct\(\)/);
 }
 
