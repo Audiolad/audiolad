@@ -290,22 +290,65 @@ export async function resolveAuthorSlugRedirect(
   };
 }
 
-export function buildAuthorRedirectTarget(currentSlug: string): string {
-  return buildAuthorPublicPath(currentSlug);
+
+export function appendQueryString(
+  path: string,
+  searchParams?: Record<string, string | string[] | undefined> | URLSearchParams | null,
+): string {
+  if (!searchParams) {
+    return path;
+  }
+
+  const params =
+    searchParams instanceof URLSearchParams
+      ? searchParams
+      : (() => {
+          const next = new URLSearchParams();
+          for (const [key, value] of Object.entries(searchParams)) {
+            if (typeof value === "string") {
+              next.set(key, value);
+            } else if (Array.isArray(value)) {
+              for (const item of value) {
+                if (typeof item === "string") {
+                  next.append(key, item);
+                }
+              }
+            }
+          }
+          return next;
+        })();
+
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+export function buildAuthorRedirectTarget(
+  currentSlug: string,
+  searchParams?: Record<string, string | string[] | undefined> | URLSearchParams | null,
+): string {
+  return appendQueryString(buildAuthorPublicPath(currentSlug), searchParams);
 }
 
 export function buildPracticeRedirectTarget(
   currentAuthorSlug: string,
   productSlug: string,
+  searchParams?: Record<string, string | string[] | undefined> | URLSearchParams | null,
 ): string {
-  return buildPracticePublicPath(currentAuthorSlug, productSlug);
+  return appendQueryString(
+    buildPracticePublicPath(currentAuthorSlug, productSlug),
+    searchParams,
+  );
 }
 
 export function buildListenRedirectTarget(
   currentAuthorSlug: string,
   productSlug: string,
+  searchParams?: Record<string, string | string[] | undefined> | URLSearchParams | null,
 ): string {
-  return buildListenPath(currentAuthorSlug, productSlug);
+  return appendQueryString(
+    buildListenPath(currentAuthorSlug, productSlug),
+    searchParams,
+  );
 }
 
 export async function practiceBelongsToAuthor(

@@ -88,7 +88,7 @@ export default async function AuthorPublicPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  await searchParams;
+  const query = await searchParams;
   const supabase = await createClient();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
@@ -102,7 +102,9 @@ export default async function AuthorPublicPage({
     );
     const redirected = await resolveAuthorSlugRedirect(supabase, slug);
     if (redirected) {
-      permanentRedirect(buildAuthorRedirectTarget(redirected.currentSlug));
+      permanentRedirect(
+        buildAuthorRedirectTarget(redirected.currentSlug, query),
+      );
     }
     notFound();
   }

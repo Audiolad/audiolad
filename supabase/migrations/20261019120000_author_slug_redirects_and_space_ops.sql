@@ -22,15 +22,11 @@ COMMENT ON TABLE public.author_slug_redirects IS
 
 ALTER TABLE public.author_slug_redirects ENABLE ROW LEVEL SECURITY;
 
+-- No direct public SELECT: history is exposed only via resolve_author_slug_redirect.
 DROP POLICY IF EXISTS author_slug_redirects_public_select ON public.author_slug_redirects;
-CREATE POLICY author_slug_redirects_public_select
-  ON public.author_slug_redirects
-  FOR SELECT
-  TO anon, authenticated
-  USING (true);
 
 REVOKE ALL ON TABLE public.author_slug_redirects FROM PUBLIC;
-GRANT SELECT ON TABLE public.author_slug_redirects TO anon, authenticated;
+REVOKE ALL ON TABLE public.author_slug_redirects FROM anon, authenticated;
 GRANT ALL ON TABLE public.author_slug_redirects TO service_role;
 
 -- Current slug must not collide with another author's historical slug.
@@ -79,6 +75,25 @@ BEGIN
     v_suffix := v_suffix + 1;
   END LOOP;
   RETURN v_candidate;
+END;
+$$;
+
+
+-- Transactional namespace lock shared by rename + create so current/history
+-- cannot race across concurrent sessions for the same normalized slug.
+CREATE OR REPLACE FUNCTION public.acquire_author_slug_namespace_lock(p_slug text)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_slug text := lower(btrim(coalesce(p_slug, '')));
+BEGIN
+  IF v_slug = '' THEN
+    RAISE EXCEPTION 'slug_invalid' USING ERRCODE = '22023';
+  END IF;
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('author_slug_namespace:' || v_slug, 0)
+  );
 END;
 $$;
 
@@ -160,21 +175,25 @@ BEGIN
     v_blockers := array_append(v_blockers, 'has_personal_materials');
   END IF;
 
-  IF to_regclass('public.studio_projects') IS NOT NULL
-     AND EXISTS (SELECT 1 FROM public.studio_projects AS s WHERE s.author_id = p_author_id) THEN
-    v_blockers := array_append(v_blockers, 'has_studio_project');
+  -- Optional tables: nest IF so the planner never resolves missing relations.
+  IF to_regclass('public.studio_projects') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.studio_projects AS s WHERE s.author_id = p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_studio_project');
+    END IF;
   END IF;
 
-  IF to_regclass('public.audiobook_projects') IS NOT NULL
-     AND EXISTS (SELECT 1 FROM public.audiobook_projects AS b WHERE b.author_id = p_author_id) THEN
-    v_blockers := array_append(v_blockers, 'has_audiobook_project');
+  IF to_regclass('public.audiobook_projects') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.audiobook_projects AS b WHERE b.author_id = p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_audiobook_project');
+    END IF;
   END IF;
 
-  IF to_regclass('public.practice_moderation_email_outbox') IS NOT NULL
-     AND EXISTS (
-       SELECT 1 FROM public.practice_moderation_email_outbox AS o WHERE o.author_id = p_author_id
-     ) THEN
-    v_blockers := array_append(v_blockers, 'has_moderation_outbox');
+  IF to_regclass('public.practice_moderation_email_outbox') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.practice_moderation_email_outbox AS o WHERE o.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_moderation_outbox');
+    END IF;
   END IF;
 
   RETURN v_blockers;
@@ -299,6 +318,9 @@ BEGIN
     RAISE EXCEPTION 'slug_invalid' USING ERRCODE = '22023';
   END IF;
 
+  -- Serialize namespace claims for the destination slug before reading/writing.
+  PERFORM public.acquire_author_slug_namespace_lock(v_new_slug);
+
   SELECT a.slug, a.name
   INTO v_old_slug, v_name
   FROM public.authors AS a
@@ -329,6 +351,9 @@ BEGIN
       'previous_slug', v_old_slug
     );
   END IF;
+
+  -- Also lock the slug leaving current→history so concurrent create cannot steal it.
+  PERFORM public.acquire_author_slug_namespace_lock(v_old_slug);
 
   -- Reclaim own historical slug.
   DELETE FROM public.author_slug_redirects AS r
@@ -547,12 +572,16 @@ BEGIN
     IF v_slug IS NULL OR char_length(v_slug) < 2 THEN
       RAISE EXCEPTION 'invalid_project_slug' USING ERRCODE = '22023';
     END IF;
-    IF EXISTS (SELECT 1 FROM public.authors AS a WHERE a.slug = v_slug)
-       OR EXISTS (SELECT 1 FROM public.author_slug_redirects AS r WHERE r.old_slug = v_slug) THEN
-      RAISE EXCEPTION 'project_slug_taken' USING ERRCODE = '23505';
-    END IF;
   ELSE
     v_slug := public.allocate_unique_author_slug(v_name);
+  END IF;
+
+  -- Shared transactional namespace lock with change_author_slug.
+  PERFORM public.acquire_author_slug_namespace_lock(v_slug);
+
+  IF EXISTS (SELECT 1 FROM public.authors AS a WHERE a.slug = v_slug)
+     OR EXISTS (SELECT 1 FROM public.author_slug_redirects AS r WHERE r.old_slug = v_slug) THEN
+    RAISE EXCEPTION 'project_slug_taken' USING ERRCODE = '23505';
   END IF;
 
   INSERT INTO public.authors (
@@ -577,11 +606,20 @@ BEGIN
 END;
 $$;
 
+-- Internal helpers: not callable via PostgREST (no PUBLIC EXECUTE).
+REVOKE ALL ON FUNCTION public.enforce_author_slug_namespace() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.allocate_unique_author_slug(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.author_space_has_published_practice(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.author_space_has_finance_history(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.author_space_delete_blockers(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.acquire_author_slug_namespace_lock(text) FROM PUBLIC;
+
 REVOKE ALL ON FUNCTION public.can_change_author_slug(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.can_delete_author_space(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.change_author_slug(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.delete_empty_author_space(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.resolve_author_slug_redirect(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_author_project(text, text, text) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.can_change_author_slug(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_delete_author_space(uuid) TO authenticated;
@@ -589,5 +627,6 @@ GRANT EXECUTE ON FUNCTION public.change_author_slug(uuid, text) TO authenticated
 GRANT EXECUTE ON FUNCTION public.delete_empty_author_space(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.resolve_author_slug_redirect(text)
   TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.create_author_project(text, text, text) TO authenticated;
 
 COMMIT;

@@ -17,6 +17,7 @@ type PageProps = {
 async function resolveAuthorSlugListenRedirect(
   authorSlug: string,
   productSlug: string,
+  searchParams?: Record<string, string | string[] | undefined> | null,
 ) {
   const supabase = await createClient();
   const {
@@ -36,7 +37,11 @@ async function resolveAuthorSlugListenRedirect(
   if (!belongs) {
     return null;
   }
-  return buildListenRedirectTarget(redirected.currentSlug, productSlug);
+  return buildListenRedirectTarget(
+    redirected.currentSlug,
+    productSlug,
+    searchParams,
+  );
 }
 
 async function resolveListenRoute(segments: string[]) {
@@ -84,6 +89,7 @@ export default async function ListenPage({ params, searchParams }: PageProps) {
       const redirectTo = await resolveAuthorSlugListenRedirect(
         route.authorSlug,
         route.productSlug,
+        query,
       );
       if (redirectTo) {
         permanentRedirect(redirectTo);

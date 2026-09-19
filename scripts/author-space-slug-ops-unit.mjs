@@ -102,6 +102,32 @@ function main() {
   // M. Cookie clear on delete / set on rename
   assert.match(authorApi, /buildAuthorProjectCookie|buildClearedAuthorProjectCookie/);
 
+
+  // N. History table is not publicly selectable; resolve RPC is the public path
+  assert.match(migration, /REVOKE ALL ON TABLE public\.author_slug_redirects FROM anon, authenticated/);
+  assert.doesNotMatch(
+    migration,
+    /GRANT SELECT ON TABLE public\.author_slug_redirects TO (anon|authenticated)/,
+  );
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.resolve_author_slug_redirect/);
+
+  // O. Shared transactional namespace lock on rename + create
+  assert.match(migration, /acquire_author_slug_namespace_lock/);
+  assert.match(migration, /PERFORM public\.acquire_author_slug_namespace_lock\(v_new_slug\)/);
+  assert.match(migration, /PERFORM public\.acquire_author_slug_namespace_lock\(v_slug\)/);
+
+  // P. Redirect helpers preserve query string (listen autoplay/access)
+  assert.match(spaceOps, /export function appendQueryString/);
+  assert.match(spaceOps, /buildListenRedirectTarget\([\s\S]*searchParams/);
+  assert.match(listenPage, /buildListenRedirectTarget\([\s\S]*query/);
+  assert.match(authorPage, /buildAuthorRedirectTarget\([\s\S]*query/);
+  assert.match(practicePage, /buildPracticeRedirectTarget\([\s\S]*searchParams/);
+
+  // Q. Admin preview → confirm UX
+  assert.match(adminActions, /previewAuthorSlugChangeAsAdmin/);
+  assert.match(adminActions, /confirmAuthorSlugChangeAsAdmin/);
+  assert.match(adminActions, /author_lookup/);
+
   console.log("author-space-slug-ops-unit: ok");
 }
 
