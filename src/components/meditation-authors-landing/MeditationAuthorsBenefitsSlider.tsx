@@ -39,6 +39,10 @@ function BenefitVisual({ benefit }: { benefit: MeditationAuthorsBenefit }) {
   );
 }
 
+function formatSlideIndex(index: number): string {
+  return String(index + 1).padStart(2, "0");
+}
+
 export default function MeditationAuthorsBenefitsSlider() {
   const trackRef = useRef<HTMLUListElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -114,45 +118,15 @@ export default function MeditationAuthorsBenefitsSlider() {
 
   return (
     <div className="mal-benefits-slider" data-mal-benefits-slider>
-      <ul
-        ref={trackRef}
-        className="mal-benefits-slider__track"
-        aria-label="Преимущества для авторов медитаций"
-        tabIndex={0}
-        onKeyDown={onTrackKeyDown}
-      >
-        {MEDITATION_AUTHORS_LANDING_BENEFITS.map((benefit) => (
-          <li
-            key={benefit.id}
-            className="mal-benefits-slider__item"
-            data-mal-benefit-slide={benefit.id}
-          >
-            <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[#e8def5] bg-white shadow-[0_12px_30px_rgba(90,60,145,0.06)]">
-              <div className="mal-benefits-slider__media">
-                <BenefitVisual benefit={benefit} />
-              </div>
-              <div className="flex flex-1 flex-col gap-3 px-5 py-5 sm:px-6 sm:py-6">
-                <h3 className="text-lg font-semibold tracking-tight text-[#25135c] sm:text-xl">
-                  {benefit.title}
-                </h3>
-                <p className="text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-                  {benefit.text}
-                </p>
-              </div>
-            </article>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mal-benefits-slider__nav" aria-hidden="false">
+      <div className="mal-benefits-slider__viewport">
         <button
           type="button"
-          className="mal-benefits-slider__arrow"
+          className="mal-benefits-slider__arrow mal-benefits-slider__arrow--prev"
           aria-label="Предыдущий слайд"
           disabled={activeIndex === 0}
           onClick={() => scrollToSlide(Math.max(activeIndex - 1, 0))}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M15 6 9 12l6 6"
               stroke="currentColor"
@@ -162,14 +136,49 @@ export default function MeditationAuthorsBenefitsSlider() {
             />
           </svg>
         </button>
+
+        <ul
+          ref={trackRef}
+          className="mal-benefits-slider__track"
+          aria-label="Преимущества для авторов медитаций"
+          tabIndex={0}
+          onKeyDown={onTrackKeyDown}
+        >
+          {MEDITATION_AUTHORS_LANDING_BENEFITS.map((benefit, index) => (
+            <li
+              key={benefit.id}
+              className="mal-benefits-slider__item"
+              data-mal-benefit-slide={benefit.id}
+            >
+              <article className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#e8def5] bg-white shadow-[0_10px_24px_rgba(90,60,145,0.06)]">
+                <div className="mal-benefits-slider__media">
+                  <BenefitVisual benefit={benefit} />
+                </div>
+                <div className="flex flex-1 flex-col gap-2 px-4 py-4 sm:gap-2.5 sm:px-5 sm:py-5">
+                  <p className="mal-benefits-slider__index" aria-hidden="true">
+                    {formatSlideIndex(index)}
+                  </p>
+                  <h3 className="text-base font-semibold tracking-tight text-[#25135c] sm:text-lg">
+                    <span className="sr-only">{formatSlideIndex(index)}. </span>
+                    {benefit.title}
+                  </h3>
+                  <p className="text-[15px] leading-6 text-[#4a3d73] sm:text-base sm:leading-7">
+                    {benefit.text}
+                  </p>
+                </div>
+              </article>
+            </li>
+          ))}
+        </ul>
+
         <button
           type="button"
-          className="mal-benefits-slider__arrow"
+          className="mal-benefits-slider__arrow mal-benefits-slider__arrow--next"
           aria-label="Следующий слайд"
           disabled={activeIndex === lastIndex}
           onClick={() => scrollToSlide(Math.min(activeIndex + 1, lastIndex))}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="m9 6 6 6-6 6"
               stroke="currentColor"

@@ -239,35 +239,43 @@ export default function MeditationAuthorsLandingPageView() {
 
       {/* Block 3 — Studio */}
       <Section id="mal-studio" title={MEDITATION_AUTHORS_LANDING_STUDIO_HEADING}>
-        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
+        <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="order-2 min-w-0 lg:order-1 lg:pt-2">
+            <VisualSlot visual={studio} />
+          </div>
+          <div className="order-1 min-w-0 lg:order-2">
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_STUDIO_TEXT} />
             <div className="mt-8">
               <SecondaryCta />
             </div>
           </div>
-          <VisualSlot visual={studio} />
         </div>
       </Section>
 
       {/* Block 4 — Author space */}
       <Section id="mal-author-space" title={MEDITATION_AUTHORS_LANDING_SPACE_HEADING}>
-        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <Paragraphs items={MEDITATION_AUTHORS_LANDING_SPACE_TEXT} />
-          <VisualSlot visual={authorSpace} />
+        <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="min-w-0">
+            <Paragraphs items={MEDITATION_AUTHORS_LANDING_SPACE_TEXT} />
+          </div>
+          <div className="min-w-0 lg:pt-6">
+            <VisualSlot visual={authorSpace} />
+          </div>
         </div>
       </Section>
 
       {/* Block 5 — Listener intro */}
       <Section id="mal-listener-intro" title={MEDITATION_AUTHORS_LANDING_INTRO_HEADING}>
-        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
+        <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="order-2 min-w-0 lg:order-1 lg:pt-2">
+            <VisualSlot visual={listenerIntro} />
+          </div>
+          <div className="order-1 min-w-0 lg:order-2">
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_INTRO_TEXT} />
             <div className="mt-8">
               <CtaRow />
             </div>
           </div>
-          <VisualSlot visual={listenerIntro} />
         </div>
       </Section>
 

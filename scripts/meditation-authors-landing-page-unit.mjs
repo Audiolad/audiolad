@@ -169,6 +169,13 @@ function testPageWiring() {
   assert.match(view, /BECOME_AUTHOR_HREF/);
   assert.match(view, /MEDITATION_AUTHORS_LANDING_STUDIO_HREF/);
   assert.match(view, /MeditationAuthorsBenefitsSlider/);
+  const slider = read(
+    "src/components/meditation-authors-landing/MeditationAuthorsBenefitsSlider.tsx",
+  );
+  assert.match(slider, /mal-benefits-slider__index/);
+  assert.match(slider, /padStart\(2, "0"\)/);
+  assert.match(slider, /arrow--prev/);
+  assert.match(slider, /arrow--next/);
   assert.equal(view.includes(BECOME_AUTHOR_HREF) || view.includes("BECOME_AUTHOR_HREF"), true);
   assert.match(view, /Стать автором бесплатно|MEDITATION_AUTHORS_LANDING_PRIMARY_CTA/);
   assert.match(
