@@ -11,6 +11,8 @@ import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGal
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { AuthorProductCharCounter as CharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
 import AuthorProductFormActions from "@/components/author-dashboard/product-form-sections/AuthorProductFormActions";
+import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
+import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
@@ -45,6 +47,19 @@ import {
   getVisibleAuthorProductStatus,
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
+import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
+import {
+  buildAuthorProductEditPath,
+  buildWizardStepHref,
+  nextProductWizardStep,
+  previousProductWizardStep,
+  shouldShowProductWizardStep,
+} from "@/lib/author-products/product-wizard-navigation";
+import {
+  PRODUCT_WIZARD_DEFAULT_STEP,
+  PRODUCT_WIZARD_STEP_COUNT,
+  type ProductWizardStep,
+} from "@/lib/author-products/product-wizard-steps";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
   AUDIO_POST_CUSTOM_TYPE_LABEL,
@@ -292,6 +307,7 @@ type AuthorProductFormProps = {
   initialAuthorSlug?: string;
   initialProduct?: AuthorProductDetail;
   initialPublicationClass?: PublicationClass | null;
+  initialWizardStep?: ProductWizardStep;
   topicFormData: AuthorProductTopicFormData;
   mode: "create" | "edit";
 };
@@ -661,10 +677,13 @@ export default function AuthorProductForm({
   initialAuthorSlug,
   initialProduct,
   initialPublicationClass,
+  initialWizardStep = PRODUCT_WIZARD_DEFAULT_STEP,
   topicFormData,
   mode,
 }: AuthorProductFormProps) {
   const router = useRouter();
+  const [wizardStep, setWizardStep] =
+    useState<ProductWizardStep>(initialWizardStep);
   const [form, setForm] = useState<FormState>(() =>
     buildInitialForm(
       authors,
@@ -1052,6 +1071,15 @@ export default function AuthorProductForm({
 
   const canBypassProductModeration =
     selectedAuthor?.canBypassProductModeration === true;
+
+  const wizardEnabled = isAuthorProductWizardEnabled(form.authorId);
+  const showWizardStep = (step: ProductWizardStep) =>
+    shouldShowProductWizardStep({
+      wizardEnabled,
+      activeStep: wizardStep,
+      step,
+    });
+
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthorAccessStatus,
   );
@@ -1167,11 +1195,14 @@ export default function AuthorProductForm({
     }));
 
     if (mode === "create" && typeof window !== "undefined") {
-      window.history.replaceState(
-        null,
-        "",
-        `/author-dashboard/products/${created.practice.id}`,
-      );
+      const nextPath = wizardEnabled
+        ? buildAuthorProductEditPath(created.practice.id, {
+            step: wizardStep,
+            preserveSearch: window.location.search,
+            includeStep: true,
+          })
+        : buildAuthorProductEditPath(created.practice.id);
+      window.history.replaceState(null, "", nextPath);
     }
 
     return {
@@ -2561,6 +2592,58 @@ export default function AuthorProductForm({
     }
   }
 
+  function goToWizardStep(nextStep: ProductWizardStep) {
+    setWizardStep(nextStep);
+    if (typeof window === "undefined") {
+      return;
+    }
+    const nextHref = buildWizardStepHref(
+      window.location.pathname,
+      window.location.search,
+      nextStep,
+    );
+    window.history.replaceState(null, "", nextHref);
+  }
+
+  function canJumpToWizardStep(step: ProductWizardStep) {
+    if (!wizardEnabled) {
+      return false;
+    }
+    if (step === wizardStep) {
+      return true;
+    }
+    // Back always; forward only after a draft id exists (saved product).
+    if (step < wizardStep) {
+      return true;
+    }
+    return Boolean(practiceIdRef.current || practiceId);
+  }
+
+  async function saveWizardStep() {
+    await saveDraft();
+  }
+
+  async function saveWizardStepAndContinue() {
+    setError(null);
+    setMessage(null);
+    const saved = await saveProduct();
+    if (!saved) {
+      return;
+    }
+    setMessage("Черновик сохранён.");
+    const next = nextProductWizardStep(wizardStep);
+    if (next) {
+      goToWizardStep(next);
+    }
+  }
+
+  function goWizardBack() {
+    const prev = previousProductWizardStep(wizardStep);
+    if (prev) {
+      goToWizardStep(prev);
+    }
+  }
+
   return (
     <div className="min-w-0 space-y-8">
       {selectedAuthor ? (
@@ -2576,9 +2659,27 @@ export default function AuthorProductForm({
         moderationReviewComment={form.moderationReviewComment}
       />
 
+      {wizardEnabled ? (
+        <AuthorProductWizardStepper
+          activeStep={wizardStep}
+          onSelectStep={goToWizardStep}
+          canJumpToStep={canJumpToWizardStep}
+        />
+      ) : null}
+
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[20px] font-semibold">Основная информация</h2>
+          {!wizardEnabled || wizardStep === 1 ? (
+            <h2 className="text-[20px] font-semibold">Основная информация</h2>
+          ) : (
+            <h2 className="text-[20px] font-semibold">
+              {wizardStep === 2
+                ? "Материалы"
+                : wizardStep === 3
+                  ? "Описание и продвижение"
+                  : "Условия и публикация"}
+            </h2>
+          )}
           {mode === "edit" ? (
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
@@ -2591,6 +2692,8 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
+{showWizardStep(1) ? (
+        <>
         <div
           className="rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] px-4 py-3"
           role="note"
@@ -2884,6 +2987,10 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
+</>
+        ) : null}
+
+{showWizardStep(3) ? (
         <label
           className="block"
           data-submit-issue={fieldErrors.description ? "" : undefined}
@@ -2926,6 +3033,10 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
+) : null}
+
+{showWizardStep(1) ? (
+        <>
         {form.productKind === PRODUCT_KIND.PRACTICE ? (
         <>
         <label className="block">
@@ -3042,6 +3153,11 @@ export default function AuthorProductForm({
           </fieldset>
         ) : null}
 
+</>
+        ) : null}
+
+{showWizardStep(4) ? (
+        <>
         {form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
@@ -3276,6 +3392,10 @@ export default function AuthorProductForm({
           </fieldset>
         ) : null}
 
+</>
+        ) : null}
+
+{showWizardStep(3) ? (
         <div data-submit-issue={topicError ? "" : undefined}>
           <span className="mb-2 block text-sm font-medium">Темы</span>
           <TopicSelector
@@ -3292,6 +3412,9 @@ export default function AuthorProductForm({
           />
         </div>
 
+) : null}
+
+{showWizardStep(1) ? (
         <div>
           <span className="mb-2 block text-sm font-medium">Адрес продукта</span>
           {slugLocked ? (
@@ -3313,6 +3436,10 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
+) : null}
+
+{showWizardStep(2) ? (
+        <>
         <CoverUploadBlock
           label="Обложка"
           coverUrl={form.coverUrl}
@@ -3364,6 +3491,11 @@ export default function AuthorProductForm({
         </div>
         ) : null}
 
+</>
+        ) : null}
+
+{showWizardStep(4) ? (
+        <>
         {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
         <div>
           <span className="mb-2 block text-sm font-medium">Цена</span>
@@ -3557,6 +3689,10 @@ export default function AuthorProductForm({
         </div>
         ) : null}
 
+</>
+        ) : null}
+
+{showWizardStep(4) ? (
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">
             Кому показывать продукт?
@@ -3640,33 +3776,40 @@ export default function AuthorProductForm({
             />
           ) : null}
         </fieldset>
+) : null}
+
       </section>
 
-      {isCourse ? (
-        <AuthorCourseBuilder
-          practiceId={practiceId || null}
-          getPracticeId={getPracticeIdForCoverUpload}
-          disabled={!canMutateContent || busy}
-          basePrice={form.price}
-          isFree={form.isFree}
-          onContentSnapshotChange={setCourseContentSnapshot}
-        />
+      {showWizardStep(2) ? (
+        isCourse ? (
+          <AuthorCourseBuilder
+            practiceId={practiceId || null}
+            getPracticeId={getPracticeIdForCoverUpload}
+            disabled={!canMutateContent || busy}
+            basePrice={form.price}
+            isFree={form.isFree}
+            onContentSnapshotChange={setCourseContentSnapshot}
+          />
+        ) : null
       ) : null}
 
-      {practiceId ? (
-        <AuthorPracticeAccessLinks
-          practiceId={practiceId}
-          publicationClass={form.publicationClass}
-          levels={(courseContentSnapshot.access_levels ?? []).map((level) => ({
-            level: level.level,
-            title: level.title,
-            description: level.description,
-          }))}
-          disabled={!canMutateContent || busy}
-        />
+      {showWizardStep(4) ? (
+        practiceId ? (
+          <AuthorPracticeAccessLinks
+            practiceId={practiceId}
+            publicationClass={form.publicationClass}
+            levels={(courseContentSnapshot.access_levels ?? []).map((level) => ({
+              level: level.level,
+              title: level.title,
+              description: level.description,
+            }))}
+            disabled={!canMutateContent || busy}
+          />
+        ) : null
       ) : null}
 
-      {shouldShowPracticeListeningNotice(
+      {showWizardStep(4) &&
+      shouldShowPracticeListeningNotice(
         form.publicationClass,
         form.productKind,
       ) ? (
@@ -3717,7 +3860,7 @@ export default function AuthorProductForm({
       />
       ) : null}
 
-      {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
+      {showWizardStep(4) && form.productKind === PRODUCT_KIND.AUDIO_POST ? (
         <AuthorProductPostListenPromoSection
           promoEnabled={form.promoEnabled}
           promoTitle={form.promoTitle}
@@ -3747,7 +3890,7 @@ export default function AuthorProductForm({
         />
       ) : null}
 
-      {isCourse ? null : (
+      {showWizardStep(2) && !isCourse ? (
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
           {form.productKind === PRODUCT_KIND.MUSIC
@@ -4138,8 +4281,9 @@ export default function AuthorProductForm({
           ) : null}
         </div>
       </section>
-      )}
+      ) : null}
 
+      {showWizardStep(3) ? (
       <AuthorProductSeoSection
         title={form.title}
         subtitle={form.subtitle}
@@ -4183,8 +4327,31 @@ export default function AuthorProductForm({
           setForm((current) => ({ ...current, ...patch }));
         }}
       />
+      ) : null}
 
-      <AuthorProductFormActions
+      {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (
+        <AuthorProductWizardStepNav
+          showBack={wizardStep > 1}
+          showContinue
+          busy={busy}
+          canSave={canEditPublicFields}
+          onBack={goWizardBack}
+          onSave={() => void saveWizardStep()}
+          onSaveAndContinue={() => void saveWizardStepAndContinue()}
+        />
+      ) : null}
+
+      {wizardEnabled && wizardStep === PRODUCT_WIZARD_STEP_COUNT ? (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={goWizardBack}
+            className="w-fit rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+          >
+            Назад
+          </button>
+          <AuthorProductFormActions
         mode={mode}
         busy={busy}
         publishing={publishing}
@@ -4212,6 +4379,39 @@ export default function AuthorProductForm({
         onWithdrawFromModeration={() => void withdrawFromModeration()}
         onDeleteProduct={() => void deleteProduct()}
       />
+        </div>
+      ) : null}
+
+      {!wizardEnabled ? (
+        <AuthorProductFormActions
+          mode={mode}
+          busy={busy}
+          publishing={publishing}
+          canEditPublicFields={canEditPublicFields}
+          canMutateContent={canMutateContent}
+          canBypassProductModeration={canBypassProductModeration}
+          isPublished={isPublished}
+          isUnpublished={isUnpublished}
+          isDraft={isDraft}
+          isSubmitted={isSubmitted}
+          needsChanges={needsChanges}
+          publishedAt={form.publishedAt}
+          moderationStatus={form.moderationStatus}
+          practiceId={practiceId}
+          publicPath={publicPath}
+          publishPreviewPath={publishPreviewPath}
+          deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
+          error={error}
+          onSaveDraft={() => void saveDraft()}
+          onUnpublish={() => void unpublishProduct()}
+          onStartEditing={() => void startEditingProduct()}
+          onOpenPublishPreview={() => void openPublishPreviewTab()}
+          onPublish={() => void publishProduct()}
+          onSubmitForModeration={() => void submitForModeration()}
+          onWithdrawFromModeration={() => void withdrawFromModeration()}
+          onDeleteProduct={() => void deleteProduct()}
+        />
+      ) : null}
 
       {selectedAuthor ? (
         <p className="text-xs text-[#7d70a2]">

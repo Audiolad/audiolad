@@ -1,7 +1,6 @@
 /**
- * Domain contract for the future 4-step author product wizard.
- * Navigation will use `?step=1..4`. This module is foundation only —
- * it does not touch routes, forms, or save flows.
+ * Domain contract for the 4-step author product wizard (`?step=1..4`).
+ * Labels and step parsing are shared by the Aurafon wizard UI.
  */
 
 export const PRODUCT_WIZARD_STEPS = [
