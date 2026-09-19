@@ -486,6 +486,72 @@ export function buildAiMusicHubPageJsonLd(
   };
 }
 
+
+export type MeditationAuthorsLandingPageJsonLdInput = {
+  title: string;
+  description: string;
+  path?: string;
+  datePublished?: string;
+};
+
+/**
+ * Selling landing for meditation / audio-practice authors.
+ * Emits WebPage without Product/Offer/AggregateRating nodes.
+ */
+export function buildMeditationAuthorsLandingPageJsonLd(
+  input: MeditationAuthorsLandingPageJsonLdInput,
+  origin = getAppOrigin(),
+): JsonLdNode {
+  const siteOrigin = originUrl(origin);
+  const path = input.path ?? "/dlya-avtorov-meditatsiy";
+  const pageUrl = absolutePath(path, origin);
+  const breadcrumbs = buildBreadcrumbListJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Авторам", path: "/for-authors" },
+      { name: input.title, path },
+    ],
+    origin,
+  );
+
+  const webPage: JsonLdNode = {
+    "@type": "WebPage",
+    "@id": `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    isPartOf: {
+      "@id": `${siteOrigin}/#website`,
+    },
+    about: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+  };
+
+  if (input.datePublished) {
+    webPage.datePublished = input.datePublished;
+  }
+
+  const graph: JsonLdNode[] = [
+    buildOrganizationJsonLd(origin),
+    buildWebSiteJsonLd(origin),
+    webPage,
+  ];
+
+  if (breadcrumbs) {
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
+    graph.push(breadcrumbNode);
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": graph,
+  };
+}
+
+
 export function buildBreadcrumbListJsonLd(
   items: ReadonlyArray<BreadcrumbItemInput>,
   origin = getAppOrigin(),

@@ -15,6 +15,11 @@ import {
   AI_MUSIC_HUB_SEO_TITLE,
 } from "@/lib/seo/ai-music-hub/content";
 import {
+  MEDITATION_AUTHORS_LANDING_PATH,
+  MEDITATION_AUTHORS_LANDING_SEO_DESCRIPTION,
+  MEDITATION_AUTHORS_LANDING_SEO_TITLE,
+} from "@/lib/seo/meditation-authors-landing/content";
+import {
   DISTRIBYUTOR_II_MUZYKI_PATH,
   DISTRIBYUTOR_II_MUZYKI_SEO_DESCRIPTION,
   DISTRIBYUTOR_II_MUZYKI_SEO_TITLE,
@@ -111,6 +116,13 @@ export {
   AI_MUSIC_HUB_SEO_DESCRIPTION,
   AI_MUSIC_HUB_SEO_TITLE,
 } from "@/lib/seo/ai-music-hub/content";
+
+export {
+  MEDITATION_AUTHORS_LANDING_PAGE_H1,
+  MEDITATION_AUTHORS_LANDING_SEO_DESCRIPTION,
+  MEDITATION_AUTHORS_LANDING_SEO_TITLE,
+} from "@/lib/seo/meditation-authors-landing/content";
+
 
 export function buildSiteCanonicalUrl(path = "/"): string {
   const origin = getAppOrigin().replace(/\/$/, "");
@@ -306,6 +318,37 @@ export function buildAiMusicHubMetadata(): Metadata {
       card: "summary",
       title: AI_MUSIC_HUB_SEO_TITLE,
       description: AI_MUSIC_HUB_SEO_DESCRIPTION,
+    },
+  };
+}
+
+
+export function buildMeditationAuthorsLandingMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(MEDITATION_AUTHORS_LANDING_PATH);
+
+  return {
+    title: MEDITATION_AUTHORS_LANDING_SEO_TITLE,
+    description: MEDITATION_AUTHORS_LANDING_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    robots: {
+      // Temporary production-test indexing. Restore index: true after visual QA.
+      index: false,
+      follow: true,
+    },
+    openGraph: {
+      title: MEDITATION_AUTHORS_LANDING_SEO_TITLE,
+      description: MEDITATION_AUTHORS_LANDING_SEO_DESCRIPTION,
+      url: canonical,
+      type: "website",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: MEDITATION_AUTHORS_LANDING_SEO_TITLE,
+      description: MEDITATION_AUTHORS_LANDING_SEO_DESCRIPTION,
     },
   };
 }

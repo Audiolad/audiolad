@@ -1,6 +1,7 @@
 export {
   buildAboutPageJsonLd,
   buildAiMusicHubPageJsonLd,
+  buildMeditationAuthorsLandingPageJsonLd,
   buildAuthorJsonLd,
   buildBreadcrumbListJsonLd,
   buildForAuthorsPageJsonLd,
@@ -16,6 +17,7 @@ export {
   type AboutPageJsonLdInput,
   type AiMusicHubFaqJsonLdInput,
   type AiMusicHubPageJsonLdInput,
+  type MeditationAuthorsLandingPageJsonLdInput,
   type AuthorJsonLdInput,
   type BreadcrumbItemInput,
   type ForAuthorsFaqJsonLdInput,
