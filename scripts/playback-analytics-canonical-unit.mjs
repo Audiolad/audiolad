@@ -14,6 +14,7 @@ import {
   clearPendingConfirmedPlay,
   createListenTrackerContextState,
   expireListenTrackerContextIfInactive,
+  hasPendingConfirmedPlayForTrack,
   isListeningContextInactive,
   listPendingConfirmedPlays,
   noteListenTrackerPlayingActivity,
@@ -55,6 +56,10 @@ function testCanonicalMountContract() {
   assert.doesNotMatch(audioPost, /<ListenAnalyticsTracker/);
   assert.match(tracker, /subscribeCachedAnalyticsSessionId/);
   assert.match(tracker, /notePendingConfirmedPlay/);
+  assert.match(tracker, /entry\.path/);
+  assert.doesNotMatch(tracker, /clearPending:\s*true/);
+  assert.match(contextHelper, /listeningContextId/);
+
   assert.match(tracker, /shouldRecordPendingConfirmedPlay/);
   assert.match(contextHelper, /pendingConfirmedPlays/);
   assert.match(client, /export function subscribeCachedAnalyticsSessionId/);
@@ -153,7 +158,7 @@ function testResolveTargetPaths() {
 
 /**
  * Simulate tracker decisions around play_started using confirmed isPlaying only.
- * steps: { kind, at, isPlaying?, trackId?, sessionId?, practiceId? }
+ * steps: { kind, at, isPlaying?, trackId?, sessionId?, practiceId?, path?, programCompleted? }
  */
 function simulateConfirmedPlayPipeline(steps) {
   resetContinuousListenSession();
@@ -161,6 +166,7 @@ function simulateConfirmedPlayPipeline(steps) {
   const emits = [];
   let practiceId = "p";
   let trackId = "A";
+  let path = "/practice/author/a";
   let sessionId = null;
   let isPlaying = false;
 
@@ -174,18 +180,36 @@ function simulateConfirmedPlayPipeline(steps) {
           sessionId,
         })
       ) {
-        notePendingConfirmedPlay(state, practiceId, trackId, now);
+        notePendingConfirmedPlay(state, {
+          practiceId,
+          trackId,
+          path,
+          now,
+        });
       }
       return;
     }
 
     for (const entry of listPendingConfirmedPlays(state)) {
-      clearPendingConfirmedPlay(state, entry.practiceId, entry.trackId);
-      if (rememberContinuousListenPlayStarted(entry.practiceId, entry.trackId, now)) {
-        emits.push({ practiceId: entry.practiceId, trackId: entry.trackId, at: now });
+      clearPendingConfirmedPlay(state, entry);
+      if (
+        rememberContinuousListenPlayStarted(
+          entry.practiceId,
+          entry.trackId,
+          entry.confirmedAt,
+        )
+      ) {
+        emits.push({
+          practiceId: entry.practiceId,
+          trackId: entry.trackId,
+          path: entry.path,
+          listeningContextId: entry.listeningContextId,
+          at: now,
+        });
       }
       if (entry.practiceId === practiceId && entry.trackId === trackId) {
         state.playStarted = true;
+        state.listeningStartedAt = entry.listeningContextId;
       }
     }
 
@@ -196,14 +220,24 @@ function simulateConfirmedPlayPipeline(steps) {
         isPlaying,
         playStarted: state.playStarted,
         sessionId,
-        pendingConfirmedPlays: state.pendingConfirmedPlays,
+        hasPendingForCurrentTrack: hasPendingConfirmedPlayForTrack(
+          state,
+          practiceId,
+          trackId,
+        ),
       })
     ) {
       state.playStarted = true;
-      clearPendingConfirmedPlay(state, practiceId, trackId);
+      if (!state.listeningStartedAt) state.listeningStartedAt = now;
       noteListenTrackerPlayingActivity(state, now);
       if (rememberContinuousListenPlayStarted(practiceId, trackId, now)) {
-        emits.push({ practiceId, trackId, at: now });
+        emits.push({
+          practiceId,
+          trackId,
+          path,
+          listeningContextId: state.listeningStartedAt,
+          at: now,
+        });
       }
     }
   }
@@ -211,14 +245,19 @@ function simulateConfirmedPlayPipeline(steps) {
   for (const step of steps) {
     const now = step.at;
     if (step.practiceId) practiceId = step.practiceId;
+    if (step.path) path = step.path;
     if (step.trackId) {
       if (step.trackId !== trackId || step.practiceId) {
-        resetListenTrackerContextState(state); // keep pending
+        resetListenTrackerContextState(state);
         trackId = step.trackId;
       }
     }
     if ("sessionId" in step) sessionId = step.sessionId;
     if ("isPlaying" in step) isPlaying = step.isPlaying;
+
+    if (step.programCompleted) {
+      resetListenTrackerContextState(state);
+    }
 
     if (step.kind === "playing_tick" && isPlaying) {
       noteListenTrackerPlayingActivity(state, now);
@@ -239,9 +278,7 @@ function testH2PendingConfirmedPlaySurvivesPauseBeforeSession() {
   const { emits } = simulateConfirmedPlayPipeline([
     { kind: "edge", at: t0, trackId: "A", sessionId: null, isPlaying: true },
     { kind: "playing_tick", at: t0 + 200, isPlaying: true },
-    // Pause before session arrives
     { kind: "edge", at: t0 + 800, isPlaying: false },
-    // Session becomes ready while paused — must still emit start for A
     { kind: "edge", at: t0 + 1200, sessionId: "sess-1", isPlaying: false },
   ]);
 
@@ -252,12 +289,134 @@ function testH2PendingConfirmedPlaySurvivesPauseBeforeSession() {
   );
 }
 
+function testCompletedBeforeSession() {
+  const t0 = 11_000_000;
+  const { emits } = simulateConfirmedPlayPipeline([
+    {
+      kind: "edge",
+      at: t0,
+      trackId: "A",
+      path: "/practice/author/a",
+      sessionId: null,
+      isPlaying: true,
+    },
+    { kind: "playing_tick", at: t0 + 100, isPlaying: true },
+    // Material finishes before analytics session exists
+    {
+      kind: "edge",
+      at: t0 + 500,
+      isPlaying: false,
+      programCompleted: true,
+    },
+    { kind: "edge", at: t0 + 900, sessionId: "sess-complete", isPlaying: false },
+  ]);
+
+  assert.equal(emits.length, 1, "completed-before-session: start A = 1");
+  assert.equal(emits[0].trackId, "A");
+  assert.equal(emits[0].path, "/practice/author/a");
+  console.log("regression completed-before-session: ok");
+}
+
+function testOriginalPathPreserved() {
+  const t0 = 12_000_000;
+  const { emits } = simulateConfirmedPlayPipeline([
+    {
+      kind: "edge",
+      at: t0,
+      trackId: "A-track",
+      practiceId: "A",
+      path: "/practice/author/a",
+      sessionId: null,
+      isPlaying: true,
+    },
+    { kind: "edge", at: t0 + 200, isPlaying: false },
+    // Navigate away / switch product before session
+    {
+      kind: "edge",
+      at: t0 + 400,
+      trackId: "B-track",
+      practiceId: "B",
+      path: "/practice/author/b",
+      isPlaying: false,
+    },
+    {
+      kind: "edge",
+      at: t0 + 800,
+      sessionId: "sess-path",
+      isPlaying: false,
+      path: "/practice/author/b",
+    },
+  ]);
+
+  assert.equal(emits.length, 1, "original-path-preserved: one pending flush");
+  assert.equal(emits[0].practiceId, "A");
+  assert.equal(emits[0].trackId, "A-track");
+  assert.equal(
+    emits[0].path,
+    "/practice/author/a",
+    "original-path-preserved: path from confirmed play, not flush-time path",
+  );
+  console.log("regression original-path-preserved: ok");
+}
+
+function testSameTrackTwoContextsBeforeSession() {
+  const t0 = 13_000_000;
+  const { emits } = simulateConfirmedPlayPipeline([
+    {
+      kind: "edge",
+      at: t0,
+      trackId: "A",
+      path: "/practice/author/a",
+      sessionId: null,
+      isPlaying: true,
+    },
+    { kind: "playing_tick", at: t0 + 1_000, isPlaying: true },
+    { kind: "edge", at: t0 + 2_000, isPlaying: false },
+    // Pause longer than gap → new listening context
+    {
+      kind: "edge",
+      at: t0 + 2_000 + LISTENING_SESSION_GAP_MS + 1_000,
+      isPlaying: true,
+      sessionId: null,
+    },
+    {
+      kind: "playing_tick",
+      at: t0 + 2_000 + LISTENING_SESSION_GAP_MS + 2_000,
+      isPlaying: true,
+    },
+    {
+      kind: "edge",
+      at: t0 + 2_000 + LISTENING_SESSION_GAP_MS + 3_000,
+      isPlaying: false,
+    },
+    {
+      kind: "edge",
+      at: t0 + 2_000 + LISTENING_SESSION_GAP_MS + 4_000,
+      sessionId: "sess-two",
+      isPlaying: false,
+    },
+  ]);
+
+  assert.equal(
+    emits.length,
+    2,
+    "same-track-two-contexts-before-session: 2 audio_play_started",
+  );
+  assert.equal(emits[0].trackId, "A");
+  assert.equal(emits[1].trackId, "A");
+  assert.notEqual(
+    emits[0].listeningContextId,
+    emits[1].listeningContextId,
+    "distinct listening context identities",
+  );
+  console.log("regression same-track-two-contexts-before-session: ok");
+}
+
 function testH2PendingANotAttributedToB() {
   const t0 = 20_000_000;
   const { emits } = simulateConfirmedPlayPipeline([
     { kind: "edge", at: t0, trackId: "A", sessionId: null, isPlaying: true },
     { kind: "edge", at: t0 + 300, isPlaying: false },
-    // Switch to B before session; B never confirmed playing
     { kind: "edge", at: t0 + 400, trackId: "B", isPlaying: false },
     { kind: "edge", at: t0 + 900, sessionId: "sess-2", isPlaying: false },
   ]);
@@ -394,12 +553,37 @@ function testRepeatOneLoopsDoNotEmitNewStart() {
 
 function testTrackChangeResetsLocalContextKeepsPending() {
   const state = createListenTrackerContextState();
-  notePendingConfirmedPlay(state, "p", "A", 100);
+  notePendingConfirmedPlay(state, {
+    practiceId: "p",
+    trackId: "A",
+    path: "/practice/author/a",
+    now: 100,
+  });
   state.playStarted = true;
   resetListenTrackerContextState(state);
   assert.equal(state.playStarted, false);
   assert.equal(listPendingConfirmedPlays(state).length, 1);
   assert.equal(listPendingConfirmedPlays(state)[0].trackId, "A");
+  assert.equal(listPendingConfirmedPlays(state)[0].path, "/practice/author/a");
+}
+
+function testShortPauseResumeDoesNotDuplicatePending() {
+  const state = createListenTrackerContextState();
+  notePendingConfirmedPlay(state, {
+    practiceId: "p",
+    trackId: "A",
+    path: "/p/a",
+    now: 1000,
+  });
+  noteListenTrackerPlayingActivity(state, 1500);
+  // short pause then resume — same context
+  notePendingConfirmedPlay(state, {
+    practiceId: "p",
+    trackId: "A",
+    path: "/p/a",
+    now: 2000,
+  });
+  assert.equal(listPendingConfirmedPlays(state).length, 1);
 }
 
 function testNoRetryOverloadInThisPr() {
@@ -420,6 +604,9 @@ function testCiWiring() {
 testCanonicalMountContract();
 testResolveTargetPaths();
 testH2PendingConfirmedPlaySurvivesPauseBeforeSession();
+testCompletedBeforeSession();
+testOriginalPathPreserved();
+testSameTrackTwoContextsBeforeSession();
 testH2PendingANotAttributedToB();
 testManualSwitchClearsPlayingBeforeStartB();
 testAutoNextStillEmitsForNewTrack();
@@ -430,6 +617,7 @@ testMultiTrackStartsAreIndependent();
 testPauseResumeSameTrackNoSecondStart();
 testRepeatOneLoopsDoNotEmitNewStart();
 testTrackChangeResetsLocalContextKeepsPending();
+testShortPauseResumeDoesNotDuplicatePending();
 testNoRetryOverloadInThisPr();
 testCiWiring();
 

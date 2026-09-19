@@ -5,12 +5,19 @@
  *
  * Pending confirmed plays: a real isPlaying=true observed before analytics
  * sessionId exists is remembered and flushed when session becomes ready —
- * even if the user already paused (H2).
+ * even if the user already paused or the program completed (H2).
  */
 
 export type PendingConfirmedPlay = {
   practiceId: string;
   trackId: string;
+  /** Path at the moment of confirmed playing (preserved across navigation). */
+  path: string;
+  /**
+   * Listening-context identity (usually listeningStartedAt / first confirmedAt).
+   * Distinct contexts of the same track (pause > gap) get distinct pending rows.
+   */
+  listeningContextId: number;
   confirmedAt: number;
 };
 
@@ -23,13 +30,17 @@ export type ListenTrackerContextState = {
   lastActivityAt: number | null;
   /**
    * Confirmed plays (isPlaying=true) that happened before sessionId.
-   * Survives pause and track switches so A is not lost / not attributed to B.
+   * Survives pause, track switches, and programCompleted until session flush.
    */
   pendingConfirmedPlays: Map<string, PendingConfirmedPlay>;
 };
 
-function pendingKey(practiceId: string, trackId: string): string {
-  return `${practiceId}:${trackId}`;
+export function pendingConfirmedPlayKey(
+  practiceId: string,
+  trackId: string,
+  listeningContextId: number,
+): string {
+  return `${practiceId}:${trackId}:${listeningContextId}`;
 }
 
 export function createListenTrackerContextState(): ListenTrackerContextState {
@@ -43,20 +54,18 @@ export function createListenTrackerContextState(): ListenTrackerContextState {
   };
 }
 
-/** Reset per-track sticky state. Pending confirmed plays are kept by default (H2). */
+/**
+ * Reset per-track sticky state. Pending confirmed plays are always kept —
+ * a real play before session must survive programCompleted and track switches.
+ */
 export function resetListenTrackerContextState(
   state: ListenTrackerContextState,
-  options?: { clearPending?: boolean },
 ): void {
   state.playStarted = false;
   state.completionTracked = false;
   state.listeningStartedAt = null;
   state.listeningSessionKey = null;
   state.lastActivityAt = null;
-
-  if (options?.clearPending) {
-    state.pendingConfirmedPlays.clear();
-  }
 }
 
 /** True when the listening context broke due to inactivity (pause/stop gap). */
@@ -99,51 +108,84 @@ export function noteListenTrackerPlayingActivity(
 /**
  * Record that this practice/track actually reached confirmed playing while the
  * analytics session was not ready yet. Intent / play() promise must not call this.
+ * Short pause/resume reuses the same listeningContextId; pause > gap opens a new one.
  */
 export function notePendingConfirmedPlay(
   state: ListenTrackerContextState,
-  practiceId: string,
-  trackId: string,
-  now: number,
-): void {
-  const key = pendingKey(practiceId, trackId);
-
-  if (state.pendingConfirmedPlays.has(key)) {
-    noteListenTrackerPlayingActivity(state, now);
-    return;
+  input: {
+    practiceId: string;
+    trackId: string;
+    path: string;
+    now: number;
+  },
+): PendingConfirmedPlay {
+  if (!state.listeningStartedAt) {
+    state.listeningStartedAt = input.now;
   }
 
-  state.pendingConfirmedPlays.set(key, {
-    practiceId,
-    trackId,
-    confirmedAt: now,
-  });
-  noteListenTrackerPlayingActivity(state, now);
+  const listeningContextId = state.listeningStartedAt;
+  const key = pendingConfirmedPlayKey(
+    input.practiceId,
+    input.trackId,
+    listeningContextId,
+  );
+  const existing = state.pendingConfirmedPlays.get(key);
+
+  if (existing) {
+    noteListenTrackerPlayingActivity(state, input.now);
+    return existing;
+  }
+
+  const entry: PendingConfirmedPlay = {
+    practiceId: input.practiceId,
+    trackId: input.trackId,
+    path: input.path,
+    listeningContextId,
+    confirmedAt: input.now,
+  };
+  state.pendingConfirmedPlays.set(key, entry);
+  noteListenTrackerPlayingActivity(state, input.now);
+  return entry;
 }
 
 export function listPendingConfirmedPlays(
   state: ListenTrackerContextState,
 ): PendingConfirmedPlay[] {
-  return [...state.pendingConfirmedPlays.values()];
+  return [...state.pendingConfirmedPlays.values()].sort(
+    (a, b) => a.confirmedAt - b.confirmedAt,
+  );
 }
 
 export function clearPendingConfirmedPlay(
   state: ListenTrackerContextState,
-  practiceId: string,
-  trackId: string,
+  entry: PendingConfirmedPlay,
 ): void {
-  state.pendingConfirmedPlays.delete(pendingKey(practiceId, trackId));
+  state.pendingConfirmedPlays.delete(
+    pendingConfirmedPlayKey(
+      entry.practiceId,
+      entry.trackId,
+      entry.listeningContextId,
+    ),
+  );
 }
 
-export function clearAllPendingConfirmedPlays(
+export function hasPendingConfirmedPlayForTrack(
   state: ListenTrackerContextState,
-): void {
-  state.pendingConfirmedPlays.clear();
+  practiceId: string,
+  trackId: string,
+): boolean {
+  for (const entry of state.pendingConfirmedPlays.values()) {
+    if (entry.practiceId === practiceId && entry.trackId === trackId) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
  * Decide whether a play-started emission should be attempted for the *current*
- * track. Pending flush for other tracks is handled separately.
+ * track after pending flush. Pending flush for other contexts is separate.
  */
 export function shouldAttemptPlayStartedEmit(input: {
   trackId: string | null;
@@ -151,7 +193,7 @@ export function shouldAttemptPlayStartedEmit(input: {
   isPlaying: boolean;
   playStarted: boolean;
   sessionId: string | null;
-  pendingConfirmedPlays: Map<string, PendingConfirmedPlay>;
+  hasPendingForCurrentTrack: boolean;
 }): boolean {
   if (!input.trackId || input.playStarted || !input.sessionId) {
     return false;
@@ -161,10 +203,7 @@ export function shouldAttemptPlayStartedEmit(input: {
     return true;
   }
 
-  // Session arrived after a confirmed play that already paused.
-  return input.pendingConfirmedPlays.has(
-    pendingKey(input.practiceId, input.trackId),
-  );
+  return input.hasPendingForCurrentTrack;
 }
 
 /** True when we should remember a pending confirmed play (no session yet). */

@@ -19,6 +19,7 @@ import {
   clearPendingConfirmedPlay,
   createListenTrackerContextState,
   expireListenTrackerContextIfInactive,
+  hasPendingConfirmedPlayForTrack,
   listPendingConfirmedPlays,
   noteListenTrackerPlayingActivity,
   notePendingConfirmedPlay,
@@ -55,8 +56,16 @@ function emitPlayStarted(input: {
   trackId: string;
   path: string;
   listeningKey: string;
+  /** Wall time for continuous-session expiry between distinct listening contexts. */
+  continuousAt?: number;
 }): void {
-  if (!rememberContinuousListenPlayStarted(input.practiceId, input.trackId)) {
+  if (
+    !rememberContinuousListenPlayStarted(
+      input.practiceId,
+      input.trackId,
+      input.continuousAt,
+    )
+  ) {
     return;
   }
 
@@ -77,7 +86,7 @@ function emitPlayStarted(input: {
  * audio_play_started follows confirmed player isPlaying (HTMLMediaElement
  * `playing` / valid adopted-playing), never play() intent alone.
  * H2: confirmed play before sessionId is pending-flushed when session arrives,
- * even after a short pause. Track A→B pending stays attributed to A.
+ * preserving original path and distinct listening contexts; survives programCompleted.
  */
 export default function ListenAnalyticsTracker({
   practiceId,
@@ -101,7 +110,7 @@ export default function ListenAnalyticsTracker({
   );
 
   // H3: reset per-track sticky state on audio item change. Pending confirmed
-  // plays for prior tracks are kept until session flush (H2 A→B before session).
+  // plays for prior tracks/contexts are kept until session flush.
   useEffect(() => {
     const practiceChanged = trackedPracticeIdRef.current !== practiceId;
     const trackChanged = trackedTrackIdRef.current !== trackId;
@@ -160,7 +169,12 @@ export default function ListenAnalyticsTracker({
       }) &&
       trackId
     ) {
-      notePendingConfirmedPlay(context, practiceId, trackId, now);
+      notePendingConfirmedPlay(context, {
+        practiceId,
+        trackId,
+        path,
+        now,
+      });
       return;
     }
 
@@ -168,7 +182,7 @@ export default function ListenAnalyticsTracker({
       return;
     }
 
-    // Flush every pending confirmed play (may include prior track A after switch to B).
+    // Flush every pending confirmed play (prior path + distinct contexts).
     const pending = listPendingConfirmedPlays(context);
 
     for (const entry of pending) {
@@ -176,7 +190,6 @@ export default function ListenAnalyticsTracker({
         context,
         entry,
         sessionId,
-        path,
         currentPracticeId: practiceId,
         currentTrackId: trackId,
         now,
@@ -190,7 +203,11 @@ export default function ListenAnalyticsTracker({
         isPlaying,
         playStarted: context.playStarted,
         sessionId,
-        pendingConfirmedPlays: context.pendingConfirmedPlays,
+        hasPendingForCurrentTrack: hasPendingConfirmedPlayForTrack(
+          context,
+          practiceId,
+          trackId ?? "",
+        ),
       })
     ) {
       return;
@@ -201,7 +218,6 @@ export default function ListenAnalyticsTracker({
     }
 
     context.playStarted = true;
-    clearPendingConfirmedPlay(context, practiceId, trackId);
 
     if (!context.listeningStartedAt) {
       context.listeningStartedAt = createListeningSessionStartedAt();
@@ -222,6 +238,7 @@ export default function ListenAnalyticsTracker({
       trackId,
       path,
       listeningKey,
+      continuousAt: now,
     });
   }, [isPlaying, path, practiceId, sessionId, trackId]);
 
@@ -247,7 +264,12 @@ export default function ListenAnalyticsTracker({
           sessionId,
         })
       ) {
-        notePendingConfirmedPlay(context, practiceId, trackId, now);
+        notePendingConfirmedPlay(context, {
+          practiceId,
+          trackId,
+          path,
+          now,
+        });
       }
     }
 
@@ -330,12 +352,13 @@ export default function ListenAnalyticsTracker({
     trackId,
   ]);
 
+  // programCompleted resets sticky per-track state but must NOT destroy H2 pending.
   useEffect(() => {
     if (!programCompleted) {
       return;
     }
 
-    resetListenTrackerContextState(contextRef.current, { clearPending: true });
+    resetListenTrackerContextState(contextRef.current);
     progressStateRef.current = createListeningProgressState();
     lastTickRef.current = null;
   }, [programCompleted, trackId]);
@@ -347,61 +370,37 @@ function flushPendingEntry(input: {
   context: ReturnType<typeof createListenTrackerContextState>;
   entry: PendingConfirmedPlay;
   sessionId: string;
-  path: string;
   currentPracticeId: string;
   currentTrackId: string | null;
   now: number;
 }): void {
-  const { context, entry, sessionId, path, currentPracticeId, currentTrackId, now } =
+  const { context, entry, sessionId, currentPracticeId, currentTrackId, now } =
     input;
 
-  clearPendingConfirmedPlay(context, entry.practiceId, entry.trackId);
+  clearPendingConfirmedPlay(context, entry);
+
+  const listeningKey = buildListeningSessionKey({
+    practiceId: entry.practiceId,
+    audioItemId: entry.trackId,
+    sessionStartedAt: entry.listeningContextId,
+  });
 
   const isCurrentTrack =
     entry.practiceId === currentPracticeId && entry.trackId === currentTrackId;
 
   if (isCurrentTrack) {
-    if (context.playStarted) {
-      return;
-    }
-
     context.playStarted = true;
-
-    if (!context.listeningStartedAt) {
-      context.listeningStartedAt = entry.confirmedAt;
-    }
-
-    const listeningKey = buildListeningSessionKey({
-      practiceId: entry.practiceId,
-      audioItemId: entry.trackId,
-      sessionStartedAt: context.listeningStartedAt,
-    });
-
+    context.listeningStartedAt = entry.listeningContextId;
     context.listeningSessionKey = listeningKey;
     noteListenTrackerPlayingActivity(context, now);
-
-    emitPlayStarted({
-      sessionId,
-      practiceId: entry.practiceId,
-      trackId: entry.trackId,
-      path,
-      listeningKey,
-    });
-    return;
   }
-
-  // Prior track (e.g. A) confirmed before session; do not touch current B sticky state.
-  const listeningKey = buildListeningSessionKey({
-    practiceId: entry.practiceId,
-    audioItemId: entry.trackId,
-    sessionStartedAt: entry.confirmedAt,
-  });
 
   emitPlayStarted({
     sessionId,
     practiceId: entry.practiceId,
     trackId: entry.trackId,
-    path,
+    path: entry.path,
     listeningKey,
+    continuousAt: entry.confirmedAt,
   });
 }
