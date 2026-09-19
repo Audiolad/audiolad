@@ -16,11 +16,16 @@ import {
   markListeningMilestoneTracked,
 } from "@/lib/analytics/dedup";
 import {
+  clearPendingConfirmedPlay,
   createListenTrackerContextState,
   expireListenTrackerContextIfInactive,
+  listPendingConfirmedPlays,
   noteListenTrackerPlayingActivity,
+  notePendingConfirmedPlay,
   resetListenTrackerContextState,
   shouldAttemptPlayStartedEmit,
+  shouldRecordPendingConfirmedPlay,
+  type PendingConfirmedPlay,
 } from "@/lib/analytics/listen-tracker-context";
 import {
   createListeningProgressState,
@@ -44,12 +49,35 @@ type ListenAnalyticsTrackerProps = {
   programCompleted: boolean;
 };
 
+function emitPlayStarted(input: {
+  sessionId: string;
+  practiceId: string;
+  trackId: string;
+  path: string;
+  listeningKey: string;
+}): void {
+  if (!rememberContinuousListenPlayStarted(input.practiceId, input.trackId)) {
+    return;
+  }
+
+  void trackPlatformEvent({
+    sessionId: input.sessionId,
+    event_name: "audio_play_started",
+    path: input.path,
+    practice_id: input.practiceId,
+    audio_item_id: input.trackId,
+    properties: {
+      listening_key: input.listeningKey,
+    },
+  });
+}
+
 /**
  * Canonical playback analytics emitter for GlobalAudioPlayer.
- * One audio_play_started per real play of a practiceId+audioItemId in a listening
- * context; track changes A→B reset per-track state; Repeat One loops stay deduped
- * via continuous-session memory; play-before-session waits for sessionId (H2).
- * Listening-session gap is inactivity since last playing activity, not listen age.
+ * audio_play_started follows confirmed player isPlaying (HTMLMediaElement
+ * `playing` / valid adopted-playing), never play() intent alone.
+ * H2: confirmed play before sessionId is pending-flushed when session arrives,
+ * even after a short pause. Track A→B pending stays attributed to A.
  */
 export default function ListenAnalyticsTracker({
   practiceId,
@@ -72,7 +100,8 @@ export default function ListenAnalyticsTracker({
     () => null,
   );
 
-  // H3: reset per-track analytics state whenever the active audio item (or practice) changes.
+  // H3: reset per-track sticky state on audio item change. Pending confirmed
+  // plays for prior tracks are kept until session flush (H2 A→B before session).
   useEffect(() => {
     const practiceChanged = trackedPracticeIdRef.current !== practiceId;
     const trackChanged = trackedTrackIdRef.current !== trackId;
@@ -88,8 +117,6 @@ export default function ListenAnalyticsTracker({
     lastTickRef.current = null;
   }, [practiceId, trackId]);
 
-  // Inactivity gap: only a pause/stop longer than LISTENING_SESSION_GAP_MS opens a
-  // new listening context. Long continuous play must not expire on short pause.
   useEffect(() => {
     if (!trackId) {
       return;
@@ -112,7 +139,6 @@ export default function ListenAnalyticsTracker({
     const context = contextRef.current;
     const now = Date.now();
 
-    // Expire before attempting emit so a long pause (> gap) can open a new context.
     if (
       expireListenTrackerContextIfInactive(
         context,
@@ -124,22 +150,58 @@ export default function ListenAnalyticsTracker({
       lastTickRef.current = null;
     }
 
+    // H2: remember confirmed playing before session exists (not play intent).
     if (
-      !shouldAttemptPlayStartedEmit({
+      shouldRecordPendingConfirmedPlay({
         trackId,
         isPlaying,
         playStarted: context.playStarted,
         sessionId,
+      }) &&
+      trackId
+    ) {
+      notePendingConfirmedPlay(context, practiceId, trackId, now);
+      return;
+    }
+
+    if (!sessionId) {
+      return;
+    }
+
+    // Flush every pending confirmed play (may include prior track A after switch to B).
+    const pending = listPendingConfirmedPlays(context);
+
+    for (const entry of pending) {
+      flushPendingEntry({
+        context,
+        entry,
+        sessionId,
+        path,
+        currentPracticeId: practiceId,
+        currentTrackId: trackId,
+        now,
+      });
+    }
+
+    if (
+      !shouldAttemptPlayStartedEmit({
+        trackId,
+        practiceId,
+        isPlaying,
+        playStarted: context.playStarted,
+        sessionId,
+        pendingConfirmedPlays: context.pendingConfirmedPlays,
       })
     ) {
       return;
     }
 
-    if (!trackId || !sessionId) {
+    if (!trackId) {
       return;
     }
 
     context.playStarted = true;
+    clearPendingConfirmedPlay(context, practiceId, trackId);
 
     if (!context.listeningStartedAt) {
       context.listeningStartedAt = createListeningSessionStartedAt();
@@ -154,20 +216,12 @@ export default function ListenAnalyticsTracker({
     context.listeningSessionKey = listeningKey;
     noteListenTrackerPlayingActivity(context, now);
 
-    // Repeat One / continuous same-item loops: suppress duplicate start.
-    if (!rememberContinuousListenPlayStarted(practiceId, trackId)) {
-      return;
-    }
-
-    void trackPlatformEvent({
+    emitPlayStarted({
       sessionId,
-      event_name: "audio_play_started",
+      practiceId,
+      trackId,
       path,
-      practice_id: practiceId,
-      audio_item_id: trackId,
-      properties: {
-        listening_key: listeningKey,
-      },
+      listeningKey,
     });
   }, [isPlaying, path, practiceId, sessionId, trackId]);
 
@@ -184,6 +238,17 @@ export default function ListenAnalyticsTracker({
     if (isPlaying) {
       touchContinuousListenSessionActivity(now);
       noteListenTrackerPlayingActivity(context, now);
+
+      if (
+        shouldRecordPendingConfirmedPlay({
+          trackId,
+          isPlaying,
+          playStarted: context.playStarted,
+          sessionId,
+        })
+      ) {
+        notePendingConfirmedPlay(context, practiceId, trackId, now);
+      }
     }
 
     const deltaSeconds =
@@ -270,10 +335,73 @@ export default function ListenAnalyticsTracker({
       return;
     }
 
-    resetListenTrackerContextState(contextRef.current);
+    resetListenTrackerContextState(contextRef.current, { clearPending: true });
     progressStateRef.current = createListeningProgressState();
     lastTickRef.current = null;
   }, [programCompleted, trackId]);
 
   return null;
+}
+
+function flushPendingEntry(input: {
+  context: ReturnType<typeof createListenTrackerContextState>;
+  entry: PendingConfirmedPlay;
+  sessionId: string;
+  path: string;
+  currentPracticeId: string;
+  currentTrackId: string | null;
+  now: number;
+}): void {
+  const { context, entry, sessionId, path, currentPracticeId, currentTrackId, now } =
+    input;
+
+  clearPendingConfirmedPlay(context, entry.practiceId, entry.trackId);
+
+  const isCurrentTrack =
+    entry.practiceId === currentPracticeId && entry.trackId === currentTrackId;
+
+  if (isCurrentTrack) {
+    if (context.playStarted) {
+      return;
+    }
+
+    context.playStarted = true;
+
+    if (!context.listeningStartedAt) {
+      context.listeningStartedAt = entry.confirmedAt;
+    }
+
+    const listeningKey = buildListeningSessionKey({
+      practiceId: entry.practiceId,
+      audioItemId: entry.trackId,
+      sessionStartedAt: context.listeningStartedAt,
+    });
+
+    context.listeningSessionKey = listeningKey;
+    noteListenTrackerPlayingActivity(context, now);
+
+    emitPlayStarted({
+      sessionId,
+      practiceId: entry.practiceId,
+      trackId: entry.trackId,
+      path,
+      listeningKey,
+    });
+    return;
+  }
+
+  // Prior track (e.g. A) confirmed before session; do not touch current B sticky state.
+  const listeningKey = buildListeningSessionKey({
+    practiceId: entry.practiceId,
+    audioItemId: entry.trackId,
+    sessionStartedAt: entry.confirmedAt,
+  });
+
+  emitPlayStarted({
+    sessionId,
+    practiceId: entry.practiceId,
+    trackId: entry.trackId,
+    path,
+    listeningKey,
+  });
 }
