@@ -9,18 +9,20 @@ import {
   parsePublicationClass,
   publicationClassToCabinetBranch,
 } from "@/lib/author-products/publication-class";
+import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ author?: string; class?: string }>;
+  searchParams: Promise<{ author?: string; class?: string; step?: string }>;
 };
 
 export default async function NewAuthorProductPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const params = await searchParams;
+  const initialWizardStep = parseProductWizardStep(params.step);
 
   const {
     data: { user },
@@ -82,6 +84,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
         }))}
         initialAuthorSlug={params.author}
         initialPublicationClass={publicationClass}
+        initialWizardStep={initialWizardStep}
         topicFormData={topicFormData}
         mode="create"
       />

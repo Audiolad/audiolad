@@ -7,16 +7,23 @@ import {
   loadAuthorDashboardProductEditData,
   mapAuthorDashboardProductEditError,
 } from "@/lib/author-products/dashboard-edit-page";
+import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ step?: string }>;
 };
 
-export default async function EditAuthorProductPage({ params }: PageProps) {
+export default async function EditAuthorProductPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
+  const query = await searchParams;
+  const initialWizardStep = parseProductWizardStep(query.step);
   const supabase = await createClient();
 
   const {
@@ -74,6 +81,7 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
           label: item.title,
         }))}
         initialProduct={product}
+        initialWizardStep={initialWizardStep}
         topicFormData={topicFormData}
         mode="edit"
       />
