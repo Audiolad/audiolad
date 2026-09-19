@@ -58,7 +58,7 @@ function publication(
     updated_at: "2026-04-01T00:00:00.000Z",
     published_at: new Date(Date.UTC(2026, 3, 1, 0, 0, index)).toISOString(),
     created_at: new Date(Date.UTC(2026, 3, 1, 0, 0, index)).toISOString(),
-    authors: { name: "Анна", slug: "anna" },
+    authors: { name: "Анна", slug: "anna", access_status: "commercial_active" },
     ...overrides,
   };
 }

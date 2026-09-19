@@ -21,7 +21,10 @@ import {
   getAudioPostDisplayLabel,
   getDisplayFormat,
 } from "@/lib/author-products/format";
-import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
+import {
+  isAudioPostProductKind,
+  isMusicProductKind,
+} from "@/lib/author-products/product-kind";
 import {
   getVisibleAuthorProductStatus,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
@@ -247,6 +250,11 @@ export default function AuthorDashboardClient({
   }
 
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(selectedAuthor.slug)}`;
+  const musicProducts = products.filter((product) =>
+    isMusicProductKind(product.product_kind),
+  );
+  const musicHref = `/author-dashboard/music?author=${encodeURIComponent(selectedAuthor.slug)}`;
+
 
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
@@ -305,7 +313,21 @@ export default function AuthorDashboardClient({
       </div>
 
       <section className="mt-8">
-        <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
+          {musicProducts.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-medium text-[#3f3560]">Все продукты</span>
+              <span className="text-[#cbbce6]">·</span>
+              <Link
+                href={musicHref}
+                className="font-medium text-[#6b5b95] hover:underline"
+              >
+                Музыка · {musicProducts.length}
+              </Link>
+            </div>
+          ) : null}
+        </div>
 
         {loading ? (
           <p className="mt-4 text-sm text-[#7d70a2]">Загрузка списка…</p>

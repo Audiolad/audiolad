@@ -62,6 +62,7 @@ function publication(
     catalog_visibility: "listed",
     is_catalog_listed: true,
     title: "Рассвет",
+    authors: { name: "Author", slug: "author", access_status: "commercial_active" },
     ...overrides,
   };
 }

@@ -1046,6 +1046,10 @@ export default function AuthorProductForm({
     [authors, form.authorId],
   );
   const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
+  const canConfigureStudioMusic = authorAccessAllowsPaidProducts(
+    selectedAuthorAccessStatus,
+  );
+
   const canBypassProductModeration =
     selectedAuthor?.canBypassProductModeration === true;
   const canMutateContent = authorAccessAllowsContentMutations(
@@ -3051,10 +3055,17 @@ export default function AuthorProductForm({
                 MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
                 MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
               ] as const
-            ).map((value) => (
+            ).map((value) => {
+              const reuseOption =
+                value === MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED;
+              const optionDisabled =
+                busy || (reuseOption && !canConfigureStudioMusic);
+              return (
               <label
                 key={value}
-                className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                className={`flex items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                  optionDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                } ${
                   form.musicUsagePermission === value
                     ? "border-[#9a74d8] bg-[#f8f4ff]"
                     : "border-[#e4d7f4] bg-white"
@@ -3065,8 +3076,9 @@ export default function AuthorProductForm({
                   name="music_usage_permission"
                   className="mt-1"
                   checked={form.musicUsagePermission === value}
-                  disabled={busy}
+                  disabled={optionDisabled}
                   onChange={() => {
+                    if (optionDisabled) return;
                     if (
                       value === MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
                     ) {
@@ -3101,7 +3113,14 @@ export default function AuthorProductForm({
                   </span>
                 </span>
               </label>
-            ))}
+              );
+            })}
+            {!canConfigureStudioMusic ? (
+              <p className="text-sm leading-5 text-[#7d70a2]">
+                «Для прослушивания и использования авторами» доступно после
+                получения коммерческого статуса.
+              </p>
+            ) : null}
           </fieldset>
         ) : null}
 

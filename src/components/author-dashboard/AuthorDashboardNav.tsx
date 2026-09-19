@@ -166,7 +166,10 @@ export default function AuthorDashboardNav({
       href: `/author-dashboard${authorQuery}`,
       label: "Продукты",
       icon: ProductsIcon,
-      active: pathname === "/author-dashboard",
+      active:
+        pathname === "/author-dashboard" ||
+        pathname.startsWith("/author-dashboard/music") ||
+        pathname.startsWith("/author-dashboard/products"),
     },
     {
       href: `/author-dashboard/diagnostics${authorQuery}`,

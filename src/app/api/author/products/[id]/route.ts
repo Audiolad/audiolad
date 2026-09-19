@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
+  STUDIO_MUSIC_COMMERCIAL_REQUIRED,
+  STUDIO_MUSIC_COMMERCIAL_REQUIRED_MESSAGE,
+} from "@/lib/studio-music/commercial-author";
+import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
+import {
   assertAuthorCommercialWriteAllowed,
   authorizePracticeAuthorAssignment,
   handleAuthorRouteError,
@@ -641,6 +646,37 @@ export async function PATCH(request: Request, context: RouteContext) {
       "music_usage_permission" in updates
         ? (updates.music_usage_permission as string | null)
         : practice.music_usage_permission;
+
+    // NEW Studio enable (listen_only → platform_reuse_allowed) requires commercial + terms.
+    {
+      const prevPerm = practice.music_usage_permission;
+      const nextPerm = nextMusicUsagePermission;
+      const enablingStudio =
+        nextPerm === "platform_reuse_allowed" &&
+        prevPerm !== "platform_reuse_allowed";
+      const creatingPaidStudioConfig =
+        enablingStudio ||
+        (("studio_music_pricing_mode" in body ||
+          "studio_music_price" in body ||
+          "studio_music_price_minor" in body) &&
+          nextPerm === "platform_reuse_allowed" &&
+          prevPerm !== "platform_reuse_allowed");
+      if (enablingStudio || creatingPaidStudioConfig) {
+        if (!authorAccessAllowsPaidProducts(accessStatus)) {
+          return NextResponse.json(
+            {
+              error: STUDIO_MUSIC_COMMERCIAL_REQUIRED,
+              message: STUDIO_MUSIC_COMMERCIAL_REQUIRED_MESSAGE,
+            },
+            { status: 403 },
+          );
+        }
+        await assertAuthorCommercialWriteAllowed(
+          practice.author_id,
+          accessStatus,
+        );
+      }
+    }
     const studioPricingPresent =
       "studio_music_pricing_mode" in body ||
       "studio_music_price" in body ||

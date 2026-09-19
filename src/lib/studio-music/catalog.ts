@@ -36,6 +36,7 @@ import {
   resolveStudioMusicAcquisition,
   type StudioMusicPricingMode,
 } from "./pricing";
+import { isStudioSourceAuthorCommercial } from "./commercial-author";
 
 export const STUDIO_MUSIC_CATALOG_FILTERS = ["all", "mine", "free", "paid"] as const;
 export type StudioMusicCatalogFilter =
@@ -80,8 +81,12 @@ export type StudioMusicCatalogPublication = StudioMusicPublicationInput & {
   created_at?: string | null;
   subtitle?: string | null;
   authors?:
-    | { name?: string | null; slug?: string | null }
-    | { name?: string | null; slug?: string | null }[]
+    | { name?: string | null; slug?: string | null; access_status?: string | null }
+    | {
+        name?: string | null;
+        slug?: string | null;
+        access_status?: string | null;
+      }[]
     | null;
 };
 
@@ -417,11 +422,35 @@ export function isPubliclyListedStudioPublication(
  * Public Studio vitrine (all / free): published music/release with
  * platform_reuse_allowed, commercially accessible, listed only.
  */
+
+function resolveStudioCatalogAuthorAccessStatus(
+  practice: StudioMusicCatalogPublication,
+): string | null {
+  const authors = practice.authors;
+  if (!authors) return null;
+  const row = Array.isArray(authors) ? authors[0] : authors;
+  return row?.access_status ?? null;
+}
+
+function isPublicStudioInventorySourceAuthor(
+  practice: StudioMusicCatalogPublication,
+): boolean {
+  return isStudioSourceAuthorCommercial(
+    resolveStudioCatalogAuthorAccessStatus(practice),
+  );
+}
+
 export function isPublicStudioMusicInventory(
   practice: StudioMusicCatalogPublication,
-  options?: { commerciallyAccessible?: boolean },
+  options?: { commerciallyAccessible?: boolean; authorAccessStatus?: string | null },
 ): boolean {
-  if (!canAcquireStudioMusic(practice, options)) {
+  const authorAccessStatus =
+    options?.authorAccessStatus ??
+    resolveStudioCatalogAuthorAccessStatus(practice);
+  if (!canAcquireStudioMusic(practice, { ...options, authorAccessStatus })) {
+    return false;
+  }
+  if (!isStudioSourceAuthorCommercial(authorAccessStatus)) {
     return false;
   }
   if (!isPubliclyListedStudioPublication(practice)) {
@@ -1026,7 +1055,8 @@ const PRACTICE_SELECT = `
   created_at,
   authors!practices_author_id_fkey (
     name,
-    slug
+    slug,
+    access_status
   )
 `;
 
@@ -1134,7 +1164,9 @@ export function createSupabaseStudioMusicCatalogStore(
 
       return takeStudioMusicCatalogPage(
         filterPublicPracticeRows(
-          (data ?? []) as StudioMusicCatalogPublication[],
+          ((data ?? []) as StudioMusicCatalogPublication[]).filter((row) =>
+            isPublicStudioInventorySourceAuthor(row),
+          ),
         ),
         limit,
       );

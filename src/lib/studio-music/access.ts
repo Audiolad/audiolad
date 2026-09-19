@@ -2,6 +2,7 @@ import {
   MUSIC_USAGE_PERMISSION,
   PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
+import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 
 export const STUDIO_MUSIC_ORDER_KIND = "studio_music_license" as const;
 
@@ -87,7 +88,11 @@ export function hasStudioMusicEntitlement(
  */
 export function canAcquireStudioMusic(
   practice: StudioMusicPublicationInput,
-  options?: { commerciallyAccessible?: boolean },
+  options?: {
+    commerciallyAccessible?: boolean;
+    /** When set, source author must be commercial_active / commercial. */
+    authorAccessStatus?: string | null;
+  },
 ): boolean {
   if (!practice.id || practice.deleted_at) {
     return false;
@@ -109,6 +114,13 @@ export function canAcquireStudioMusic(
   }
 
   if (options?.commerciallyAccessible === false) {
+    return false;
+  }
+
+  if (
+    options?.authorAccessStatus !== undefined &&
+    !isAuthorCommercialActiveAccess(options.authorAccessStatus)
+  ) {
     return false;
   }
 
