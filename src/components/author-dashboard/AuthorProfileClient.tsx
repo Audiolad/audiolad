@@ -45,6 +45,7 @@ import {
   draftsToContactPayload,
   type AuthorContactDraft,
 } from "@/lib/authors/contacts";
+import AuthorSpaceUrlSettings from "@/components/author-dashboard/AuthorSpaceUrlSettings";
 import AuthorContactsEditor from "./AuthorContactsEditor";
 
 type PublishedProductOption = {
@@ -387,6 +388,13 @@ export default function AuthorProfileClient({
               />
             </div>
           </section>
+
+          <AuthorSpaceUrlSettings
+            authorId={selectedAuthor.id}
+            authorName={name || selectedAuthor.name}
+            currentSlug={profileSlug || selectedAuthor.slug}
+            isOwner={selectedAuthor.role === "owner"}
+          />
 
           <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
             <h2 className="text-lg font-semibold">Описание</h2>

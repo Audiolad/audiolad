@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import AuthorPageViewTracker from "@/components/analytics/AuthorPageViewTracker";
@@ -41,6 +41,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
   if (error || !data) {
+    const { resolveAuthorSlugRedirect, buildAuthorRedirectTarget } = await import(
+      "@/lib/authors/space-ops"
+    );
+    const redirected = await resolveAuthorSlugRedirect(supabase, slug);
+    if (redirected) {
+      return {
+        title: "Автор – АудиоЛад",
+        robots: { index: false, follow: true },
+        alternates: {
+          canonical: `${getAppOrigin()}${buildAuthorRedirectTarget(redirected.currentSlug)}`,
+        },
+      };
+    }
     return {
       title: "Автор – АудиоЛад",
       robots: { index: false, follow: false },
@@ -75,7 +88,7 @@ export default async function AuthorPublicPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  await searchParams;
+  const query = await searchParams;
   const supabase = await createClient();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
@@ -84,6 +97,15 @@ export default async function AuthorPublicPage({
   }
 
   if (!data) {
+    const { resolveAuthorSlugRedirect, buildAuthorRedirectTarget } = await import(
+      "@/lib/authors/space-ops"
+    );
+    const redirected = await resolveAuthorSlugRedirect(supabase, slug);
+    if (redirected) {
+      permanentRedirect(
+        buildAuthorRedirectTarget(redirected.currentSlug, query),
+      );
+    }
     notFound();
   }
 

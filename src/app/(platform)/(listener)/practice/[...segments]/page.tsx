@@ -163,6 +163,38 @@ function getAuthorName(practice: PublicPracticeRow): string | null {
   return name ? name : null;
 }
 
+
+async function resolveAuthorSlugPracticeRedirect(
+  authorSlug: string,
+  productSlug: string,
+  searchParams?: Record<string, string | string[] | undefined> | null,
+) {
+  const { createClient } = await import("@/lib/supabase/server");
+  const {
+    resolveAuthorSlugRedirect,
+    buildPracticeRedirectTarget,
+    practiceBelongsToAuthor,
+  } = await import("@/lib/authors/space-ops");
+  const supabase = await createClient();
+  const redirected = await resolveAuthorSlugRedirect(supabase, authorSlug);
+  if (!redirected) {
+    return null;
+  }
+  const belongs = await practiceBelongsToAuthor(
+    supabase,
+    redirected.authorId,
+    productSlug,
+  );
+  if (!belongs) {
+    return null;
+  }
+  return buildPracticeRedirectTarget(
+    redirected.currentSlug,
+    productSlug,
+    searchParams,
+  );
+}
+
 async function resolvePracticeRoute(segments: string[]) {
   if (segments.length === 2) {
     return {
@@ -316,6 +348,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     return <CourseLearnerFileViewerPage route={fileViewerRoute} />;
   }
 
+  const query = await searchParams;
   const {
     listen: listenParam,
     preview: previewParam,
@@ -323,7 +356,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     promo: promoParam,
     price_promo: pricePromoParam,
     promo_preview: promoPreviewParam,
-  } = await searchParams;
+  } = query;
   const promoStartToken = (promoParam ?? pricePromoParam)?.trim() || null;
   const promoPreviewId = promoPreviewParam?.trim() || null;
   const route = await resolvePracticeRoute(segments);
@@ -360,6 +393,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   }
 
   if (!practice) {
+    const redirectTo = await resolveAuthorSlugPracticeRedirect(
+      route.authorSlug,
+      route.productSlug,
+      query,
+    );
+    if (redirectTo) {
+      permanentRedirect(redirectTo);
+    }
     notFound();
   }
 
