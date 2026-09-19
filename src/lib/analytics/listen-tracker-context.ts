@@ -1,25 +1,26 @@
 /**
- * Mutable listening-context state for ListenAnalyticsTracker.
+ * Mutable *local* listening-context state for ListenAnalyticsTracker.
  * LISTENING_SESSION_GAP_MS is an *inactivity* gap (time since last playing
  * activity), not the age of the current listen since first start.
  *
- * Pending confirmed plays: a real isPlaying=true observed before analytics
- * sessionId exists is remembered and flushed when session becomes ready —
- * even if the user already paused or the program completed (H2).
+ * H2 pending confirmed plays live in pending-confirmed-plays-store (stable
+ * across GlobalPlayerEngine remount). This module only owns per-instance sticky
+ * state: playStarted, progress anchors, lastActivityAt.
  */
 
-export type PendingConfirmedPlay = {
-  practiceId: string;
-  trackId: string;
-  /** Path at the moment of confirmed playing (preserved across navigation). */
-  path: string;
-  /**
-   * Listening-context identity (usually listeningStartedAt / first confirmedAt).
-   * Distinct contexts of the same track (pause > gap) get distinct pending rows.
-   */
-  listeningContextId: number;
-  confirmedAt: number;
-};
+import {
+  getPendingConfirmedPlaysStore,
+  type PendingConfirmedPlay,
+  type PendingConfirmedPlaysStore,
+} from "@/lib/analytics/pending-confirmed-plays-store";
+
+export type { PendingConfirmedPlay } from "@/lib/analytics/pending-confirmed-plays-store";
+export {
+  createPendingConfirmedPlaysStore,
+  getPendingConfirmedPlaysStore,
+  pendingConfirmedPlayKey,
+  resetPendingConfirmedPlaysStoreForTests,
+} from "@/lib/analytics/pending-confirmed-plays-store";
 
 export type ListenTrackerContextState = {
   playStarted: boolean;
@@ -28,20 +29,7 @@ export type ListenTrackerContextState = {
   listeningSessionKey: string | null;
   /** Last moment audio was actually playing (progress tick or start emit). */
   lastActivityAt: number | null;
-  /**
-   * Confirmed plays (isPlaying=true) that happened before sessionId.
-   * Survives pause, track switches, and programCompleted until session flush.
-   */
-  pendingConfirmedPlays: Map<string, PendingConfirmedPlay>;
 };
-
-export function pendingConfirmedPlayKey(
-  practiceId: string,
-  trackId: string,
-  listeningContextId: number,
-): string {
-  return `${practiceId}:${trackId}:${listeningContextId}`;
-}
 
 export function createListenTrackerContextState(): ListenTrackerContextState {
   return {
@@ -50,13 +38,12 @@ export function createListenTrackerContextState(): ListenTrackerContextState {
     listeningStartedAt: null,
     listeningSessionKey: null,
     lastActivityAt: null,
-    pendingConfirmedPlays: new Map(),
   };
 }
 
 /**
- * Reset per-track sticky state. Pending confirmed plays are always kept —
- * a real play before session must survive programCompleted and track switches.
+ * Reset per-track sticky state for this tracker instance.
+ * Does not touch the stable pending store (H2 remount survival).
  */
 export function resetListenTrackerContextState(
   state: ListenTrackerContextState,
@@ -83,7 +70,7 @@ export function isListeningContextInactive(
 
 /**
  * If inactivity exceeded the gap, clear local sticky state so the next play is
- * a new listening context. Pending confirmed plays are preserved for H2 flush.
+ * a new listening context. Pending store entries are preserved.
  */
 export function expireListenTrackerContextIfInactive(
   state: ListenTrackerContextState,
@@ -106,9 +93,8 @@ export function noteListenTrackerPlayingActivity(
 }
 
 /**
- * Record that this practice/track actually reached confirmed playing while the
- * analytics session was not ready yet. Intent / play() promise must not call this.
- * Short pause/resume reuses the same listeningContextId; pause > gap opens a new one.
+ * Record confirmed playing into the stable pending store while session is absent.
+ * Short pause/resume reuses listeningContextId; pause > gap opens a new one.
  */
 export function notePendingConfirmedPlay(
   state: ListenTrackerContextState,
@@ -118,74 +104,47 @@ export function notePendingConfirmedPlay(
     path: string;
     now: number;
   },
+  store: PendingConfirmedPlaysStore = getPendingConfirmedPlaysStore(),
 ): PendingConfirmedPlay {
   if (!state.listeningStartedAt) {
     state.listeningStartedAt = input.now;
   }
 
-  const listeningContextId = state.listeningStartedAt;
-  const key = pendingConfirmedPlayKey(
-    input.practiceId,
-    input.trackId,
-    listeningContextId,
-  );
-  const existing = state.pendingConfirmedPlays.get(key);
-
-  if (existing) {
-    noteListenTrackerPlayingActivity(state, input.now);
-    return existing;
-  }
-
-  const entry: PendingConfirmedPlay = {
+  const entry = store.note({
     practiceId: input.practiceId,
     trackId: input.trackId,
     path: input.path,
-    listeningContextId,
-    confirmedAt: input.now,
-  };
-  state.pendingConfirmedPlays.set(key, entry);
+    listeningContextId: state.listeningStartedAt,
+    now: input.now,
+  });
   noteListenTrackerPlayingActivity(state, input.now);
   return entry;
 }
 
 export function listPendingConfirmedPlays(
-  state: ListenTrackerContextState,
+  store: PendingConfirmedPlaysStore = getPendingConfirmedPlaysStore(),
 ): PendingConfirmedPlay[] {
-  return [...state.pendingConfirmedPlays.values()].sort(
-    (a, b) => a.confirmedAt - b.confirmedAt,
-  );
+  return store.list();
 }
 
 export function clearPendingConfirmedPlay(
-  state: ListenTrackerContextState,
   entry: PendingConfirmedPlay,
+  store: PendingConfirmedPlaysStore = getPendingConfirmedPlaysStore(),
 ): void {
-  state.pendingConfirmedPlays.delete(
-    pendingConfirmedPlayKey(
-      entry.practiceId,
-      entry.trackId,
-      entry.listeningContextId,
-    ),
-  );
+  store.clear(entry);
 }
 
 export function hasPendingConfirmedPlayForTrack(
-  state: ListenTrackerContextState,
   practiceId: string,
   trackId: string,
+  store: PendingConfirmedPlaysStore = getPendingConfirmedPlaysStore(),
 ): boolean {
-  for (const entry of state.pendingConfirmedPlays.values()) {
-    if (entry.practiceId === practiceId && entry.trackId === trackId) {
-      return true;
-    }
-  }
-
-  return false;
+  return store.hasForTrack(practiceId, trackId);
 }
 
 /**
  * Decide whether a play-started emission should be attempted for the *current*
- * track after pending flush. Pending flush for other contexts is separate.
+ * track after pending flush.
  */
 export function shouldAttemptPlayStartedEmit(input: {
   trackId: string | null;

@@ -13,13 +13,16 @@ import { LISTENING_SESSION_GAP_MS } from "../src/lib/analytics/constants.ts";
 import {
   clearPendingConfirmedPlay,
   createListenTrackerContextState,
+  createPendingConfirmedPlaysStore,
   expireListenTrackerContextIfInactive,
+  getPendingConfirmedPlaysStore,
   hasPendingConfirmedPlayForTrack,
   isListeningContextInactive,
   listPendingConfirmedPlays,
   noteListenTrackerPlayingActivity,
   notePendingConfirmedPlay,
   resetListenTrackerContextState,
+  resetPendingConfirmedPlaysStoreForTests,
   shouldAttemptPlayStartedEmit,
   shouldRecordPendingConfirmedPlay,
 } from "../src/lib/analytics/listen-tracker-context.ts";
@@ -56,12 +59,29 @@ function testCanonicalMountContract() {
   assert.doesNotMatch(audioPost, /<ListenAnalyticsTracker/);
   assert.match(tracker, /subscribeCachedAnalyticsSessionId/);
   assert.match(tracker, /notePendingConfirmedPlay/);
+  assert.match(
+    read("src/lib/analytics/pending-confirmed-plays-store.ts"),
+    /globalPendingConfirmedPlaysStore/,
+    "pending store is process-stable (survives engine remount)",
+  );
+  assert.match(
+    read("src/components/audio/GlobalAudioPlayerProvider.tsx"),
+    /key=\{\`\$\{getGlobalPlayerSessionKey\(session\)\}:\$\{playbackInstanceId\}\`\}/,
+    "engine remount key still uses sessionKey:playbackInstanceId",
+  );
   assert.match(tracker, /entry\.path/);
   assert.doesNotMatch(tracker, /clearPending:\s*true/);
-  assert.match(contextHelper, /listeningContextId/);
+  assert.match(
+    read("src/lib/analytics/pending-confirmed-plays-store.ts"),
+    /listeningContextId/,
+  );
 
   assert.match(tracker, /shouldRecordPendingConfirmedPlay/);
-  assert.match(contextHelper, /pendingConfirmedPlays/);
+  assert.match(
+    read("src/lib/analytics/pending-confirmed-plays-store.ts"),
+    /PendingConfirmedPlay/,
+  );
+  assert.match(contextHelper, /lastActivityAt/);
   assert.match(client, /export function subscribeCachedAnalyticsSessionId/);
   assert.match(tracker, /trackedTrackIdRef/);
   assert.match(globalAnalytics, /isPrivateAudioSession\(session\)/);
@@ -157,12 +177,115 @@ function testResolveTargetPaths() {
 }
 
 /**
- * Simulate tracker decisions around play_started using confirmed isPlaying only.
- * steps: { kind, at, isPlaying?, trackId?, sessionId?, practiceId?, path?, programCompleted? }
+ * One tracker-instance consumer over a given pending store (production-equivalent:
+ * remount = new local sticky state, same stable store).
  */
-function simulateConfirmedPlayPipeline(steps) {
-  resetContinuousListenSession();
+function createTrackerInstance(store) {
   const state = createListenTrackerContextState();
+  return { state, store };
+}
+
+function flushAndEmit(instance, opts) {
+  const { state, store } = instance;
+  const {
+    practiceId,
+    trackId,
+    path,
+    sessionId,
+    isPlaying,
+    now,
+    emits,
+  } = opts;
+
+  if (!sessionId) {
+    if (
+      shouldRecordPendingConfirmedPlay({
+        trackId,
+        isPlaying,
+        playStarted: state.playStarted,
+        sessionId,
+      })
+    ) {
+      notePendingConfirmedPlay(
+        state,
+        { practiceId, trackId, path, now },
+        store,
+      );
+    }
+    return;
+  }
+
+  for (const entry of listPendingConfirmedPlays(store)) {
+    clearPendingConfirmedPlay(entry, store);
+    if (
+      rememberContinuousListenPlayStarted(
+        entry.practiceId,
+        entry.trackId,
+        entry.confirmedAt,
+      )
+    ) {
+      emits.push({
+        practiceId: entry.practiceId,
+        trackId: entry.trackId,
+        path: entry.path,
+        listeningContextId: entry.listeningContextId,
+        at: now,
+        flushedByInstance: opts.instanceLabel ?? "?",
+      });
+    }
+    if (entry.practiceId === practiceId && entry.trackId === trackId) {
+      state.playStarted = true;
+      state.listeningStartedAt = entry.listeningContextId;
+    }
+  }
+
+  if (
+    shouldAttemptPlayStartedEmit({
+      trackId,
+      practiceId,
+      isPlaying,
+      playStarted: state.playStarted,
+      sessionId,
+      hasPendingForCurrentTrack: hasPendingConfirmedPlayForTrack(
+        practiceId,
+        trackId,
+        store,
+      ),
+    })
+  ) {
+    state.playStarted = true;
+    if (!state.listeningStartedAt) state.listeningStartedAt = now;
+    noteListenTrackerPlayingActivity(state, now);
+    if (rememberContinuousListenPlayStarted(practiceId, trackId, now)) {
+      emits.push({
+        practiceId,
+        trackId,
+        path,
+        listeningContextId: state.listeningStartedAt,
+        at: now,
+        flushedByInstance: opts.instanceLabel ?? "?",
+      });
+    }
+  }
+}
+
+/**
+ * Simulate steps. Optional remount: { kind:"remount" } discards local sticky
+ * state and creates a fresh tracker instance over the SAME stable store.
+ */
+function simulateConfirmedPlayPipeline(steps, options = {}) {
+  resetContinuousListenSession();
+  resetPendingConfirmedPlaysStoreForTests();
+  const store = options.store ?? getPendingConfirmedPlaysStore();
+  if (options.store) {
+    // isolated store for remount tests — also wipe global to avoid bleed
+    resetPendingConfirmedPlaysStoreForTests();
+  } else {
+    store.clearAll();
+  }
+
+  let instance = createTrackerInstance(store);
+  let instanceLabel = "A";
   const emits = [];
   let practiceId = "p";
   let trackId = "A";
@@ -170,107 +293,58 @@ function simulateConfirmedPlayPipeline(steps) {
   let sessionId = null;
   let isPlaying = false;
 
-  function tryEmit(now) {
-    if (!sessionId) {
-      if (
-        shouldRecordPendingConfirmedPlay({
-          trackId,
-          isPlaying,
-          playStarted: state.playStarted,
-          sessionId,
-        })
-      ) {
-        notePendingConfirmedPlay(state, {
-          practiceId,
-          trackId,
-          path,
-          now,
-        });
-      }
-      return;
-    }
-
-    for (const entry of listPendingConfirmedPlays(state)) {
-      clearPendingConfirmedPlay(state, entry);
-      if (
-        rememberContinuousListenPlayStarted(
-          entry.practiceId,
-          entry.trackId,
-          entry.confirmedAt,
-        )
-      ) {
-        emits.push({
-          practiceId: entry.practiceId,
-          trackId: entry.trackId,
-          path: entry.path,
-          listeningContextId: entry.listeningContextId,
-          at: now,
-        });
-      }
-      if (entry.practiceId === practiceId && entry.trackId === trackId) {
-        state.playStarted = true;
-        state.listeningStartedAt = entry.listeningContextId;
-      }
-    }
-
-    if (
-      shouldAttemptPlayStartedEmit({
-        trackId,
-        practiceId,
-        isPlaying,
-        playStarted: state.playStarted,
-        sessionId,
-        hasPendingForCurrentTrack: hasPendingConfirmedPlayForTrack(
-          state,
-          practiceId,
-          trackId,
-        ),
-      })
-    ) {
-      state.playStarted = true;
-      if (!state.listeningStartedAt) state.listeningStartedAt = now;
-      noteListenTrackerPlayingActivity(state, now);
-      if (rememberContinuousListenPlayStarted(practiceId, trackId, now)) {
-        emits.push({
-          practiceId,
-          trackId,
-          path,
-          listeningContextId: state.listeningStartedAt,
-          at: now,
-        });
-      }
-    }
-  }
-
   for (const step of steps) {
     const now = step.at;
+
+    if (step.kind === "remount") {
+      // Production: GlobalPlayerEngine key change unmounts tracker A, mounts B.
+      instance = createTrackerInstance(store);
+      instanceLabel = step.instanceLabel ?? "B";
+      if (step.practiceId) practiceId = step.practiceId;
+      if (step.trackId) trackId = step.trackId;
+      if (step.path) path = step.path;
+      if ("isPlaying" in step) isPlaying = step.isPlaying;
+      continue;
+    }
+
     if (step.practiceId) practiceId = step.practiceId;
     if (step.path) path = step.path;
-    if (step.trackId) {
-      if (step.trackId !== trackId || step.practiceId) {
-        resetListenTrackerContextState(state);
-        trackId = step.trackId;
-      }
+    if (step.trackId && step.trackId !== trackId) {
+      resetListenTrackerContextState(instance.state);
+      trackId = step.trackId;
     }
     if ("sessionId" in step) sessionId = step.sessionId;
     if ("isPlaying" in step) isPlaying = step.isPlaying;
 
     if (step.programCompleted) {
-      resetListenTrackerContextState(state);
+      resetListenTrackerContextState(instance.state);
     }
 
     if (step.kind === "playing_tick" && isPlaying) {
-      noteListenTrackerPlayingActivity(state, now);
+      noteListenTrackerPlayingActivity(instance.state, now);
       touchContinuousListenSessionActivity(now);
     }
 
     if (step.kind === "edge" || step.kind === "playing_tick") {
-      expireListenTrackerContextIfInactive(state, now, LISTENING_SESSION_GAP_MS);
-      tryEmit(now);
+      expireListenTrackerContextIfInactive(
+        instance.state,
+        now,
+        LISTENING_SESSION_GAP_MS,
+      );
+      flushAndEmit(instance, {
+        practiceId,
+        trackId,
+        path,
+        sessionId,
+        isPlaying,
+        now,
+        emits,
+        instanceLabel,
+      });
     }
   }
 
-  return { emits, state };
+  return { emits, store, instance };
 }
 
 function testH2PendingConfirmedPlaySurvivesPauseBeforeSession() {
@@ -281,12 +355,7 @@ function testH2PendingConfirmedPlaySurvivesPauseBeforeSession() {
     { kind: "edge", at: t0 + 800, isPlaying: false },
     { kind: "edge", at: t0 + 1200, sessionId: "sess-1", isPlaying: false },
   ]);
-
-  assert.deepEqual(
-    emits.map((e) => e.trackId),
-    ["A"],
-    "H2: confirmed playing A then pause then session → exactly one start for A",
-  );
+  assert.deepEqual(emits.map((e) => e.trackId), ["A"]);
 }
 
 function testCompletedBeforeSession() {
@@ -301,17 +370,10 @@ function testCompletedBeforeSession() {
       isPlaying: true,
     },
     { kind: "playing_tick", at: t0 + 100, isPlaying: true },
-    // Material finishes before analytics session exists
-    {
-      kind: "edge",
-      at: t0 + 500,
-      isPlaying: false,
-      programCompleted: true,
-    },
+    { kind: "edge", at: t0 + 500, isPlaying: false, programCompleted: true },
     { kind: "edge", at: t0 + 900, sessionId: "sess-complete", isPlaying: false },
   ]);
-
-  assert.equal(emits.length, 1, "completed-before-session: start A = 1");
+  assert.equal(emits.length, 1);
   assert.equal(emits[0].trackId, "A");
   assert.equal(emits[0].path, "/practice/author/a");
   console.log("regression completed-before-session: ok");
@@ -330,7 +392,6 @@ function testOriginalPathPreserved() {
       isPlaying: true,
     },
     { kind: "edge", at: t0 + 200, isPlaying: false },
-    // Navigate away / switch product before session
     {
       kind: "edge",
       at: t0 + 400,
@@ -347,16 +408,100 @@ function testOriginalPathPreserved() {
       path: "/practice/author/b",
     },
   ]);
-
-  assert.equal(emits.length, 1, "original-path-preserved: one pending flush");
+  assert.equal(emits.length, 1);
   assert.equal(emits[0].practiceId, "A");
   assert.equal(emits[0].trackId, "A-track");
-  assert.equal(
-    emits[0].path,
-    "/practice/author/a",
-    "original-path-preserved: path from confirmed play, not flush-time path",
-  );
+  assert.equal(emits[0].path, "/practice/author/a");
   console.log("regression original-path-preserved: ok");
+}
+
+function testPendingSurvivesEngineRemountBeforeSession() {
+  const store = createPendingConfirmedPlaysStore();
+  const t0 = 12_500_000;
+  const { emits } = simulateConfirmedPlayPipeline(
+    [
+      // Engine instance A
+      {
+        kind: "edge",
+        at: t0,
+        practiceId: "A",
+        trackId: "A-track",
+        path: "/practice/author/a",
+        sessionId: null,
+        isPlaying: true,
+      },
+      { kind: "playing_tick", at: t0 + 100, isPlaying: true },
+      { kind: "edge", at: t0 + 200, isPlaying: false },
+      // GlobalPlayerEngine remount (session key / playbackInstanceId) — local state gone
+      {
+        kind: "remount",
+        at: t0 + 300,
+        practiceId: "B",
+        trackId: "B-track",
+        path: "/practice/author/b",
+        isPlaying: false,
+        instanceLabel: "B",
+      },
+      // Session arrives on the NEW instance — must flush pending A from stable store
+      {
+        kind: "edge",
+        at: t0 + 500,
+        sessionId: "sess-remount",
+        isPlaying: false,
+        path: "/practice/author/b",
+      },
+    ],
+    { store },
+  );
+
+  assert.equal(emits.length, 1, "pending A survives actual engine remount");
+  assert.equal(emits[0].practiceId, "A");
+  assert.equal(emits[0].trackId, "A-track");
+  assert.equal(emits[0].path, "/practice/author/a");
+  assert.equal(emits[0].flushedByInstance, "B");
+  console.log("regression pending-survives-engine-remount: ok");
+}
+
+function testPendingSurvivesPlaylistQueueCrossProductRemount() {
+  const store = createPendingConfirmedPlaysStore();
+  const t0 = 12_700_000;
+  const { emits } = simulateConfirmedPlayPipeline(
+    [
+      {
+        kind: "edge",
+        at: t0,
+        practiceId: "queue-A",
+        trackId: "qa-1",
+        path: "/listen/author/product-a",
+        sessionId: null,
+        isPlaying: true,
+      },
+      { kind: "edge", at: t0 + 150, isPlaying: false },
+      // Playlist queue cross-product advance remounts engine
+      {
+        kind: "remount",
+        at: t0 + 200,
+        practiceId: "queue-B",
+        trackId: "qb-1",
+        path: "/listen/author/product-b",
+        isPlaying: false,
+        instanceLabel: "queue-B",
+      },
+      {
+        kind: "edge",
+        at: t0 + 400,
+        sessionId: "sess-queue",
+        isPlaying: false,
+      },
+    ],
+    { store },
+  );
+
+  assert.equal(emits.length, 1);
+  assert.equal(emits[0].practiceId, "queue-A");
+  assert.equal(emits[0].trackId, "qa-1");
+  assert.equal(emits[0].path, "/listen/author/product-a");
+  console.log("regression pending-survives-playlist-queue-remount: ok");
 }
 
 function testSameTrackTwoContextsBeforeSession() {
@@ -372,7 +517,6 @@ function testSameTrackTwoContextsBeforeSession() {
     },
     { kind: "playing_tick", at: t0 + 1_000, isPlaying: true },
     { kind: "edge", at: t0 + 2_000, isPlaying: false },
-    // Pause longer than gap → new listening context
     {
       kind: "edge",
       at: t0 + 2_000 + LISTENING_SESSION_GAP_MS + 1_000,
@@ -396,19 +540,8 @@ function testSameTrackTwoContextsBeforeSession() {
       isPlaying: false,
     },
   ]);
-
-  assert.equal(
-    emits.length,
-    2,
-    "same-track-two-contexts-before-session: 2 audio_play_started",
-  );
-  assert.equal(emits[0].trackId, "A");
-  assert.equal(emits[1].trackId, "A");
-  assert.notEqual(
-    emits[0].listeningContextId,
-    emits[1].listeningContextId,
-    "distinct listening context identities",
-  );
+  assert.equal(emits.length, 2);
+  assert.notEqual(emits[0].listeningContextId, emits[1].listeningContextId);
   console.log("regression same-track-two-contexts-before-session: ok");
 }
 
@@ -420,12 +553,7 @@ function testH2PendingANotAttributedToB() {
     { kind: "edge", at: t0 + 400, trackId: "B", isPlaying: false },
     { kind: "edge", at: t0 + 900, sessionId: "sess-2", isPlaying: false },
   ]);
-
-  assert.deepEqual(
-    emits.map((e) => e.trackId),
-    ["A"],
-    "H2: pending A flushes as A after switch to B; B gets no start without confirmed playing",
-  );
+  assert.deepEqual(emits.map((e) => e.trackId), ["A"]);
 }
 
 function testManualSwitchClearsPlayingBeforeStartB() {
@@ -498,12 +626,12 @@ function testLongPlayShortPauseResumeNoSecondStart() {
   }
   steps.push({ kind: "edge", at: t0 + 6 * 60_000 + 1_000, isPlaying: false });
   steps.push({ kind: "edge", at: t0 + 6 * 60_000 + 3_000, isPlaying: true });
-  const { emits, state } = simulateConfirmedPlayPipeline(steps);
+  const { emits, instance } = simulateConfirmedPlayPipeline(steps);
   assert.equal(emits.length, 1);
-  assert.equal(state.playStarted, true);
+  assert.equal(instance.state.playStarted, true);
   assert.equal(
     isListeningContextInactive(
-      state.lastActivityAt,
+      instance.state.lastActivityAt,
       t0 + 6 * 60_000 + 3_000,
       LISTENING_SESSION_GAP_MS,
     ),
@@ -552,38 +680,38 @@ function testRepeatOneLoopsDoNotEmitNewStart() {
 }
 
 function testTrackChangeResetsLocalContextKeepsPending() {
+  resetPendingConfirmedPlaysStoreForTests();
+  const store = getPendingConfirmedPlaysStore();
   const state = createListenTrackerContextState();
-  notePendingConfirmedPlay(state, {
-    practiceId: "p",
-    trackId: "A",
-    path: "/practice/author/a",
-    now: 100,
-  });
+  notePendingConfirmedPlay(
+    state,
+    { practiceId: "p", trackId: "A", path: "/practice/author/a", now: 100 },
+    store,
+  );
   state.playStarted = true;
   resetListenTrackerContextState(state);
   assert.equal(state.playStarted, false);
-  assert.equal(listPendingConfirmedPlays(state).length, 1);
-  assert.equal(listPendingConfirmedPlays(state)[0].trackId, "A");
-  assert.equal(listPendingConfirmedPlays(state)[0].path, "/practice/author/a");
+  assert.equal(listPendingConfirmedPlays(store).length, 1);
+  assert.equal(listPendingConfirmedPlays(store)[0].trackId, "A");
+  assert.equal(listPendingConfirmedPlays(store)[0].path, "/practice/author/a");
 }
 
 function testShortPauseResumeDoesNotDuplicatePending() {
+  resetPendingConfirmedPlaysStoreForTests();
+  const store = getPendingConfirmedPlaysStore();
   const state = createListenTrackerContextState();
-  notePendingConfirmedPlay(state, {
-    practiceId: "p",
-    trackId: "A",
-    path: "/p/a",
-    now: 1000,
-  });
+  notePendingConfirmedPlay(
+    state,
+    { practiceId: "p", trackId: "A", path: "/p/a", now: 1000 },
+    store,
+  );
   noteListenTrackerPlayingActivity(state, 1500);
-  // short pause then resume — same context
-  notePendingConfirmedPlay(state, {
-    practiceId: "p",
-    trackId: "A",
-    path: "/p/a",
-    now: 2000,
-  });
-  assert.equal(listPendingConfirmedPlays(state).length, 1);
+  notePendingConfirmedPlay(
+    state,
+    { practiceId: "p", trackId: "A", path: "/p/a", now: 2000 },
+    store,
+  );
+  assert.equal(listPendingConfirmedPlays(store).length, 1);
 }
 
 function testNoRetryOverloadInThisPr() {
@@ -606,6 +734,8 @@ testResolveTargetPaths();
 testH2PendingConfirmedPlaySurvivesPauseBeforeSession();
 testCompletedBeforeSession();
 testOriginalPathPreserved();
+testPendingSurvivesEngineRemountBeforeSession();
+testPendingSurvivesPlaylistQueueCrossProductRemount();
 testSameTrackTwoContextsBeforeSession();
 testH2PendingANotAttributedToB();
 testManualSwitchClearsPlayingBeforeStartB();

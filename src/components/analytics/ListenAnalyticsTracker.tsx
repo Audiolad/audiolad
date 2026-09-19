@@ -85,7 +85,8 @@ function emitPlayStarted(input: {
  * Canonical playback analytics emitter for GlobalAudioPlayer.
  * audio_play_started follows confirmed player isPlaying (HTMLMediaElement
  * `playing` / valid adopted-playing), never play() intent alone.
- * H2: confirmed play before sessionId is pending-flushed when session arrives,
+ * H2: confirmed play before sessionId is stored in the process-stable pending
+ * store (survives GlobalPlayerEngine remount) and flushed when session arrives,
  * preserving original path and distinct listening contexts; survives programCompleted.
  */
 export default function ListenAnalyticsTracker({
@@ -183,7 +184,7 @@ export default function ListenAnalyticsTracker({
     }
 
     // Flush every pending confirmed play (prior path + distinct contexts).
-    const pending = listPendingConfirmedPlays(context);
+    const pending = listPendingConfirmedPlays();
 
     for (const entry of pending) {
       flushPendingEntry({
@@ -204,7 +205,6 @@ export default function ListenAnalyticsTracker({
         playStarted: context.playStarted,
         sessionId,
         hasPendingForCurrentTrack: hasPendingConfirmedPlayForTrack(
-          context,
           practiceId,
           trackId ?? "",
         ),
@@ -377,7 +377,7 @@ function flushPendingEntry(input: {
   const { context, entry, sessionId, currentPracticeId, currentTrackId, now } =
     input;
 
-  clearPendingConfirmedPlay(context, entry);
+  clearPendingConfirmedPlay(entry);
 
   const listeningKey = buildListeningSessionKey({
     practiceId: entry.practiceId,
