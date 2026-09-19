@@ -160,22 +160,28 @@ assert.doesNotThrow(() =>
 
 // 4. Source guards — UI / API / RPC
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
-assert.match(form, /Отправить на модерацию/);
-assert.match(form, /Повторно отправить на модерацию/);
-assert.match(form, /Отозвать с модерации/);
+const formActions = read(
+  "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
+);
+assert.match(form, /AuthorProductFormActions/);
+assert.match(formActions, /Отправить на модерацию/);
+assert.match(formActions, /Повторно отправить на модерацию/);
+assert.match(formActions, /Отозвать с модерации/);
 assert.match(form, /submit-for-moderation/);
 assert.match(form, /withdraw-from-moderation/);
 assert.doesNotMatch(form, /Переместить в архив/);
 assert.doesNotMatch(form, /Вернуть из архива/);
 assert.doesNotMatch(form, /В архиве/);
 assert.doesNotMatch(form, /archiveProduct/);
+assert.doesNotMatch(formActions, /Переместить в архив/);
+assert.doesNotMatch(formActions, /archiveProduct/);
 assert.match(form, /canBypassProductModeration/);
-assert.match(form, /Опубликовать/);
+assert.match(formActions, /Опубликовать/);
 assert.match(form, /requestScrollToFirstSubmitIssue/);
 assert.match(form, /data-submit-issue=\{topicError \? "" : undefined\}/);
 assert.match(form, /error=\{topicError\}/);
 assert.match(
-  form,
+  formActions,
   /Отправить на модерацию[\s\S]*error &&[\s\S]*data-submit-issue/,
 );
 assert.match(

@@ -254,55 +254,79 @@ function testSaveBeforePublishHelper() {
 
 function testFormCtaWiring() {
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
+  const actions = read(
+    "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
+  );
+
+  assert.match(
+    form,
+    /AuthorProductFormActions/,
+    "form wires extracted actions section",
+  );
+  assert.match(
+    form,
+    /onOpenPublishPreview=\{\(\) => void openPublishPreviewTab\(\)\}/,
+    "form still routes preview CTA to openPublishPreviewTab",
+  );
+  assert.match(
+    form,
+    /onPublish=\{\(\) => void publishProduct\(\)\}/,
+    "form still routes publish CTA to publishProduct",
+  );
+  assert.match(
+    form,
+    /onSubmitForModeration=\{\(\) => void submitForModeration\(\)\}/,
+    "form still routes moderation CTA to submitForModeration",
+  );
 
   const bypassBlock = extractBlock(
-    form,
+    actions,
     "{isDraft && canBypassProductModeration ? (",
     "{isDraft && !canBypassProductModeration ? (",
   );
   assert.match(
     bypassBlock,
-    /onClick=\{\(\) => void openPublishPreviewTab\(\)\}/,
+    /onClick=\{\(\) => void onOpenPublishPreview\(\)\}/,
     "Preview button opens preview navigation",
   );
   assert.match(
     bypassBlock,
-    /onClick=\{\(\) => void publishProduct\(\)\}/,
+    /onClick=\{\(\) => void onPublish\(\)\}/,
     "bypass Publish button calls publishProduct",
   );
   assert.match(bypassBlock, /\{publishing \? "Публикуем…" : "Опубликовать"\}/);
   assert.match(bypassBlock, /disabled=\{busy \|\| publishing \|\| !canMutateContent\}/);
   assert.doesNotMatch(
     bypassBlock,
-    /submitForModeration/,
+    /submitForModeration|onSubmitForModeration/,
     "bypass draft CTA does not submit for moderation",
   );
 
   const ordinaryBlock = extractBlock(
-    form,
+    actions,
     "{isDraft && !canBypassProductModeration ? (",
     "{needsChanges ? (",
   );
   assert.match(
     ordinaryBlock,
-    /onClick=\{\(\) => void submitForModeration\(\)\}/,
+    /onClick=\{\(\) => void onSubmitForModeration\(\)\}/,
     "ordinary author uses submit-for-moderation",
   );
   assert.match(ordinaryBlock, /Отправить на модерацию/);
   assert.doesNotMatch(
     ordinaryBlock,
-    /void publishProduct\(\)/,
+    /void onPublish\(\)|void publishProduct\(\)/,
     "ordinary draft does not call publishProduct",
   );
   assert.match(
     ordinaryBlock,
-    /onClick=\{\(\) => void openPublishPreviewTab\(\)\}/,
+    /onClick=\{\(\) => void onOpenPublishPreview\(\)\}/,
     "ordinary Preview still opens preview",
   );
 
-  assert.match(form, /isPublished \? \(/);
+  assert.match(actions, /isPublished \? \(/);
   const publishedBlock = extractBlock(
-    form,
+    actions,
     "{isPublished ? (",
     "{isUnpublished ? (",
   );
@@ -311,10 +335,10 @@ function testFormCtaWiring() {
     /Опубликовать/,
     "published product has no first-publish button",
   );
-  assert.doesNotMatch(publishedBlock, /void publishProduct\(\)/);
+  assert.doesNotMatch(publishedBlock, /void onPublish\(\)|void publishProduct\(\)/);
 
   const unpublishedBlock = extractBlock(
-    form,
+    actions,
     "{isUnpublished ? (",
     "{isDraft && canBypassProductModeration ? (",
   );
@@ -325,17 +349,17 @@ function testFormCtaWiring() {
   );
   assert.match(
     unpublishedBlock,
-    /onClick=\{\(\) => void publishProduct\(\)\}/,
+    /onClick=\{\(\) => void onPublish\(\)\}/,
     "«Опубликовать снова» calls publishProduct, not saveProduct",
   );
   assert.doesNotMatch(
     unpublishedBlock,
-    /void saveProduct\(\)/,
+    /void saveProduct\(\)|void onSaveDraft\(\)/,
     "republish CTA does not depend on an extra save click",
   );
   assert.doesNotMatch(
     unpublishedBlock,
-    /submitForModeration/,
+    /submitForModeration|onSubmitForModeration/,
     "plain republish does not re-submit moderation",
   );
   assert.doesNotMatch(
