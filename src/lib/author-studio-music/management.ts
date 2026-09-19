@@ -25,6 +25,49 @@ export const STUDIO_MUSIC_MANAGEMENT_ERROR = {
   FORBIDDEN: "forbidden",
 } as const;
 
+
+
+/** Initial fixed-price draft for management UI; null means do not show as current fixed. */
+export function initialStudioFixedPriceDraft(item: {
+  studioPricingMode: StudioMusicPricingMode | null;
+  studioPriceRubles: number | null;
+  grandfatheredFree?: boolean;
+}): number | null {
+  if (item.grandfatheredFree) return null;
+  if (item.studioPricingMode === STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER) {
+    return null;
+  }
+  if (item.studioPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED) {
+    return item.studioPriceRubles ?? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES;
+  }
+  return null;
+}
+
+export function studioMusicConfigurationChanged(input: {
+  oldPermission: string | null | undefined;
+  nextPermission: string | null | undefined;
+  oldMode: string | null | undefined;
+  nextMode: string | null | undefined;
+  oldMinor: number | null | undefined;
+  nextMinor: number | null | undefined;
+}): boolean {
+  const oldPerm = input.oldPermission ?? null;
+  const nextPerm = input.nextPermission ?? null;
+  const oldMode = input.oldMode ?? null;
+  const nextMode = input.nextMode ?? null;
+  const oldMinor =
+    input.oldMinor == null || !Number.isFinite(input.oldMinor)
+      ? null
+      : Number(input.oldMinor);
+  const nextMinor =
+    input.nextMinor == null || !Number.isFinite(input.nextMinor)
+      ? null
+      : Number(input.nextMinor);
+  return (
+    oldPerm !== nextPerm || oldMode !== nextMode || oldMinor !== nextMinor
+  );
+}
+
 export type AuthorStudioMusicListItem = {
   practiceId: string;
   title: string;

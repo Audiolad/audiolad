@@ -297,8 +297,76 @@ assert.equal(
   isMineStudioMusicPublication({
     practice: publication({ music_usage_permission: "listen_only" }),
     isAuthorMember: true,
+    authorAccessStatus: "commercial_active",
   }),
   true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "commercial" },
+    }),
+    isAuthorMember: true,
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "free" },
+    }),
+    entitlement: { practice_id: listedAllowed.id, revoked_at: null, grant_source: "purchase" },
+    isAuthorMember: false,
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_suspended",
+      },
+    }),
+    entitlement: { practice_id: listedAllowed.id, revoked_at: null, grant_source: "free" },
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "free" },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_pending",
+      },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_onboarding",
+      },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
 );
 assert.equal(
   isMineStudioMusicPublication({

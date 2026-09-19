@@ -17,8 +17,11 @@ import {
 } from "@/lib/author-products/types";
 import { getVisibleAuthorProductStatus } from "@/lib/author-products/moderation";
 import type { AuthorStudioMusicListItem } from "@/lib/author-studio-music/management";
-import { DEFAULT_STUDIO_MUSIC_FIXED_RUBLES } from "@/lib/studio-music/pricing";
-import { STUDIO_NEW_FREE_POLICY_COPY } from "@/lib/studio-music/new-free-policy";
+import { initialStudioFixedPriceDraft } from "@/lib/author-studio-music/management";
+import {
+  DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+  STUDIO_MUSIC_PRICING_MODE,
+} from "@/lib/studio-music/pricing";
 
 type Tab = "library" | "studio";
 type StudioFilter = "all" | "in" | "out";
@@ -46,6 +49,7 @@ export default function AuthorMusicClient({
   const [rowMessage, setRowMessage] = useState<Record<string, string>>({});
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [editingPriceIds, setEditingPriceIds] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     if (!selectedAuthor) return;
@@ -72,12 +76,16 @@ export default function AuthorMusicClient({
       setInStudioCount(payload.inStudioCount ?? 0);
       setNotInStudioCount(payload.notInStudioCount ?? 0);
       const drafts: Record<string, string> = {};
+      const editing: Record<string, boolean> = {};
       for (const item of list) {
-        drafts[item.practiceId] = String(
-          item.studioPriceRubles ?? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
-        );
+        const fixed = initialStudioFixedPriceDraft(item);
+        if (fixed != null) {
+          drafts[item.practiceId] = String(fixed);
+        }
+        editing[item.practiceId] = false;
       }
       setPriceDrafts(drafts);
+      setEditingPriceIds(editing);
     } catch {
       setError("Не удалось загрузить музыку.");
       setItems([]);
@@ -167,6 +175,15 @@ export default function AuthorMusicClient({
         ...c,
         [item.practiceId]: "Настройки Студии сохранены",
       }));
+      setEditingPriceIds((c) => ({ ...c, [item.practiceId]: false }));
+      if (payload.item?.studioPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED) {
+        setPriceDrafts((c) => ({
+          ...c,
+          [item.practiceId]: String(
+            payload.item!.studioPriceRubles ?? DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+          ),
+        }));
+      }
     } catch (err) {
       setRowError((c) => ({
         ...c,
@@ -295,6 +312,7 @@ export default function AuthorMusicClient({
                 authorSlug={selectedAuthor.slug}
                 canManage={canManageStudio}
                 saving={savingId === item.practiceId}
+                editingPrice={editingPriceIds[item.practiceId] === true}
                 priceDraft={
                   priceDrafts[item.practiceId] ??
                   String(DEFAULT_STUDIO_MUSIC_FIXED_RUBLES)
@@ -302,6 +320,21 @@ export default function AuthorMusicClient({
                 onPriceDraft={(value) =>
                   setPriceDrafts((c) => ({ ...c, [item.practiceId]: value }))
                 }
+                onStartEditPrice={() => {
+                  setEditingPriceIds((c) => ({
+                    ...c,
+                    [item.practiceId]: true,
+                  }));
+                  setPriceDrafts((c) => ({
+                    ...c,
+                    [item.practiceId]:
+                      c[item.practiceId] ??
+                      String(
+                        item.studioPriceRubles ??
+                          DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
+                      ),
+                  }));
+                }}
                 message={rowMessage[item.practiceId]}
                 error={rowError[item.practiceId]}
                 onToggle={(enabled) => {
@@ -390,8 +423,10 @@ function MusicStudioCard({
   authorSlug,
   canManage,
   saving,
+  editingPrice,
   priceDraft,
   onPriceDraft,
+  onStartEditPrice,
   onToggle,
   onSavePrice,
   message,
@@ -401,8 +436,10 @@ function MusicStudioCard({
   authorSlug: string;
   canManage: boolean;
   saving: boolean;
+  editingPrice: boolean;
   priceDraft: string;
   onPriceDraft: (value: string) => void;
+  onStartEditPrice: () => void;
   onToggle: (enabled: boolean) => void;
   onSavePrice: () => void;
   message?: string;
@@ -410,6 +447,16 @@ function MusicStudioCard({
 }) {
   const toggleDisabled =
     !canManage || saving || (!item.published && !item.inStudio);
+  const isAuto =
+    item.studioPricingMode === STUDIO_MUSIC_PRICING_MODE.AUTO_2X_LISTENER;
+  const isFixed =
+    item.studioPricingMode === STUDIO_MUSIC_PRICING_MODE.FIXED;
+  const isGrandfatheredFree = item.grandfatheredFree === true;
+  const showFixedEditor =
+    canManage &&
+    (item.inStudio || item.published) &&
+    (isFixed || editingPrice);
+
   return (
     <article className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -451,13 +498,44 @@ function MusicStudioCard({
             <p className="text-xs text-[#7d70a2]">Сначала опубликуйте продукт.</p>
           ) : null}
 
-          {item.grandfatheredFree ? (
-            <p className="text-sm text-[#7d70a2]">
-              {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredKept}
-            </p>
+          {item.inStudio && isGrandfatheredFree && !editingPrice ? (
+            <div className="space-y-2">
+              <p className="text-sm text-[#7d70a2]">
+                Бесплатно — сохранено ранее
+              </p>
+              {canManage ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={onStartEditPrice}
+                  className="rounded-[14px] border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-medium text-[#5b3e91] disabled:opacity-60"
+                >
+                  Сделать лицензию платной
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
-          {canManage && (item.inStudio || item.published) ? (
+          {item.inStudio && isAuto && !editingPrice ? (
+            <div className="space-y-2">
+              <p className="text-sm text-[#7d70a2]">
+                Автоматическая цена — в 2 раза выше цены прослушивания, минимум{" "}
+                {DEFAULT_STUDIO_MUSIC_FIXED_RUBLES} ₽
+              </p>
+              {canManage ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={onStartEditPrice}
+                  className="rounded-[14px] border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-medium text-[#5b3e91] disabled:opacity-60"
+                >
+                  Установить свою цену
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showFixedEditor ? (
             <div className="flex flex-wrap items-end gap-3">
               <label className="block text-sm">
                 <span className="mb-1 block text-[#7d70a2]">Цена лицензии, ₽</span>
@@ -471,17 +549,29 @@ function MusicStudioCard({
                   className="w-28 rounded-[14px] border border-[#e4d7f4] px-3 py-2 outline-none focus:border-[#9a74d8]"
                 />
               </label>
-              {item.inStudio ? (
+              {item.inStudio || editingPrice ? (
                 <button
                   type="button"
                   disabled={saving}
                   onClick={onSavePrice}
                   className="rounded-[14px] bg-[#5b3e91] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                 >
-                  Сохранить цену
+                  {isGrandfatheredFree || isAuto
+                    ? "Сохранить платную лицензию"
+                    : "Сохранить цену"}
                 </button>
               ) : null}
             </div>
+          ) : null}
+
+          {canManage &&
+          !item.inStudio &&
+          item.published &&
+          !editingPrice ? (
+            <p className="text-xs text-[#7d70a2]">
+              При включении в Студию лицензия будет платной от{" "}
+              {DEFAULT_STUDIO_MUSIC_FIXED_RUBLES} ₽.
+            </p>
           ) : null}
 
           {message ? (

@@ -3144,6 +3144,15 @@ export default function AuthorProductForm({
                 {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredExplain}
               </p>
             ) : null}
+            {!canConfigureStudioMusic &&
+            form.musicUsagePermission ===
+              MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED ? (
+              <p className="text-sm leading-5 text-[#7d70a2]">
+                Настройки лицензии для Студии доступны только при коммерческом
+                статусе. Текущие значения сохранены и показаны только для
+                просмотра.
+              </p>
+            ) : null}
             {(
               [
                 {
@@ -3181,8 +3190,13 @@ export default function AuthorProductForm({
                     name="studio_music_pricing_mode"
                     className="mt-1"
                     checked={form.studioMusicPricingMode === option.value}
-                    disabled={busy || !canEditPublicFields}
+                    disabled={
+                      busy ||
+                      !canEditPublicFields ||
+                      !canConfigureStudioMusic
+                    }
                     onChange={() => {
+                      if (!canConfigureStudioMusic) return;
                       const shouldSetDefaultPrice =
                         option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
                         !validateStudioMusicPaidPriceInputDraft(studioMusicPriceDraft).ok;
@@ -3223,8 +3237,13 @@ export default function AuthorProductForm({
                   max={MAX_PAID_PRICE_RUB}
                   step={1}
                   value={studioMusicPriceDraft}
-                  disabled={busy || !canEditPublicFields}
+                  disabled={
+                    busy ||
+                    !canEditPublicFields ||
+                    !canConfigureStudioMusic
+                  }
                   onChange={(event) => {
+                    if (!canConfigureStudioMusic) return;
                     const draft = event.target.value;
                     const rubles = parsePriceInputDraft(draft);
 

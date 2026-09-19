@@ -69,6 +69,8 @@ psql(`DROP DATABASE IF EXISTS ${dbName};`);
 psql(`CREATE DATABASE ${dbName};`);
 psql(
   `
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE public.authors (
   id uuid PRIMARY KEY,
   access_status text NOT NULL
@@ -110,16 +112,86 @@ AS $$
   SELECT true;
 $$;
 
--- Entitlement use path: always true for smoke user (existing grant preserved).
-CREATE OR REPLACE FUNCTION public.can_use_music_in_studio(
-  p_practice_id uuid,
-  p_user_id uuid
+CREATE TABLE public.studio_music_entitlements (
+  user_id uuid NOT NULL,
+  practice_id uuid NOT NULL REFERENCES public.practices(id),
+  grant_source text,
+  revoked_at timestamptz,
+  PRIMARY KEY (user_id, practice_id)
+);
+
+CREATE OR REPLACE FUNCTION public.has_studio_music_entitlement(
+  p_user_id uuid,
+  p_practice_id uuid
 )
 RETURNS boolean
 LANGUAGE sql
-IMMUTABLE
+STABLE
 AS $$
-  SELECT true;
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.studio_music_entitlements e
+    WHERE e.user_id = p_user_id
+      AND e.practice_id = p_practice_id
+      AND e.revoked_at IS NULL
+  );
+$$;
+
+-- Production signature: (user_id, practice_id)
+CREATE OR REPLACE FUNCTION public.can_use_music_in_studio(
+  p_user_id uuid,
+  p_practice_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT public.has_studio_music_entitlement(p_user_id, p_practice_id);
+$$;
+
+-- Minimal acquire stubs that call canonical can_acquire gate (same as production).
+CREATE OR REPLACE FUNCTION public.create_studio_music_order(
+  p_practice_id uuid,
+  p_idempotency_key uuid,
+  p_expected_amount_minor bigint
+)
+RETURNS TABLE(order_id uuid)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_practice public.practices;
+  v_user_id uuid := 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+BEGIN
+  SELECT * INTO v_practice FROM public.practices WHERE id = p_practice_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'practice_not_found';
+  END IF;
+  IF NOT public.can_acquire_studio_music(v_practice, v_user_id) THEN
+    RAISE EXCEPTION 'studio_music_not_acquirable';
+  END IF;
+  RETURN QUERY SELECT gen_random_uuid();
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.acquire_free_studio_music(
+  p_practice_id uuid
+)
+RETURNS TABLE(entitlement_id uuid)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_practice public.practices;
+  v_user_id uuid := 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+BEGIN
+  SELECT * INTO v_practice FROM public.practices WHERE id = p_practice_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'practice_not_found';
+  END IF;
+  IF NOT public.can_acquire_studio_music(v_practice, v_user_id) THEN
+    RAISE EXCEPTION 'studio_music_not_acquirable';
+  END IF;
+  RETURN QUERY SELECT gen_random_uuid();
+END;
 $$;
 `,
   dbName,

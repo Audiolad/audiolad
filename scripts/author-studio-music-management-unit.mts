@@ -8,6 +8,8 @@ import {
   buildStudioDisableFields,
   buildStudioEnableFields,
   isStudioParticipationEnabled,
+  studioMusicConfigurationChanged,
+  initialStudioFixedPriceDraft,
 } from "../src/lib/author-studio-music/management";
 import { canAcquireStudioMusic } from "../src/lib/studio-music/access";
 import { isStudioSourceAuthorCommercial } from "../src/lib/studio-music/commercial-author";
@@ -125,3 +127,83 @@ assert.match(mig, /commercial_active/);
 assert.doesNotMatch(mig, /UPDATE\s+public\.practices/i);
 
 console.log("author-studio-music-management-unit: ok");
+
+
+assert.equal(
+  studioMusicConfigurationChanged({
+    oldPermission: "platform_reuse_allowed",
+    nextPermission: "platform_reuse_allowed",
+    oldMode: "fixed",
+    nextMode: "fixed",
+    oldMinor: 49900,
+    nextMinor: 49900,
+  }),
+  false,
+  "identical studio re-save",
+);
+
+assert.equal(
+  studioMusicConfigurationChanged({
+    oldPermission: "platform_reuse_allowed",
+    nextPermission: "platform_reuse_allowed",
+    oldMode: "fixed",
+    nextMode: "auto_2x_listener",
+    oldMinor: 49900,
+    nextMinor: null,
+  }),
+  true,
+  "mode change",
+);
+
+assert.equal(
+  studioMusicConfigurationChanged({
+    oldPermission: "listen_only",
+    nextPermission: "platform_reuse_allowed",
+    oldMode: null,
+    nextMode: "fixed",
+    oldMinor: null,
+    nextMinor: 49900,
+  }),
+  true,
+  "enable studio",
+);
+
+assert.equal(
+  studioMusicConfigurationChanged({
+    oldPermission: "platform_reuse_allowed",
+    nextPermission: "platform_reuse_allowed",
+    oldMode: "fixed",
+    nextMode: "fixed",
+    oldMinor: 49900,
+    nextMinor: 99900,
+  }),
+  true,
+  "price change",
+);
+
+assert.equal(
+  initialStudioFixedPriceDraft({
+    studioPricingMode: "auto_2x_listener",
+    studioPriceRubles: null,
+  }),
+  null,
+  "AUTO must not seed as fixed 499",
+);
+assert.equal(
+  initialStudioFixedPriceDraft({
+    studioPricingMode: "free",
+    studioPriceRubles: null,
+    grandfatheredFree: true,
+  }),
+  null,
+  "grandfathered FREE must not seed as fixed 499",
+);
+assert.equal(
+  initialStudioFixedPriceDraft({
+    studioPricingMode: "fixed",
+    studioPriceRubles: 799,
+  }),
+  799,
+);
+
+console.log("author-studio-music-management-unit: config-changed ok");
