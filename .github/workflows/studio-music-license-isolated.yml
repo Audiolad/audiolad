@@ -27,6 +27,9 @@ on:
       - "scripts/studio-music-new-free-policy-sql-unit.mjs"
       - "supabase/migrations/20261009120300_studio_disable_new_free_music.sql"
       - "supabase/tests/studio_disable_new_free_music_smoke.sql"
+      - "scripts/studio-require-commercial-author-sql-unit.mjs"
+      - "supabase/migrations/20261009120500_studio_require_commercial_author.sql"
+      - "supabase/tests/studio_require_commercial_author_smoke.sql"
 
 permissions:
   contents: read
@@ -74,3 +77,12 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:studio-music-new-free-policy-sql
+
+      - name: Execute Studio commercial-author acquire gate SQL
+        env:
+          AUDIOLAD_STUDIO_MUSIC_ISOLATED: "1"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:studio-require-commercial-author-sql

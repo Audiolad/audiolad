@@ -58,7 +58,7 @@ function publication(
     updated_at: "2026-04-01T00:00:00.000Z",
     published_at: new Date(Date.UTC(2026, 3, 1, 0, 0, index)).toISOString(),
     created_at: new Date(Date.UTC(2026, 3, 1, 0, 0, index)).toISOString(),
-    authors: { name: "Анна", slug: "anna" },
+    authors: { name: "Анна", slug: "anna", access_status: "commercial_active" },
     ...overrides,
   };
 }
@@ -174,8 +174,24 @@ function matchPostgrestClause(
   return String(actual ?? "") < expected;
 }
 
+function readNested(row: Record<string, unknown>, column: string): unknown {
+  if (!column.includes(".")) {
+    return row[column];
+  }
+  const [head, ...rest] = column.split(".");
+  const nested = row[head];
+  if (!nested || typeof nested !== "object") {
+    return undefined;
+  }
+  const obj = Array.isArray(nested) ? nested[0] : nested;
+  if (!obj || typeof obj !== "object") {
+    return undefined;
+  }
+  return readNested(obj as Record<string, unknown>, rest.join("."));
+}
+
 function applyEq(row: Record<string, unknown>, column: string, value: unknown) {
-  return row[column] === value;
+  return readNested(row, column) === value;
 }
 
 function applyIs(row: Record<string, unknown>, column: string, value: unknown) {
@@ -240,7 +256,7 @@ function createRecordingSupabase(input: {
       }
       if (
         !query.ins.every(([column, values]) =>
-          values.includes(String(row[column] ?? "")),
+          values.includes(String(readNested(row, column) ?? "")),
         )
       ) {
         return false;
@@ -337,6 +353,30 @@ function createRecordingSupabase(input: {
           result = { data: input.entitlements ?? [], error: null };
         } else if (table === "author_members") {
           result = { data: input.authorMembers ?? [], error: null };
+        } else if (table === "authors") {
+          const ids =
+            query.ins.find(([column]) => column === "id")?.[1] ?? [];
+          const byId = new Map<string, { id: string; access_status: string }>();
+          for (const practice of input.practices) {
+            const authors = practice.authors as
+              | { access_status?: string | null }
+              | Array<{ access_status?: string | null }>
+              | null
+              | undefined;
+            const row = Array.isArray(authors) ? authors[0] : authors;
+            const status =
+              typeof row?.access_status === "string"
+                ? row.access_status
+                : "free";
+            byId.set(String(practice.author_id), {
+              id: String(practice.author_id),
+              access_status: status,
+            });
+          }
+          result = {
+            data: ids.map((id) => byId.get(id) ?? { id, access_status: "free" }),
+            error: null,
+          };
         } else {
           result = { data: [], error: null };
         }
@@ -992,5 +1032,45 @@ function assertNoDuplicates(ids: string[]) {
 
 assert.match(catalogSource, /studioMusicCatalogPaidOrFilter/);
 assert.match(catalogSource, /applyStudioMusicCatalogSearch/);
+
+
+{
+  // Non-commercial rows must not consume the public pagination window.
+  const nonCommercial = Array.from({ length: 10 }, (_, index) =>
+    publication(index, {
+      title: `free-author-${index}`,
+      authors: { name: "Free", slug: "free", access_status: "free" },
+    }),
+  );
+  const commercial = Array.from({ length: 5 }, (_, index) =>
+    publication(index + 100, {
+      title: `commercial-${index}`,
+      authors: {
+        name: "Comm",
+        slug: "comm",
+        access_status: "commercial_active",
+      },
+    }),
+  );
+  const recording = createRecordingSupabase({
+    practices: [...nonCommercial, ...commercial],
+  });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const page = await store.listPublicInventory({
+    filter: "all",
+    cursor: null,
+    limit: 5,
+  });
+  assert.equal(page.practices.length, 5, "commercial-before-pagination count");
+  assert.ok(
+    page.practices.every((practice) => String(practice.title ?? "").startsWith("commercial-")),
+    "commercial-before-pagination titles",
+  );
+  assert.deepEqual(recording.practiceLimits, [6]);
+  assert.ok(
+    recording.materializedPracticeCounts[0] <= 6,
+    "commercial-before-pagination materialize",
+  );
+}
 
 console.log("studio-music-catalog-pagination-unit: ok");

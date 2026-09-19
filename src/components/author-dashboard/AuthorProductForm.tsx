@@ -1065,6 +1065,10 @@ export default function AuthorProductForm({
     [authors, form.authorId],
   );
   const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
+  const canConfigureStudioMusic = authorAccessAllowsPaidProducts(
+    selectedAuthorAccessStatus,
+  );
+
   const canBypassProductModeration =
     selectedAuthor?.canBypassProductModeration === true;
 
@@ -3167,10 +3171,17 @@ export default function AuthorProductForm({
                 MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
                 MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
               ] as const
-            ).map((value) => (
+            ).map((value) => {
+              const reuseOption =
+                value === MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED;
+              const optionDisabled =
+                busy || (reuseOption && !canConfigureStudioMusic);
+              return (
               <label
                 key={value}
-                className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                className={`flex items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                  optionDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                } ${
                   form.musicUsagePermission === value
                     ? "border-[#9a74d8] bg-[#f8f4ff]"
                     : "border-[#e4d7f4] bg-white"
@@ -3181,8 +3192,9 @@ export default function AuthorProductForm({
                   name="music_usage_permission"
                   className="mt-1"
                   checked={form.musicUsagePermission === value}
-                  disabled={busy}
+                  disabled={optionDisabled}
                   onChange={() => {
+                    if (optionDisabled) return;
                     if (
                       value === MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
                     ) {
@@ -3217,7 +3229,14 @@ export default function AuthorProductForm({
                   </span>
                 </span>
               </label>
-            ))}
+              );
+            })}
+            {!canConfigureStudioMusic ? (
+              <p className="text-sm leading-5 text-[#7d70a2]">
+                «Для прослушивания и использования авторами» доступно после
+                получения коммерческого статуса.
+              </p>
+            ) : null}
           </fieldset>
         ) : null}
 
@@ -3239,6 +3258,15 @@ export default function AuthorProductForm({
               <p className="text-sm leading-5 text-[#7d70a2]">
                 {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredKept}{" "}
                 {STUDIO_NEW_FREE_POLICY_COPY.grandfatheredExplain}
+              </p>
+            ) : null}
+            {!canConfigureStudioMusic &&
+            form.musicUsagePermission ===
+              MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED ? (
+              <p className="text-sm leading-5 text-[#7d70a2]">
+                Настройки лицензии для Студии доступны только при коммерческом
+                статусе. Текущие значения сохранены и показаны только для
+                просмотра.
               </p>
             ) : null}
             {(
@@ -3278,8 +3306,13 @@ export default function AuthorProductForm({
                     name="studio_music_pricing_mode"
                     className="mt-1"
                     checked={form.studioMusicPricingMode === option.value}
-                    disabled={busy || !canEditPublicFields}
+                    disabled={
+                      busy ||
+                      !canEditPublicFields ||
+                      !canConfigureStudioMusic
+                    }
                     onChange={() => {
+                      if (!canConfigureStudioMusic) return;
                       const shouldSetDefaultPrice =
                         option.value === STUDIO_MUSIC_PRICING_MODE.FIXED &&
                         !validateStudioMusicPaidPriceInputDraft(studioMusicPriceDraft).ok;
@@ -3320,8 +3353,13 @@ export default function AuthorProductForm({
                   max={MAX_PAID_PRICE_RUB}
                   step={1}
                   value={studioMusicPriceDraft}
-                  disabled={busy || !canEditPublicFields}
+                  disabled={
+                    busy ||
+                    !canEditPublicFields ||
+                    !canConfigureStudioMusic
+                  }
                   onChange={(event) => {
+                    if (!canConfigureStudioMusic) return;
                     const draft = event.target.value;
                     const rubles = parsePriceInputDraft(draft);
 

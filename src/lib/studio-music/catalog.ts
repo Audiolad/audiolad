@@ -36,6 +36,7 @@ import {
   resolveStudioMusicAcquisition,
   type StudioMusicPricingMode,
 } from "./pricing";
+import { isStudioSourceAuthorCommercial } from "./commercial-author";
 
 export const STUDIO_MUSIC_CATALOG_FILTERS = ["all", "mine", "free", "paid"] as const;
 export type StudioMusicCatalogFilter =
@@ -80,8 +81,12 @@ export type StudioMusicCatalogPublication = StudioMusicPublicationInput & {
   created_at?: string | null;
   subtitle?: string | null;
   authors?:
-    | { name?: string | null; slug?: string | null }
-    | { name?: string | null; slug?: string | null }[]
+    | { name?: string | null; slug?: string | null; access_status?: string | null }
+    | {
+        name?: string | null;
+        slug?: string | null;
+        access_status?: string | null;
+      }[]
     | null;
 };
 
@@ -417,11 +422,35 @@ export function isPubliclyListedStudioPublication(
  * Public Studio vitrine (all / free): published music/release with
  * platform_reuse_allowed, commercially accessible, listed only.
  */
+
+export function resolveStudioCatalogAuthorAccessStatus(
+  practice: StudioMusicCatalogPublication,
+): string | null {
+  const authors = practice.authors;
+  if (!authors) return null;
+  const row = Array.isArray(authors) ? authors[0] : authors;
+  return row?.access_status ?? null;
+}
+
+function isPublicStudioInventorySourceAuthor(
+  practice: StudioMusicCatalogPublication,
+): boolean {
+  return isStudioSourceAuthorCommercial(
+    resolveStudioCatalogAuthorAccessStatus(practice),
+  );
+}
+
 export function isPublicStudioMusicInventory(
   practice: StudioMusicCatalogPublication,
-  options?: { commerciallyAccessible?: boolean },
+  options?: { commerciallyAccessible?: boolean; authorAccessStatus?: string | null },
 ): boolean {
-  if (!canAcquireStudioMusic(practice, options)) {
+  const authorAccessStatus =
+    options?.authorAccessStatus ??
+    resolveStudioCatalogAuthorAccessStatus(practice);
+  if (!canAcquireStudioMusic(practice, { ...options, authorAccessStatus })) {
+    return false;
+  }
+  if (!isStudioSourceAuthorCommercial(authorAccessStatus)) {
     return false;
   }
   if (!isPubliclyListedStudioPublication(practice)) {
@@ -474,17 +503,19 @@ export function isPaidPublicStudioMusicInventory(
 }
 
 /**
- * Mine: active entitlement OR live author member.
- * Does not re-check status / permission / listed.
- * Never consults user_practices.
+ * Mine: active entitlement (any source-author status) OR live author member
+ * only when source author is commercial_active / legacy commercial.
+ * Never consults user_practices. Does not re-check listed/permission.
  */
 export function isMineStudioMusicPublication(input: {
   practice: Pick<
     StudioMusicCatalogPublication,
     "id" | "deleted_at" | "product_kind" | "publication_class"
-  >;
+  > &
+    Partial<Pick<StudioMusicCatalogPublication, "authors">>;
   entitlement?: StudioMusicCatalogEntitlement | null;
   isAuthorMember?: boolean;
+  authorAccessStatus?: string | null;
 }): boolean {
   if (!input.practice.id || input.practice.deleted_at) {
     return false;
@@ -492,10 +523,19 @@ export function isMineStudioMusicPublication(input: {
   if (!isStudioMusicPublication(input.practice)) {
     return false;
   }
-  return canUseMusicInStudio({
-    entitlement: input.entitlement,
-    isAuthorMember: input.isAuthorMember,
-  });
+  if (hasStudioMusicEntitlement(input.entitlement)) {
+    return true;
+  }
+  if (input.isAuthorMember !== true) {
+    return false;
+  }
+  const access =
+    input.authorAccessStatus !== undefined
+      ? input.authorAccessStatus
+      : resolveStudioCatalogAuthorAccessStatus(
+          input.practice as StudioMusicCatalogPublication,
+        );
+  return isStudioSourceAuthorCommercial(access);
 }
 
 export function resolveStudioMusicGrantSource(input: {
@@ -886,6 +926,7 @@ export async function handleStudioMusicCatalog(input: {
             practice.author_id &&
               authorMemberAuthorIds.includes(practice.author_id),
           ),
+          authorAccessStatus: resolveStudioCatalogAuthorAccessStatus(practice),
         }) && matchesStudioMusicCatalogSearch(practice, searchWords),
     );
     nextCursor = mine.nextCursor;
@@ -1002,6 +1043,35 @@ function applyStudioMusicCatalogSearch<T extends { or: (filters: string) => T }>
   return next;
 }
 
+const PRACTICE_SELECT_PUBLIC = `
+  id,
+  author_id,
+  title,
+  slug,
+  product_kind,
+  publication_class,
+  music_usage_permission,
+  status,
+  deleted_at,
+  is_free,
+  price,
+  studio_music_pricing_mode,
+  studio_music_price_minor,
+  subtitle,
+  catalog_visibility,
+  is_catalog_listed,
+  cover_url,
+  cover_image,
+  updated_at,
+  published_at,
+  created_at,
+  authors!practices_author_id_fkey!inner (
+    name,
+    slug,
+    access_status
+  )
+`;
+
 const PRACTICE_SELECT = `
   id,
   author_id,
@@ -1026,7 +1096,8 @@ const PRACTICE_SELECT = `
   created_at,
   authors!practices_author_id_fkey (
     name,
-    slug
+    slug,
+    access_status
   )
 `;
 
@@ -1107,7 +1178,7 @@ export function createSupabaseStudioMusicCatalogStore(
     async listPublicInventory({ filter, cursor, limit, q = null }) {
       let query = supabase
         .from("practices")
-        .select(PRACTICE_SELECT)
+        .select(PRACTICE_SELECT_PUBLIC)
         .eq("status", "published")
         .is("deleted_at", null)
         .eq(
@@ -1115,7 +1186,8 @@ export function createSupabaseStudioMusicCatalogStore(
           MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
         )
         .or("product_kind.eq.music,publication_class.eq.release")
-        .or(studioMusicListedVisibilityOrFilter());
+        .or(studioMusicListedVisibilityOrFilter())
+        .in("authors.access_status", ["commercial_active", "commercial"]);
 
       if (filter === "free") {
         query = query.or(studioMusicCatalogFreeOrFilter());
@@ -1125,6 +1197,7 @@ export function createSupabaseStudioMusicCatalogStore(
       }
 
       query = applyStudioMusicCatalogSearch(query, q);
+      // Commercial-author filter is applied above BEFORE keyset/limit.
       query = applyStudioMusicCatalogKeyset(query, cursor, limit);
 
       const { data, error } = await query;
@@ -1134,7 +1207,9 @@ export function createSupabaseStudioMusicCatalogStore(
 
       return takeStudioMusicCatalogPage(
         filterPublicPracticeRows(
-          (data ?? []) as StudioMusicCatalogPublication[],
+          ((data ?? []) as StudioMusicCatalogPublication[]).filter((row) =>
+            isPublicStudioInventorySourceAuthor(row),
+          ),
         ),
         limit,
       );
@@ -1159,13 +1234,32 @@ export function createSupabaseStudioMusicCatalogStore(
 
       const entitlements = (entitlementResult.data ??
         []) as StudioMusicCatalogEntitlement[];
-      const authorMemberAuthorIds = [
+      const rawMemberAuthorIds = [
         ...new Set(
           (memberResult.data ?? [])
             .map((row) => String(row.author_id ?? ""))
             .filter(Boolean),
         ),
       ];
+      // Own-author Mine without entitlement only for commercial source authors.
+      let authorMemberAuthorIds = rawMemberAuthorIds;
+      if (rawMemberAuthorIds.length > 0) {
+        const { data: authorRows, error: authorError } = await supabase
+          .from("authors")
+          .select("id, access_status")
+          .in("id", rawMemberAuthorIds);
+        if (authorError) {
+          throw new Error("studio_music_mine_lookup_failed");
+        }
+        authorMemberAuthorIds = (authorRows ?? [])
+          .filter((row) =>
+            isStudioSourceAuthorCommercial(
+              typeof row.access_status === "string" ? row.access_status : null,
+            ),
+          )
+          .map((row) => String(row.id))
+          .filter(Boolean);
+      }
       const entitledIds = [
         ...new Set(
           entitlements

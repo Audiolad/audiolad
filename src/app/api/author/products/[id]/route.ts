@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  STUDIO_MUSIC_COMMERCIAL_REQUIRED,
+  STUDIO_MUSIC_COMMERCIAL_REQUIRED_MESSAGE,
+} from "@/lib/studio-music/commercial-author";
+import { studioMusicConfigurationChanged } from "@/lib/author-studio-music/management";
+import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
+import {
   assertAuthorCommercialWriteAllowed,
   authorizePracticeAuthorAssignment,
   handleAuthorRouteError,
@@ -641,6 +647,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       "music_usage_permission" in updates
         ? (updates.music_usage_permission as string | null)
         : practice.music_usage_permission;
+
     const studioPricingPresent =
       "studio_music_pricing_mode" in body ||
       "studio_music_price" in body ||
@@ -649,6 +656,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       "is_free" in body ||
       "price" in body ||
       "product_kind" in body;
+
+    let nextStudioMode: string | null | undefined =
+      practice.studio_music_pricing_mode;
+    let nextStudioMinor: number | null | undefined =
+      practice.studio_music_price_minor;
 
     if (studioPricingPresent || nextProductKind !== PRODUCT_KIND.MUSIC) {
       const studioPricing = normalizeStudioMusicPricingForSave({
@@ -676,8 +688,37 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
 
+      nextStudioMode = studioPricing.mode;
+      nextStudioMinor = studioPricing.priceMinor;
       updates.studio_music_pricing_mode = studioPricing.mode;
       updates.studio_music_price_minor = studioPricing.priceMinor;
+    }
+
+    // Any factual Studio config change requires commercial + current Author Terms.
+    // Identical re-save of legacy Studio fields (title-only edit) must pass.
+    if (
+      studioMusicConfigurationChanged({
+        oldPermission: practice.music_usage_permission,
+        nextPermission: nextMusicUsagePermission,
+        oldMode: practice.studio_music_pricing_mode,
+        nextMode: nextStudioMode,
+        oldMinor: practice.studio_music_price_minor,
+        nextMinor: nextStudioMinor,
+      })
+    ) {
+      if (!authorAccessAllowsPaidProducts(accessStatus)) {
+        return NextResponse.json(
+          {
+            error: STUDIO_MUSIC_COMMERCIAL_REQUIRED,
+            message: STUDIO_MUSIC_COMMERCIAL_REQUIRED_MESSAGE,
+          },
+          { status: 403 },
+        );
+      }
+      await assertAuthorCommercialWriteAllowed(
+        practice.author_id,
+        accessStatus,
+      );
     }
 
     {

@@ -34,6 +34,7 @@ const publicPractice: StudioMusicCatalogPublication = {
   studio_music_pricing_mode: "auto_2x_listener",
   catalog_visibility: "listed",
   is_catalog_listed: true,
+  authors: { name: "Анна", slug: "anna", access_status: "commercial_active" },
 };
 
 const unpublishedPractice: StudioMusicCatalogPublication = {

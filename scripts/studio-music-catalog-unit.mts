@@ -62,7 +62,7 @@ const listedAllowed: StudioMusicCatalogPublication = {
   author_id: "author-1",
   published_at: "2026-09-01T00:00:00.000Z",
   created_at: "2026-08-01T00:00:00.000Z",
-  authors: { name: "Анна", slug: "anna" },
+  authors: { name: "Анна", slug: "anna", access_status: "commercial_active" },
 };
 
 function publication(
@@ -86,6 +86,22 @@ assert.equal(parseStudioMusicCatalogLimit("20"), 20);
 assert.equal(parseStudioMusicCatalogLimit("99"), 50);
 
 assert.equal(isPublicStudioMusicInventory(listedAllowed), true);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({
+      authors: { name: "Анна", slug: "anna", access_status: "free" },
+    }),
+  ),
+  false,
+);
+assert.equal(
+  isPublicStudioMusicInventory(
+    publication({
+      authors: { name: "Анна", slug: "anna", access_status: "commercial_pending" },
+    }),
+  ),
+  false,
+);
 assert.equal(
   isPublicStudioMusicInventory(publication({ publication_class: "release", product_kind: "practice" })),
   true,
@@ -281,8 +297,76 @@ assert.equal(
   isMineStudioMusicPublication({
     practice: publication({ music_usage_permission: "listen_only" }),
     isAuthorMember: true,
+    authorAccessStatus: "commercial_active",
   }),
   true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "commercial" },
+    }),
+    isAuthorMember: true,
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "free" },
+    }),
+    entitlement: { practice_id: listedAllowed.id, revoked_at: null, grant_source: "purchase" },
+    isAuthorMember: false,
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_suspended",
+      },
+    }),
+    entitlement: { practice_id: listedAllowed.id, revoked_at: null, grant_source: "free" },
+  }),
+  true,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: { name: "Анна", slug: "anna", access_status: "free" },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_pending",
+      },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({
+      authors: {
+        name: "Анна",
+        slug: "anna",
+        access_status: "commercial_onboarding",
+      },
+    }),
+    isAuthorMember: true,
+  }),
+  false,
 );
 assert.equal(
   isMineStudioMusicPublication({
