@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  assertStudioProjectTimelineLimit,
+  StudioClipGeometryInvalidError,
+  StudioProjectTimelineLimitError,
+} from "../clip-geometry-limits";
 import { STUDIO_LIMITS } from "../limits";
 import {
   STUDIO_SCHEMA_VERSION,
@@ -222,6 +227,36 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
         throw new StudioApiError("invalid_ripple_layout", 422);
       }
     }
+  }
+
+  try {
+    assertStudioProjectTimelineLimit(
+      value.tracks.map((track) => {
+        if (!isRecord(track) || !Array.isArray(track.clips)) {
+          throw new StudioApiError("invalid_track", 422);
+        }
+        return {
+          clips: track.clips.map((clip) => {
+            if (!isRecord(clip)) {
+              throw new StudioApiError("invalid_clip", 422);
+            }
+            return {
+              startTime: Number(clip.startTime),
+              duration: Number(clip.duration),
+            };
+          }),
+        };
+      }),
+    );
+  } catch (error) {
+    if (error instanceof StudioApiError) throw error;
+    if (error instanceof StudioProjectTimelineLimitError) {
+      throw new StudioApiError("project_timeline_too_long", 422);
+    }
+    if (error instanceof StudioClipGeometryInvalidError) {
+      throw new StudioApiError("invalid_clip", 422);
+    }
+    throw error;
   }
 
   return {

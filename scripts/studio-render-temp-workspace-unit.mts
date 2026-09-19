@@ -196,7 +196,8 @@ async function main() {
             skippedFresh: [],
             skippedForeign: [],
           }),
-          assertDiskSpace: async () => ({
+          assertTimeline: () => 1,
+            assertDiskSpace: async () => ({
             freeBytes: STUDIO_RENDER_MIN_FREE_BYTES * 2,
             requiredBytes: STUDIO_RENDER_MIN_FREE_BYTES,
           }),
@@ -259,6 +260,7 @@ async function main() {
               skippedFresh: [],
               skippedForeign: [],
             }),
+            assertTimeline: () => 1,
             assertDiskSpace: async () => ({
               freeBytes: STUDIO_RENDER_MIN_FREE_BYTES * 2,
               requiredBytes: STUDIO_RENDER_MIN_FREE_BYTES,
@@ -304,6 +306,7 @@ async function main() {
             skippedFresh: [],
             skippedForeign: [],
           }),
+          assertTimeline: () => 1,
           assertDiskSpace: async () => {
             throw new StudioRenderDiskSpaceError(100, STUDIO_RENDER_MIN_FREE_BYTES);
           },

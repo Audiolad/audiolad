@@ -123,6 +123,80 @@ assert.throws(
   }),
   (error: unknown) => error instanceof StudioApiError && error.code === "invalid_clip",
 );
+
+// Pathological geometry must not persist (root cause of ~14GiB renders)
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{
+      ...validProjectData.tracks[0],
+      clips: [{
+        ...validProjectData.tracks[0].clips[0],
+        startTime: 625_000,
+        duration: 3,
+      }],
+    }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "project_timeline_too_long",
+);
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{
+      ...validProjectData.tracks[0],
+      clips: [{
+        ...validProjectData.tracks[0].clips[0],
+        startTime: 0,
+        duration: 625_000,
+      }],
+    }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "project_timeline_too_long",
+);
+// Near-end overhang: startTime=10799 + duration=2 → end 10801 > 3h
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{
+      ...validProjectData.tracks[0],
+      clips: [{
+        ...validProjectData.tracks[0].clips[0],
+        startTime: 10_799,
+        duration: 2,
+        fadeInDuration: 0,
+        fadeOutDuration: 0,
+      }],
+    }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "project_timeline_too_long",
+);
+// Exact 3h boundary persists
+assert.doesNotThrow(() => parseStudioProjectData({
+  ...validProjectData,
+  tracks: [{
+    ...validProjectData.tracks[0],
+    clips: [{
+      ...validProjectData.tracks[0].clips[0],
+      startTime: 0,
+      duration: 10_800,
+      fadeInDuration: 0,
+      fadeOutDuration: 0,
+    }],
+  }],
+}));
+assert.doesNotThrow(() => parseStudioProjectData({
+  ...validProjectData,
+  tracks: [{
+    ...validProjectData.tracks[0],
+    clips: [{
+      ...validProjectData.tracks[0].clips[0],
+      startTime: 10_799,
+      duration: 1,
+      fadeInDuration: 0,
+      fadeOutDuration: 0,
+    }],
+  }],
+}));
 assert.throws(
   () => parseStudioProjectData({
     ...validProjectData,

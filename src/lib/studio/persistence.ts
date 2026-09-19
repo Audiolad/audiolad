@@ -1,4 +1,10 @@
 import { getStudioClipEnd } from "./clip-math";
+
+import {
+  assertStudioProjectTimelineLimit,
+  StudioClipGeometryInvalidError,
+  StudioProjectTimelineLimitError,
+} from "./clip-geometry-limits";
 import {
   parseStudioVoicePreset,
   type StudioVoicePreset as StudioVoicePresetType,
@@ -25,7 +31,9 @@ export type StudioPersistenceErrorCode =
   | "overlapping_clips"
   | "invalid_asset_duration"
   | "missing_asset_duration"
-  | "clip_exceeds_asset_duration";
+  | "clip_exceeds_asset_duration"
+  | "clip_geometry_too_large"
+  | "project_timeline_too_long";
 
 export class StudioPersistenceError extends Error {
   constructor(
@@ -371,6 +379,17 @@ export function validateStudioProjectDocument(
   const tracks = document.tracks.map((track, index) => parseTrack(track, `tracks[${index}]`));
   validateRelationships(slots, tracks);
   validateAssetDurations(tracks, assetDurations);
+  try {
+    assertStudioProjectTimelineLimit(tracks);
+  } catch (error) {
+    if (error instanceof StudioProjectTimelineLimitError) {
+      fail("project_timeline_too_long", "tracks");
+    }
+    if (error instanceof StudioClipGeometryInvalidError) {
+      fail("invalid_clip", "tracks");
+    }
+    throw error;
+  }
 
   return {
     schemaVersion: STUDIO_PROJECT_SCHEMA_VERSION,

@@ -1,17 +1,26 @@
 export const STUDIO_ASSETS_BUCKET = "studio-draft-assets" as const;
 
 export const MAX_STUDIO_AUDIO_DURATION_SECONDS = 10_800;
+/** Official Studio product max for the whole project timeline (3 hours). */
+export const MAX_STUDIO_PROJECT_TIMELINE_SECONDS = 10_800;
 export const MAX_STUDIO_ASSET_BYTES = 314_572_800;
 export const MAX_STUDIO_PROJECT_BYTES = 750 * 1024 * 1024;
+/** Concurrent track/slot cap enforced by Studio editor UI (not a timeline duration). */
+export const MAX_STUDIO_TRACKS = 5;
 
 export const STUDIO_LIMITS = {
   maxAudioDurationSeconds: MAX_STUDIO_AUDIO_DURATION_SECONDS,
+  maxProjectTimelineSeconds: MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
   maxAssetBytes: MAX_STUDIO_ASSET_BYTES,
   maxProjectAssetBytes: MAX_STUDIO_PROJECT_BYTES,
+  maxTracks: MAX_STUDIO_TRACKS,
 } as const;
 
 export const STUDIO_AUDIO_TOO_LONG_MESSAGE =
   "Максимальная продолжительность одной аудиодорожки — 3 часа.";
+
+export const STUDIO_PROJECT_TIMELINE_TOO_LONG_MESSAGE =
+  "Максимальная длительность проекта Studio — 3 часа.";
 
 export const STUDIO_ASSET_TOO_LARGE_MESSAGE =
   "Размер одной дорожки превышает лимит Studio — 300 МБ.";

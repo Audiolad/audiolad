@@ -24,6 +24,10 @@ import {
   StudioRenderSnapshotError,
 } from "../render/snapshot";
 import { buildStudioRenderTimeline } from "../render/timeline";
+import {
+  assertStudioRenderTimelineSafe,
+  StudioRenderTimelineGuardError,
+} from "../render/timeline-guard";
 export { renderOutputPath } from "../render/storage";
 
 export const STUDIO_RENDER_BUCKET = "studio-renders";
@@ -62,6 +66,17 @@ export async function createStudioRenderJob(projectId: string): Promise<StudioRe
   } catch (error) {
     if (error instanceof StudioRenderSnapshotError) {
       throw new StudioApiError("invalid_project_asset", 422);
+    }
+    throw error;
+  }
+  try {
+    assertStudioRenderTimelineSafe(snapshot);
+  } catch (error) {
+    if (error instanceof StudioRenderTimelineGuardError) {
+      if (error.code === "studio_render_timeline_invalid" && buildStudioRenderTimeline(snapshot).durationSeconds <= 0) {
+        throw new StudioApiError("no_active_tracks", 422);
+      }
+      throw new StudioApiError(error.code, 422);
     }
     throw error;
   }
