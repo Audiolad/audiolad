@@ -23,9 +23,12 @@ type GlobalPlaybackAnalyticsProps = {
 };
 
 /**
- * Canonical mount for playback analytics on GlobalAudioPlayer.
+ * Canonical mount for catalog playback analytics on GlobalAudioPlayer.
  * Covers /practice, /listen, catalog, /p, /listens, playlist queue, mini-player.
- * Local ListenAnalyticsTracker mounts on those surfaces must not also emit.
+ *
+ * private_audio is intentionally excluded: itemId is not a practices row, and
+ * insert_platform_analytics_event NULLs unknown practice_id — those events would
+ * still inflate global admin play_starts / listeners KPI.
  */
 export function resolveGlobalPlaybackAnalyticsTarget(
   session: LoadSessionInput,
@@ -35,11 +38,9 @@ export function resolveGlobalPlaybackAnalyticsTarget(
     return null;
   }
 
+  // Do not emit platform playback KPI for personal/private materials.
   if (isPrivateAudioSession(session)) {
-    return {
-      practiceId: session.itemId,
-      path: session.detailPath || pathname || "/",
-    };
+    return null;
   }
 
   if (!isCatalogGlobalPlayerSession(session)) {

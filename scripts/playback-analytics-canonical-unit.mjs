@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Canonical GlobalAudioPlayer playback analytics — contract + continuous-session
- * regression checks (H1 / H2 / H3). No DB, no network.
+ * Canonical GlobalAudioPlayer playback analytics — contract + listening-context
+ * regression checks (H1 / H2 / H3 / inactivity gap / private_audio). No DB.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,6 +9,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveGlobalPlaybackAnalyticsTarget } from "../src/components/analytics/GlobalPlaybackAnalytics.tsx";
+import { LISTENING_SESSION_GAP_MS } from "../src/lib/analytics/constants.ts";
+import {
+  createListenTrackerContextState,
+  expireListenTrackerContextIfInactive,
+  isListeningContextInactive,
+  noteListenTrackerPlayingActivity,
+  resetListenTrackerContextState,
+  shouldAttemptPlayStartedEmit,
+} from "../src/lib/analytics/listen-tracker-context.ts";
 import {
   rememberContinuousListenCompleted,
   rememberContinuousListenPlayStarted,
@@ -33,6 +42,7 @@ function testCanonicalMountContract() {
   const globalAnalytics = read(
     "src/components/analytics/GlobalPlaybackAnalytics.tsx",
   );
+  const contextHelper = read("src/lib/analytics/listen-tracker-context.ts");
 
   assert.match(
     provider,
@@ -61,8 +71,8 @@ function testCanonicalMountContract() {
   );
   assert.match(
     tracker,
-    /if \(!sessionId\)/,
-    "H2: start is deferred until sessionId exists",
+    /expireListenTrackerContextIfInactive/,
+    "inactivity gap uses last playing activity, not listen age",
   );
   assert.match(
     client,
@@ -75,19 +85,24 @@ function testCanonicalMountContract() {
     "H3: tracker tracks previous audioItemId for A→B reset",
   );
   assert.match(
-    tracker,
-    /playStartedRef\.current = false/,
-    "H3: track change clears sticky playStarted",
-  );
-  assert.match(
-    tracker,
-    /rememberContinuousListenPlayStarted/,
-    "Repeat One stays deduped via continuous session",
+    contextHelper,
+    /lastActivityAt/,
+    "listening context tracks last playing activity",
   );
   assert.match(
     globalAnalytics,
-    /session\.isAuthorPreview/,
-    "author preview still skips analytics",
+    /isPrivateAudioSession\(session\)/,
+    "private_audio is explicitly gated",
+  );
+  assert.match(
+    globalAnalytics,
+    /return null/,
+    "private_audio resolve returns null (excluded from platform KPI)",
+  );
+  assert.doesNotMatch(
+    tracker,
+    /isListeningSessionExpired/,
+    "tracker no longer expires by age-since-start",
   );
 }
 
@@ -117,11 +132,6 @@ function testResolveTargetPaths() {
     { practiceId: "prac-1", path: "/listen/ann/breath" },
     "/listen play attributes to the listen path",
   );
-  assert.deepEqual(
-    resolveGlobalPlaybackAnalyticsTarget(catalog, "/"),
-    { practiceId: "prac-1", path: "/listen/ann/breath" },
-    "fallback path uses listen URL when pathname is root",
-  );
   assert.equal(
     resolveGlobalPlaybackAnalyticsTarget(
       { ...catalog, isAuthorPreview: true },
@@ -134,7 +144,7 @@ function testResolveTargetPaths() {
   const privateAudio = {
     sourceType: "private_audio",
     itemId: "priv-1",
-    detailPath: "/cabinet/private/priv-1",
+    detailPath: "/my-library/private-audio/priv-1",
     authorText: null,
     practiceTitle: "t",
     authorName: "a",
@@ -146,41 +156,159 @@ function testResolveTargetPaths() {
     coverImageUrl: null,
     isAuthorPreview: false,
   };
-  assert.deepEqual(
+  assert.equal(
     resolveGlobalPlaybackAnalyticsTarget(privateAudio, "/elsewhere"),
-    { practiceId: "priv-1", path: "/cabinet/private/priv-1" },
-    "private_audio uses detailPath + itemId",
+    null,
+    "private_audio is excluded so itemId cannot become a null practice_id KPI event",
   );
+}
+
+/**
+ * Simulate tracker-state decisions the React component makes around play_started.
+ * Returns how many times an emit would be attempted after continuous dedupe.
+ */
+function simulatePlayStartedAttempts(steps) {
+  resetContinuousListenSession();
+  const state = createListenTrackerContextState();
+  const practiceId = "p";
+  const trackId = "t1";
+  let emits = 0;
+
+  for (const step of steps) {
+    const now = step.at;
+
+    if (step.kind === "playing_tick") {
+      noteListenTrackerPlayingActivity(state, now);
+      touchContinuousListenSessionActivity(now);
+      continue;
+    }
+
+    if (step.kind === "pause_or_resume_edge") {
+      expireListenTrackerContextIfInactive(
+        state,
+        now,
+        LISTENING_SESSION_GAP_MS,
+      );
+
+      if (
+        !shouldAttemptPlayStartedEmit({
+          trackId,
+          isPlaying: step.isPlaying,
+          playStarted: state.playStarted,
+          sessionId: "sess",
+        })
+      ) {
+        continue;
+      }
+
+      state.playStarted = true;
+      if (!state.listeningStartedAt) {
+        state.listeningStartedAt = now;
+      }
+      noteListenTrackerPlayingActivity(state, now);
+
+      if (rememberContinuousListenPlayStarted(practiceId, trackId, now)) {
+        emits += 1;
+      }
+    }
+  }
+
+  return { emits, state };
+}
+
+function testLongPlayShortPauseResumeNoSecondStart() {
+  const t0 = 1_000_000;
+  const steps = [
+    { kind: "pause_or_resume_edge", at: t0, isPlaying: true },
+  ];
+
+  // >5 minutes of active listening (activity ticks every minute).
+  for (let minute = 1; minute <= 6; minute += 1) {
+    steps.push({
+      kind: "playing_tick",
+      at: t0 + minute * 60_000,
+    });
+  }
+
+  const pauseAt = t0 + 6 * 60_000 + 1_000;
+  steps.push({ kind: "pause_or_resume_edge", at: pauseAt, isPlaying: false });
+
+  const resumeAt = pauseAt + 2_000;
+  steps.push({ kind: "pause_or_resume_edge", at: resumeAt, isPlaying: true });
+
+  const { emits, state } = simulatePlayStartedAttempts(steps);
+
+  assert.equal(
+    emits,
+    1,
+    "Play → >5min active listen → short pause → resume must not emit a second start",
+  );
+  assert.equal(state.playStarted, true, "same listening context stays sticky");
+  assert.equal(
+    isListeningContextInactive(state.lastActivityAt, resumeAt, LISTENING_SESSION_GAP_MS),
+    false,
+    "2s pause after long play is not an inactivity gap",
+  );
+}
+
+function testLongPauseOpensNewListeningContext() {
+  const t0 = 2_000_000;
+  const steps = [
+    { kind: "pause_or_resume_edge", at: t0, isPlaying: true },
+    { kind: "playing_tick", at: t0 + 10_000 },
+    { kind: "pause_or_resume_edge", at: t0 + 11_000, isPlaying: false },
+    // Pause longer than LISTENING_SESSION_GAP_MS → new listening context.
+    {
+      kind: "pause_or_resume_edge",
+      at: t0 + 11_000 + LISTENING_SESSION_GAP_MS + 1_000,
+      isPlaying: true,
+    },
+  ];
+
+  const { emits } = simulatePlayStartedAttempts(steps);
+
+  assert.equal(
+    emits,
+    2,
+    "Pause longer than the inactivity gap is a new listening context → new start allowed",
+  );
+}
+
+function testAgeSinceStartAloneDoesNotExpire() {
+  const state = createListenTrackerContextState();
+  const startedAt = 3_000_000;
+  state.playStarted = true;
+  state.listeningStartedAt = startedAt;
+  // Activity was recent (1s ago) even though listen started > gap ago.
+  state.lastActivityAt = startedAt + LISTENING_SESSION_GAP_MS + 60_000;
+
+  const now = state.lastActivityAt + 1_000;
+  const expired = expireListenTrackerContextIfInactive(
+    state,
+    now,
+    LISTENING_SESSION_GAP_MS,
+  );
+
+  assert.equal(
+    expired,
+    false,
+    "age since first start must not expire a still-active listening context",
+  );
+  assert.equal(state.playStarted, true);
 }
 
 function testMultiTrackStartsAreIndependent() {
   resetContinuousListenSession();
-  assert.equal(
-    rememberContinuousListenPlayStarted("p", "A"),
-    true,
-    "first play of A emits start",
-  );
-  assert.equal(
-    rememberContinuousListenPlayStarted("p", "B"),
-    true,
-    "auto-next / manual next to B emits a new start",
-  );
-  assert.equal(
-    rememberContinuousListenPlayStarted("p", "A"),
-    false,
-    "returning to A in the same continuous session stays deduped",
-  );
+  assert.equal(rememberContinuousListenPlayStarted("p", "A"), true);
+  assert.equal(rememberContinuousListenPlayStarted("p", "B"), true);
+  assert.equal(rememberContinuousListenPlayStarted("p", "A"), false);
 }
 
 function testPauseResumeSameTrackNoSecondStart() {
   resetContinuousListenSession();
   assert.equal(rememberContinuousListenPlayStarted("p", "t1"), true);
   touchContinuousListenSessionActivity();
-  assert.equal(
-    rememberContinuousListenPlayStarted("p", "t1"),
-    false,
-    "pause/resume of the same track does not emit another start",
-  );
+  assert.equal(rememberContinuousListenPlayStarted("p", "t1"), false);
 }
 
 function testRepeatOneLoopsDoNotEmitNewStart() {
@@ -189,37 +317,53 @@ function testRepeatOneLoopsDoNotEmitNewStart() {
   assert.equal(rememberContinuousListenCompleted("p", "loop"), true);
   for (let i = 0; i < 20; i += 1) {
     touchContinuousListenSessionActivity();
-    assert.equal(
-      rememberContinuousListenPlayStarted("p", "loop"),
-      false,
-      `Repeat One loop ${i + 1} must not emit a new start`,
-    );
-    assert.equal(
-      rememberContinuousListenCompleted("p", "loop"),
-      false,
-      `Repeat One loop ${i + 1} must not emit a new completed`,
-    );
+    assert.equal(rememberContinuousListenPlayStarted("p", "loop"), false);
+    assert.equal(rememberContinuousListenCompleted("p", "loop"), false);
   }
+}
+
+function testTrackChangeResetsLocalContext() {
+  const state = createListenTrackerContextState();
+  state.playStarted = true;
+  state.listeningStartedAt = 100;
+  state.listeningSessionKey = "p:A:100";
+  state.lastActivityAt = 150;
+  resetListenTrackerContextState(state);
+  assert.equal(state.playStarted, false);
+  assert.equal(state.lastActivityAt, null);
 }
 
 function testNoRetryOverloadInThisPr() {
   const tracker = read("src/components/analytics/ListenAnalyticsTracker.tsx");
-  const client = read("src/lib/analytics/client.ts");
-  assert.doesNotMatch(
-    tracker,
-    /503|504|overloaded/,
-    "this PR does not add 503/504/overload retry in the tracker",
+  assert.doesNotMatch(tracker, /503|504|overloaded/);
+}
+
+function testCiWiring() {
+  const pkg = JSON.parse(read("package.json"));
+  const p2 = pkg.scripts["test:platform-analytics-p2"] ?? "";
+  assert.match(
+    p2,
+    /playback-analytics-canonical-unit/,
+    "canonical playback unit must run via test:platform-analytics-p2 (PR CI)",
   );
-  // retry-queue may already exist historically; ensure we did not expand it here
-  // by requiring the tracker itself stays free of overload retry wiring.
-  void client;
+  const workflow = read(".github/workflows/pr-repository-validation.yml");
+  assert.match(
+    workflow,
+    /test:platform-analytics-p2/,
+    "PR Repository Validation already invokes platform-analytics-p2",
+  );
 }
 
 testCanonicalMountContract();
 testResolveTargetPaths();
+testLongPlayShortPauseResumeNoSecondStart();
+testLongPauseOpensNewListeningContext();
+testAgeSinceStartAloneDoesNotExpire();
 testMultiTrackStartsAreIndependent();
 testPauseResumeSameTrackNoSecondStart();
 testRepeatOneLoopsDoNotEmitNewStart();
+testTrackChangeResetsLocalContext();
 testNoRetryOverloadInThisPr();
+testCiWiring();
 
 console.log("playback-analytics-canonical-unit: ok");

@@ -206,8 +206,13 @@ assert.match(
 const sharedTracker = read("src/components/analytics/ListenAnalyticsTracker.tsx");
 assert.match(
   sharedTracker,
-  /if \(!trackId \|\| !isPlaying \|\| playStartedRef\.current\)/,
-  "the shared tracker emits one start until its listening session resets",
+  /shouldAttemptPlayStartedEmit/,
+  "the shared tracker emits one start until its listening context resets",
+);
+assert.match(
+  sharedTracker,
+  /expireListenTrackerContextIfInactive/,
+  "listening gap is inactivity since last playing activity",
 );
 assert.match(
   sharedTracker,

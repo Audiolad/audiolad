@@ -13,9 +13,15 @@ import {
   buildListeningSessionKey,
   createListeningSessionStartedAt,
   hasTrackedListeningMilestone,
-  isListeningSessionExpired,
   markListeningMilestoneTracked,
 } from "@/lib/analytics/dedup";
+import {
+  createListenTrackerContextState,
+  expireListenTrackerContextIfInactive,
+  noteListenTrackerPlayingActivity,
+  resetListenTrackerContextState,
+  shouldAttemptPlayStartedEmit,
+} from "@/lib/analytics/listen-tracker-context";
 import {
   createListeningProgressState,
   getNewlyReachedMilestones,
@@ -43,6 +49,7 @@ type ListenAnalyticsTrackerProps = {
  * One audio_play_started per real play of a practiceId+audioItemId in a listening
  * context; track changes A→B reset per-track state; Repeat One loops stay deduped
  * via continuous-session memory; play-before-session waits for sessionId (H2).
+ * Listening-session gap is inactivity since last playing activity, not listen age.
  */
 export default function ListenAnalyticsTracker({
   practiceId,
@@ -53,10 +60,7 @@ export default function ListenAnalyticsTracker({
   isPlaying,
   programCompleted,
 }: ListenAnalyticsTrackerProps) {
-  const playStartedRef = useRef(false);
-  const completionTrackedRef = useRef(false);
-  const listeningStartedAtRef = useRef<number | null>(null);
-  const listeningSessionKeyRef = useRef<string | null>(null);
+  const contextRef = useRef(createListenTrackerContextState());
   const progressStateRef = useRef(createListeningProgressState());
   const lastTickRef = useRef<number | null>(null);
   const trackedPracticeIdRef = useRef<string | null>(null);
@@ -79,53 +83,76 @@ export default function ListenAnalyticsTracker({
 
     trackedPracticeIdRef.current = practiceId;
     trackedTrackIdRef.current = trackId;
-    playStartedRef.current = false;
-    completionTrackedRef.current = false;
-    listeningStartedAtRef.current = null;
-    listeningSessionKeyRef.current = null;
+    resetListenTrackerContextState(contextRef.current);
     progressStateRef.current = createListeningProgressState();
     lastTickRef.current = null;
   }, [practiceId, trackId]);
 
+  // Inactivity gap: only a pause/stop longer than LISTENING_SESSION_GAP_MS opens a
+  // new listening context. Long continuous play must not expire on short pause.
   useEffect(() => {
     if (!trackId) {
       return;
     }
 
+    const now = Date.now();
     if (
-      listeningStartedAtRef.current &&
-      isListeningSessionExpired(listeningStartedAtRef.current, LISTENING_SESSION_GAP_MS)
+      expireListenTrackerContextIfInactive(
+        contextRef.current,
+        now,
+        LISTENING_SESSION_GAP_MS,
+      )
     ) {
-      playStartedRef.current = false;
-      listeningStartedAtRef.current = null;
-      listeningSessionKeyRef.current = null;
       progressStateRef.current = createListeningProgressState();
+      lastTickRef.current = null;
     }
   }, [trackId, isPlaying]);
 
   useEffect(() => {
-    if (!trackId || !isPlaying || playStartedRef.current) {
+    const context = contextRef.current;
+    const now = Date.now();
+
+    // Expire before attempting emit so a long pause (> gap) can open a new context.
+    if (
+      expireListenTrackerContextIfInactive(
+        context,
+        now,
+        LISTENING_SESSION_GAP_MS,
+      )
+    ) {
+      progressStateRef.current = createListeningProgressState();
+      lastTickRef.current = null;
+    }
+
+    if (
+      !shouldAttemptPlayStartedEmit({
+        trackId,
+        isPlaying,
+        playStarted: context.playStarted,
+        sessionId,
+      })
+    ) {
       return;
     }
 
-    // H2: wait for analytics session; do not sticky-claim playStarted until we can emit.
-    if (!sessionId) {
+    if (!trackId || !sessionId) {
       return;
     }
 
-    playStartedRef.current = true;
+    context.playStarted = true;
 
-    if (!listeningStartedAtRef.current) {
-      listeningStartedAtRef.current = createListeningSessionStartedAt();
+    if (!context.listeningStartedAt) {
+      context.listeningStartedAt = createListeningSessionStartedAt();
     }
 
     const listeningKey = buildListeningSessionKey({
       practiceId,
       audioItemId: trackId,
-      sessionStartedAt: listeningStartedAtRef.current,
+      sessionStartedAt: context.listeningStartedAt,
     });
 
-    listeningSessionKeyRef.current = listeningKey;
+    context.listeningSessionKey = listeningKey;
+    noteListenTrackerPlayingActivity(context, now);
 
     // Repeat One / continuous same-item loops: suppress duplicate start.
     if (!rememberContinuousListenPlayStarted(practiceId, trackId)) {
@@ -152,9 +179,11 @@ export default function ListenAnalyticsTracker({
     const now = Date.now();
     const previousTick = lastTickRef.current;
     lastTickRef.current = now;
+    const context = contextRef.current;
 
     if (isPlaying) {
       touchContinuousListenSessionActivity(now);
+      noteListenTrackerPlayingActivity(context, now);
     }
 
     const deltaSeconds =
@@ -170,7 +199,7 @@ export default function ListenAnalyticsTracker({
 
     progressStateRef.current = nextState;
 
-    const listeningKey = listeningSessionKeyRef.current;
+    const listeningKey = context.listeningSessionKey;
 
     if (!sessionId || !listeningKey) {
       return;
@@ -198,7 +227,7 @@ export default function ListenAnalyticsTracker({
     }
 
     if (
-      !completionTrackedRef.current &&
+      !context.completionTracked &&
       isListeningCompleted(nextState, {
         currentTime,
         duration,
@@ -206,7 +235,7 @@ export default function ListenAnalyticsTracker({
       })
     ) {
       if (!hasTrackedListeningMilestone(listeningKey, "audio_completed")) {
-        completionTrackedRef.current = true;
+        context.completionTracked = true;
         markListeningMilestoneTracked(listeningKey, "audio_completed");
 
         if (!rememberContinuousListenCompleted(practiceId, trackId)) {
@@ -241,10 +270,7 @@ export default function ListenAnalyticsTracker({
       return;
     }
 
-    completionTrackedRef.current = false;
-    playStartedRef.current = false;
-    listeningStartedAtRef.current = null;
-    listeningSessionKeyRef.current = null;
+    resetListenTrackerContextState(contextRef.current);
     progressStateRef.current = createListeningProgressState();
     lastTickRef.current = null;
   }, [programCompleted, trackId]);
