@@ -72,6 +72,7 @@ export function getAudioPreviewErrorMessage(code: string | undefined): string {
 export const PRODUCT_CONTENT_LIMITS = {
   title: 70,
   subtitle: 120,
+  audioProductAuthor: 120,
   description: 1000,
   audioTitle: 100,
   audioDescription: 500,
@@ -122,6 +123,14 @@ export function validateTitleLength(value: string): ProductFieldErrorCode | null
     return "title_too_long";
   }
 
+  return null;
+}
+
+
+export function validateAudioProductAuthorLength(value: string): string | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.audioProductAuthor) {
+    return "audio_product_author_too_long";
+  }
   return null;
 }
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/author-products/auth";
 import { resolveAppreciationOverridePatch } from "@/lib/author-products/appreciation-override";
 import {
+  validateAudioProductAuthorLength,
   validateDescriptionLength,
   validateListeningNoticeTextLength,
   validateListeningNoticeTitleLength,
@@ -129,6 +130,7 @@ function applyClearableTextField(
   key:
     | "subtitle"
     | "description"
+    | "audio_product_author"
     | "format"
     | "seo_primary_query"
     | "seo_about"
@@ -275,6 +277,21 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       if (subtitleError) {
         return NextResponse.json({ error: subtitleError }, { status: 400 });
+      }
+    }
+
+    if ("audio_product_author" in body) {
+      const audioProductAuthorError = applyClearableTextField(
+        body,
+        "audio_product_author",
+        updates,
+        validateAudioProductAuthorLength,
+      );
+      if (audioProductAuthorError) {
+        return NextResponse.json(
+          { error: audioProductAuthorError },
+          { status: 400 },
+        );
       }
     }
 

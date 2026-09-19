@@ -88,6 +88,7 @@ export type PracticeRow = {
   slug: string;
   subtitle: string | null;
   description: string | null;
+  audio_product_author: string | null;
   format: string | null;
   product_kind: ProductKind;
   publication_class: PublicationClass | null;
@@ -155,6 +156,7 @@ export type AuthorProductListItem = {
 export function coercePracticeRow(
   row: Omit<
     PracticeRow,
+    | "audio_product_author"
     | "product_kind"
     | "publication_class"
     | "music_usage_permission"
@@ -183,6 +185,7 @@ export function coercePracticeRow(
     | "author_recommendations_title"
     | "listener_appreciation_override"
   > & {
+    audio_product_author?: string | null;
     product_kind?: string | null;
     publication_class?: string | null;
     music_usage_permission?: string | null;
@@ -214,6 +217,10 @@ export function coercePracticeRow(
 ): PracticeRow {
   return {
     ...row,
+    audio_product_author:
+      typeof row.audio_product_author === "string"
+        ? row.audio_product_author.trim() || null
+        : row.audio_product_author ?? null,
     product_kind: normalizeProductKind(row.product_kind),
     publication_class: parsePublicationClass(row.publication_class),
     music_usage_permission:
