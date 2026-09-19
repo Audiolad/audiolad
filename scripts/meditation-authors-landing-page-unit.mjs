@@ -120,7 +120,7 @@ function testMetadata() {
     metadata.alternates?.canonical,
     `${ORIGIN}${MEDITATION_AUTHORS_LANDING_PATH}`,
   );
-  assert.equal(metadata.robots?.index, false);
+  assert.equal(metadata.robots?.index, true);
   assert.equal(metadata.robots?.follow, true);
   assert.equal(metadata.openGraph?.type, "website");
 }
@@ -219,10 +219,21 @@ function testNoBakedMarketingInImages() {
   assert.doesNotMatch(view, /GenerateImage|unsplash|placeholder\.com/i);
 }
 
+
+function testSitemap() {
+  const sitemap = read("src/lib/seo/sitemap-data.ts");
+  assert.match(
+    sitemap,
+    /path:\s*"\/dlya-avtorov-meditatsiy"/,
+    "landing path must be in STATIC_SITEMAP_PAGES",
+  );
+}
+
 const tests = [
   ["path and copy", testPathAndCopy],
   ["final assets wired", testFinalAssetsWired],
   ["metadata", testMetadata],
+  ["sitemap", testSitemap],
   ["json-ld", testJsonLd],
   ["files exist", testFilesExist],
   ["page wiring", testPageWiring],

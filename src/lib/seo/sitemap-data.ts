@@ -47,6 +47,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/about", changeFrequency: "monthly", priority: 0.7 },
   { path: "/philosophy", changeFrequency: "monthly", priority: 0.6 },
   { path: "/for-authors", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/dlya-avtorov-meditatsiy", changeFrequency: "monthly", priority: 0.7 },
   { path: "/distribyutor-ii-muzyki", changeFrequency: "monthly", priority: 0.7 },
   { path: "/kak-sozdat-ii-muzyku", changeFrequency: "monthly", priority: 0.7 },
   { path: "/kak-vylozhit-ii-muzyku", changeFrequency: "monthly", priority: 0.7 },
