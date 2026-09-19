@@ -19,10 +19,9 @@ function BenefitVisual({ benefit }: { benefit: MeditationAuthorsBenefit }) {
       <Image
         src={benefit.src}
         alt=""
-        width={benefit.width}
-        height={benefit.height}
-        className="h-full w-full object-cover"
-        sizes="(max-width: 768px) 86vw, 28rem"
+        fill
+        className="object-cover"
+        sizes="(max-width: 768px) 85vw, 28rem"
         loading="lazy"
         draggable={false}
       />
@@ -31,7 +30,7 @@ function BenefitVisual({ benefit }: { benefit: MeditationAuthorsBenefit }) {
 
   return (
     <div
-      className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f7f2ff] via-[#faf7ff] to-[#efe6f8] px-5 text-center text-sm leading-6 text-[#7d70a2]"
+      className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#f7f2ff] via-[#faf7ff] to-[#efe6f8] px-5 text-center text-sm leading-6 text-[#7d70a2]"
       role="img"
       aria-label={benefit.visualLabel}
     >
@@ -129,10 +128,7 @@ export default function MeditationAuthorsBenefitsSlider() {
             data-mal-benefit-slide={benefit.id}
           >
             <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[#e8def5] bg-white shadow-[0_12px_30px_rgba(90,60,145,0.06)]">
-              <div
-                className="relative w-full overflow-hidden border-b border-[#efe6f8]"
-                style={{ aspectRatio: `${benefit.width} / ${benefit.height}` }}
-              >
+              <div className="mal-benefits-slider__media">
                 <BenefitVisual benefit={benefit} />
               </div>
               <div className="flex flex-1 flex-col gap-3 px-5 py-5 sm:px-6 sm:py-6">

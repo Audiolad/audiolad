@@ -3,6 +3,12 @@
  * Soft wellness / creator landing: scroll-snap slider + breathing primary CTA.
  */
 
+[data-meditation-authors-landing] {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 .mal-cta-primary {
   position: relative;
   transform-origin: center;
@@ -71,6 +77,68 @@
   }
 }
 
+/* Visual frames: reserve ratio, fill without CLS */
+.mal-visual {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  border-radius: 28px;
+  border: 1px solid #e8def5;
+  background: #faf7ff;
+  box-shadow: 0 16px 40px rgba(90, 60, 145, 0.08);
+}
+
+.mal-visual__img {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Ultra-wide UI screenshots get a taller mobile frame so they don't look tiny */
+.mal-visual--studio,
+.mal-visual--search-funnel {
+  aspect-ratio: 16 / 10;
+}
+
+.mal-visual--studio .mal-visual__img,
+.mal-visual--search-funnel .mal-visual__img {
+  object-position: top center;
+}
+
+@media (min-width: 1024px) {
+  .mal-visual--studio {
+    aspect-ratio: 2930 / 1582;
+  }
+
+  .mal-visual--search-funnel {
+    aspect-ratio: 1672 / 941;
+  }
+}
+
+.mal-visual--hero {
+  aspect-ratio: 1536 / 1024;
+}
+
+.mal-visual--author-space,
+.mal-visual--listener-intro,
+.mal-visual--final-cta {
+  aspect-ratio: 4 / 3;
+}
+
+.mal-visual--listener-intro {
+  aspect-ratio: 1495 / 1052;
+}
+
+.mal-hero {
+  min-width: 0;
+}
+
+.mal-hero__visual {
+  min-width: 0;
+}
+
 .mal-benefits-slider {
   width: 100%;
   min-width: 0;
@@ -80,13 +148,14 @@
   display: flex;
   gap: 1rem;
   margin: 0;
-  padding: 0.25rem 0.15rem 0.75rem;
+  padding: 0.25rem 0 0.75rem;
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
   scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.15rem;
   scrollbar-width: none;
   touch-action: pan-x pan-y;
 }
@@ -107,8 +176,10 @@
   border-radius: 16px;
 }
 
+/* % of track (not 86vw) — avoids page-level horizontal scroll */
 .mal-benefits-slider__item {
-  flex: 0 0 min(86vw, 22.5rem);
+  flex: 0 0 85%;
+  max-width: 22.5rem;
   min-width: 0;
   scroll-snap-align: start;
   scroll-snap-stop: always;
@@ -116,14 +187,25 @@
 
 @media (min-width: 768px) {
   .mal-benefits-slider__item {
-    flex-basis: min(70%, 28rem);
+    flex-basis: 70%;
+    max-width: 28rem;
   }
 }
 
 @media (min-width: 1280px) {
   .mal-benefits-slider__item {
-    flex-basis: min(42%, 30rem);
+    flex-basis: 42%;
+    max-width: 30rem;
   }
+}
+
+.mal-benefits-slider__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-bottom: 1px solid #efe6f8;
+  background: #faf7ff;
 }
 
 .mal-benefits-slider__dots {

@@ -65,20 +65,16 @@ function VisualSlot({
   priority?: boolean;
   className?: string;
 }) {
-  const frameClassName = `overflow-hidden rounded-[28px] border border-[#e8def5] bg-[#faf7ff] shadow-[0_16px_40px_rgba(90,60,145,0.08)] ${className}`;
+  const frameClassName = `mal-visual mal-visual--${visual.id} ${className}`.trim();
 
   if (visual.src) {
     return (
-      <figure
-        className={frameClassName}
-        style={{ aspectRatio: `${visual.width} / ${visual.height}` }}
-      >
+      <figure className={frameClassName}>
         <Image
           src={visual.src}
           alt={visual.alt}
-          width={visual.width}
-          height={visual.height}
-          className="h-full w-full object-cover"
+          fill
+          className="mal-visual__img"
           sizes="(max-width: 1023px) 100vw, 52vw"
           priority={priority}
           loading={priority ? undefined : "lazy"}
@@ -90,8 +86,7 @@ function VisualSlot({
   return (
     <figure className={frameClassName}>
       <div
-        className="flex w-full items-center justify-center bg-gradient-to-br from-[#fffaff] via-[#f7f2ff] to-[#efe6f8] px-6 text-center text-sm leading-6 text-[#7d70a2] sm:text-base sm:leading-7"
-        style={{ aspectRatio: `${visual.width} / ${visual.height}` }}
+        className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#fffaff] via-[#f7f2ff] to-[#efe6f8] px-6 text-center text-sm leading-6 text-[#7d70a2] sm:text-base sm:leading-7"
         role="img"
         aria-label={visual.alt}
         data-mal-visual-slot={visual.id}
@@ -214,12 +209,12 @@ export default function MeditationAuthorsLandingPageView() {
       </nav>
 
       {/* Block 1 — Hero */}
-      <header className="mt-8 grid items-center gap-8 lg:mt-10 lg:grid-cols-2 lg:gap-12 xl:gap-16">
-        <div className="order-2 lg:order-1">
-          <VisualSlot visual={hero} priority className="mx-auto max-w-xl lg:max-w-none" />
+      <header className="mal-hero mt-8 grid items-start gap-8 lg:mt-10 lg:grid-cols-2 lg:items-center lg:gap-12 xl:gap-16">
+        <div className="mal-hero__visual order-2 min-w-0 lg:order-1">
+          <VisualSlot visual={hero} priority />
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 min-w-0 lg:order-2">
           <h1 className="text-[1.85rem] font-semibold leading-tight tracking-tight text-[#25135c] sm:text-4xl sm:leading-tight">
             {MEDITATION_AUTHORS_LANDING_PAGE_H1}
           </h1>
@@ -244,7 +239,7 @@ export default function MeditationAuthorsLandingPageView() {
 
       {/* Block 3 — Studio */}
       <Section id="mal-studio" title={MEDITATION_AUTHORS_LANDING_STUDIO_HEADING}>
-        <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
           <div>
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_STUDIO_TEXT} />
             <div className="mt-8">
@@ -257,7 +252,7 @@ export default function MeditationAuthorsLandingPageView() {
 
       {/* Block 4 — Author space */}
       <Section id="mal-author-space" title={MEDITATION_AUTHORS_LANDING_SPACE_HEADING}>
-        <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
           <Paragraphs items={MEDITATION_AUTHORS_LANDING_SPACE_TEXT} />
           <VisualSlot visual={authorSpace} />
         </div>
@@ -265,7 +260,7 @@ export default function MeditationAuthorsLandingPageView() {
 
       {/* Block 5 — Listener intro */}
       <Section id="mal-listener-intro" title={MEDITATION_AUTHORS_LANDING_INTRO_HEADING}>
-        <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
           <div>
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_INTRO_TEXT} />
             <div className="mt-8">
