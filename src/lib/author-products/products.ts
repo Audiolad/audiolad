@@ -43,6 +43,7 @@ const PRACTICE_DETAIL_SELECT = `
   slug,
   subtitle,
   description,
+  audio_product_author,
   format,
   product_kind,
   publication_class,

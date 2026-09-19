@@ -60,6 +60,12 @@ import {
   PRODUCT_WIZARD_STEP_COUNT,
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
+import { isAurafonMusicWizard } from "@/lib/author-products/aurafon-music-wizard";
+import {
+  AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
+  hasAudioProductAuthor,
+} from "@/lib/author-products/audio-product-author";
+import { validateMusicTrackTitleForAurafonWizard } from "@/lib/author-products/music-track-title";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
   AUDIO_POST_CUSTOM_TYPE_LABEL,
@@ -317,6 +323,7 @@ type FormState = {
   title: string;
   subtitle: string;
   description: string;
+  audioProductAuthor: string;
   productKind: ProductKind;
   publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
@@ -480,6 +487,7 @@ function buildInitialForm(
     title: "",
     subtitle: "",
     description: "",
+    audioProductAuthor: "",
     productKind: created.productKind,
     publicationClass: created.publicationClass,
     musicUsagePermission:
@@ -610,6 +618,7 @@ function buildProductSavePayload(
     title: form.title.trim(),
     subtitle: form.subtitle.trim() || null,
     description: form.description.trim() || null,
+    audio_product_author: form.audioProductAuthor.trim() || null,
     product_kind: form.productKind,
     ...(form.publicationClass
       ? {
@@ -775,6 +784,7 @@ export default function AuthorProductForm({
     title?: string;
     subtitle?: string;
     description?: string;
+    audioProductAuthor?: string;
     formatCustom?: string;
     listeningNoticeTitle?: string;
     listeningNoticeText?: string;
@@ -1073,6 +1083,10 @@ export default function AuthorProductForm({
     selectedAuthor?.canBypassProductModeration === true;
 
   const wizardEnabled = isAuthorProductWizardEnabled(form.authorId);
+  const aurafonMusicWizard = isAurafonMusicWizard({
+    authorId: form.authorId,
+    productKind: form.productKind,
+  });
   const showWizardStep = (step: ProductWizardStep) =>
     shouldShowProductWizardStep({
       wizardEnabled,
@@ -1526,6 +1540,7 @@ export default function AuthorProductForm({
           if (
             fieldKey === "title" ||
             fieldKey === "subtitle" ||
+            fieldKey === "audioProductAuthor" ||
             fieldKey === "description" ||
             fieldKey === "formatCustom" ||
             fieldKey === "listeningNoticeTitle" ||
@@ -1634,6 +1649,9 @@ export default function AuthorProductForm({
   }
 
   async function openPublishPreviewTab(): Promise<boolean> {
+    if (!assertAurafonMusicReadyForPublish()) {
+      return false;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -1708,6 +1726,10 @@ export default function AuthorProductForm({
 
   async function publishProduct() {
     if (publishInFlightRef.current) {
+      return;
+    }
+
+    if (!assertAurafonMusicReadyForPublish()) {
       return;
     }
 
@@ -2619,8 +2641,72 @@ export default function AuthorProductForm({
     return Boolean(practiceIdRef.current || practiceId);
   }
 
+  function applyAurafonMusicAuthorFieldError(): boolean {
+    if (!aurafonMusicWizard) {
+      return false;
+    }
+    if (hasAudioProductAuthor(form.audioProductAuthor)) {
+      return false;
+    }
+    setFieldErrors((current) => ({
+      ...current,
+      audioProductAuthor: AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
+    }));
+    return true;
+  }
+
+  function applyAurafonMusicTrackTitleErrors(): boolean {
+    if (!aurafonMusicWizard) {
+      return false;
+    }
+    let hasInvalid = false;
+    const nextErrors: Record<string, { title?: string; description?: string }> =
+      { ...audioFieldErrors };
+    for (const item of audioItems) {
+      const titleError = validateMusicTrackTitleForAurafonWizard(item.title);
+      if (titleError) {
+        hasInvalid = true;
+        nextErrors[item.id] = {
+          ...nextErrors[item.id],
+          title: titleError,
+        };
+      }
+    }
+    if (hasInvalid) {
+      setAudioFieldErrors(nextErrors);
+    }
+    return hasInvalid;
+  }
+
+  function assertAurafonMusicReadyForPublish(): boolean {
+    if (!aurafonMusicWizard) {
+      return true;
+    }
+    if (applyAurafonMusicAuthorFieldError()) {
+      goToWizardStep(1);
+      requestScrollToFirstSubmitIssue();
+      return false;
+    }
+    if (applyAurafonMusicTrackTitleErrors()) {
+      goToWizardStep(2);
+      requestScrollToFirstSubmitIssue();
+      return false;
+    }
+    return true;
+  }
+
   async function saveWizardStep() {
     await saveDraft();
+    if (aurafonMusicWizard && wizardStep === 1) {
+      if (applyAurafonMusicAuthorFieldError()) {
+        requestScrollToFirstSubmitIssue();
+      }
+    }
+    if (aurafonMusicWizard && wizardStep === 2) {
+      if (applyAurafonMusicTrackTitleErrors()) {
+        requestScrollToFirstSubmitIssue();
+      }
+    }
   }
 
   async function saveWizardStepAndContinue() {
@@ -2631,6 +2717,20 @@ export default function AuthorProductForm({
       return;
     }
     setMessage("Черновик сохранён.");
+
+    if (aurafonMusicWizard && wizardStep === 1) {
+      if (applyAurafonMusicAuthorFieldError()) {
+        requestScrollToFirstSubmitIssue();
+        return;
+      }
+    }
+    if (aurafonMusicWizard && wizardStep === 2) {
+      if (applyAurafonMusicTrackTitleErrors()) {
+        requestScrollToFirstSubmitIssue();
+        return;
+      }
+    }
+
     const next = nextProductWizardStep(wizardStep);
     if (next) {
       goToWizardStep(next);
@@ -2987,6 +3087,46 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
+        {isAurafonMusicWizard({
+          authorId: form.authorId,
+          productKind: form.productKind,
+        }) ? (
+          <label
+            className="block"
+            data-submit-issue={fieldErrors.audioProductAuthor ? "" : undefined}
+          >
+            <span className="mb-2 block text-sm font-medium">Автор музыки</span>
+            <input
+              value={form.audioProductAuthor}
+              maxLength={PRODUCT_CONTENT_LIMITS.audioProductAuthor}
+              onChange={(event) => {
+                setFieldErrors((current) => ({
+                  ...current,
+                  audioProductAuthor: undefined,
+                }));
+                setForm((current) => ({
+                  ...current,
+                  audioProductAuthor: event.target.value,
+                }));
+              }}
+              placeholder="Например: Сергей Петров"
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+            />
+            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+              Укажите имя и фамилию автора музыки.
+            </p>
+            <CharCounter
+              value={form.audioProductAuthor}
+              max={PRODUCT_CONTENT_LIMITS.audioProductAuthor}
+            />
+            {fieldErrors.audioProductAuthor ? (
+              <p className="mt-2 text-sm text-[#9b3d3d]">
+                {fieldErrors.audioProductAuthor}
+              </p>
+            ) : null}
+          </label>
+        ) : null}
+
 </>
         ) : null}
 
@@ -3156,15 +3296,31 @@ export default function AuthorProductForm({
 </>
         ) : null}
 
+<div
+        className={
+          aurafonMusicWizard && wizardStep === 4
+            ? "flex flex-col gap-6"
+            : "contents"
+        }
+      >
+        <div
+          className={
+            aurafonMusicWizard && wizardStep === 4 ? "order-2" : undefined
+          }
+        >
 {showWizardStep(4) ? (
         <>
         {form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
-              Условия использования музыки
+              {aurafonMusicWizard
+                ? "Использование музыки в Студии АудиоЛада"
+                : "Условия использования музыки"}
             </legend>
             <p className="text-sm leading-5 text-[#7d70a2]">
-              {MUSIC_USAGE_PERMISSION_INTRO}
+              {aurafonMusicWizard
+                ? "Другие авторы могут использовать вашу музыку при создании медитаций, практик и других аудиопродуктов в Студии АудиоЛада. За каждое такое использование вы получаете оплату."
+                : MUSIC_USAGE_PERMISSION_INTRO}
             </p>
             {(
               [
@@ -3222,7 +3378,11 @@ export default function AuthorProductForm({
                 />
                 <span>
                   <span className="block text-sm font-medium text-[#3f3560]">
-                    {getMusicUsagePermissionLabel(value)}
+                    {aurafonMusicWizard
+                      ? value === MUSIC_USAGE_PERMISSION.LISTEN_ONLY
+                        ? "Только для прослушивания"
+                        : "Разрешить использование в Студии АудиоЛада"
+                      : getMusicUsagePermissionLabel(value)}
                   </span>
                   <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
                     {getMusicUsagePermissionDescription(value)}
@@ -3245,11 +3405,22 @@ export default function AuthorProductForm({
           MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
-              Использование в Студии АудиоЛада
+              {aurafonMusicWizard
+                ? "Стоимость использования музыки в Студии"
+                : "Использование в Студии АудиоЛада"}
             </legend>
             <p className="text-sm leading-5 text-[#7d70a2]">
-              Разрешите другим авторам использовать вашу музыку при создании
-              медитаций и практик.
+              {aurafonMusicWizard ? (
+                <>
+                  Выберите стоимость использования вашей музыки другим автором.
+                  Минимальная стоимость — {MIN_STUDIO_MUSIC_PRICE_RUBLES} ₽.
+                </>
+              ) : (
+                <>
+                  Разрешите другим авторам использовать вашу музыку при создании
+                  медитаций и практик.
+                </>
+              )}
             </p>
             <p className="text-sm leading-5 text-[#7d70a2]">
               {STUDIO_NEW_FREE_POLICY_COPY.newProductsPaidOnly}
@@ -3394,6 +3565,8 @@ export default function AuthorProductForm({
 
 </>
         ) : null}
+        </div>
+
 
 {showWizardStep(3) ? (
         <div data-submit-issue={topicError ? "" : undefined}>
@@ -3494,11 +3667,28 @@ export default function AuthorProductForm({
 </>
         ) : null}
 
+        <div
+          className={
+            aurafonMusicWizard && wizardStep === 4 ? "order-1" : undefined
+          }
+        >
 {showWizardStep(4) ? (
         <>
+        {aurafonMusicWizard ? (
+          <div className="mb-2">
+            <h3 className="text-[18px] font-semibold text-[#3f3560]">
+              Доступ для слушателей АудиоЛада
+            </h3>
+            <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+              Выберите, как ваша музыка будет доступна слушателям АудиоЛада.
+            </p>
+          </div>
+        ) : null}
         {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
         <div>
-          <span className="mb-2 block text-sm font-medium">Цена</span>
+          <span className="mb-2 block text-sm font-medium">
+            {aurafonMusicWizard ? "Цена для слушателей" : "Цена"}
+          </span>
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
@@ -3692,6 +3882,13 @@ export default function AuthorProductForm({
 </>
         ) : null}
 
+
+        </div>
+        <div
+          className={
+            aurafonMusicWizard && wizardStep === 4 ? "order-3" : undefined
+          }
+        >
 {showWizardStep(4) ? (
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">
@@ -3777,6 +3974,8 @@ export default function AuthorProductForm({
           ) : null}
         </fieldset>
 ) : null}
+        </div>
+      </div>
 
       </section>
 
@@ -3963,7 +4162,11 @@ export default function AuthorProductForm({
               </div>
 
               <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium">Название</span>
+                <span className="mb-2 block text-sm font-medium">
+                  {aurafonMusicWizard
+                    ? "Название (обязательно, на русском языке)"
+                    : "Название"}
+                </span>
                 <input
                   ref={(element) => setTitleInputRef(audioItem.id, element)}
                   value={audioItem.title}
@@ -4019,7 +4222,9 @@ export default function AuthorProductForm({
 
               <label className="mt-4 block">
                 <span className="mb-2 block text-sm font-medium">
-                  Краткое описание
+                  {aurafonMusicWizard
+                    ? "Подназвание (необязательно)"
+                    : "Краткое описание"}
                 </span>
                 <textarea
                   value={audioItem.description ?? ""}

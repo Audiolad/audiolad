@@ -157,7 +157,7 @@ assert.match(form, /wizardEnabled && wizardStep === PRODUCT_WIZARD_STEP_COUNT[\s
 // No second controller / no new product fields / no reservation
 assert.doesNotMatch(form, /AurafonProductForm/);
 assert.doesNotMatch(form, /LegacyAuthorProductForm/);
-assert.doesNotMatch(form, /audio_product_author/);
+// audio_product_author added in Aurafon music wizard refine PR
 assert.doesNotMatch(form, /rightsDeclaration|declarationOfRights/);
 assert.doesNotMatch(form, /reservation/);
 

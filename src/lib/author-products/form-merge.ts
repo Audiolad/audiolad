@@ -39,6 +39,7 @@ export type ProductFormSnapshot = {
   title: string;
   subtitle: string;
   description: string;
+  audioProductAuthor: string;
   productKind: ProductKind;
   publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
@@ -96,6 +97,7 @@ export function productDetailToFormSnapshot(
     title: practice.title,
     subtitle: practice.subtitle ?? "",
     description: practice.description ?? "",
+    audioProductAuthor: practice.audio_product_author ?? "",
     productKind,
     publicationClass: parsePublicationClass(practice.publication_class),
     musicUsagePermission:
@@ -196,6 +198,7 @@ export function mergeServerProductIntoForm(
     title: current.title.trim() ? current.title : server.title,
     subtitle: current.subtitle,
     description: current.description,
+    audioProductAuthor: current.audioProductAuthor,
     productKind: current.productKind || server.productKind,
     publicationClass: current.publicationClass ?? server.publicationClass,
     musicUsagePermission:
