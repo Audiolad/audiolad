@@ -139,23 +139,38 @@
   min-width: 0;
 }
 
+.mal-block-body {
+  margin-top: 2rem;
+}
+
+@media (min-width: 640px) {
+  .mal-block-body {
+    margin-top: 2.5rem;
+  }
+}
+
 .mal-benefits-slider {
   width: 100%;
   min-width: 0;
 }
 
+.mal-benefits-slider__viewport {
+  position: relative;
+  min-width: 0;
+}
+
 .mal-benefits-slider__track {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   margin: 0;
-  padding: 0.25rem 0 0.75rem;
+  padding: 0.15rem 2.35rem 0.35rem;
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: 0.15rem;
+  scroll-padding-inline: 2.35rem;
   scrollbar-width: none;
   touch-action: pan-x pan-y;
 }
@@ -176,10 +191,10 @@
   border-radius: 16px;
 }
 
-/* % of track (not 86vw) — avoids page-level horizontal scroll */
+/* Compact cards; % of track avoids page-level horizontal scroll */
 .mal-benefits-slider__item {
-  flex: 0 0 85%;
-  max-width: 22.5rem;
+  flex: 0 0 82%;
+  max-width: 20.5rem;
   min-width: 0;
   scroll-snap-align: start;
   scroll-snap-stop: always;
@@ -187,25 +202,34 @@
 
 @media (min-width: 768px) {
   .mal-benefits-slider__item {
-    flex-basis: 70%;
-    max-width: 28rem;
+    flex-basis: 58%;
+    max-width: 24rem;
   }
 }
 
 @media (min-width: 1280px) {
   .mal-benefits-slider__item {
-    flex-basis: 42%;
-    max-width: 30rem;
+    flex-basis: 38%;
+    max-width: 26rem;
   }
 }
 
 .mal-benefits-slider__media {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 11;
   overflow: hidden;
   border-bottom: 1px solid #efe6f8;
   background: #faf7ff;
+}
+
+.mal-benefits-slider__index {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #7042c5;
 }
 
 .mal-benefits-slider__dots {
@@ -213,14 +237,14 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 0.9rem;
-  margin-top: 0.85rem;
+  gap: 0.35rem;
+  min-height: 0.75rem;
+  margin-top: 0.65rem;
 }
 
 .mal-benefits-slider__dot {
-  width: 0.38rem;
-  height: 0.38rem;
+  width: 0.34rem;
+  height: 0.34rem;
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -236,34 +260,35 @@
 }
 
 .mal-benefits-slider__dot--active {
-  width: 0.85rem;
+  width: 0.75rem;
   background: #7042c5;
 }
 
-.mal-benefits-slider__nav {
-  display: none;
-  gap: 0.5rem;
-  margin-top: 0.85rem;
-}
-
-@media (min-width: 768px) {
-  .mal-benefits-slider__nav {
-    display: flex;
-    justify-content: flex-end;
-  }
-}
-
+/* Side arrows overlayed on the slider — no extra bar below */
 .mal-benefits-slider__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
   display: inline-flex;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   border: 1px solid #d8c8ee;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   color: #7042c5;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  box-shadow: 0 4px 14px rgba(90, 60, 145, 0.1);
+  transform: translateY(-50%);
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.mal-benefits-slider__arrow--prev {
+  left: 0.15rem;
+}
+
+.mal-benefits-slider__arrow--next {
+  right: 0.15rem;
 }
 
 .mal-benefits-slider__arrow:hover:not(:disabled) {
@@ -272,7 +297,7 @@
 }
 
 .mal-benefits-slider__arrow:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
