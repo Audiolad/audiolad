@@ -72,13 +72,10 @@ assert.match(form, /Содержание аудиопродукта|Треки/)
 assert.match(form, /catalogVisibility|CATALOG_VISIBILITY/);
 assert.match(form, /CATALOG_GALLERY_MAX_SLIDES|gallery/);
 
-// This PR must not enable the wizard UI
-assert.doesNotMatch(form, /isAuthorProductWizardEnabled/);
-assert.doesNotMatch(form, /parseProductWizardStep/);
-assert.doesNotMatch(form, /\?step=/);
-assert.doesNotMatch(form, /product-wizard-beta/);
-assert.doesNotMatch(form, /PRODUCT_WIZARD_STEPS/);
+// Presentational sections stay free of wizard gate/navigation.
 assert.doesNotMatch(actions, /isAuthorProductWizardEnabled/);
 assert.doesNotMatch(listening, /isAuthorProductWizardEnabled/);
+assert.doesNotMatch(actions, /parseProductWizardStep/);
+assert.doesNotMatch(listening, /product-wizard-beta/);
 
 console.log("author-product-form-sections-unit: ok");

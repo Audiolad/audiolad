@@ -120,11 +120,13 @@ assert.equal(parseProductWizardStep("abc"), 1);
 assert.equal(parseProductWizardStep("1.5"), 1);
 assert.equal(parseProductWizardStep(" 2 "), 2);
 
-// Foundation must not wire into the live form yet.
+// Aurafon wizard UI wires the foundation gate + step contract into the live form.
 const productForm = read("src/components/author-dashboard/AuthorProductForm.tsx");
-assert.doesNotMatch(productForm, /isAuthorProductWizardEnabled/);
+assert.match(productForm, /isAuthorProductWizardEnabled\(form\.authorId\)/);
+assert.match(productForm, /product-wizard-beta/);
+assert.match(productForm, /product-wizard-steps/);
+assert.match(productForm, /PRODUCT_WIZARD_STEPS|PRODUCT_WIZARD_STEP_COUNT|ProductWizardStep/);
 assert.doesNotMatch(productForm, /parseProductWizardStep/);
-assert.doesNotMatch(productForm, /product-wizard-steps/);
-assert.doesNotMatch(productForm, /product-wizard-beta/);
+assert.match(productForm, /readProductWizardStepFromSearch|buildWizardStepHref/);
 
 console.log("author-product-wizard-foundation-unit: ok");
