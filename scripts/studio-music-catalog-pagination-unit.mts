@@ -1063,7 +1063,7 @@ assert.match(catalogSource, /applyStudioMusicCatalogSearch/);
   });
   assert.equal(page.practices.length, 5, "commercial-before-pagination count");
   assert.ok(
-    page.practices.every((practice) => practice.title.startsWith("commercial-")),
+    page.practices.every((practice) => String(practice.title ?? "").startsWith("commercial-")),
     "commercial-before-pagination titles",
   );
   assert.deepEqual(recording.practiceLimits, [6]);
