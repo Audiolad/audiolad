@@ -295,7 +295,8 @@
     "test:studio-render-temp-workspace": "npx tsx scripts/studio-render-temp-workspace-unit.mts",
     "test:studio-render-timeline-guard": "npx tsx scripts/studio-render-timeline-guard-unit.mts",
     "test:playback-analytics-canonical": "npx tsx scripts/playback-analytics-canonical-unit.mjs",
-    "test:studio-require-commercial-author-sql": "node scripts/studio-require-commercial-author-sql-unit.mjs"
+    "test:studio-require-commercial-author-sql": "node scripts/studio-require-commercial-author-sql-unit.mjs",
+    "test:author-space-slug-ops": "node scripts/author-space-slug-ops-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -163,6 +163,33 @@ function getAuthorName(practice: PublicPracticeRow): string | null {
   return name ? name : null;
 }
 
+
+async function resolveAuthorSlugPracticeRedirect(
+  authorSlug: string,
+  productSlug: string,
+) {
+  const { createClient } = await import("@/lib/supabase/server");
+  const {
+    resolveAuthorSlugRedirect,
+    buildPracticeRedirectTarget,
+    practiceBelongsToAuthor,
+  } = await import("@/lib/authors/space-ops");
+  const supabase = await createClient();
+  const redirected = await resolveAuthorSlugRedirect(supabase, authorSlug);
+  if (!redirected) {
+    return null;
+  }
+  const belongs = await practiceBelongsToAuthor(
+    supabase,
+    redirected.authorId,
+    productSlug,
+  );
+  if (!belongs) {
+    return null;
+  }
+  return buildPracticeRedirectTarget(redirected.currentSlug, productSlug);
+}
+
 async function resolvePracticeRoute(segments: string[]) {
   if (segments.length === 2) {
     return {
@@ -360,6 +387,13 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   }
 
   if (!practice) {
+    const redirectTo = await resolveAuthorSlugPracticeRedirect(
+      route.authorSlug,
+      route.productSlug,
+    );
+    if (redirectTo) {
+      permanentRedirect(redirectTo);
+    }
     notFound();
   }
 

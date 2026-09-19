@@ -80,3 +80,15 @@ export function withAuthorQuery(href: string, authorSlug: string | null | undefi
   const next = params.toString();
   return next ? `${path}?${next}` : path;
 }
+
+export function buildClearedAuthorProjectCookie(): string {
+  return `${AUTHOR_PROJECT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+export function clearAuthorProjectCookieClient() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  document.cookie = buildClearedAuthorProjectCookie();
+}
+
