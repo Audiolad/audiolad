@@ -1540,6 +1540,7 @@ export default function AuthorProductForm({
           if (
             fieldKey === "title" ||
             fieldKey === "subtitle" ||
+            fieldKey === "audioProductAuthor" ||
             fieldKey === "description" ||
             fieldKey === "formatCustom" ||
             fieldKey === "listeningNoticeTitle" ||
@@ -3114,7 +3115,10 @@ export default function AuthorProductForm({
             <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
               Укажите имя и фамилию автора музыки.
             </p>
-            <CharCounter value={form.audioProductAuthor} max={120} />
+            <CharCounter
+              value={form.audioProductAuthor}
+              max={PRODUCT_CONTENT_LIMITS.audioProductAuthor}
+            />
             {fieldErrors.audioProductAuthor ? (
               <p className="mt-2 text-sm text-[#9b3d3d]">
                 {fieldErrors.audioProductAuthor}
@@ -3511,9 +3515,7 @@ export default function AuthorProductForm({
                 data-submit-issue={fieldErrors.studioMusicPrice ? "" : undefined}
               >
                 <span className="mb-1 block text-sm text-[#7d70a2]">
-                  {aurafonMusicWizard
-                    ? "Цена для Студии, ₽"
-                    : "Цена для Студии, ₽"}
+                  Цена для Студии, ₽
                 </span>
                 <input
                   type="number"

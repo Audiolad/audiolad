@@ -104,6 +104,7 @@ export const AUTHOR_SEO_SECONDARY_ACTIVE_MAX = 2;
 export type ProductFieldErrorCode =
   | "title_too_long"
   | "subtitle_too_long"
+  | "audio_product_author_too_long"
   | "description_too_long"
   | "audio_title_too_long"
   | "audio_description_too_long"
@@ -127,7 +128,9 @@ export function validateTitleLength(value: string): ProductFieldErrorCode | null
 }
 
 
-export function validateAudioProductAuthorLength(value: string): string | null {
+export function validateAudioProductAuthorLength(
+  value: string,
+): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.audioProductAuthor) {
     return "audio_product_author_too_long";
   }
@@ -284,6 +287,8 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Название не должно превышать 70 символов.";
     case "subtitle_too_long":
       return "Подзаголовок не должен превышать 120 символов.";
+    case "audio_product_author_too_long":
+      return "Автор аудиопродукта не должен превышать 120 символов.";
     case "description_too_long":
       return `Текст «${AUTHOR_DESCRIPTION_LABEL}» не должен превышать 1000 символов.`;
     case "audio_title_too_long":
@@ -320,6 +325,7 @@ export function getProductFieldKeyForError(
 ):
   | "title"
   | "subtitle"
+  | "audioProductAuthor"
   | "description"
   | "audioTitle"
   | "audioDescription"
@@ -338,6 +344,8 @@ export function getProductFieldKeyForError(
       return "title";
     case "subtitle_too_long":
       return "subtitle";
+    case "audio_product_author_too_long":
+      return "audioProductAuthor";
     case "description_too_long":
       return "description";
     case "audio_title_too_long":

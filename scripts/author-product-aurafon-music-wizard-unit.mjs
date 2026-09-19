@@ -7,12 +7,15 @@ import { fileURLToPath } from "node:url";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon.ts";
 import { isAurafonMusicWizard } from "../src/lib/author-products/aurafon-music-wizard.ts";
 import {
-  AUDIO_PRODUCT_AUTHOR_MAX_LENGTH,
   AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
   hasAudioProductAuthor,
-  normalizeAudioProductAuthor,
-  validateAudioProductAuthorLength,
 } from "../src/lib/author-products/audio-product-author.ts";
+import {
+  PRODUCT_CONTENT_LIMITS,
+  getProductFieldErrorMessage,
+  getProductFieldKeyForError,
+  validateAudioProductAuthorLength,
+} from "../src/lib/author-products/limits.ts";
 import {
   MUSIC_TRACK_TITLE_CYRILLIC_ERROR,
   musicTrackTitleHasCyrillic,
@@ -48,16 +51,21 @@ assert.equal(
   false,
 );
 
-// Author field normalize
-assert.equal(normalizeAudioProductAuthor(null), null);
-assert.equal(normalizeAudioProductAuthor(""), null);
-assert.equal(normalizeAudioProductAuthor("   "), null);
-assert.equal(normalizeAudioProductAuthor(" Сергей Петров "), "Сергей Петров");
-assert.equal(validateAudioProductAuthorLength("x".repeat(121)), "audio_product_author_too_long");
-assert.equal(validateAudioProductAuthorLength("ok"), null);
+// Author field helpers + canonical length / field-error contract
 assert.equal(hasAudioProductAuthor(""), false);
 assert.equal(hasAudioProductAuthor("Сергей"), true);
-assert.equal(AUDIO_PRODUCT_AUTHOR_MAX_LENGTH, 120);
+assert.equal(AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE, "Укажите автора музыки.");
+assert.equal(PRODUCT_CONTENT_LIMITS.audioProductAuthor, 120);
+assert.equal(validateAudioProductAuthorLength("x".repeat(121)), "audio_product_author_too_long");
+assert.equal(validateAudioProductAuthorLength("ok"), null);
+assert.equal(
+  getProductFieldErrorMessage("audio_product_author_too_long"),
+  "Автор аудиопродукта не должен превышать 120 символов.",
+);
+assert.equal(
+  getProductFieldKeyForError("audio_product_author_too_long"),
+  "audioProductAuthor",
+);
 
 // Cyrillic titles
 const pass = [
@@ -136,5 +144,17 @@ assert.match(form, /isAurafonMusicWizard\(\{[\s\S]*Автор музыки/);
 
 assert.equal(CATALOG_GALLERY_MAX_SLIDES, 30);
 assert.equal(AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE, "Укажите автора музыки.");
+
+const audioAuthorHelper = read("src/lib/author-products/audio-product-author.ts");
+assert.doesNotMatch(audioAuthorHelper, /validateAudioProductAuthorLength/);
+assert.doesNotMatch(audioAuthorHelper, /AUDIO_PRODUCT_AUTHOR_MAX_LENGTH/);
+assert.doesNotMatch(audioAuthorHelper, /normalizeAudioProductAuthor/);
+const limitsSrc = read("src/lib/author-products/limits.ts");
+assert.match(limitsSrc, /audio_product_author_too_long/);
+assert.match(limitsSrc, /Автор аудиопродукта не должен превышать 120 символов/);
+assert.match(limitsSrc, /case "audio_product_author_too_long":\s*return "audioProductAuthor"/);
+assert.match(form, /PRODUCT_CONTENT_LIMITS\.audioProductAuthor/);
+assert.match(form, /fieldKey === "audioProductAuthor"/);
+assert.doesNotMatch(form, /aurafonMusicWizard\s*\?\s*"Цена для Студии/);
 
 console.log("author-product-aurafon-music-wizard-unit: ok");
