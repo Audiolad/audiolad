@@ -361,7 +361,7 @@ function MusicLibraryCard({
             Прослушивание:{" "}
             {item.listenerIsFree
               ? "бесплатно"
-              : formatPriceLabel(item.listenerPriceRubles)}
+              : formatPriceLabel(item.listenerPriceRubles, false)}
           </p>
           <p className="text-sm text-[#7d70a2]">
             {item.inStudio ? "В Студии" : "Не в Студии"}
@@ -433,7 +433,7 @@ function MusicStudioCard({
               Прослушивание:{" "}
               {item.listenerIsFree
                 ? "бесплатно"
-                : formatPriceLabel(item.listenerPriceRubles)}
+                : formatPriceLabel(item.listenerPriceRubles, false)}
             </p>
           </div>
 
