@@ -3098,7 +3098,7 @@ export default function AuthorProductForm({
             <span className="mb-2 block text-sm font-medium">Автор музыки</span>
             <input
               value={form.audioProductAuthor}
-              maxLength={120}
+              maxLength={PRODUCT_CONTENT_LIMITS.audioProductAuthor}
               onChange={(event) => {
                 setFieldErrors((current) => ({
                   ...current,
