@@ -376,12 +376,33 @@ export async function trackPlatformEvent(
   return { client_event_id: clientEventId, accepted: result.ok };
 }
 
+type CachedAnalyticsSessionListener = (sessionId: string | null) => void;
+
+const cachedAnalyticsSessionListeners = new Set<CachedAnalyticsSessionListener>();
+
 export function setCachedAnalyticsSessionId(sessionId: string | null): void {
   cachedSessionId = sessionId;
+  for (const listener of cachedAnalyticsSessionListeners) {
+    try {
+      listener(sessionId);
+    } catch {
+      // Analytics listeners must not break UX
+    }
+  }
 }
 
 export function getCachedAnalyticsSessionId(): string | null {
   return cachedSessionId;
+}
+
+/** Subscribe to analytics session cache readiness (H2: play-before-session). */
+export function subscribeCachedAnalyticsSessionId(
+  listener: CachedAnalyticsSessionListener,
+): () => void {
+  cachedAnalyticsSessionListeners.add(listener);
+  return () => {
+    cachedAnalyticsSessionListeners.delete(listener);
+  };
 }
 
 export type CurrentAnalyticsIdentity = {

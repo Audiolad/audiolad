@@ -13,7 +13,6 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import LibraryAddButton from "@/components/LibraryAddButton";
-import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracker";
 import ListenPageViewTracker from "@/components/analytics/ListenPageViewTracker";
 import PromoPlaybackPrompts from "@/components/promo/PromoPlaybackPrompts";
 import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
@@ -618,21 +617,10 @@ export function ListenPlayerProvider({
     <ListenPlayerContext.Provider value={value}>
       {children}
       {isEngineReady && !isAuthorPreview && authorSlug && productSlug ? (
-        <>
-          <ListenPageViewTracker
-            practiceId={practiceId}
-            path={`/listen/${authorSlug}/${productSlug}`}
-          />
-          <ListenAnalyticsTracker
-            practiceId={practiceId}
-            trackId={currentTrack?.id ?? null}
-            path={`/listen/${authorSlug}/${productSlug}`}
-            currentTime={currentTime}
-            duration={displayDuration}
-            isPlaying={isPlaying}
-            programCompleted={programCompleted}
-          />
-        </>
+        <ListenPageViewTracker
+          practiceId={practiceId}
+          path={`/listen/${authorSlug}/${productSlug}`}
+        />
       ) : null}
     </ListenPlayerContext.Provider>
   );

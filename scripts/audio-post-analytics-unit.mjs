@@ -148,86 +148,96 @@ assert.equal(
   "a tracker only follows its matching runtime product session",
 );
 
-const inlineTracker = read(
+const inlineHelper = read(
   "src/components/products/audio-post/AudioPostListenAnalytics.tsx",
 );
 assert.match(
-  inlineTracker,
+  inlineHelper,
   /isInlineOnlyPlaybackSession\(session\)/,
-  "inline tracker is limited to inline_only sessions",
+  "inline helper is limited to inline_only sessions",
 );
 assert.match(
-  inlineTracker,
+  inlineHelper,
   /getActiveInlineAudioPostSession/,
   "author previews do not emit playback analytics",
 );
 assert.match(
-  inlineTracker,
+  inlineHelper,
   /session\.practiceId !== context\.practiceId/,
-  "tracker ignores a global session for another product",
+  "helper ignores a global session for another product",
 );
 assert.match(
-  inlineTracker,
-  /trackId=\{engine\.currentTrack\?\.id \?\? null\}/,
-  "tracker receives the active audio item id",
+  inlineHelper,
+  /return null/,
+  "audio_post page helper no longer mounts a second ListenAnalyticsTracker",
 );
-assert.match(
-  inlineTracker,
-  /isPlaying=\{engine\.isPlaying\}/,
-  "start event continues to follow actual playback",
-);
-assert.match(
-  inlineTracker,
-  /programCompleted=\{engine\.programCompleted\}/,
-  "completion follows the shared tracker logic",
+assert.doesNotMatch(
+  inlineHelper,
+  /<ListenAnalyticsTracker/,
+  "audio_post does not double-mount playback analytics",
 );
 
 const audioPostPage = read("src/components/products/audio-post/AudioPostPage.tsx");
 assert.equal(
   (audioPostPage.match(/<AudioPostListenAnalytics/g) ?? []).length,
   1,
-  "audio_post page mounts exactly one inline tracker across responsive layouts",
-);
-assert.match(
-  audioPostPage,
-  /path=\{viewModel\.practicePagePath\}/,
-  "inline analytics use the canonical public practice path",
+  "audio_post page keeps a single legacy mount slot (now a no-op)",
 );
 
 const fullscreenPlayer = read("src/components/audio/listen-player-shared.tsx");
-assert.match(
+assert.doesNotMatch(
   fullscreenPlayer,
   /<ListenAnalyticsTracker/,
-  "practice and music retain the fullscreen tracker",
+  "fullscreen listen player no longer mounts a duplicate tracker",
+);
+assert.match(
+  fullscreenPlayer,
+  /ListenPageViewTracker/,
+  "fullscreen listen still records listen page views",
 );
 
 const globalProvider = read("src/components/audio/GlobalAudioPlayerProvider.tsx");
-assert.doesNotMatch(
+assert.match(
   globalProvider,
-  /ListenAnalyticsTracker/,
-  "global provider does not add a second tracker for fullscreen sessions",
+  /<GlobalPlaybackAnalytics/,
+  "global player mounts the canonical playback analytics path",
 );
 
 const sharedTracker = read("src/components/analytics/ListenAnalyticsTracker.tsx");
 assert.match(
   sharedTracker,
-  /if \(!trackId \|\| !isPlaying \|\| playStartedRef\.current\)/,
-  "the shared tracker emits one start until its listening session resets",
+  /shouldAttemptPlayStartedEmit/,
+  "the shared tracker emits one start until its listening context resets",
+);
+assert.match(
+  sharedTracker,
+  /expireListenTrackerContextIfInactive/,
+  "listening gap is inactivity since last playing activity",
+);
+assert.match(
+  sharedTracker,
+  /subscribeCachedAnalyticsSessionId/,
+  "play-before-session waits for analytics session readiness",
+);
+assert.match(
+  sharedTracker,
+  /trackedTrackIdRef/,
+  "track A→B resets per-track analytics state",
 );
 assert.match(
   sharedTracker,
   /event_name: "audio_play_started"/,
-  "the inline adapter reuses the standard start event",
+  "the shared tracker emits the standard start event",
 );
 assert.match(
   sharedTracker,
   /getNewlyReachedMilestones/,
-  "the inline adapter reuses the standard progress milestone flow",
+  "the shared tracker reuses the standard progress milestone flow",
 );
 assert.match(
   sharedTracker,
   /event_name: "audio_completed"/,
-  "the inline adapter reuses the standard completion event",
+  "the shared tracker reuses the standard completion event",
 );
 
 const cta = read("src/components/products/NextStepRecommendation.tsx");

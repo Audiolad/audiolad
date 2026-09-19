@@ -304,7 +304,12 @@ function testProviderSoT() {
     "playlist last-item all uses restartPlaylistQueue",
   );
   assert.match(provider, /resetContinuousListenSession/);
-  assert.doesNotMatch(provider, /ListenAnalyticsTracker/);
+  assert.match(provider, /GlobalPlaybackAnalytics/);
+  assert.doesNotMatch(
+    provider,
+    /from "@\/components\/analytics\/ListenAnalyticsTracker"/,
+    "provider mounts GlobalPlaybackAnalytics, not ListenAnalyticsTracker directly",
+  );
 
   assert.match(sequential, /getRepeatMode\?: \(\) => RepeatMode/);
   assert.match(sequential, /getRepeatModeRef/);
@@ -318,7 +323,8 @@ function testProviderSoT() {
   assert.match(shared, /cycleRepeatMode,/);
   assert.doesNotMatch(shared, /useState<RepeatMode>/);
 
-  assert.match(tracker, /if \(!trackId \|\| !isPlaying \|\| playStartedRef\.current\)/);
+  assert.match(tracker, /shouldAttemptPlayStartedEmit/);
+  assert.match(tracker, /expireListenTrackerContextIfInactive/);
   assert.match(tracker, /rememberContinuousListenPlayStarted/);
   assert.match(tracker, /rememberContinuousListenCompleted/);
   assert.match(tracker, /touchContinuousListenSessionActivity/);

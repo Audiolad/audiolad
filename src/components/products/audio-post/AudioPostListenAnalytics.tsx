@@ -4,7 +4,6 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
-import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracker";
 import {
   isCatalogGlobalPlayerSession,
   type CatalogGlobalPlayerSession,
@@ -41,33 +40,20 @@ export function getActiveInlineAudioPostSession(
   return session;
 }
 
-export default function AudioPostListenAnalytics({
-  practiceId,
-  authorSlug,
-  productSlug,
-  path,
-}: AudioPostListenAnalyticsProps) {
-  const { session } = useGlobalAudioPlayer();
-  const engine = useOptionalPlayerEngine();
-  const activeSession = getActiveInlineAudioPostSession(session, {
-    practiceId,
-    authorSlug,
-    productSlug,
-  });
-
-  if (!engine || !activeSession) {
-    return null;
-  }
-
-  return (
-    <ListenAnalyticsTracker
-      practiceId={activeSession.practiceId}
-      trackId={engine.currentTrack?.id ?? null}
-      path={path}
-      currentTime={engine.currentTime}
-      duration={engine.displayDuration}
-      isPlaying={engine.isPlaying}
-      programCompleted={engine.programCompleted}
-    />
-  );
+/**
+ * Legacy mount point for audio_post pages.
+ * Playback events (audio_play_started / milestones / audio_completed) are emitted
+ * by GlobalPlaybackAnalytics inside GlobalAudioPlayer — this component stays as a
+ * no-op so product pages do not double-count, while getActiveInlineAudioPostSession
+ * remains available for unit helpers.
+ */
+export default function AudioPostListenAnalytics(
+  _props: AudioPostListenAnalyticsProps,
+) {
+  // Touch hooks so the page still sits under the global player context contract.
+  // Playback events come from GlobalPlaybackAnalytics — keep this mount as a no-op.
+  useGlobalAudioPlayer();
+  useOptionalPlayerEngine();
+  void _props;
+  return null;
 }

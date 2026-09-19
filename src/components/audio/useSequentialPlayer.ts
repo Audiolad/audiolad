@@ -855,6 +855,9 @@ export function useSequentialPlayer({
         })
       ) {
         hadSuccessfulPlayingRef.current = true;
+        // Confirmed playback already in progress (iOS/prefetch handoff) —
+        // do not wait for a second `playing` event that may never re-fire.
+        setPlayingState(true);
       }
 
       // Shared next-track path (iOS / Android / desktop). play() stays in this
@@ -882,7 +885,7 @@ export function useSequentialPlayer({
 
       return true;
     },
-    [audioRef, debugSnapshot],
+    [audioRef, debugSnapshot, setPlayingState],
   );
 
   const switchToTrack = useCallback(
@@ -926,7 +929,12 @@ export function useSequentialPlayer({
       const prefetchMatch =
         Boolean(prefetch) && prefetch?.audioItemId === nextTrack.id;
 
-      wasPlayingBeforeSwitchRef.current = options?.autoPlay ?? isPlaying;
+      // Capture intent before clearing playing. Analytics must not see sticky
+      // isPlaying=true across audioItemId A→B until B gets confirmed `playing`
+      // (or valid adopted-playing). Fail-to-play B ⇒ no audio_play_started for B.
+      wasPlayingBeforeSwitchRef.current =
+        options?.autoPlay ?? isPlayingRef.current;
+      setPlayingState(false);
       setCurrentTrackIndex(nextIndex);
       setPendingStartPosition(options?.startPosition ?? 0);
       setCurrentTime(options?.startPosition ?? 0);
@@ -959,9 +967,9 @@ export function useSequentialPlayer({
     [
       applyUrlAndPlayNow,
       currentTrackIndex,
-      isPlaying,
       loadSignedUrl,
       saveProgress,
+      setPlayingState,
       tracks,
     ],
   );
