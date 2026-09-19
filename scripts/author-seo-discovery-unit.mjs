@@ -544,8 +544,11 @@ assert.equal(isAuthorSeoDiscoveryEnabled(otherAuthorId), false);
 assert.equal(isAuthorSeoDiscoveryEnabled(""), false);
 assert.equal(isAuthorSeoDiscoveryEnabled(null), false);
 
+const aurafonIdentity = read("src/lib/authors/aurafon.ts");
+assert.match(aurafonIdentity, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 const discoveryBeta = read("src/lib/seo-queries/discovery-beta.ts");
-assert.match(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
+assert.match(discoveryBeta, /from "@\/lib\/authors\/aurafon"/);
+assert.doesNotMatch(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 assert.match(discoveryRoute, /isAuthorSeoDiscoveryEnabled/);
 assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
 assert.match(discoveryRoute, /seo_discovery_context_failed/);

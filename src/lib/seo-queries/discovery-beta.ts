@@ -1,25 +1,22 @@
 /**
  * Closed beta for author SEO discovery («Что ищут слушатели»).
  * Server + UI must use this helper — never scatter Magic UUIDs.
+ *
+ * Identity lives in `@/lib/authors/aurafon`. This module is the SEO-discovery
+ * feature gate only — other Aurafon betas must not depend on it.
  */
 
-/** Stable Auraфон / Аурофон author workspace UUID (migration 20260801120000). */
-export const AURAFON_AUTHOR_ID = "59c7e5b8-eae4-4394-82fb-b815a10be6c2";
+import { isAurafonAuthor } from "@/lib/authors/aurafon";
 
-/** Documentation slug only — gate decisions use UUID. */
-export const AURAFON_AUTHOR_SLUG = "aurafon";
-
-const AUTHOR_SEO_DISCOVERY_BETA_AUTHOR_IDS = Object.freeze(
-  new Set<string>([AURAFON_AUTHOR_ID]),
-);
+export {
+  AURAFON_AUTHOR_ID,
+  AURAFON_AUTHOR_SLUG,
+} from "@/lib/authors/aurafon";
 
 export function isAuthorSeoDiscoveryEnabled(
   authorId: string | null | undefined,
 ): boolean {
-  if (typeof authorId !== "string" || !authorId.trim()) {
-    return false;
-  }
-  return AUTHOR_SEO_DISCOVERY_BETA_AUTHOR_IDS.has(authorId.trim());
+  return isAurafonAuthor(authorId);
 }
 
 export function assertAuthorSeoDiscoveryEnabled(authorId: string): void {
