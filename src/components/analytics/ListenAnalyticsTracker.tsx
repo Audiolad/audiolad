@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import type { AudioProgressMilestoneEvent } from "@/lib/analytics/constants";
 import { LISTENING_SESSION_GAP_MS } from "@/lib/analytics/constants";
 import {
   getCachedAnalyticsSessionId,
+  subscribeCachedAnalyticsSessionId,
   trackPlatformEvent,
 } from "@/lib/analytics/client";
 import {
@@ -37,6 +38,12 @@ type ListenAnalyticsTrackerProps = {
   programCompleted: boolean;
 };
 
+/**
+ * Canonical playback analytics emitter for GlobalAudioPlayer.
+ * One audio_play_started per real play of a practiceId+audioItemId in a listening
+ * context; track changes A→B reset per-track state; Repeat One loops stay deduped
+ * via continuous-session memory; play-before-session waits for sessionId (H2).
+ */
 export default function ListenAnalyticsTracker({
   practiceId,
   trackId,
@@ -52,14 +59,36 @@ export default function ListenAnalyticsTracker({
   const listeningSessionKeyRef = useRef<string | null>(null);
   const progressStateRef = useRef(createListeningProgressState());
   const lastTickRef = useRef<number | null>(null);
+  const trackedPracticeIdRef = useRef<string | null>(null);
+  const trackedTrackIdRef = useRef<string | null>(null);
+
+  const sessionId = useSyncExternalStore(
+    subscribeCachedAnalyticsSessionId,
+    getCachedAnalyticsSessionId,
+    () => null,
+  );
+
+  // H3: reset per-track analytics state whenever the active audio item (or practice) changes.
+  useEffect(() => {
+    const practiceChanged = trackedPracticeIdRef.current !== practiceId;
+    const trackChanged = trackedTrackIdRef.current !== trackId;
+
+    if (!practiceChanged && !trackChanged) {
+      return;
+    }
+
+    trackedPracticeIdRef.current = practiceId;
+    trackedTrackIdRef.current = trackId;
+    playStartedRef.current = false;
+    completionTrackedRef.current = false;
+    listeningStartedAtRef.current = null;
+    listeningSessionKeyRef.current = null;
+    progressStateRef.current = createListeningProgressState();
+    lastTickRef.current = null;
+  }, [practiceId, trackId]);
 
   useEffect(() => {
     if (!trackId) {
-      playStartedRef.current = false;
-      listeningStartedAtRef.current = null;
-      listeningSessionKeyRef.current = null;
-      progressStateRef.current = createListeningProgressState();
-      lastTickRef.current = null;
       return;
     }
 
@@ -72,15 +101,14 @@ export default function ListenAnalyticsTracker({
       listeningSessionKeyRef.current = null;
       progressStateRef.current = createListeningProgressState();
     }
-  }, [trackId]);
+  }, [trackId, isPlaying]);
 
   useEffect(() => {
     if (!trackId || !isPlaying || playStartedRef.current) {
       return;
     }
 
-    const sessionId = getCachedAnalyticsSessionId();
-
+    // H2: wait for analytics session; do not sticky-claim playStarted until we can emit.
     if (!sessionId) {
       return;
     }
@@ -99,6 +127,7 @@ export default function ListenAnalyticsTracker({
 
     listeningSessionKeyRef.current = listeningKey;
 
+    // Repeat One / continuous same-item loops: suppress duplicate start.
     if (!rememberContinuousListenPlayStarted(practiceId, trackId)) {
       return;
     }
@@ -113,7 +142,7 @@ export default function ListenAnalyticsTracker({
         listening_key: listeningKey,
       },
     });
-  }, [isPlaying, path, practiceId, trackId]);
+  }, [isPlaying, path, practiceId, sessionId, trackId]);
 
   useEffect(() => {
     if (!trackId || duration <= 0) {
@@ -141,7 +170,6 @@ export default function ListenAnalyticsTracker({
 
     progressStateRef.current = nextState;
 
-    const sessionId = getCachedAnalyticsSessionId();
     const listeningKey = listeningSessionKeyRef.current;
 
     if (!sessionId || !listeningKey) {
@@ -204,6 +232,7 @@ export default function ListenAnalyticsTracker({
     path,
     practiceId,
     programCompleted,
+    sessionId,
     trackId,
   ]);
 

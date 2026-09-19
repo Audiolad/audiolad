@@ -202,23 +202,19 @@ function testIntegrations() {
   assert(providers.includes("PlatformAnalyticsProvider"), "global analytics provider");
   assert(providers.includes("YandexMetrika"), "yandex metrika provider");
   assert(
-    listenPlayer.includes(
-      'from "@/components/analytics/ListenAnalyticsTracker"',
-    ),
-    "listen player imports ListenAnalyticsTracker",
+    !listenPlayer.includes("<ListenAnalyticsTracker"),
+    "listen player no longer mounts a duplicate ListenAnalyticsTracker",
   );
   assert(
-    listenPlayer.includes("<ListenAnalyticsTracker"),
-    "ListenAnalyticsTracker is mounted in shared listen player",
+    listenPlayer.includes("ListenPageViewTracker"),
+    "listen player still mounts ListenPageViewTracker",
+  );
+  const globalPlayer = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
   );
   assert(
-    listenPlayer.includes("practiceId={practiceId}") &&
-      listenPlayer.includes("trackId={currentTrack?.id ?? null}") &&
-      listenPlayer.includes("currentTime={currentTime}") &&
-      listenPlayer.includes("duration={displayDuration}") &&
-      listenPlayer.includes("isPlaying={isPlaying}") &&
-      listenPlayer.includes("programCompleted={programCompleted}"),
-    "tracker receives current listen session and track state",
+    globalPlayer.includes("GlobalPlaybackAnalytics"),
+    "canonical playback analytics mounts on GlobalAudioPlayer",
   );
   assert(
     !legacyPlayer.includes("ListenAnalyticsTracker"),

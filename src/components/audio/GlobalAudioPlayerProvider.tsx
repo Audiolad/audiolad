@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { useSequentialPlayer } from "@/components/audio/useSequentialPlayer";
 import GlobalMiniPlayer from "@/components/audio/GlobalMiniPlayer";
+import GlobalPlaybackAnalytics from "@/components/analytics/GlobalPlaybackAnalytics";
 import PlayerDebugPanel from "@/components/audio/PlayerDebugPanel";
 import {
   clearMediaSession,
@@ -607,6 +608,16 @@ function GlobalPlayerEngine({
   return (
     <PlayerEngineContext.Provider value={playerContextValue}>
       {children}
+      <GlobalPlaybackAnalytics
+        session={session}
+        engine={{
+          currentTrack,
+          currentTime,
+          displayDuration,
+          isPlaying,
+          programCompleted: engine.programCompleted,
+        }}
+      />
       <GlobalMiniPlayer />
       <PlayerDebugPanel />
     </PlayerEngineContext.Provider>
