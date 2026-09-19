@@ -37,6 +37,7 @@ export default function AuthorSpaceUrlSettings({
   const [eligibility, setEligibility] = useState<EligibilityResponse | null>(null);
   const [loadingEligibility, setLoadingEligibility] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [slugBaseline, setSlugBaseline] = useState(currentSlug);
   const [draftSlug, setDraftSlug] = useState(currentSlug);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -44,9 +45,11 @@ export default function AuthorSpaceUrlSettings({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Sync draft when parent passes a new saved slug (avoid setState-in-effect lint).
+  if (currentSlug !== slugBaseline) {
+    setSlugBaseline(currentSlug);
     setDraftSlug(currentSlug);
-  }, [currentSlug]);
+  }
 
   useEffect(() => {
     let cancelled = false;
