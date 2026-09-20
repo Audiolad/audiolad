@@ -25,6 +25,7 @@ export function serializeProductEditorBaseline(
     title: string;
     subtitle: string;
     description: string;
+    audioProductAuthor?: string;
     productKind: string;
     publicationClass: string | null;
     musicUsagePermission: string | null;
@@ -70,6 +71,7 @@ export function serializeProductEditorBaseline(
     title: form.title,
     subtitle: form.subtitle,
     description: form.description,
+    audioProductAuthor: form.audioProductAuthor ?? "",
     productKind: form.productKind,
     publicationClass: form.publicationClass,
     musicUsagePermission: form.musicUsagePermission,
