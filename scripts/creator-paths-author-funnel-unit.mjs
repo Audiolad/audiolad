@@ -30,7 +30,9 @@ assert.match(
   /MEDITATION_AUTHORS_LANDING_PROMO_LINK/,
 );
 assert.match(cta, /Стать автором бесплатно/);
-assert.match(cta, /АВТОРАМ АУДИОЛАДА/);
+assert.match(cta, /КАБИНЕТ АВТОРА/);
+assert.match(cta, /Публикуйте свои медитации и практики/);
+assert.match(cta, /медитации, практики, аудиокурсы/);
 assert.match(cta, /Хотите создать и опубликовать свою медитацию\?/);
 assert.match(cta, /Попробуйте бесплатно прямо сейчас/);
 assert.match(cta, /studio\/meditation/);
