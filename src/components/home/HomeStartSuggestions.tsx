@@ -1,6 +1,6 @@
 import type { HomeProduct } from "@/lib/home/types";
 
-import HomeProductCard from "./HomeProductCard";
+import HomeProductCarouselTrack from "./HomeProductCarouselTrack";
 import HomeSectionHeader from "./HomeSectionHeader";
 
 type HomeStartSuggestionsProps = {
@@ -21,13 +21,11 @@ export default function HomeStartSuggestions({
         Выберите практику в подарок или откройте материал из каталога.
       </p>
 
-      <div className="home-carousel-track catalog-carousel mt-3.5 flex gap-3 overflow-x-auto pb-1 xl:mt-4">
-        {products.map((product) => (
-          <div key={product.id} data-catalog-carousel-item>
-            <HomeProductCard product={product} />
-          </div>
-        ))}
-      </div>
+      <HomeProductCarouselTrack
+        products={products}
+        prevAriaLabel="Предыдущие подсказки «С чего начнём»"
+        nextAriaLabel="Следующие подсказки «С чего начнём»"
+      />
     </section>
   );
 }
