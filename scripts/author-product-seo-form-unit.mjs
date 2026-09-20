@@ -320,7 +320,8 @@ assert.doesNotMatch(formSource, /wordstat|Wordstat/);
 assert.equal([...formSource.matchAll(/<AuthorProductSeoSection/g)].length, 1);
 assert.ok(
   formSource.indexOf("<AuthorProductSeoSection") <
-    formSource.indexOf('className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"'),
+    formSource.indexOf("<AuthorProductFormActions"),
+  "SEO section stays above form actions",
 );
 assert.match(read("src/lib/products/product-copy.ts"), /export const AUTHOR_DESCRIPTION_LABEL = "О продукте"/);
 assert.match(read("src/lib/author-products/limits.ts"), /description: 1000/);

@@ -23,6 +23,18 @@ function mapReservationError(error: unknown) {
   if (message.includes("seo_reservation_product_lifecycle_locked")) {
     return { error: "seo_reservation_product_lifecycle_locked", message: "Запрос нельзя освободить после отправки продукта на модерацию или публикации.", status: 409 };
   }
+  if (message.includes("seo_reservation_expired")) {
+    return { error: "seo_reservation_expired", message: "Бронирование поискового запроса истекло.", status: 409 };
+  }
+  if (message.includes("seo_reservation_already_linked")) {
+    return { error: "seo_reservation_already_linked", message: "Этот поисковый запрос уже связан с другим продуктом.", status: 409 };
+  }
+  if (message.includes("practice_already_has_primary_seo_query")) {
+    return { error: "practice_already_has_primary_seo_query", message: "У продукта уже есть другой основной поисковый запрос.", status: 409 };
+  }
+  if (message.includes("seo_query_too_long_for_product")) {
+    return { error: "seo_query_too_long_for_product", message: "Этот поисковый запрос слишком длинный для основного запроса продукта.", status: 409 };
+  }
   if (message.includes("seo_reservation_product_not_linkable")) {
     return { error: "seo_reservation_product_not_linkable", message: "Связать запрос можно только с черновиком до отправки на модерацию.", status: 409 };
   }

@@ -10,6 +10,7 @@ import {
   type CabinetBranch,
   type ProductPublicationClass,
 } from "@/lib/author-products/publication-class";
+import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 
 const BRANCH_OPTIONS: Array<{
   value: CabinetBranch;
@@ -48,24 +49,34 @@ const PRODUCT_OPTIONS: Array<{
   },
 ];
 
-function buildCreateHref(
-  publicationClass: string,
-  authorSlug?: string,
-): string {
-  const params = new URLSearchParams();
-  params.set("class", publicationClass);
-
-  if (authorSlug) {
-    params.set("author", authorSlug);
+function buildCreateHref(input: {
+  publicationClass: string;
+  authorSlug?: string;
+  seoReservationId?: string;
+}): string {
+  const reservationId = input.seoReservationId?.trim();
+  if (reservationId && input.authorSlug?.trim()) {
+    return buildSeoReservationProductCreateHref({
+      authorSlug: input.authorSlug,
+      reservationId,
+      publicationClass: input.publicationClass,
+    });
   }
 
+  const params = new URLSearchParams();
+  params.set("class", input.publicationClass);
+  if (input.authorSlug) {
+    params.set("author", input.authorSlug);
+  }
   return `/author-dashboard/products/new?${params.toString()}`;
 }
 
 export default function AuthorCreateWizard({
   authorSlug,
+  seoReservationId,
 }: {
   authorSlug?: string;
+  seoReservationId?: string;
 }) {
   const router = useRouter();
   const [branch, setBranch] = useState<CabinetBranch | null>(null);
@@ -96,7 +107,13 @@ export default function AuthorCreateWizard({
               key={option.value}
               type="button"
               onClick={() =>
-                router.push(buildCreateHref(option.value, authorSlug))
+                router.push(
+                  buildCreateHref({
+                    publicationClass: option.value,
+                    authorSlug,
+                    seoReservationId,
+                  }),
+                )
               }
               className="rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4 text-left transition hover:border-[#9a74d8] hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
@@ -122,12 +139,14 @@ export default function AuthorCreateWizard({
                 }
 
                 router.push(
-                  buildCreateHref(
-                    option.value === CABINET_BRANCH.MUSIC
-                      ? "release"
-                      : "post",
+                  buildCreateHref({
+                    publicationClass:
+                      option.value === CABINET_BRANCH.MUSIC
+                        ? "release"
+                        : "post",
                     authorSlug,
-                  ),
+                    seoReservationId,
+                  }),
                 );
               }}
               className="rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4 text-left transition hover:border-[#9a74d8] hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"

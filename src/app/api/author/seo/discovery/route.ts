@@ -35,6 +35,7 @@ function databaseMatchStatus(input: {
     authorId: string;
     status: string;
     id: string;
+    productId: string | null;
     productTitle: string | null;
   } | null;
 }): {
@@ -42,6 +43,7 @@ function databaseMatchStatus(input: {
   statusLabel: "Свободен" | "Занят" | "У вас в работе";
   canReserve: boolean;
   reservationId: string | null;
+  productId: string | null;
   productTitle: string | null;
 } {
   const reservation = input.reservation;
@@ -52,6 +54,7 @@ function databaseMatchStatus(input: {
         statusLabel: "У вас в работе",
         canReserve: false,
         reservationId: reservation.id,
+        productId: reservation.productId,
         productTitle: reservation.productTitle,
       };
     }
@@ -60,6 +63,7 @@ function databaseMatchStatus(input: {
       statusLabel: "Занят",
       canReserve: false,
       reservationId: null,
+      productId: null,
       productTitle: null,
     };
   }
@@ -68,6 +72,7 @@ function databaseMatchStatus(input: {
     statusLabel: "Свободен",
     canReserve: true,
     reservationId: null,
+    productId: null,
     productTitle: null,
   };
 }
@@ -123,6 +128,7 @@ export async function POST(request: Request) {
           statusLabel: status.statusLabel,
           queryId: item.id,
           reservationId: status.reservationId,
+          productId: status.productId,
           productTitle: status.productTitle,
           canReserve: status.canReserve,
           canPropose: false,

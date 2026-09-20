@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
 import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
@@ -107,6 +108,7 @@ export default function AuthorSeoOpportunitiesClient({
       {discoveryEnabled ? (
         <AuthorSeoDiscoveryPanel
           authorId={authorId}
+          authorSlug={authorSlug}
           variant="opportunities"
           activeReservationCount={activeCount}
           analyzedOpportunities={items}
@@ -178,7 +180,9 @@ export default function AuthorSeoOpportunitiesClient({
               {own ? <div className="mt-4 flex flex-wrap items-center gap-3">
                 {until ? <span className="text-sm text-[#5f5484]">До {until}</span> : null}
                 {item.productId ? <Link href={`/author-dashboard/products/${item.productId}`} className="text-sm font-semibold text-[#7042c5]">Открыть продукт</Link> : (
-                  <Link href={`/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`} className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">Создать продукт по этому запросу</Link>
+                  item.reservationId ? (
+                    <Link href={buildSeoReservationProductCreateHref({ authorSlug, reservationId: item.reservationId })} className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">Создать продукт по этому запросу</Link>
+                  ) : null
                 )}
                 {!item.productId && products.length > 0 && item.reservationId ? <>
                   <select aria-label="Связать с черновиком" value={selectedProducts[item.reservationId] ?? ""} onChange={(event) => setSelectedProducts((current) => ({ ...current, [item.reservationId!]: event.target.value }))} className="min-h-10 rounded-xl border border-[#d7c4f5] px-2 text-sm">

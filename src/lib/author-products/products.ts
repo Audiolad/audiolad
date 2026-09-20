@@ -78,6 +78,7 @@ const PRACTICE_DETAIL_SELECT = `
   promo_button_text,
   promo_url,
   promo_open_in_new_tab,
+  primary_seo_query_id,
   seo_primary_query,
   seo_secondary_queries,
   seo_title,

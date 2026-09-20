@@ -154,12 +154,12 @@ assert.match(form, /showWizardStep\(3\) \? \(\s*<AuthorProductSeoSection/);
 assert.match(form, /showWizardStep\(4\)[\s\S]*Кому показывать продукт\?/);
 assert.match(form, /wizardEnabled && wizardStep === PRODUCT_WIZARD_STEP_COUNT[\s\S]*AuthorProductFormActions/);
 
-// No second controller / no new product fields / no reservation
+// No second controller / no rights-declaration field (SEO reservation link is intentional)
 assert.doesNotMatch(form, /AurafonProductForm/);
 assert.doesNotMatch(form, /LegacyAuthorProductForm/);
-// audio_product_author added in Aurafon music wizard refine PR
 assert.doesNotMatch(form, /rightsDeclaration|declarationOfRights/);
-assert.doesNotMatch(form, /reservation/);
+assert.match(form, /SeoReservationProductFormContext|seoReservationContext/);
+assert.doesNotMatch(form, /productReservation|reserveProduct\(/);
 
 // Gallery limit unchanged reference still in repo
 const gallery = read("src/lib/catalog/gallery.ts");
