@@ -4,11 +4,13 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = "/var/www/audiolad";
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(path) {
-  return readFileSync(`${root}/${path}`, "utf8");
+  return readFileSync(join(root, path), "utf8");
 }
 
 const guestHome = read("src/components/home/GuestHome.tsx");
@@ -17,7 +19,7 @@ const sidebar = read("src/components/listener/DesktopSidebar.tsx");
 const banner = read("src/components/listener/BecomeAuthorPromoBanner.tsx");
 
 assert(
-  existsSync(`${root}/public/images/banners/become-author-mobile-banner-v1.webp`),
+  existsSync(join(root, "public/images/banners/become-author-mobile-banner-v1.webp")),
   "mobile banner webp asset exists",
 );
 
@@ -82,7 +84,16 @@ for (const source of [
 ]) {
   assert(banner.includes(`"${source}"`), `source type includes ${source}`);
 }
-assert(banner.includes("BECOME_AUTHOR_HREF"), "banner links via BECOME_AUTHOR_HREF");
+assert(
+  banner.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+    !banner.includes("BECOME_AUTHOR_HREF"),
+  "promo banner links the meditation authors landing, not /become-author",
+);
+assert(
+  banner.includes("meditation-authors-landing") ||
+    banner.includes("MEDITATION_AUTHORS_LANDING_PATH"),
+  "promo banner imports the authors landing path",
+);
 assert(banner.includes('aria-label="Стать автором на АудиоЛад"'), "banner aria-label");
 assert(banner.includes("visibility"), "banner supports visibility prop");
 assert(banner.includes("xl:hidden"), "banner keeps mobile-only default");
