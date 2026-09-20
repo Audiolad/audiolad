@@ -485,6 +485,11 @@ function buildInitialForm(
 ): FormState {
   if (initialProduct) {
     const snapshot = productDetailToFormSnapshot(initialProduct);
+    const linkedQueryText =
+      initialSeoReservationContext?.linked &&
+      initialSeoReservationContext.queryText.trim()
+        ? initialSeoReservationContext.queryText.trim()
+        : null;
     return {
       ...snapshot,
       audioProductAuthor: resolveFormAudioProductAuthor(
@@ -492,6 +497,7 @@ function buildInitialForm(
         snapshot.authorId,
         initialProduct.practice.audio_product_author,
       ),
+      seoPrimaryQuery: linkedQueryText ?? snapshot.seoPrimaryQuery,
     };
   }
 
@@ -1473,6 +1479,8 @@ export default function AuthorProductForm({
       authors,
       initialAuthorSlug,
       productPayload.product,
+      undefined,
+      seoReservationContext,
     );
     setForm(nextForm);
     setStudioMusicPriceDraft(String(nextForm.studioMusicPriceRubles));

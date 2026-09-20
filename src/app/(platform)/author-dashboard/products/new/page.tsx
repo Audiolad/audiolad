@@ -93,7 +93,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
         internalBackHref="/author-dashboard"
       >
         <AuthorCreateWizard
-          authorSlug={params.author}
+          authorSlug={initialAuthor.slug}
           seoReservationId={
             reservationLoad?.ok ? reservationLoad.context.reservationId : seoReservationId || undefined
           }

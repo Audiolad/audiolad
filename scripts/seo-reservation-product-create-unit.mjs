@@ -58,17 +58,25 @@ assert.match(
   /seoReservationId,\s*\}\)/,
 );
 
-// C — Opportunities + Discovery CTAs use helper with reservationId (not query text)
+// C — Opportunities: beta uses reservation href; non-beta keeps legacy create href
 const opportunities = read(
   "src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx",
 );
 assert.match(opportunities, /buildSeoReservationProductCreateHref/);
-assert.match(
-  opportunities,
-  /reservationId:\s*item\.reservationId/,
-);
 assert.match(opportunities, /Создать продукт по этому запросу/);
 assert.match(opportunities, /authorSlug=\{authorSlug\}/);
+assert.match(
+  opportunities,
+  /discoveryEnabled \? buildSeoReservationProductCreateHref\(\{ authorSlug, reservationId: item\.reservationId \}\)/,
+);
+assert.match(
+  opportunities,
+  /\/author-dashboard\/products\/new\?author=\$\{encodeURIComponent\(authorSlug\)\}/,
+);
+assert.match(
+  opportunities,
+  /discoveryEnabled \? buildSeoReservationProductCreateHref[\s\S]*?: `\/author-dashboard\/products\/new\?author=\$\{encodeURIComponent\(authorSlug\)\}`/,
+);
 
 const panel = read(
   "src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx",
@@ -114,6 +122,8 @@ assert.match(newPage, /seo_reservation_id/);
 assert.match(newPage, /loadSeoReservationProductCreateContext/);
 assert.match(newPage, /initialSeoReservationContext/);
 assert.match(newPage, /AuthorCreateWizard/);
+assert.match(newPage, /authorSlug=\{initialAuthor\.slug\}/);
+assert.doesNotMatch(newPage, /AuthorCreateWizard[\s\S]{0,120}authorSlug=\{params\.author\}/);
 assert.match(newPage, /seoReservationId=/);
 assert.match(newPage, /seo-opportunities/);
 
@@ -124,17 +134,31 @@ assert.match(editPage, /primary_seo_query_id/);
 assert.match(editPage, /initialSeoReservationContext/);
 assert.match(editPage, /linked:\s*true/);
 
-// E — Form: Step1 banner/prefill, first-save auto-link, Step3 lock
+// E — Form: Step1 banner/prefill, linked canonical wins, first-save auto-link, Step3 lock
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /initialSeoReservationContext/);
 assert.match(
   form,
   /seoPrimaryQuery:\s*initialSeoReservationContext\?\.queryText/,
 );
+assert.match(form, /linkedQueryText/);
+assert.match(
+  form,
+  /seoPrimaryQuery:\s*linkedQueryText \?\? snapshot\.seoPrimaryQuery/,
+);
 assert.match(form, /linkSeoReservationToProduct/);
 assert.match(form, /!seoReservationContext\.linked/);
 assert.match(form, /primaryQueryLocked/);
 assert.match(form, /seoReservationContext\.queryText/);
+assert.match(
+  form,
+  /buildInitialForm\(\s*authors,\s*initialAuthorSlug,\s*productPayload\.product,\s*undefined,\s*seoReservationContext,\s*\)/,
+);
+// Autofill request body uses the form seoPrimaryQuery (canonical after linked init)
+const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
+assert.match(seoSection, /\/api\/author\/seo\/product-autofill/);
+assert.match(seoSection, /seoPrimaryQuery,/);
+assert.match(form, /seoPrimaryQuery=\{form\.seoPrimaryQuery\}/);
 
 const section = read(
   "src/components/author-dashboard/AuthorProductSeoSection.tsx",
@@ -213,6 +237,20 @@ assert.equal(
   true,
 );
 assert.doesNotMatch(migration, /CREATE TABLE|ADD COLUMN/);
+assert.match(migration, /CREATE OR REPLACE FUNCTION public\.guard_practice_primary_seo_query/);
+assert.match(migration, /primary_seo_query_requires_rpc/);
+assert.match(migration, /linked_primary_seo_query_mismatch/);
+assert.match(
+  migration,
+  /NEW\.seo_primary_query IS DISTINCT FROM OLD\.seo_primary_query/,
+);
+assert.match(
+  migration,
+  /NEW\.seo_primary_query IS DISTINCT FROM v_canonical/,
+);
+assert.match(migration, /allow_primary_seo_query_link/);
+assert.doesNotMatch(migration, /UPDATE\s+public\.practices\s+p\s+SET/i);
+assert.doesNotMatch(migration, /FROM\s+public\.practices[\s\S]{0,80}SET\s+seo_primary_query\s*=\s*q\.query_text/i);
 
 const types = read("src/lib/author-products/types.ts");
 assert.match(types, /primary_seo_query_id/);

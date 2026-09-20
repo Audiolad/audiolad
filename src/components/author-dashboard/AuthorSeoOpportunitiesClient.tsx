@@ -181,7 +181,7 @@ export default function AuthorSeoOpportunitiesClient({
                 {until ? <span className="text-sm text-[#5f5484]">До {until}</span> : null}
                 {item.productId ? <Link href={`/author-dashboard/products/${item.productId}`} className="text-sm font-semibold text-[#7042c5]">Открыть продукт</Link> : (
                   item.reservationId ? (
-                    <Link href={buildSeoReservationProductCreateHref({ authorSlug, reservationId: item.reservationId })} className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">Создать продукт по этому запросу</Link>
+                    <Link href={discoveryEnabled ? buildSeoReservationProductCreateHref({ authorSlug, reservationId: item.reservationId }) : `/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`} className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">Создать продукт по этому запросу</Link>
                   ) : null
                 )}
                 {!item.productId && products.length > 0 && item.reservationId ? <>

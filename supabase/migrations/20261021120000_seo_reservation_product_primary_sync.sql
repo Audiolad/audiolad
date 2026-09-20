@@ -231,3 +231,40 @@ COMMENT ON FUNCTION public.release_seo_query_reservation(uuid) IS
 
 COMMENT ON FUNCTION public.admin_release_seo_query_reservation(uuid) IS
   'audiolad:seo-reservation-admin-release:v2; clears practices.primary_seo_query_id and practices.seo_primary_query';
+
+-- Keep RPC-only primary_seo_query_id changes, and additionally keep
+-- seo_primary_query aligned with seo_queries when a primary id is linked.
+CREATE OR REPLACE FUNCTION public.guard_practice_primary_seo_query()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_canonical text;
+BEGIN
+  IF (
+    (TG_OP = 'INSERT' AND NEW.primary_seo_query_id IS NOT NULL)
+    OR (TG_OP = 'UPDATE' AND NEW.primary_seo_query_id IS DISTINCT FROM OLD.primary_seo_query_id)
+  ) AND current_setting('audiolad.allow_primary_seo_query_link', true) IS DISTINCT FROM 'on' THEN
+    RAISE EXCEPTION 'primary_seo_query_requires_rpc' USING ERRCODE = '42501';
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.primary_seo_query_id IS NOT NULL
+     AND NEW.seo_primary_query IS DISTINCT FROM OLD.seo_primary_query
+     AND current_setting('audiolad.allow_primary_seo_query_link', true) IS DISTINCT FROM 'on' THEN
+    SELECT query_text INTO v_canonical
+    FROM public.seo_queries
+    WHERE id = NEW.primary_seo_query_id;
+
+    IF NOT FOUND OR NEW.seo_primary_query IS DISTINCT FROM v_canonical THEN
+      RAISE EXCEPTION 'linked_primary_seo_query_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.guard_practice_primary_seo_query() IS
+  'audiolad:seo-primary-guard:v2; RPC-gated primary_seo_query_id changes; linked seo_primary_query may only match seo_queries.query_text unless allow flag is on';
