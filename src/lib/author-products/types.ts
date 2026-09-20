@@ -125,6 +125,7 @@ export type PracticeRow = {
   promo_button_text: string | null;
   promo_url: string | null;
   promo_open_in_new_tab: boolean;
+  primary_seo_query_id: string | null;
   seo_primary_query: string | null;
   seo_secondary_queries: string[] | null;
   seo_title: string | null;
@@ -179,6 +180,7 @@ export function coercePracticeRow(
     | "promo_button_text"
     | "promo_url"
     | "promo_open_in_new_tab"
+    | "primary_seo_query_id"
     | "seo_primary_query"
     | "seo_secondary_queries"
     | "seo_title"
@@ -208,6 +210,7 @@ export function coercePracticeRow(
     promo_button_text?: string | null;
     promo_url?: string | null;
     promo_open_in_new_tab?: boolean | null;
+    primary_seo_query_id?: string | null;
     seo_primary_query?: string | null;
     seo_secondary_queries?: string[] | null;
     seo_title?: string | null;
@@ -259,6 +262,10 @@ export function coercePracticeRow(
     promo_button_text: row.promo_button_text ?? null,
     promo_url: row.promo_url ?? null,
     promo_open_in_new_tab: row.promo_open_in_new_tab === true,
+    primary_seo_query_id:
+      typeof row.primary_seo_query_id === "string"
+        ? row.primary_seo_query_id
+        : row.primary_seo_query_id ?? null,
     seo_primary_query: row.seo_primary_query ?? null,
     seo_secondary_queries: row.seo_secondary_queries ?? null,
     seo_title: row.seo_title ?? null,

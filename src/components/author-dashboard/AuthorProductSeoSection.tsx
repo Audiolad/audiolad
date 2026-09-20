@@ -114,6 +114,9 @@ export type AuthorProductSeoSectionProps = {
     }>,
   ) => void;
   disabled?: boolean;
+  /** Reserved/linked primary query must stay in sync with relational id. */
+  primaryQueryLocked?: boolean;
+  primaryQueryLockHint?: string;
 };
 
 export default function AuthorProductSeoSection({
@@ -134,6 +137,8 @@ export default function AuthorProductSeoSection({
   fieldErrors,
   onChange,
   disabled = false,
+  primaryQueryLocked = false,
+  primaryQueryLockHint,
 }: AuthorProductSeoSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [relatedProductQuery, setRelatedProductQuery] = useState("");
@@ -505,18 +510,21 @@ export default function AuthorProductSeoSection({
         <input
           value={seoPrimaryQuery}
           maxLength={PRODUCT_CONTENT_LIMITS.seoPrimaryQuery}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange({ seoPrimaryQuery: event.target.value })
-          }
-          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:cursor-not-allowed disabled:opacity-60"
+          readOnly={primaryQueryLocked}
+          disabled={disabled && !primaryQueryLocked}
+          onChange={(event) => {
+            if (primaryQueryLocked) return;
+            onChange({ seoPrimaryQuery: event.target.value });
+          }}
+          className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] read-only:bg-[#f7f2ff] read-only:text-[#3f3560] disabled:cursor-not-allowed disabled:opacity-60"
           placeholder="Например: медитация для сна"
         />
         <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-          Выберите одну главную фразу, по которой человек может искать именно
-          такой продукт. Можно использовать название продукта или оставить поле пустым.
+          {primaryQueryLockHint
+            ? primaryQueryLockHint
+            : "Выберите одну главную фразу, по которой человек может искать именно такой продукт. Можно использовать название продукта или оставить поле пустым."}
         </p>
-        {!seoPrimaryQuery.trim() && title.trim() ? (
+        {!primaryQueryLocked && !seoPrimaryQuery.trim() && title.trim() ? (
           <button
             type="button"
             disabled={disabled}

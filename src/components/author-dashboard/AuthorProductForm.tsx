@@ -61,6 +61,8 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isAurafonMusicWizard } from "@/lib/author-products/aurafon-music-wizard";
+import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
+import { linkSeoReservationToProduct } from "@/lib/seo-queries/seo-reservation-product-context";
 import {
   AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
   hasAudioProductAuthor,
@@ -314,6 +316,7 @@ type AuthorProductFormProps = {
   initialProduct?: AuthorProductDetail;
   initialPublicationClass?: PublicationClass | null;
   initialWizardStep?: ProductWizardStep;
+  initialSeoReservationContext?: SeoReservationProductFormContext | null;
   topicFormData: AuthorProductTopicFormData;
   mode: "create" | "edit";
 };
@@ -478,9 +481,15 @@ function buildInitialForm(
   initialAuthorSlug: string | undefined,
   initialProduct: AuthorProductDetail | undefined,
   initialPublicationClass?: PublicationClass | null,
+  initialSeoReservationContext?: SeoReservationProductFormContext | null,
 ): FormState {
   if (initialProduct) {
     const snapshot = productDetailToFormSnapshot(initialProduct);
+    const linkedQueryText =
+      initialSeoReservationContext?.linked &&
+      initialSeoReservationContext.queryText.trim()
+        ? initialSeoReservationContext.queryText.trim()
+        : null;
     return {
       ...snapshot,
       audioProductAuthor: resolveFormAudioProductAuthor(
@@ -488,6 +497,7 @@ function buildInitialForm(
         snapshot.authorId,
         initialProduct.practice.audio_product_author,
       ),
+      seoPrimaryQuery: linkedQueryText ?? snapshot.seoPrimaryQuery,
     };
   }
 
@@ -546,7 +556,7 @@ function buildInitialForm(
     listeningNoticeEnabled: listeningDefaults.listeningNoticeEnabled,
     listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
     listeningNoticeText: listeningDefaults.listeningNoticeText,
-    seoPrimaryQuery: "",
+    seoPrimaryQuery: initialSeoReservationContext?.queryText ?? "",
     seoSecondaryQueries: [],
     seoTitle: "",
     seoDescription: "",
@@ -713,6 +723,7 @@ export default function AuthorProductForm({
   initialProduct,
   initialPublicationClass,
   initialWizardStep = PRODUCT_WIZARD_DEFAULT_STEP,
+  initialSeoReservationContext = null,
   topicFormData,
   mode,
 }: AuthorProductFormProps) {
@@ -725,8 +736,13 @@ export default function AuthorProductForm({
       initialAuthorSlug,
       initialProduct,
       initialPublicationClass,
+      initialSeoReservationContext,
     ),
   );
+  const [seoReservationContext, setSeoReservationContext] =
+    useState<SeoReservationProductFormContext | null>(
+      initialSeoReservationContext ?? null,
+    );
   const [studioMusicPriceDraft, setStudioMusicPriceDraft] = useState(() =>
     String(form.studioMusicPriceRubles),
   );
@@ -1463,6 +1479,8 @@ export default function AuthorProductForm({
       authors,
       initialAuthorSlug,
       productPayload.product,
+      undefined,
+      seoReservationContext,
     );
     setForm(nextForm);
     setStudioMusicPriceDraft(String(nextForm.studioMusicPriceRubles));
@@ -1643,6 +1661,32 @@ export default function AuthorProductForm({
         return false;
       }
 
+      if (
+        seoReservationContext &&
+        !seoReservationContext.linked &&
+        seoReservationContext.reservationId
+      ) {
+        const linkResult = await linkSeoReservationToProduct({
+          authorId: formForSave.authorId || reloaded.practice.author_id,
+          reservationId: seoReservationContext.reservationId,
+          productId: id,
+        });
+        if (!linkResult.ok) {
+          setError(linkResult.message);
+          setBusy(false);
+          return false;
+        }
+        setSeoReservationContext({
+          ...seoReservationContext,
+          linked: true,
+          expiresAt: null,
+        });
+        setForm((current) => ({
+          ...current,
+          seoPrimaryQuery: seoReservationContext.queryText,
+        }));
+      }
+
       savedBaselineRef.current = serializeProductEditorBaseline(
         {
           ...productDetailToFormSnapshot(reloaded),
@@ -1651,6 +1695,10 @@ export default function AuthorProductForm({
             reloaded.practice.author_id,
             reloaded.practice.audio_product_author,
           ),
+          seoPrimaryQuery:
+            seoReservationContext?.queryText ||
+            reloaded.practice.seo_primary_query ||
+            "",
         },
         reloaded.audio_items,
       );
@@ -2852,6 +2900,32 @@ export default function AuthorProductForm({
             </Link>
           </p>
         </div>
+
+        {seoReservationContext ? (
+          <div className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3">
+            <p className="text-sm font-semibold text-[#3f3560]">
+              Поисковый запрос для продукта
+            </p>
+            <p className="mt-1 text-sm font-medium text-[#25135c]">
+              «{seoReservationContext.queryText}»
+            </p>
+            <p className="mt-1.5 text-sm leading-5 text-[#5f5484]">
+              {seoReservationContext.linked
+                ? "Запрос связан с этим продуктом."
+                : "Запрос забронирован за вами. После первого сохранения он будет связан с этим продуктом."}
+            </p>
+            {!seoReservationContext.linked && seoReservationContext.expiresAt ? (
+              <p className="mt-1 text-sm text-[#5f5484]">
+                Забронирован до{" "}
+                {new Intl.DateTimeFormat("ru-RU", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date(seoReservationContext.expiresAt))}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {mode === "create" && selectedAuthor ? (
           <p className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
@@ -4536,6 +4610,18 @@ export default function AuthorProductForm({
         productKind={form.productKind}
         isFree={form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree}
         seoPrimaryQuery={form.seoPrimaryQuery}
+        primaryQueryLocked={Boolean(
+          seoReservationContext ||
+            initialProduct?.practice.primary_seo_query_id,
+        )}
+        primaryQueryLockHint={
+          seoReservationContext?.linked ||
+          initialProduct?.practice.primary_seo_query_id
+            ? "Этот запрос выбран в разделе «Поисковые запросы» и связан с продуктом."
+            : seoReservationContext
+              ? "Этот запрос выбран для продукта и будет связан после сохранения."
+              : undefined
+        }
         seoSecondaryQueries={form.seoSecondaryQueries}
         seoTitle={form.seoTitle}
         seoDescription={form.seoDescription}

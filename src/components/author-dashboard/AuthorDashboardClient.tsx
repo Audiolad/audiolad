@@ -276,6 +276,7 @@ export default function AuthorDashboardClient({
           <AuthorSeoDiscoveryPanel
             key={selectedAuthor.id}
             authorId={selectedAuthor.id}
+            authorSlug={selectedAuthor.slug}
             variant="dashboard"
             activeReservationCount={seoActiveReservationCounts[selectedAuthor.id] ?? 0}
             analyzedOpportunities={seoAnalyzedOpportunitiesByAuthorId[selectedAuthor.id] ?? []}

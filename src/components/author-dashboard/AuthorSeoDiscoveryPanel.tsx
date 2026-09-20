@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -8,6 +9,7 @@ import {
   isSeoActiveReservationLimitReached,
   nextActiveReservationCountAfterReserve,
 } from "@/lib/seo-queries/types";
+import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
@@ -16,6 +18,7 @@ export type AuthorSeoDiscoveryResult = {
   statusLabel: string;
   queryId: string | null;
   reservationId: string | null;
+  productId: string | null;
   productTitle: string | null;
   canReserve: boolean;
   canPropose: boolean;
@@ -31,6 +34,8 @@ export type AuthorSeoDiscoveryReservedEvent = {
 
 type Props = {
   authorId: string;
+  /** Required for reservation → create deep-link CTA. */
+  authorSlug: string;
   /** dashboard = search-first Aurafon home copy; opportunities = existing SEO page heading */
   variant: "dashboard" | "opportunities";
   activeReservationCount: number;
@@ -49,6 +54,7 @@ function formatMonthlyFrequency(value: number) {
  */
 export default function AuthorSeoDiscoveryPanel({
   authorId,
+  authorSlug,
   variant,
   activeReservationCount,
   analyzedOpportunities = [],
@@ -111,6 +117,7 @@ export default function AuthorSeoDiscoveryPanel({
               canReserve: false,
               canPropose: false,
               reservationId,
+              productId: null,
             }
           : item,
       ),
@@ -125,6 +132,7 @@ export default function AuthorSeoDiscoveryPanel({
               canReserve: false,
               canPropose: false,
               reservationId,
+              productId: null,
             }
           : item,
       ),
@@ -322,6 +330,28 @@ export default function AuthorSeoDiscoveryPanel({
                       >
                         Взять в работу
                       </button>
+                    ) : null}
+                    {item.status === "own" && item.reservationId ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        {item.productId ? (
+                          <Link
+                            href={`/author-dashboard/products/${item.productId}`}
+                            className="text-sm font-semibold text-[#7042c5]"
+                          >
+                            Открыть продукт
+                          </Link>
+                        ) : (
+                          <Link
+                            href={buildSeoReservationProductCreateHref({
+                              authorSlug,
+                              reservationId: item.reservationId,
+                            })}
+                            className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+                          >
+                            Создать продукт по этому запросу
+                          </Link>
+                        )}
+                      </div>
                     ) : null}
                     {item.status === "own" && item.queryId && item.reservationId ? (
                       <AuthorSeoPromptBuilder

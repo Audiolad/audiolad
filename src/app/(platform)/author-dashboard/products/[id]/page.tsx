@@ -8,6 +8,7 @@ import {
   mapAuthorDashboardProductEditError,
 } from "@/lib/author-products/dashboard-edit-page";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
+import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,42 @@ export default async function EditAuthorProductPage({
     }
     throw error;
   }
+
+  let initialSeoReservationContext: SeoReservationProductFormContext | null =
+    null;
+  const primaryQueryId = product.practice.primary_seo_query_id;
+  if (primaryQueryId) {
+    const { data: seoQuery } = await supabase
+      .from("seo_queries")
+      .select("id, query_text")
+      .eq("id", primaryQueryId)
+      .maybeSingle();
+    const queryText =
+      typeof seoQuery?.query_text === "string"
+        ? seoQuery.query_text.trim()
+        : product.practice.seo_primary_query?.trim() || "";
+    if (queryText) {
+      const { data: reservation } = await supabase
+        .from("seo_query_reservations")
+        .select("id, expires_at, status")
+        .eq("product_id", product.practice.id)
+        .eq("query_id", primaryQueryId)
+        .in("status", ["active", "used"])
+        .maybeSingle();
+      initialSeoReservationContext = {
+        reservationId:
+          typeof reservation?.id === "string" ? reservation.id : "",
+        queryId: primaryQueryId,
+        queryText,
+        expiresAt:
+          typeof reservation?.expires_at === "string"
+            ? reservation.expires_at
+            : null,
+        linked: true,
+      };
+    }
+  }
+
   const { data: relatedProducts } = await supabase
     .from("practices")
     .select("id, title")
@@ -82,6 +119,7 @@ export default async function EditAuthorProductPage({
         }))}
         initialProduct={product}
         initialWizardStep={initialWizardStep}
+        initialSeoReservationContext={initialSeoReservationContext}
         topicFormData={topicFormData}
         mode="edit"
       />
