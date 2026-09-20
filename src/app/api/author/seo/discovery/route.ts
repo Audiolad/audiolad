@@ -123,7 +123,7 @@ export async function POST(request: Request) {
         });
         return {
           phrase: item.queryText,
-          frequency: item.frequency ?? 0,
+          frequency: typeof item.frequency === "number" ? item.frequency : null,
           status: status.status,
           statusLabel: status.statusLabel,
           queryId: item.id,

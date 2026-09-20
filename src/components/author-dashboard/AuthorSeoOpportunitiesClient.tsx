@@ -28,7 +28,8 @@ function formatUntil(value: string | null) {
     : null;
 }
 
-function formatMonthlyFrequency(value: number) {
+function formatMonthlyFrequency(value: number | null) {
+  if (value === null || Number.isNaN(value)) return null;
   return `Запросов в месяц: ${value.toLocaleString("ru-RU")}`;
 }
 

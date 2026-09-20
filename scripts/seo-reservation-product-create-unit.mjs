@@ -50,13 +50,10 @@ assert.doesNotMatch(hrefSrc, /query_text|queryText/);
 
 // B — CreateWizard preserves reservation via helper
 const wizard = read("src/components/author-dashboard/AuthorCreateWizard.tsx");
-assert.match(wizard, /buildSeoReservationProductCreateHref/);
+assert.match(wizard, /buildAuthorProductCreateHref/);
 assert.match(wizard, /seoReservationId/);
 assert.match(wizard, /publicationClass:\s*input\.publicationClass/);
-assert.match(
-  wizard,
-  /seoReservationId,\s*\}\)/,
-);
+assert.match(wizard, /reservationId:\s*input\.seoReservationId/);
 
 // C — Opportunities: beta uses reservation href; non-beta keeps legacy create href
 const opportunities = read(
@@ -82,7 +79,7 @@ const panel = read(
   "src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx",
 );
 assert.match(panel, /authorSlug:\s*string/);
-assert.match(panel, /buildSeoReservationProductCreateHref/);
+assert.match(panel, /buildAuthorProductCreateHref/);
 assert.match(panel, /Создать продукт по этому запросу/);
 assert.match(panel, /Открыть продукт/);
 assert.match(panel, /productId/);
@@ -91,10 +88,16 @@ assert.doesNotMatch(
   /seo_reservation_id=\$\{|query_text=|encodeURIComponent\(.*query/,
 );
 
-const dash = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
+const createStep = read(
+  "src/components/author-dashboard/AuthorProductSeoQueryStep.tsx",
+);
 assert.match(
-  dash,
-  /AuthorSeoDiscoveryPanel[\s\S]*?authorSlug=\{selectedAuthor\.slug\}/,
+  createStep,
+  /AuthorSeoDiscoveryPanel[\s\S]*?authorSlug=\{authorSlug\}/,
+);
+assert.doesNotMatch(
+  read("src/components/author-dashboard/AuthorDashboardClient.tsx"),
+  /AuthorSeoDiscoveryPanel/,
 );
 
 // D — Server loader: beta gate, ownership, no client query text trust
