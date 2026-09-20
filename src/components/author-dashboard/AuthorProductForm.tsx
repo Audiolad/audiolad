@@ -19,6 +19,7 @@ import AuthorProductPostListenPromoSection from "@/components/author-dashboard/p
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
+import AuthorPublishedProductSeoQueryLinker from "@/components/author-dashboard/AuthorPublishedProductSeoQueryLinker";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import PracticeVisibilityUsersEditor from "@/components/author-dashboard/PracticeVisibilityUsersEditor";
 import {
@@ -48,6 +49,7 @@ import {
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
 import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import {
   buildAuthorProductEditPath,
   buildWizardStepHref,
@@ -1132,6 +1134,18 @@ export default function AuthorProductForm({
     selectedAuthor?.canBypassProductModeration === true;
 
   const wizardEnabled = isAuthorProductWizardEnabled(form.authorId);
+  const publishedProductStatus =
+    initialProduct?.practice.status === "published";
+  const hasRelationalPrimarySeoQuery = Boolean(
+    initialProduct?.practice.primary_seo_query_id ||
+      seoReservationContext?.linked,
+  );
+  const showPublishedSeoLinker =
+    mode === "edit" &&
+    publishedProductStatus &&
+    isAuthorSeoDiscoveryEnabled(form.authorId) &&
+    !hasRelationalPrimarySeoQuery;
+
   const aurafonMusicWizard = isAurafonMusicWizard({
     authorId: form.authorId,
     productKind: form.productKind,
@@ -4603,6 +4617,38 @@ export default function AuthorProductForm({
       ) : null}
 
       {showWizardStep(3) ? (
+      <>
+      {showPublishedSeoLinker && practiceId ? (
+        <AuthorPublishedProductSeoQueryLinker
+          productId={practiceId}
+          legacySeoPrimaryQuery={form.seoPrimaryQuery}
+          onAttached={(payload) => {
+            setSeoReservationContext({
+              reservationId: payload.reservationId,
+              queryId: payload.queryId,
+              queryText: payload.queryText,
+              expiresAt: null,
+              linked: true,
+            });
+            setForm((current) => ({
+              ...current,
+              seoPrimaryQuery: payload.queryText,
+            }));
+          }}
+        />
+      ) : null}
+      {hasRelationalPrimarySeoQuery &&
+      isAuthorSeoDiscoveryEnabled(form.authorId) &&
+      publishedProductStatus ? (
+        <div className="mb-4 rounded-[22px] border border-[#eadff8] bg-white p-4">
+          <p className="text-sm font-semibold text-[#25135c]">
+            Запрос закреплён за этим продуктом
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+            «{form.seoPrimaryQuery || seoReservationContext?.queryText || "—"}»
+          </p>
+        </div>
+      ) : null}
       <AuthorProductSeoSection
         title={form.title}
         subtitle={form.subtitle}
@@ -4612,15 +4658,18 @@ export default function AuthorProductForm({
         seoPrimaryQuery={form.seoPrimaryQuery}
         primaryQueryLocked={Boolean(
           seoReservationContext ||
-            initialProduct?.practice.primary_seo_query_id,
+            initialProduct?.practice.primary_seo_query_id ||
+            showPublishedSeoLinker,
         )}
         primaryQueryLockHint={
           seoReservationContext?.linked ||
           initialProduct?.practice.primary_seo_query_id
-            ? "Этот запрос выбран в разделе «Поисковые запросы» и связан с продуктом."
-            : seoReservationContext
-              ? "Этот запрос выбран для продукта и будет связан после сохранения."
-              : undefined
+            ? "Запрос закреплён за этим продуктом."
+            : showPublishedSeoLinker
+              ? "Для опубликованного продукта закрепите основной запрос через блок выше."
+              : seoReservationContext
+                ? "Этот запрос выбран для продукта и будет связан после сохранения."
+                : undefined
         }
         seoSecondaryQueries={form.seoSecondaryQueries}
         seoTitle={form.seoTitle}
@@ -4658,6 +4707,7 @@ export default function AuthorProductForm({
           setForm((current) => ({ ...current, ...patch }));
         }}
       />
+      </>
       ) : null}
 
       {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (

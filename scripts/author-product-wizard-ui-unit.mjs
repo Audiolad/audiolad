@@ -150,7 +150,7 @@ assert.doesNotMatch(step1Slice, /AuthorProductSeoSection/);
 
 assert.match(form, /showWizardStep\(2\)[\s\S]*CoverUploadBlock/);
 assert.match(form, /showWizardStep\(2\) && !isCourse/);
-assert.match(form, /showWizardStep\(3\) \? \(\s*<AuthorProductSeoSection/);
+assert.match(form, /showWizardStep\(3\) \? \([\s\S]*?<AuthorProductSeoSection/);
 assert.match(form, /showWizardStep\(4\)[\s\S]*Кому показывать продукт\?/);
 assert.match(form, /wizardEnabled && wizardStep === PRODUCT_WIZARD_STEP_COUNT[\s\S]*AuthorProductFormActions/);
 
