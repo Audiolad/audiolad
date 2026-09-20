@@ -459,6 +459,20 @@ function deriveTitleFromFilename(fileName: string): {
   };
 }
 
+function resolveFormAudioProductAuthor(
+  authors: AuthorWorkspace[],
+  authorId: string,
+  productAudioProductAuthor: string | null | undefined,
+): string {
+  if (hasAudioProductAuthor(productAudioProductAuthor)) {
+    return (productAudioProductAuthor as string).trim();
+  }
+
+  const workspace =
+    authors.find((item) => item.id === authorId) ?? authors[0] ?? null;
+  return workspace?.defaultAudioProductAuthor ?? "";
+}
+
 function buildInitialForm(
   authors: AuthorWorkspace[],
   initialAuthorSlug: string | undefined,
@@ -466,7 +480,15 @@ function buildInitialForm(
   initialPublicationClass?: PublicationClass | null,
 ): FormState {
   if (initialProduct) {
-    return productDetailToFormSnapshot(initialProduct);
+    const snapshot = productDetailToFormSnapshot(initialProduct);
+    return {
+      ...snapshot,
+      audioProductAuthor: resolveFormAudioProductAuthor(
+        authors,
+        snapshot.authorId,
+        initialProduct.practice.audio_product_author,
+      ),
+    };
   }
 
   const author =
@@ -487,7 +509,11 @@ function buildInitialForm(
     title: "",
     subtitle: "",
     description: "",
-    audioProductAuthor: "",
+    audioProductAuthor: resolveFormAudioProductAuthor(
+      authors,
+      author?.id ?? "",
+      null,
+    ),
     productKind: created.productKind,
     publicationClass: created.publicationClass,
     musicUsagePermission:
@@ -756,7 +782,14 @@ export default function AuthorProductForm({
   const savedBaselineRef = useRef<string | null>(
     initialProduct
       ? serializeProductEditorBaseline(
-          productDetailToFormSnapshot(initialProduct),
+          {
+            ...productDetailToFormSnapshot(initialProduct),
+            audioProductAuthor: resolveFormAudioProductAuthor(
+              authors,
+              initialProduct.practice.author_id,
+              initialProduct.practice.audio_product_author,
+            ),
+          },
           initialProduct.audio_items,
         )
       : null,
@@ -1611,7 +1644,14 @@ export default function AuthorProductForm({
       }
 
       savedBaselineRef.current = serializeProductEditorBaseline(
-        productDetailToFormSnapshot(reloaded),
+        {
+          ...productDetailToFormSnapshot(reloaded),
+          audioProductAuthor: resolveFormAudioProductAuthor(
+            authors,
+            reloaded.practice.author_id,
+            reloaded.practice.audio_product_author,
+          ),
+        },
         reloaded.audio_items,
       );
       setEditorDirty(applyProductEditorSaveToDirty({ dirty: true, saved: true }));

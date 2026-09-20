@@ -50,6 +50,8 @@ export type AuthorWorkspace = {
   role: AuthorMemberRole;
   accessStatus: AuthorAccessStatus;
   canBypassProductModeration: boolean;
+  /** Project-level default credited audio-product author (nullable). */
+  defaultAudioProductAuthor: string | null;
 };
 
 export type AudioItemRow = {

@@ -34,6 +34,7 @@ export type ActingAuthorMembership = {
   authorSlug: string;
   canBypassProductModeration: boolean;
   actingDisplayName: string;
+  defaultAudioProductAuthor: string | null;
 };
 
 function mapSessionRow(row: SessionRow): AuthorSupportSessionRecord {
@@ -157,7 +158,8 @@ export async function loadActingAuthorMembership(input: {
         name,
         slug,
         access_status,
-        can_bypass_product_moderation
+        can_bypass_product_moderation,
+        default_audio_product_author
       )
     `,
     )
@@ -186,6 +188,11 @@ export async function loadActingAuthorMembership(input: {
     (typeof profile?.email === "string" && profile.email.split("@")[0]) ||
     "Автор";
 
+  const rawDefault =
+    typeof author.default_audio_product_author === "string"
+      ? author.default_audio_product_author.trim()
+      : "";
+
   return {
     role: data.role as AuthorMemberRole,
     accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
@@ -193,6 +200,7 @@ export async function loadActingAuthorMembership(input: {
     authorSlug: (author.slug as string) || "",
     canBypassProductModeration: author.can_bypass_product_moderation === true,
     actingDisplayName: displayName,
+    defaultAudioProductAuthor: rawDefault || null,
   };
 }
 

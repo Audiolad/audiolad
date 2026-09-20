@@ -123,6 +123,7 @@ export async function listAuthorWorkspacesForUser(
         role: membership.role,
         accessStatus: membership.accessStatus,
         canBypassProductModeration: membership.canBypassProductModeration,
+        defaultAudioProductAuthor: membership.defaultAudioProductAuthor,
       },
     ];
   }
@@ -139,7 +140,8 @@ export async function listAuthorWorkspacesForUser(
         name,
         slug,
         access_status,
-        can_bypass_product_moderation
+        can_bypass_product_moderation,
+        default_audio_product_author
       )
     `,
     )
@@ -169,6 +171,11 @@ export async function listAuthorWorkspacesForUser(
       continue;
     }
 
+    const rawDefault =
+      typeof author.default_audio_product_author === "string"
+        ? author.default_audio_product_author.trim()
+        : "";
+
     workspaces.push({
       id: author.id,
       name: author.name,
@@ -177,6 +184,7 @@ export async function listAuthorWorkspacesForUser(
       accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
       canBypassProductModeration:
         author.can_bypass_product_moderation === true || actorCanBypass,
+      defaultAudioProductAuthor: rawDefault || null,
     });
   }
 

@@ -14,6 +14,7 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { resolveAppreciationOverridePatch } from "@/lib/author-products/appreciation-override";
+import { seedAuthorDefaultAudioProductAuthorIfAbsent } from "@/lib/author-products/seed-default-audio-product-author";
 import {
   validateAudioProductAuthorLength,
   validateDescriptionLength,
@@ -1093,6 +1094,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!product) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+
+    // Non-critical: first non-empty audio_product_author seeds workspace default once.
+    await seedAuthorDefaultAudioProductAuthorIfAbsent(supabase, {
+      authorId: product.practice.author_id,
+      audioProductAuthor: product.practice.audio_product_author,
+    });
 
     if (
       practice.status === "published" &&
