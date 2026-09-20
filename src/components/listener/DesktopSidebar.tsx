@@ -16,7 +16,6 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
       showEditorialNav={shellData.showEditorialNav}
       showEditorialDirectionsNav={shellData.showEditorialDirectionsNav}
       showSidebarAuthorPromo={shellData.showSidebarAuthorPromo}
-      authorCtaHref={shellData.authorCta.href}
       sidebarLogo={sidebarLogo}
       sidebarMark={sidebarMark}
       becomeAuthorBanner={becomeAuthorBanner}

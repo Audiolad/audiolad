@@ -4,6 +4,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   resolveListenerAuthorCta,
@@ -11,9 +13,10 @@ import {
   resolveShowSidebarAuthorPromo,
 } from "../src/lib/listener/author-cta.ts";
 
-const root = "/var/www/audiolad";
-const sidebar = readFileSync(`${root}/src/components/listener/DesktopSidebar.tsx`, "utf8");
-const shellData = readFileSync(`${root}/src/lib/listener/shell-data.ts`, "utf8");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const sidebar = readFileSync(join(root, "src/components/listener/DesktopSidebar.tsx"), "utf8");
+const chrome = readFileSync(join(root, "src/components/listener/DesktopSidebarChrome.tsx"), "utf8");
+const shellData = readFileSync(join(root, "src/lib/listener/shell-data.ts"), "utf8");
 
 const workspace = [{ id: "a1", slug: "sergey", name: "Sergey" }];
 
@@ -97,6 +100,16 @@ assert(
 assert(
   shellData.includes("resolveShowSidebarAuthorPromo"),
   "shell-data resolves sidebar promo via shared author-cta helper",
+);
+
+assert(
+  !sidebar.includes("authorCtaHref"),
+  "DesktopSidebar no longer passes authorCtaHref into chrome promo banner",
+);
+assert(
+  chrome.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+    !chrome.includes("authorCtaHref"),
+  "DesktopSidebarChrome AuthorPromoBanner uses authors landing path",
 );
 
 console.log("listener-author-promo-unit: ok");
