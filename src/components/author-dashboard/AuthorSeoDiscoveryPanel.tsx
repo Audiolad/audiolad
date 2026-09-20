@@ -14,7 +14,8 @@ import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-prod
 
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
-  frequency: number;
+  /** Database matches may be null (manual seeds without Wordstat). Wordstat rows are numbers. */
+  frequency: number | null;
   status: string;
   statusLabel: string;
   queryId: string | null;
@@ -28,7 +29,7 @@ export type AuthorSeoDiscoveryResult = {
 export type AuthorSeoDiscoveryReservedEvent = {
   queryId: string;
   phrase: string;
-  frequency: number;
+  frequency: number | null;
   reservationId: string;
   expiresAt: string | null;
 };
@@ -47,7 +48,8 @@ type Props = {
   onReserved?: (event: AuthorSeoDiscoveryReservedEvent) => void;
 };
 
-function formatMonthlyFrequency(value: number) {
+function formatMonthlyFrequency(value: number | null) {
+  if (value === null || Number.isNaN(value)) return null;
   return `Запросов в месяц: ${value.toLocaleString("ru-RU")}`;
 }
 
@@ -325,9 +327,11 @@ export default function AuthorSeoDiscoveryPanel({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h4 className="text-base font-semibold text-[#25135c]">{item.phrase}</h4>
-                        <p className="mt-1 text-sm text-[#5f5484]">
-                          {formatMonthlyFrequency(item.frequency)}
-                        </p>
+                        {formatMonthlyFrequency(item.frequency) ? (
+                          <p className="mt-1 text-sm text-[#5f5484]">
+                            {formatMonthlyFrequency(item.frequency)}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">
                         {item.statusLabel}
@@ -410,9 +414,11 @@ export default function AuthorSeoDiscoveryPanel({
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h4 className="text-base font-semibold text-[#25135c]">{item.phrase}</h4>
-                          <p className="mt-1 text-sm text-[#5f5484]">
-                            {formatMonthlyFrequency(item.frequency)}
-                          </p>
+                          {formatMonthlyFrequency(item.frequency) ? (
+                            <p className="mt-1 text-sm text-[#5f5484]">
+                              {formatMonthlyFrequency(item.frequency)}
+                            </p>
+                          ) : null}
                         </div>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">
                           {item.statusLabel}

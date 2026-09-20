@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Focused unit: move SEO discovery into product create (Aurafon closed beta).
- * Covers dashboard removal, create orchestration A–D, skip, query-first, non-beta.
+ * Focused unit: SEO discovery in product create (Aurafon closed beta) + UX/data cleanup.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -16,6 +15,7 @@ import {
   buildSeoReservationProductCreateHref,
   isSeoQuerySkipParam,
 } from "../src/lib/seo-queries/reservation-product-create-href.ts";
+import { getProductSeoQueryStepCopy } from "../src/lib/seo-queries/product-seo-query-step-copy.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
@@ -28,6 +28,7 @@ const panel = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx"
 const wizard = read("src/components/author-dashboard/AuthorCreateWizard.tsx");
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
 const opportunitiesUi = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
+const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
 
 // --- Dashboard: discovery removed ---
 assert.doesNotMatch(dash, /AuthorSeoDiscoveryPanel/);
@@ -37,7 +38,6 @@ assert.doesNotMatch(dashPage, /listSeoOpportunitiesForAuthor/);
 assert.doesNotMatch(dashPage, /seoActiveReservationCounts/);
 assert.doesNotMatch(dashPage, /isAuthorSeoDiscoveryEnabled/);
 
-// Standalone opportunities nav preserved
 assert.match(nav, /Что ищут слушатели/);
 assert.match(opportunitiesUi, /variant="opportunities"/);
 
@@ -91,27 +91,20 @@ assert.doesNotMatch(
   /query_text|q=|текст/i,
 );
 
-// --- Create page orchestration ---
+// --- Create page orchestration (I) ---
 assert.match(createPage, /AuthorProductSeoQueryStep/);
 assert.match(createPage, /isAuthorSeoDiscoveryEnabled/);
 assert.match(createPage, /isSeoQuerySkipParam/);
 assert.match(createPage, /listSeoOpportunitiesForAuthor/);
-// A: no class → wizard
 assert.match(createPage, /AuthorCreateWizard/);
 assert.match(createPage, /if \(!publicationClass\)/);
-// B: beta + class + no reservation + no skip → query step
 assert.match(createPage, /seoBeta && !hasValidReservation && !seoQuerySkip/);
-// C/D: form path with reservation or skip
 assert.match(createPage, /AuthorProductForm/);
 assert.match(createPage, /initialSeoReservationContext/);
-// form back → query step for beta
 assert.match(createPage, /formBackHref = seoBeta \? queryStepHref : typeChooserHref/);
-// query step back → type chooser
 assert.match(createPage, /internalBackHref=\{typeChooserHref\}/);
 
-// --- Query step UI ---
-assert.match(createStep, /Выберите поисковый запрос/);
-assert.match(createStep, /Продолжить без поискового запроса/);
+// --- Query step structure ---
 assert.match(createStep, /Ваши запросы в работе/);
 assert.match(createStep, /!item\.productId/);
 assert.match(createStep, /variant="product-create"/);
@@ -120,7 +113,58 @@ assert.doesNotMatch(createStep, /AuthorSeoPromptBuilder/);
 assert.doesNotMatch(createStep, /from\("practices"\)/);
 assert.doesNotMatch(createStep, /\/api\/author\/products/);
 
-// --- Discovery product-create ---
+// A — skip after discovery panel, not duplicated
+const skipIdx = createStep.indexOf("Продолжить без поискового запроса");
+const panelIdx = createStep.indexOf("AuthorSeoDiscoveryPanel");
+assert.ok(panelIdx > 0, "discovery panel present");
+assert.ok(skipIdx > panelIdx, "skip action after AuthorSeoDiscoveryPanel");
+assert.equal(
+  (createStep.match(/Продолжить без поискового запроса/g) || []).length,
+  1,
+  "skip not duplicated",
+);
+assert.match(createStep, /data-testid="author-product-seo-query-skip"/);
+assert.doesNotMatch(
+  createStep.slice(0, panelIdx),
+  /Продолжить без поискового запроса/,
+);
+
+// B/C — release music copy
+const releaseCopy = getProductSeoQueryStepCopy("release");
+assert.equal(releaseCopy.title, "Выберите поисковый запрос для музыки");
+assert.match(releaseCopy.description, /создаёте музыку/);
+assert.match(createStep, /getProductSeoQueryStepCopy/);
+assert.match(createStep, /copy\.title/);
+
+// D — generic non-release
+const practiceCopy = getProductSeoQueryStepCopy("practice");
+assert.equal(practiceCopy.title, "Выберите поисковый запрос");
+assert.match(practiceCopy.description, /создаёте аудиопродукт/);
+assert.doesNotMatch(practiceCopy.description, /создаёте музыку/);
+assert.equal(getProductSeoQueryStepCopy("course").title, "Выберите поисковый запрос");
+assert.equal(getProductSeoQueryStepCopy(undefined).title, "Выберите поисковый запрос");
+
+// E — database frequency NULL stays null in API DTO
+assert.match(
+  discoveryRoute,
+  /frequency:\s*typeof item\.frequency === "number" \? item\.frequency : null/,
+);
+assert.doesNotMatch(discoveryRoute, /frequency:\s*item\.frequency \?\? 0/);
+
+// F/G — null-safe frequency display; Wordstat label template retained
+assert.match(panel, /frequency:\s*number\s*\|\s*null/);
+assert.match(panel, /function formatMonthlyFrequency\(value: number \| null\)/);
+assert.match(panel, /if \(value === null \|\| Number\.isNaN\(value\)\) return null/);
+assert.match(panel, /Запросов в месяц:/);
+assert.doesNotMatch(panel, /Запросов в месяц: 0/);
+assert.doesNotMatch(createStep, /Запросов в месяц: 0/);
+assert.match(createStep, /function formatMonthlyFrequency\(value: number \| null\)/);
+
+// H — own unlinked pre-create status
+assert.match(createStep, /У вас в работе/);
+assert.doesNotMatch(createStep, /lifecycleLabel/);
+
+// Discovery product-create CTAs
 assert.match(panel, /"opportunities" \| "product-create"/);
 assert.doesNotMatch(panel, /"dashboard"/);
 assert.match(panel, /Взять в работу и продолжить/);
@@ -128,20 +172,17 @@ assert.match(panel, /Выбрать и продолжить/);
 assert.match(panel, /buildAuthorProductCreateHref/);
 assert.match(panel, /router\.push/);
 assert.match(panel, /!isProductCreate/);
-assert.match(panel, /AuthorSeoPromptBuilder/); // still for opportunities
+assert.match(panel, /AuthorSeoPromptBuilder/);
 
-// --- Wizard uses canonical helper ---
 assert.match(wizard, /buildAuthorProductCreateHref/);
 assert.match(wizard, /reservationId:\s*input\.seoReservationId/);
 
-// --- Zero migrations in this change set (script invariant) ---
+// Zero migrations for this feature
 const migDir = path.join(root, "supabase/migrations");
 const migNames = readdirSync(migDir).filter((n) => n.endsWith(".sql")).sort();
 assert.ok(migNames.includes("20261021120000_seo_reservation_product_primary_sync.sql"));
 assert.ok(migNames.includes("20261022120000_seo_spa_massage_queries_seed.sql"));
-// This PR must not introduce a newer migration than spa seed for this feature
 const afterSpa = migNames.filter((n) => n > "20261022120000_seo_spa_massage_queries_seed.sql");
-// Allow unrelated newer migrations already on main; just ensure we didn't add one in working tree via this feature name
 for (const name of afterSpa) {
   const body = read(`supabase/migrations/${name}`);
   assert.doesNotMatch(body, /author-create-seo-query|seo_query.?skip|product-create/i);

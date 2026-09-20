@@ -3,14 +3,12 @@
 import Link from "next/link";
 
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
+import { getProductSeoQueryStepCopy } from "@/lib/seo-queries/product-seo-query-step-copy";
 import {
   buildAuthorProductCreateHref,
 } from "@/lib/seo-queries/reservation-product-create-href";
 import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
-import {
-  countActiveAuthorSeoReservations,
-  lifecycleLabel,
-} from "@/lib/seo-queries/types";
+import { countActiveAuthorSeoReservations } from "@/lib/seo-queries/types";
 
 type Props = {
   authorId: string;
@@ -46,6 +44,7 @@ export default function AuthorProductSeoQueryStep({
     publicationClass,
     seoQuerySkip: true,
   });
+  const copy = getProductSeoQueryStepCopy(publicationClass);
 
   return (
     <div className="space-y-5" data-testid="author-product-seo-query-step">
@@ -54,19 +53,11 @@ export default function AuthorProductSeoQueryStep({
           Бета
         </p>
         <h2 className="mt-1 text-lg font-semibold text-[#25135c]">
-          Выберите поисковый запрос
+          {copy.title}
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#4c3d78]">
-          Закрепите свободный запрос или продолжите с уже взятым в работу.
-          Можно создать продукт и без поискового запроса.
+          {copy.description}
         </p>
-        <Link
-          href={skipHref}
-          className="mt-4 inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] bg-white px-4 text-sm font-semibold text-[#7042c5]"
-          data-testid="author-product-seo-query-skip"
-        >
-          Продолжить без поискового запроса
-        </Link>
       </section>
 
       {ownUnlinked.length > 0 ? (
@@ -78,7 +69,9 @@ export default function AuthorProductSeoQueryStep({
             Эти запросы уже закреплены за вами и ещё не привязаны к продукту.
           </p>
           <div className="mt-3 grid gap-3">
-            {ownUnlinked.map((item) => (
+            {ownUnlinked.map((item) => {
+              const frequencyLabel = formatMonthlyFrequency(item.frequency);
+              return (
               <article
                 key={item.reservationId ?? item.id}
                 className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4"
@@ -88,14 +81,14 @@ export default function AuthorProductSeoQueryStep({
                     <h4 className="text-base font-semibold text-[#25135c]">
                       {item.queryText}
                     </h4>
-                    {formatMonthlyFrequency(item.frequency) ? (
+                    {frequencyLabel ? (
                       <p className="mt-1 text-sm text-[#5f5484]">
-                        {formatMonthlyFrequency(item.frequency)}
+                        {frequencyLabel}
                       </p>
                     ) : null}
                   </div>
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                    {lifecycleLabel(item.lifecycle)}
+                    У вас в работе
                   </span>
                 </div>
                 {item.reservationId ? (
@@ -111,7 +104,8 @@ export default function AuthorProductSeoQueryStep({
                   </Link>
                 ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -123,6 +117,16 @@ export default function AuthorProductSeoQueryStep({
         publicationClass={publicationClass}
         activeReservationCount={activeCount}
       />
+
+      <div className="flex justify-center pt-1">
+        <Link
+          href={skipHref}
+          className="inline-flex min-h-10 items-center rounded-full border border-[#d7c4f5] bg-transparent px-4 text-sm font-medium text-[#5f5484] hover:border-[#bda6e1] hover:text-[#7042c5]"
+          data-testid="author-product-seo-query-skip"
+        >
+          Продолжить без поискового запроса
+        </Link>
+      </div>
     </div>
   );
 }

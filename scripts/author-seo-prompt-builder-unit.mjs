@@ -256,7 +256,11 @@ assert.match(builderUi, /navigator\.clipboard\.writeText\(prompt\)/);
 assert.match(builderUi, /Как работать с промптом/);
 assert.doesNotMatch(builderUi, /iframe|VideoPlayer/i);
 assert.match(discoveryPanel, /AuthorSeoPromptBuilder/);
-assert.match(dash, /seoAnalyzedOpportunitiesByAuthorId/);
+// Prompt builder related queries come from opportunities page, not products dashboard
+assert.doesNotMatch(dash, /seoAnalyzedOpportunitiesByAuthorId/);
+assert.doesNotMatch(dash, /AuthorSeoPromptBuilder/);
+assert.match(opportunitiesUi, /analyzedOpportunities=\{items\}/);
+assert.match(discoveryPanel, /analyzedOpportunities/);
 assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
 assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("{{RELATED_QUERIES}}"));
 assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("{{PRODUCT_SOURCE}}"));
