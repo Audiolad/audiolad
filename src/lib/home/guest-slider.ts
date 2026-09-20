@@ -1,5 +1,5 @@
 import { buildAuthRouteHref } from "@/lib/auth/routes";
-import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
+import { MEDITATION_AUTHORS_LANDING_PATH } from "@/lib/seo/meditation-authors-landing";
 
 export const GUEST_HOME_INTRO =
   "АудиоЛад – платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.";
@@ -62,7 +62,7 @@ export const GUEST_HOME_SLIDES: readonly GuestHomeSlide[] = [
   {
     id: "07",
     src: "/images/home/guest-slider/07-audio-practices.webp",
-    href: BECOME_AUTHOR_HREF,
+    href: MEDITATION_AUTHORS_LANDING_PATH,
     ariaLabel:
       "Слайд 7: Станьте автором АудиоЛада. Создавайте свои аудиопрактики, медитации, аудиокурсы и программы, публикуйте их на платформе и развивайте своё авторское пространство.",
   },

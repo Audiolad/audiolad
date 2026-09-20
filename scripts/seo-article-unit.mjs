@@ -8259,22 +8259,29 @@ assert(
   "creator paths CTA links Studio directly to meditation studio",
 );
 assert(
-  creatorPathsCtaSource.includes("solutionsPromoHref") &&
-    creatorPathsCtaSource.includes("href = isStudio ? STUDIO_HREF : solutionsPromoHref"),
-  "creator paths CTA receives its visitor-specific 25 solutions entry href",
+  creatorPathsCtaSource.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+    creatorPathsCtaSource.includes('kind="author"') &&
+    creatorPathsCtaSource.includes('kind="studio"'),
+  "creator paths CTA second card links the meditation authors landing",
+);
+assert(
+  !creatorPathsCtaSource.includes("solutionsPromoHref") &&
+    !creatorPathsCtaSource.includes("25 ГОТОВЫХ РЕШЕНИЙ") &&
+    !creatorPathsCtaSource.includes("Посмотреть 25 готовых решений") &&
+    !creatorPathsCtaSource.includes("SolutionsVisual") &&
+    !creatorPathsCtaSource.includes("готовые темы, тексты"),
+  "creator paths CTA no longer promotes the 25 solutions product",
 );
 const articleLoadSource = read("src/lib/seo/articles/load.ts");
 assert(
-  articleLoadSource.includes("buildCatalogListingPriceView") &&
-    articleLoadSource.includes("loadPersonalPromotionStarts") &&
-    articleLoadSource.includes("personalTeaser: true") &&
-    articleLoadSource.includes("solutionsPromoHref"),
-  "creator article reuses the Catalog personal countdown entry flow",
+  !articleLoadSource.includes("solutionsPromoHref") &&
+    !articleLoadSource.includes("loadMeditationSolutionsPromoHref") &&
+    !articleLoadSource.includes("25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditatsiy"),
+  "creator article loader no longer resolves a solutions promo href",
 );
 assert(
-  articleLoadSource.includes("readPriceVisitorId") &&
-    pageSource.includes('export const dynamic = "force-dynamic"'),
-  "creator promo entry href is resolved per request without shared article caching",
+  pageSource.includes('export const dynamic = "force-dynamic"'),
+  "article page stays force-dynamic",
 );
 assert(
   !creatorPathsCtaSource.includes("import { SCHOOL_ORIGIN }") &&
@@ -8283,29 +8290,43 @@ assert(
   "creator paths CTA no longer uses the School card",
 );
 assert(
-  creatorPathsCtaSource.includes("Посмотреть 25 готовых решений сейчас") &&
-    creatorPathsCtaSource.includes("25 ГОТОВЫХ РЕШЕНИЙ") &&
-    !creatorPathsCtaSource.includes("sm:hidden"),
-  "creator paths CTA uses the full 25 solutions label on every viewport",
-);
-assert(
-  creatorPathsCtaSource.includes('target="_blank"') &&
-    creatorPathsCtaSource.includes('rel="noopener noreferrer"'),
-  "creator paths CTA preserves the article in a new tab",
+  creatorPathsCtaSource.includes("Хотите создать и опубликовать свою медитацию?"),
+  "creator paths CTA uses the publish-focused section heading",
 );
 assert(
   creatorPathsCtaSource.includes("Уже готовы записать свою медитацию?") &&
     creatorPathsCtaSource.includes(
       "без специальных навыков и сложных программ.",
-    ),
-  "creator paths CTA uses the balanced Studio copy",
+    ) &&
+    creatorPathsCtaSource.includes("Попробуйте бесплатно прямо сейчас"),
+  "creator paths CTA keeps the Studio card",
 );
 assert(
-  creatorPathsCtaSource.includes("Хотите готовые темы, тексты и инструкции?") &&
+  creatorPathsCtaSource.includes("АВТОРАМ АУДИОЛАДА") &&
     creatorPathsCtaSource.includes(
-      "пошаговые инструкции для старта.",
-    ),
-  "creator paths CTA uses the 25 solutions copy",
+      "Публикуйте свои медитации и находите новых слушателей",
+    ) &&
+    creatorPathsCtaSource.includes("Стать автором бесплатно"),
+  "creator paths CTA uses the author landing card copy",
+);
+assert(
+  creatorPathsCtaSource.includes('target: "_blank"') &&
+    creatorPathsCtaSource.includes('rel: "noopener noreferrer"'),
+  "Studio card still opens in a new tab",
+);
+assert(
+  creatorPathsCtaSource.includes('target: "_blank"') &&
+    creatorPathsCtaSource.includes('rel: "noopener noreferrer"') &&
+    creatorPathsCtaSource.includes("isStudio") &&
+    creatorPathsCtaSource.includes(": {}"),
+  "author landing card opens in the same tab (Studio alone keeps target=_blank)",
+);
+assert(
+  (fullViewSource.match(/<CreatorPathsCta/g) || []).length === 2 &&
+    fullViewSource.includes('placement="top"') &&
+    fullViewSource.includes('placement="bottom"') &&
+    !fullViewSource.includes("solutionsPromoHref"),
+  "top and bottom placements share one CreatorPathsCta without solutionsPromoHref",
 );
 const viewSource = fullViewSource.slice(
   fullViewSource.indexOf("function PracticeArticlePageView"),

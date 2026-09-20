@@ -143,7 +143,7 @@ assert.match(
   slidesBlock,
   /buildAuthRouteHref\("\/auth\/sign-up", "\/my-practices"\)/,
 );
-assert.match(slidesBlock, /href: BECOME_AUTHOR_HREF/);
+assert.match(slidesBlock, /href: MEDITATION_AUTHORS_LANDING_PATH/);
 
 const hrefOrder = [
   'href: "/catalog"',
@@ -152,7 +152,7 @@ const hrefOrder = [
   'href: "/playlists/catalog"',
   'href: "/catalog?access=paid"',
   'buildAuthRouteHref("/auth/sign-up", "/my-practices")',
-  "href: BECOME_AUTHOR_HREF",
+  "href: MEDITATION_AUTHORS_LANDING_PATH",
 ].map((token) => slidesBlock.indexOf(token));
 
 for (let index = 1; index < hrefOrder.length; index += 1) {
