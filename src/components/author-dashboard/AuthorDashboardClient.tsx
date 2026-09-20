@@ -6,8 +6,6 @@ import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { useEffect, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
-import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
 import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
@@ -40,22 +38,8 @@ import {
 
 type AuthorDashboardClientProps = {
   authors: AuthorWorkspace[];
-  /** Canonical effective active SEO reservation counts keyed by author workspace id (beta only). */
-  seoActiveReservationCounts?: Record<string, number>;
-  /** Analyzed opportunities for SEO prompt related-query ranking (beta only). */
-  seoAnalyzedOpportunitiesByAuthorId?: Record<
-    string,
-    Array<{
-      id: string;
-      queryText: string;
-      frequency: number | null;
-      intent: string | null;
-      recommendedFormat: string | null;
-      audioFit: string | null;
-      clusterName: string | null;
-    }>
-  >;
 };
+
 
 function PlusIcon() {
   return (
@@ -185,8 +169,6 @@ function ProductCard({
 
 export default function AuthorDashboardClient({
   authors,
-  seoActiveReservationCounts = {},
-  seoAnalyzedOpportunitiesByAuthorId = {},
 }: AuthorDashboardClientProps) {
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -270,19 +252,6 @@ export default function AuthorDashboardClient({
         accessStatus={selectedAuthor.accessStatus}
         productCount={loading ? -1 : products.length}
       />
-
-      {isAuthorSeoDiscoveryEnabled(selectedAuthor.id) ? (
-        <div className="mt-4" data-testid="author-seo-discovery-panel">
-          <AuthorSeoDiscoveryPanel
-            key={selectedAuthor.id}
-            authorId={selectedAuthor.id}
-            authorSlug={selectedAuthor.slug}
-            variant="dashboard"
-            activeReservationCount={seoActiveReservationCounts[selectedAuthor.id] ?? 0}
-            analyzedOpportunities={seoAnalyzedOpportunitiesByAuthorId[selectedAuthor.id] ?? []}
-          />
-        </div>
-      ) : null}
 
       <AuthorOnboardingChecklist
         key={selectedAuthor.id}

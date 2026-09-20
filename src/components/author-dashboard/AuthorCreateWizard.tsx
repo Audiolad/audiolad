@@ -10,7 +10,7 @@ import {
   type CabinetBranch,
   type ProductPublicationClass,
 } from "@/lib/author-products/publication-class";
-import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
+import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 
 const BRANCH_OPTIONS: Array<{
   value: CabinetBranch;
@@ -54,21 +54,11 @@ function buildCreateHref(input: {
   authorSlug?: string;
   seoReservationId?: string;
 }): string {
-  const reservationId = input.seoReservationId?.trim();
-  if (reservationId && input.authorSlug?.trim()) {
-    return buildSeoReservationProductCreateHref({
-      authorSlug: input.authorSlug,
-      reservationId,
-      publicationClass: input.publicationClass,
-    });
-  }
-
-  const params = new URLSearchParams();
-  params.set("class", input.publicationClass);
-  if (input.authorSlug) {
-    params.set("author", input.authorSlug);
-  }
-  return `/author-dashboard/products/new?${params.toString()}`;
+  return buildAuthorProductCreateHref({
+    authorSlug: input.authorSlug,
+    publicationClass: input.publicationClass,
+    reservationId: input.seoReservationId,
+  });
 }
 
 export default function AuthorCreateWizard({

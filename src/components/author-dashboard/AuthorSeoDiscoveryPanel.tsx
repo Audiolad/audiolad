@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -9,7 +10,7 @@ import {
   isSeoActiveReservationLimitReached,
   nextActiveReservationCountAfterReserve,
 } from "@/lib/seo-queries/types";
-import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
+import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
@@ -36,10 +37,12 @@ type Props = {
   authorId: string;
   /** Required for reservation → create deep-link CTA. */
   authorSlug: string;
-  /** dashboard = search-first Aurafon home copy; opportunities = existing SEO page heading */
-  variant: "dashboard" | "opportunities";
+  /** opportunities = SEO page; product-create = pre-create query selection */
+  variant: "opportunities" | "product-create";
   activeReservationCount: number;
-  /** Analyzed SEO opportunities for related-query ranking (no Wordstat). */
+  /** Required on product-create so reserve/select can continue into the form. */
+  publicationClass?: string | null;
+  /** Analyzed SEO opportunities for related-query ranking (opportunities only). */
   analyzedOpportunities?: AuthorSeoPromptRelatedCandidate[];
   onReserved?: (event: AuthorSeoDiscoveryReservedEvent) => void;
 };
@@ -49,17 +52,20 @@ function formatMonthlyFrequency(value: number) {
 }
 
 /**
- * Single closed-beta SEO discovery implementation for Aurafon:
- * database matches + Wordstat additions. Used by main dashboard and /seo-opportunities.
+ * Closed-beta SEO discovery: database matches + Wordstat additions.
+ * Used by /seo-opportunities and the product-create query step.
  */
 export default function AuthorSeoDiscoveryPanel({
   authorId,
   authorSlug,
   variant,
   activeReservationCount,
+  publicationClass = null,
   analyzedOpportunities = [],
   onReserved,
 }: Props) {
+  const router = useRouter();
+  const isProductCreate = variant === "product-create";
   const [discoverPhrase, setDiscoverPhrase] = useState("");
   const [discoverySeedPhrase, setDiscoverySeedPhrase] = useState<string | null>(null);
   const [databaseMatches, setDatabaseMatches] = useState<AuthorSeoDiscoveryResult[]>([]);
@@ -149,6 +155,16 @@ export default function AuthorSeoDiscoveryPanel({
         reservationId,
         expiresAt,
       });
+    }
+    if (isProductCreate && reservationId) {
+      router.push(
+        buildAuthorProductCreateHref({
+          authorSlug,
+          publicationClass,
+          reservationId,
+        }),
+      );
+      return;
     }
     setDiscoverMessage(payload.message ?? "Запрос закреплен за вами");
   }
@@ -247,19 +263,18 @@ export default function AuthorSeoDiscoveryPanel({
     setDiscoverMessage(payload.message ?? "Запрос отправлен на проверку.");
   }
 
-  const heading =
-    variant === "dashboard" ? "Найдите тему для нового аудиопродукта" : "Что ищут слушатели";
+  const heading = isProductCreate
+    ? "Найти другой поисковый запрос"
+    : "Что ищут слушатели";
   const subtitle =
-    variant === "dashboard"
-      ? "Введите тему — сначала покажем проверенные запросы из базы АудиоЛада, затем дополнительные варианты из Яндекса."
-      : "Введите одну тему — сначала покажем проверенные запросы из базы АудиоЛада, затем дополнительные варианты из Яндекса.";
+    "Введите одну тему — сначала покажем проверенные запросы из базы АудиоЛада, затем дополнительные варианты из Яндекса.";
 
   return (
     <section className="rounded-[24px] border border-[#d7c4f5] bg-white p-5 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
-      {variant === "dashboard" ? (
+      {isProductCreate ? (
         <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">Бета</p>
       ) : null}
-      <h2 className={`text-lg font-semibold text-[#25135c] ${variant === "dashboard" ? "mt-1" : ""}`}>
+      <h2 className={`text-lg font-semibold text-[#25135c] ${isProductCreate ? "mt-1" : ""}`}>
         {heading}
       </h2>
       <p className="mt-2 text-sm leading-6 text-[#4c3d78]">{subtitle}</p>
@@ -328,7 +343,7 @@ export default function AuthorSeoDiscoveryPanel({
                         onClick={() => reserve(item.queryId!)}
                         className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
                       >
-                        Взять в работу
+                        {isProductCreate ? "Взять в работу и продолжить" : "Взять в работу"}
                       </button>
                     ) : null}
                     {item.status === "own" && item.reservationId ? (
@@ -342,18 +357,24 @@ export default function AuthorSeoDiscoveryPanel({
                           </Link>
                         ) : (
                           <Link
-                            href={buildSeoReservationProductCreateHref({
+                            href={buildAuthorProductCreateHref({
                               authorSlug,
                               reservationId: item.reservationId,
+                              publicationClass: isProductCreate ? publicationClass : null,
                             })}
                             className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
                           >
-                            Создать продукт по этому запросу
+                            {isProductCreate
+                              ? "Выбрать и продолжить"
+                              : "Создать продукт по этому запросу"}
                           </Link>
                         )}
                       </div>
                     ) : null}
-                    {item.status === "own" && item.queryId && item.reservationId ? (
+                    {!isProductCreate
+                      && item.status === "own"
+                      && item.queryId
+                      && item.reservationId ? (
                       <AuthorSeoPromptBuilder
                         primaryQueryText={item.phrase}
                         primaryQueryId={item.queryId}

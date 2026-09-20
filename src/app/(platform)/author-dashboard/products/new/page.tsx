@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import AuthorCreateWizard from "@/components/author-dashboard/AuthorCreateWizard";
 import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
+import AuthorProductSeoQueryStep from "@/components/author-dashboard/AuthorProductSeoQueryStep";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import {
@@ -12,7 +13,14 @@ import {
 } from "@/lib/author-products/publication-class";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
-import { SEO_RESERVATION_ID_PARAM } from "@/lib/seo-queries/reservation-product-create-href";
+import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
+import {
+  SEO_QUERY_SKIP_PARAM,
+  SEO_RESERVATION_ID_PARAM,
+  buildAuthorProductCreateHref,
+  isSeoQuerySkipParam,
+} from "@/lib/seo-queries/reservation-product-create-href";
 import { loadSeoReservationProductCreateContext } from "@/lib/seo-queries/load-seo-reservation-product-create-context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,8 +32,29 @@ type PageProps = {
     class?: string;
     step?: string;
     seo_reservation_id?: string;
+    seo_query?: string;
   }>;
 };
+
+function reservationErrorShell(message: string, backHref: string) {
+  return (
+    <AuthorShell
+      title="Создать"
+      subtitle="Поисковый запрос"
+      internalBackHref={backHref}
+    >
+      <div className="rounded-[22px] border border-[#eadff8] bg-white p-6">
+        <p className="text-sm leading-6 text-[#5f5484]">{message}</p>
+        <Link
+          href={backHref}
+          className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+        >
+          Назад
+        </Link>
+      </div>
+    </AuthorShell>
+  );
+}
 
 export default async function NewAuthorProductPage({ searchParams }: PageProps) {
   const supabase = await createClient();
@@ -37,6 +66,13 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
       : typeof params[SEO_RESERVATION_ID_PARAM] === "string"
         ? String(params[SEO_RESERVATION_ID_PARAM]).trim()
         : "";
+  const seoQuerySkip = isSeoQuerySkipParam(
+    typeof params.seo_query === "string"
+      ? params.seo_query
+      : typeof params[SEO_QUERY_SKIP_PARAM] === "string"
+        ? String(params[SEO_QUERY_SKIP_PARAM])
+        : undefined,
+  );
 
   const {
     data: { user },
@@ -55,6 +91,16 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
   const initialAuthor =
     authors.find((item) => item.slug === params.author) ?? authors[0];
   const publicationClass = parsePublicationClass(params.class);
+  const seoBeta = isAuthorSeoDiscoveryEnabled(initialAuthor.id);
+  const typeChooserHref = buildAuthorProductCreateHref({
+    authorSlug: initialAuthor.slug,
+  });
+  const queryStepHref = publicationClass
+    ? buildAuthorProductCreateHref({
+        authorSlug: initialAuthor.slug,
+        publicationClass,
+      })
+    : typeChooserHref;
 
   const reservationLoad = seoReservationId
     ? await loadSeoReservationProductCreateContext(supabase, {
@@ -63,26 +109,12 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
       })
     : null;
 
+  // A / query-first: no class → type chooser (reservation preserved in URL via wizard links)
   if (!publicationClass) {
     if (reservationLoad && !reservationLoad.ok) {
-      return (
-        <AuthorShell
-          title="Создать"
-          subtitle="Поисковый запрос"
-          internalBackHref="/author-dashboard/seo-opportunities"
-        >
-          <div className="rounded-[22px] border border-[#eadff8] bg-white p-6">
-            <p className="text-sm leading-6 text-[#5f5484]">
-              {reservationLoad.message}
-            </p>
-            <Link
-              href="/author-dashboard/seo-opportunities"
-              className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
-            >
-              К поисковым запросам
-            </Link>
-          </div>
-        </AuthorShell>
+      return reservationErrorShell(
+        reservationLoad.message,
+        "/author-dashboard/seo-opportunities",
       );
     }
 
@@ -95,7 +127,9 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
         <AuthorCreateWizard
           authorSlug={initialAuthor.slug}
           seoReservationId={
-            reservationLoad?.ok ? reservationLoad.context.reservationId : seoReservationId || undefined
+            reservationLoad?.ok
+              ? reservationLoad.context.reservationId
+              : seoReservationId || undefined
           }
         />
       </AuthorShell>
@@ -103,27 +137,30 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
   }
 
   if (reservationLoad && !reservationLoad.ok) {
+    return reservationErrorShell(reservationLoad.message, queryStepHref);
+  }
+
+  // B: beta + class + no reservation + no skip → pre-create query step
+  const hasValidReservation = Boolean(reservationLoad?.ok);
+  if (seoBeta && !hasValidReservation && !seoQuerySkip) {
+    const opportunities = await listSeoOpportunitiesForAuthor(initialAuthor.id);
     return (
       <AuthorShell
         title="Создать"
-        subtitle="Поисковый запрос"
-        internalBackHref="/author-dashboard/seo-opportunities"
+        subtitle="Выберите поисковый запрос"
+        internalBackHref={typeChooserHref}
       >
-        <div className="rounded-[22px] border border-[#eadff8] bg-white p-6">
-          <p className="text-sm leading-6 text-[#5f5484]">
-            {reservationLoad.message}
-          </p>
-          <Link
-            href="/author-dashboard/seo-opportunities"
-            className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
-          >
-            К поисковым запросам
-          </Link>
-        </div>
+        <AuthorProductSeoQueryStep
+          authorId={initialAuthor.id}
+          authorSlug={initialAuthor.slug}
+          publicationClass={publicationClass}
+          opportunities={opportunities}
+        />
       </AuthorShell>
     );
   }
 
+  // C / D / non-beta / query-first-after-class: form
   const topicFormData = await loadAuthorProductTopicFormData(
     supabase,
     initialAuthor.id,
@@ -140,11 +177,13 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     .order("title")
     .limit(8);
 
+  const formBackHref = seoBeta ? queryStepHref : typeChooserHref;
+
   return (
     <AuthorShell
       title={`Создать: ${CABINET_BRANCH_LABELS[cabinetBranch]}`}
       subtitle="Единая форма для одиночного и составного продукта"
-      internalBackHref="/author-dashboard/products/new"
+      internalBackHref={formBackHref}
     >
       <AuthorProductForm
         authors={authors}
