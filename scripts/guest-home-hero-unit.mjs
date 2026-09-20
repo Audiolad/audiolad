@@ -143,7 +143,7 @@ assert.match(
   slidesBlock,
   /buildAuthRouteHref\("\/auth\/sign-up", "\/my-practices"\)/,
 );
-assert.match(slidesBlock, /href: MEDITATION_AUTHORS_LANDING_PATH/);
+assert.match(slidesBlock, /href: MEDITATION_AUTHORS_LANDING_PROMO_LINK\.href/);
 
 const hrefOrder = [
   'href: "/catalog"',
@@ -152,7 +152,7 @@ const hrefOrder = [
   'href: "/playlists/catalog"',
   'href: "/catalog?access=paid"',
   'buildAuthRouteHref("/auth/sign-up", "/my-practices")',
-  "href: MEDITATION_AUTHORS_LANDING_PATH",
+  "href: MEDITATION_AUTHORS_LANDING_PROMO_LINK.href",
 ].map((token) => slidesBlock.indexOf(token));
 
 for (let index = 1; index < hrefOrder.length; index += 1) {
@@ -194,5 +194,10 @@ assert.doesNotMatch(
   /mt-8 xl:mt-5/,
   "guest intro no longer uses the old tall hero margin",
 );
+
+assert.match(slidesBlock, /target: MEDITATION_AUTHORS_LANDING_PROMO_LINK\.target/);
+assert.match(slidesBlock, /rel: MEDITATION_AUTHORS_LANDING_PROMO_LINK\.rel/);
+assert.match(slider, /target=\{slide\.target\}/);
+assert.match(slider, /rel=\{slide\.rel\}/);
 
 console.log("guest-home-hero-unit: ok");

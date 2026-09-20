@@ -26,7 +26,9 @@ assert.match(
   /MEDITATION_AUTHORS_LANDING_PATH = "\/dlya-avtorov-meditatsiy"/,
 );
 
-assert.match(chrome, /MEDITATION_AUTHORS_LANDING_PATH/);
+assert.match(chrome, /MEDITATION_AUTHORS_LANDING_PROMO_LINK/);
+assert.match(chrome, /target=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.target\}/);
+assert.match(chrome, /rel=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.rel\}/);
 assert.match(chrome, /function AuthorPromoBanner/);
 assert.equal(
   (chrome.match(/<AuthorPromoBanner/g) || []).length,

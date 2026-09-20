@@ -107,9 +107,10 @@ assert(
   "DesktopSidebar no longer passes authorCtaHref into chrome promo banner",
 );
 assert(
-  chrome.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+  chrome.includes("MEDITATION_AUTHORS_LANDING_PROMO_LINK") &&
+    chrome.includes("PROMO_LINK.target") &&
     !chrome.includes("authorCtaHref"),
-  "DesktopSidebarChrome AuthorPromoBanner uses authors landing path",
+  "DesktopSidebarChrome AuthorPromoBanner uses authors landing promo link in a new tab",
 );
 
 console.log("listener-author-promo-unit: ok");

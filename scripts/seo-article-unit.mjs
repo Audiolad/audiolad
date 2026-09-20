@@ -8259,7 +8259,7 @@ assert(
   "creator paths CTA links Studio directly to meditation studio",
 );
 assert(
-  creatorPathsCtaSource.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+  creatorPathsCtaSource.includes("MEDITATION_AUTHORS_LANDING_PROMO_LINK") &&
     creatorPathsCtaSource.includes('kind="author"') &&
     creatorPathsCtaSource.includes('kind="studio"'),
   "creator paths CTA second card links the meditation authors landing",
@@ -8310,16 +8310,10 @@ assert(
   "creator paths CTA uses the author landing card copy",
 );
 assert(
-  creatorPathsCtaSource.includes('target: "_blank"') &&
-    creatorPathsCtaSource.includes('rel: "noopener noreferrer"'),
-  "Studio card still opens in a new tab",
-);
-assert(
-  creatorPathsCtaSource.includes('target: "_blank"') &&
-    creatorPathsCtaSource.includes('rel: "noopener noreferrer"') &&
-    creatorPathsCtaSource.includes("isStudio") &&
-    creatorPathsCtaSource.includes(": {}"),
-  "author landing card opens in the same tab (Studio alone keeps target=_blank)",
+  creatorPathsCtaSource.includes('target="_blank"') &&
+    creatorPathsCtaSource.includes('rel="noopener noreferrer"') &&
+    creatorPathsCtaSource.includes("MEDITATION_AUTHORS_LANDING_PROMO_LINK"),
+  "Studio and author landing cards both open in a new tab",
 );
 assert(
   (fullViewSource.match(/<CreatorPathsCta/g) || []).length === 2 &&

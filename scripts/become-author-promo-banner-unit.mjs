@@ -85,14 +85,13 @@ for (const source of [
   assert(banner.includes(`"${source}"`), `source type includes ${source}`);
 }
 assert(
-  banner.includes("MEDITATION_AUTHORS_LANDING_PATH") &&
+  banner.includes("MEDITATION_AUTHORS_LANDING_PROMO_LINK") &&
     !banner.includes("BECOME_AUTHOR_HREF"),
   "promo banner links the meditation authors landing, not /become-author",
 );
 assert(
-  banner.includes("meditation-authors-landing") ||
-    banner.includes("MEDITATION_AUTHORS_LANDING_PATH"),
-  "promo banner imports the authors landing path",
+  banner.includes("PROMO_LINK.target") && banner.includes("PROMO_LINK.rel"),
+  "promo banner opens the authors landing in a new tab",
 );
 assert(banner.includes('aria-label="Стать автором на АудиоЛад"'), "banner aria-label");
 assert(banner.includes("visibility"), "banner supports visibility prop");

@@ -1,8 +1,7 @@
 import type { ArticleCreatorPathsContinuation } from "@/lib/seo/articles";
-import { MEDITATION_AUTHORS_LANDING_PATH } from "@/lib/seo/meditation-authors-landing";
+import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "@/lib/seo/meditation-authors-landing";
 
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
-const AUTHOR_LANDING_HREF = MEDITATION_AUTHORS_LANDING_PATH;
 
 type CreatorPathsCtaProps = {
   emphasis: ArticleCreatorPathsContinuation["emphasis"];
@@ -75,7 +74,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
   const description = isStudio
     ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере – без специальных навыков и сложных программ."
     : "Создайте своё авторское пространство, публикуйте бесплатные и платные практики, находите новых слушателей через поиск и зарабатывайте на своём творчестве.";
-  const href = isStudio ? STUDIO_HREF : AUTHOR_LANDING_HREF;
+  const href = isStudio ? STUDIO_HREF : MEDITATION_AUTHORS_LANDING_PROMO_LINK.href;
   const eyebrow = isStudio ? "СТУДИЯ АУДИОЛАД" : "АВТОРАМ АУДИОЛАДА";
   const cta = isStudio
     ? "Попробуйте бесплатно прямо сейчас"
@@ -84,9 +83,8 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
   return (
     <a
       href={href}
-      {...(isStudio
-        ? { target: "_blank", rel: "noopener noreferrer" }
-        : {})}
+      target="_blank"
+      rel="noopener noreferrer"
       className="group flex min-h-[13.5rem] flex-col rounded-[22px] border border-[#dfd0f3] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:border-[#c9b6ea] hover:bg-[#fdfbff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] motion-reduce:transform-none sm:p-5"
     >
       <div className="flex items-center justify-between gap-3">

@@ -1,5 +1,17 @@
 export const MEDITATION_AUTHORS_LANDING_PATH = "/dlya-avtorov-meditatsiy";
 
+/**
+ * Shared attributes for promotional entries INTO the authors landing
+ * from elsewhere on the platform. Always open in a new tab so the source
+ * page stays available. Do not use for /become-author or other stateful
+ * author-application routes.
+ */
+export const MEDITATION_AUTHORS_LANDING_PROMO_LINK = {
+  href: MEDITATION_AUTHORS_LANDING_PATH,
+  target: "_blank",
+  rel: "noopener noreferrer",
+} as const;
+
 export const MEDITATION_AUTHORS_LANDING_DATE_PUBLISHED = "2026-09-19";
 
 export const MEDITATION_AUTHORS_LANDING_SEO_TITLE =
