@@ -286,6 +286,7 @@
     "test:author-product-wizard-ui": "npx tsx scripts/author-product-wizard-ui-unit.mjs",
     "test:author-product-aurafon-music-wizard": "npx tsx scripts/author-product-aurafon-music-wizard-unit.mjs",
     "test:author-default-audio-product-author": "npx tsx scripts/author-default-audio-product-author-unit.mjs",
+    "test:seo-spa-massage-queries-seed": "npx tsx scripts/seo-spa-massage-queries-seed-unit.mjs",
     "test:seo-reservation-product-create": "npx tsx scripts/seo-reservation-product-create-unit.mjs",
     "test:author-seo-discovery": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-discovery-unit.mjs",
     "test:author-seo-prompt-builder": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-seo-prompt-builder-unit.mjs",
