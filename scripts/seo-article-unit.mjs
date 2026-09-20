@@ -8229,6 +8229,18 @@ assert(
   fullViewSource.includes("CreatorPathsCta"),
   "creator paths CTA is rendered by article view",
 );
+assert(
+  !fullViewSource.includes("Опубликовано:") &&
+    !fullViewSource.includes("Обновлено:") &&
+    !fullViewSource.includes("ArticleBylineDates"),
+  "article view stays evergreen without visible publish/update dates",
+);
+const articleJsonLdSource = read("src/lib/seo/articles/json-ld.ts");
+assert(
+  !articleJsonLdSource.includes("datePublished") &&
+    !articleJsonLdSource.includes("dateModified"),
+  "Article JSON-LD omits datePublished/dateModified",
+);
 const articleTopicLinkSource = read(
   "src/components/articles/ArticleTopicLink.tsx",
 );

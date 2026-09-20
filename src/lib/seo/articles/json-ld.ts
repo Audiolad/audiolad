@@ -55,8 +55,6 @@ export function buildArticleJsonLd(
       "@id": data.canonicalUrl,
     },
     url: data.canonicalUrl,
-    datePublished: data.article.publishedAt,
-    dateModified: data.article.updatedAt,
     author: {
       "@type": "Organization",
       name: data.article.authorLabel,
