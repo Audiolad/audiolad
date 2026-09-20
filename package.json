@@ -303,7 +303,8 @@
     "test:meditation-authors-landing": "npx tsx scripts/meditation-authors-landing-page-unit.mjs",
     "test:creator-paths-author-funnel": "node scripts/creator-paths-author-funnel-unit.mjs",
     "test:desktop-sidebar-author-promo-landing": "npx tsx scripts/desktop-sidebar-author-promo-landing-unit.mjs",
-    "test:articles-evergreen-dates": "npx tsx scripts/articles-evergreen-dates-unit.mjs"
+    "test:articles-evergreen-dates": "npx tsx scripts/articles-evergreen-dates-unit.mjs",
+    "test:home-start-suggestions": "npx tsx scripts/home-start-suggestions-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

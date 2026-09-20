@@ -26,8 +26,11 @@ import {
   getRecentlyListenedProducts,
   isProgramProduct,
   loadAudioSummaryMap,
-  takeUniqueProducts,
 } from "./listening-progress";
+import {
+  HOME_START_SUGGESTIONS_LIMIT,
+  takeUniqueAuthorProducts,
+} from "./start-suggestions";
 import { safeHomeSection } from "./safe";
 import type {
   GuestHomeData,
@@ -353,7 +356,10 @@ export async function getPersonalHomeData(
     shownIds.add(program.product.id);
   }
 
-  const startSuggestions = takeUniqueProducts([freeProducts, allProducts], 4);
+  const startSuggestions = takeUniqueAuthorProducts(
+    [freeProducts, allProducts],
+    HOME_START_SUGGESTIONS_LIMIT,
+  );
   // Keep absolute newest by catalog order; do not dedupe against upper rails.
   const newProducts = allProducts.slice(0, 8);
   const greetingFirstName = getGreetingFirstName(profile, userMetadata);
