@@ -24,7 +24,7 @@ export type {
 } from "./directory";
 export { buildArticlesDirectoryJsonLdGraph } from "./directory-json-ld";
 export { buildArticlesDirectoryMetadata } from "./directory-metadata";
-export { buildArticleJsonLdGraph, buildArticleFaqJsonLd } from "./json-ld";
+export { buildArticleJsonLd, buildArticleJsonLdGraph, buildArticleFaqJsonLd } from "./json-ld";
 export { loadArticlePageData } from "./load";
 export { buildArticleMetadata } from "./metadata";
 export { buildArticlePath, isValidArticleSlug } from "./paths";
@@ -70,9 +70,3 @@ export {
   isPracticeArticlePageData,
 } from "./types";
 
-export {
-  articleDatesDiffer,
-  formatArticleVisibleDate,
-  resolveArticleVisibleDates,
-} from "./visible-dates";
-export type { ArticleVisibleDates } from "./visible-dates";

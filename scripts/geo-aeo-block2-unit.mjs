@@ -7,10 +7,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  formatArticleVisibleDate,
+  buildArticleJsonLd,
   listArticleDefinitions,
   loadArticleDirectoryPageData,
-  resolveArticleVisibleDates,
 } from "../src/lib/seo/articles/index.ts";
 import { buildArticlesDirectoryJsonLdGraph } from "../src/lib/seo/articles/directory-json-ld.ts";
 import {
@@ -40,38 +39,60 @@ function read(relPath) {
   return readFileSync(join(ROOT, relPath), "utf8");
 }
 
-const sameDay = resolveArticleVisibleDates({
-  publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
-});
-assert(sameDay?.publishedLabel.includes("27"), "published day");
-assert(sameDay?.publishedLabel.includes("2026"), "published year");
-assert(sameDay?.showUpdated === false, "same calendar day hides updated");
-
-const changed = resolveArticleVisibleDates({
-  publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-08-01T00:00:00.000Z",
-});
-assert(changed?.showUpdated === true, "different day shows updated");
-assert(changed?.updatedLabel.includes("2026"), "updated year");
-assert(
-  formatArticleVisibleDate("not-a-date") === "",
-  "invalid date is not invented",
-);
-
 const articles = listArticleDefinitions();
 assert(articles.length > 0, "article registry loaded");
+assert(articles.length === 103, `expected 103 articles, got ${articles.length}`);
 
 const practice = articles.find((article) => article.productContinuation?.kind === "practice") ?? articles[0];
 const creator = articles.find((article) => article.productContinuation?.kind === "creator_paths");
-const practiceDates = resolveArticleVisibleDates(practice);
-assert(practiceDates, "practice article has visible published date");
-assert(resolveArticleVisibleDates(creator ?? practice), "creator or practice dates resolve");
+assert(practice?.publishedAt, "practice keeps technical publishedAt");
+assert(creator?.publishedAt, "creator keeps technical publishedAt");
+assert(practice?.updatedAt, "practice keeps technical updatedAt");
 
 const viewSource = read("src/components/articles/ArticlePageView.tsx");
-assert(viewSource.includes("Опубликовано:"), "visible published label");
-assert(viewSource.includes("Обновлено:"), "visible updated label");
-assert(viewSource.includes("ArticleBylineDates"), "shared date component");
+assert(!viewSource.includes("Опубликовано:"), "article UI has no published label");
+assert(!viewSource.includes("Обновлено:"), "article UI has no updated label");
+assert(!viewSource.includes("ArticleBylineDates"), "ArticleBylineDates removed");
+assert(!viewSource.includes("resolveArticleVisibleDates"), "visible-dates helper unused in view");
+assert(viewSource.includes("readingTimeLabel"), "reading time remains");
+assert(viewSource.includes("authorLabel"), "author label remains");
+
+const jsonLdSource = read("src/lib/seo/articles/json-ld.ts");
+assert(!jsonLdSource.includes("datePublished"), "Article JSON-LD source has no datePublished");
+assert(!jsonLdSource.includes("dateModified"), "Article JSON-LD source has no dateModified");
+
+// Runtime JSON-LD for both funnels must not emit article dates
+function assertNoArticleDates(kind, article) {
+  const fakeData = {
+    article,
+    path: `/articles/${article.slug}`,
+    canonicalUrl: `https://audiolad.ru/articles/${article.slug}`,
+    readingTimeMinutes: 5,
+  };
+  if (kind === "practice") {
+    fakeData.primaryPractice = {
+      coverUrl: null,
+      id: "x",
+      authorSlug: "a",
+      slug: "p",
+      title: "t",
+      price: 0,
+      format: "audio",
+    };
+    fakeData.relatedPractices = [];
+    fakeData.libraryAction = "hidden";
+  }
+  const node = buildArticleJsonLd(fakeData, "https://audiolad.ru");
+  assert(node["@type"] === "Article", `${kind} Article type`);
+  assert(!Object.hasOwn(node, "datePublished"), `${kind} no datePublished`);
+  assert(!Object.hasOwn(node, "dateModified"), `${kind} no dateModified`);
+  assert(node.headline, `${kind} keeps headline`);
+  assert(node.author, `${kind} keeps author`);
+  assert(node.publisher, `${kind} keeps publisher`);
+}
+
+assertNoArticleDates("practice", practice);
+assertNoArticleDates("creator_paths", creator);
 
 const listenTypes = read("src/lib/seo/listens/types.ts");
 assert(!listenTypes.includes("publishedAt"), "listen model has no publishedAt");
@@ -143,6 +164,10 @@ assert(
 
 const articleEntries = mapArticleDefinitionsToSitemapEntries();
 assert(articleEntries.length === articles.length, "sitemap articles = registry");
+assert(
+  articleEntries.every((entry) => Boolean(entry.lastModified)),
+  "sitemap articles keep lastModified from technical timestamps",
+);
 const listed = loadArticleDirectoryPageData();
 const directoryGraph = buildArticlesDirectoryJsonLdGraph(listed);
 const directoryList = directoryGraph["@graph"].find(
