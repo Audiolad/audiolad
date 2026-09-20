@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { MEDITATION_AUTHORS_LANDING_PATH } from "@/lib/seo/meditation-authors-landing";
+import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "@/lib/seo/meditation-authors-landing";
 
 import becomeAuthorMobileBanner from "../../../public/images/banners/become-author-mobile-banner-v1.webp";
 
@@ -58,7 +58,9 @@ export default function BecomeAuthorPromoBanner({
       data-promo-source={source}
     >
       <Link
-        href={MEDITATION_AUTHORS_LANDING_PATH}
+        href={MEDITATION_AUTHORS_LANDING_PROMO_LINK.href}
+        target={MEDITATION_AUTHORS_LANDING_PROMO_LINK.target}
+        rel={MEDITATION_AUTHORS_LANDING_PROMO_LINK.rel}
         aria-label="Стать автором на АудиоЛад"
         className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] xl:max-w-[720px]"
       >

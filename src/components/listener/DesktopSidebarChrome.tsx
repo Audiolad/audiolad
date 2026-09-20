@@ -20,13 +20,13 @@ import {
   LISTENER_SIDEBAR_FLYOUT_CLOSE_DELAY_MS,
   LISTENER_SIDEBAR_FLYOUT_OPEN_DELAY_MS,
 } from "@/lib/navigation/listener-sidebar";
+import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "@/lib/seo/meditation-authors-landing";
 
 type DesktopSidebarChromeProps = {
   showMyMaterialsNav: boolean;
   showEditorialNav: boolean;
   showEditorialDirectionsNav: boolean;
   showSidebarAuthorPromo: boolean;
-  authorCtaHref: string;
   sidebarLogo: StaticImageData;
   sidebarMark: StaticImageData;
   becomeAuthorBanner: StaticImageData;
@@ -87,17 +87,17 @@ function SpaceHeading() {
 }
 
 function AuthorPromoBanner({
-  href,
   banner,
   bannerSizes,
 }: {
-  href: string;
   banner: StaticImageData;
   bannerSizes: string;
 }) {
   return (
     <Link
-      href={href}
+      href={MEDITATION_AUTHORS_LANDING_PROMO_LINK.href}
+      target={MEDITATION_AUTHORS_LANDING_PROMO_LINK.target}
+      rel={MEDITATION_AUTHORS_LANDING_PROMO_LINK.rel}
       aria-label="Стать автором на АудиоЛад"
       className="mx-3 mb-3 block shrink-0 transition-[transform,filter,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:brightness-[1.03] hover:shadow-[0_6px_16px_rgba(90,60,145,0.14)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
     >
@@ -111,7 +111,6 @@ export default function DesktopSidebarChrome({
   showEditorialNav,
   showEditorialDirectionsNav,
   showSidebarAuthorPromo,
-  authorCtaHref,
   sidebarLogo,
   sidebarMark,
   becomeAuthorBanner,
@@ -343,7 +342,6 @@ export default function DesktopSidebarChrome({
 
         {!collapsed && showSidebarAuthorPromo ? (
           <AuthorPromoBanner
-            href={authorCtaHref}
             banner={becomeAuthorBanner}
             bannerSizes={bannerSizes}
           />
@@ -391,7 +389,6 @@ export default function DesktopSidebarChrome({
 
               {showSidebarAuthorPromo ? (
                 <AuthorPromoBanner
-                  href={authorCtaHref}
                   banner={becomeAuthorBanner}
                   bannerSizes={bannerSizes}
                 />

@@ -20,10 +20,14 @@ const guestSlider = read("src/lib/home/guest-slider.ts");
 const authorCta = read("src/lib/listener/author-cta.ts");
 const profileConsts = read("src/lib/profile/constants.ts");
 
-assert.match(cta, /MEDITATION_AUTHORS_LANDING_PATH/);
+assert.match(cta, /MEDITATION_AUTHORS_LANDING_PROMO_LINK/);
 assert.match(
   read("src/lib/seo/meditation-authors-landing/content.ts"),
   /MEDITATION_AUTHORS_LANDING_PATH = "\/dlya-avtorov-meditatsiy"/,
+);
+assert.match(
+  read("src/lib/seo/meditation-authors-landing/content.ts"),
+  /MEDITATION_AUTHORS_LANDING_PROMO_LINK/,
 );
 assert.match(cta, /Стать автором бесплатно/);
 assert.match(cta, /АВТОРАМ АУДИОЛАДА/);
@@ -35,14 +39,9 @@ assert.doesNotMatch(cta, /25 готовых решений/);
 assert.doesNotMatch(cta, /solutionsPromoHref/);
 assert.doesNotMatch(cta, /SolutionsVisual/);
 
-// author card: no target=_blank on the same-tab path
-const authorCard = cta.slice(cta.indexOf('kind: "author"') > -1 ? 0 : 0);
-assert.ok(
-  cta.includes('target: "_blank"') &&
-    cta.includes('rel: "noopener noreferrer"') &&
-    cta.includes(": {}"),
-  "only Studio opens in a new tab",
-);
+assert.match(cta, /target="_blank"/);
+assert.match(cta, /rel="noopener noreferrer"/);
+assert.match(cta, /MEDITATION_AUTHORS_LANDING_PROMO_LINK\.href/);
 
 assert.equal((view.match(/<CreatorPathsCta/g) || []).length, 2);
 assert.match(view, /placement="top"/);
@@ -53,13 +52,17 @@ assert.doesNotMatch(load, /solutionsPromoHref/);
 assert.doesNotMatch(load, /loadMeditationSolutionsPromoHref/);
 assert.doesNotMatch(types, /solutionsPromoHref/);
 
-assert.match(banner, /MEDITATION_AUTHORS_LANDING_PATH/);
+assert.match(banner, /MEDITATION_AUTHORS_LANDING_PROMO_LINK/);
+assert.match(banner, /target=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.target\}/);
+assert.match(banner, /rel=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.rel\}/);
 assert.doesNotMatch(banner, /BECOME_AUTHOR_HREF/);
 
 assert.match(guestSlider, /id: "07"/);
 const slide07 = guestSlider.slice(guestSlider.indexOf('id: "07"'));
-assert.match(slide07, /MEDITATION_AUTHORS_LANDING_PATH/);
-assert.doesNotMatch(slide07.slice(0, 200), /BECOME_AUTHOR_HREF/);
+assert.match(slide07, /MEDITATION_AUTHORS_LANDING_PROMO_LINK\.href/);
+assert.match(slide07, /MEDITATION_AUTHORS_LANDING_PROMO_LINK\.target/);
+assert.match(slide07, /MEDITATION_AUTHORS_LANDING_PROMO_LINK\.rel/);
+assert.doesNotMatch(slide07.slice(0, 280), /BECOME_AUTHOR_HREF/);
 
 // application / status CTAs stay on /become-author
 assert.match(profileConsts, /BECOME_AUTHOR_HREF = "\/become-author"/);

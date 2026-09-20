@@ -144,6 +144,8 @@ export default function GuestHomeSlider() {
           <li key={slide.id} className="guest-home-slider__item">
             <Link
               href={slide.href}
+              target={slide.target}
+              rel={slide.rel}
               aria-label={slide.ariaLabel}
               data-guest-home-slide={slide.id}
               className="guest-home-slider__link"
