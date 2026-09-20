@@ -208,22 +208,21 @@ export default function MeditationAuthorsLandingPageView() {
         </ol>
       </nav>
 
-      {/* Block 1 — Hero */}
-      <header className="mal-hero mt-8 grid items-start gap-8 lg:mt-10 lg:grid-cols-2 lg:items-center lg:gap-12 xl:gap-16">
-        <div className="mal-hero__visual order-2 min-w-0 lg:order-1">
+      {/* Block 1 — Hero
+          Mobile order: H1 → image → subtitle → CTAs.
+          Desktop: image left, copy stack right (explicit grid placement). */}
+      <header className="mal-hero mt-8 grid items-start gap-8 lg:mt-10 lg:grid-cols-2 lg:items-center lg:gap-x-12 lg:gap-y-0 xl:gap-x-16">
+        <h1 className="mal-hero__title order-1 min-w-0 text-[1.85rem] font-semibold leading-tight tracking-tight text-[#25135c] sm:text-4xl sm:leading-tight lg:col-start-2 lg:row-start-1">
+          {MEDITATION_AUTHORS_LANDING_PAGE_H1}
+        </h1>
+        <div className="mal-hero__visual order-2 min-w-0 lg:col-start-1 lg:row-span-3 lg:row-start-1">
           <VisualSlot visual={hero} priority />
         </div>
-
-        <div className="order-1 min-w-0 lg:order-2">
-          <h1 className="text-[1.85rem] font-semibold leading-tight tracking-tight text-[#25135c] sm:text-4xl sm:leading-tight">
-            {MEDITATION_AUTHORS_LANDING_PAGE_H1}
-          </h1>
-          <p className="mt-5 text-base leading-7 text-[#4a3d73] sm:mt-6 sm:text-lg sm:leading-8">
-            {MEDITATION_AUTHORS_LANDING_SUBTITLE}
-          </p>
-          <div className="mt-8">
-            <CtaRow showSecondary />
-          </div>
+        <p className="mal-hero__subtitle order-3 min-w-0 text-base leading-7 text-[#4a3d73] sm:text-lg sm:leading-8 lg:col-start-2 lg:row-start-2 lg:mt-6">
+          {MEDITATION_AUTHORS_LANDING_SUBTITLE}
+        </p>
+        <div className="mal-hero__ctas order-4 min-w-0 lg:col-start-2 lg:row-start-3 lg:mt-8">
+          <CtaRow showSecondary />
         </div>
       </header>
 
@@ -237,13 +236,13 @@ export default function MeditationAuthorsLandingPageView() {
         </div>
       </Section>
 
-      {/* Block 3 — Studio */}
+      {/* Block 3 — Studio: mobile heading→image→text→CTA; desktop image|text */}
       <Section id="mal-studio" title={MEDITATION_AUTHORS_LANDING_STUDIO_HEADING}>
         <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div className="order-2 min-w-0 lg:order-1 lg:pt-2">
+          <div className="order-1 min-w-0 lg:order-1 lg:pt-2">
             <VisualSlot visual={studio} />
           </div>
-          <div className="order-1 min-w-0 lg:order-2">
+          <div className="order-2 min-w-0 lg:order-2">
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_STUDIO_TEXT} />
             <div className="mt-8">
               <SecondaryCta />
@@ -252,25 +251,25 @@ export default function MeditationAuthorsLandingPageView() {
         </div>
       </Section>
 
-      {/* Block 4 — Author space */}
+      {/* Block 4 — Author space: mobile heading→image→text; desktop text|image */}
       <Section id="mal-author-space" title={MEDITATION_AUTHORS_LANDING_SPACE_HEADING}>
         <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div className="min-w-0">
-            <Paragraphs items={MEDITATION_AUTHORS_LANDING_SPACE_TEXT} />
-          </div>
-          <div className="min-w-0 lg:pt-6">
+          <div className="order-1 min-w-0 lg:order-2 lg:pt-6">
             <VisualSlot visual={authorSpace} />
+          </div>
+          <div className="order-2 min-w-0 lg:order-1">
+            <Paragraphs items={MEDITATION_AUTHORS_LANDING_SPACE_TEXT} />
           </div>
         </div>
       </Section>
 
-      {/* Block 5 — Listener intro */}
+      {/* Block 5 — Listener intro: mobile heading→image→text→CTA; desktop image|text */}
       <Section id="mal-listener-intro" title={MEDITATION_AUTHORS_LANDING_INTRO_HEADING}>
         <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div className="order-2 min-w-0 lg:order-1 lg:pt-2">
+          <div className="order-1 min-w-0 lg:order-1 lg:pt-2">
             <VisualSlot visual={listenerIntro} />
           </div>
-          <div className="order-1 min-w-0 lg:order-2">
+          <div className="order-2 min-w-0 lg:order-2">
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_INTRO_TEXT} />
             <div className="mt-8">
               <CtaRow />
@@ -279,19 +278,21 @@ export default function MeditationAuthorsLandingPageView() {
         </div>
       </Section>
 
-      {/* Block 6 — Search / Yandex & Google */}
+      {/* Block 6 — Search: mobile heading→image→lead+text+closing; desktop text|image */}
       <Section id="mal-search" title={MEDITATION_AUTHORS_LANDING_SEARCH_HEADING}>
-        <p className="mt-5 text-lg font-medium leading-8 text-[#25135c] sm:text-xl sm:leading-9">
-          {MEDITATION_AUTHORS_LANDING_SEARCH_LEAD}
-        </p>
-        <div className="mt-6 grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
+        <div className="mal-block-body grid min-w-0 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="order-1 min-w-0 lg:order-2">
+            <VisualSlot visual={searchFunnel} />
+          </div>
+          <div className="order-2 min-w-0 lg:order-1">
+            <p className="text-lg font-medium leading-8 text-[#25135c] sm:text-xl sm:leading-9">
+              {MEDITATION_AUTHORS_LANDING_SEARCH_LEAD}
+            </p>
             <Paragraphs items={MEDITATION_AUTHORS_LANDING_SEARCH_TEXT} />
             <p className="mt-6 rounded-[24px] border border-[#d8c8ee] bg-gradient-to-br from-[#fffaff] to-[#efe4fb] px-5 py-5 text-base font-medium leading-7 text-[#25135c] sm:px-6 sm:text-[17px] sm:leading-8">
               {MEDITATION_AUTHORS_LANDING_SEARCH_CLOSING}
             </p>
           </div>
-          <VisualSlot visual={searchFunnel} />
         </div>
       </Section>
 

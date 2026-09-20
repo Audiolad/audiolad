@@ -305,3 +305,17 @@
   outline: 2px solid #7042c5;
   outline-offset: 2px;
 }
+
+/* Mobile: hide side arrows entirely (no reserved gutter); keep swipe + dots.
+   Tablet/desktop (md+) keep overlay arrows. */
+@media (max-width: 767px) {
+  .mal-benefits-slider__arrow {
+    display: none;
+  }
+
+  .mal-benefits-slider__track {
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    scroll-padding-inline: 0.15rem;
+  }
+}

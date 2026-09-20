@@ -226,6 +226,38 @@ function testNoBakedMarketingInImages() {
   assert.doesNotMatch(view, /GenerateImage|unsplash|placeholder\.com/i);
 }
 
+function testMobileOrderAndSliderArrows() {
+  const view = read(
+    "src/components/meditation-authors-landing/MeditationAuthorsLandingPageView.tsx",
+  );
+  const css = read(
+    "src/components/meditation-authors-landing/meditation-authors-landing.css",
+  );
+
+  // Hero: explicit mobile order H1 → visual → subtitle → CTAs
+  assert.match(view, /mal-hero__title[^"]*order-1/);
+  assert.match(view, /mal-hero__visual[^"]*order-2/);
+  assert.match(view, /mal-hero__subtitle[^"]*order-3/);
+  assert.match(view, /mal-hero__ctas[^"]*order-4/);
+
+  // Studio / listener: image before copy on mobile
+  assert.match(view, /id="mal-studio"[\s\S]*?order-1[\s\S]*?VisualSlot visual=\{studio\}[\s\S]*?order-2/);
+  assert.match(view, /id="mal-listener-intro"[\s\S]*?order-1[\s\S]*?VisualSlot visual=\{listenerIntro\}[\s\S]*?order-2/);
+
+  // Author space: image first on mobile, text left on desktop
+  assert.match(view, /id="mal-author-space"[\s\S]*?order-1[\s\S]*?lg:order-2[\s\S]*?VisualSlot visual=\{authorSpace\}/);
+  assert.match(view, /id="mal-author-space"[\s\S]*?order-2[\s\S]*?lg:order-1[\s\S]*?SPACE_TEXT/);
+
+  // Search: image immediately after heading on mobile
+  assert.match(view, /id="mal-search"[\s\S]*?order-1[\s\S]*?VisualSlot visual=\{searchFunnel\}[\s\S]*?order-2[\s\S]*?SEARCH_LEAD/);
+
+  // Final CTA keeps image at end of its grid (no mobile reorder swap)
+  assert.match(view, /id="mal-final-cta"[\s\S]*?FINAL_HEADING[\s\S]*?VisualSlot visual=\{finalCta\}/);
+
+  // Arrows hidden only below md
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.mal-benefits-slider__arrow[\s\S]*?display:\s*none/);
+}
+
 
 function testSitemap() {
   const sitemap = read("src/lib/seo/sitemap-data.ts");
@@ -245,6 +277,7 @@ const tests = [
   ["files exist", testFilesExist],
   ["page wiring", testPageWiring],
   ["html text not baked into images", testNoBakedMarketingInImages],
+  ["mobile order and slider arrows", testMobileOrderAndSliderArrows],
 ];
 
 let failed = 0;
