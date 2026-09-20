@@ -88,4 +88,14 @@ assert.equal(
   "npx tsx scripts/author-default-audio-product-author-unit.mjs",
 );
 
+
+// H — dirty baseline + support/promotion workspace mapping
+const editorSave = read("src/lib/author-products/editor-save-state.ts");
+assert.match(editorSave, /audioProductAuthor/);
+const supportCtx = read("src/lib/author-support/context.ts");
+assert.match(supportCtx, /defaultAudioProductAuthor: membership\.defaultAudioProductAuthor/);
+const promo = read("src/lib/promotion/access.ts");
+assert.match(promo, /default_audio_product_author/);
+assert.match(promo, /defaultAudioProductAuthor:/);
+
 console.log("author-default-audio-product-author-unit: ok");

@@ -29,7 +29,7 @@ export async function listPromotionWorkspaces(
 
   const { data, error } = await supabase
     .from("authors")
-    .select("id, name, slug, access_status, can_bypass_product_moderation")
+    .select("id, name, slug, access_status, can_bypass_product_moderation, default_audio_product_author")
     .order("name", { ascending: true });
 
   if (error) {
@@ -39,15 +39,22 @@ export async function listPromotionWorkspaces(
 
   return (data ?? [])
     .filter((author) => author.id && author.name && author.slug)
-    .map((author) => ({
-      id: author.id,
-      name: author.name,
-      slug: author.slug,
-      role: "owner" as AuthorMemberRole,
-      accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
-      canBypassProductModeration:
-        author.can_bypass_product_moderation === true,
-    }));
+    .map((author) => {
+      const rawDefault =
+        typeof author.default_audio_product_author === "string"
+          ? author.default_audio_product_author.trim()
+          : "";
+      return {
+        id: author.id,
+        name: author.name,
+        slug: author.slug,
+        role: "owner" as AuthorMemberRole,
+        accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
+        canBypassProductModeration:
+          author.can_bypass_product_moderation === true,
+        defaultAudioProductAuthor: rawDefault || null,
+      };
+    });
 }
 
 export async function requireAuthorPromotionAccess(authorId: string) {

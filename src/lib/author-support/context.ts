@@ -184,5 +184,6 @@ export function toSupportWorkspace(
     role: membership.role,
     accessStatus: membership.accessStatus,
     canBypassProductModeration: membership.canBypassProductModeration,
+    defaultAudioProductAuthor: membership.defaultAudioProductAuthor,
   };
 }
