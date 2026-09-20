@@ -8314,9 +8314,9 @@ assert(
   "creator paths CTA keeps the Studio card",
 );
 assert(
-  creatorPathsCtaSource.includes("АВТОРАМ АУДИОЛАДА") &&
+  creatorPathsCtaSource.includes("КАБИНЕТ АВТОРА") &&
     creatorPathsCtaSource.includes(
-      "Публикуйте свои медитации и находите новых слушателей",
+      "Публикуйте свои медитации и практики",
     ) &&
     creatorPathsCtaSource.includes("Стать автором бесплатно"),
   "creator paths CTA uses the author landing card copy",
