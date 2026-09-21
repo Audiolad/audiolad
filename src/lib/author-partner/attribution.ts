@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { shouldSetPartnerAttributionCookie } from "./cookie";
 import { logPartnerAttribution } from "./log";
 import {
   createPartnerAttributionToken,
@@ -112,17 +113,38 @@ export async function touchPartnerInvite(input: {
       return { ok: false, error: err, setCookie: false };
     }
 
-    const result = asString(row.result) ?? "created";
+    const result = asString(row.result);
+    if (!result) {
+      return { ok: false, error: "touch_failed", setCookie: false };
+    }
+
+    // Prefer explicit SQL flag; never invent a ghost cookie without a server attribution row.
+    const setCookie = shouldSetPartnerAttributionCookie({
+      result,
+      cookieShouldSet: row.cookie_should_set === true,
+      attributionId: asString(row.attribution_id),
+    });
 
     if (result === "already_author") {
       logPartnerAttribution({
         event: "partner_attribution_rejected_existing_author",
         result,
       });
+      return { ok: true, result: "already_author", setCookie: false };
+    }
+
+    if (result === "referral_already_activated") {
+      logPartnerAttribution({
+        event: "partner_attribution_preserved_first_touch",
+        result,
+        referralId: asString(row.referral_id),
+      });
       return {
         ok: true,
-        result: "already_author",
+        result: "referral_already_activated",
         setCookie: false,
+        referralId: asString(row.referral_id),
+        referrerAuthorId: asString(row.referrer_author_id),
       };
     }
 
@@ -137,8 +159,8 @@ export async function touchPartnerInvite(input: {
       return {
         ok: true,
         result: result as "preserved_first_touch" | "already_bound",
-        token: existingToken ?? token,
-        setCookie: !existingToken,
+        token: existingToken ?? undefined,
+        setCookie: false,
         code: asString(row.code),
         referrerAuthorId: asString(row.referrer_author_id),
         attributionId: asString(row.attribution_id),
@@ -147,7 +169,7 @@ export async function touchPartnerInvite(input: {
       };
     }
 
-    if (result === "bound" || result === "already_bound") {
+    if (result === "bound") {
       logPartnerAttribution({
         event: "partner_attribution_bound_invite_authenticated",
         result,
@@ -156,33 +178,41 @@ export async function touchPartnerInvite(input: {
       });
       return {
         ok: true,
-        result: result as "bound" | "already_bound",
+        result: "bound",
         token,
-        setCookie: true,
+        setCookie,
         code: asString(row.code),
         referrerAuthorId: asString(row.referrer_author_id),
+        attributionId: asString(row.attribution_id),
         referralId: asString(row.referral_id),
         expiresAt: asString(row.attribution_expires_at) ?? asString(row.expires_at),
       };
     }
 
-    logPartnerAttribution({
-      event: "partner_attribution_created",
-      result,
-      attributionId: asString(row.attribution_id),
-      referrerAuthorId: asString(row.referrer_author_id),
-    });
+    if (result === "created") {
+      logPartnerAttribution({
+        event: "partner_attribution_created",
+        result,
+        attributionId: asString(row.attribution_id),
+        referrerAuthorId: asString(row.referrer_author_id),
+      });
+      return {
+        ok: true,
+        result: "created",
+        token,
+        setCookie: true,
+        code: asString(row.code),
+        referrerAuthorId: asString(row.referrer_author_id),
+        attributionId: asString(row.attribution_id),
+        expiresAt: asString(row.expires_at),
+      };
+    }
 
-    return {
-      ok: true,
-      result: "created",
-      token,
-      setCookie: true,
-      code: asString(row.code),
-      referrerAuthorId: asString(row.referrer_author_id),
-      attributionId: asString(row.attribution_id),
-      expiresAt: asString(row.expires_at),
-    };
+    logPartnerAttribution({
+      event: "partner_attribution_touch_failed",
+      error: `unexpected_result:${result}`,
+    });
+    return { ok: false, error: "touch_failed", setCookie: false };
   } catch (error) {
     logPartnerAttribution({
       event: "partner_attribution_touch_failed",
@@ -298,17 +328,26 @@ export async function claimPartnerAttribution(input: {
 export async function bindManualPartnerCode(input: {
   code: string;
   inviteeUserId: string;
+  /** Opaque cookie token; hashed server-side and passed so pending first-touch wins. */
+  pendingToken?: string | null;
 }): Promise<PartnerClaimResult> {
   const code = input.code.trim();
-  if (!code) {
+  const pendingHash =
+    input.pendingToken && isPartnerAttributionTokenShape(input.pendingToken)
+      ? hashPartnerAttributionToken(input.pendingToken)
+      : null;
+
+  if (!code && !pendingHash) {
     return { ok: false, error: "empty" };
   }
 
   try {
     const supabase = createServiceRoleClient();
+
     const { data, error } = await supabase.rpc("author_partner_bind_manual_code", {
       p_code: code,
       p_invitee_user_id: input.inviteeUserId,
+      p_pending_token_hash: pendingHash,
     });
 
     if (error) {

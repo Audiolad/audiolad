@@ -32,6 +32,8 @@ import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-application-admin-alert-email";
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
 import { bindManualPartnerCode } from "@/lib/author-partner/attribution";
+import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 function failureState(
@@ -164,10 +166,14 @@ export async function submitAuthorApplication(
     }
 
     const trimmedInvite = values.inviteCode.trim();
-    if (trimmedInvite) {
+    const cookieStoreForInvite = await cookies();
+    const pendingInviteToken =
+      cookieStoreForInvite.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE)?.value ?? null;
+    if (trimmedInvite || pendingInviteToken) {
       const bindResult = await bindManualPartnerCode({
         code: trimmedInvite,
         inviteeUserId: user.id,
+        pendingToken: pendingInviteToken,
       });
       if (!bindResult.ok) {
         if (bindResult.error === "not_found") {

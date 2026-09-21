@@ -34,6 +34,7 @@ export type StoredAuthorApplicationDraft = {
   wantsTraining: boolean;
   interestedInSchool: boolean;
   savedAt: string;
+  inviteCode?: string;
 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -52,6 +53,7 @@ export function formValuesToDraft(
     hasReadyMaterials: values.hasReadyMaterials,
     wantsTraining: values.wantsTraining,
     interestedInSchool: values.interestedInSchool,
+    inviteCode: values.inviteCode ?? "",
     savedAt,
   };
 }
@@ -71,7 +73,7 @@ export function draftToFormValues(
     wantsTraining: draft.wantsTraining,
     interestedInSchool: draft.interestedInSchool,
     consentPersonalData: false,
-  inviteCode: "",
+  inviteCode: typeof draft.inviteCode === "string" ? draft.inviteCode : "",
   };
 }
 
@@ -204,15 +206,21 @@ export function resolveInitialAuthorApplicationFormValues(input: {
       values: {
         ...input.databaseValues,
         consentPersonalData: false,
-  inviteCode: "",
+        // Keep canonical invite from server when present.
+        inviteCode: input.databaseValues.inviteCode ?? "",
       },
       restoredFromDraft: false,
     };
   }
 
   if (input.draft) {
+    const fromDraft = draftToFormValues(input.draft);
+    const canonicalInvite = input.databaseValues.inviteCode?.trim() ?? "";
     return {
-      values: draftToFormValues(input.draft),
+      values: {
+        ...fromDraft,
+        inviteCode: canonicalInvite || fromDraft.inviteCode,
+      },
       restoredFromDraft: true,
     };
   }

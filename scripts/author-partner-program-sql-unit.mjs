@@ -327,9 +327,94 @@ if (runtime) {
   assert(attrSql.includes("author_partner_claim_attribution"), "claim_attribution rpc");
   assert(attrSql.includes("author_partner_bind_manual_code"), "bind_manual_code rpc");
   assert(attrSql.includes("pg_advisory_xact_lock"), "advisory lock");
+  assert(attrSql.includes("REFERENCES public.authors (id) ON DELETE CASCADE"), "anonymous attribution cascades with author");
+  assert(attrSql.includes("REFERENCES public.author_referrals (id) ON DELETE CASCADE"), "bound attribution cascades with referral");
+  assert(attrSql.includes("p_pending_token_hash"), "manual bind accepts pending token hash");
+  assert(attrSql.includes("cookie_should_set"), "touch returns cookie_should_set");
   assert(attrSql.includes("interval '60 days'"), "60-day ttl");
   assert(!/partner_commission/.test(attrSql), "no partner_commission");
   assert(!/ledger_credit/.test(attrSql), "no ledger_credit");
   assert(!/capacity_bonus/.test(attrSql), "no capacity_bonus");
   console.log("author-partner attribution migration unit checks ok");
 }
+
+function dockerOk() {
+  return dockerAvailable();
+}
+
+function runAttributionBehavioralSmoke() {
+  const attrSmokePath = join(
+    repoRoot,
+    "supabase/tests/author_partner_attribution_smoke.sql",
+  );
+  assert(existsSync(attrSmokePath), "attribution smoke sql must exist");
+  const attrSmokeSql = readFileSync(attrSmokePath, "utf8");
+  assert(attrSmokeSql.includes("author_partner_touch_invite"), "smoke touches invite");
+  assert(attrSmokeSql.includes("author_partner_bind_manual_code"), "smoke binds manual");
+  assert(attrSmokeSql.includes("preserved_first_touch"), "smoke asserts first-touch");
+
+  if (!dockerOk()) {
+    console.log("author-partner attribution behavioral smoke: skipped (no docker)");
+    return;
+  }
+  const container = resolveDockerDbContainer();
+  if (!container) {
+    console.log("author-partner attribution behavioral smoke: skipped (no db container)");
+    return;
+  }
+
+  const db = "partner_attr_smoke_" + Date.now();
+  const attributionPath = join(
+    repoRoot,
+    "supabase/migrations/20261025120000_author_partner_attribution.sql",
+  );
+  const stub = readFileSync(stubPath, "utf8");
+  const foundation = readFileSync(migrationPath, "utf8");
+  const attribution = readFileSync(attributionPath, "utf8");
+  const smoke = readFileSync(attrSmokePath, "utf8");
+
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${db} WITH (FORCE);`],
+    { stdio: "pipe" },
+  );
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `CREATE DATABASE ${db};`],
+    { stdio: "pipe" },
+  );
+
+  const runSql = (sql) => {
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+      { input: sql, stdio: ["pipe", "pipe", "pipe"], encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
+    );
+  };
+
+  try {
+    runSql(stub);
+    runSql(foundation);
+    runSql(attribution);
+    // NOTICE goes to stderr; ON_ERROR_STOP=1 + non-zero exit is the failure signal
+    // (same pattern as foundation isolated smoke).
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+      { input: smoke, stdio: ["pipe", "pipe", "inherit"], maxBuffer: 20 * 1024 * 1024 },
+    );
+    console.log("author-partner attribution behavioral smoke: ok");
+  } finally {
+    try {
+      execFileSync(
+        "docker",
+        ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${db} WITH (FORCE);`],
+        { stdio: "pipe" },
+      );
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+runAttributionBehavioralSmoke();

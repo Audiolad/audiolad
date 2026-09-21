@@ -189,6 +189,7 @@ function AuthorApplicationForm({
   restoredDraftNotice,
   updateContactsOnly,
   contactsSectionRef,
+  inviteLocked,
   onValuesChange,
   onSubmit,
   onInteractionStart,
@@ -199,6 +200,7 @@ function AuthorApplicationForm({
   restoredDraftNotice: boolean;
   updateContactsOnly: boolean;
   contactsSectionRef: RefObject<HTMLDivElement | null>;
+  inviteLocked: boolean;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
@@ -897,6 +899,7 @@ export default function AuthorApplicationPanel({
             restoredDraftNotice={restoredDraftNotice}
             updateContactsOnly={updateContactsOnly}
             contactsSectionRef={contactsSectionRef}
+            inviteLocked={inviteLocked}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}

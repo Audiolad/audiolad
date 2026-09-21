@@ -37,3 +37,21 @@ export function applyPartnerAttributionCookie(
 ): void {
   cookieStore.set(buildPartnerAttributionCookieOptions(token));
 }
+
+/** Cookie may be set only when this opaque token has/creates a server attribution row. */
+export function shouldSetPartnerAttributionCookie(input: {
+  result: string;
+  cookieShouldSet?: boolean;
+  attributionId?: string | null;
+}): boolean {
+  if (input.cookieShouldSet === true) {
+    return true;
+  }
+  if (input.result === "created") {
+    return true;
+  }
+  if (input.result === "bound" && Boolean(input.attributionId)) {
+    return true;
+  }
+  return false;
+}

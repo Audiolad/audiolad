@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.author_partner_attributions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token_hash text NOT NULL,
   referrer_author_id uuid NOT NULL
-    REFERENCES public.authors (id) ON DELETE RESTRICT,
+    REFERENCES public.authors (id) ON DELETE CASCADE,
   code_used text NOT NULL,
   code_normalized text NOT NULL,
   source text NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS public.author_partner_attributions (
     REFERENCES auth.users (id) ON DELETE SET NULL,
   bound_at timestamptz NULL,
   bound_referral_id uuid NULL
-    REFERENCES public.author_referrals (id) ON DELETE SET NULL,
+    REFERENCES public.author_referrals (id) ON DELETE CASCADE,
   CONSTRAINT author_partner_attributions_token_hash_unique UNIQUE (token_hash),
   CONSTRAINT author_partner_attributions_source_check
     CHECK (source IN ('invite_link', 'manual_code')),
@@ -340,8 +340,10 @@ DECLARE
   v_code_norm text;
   v_existing public.author_partner_attributions%ROWTYPE;
   v_referral public.author_referrals%ROWTYPE;
+  v_bound_referral public.author_referrals%ROWTYPE;
   v_new public.author_partner_attributions%ROWTYPE;
   v_now timestamptz := now();
+  v_claim jsonb;
 BEGIN
   IF p_token_hash IS NULL OR p_token_hash !~ '^[0-9a-f]{64}$' THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invalid_token');
@@ -382,23 +384,62 @@ BEGIN
         'attribution_id', v_existing.id,
         'referrer_author_id', v_existing.referrer_author_id,
         'code', v_existing.code_used,
-        'expires_at', v_existing.expires_at
+        'expires_at', v_existing.expires_at,
+        'cookie_should_set', false
       );
     END IF;
 
     IF v_existing.status = 'bound' THEN
-      RETURN jsonb_build_object(
-        'ok', true,
-        'result', 'already_bound',
-        'attribution_id', v_existing.id,
-        'referrer_author_id', v_existing.referrer_author_id
-      );
+      SELECT * INTO v_bound_referral
+      FROM public.author_referrals AS r
+      WHERE r.id = v_existing.bound_referral_id
+      FOR UPDATE;
+
+      IF FOUND AND v_bound_referral.activated_at IS NOT NULL THEN
+        RETURN jsonb_build_object(
+          'ok', true,
+          'result', 'referral_already_activated',
+          'attribution_id', v_existing.id,
+          'referral_id', v_bound_referral.id,
+          'referrer_author_id', v_bound_referral.referrer_author_id,
+          'cookie_should_set', false
+        );
+      END IF;
+
+      IF FOUND
+         AND v_bound_referral.status = 'attributed'
+         AND v_bound_referral.attribution_expires_at IS NOT NULL
+         AND v_bound_referral.attribution_expires_at > v_now THEN
+        RETURN jsonb_build_object(
+          'ok', true,
+          'result', 'already_bound',
+          'attribution_id', v_existing.id,
+          'referral_id', v_bound_referral.id,
+          'referrer_author_id', v_bound_referral.referrer_author_id,
+          'code', v_bound_referral.code_used,
+          'expires_at', v_bound_referral.attribution_expires_at,
+          'cookie_should_set', false
+        );
+      END IF;
+
+      -- Stale bound attribution: unactivated referral expired or missing.
+      IF FOUND AND v_bound_referral.activated_at IS NULL THEN
+        DELETE FROM public.author_referrals WHERE id = v_bound_referral.id;
+        -- attributions cascade-deleted with referral
+      ELSE
+        DELETE FROM public.author_partner_attributions WHERE id = v_existing.id;
+      END IF;
+      v_existing := NULL;
     END IF;
   END IF;
 
   IF p_invitee_user_id IS NOT NULL THEN
     IF public.author_partner_user_owns_author_space(p_invitee_user_id) THEN
-      RETURN jsonb_build_object('ok', true, 'result', 'already_author');
+      RETURN jsonb_build_object(
+        'ok', true,
+        'result', 'already_author',
+        'cookie_should_set', false
+      );
     END IF;
 
     BEGIN
@@ -420,7 +461,9 @@ BEGIN
         RETURN jsonb_build_object(
           'ok', true,
           'result', 'referral_already_activated',
-          'referral_id', v_referral.id
+          'referral_id', v_referral.id,
+          'referrer_author_id', v_referral.referrer_author_id,
+          'cookie_should_set', false
         );
       END IF;
 
@@ -433,7 +476,8 @@ BEGIN
           'referral_id', v_referral.id,
           'referrer_author_id', v_referral.referrer_author_id,
           'code', v_referral.code_used,
-          'expires_at', v_referral.attribution_expires_at
+          'expires_at', v_referral.attribution_expires_at,
+          'cookie_should_set', false
         );
       END IF;
 
@@ -443,7 +487,10 @@ BEGIN
     END IF;
   END IF;
 
-  IF v_existing.id IS NOT NULL THEN
+  -- Create or refresh pending attribution for this opaque token.
+  IF EXISTS (
+    SELECT 1 FROM public.author_partner_attributions AS a WHERE a.token_hash = p_token_hash
+  ) THEN
     UPDATE public.author_partner_attributions AS a
     SET
       referrer_author_id = v_author_id,
@@ -456,7 +503,7 @@ BEGIN
       invitee_user_id = NULL,
       bound_at = NULL,
       bound_referral_id = NULL
-    WHERE a.id = v_existing.id
+    WHERE a.token_hash = p_token_hash
     RETURNING * INTO v_new;
   ELSE
     INSERT INTO public.author_partner_attributions (
@@ -480,7 +527,15 @@ BEGIN
   END IF;
 
   IF p_invitee_user_id IS NOT NULL THEN
-    RETURN public.author_partner_claim_attribution(p_token_hash, p_invitee_user_id);
+    v_claim := public.author_partner_claim_attribution(p_token_hash, p_invitee_user_id);
+    -- claim returns bound / preserved / already_author; never invent cookie for SoT-only preserves
+    IF coalesce(v_claim->>'ok', 'false') = 'true' THEN
+      RETURN v_claim || jsonb_build_object(
+        'cookie_should_set',
+        coalesce(v_claim->>'result', '') IN ('bound', 'created')
+      );
+    END IF;
+    RETURN v_claim;
   END IF;
 
   RETURN jsonb_build_object(
@@ -489,13 +544,14 @@ BEGIN
     'attribution_id', v_new.id,
     'referrer_author_id', v_new.referrer_author_id,
     'code', v_new.code_used,
-    'expires_at', v_new.expires_at
+    'expires_at', v_new.expires_at,
+    'cookie_should_set', true
   );
 END;
 $$;
 
 COMMENT ON FUNCTION public.author_partner_touch_invite(text, text, uuid) IS
-  'audiolad:author-partner:v2; resolve invite code + first-touch anonymous attribution.';
+  'audiolad:author-partner:v2; resolve invite code + first-touch anonymous attribution. Stale bound TTL yields to a new first-touch.';
 
 REVOKE ALL ON FUNCTION public.author_partner_touch_invite(text, text, uuid)
   FROM PUBLIC, anon, authenticated;
@@ -508,7 +564,8 @@ GRANT EXECUTE ON FUNCTION public.author_partner_touch_invite(text, text, uuid)
 
 CREATE OR REPLACE FUNCTION public.author_partner_bind_manual_code(
   p_code text,
-  p_invitee_user_id uuid
+  p_invitee_user_id uuid,
+  p_pending_token_hash text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -526,6 +583,8 @@ DECLARE
   v_now timestamptz := now();
   v_lock_key bigint;
   v_expires timestamptz;
+  v_claim jsonb;
+  v_pending public.author_partner_attributions%ROWTYPE;
 BEGIN
   IF p_invitee_user_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'error', 'user_required');
@@ -536,6 +595,58 @@ BEGIN
 
   IF public.author_partner_user_owns_author_space(p_invitee_user_id) THEN
     RETURN jsonb_build_object('ok', true, 'result', 'already_author');
+  END IF;
+
+  -- Pending cookie attribution wins over manual code (first-touch).
+  IF p_pending_token_hash IS NOT NULL AND p_pending_token_hash ~ '^[0-9a-f]{64}$' THEN
+    SELECT * INTO v_pending
+    FROM public.author_partner_attributions AS a
+    WHERE a.token_hash = p_pending_token_hash
+    FOR UPDATE;
+
+    IF FOUND THEN
+      IF v_pending.status = 'pending' AND v_pending.expires_at > v_now THEN
+        v_claim := public.author_partner_claim_attribution(
+          p_pending_token_hash,
+          p_invitee_user_id
+        );
+        RETURN v_claim;
+      END IF;
+
+      IF v_pending.status = 'bound' THEN
+        SELECT * INTO v_referral
+        FROM public.author_referrals AS r
+        WHERE r.id = v_pending.bound_referral_id;
+
+        IF FOUND AND v_referral.activated_at IS NOT NULL THEN
+          RETURN jsonb_build_object(
+            'ok', true,
+            'result', 'referral_already_activated',
+            'referral_id', v_referral.id,
+            'code', v_referral.code_used
+          );
+        END IF;
+
+        IF FOUND
+           AND v_referral.status = 'attributed'
+           AND v_referral.attribution_expires_at IS NOT NULL
+           AND v_referral.attribution_expires_at > v_now THEN
+          RETURN jsonb_build_object(
+            'ok', true,
+            'result', 'preserved_first_touch',
+            'referral_id', v_referral.id,
+            'code', v_referral.code_used,
+            'referrer_author_id', v_referral.referrer_author_id,
+            'expires_at', v_referral.attribution_expires_at
+          );
+        END IF;
+
+        -- Stale bound pending cookie: drop expired referral (cascades attribution).
+        IF FOUND AND v_referral.activated_at IS NULL THEN
+          DELETE FROM public.author_referrals WHERE id = v_referral.id;
+        END IF;
+      END IF;
+    END IF;
   END IF;
 
   SELECT * INTO v_referral
@@ -569,6 +680,10 @@ BEGIN
     IF v_referral.activated_at IS NULL THEN
       DELETE FROM public.author_referrals WHERE id = v_referral.id;
     END IF;
+  END IF;
+
+  IF p_code IS NULL OR btrim(p_code) = '' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'empty');
   END IF;
 
   v_resolved := public.resolve_author_partner_code(p_code);
@@ -637,8 +752,26 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.author_partner_bind_manual_code(text, uuid) IS
-  'audiolad:author-partner:v2; manual invite code on become-author form; respects first-touch.';
+COMMENT ON FUNCTION public.author_partner_bind_manual_code(text, uuid, text) IS
+  'audiolad:author-partner:v2; manual invite code on become-author; pending cookie first-touch wins over manual under one advisory lock.';
+
+REVOKE ALL ON FUNCTION public.author_partner_bind_manual_code(text, uuid, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.author_partner_bind_manual_code(text, uuid, text)
+  TO service_role;
+
+-- Keep 2-arg overload for callers that only pass code+user (no pending cookie).
+CREATE OR REPLACE FUNCTION public.author_partner_bind_manual_code(
+  p_code text,
+  p_invitee_user_id uuid
+)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.author_partner_bind_manual_code(p_code, p_invitee_user_id, NULL);
+$$;
 
 REVOKE ALL ON FUNCTION public.author_partner_bind_manual_code(text, uuid)
   FROM PUBLIC, anon, authenticated;
