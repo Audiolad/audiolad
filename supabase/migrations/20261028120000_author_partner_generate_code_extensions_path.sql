@@ -11,7 +11,7 @@ CREATE OR REPLACE FUNCTION public.author_partner_generate_code()
 RETURNS text
 LANGUAGE plpgsql
 VOLATILE
-SET search_path TO public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_raw text;

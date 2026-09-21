@@ -84,7 +84,8 @@ assert(migration.includes("ensure_author_partner_profile"), "ensure rpc");
 assert(existsSync(generateCodeFixPath), "generate_code extensions path fix migration");
 const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
 assert(generateCodeFix.includes("extensions.gen_random_bytes"), "fix qualifies gen_random_bytes");
-assert(generateCodeFix.includes("extensions"), "fix search_path includes extensions");
+assert(generateCodeFix.includes("SET search_path = public, pg_temp"), "fix keeps hardened search_path without extensions");
+assert(!/SET search_path[^=\n]*=\s*public,\s*extensions/.test(generateCodeFix), "fix must not put extensions on search_path");
 
 assert(migration.includes("change_author_partner_code"), "change rpc");
 assert(migration.includes("get_author_partner_profile"), "get rpc");
@@ -312,10 +313,137 @@ SELECT public.ensure_author_partner_profile('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb
   });
 }
 
+
+/**
+ * Explicit production regression:
+ * pgcrypto in schema extensions + foundation WITHOUT generate-code fix ⇒ ensure fails 42883;
+ * after 20261028120000 ⇒ ensure ok/created + idempotent + get exists.
+ */
+function runGenRandomBytesExtensionsPathRegression(runtime) {
+  if (!runtime || !String(runtime).startsWith("docker:")) {
+    console.log("author-partner gen_random_bytes regression: skipped (no docker)");
+    return;
+  }
+  const container = String(runtime).slice("docker:".length);
+  const db = "partner_gen_random_bytes_reg_" + Date.now();
+  const stubSql = readFileSync(stubPath, "utf8");
+  const foundationSql = readFileSync(migrationPath, "utf8");
+  const fixSql = readFileSync(generateCodeFixPath, "utf8");
+
+  function psql(dbName, sql) {
+    return execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", dbName, "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+      { input: sql, encoding: "utf8" },
+    ).trim();
+  }
+  function admin(sql) {
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql],
+      { stdio: "ignore" },
+    );
+  }
+
+  admin(`DROP DATABASE IF EXISTS ${db} WITH (FORCE);`);
+  admin(`CREATE DATABASE ${db};`);
+  try {
+    psql(db, stubSql);
+    psql(db, foundationSql);
+
+    // Owner context setup
+    psql(
+      db,
+      `
+DO $$
+DECLARE
+  u uuid := 'a1111111-1111-4111-8111-111111111111';
+  a uuid := 'b2222222-2222-4222-8222-222222222222';
+BEGIN
+  INSERT INTO auth.users (id) VALUES (u) ON CONFLICT DO NOTHING;
+  INSERT INTO public.authors (id, name, slug) VALUES (a, 'Reg Author', 'reg-gen-bytes')
+    ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.author_members (author_id, user_id, role) VALUES (a, u, 'owner')
+    ON CONFLICT (author_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+END $$;
+`,
+    );
+
+    // BEFORE fix: expect 42883 / missing gen_random_bytes
+    let beforeErr = "";
+    try {
+      psql(
+        db,
+        `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+      );
+    } catch (error) {
+      beforeErr = String(error?.stderr || error?.message || error);
+    }
+    assert(beforeErr, "before-fix ensure must fail");
+    assert(
+      /gen_random_bytes/i.test(beforeErr) || /42883/.test(beforeErr),
+      `before-fix must cite gen_random_bytes or 42883, got: ${beforeErr.slice(0, 500)}`,
+    );
+
+    // Apply fix once
+    psql(db, fixSql);
+
+    const first = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const firstJson = JSON.parse(first.split("\n").filter(Boolean).pop());
+    assert(firstJson.ok === true, `after-fix ensure ok, got ${first}`);
+    assert(firstJson.created === true, `after-fix created=true, got ${first}`);
+    assert(typeof firstJson.primary_code === "string" && firstJson.primary_code.length > 0, "primary_code present");
+    const code = firstJson.primary_code;
+
+    const second = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const secondJson = JSON.parse(second.split("\n").filter(Boolean).pop());
+    assert(secondJson.ok === true, "second ensure ok");
+    assert(secondJson.created === false, "second ensure created=false");
+    assert(secondJson.primary_code === code, "idempotent same primary_code");
+
+    const got = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.get_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const gotJson = JSON.parse(got.split("\n").filter(Boolean).pop());
+    assert(gotJson.exists === true || gotJson.ok === true && gotJson.exists !== false, `get exists, got ${got}`);
+    // Prefer explicit exists=true when present
+    if ("exists" in gotJson) {
+      assert(gotJson.exists === true, "get_author_partner_profile exists=true");
+    }
+    console.log("author-partner gen_random_bytes extensions-path regression: ok");
+  } finally {
+    admin(`DROP DATABASE IF EXISTS ${db} WITH (FORCE);`);
+  }
+}
+
 const runtime = runIsolatedSql();
 if (runtime) {
   console.log(`author-partner-program-sql-unit: parse + isolated smoke ok (${runtime})`);
   await runConcurrentEnsure(runtime);
+  runGenRandomBytesExtensionsPathRegression(runtime);
 } else {
   console.log("author-partner-program-sql-unit: parse-only ok (no local postgres)");
 }
@@ -512,7 +640,7 @@ assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into ext
     runSql(stub);
     runSql(foundation);
 
-    runSql(generateCodeFix);runSql(generateCodeFix);
+    runSql(generateCodeFix);
     runSql(attribution);
     // NOTICE goes to stderr; ON_ERROR_STOP=1 + non-zero exit is the failure signal
     // (same pattern as foundation isolated smoke).
@@ -625,7 +753,7 @@ assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into ext
     runSql(stub);
     runSql(foundation);
 
-    runSql(generateCodeFix);runSql(generateCodeFix);
+    runSql(generateCodeFix);
     runSql(attribution);
     runSql(activation);
     execFileSync(
