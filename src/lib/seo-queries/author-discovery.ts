@@ -211,6 +211,7 @@ export type AuthorProposeResult =
       ok: true;
       status: "proposed" | "already_proposed";
       queryId: string;
+      proposalId: string | null;
       createdQuery: boolean;
       analysisStatus: "not_analyzed";
       frequency: number;
@@ -314,6 +315,7 @@ export async function proposeAuthorSeoQuery(
       ok: true,
       status: "already_proposed",
       queryId: query.id,
+      proposalId: existingProposal.id,
       createdQuery,
       analysisStatus: "not_analyzed",
       frequency: typeof query.frequency === "number" ? query.frequency : input.count,
@@ -333,6 +335,7 @@ export async function proposeAuthorSeoQuery(
       ok: true,
       status: "already_proposed",
       queryId: query.id,
+      proposalId: null,
       createdQuery,
       analysisStatus: "not_analyzed",
       frequency: typeof query.frequency === "number" ? query.frequency : input.count,
@@ -349,6 +352,7 @@ export async function proposeAuthorSeoQuery(
     ok: true,
     status: "proposed",
     queryId: query.id,
+    proposalId: proposal.id,
     createdQuery,
     analysisStatus: "not_analyzed",
     frequency: typeof query.frequency === "number" ? query.frequency : input.count,

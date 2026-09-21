@@ -32,7 +32,7 @@ export default function AdminShell({
 }: AdminShellProps) {
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[960px] bg-platform-surface px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:px-8">
+      <div className="mx-auto min-h-screen w-full max-w-none bg-platform-surface px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1.25rem+env(safe-area-inset-top,0px))] sm:px-6 lg:px-8">
         <header className="flex items-start justify-between gap-3">
           <Link
             href={backHref}

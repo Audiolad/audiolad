@@ -41,6 +41,26 @@ import {
   renderAuthorApplicationAdminAlertEmailHtml,
   renderAuthorApplicationAdminAlertEmailText,
 } from "./author-application-admin-alert";
+
+import {
+  SEO_QUERY_PROPOSAL_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
+  SEO_QUERY_PROPOSAL_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
+  buildSeoQueryProposalAdminAlertSubject,
+  renderSeoQueryProposalAdminAlertEmailHtml,
+  renderSeoQueryProposalAdminAlertEmailText,
+} from "./seo-query-proposal-admin-alert";
+import {
+  SEO_QUERY_PROPOSAL_APPROVED_EMAIL_TEMPLATE_KEY,
+  SEO_QUERY_PROPOSAL_APPROVED_EMAIL_TEMPLATE_VERSION,
+  SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_KEY,
+  SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_VERSION,
+  buildSeoQueryProposalApprovedSubject,
+  buildSeoQueryProposalRejectedSubject,
+  renderSeoQueryProposalApprovedEmailHtml,
+  renderSeoQueryProposalApprovedEmailText,
+  renderSeoQueryProposalRejectedEmailHtml,
+  renderSeoQueryProposalRejectedEmailText,
+} from "./seo-query-proposal-decision";
 import {
   COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
   COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
@@ -556,6 +576,70 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+
+    if (input.templateKey === SEO_QUERY_PROPOSAL_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+      const authorName = readString(input.payload, "authorName");
+      const queryText = readString(input.payload, "queryText");
+      const frequencyLabel = readString(input.payload, "frequencyLabel");
+      const sourceLabel = readString(input.payload, "sourceLabel");
+      const submittedAtLabel = readString(input.payload, "submittedAtLabel");
+      const queryId = readString(input.payload, "queryId");
+      if (!authorName || !queryText || !frequencyLabel || !sourceLabel || !submittedAtLabel || !queryId) {
+        return { ok: false, code: "invalid_payload" };
+      }
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      return {
+        ok: true,
+        subject: buildSeoQueryProposalAdminAlertSubject(queryText),
+        html: renderSeoQueryProposalAdminAlertEmailHtml({
+          authorName, queryText, frequencyLabel, sourceLabel, submittedAtLabel, queryId, siteOrigin,
+        }),
+        text: renderSeoQueryProposalAdminAlertEmailText({
+          authorName, queryText, frequencyLabel, sourceLabel, submittedAtLabel, queryId, siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === SEO_QUERY_PROPOSAL_APPROVED_EMAIL_TEMPLATE_KEY) {
+      const queryText = readString(input.payload, "queryText");
+      const frequencyLabel = readString(input.payload, "frequencyLabel");
+      const expiresAtLabel = readString(input.payload, "expiresAtLabel");
+      const createProductUrl = readString(input.payload, "createProductUrl");
+      if (!queryText || !frequencyLabel || !expiresAtLabel || !createProductUrl) {
+        return { ok: false, code: "invalid_payload" };
+      }
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      return {
+        ok: true,
+        subject: buildSeoQueryProposalApprovedSubject(queryText),
+        html: renderSeoQueryProposalApprovedEmailHtml({
+          queryText, frequencyLabel, expiresAtLabel, createProductUrl, siteOrigin,
+        }),
+        text: renderSeoQueryProposalApprovedEmailText({
+          queryText, frequencyLabel, expiresAtLabel, createProductUrl, siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_KEY) {
+      const queryText = readString(input.payload, "queryText");
+      const opportunitiesUrl = readString(input.payload, "opportunitiesUrl");
+      if (!queryText || !opportunitiesUrl) {
+        return { ok: false, code: "invalid_payload" };
+      }
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      return {
+        ok: true,
+        subject: buildSeoQueryProposalRejectedSubject(queryText),
+        html: renderSeoQueryProposalRejectedEmailHtml({
+          queryText, opportunitiesUrl, siteOrigin,
+        }),
+        text: renderSeoQueryProposalRejectedEmailText({
+          queryText, opportunitiesUrl, siteOrigin,
+        }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -623,6 +707,16 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
     return PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_VERSION;
   }
 
+  
+  if (templateKey === SEO_QUERY_PROPOSAL_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+    return SEO_QUERY_PROPOSAL_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION;
+  }
+  if (templateKey === SEO_QUERY_PROPOSAL_APPROVED_EMAIL_TEMPLATE_KEY) {
+    return SEO_QUERY_PROPOSAL_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+  if (templateKey === SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_KEY) {
+    return SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_VERSION;
+  }
   return null;
 }
 
