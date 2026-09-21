@@ -47,6 +47,13 @@ export const PLATFORM_OWNER_SALE_MESSAGE_TYPE = "platform_owner_sale";
 /** One-shot listener welcome. Uses this table only; not an author outbox worker. */
 export const LISTENER_WELCOME_MESSAGE_TYPE = "listener_welcome";
 
+export const SEO_QUERY_PROPOSAL_SUBMITTED_ADMIN_MESSAGE_TYPE =
+  "seo_query_proposal_submitted_admin";
+export const SEO_QUERY_PROPOSAL_APPROVED_AUTHOR_MESSAGE_TYPE =
+  "seo_query_proposal_approved_author";
+export const SEO_QUERY_PROPOSAL_REJECTED_AUTHOR_MESSAGE_TYPE =
+  "seo_query_proposal_rejected_author";
+
 const PAYOUT_PROFILE_MESSAGE_TYPES = new Set([
   PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE,
   PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE,
@@ -59,6 +66,9 @@ const NULL_APPLICATION_FK_MESSAGE_TYPES = new Set([
   COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE,
   AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE,
   PLATFORM_OWNER_SALE_MESSAGE_TYPE,
+  SEO_QUERY_PROPOSAL_SUBMITTED_ADMIN_MESSAGE_TYPE,
+  SEO_QUERY_PROPOSAL_APPROVED_AUTHOR_MESSAGE_TYPE,
+  SEO_QUERY_PROPOSAL_REJECTED_AUTHOR_MESSAGE_TYPE,
 ]);
 
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
@@ -124,6 +134,25 @@ export function buildListenerWelcomeDedupKey(userId: string): string {
   return `listener_welcome:${userId.trim()}`;
 }
 
+
+export function buildSeoQueryProposalSubmittedAdminDedupKey(
+  proposalId: string,
+): string {
+  return `seo-query-proposal:${proposalId.trim()}:submitted:admin`;
+}
+
+export function buildSeoQueryProposalApprovedAuthorDedupKey(
+  proposalId: string,
+): string {
+  return `seo-query-proposal:${proposalId.trim()}:approved:author`;
+}
+
+export function buildSeoQueryProposalRejectedAuthorDedupKey(
+  proposalId: string,
+): string {
+  return `seo-query-proposal:${proposalId.trim()}:rejected:author`;
+}
+
 function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
@@ -169,6 +198,18 @@ function resolveOperationalEmailDedupKey(
 
   if (messageType === PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE) {
     return buildPayoutProfileRejectedDedupKey(applicationId, version);
+  }
+
+  if (messageType === SEO_QUERY_PROPOSAL_SUBMITTED_ADMIN_MESSAGE_TYPE) {
+    return buildSeoQueryProposalSubmittedAdminDedupKey(applicationId);
+  }
+
+  if (messageType === SEO_QUERY_PROPOSAL_APPROVED_AUTHOR_MESSAGE_TYPE) {
+    return buildSeoQueryProposalApprovedAuthorDedupKey(applicationId);
+  }
+
+  if (messageType === SEO_QUERY_PROPOSAL_REJECTED_AUTHOR_MESSAGE_TYPE) {
+    return buildSeoQueryProposalRejectedAuthorDedupKey(applicationId);
   }
 
   return buildAuthorAccessGrantedDedupKey(applicationId);

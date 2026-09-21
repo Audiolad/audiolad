@@ -15,6 +15,14 @@ type Row = {
   recommendedFormat: string | null; audioFit: string | null; lifecycle: string;
   author: string | null; product: string | null; reservedAt: string | null; expiresAt: string | null; createdAt: string;
   reservationId: string | null; clusterId: string | null; analysisStatus: "not_analyzed" | "analyzed" | "not_applicable";
+  proposalId: string | null;
+  proposalAuthorId: string | null;
+  proposalAuthorName: string | null;
+  proposalAuthorSlug: string | null;
+  proposalCreatedAt: string | null;
+  proposedByAuthor: boolean;
+  needsReview: boolean;
+  approvedUnreserved: boolean;
 };
 type Cluster = { id: string; name: string };
 type WordstatSuggestion = {
@@ -94,20 +102,29 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
   const clusters = useMemo(() => [...new Set(rows.map((row) => row.cluster).filter((value): value is string => Boolean(value)))], [rows]);
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source))], [rows]);
-  const filtered = useMemo(() => rows.filter((row) =>
-    (row.queryText.toLowerCase().includes(search.toLowerCase()) || row.normalizedQuery.includes(search.toLowerCase()))
-    && (!status || row.lifecycle === status)
-    && (!analysisStatus || row.analysisStatus === analysisStatus)
-    && (!source || row.source === source)
-    && (!cluster || row.cluster === cluster),
-  ), [rows, search, status, analysisStatus, source, cluster]);
+  const filtered = useMemo(() => {
+    const next = rows.filter((row) =>
+      (row.queryText.toLowerCase().includes(search.toLowerCase()) || row.normalizedQuery.includes(search.toLowerCase()))
+      && (!status || row.lifecycle === status)
+      && (!analysisStatus || row.analysisStatus === analysisStatus)
+      && (!source || row.source === source)
+      && (!cluster || row.cluster === cluster),
+    );
+    return next.sort((a, b) => {
+      if (a.needsReview !== b.needsReview) return a.needsReview ? -1 : 1;
+      if (a.approvedUnreserved !== b.approvedUnreserved) {
+        return a.approvedUnreserved ? -1 : 1;
+      }
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }, [rows, search, status, analysisStatus, source, cluster]);
 
   async function addQuery(event: React.FormEvent) {
     event.preventDefault();
     const response = await fetch("/api/admin/seo-queries", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query_text: newQuery, source: "manual" }) });
     const payload = await response.json();
     if (!response.ok) return setNotice(payload.error === "normalized_query_duplicate" ? "Такой нормализованный запрос уже существует." : "Не удалось добавить запрос.");
-    setRows((current) => [{ id: payload.query.id, queryText: payload.query.query_text, normalizedQuery: payload.query.normalized_query, source: payload.query.source, frequency: null, cluster: null, clusterId: null, intent: null, recommendedFormat: null, audioFit: null, analysisStatus: "not_analyzed", lifecycle: "Свободен", author: null, product: null, reservedAt: null, expiresAt: null, createdAt: payload.query.created_at, reservationId: null }, ...current]);
+    setRows((current) => [{ id: payload.query.id, queryText: payload.query.query_text, normalizedQuery: payload.query.normalized_query, source: payload.query.source, frequency: null, cluster: null, clusterId: null, intent: null, recommendedFormat: null, audioFit: null, analysisStatus: "not_analyzed", lifecycle: "Свободен", author: null, product: null, reservedAt: null, expiresAt: null, createdAt: payload.query.created_at, reservationId: null, proposalId: null, proposalAuthorId: null, proposalAuthorName: null, proposalAuthorSlug: null, proposalCreatedAt: null, proposedByAuthor: false, needsReview: false, approvedUnreserved: false }, ...current]);
     setNewQuery(""); setNotice("SEO-запрос добавлен.");
   }
 
@@ -230,20 +247,117 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     } : item));
   }
 
+  function applyFailureMessage(status: string | undefined) {
+    if (status === "reservation_limit_reached") {
+      return "У автора уже есть активная бронь. Снимите её или дождитесь истечения, затем закрепите снова.";
+    }
+    if (status === "reservation_conflict") {
+      return "Запрос уже забронирован или использован другим автором.";
+    }
+    if (status === "already_reviewed") {
+      return "Запись уже просмотрена с другим решением.";
+    }
+    return "Не удалось применить решение: запись уже просмотрена или зарезервирована.";
+  }
+
   async function applyReview(id: string, analysis_status: "analyzed" | "not_applicable") {
     const item = reviewItems.find((candidate) => candidate.id === id);
+    const row = rows.find((candidate) => candidate.id === id);
     if (!item) return;
     const suggested = item.suggested;
     setAnalysisBusy(true);
-    const response = await fetch("/api/admin/seo-queries/analyze", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: [{ id, intent: suggested.intent, recommended_format: suggested.recommended_format, audio_fit: suggested.audio_fit, analysis_status }] }) });
+    const bodyItem: Record<string, unknown> = {
+      id,
+      intent: suggested.intent,
+      recommended_format: suggested.recommended_format,
+      audio_fit: suggested.audio_fit,
+      analysis_status,
+    };
+    if (row?.proposalId) bodyItem.proposal_id = row.proposalId;
+    const response = await fetch("/api/admin/seo-queries/analyze", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items: [bodyItem] }),
+    });
     const payload = await response.json();
     setAnalysisBusy(false);
     const result = payload.results?.[0];
-    if (!response.ok || result?.status !== "applied") return setAnalysisSummary("Не удалось применить решение: запись уже просмотрена или зарезервирована.");
-    setRows((current) => current.map((row) => row.id === id ? { ...row, intent: result.intent, recommendedFormat: result.recommended_format, audioFit: result.audio_fit, analysisStatus: result.analysis_status } : row));
+    if (!response.ok || result?.status !== "applied") {
+      return setAnalysisSummary(applyFailureMessage(result?.status));
+    }
+    const reservationId =
+      typeof result.reservation_id === "string" ? result.reservation_id : null;
+    const expiresAt =
+      typeof result.expires_at === "string" ? result.expires_at : null;
+    setRows((current) => current.map((candidate) => {
+      if (candidate.id !== id) return candidate;
+      const nextStatus = (result.analysis_status ?? analysis_status) as Row["analysisStatus"];
+      const reserved = Boolean(reservationId);
+      return {
+        ...candidate,
+        intent: suggested.intent,
+        recommendedFormat: suggested.recommended_format,
+        audioFit: suggested.audio_fit,
+        analysisStatus: nextStatus,
+        reservationId,
+        reservedAt: reserved ? new Date().toISOString() : candidate.reservedAt,
+        expiresAt: reserved ? expiresAt : candidate.expiresAt,
+        lifecycle: reserved ? "В работе" : nextStatus === "not_applicable" ? "Свободен" : candidate.lifecycle,
+        author: reserved
+          ? (candidate.proposalAuthorName ?? candidate.author)
+          : nextStatus === "not_applicable"
+            ? null
+            : candidate.author,
+        needsReview: false,
+        approvedUnreserved: nextStatus === "analyzed" && !reserved && Boolean(candidate.proposalId),
+      };
+    }));
     setReviewItems((current) => current.filter((candidate) => candidate.id !== id));
     setSelectedAnalysisIds((current) => { const next = new Set(current); next.delete(id); return next; });
     setAnalysisSummary(`Применено: готово ${payload.summary.analyzed}; не подходит ${payload.summary.not_applicable}; конфликтов ${payload.summary.conflicts}; ошибок ${payload.summary.errors}.`);
+  }
+
+  async function reconcileReservation(row: Row) {
+    if (!row.proposalId || !row.approvedUnreserved) return;
+    setAnalysisBusy(true);
+    const response = await fetch("/api/admin/seo-queries/analyze", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        items: [{
+          id: row.id,
+          proposal_id: row.proposalId,
+          intent: row.intent ?? "informational",
+          recommended_format: row.recommendedFormat,
+          audio_fit: row.audioFit ?? "medium",
+          analysis_status: "analyzed",
+        }],
+      }),
+    });
+    const payload = await response.json();
+    setAnalysisBusy(false);
+    const result = payload.results?.[0];
+    if (!response.ok || result?.status !== "applied") {
+      return setAnalysisSummary(applyFailureMessage(result?.status));
+    }
+    const reservationId =
+      typeof result.reservation_id === "string" ? result.reservation_id : null;
+    const expiresAt =
+      typeof result.expires_at === "string" ? result.expires_at : null;
+    setRows((current) => current.map((candidate) => candidate.id === row.id ? {
+      ...candidate,
+      analysisStatus: "analyzed",
+      reservationId,
+      reservedAt: reservationId ? new Date().toISOString() : candidate.reservedAt,
+      expiresAt: reservationId ? expiresAt : candidate.expiresAt,
+      lifecycle: reservationId ? "В работе" : candidate.lifecycle,
+      author: reservationId
+        ? (candidate.proposalAuthorName ?? candidate.author)
+        : candidate.author,
+      needsReview: false,
+      approvedUnreserved: !reservationId,
+    } : candidate));
+    setAnalysisSummary(reservationId ? "Запрос закреплён за автором." : "Решение применено.");
   }
 
   return <div className="space-y-5">
@@ -306,7 +420,21 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         <div className="flex gap-2"><button className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white">Сохранить</button><button type="button" onClick={() => setEditingId("")} className="min-h-11 px-4 text-sm text-[#7042c5]">Отмена</button></div>
       </form> : null;
     })() : null}
-    <div className="hidden overflow-x-auto rounded-[22px] border border-[#eadff8] bg-white md:block"><table className="min-w-full text-left text-sm"><thead className="bg-[#faf6ff] text-[#796ba0]"><tr>{["", "Запрос", "Normalized", "Частотность", "Источник", "Кластер", "Intent", "Формат", "Audio Fit", "Анализ", "Статус", "Автор / продукт", "Бронь", "Создан", ""].map((title, index) => <th key={`${title}-${index}`} className="px-3 py-3 font-medium">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.id} className="border-t border-[#f3edf9]"><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "—"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "—"}</td><td className="px-3 py-3">{row.intent ?? "—"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "—"}</td><td className="px-3 py-3">{row.audioFit ?? "—"}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? "—"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>)}</tbody></table></div>
-    <div className="space-y-3 md:hidden">{filtered.map((row) => <article key={row.id} className="rounded-[22px] border border-[#eadff8] bg-white p-4"><h2 className="font-semibold text-[#25135c]">{row.queryText}</h2><p className="mt-1 text-xs text-[#796ba0]">{row.normalizedQuery}</p><div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]"><span>{row.lifecycle}</span><span>{row.frequency ?? "—"} частотность</span><span>{row.cluster ?? "Без кластера"}</span><span>{row.author ?? "Свободен"}</span></div></article>)}</div>
+    <div className="hidden overflow-x-auto rounded-[22px] border border-[#eadff8] bg-white md:block"><table className="min-w-full text-left text-sm"><thead className="bg-[#faf6ff] text-[#796ba0]"><tr>{["", "Запрос", "Normalized", "Частотность", "Источник", "Кластер", "Intent", "Формат", "Audio Fit", "Анализ", "Статус", "Автор / продукт", "Бронь", "Создан", ""].map((title, index) => <th key={`${title}-${index}`} className="px-3 py-3 font-medium">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => {
+      const rowTone = row.needsReview
+        ? "border-t border-[#f3edf9] bg-[#fff7e8]"
+        : row.approvedUnreserved
+          ? "border-t border-[#f3edf9] bg-[#fff4ec]"
+          : "border-t border-[#f3edf9]";
+      return <tr key={row.id} id={`seo-query-${row.id}`} className={rowTone}><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}{row.needsReview ? <span className="ml-2 inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно проверить</span> : null}{row.approvedUnreserved ? <span className="ml-2 inline-flex rounded-full bg-[#ffd0b0] px-2 py-0.5 text-[11px] font-semibold text-[#8a4b1a]">Одобрен — не закреплён</span> : null}{row.proposedByAuthor && row.proposalAuthorName ? <span className="mt-1 block text-xs font-normal text-[#796ba0]">Предложил: {row.proposalAuthorName}</span> : null}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "—"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "—"}</td><td className="px-3 py-3">{row.intent ?? "—"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "—"}</td><td className="px-3 py-3">{row.audioFit ?? "—"}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? row.proposalAuthorName ?? "—"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3 whitespace-nowrap"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mr-2 text-xs font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>;
+    })}</tbody></table></div>
+    <div className="space-y-3 md:hidden">{filtered.map((row) => {
+      const cardTone = row.needsReview
+        ? "rounded-[22px] border border-[#f0c35a] bg-[#fff7e8] p-4"
+        : row.approvedUnreserved
+          ? "rounded-[22px] border border-[#f0a66a] bg-[#fff4ec] p-4"
+          : "rounded-[22px] border border-[#eadff8] bg-white p-4";
+      return <article key={row.id} id={`seo-query-${row.id}`} className={cardTone}><h2 className="font-semibold text-[#25135c]">{row.queryText}</h2>{row.needsReview ? <p className="mt-1 text-xs font-semibold text-[#7a5b12]">Нужно проверить</p> : null}{row.approvedUnreserved ? <p className="mt-1 text-xs font-semibold text-[#8a4b1a]">Одобрен — не закреплён</p> : null}<p className="mt-1 text-xs text-[#796ba0]">{row.normalizedQuery}</p><div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]"><span>{row.lifecycle}</span><span>{row.frequency ?? "—"} частотность</span><span>{row.cluster ?? "Без кластера"}</span><span>{row.author ?? row.proposalAuthorName ?? "Свободен"}</span></div>{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mt-3 text-sm font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}</article>;
+    })}</div>
   </div>;
 }

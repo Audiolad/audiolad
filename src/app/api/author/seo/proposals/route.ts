@@ -12,6 +12,7 @@ import { createAuthorProposalRepository } from "@/lib/seo-queries/author-discove
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
+import { sendSeoQueryProposalAdminAlertEmail } from "@/lib/email/send-seo-query-proposal-admin-alert-email";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -113,11 +114,59 @@ export async function POST(request: Request) {
       );
     }
 
+    if (result.status === "proposed" && result.proposalId) {
+      try {
+        const service = createServiceRoleClient();
+        const [{ data: author }, { data: query }] = await Promise.all([
+          service
+            .from("authors")
+            .select("name, slug")
+            .eq("id", authorId)
+            .maybeSingle(),
+          service
+            .from("seo_queries")
+            .select("query_text, frequency, source")
+            .eq("id", result.queryId)
+            .maybeSingle(),
+        ]);
+        const emailResult = await sendSeoQueryProposalAdminAlertEmail({
+          proposalId: result.proposalId,
+          queryId: result.queryId,
+          queryText:
+            typeof query?.query_text === "string"
+              ? query.query_text
+              : matched.phrase,
+          authorName:
+            typeof author?.name === "string" ? author.name : "Автор",
+          frequency:
+            typeof query?.frequency === "number"
+              ? query.frequency
+              : matched.count,
+          source:
+            typeof query?.source === "string" ? query.source : "wordstat",
+          submittedAt: new Date().toISOString(),
+          supabase: service,
+        });
+        if (!emailResult.ok) {
+          console.error(
+            "seo_query_proposal_admin_email_failed",
+            emailResult.code,
+          );
+        }
+      } catch (error) {
+        console.error(
+          "seo_query_proposal_admin_email_unexpected",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         status: result.status,
         message: result.message,
         queryId: result.queryId,
+        proposalId: result.proposalId,
       },
       { status: result.status === "proposed" ? 201 : 200 },
     );
