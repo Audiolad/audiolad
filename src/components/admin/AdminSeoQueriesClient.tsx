@@ -249,7 +249,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
 
   function applyFailureMessage(status: string | undefined) {
     if (status === "reservation_limit_reached") {
-      return "У автора уже есть активная бронь. Снимите её или дождитесь истечения, затем закрепите снова.";
+      return "Нельзя одобрить запрос: у автора уже 5 поисковых запросов в работе. Снимите одну бронь или дождитесь её окончания.";
     }
     if (status === "reservation_conflict") {
       return "Запрос уже забронирован или использован другим автором.";

@@ -20,6 +20,8 @@ assert.match(client, /Закрепить автору/);
 assert.match(client, /seo-query-\$\{row\.id\}/);
 assert.match(client, /proposal_id/);
 assert.match(client, /reservation_limit_reached/);
+assert.match(client, /у автора уже 5 поисковых запросов в работе/);
+assert.doesNotMatch(client, /У автора уже есть активная бронь/);
 assert.match(client, /needsReview/);
 assert.match(client, /approvedUnreserved/);
 
