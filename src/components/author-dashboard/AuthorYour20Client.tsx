@@ -154,8 +154,9 @@ export default function AuthorYour20Client({
             АудиоЛада.
           </p>
           <p>
-            Приглашённый вами автор получает бонусом дополнительное авторское
-            пространство бесплатно.
+            Приглашённый вами автор бесплатно получает дополнительное авторское
+            пространство. То есть получает бонус – возможность создать ещё один
+            проект внутри своего аккаунта.
           </p>
         </div>
 
@@ -213,7 +214,9 @@ export default function AuthorYour20Client({
           <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
             <h3 className="text-[17px] font-semibold">Код приглашения</h3>
             <p className="mt-1 text-sm text-[#7d70a2]">
-              Код используется в вашей персональной ссылке.
+              Код используется в вашей персональной ссылке. Автоматический код
+              можно заменить на любой свободный, который вам нравится (например,
+              natalya или natalya-meditation).
             </p>
             <input
               value={codeDraft}
