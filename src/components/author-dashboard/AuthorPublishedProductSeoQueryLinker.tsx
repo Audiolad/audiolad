@@ -141,17 +141,17 @@ export default function AuthorPublishedProductSeoQueryLinker({
           </p>
           <button
             type="button"
-            disabled={pending}
+            disabled={Boolean(attachPending)}
             onClick={() => {
-              setPhrase(legacyHint);
-              setOpen(true);
               setMessage(null);
-              void runSearch(legacyHint);
+              // Single user action: find-or-create + attach via published RPC.
+              // Occupied queries surface as API error; no second confirm step.
+              void attach({ queryText: legacyHint });
             }}
             className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {pending && searchedPhrase === legacyHint
-              ? "Ищем…"
+            {attachPending === legacyHint
+              ? "Закрепляем…"
               : "Закрепить этот запрос"}
           </button>
         </div>
