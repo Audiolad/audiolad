@@ -76,11 +76,30 @@ export type ProductQualityReviewFieldCounts = {
   total: number;
 };
 
+export type ProductQualityReviewPrimaryPresence = {
+  title: boolean;
+  subtitle: boolean;
+  description: boolean;
+  seoTitle: boolean;
+  seoDescription: boolean;
+  usage: boolean;
+  faq: boolean;
+};
+
+export type ProductQualityReviewSecondaryCoverageSignals = {
+  secondary1?: string;
+  secondary2?: string;
+  secondary1UsageCovered: boolean;
+  secondary2FaqCovered: boolean;
+};
+
 export type ProductQualityReviewSignals = {
   primaryExactByField: ProductQualityReviewFieldCounts;
+  primaryPresentIn: ProductQualityReviewPrimaryPresence;
   titleEqualsPrimary: boolean;
   primaryOveruseSoft: boolean;
   secondaryCount: number;
+  secondaryCoverage: ProductQualityReviewSecondaryCoverageSignals;
   emptyOptionalFields: string[];
 };
 

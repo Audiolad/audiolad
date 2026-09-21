@@ -68,34 +68,90 @@ function basePackage(overrides = {}) {
   };
 }
 
-// A — green fixture parses
-const green = parseProductQualityReviewResult({
-  status: "green",
-  summary: "Тексты выглядят естественно.",
-  issues: [],
-  positiveNotes: ["Основной запрос использован естественно."],
+// A — YELLOW weak SEO (underoptimization)
+const weakSeo = basePackage({
+  title: "Музыка для спа",
+  description: "Спокойные звуки для отдыха.",
+  seoTitle: "Спокойная музыка",
+  seoDescription: "Мягкий фон для отдыха.",
+  seoSecondaryQueries: ["спокойная музыка для массажа"],
+  usageItems: ["Вечером", "В паузе", "После работы"],
+  faqItems: [
+    { question: "Сколько длится трек?", answer: "Около часа спокойного фона." },
+    { question: "Нужны наушники?", answer: "Можно слушать как удобно." },
+  ],
 });
-assert.equal(green?.status, "green");
-assert.equal(green?.issues.length, 0);
-
-// B — yellow fixture
-const yellow = parseProductQualityReviewResult({
+const weakSignals = buildProductQualityReviewSignals(weakSeo);
+assert.equal(weakSignals.titleEqualsPrimary, true);
+assert.equal(weakSignals.primaryPresentIn.title, true);
+assert.equal(weakSignals.primaryPresentIn.seoTitle, false);
+assert.equal(weakSignals.primaryPresentIn.seoDescription, false);
+assert.equal(weakSignals.primaryPresentIn.description, false);
+assert.equal(weakSignals.primaryPresentIn.usage, false);
+assert.equal(weakSignals.primaryPresentIn.faq, false);
+assert.equal(weakSignals.secondaryCoverage.secondary1UsageCovered, false);
+const yellowWeak = parseProductQualityReviewResult({
   status: "yellow",
-  summary: "Есть риск переоптимизации.",
+  summary: "Поисковая тема выражена недостаточно.",
   issues: [
     {
       severity: "warning",
       field: "seoDescription",
-      message: "SEO-описание повторяет основной запрос слишком близко к заголовку.",
-      recommendation: "Оставьте точный запрос в SEO-заголовке, а в описании переформулируйте.",
+      message: "Основной запрос есть только в заголовке продукта.",
+      recommendation:
+        "Основной запрос есть только в заголовке. Добавьте его естественно в описание продукта или SEO-описание.",
+    },
+    {
+      severity: "warning",
+      field: "usage",
+      message: "Дополнительный запрос не отражён в тексте.",
+      recommendation:
+        "Дополнительный запрос «спокойная музыка для массажа» выбран, но не отражён в тексте. Его можно естественно использовать в одном из пунктов «Когда слушать».",
     },
   ],
   positiveNotes: [],
 });
-assert.equal(yellow?.status, "yellow");
-assert.equal(yellow?.issues[0]?.severity, "warning");
+assert.equal(yellowWeak?.status, "yellow");
+assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "SEO слишком слабое");
+for (const issue of yellowWeak.issues) {
+  assert.doesNotMatch(issue.recommendation, /добавьте\s+\d+\s+раз/i);
+  assert.doesNotMatch(issue.recommendation, /плотност/i);
+  assert.doesNotMatch(issue.recommendation, /\d+[.,]\d+\s*%/);
+}
 
-// C — red exact stuffing package still needs model, but signals show high exact counts
+// B — GREEN balanced
+const balanced = basePackage({
+  usageItems: [
+    "Во время спокойного массажа",
+    "Перед сном для мягкого вечера",
+    "В паузе между делами",
+  ],
+  faqItems: [
+    {
+      question: "Для чего подходит эта музыка?",
+      answer: "Для спокойного фона во время массажа или отдыха в спа.",
+    },
+    {
+      question: "Нужно ли наушники?",
+      answer: "Можно слушать и в колонках, и в наушниках.",
+    },
+  ],
+});
+const balancedSignals = buildProductQualityReviewSignals(balanced);
+assert.equal(balancedSignals.titleEqualsPrimary, true);
+assert.equal(balancedSignals.primaryPresentIn.seoTitle, true);
+assert.equal(balancedSignals.primaryPresentIn.seoDescription, true);
+assert.equal(balancedSignals.primaryOveruseSoft, false);
+const greenBalanced = parseProductQualityReviewResult({
+  status: "green",
+  summary: "SEO в норме: тема понятна, без переспама.",
+  issues: [],
+  positiveNotes: ["Основной запрос встроен естественно в SEO-поля."],
+});
+assert.equal(greenBalanced?.status, "green");
+assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "SEO в норме");
+
+// C — RED stuffing
 const stuffing = basePackage({
   description:
     "музыка для спа, музыка для спа салонов, музыка для спа процедур, музыка для спа расслабляющая",
@@ -123,8 +179,69 @@ const red = parseProductQualityReviewResult({
   positiveNotes: [],
 });
 assert.equal(red?.status, "red");
+assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.title, "Слишком много SEO-повторов");
 
-// D — near-synonym package shape accepted by request parser
+// D — title=primary alone does not auto-green
+assert.equal(weakSignals.titleEqualsPrimary, true);
+assert.notEqual(yellowWeak.status, "green");
+
+// E — primary need not be exact in every field for a green-capable package
+const sparseExact = basePackage({
+  seoTitle: "Спокойный фон для спа-салона",
+  seoDescription: "Мягкие треки, чтобы отдохнуть после массажа в спа.",
+  description: "Спокойные звуки поддерживают расслабление тела и дыхания.",
+});
+const sparseSignals = buildProductQualityReviewSignals(sparseExact);
+assert.equal(sparseSignals.primaryPresentIn.title, true);
+assert.equal(
+  parseProductQualityReviewResult({
+    status: "green",
+    summary: "Тема передана естественно без exact primary в каждом поле.",
+    issues: [],
+    positiveNotes: [],
+  })?.status,
+  "green",
+);
+
+// F — thematic semantic wording can support green without many exact repeats
+const thematicPkg = basePackage({
+  description: "Спокойный спа-фон для массажа и мягкого отдыха тела.",
+  seoTitle: "Спокойный фон для спа",
+  seoDescription: "Мягкий фон для отдыха и массажа в спа-атмосфере.",
+  usageItems: ["Во время массажа", "Для вечернего отдыха", "В паузе"],
+  faqItems: [
+    {
+      question: "Это подходит для спа?",
+      answer: "Да, как спокойный фон во время массажа и отдыха.",
+    },
+  ],
+});
+const thematicSignals = buildProductQualityReviewSignals(thematicPkg);
+assert.ok(thematicSignals.primaryExactByField.total < stuffingSignals.primaryExactByField.total);
+assert.equal(
+  parseProductQualityReviewResult({
+    status: "green",
+    summary: "Тема выражена естественно через смысловые формулировки.",
+    issues: [],
+    positiveNotes: ["Тематические формулировки поддерживают intent."],
+  })?.status,
+  "green",
+);
+
+// G — no density / score / quota
+assert.equal("density" in PRODUCT_QUALITY_REVIEW_JSON_SCHEMA.properties, false);
+assert.equal("score" in PRODUCT_QUALITY_REVIEW_JSON_SCHEMA.properties, false);
+assert.equal("quota" in PRODUCT_QUALITY_REVIEW_JSON_SCHEMA.properties, false);
+assert.equal("density" in weakSignals, false);
+assert.equal("score" in weakSignals, false);
+
+// H — yellow recommendations are concrete placements, not N-times rules
+assert.match(yellowWeak.issues[0].recommendation, /естественно/i);
+assert.doesNotMatch(
+  yellowWeak.issues.map((i) => i.recommendation).join("\n"),
+  /добавьте ключ \d+/i,
+);
+
 const near = parseProductQualityReviewRequest({
   authorId: AURAFON_AUTHOR_ID,
   ...basePackage({
@@ -134,29 +251,6 @@ const near = parseProductQualityReviewRequest({
 });
 assert.equal(near.ok, true);
 
-// E — title equals primary + one seoTitle + one seoDescription is not auto-red by signals alone
-const natural = basePackage();
-const naturalSignals = buildProductQualityReviewSignals(natural);
-assert.equal(naturalSignals.titleEqualsPrimary, true);
-assert.equal(naturalSignals.primaryExactByField.seoTitle, 1);
-assert.ok(naturalSignals.primaryExactByField.seoDescription >= 1);
-// No density threshold fields in schema
-assert.equal("density" in PRODUCT_QUALITY_REVIEW_JSON_SCHEMA.properties, false);
-assert.equal("score" in PRODUCT_QUALITY_REVIEW_JSON_SCHEMA.properties, false);
-
-// F — thematic words alone do not invent soft overuse on empty primary fields
-const thematic = buildProductQualityReviewSignals(
-  basePackage({
-    description: "спа массаж отдых тело дыхание",
-    seoTitle: "Спокойный фон",
-    seoDescription: "Мягкий фон для отдыха",
-    usageItems: ["массаж", "отдых", "вечер"],
-    faqItems: [{ question: "Это для спа?", answer: "Да, для спокойного отдыха." }],
-  }),
-);
-assert.equal(thematic.primaryExactByField.description, 0);
-
-// G — empty optional fields listed, not treated as spam automatically
 const emptyOpts = buildProductQualityReviewSignals(
   basePackage({
     subtitle: "",
@@ -170,21 +264,19 @@ const emptyOpts = buildProductQualityReviewSignals(
 assert.ok(emptyOpts.emptyOptionalFields.includes("seoTitle"));
 assert.ok(emptyOpts.emptyOptionalFields.includes("faqItems"));
 
-// H — issues max 5
 const tooMany = parseProductQualityReviewResult({
   status: "yellow",
-  summary: "Есть замечания.",
+  summary: "Поисковая тема выражена слабо.",
   issues: Array.from({ length: 8 }, (_, i) => ({
     severity: "warning",
     field: "whole_package",
     message: `msg ${i}`,
-    recommendation: `rec ${i}`,
+    recommendation: `Добавьте тему естественно в поле ${i}.`,
   })),
   positiveNotes: [],
 });
 assert.equal(tooMany?.issues.length, 5);
 
-// I — no numeric score in accepted summary
 assert.equal(
   parseProductQualityReviewResult({
     status: "green",
@@ -194,6 +286,8 @@ assert.equal(
   }),
   null,
 );
+
+const natural = balanced;
 
 // J — fingerprint stale after seoDescription edit
 const fp1 = buildProductQualityReviewFingerprint(natural);
@@ -243,26 +337,31 @@ assert.match(route, /product_quality_review_beta_disabled/);
 assert.doesNotMatch(route, /\.from\(|\.update\(|\.insert\(/);
 assert.match(route, /Analysis only/);
 
-// Prompt contract
+// Prompt contract — balance scale
 const prompt = buildProductQualityReviewSystemPrompt();
 assert.match(prompt, /весь пакет|TEXT PACKAGE|весь пакет вместе|Оценивай весь пакет/i);
-assert.match(prompt, /не.*density|НЕ используй произвольные пороги keyword density/i);
+assert.match(prompt, /НЕ используй произвольные пороги keyword density/i);
+assert.match(prompt, /fixed occurrence quotas/i);
 assert.match(prompt, /Exact-match repetition alone is not enough/i);
-assert.match(prompt, /Near-synonym stuffing/i);
-assert.match(prompt, /YELLOW/);
+assert.match(prompt, /near-synonym stuffing|Near-synonym stuffing/i);
+assert.match(prompt, /underoptimization|YELLOW = SEO СЛИШКОМ СЛАБОЕ/i);
+assert.match(prompt, /YELLOW НЕ означает borderline overoptimization/);
+assert.match(prompt, /GREEN = SEO СБАЛАНСИРОВАНО/);
+assert.match(prompt, /RED = SEO ПЕРЕОПТИМИЗИРОВАНО/);
+assert.match(prompt, /exact phrase everywhere/i);
 assert.match(prompt, /не суди ранжирование|Не суди ранжирование/i);
 
-// UI copy for traffic light
-assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "Тексты выглядят естественно");
-assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "Есть риск переоптимизации");
+// UI copy for traffic light (balance semantics)
+assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "SEO в норме");
+assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "SEO слишком слабое");
 assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.title, "Слишком много SEO-повторов");
 assert.equal(
   PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.subtitle,
-  "Явного SEO-переспама не найдено. Тексты можно оставить как есть.",
+  "Поисковые запросы используются естественно. Текст хорошо передаёт тему продукта без лишних повторов.",
 );
 assert.equal(
   PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.subtitle,
-  "Текст в целом можно оставить, но некоторые повторы или формулировки стоит проверить.",
+  "Поисковая тема выражена недостаточно. Добавьте основной или дополнительный запрос в подходящие места текста естественным языком.",
 );
 assert.equal(
   PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.subtitle,

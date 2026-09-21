@@ -3,15 +3,21 @@ import {
   evaluatePrimaryQueryOveruse,
 } from "@/lib/seo/primary-query-overuse";
 import { normalizeSeoPhrase } from "@/lib/seo/product-metadata";
+import {
+  evaluateSecondaryQueryCoverage,
+  selectActiveSecondaryQueries,
+} from "@/lib/seo/secondary-query-coverage";
 import type {
   ProductQualityReviewFieldCounts,
   ProductQualityReviewPackage,
+  ProductQualityReviewPrimaryPresence,
   ProductQualityReviewSignals,
 } from "@/lib/seo/product-quality-review/types";
 
 /**
  * Deterministic category facts for the model and tests.
  * Never used alone as the final green/yellow/red verdict.
+ * Traffic light is a balance scale: underoptimization → balanced → overoptimization.
  */
 export function buildProductQualityReviewSignals(
   input: ProductQualityReviewPackage,
@@ -44,9 +50,29 @@ export function buildProductQualityReviewSignals(
     byField.usage +
     byField.faq;
 
+  const primaryPresentIn: ProductQualityReviewPrimaryPresence = {
+    title: byField.title > 0,
+    subtitle: byField.subtitle > 0,
+    description: byField.description > 0,
+    seoTitle: byField.seoTitle > 0,
+    seoDescription: byField.seoDescription > 0,
+    usage: byField.usage > 0,
+    faq: byField.faq > 0,
+  };
+
   const overuse = evaluatePrimaryQueryOveruse({
     primaryQuery: primary,
     productTitle: input.title,
+    usageItems: input.usageItems.map((content) => ({ content })),
+    faqItems: input.faqItems,
+  });
+
+  const activeSecondary = selectActiveSecondaryQueries(
+    input.seoSecondaryQueries,
+  );
+  const secondaryCoverageRaw = evaluateSecondaryQueryCoverage({
+    primaryQuery: primary,
+    activeSecondaryQueries: activeSecondary,
     usageItems: input.usageItems.map((content) => ({ content })),
     faqItems: input.faqItems,
   });
@@ -71,12 +97,18 @@ export function buildProductQualityReviewSignals(
 
   return {
     primaryExactByField: byField,
+    primaryPresentIn,
     titleEqualsPrimary:
       Boolean(primary) &&
       normalizeSeoPhrase(input.title) === normalizeSeoPhrase(primary),
     primaryOveruseSoft: overuse.primaryOveruse,
-    secondaryCount: input.seoSecondaryQueries.filter((item) => item.trim())
-      .length,
+    secondaryCount: activeSecondary.length,
+    secondaryCoverage: {
+      ...(activeSecondary[0] ? { secondary1: activeSecondary[0] } : {}),
+      ...(activeSecondary[1] ? { secondary2: activeSecondary[1] } : {}),
+      secondary1UsageCovered: secondaryCoverageRaw.secondary1UsageCovered,
+      secondary2FaqCovered: secondaryCoverageRaw.secondary2FaqCovered,
+    },
     emptyOptionalFields,
   };
 }

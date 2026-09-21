@@ -49,15 +49,21 @@ export const PRODUCT_QUALITY_REVIEW_JSON_SCHEMA = {
 
 export function buildProductQualityReviewSystemPrompt(): string {
   return [
-    "Ты проверяешь русскоязычный текстовый пакет аудиопродукта на естественность и SEO-переспам.",
+    "Ты проверяешь русскоязычный текстовый пакет аудиопродукта на БАЛАНС SEO.",
+    "Светофор — шкала: недостаточно SEO-сигналов → естественный баланс → переспам.",
     "Оценивай весь пакет вместе: title, subtitle, description, seoTitle, seoDescription, usage, FAQ, primary и secondary queries.",
-    "Факты и польза для человека важнее ключей. Текст должен звучать для слушателя, а не как набор SEO-фраз.",
-    "НЕ используй произвольные пороги keyword density и НЕ решай цвет только по числу exact matches.",
-    "Exact-match repetition alone is not enough for red. Near-synonym stuffing and unnatural SEO lists matter.",
-    "GREEN: естественный текст, ключи встроены органично, допустимы нормальные повторы темы.",
-    "YELLOW: есть отдельные повторы или SEO-формулировки, но читать ещё можно; yellow — предупреждение, не ошибка; пользователь может оставить текст.",
-    "RED: только при явной переоптимизации — неестественные повторы, перечисление ключей, FAQ ради ключей, near-synonym stuffing, текст для поисковика.",
-    "Не штрафуй автоматически: название = primary; primary один раз в SEO title; primary один раз в SEO description; морфологию; естественные синонимы; пустые optional поля; обычные тематические слова (спа, массаж, отдых).",
+    "Факты и польза для человека важнее ключей. Текст должен звучать для слушателя.",
+    "НЕ используй произвольные пороги keyword density и НЕ вводи fixed occurrence quotas.",
+    "НЕ решай цвет только по числу exact matches. CATEGORY FACTS — подсказки, не вердикт.",
+    "",
+    "GREEN = SEO СБАЛАНСИРОВАНО: достаточно сигналов + естественный текст. Тема страницы понятна, primary (и при необходимости secondary) встроены естественно, нет недостаточной оптимизации и нет stuffing. Exact primary НЕ обязан быть во всех полях. Thematic / semantic wording может поддерживать green.",
+    "",
+    "YELLOW = SEO СЛИШКОМ СЛАБОЕ (underoptimization): текст естественный, но поисковая тема выражена недостаточно — например primary почти только в title, seoTitle/seoDescription не отражают primary, description не поддерживает тему, secondary выбраны но не отражены в usage/FAQ/описании. YELLOW НЕ означает borderline overoptimization и НЕ «почти переспам».",
+    "Для YELLOW давай КОНКРЕТНЫЕ рекомендации: какое поле слабое и куда естественно добавить тему. Хорошо: «Основной запрос есть только в заголовке. Добавьте его естественно в описание или SEO-описание.» Плохо: «Добавьте ключ 3 раза», «плотность слишком низкая», «нужно 2,5%». Не предлагай набивать exact phrase everywhere.",
+    "",
+    "RED = SEO ПЕРЕОПТИМИЗИРОВАНО: только материальная переоптимизация — неестественные точные повторы, near-synonym stuffing, перечисления ключевых вариантов, FAQ ради ключей, повтор SEO-фраз в соседних блоках, текст явно для поисковика. Exact-match repetition alone is not enough for red.",
+    "",
+    "Не штрафуй автоматически: название = primary; один естественный primary в SEO title или description; морфологию; естественные синонимы; пустые optional поля; обычные тематические слова (спа, массаж, отдых).",
     "Не выдумывай факты продукта. Не суди ранжирование, индексацию и обещания SEO-результатов.",
     "Верни строго JSON по схеме. Без HTML. Без numeric SEO score. Максимум 5 issues и 3 positiveNotes.",
     "Если GREEN — не выдумывай проблемы; positiveNotes optional.",
@@ -71,7 +77,7 @@ export function buildProductQualityReviewUserPrompt(input: {
   const pkg = input.package;
   const signals = input.signals;
   return [
-    "Проанализируй текстовый пакет продукта.",
+    "Проанализируй текстовый пакет продукта на баланс SEO (underoptimization / balanced / overoptimization).",
     "",
     "CATEGORY FACTS (deterministic signals, NOT the final verdict):",
     JSON.stringify(signals),
@@ -90,6 +96,6 @@ export function buildProductQualityReviewUserPrompt(input: {
       faqItems: pkg.faqItems,
     }),
     "",
-    "Верни status/summary/issues/positiveNotes.",
+    "Верни status/summary/issues/positiveNotes. Для yellow указывай конкретные полезные placements, без density/quotas.",
   ].join("\n");
 }
