@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { touchPartnerInvite } from "@/lib/author-partner/attribution";
+import { buildPublicRedirectUrl } from "@/lib/seo/app-origin";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
 import {
   applyPartnerAttributionCookie,
@@ -14,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 function redirectToBecomeAuthor(request: Request, invited: boolean): NextResponse {
-  const url = new URL("/become-author", request.url);
+  const url = buildPublicRedirectUrl("/become-author", request);
   if (invited) {
     url.searchParams.set("invited", "1");
   }
