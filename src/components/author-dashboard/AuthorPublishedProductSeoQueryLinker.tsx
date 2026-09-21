@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type SearchMatch = {
@@ -50,16 +50,6 @@ export default function AuthorPublishedProductSeoQueryLinker({
 
   const legacyHint = legacySeoPrimaryQuery.trim();
   const canAdoptLegacy = Boolean(legacyHint);
-
-  const selectable = useMemo(
-    () =>
-      matches.filter(
-        (item) =>
-          item.availability === "available" ||
-          item.availability === "own_unlinked",
-      ),
-    [matches],
-  );
 
   async function runSearch(nextPhrase: string) {
     const value = nextPhrase.trim();
@@ -151,16 +141,17 @@ export default function AuthorPublishedProductSeoQueryLinker({
           </p>
           <button
             type="button"
-            disabled={Boolean(attachPending)}
+            disabled={pending}
             onClick={() => {
               setPhrase(legacyHint);
               setOpen(true);
-              void attach({ queryText: legacyHint });
+              setMessage(null);
+              void runSearch(legacyHint);
             }}
             className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {attachPending === legacyHint
-              ? "Закрепляем…"
+            {pending && searchedPhrase === legacyHint
+              ? "Ищем…"
               : "Закрепить этот запрос"}
           </button>
         </div>
@@ -314,7 +305,6 @@ export default function AuthorPublishedProductSeoQueryLinker({
                 </div>
               ) : null}
 
-              {selectable.length === 0 && exactNormalizedMatch ? null : null}
             </div>
           ) : null}
         </div>

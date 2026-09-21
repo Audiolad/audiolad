@@ -110,6 +110,27 @@ assert.match(form, /Для опубликованного продукта за�
 assert.match(form, /Запрос закреплён за этим продуктом/);
 assert.match(form, /linked:\s*true/);
 
+
+// Pre-merge cleanup: exact lookup ignores analysis_status; fuzzy stays analyzed
+assert.match(lib, /Exact match ignores analysis_status/);
+assert.match(lib, /isEffectiveSeoReservation/);
+assert.match(lib, /expires_at/);
+{
+  const exactStart = lib.indexOf('.eq("normalized_query", normalized)');
+  assert.ok(exactStart > 0, "exact normalized lookup present");
+  const beforeExact = lib.slice(exactStart - 200, exactStart);
+  // The exact query builder must not chain .eq("analysis_status"...) immediately before normalized eq
+  assert.doesNotMatch(beforeExact, /\.eq\("analysis_status", "analyzed"\)\s*\n\s*\.eq\("normalized_query"/);
+  const fuzzySlice = lib.slice(exactStart, exactStart + 500);
+  assert.match(fuzzySlice, /\.eq\("analysis_status", "analyzed"\)/);
+}
+
+// Legacy CTA: search+confirm, never silent attach(queryText: legacy)
+assert.match(linker, /void runSearch\(legacyHint\)/);
+assert.doesNotMatch(linker, /attach\(\{\s*queryText:\s*legacyHint\s*\}\)/);
+assert.doesNotMatch(linker, /selectable\.length === 0 && exactNormalizedMatch \? null : null/);
+assert.doesNotMatch(linker, /useMemo/);
+
 // Error map + limit
 assert.equal(PRODUCT_CONTENT_LIMITS.seoPrimaryQuery, 120);
 assert.equal(

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isEffectiveSeoReservation } from "@/lib/seo-queries/reservation-effective";
 
 export type PublishedSeoQuerySearchMatch = {
   queryId: string;
@@ -122,12 +123,12 @@ export async function searchPublishedProductSeoQueries(
 
   if (normalized) {
     const safe = normalized.replace(/[%_]/g, " ");
+    // Exact match ignores analysis_status; fuzzy recommendations stay analyzed-only.
     const [{ data: exactRows, error: exactError }, { data: fuzzyRows, error: fuzzyError }] =
       await Promise.all([
         supabase
           .from("seo_queries")
           .select(selectCols)
-          .eq("analysis_status", "analyzed")
           .eq("normalized_query", normalized)
           .limit(5),
         supabase
@@ -164,13 +165,14 @@ export async function searchPublishedProductSeoQueries(
       status: string;
       authorId: string;
       productId: string | null;
+      expiresAt: string | null;
     }
   >();
 
   if (queryIds.length > 0) {
     const { data: reservations, error: reservationError } = await supabase
       .from("seo_query_reservations")
-      .select("query_id, status, author_id, product_id")
+      .select("query_id, status, author_id, product_id, expires_at")
       .in("query_id", queryIds)
       .in("status", ["active", "used"]);
     if (reservationError) throw reservationError;
@@ -179,6 +181,7 @@ export async function searchPublishedProductSeoQueries(
         status: row.status as string,
         authorId: row.author_id as string,
         productId: (row.product_id as string | null) ?? null,
+        expiresAt: (row.expires_at as string | null) ?? null,
       });
     }
   }
@@ -198,7 +201,15 @@ export async function searchPublishedProductSeoQueries(
       "available";
     let statusLabel = "Свободен";
 
-    if (reservation?.status === "used") {
+    const effective = reservation
+      ? isEffectiveSeoReservation({
+          status: reservation.status,
+          productId: reservation.productId,
+          expiresAt: reservation.expiresAt,
+        })
+      : false;
+
+    if (effective && reservation?.status === "used") {
       if (reservation.productId === input.productId) {
         availability = "linked_this";
         statusLabel = "Закреплён за этим продуктом";
@@ -206,7 +217,7 @@ export async function searchPublishedProductSeoQueries(
         availability = "used_other";
         statusLabel = "Уже используется";
       }
-    } else if (reservation?.status === "active") {
+    } else if (effective && reservation?.status === "active") {
       if (reservation.authorId === input.authorId && !reservation.productId) {
         availability = "own_unlinked";
         statusLabel = "У вас в работе";
@@ -224,6 +235,7 @@ export async function searchPublishedProductSeoQueries(
         statusLabel = "У вас в работе";
       }
     }
+    // Expired active + product_id NULL → treat as available (matches expire semantics).
 
     matches.push({
       queryId,
