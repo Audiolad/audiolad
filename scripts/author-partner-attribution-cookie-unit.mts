@@ -176,7 +176,9 @@ test("shared-browser: A SERGEY bind clears cookie so B can take MARINA", () => {
   // Anonymous A touches SERGEY → cookie set
   assert.equal(shouldSetPartnerAttributionCookie({ result: "created" }), true);
   applyPartnerAttributionCookie(store, "token-sergey-" + "1".repeat(48));
-  assert.equal(jar.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE)?.maxAge! > 0, true);
+  const afterA = jar.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE);
+  assert.ok(afterA);
+  assert.equal(afterA.maxAge > 0, true);
 
   // A signs up / claim → bound → clear
   assert.equal(shouldClearPartnerAttributionCookie({ ok: true, result: "bound" }), true);
