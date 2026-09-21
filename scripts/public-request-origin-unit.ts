@@ -174,6 +174,8 @@ function runTests() {
     "utf8",
   );
   assert.match(inviteSource, /buildPublicRedirectUrl/);
+  assert.match(inviteSource, /FOR_AUTHORS_PATH/);
+  assert.match(inviteSource, /redirectToForAuthors/);
   assert.doesNotMatch(
     inviteSource,
     /new URL\(\s*["']\/become-author["']\s*,\s*request\.url\s*\)/,
@@ -182,6 +184,25 @@ function runTests() {
     inviteSource,
     /new URL\([^\n]+,\s*request\.url\)/,
   );
+  // Successful invite lands on /for-authors (no ?invited=1).
+  assert.match(
+    inviteSource,
+    /buildPublicRedirectUrl\(\s*FOR_AUTHORS_PATH\s*,\s*request\s*\)/,
+  );
+  assert.doesNotMatch(
+    inviteSource,
+    /searchParams\.set\(\s*["']invited["']/,
+  );
+  // already_author branch still redirects to /become-author.
+  assert.match(
+    inviteSource,
+    /buildPublicRedirectUrl\(\s*["']\/become-author["']\s*,\s*request\s*\)/,
+  );
+  assert.match(inviteSource, /already_author/);
+  assert.match(
+    inviteSource,
+    /redirectToBecomeAuthor\(\s*request\s*\)/,
+  );
 
   const inviteProdLike = requestAt("http://localhost:3001/invite/sergey", {
     host: "audiolad.ru",
@@ -189,12 +210,17 @@ function runTests() {
     "x-forwarded-proto": "https",
   });
   assert.equal(
+    buildPublicRedirectUrl("/for-authors", inviteProdLike).href,
+    "https://audiolad.ru/for-authors",
+  );
+  assert.equal(
     buildPublicRedirectUrl("/become-author", inviteProdLike).href,
     "https://audiolad.ru/become-author",
   );
-  const invitedUrl = buildPublicRedirectUrl("/become-author", inviteProdLike);
-  invitedUrl.searchParams.set("invited", "1");
-  assert.equal(invitedUrl.href, "https://audiolad.ru/become-author?invited=1");
+  assert.doesNotMatch(
+    buildPublicRedirectUrl("/for-authors", inviteProdLike).href,
+    /localhost/,
+  );
 
   const startSource = readFileSync(
     join(ROOT, "src/app/(studio)/studio/try/start/route.ts"),

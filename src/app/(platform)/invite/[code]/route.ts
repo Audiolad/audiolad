@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { touchPartnerInvite } from "@/lib/author-partner/attribution";
 import { buildPublicRedirectUrl } from "@/lib/seo/app-origin";
+import { FOR_AUTHORS_PATH } from "@/lib/seo/for-authors";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
 import {
   applyPartnerAttributionCookie,
@@ -14,12 +15,16 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-function redirectToBecomeAuthor(request: Request, invited: boolean): NextResponse {
-  const url = buildPublicRedirectUrl("/become-author", request);
-  if (invited) {
-    url.searchParams.set("invited", "1");
-  }
-  return NextResponse.redirect(url);
+function redirectToBecomeAuthor(request: Request): NextResponse {
+  return NextResponse.redirect(
+    buildPublicRedirectUrl("/become-author", request),
+  );
+}
+
+function redirectToForAuthors(request: Request): NextResponse {
+  return NextResponse.redirect(
+    buildPublicRedirectUrl(FOR_AUTHORS_PATH, request),
+  );
 }
 
 function notFoundResponse(): NextResponse {
@@ -75,12 +80,12 @@ export async function GET(
   }
 
   if (result.result === "already_author") {
-    const response = redirectToBecomeAuthor(request, false);
+    const response = redirectToBecomeAuthor(request);
     clearPartnerAttributionCookie(response.cookies);
     return response;
   }
 
-  const response = redirectToBecomeAuthor(request, true);
+  const response = redirectToForAuthors(request);
 
   if (result.setCookie && result.token) {
     applyPartnerAttributionCookie(response.cookies, result.token);
