@@ -331,6 +331,10 @@ if (runtime) {
   assert(attrSql.includes("REFERENCES public.author_referrals (id) ON DELETE CASCADE"), "bound attribution cascades with referral");
   assert(attrSql.includes("p_pending_token_hash"), "manual bind accepts pending token hash");
   assert(attrSql.includes("cookie_should_set"), "touch returns cookie_should_set");
+  assert(
+    attrSql.includes("Authenticated touch") || attrSql.includes("never set anonymous cookie"),
+    "migration documents no cookie after authenticated claim",
+  );
   assert(attrSql.includes("interval '60 days'"), "60-day ttl");
   assert(!/partner_commission/.test(attrSql), "no partner_commission");
   assert(!/ledger_credit/.test(attrSql), "no ledger_credit");

@@ -180,7 +180,8 @@ export async function touchPartnerInvite(input: {
         ok: true,
         result: "bound",
         token,
-        setCookie,
+        // User-level SoT exists — never leave anonymous ghost cookie.
+        setCookie: false,
         code: asString(row.code),
         referrerAuthorId: asString(row.referrer_author_id),
         attributionId: asString(row.attribution_id),

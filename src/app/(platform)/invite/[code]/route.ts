@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 
 import { touchPartnerInvite } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
-import { applyPartnerAttributionCookie } from "@/lib/author-partner/cookie";
+import {
+  applyPartnerAttributionCookie,
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
 import { decodeInviteCodeParam } from "@/lib/author-partner/invite-code-param";
 import { createClient } from "@/lib/supabase/server";
 
@@ -57,17 +61,34 @@ export async function GET(
   });
 
   if (!result.ok) {
-    return notFoundResponse();
+    // Stale/unusable cookie on this token — clear so the next visitor is clean.
+    // Do not clear on generic not_found for anonymous mistyped codes without a cookie.
+    const response = notFoundResponse();
+    if (
+      existingToken &&
+      shouldClearPartnerAttributionCookie({ ok: false, error: result.error })
+    ) {
+      clearPartnerAttributionCookie(response.cookies);
+    }
+    return response;
   }
 
   if (result.result === "already_author") {
-    return redirectToBecomeAuthor(request, false);
+    const response = redirectToBecomeAuthor(request, false);
+    clearPartnerAttributionCookie(response.cookies);
+    return response;
   }
 
   const response = redirectToBecomeAuthor(request, true);
 
   if (result.setCookie && result.token) {
     applyPartnerAttributionCookie(response.cookies, result.token);
+  } else if (
+    inviteeUserId &&
+    shouldClearPartnerAttributionCookie({ ok: true, result: result.result })
+  ) {
+    // Authenticated bind / preserve: author_referrals is SoT — drop browser cookie.
+    clearPartnerAttributionCookie(response.cookies);
   }
 
   return response;

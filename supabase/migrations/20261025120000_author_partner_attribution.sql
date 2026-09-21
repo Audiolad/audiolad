@@ -530,9 +530,10 @@ BEGIN
     v_claim := public.author_partner_claim_attribution(p_token_hash, p_invitee_user_id);
     -- claim returns bound / preserved / already_author; never invent cookie for SoT-only preserves
     IF coalesce(v_claim->>'ok', 'false') = 'true' THEN
+      -- Authenticated touch→claim: author_referrals is SoT; never set anonymous cookie.
       RETURN v_claim || jsonb_build_object(
         'cookie_should_set',
-        coalesce(v_claim->>'result', '') IN ('bound', 'created')
+        false
       );
     END IF;
     RETURN v_claim;

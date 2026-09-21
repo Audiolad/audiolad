@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 
 import { claimPartnerAttribution } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import {
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
 import { createClient } from "@/lib/supabase/server";
 
 export type ClaimPartnerAttributionActionResult =
@@ -34,6 +38,16 @@ export async function claimPartnerAttributionAction(): Promise<ClaimPartnerAttri
       inviteeUserId: user.id,
       source: "signin",
     });
+
+    if (
+      shouldClearPartnerAttributionCookie({
+        ok: result.ok,
+        result: result.ok ? result.result : null,
+        error: result.ok ? null : result.error,
+      })
+    ) {
+      clearPartnerAttributionCookie(cookieStore);
+    }
 
     if (!result.ok) {
       return { ok: false, error: result.error };

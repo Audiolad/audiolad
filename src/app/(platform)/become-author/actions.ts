@@ -33,6 +33,10 @@ import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-ap
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
 import { bindManualPartnerCode } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import {
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -209,6 +213,23 @@ export async function submitAuthorApplication(
         } else if (!bindResult.ok) {
           console.error("become_author_partner_bind_failed", bindResult.error);
         }
+      } else if (
+        shouldClearPartnerAttributionCookie({
+          ok: true,
+          result: bindResult.result,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStoreForInvite);
+      }
+      if (
+        !bindResult.ok &&
+        pendingInviteToken &&
+        shouldClearPartnerAttributionCookie({
+          ok: false,
+          error: bindResult.error,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStoreForInvite);
       }
     }
 

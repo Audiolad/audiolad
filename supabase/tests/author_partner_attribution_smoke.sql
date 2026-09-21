@@ -10,6 +10,7 @@ DECLARE
   v_user_e uuid := 'a5555555-5555-4555-8555-555555555555';
   v_user_f uuid := 'a6666666-6666-4666-8666-666666666666';
   v_user_g uuid := 'a7777777-7777-4777-8777-777777777777';
+  v_user_h uuid := 'a8888888-8888-4888-8888-888888888888';
   v_author_a uuid := 'aa111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
   v_author_b uuid := 'aa222222-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
   v_author_empty uuid := 'aa333333-cccc-4ccc-8ccc-ccccccccccc1';
@@ -19,7 +20,7 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id) VALUES
     (v_user_a), (v_user_b), (v_user_c), (v_user_d),
-    (v_user_e), (v_user_f), (v_user_g)
+    (v_user_e), (v_user_f), (v_user_g), (v_user_h)
   ON CONFLICT DO NOTHING;
 
   INSERT INTO public.authors (id, name, slug) VALUES
@@ -171,5 +172,18 @@ BEGIN
     RAISE EXCEPTION 'attribution should cascade when referral deleted, left %', v_cnt;
   END IF;
 
-  RAISE NOTICE 'author_partner_attribution_smoke: ok';
+  
+  -- Authenticated invitee: immediate bind must return cookie_should_set=false
+  v := public.author_partner_touch_invite('MARINA', repeat('c', 64), v_user_h);
+  IF coalesce(v->>'ok', 'false') <> 'true' THEN
+    RAISE EXCEPTION 'authenticated touch failed: %', v;
+  END IF;
+  IF coalesce(v->>'result', '') = 'bound' AND coalesce(v->>'cookie_should_set', 'true') = 'true' THEN
+    RAISE EXCEPTION 'authenticated bound must not set cookie: %', v;
+  END IF;
+  IF coalesce(v->>'cookie_should_set', 'false') = 'true' AND coalesce(v->>'result','') <> 'created' THEN
+    RAISE EXCEPTION 'cookie_should_set unexpectedly true: %', v;
+  END IF;
+
+RAISE NOTICE 'author_partner_attribution_smoke: ok';
 END $$;

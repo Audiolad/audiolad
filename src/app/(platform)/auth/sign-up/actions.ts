@@ -21,6 +21,10 @@ import {
 } from "@/lib/email/on-new-listener-created";
 import { claimPartnerAttribution } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import {
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
 import { cookies } from "next/headers";
 
 type SignUpAuthClient = {
@@ -247,11 +251,20 @@ export async function signUpAction(
     try {
       const cookieStore = await cookies();
       const token = cookieStore.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE)?.value;
-      await claimPartnerAttribution({
+      const claimResult = await claimPartnerAttribution({
         token,
         inviteeUserId: data.user.id,
         source: "signup",
       });
+      if (
+        shouldClearPartnerAttributionCookie({
+          ok: claimResult.ok,
+          result: claimResult.ok ? claimResult.result : null,
+          error: claimResult.ok ? null : claimResult.error,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStore);
+      }
     } catch (error) {
       console.error(
         "signup_partner_attribution_failed",
