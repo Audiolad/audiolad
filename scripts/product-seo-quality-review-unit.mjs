@@ -13,7 +13,18 @@ import {
   buildProductQualityReviewSystemPrompt,
   PRODUCT_QUALITY_REVIEW_JSON_SCHEMA,
 } from "../src/lib/seo/product-quality-review/prompt.ts";
+import { runProductQualityReviewModel } from "../src/lib/seo/product-quality-review/provider.ts";
 import { buildProductQualityReviewSignals } from "../src/lib/seo/product-quality-review/signals.ts";
+import {
+  PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
+  PRODUCT_SEO_AI_RESPONSES_URL,
+  PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
+} from "../src/lib/seo/product-autofill/types.ts";
+import {
+  YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS,
+  YANDEX_AI_CONTENT_FILTER_STATUS,
+  buildYandexAiModelUri,
+} from "../src/lib/seo/product-autofill/yandex-provider.ts";
 import {
   parseProductQualityReviewRequest,
   parseProductQualityReviewResult,
@@ -190,11 +201,34 @@ const edited = { ...natural, seoDescription: "Полностью новый те
 assert.equal(isProductQualityReviewFingerprintCurrent(edited, fp1), false);
 assert.match(PRODUCT_QUALITY_REVIEW_STALE_MESSAGE, /изменены/);
 
-// K — generation path clears review: SeoSection must reset fingerprint (source contract)
+// K — generation keeps prior review → fingerprint mismatch → stale (source + fingerprint semantics)
 const section = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
-assert.match(section, /setReviewedFingerprint\(null\)/);
-assert.match(section, /applyGeneratedDraft/);
+assert.match(section, /function applyGeneratedDraft/);
 assert.match(section, /PRODUCT_QUALITY_REVIEW_STALE_MESSAGE/);
+const applyBlock = section.slice(
+  section.indexOf("function applyGeneratedDraft"),
+  section.indexOf("async function runProductQualityReview"),
+);
+assert.doesNotMatch(applyBlock, /setReviewedFingerprint\(null\)/);
+assert.doesNotMatch(applyBlock, /setReviewStatus\(null\)/);
+assert.doesNotMatch(applyBlock, /setReviewSummary\(null\)/);
+assert.doesNotMatch(applyBlock, /setReviewIssues\(\[\]\)/);
+assert.doesNotMatch(applyBlock, /setReviewPositiveNotes\(\[\]\)/);
+assert.match(section, /reviewIsStale/);
+assert.match(section, /PRODUCT_QUALITY_REVIEW_CTA_AGAIN/);
+// Fingerprint semantics: keeping reviewedFingerprint after package change → stale
+const beforeGen = basePackage();
+const reviewedFp = buildProductQualityReviewFingerprint(beforeGen);
+const afterGen = {
+  ...beforeGen,
+  seoTitle: "Новый SEO-заголовок после генерации",
+  seoDescription: "Новое SEO-описание после генерации текстов.",
+};
+assert.equal(
+  isProductQualityReviewFingerprintCurrent(afterGen, reviewedFp),
+  false,
+);
+assert.equal(Boolean(reviewedFp) && !isProductQualityReviewFingerprintCurrent(afterGen, reviewedFp), true);
 
 // L — RED does not gate publish/save (no disabled publish from reviewStatus)
 assert.doesNotMatch(section, /reviewStatus === "red".*disabled|disabled.*reviewStatus === "red"/);
@@ -222,6 +256,27 @@ assert.match(prompt, /не суди ранжирование|Не суди ра�
 assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "Тексты выглядят естественно");
 assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "Есть риск переоптимизации");
 assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.title, "Слишком много SEO-повторов");
+assert.equal(
+  PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.subtitle,
+  "Явного SEO-переспама не найдено. Тексты можно оставить как есть.",
+);
+assert.equal(
+  PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.subtitle,
+  "Текст в целом можно оставить, но некоторые повторы или формулировки стоит проверить.",
+);
+assert.equal(
+  PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.subtitle,
+  "Текст выглядит переоптимизированным. Уберите лишние повторения поисковых запросов и сделайте формулировки естественнее.",
+);
+// Fixed subtitle always rendered; model summary must not replace it
+assert.match(
+  section,
+  /PRODUCT_QUALITY_REVIEW_STATUS_COPY\[reviewStatus\]\.subtitle/,
+);
+assert.doesNotMatch(
+  section,
+  /reviewSummary\s*\|\|\s*PRODUCT_QUALITY_REVIEW_STATUS_COPY\[reviewStatus\]\.subtitle/,
+);
 
 // missing primary request
 assert.equal(
@@ -257,5 +312,197 @@ const yandexCanonical = read("src/lib/seo/product-autofill/yandex-provider.ts");
 assert.match(yandexCanonical, /export function buildYandexAiModelUri/);
 assert.match(yandexCanonical, /export function readYandexFirstAlternative/);
 assert.match(yandexCanonical, /gpt:\/\/\$\{folderId\}\/\$\{modelId\}\/latest/);
+
+
+// --- Mocked provider behavior (no network, no real secrets) ---
+function mockFetch(handlers) {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), init });
+    const handler = handlers.shift();
+    if (!handler) throw new Error("unexpected fetch");
+    return handler(url, init);
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
+}
+
+function jsonResponse(status, body) {
+  return { status, json: async () => body };
+}
+
+function yandexAlt(text, status = YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS) {
+  const alternative = { message: { role: "assistant", text } };
+  if (status !== undefined && status !== null) {
+    alternative.status = status;
+  }
+  return { result: { alternatives: [alternative] } };
+}
+
+const validReviewJson = JSON.stringify({
+  status: "green",
+  summary: "Тексты выглядят естественно.",
+  issues: [],
+  positiveNotes: ["Основной запрос использован естественно."],
+});
+
+const reviewPkg = basePackage();
+const reviewSignals = buildProductQualityReviewSignals(reviewPkg);
+
+const TEST_YANDEX_KEY = "test-yandex-quality-key";
+const TEST_YANDEX_FOLDER = "b1gtestfolder";
+const TEST_OPENAI_KEY = "test-openai-quality-key";
+
+const yandexEnv = {
+  PRODUCT_SEO_AI_ENABLED: "true",
+  PRODUCT_SEO_AI_PROVIDER: "yandex",
+  YANDEX_AI_API_KEY: TEST_YANDEX_KEY,
+  YANDEX_AI_FOLDER_ID: TEST_YANDEX_FOLDER,
+  YANDEX_AI_MODEL: "yandexgpt-lite",
+};
+
+const openaiEnv = {
+  PRODUCT_SEO_AI_ENABLED: "true",
+  PRODUCT_SEO_AI_PROVIDER: "openai",
+  OPENAI_API_KEY: TEST_OPENAI_KEY,
+  PRODUCT_SEO_AI_MODEL: "gpt-test-seo",
+};
+
+// A — Yandex request shape
+{
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexAlt(validReviewJson)),
+  ]);
+  const result = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl, env: yandexEnv },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.equal(fetchImpl.calls[0].url, PRODUCT_SEO_YANDEX_AI_COMPLETION_URL);
+  assert.equal(
+    fetchImpl.calls[0].init.headers.Authorization,
+    `Api-Key ${TEST_YANDEX_KEY}`,
+  );
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(
+    sent.modelUri,
+    buildYandexAiModelUri(TEST_YANDEX_FOLDER, "yandexgpt-lite"),
+  );
+  assert.match(sent.modelUri, /\/latest$/);
+  assert.equal(sent.completionOptions.stream, false);
+  assert.equal(
+    sent.completionOptions.maxTokens,
+    String(PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS),
+  );
+  assert.deepEqual(sent.jsonSchema, {
+    schema: PRODUCT_QUALITY_REVIEW_JSON_SCHEMA,
+  });
+}
+
+// B — Yandex FINAL → ok
+{
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexAlt(validReviewJson, YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS)),
+  ]);
+  const result = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl, env: yandexEnv },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.result.status, "green");
+}
+
+// C — Yandex CONTENT_FILTER → fail-open content-filter path
+{
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexAlt("blocked", YANDEX_AI_CONTENT_FILTER_STATUS),
+      ),
+  ]);
+  const result = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl, env: yandexEnv },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "CONTENT_FILTERED");
+  assert.equal(result.error.providerStatus, YANDEX_AI_CONTENT_FILTER_STATUS);
+}
+
+// D — Yandex unknown/missing status → ok=false
+{
+  const fetchImplMissing = mockFetch([
+    () => jsonResponse(200, yandexAlt(validReviewJson, null)),
+  ]);
+  const missing = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl: fetchImplMissing, env: yandexEnv },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.error.code, "PROVIDER_ERROR");
+
+  const fetchImplUnknown = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexAlt(validReviewJson, "ALTERNATIVE_STATUS_TRUNCATED_FINAL"),
+      ),
+  ]);
+  const unknown = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl: fetchImplUnknown, env: yandexEnv },
+  });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.error.code, "PROVIDER_ERROR");
+}
+
+// E — Yandex malformed JSON in FINAL text → ok=false
+{
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(
+        200,
+        yandexAlt("{not-json", YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS),
+      ),
+  ]);
+  const result = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl, env: yandexEnv },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_ERROR");
+}
+
+// F — OpenAI structured output request + valid response
+{
+  const fetchImpl = mockFetch([
+    () =>
+      jsonResponse(200, {
+        output_text: validReviewJson,
+      }),
+  ]);
+  const result = await runProductQualityReviewModel({
+    package: reviewPkg,
+    signals: reviewSignals,
+    options: { fetchImpl, env: openaiEnv },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.result.status, "green");
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.equal(fetchImpl.calls[0].url, PRODUCT_SEO_AI_RESPONSES_URL);
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(sent.text.format.type, "json_schema");
+  assert.equal(sent.text.format.strict, true);
+  assert.deepEqual(sent.text.format.schema, PRODUCT_QUALITY_REVIEW_JSON_SCHEMA);
+}
+
 
 console.log("product-seo-quality-review-unit: ok");

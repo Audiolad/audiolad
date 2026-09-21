@@ -441,12 +441,9 @@ export default function AuthorProductSeoSection({
         faqItems: draft.faqItems,
       },
     });
-    // Generation changes the text package — previous review is stale.
-    setReviewedFingerprint(null);
-    setReviewStatus(null);
-    setReviewSummary(null);
-    setReviewIssues([]);
-    setReviewPositiveNotes([]);
+    // Generation changes the text package. Keep prior review result + fingerprint
+    // so currentFingerprint != reviewedFingerprint → stale UI (hide colored card,
+    // show «Тексты изменены…» + «Проверить снова»). Do not wipe review state.
     setReviewError(null);
   }
 
@@ -864,9 +861,11 @@ export default function AuthorProductSeoSection({
                 {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].title}
               </p>
               <p className="mt-1 text-sm leading-5">
-                {reviewSummary ||
-                  PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].subtitle}
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].subtitle}
               </p>
+              {reviewSummary ? (
+                <p className="mt-2 text-sm leading-5 opacity-90">{reviewSummary}</p>
+              ) : null}
               {reviewIssues.length > 0 ? (
                 <ul className="mt-3 space-y-2 text-sm leading-5">
                   {reviewIssues.map((issue, index) => (
