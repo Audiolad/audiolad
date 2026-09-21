@@ -143,6 +143,61 @@ function main() {
   );
   assert.equal(canCreateOwnedAuthorProject(100, null, true), true);
 
+  // Partner bonus alone: free base 1 + bonus 1 = 2
+  const partnerOnly = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: false,
+    premiumEnabled: false,
+    purchasedSlots: 0,
+    partnerBonusSlots: 1,
+  });
+  assert.equal(partnerOnly.limit, 2);
+  assert.equal(partnerOnly.partnerBonusSlots, 1);
+  assert.equal(partnerOnly.source, "partner_bonus");
+
+  // Partner bonus + purchased 1 = 3
+  const partnerBuy = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: false,
+    premiumEnabled: false,
+    purchasedSlots: 1,
+    partnerBonusSlots: 1,
+  });
+  assert.equal(partnerBuy.limit, 3);
+  assert.equal(partnerBuy.source, "purchased");
+
+  // Premium 3 + bonus = 4
+  const premiumBonus = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: false,
+    premiumEnabled: true,
+    purchasedSlots: 0,
+    partnerBonusSlots: 1,
+  });
+  assert.equal(premiumBonus.limit, 4);
+
+  // Premium + purchased + bonus
+  const premiumBuyBonus = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: false,
+    premiumEnabled: true,
+    purchasedSlots: 2,
+    partnerBonusSlots: 1,
+  });
+  assert.equal(premiumBuyBonus.limit, 6);
+
+  // Unlimited stays unlimited with bonus recorded
+  const unlimitedBonus = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    unlimited: true,
+    premiumEnabled: false,
+    purchasedSlots: 0,
+    partnerBonusSlots: 1,
+  });
+  assert.equal(unlimitedBonus.unlimited, true);
+  assert.equal(unlimitedBonus.limit, null);
+  assert.equal(unlimitedBonus.partnerBonusSlots, 1);
+
   // Catalog server amounts
   const sku1 = resolveAuthorProjectCapacityPackage("author_project_slot_1");
   const sku5 = resolveAuthorProjectCapacityPackage("author_project_slots_5");

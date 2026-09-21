@@ -10,7 +10,12 @@ type PartnerAttributionLogEvent =
   | "partner_attribution_rejected_self_referral"
   | "partner_attribution_rejected_not_found"
   | "partner_attribution_claim_failed"
-  | "partner_attribution_touch_failed";
+  | "partner_attribution_touch_failed"
+  | "partner_referral_activated"
+  | "partner_referral_activation_idempotent"
+  | "partner_referral_activation_expired"
+  | "partner_referral_activation_no_referral"
+  | "partner_bonus_slot_granted";
 
 type PartnerAttributionLogFields = {
   event: PartnerAttributionLogEvent;

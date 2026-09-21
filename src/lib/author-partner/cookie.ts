@@ -89,8 +89,11 @@ export function shouldSetPartnerAttributionCookie(input: {
 }): boolean {
   if (
     input.result === "bound" ||
+    input.result === "bound_and_activated" ||
     input.result === "already_bound" ||
+    input.result === "already_bound_activated" ||
     input.result === "preserved_first_touch" ||
+    input.result === "preserved_first_touch_activated" ||
     input.result === "referral_already_activated" ||
     input.result === "already_author"
   ) {
@@ -107,8 +110,11 @@ export function shouldSetPartnerAttributionCookie(input: {
 
 const CLEAR_ON_SUCCESS = new Set([
   "bound",
+  "bound_and_activated",
   "already_bound",
+  "already_bound_activated",
   "preserved_first_touch",
+  "preserved_first_touch_activated",
   "referral_already_activated",
   "already_author",
 ]);

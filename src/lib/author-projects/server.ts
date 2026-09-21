@@ -23,6 +23,7 @@ export type AuthorProjectsSummary = {
   hasOverride: boolean;
   baseLimit: number;
   purchasedSlots: number;
+  partnerBonusSlots: number;
   canCreate: boolean;
   showPremiumUpsell: boolean;
   showCapacityOffer: boolean;
@@ -37,30 +38,62 @@ export async function loadAuthorProjectLimitFields(
   unlimited: boolean;
   premiumEnabled: boolean;
   purchasedSlots: number;
+  partnerBonusSlots: number;
 }> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "author_project_limit_override, author_projects_unlimited, author_premium_enabled, author_project_slots_purchased",
+      "author_project_limit_override, author_projects_unlimited, author_premium_enabled, author_project_slots_purchased, author_project_slots_partner_bonus",
     )
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     // Column may be missing before migration lands in a local DB; fall back.
-    if (/author_project_slots_purchased/i.test(error.message)) {
+    if (
+      /author_project_slots_purchased/i.test(error.message) ||
+      /author_project_slots_partner_bonus/i.test(error.message)
+    ) {
       const legacy = await supabase
         .from("profiles")
         .select(
-          "author_project_limit_override, author_projects_unlimited, author_premium_enabled",
+          "author_project_limit_override, author_projects_unlimited, author_premium_enabled, author_project_slots_purchased",
         )
         .eq("id", userId)
         .maybeSingle();
       if (legacy.error) {
-        console.error("author_project_limit_lookup_error", legacy.error.message);
-        throw new AuthorAccessError("internal_error", 500);
+        // Pre-bonus / pre-purchase schema fallback.
+        const older = await supabase
+          .from("profiles")
+          .select(
+            "author_project_limit_override, author_projects_unlimited, author_premium_enabled",
+          )
+          .eq("id", userId)
+          .maybeSingle();
+        if (older.error) {
+          console.error("author_project_limit_lookup_error", older.error.message);
+          throw new AuthorAccessError("internal_error", 500);
+        }
+        const overrideRaw = older.data?.author_project_limit_override;
+        return {
+          override:
+            typeof overrideRaw === "number" && Number.isFinite(overrideRaw)
+              ? overrideRaw
+              : null,
+          unlimited: older.data?.author_projects_unlimited === true,
+          premiumEnabled: older.data?.author_premium_enabled === true,
+          purchasedSlots: 0,
+          partnerBonusSlots: 0,
+        };
       }
       const overrideRaw = legacy.data?.author_project_limit_override;
+      const purchasedRaw = legacy.data?.author_project_slots_purchased;
+      const purchasedSlots =
+        typeof purchasedRaw === "number" &&
+        Number.isFinite(purchasedRaw) &&
+        purchasedRaw > 0
+          ? Math.floor(purchasedRaw)
+          : 0;
       return {
         override:
           typeof overrideRaw === "number" && Number.isFinite(overrideRaw)
@@ -68,7 +101,8 @@ export async function loadAuthorProjectLimitFields(
             : null,
         unlimited: legacy.data?.author_projects_unlimited === true,
         premiumEnabled: legacy.data?.author_premium_enabled === true,
-        purchasedSlots: 0,
+        purchasedSlots,
+        partnerBonusSlots: 0,
       };
     }
     console.error("author_project_limit_lookup_error", error.message);
@@ -87,12 +121,21 @@ export async function loadAuthorProjectLimitFields(
     purchasedRaw > 0
       ? Math.floor(purchasedRaw)
       : 0;
+  const partnerBonusRaw = (data as { author_project_slots_partner_bonus?: number | null } | null)
+    ?.author_project_slots_partner_bonus;
+  const partnerBonusSlots =
+    typeof partnerBonusRaw === "number" &&
+    Number.isFinite(partnerBonusRaw) &&
+    partnerBonusRaw > 0
+      ? Math.min(1, Math.floor(partnerBonusRaw))
+      : 0;
 
   return {
     override,
     unlimited: data?.author_projects_unlimited === true,
     premiumEnabled: data?.author_premium_enabled === true,
     purchasedSlots,
+    partnerBonusSlots,
   };
 }
 
@@ -128,6 +171,7 @@ export async function getAuthorProjectsSummary(
     hasOverride: resolution.hasOverride,
     baseLimit: resolution.baseLimit,
     purchasedSlots: resolution.purchasedSlots,
+    partnerBonusSlots: resolution.partnerBonusSlots,
     canCreate,
     showPremiumUpsell: showCapacityOffer,
     showCapacityOffer,
