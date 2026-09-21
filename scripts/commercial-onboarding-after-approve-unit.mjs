@@ -28,6 +28,7 @@ import {
 } from "../src/lib/email/operational-deliveries.ts";
 import {
   COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
+  getCommercialAuthorTermsUrl,
   getCommercialOnboardingUrl,
   renderCommercialApplicationApprovedEmailHtml,
   renderCommercialApplicationApprovedEmailText,
@@ -182,11 +183,15 @@ function testEconomics() {
 async function testApprovalEmail() {
   assert.equal(
     COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
-    "Коммерческий кабинет АудиоЛада одобрен",
+    "Ваш коммерческий статус одобрен",
   );
   assert.equal(
     getCommercialOnboardingUrl("https://audiolad.ru"),
     "https://audiolad.ru/author-dashboard",
+  );
+  assert.equal(
+    getCommercialAuthorTermsUrl("https://audiolad.ru", "ol-ga-don"),
+    "https://audiolad.ru/author-dashboard/commercial/terms?author=ol-ga-don",
   );
   assert.equal(
     buildCommercialApplicationApprovedDedupKey("app-1"),
@@ -199,22 +204,47 @@ async function testApprovalEmail() {
 
   const html = renderCommercialApplicationApprovedEmailHtml({
     authorName: "Герман",
+    authorSlug: "german",
     siteOrigin: "https://audiolad.ru",
   });
   const text = renderCommercialApplicationApprovedEmailText({
     authorName: "Герман",
+    authorSlug: "german",
     siteOrigin: "https://audiolad.ru",
   });
   assert.match(html, /Здравствуйте, Герман!/);
-  assert.match(html, /Продолжить подключение/);
-  assert.match(html, /https:\/\/audiolad\.ru\/author-dashboard/);
-  assert.match(text, /данные для получения авторского вознаграждения/);
+  assert.match(html, /Принять авторское соглашение/);
+  assert.match(
+    html,
+    /https:\/\/audiolad\.ru\/author-dashboard\/commercial\/terms\?author=german/,
+  );
+  assert.match(text, /примите авторское соглашение/);
+  assert.doesNotMatch(html, /уже принято/);
+
+  const acceptedHtml = renderCommercialApplicationApprovedEmailHtml({
+    authorName: "Ольга Дон",
+    authorSlug: "ol-ga-don",
+    siteOrigin: "https://audiolad.ru",
+    termsAlreadyAccepted: true,
+  });
+  const acceptedText = renderCommercialApplicationApprovedEmailText({
+    authorName: "Ольга Дон",
+    authorSlug: "ol-ga-don",
+    siteOrigin: "https://audiolad.ru",
+    termsAlreadyAccepted: true,
+  });
+  assert.match(acceptedHtml, /уже принято/);
+  assert.match(acceptedHtml, /Открыть кабинет автора/);
+  assert.match(acceptedHtml, /https:\/\/audiolad\.ru\/author-dashboard/);
+  assert.doesNotMatch(acceptedHtml, /Принять авторское соглашение/);
+  assert.doesNotMatch(acceptedText, /примите авторское соглашение/);
 
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: "commercial_application_approved",
-    templateVersion: "commercial-application-approved-v1-20260727",
+    templateVersion: "commercial-application-approved-v2-20260921",
     payload: {
       authorName: "Герман",
+      authorSlug: "german",
       siteOrigin: "https://audiolad.ru",
     },
   });
@@ -224,7 +254,14 @@ async function testApprovalEmail() {
       rendered.subject,
       COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
     );
+    assert.match(rendered.html, /commercial\/terms\?author=german/);
   }
+
+  const actions = read(
+    "src/app/(platform)/admin/commercial-applications/actions.ts",
+  );
+  assert.match(actions, /termsAlreadyAccepted:\s*termsStatus\.accepted/);
+  assert.match(actions, /authorSlug/);
 }
 
 function testSourceGuards() {

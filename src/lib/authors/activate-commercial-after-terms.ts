@@ -11,13 +11,15 @@ export type ActivateCommercialAfterTermsResult = {
 };
 
 /**
- * After Author Terms acceptance, promote commercial_onboarding → commercial_active.
- * Payout profile is intentionally not part of this transition. Default
- * finance share/hold terms + payout_eligible are provisioned so sales can accrue.
+ * Promote commercial_onboarding → commercial_active when Author Terms are
+ * already accepted. Used after terms accept, after admin approve (if terms
+ * were accepted earlier), and as a read-path self-heal for stuck cabinets.
+ * Payout profile is intentionally not part of this transition.
  */
 export async function activateCommercialAccessAfterTermsAccepted(input: {
   authorId: string;
   actorUserId: string;
+  reason?: string;
 }): Promise<ActivateCommercialAfterTermsResult> {
   const client = createServiceRoleClient();
   const { data: author, error: loadError } = await client
@@ -41,6 +43,7 @@ export async function activateCommercialAccessAfterTermsAccepted(input: {
 
   let toStatus = fromStatus;
   let activated = false;
+  const reason = input.reason?.trim() || "author_terms_accepted";
 
   if (fromStatus === "commercial_onboarding") {
     const { data, error } = await client.rpc(
@@ -49,7 +52,7 @@ export async function activateCommercialAccessAfterTermsAccepted(input: {
         p_author_id: input.authorId,
         p_new_status: "commercial_active",
         p_changed_by: input.actorUserId,
-        p_reason: "author_terms_accepted",
+        p_reason: reason,
         p_commercial_application_id: null,
       },
     );

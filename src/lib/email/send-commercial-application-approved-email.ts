@@ -22,6 +22,9 @@ export type SendCommercialApplicationApprovedEmailInput = {
   toEmail: string;
   applicationId: string;
   authorName?: string | null;
+  authorSlug?: string | null;
+  /** Skip «accept terms» CTA when the author already accepted current terms. */
+  termsAlreadyAccepted?: boolean;
   siteOrigin?: string;
   forceResend?: boolean;
   supabase?: SupabaseClient;
@@ -84,6 +87,8 @@ export async function sendCommercialApplicationApprovedEmail(
     templateVersion: COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
     payload: {
       authorName: input.authorName ?? "",
+      authorSlug: input.authorSlug ?? "",
+      termsAlreadyAccepted: input.termsAlreadyAccepted === true,
       siteOrigin: input.siteOrigin ?? getAppOrigin(),
     },
   });

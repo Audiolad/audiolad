@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import type { AdminCommercialApplicationActionState } from "@/app/(platform)/admin/commercial-applications/action-state";
 import { callCommercialApplicationRpc } from "@/lib/author-commercial-applications/rpc";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { activateCommercialAccessAfterTermsAccepted } from "@/lib/authors/activate-commercial-after-terms";
+import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { sendCommercialApplicationApprovedEmail } from "@/lib/email/send-commercial-application-approved-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
@@ -94,7 +96,7 @@ export async function approveCommercialApplication(
   _prevState: AdminCommercialApplicationActionState,
   formData: FormData,
 ): Promise<AdminCommercialApplicationActionState> {
-  await requireAdminPermission("authors.manage");
+  const admin = await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();
@@ -121,6 +123,35 @@ export async function approveCommercialApplication(
 
   let warning: string | undefined;
 
+  // Always attempt finalize when current Author Terms are already accepted
+  // (covers terms-before-approve and idempotent re-approve heal).
+  try {
+    const service = createServiceRoleClient();
+    const { data: application } = await service
+      .from("author_commercial_applications")
+      .select("author_id, created_by")
+      .eq("id", applicationId)
+      .maybeSingle();
+
+    const authorId = application?.author_id as string | undefined;
+    if (authorId) {
+      const terms = await hasAcceptedCurrentAuthorTerms(authorId, service);
+      if (terms.accepted) {
+        await activateCommercialAccessAfterTermsAccepted({
+          authorId,
+          actorUserId: admin.userId,
+          reason: "author_terms_already_accepted_on_approve",
+        });
+      }
+    }
+  } catch (error) {
+    console.error(
+      "commercial_application_approve_activate_failed",
+      applicationId,
+      error,
+    );
+  }
+
   if (!rpc.result.idempotent) {
     try {
       const service = createServiceRoleClient();
@@ -133,11 +164,11 @@ export async function approveCommercialApplication(
       const authorId = application?.author_id as string | undefined;
       const createdBy = application?.created_by as string | undefined;
 
-      const [authorResult, profileResult] = await Promise.all([
+      const [authorResult, profileResult, termsStatus] = await Promise.all([
         authorId
           ? service
               .from("authors")
-              .select("name")
+              .select("name, slug")
               .eq("id", authorId)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -148,6 +179,9 @@ export async function approveCommercialApplication(
               .eq("id", createdBy)
               .maybeSingle()
           : Promise.resolve({ data: null }),
+        authorId
+          ? hasAcceptedCurrentAuthorTerms(authorId, service)
+          : Promise.resolve({ accepted: false }),
       ]);
 
       const recipientEmail =
@@ -156,12 +190,18 @@ export async function approveCommercialApplication(
         authorResult.data?.name?.trim() ||
         profileResult.data?.full_name?.trim() ||
         null;
+      const authorSlug =
+        typeof authorResult.data?.slug === "string"
+          ? authorResult.data.slug.trim()
+          : null;
 
       if (recipientEmail) {
         const emailResult = await sendCommercialApplicationApprovedEmail({
           toEmail: recipientEmail,
           applicationId,
           authorName,
+          authorSlug,
+          termsAlreadyAccepted: termsStatus.accepted === true,
           siteOrigin: getAppOrigin(),
           supabase: service,
         });
