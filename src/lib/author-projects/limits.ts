@@ -7,7 +7,8 @@ export type AuthorProjectLimitSource =
   | "override"
   | "premium"
   | "default"
-  | "purchased";
+  | "purchased"
+  | "partner_bonus";
 
 export type AuthorProjectLimitResolution = {
   limit: number | null;
@@ -17,17 +18,19 @@ export type AuthorProjectLimitResolution = {
   hasOverride: boolean;
   baseLimit: number;
   purchasedSlots: number;
+  partnerBonusSlots: number;
 };
 
 /**
  * base = admin_override ?? premium_plan_limit ?? 1
- * effective = unlimited ? null : base + purchased_slots
+ * effective = unlimited ? null : base + purchased_slots + partner_bonus_slots
  */
 export function resolveEffectiveAuthorProjectLimit(input: {
   override: number | null | undefined;
   unlimited: boolean | null | undefined;
   premiumEnabled: boolean | null | undefined;
   purchasedSlots?: number | null | undefined;
+  partnerBonusSlots?: number | null | undefined;
 }): AuthorProjectLimitResolution {
   const override =
     typeof input.override === "number" &&
@@ -42,6 +45,12 @@ export function resolveEffectiveAuthorProjectLimit(input: {
     input.purchasedSlots > 0
       ? Math.floor(input.purchasedSlots)
       : 0;
+  const partnerBonusSlots =
+    typeof input.partnerBonusSlots === "number" &&
+    Number.isFinite(input.partnerBonusSlots) &&
+    input.partnerBonusSlots > 0
+      ? Math.min(1, Math.floor(input.partnerBonusSlots))
+      : 0;
 
   if (input.unlimited === true) {
     return {
@@ -52,6 +61,7 @@ export function resolveEffectiveAuthorProjectLimit(input: {
       hasOverride: true,
       baseLimit: override ?? (premiumEnabled ? PREMIUM_AUTHOR_PROJECT_LIMIT : DEFAULT_AUTHOR_PROJECT_LIMIT),
       purchasedSlots,
+      partnerBonusSlots,
     };
   }
 
@@ -69,9 +79,11 @@ export function resolveEffectiveAuthorProjectLimit(input: {
     source = "default";
   }
 
-  const limit = baseLimit + purchasedSlots;
+  const limit = baseLimit + purchasedSlots + partnerBonusSlots;
   if (purchasedSlots > 0) {
     source = "purchased";
+  } else if (partnerBonusSlots > 0) {
+    source = "partner_bonus";
   }
 
   return {
@@ -82,6 +94,7 @@ export function resolveEffectiveAuthorProjectLimit(input: {
     hasOverride: override != null,
     baseLimit,
     purchasedSlots,
+    partnerBonusSlots,
   };
 }
 

@@ -524,4 +524,358 @@ async function runAttributionBehavioralSmoke() {
   }
 }
 
+
 await runAttributionBehavioralSmoke();
+
+async function runActivationBehavioralSmoke() {
+  const activationPath = join(
+    repoRoot,
+    "supabase/migrations/20261027120100_author_partner_activation_bonus.sql",
+  );
+  const activationSmokePath = join(
+    repoRoot,
+    "supabase/tests/author_partner_activation_smoke.sql",
+  );
+  assert(existsSync(activationPath), "activation migration must exist");
+  assert(existsSync(activationSmokePath), "activation smoke sql must exist");
+  const activationSql = readFileSync(activationPath, "utf8");
+  const activationSmokeSql = readFileSync(activationSmokePath, "utf8");
+  assert(activationSql.includes("finalize_author_partner_referral"), "finalizer");
+  assert(activationSql.includes("author_project_slots_partner_bonus"), "partner bonus column");
+  assert(activationSql.includes("activation_author_id_snapshot"), "activation snapshot");
+  assert(activationSql.includes("interval '3 years'"), "3y window");
+  assert(activationSql.includes("author_partner_earliest_owner_membership"), "earliest owner helper");
+  assert(activationSql.includes("author_partner_attribution_window_ok"), "60d window helper vs ownership");
+  assert(activationSql.includes("bound_and_activated"), "claim race activate path");
+  assert(activationSql.includes("author_partner_bonus_profile_missing") || activationSql.includes("bonus_profile_missing"), "atomic bonus missing-profile guard");
+  assert(activationSql.includes("partner_referral_reconcile_done") || activationSql.includes("reconcile_done"), "pre-PR3 reconciliation");
+  assert(!activationSql.includes("20261026120000_author_partner_activation"), "no stale 261 partner stamp");
+  assert(!/partner_commission|sale_accrual|author_ledger/.test(activationSql), "no finance");
+  assert(activationSmokeSql.includes("finalize_author_partner_referral"), "smoke calls finalizer");
+  assert(activationSmokeSql.includes("author_partner_activation_smoke_ok"), "smoke notice");
+  assert(activationSmokeSql.includes("race B create-then-claim") || activationSmokeSql.includes("Race B:"), "smoke race B");
+  assert(activationSmokeSql.includes("already_author"), "smoke post-ownership");
+  assert(activationSmokeSql.includes("author_partner_touch_invite"), "smoke authenticated touch");
+  assert(activationSmokeSql.includes("create_author_project"), "smoke real create hook");
+  assert(activationSmokeSql.includes("approve_author_application"), "smoke real approve hook");
+  assert(activationSmokeSql.includes("provision_studio_author_workspace"), "smoke real studio hook");
+  assert(/bonus_profile_missing|profile_missing|author_partner_bonus/.test(activationSmokeSql), "smoke profile-missing rollback");
+  assert(/day.?59/i.test(activationSmokeSql), "smoke day59 TTL");
+  assert(/day.?61/i.test(activationSmokeSql), "smoke day61 TTL");
+  assert(activationSmokeSql.includes("author_partner_bind_manual_code"), "smoke manual bind TTL");
+  assert(activationSmokeSql.includes("manual pending day59/day61"), "smoke manual pending recovery");
+  assert(activationSmokeSql.includes("manual bound prep expected bound") || activationSmokeSql.includes("manual bound day59"), "smoke manual bound recovery");
+  assert(activationSmokeSql.includes("manual late day61 ownership"), "smoke manual late invalid ownership");
+
+  if (!dockerOk()) {
+    console.log("author-partner activation behavioral smoke: skipped (no docker)");
+    return;
+  }
+  const container = resolveDockerDbContainer();
+  if (!container) {
+    console.log("author-partner activation behavioral smoke: skipped (no db container)");
+    return;
+  }
+
+  const db = "partner_activation_smoke_" + Date.now();
+  const attributionPath = join(
+    repoRoot,
+    "supabase/migrations/20261025120000_author_partner_attribution.sql",
+  );
+  const stub = readFileSync(stubPath, "utf8");
+  const foundation = readFileSync(migrationPath, "utf8");
+  const attribution = readFileSync(attributionPath, "utf8");
+  const activation = readFileSync(activationPath, "utf8");
+  const smoke = readFileSync(activationSmokePath, "utf8");
+
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${db} WITH (FORCE);`],
+    { stdio: "pipe" },
+  );
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `CREATE DATABASE ${db};`],
+    { stdio: "pipe" },
+  );
+
+  const runSql = (sql) => {
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+      { input: sql, stdio: ["pipe", "pipe", "pipe"], encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
+    );
+  };
+
+  try {
+    runSql(stub);
+    runSql(foundation);
+    runSql(attribution);
+    runSql(activation);
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+      { input: smoke, stdio: ["pipe", "pipe", "inherit"], maxBuffer: 20 * 1024 * 1024 },
+    );
+    console.log("author-partner activation behavioral smoke: ok");
+  } finally {
+    try {
+      execFileSync(
+        "docker",
+        ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${db} WITH (FORCE);`],
+        { stdio: "pipe" },
+      );
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+await runActivationBehavioralSmoke();
+
+async function runConcurrentActivationAndMigrationRecon() {
+  if (!dockerOk()) {
+    console.log("author-partner activation concurrency/recon: skipped (no docker)");
+    return;
+  }
+  const container = resolveDockerDbContainer();
+  if (!container) {
+    console.log("author-partner activation concurrency/recon: skipped (no db container)");
+    return;
+  }
+
+  const activationPath = join(
+    repoRoot,
+    "supabase/migrations/20261027120100_author_partner_activation_bonus.sql",
+  );
+  const attributionPath = join(
+    repoRoot,
+    "supabase/migrations/20261025120000_author_partner_attribution.sql",
+  );
+  const stub = readFileSync(stubPath, "utf8");
+  const foundation = readFileSync(migrationPath, "utf8");
+  const attribution = readFileSync(attributionPath, "utf8");
+  const activation = readFileSync(activationPath, "utf8");
+
+  const runOn = (db, sql) => {
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+      { input: sql, stdio: ["pipe", "pipe", "pipe"], encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
+    );
+  };
+  const q = (db, sql) =>
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c", sql],
+      { encoding: "utf8" },
+    ).trim();
+
+  // --- Migration-time reconciliation ---
+  const reconDb = "partner_activation_recon_" + Date.now();
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${reconDb} WITH (FORCE);`],
+    { stdio: "pipe" },
+  );
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `CREATE DATABASE ${reconDb};`],
+    { stdio: "pipe" },
+  );
+  try {
+    runOn(reconDb, stub);
+    runOn(reconDb, foundation);
+    runOn(reconDb, attribution);
+    runOn(
+      reconDb,
+      `
+BEGIN;
+INSERT INTO auth.users (id, email) VALUES
+  ('a1111111-1111-4111-8111-111111111101', 'r@t.local'),
+  ('a2222222-2222-4222-8222-222222222202', 'i@t.local')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.profiles (id) VALUES
+  ('a1111111-1111-4111-8111-111111111101'),
+  ('a2222222-2222-4222-8222-222222222202')
+ON CONFLICT DO NOTHING;
+INSERT INTO auth.users (id, email) VALUES
+  ('a3333333-3333-4333-8333-333333333303', 'neg@t.local')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.profiles (id) VALUES
+  ('a3333333-3333-4333-8333-333333333303')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.authors (id, name, slug) VALUES
+  ('aa111111-aaaa-4aaa-8aaa-aaaaaaaaaa01', 'Recon Ref', 'recon-ref'),
+  ('aa222222-bbbb-4bbb-8bbb-bbbbbbbbbb02', 'Recon Inv', 'recon-inv'),
+  ('aa333333-cccc-4ccc-8ccc-cccccccccc03', 'Recon Neg', 'recon-neg')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.author_members (author_id, user_id, role, created_at) VALUES
+  ('aa111111-aaaa-4aaa-8aaa-aaaaaaaaaa01', 'a1111111-1111-4111-8111-111111111101', 'owner', now() - interval '40 days'),
+  ('aa222222-bbbb-4bbb-8bbb-bbbbbbbbbb02', 'a2222222-2222-4222-8222-222222222202', 'owner', now() - interval '10 days'),
+  -- ownership BEFORE first-touch (retroactive forbid)
+  ('aa333333-cccc-4ccc-8ccc-cccccccccc03', 'a3333333-3333-4333-8333-333333333303', 'owner', now() - interval '40 days')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.author_referrals (
+  referrer_author_id, referrer_owner_user_id, invitee_user_id,
+  code_used, code_normalized, attributed_at, attribution_expires_at, status, created_at
+) VALUES (
+  'aa111111-aaaa-4aaa-8aaa-aaaaaaaaaa01',
+  'a1111111-1111-4111-8111-111111111101',
+  'a2222222-2222-4222-8222-222222222202',
+  'RECONX', public.author_partner_normalize_code('RECONX'),
+  now() - interval '30 days', now() + interval '30 days', 'attributed',
+  now() - interval '30 days'
+), (
+  'aa111111-aaaa-4aaa-8aaa-aaaaaaaaaa01',
+  'a1111111-1111-4111-8111-111111111101',
+  'a3333333-3333-4333-8333-333333333303',
+  'RECONX', public.author_partner_normalize_code('RECONX'),
+  -- first-touch AFTER ownership
+  now() - interval '20 days', now() + interval '40 days', 'attributed',
+  now() - interval '20 days'
+);
+COMMIT;
+`,
+    );
+    runOn(reconDb, activation);
+    const act = q(
+      reconDb,
+      `SELECT status || '|' || CASE WHEN activated_at IS NOT NULL THEN 'yes' ELSE 'no' END || '|' || coalesce(activation_author_id_snapshot::text,'null') || '|' || coalesce(author_project_slots_partner_bonus::text,'0')
+       FROM public.author_referrals r
+       JOIN public.profiles p ON p.id = r.invitee_user_id
+       WHERE r.invitee_user_id = 'a2222222-2222-4222-8222-222222222202';`,
+    );
+    assert(act === "activated|yes|aa222222-bbbb-4bbb-8bbb-bbbbbbbbbb02|1", `migration-time recon expected activated+snap+bonus1, got ${act}`);
+    const neg = q(
+      reconDb,
+      `SELECT status || '|' || CASE WHEN activated_at IS NOT NULL THEN 'yes' ELSE 'no' END || '|' || coalesce(activation_author_id_snapshot::text,'null') || '|' || coalesce(author_project_slots_partner_bonus::text,'0')
+       FROM public.author_referrals r
+       JOIN public.profiles p ON p.id = r.invitee_user_id
+       WHERE r.invitee_user_id = 'a3333333-3333-4333-8333-333333333303';`,
+    );
+    assert(neg === "attributed|no|null|0", `migration-time recon negative (own-before-touch) must stay unactivated, got ${neg}`);
+    console.log("author-partner activation migration-time recon: ok (positive+negative)");
+  } finally {
+    try {
+      execFileSync(
+        "docker",
+        ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${reconDb} WITH (FORCE);`],
+        { stdio: "pipe" },
+      );
+    } catch { /* ignore */ }
+  }
+
+  // --- True two-session concurrent finalize ---
+  const concDb = "partner_activation_conc_" + Date.now();
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${concDb} WITH (FORCE);`],
+    { stdio: "pipe" },
+  );
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `CREATE DATABASE ${concDb};`],
+    { stdio: "pipe" },
+  );
+  try {
+    runOn(concDb, stub);
+    runOn(concDb, foundation);
+    runOn(concDb, attribution);
+    runOn(concDb, activation);
+    const invitee = "b2222222-2222-4222-8222-222222222222";
+    const authorA = "bb222222-bbbb-4bbb-8bbb-bbbbbbbbbbb2";
+    const authorB = "bb333333-cccc-4ccc-8ccc-ccccccccccc3";
+    runOn(
+      concDb,
+      `
+BEGIN;
+INSERT INTO auth.users (id, email) VALUES
+  ('b1111111-1111-4111-8111-111111111111', 'cr@t.local'),
+  ('${invitee}', 'ci@t.local')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.profiles (id) VALUES
+  ('b1111111-1111-4111-8111-111111111111'),
+  ('${invitee}')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.authors (id, name, slug) VALUES
+  ('bb111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'Conc Ref', 'conc-ref'),
+  ('${authorA}', 'Conc Inv A', 'conc-inv-a'),
+  ('${authorB}', 'Conc Inv B', 'conc-inv-b')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.author_members (author_id, user_id, role, created_at) VALUES
+  ('bb111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'b1111111-1111-4111-8111-111111111111', 'owner', now() - interval '5 days'),
+  ('${authorA}', '${invitee}', 'owner', now() - interval '1 hour'),
+  ('${authorB}', '${invitee}', 'owner', now() - interval '30 minutes')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.author_referrals (
+  referrer_author_id, referrer_owner_user_id, invitee_user_id,
+  code_used, code_normalized, attributed_at, attribution_expires_at, status, created_at
+) VALUES (
+  'bb111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+  'b1111111-1111-4111-8111-111111111111',
+  '${invitee}',
+  'CONCRF', public.author_partner_normalize_code('CONCRF'),
+  now() - interval '2 days', now() + interval '50 days', 'attributed',
+  now() - interval '2 days'
+);
+COMMIT;
+`,
+    );
+
+    function spawnFinalize(authorId) {
+      const sql = `SELECT public.finalize_author_partner_referral('${invitee}'::uuid, '${authorId}'::uuid);`;
+      return new Promise((resolve, reject) => {
+        import("node:child_process").then(({ spawn }) => {
+          const child = spawn(
+            "docker",
+            ["exec", "-i", container, "psql", "-U", "postgres", "-d", concDb, "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+            { stdio: ["pipe", "pipe", "pipe"] },
+          );
+          let out = "";
+          let err = "";
+          child.stdout.on("data", (d) => { out += d; });
+          child.stderr.on("data", (d) => { err += d; });
+          child.on("close", (codeExit) => {
+            if (codeExit !== 0) reject(new Error(err || out || `exit ${codeExit}`));
+            else resolve(out.trim());
+          });
+          child.stdin.write(sql);
+          child.stdin.end();
+        }).catch(reject);
+      });
+    }
+
+    const [ra, rb] = await Promise.all([spawnFinalize(authorA), spawnFinalize(authorB)]);
+    const parse = (s) => JSON.parse(s.split("\n").filter(Boolean).pop());
+    const ja = parse(ra);
+    const jb = parse(rb);
+    const results = [ja.result, jb.result];
+    const activatedCount = results.filter((r) => r === "activated").length;
+    const alreadyCount = results.filter((r) => r === "already_activated").length;
+    assert(activatedCount === 1, `concurrent A/B expected exactly one activated, got ${JSON.stringify([ja, jb])}`);
+    assert(alreadyCount === 1, `concurrent A/B expected exactly one already_activated, got ${JSON.stringify([ja, jb])}`);
+    const winner = ja.result === "activated" ? authorA : authorB;
+    const loser = winner === authorA ? authorB : authorA;
+    const row = q(
+      concDb,
+      `SELECT status || '|' || coalesce(author_project_slots_partner_bonus::text,'0') || '|' || coalesce(activation_author_id_snapshot::text,'null') || '|' || CASE WHEN activated_at IS NOT NULL THEN 'yes' ELSE 'no' END || '|' || CASE WHEN expires_at IS NOT NULL THEN 'yes' ELSE 'no' END
+       FROM public.author_referrals r
+       JOIN public.profiles p ON p.id = r.invitee_user_id
+       WHERE r.invitee_user_id = '${invitee}';`,
+    );
+    assert(row === `activated|1|${winner}|yes|yes`, `concurrent A/B must lock winner snapshot+bonus1, got ${row} (winner=${winner})`);
+    assert(!row.includes(loser), `snapshot must not flip to loser ${loser}`);
+    console.log("author-partner activation concurrent A/B: ok", `A=${ja.result}`, `B=${jb.result}`, `winner=${winner}`);
+  } finally {
+    try {
+      execFileSync(
+        "docker",
+        ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${concDb} WITH (FORCE);`],
+        { stdio: "pipe" },
+      );
+    } catch { /* ignore */ }
+  }
+}
+
+await runConcurrentActivationAndMigrationRecon();

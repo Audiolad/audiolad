@@ -162,6 +162,31 @@ test("anonymous created → KEEP/SET cookie", () => {
  * Shared-browser regression (logical):
  * A binds SERGEY → cookie cleared → B on same browser touches MARINA cleanly.
  */
+
+test("PR3 activation success results clear cookie", () => {
+  for (const result of [
+    "bound_and_activated",
+    "preserved_first_touch_activated",
+    "already_bound_activated",
+  ] as const) {
+    assert.equal(
+      shouldClearPartnerAttributionCookie({ ok: true, result }),
+      true,
+      result + " must CLEAR",
+    );
+    assert.equal(
+      shouldSetPartnerAttributionCookie({ result }),
+      false,
+      result + " must not SET",
+    );
+  }
+  assert.equal(
+    shouldClearPartnerAttributionCookie({ ok: false, error: "claim_failed" }),
+    false,
+    "claim_failed must KEEP",
+  );
+});
+
 test("shared-browser: A SERGEY bind clears cookie so B can take MARINA", () => {
   const jar = new Map<string, { value: string; maxAge: number }>();
   const store = {

@@ -14,13 +14,13 @@ export type PartnerTouchResult =
       result:
         | "created"
         | "preserved_first_touch"
+        | "preserved_first_touch_activated"
         | "already_bound"
+        | "already_bound_activated"
         | "already_author"
         | "referral_already_activated"
         | "bound"
-        | "already_bound"
-        | "preserved_first_touch"
-        | "already_author";
+        | "bound_and_activated";
       token?: string;
       setCookie: boolean;
       code?: string;
@@ -206,6 +206,34 @@ export async function touchPartnerInvite(input: {
         referrerAuthorId: asString(row.referrer_author_id),
         attributionId: asString(row.attribution_id),
         expiresAt: asString(row.expires_at),
+      };
+    }
+
+    if (
+      result === "bound_and_activated" ||
+      result === "preserved_first_touch_activated" ||
+      result === "already_bound_activated"
+    ) {
+      logPartnerAttribution({
+        event: "partner_attribution_bound_invite_authenticated",
+        result,
+        referralId: asString(row.referral_id),
+        referrerAuthorId: asString(row.referrer_author_id),
+      });
+      return {
+        ok: true,
+        result: result as
+          | "bound_and_activated"
+          | "preserved_first_touch_activated"
+          | "already_bound_activated",
+        token: existingToken ?? token,
+        setCookie: false,
+        code: asString(row.code),
+        referrerAuthorId: asString(row.referrer_author_id),
+        attributionId: asString(row.attribution_id),
+        referralId: asString(row.referral_id),
+        expiresAt:
+          asString(row.attribution_expires_at) ?? asString(row.expires_at),
       };
     }
 
