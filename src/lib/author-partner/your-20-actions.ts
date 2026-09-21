@@ -14,6 +14,7 @@ import {
   partnerCodeUserMessage,
   type PartnerCodeUserErrorCode,
 } from "@/lib/author-partner/rpc-user-messages";
+import { logPartnerYour20RpcFailure } from "@/lib/author-partner/log";
 import {
   parseAuthorPartnerProfilePayload,
   type AuthorPartnerProfileView,
@@ -125,6 +126,14 @@ export async function ensureAuthorPartnerProfileAction(
   });
 
   if (error) {
+    logPartnerYour20RpcFailure({
+      event: "author_partner_ensure_rpc_failed",
+      authorId,
+      postgresCode: error.code,
+      messageToken: error.message,
+      detailsToken: typeof error.details === "string" ? error.details : null,
+      hintToken: typeof error.hint === "string" ? error.hint : null,
+    });
     const code = parsePartnerRpcErrorCode(error);
     return { ok: false, code, message: partnerCodeUserMessage(code) };
   }
@@ -170,6 +179,14 @@ export async function changeAuthorPartnerCodeAction(
   });
 
   if (error) {
+    logPartnerYour20RpcFailure({
+      event: "author_partner_change_code_rpc_failed",
+      authorId,
+      postgresCode: error.code,
+      messageToken: error.message,
+      detailsToken: typeof error.details === "string" ? error.details : null,
+      hintToken: typeof error.hint === "string" ? error.hint : null,
+    });
     const code = parsePartnerRpcErrorCode(error);
     return { ok: false, code, message: partnerCodeUserMessage(code) };
   }

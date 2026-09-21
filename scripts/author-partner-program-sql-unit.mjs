@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationName = "20261024120000_author_partner_program_foundation.sql";
 const migrationPath = join(repoRoot, "supabase/migrations", migrationName);
+const generateCodeFixName = "20261028120000_author_partner_generate_code_extensions_path.sql";
+const generateCodeFixPath = join(repoRoot, "supabase/migrations", generateCodeFixName);
 const stubPath = join(repoRoot, "scripts/lib/author-partner-program-sql-stub.sql");
 const smokePath = join(
   repoRoot,
@@ -79,6 +81,12 @@ assert(migration.includes("invitee_user_id IS DISTINCT FROM referrer_owner_user_
 assert(migration.includes("ENABLE ROW LEVEL SECURITY"), "RLS enabled");
 assert(migration.includes("resolve_author_partner_code"), "resolve rpc");
 assert(migration.includes("ensure_author_partner_profile"), "ensure rpc");
+assert(existsSync(generateCodeFixPath), "generate_code extensions path fix migration");
+const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
+assert(generateCodeFix.includes("extensions.gen_random_bytes"), "fix qualifies gen_random_bytes");
+assert(generateCodeFix.includes("SET search_path = public, pg_temp"), "fix keeps hardened search_path without extensions");
+assert(!/SET search_path[^=\n]*=\s*public,\s*extensions/.test(generateCodeFix), "fix must not put extensions on search_path");
+
 assert(migration.includes("change_author_partner_code"), "change rpc");
 assert(migration.includes("get_author_partner_profile"), "get rpc");
 assert(migration.includes("author_partner_assert_not_self_referral"), "self-ref helper");
@@ -112,6 +120,7 @@ assert(
 assert(!/app\/(invite|partner)\//.test(migration), "scope freeze: no invite/partner routes");
 
 const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
 assert(stub.includes("CREATE TABLE IF NOT EXISTS public.author_members"), "stub members");
 assert(stub.includes("CREATE OR REPLACE FUNCTION auth.uid()"), "stub auth.uid");
 
@@ -128,7 +137,7 @@ assert(smoke.includes("claim_kind=primary") || smoke.includes("I:"), "smoke clai
 assert(smoke.includes("has_partner_referrals_as_referrer"), "smoke delete blockers");
 
 function runIsolatedSql() {
-  const sql = [stub, migration, smoke].join("\n");
+  const sql = [stub, migration, readFileSync(generateCodeFixPath, "utf8"), smoke].join("\n");
   const container = dockerAvailable() ? resolveDockerDbContainer() : null;
 
   if (container) {
@@ -304,10 +313,137 @@ SELECT public.ensure_author_partner_profile('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb
   });
 }
 
+
+/**
+ * Explicit production regression:
+ * pgcrypto in schema extensions + foundation WITHOUT generate-code fix ⇒ ensure fails 42883;
+ * after 20261028120000 ⇒ ensure ok/created + idempotent + get exists.
+ */
+function runGenRandomBytesExtensionsPathRegression(runtime) {
+  if (!runtime || !String(runtime).startsWith("docker:")) {
+    console.log("author-partner gen_random_bytes regression: skipped (no docker)");
+    return;
+  }
+  const container = String(runtime).slice("docker:".length);
+  const db = "partner_gen_random_bytes_reg_" + Date.now();
+  const stubSql = readFileSync(stubPath, "utf8");
+  const foundationSql = readFileSync(migrationPath, "utf8");
+  const fixSql = readFileSync(generateCodeFixPath, "utf8");
+
+  function psql(dbName, sql) {
+    return execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", dbName, "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+      { input: sql, encoding: "utf8" },
+    ).trim();
+  }
+  function admin(sql) {
+    execFileSync(
+      "docker",
+      ["exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql],
+      { stdio: "ignore" },
+    );
+  }
+
+  admin(`DROP DATABASE IF EXISTS ${db} WITH (FORCE);`);
+  admin(`CREATE DATABASE ${db};`);
+  try {
+    psql(db, stubSql);
+    psql(db, foundationSql);
+
+    // Owner context setup
+    psql(
+      db,
+      `
+DO $$
+DECLARE
+  u uuid := 'a1111111-1111-4111-8111-111111111111';
+  a uuid := 'b2222222-2222-4222-8222-222222222222';
+BEGIN
+  INSERT INTO auth.users (id) VALUES (u) ON CONFLICT DO NOTHING;
+  INSERT INTO public.authors (id, name, slug) VALUES (a, 'Reg Author', 'reg-gen-bytes')
+    ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.author_members (author_id, user_id, role) VALUES (a, u, 'owner')
+    ON CONFLICT (author_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+END $$;
+`,
+    );
+
+    // BEFORE fix: expect 42883 / missing gen_random_bytes
+    let beforeErr = "";
+    try {
+      psql(
+        db,
+        `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+      );
+    } catch (error) {
+      beforeErr = String(error?.stderr || error?.message || error);
+    }
+    assert(beforeErr, "before-fix ensure must fail");
+    assert(
+      /gen_random_bytes/i.test(beforeErr) || /42883/.test(beforeErr),
+      `before-fix must cite gen_random_bytes or 42883, got: ${beforeErr.slice(0, 500)}`,
+    );
+
+    // Apply fix once
+    psql(db, fixSql);
+
+    const first = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const firstJson = JSON.parse(first.split("\n").filter(Boolean).pop());
+    assert(firstJson.ok === true, `after-fix ensure ok, got ${first}`);
+    assert(firstJson.created === true, `after-fix created=true, got ${first}`);
+    assert(typeof firstJson.primary_code === "string" && firstJson.primary_code.length > 0, "primary_code present");
+    const code = firstJson.primary_code;
+
+    const second = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.ensure_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const secondJson = JSON.parse(second.split("\n").filter(Boolean).pop());
+    assert(secondJson.ok === true, "second ensure ok");
+    assert(secondJson.created === false, "second ensure created=false");
+    assert(secondJson.primary_code === code, "idempotent same primary_code");
+
+    const got = psql(
+      db,
+      `
+SELECT set_config('request.jwt.claim.sub', 'a1111111-1111-4111-8111-111111111111', false);
+SET ROLE authenticated;
+SELECT public.get_author_partner_profile('b2222222-2222-4222-8222-222222222222'::uuid);
+`,
+    );
+    const gotJson = JSON.parse(got.split("\n").filter(Boolean).pop());
+    assert(gotJson.exists === true || gotJson.ok === true && gotJson.exists !== false, `get exists, got ${got}`);
+    // Prefer explicit exists=true when present
+    if ("exists" in gotJson) {
+      assert(gotJson.exists === true, "get_author_partner_profile exists=true");
+    }
+    console.log("author-partner gen_random_bytes extensions-path regression: ok");
+  } finally {
+    admin(`DROP DATABASE IF EXISTS ${db} WITH (FORCE);`);
+  }
+}
+
 const runtime = runIsolatedSql();
 if (runtime) {
   console.log(`author-partner-program-sql-unit: parse + isolated smoke ok (${runtime})`);
   await runConcurrentEnsure(runtime);
+  runGenRandomBytesExtensionsPathRegression(runtime);
 } else {
   console.log("author-partner-program-sql-unit: parse-only ok (no local postgres)");
 }
@@ -475,7 +611,9 @@ async function runAttributionBehavioralSmoke() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const smoke = readFileSync(attrSmokePath, "utf8");
 
@@ -501,6 +639,8 @@ async function runAttributionBehavioralSmoke() {
   try {
     runSql(stub);
     runSql(foundation);
+
+    runSql(generateCodeFix);
     runSql(attribution);
     // NOTICE goes to stderr; ON_ERROR_STOP=1 + non-zero exit is the failure signal
     // (same pattern as foundation isolated smoke).
@@ -583,7 +723,9 @@ async function runActivationBehavioralSmoke() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const activation = readFileSync(activationPath, "utf8");
   const smoke = readFileSync(activationSmokePath, "utf8");
@@ -610,6 +752,8 @@ async function runActivationBehavioralSmoke() {
   try {
     runSql(stub);
     runSql(foundation);
+
+    runSql(generateCodeFix);
     runSql(attribution);
     runSql(activation);
     execFileSync(
@@ -653,7 +797,9 @@ async function runConcurrentActivationAndMigrationRecon() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const activation = readFileSync(activationPath, "utf8");
 
