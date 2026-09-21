@@ -85,6 +85,8 @@ import {
 } from "@/lib/studio/local-playback-asset";
 import {
   findActiveStudioClip,
+  isStudioPlaybackGenerationCurrent,
+  nextStudioPlaybackGeneration,
   planStudioMediaElementSync,
   shouldCorrectStudioMediaDrift,
 } from "@/lib/studio/media-element-sync";
@@ -363,6 +365,7 @@ function syncTrackMediaPlayback(
   position: number,
   playing: boolean,
   contextTime: number,
+  options: { forceEnter?: boolean } = {},
 ) {
   const media = runtime.mediaElement;
   const plan = planStudioMediaElementSync({
@@ -372,6 +375,7 @@ function syncTrackMediaPlayback(
     activeClipId: runtime.activeClipId,
     mediaCurrentTime: media.currentTime,
     mediaEnded: media.ended,
+    forceEnter: options.forceEnter === true,
   });
   media.loop = plan.loop;
 
@@ -386,6 +390,10 @@ function syncTrackMediaPlayback(
     );
     runtime.sources.clear();
     runtime.activeClipId = null;
+    // Park media while paused (or reset gap loop) even under a silence envelope.
+    if (plan.seekTo != null) {
+      seekStudioMediaElement(media, plan.seekTo);
+    }
   } else if (plan.enteredClip) {
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
@@ -510,6 +518,7 @@ export function StudioAudioProvider({
   const statusRef = useRef<StudioAudioStatus>("idle");
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
+  const playbackGenerationRef = useRef(0);
   const replacementGenerationRef = useRef(new Map<string, number>());
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
@@ -743,6 +752,9 @@ export function StudioAudioProvider({
   const stopSources = useCallback(() => {
     // Immediate mute+pause: a scheduled gain ramp cannot audibly finish after
     // mediaElement.pause(), so do not pretend this path is a soft de-click.
+    playbackGenerationRef.current = nextStudioPlaybackGeneration(
+      playbackGenerationRef.current,
+    );
     const contextTime = audioContextRef.current?.currentTime ?? 0;
     for (const runtime of trackRuntimesRef.current.values()) {
       if (!runtime.mediaElement.paused) {
@@ -823,13 +835,26 @@ export function StudioAudioProvider({
         requestedPosition,
         projectDurationRef.current,
       );
+      const generation = nextStudioPlaybackGeneration(
+        playbackGenerationRef.current,
+      );
+      playbackGenerationRef.current = generation;
       const startAt = context.currentTime;
       for (const track of tracksRef.current) {
         const runtime = trackRuntimesRef.current.get(track.id);
         if (!runtime) {
           continue;
         }
-        syncTrackMediaPlayback(runtime, track, position, true, startAt);
+        // Every Play / playing-seek restart is a fresh enter: do not reuse a
+        // stale activeClipId left by paused parking or a raced sync tick.
+        runtime.activeClipId = null;
+        syncTrackMediaPlayback(runtime, track, position, true, startAt, {
+          forceEnter: true,
+        });
+      }
+
+      if (!isStudioPlaybackGenerationCurrent(generation, playbackGenerationRef.current)) {
+        return;
       }
 
       startedAtContextTimeRef.current = startAt;
@@ -1932,7 +1957,16 @@ export function StudioAudioProvider({
 
       cancelProgressLoop();
       stopSources();
+      const playGeneration = playbackGenerationRef.current;
       await refreshPersistedPlaybackUrls({ force: false });
+      if (
+        !isStudioPlaybackGenerationCurrent(
+          playGeneration,
+          playbackGenerationRef.current,
+        )
+      ) {
+        return;
+      }
       const restartPosition =
         positionRef.current >= projectDurationRef.current ? 0 : positionRef.current;
       startSourcesAtPosition(restartPosition);

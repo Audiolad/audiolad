@@ -74,6 +74,12 @@ function clipIdOf(clip: StudioMediaClipWindow & { id?: string }): string {
 /**
  * One MediaElement per track. During a timeline gap we keep the element
  * playing (silenced) so a later clip does not need a new user gesture.
+ *
+ * While the transport is paused we only park the media clock at the mapped
+ * source time and keep the envelope closed. Arming `activeClipId` / opening
+ * the envelope on paused seeks made the next Play take the non-enter path
+ * (`enteredClip: false`) and skip envelope rebuild — audible as missing
+ * tracks until an unrelated UI seek re-entered the clip.
  */
 export function planStudioMediaElementSync({
   clips,
@@ -82,6 +88,7 @@ export function planStudioMediaElementSync({
   activeClipId,
   mediaCurrentTime,
   mediaEnded = false,
+  forceEnter = false,
 }: {
   clips: readonly (StudioMediaClipWindow & { id?: string })[];
   timelineTime: number;
@@ -89,6 +96,8 @@ export function planStudioMediaElementSync({
   activeClipId: string | null;
   mediaCurrentTime: number;
   mediaEnded?: boolean;
+  /** When true, treat the clip as a fresh enter even if activeClipId matches. */
+  forceEnter?: boolean;
 }): StudioMediaElementSyncPlan {
   const clip = findActiveStudioClip(clips, timelineTime);
   if (!clip) {
@@ -107,7 +116,24 @@ export function planStudioMediaElementSync({
     Number.isFinite(clip.startTime) && clip.startTime > 0 ? clip.startTime : 0;
   const mediaTime = getStudioClipMediaTime(clip, timelineTime);
   const clipId = clipIdOf(clip);
-  const entered = activeClipId !== clipId;
+  const elapsedClipTime = Math.max(timelineTime - startTime, 0);
+
+  // Paused transport: park media for buffering, never arm envelope/activeClip.
+  if (!playing) {
+    return {
+      activeClipId: null,
+      envelope: "silence",
+      // Always park at the mapped source time so Play does not inherit a stale
+      // media clock. Envelope/activeClip stay disarmed until a playing enter.
+      seekTo: mediaTime,
+      loop: false,
+      wantPlaying: false,
+      enteredClip: false,
+      elapsedClipTime,
+    };
+  }
+
+  const entered = forceEnter || activeClipId !== clipId;
   const shouldSeek =
     entered || shouldCorrectStudioMediaDrift(mediaCurrentTime, mediaTime);
   return {
@@ -115,10 +141,49 @@ export function planStudioMediaElementSync({
     envelope: "clip",
     seekTo: shouldSeek ? mediaTime : null,
     loop: false,
-    wantPlaying: playing,
+    wantPlaying: true,
     enteredClip: entered,
-    elapsedClipTime: Math.max(timelineTime - startTime, 0),
+    elapsedClipTime,
   };
+}
+
+/**
+ * Bump a transport generation and decide whether a deferred callback may still
+ * mutate playback. Stale generations must not pause, seek, or open envelopes
+ * for a newer Play/seek restart.
+ */
+export function nextStudioPlaybackGeneration(current: number): number {
+  const safe = Number.isFinite(current) && current >= 0 ? Math.floor(current) : 0;
+  return safe + 1;
+}
+
+export function isStudioPlaybackGenerationCurrent(
+  expected: number,
+  current: number,
+): boolean {
+  return expected === current;
+}
+
+/**
+ * Which tracks should audibly start for a playhead position. Selection and
+ * zoom are intentionally not inputs — only unmuted tracks whose clips cover
+ * the playhead.
+ */
+export function listStudioTracksAudibleAtPlayhead<
+  TTrack extends {
+    id: string;
+    muted?: boolean;
+    clips: readonly (StudioMediaClipWindow & { id?: string })[];
+  },
+>(tracks: readonly TTrack[], timelineTime: number): string[] {
+  const audible: string[] = [];
+  for (const track of tracks) {
+    if (track.muted) continue;
+    if (findActiveStudioClip(track.clips, timelineTime)) {
+      audible.push(track.id);
+    }
+  }
+  return audible;
 }
 
 export function countActiveStudioClips<T extends StudioMediaClipWindow>(

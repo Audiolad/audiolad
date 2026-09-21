@@ -15,6 +15,9 @@ import {
   findActiveStudioClip,
   findNextStudioClip,
   getStudioClipMediaTime,
+  isStudioPlaybackGenerationCurrent,
+  listStudioTracksAudibleAtPlayhead,
+  nextStudioPlaybackGeneration,
   planStudioMediaElementSync,
   shouldCorrectStudioMediaDrift,
   STUDIO_MEDIA_DRIFT_SEEK_SECONDS,
@@ -311,6 +314,11 @@ async function testProviderAndHydrationContracts() {
   assert.match(provider, /revokeStudioObjectUrl/);
   assert.match(provider, /shouldRefreshStudioPlaybackUrl/);
   assert.match(provider, /planStudioMediaElementSync/);
+  assert.match(provider, /forceEnter: true/);
+  assert.match(provider, /playbackGenerationRef/);
+  assert.match(provider, /nextStudioPlaybackGeneration/);
+  assert.match(provider, /isStudioPlaybackGenerationCurrent/);
+  assert.match(provider, /runtime\.activeClipId = null/);
   assert.match(provider, /applyStudioMediaElementSrcRefresh/);
   assert.match(provider, /studioTrackHasOverlappingClips/);
   assert.match(provider, /appendStudioClipsIfNoOverlap/);
@@ -357,6 +365,142 @@ async function testProviderAndHydrationContracts() {
   assert.match(provider, /fadeOutDuration: 0/);
 }
 
+
+function testPausedSeekDoesNotArmEnvelope() {
+  const clips = [{ id: "m1", startTime: 0, offset: 0, duration: 120 }];
+  const parked = planStudioMediaElementSync({
+    clips,
+    timelineTime: 40,
+    playing: false,
+    activeClipId: null,
+    mediaCurrentTime: 0,
+  });
+  assert.equal(parked.envelope, "silence");
+  assert.equal(parked.activeClipId, null);
+  assert.equal(parked.enteredClip, false);
+  assert.equal(parked.wantPlaying, false);
+  assert.equal(parked.seekTo, 40);
+
+  // Previously paused seeks armed activeClipId; the next Play then skipped
+  // envelope rebuild (enteredClip=false). Parking must leave active disarmed.
+  const afterParkedPlay = planStudioMediaElementSync({
+    clips,
+    timelineTime: 40,
+    playing: true,
+    activeClipId: parked.activeClipId,
+    mediaCurrentTime: parked.seekTo ?? 0,
+    forceEnter: true,
+  });
+  assert.equal(afterParkedPlay.enteredClip, true);
+  assert.equal(afterParkedPlay.envelope, "clip");
+  assert.equal(afterParkedPlay.seekTo, 40);
+  assert.equal(afterParkedPlay.wantPlaying, true);
+}
+
+function testSequentialSeeksThenPlayForceEnter() {
+  const clips = [{ id: "voice", startTime: 5, offset: 2, duration: 30 }];
+  let active = null;
+  let mediaTime = 0;
+  const seeks = [8, 20, 12, 25];
+  for (const t of seeks) {
+    const plan = planStudioMediaElementSync({
+      clips,
+      timelineTime: t,
+      playing: false,
+      activeClipId: active,
+      mediaCurrentTime: mediaTime,
+    });
+    assert.equal(plan.activeClipId, null);
+    assert.equal(plan.enteredClip, false);
+    assert.equal(plan.envelope, "silence");
+    assert.equal(plan.seekTo, getStudioClipMediaTime(clips[0], t));
+    active = plan.activeClipId;
+    mediaTime = plan.seekTo ?? mediaTime;
+  }
+  const play = planStudioMediaElementSync({
+    clips,
+    timelineTime: 25,
+    playing: true,
+    activeClipId: active,
+    mediaCurrentTime: mediaTime,
+    forceEnter: true,
+  });
+  assert.equal(play.enteredClip, true);
+  assert.equal(play.seekTo, getStudioClipMediaTime(clips[0], 25));
+  assert.equal(play.elapsedClipTime, 20);
+}
+
+function testMultiTrackAudibleAtPlayheadIgnoresSelectionZoom() {
+  const tracks = [
+    {
+      id: "music",
+      muted: false,
+      clips: [{ id: "m", startTime: 0, offset: 0, duration: 100 }],
+    },
+    {
+      id: "voice-a",
+      muted: false,
+      clips: [{ id: "a", startTime: 10, offset: 0, duration: 40 }],
+    },
+    {
+      id: "voice-b",
+      muted: false,
+      clips: [{ id: "b", startTime: 15, offset: 1, duration: 20 }],
+    },
+    {
+      id: "muted-voice",
+      muted: true,
+      clips: [{ id: "x", startTime: 0, offset: 0, duration: 100 }],
+    },
+  ];
+  assert.deepEqual(listStudioTracksAudibleAtPlayhead(tracks, 5), ["music"]);
+  assert.deepEqual(listStudioTracksAudibleAtPlayhead(tracks, 12), [
+    "music",
+    "voice-a",
+  ]);
+  assert.deepEqual(listStudioTracksAudibleAtPlayhead(tracks, 16), [
+    "music",
+    "voice-a",
+    "voice-b",
+  ]);
+  assert.deepEqual(listStudioTracksAudibleAtPlayhead(tracks, 50), ["music"]);
+}
+
+function testStalePlaybackGenerationCannotMutate() {
+  let generation = 0;
+  generation = nextStudioPlaybackGeneration(generation);
+  const started = generation;
+  generation = nextStudioPlaybackGeneration(generation);
+  assert.equal(isStudioPlaybackGenerationCurrent(started, generation), false);
+  assert.equal(isStudioPlaybackGenerationCurrent(generation, generation), true);
+}
+
+function testForceEnterReopensSameClipAfterPause() {
+  const clips = [{ id: "m1", startTime: 0, offset: 10, duration: 60 }];
+  // Simulate the old broken path: activeClipId still armed, gain would stay 0.
+  const broken = planStudioMediaElementSync({
+    clips,
+    timelineTime: 30,
+    playing: true,
+    activeClipId: "m1",
+    mediaCurrentTime: 40,
+  });
+  assert.equal(broken.enteredClip, false);
+  assert.equal(broken.seekTo, null);
+
+  const fixed = planStudioMediaElementSync({
+    clips,
+    timelineTime: 30,
+    playing: true,
+    activeClipId: "m1",
+    mediaCurrentTime: 40,
+    forceEnter: true,
+  });
+  assert.equal(fixed.enteredClip, true);
+  assert.equal(fixed.seekTo, 40);
+}
+
+
 testClipSyncMath();
 testSignedPlaybackHelpers();
 testObjectUrlDisposal();
@@ -364,6 +508,11 @@ await testLocalAssetUsesMetadataNotDecode();
 await testMetadataWaitAbortAndErrors();
 testSameTrackOverlapImpossibleAndAtMostOneActive();
 testGapPlaybackKeepsUserGesture();
+testPausedSeekDoesNotArmEnvelope();
+testSequentialSeeksThenPlayForceEnter();
+testMultiTrackAudibleAtPlayheadIgnoresSelectionZoom();
+testStalePlaybackGenerationCannotMutate();
+testForceEnterReopensSameClipAfterPause();
 testSignedUrlRefreshDoesNotRecreateSource();
 testFallbackWaveform();
 await testProviderAndHydrationContracts();
