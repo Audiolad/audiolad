@@ -125,11 +125,23 @@ assert.match(lib, /expires_at/);
   assert.match(fuzzySlice, /\.eq\("analysis_status", "analyzed"\)/);
 }
 
-// Legacy CTA: search+confirm, never silent attach(queryText: legacy)
-assert.match(linker, /void runSearch\(legacyHint\)/);
-assert.doesNotMatch(linker, /attach\(\{\s*queryText:\s*legacyHint\s*\}\)/);
+// Legacy CTA: single-action attach (find-or-create via published RPC)
+assert.match(linker, /attach\(\{\s*queryText:\s*legacyHint\s*\}\)/);
+assert.doesNotMatch(linker, /void runSearch\(legacyHint\)/);
+assert.match(linker, /Закрепляем…/);
+assert.match(linker, /attachPending === legacyHint/);
+// Manual search flow keeps create confirmation
+assert.match(linker, /Добавить запрос и закрепить/);
+assert.match(linker, /Подтвердить/);
+assert.match(linker, /Поиск по базе запросов/);
 assert.doesNotMatch(linker, /selectable\.length === 0 && exactNormalizedMatch \? null : null/);
 assert.doesNotMatch(linker, /useMemo/);
+// Instant linked UI in form after onAttached
+assert.match(form, /linked:\s*true/);
+assert.match(form, /seoPrimaryQuery:\s*payload\.queryText/);
+assert.match(form, /Запрос закреплён за этим продуктом/);
+assert.match(form, /hasRelationalPrimarySeoQuery/);
+assert.match(form, /showPublishedSeoLinker/);
 
 // Error map + limit
 assert.equal(PRODUCT_CONTENT_LIMITS.seoPrimaryQuery, 120);
