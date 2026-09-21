@@ -167,6 +167,35 @@ function runTests() {
   assert.doesNotMatch(callbackSource, /url\.origin/);
   assert.doesNotMatch(callbackSource, /new URL\([^\n]+,\s*url\.origin\)/);
 
+
+  // Invite route must not redirect browsers to loopback in production.
+  const inviteSource = readFileSync(
+    join(ROOT, "src/app/(platform)/invite/[code]/route.ts"),
+    "utf8",
+  );
+  assert.match(inviteSource, /buildPublicRedirectUrl/);
+  assert.doesNotMatch(
+    inviteSource,
+    /new URL\(\s*["']\/become-author["']\s*,\s*request\.url\s*\)/,
+  );
+  assert.doesNotMatch(
+    inviteSource,
+    /new URL\([^\n]+,\s*request\.url\)/,
+  );
+
+  const inviteProdLike = requestAt("http://localhost:3001/invite/sergey", {
+    host: "audiolad.ru",
+    "x-forwarded-host": "audiolad.ru",
+    "x-forwarded-proto": "https",
+  });
+  assert.equal(
+    buildPublicRedirectUrl("/become-author", inviteProdLike).href,
+    "https://audiolad.ru/become-author",
+  );
+  const invitedUrl = buildPublicRedirectUrl("/become-author", inviteProdLike);
+  invitedUrl.searchParams.set("invited", "1");
+  assert.equal(invitedUrl.href, "https://audiolad.ru/become-author?invited=1");
+
   const startSource = readFileSync(
     join(ROOT, "src/app/(studio)/studio/try/start/route.ts"),
     "utf8",
