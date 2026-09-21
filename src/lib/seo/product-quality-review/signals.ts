@@ -7,6 +7,7 @@ import {
   evaluateSecondaryQueryCoverage,
   selectActiveSecondaryQueries,
 } from "@/lib/seo/secondary-query-coverage";
+import { evaluateProductStructuralStuffing } from "@/lib/seo/product-quality-review/structural-stuffing";
 import type {
   ProductQualityReviewFieldCounts,
   ProductQualityReviewPackage,
@@ -95,6 +96,15 @@ export function buildProductQualityReviewSignals(
     emptyOptionalFields.push("faqItems");
   }
 
+  const structuralStuffing = evaluateProductStructuralStuffing({
+    description: input.description,
+    seoDescription: input.seoDescription,
+    usageItems: input.usageItems,
+    faqItems: input.faqItems,
+    seoPrimaryQuery: primary,
+    seoSecondaryQueries: input.seoSecondaryQueries,
+  });
+
   return {
     primaryExactByField: byField,
     primaryPresentIn,
@@ -110,5 +120,6 @@ export function buildProductQualityReviewSignals(
       secondary2FaqCovered: secondaryCoverageRaw.secondary2FaqCovered,
     },
     emptyOptionalFields,
+    structuralStuffing,
   };
 }

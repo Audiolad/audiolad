@@ -93,6 +93,22 @@ export type ProductQualityReviewSecondaryCoverageSignals = {
   secondary2FaqCovered: boolean;
 };
 
+export type ProductQualityReviewFieldStructuralStuffing = {
+  material: boolean;
+  exactPrimaryCount: number;
+  neighboringSentenceRepeats: boolean;
+  keywordListPattern: boolean;
+  nearDuplicateChain: boolean;
+};
+
+export type ProductQualityReviewStructuralStuffing = {
+  material: boolean;
+  description: ProductQualityReviewFieldStructuralStuffing;
+  seoDescription: ProductQualityReviewFieldStructuralStuffing;
+  usage: ProductQualityReviewFieldStructuralStuffing;
+  faq: ProductQualityReviewFieldStructuralStuffing;
+};
+
 export type ProductQualityReviewSignals = {
   primaryExactByField: ProductQualityReviewFieldCounts;
   primaryPresentIn: ProductQualityReviewPrimaryPresence;
@@ -101,6 +117,7 @@ export type ProductQualityReviewSignals = {
   secondaryCount: number;
   secondaryCoverage: ProductQualityReviewSecondaryCoverageSignals;
   emptyOptionalFields: string[];
+  structuralStuffing: ProductQualityReviewStructuralStuffing;
 };
 
 export const PRODUCT_QUALITY_REVIEW_ISSUES_MAX = 5;

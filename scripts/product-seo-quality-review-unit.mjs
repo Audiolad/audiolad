@@ -30,6 +30,13 @@ import {
   parseProductQualityReviewResult,
 } from "../src/lib/seo/product-quality-review/validate.ts";
 import {
+  reviewProductTextQualityForRequest,
+} from "../src/lib/seo/product-quality-review/orchestrate.ts";
+import {
+  DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+  reconcileProductQualityReviewResult,
+} from "../src/lib/seo/product-quality-review/reconcile.ts";
+import {
   PRODUCT_QUALITY_REVIEW_BLOCK_TITLE,
   PRODUCT_QUALITY_REVIEW_CTA,
   PRODUCT_QUALITY_REVIEW_CTA_AGAIN,
@@ -38,6 +45,8 @@ import {
   PRODUCT_QUALITY_REVIEW_LOADING,
   PRODUCT_QUALITY_REVIEW_STATUS_COPY,
   PRODUCT_QUALITY_REVIEW_STALE_MESSAGE,
+  getProductQualityReviewFieldLabel,
+  humanizeProductQualityReviewText,
 } from "../src/lib/seo/product-quality-review/ui.ts";
 
 const root = process.cwd();
@@ -655,6 +664,345 @@ const openaiEnv = {
   assert.equal(sent.text.format.type, "json_schema");
   assert.equal(sent.text.format.strict, true);
   assert.deepEqual(sent.text.format.schema, PRODUCT_QUALITY_REVIEW_JSON_SCHEMA);
+}
+
+
+
+// --- Description stuffing + terminology (live bug follow-up) ---
+
+function buildLiveLikeStuffedDescription() {
+  const chunks = [
+    "Музыка для крепкого сна помогает мягко перейти ко сну после долгого дня.",
+    "Слушайте музыка для крепкого сна в тихой комнате без яркого света.",
+    "Релакс музыка для крепкого сна создаёт спокойный фон для вечера.",
+    "Музыка для крепкого и глубокого сна поддерживает медленное дыхание.",
+    "Музыка для крепкого сна слушать онлайн удобно дома и в дороге.",
+    "Эта музыка для крепкого сна подходит, когда хочется тишины и покоя.",
+    "Музыка для крепкого сна, музыка для крепкого и глубокого сна, релакс музыка для крепкого сна.",
+    "Ещё раз: музыка для крепкого сна звучит мягко и ровно всю ночь.",
+    "Музыка для крепкого сна помогает телу замедлиться перед отдыхом.",
+    "Выбирайте музыка для крепкого сна, если нужен спокойный ночной фон.",
+  ];
+  // Stretch toward live-like length without inventing density % rules.
+  return Array.from({ length: 3 }, () => chunks.join(" ")).join(" ");
+}
+
+const liveLikePkg = basePackage({
+  title: "Музыка для крепкого сна",
+  seoPrimaryQuery: "музыка для крепкого сна",
+  seoSecondaryQueries: ["спокойная музыка для сна"],
+  description: buildLiveLikeStuffedDescription(),
+  seoTitle: "Музыка для крепкого сна – мягкий фон на ночь",
+  seoDescription:
+    "Спокойная музыка для крепкого сна: мягкий фон, чтобы отдохнуть вечером.",
+  usageItems: [
+    "Перед сном в тихой комнате",
+    "После долгого рабочего дня",
+    "В спокойном вечернем ритуале",
+  ],
+  faqItems: [
+    {
+      question: "Когда лучше включать трек?",
+      answer: "Вечером, когда хочется спокойно отдохнуть без спешки.",
+    },
+    {
+      question: "Нужны ли наушники?",
+      answer: "Можно слушать в колонках или в наушниках — как удобнее.",
+    },
+  ],
+});
+assert.ok(liveLikePkg.description.length >= 1200);
+const liveLikeSignals = buildProductQualityReviewSignals(liveLikePkg);
+assert.equal(liveLikeSignals.structuralStuffing.material, true);
+assert.equal(liveLikeSignals.structuralStuffing.description.material, true);
+assert.equal(liveLikeSignals.primaryPresentIn.seoTitle, true);
+assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
+// A — live-like RED description; good other fields cannot mask stuffing
+{
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "SEO в норме",
+      issues: [
+        {
+          severity: "warning",
+          field: "usage",
+          message: "Добавьте основной запрос в usage.",
+          recommendation:
+            "Основной запрос можно упомянуть в пунктах списка usage.",
+        },
+      ],
+      positiveNotes: ["Добавьте ещё ключ в текст"],
+    },
+    liveLikeSignals,
+  );
+  assert.equal(reconciled.status, "red");
+  assert.equal(
+    reconciled.issues.some((issue) => issue.field === "description"),
+    true,
+  );
+  assert.equal(
+    reconciled.issues[0]?.message,
+    DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+  );
+  const joined = [
+    reconciled.summary,
+    ...reconciled.issues.map((i) => `${i.message}\n${i.recommendation}`),
+    ...reconciled.positiveNotes,
+  ].join("\n");
+  assert.doesNotMatch(joined, /\busage\b/);
+  assert.doesNotMatch(joined, /\bFAQ\b/);
+  assert.doesNotMatch(joined, /\bfaq\b/);
+  assert.doesNotMatch(joined, /добавьте\s+(ещё\s+)?(основной\s+|дополнительн\w*\s+)?(поисков\w*\s+)?(запрос|ключ)/i);
+}
+
+// B — model GREEN + material stuffing → server RED
+{
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "Всё хорошо.",
+      issues: [],
+      positiveNotes: [],
+    },
+    liveLikeSignals,
+  );
+  assert.equal(reconciled.status, "red");
+}
+
+// C — model YELLOW + material stuffing → RED
+{
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "yellow",
+      summary: "Тема слабая.",
+      issues: [],
+      positiveNotes: [],
+    },
+    liveLikeSignals,
+  );
+  assert.equal(reconciled.status, "red");
+}
+
+// D — primary once + natural thematic words → NOT force red
+{
+  const once = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description:
+      "Спокойный фон помогает вечером расслабить тело. Мягкие звуки поддерживают отдых. Один раз естественно: музыка для крепкого сна звучит мягко.",
+    seoTitle: "Музыка для крепкого сна – мягкий фон",
+    seoDescription: "Спокойная музыка для крепкого сна на вечер.",
+  });
+  const signals = buildProductQualityReviewSignals(once);
+  assert.equal(signals.structuralStuffing.description.material, false);
+  assert.equal(signals.structuralStuffing.material, false);
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "SEO в норме.",
+      issues: [],
+      positiveNotes: [],
+    },
+    signals,
+  );
+  assert.equal(reconciled.status, "green");
+}
+
+// E — several natural synonyms without query-chain → NOT force red
+{
+  const synonyms = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description:
+      "Спокойный фон помогает вечером расслабить тело и дыхание. Мягкие звуки поддерживают отдых после долгого дня. Тихая атмосфера подходит для домашнего вечера без спешки и лишней спешки.",
+  });
+  const signals = buildProductQualityReviewSignals(synonyms);
+  assert.equal(signals.structuralStuffing.material, false);
+}
+
+// F — comma-separated keyword list → RED
+{
+  const listed = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description:
+      "музыка для крепкого сна, музыка для крепкого и глубокого сна, релакс музыка для крепкого сна, музыка для крепкого сна слушать онлайн, спокойная музыка для сна",
+  });
+  const signals = buildProductQualityReviewSignals(listed);
+  assert.equal(signals.structuralStuffing.description.keywordListPattern, true);
+  assert.equal(signals.structuralStuffing.description.material, true);
+  assert.equal(
+    reconcileProductQualityReviewResult(
+      { status: "green", summary: "ok", issues: [], positiveNotes: [] },
+      signals,
+    ).status,
+    "red",
+  );
+}
+
+// G — near-duplicate query chain → RED
+{
+  const chain = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description: [
+      "Музыка для крепкого сна для вечера.",
+      "Музыка для крепкого и глубокого сна дома.",
+      "Релакс музыка для крепкого сна онлайн.",
+      "Музыка для крепкого сна слушать онлайн.",
+    ].join(" "),
+  });
+  const signals = buildProductQualityReviewSignals(chain);
+  assert.equal(
+    signals.structuralStuffing.description.nearDuplicateChain ||
+      signals.structuralStuffing.description.neighboringSentenceRepeats ||
+      signals.structuralStuffing.description.material,
+    true,
+  );
+  assert.equal(signals.structuralStuffing.material, true);
+}
+
+// H — RED issue field=description but user-facing says «Описание продукта»
+{
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "ok",
+      issues: [],
+      positiveNotes: [],
+    },
+    liveLikeSignals,
+  );
+  const descIssue = reconciled.issues.find((issue) => issue.field === "description");
+  assert.ok(descIssue);
+  assert.match(descIssue.message, /Описание продукта/i);
+  assert.doesNotMatch(descIssue.message, /`description`/);
+  assert.doesNotMatch(descIssue.message, /\bfield\s*=\s*description\b/);
+}
+
+// I–R terminology
+{
+  const dirty = humanizeProductQualityReviewText(
+    "Добавьте primary query в usage и FAQ. Смотрите seoDescription и seoTitle. Проблема в description.",
+  );
+  assert.doesNotMatch(dirty, /\busage\b/);
+  assert.doesNotMatch(dirty, /\bFAQ\b/);
+  assert.doesNotMatch(dirty, /\bfaq\b/);
+  assert.doesNotMatch(dirty, /\bseoDescription\b/);
+  assert.doesNotMatch(dirty, /\bseoTitle\b/);
+  assert.doesNotMatch(dirty, /\bdescription\b/);
+  assert.doesNotMatch(dirty, /\bprimary\b/i);
+  assert.match(dirty, /Когда слушать/);
+  assert.match(dirty, /Вопросы и ответы/);
+  assert.match(dirty, /описание для поиска/i);
+  assert.match(dirty, /заголовок для поиска/i);
+  assert.match(dirty, /описание продукта/i);
+
+  assert.equal(getProductQualityReviewFieldLabel("usage"), "Когда слушать");
+  assert.equal(getProductQualityReviewFieldLabel("faq"), "Вопросы и ответы");
+  assert.equal(getProductQualityReviewFieldLabel("description"), "Описание продукта");
+  assert.equal(
+    getProductQualityReviewFieldLabel("seoDescription"),
+    "Описание для поиска",
+  );
+  assert.equal(getProductQualityReviewFieldLabel("seoTitle"), "Заголовок для поиска");
+}
+
+// S — at RED no primary «добавьте ещё ключи» advice
+{
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "red",
+      summary: "Переспам",
+      issues: [
+        {
+          severity: "critical",
+          field: "description",
+          message: "Слишком много повторов.",
+          recommendation: "Добавьте ещё поисковый запрос в текст.",
+        },
+      ],
+      positiveNotes: [],
+    },
+    liveLikeSignals,
+  );
+  assert.equal(reconciled.status, "red");
+  assert.equal(
+    reconciled.issues.every(
+      (issue) =>
+        !/добавьте\s+(ещё\s+)?(основной\s+|дополнительн\w*\s+)?(поисков\w*\s+)?(запрос|ключ)/i.test(
+          issue.recommendation,
+        ),
+    ),
+    true,
+  );
+}
+
+// T — green/yellow semantics otherwise preserved (no false stuffing)
+{
+  assert.equal(
+    reconcileProductQualityReviewResult(
+      {
+        status: "yellow",
+        summary: "Тема слабая.",
+        issues: [
+          {
+            severity: "warning",
+            field: "seoDescription",
+            message: "Основной запрос почти не отражён.",
+            recommendation:
+              "Добавьте основной поисковый запрос естественно в описание для поиска.",
+          },
+        ],
+        positiveNotes: [],
+      },
+      buildProductQualityReviewSignals(weakSeo),
+    ).status,
+    "yellow",
+  );
+  assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "SEO в норме");
+  assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "SEO слишком слабое");
+  assert.equal(
+    PRODUCT_QUALITY_REVIEW_STATUS_COPY.red.title,
+    "Слишком много SEO-повторов",
+  );
+}
+
+// Prompt forbids internal names + prioritizes description
+{
+  const systemPrompt = buildProductQualityReviewSystemPrompt();
+  assert.match(systemPrompt, /основное описание продукта/i);
+  assert.match(systemPrompt, /не компенсируй переспам/i);
+  assert.match(systemPrompt, /НИКОГДА не используй внутренние имена/i);
+  assert.match(systemPrompt, /Когда слушать/);
+  assert.match(systemPrompt, /Вопросы и ответы/);
+  assert.doesNotMatch(systemPrompt, /\d+\s*%\s*=\s*red/i);
+  assert.match(systemPrompt, /НЕ используй произвольные пороги keyword density/i);
+}
+
+// No density threshold constants in structural module
+{
+  const structuralSrc = read(
+    "src/lib/seo/product-quality-review/structural-stuffing.ts",
+  );
+  assert.doesNotMatch(structuralSrc, /\b3%\b/);
+  assert.doesNotMatch(structuralSrc, /\b5%\b/);
+  assert.doesNotMatch(structuralSrc, /keywordDensity/);
+  assert.doesNotMatch(structuralSrc, /seoScore|SEO score/i);
+}
+
+// Orchestrate path applies reconcile (mock GREEN on stuffed package → RED)
+{
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexAlt(validReviewJson)),
+  ]);
+  const result = await reviewProductTextQualityForRequest(
+    { authorId: AURAFON_AUTHOR_ID, ...liveLikePkg },
+    { fetchImpl, env: yandexEnv },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.result.status, "red");
+  assert.equal(
+    result.result.issues.some((issue) => issue.field === "description"),
+    true,
+  );
 }
 
 

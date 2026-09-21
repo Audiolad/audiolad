@@ -2,6 +2,7 @@ import { productSeoAiError } from "@/lib/seo/product-autofill/errors";
 import type { ProductSeoAiErrorResult } from "@/lib/seo/product-autofill/types";
 import { assertAuthorProductQualityReviewEnabled } from "@/lib/seo/product-quality-review/beta";
 import { runProductQualityReviewModel } from "@/lib/seo/product-quality-review/provider";
+import { reconcileProductQualityReviewResult } from "@/lib/seo/product-quality-review/reconcile";
 import { buildProductQualityReviewSignals } from "@/lib/seo/product-quality-review/signals";
 import type {
   ProductQualityReviewRequest,
@@ -92,7 +93,10 @@ export async function reviewProductTextQualityForRequest(
   if (!model.ok) {
     return model;
   }
-  return { ok: true, result: model.result };
+  return {
+    ok: true,
+    result: reconcileProductQualityReviewResult(model.result, signals),
+  };
 }
 
 /** Test helper: force a parsed fixture through the same validator path. */
