@@ -1,6 +1,9 @@
--- Author partner program foundation (PR1).
+-- Author partner program foundation (PR1, hardened).
 -- Identity + invite codes + referral core only.
 -- Does NOT touch ledger, payouts, capacity, attribution cookies, or UI routes.
+--
+-- Partner identity is author_id (referrer_author_id). referrer_owner_user_id is an
+-- audit/self-referral snapshot only — never the financial or authorization owner.
 
 BEGIN;
 
@@ -90,6 +93,8 @@ AS $$
   );
 $$;
 
+-- Internal: resolves current owner user_id. Must NOT be callable by clients
+-- (would leak auth.users ids for arbitrary author workspaces).
 CREATE OR REPLACE FUNCTION public.author_partner_owner_user_id(p_author_id uuid)
 RETURNS uuid
 LANGUAGE sql
@@ -105,9 +110,13 @@ AS $$
   LIMIT 1;
 $$;
 
-REVOKE ALL ON FUNCTION public.author_partner_owner_user_id(uuid) FROM PUBLIC, anon;
+COMMENT ON FUNCTION public.author_partner_owner_user_id(uuid) IS
+  'audiolad:author-partner:v1; INTERNAL only. Returns current owner user_id. Not for client use.';
+
+REVOKE ALL ON FUNCTION public.author_partner_owner_user_id(uuid)
+  FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.author_partner_owner_user_id(uuid)
-  TO authenticated, service_role;
+  TO service_role;
 
 CREATE OR REPLACE FUNCTION public.author_partner_is_owner(p_author_id uuid)
 RETURNS boolean
@@ -178,6 +187,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS author_partner_code_claims_one_primary_per_aut
   ON public.author_partner_code_claims (author_id)
   WHERE claim_kind = 'primary';
 
+-- Composite uniqueness enables author-scoped FKs from profiles/aliases.
+CREATE UNIQUE INDEX IF NOT EXISTS author_partner_code_claims_author_code_uidx
+  ON public.author_partner_code_claims (author_id, code_normalized);
+
 CREATE INDEX IF NOT EXISTS author_partner_code_claims_author_id_idx
   ON public.author_partner_code_claims (author_id);
 
@@ -203,10 +216,10 @@ CREATE TABLE IF NOT EXISTS public.author_partner_profiles (
       primary_code_normalized = lower(btrim(primary_code_normalized))
       AND primary_code_normalized = public.author_partner_normalize_code(primary_code)
     ),
-  CONSTRAINT author_partner_profiles_primary_fk
-    FOREIGN KEY (primary_code_normalized)
-    REFERENCES public.author_partner_code_claims (code_normalized)
-    ON DELETE RESTRICT
+  CONSTRAINT author_partner_profiles_primary_claim_fk
+    FOREIGN KEY (author_id, primary_code_normalized)
+    REFERENCES public.author_partner_code_claims (author_id, code_normalized)
+    ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS author_partner_profiles_status_idx
@@ -234,9 +247,9 @@ CREATE TABLE IF NOT EXISTS public.author_partner_code_aliases (
       code_normalized = lower(btrim(code_normalized))
       AND code_normalized = public.author_partner_normalize_code(code)
     ),
-  CONSTRAINT author_partner_code_aliases_code_fk
-    FOREIGN KEY (code_normalized)
-    REFERENCES public.author_partner_code_claims (code_normalized)
+  CONSTRAINT author_partner_code_aliases_claim_fk
+    FOREIGN KEY (author_id, code_normalized)
+    REFERENCES public.author_partner_code_claims (author_id, code_normalized)
     ON DELETE CASCADE,
   CONSTRAINT author_partner_code_aliases_code_unique
     UNIQUE (code_normalized)
@@ -247,6 +260,60 @@ CREATE INDEX IF NOT EXISTS author_partner_code_aliases_author_id_idx
 
 COMMENT ON TABLE public.author_partner_code_aliases IS
   'audiolad:author-partner:v1; retained invite codes after primary change; still resolve to same author.';
+
+-- claim_kind must match row role (DB-level, not only RPC).
+CREATE OR REPLACE FUNCTION public.author_partner_assert_claim_kind()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_kind text;
+  v_author uuid;
+  v_code text;
+  v_expect text;
+BEGIN
+  IF TG_TABLE_NAME = 'author_partner_profiles' THEN
+    v_author := NEW.author_id;
+    v_code := NEW.primary_code_normalized;
+    v_expect := 'primary';
+  ELSE
+    v_author := NEW.author_id;
+    v_code := NEW.code_normalized;
+    v_expect := 'alias';
+  END IF;
+
+  SELECT c.claim_kind
+  INTO v_kind
+  FROM public.author_partner_code_claims AS c
+  WHERE c.author_id = v_author
+    AND c.code_normalized = v_code;
+
+  IF v_kind IS DISTINCT FROM v_expect THEN
+    RAISE EXCEPTION 'author_partner_claim_kind_mismatch'
+      USING ERRCODE = '23514',
+            DETAIL = format('expected %s claim for %s', v_expect, v_code);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS author_partner_profiles_assert_claim_kind_trg
+  ON public.author_partner_profiles;
+CREATE TRIGGER author_partner_profiles_assert_claim_kind_trg
+  BEFORE INSERT OR UPDATE OF author_id, primary_code_normalized
+  ON public.author_partner_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.author_partner_assert_claim_kind();
+
+DROP TRIGGER IF EXISTS author_partner_code_aliases_assert_claim_kind_trg
+  ON public.author_partner_code_aliases;
+CREATE TRIGGER author_partner_code_aliases_assert_claim_kind_trg
+  BEFORE INSERT OR UPDATE OF author_id, code_normalized
+  ON public.author_partner_code_aliases
+  FOR EACH ROW
+  EXECUTE FUNCTION public.author_partner_assert_claim_kind();
 
 -- ---------------------------------------------------------------------------
 -- 5. Core referral record (no attribution engine yet)
@@ -282,12 +349,13 @@ CREATE TABLE IF NOT EXISTS public.author_referrals (
     CHECK (code_normalized = public.author_partner_normalize_code(code_used)),
   CONSTRAINT author_referrals_activated_shape_check
     CHECK (
-      status <> 'activated'
+      (activated_at IS NULL AND status IN ('attributed', 'void'))
       OR (
         activated_at IS NOT NULL
         AND expires_at IS NOT NULL
         AND invitee_author_id IS NOT NULL
         AND expires_at > activated_at
+        AND status IN ('activated', 'expired', 'void')
       )
     )
 );
@@ -299,14 +367,16 @@ CREATE INDEX IF NOT EXISTS author_referrals_status_idx
   ON public.author_referrals (status);
 
 COMMENT ON TABLE public.author_referrals IS
-  'audiolad:author-partner:v1; single-level referral core. One invitee_user → one referrer_author. Immutable after activated.';
+  'audiolad:author-partner:v1; single-level referral core. One invitee_user → one referrer_author. Once activated_at is set, identity fields stay immutable forever (status may still move activated→expired/void).';
 
 COMMENT ON COLUMN public.author_referrals.referrer_author_id IS
-  'Canonical partner identity for future ledger credits (author workspace that owns the invite code).';
+  'Canonical partner identity for future ledger credits AND authorization (author workspace that owns the invite code).';
 
 COMMENT ON COLUMN public.author_referrals.referrer_owner_user_id IS
-  'Owner user of referrer_author_id at bind time; used for self-referral defense.';
+  'AUDIT SNAPSHOT only: owner user_id of referrer_author_id at bind time. Used for self-referral defense / fraud review. NOT the financial owner and NOT the RLS authorization source.';
 
+-- Once activated_at is set, identity is permanently immutable.
+-- Status may still change (activated → expired/void); that must NOT lift protection.
 CREATE OR REPLACE FUNCTION public.author_referrals_protect_activated()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -314,14 +384,14 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    IF OLD.status = 'activated' THEN
+    IF OLD.activated_at IS NOT NULL THEN
       RAISE EXCEPTION 'author_referral_activated_immutable'
         USING ERRCODE = '22023';
     END IF;
     RETURN OLD;
   END IF;
 
-  IF OLD.status = 'activated' THEN
+  IF OLD.activated_at IS NOT NULL THEN
     IF NEW.id IS DISTINCT FROM OLD.id
       OR NEW.referrer_author_id IS DISTINCT FROM OLD.referrer_author_id
       OR NEW.referrer_owner_user_id IS DISTINCT FROM OLD.referrer_owner_user_id
@@ -388,7 +458,6 @@ DECLARE
 BEGIN
   LOOP
     v_attempt := v_attempt + 1;
-    -- 10 hex chars from 5 random bytes → non-sequential, URL-safe.
     v_raw := encode(gen_random_bytes(5), 'hex');
     v_code := 'p' || v_raw;
 
@@ -459,6 +528,7 @@ BEGIN
   FROM public.authors AS a
   WHERE a.id = v_claim.author_id;
 
+  -- Public-safe projection only — never owner user_id / email / finance.
   RETURN jsonb_build_object(
     'ok', true,
     'author_id', v_claim.author_id,
@@ -472,7 +542,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.resolve_author_partner_code(text) IS
-  'audiolad:author-partner:v1; public resolve of primary or alias invite code → safe author projection.';
+  'audiolad:author-partner:v1; public resolve of primary or alias invite code → safe author projection (no user_id).';
 
 REVOKE ALL ON FUNCTION public.resolve_author_partner_code(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.resolve_author_partner_code(text)
@@ -502,6 +572,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.authors AS a WHERE a.id = p_author_id) THEN
     RAISE EXCEPTION 'author_not_found' USING ERRCODE = 'P0002';
   END IF;
+
+  -- Serialize concurrent ensure for the same author within the transaction.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('author_partner_profile:' || p_author_id::text, 0)
+  );
 
   SELECT *
   INTO v_profile
@@ -546,6 +621,23 @@ BEGIN
       );
     EXCEPTION
       WHEN unique_violation THEN
+        -- Idempotent under race: if another session created the profile, return it.
+        SELECT *
+        INTO v_profile
+        FROM public.author_partner_profiles AS p
+        WHERE p.author_id = p_author_id;
+
+        IF FOUND THEN
+          RETURN jsonb_build_object(
+            'ok', true,
+            'created', false,
+            'author_id', v_profile.author_id,
+            'primary_code', v_profile.primary_code,
+            'status', v_profile.status
+          );
+        END IF;
+
+        -- Otherwise a code collision with another author — retry a new code.
         IF v_attempt >= 24 THEN
           RAISE EXCEPTION 'author_partner_code_generate_exhausted'
             USING ERRCODE = 'P0001';
@@ -556,7 +648,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.ensure_author_partner_profile(uuid) IS
-  'audiolad:author-partner:v1; owner-only ensure profile + generated primary code (DB uniqueness + retry).';
+  'audiolad:author-partner:v1; owner-only ensure profile + generated primary code. Concurrent-safe (advisory lock + re-read on unique_violation).';
 
 REVOKE ALL ON FUNCTION public.ensure_author_partner_profile(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.ensure_author_partner_profile(uuid)
@@ -751,7 +843,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.get_author_partner_profile(uuid) IS
-  'audiolad:author-partner:v1; member read of own partner profile + aliases (no finance).';
+  'audiolad:author-partner:v1; member read of own partner profile + aliases (no finance / no owner user_id).';
 
 REVOKE ALL ON FUNCTION public.get_author_partner_profile(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_author_partner_profile(uuid)
@@ -800,7 +892,112 @@ GRANT EXECUTE ON FUNCTION public.author_partner_assert_not_self_referral(uuid, u
   TO service_role;
 
 -- ---------------------------------------------------------------------------
--- 9. RLS
+-- 9. Integrate with author space delete blockers (product-safe)
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.author_space_delete_blockers(p_author_id uuid)
+RETURNS text[]
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_blockers text[] := ARRAY[]::text[];
+BEGIN
+  -- Defensive to_regclass / to_regprocedure so isolated smoke stubs and
+  -- partial environments still load this replacement safely.
+  IF to_regclass('public.practices') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.practices AS p WHERE p.author_id = p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_practices');
+    END IF;
+  END IF;
+
+  IF to_regprocedure('public.author_space_has_finance_history(uuid)') IS NOT NULL THEN
+    IF public.author_space_has_finance_history(p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_finance');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.author_commercial_applications') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.author_commercial_applications AS a WHERE a.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_commercial_application');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.author_payout_profiles') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.author_payout_profiles AS p WHERE p.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_payout_profile');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.author_terms_acceptances') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.author_terms_acceptances AS t WHERE t.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_terms_acceptance');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.personal_materials') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.personal_materials AS m WHERE m.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_personal_materials');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.studio_projects') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.studio_projects AS s WHERE s.author_id = p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_studio_project');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.audiobook_projects') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.audiobook_projects AS b WHERE b.author_id = p_author_id) THEN
+      v_blockers := array_append(v_blockers, 'has_audiobook_project');
+    END IF;
+  END IF;
+
+  IF to_regclass('public.practice_moderation_email_outbox') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.practice_moderation_email_outbox AS o WHERE o.author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_moderation_outbox');
+    END IF;
+  END IF;
+
+  -- Partner referrals (FK RESTRICT on referrer/invitee author). Surface as
+  -- product blockers instead of an unexpected FK failure on delete.
+  IF to_regclass('public.author_referrals') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.author_referrals AS r
+      WHERE r.referrer_author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_partner_referrals_as_referrer');
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.author_referrals AS r
+      WHERE r.invitee_author_id = p_author_id
+    ) THEN
+      v_blockers := array_append(v_blockers, 'has_partner_referrals_as_invitee');
+    END IF;
+  END IF;
+
+  RETURN v_blockers;
+END;
+$$;
+
+COMMENT ON FUNCTION public.author_space_delete_blockers(uuid) IS
+  'audiolad:author-space-ops; hard-delete blockers including partner referral RESTRICT edges.';
+
+-- ---------------------------------------------------------------------------
+-- 10. RLS
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.author_partner_reserved_codes ENABLE ROW LEVEL SECURITY;
@@ -817,6 +1014,8 @@ REVOKE ALL ON TABLE public.author_referrals FROM PUBLIC, anon, authenticated;
 
 GRANT SELECT ON TABLE public.author_partner_profiles TO authenticated;
 GRANT SELECT ON TABLE public.author_partner_code_aliases TO authenticated;
+GRANT SELECT ON TABLE public.author_referrals TO authenticated;
+
 GRANT ALL ON TABLE public.author_partner_reserved_codes TO service_role;
 GRANT ALL ON TABLE public.author_partner_code_claims TO service_role;
 GRANT ALL ON TABLE public.author_partner_profiles TO service_role;
@@ -839,14 +1038,17 @@ CREATE POLICY "Author members can read partner code aliases"
   TO authenticated
   USING (public.author_partner_is_member(author_id));
 
+-- Referrer-side access is CURRENT author ownership (not historical snapshot user).
 DROP POLICY IF EXISTS "Referrer owner or invitee can read referrals"
   ON public.author_referrals;
-CREATE POLICY "Referrer owner or invitee can read referrals"
+DROP POLICY IF EXISTS "Current referrer owner or invitee can read referrals"
+  ON public.author_referrals;
+CREATE POLICY "Current referrer owner or invitee can read referrals"
   ON public.author_referrals
   FOR SELECT
   TO authenticated
   USING (
-    referrer_owner_user_id = auth.uid()
+    public.author_partner_is_owner(referrer_author_id)
     OR invitee_user_id = auth.uid()
   );
 
