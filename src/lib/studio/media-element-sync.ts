@@ -202,3 +202,123 @@ export function countActiveStudioClips<T extends StudioMediaClipWindow>(
   }
   return count;
 }
+
+/**
+ * Mirrors `StudioAudioProvider.startSourcesAtPosition` planning for one track:
+ * clear any stale `activeClipId`, then `planStudioMediaElementSync(..., forceEnter: true)`.
+ * Selection / zoom are intentionally absent — they must not affect this plan.
+ */
+export function planStudioProviderPlayRestart(input: {
+  clips: readonly (StudioMediaClipWindow & { id?: string })[];
+  timelineTime: number;
+  /** Stale arm left over from an older bug or raced sync; ignored via forceEnter. */
+  staleActiveClipId: string | null;
+  mediaCurrentTime: number;
+  mediaEnded?: boolean;
+}): StudioMediaElementSyncPlan {
+  return planStudioMediaElementSync({
+    clips: input.clips,
+    timelineTime: input.timelineTime,
+    playing: true,
+    // Provider clears runtime.activeClipId to null before sync; pass null here too.
+    activeClipId: null,
+    mediaCurrentTime: input.mediaCurrentTime,
+    mediaEnded: input.mediaEnded,
+    forceEnter: true,
+  });
+}
+
+/**
+ * Full Pause → paused seeks → Play restart for several tracks, matching the
+ * provider call sequence (stopSources disarm → seek(playing=false) park →
+ * startSourcesAtPosition forceEnter). Used by regression tests to lock the
+ * production transport path without mounting React.
+ */
+export function planStudioProviderPauseSeekPlayCycle(input: {
+  tracks: readonly {
+    id: string;
+    muted?: boolean;
+    clips: readonly (StudioMediaClipWindow & { id?: string })[];
+    /** Clip id that was active while playing before pause. */
+    activeClipIdBeforePause: string | null;
+    mediaCurrentTimeBeforePause: number;
+  }[];
+  pausedSeekTimes: readonly number[];
+  playAt: number;
+}): {
+  afterPause: { trackId: string; activeClipId: null }[];
+  afterPausedSeeks: {
+    seekTime: number;
+    tracks: {
+      trackId: string;
+      plan: StudioMediaElementSyncPlan;
+      mediaCurrentTime: number;
+    }[];
+  }[];
+  afterPlay: {
+    trackId: string;
+    plan: StudioMediaElementSyncPlan;
+    expectedSourceOffset: number;
+  }[];
+} {
+  const afterPause = input.tracks.map((track) => ({
+    trackId: track.id,
+    activeClipId: null as null,
+  }));
+
+  const mediaByTrack = new Map(
+    input.tracks.map((track) => [track.id, track.mediaCurrentTimeBeforePause]),
+  );
+
+  const afterPausedSeeks: {
+    seekTime: number;
+    tracks: {
+      trackId: string;
+      plan: StudioMediaElementSyncPlan;
+      mediaCurrentTime: number;
+    }[];
+  }[] = [];
+
+  for (const seekTime of input.pausedSeekTimes) {
+    const stepTracks = input.tracks.map((track) => {
+      const plan = planStudioMediaElementSync({
+        clips: track.clips,
+        timelineTime: seekTime,
+        playing: false,
+        activeClipId: null,
+        mediaCurrentTime: mediaByTrack.get(track.id) ?? 0,
+      });
+      const nextMedia =
+        plan.seekTo != null ? plan.seekTo : (mediaByTrack.get(track.id) ?? 0);
+      mediaByTrack.set(track.id, nextMedia);
+      return {
+        trackId: track.id,
+        plan,
+        mediaCurrentTime: nextMedia,
+      };
+    });
+    afterPausedSeeks.push({ seekTime, tracks: stepTracks });
+  }
+
+  const afterPlay = input.tracks.map((track) => {
+    const clip = findActiveStudioClip(track.clips, input.playAt);
+    const expectedSourceOffset = clip
+      ? getStudioClipMediaTime(clip, input.playAt)
+      : 0;
+    const plan = planStudioProviderPlayRestart({
+      clips: track.clips,
+      timelineTime: input.playAt,
+      // Even if a stale id somehow survived, restart ignores it.
+      staleActiveClipId: track.activeClipIdBeforePause,
+      mediaCurrentTime: mediaByTrack.get(track.id) ?? 0,
+    });
+    return {
+      trackId: track.id,
+      plan,
+      expectedSourceOffset,
+    };
+  });
+
+  return { afterPause, afterPausedSeeks, afterPlay };
+}
+

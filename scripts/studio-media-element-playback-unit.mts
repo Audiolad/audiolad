@@ -19,6 +19,8 @@ import {
   listStudioTracksAudibleAtPlayhead,
   nextStudioPlaybackGeneration,
   planStudioMediaElementSync,
+  planStudioProviderPauseSeekPlayCycle,
+  planStudioProviderPlayRestart,
   shouldCorrectStudioMediaDrift,
   STUDIO_MEDIA_DRIFT_SEEK_SECONDS,
 } from "../src/lib/studio/media-element-sync";
@@ -319,6 +321,21 @@ async function testProviderAndHydrationContracts() {
   assert.match(provider, /nextStudioPlaybackGeneration/);
   assert.match(provider, /isStudioPlaybackGenerationCurrent/);
   assert.match(provider, /runtime\.activeClipId = null/);
+  // startSourcesAtPosition: disarm then forceEnter (Pause→seek→Play restart).
+  assert.match(
+    provider,
+    /runtime\.activeClipId = null;\s*syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
+  );
+  // Paused seek must call sync with playing=false (park only).
+  assert.match(
+    provider,
+    /syncTrackMediaPlayback\(\s*runtime,\s*track,\s*nextPosition,\s*false,/,
+  );
+  // Transport path must not read timeline UI state.
+  assert.doesNotMatch(
+    provider,
+    /syncTrackMediaPlayback\([\s\S]{0,200}selectedClipId|pixelsPerSecond/,
+  );
   assert.match(provider, /applyStudioMediaElementSrcRefresh/);
   assert.match(provider, /studioTrackHasOverlappingClips/);
   assert.match(provider, /appendStudioClipsIfNoOverlap/);
@@ -475,6 +492,107 @@ function testStalePlaybackGenerationCannotMutate() {
   assert.equal(isStudioPlaybackGenerationCurrent(generation, generation), true);
 }
 
+
+function testProviderPauseSeekPlayRestoresMusicAndTwoVoices() {
+  // Mirrors StudioAudioProvider: stopSources → seek(playing=false) × N →
+  // startSourcesAtPosition(forceEnter). This is the production path, not only
+  // the audible-at-playhead helper.
+  const musicClips = [{ id: "m1", startTime: 0, offset: 0, duration: 180 }];
+  const voiceAClips = [{ id: "a1", startTime: 0, offset: 0, duration: 90 }];
+  const voiceBClips = [{ id: "b1", startTime: 0, offset: 5, duration: 80 }];
+
+  const cycle = planStudioProviderPauseSeekPlayCycle({
+    tracks: [
+      {
+        id: "music",
+        clips: musicClips,
+        activeClipIdBeforePause: "m1",
+        mediaCurrentTimeBeforePause: 12,
+      },
+      {
+        id: "voice-a",
+        clips: voiceAClips,
+        activeClipIdBeforePause: "a1",
+        mediaCurrentTimeBeforePause: 12,
+      },
+      {
+        id: "voice-b",
+        clips: voiceBClips,
+        activeClipIdBeforePause: "b1",
+        mediaCurrentTimeBeforePause: 17,
+      },
+    ],
+    pausedSeekTimes: [20, 45, 33, 50],
+    playAt: 50,
+  });
+
+  assert.deepEqual(
+    cycle.afterPause.map((item) => item.activeClipId),
+    [null, null, null],
+  );
+
+  for (const step of cycle.afterPausedSeeks) {
+    for (const track of step.tracks) {
+      assert.equal(track.plan.activeClipId, null);
+      assert.equal(track.plan.enteredClip, false);
+      assert.equal(track.plan.envelope, "silence");
+      assert.equal(track.plan.wantPlaying, false);
+      // Paused park must not request media.play() — avoids AbortError noise.
+      assert.equal(track.plan.wantPlaying && true, false);
+    }
+    assert.equal(
+      step.tracks.find((t) => t.trackId === "music")?.plan.seekTo,
+      getStudioClipMediaTime(musicClips[0], step.seekTime),
+    );
+    assert.equal(
+      step.tracks.find((t) => t.trackId === "voice-a")?.plan.seekTo,
+      getStudioClipMediaTime(voiceAClips[0], step.seekTime),
+    );
+    assert.equal(
+      step.tracks.find((t) => t.trackId === "voice-b")?.plan.seekTo,
+      getStudioClipMediaTime(voiceBClips[0], step.seekTime),
+    );
+  }
+
+  // UI-only knobs must not be inputs to transport planning.
+  const selectedClipId = "m1";
+  const pixelsPerSecond = 80;
+  void selectedClipId;
+  void pixelsPerSecond;
+
+  for (const track of cycle.afterPlay) {
+    assert.equal(track.plan.enteredClip, true);
+    assert.equal(track.plan.envelope, "clip");
+    assert.equal(track.plan.wantPlaying, true);
+    assert.equal(track.plan.seekTo, track.expectedSourceOffset);
+    assert.ok(track.plan.activeClipId);
+  }
+
+  assert.equal(
+    cycle.afterPlay.find((t) => t.trackId === "music")?.expectedSourceOffset,
+    50,
+  );
+  assert.equal(
+    cycle.afterPlay.find((t) => t.trackId === "voice-a")?.expectedSourceOffset,
+    50,
+  );
+  assert.equal(
+    cycle.afterPlay.find((t) => t.trackId === "voice-b")?.expectedSourceOffset,
+    55,
+  );
+
+  // Stale armed id alone must not skip enter when using provider restart helper.
+  const stale = planStudioProviderPlayRestart({
+    clips: musicClips,
+    timelineTime: 50,
+    staleActiveClipId: "m1",
+    mediaCurrentTime: 50,
+  });
+  assert.equal(stale.enteredClip, true);
+  assert.equal(stale.seekTo, 50);
+}
+
+
 function testForceEnterReopensSameClipAfterPause() {
   const clips = [{ id: "m1", startTime: 0, offset: 10, duration: 60 }];
   // Simulate the old broken path: activeClipId still armed, gain would stay 0.
@@ -512,6 +630,7 @@ testPausedSeekDoesNotArmEnvelope();
 testSequentialSeeksThenPlayForceEnter();
 testMultiTrackAudibleAtPlayheadIgnoresSelectionZoom();
 testStalePlaybackGenerationCannotMutate();
+testProviderPauseSeekPlayRestoresMusicAndTwoVoices();
 testForceEnterReopensSameClipAfterPause();
 testSignedUrlRefreshDoesNotRecreateSource();
 testFallbackWaveform();
