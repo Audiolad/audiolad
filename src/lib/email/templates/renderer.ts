@@ -562,6 +562,8 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
 
       const authorName = readString(input.payload, "authorName") ?? undefined;
       const publicProductPath = readString(input.payload, "publicProductPath");
+      const authorSlug = readString(input.payload, "authorSlug") ?? undefined;
+      const productSlug = readString(input.payload, "productSlug") ?? undefined;
       const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
 
       return {
@@ -572,6 +574,8 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
           productTitle,
           authorDashboardPath,
           publicProductPath,
+          authorSlug,
+          productSlug,
           siteOrigin,
         }),
         text: renderAuthorProductModerationApprovedEmailText({
@@ -579,6 +583,8 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
           productTitle,
           authorDashboardPath,
           publicProductPath,
+          authorSlug,
+          productSlug,
           siteOrigin,
         }),
       };

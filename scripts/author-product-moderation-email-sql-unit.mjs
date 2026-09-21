@@ -25,6 +25,8 @@ const MIGRATION =
   "supabase/migrations/20260801140000_practice_moderation_email_outbox.sql";
 const ADMIN_MIGRATION =
   "supabase/migrations/20260804120000_practice_moderation_admin_email_outbox.sql";
+const CANONICAL_CTA_MIGRATION =
+  "supabase/migrations/20261027120000_product_published_email_context_canonical.sql";
 
 const AUTHOR_ID = "22222222-2222-2222-2222-222222222222";
 const OWNER_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -266,6 +268,8 @@ CREATE TABLE public.profiles (
   psqlFile(TEST_DB, join(ROOT, MIGRATION));
   psqlFile(TEST_DB, join(ROOT, ADMIN_MIGRATION));
   psqlFile(TEST_DB, join(ROOT, ADMIN_MIGRATION));
+  psqlFile(TEST_DB, join(ROOT, CANONICAL_CTA_MIGRATION));
+  psqlFile(TEST_DB, join(ROOT, CANONICAL_CTA_MIGRATION));
 
   psql(
     TEST_DB,
@@ -431,6 +435,32 @@ async function runAssertions() {
     ),
     "true",
     "approved_and_published must never carry a moderator comment",
+  );
+
+  assertEqual(
+    scalar(
+      `SELECT context->>'author_name' FROM public.practice_moderation_email_outbox WHERE event_id = '${publishedEventId}'`,
+    ),
+    "Author",
+    "approved_and_published must snapshot author_name",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'author_slug' FROM public.practice_moderation_email_outbox WHERE event_id = '${publishedEventId}'`,
+    ),
+    "maria",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'product_slug' FROM public.practice_moderation_email_outbox WHERE event_id = '${publishedEventId}'`,
+    ),
+    "practice-b",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'public_product_path' FROM public.practice_moderation_email_outbox WHERE event_id = '${publishedEventId}'`,
+    ),
+    "/practice/maria/practice-b",
   );
 
   const resubmittedEventId = logPracticeModerationEvent({

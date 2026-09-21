@@ -23,6 +23,10 @@ export type AuthorProductModerationEmailContext = {
   author_dashboard_path: string;
   public_product_path: string | null;
   moderator_comment: string | null;
+  /** Optional snapshot fields (v2+). Used to rebuild the CTA via buildPracticePublicPath. */
+  author_name?: string | null;
+  author_slug?: string | null;
+  product_slug?: string | null;
 };
 
 export type AuthorProductModerationAdminEmailContext = {
@@ -68,13 +72,19 @@ export function isAuthorProductModerationEmailContext(
 
   const record = value as Record<string, unknown>;
 
+  const optionalStringOrNull = (value: unknown) =>
+    value === undefined || value === null || typeof value === "string";
+
   return (
     (record.product_title === null || typeof record.product_title === "string") &&
     typeof record.author_dashboard_path === "string" &&
     record.author_dashboard_path.length > 0 &&
     (record.public_product_path === null ||
       typeof record.public_product_path === "string") &&
-    (record.moderator_comment === null || typeof record.moderator_comment === "string")
+    (record.moderator_comment === null || typeof record.moderator_comment === "string") &&
+    optionalStringOrNull(record.author_name) &&
+    optionalStringOrNull(record.author_slug) &&
+    optionalStringOrNull(record.product_slug)
   );
 }
 
