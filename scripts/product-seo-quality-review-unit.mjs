@@ -239,4 +239,23 @@ assert.match(form, /authorId=\{form\.authorId\}/);
 // no migration files in this feature module
 assert.doesNotMatch(read("src/lib/seo/product-quality-review/orchestrate.ts"), /supabase\/migrations/);
 
+
+// Yandex quality-review provider must follow canonical autofill contract
+const reviewProvider = read("src/lib/seo/product-quality-review/provider.ts");
+assert.match(reviewProvider, /buildYandexAiModelUri/);
+assert.match(reviewProvider, /YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS/);
+assert.match(reviewProvider, /YANDEX_AI_CONTENT_FILTER_STATUS/);
+assert.match(reviewProvider, /readYandexFirstAlternative/);
+assert.match(reviewProvider, /jsonSchema:\s*\{\s*schema:\s*PRODUCT_QUALITY_REVIEW_JSON_SCHEMA/);
+assert.match(reviewProvider, /maxTokens:\s*String\(PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS\)/);
+assert.doesNotMatch(reviewProvider, /gpt:\/\/\$\{folderId\}\/\$\{config\.model\}`/);
+assert.doesNotMatch(reviewProvider, /temperature:\s*0\.2/);
+assert.doesNotMatch(reviewProvider, /x-folder-id/);
+assert.match(reviewProvider, /productSeoAiContentFilteredError/);
+
+const yandexCanonical = read("src/lib/seo/product-autofill/yandex-provider.ts");
+assert.match(yandexCanonical, /export function buildYandexAiModelUri/);
+assert.match(yandexCanonical, /export function readYandexFirstAlternative/);
+assert.match(yandexCanonical, /gpt:\/\/\$\{folderId\}\/\$\{modelId\}\/latest/);
+
 console.log("product-seo-quality-review-unit: ok");

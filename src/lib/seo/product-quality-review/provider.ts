@@ -9,6 +9,7 @@ import {
 } from "@/lib/seo/product-autofill/config";
 import {
   classifyProductSeoAiHttpError,
+  productSeoAiContentFilteredError,
   productSeoAiError,
 } from "@/lib/seo/product-autofill/errors";
 import {
@@ -19,6 +20,12 @@ import {
   PRODUCT_SEO_YANDEX_AI_COMPLETION_URL,
   type ProductSeoAiErrorResult,
 } from "@/lib/seo/product-autofill/types";
+import {
+  YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS,
+  YANDEX_AI_CONTENT_FILTER_STATUS,
+  buildYandexAiModelUri,
+  readYandexFirstAlternative,
+} from "@/lib/seo/product-autofill/yandex-provider";
 import {
   buildProductQualityReviewSystemPrompt,
   buildProductQualityReviewUserPrompt,
@@ -111,22 +118,6 @@ function extractOpenAiOutputText(body: unknown): string | null {
     }
   }
   return null;
-}
-
-function extractYandexText(body: unknown): string | null {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
-  const result = (body as { result?: unknown }).result;
-  if (!result || typeof result !== "object" || Array.isArray(result)) return null;
-  const alternatives = (result as { alternatives?: unknown }).alternatives;
-  if (!Array.isArray(alternatives) || alternatives.length === 0) return null;
-  const first = alternatives[0];
-  if (!first || typeof first !== "object" || Array.isArray(first)) return null;
-  const message = (first as { message?: unknown }).message;
-  if (!message || typeof message !== "object" || Array.isArray(message)) {
-    return null;
-  }
-  const text = (message as { text?: unknown }).text;
-  return typeof text === "string" && text.trim() ? text : null;
 }
 
 function parseResultFromText(text: string): ProductQualityReviewResult | null {
@@ -229,33 +220,31 @@ export async function runProductQualityReviewModel(input: {
     return { ok: true, result };
   }
 
-  // yandex
+  // Canonical Yandex Product SEO completion contract (same as autofill).
   const apiKey = readYandexAiApiKey(env);
   const folderId = readYandexAiFolderId(env);
   if (!apiKey || !folderId) return productSeoAiError("NOT_CONFIGURED");
 
-  const modelUri = `gpt://${folderId}/${config.model}`;
+  const modelUri = buildYandexAiModelUri(folderId, config.model);
   const attempt = await requestOnce(PRODUCT_SEO_YANDEX_AI_COMPLETION_URL, {
     headers: {
       Authorization: `Api-Key ${apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "x-folder-id": folderId,
     },
     body: JSON.stringify({
       modelUri,
       completionOptions: {
         stream: false,
-        temperature: 0.2,
-        maxTokens: PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
+        maxTokens: String(PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS),
       },
       messages: [
         { role: "system", text: systemPrompt },
-        {
-          role: "user",
-          text: `${userPrompt}\n\nОтветь только JSON по схеме ${PRODUCT_QUALITY_REVIEW_SCHEMA_NAME}.`,
-        },
+        { role: "user", text: userPrompt },
       ],
+      jsonSchema: {
+        schema: PRODUCT_QUALITY_REVIEW_JSON_SCHEMA,
+      },
     }),
     fetchImpl,
     timeoutMs,
@@ -275,7 +264,31 @@ export async function runProductQualityReviewModel(input: {
     return productSeoAiError(code);
   }
 
-  const text = extractYandexText(attempt.body);
+  const alternative = readYandexFirstAlternative(attempt.body);
+  if (
+    !alternative ||
+    alternative.status !== YANDEX_AI_ACCEPTED_ALTERNATIVE_STATUS
+  ) {
+    if (alternative?.status === YANDEX_AI_CONTENT_FILTER_STATUS) {
+      logReviewEvent("provider_content_filtered", {
+        provider: "yandex",
+        status: alternative.status,
+        durationMs: Date.now() - started,
+      });
+      return productSeoAiContentFilteredError({
+        providerStatus: alternative.status,
+      });
+    }
+    logReviewEvent("provider_invalid", {
+      provider: "yandex",
+      error: "INVALID_OUTPUT",
+      status: alternative?.status ?? "missing",
+      durationMs: Date.now() - started,
+    });
+    return productSeoAiError("PROVIDER_ERROR");
+  }
+
+  const text = alternative.text;
   const result = text ? parseResultFromText(text) : null;
   if (!result) {
     logReviewEvent("provider_invalid", {
