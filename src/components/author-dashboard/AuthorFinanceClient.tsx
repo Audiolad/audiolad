@@ -365,7 +365,7 @@ export default function AuthorFinanceClient({
 
   return (
     <div className="min-w-0">
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
 
       {error ? (
         <p className="mt-6 rounded-[20px] border border-[#f0d2d2] bg-[#fdf6f6] px-4 py-3 text-sm text-[#a24a4a]">

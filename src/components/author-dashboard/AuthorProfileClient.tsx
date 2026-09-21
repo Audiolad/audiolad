@@ -308,7 +308,7 @@ export default function AuthorProfileClient({
 
   return (
     <div>
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
 
       {loading ? (
         <p className="mt-6 text-sm text-[#7d70a2]">Загрузка профиля…</p>

@@ -244,7 +244,7 @@ export default function AuthorDashboardClient({
 
   return (
     <div>
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
       <AuthorTermsRequiredBanner
         authorId={selectedAuthor.id}

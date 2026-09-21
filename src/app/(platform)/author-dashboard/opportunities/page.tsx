@@ -31,7 +31,7 @@ export default async function AuthorOpportunitiesPage({
   const workspace =
     workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
 
-  const { supabase, accessStatus } = await requireAuthorMembership(workspace.id);
+  const { supabase, accessStatus, role } = await requireAuthorMembership(workspace.id);
   const view = await loadAuthorOpportunitiesView({
     supabase,
     authorId: workspace.id,
@@ -47,7 +47,7 @@ export default async function AuthorOpportunitiesPage({
       subtitle="Как продвигать продукты и развивать аудиторию"
       internalBackHref={backHref}
     >
-      <AuthorOpportunitiesClient view={view} />
+      <AuthorOpportunitiesClient view={view} authorRole={role} />
     </AuthorShell>
   );
 }

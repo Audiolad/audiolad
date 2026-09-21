@@ -200,6 +200,7 @@ export default function AuthorMusicClient({
       <AuthorDashboardNav
         authorSlug={selectedAuthor.slug}
         authorId={selectedAuthor.id}
+        authorRole={selectedAuthor.role}
       />
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
 

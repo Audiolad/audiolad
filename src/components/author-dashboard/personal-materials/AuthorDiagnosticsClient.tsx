@@ -190,7 +190,7 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
 
   return (
     <div className="min-w-0">
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[#5f5484]">

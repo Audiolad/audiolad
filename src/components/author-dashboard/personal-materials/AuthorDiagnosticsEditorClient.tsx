@@ -642,7 +642,7 @@ export default function AuthorDiagnosticsEditorClient({
 
   return (
     <div className="min-w-0">
-      <AuthorDashboardNav authorSlug={selectedAuthor?.slug} />
+      <AuthorDashboardNav authorSlug={selectedAuthor?.slug} authorId={selectedAuthor?.id} authorRole={selectedAuthor?.role} />
 
       <div className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
