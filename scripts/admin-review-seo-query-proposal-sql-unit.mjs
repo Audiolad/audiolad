@@ -13,7 +13,7 @@ const CONTAINER =
   process.env.AUDIOLAD_SUPABASE_DB_CONTAINER ||
   process.env.AUDIOLAD_SEO_PROPOSAL_REVIEW_DB_CONTAINER ||
   process.env.AUDIOLAD_PUBLISHED_SEO_ATTACH_DB_CONTAINER ||
-  "audiolad-seo-attach-pg";
+  "supabase-db";
 const TEST_DB = "audiolad_seo_proposal_review_test";
 const MIGRATION = join(
   ROOT,
@@ -32,6 +32,7 @@ const DATABASE_URL =
   process.env.AUDIOLAD_SEO_PROPOSAL_REVIEW_DATABASE_URL?.trim() ||
   process.env.AUDIOLAD_PUBLISHED_SEO_ATTACH_DATABASE_URL?.trim() ||
   process.env.AUDIOLAD_AUTHOR_SLUG_OPS_DATABASE_URL?.trim() ||
+  process.env.AUDIOLAD_ANALYTICS_P2_DATABASE_URL?.trim() ||
   null;
 
 function assert(cond, msg) {
