@@ -12,6 +12,7 @@ import type {
 
 type Props = {
   view: AuthorOpportunitiesViewModel;
+  authorRole?: string | null;
 };
 
 function SectionCard({
@@ -236,10 +237,10 @@ export function AuthorOpportunitiesContent({ view }: Props) {
   );
 }
 
-export default function AuthorOpportunitiesClient({ view }: Props) {
+export default function AuthorOpportunitiesClient({ view, authorRole }: Props) {
   return (
     <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={view.authorSlug} authorId={view.authorId} />
+      <AuthorDashboardNav authorSlug={view.authorSlug} authorId={view.authorId} authorRole={authorRole} />
       <AuthorOpportunitiesContent view={view} />
     </div>
   );

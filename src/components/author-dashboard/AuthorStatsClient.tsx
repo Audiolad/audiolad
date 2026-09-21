@@ -400,7 +400,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
 
   return (
     <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={selectedAuthor?.slug} authorId={selectedAuthor?.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor?.slug} authorId={selectedAuthor?.id} authorRole={selectedAuthor?.role} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <label className="block text-sm text-[#5c5080]">

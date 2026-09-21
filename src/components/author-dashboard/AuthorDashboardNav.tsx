@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import AuthorCreateProjectCta from "@/components/author-dashboard/AuthorCreateProjectCta";
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
+import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/ui-beta";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function ProfileIcon() {
@@ -108,6 +109,21 @@ function FinanceIcon() {
   );
 }
 
+function PercentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <circle cx="7.5" cy="7.5" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="16.5" cy="16.5" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M17 6 7 18"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function StatusIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -148,11 +164,14 @@ function DocumentsIcon() {
 type AuthorDashboardNavProps = {
   authorSlug?: string;
   authorId?: string;
+  /** Owner/editor role of the current workspace; needed for partner beta tab. */
+  authorRole?: "owner" | "editor" | string | null;
 };
 
 export default function AuthorDashboardNav({
   authorSlug,
   authorId,
+  authorRole,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
   const supportMode = useAuthorSupportMode();
@@ -209,6 +228,21 @@ export default function AuthorDashboardNav({
             icon: FinanceIcon,
             active: pathname.startsWith("/author-dashboard/finance"),
           },
+          ...(canAccessAuthorPartnerYour20Ui({
+            authorId,
+            authorSlug,
+            role: authorRole,
+            isSupportMode: supportMode,
+          })
+            ? [
+                {
+                  href: `/author-dashboard/your-20${authorQuery}`,
+                  label: "Ваши 20%",
+                  icon: PercentIcon,
+                  active: pathname.startsWith("/author-dashboard/your-20"),
+                },
+              ]
+            : []),
         ]
       : []),
     {

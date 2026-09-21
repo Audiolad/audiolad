@@ -459,7 +459,7 @@ export default function AuthorPromotionClient({
   if (searchParams.get("offer")) {
     return (
       <div className="space-y-8">
-        <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+        <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
         <AuthorQuickOffersClient selectedAuthor={selectedAuthor} />
       </div>
     );
@@ -467,7 +467,7 @@ export default function AuthorPromotionClient({
 
   return (
     <div className="space-y-8">
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-sm text-[#5f5484]">

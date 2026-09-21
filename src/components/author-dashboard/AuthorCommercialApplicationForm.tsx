@@ -259,7 +259,7 @@ export default function AuthorCommercialApplicationForm({
 
   return (
     <div className="space-y-5">
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
 
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">

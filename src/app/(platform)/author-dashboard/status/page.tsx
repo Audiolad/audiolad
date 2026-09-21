@@ -48,6 +48,7 @@ export default async function AuthorStatusPage({ searchParams }: PageProps) {
       <AuthorStatusClient
         authorId={workspace.id}
         authorSlug={workspace.slug}
+        authorRole={role}
         view={view}
       />
     </AuthorShell>
