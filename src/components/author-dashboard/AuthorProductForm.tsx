@@ -4654,6 +4654,7 @@ export default function AuthorProductForm({
         subtitle={form.subtitle}
         description={form.description}
         productKind={form.productKind}
+        authorId={form.authorId}
         isFree={form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree}
         seoPrimaryQuery={form.seoPrimaryQuery}
         primaryQueryLocked={Boolean(

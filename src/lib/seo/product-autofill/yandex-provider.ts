@@ -94,7 +94,7 @@ function logAiEvent(
   console.info(`[product-seo-ai] ${message}`, safe);
 }
 
-function readYandexFirstAlternative(body: unknown): {
+export function readYandexFirstAlternative(body: unknown): {
   status: string | null;
   text: string | null;
 } | null {
