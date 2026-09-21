@@ -59,7 +59,7 @@ assert.match(ops, /seo_query_proposal_approved_author/);
 assert.match(ops, /seo_query_proposal_rejected_author/);
 
 const migration = read(
-  "supabase/migrations/20261025120000_admin_review_seo_query_proposal.sql",
+  "supabase/migrations/20261026120000_admin_review_seo_query_proposal.sql",
 );
 assert.match(migration, /admin_review_seo_query_proposal/);
 assert.match(migration, /service_role/);

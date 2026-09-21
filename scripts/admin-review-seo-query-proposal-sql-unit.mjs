@@ -17,7 +17,7 @@ const CONTAINER =
 const TEST_DB = "audiolad_seo_proposal_review_test";
 const MIGRATION = join(
   ROOT,
-  "supabase/migrations/20261025120000_admin_review_seo_query_proposal.sql",
+  "supabase/migrations/20261026120000_admin_review_seo_query_proposal.sql",
 );
 const STUB = join(
   ROOT,
