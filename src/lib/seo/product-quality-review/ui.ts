@@ -1,12 +1,15 @@
 import type { ProductQualityReviewStatus } from "@/lib/seo/product-quality-review/types";
 
 export const PRODUCT_QUALITY_REVIEW_BLOCK_TITLE =
-  "Проверка текстов для поиска";
+  "Финальная проверка SEO";
 
 export const PRODUCT_QUALITY_REVIEW_HELPER =
-  "Проверьте баланс SEO в текстовом пакете: недостаточно сигналов, норма, или переспам.";
+  "Проверьте оформление продукта перед сохранением. Система покажет, достаточно ли поисковых запросов и нет ли переспама.";
 
-export const PRODUCT_QUALITY_REVIEW_CTA = "Проверить тексты";
+export const PRODUCT_QUALITY_REVIEW_HELPER_WHY =
+  "Это важно, чтобы Яндексу было проще правильно определить тему страницы и чтобы переоптимизация не ухудшала её видимость в поиске.";
+
+export const PRODUCT_QUALITY_REVIEW_CTA = "Проверить SEO";
 
 export const PRODUCT_QUALITY_REVIEW_LOADING = "Проверяем…";
 

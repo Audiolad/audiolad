@@ -65,6 +65,7 @@ import {
   PRODUCT_QUALITY_REVIEW_CTA_AGAIN,
   PRODUCT_QUALITY_REVIEW_FAIL_OPEN_MESSAGE,
   PRODUCT_QUALITY_REVIEW_HELPER,
+  PRODUCT_QUALITY_REVIEW_HELPER_WHY,
   PRODUCT_QUALITY_REVIEW_LOADING,
   PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY,
   PRODUCT_QUALITY_REVIEW_STATUS_COPY,
@@ -807,89 +808,6 @@ export default function AuthorProductSeoSection({
         ) : null}
       </div>
 
-      {qualityReviewEnabled ? (
-        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
-          <h3 className="text-sm font-semibold text-[#2b2140]">
-            {PRODUCT_QUALITY_REVIEW_BLOCK_TITLE}
-          </h3>
-          <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-            {PRODUCT_QUALITY_REVIEW_HELPER}
-          </p>
-          {!seoPrimaryQuery.trim() ? (
-            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-              {PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            disabled={
-              disabled ||
-              reviewLoading ||
-              !seoPrimaryQuery.trim()
-            }
-            onClick={() => {
-              void runProductQualityReview();
-            }}
-            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {reviewLoading
-              ? PRODUCT_QUALITY_REVIEW_LOADING
-              : reviewIsStale || reviewedFingerprint
-                ? PRODUCT_QUALITY_REVIEW_CTA_AGAIN
-                : PRODUCT_QUALITY_REVIEW_CTA}
-          </button>
-          {reviewError ? (
-            <p className="mt-3 text-sm text-[#9b3d3d]" role="status">
-              {reviewError}
-            </p>
-          ) : null}
-          {reviewIsStale ? (
-            <p className="mt-3 text-sm leading-5 text-[#5c5278]" role="status">
-              {PRODUCT_QUALITY_REVIEW_STALE_MESSAGE}
-            </p>
-          ) : null}
-          {!reviewIsStale && reviewStatus ? (
-            <div
-              className={`mt-3 rounded-[14px] border px-3 py-3 ${PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].toneClass}`}
-              role="status"
-              aria-live="polite"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide">
-                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].marker}
-              </p>
-              <p className="mt-1 text-base font-semibold">
-                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].title}
-              </p>
-              <p className="mt-1 text-sm leading-5">
-                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].subtitle}
-              </p>
-              {reviewSummary ? (
-                <p className="mt-2 text-sm leading-5 opacity-90">{reviewSummary}</p>
-              ) : null}
-              {reviewIssues.length > 0 ? (
-                <ul className="mt-3 space-y-2 text-sm leading-5">
-                  {reviewIssues.map((issue, index) => (
-                    <li key={`${issue.field}-${index}`}>
-                      <span className="font-medium">{issue.message}</span>
-                      <span className="mt-0.5 block opacity-90">
-                        Совет: {issue.recommendation}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {reviewPositiveNotes.length > 0 ? (
-                <ul className="mt-3 space-y-1 text-sm leading-5">
-                  {reviewPositiveNotes.map((note, index) => (
-                    <li key={`positive-${index}`}>• {note}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       <p className="mt-4 text-sm font-medium text-[#2b2140]">
         SEO-готовность: {readiness.doneCount} из {readiness.total}
       </p>
@@ -1182,6 +1100,93 @@ export default function AuthorProductSeoSection({
       <p className="mt-2 text-xs leading-5 text-[#7d70a2]">
         Яндекс может изменить заголовок и описание в результатах поиска.
       </p>
+
+      {qualityReviewEnabled ? (
+        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+          <h3 className="text-sm font-semibold text-[#2b2140]">
+            {PRODUCT_QUALITY_REVIEW_BLOCK_TITLE}
+          </h3>
+          <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_QUALITY_REVIEW_HELPER}
+          </p>
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_QUALITY_REVIEW_HELPER_WHY}
+          </p>
+          {!seoPrimaryQuery.trim() ? (
+            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+              {PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={
+              disabled ||
+              reviewLoading ||
+              !seoPrimaryQuery.trim()
+            }
+            onClick={() => {
+              void runProductQualityReview();
+            }}
+            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {reviewLoading
+              ? PRODUCT_QUALITY_REVIEW_LOADING
+              : reviewIsStale || reviewedFingerprint
+                ? PRODUCT_QUALITY_REVIEW_CTA_AGAIN
+                : PRODUCT_QUALITY_REVIEW_CTA}
+          </button>
+          {reviewError ? (
+            <p className="mt-3 text-sm text-[#9b3d3d]" role="status">
+              {reviewError}
+            </p>
+          ) : null}
+          {reviewIsStale ? (
+            <p className="mt-3 text-sm leading-5 text-[#5c5278]" role="status">
+              {PRODUCT_QUALITY_REVIEW_STALE_MESSAGE}
+            </p>
+          ) : null}
+          {!reviewIsStale && reviewStatus ? (
+            <div
+              className={`mt-3 rounded-[14px] border px-3 py-3 ${PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].toneClass}`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide">
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].marker}
+              </p>
+              <p className="mt-1 text-base font-semibold">
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].title}
+              </p>
+              <p className="mt-1 text-sm leading-5">
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].subtitle}
+              </p>
+              {reviewSummary ? (
+                <p className="mt-2 text-sm leading-5 opacity-90">{reviewSummary}</p>
+              ) : null}
+              {reviewIssues.length > 0 ? (
+                <ul className="mt-3 space-y-2 text-sm leading-5">
+                  {reviewIssues.map((issue, index) => (
+                    <li key={`${issue.field}-${index}`}>
+                      <span className="font-medium">{issue.message}</span>
+                      <span className="mt-0.5 block opacity-90">
+                        Совет: {issue.recommendation}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {reviewPositiveNotes.length > 0 ? (
+                <ul className="mt-3 space-y-1 text-sm leading-5">
+                  {reviewPositiveNotes.map((note, index) => (
+                    <li key={`positive-${index}`}>• {note}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       </> : null}
     </section>
   );
