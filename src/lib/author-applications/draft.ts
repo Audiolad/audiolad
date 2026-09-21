@@ -71,6 +71,7 @@ export function draftToFormValues(
     wantsTraining: draft.wantsTraining,
     interestedInSchool: draft.interestedInSchool,
     consentPersonalData: false,
+  inviteCode: "",
   };
 }
 
@@ -203,6 +204,7 @@ export function resolveInitialAuthorApplicationFormValues(input: {
       values: {
         ...input.databaseValues,
         consentPersonalData: false,
+  inviteCode: "",
       },
       restoredFromDraft: false,
     };

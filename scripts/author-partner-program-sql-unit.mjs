@@ -311,3 +311,25 @@ if (runtime) {
 } else {
   console.log("author-partner-program-sql-unit: parse-only ok (no local postgres)");
 }
+
+
+// PR2 attribution migration presence (scope freeze + first-touch helpers)
+{
+  const attrMig = join(
+    repoRoot,
+    "supabase/migrations/20261025120000_author_partner_attribution.sql",
+  );
+  assert(existsSync(attrMig), "attribution migration must exist");
+  const attrSql = readFileSync(attrMig, "utf8");
+  assert(attrSql.includes("author_partner_attributions"), "attributions table");
+  assert(attrSql.includes("attribution_expires_at"), "attribution_expires_at column");
+  assert(attrSql.includes("author_partner_touch_invite"), "touch_invite rpc");
+  assert(attrSql.includes("author_partner_claim_attribution"), "claim_attribution rpc");
+  assert(attrSql.includes("author_partner_bind_manual_code"), "bind_manual_code rpc");
+  assert(attrSql.includes("pg_advisory_xact_lock"), "advisory lock");
+  assert(attrSql.includes("interval '60 days'"), "60-day ttl");
+  assert(!/partner_commission/.test(attrSql), "no partner_commission");
+  assert(!/ledger_credit/.test(attrSql), "no ledger_credit");
+  assert(!/capacity_bonus/.test(attrSql), "no capacity_bonus");
+  console.log("author-partner attribution migration unit checks ok");
+}

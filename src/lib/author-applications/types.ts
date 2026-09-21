@@ -92,6 +92,8 @@ export type AuthorApplicationFormValues = {
   wantsTraining: boolean;
   interestedInSchool: boolean;
   consentPersonalData: boolean;
+  /** Form-only; never persisted on author_applications. */
+  inviteCode: string;
 };
 
 export type AuthorApplicationSubmittedContacts = {

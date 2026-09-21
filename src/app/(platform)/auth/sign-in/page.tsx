@@ -9,6 +9,7 @@ import {
   resolveSignInIntroCopy,
 } from "@/lib/auth/sign-in-messages";
 import { createClient } from "@/lib/supabase/client";
+import { claimPartnerAttributionAction } from "@/app/(platform)/auth/claim-partner-attribution/actions";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -48,6 +49,12 @@ function SignInForm() {
       setMessage(SIGN_IN_GENERIC_ERROR);
       setIsLoading(false);
       return;
+    }
+
+    try {
+      await claimPartnerAttributionAction();
+    } catch {
+      // Attribution must never break login.
     }
 
     const destination = getSafeNextPath(searchParams.get("next"));

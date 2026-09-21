@@ -31,6 +31,7 @@ import {
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-application-admin-alert-email";
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
+import { bindManualPartnerCode } from "@/lib/author-partner/attribution";
 import { createClient } from "@/lib/supabase/server";
 
 function failureState(
@@ -160,6 +161,35 @@ export async function submitAuthorApplication(
 
     if (hasAuthorApplicationFieldErrors(errors)) {
       return failureState(errors, values);
+    }
+
+    const trimmedInvite = values.inviteCode.trim();
+    if (trimmedInvite) {
+      const bindResult = await bindManualPartnerCode({
+        code: trimmedInvite,
+        inviteeUserId: user.id,
+      });
+      if (!bindResult.ok) {
+        if (bindResult.error === "not_found") {
+          return failureState(
+            {
+              inviteCode:
+                "Код приглашения не найден. Проверьте код или оставьте поле пустым.",
+            },
+            values,
+          );
+        }
+        if (bindResult.error === "self_referral") {
+          return failureState(
+            {
+              inviteCode: "Этот код нельзя использовать для вашего аккаунта.",
+            },
+            values,
+          );
+        }
+        // Technical failures: do not block application submit.
+        console.error("become_author_partner_bind_failed", bindResult.error);
+      }
     }
 
     if (existing && !canSubmitAuthorApplicationStatus(existing.status)) {
