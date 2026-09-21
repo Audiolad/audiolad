@@ -67,15 +67,16 @@ assert.match(draftLinkMig, /seo_reservation_product_not_linkable/);
 assert.match(draftLinkMig, /status <> 'draft'/);
 assert.doesNotMatch(draftLinkMig, /attach_published_seo_query_to_product/);
 
-// Exactly one new migration after spa seed for this feature
+// Published SEO attach must be the immediate next migration after spa seed.
+// Later migrations (e.g. partner foundation) may follow; do not freeze the tail length.
 const migs = readdirSync(path.join(root, "supabase/migrations"))
   .filter((n) => n.endsWith(".sql"))
   .sort();
 assert.ok(migs.includes(migName));
 assert.ok(migs.includes("20261022120000_seo_spa_massage_queries_seed.sql"));
 const after = migs.filter((n) => n > "20261022120000_seo_spa_massage_queries_seed.sql");
-assert.equal(after.length, 1);
-assert.equal(after[0], migName);
+assert.ok(after.includes(migName), "published SEO attach migration missing after spa seed");
+assert.equal(after[0], migName, "published SEO attach must immediately follow spa seed");
 
 // API security + operations
 assert.match(route, /requirePracticeMutationAccess/);

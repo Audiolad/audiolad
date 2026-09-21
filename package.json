@@ -309,7 +309,8 @@
     "test:desktop-sidebar-author-promo-landing": "npx tsx scripts/desktop-sidebar-author-promo-landing-unit.mjs",
     "test:articles-evergreen-dates": "npx tsx scripts/articles-evergreen-dates-unit.mjs",
     "test:home-start-suggestions": "npx tsx scripts/home-start-suggestions-unit.mjs",
-    "test:author-published-product-seo-link-sql": "node scripts/author-published-product-seo-link-sql-unit.mjs"
+    "test:author-published-product-seo-link-sql": "node scripts/author-published-product-seo-link-sql-unit.mjs",
+    "test:author-partner-program": "node scripts/author-partner-program-sql-unit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
