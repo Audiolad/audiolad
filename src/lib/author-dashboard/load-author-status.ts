@@ -12,6 +12,7 @@ import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/typ
 import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { loadAuthorAppreciationSettings } from "@/lib/author-appreciation/settings";
+import { activateCommercialAccessAfterTermsAccepted } from "@/lib/authors/activate-commercial-after-terms";
 import { ensureAutoCommercialAppreciationLifecycle } from "@/lib/authors/ensure-auto-commercial-lifecycle";
 
 async function loadPayoutProfileSummary(authorId: string): Promise<{
@@ -67,8 +68,37 @@ export async function loadAuthorStatusView(input: {
       loadAuthorAppreciationSettings(supabase, input.authorId),
     ]);
 
+  let accessStatus = input.accessStatus;
+
+  // Self-heal: approved path + current terms accepted must not stay forever
+  // on commercial_onboarding («Коммерческий статус активируется»).
+  if (
+    accessStatus === "commercial_onboarding" &&
+    termsAcceptance.accepted &&
+    input.role === "owner"
+  ) {
+    try {
+      const actorUserId = termsAcceptance.acceptance?.accepted_by_user_id;
+      if (actorUserId) {
+        const healed = await activateCommercialAccessAfterTermsAccepted({
+          authorId: input.authorId,
+          actorUserId,
+          reason: "author_terms_accepted_status_page_heal",
+        });
+        if (
+          healed.toStatus === "commercial_active" ||
+          healed.toStatus === "commercial"
+        ) {
+          accessStatus = healed.toStatus as AuthorAccessStatus;
+        }
+      }
+    } catch (error) {
+      console.error("author_status_commercial_activate_heal_failed", error);
+    }
+  }
+
   return resolveAuthorStatusView({
-    accessStatus: input.accessStatus,
+    accessStatus,
     applicationStatus: application?.status ?? null,
     applicationSubmittedAt: application?.submitted_at ?? null,
     applicationReviewComment: application?.review_comment ?? null,

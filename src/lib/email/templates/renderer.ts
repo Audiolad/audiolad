@@ -284,17 +284,25 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
     ) {
       const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
       const authorName = readString(input.payload, "authorName");
+      const authorSlug = readString(input.payload, "authorSlug") ?? undefined;
+      const termsAlreadyAccepted =
+        input.payload?.termsAlreadyAccepted === true ||
+        input.payload?.termsAlreadyAccepted === "true";
 
       return {
         ok: true,
         subject: COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
         html: renderCommercialApplicationApprovedEmailHtml({
           authorName,
+          authorSlug,
           siteOrigin,
+          termsAlreadyAccepted,
         }),
         text: renderCommercialApplicationApprovedEmailText({
           authorName,
+          authorSlug,
           siteOrigin,
+          termsAlreadyAccepted,
         }),
       };
     }
