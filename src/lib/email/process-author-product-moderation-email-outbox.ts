@@ -7,6 +7,7 @@ import {
   isAuthorProductModerationEmailContext,
   isAuthorProductModerationOutboxAction,
 } from "@/lib/email/author-product-moderation-context";
+import { resolveAuthorProductPublishedPublicPath } from "@/lib/email/templates/author-product-moderation-approved";
 import {
   notifyAuthorProductModeration,
   type NotifyAuthorProductModerationInput,
@@ -153,14 +154,22 @@ export async function processAuthorProductModerationEmailOutbox(options?: {
     }
 
     const context = row.context;
+    const publicProductPath =
+      row.action === "approved_and_published"
+        ? resolveAuthorProductPublishedPublicPath({
+            authorSlug: context.author_slug,
+            productSlug: context.product_slug,
+            publicProductPath: context.public_product_path,
+          })
+        : context.public_product_path;
     const result = await send({
       eventId: row.event_id,
       action: row.action,
       toEmail: row.recipient_email as string,
-      authorName: null,
+      authorName: context.author_name ?? null,
       productTitle: context.product_title ?? "",
       authorDashboardPath: context.author_dashboard_path,
-      publicProductPath: context.public_product_path,
+      publicProductPath,
       moderatorComment: context.moderator_comment,
     });
 

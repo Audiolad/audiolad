@@ -15,7 +15,9 @@ import {
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
   renderAuthorProductModerationApprovedEmailHtml,
   renderAuthorProductModerationApprovedEmailText,
+  resolveAuthorProductPublishedPublicPath,
 } from "../src/lib/email/templates/author-product-moderation-approved.ts";
+import { buildPracticePublicPath } from "../src/lib/products/paths.ts";
 import {
   AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_SUBJECT,
   renderAuthorProductModerationChangesRequestedEmailHtml,
@@ -49,7 +51,7 @@ assert.equal(
 );
 assert.equal(
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
-  "Ваш продукт опубликован – АудиоЛад",
+  "Ваш продукт опубликован на АудиоЛаде",
 );
 
 // ---------------------------------------------------------------------------
@@ -113,22 +115,55 @@ assert.ok(
 );
 
 // ---------------------------------------------------------------------------
-// approved template: CTA to public product path, falls back to dashboard
-// path only when the public path snapshot is missing.
+// approved template: CTA via canonical builder, TZ copy, author greeting.
 // ---------------------------------------------------------------------------
+
+assert.equal(
+  resolveAuthorProductPublishedPublicPath({
+    authorSlug: "maria",
+    productSlug: "dyhatelnaya-praktika",
+  }),
+  buildPracticePublicPath("maria", "dyhatelnaya-praktika"),
+  "slugs must go through buildPracticePublicPath",
+);
+assert.equal(
+  resolveAuthorProductPublishedPublicPath({
+    publicProductPath: "/practice/maria/dyhatelnaya-praktika",
+  }),
+  buildPracticePublicPath("maria", "dyhatelnaya-praktika"),
+  "legacy path snapshot must be rebuilt via the canonical builder",
+);
+assert.equal(
+  resolveAuthorProductPublishedPublicPath({ publicProductPath: null }),
+  null,
+);
 
 const approvedHtml = renderAuthorProductModerationApprovedEmailHtml({
   authorName: "Мария",
   productTitle: "Дыхательная практика",
   authorDashboardPath: "/author-dashboard/products/practice-1?author=maria",
-  publicProductPath: "/practice/maria/dyhatelnaya-praktika",
+  authorSlug: "maria",
+  productSlug: "dyhatelnaya-praktika",
   siteOrigin: "https://audiolad.ru",
 });
 assert.ok(
   approvedHtml.includes('href="https://audiolad.ru/practice/maria/dyhatelnaya-praktika"'),
-  "approved CTA must link to the public product page when available",
+  "approved CTA must link to the canonical public product page",
 );
-assert.ok(approvedHtml.includes(">Открыть продукт<"), "CTA label must be exactly 'Открыть продукт'");
+assert.ok(approvedHtml.includes(">Смотреть продукт<"), "CTA label must be exactly 'Смотреть продукт'");
+assert.ok(approvedHtml.includes("Здравствуйте, Мария!"), "greeting must include author name");
+assert.ok(
+  approvedHtml.includes("прошёл модерацию и опубликован на АудиоЛаде"),
+  "body must match the published-product copy",
+);
+assert.ok(
+  approvedHtml.includes("Теперь его могут слушать пользователи платформы"),
+  "body must include the listen availability line",
+);
+assert.ok(
+  !approvedHtml.includes("Открыть продукт"),
+  "legacy CTA label must not appear",
+);
 
 const approvedHtmlFallback = renderAuthorProductModerationApprovedEmailHtml({
   productTitle: "Дыхательная практика",
@@ -144,12 +179,15 @@ assert.ok(
 );
 
 const approvedText = renderAuthorProductModerationApprovedEmailText({
+  authorName: "Мария",
   productTitle: "Дыхательная практика",
   authorDashboardPath: "/author-dashboard/products/practice-1?author=maria",
   publicProductPath: "/practice/maria/dyhatelnaya-praktika",
   siteOrigin: "https://audiolad.ru",
 });
 assert.ok(approvedText.includes("https://audiolad.ru/practice/maria/dyhatelnaya-praktika"));
+assert.ok(approvedText.includes("Смотреть продукт:"));
+assert.ok(approvedText.includes("Ваш продукт «Дыхательная практика» прошёл модерацию"));
 
 // ---------------------------------------------------------------------------
 // Renderer registration (two templates only)
@@ -341,6 +379,79 @@ function makeClient(claimedRows) {
 }
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Worker: approved_and_published rebuilds CTA via canonical builder, passes
+// author name, and completes once (idempotent Message-ID stays event-scoped).
+// ---------------------------------------------------------------------------
+
+{
+  const approvedRow = {
+    event_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+    action: "approved_and_published",
+    recipient_email: "owner@example.test",
+    claim_token: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    context: {
+      product_title: "Дыхательная практика",
+      author_name: "Мария",
+      author_slug: "maria",
+      product_slug: "dyhatelnaya-praktika",
+      author_dashboard_path: "/author-dashboard/products/practice-1?author=maria",
+      // Deliberately wrong prefix to prove the worker rebuilds from slugs.
+      public_product_path: "/wrong/maria/dyhatelnaya-praktika",
+      moderator_comment: null,
+    },
+  };
+  const client = makeClient([approvedRow]);
+  let sentInput = null;
+  const result = await processAuthorProductModerationEmailOutbox({
+    supabase: client,
+    send: async (input) => {
+      sentInput = input;
+      return { ok: true };
+    },
+  });
+  assert.deepEqual(result, { claimed: 1, sent: 1, failed: 0 });
+  assert.equal(sentInput.authorName, "Мария");
+  assert.equal(sentInput.productTitle, "Дыхательная практика");
+  assert.equal(
+    sentInput.publicProductPath,
+    buildPracticePublicPath("maria", "dyhatelnaya-praktika"),
+  );
+  assert.equal(client.calls.at(-1).args.p_outcome, "sent");
+  assert.equal(
+    buildAuthorProductModerationMessageId(approvedRow.event_id),
+    `<moderation-${approvedRow.event_id}@audiolad.ru>`,
+  );
+}
+
+{
+  // Failed publication / missing path: still send is the worker's job; stale
+  // cancel happens in claim SQL. Here we assert invalid context fails closed
+  // without calling send when action is approved but context is broken.
+  const badRow = {
+    event_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    action: "approved_and_published",
+    recipient_email: "owner@example.test",
+    claim_token: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    context: {
+      product_title: "X",
+      // missing required author_dashboard_path
+      public_product_path: null,
+      moderator_comment: null,
+    },
+  };
+  const client = makeClient([badRow]);
+  const result = await processAuthorProductModerationEmailOutbox({
+    supabase: client,
+    send: async () => {
+      throw new Error("must_not_send_invalid_approved_context");
+    },
+  });
+  assert.deepEqual(result, { claimed: 1, sent: 0, failed: 1 });
+  assert.equal(client.calls.at(-1).args.p_error_code, "invalid_outbox_row");
+}
+
 // Source contract: the new migration only, existing moderation migrations
 // must remain untouched (verified independently by the pre-existing
 // admin-product-moderation-unit.mjs / author-product-moderation-*-unit.mjs
@@ -398,5 +509,30 @@ const adminMigration = read(
 assert.match(adminMigration, /platform_admin/);
 assert.match(adminMigration, /IF p_action IN \('submitted', 'resubmitted'\) THEN/);
 assert.match(adminMigration, /authors@audiolad\.ru/);
+
+
+const publishedEmailMigration = read(
+  "supabase/migrations/20261027120000_product_published_email_context_canonical.sql",
+);
+assert.match(
+  publishedEmailMigration,
+  /author_name/,
+);
+assert.match(
+  publishedEmailMigration,
+  /author_slug/,
+);
+assert.match(
+  publishedEmailMigration,
+  /product_slug/,
+);
+assert.match(
+  publishedEmailMigration,
+  /IF p_action IN \('changes_requested', 'approved_and_published'\) THEN/,
+);
+assert.doesNotMatch(
+  publishedEmailMigration,
+  /IF p_action = 'approved_and_published' THEN\s*INSERT/,
+);
 
 console.log("author-product-moderation-email-unit: ok");
