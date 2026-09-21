@@ -30,6 +30,12 @@ import {
   parseProductQualityReviewResult,
 } from "../src/lib/seo/product-quality-review/validate.ts";
 import {
+  PRODUCT_QUALITY_REVIEW_BLOCK_TITLE,
+  PRODUCT_QUALITY_REVIEW_CTA,
+  PRODUCT_QUALITY_REVIEW_CTA_AGAIN,
+  PRODUCT_QUALITY_REVIEW_HELPER,
+  PRODUCT_QUALITY_REVIEW_HELPER_WHY,
+  PRODUCT_QUALITY_REVIEW_LOADING,
   PRODUCT_QUALITY_REVIEW_STATUS_COPY,
   PRODUCT_QUALITY_REVIEW_STALE_MESSAGE,
 } from "../src/lib/seo/product-quality-review/ui.ts";
@@ -376,6 +382,54 @@ assert.doesNotMatch(
   section,
   /reviewSummary\s*\|\|\s*PRODUCT_QUALITY_REVIEW_STATUS_COPY\[reviewStatus\]\.subtitle/,
 );
+
+// UX follow-up — final Step 3 position + copy (A–J)
+assert.equal(PRODUCT_QUALITY_REVIEW_BLOCK_TITLE, "Финальная проверка SEO");
+assert.equal(
+  PRODUCT_QUALITY_REVIEW_HELPER,
+  "Проверьте оформление продукта перед сохранением. Система покажет, достаточно ли поисковых запросов и нет ли переспама.",
+);
+assert.equal(
+  PRODUCT_QUALITY_REVIEW_HELPER_WHY,
+  "Это важно, чтобы Яндексу было проще правильно определить тему страницы и чтобы переоптимизация не ухудшала её видимость в поиске.",
+);
+assert.match(PRODUCT_QUALITY_REVIEW_HELPER, /Проверьте оформление продукта перед сохранением/);
+assert.match(PRODUCT_QUALITY_REVIEW_HELPER_WHY, /Яндексу было проще правильно определить тему страницы/);
+assert.match(PRODUCT_QUALITY_REVIEW_HELPER_WHY, /переоптимизация не ухудшала её видимость/);
+assert.doesNotMatch(PRODUCT_QUALITY_REVIEW_HELPER + PRODUCT_QUALITY_REVIEW_HELPER_WHY, /заблокирует|гарант/i);
+assert.equal(PRODUCT_QUALITY_REVIEW_CTA, "Проверить SEO");
+assert.equal(PRODUCT_QUALITY_REVIEW_LOADING, "Проверяем…");
+assert.equal(PRODUCT_QUALITY_REVIEW_CTA_AGAIN, "Проверить снова");
+assert.match(section, /PRODUCT_QUALITY_REVIEW_BLOCK_TITLE/);
+assert.match(section, /PRODUCT_QUALITY_REVIEW_HELPER_WHY/);
+assert.match(section, /PRODUCT_QUALITY_REVIEW_CTA/);
+// A/B — review block after FAQ + recommendations/related; not immediately after generator
+const generateIdx = section.indexOf("PRODUCT_SEO_GENERATE_CTA");
+const faqIdx = section.indexOf("Вопросы и ответы");
+const recommendationsIdx = section.indexOf("Рекомендации автора");
+const relatedSearchIdx = section.indexOf('id="related-product-search"');
+const reviewBlockIdx = section.indexOf("{qualityReviewEnabled ? (");
+assert.ok(generateIdx > 0);
+assert.ok(faqIdx > generateIdx);
+assert.ok(recommendationsIdx > faqIdx);
+assert.ok(relatedSearchIdx > recommendationsIdx);
+assert.ok(reviewBlockIdx > relatedSearchIdx);
+assert.ok(reviewBlockIdx > recommendationsIdx);
+assert.ok(reviewBlockIdx > faqIdx);
+const betweenGenAndReview = section.slice(generateIdx, reviewBlockIdx);
+assert.match(betweenGenAndReview, /Заголовок для поиска/);
+assert.match(betweenGenAndReview, /Описание для поиска/);
+assert.match(betweenGenAndReview, /Вопросы и ответы/);
+assert.match(betweenGenAndReview, /Рекомендации автора/);
+assert.match(betweenGenAndReview, /id="related-product-search"/);
+// H — stale semantics preserved
+assert.match(section, /reviewIsStale/);
+assert.match(section, /PRODUCT_QUALITY_REVIEW_STALE_MESSAGE/);
+assert.match(section, /!reviewIsStale && reviewStatus/);
+// I — traffic-light titles unchanged (already asserted above)
+// J — review does not block save/publish in SEO section or form
+assert.doesNotMatch(section, /reviewStatus === "red".*disabled|disabled.*reviewStatus === "red"/);
+assert.doesNotMatch(read("src/components/author-dashboard/AuthorProductForm.tsx"), /reviewStatus|qualityReviewEnabled|product-quality-review/);
 
 // missing primary request
 assert.equal(
