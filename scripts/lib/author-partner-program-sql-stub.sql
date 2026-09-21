@@ -1,7 +1,29 @@
 -- Minimal schema for isolated author partner program tests.
 -- Never apply to production.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS extensions;
+-- Mirror production: pgcrypto lives in "extensions", not on public search_path.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+-- Other helpers (e.g. digest) may be called from SECURITY DEFINER bodies with
+-- search_path=public,pg_temp. Expose digest in public for those stubs.
+-- Intentionally do NOT wrap gen_random_bytes here: the partner code generator
+-- regression must fail the same way production did (42883) until the fix
+-- migration qualifies extensions.gen_random_bytes.
+CREATE OR REPLACE FUNCTION public.digest(text, text)
+RETURNS bytea
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $digest$ SELECT extensions.digest($1, $2) $digest$;
+
+CREATE OR REPLACE FUNCTION public.digest(bytea, text)
+RETURNS bytea
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $digest$ SELECT extensions.digest($1, $2) $digest$;
+
 
 CREATE SCHEMA IF NOT EXISTS auth;
 
@@ -80,7 +102,9 @@ ALTER TABLE public.authors
   ADD COLUMN IF NOT EXISTS access_status_changed_at timestamptz,
   ADD COLUMN IF NOT EXISTS access_status_changed_by uuid;
 CREATE UNIQUE INDEX IF NOT EXISTS authors_slug_key ON public.authors (slug);
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS extensions;
+-- Mirror production: pgcrypto lives in "extensions", not on public search_path.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 CREATE TABLE IF NOT EXISTS public.author_slug_redirects (
   old_slug text PRIMARY KEY,

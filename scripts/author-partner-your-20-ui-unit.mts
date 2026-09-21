@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -194,4 +195,26 @@ test("profile parse: alias list preserved", () => {
 test("your-20 route keeps ?author=sergey-petrov", () => {
   const href = `/author-dashboard/your-20?author=${encodeURIComponent(BETA)}`;
   assert.equal(href, "/author-dashboard/your-20?author=sergey-petrov");
+});
+
+test("copy: three paragraphs explain 20%, 3-year window from author activation, bonus space", () => {
+  const src = readFileSync(
+    new URL("../src/components/author-dashboard/AuthorYour20Client.tsx", import.meta.url),
+    "utf8",
+  );
+  const collapsed = src.replace(/\s+/g, " ");
+  assert.match(collapsed, /фактически начисленной приглашённому автору\./);
+  assert.match(
+    collapsed,
+    /Партнёрское вознаграждение вы будете получать в течение трёх лет с момента, когда приглашённый вами пользователь становится автором АудиоЛада\./,
+  );
+  assert.match(
+    collapsed,
+    /Приглашённый вами автор получает бонусом дополнительное авторское пространство бесплатно\./,
+  );
+  assert.match(collapsed, /не уменьшает роялти приглашённого автора/);
+  assert.doesNotMatch(
+    collapsed,
+    /фактически начисленной приглашённому автору, в течение трёх лет\./,
+  );
 });

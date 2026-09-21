@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationName = "20261024120000_author_partner_program_foundation.sql";
 const migrationPath = join(repoRoot, "supabase/migrations", migrationName);
+const generateCodeFixName = "20261028120000_author_partner_generate_code_extensions_path.sql";
+const generateCodeFixPath = join(repoRoot, "supabase/migrations", generateCodeFixName);
 const stubPath = join(repoRoot, "scripts/lib/author-partner-program-sql-stub.sql");
 const smokePath = join(
   repoRoot,
@@ -79,6 +81,11 @@ assert(migration.includes("invitee_user_id IS DISTINCT FROM referrer_owner_user_
 assert(migration.includes("ENABLE ROW LEVEL SECURITY"), "RLS enabled");
 assert(migration.includes("resolve_author_partner_code"), "resolve rpc");
 assert(migration.includes("ensure_author_partner_profile"), "ensure rpc");
+assert(existsSync(generateCodeFixPath), "generate_code extensions path fix migration");
+const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
+assert(generateCodeFix.includes("extensions.gen_random_bytes"), "fix qualifies gen_random_bytes");
+assert(generateCodeFix.includes("extensions"), "fix search_path includes extensions");
+
 assert(migration.includes("change_author_partner_code"), "change rpc");
 assert(migration.includes("get_author_partner_profile"), "get rpc");
 assert(migration.includes("author_partner_assert_not_self_referral"), "self-ref helper");
@@ -112,6 +119,7 @@ assert(
 assert(!/app\/(invite|partner)\//.test(migration), "scope freeze: no invite/partner routes");
 
 const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
 assert(stub.includes("CREATE TABLE IF NOT EXISTS public.author_members"), "stub members");
 assert(stub.includes("CREATE OR REPLACE FUNCTION auth.uid()"), "stub auth.uid");
 
@@ -128,7 +136,7 @@ assert(smoke.includes("claim_kind=primary") || smoke.includes("I:"), "smoke clai
 assert(smoke.includes("has_partner_referrals_as_referrer"), "smoke delete blockers");
 
 function runIsolatedSql() {
-  const sql = [stub, migration, smoke].join("\n");
+  const sql = [stub, migration, readFileSync(generateCodeFixPath, "utf8"), smoke].join("\n");
   const container = dockerAvailable() ? resolveDockerDbContainer() : null;
 
   if (container) {
@@ -475,7 +483,9 @@ async function runAttributionBehavioralSmoke() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const smoke = readFileSync(attrSmokePath, "utf8");
 
@@ -501,6 +511,8 @@ async function runAttributionBehavioralSmoke() {
   try {
     runSql(stub);
     runSql(foundation);
+
+    runSql(generateCodeFix);runSql(generateCodeFix);
     runSql(attribution);
     // NOTICE goes to stderr; ON_ERROR_STOP=1 + non-zero exit is the failure signal
     // (same pattern as foundation isolated smoke).
@@ -583,7 +595,9 @@ async function runActivationBehavioralSmoke() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const activation = readFileSync(activationPath, "utf8");
   const smoke = readFileSync(activationSmokePath, "utf8");
@@ -610,6 +624,8 @@ async function runActivationBehavioralSmoke() {
   try {
     runSql(stub);
     runSql(foundation);
+
+    runSql(generateCodeFix);runSql(generateCodeFix);
     runSql(attribution);
     runSql(activation);
     execFileSync(
@@ -653,7 +669,9 @@ async function runConcurrentActivationAndMigrationRecon() {
     "supabase/migrations/20261025120000_author_partner_attribution.sql",
   );
   const stub = readFileSync(stubPath, "utf8");
+assert(stub.includes("WITH SCHEMA extensions"), "stub installs pgcrypto into extensions like production");
   const foundation = readFileSync(migrationPath, "utf8");
+  const generateCodeFix = readFileSync(generateCodeFixPath, "utf8");
   const attribution = readFileSync(attributionPath, "utf8");
   const activation = readFileSync(activationPath, "utf8");
 
