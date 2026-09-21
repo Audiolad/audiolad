@@ -71,7 +71,6 @@ export default async function AuthorYour20Page({
 
   if (
     !canAccessAuthorPartnerYour20Ui({
-      authorId: selected.id,
       authorSlug: selected.slug,
       role: selected.role,
       isSupportMode: false,
@@ -85,12 +84,7 @@ export default async function AuthorYour20Page({
   }
 
   // Defense in depth: beta allowlist alone.
-  if (
-    !isAuthorPartnerUiBetaEnabled({
-      authorId: selected.id,
-      authorSlug: selected.slug,
-    })
-  ) {
+  if (!isAuthorPartnerUiBetaEnabled({ authorSlug: selected.slug })) {
     redirect("/author-dashboard");
   }
 
@@ -98,8 +92,12 @@ export default async function AuthorYour20Page({
     p_author_id: selected.id,
   });
 
+  // Do not mask RPC/network/permission failures as exists=false.
+  const initialLoadError = error
+    ? "Не удалось загрузить данные ссылки. Обновите страницу."
+    : null;
   const initialProfile = error
-    ? { exists: false as const, authorId: selected.id }
+    ? null
     : parseAuthorPartnerProfilePayload(data, selected.id);
 
   return (
@@ -109,10 +107,11 @@ export default async function AuthorYour20Page({
       internalBackHref="/author-dashboard"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
-        <AuthorYour20Client
+                <AuthorYour20Client
           authors={authors}
           initialAuthorId={selected.id}
           initialProfile={initialProfile}
+          initialLoadError={initialLoadError}
           siteOrigin={getAppOrigin()}
         />
       </Suspense>

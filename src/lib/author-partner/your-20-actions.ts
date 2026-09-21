@@ -7,8 +7,7 @@ import {
 } from "@/lib/author-products/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
-  canAccessAuthorPartnerYour20Ui,
-  isAuthorPartnerUiBetaEnabled,
+  evaluatePartnerYour20Access,
 } from "@/lib/author-partner/ui-beta";
 import {
   parsePartnerRpcErrorCode,
@@ -32,25 +31,21 @@ export type PartnerYour20ActionResult =
       message: string;
     };
 
+/**
+ * Authoritative gate for your-20 mutations:
+ * 1) support-mode blocked
+ * 2) requireAuthorMembership → role must be owner
+ * 3) load authors.slug by authorId (server SoT)
+ * 4) slug must be sergey-petrov
+ *
+ * Never trusts a client-supplied slug.
+ */
 async function assertPartnerYour20MutationAccess(
   authorId: string,
-): Promise<PartnerYour20ActionResult | { ok: true; role: string }> {
+): Promise<
+  PartnerYour20ActionResult | { ok: true; role: string; authorSlug: string }
+> {
   const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    return {
-      ok: false,
-      code: "support_mode_blocked",
-      message: partnerCodeUserMessage("support_mode_blocked"),
-    };
-  }
-
-  if (!isAuthorPartnerUiBetaEnabled({ authorId })) {
-    return {
-      ok: false,
-      code: "beta_disabled",
-      message: partnerCodeUserMessage("beta_disabled"),
-    };
-  }
 
   let role: string;
   try {
@@ -67,21 +62,33 @@ async function assertPartnerYour20MutationAccess(
     throw error;
   }
 
-  if (
-    !canAccessAuthorPartnerYour20Ui({
-      authorId,
-      role,
-      isSupportMode: false,
-    })
-  ) {
+  const supabase = await createClient();
+  const { data: authorRow, error: authorError } = await supabase
+    .from("authors")
+    .select("slug")
+    .eq("id", authorId)
+    .maybeSingle();
+
+  const resolvedAuthorSlug =
+    !authorError && authorRow && typeof authorRow.slug === "string"
+      ? authorRow.slug.trim()
+      : null;
+
+  const decision = evaluatePartnerYour20Access({
+    resolvedAuthorSlug,
+    role,
+    isSupportMode: Boolean(execution?.isSupportMode),
+  });
+
+  if (decision !== "allowed") {
     return {
       ok: false,
-      code: "forbidden",
-      message: partnerCodeUserMessage("forbidden"),
+      code: decision,
+      message: partnerCodeUserMessage(decision),
     };
   }
 
-  return { ok: true, role };
+  return { ok: true, role, authorSlug: resolvedAuthorSlug! };
 }
 
 export async function loadAuthorPartnerProfileAction(

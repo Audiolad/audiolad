@@ -229,7 +229,6 @@ export default function AuthorDashboardNav({
             active: pathname.startsWith("/author-dashboard/finance"),
           },
           ...(canAccessAuthorPartnerYour20Ui({
-            authorId,
             authorSlug,
             role: authorRole,
             isSupportMode: supportMode,

@@ -18,7 +18,8 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 type Props = {
   authors: AuthorWorkspace[];
   initialAuthorId: string;
-  initialProfile: AuthorPartnerProfileView;
+  initialProfile: AuthorPartnerProfileView | null;
+  initialLoadError?: string | null;
   siteOrigin: string;
 };
 
@@ -26,6 +27,7 @@ export default function AuthorYour20Client({
   authors,
   initialAuthorId,
   initialProfile,
+  initialLoadError = null,
   siteOrigin,
 }: Props) {
   const router = useRouter();
@@ -45,18 +47,20 @@ export default function AuthorYour20Client({
     );
   }, [authors, initialAuthorId, searchParams]);
 
-  const [profile, setProfile] =
-    useState<AuthorPartnerProfileView>(initialProfile);
-  const [codeDraft, setCodeDraft] = useState(
-    initialProfile.exists ? initialProfile.primaryCode : "",
+  const [profile, setProfile] = useState<AuthorPartnerProfileView | null>(
+    initialProfile,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [codeDraft, setCodeDraft] = useState(
+    initialProfile?.exists ? initialProfile.primaryCode : "",
+  );
+  const [error, setError] = useState<string | null>(initialLoadError);
   const [info, setInfo] = useState<string | null>(null);
   const [copyFlash, setCopyFlash] = useState<string | null>(null);
 
-  const inviteUrl = profile.exists
-    ? buildAuthorPartnerInviteUrl(profile.primaryCode, siteOrigin)
-    : "";
+  const inviteUrl =
+    profile && profile.exists
+      ? buildAuthorPartnerInviteUrl(profile.primaryCode, siteOrigin)
+      : "";
 
   function flashCopy(label: string) {
     setCopyFlash(label);
@@ -160,7 +164,17 @@ export default function AuthorYour20Client({
         </div>
       </section>
 
-      {!profile.exists ? (
+      {!profile ? (
+        <section className="rounded-[24px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-5 sm:px-5">
+          <h3 className="text-[17px] font-semibold text-[#9b2c2c]">
+            Не удалось загрузить данные
+          </h3>
+          <p className="mt-2 text-sm text-[#9b2c2c]">
+            {error ??
+              "Не удалось загрузить данные ссылки. Обновите страницу."}
+          </p>
+        </section>
+      ) : !profile.exists ? (
         <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
           <h3 className="text-[17px] font-semibold">Создайте свою ссылку</h3>
           <p className="mt-2 text-sm text-[#7d70a2]">АудиоЛад создаст для вас персональный код приглашения. После этого вы сможете заменить его на свой.</p>
@@ -236,7 +250,6 @@ export default function AuthorYour20Client({
           </section>
         </>
       )}
-
       {error ? (
         <p className="rounded-[16px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b2c2c]">
           {error}
