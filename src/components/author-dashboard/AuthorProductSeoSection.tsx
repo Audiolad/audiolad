@@ -50,6 +50,26 @@ import {
   createDefaultProductSeoStyleProfile,
   sanitizeProductSeoStyleProfile,
 } from "@/lib/seo/product-autofill/style-profile";
+import { isAuthorProductQualityReviewEnabled } from "@/lib/seo/product-quality-review/beta";
+import {
+  buildProductQualityReviewFingerprint,
+  isProductQualityReviewFingerprintCurrent,
+} from "@/lib/seo/product-quality-review/fingerprint";
+import type {
+  ProductQualityReviewIssue,
+  ProductQualityReviewStatus,
+} from "@/lib/seo/product-quality-review/types";
+import {
+  PRODUCT_QUALITY_REVIEW_BLOCK_TITLE,
+  PRODUCT_QUALITY_REVIEW_CTA,
+  PRODUCT_QUALITY_REVIEW_CTA_AGAIN,
+  PRODUCT_QUALITY_REVIEW_FAIL_OPEN_MESSAGE,
+  PRODUCT_QUALITY_REVIEW_HELPER,
+  PRODUCT_QUALITY_REVIEW_LOADING,
+  PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY,
+  PRODUCT_QUALITY_REVIEW_STATUS_COPY,
+  PRODUCT_QUALITY_REVIEW_STALE_MESSAGE,
+} from "@/lib/seo/product-quality-review/ui";
 import {
   AUTHOR_RECOMMENDATIONS_HELPER_COPY,
   AUTHOR_RECOMMENDATIONS_LIMIT_COPY,
@@ -85,6 +105,8 @@ export type AuthorProductSeoSectionProps = {
   subtitle: string;
   description: string;
   productKind: string;
+  /** Author workspace id — gates Aurafon-only quality review. */
+  authorId?: string;
   /** Authoritative form access flag (`isFree` / `is_free`). */
   isFree: boolean;
   seoPrimaryQuery: string;
@@ -124,6 +146,7 @@ export default function AuthorProductSeoSection({
   subtitle,
   description,
   productKind,
+  authorId = "",
   isFree,
   seoPrimaryQuery,
   seoSecondaryQueries,
@@ -163,6 +186,19 @@ export default function AuthorProductSeoSection({
   );
   const [secondaryDraft, setSecondaryDraft] = useState("");
   const [secondaryBulkMessage, setSecondaryBulkMessage] = useState<string | null>(
+    null,
+  );
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<ProductQualityReviewStatus | null>(
+    null,
+  );
+  const [reviewSummary, setReviewSummary] = useState<string | null>(null);
+  const [reviewIssues, setReviewIssues] = useState<ProductQualityReviewIssue[]>(
+    [],
+  );
+  const [reviewPositiveNotes, setReviewPositiveNotes] = useState<string[]>([]);
+  const [reviewedFingerprint, setReviewedFingerprint] = useState<string | null>(
     null,
   );
   const selectedRelatedIds = useMemo(
@@ -311,6 +347,41 @@ export default function AuthorProductSeoSection({
     seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length,
     publicPath,
   };
+  const qualityReviewEnabled = isAuthorProductQualityReviewEnabled(authorId);
+  const reviewPackage = useMemo(
+    () => ({
+      title,
+      subtitle,
+      description,
+      productKind,
+      seoPrimaryQuery,
+      seoSecondaryQueries,
+      seoTitle,
+      seoDescription,
+      usageItems: seoContent.usageItems.map((item) => item.content),
+      faqItems: seoContent.faqItems.map((item) => ({
+        question: item.question,
+        answer: item.answer,
+      })),
+    }),
+    [
+      title,
+      subtitle,
+      description,
+      productKind,
+      seoPrimaryQuery,
+      seoSecondaryQueries,
+      seoTitle,
+      seoDescription,
+      seoContent.usageItems,
+      seoContent.faqItems,
+    ],
+  );
+  const reviewFingerprintCurrent = isProductQualityReviewFingerprintCurrent(
+    reviewPackage,
+    reviewedFingerprint,
+  );
+  const reviewIsStale = Boolean(reviewedFingerprint) && !reviewFingerprintCurrent;
   const preview = buildProductSeoPreview(seoInput);
   const readiness = evaluateProductSeoReadiness(seoInput);
   const accordionBadge = resolveProductSeoAccordionBadge(readiness, {
@@ -370,6 +441,76 @@ export default function AuthorProductSeoSection({
         faqItems: draft.faqItems,
       },
     });
+    // Generation changes the text package — previous review is stale.
+    setReviewedFingerprint(null);
+    setReviewStatus(null);
+    setReviewSummary(null);
+    setReviewIssues([]);
+    setReviewPositiveNotes([]);
+    setReviewError(null);
+  }
+
+  async function runProductQualityReview() {
+    if (reviewLoading || disabled || !qualityReviewEnabled) return;
+    if (!seoPrimaryQuery.trim()) {
+      setReviewError(PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY);
+      return;
+    }
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const fingerprint = buildProductQualityReviewFingerprint(reviewPackage);
+      const response = await fetch("/api/author/seo/product-quality-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authorId,
+          ...reviewPackage,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            status?: ProductQualityReviewStatus;
+            summary?: string;
+            issues?: ProductQualityReviewIssue[];
+            positiveNotes?: string[];
+            error?: string;
+            code?: string;
+          }
+        | null;
+      if (
+        !response.ok ||
+        !payload ||
+        (payload.status !== "green" &&
+          payload.status !== "yellow" &&
+          payload.status !== "red") ||
+        typeof payload.summary !== "string"
+      ) {
+        setReviewError(
+          payload && typeof payload.error === "string" && payload.error.trim()
+            ? payload.error
+            : PRODUCT_QUALITY_REVIEW_FAIL_OPEN_MESSAGE,
+        );
+        setReviewStatus(null);
+        setReviewedFingerprint(null);
+        return;
+      }
+      setReviewStatus(payload.status);
+      setReviewSummary(payload.summary);
+      setReviewIssues(Array.isArray(payload.issues) ? payload.issues.slice(0, 5) : []);
+      setReviewPositiveNotes(
+        Array.isArray(payload.positiveNotes)
+          ? payload.positiveNotes.slice(0, 3)
+          : [],
+      );
+      setReviewedFingerprint(fingerprint);
+    } catch {
+      setReviewError(PRODUCT_QUALITY_REVIEW_FAIL_OPEN_MESSAGE);
+      setReviewStatus(null);
+      setReviewedFingerprint(null);
+    } finally {
+      setReviewLoading(false);
+    }
   }
 
   async function generateProductSeo() {
@@ -668,6 +809,87 @@ export default function AuthorProductSeoSection({
           <p className="mt-3 text-sm text-[#9b3d3d]">{generateError}</p>
         ) : null}
       </div>
+
+      {qualityReviewEnabled ? (
+        <div className="mt-4 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4">
+          <h3 className="text-sm font-semibold text-[#2b2140]">
+            {PRODUCT_QUALITY_REVIEW_BLOCK_TITLE}
+          </h3>
+          <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_QUALITY_REVIEW_HELPER}
+          </p>
+          {!seoPrimaryQuery.trim() ? (
+            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+              {PRODUCT_QUALITY_REVIEW_MISSING_PRIMARY}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={
+              disabled ||
+              reviewLoading ||
+              !seoPrimaryQuery.trim()
+            }
+            onClick={() => {
+              void runProductQualityReview();
+            }}
+            className="mt-3 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {reviewLoading
+              ? PRODUCT_QUALITY_REVIEW_LOADING
+              : reviewIsStale || reviewedFingerprint
+                ? PRODUCT_QUALITY_REVIEW_CTA_AGAIN
+                : PRODUCT_QUALITY_REVIEW_CTA}
+          </button>
+          {reviewError ? (
+            <p className="mt-3 text-sm text-[#9b3d3d]" role="status">
+              {reviewError}
+            </p>
+          ) : null}
+          {reviewIsStale ? (
+            <p className="mt-3 text-sm leading-5 text-[#5c5278]" role="status">
+              {PRODUCT_QUALITY_REVIEW_STALE_MESSAGE}
+            </p>
+          ) : null}
+          {!reviewIsStale && reviewStatus ? (
+            <div
+              className={`mt-3 rounded-[14px] border px-3 py-3 ${PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].toneClass}`}
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide">
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].marker}
+              </p>
+              <p className="mt-1 text-base font-semibold">
+                {PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].title}
+              </p>
+              <p className="mt-1 text-sm leading-5">
+                {reviewSummary ||
+                  PRODUCT_QUALITY_REVIEW_STATUS_COPY[reviewStatus].subtitle}
+              </p>
+              {reviewIssues.length > 0 ? (
+                <ul className="mt-3 space-y-2 text-sm leading-5">
+                  {reviewIssues.map((issue, index) => (
+                    <li key={`${issue.field}-${index}`}>
+                      <span className="font-medium">{issue.message}</span>
+                      <span className="mt-0.5 block opacity-90">
+                        Совет: {issue.recommendation}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {reviewPositiveNotes.length > 0 ? (
+                <ul className="mt-3 space-y-1 text-sm leading-5">
+                  {reviewPositiveNotes.map((note, index) => (
+                    <li key={`positive-${index}`}>• {note}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className="mt-4 text-sm font-medium text-[#2b2140]">
         SEO-готовность: {readiness.doneCount} из {readiness.total}
