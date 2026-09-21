@@ -191,6 +191,7 @@ export function normalizeAuthorApplicationFormValues(
     wantsTraining: formData.get("wantsTraining") === "on",
     interestedInSchool: formData.get("interestedInSchool") === "on",
     consentPersonalData: formData.get("consentPersonalData") === "on",
+    inviteCode: trimValue(formData.get("inviteCode")),
   };
 }
 
@@ -312,6 +313,7 @@ export function rowToFormValues(
     wantsTraining: row.wants_training ?? false,
     interestedInSchool: row.interested_in_school ?? false,
     consentPersonalData: row.consent_personal_data,
+    inviteCode: "",
   };
 }
 

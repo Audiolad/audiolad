@@ -14,6 +14,7 @@ import { rowToFormValues } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
+import { getInviteePartnerAttribution } from "@/lib/author-partner/attribution";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ const EMPTY_FORM_VALUES = {
   wantsTraining: false,
   interestedInSchool: false,
   consentPersonalData: false,
+  inviteCode: "",
 };
 
 export default async function BecomeAuthorPage({
@@ -57,20 +59,33 @@ export default async function BecomeAuthorPage({
     ? await listAuthorWorkspacesForUser(user.id).catch(() => [])
     : [];
 
+  const partnerAttribution = user
+    ? await getInviteePartnerAttribution(user.id)
+    : { exists: false };
+
   const view = await getBecomeAuthorPageView(supabase, {
     user,
     workspaceCount: workspaces.length,
     showSubmittedBanner,
   });
 
-  const defaultValues = view.application
-    ? rowToFormValues(view.application, {
-        fallbackContactEmail: view.userEmail,
-      })
-    : {
-        ...EMPTY_FORM_VALUES,
-        contactEmail: view.userEmail ?? "",
-      };
+  const defaultValues = {
+    ...(view.application
+      ? rowToFormValues(view.application, {
+          fallbackContactEmail: view.userEmail,
+        })
+      : {
+          ...EMPTY_FORM_VALUES,
+          contactEmail: view.userEmail ?? "",
+        }),
+    inviteCode:
+      partnerAttribution.exists && partnerAttribution.code
+        ? partnerAttribution.code
+        : "",
+  };
+
+  const inviteLocked =
+    Boolean(partnerAttribution.exists && partnerAttribution.code);
 
   return (
     <BecomeAuthorShell>
@@ -96,6 +111,7 @@ export default async function BecomeAuthorPage({
             defaultValues={defaultValues}
             showSubmittedBanner={view.showSubmittedBanner}
             userEmail={view.userEmail}
+            inviteLocked={inviteLocked}
           />
         </aside>
 

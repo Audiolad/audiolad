@@ -71,6 +71,7 @@ type AuthorApplicationPanelProps = {
   defaultValues: AuthorApplicationFormValues;
   showSubmittedBanner: boolean;
   userEmail: string | null;
+  inviteLocked?: boolean;
 };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -188,6 +189,7 @@ function AuthorApplicationForm({
   restoredDraftNotice,
   updateContactsOnly,
   contactsSectionRef,
+  inviteLocked,
   onValuesChange,
   onSubmit,
   onInteractionStart,
@@ -198,6 +200,7 @@ function AuthorApplicationForm({
   restoredDraftNotice: boolean;
   updateContactsOnly: boolean;
   contactsSectionRef: RefObject<HTMLDivElement | null>;
+  inviteLocked: boolean;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
@@ -334,6 +337,44 @@ function AuthorApplicationForm({
             {EMAIL_FIELD_HINT}
           </p>
           <FieldError id="contactEmail-error" message={errors.contactEmail} />
+        </div>
+
+
+        <div className="mt-5">
+          <label htmlFor="inviteCode" className={becomeAuthorLabelClass}>
+            Код приглашения
+          </label>
+          <p className="mt-1 text-[14px] leading-snug text-[#6b5f8a]">
+            Если вас пригласил автор АудиоЛада, укажите его код приглашения.
+          </p>
+          <input
+            id="inviteCode"
+            name="inviteCode"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            readOnly={inviteLocked}
+            value={values.inviteCode}
+            onChange={(event) => {
+              if (inviteLocked) return;
+              patchValues({ inviteCode: event.currentTarget.value });
+            }}
+            className={becomeAuthorInputClass}
+            aria-invalid={Boolean(errors.inviteCode)}
+            aria-describedby={
+              errors.inviteCode
+                ? "inviteCode-hint inviteCode-error"
+                : inviteLocked
+                  ? "inviteCode-locked"
+                  : "inviteCode-hint"
+            }
+          />
+          {inviteLocked ? (
+            <p id="inviteCode-locked" className="mt-2 text-[14px] leading-snug text-[#3d8d65]">
+              Приглашение уже учтено.
+            </p>
+          ) : null}
+          <FieldError id="inviteCode-error" message={errors.inviteCode} />
         </div>
 
         <div>
@@ -512,6 +553,7 @@ export default function AuthorApplicationPanel({
   defaultValues,
   showSubmittedBanner,
   userEmail,
+  inviteLocked = false,
 }: AuthorApplicationPanelProps) {
   const [state, submitAction, isPending] = useActionState(
     submitAuthorApplication,
@@ -857,6 +899,7 @@ export default function AuthorApplicationPanel({
             restoredDraftNotice={restoredDraftNotice}
             updateContactsOnly={updateContactsOnly}
             contactsSectionRef={contactsSectionRef}
+            inviteLocked={inviteLocked}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}

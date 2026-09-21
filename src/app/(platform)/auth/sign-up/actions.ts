@@ -19,6 +19,13 @@ import {
   onNewListenerCreated,
   type OnNewListenerCreatedResult,
 } from "@/lib/email/on-new-listener-created";
+import { claimPartnerAttribution } from "@/lib/author-partner/attribution";
+import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import {
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
+import { cookies } from "next/headers";
 
 type SignUpAuthClient = {
   auth: {
@@ -235,6 +242,32 @@ export async function signUpAction(
     } catch (error) {
       console.error(
         "signup_welcome_email_failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    }
+  }
+
+  if (data.user?.id) {
+    try {
+      const cookieStore = await cookies();
+      const token = cookieStore.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE)?.value;
+      const claimResult = await claimPartnerAttribution({
+        token,
+        inviteeUserId: data.user.id,
+        source: "signup",
+      });
+      if (
+        shouldClearPartnerAttributionCookie({
+          ok: claimResult.ok,
+          result: claimResult.ok ? claimResult.result : null,
+          error: claimResult.ok ? null : claimResult.error,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStore);
+      }
+    } catch (error) {
+      console.error(
+        "signup_partner_attribution_failed",
         error instanceof Error ? error.message : "unknown",
       );
     }

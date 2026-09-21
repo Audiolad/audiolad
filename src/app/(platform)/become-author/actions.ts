@@ -31,6 +31,13 @@ import {
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-application-admin-alert-email";
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
+import { bindManualPartnerCode } from "@/lib/author-partner/attribution";
+import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
+import {
+  clearPartnerAttributionCookie,
+  shouldClearPartnerAttributionCookie,
+} from "@/lib/author-partner/cookie";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 function failureState(
@@ -160,6 +167,70 @@ export async function submitAuthorApplication(
 
     if (hasAuthorApplicationFieldErrors(errors)) {
       return failureState(errors, values);
+    }
+
+    const trimmedInvite = values.inviteCode.trim();
+    const cookieStoreForInvite = await cookies();
+    const pendingInviteToken =
+      cookieStoreForInvite.get(AUTHOR_PARTNER_ATTRIBUTION_COOKIE)?.value ?? null;
+    if (trimmedInvite || pendingInviteToken) {
+      const bindResult = await bindManualPartnerCode({
+        code: trimmedInvite,
+        inviteeUserId: user.id,
+        pendingToken: pendingInviteToken,
+      });
+      if (!bindResult.ok) {
+        // Manual code typed by the user: surface field errors.
+        // Cookie-only / expired / unknown attribution must NEVER block submit.
+        if (trimmedInvite) {
+          if (bindResult.error === "not_found") {
+            return failureState(
+              {
+                inviteCode:
+                  "Код приглашения не найден. Проверьте код или оставьте поле пустым.",
+              },
+              values,
+            );
+          }
+          if (bindResult.error === "self_referral") {
+            return failureState(
+              {
+                inviteCode: "Этот код нельзя использовать для вашего аккаунта.",
+              },
+              values,
+            );
+          }
+        }
+        // Cookie-only miss / expired / technical: typed noop — application continues.
+        if (
+          !trimmedInvite &&
+          (bindResult.error === "not_found" ||
+            bindResult.error === "empty" ||
+            bindResult.error === "attribution_expired" ||
+            bindResult.error === "attribution_not_found")
+        ) {
+          // no_valid_attribution — intentional silent continue
+        } else if (!bindResult.ok) {
+          console.error("become_author_partner_bind_failed", bindResult.error);
+        }
+      } else if (
+        shouldClearPartnerAttributionCookie({
+          ok: true,
+          result: bindResult.result,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStoreForInvite);
+      }
+      if (
+        !bindResult.ok &&
+        pendingInviteToken &&
+        shouldClearPartnerAttributionCookie({
+          ok: false,
+          error: bindResult.error,
+        })
+      ) {
+        clearPartnerAttributionCookie(cookieStoreForInvite);
+      }
     }
 
     if (existing && !canSubmitAuthorApplicationStatus(existing.status)) {
