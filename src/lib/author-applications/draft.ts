@@ -140,6 +140,8 @@ export function parseStoredAuthorApplicationDraft(
       hasReadyMaterials: parsed.hasReadyMaterials,
       wantsTraining: parsed.wantsTraining,
       interestedInSchool: parsed.interestedInSchool,
+      inviteCode:
+        typeof parsed.inviteCode === "string" ? parsed.inviteCode : "",
       savedAt:
         typeof parsed.savedAt === "string"
           ? parsed.savedAt

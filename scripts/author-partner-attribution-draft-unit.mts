@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   formValuesToDraft,
+  parseStoredAuthorApplicationDraft,
   resolveInitialAuthorApplicationFormValues,
 } from "../src/lib/author-applications/draft";
 import type { AuthorApplicationFormValues } from "../src/lib/author-applications/types";
@@ -27,12 +28,42 @@ function baseValues(
   };
 }
 
-test("locked SERGEY + local draft keeps inviteCode SERGEY", () => {
+function roundTripDraft(values: AuthorApplicationFormValues) {
+  const draft = formValuesToDraft(values);
+  const raw = JSON.stringify(draft);
+  const parsed = parseStoredAuthorApplicationDraft(raw);
+  assert.ok(parsed, "parsed draft must not be null");
+  return parsed;
+}
+
+test("round-trip: manual MARINA survives localStorage reload when DB invite empty", () => {
+  const databaseValues = baseValues();
+  const parsed = roundTripDraft(
+    baseValues({
+      displayName: "Manual",
+      about: "about text here",
+      inviteCode: "MARINA",
+    }),
+  );
+
+  assert.equal(parsed.inviteCode, "MARINA");
+
+  const resolved = resolveInitialAuthorApplicationFormValues({
+    databaseValues,
+    application: null,
+    draft: parsed,
+  });
+
+  assert.equal(resolved.restoredFromDraft, true);
+  assert.equal(resolved.values.inviteCode, "MARINA");
+});
+
+test("round-trip: draft MARINA + canonical SERGEY → SERGEY after reload", () => {
   const databaseValues = baseValues({
     displayName: "From DB",
     inviteCode: "SERGEY",
   });
-  const draft = formValuesToDraft(
+  const parsed = roundTripDraft(
     baseValues({
       displayName: "From Draft",
       selectedDirections: ["music"],
@@ -40,14 +71,16 @@ test("locked SERGEY + local draft keeps inviteCode SERGEY", () => {
       contactEmail: "a@example.com",
       contactDetails: "telegram",
       hasReadyMaterials: true,
-      inviteCode: "",
+      inviteCode: "MARINA",
     }),
   );
+
+  assert.equal(parsed.inviteCode, "MARINA");
 
   const resolved = resolveInitialAuthorApplicationFormValues({
     databaseValues,
     application: null,
-    draft,
+    draft: parsed,
   });
 
   assert.equal(resolved.restoredFromDraft, true);
@@ -55,21 +88,20 @@ test("locked SERGEY + local draft keeps inviteCode SERGEY", () => {
   assert.equal(resolved.values.displayName, "From Draft");
 });
 
-test("unlocked draft keeps manual inviteCode when DB has none", () => {
-  const databaseValues = baseValues();
-  const draft = formValuesToDraft(
-    baseValues({
-      displayName: "Manual",
-      about: "about",
-      inviteCode: "MARINA",
-    }),
-  );
-
-  const resolved = resolveInitialAuthorApplicationFormValues({
-    databaseValues,
-    application: null,
-    draft,
-  });
-
-  assert.equal(resolved.values.inviteCode, "MARINA");
+test("legacy draft without inviteCode parses as empty invite", () => {
+  const legacy = {
+    displayName: "Legacy",
+    selectedDirections: ["music"],
+    directionOther: "",
+    about: "about",
+    contactEmail: "a@example.com",
+    contactDetails: "",
+    hasReadyMaterials: false,
+    wantsTraining: false,
+    interestedInSchool: false,
+    savedAt: new Date(0).toISOString(),
+  };
+  const parsed = parseStoredAuthorApplicationDraft(JSON.stringify(legacy));
+  assert.ok(parsed);
+  assert.equal(parsed.inviteCode, "");
 });

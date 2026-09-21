@@ -176,25 +176,39 @@ export async function submitAuthorApplication(
         pendingToken: pendingInviteToken,
       });
       if (!bindResult.ok) {
-        if (bindResult.error === "not_found") {
-          return failureState(
-            {
-              inviteCode:
-                "Код приглашения не найден. Проверьте код или оставьте поле пустым.",
-            },
-            values,
-          );
+        // Manual code typed by the user: surface field errors.
+        // Cookie-only / expired / unknown attribution must NEVER block submit.
+        if (trimmedInvite) {
+          if (bindResult.error === "not_found") {
+            return failureState(
+              {
+                inviteCode:
+                  "Код приглашения не найден. Проверьте код или оставьте поле пустым.",
+              },
+              values,
+            );
+          }
+          if (bindResult.error === "self_referral") {
+            return failureState(
+              {
+                inviteCode: "Этот код нельзя использовать для вашего аккаунта.",
+              },
+              values,
+            );
+          }
         }
-        if (bindResult.error === "self_referral") {
-          return failureState(
-            {
-              inviteCode: "Этот код нельзя использовать для вашего аккаунта.",
-            },
-            values,
-          );
+        // Cookie-only miss / expired / technical: typed noop — application continues.
+        if (
+          !trimmedInvite &&
+          (bindResult.error === "not_found" ||
+            bindResult.error === "empty" ||
+            bindResult.error === "attribution_expired" ||
+            bindResult.error === "attribution_not_found")
+        ) {
+          // no_valid_attribution — intentional silent continue
+        } else if (!bindResult.ok) {
+          console.error("become_author_partner_bind_failed", bindResult.error);
         }
-        // Technical failures: do not block application submit.
-        console.error("become_author_partner_bind_failed", bindResult.error);
       }
     }
 

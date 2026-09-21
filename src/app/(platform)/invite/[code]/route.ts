@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { touchPartnerInvite } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
 import { applyPartnerAttributionCookie } from "@/lib/author-partner/cookie";
+import { decodeInviteCodeParam } from "@/lib/author-partner/invite-code-param";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,8 @@ export async function GET(
   context: { params: Promise<{ code: string }> },
 ) {
   const { code: rawCode } = await context.params;
-  const code = decodeURIComponent(rawCode ?? "").trim();
+  // Params are usually already decoded by Next; safeDecode never throws URIError.
+  const code = decodeInviteCodeParam(rawCode);
 
   if (!code) {
     return notFoundResponse();

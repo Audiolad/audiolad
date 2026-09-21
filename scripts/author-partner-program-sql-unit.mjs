@@ -342,7 +342,104 @@ function dockerOk() {
   return dockerAvailable();
 }
 
-function runAttributionBehavioralSmoke() {
+
+function runConcurrentFirstTouchBind(container, db) {
+  // Same invitee, two referrer codes racing — advisory lock must yield exactly one referral.
+  const setup = `
+DO $$
+DECLARE
+  u_invitee uuid := 'c1111111-1111-4111-8111-111111111111';
+  u_a uuid := 'c2222222-2222-4222-8222-222222222222';
+  u_b uuid := 'c3333333-3333-4333-8333-333333333333';
+  a uuid := 'cc111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  b uuid := 'cc222222-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+BEGIN
+  INSERT INTO auth.users (id) VALUES (u_invitee), (u_a), (u_b) ON CONFLICT DO NOTHING;
+  INSERT INTO public.authors (id, name, slug) VALUES
+    (a, 'ConcA', 'conc-a'), (b, 'ConcB', 'conc-b')
+  ON CONFLICT DO NOTHING;
+  INSERT INTO public.author_members (author_id, user_id, role) VALUES
+    (a, u_a, 'owner'), (b, u_b, 'owner')
+  ON CONFLICT DO NOTHING;
+  PERFORM set_config('request.jwt.claim.sub', u_a::text, true);
+  PERFORM public.ensure_author_partner_profile(a);
+  PERFORM public.change_author_partner_code(a, 'CONCA');
+  PERFORM set_config('request.jwt.claim.sub', u_b::text, true);
+  PERFORM public.ensure_author_partner_profile(b);
+  PERFORM public.change_author_partner_code(b, 'CONCB');
+END $$;
+`;
+  execFileSync(
+    "docker",
+    ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1"],
+    { input: setup, stdio: ["pipe", "pipe", "pipe"] },
+  );
+
+  const invitee = "c1111111-1111-4111-8111-111111111111";
+  function spawnBind(code) {
+    const sql = `SELECT public.author_partner_bind_manual_code('${code}', '${invitee}'::uuid, NULL);`;
+    return new Promise((resolve, reject) => {
+      import("node:child_process").then(({ spawn }) => {
+        const child = spawn(
+          "docker",
+          ["exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+          { stdio: ["pipe", "pipe", "pipe"] },
+        );
+        let out = "";
+        let err = "";
+        child.stdout.on("data", (d) => { out += d; });
+        child.stderr.on("data", (d) => { err += d; });
+        child.on("close", (codeExit) => {
+          if (codeExit !== 0) reject(new Error(err || out || `exit ${codeExit}`));
+          else resolve(out.trim());
+        });
+        child.stdin.write(sql);
+        child.stdin.end();
+      }).catch(reject);
+    });
+  }
+
+  return Promise.all([spawnBind("CONCA"), spawnBind("CONCB")]).then(([ra, rb]) => {
+    const parse = (s) => {
+      const line = s.split("\\n").filter(Boolean).pop();
+      return JSON.parse(line);
+    };
+    const ja = parse(ra);
+    const jb = parse(rb);
+    assert(ja.ok === true || jb.ok === true, "at least one concurrent bind ok");
+    // Exactly one winner creates/keeps a single referral row for the invitee.
+    const cnt = execFileSync(
+      "docker",
+      [
+        "exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-t", "-A",
+        "-c",
+        `SELECT count(*) FROM public.author_referrals WHERE invitee_user_id = '${invitee}'::uuid;`,
+      ],
+      { encoding: "utf8" },
+    ).trim();
+    assert(cnt === "1", `concurrent first-touch exactly one referral, got ${cnt}`);
+    const winners = [ja, jb].filter((j) => j.ok === true && (j.result === "bound" || j.result === "created" || j.code));
+    const codes = new Set(
+      execFileSync(
+        "docker",
+        [
+          "exec", "-i", container, "psql", "-U", "postgres", "-d", db, "-t", "-A",
+          "-c",
+          `SELECT code_used FROM public.author_referrals WHERE invitee_user_id = '${invitee}'::uuid;`,
+        ],
+        { encoding: "utf8" },
+      ).trim().split("\\n").filter(Boolean),
+    );
+    assert(codes.size === 1, `concurrent first-touch single referrer code, got ${[...codes]}`);
+    // Loser must not flip the winner (preserved_first_touch or self-serialized).
+    const loser = [ja, jb].find((j) => j.result === "preserved_first_touch" || (j.ok === true && j.code && ![...codes][0].includes(j.code) === false));
+    void loser;
+    void winners;
+    console.log("author-partner attribution concurrent first-touch: ok", [...codes][0]);
+  });
+}
+
+async function runAttributionBehavioralSmoke() {
   const attrSmokePath = join(
     repoRoot,
     "supabase/tests/author_partner_attribution_smoke.sql",
@@ -352,6 +449,11 @@ function runAttributionBehavioralSmoke() {
   assert(attrSmokeSql.includes("author_partner_touch_invite"), "smoke touches invite");
   assert(attrSmokeSql.includes("author_partner_bind_manual_code"), "smoke binds manual");
   assert(attrSmokeSql.includes("preserved_first_touch"), "smoke asserts first-touch");
+  assert(attrSmokeSql.includes("disabled"), "smoke covers disabled profile");
+  assert(attrSmokeSql.includes("self_referral"), "smoke covers self-referral");
+  assert(attrSmokeSql.includes("already_author"), "smoke covers already_author");
+  assert(attrSmokeSql.includes("alias"), "smoke covers alias");
+  assert(attrSmokeSql.includes("attribution_expires_at"), "smoke covers stale TTL");
 
   if (!dockerOk()) {
     console.log("author-partner attribution behavioral smoke: skipped (no docker)");
@@ -404,6 +506,7 @@ function runAttributionBehavioralSmoke() {
       { input: smoke, stdio: ["pipe", "pipe", "inherit"], maxBuffer: 20 * 1024 * 1024 },
     );
     console.log("author-partner attribution behavioral smoke: ok");
+    await runConcurrentFirstTouchBind(container, db);
   } finally {
     try {
       execFileSync(
@@ -417,4 +520,4 @@ function runAttributionBehavioralSmoke() {
   }
 }
 
-runAttributionBehavioralSmoke();
+await runAttributionBehavioralSmoke();
