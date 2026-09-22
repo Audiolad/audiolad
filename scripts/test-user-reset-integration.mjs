@@ -41,6 +41,9 @@ const MIGRATION_FILES = [
   "20260722190000_admin_operation_log_reconciliation.sql",
 ];
 
+const FIRST_TOUCH_USER_FK_MIGRATION =
+  "20261029120000_analytics_first_touch_user_delete_cascade.sql";
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -427,6 +430,89 @@ END $$;
   });
 }
 
+function testUserFirstTouchCascadeOnAuthDelete() {
+  assert(
+    sqlScalar("SELECT to_regclass('public.analytics_first_touches') IS NOT NULL") === "t",
+    "analytics_first_touches exists",
+  );
+
+  sqlFile(readMigration(FIRST_TOUCH_USER_FK_MIGRATION));
+
+  const userId = randomUUID();
+  const email = fixtureEmail("first-touch");
+  const anonId = `anon-ft-cascade-${RUN_ID}`;
+  const userTouchId = randomUUID();
+  const anonTouchId = randomUUID();
+
+  try {
+    insertAuthUser(userId, email);
+    sqlFile(`
+INSERT INTO public.analytics_first_touches (
+  id, subject_type, user_id, first_seen_at, source_class, confidence, origin
+) VALUES (
+  ${quoteLiteral(userTouchId)}, 'user', ${quoteLiteral(userId)}, now(),
+  'direct_or_unknown', 'exact', 'auth_session'
+);
+
+INSERT INTO public.analytics_first_touches (
+  id, subject_type, anonymous_id, first_seen_at, source_class, confidence, origin
+) VALUES (
+  ${quoteLiteral(anonTouchId)}, 'anonymous', ${quoteLiteral(anonId)}, now(),
+  'direct_or_unknown', 'exact', 'session_insert'
+);
+`);
+
+    assert(
+      sqlScalar(`
+        SELECT c.confdeltype
+        FROM pg_constraint AS c
+        WHERE c.conrelid = 'public.analytics_first_touches'::regclass
+          AND c.conname = 'analytics_first_touches_user_id_fkey'
+      `) === "c",
+      "user_id FK ON DELETE CASCADE",
+    );
+    assert(
+      sqlScalar(
+        `SELECT COUNT(*) FROM public.analytics_first_touches WHERE id = ${quoteLiteral(userTouchId)}`,
+      ) === "1",
+      "user first-touch seeded",
+    );
+
+    deleteAuthUser(userId);
+
+    assert(
+      sqlScalar(`SELECT COUNT(*) FROM auth.users WHERE id = ${quoteLiteral(userId)}`) === "0",
+      "auth user delete succeeded with a user-level first-touch",
+    );
+    assert(
+      sqlScalar(
+        `SELECT COUNT(*) FROM public.analytics_first_touches WHERE id = ${quoteLiteral(userTouchId)}`,
+      ) === "0",
+      "user first-touch removed by CASCADE",
+    );
+    assert(
+      sqlScalar(`
+        SELECT COUNT(*) FROM public.analytics_first_touches
+        WHERE subject_type = 'user' AND user_id IS NULL
+      `) === "0",
+      "delete did not leave a user first-touch with null user_id",
+    );
+    assert(
+      sqlScalar(
+        `SELECT COUNT(*) FROM public.analytics_first_touches WHERE id = ${quoteLiteral(anonTouchId)}`,
+      ) === "1",
+      "anonymous first-touch remains",
+    );
+  } finally {
+    sqlFile(`
+DELETE FROM public.analytics_first_touches
+WHERE id IN (${quoteLiteral(userTouchId)}::uuid, ${quoteLiteral(anonTouchId)}::uuid)
+   OR anonymous_id = ${quoteLiteral(anonId)};
+DELETE FROM auth.users WHERE id = ${quoteLiteral(userId)};
+`);
+  }
+}
+
 function testIdempotentCleanup() {
   const userId = randomUUID();
   const email = fixtureEmail("idempotent");
@@ -498,6 +584,7 @@ function main() {
   testEmailCleanup();
   testAnalyticsCleanup();
   testSharedAnonymousIdSafety();
+  testUserFirstTouchCascadeOnAuthDelete();
   testIdempotentCleanup();
   cleanupCommittedFixtures();
 

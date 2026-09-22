@@ -219,6 +219,54 @@ INSERT INTO auth.users VALUES
     TEST_DB,
     join(ROOT, "supabase/migrations/20260725210000_analytics_p322_first_touch.sql"),
   );
+
+  const shapeBefore = scalar(`
+    SELECT pg_get_constraintdef(c.oid)
+    FROM pg_constraint AS c
+    WHERE c.conrelid = 'public.analytics_first_touches'::regclass
+      AND c.conname = 'analytics_first_touches_subject_shape_check';
+  `);
+  assert(
+    shapeBefore.includes("subject_type = 'user'::text") &&
+      shapeBefore.includes("user_id IS NOT NULL"),
+    "subject shape check present before FK change",
+  );
+  assertEqual(
+    scalar(`
+      SELECT c.confdeltype
+      FROM pg_constraint AS c
+      WHERE c.conrelid = 'public.analytics_first_touches'::regclass
+        AND c.conname = 'analytics_first_touches_user_id_fkey';
+    `),
+    "n",
+    "historical user_id FK is ON DELETE SET NULL",
+  );
+
+  psqlFile(
+    TEST_DB,
+    join(ROOT, "supabase/migrations/20261029120000_analytics_first_touch_user_delete_cascade.sql"),
+  );
+
+  assertEqual(
+    scalar(`
+      SELECT pg_get_constraintdef(c.oid)
+      FROM pg_constraint AS c
+      WHERE c.conrelid = 'public.analytics_first_touches'::regclass
+        AND c.conname = 'analytics_first_touches_subject_shape_check';
+    `),
+    shapeBefore,
+    "subject shape check unchanged",
+  );
+  assertEqual(
+    scalar(`
+      SELECT c.confdeltype
+      FROM pg_constraint AS c
+      WHERE c.conrelid = 'public.analytics_first_touches'::regclass
+        AND c.conname = 'analytics_first_touches_user_id_fkey';
+    `),
+    "c",
+    "user_id FK is ON DELETE CASCADE",
+  );
 }
 
 function ftAnon(anonId) {
@@ -563,7 +611,56 @@ WHERE routine_schema = 'public'
 `);
   assertEqual(integGrant, "0", "integrity not granted to client roles");
 
+  testAuthUserDeleteCascadesUserFirstTouch();
+
   console.log("analytics-p322-sql-unit: ok");
+}
+
+function testAuthUserDeleteCascadesUserFirstTouch() {
+  const userId = "e5555555-5555-4555-8555-555555555555";
+  const anonId = "anon-cascade-survivor-p322";
+  psql(
+    TEST_DB,
+    `
+INSERT INTO auth.users (id, email)
+VALUES ('${userId}', 'cascade-p322@example.com');
+
+INSERT INTO analytics_first_touches (
+  subject_type, user_id, first_seen_at, source_class, confidence, origin
+) VALUES (
+  'user', '${userId}', now(), 'direct_or_unknown', 'exact', 'auth_session'
+);
+
+INSERT INTO analytics_first_touches (
+  subject_type, anonymous_id, first_seen_at, source_class, confidence, origin
+) VALUES (
+  'anonymous', '${anonId}', now(), 'direct_or_unknown', 'exact', 'session_insert'
+);
+`,
+  );
+
+  assertEqual(countFt(`subject_type = 'user' AND user_id = '${userId}'`), 1, "user first-touch seeded");
+  assertEqual(ftAnon(anonId).subject_type, "anonymous", "anonymous first-touch seeded");
+
+  psql(TEST_DB, `DELETE FROM auth.users WHERE id = '${userId}';`);
+
+  assertEqual(
+    scalar(`SELECT count(*)::text FROM auth.users WHERE id = '${userId}';`),
+    "0",
+    "auth user delete succeeded",
+  );
+  assertEqual(
+    countFt(`subject_type = 'user' AND user_id = '${userId}'`),
+    0,
+    "user first-touch row removed by CASCADE",
+  );
+  assertEqual(
+    countFt(`subject_type = 'user' AND user_id IS NULL`),
+    0,
+    "delete did not null user_id on a user first-touch",
+  );
+  assertEqual(ftAnon(anonId).anonymous_id, anonId, "anonymous first-touch remains");
+  assertEqual(ftAnon(anonId).user_id, null, "anonymous first-touch user_id stays null");
 }
 
 main();

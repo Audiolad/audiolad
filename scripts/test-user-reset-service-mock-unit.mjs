@@ -303,6 +303,11 @@ async function testDeleteUserCalledWithTargetUuid() {
 
   assert(result.ok, "reset ok");
   assert(result.result.status === "success", "reset success");
+  assert(result.result.deletedCounts.authUserDeleted === true, "authUserDeleted");
+  assert(
+    !service.calls.tables.includes("analytics_first_touches"),
+    "reset does not manually delete analytics_first_touches",
+  );
   assert(service.calls.deleteUser.length === 1, "deleteUser called once");
   assert(
     service.calls.deleteUser[0] === service.targetUserId,
