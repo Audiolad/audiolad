@@ -148,10 +148,17 @@ function testPolicy() {
 }
 
 function testStaticWiring() {
-  const actions = readRepoFile("src", "app", "admin", "users", "test-reset-actions.ts");
+  const actions = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "admin",
+    "users",
+    "test-reset-actions.ts",
+  );
   const panel = readRepoFile("src", "components", "admin", "TestUserResetPanel.tsx");
   const reset = readRepoFile("src", "lib", "admin", "test-user-reset", "reset.ts");
-  const page = readRepoFile("src", "app", "admin", "users", "page.tsx");
+  const page = readRepoFile("src", "app", "(platform)", "admin", "users", "page.tsx");
 
   assert(actions.includes("requirePlatformOwnerAccess"), "owner guard in actions");
   assert(actions.includes("resetAllowlistedTestUser"), "reset service wired");
@@ -160,6 +167,31 @@ function testStaticWiring() {
   assert(panel.includes("TEST_USER_RESET_CONFIRMATION_PHRASE"), "panel phrase constant");
   assert(panel.includes("Очистить локальные тестовые данные"), "local clear button");
   assert(reset.includes("auth.admin.deleteUser"), "auth admin delete used");
+  assert(
+    !reset.includes("analytics_first_touches"),
+    "reset does not manually delete analytics_first_touches",
+  );
+  const firstTouchFk = readRepoFile(
+    "supabase",
+    "migrations",
+    "20261029120000_analytics_first_touch_user_delete_cascade.sql",
+  );
+  assert(
+    firstTouchFk.includes("analytics_first_touches_user_id_fkey"),
+    "cascade migration names the user_id FK",
+  );
+  assert(
+    firstTouchFk.includes("ON DELETE CASCADE"),
+    "user_id FK uses ON DELETE CASCADE",
+  );
+  assert(
+    !/DROP\s+CONSTRAINT[^;]*analytics_first_touches_subject_shape_check/i.test(firstTouchFk),
+    "cascade migration does not drop the subject shape check",
+  );
+  assert(
+    !firstTouchFk.includes("ADD CONSTRAINT analytics_first_touches_subject_shape_check"),
+    "cascade migration does not replace the subject shape check",
+  );
   const preflightSource = readRepoFile("src", "lib", "admin", "test-user-reset", "preflight.ts");
   assert(preflightSource.includes("practice_listen_stats"), "listen-stats counted in reset");
   assert(preflightSource.includes("practice_ratings"), "ratings counted in reset");
