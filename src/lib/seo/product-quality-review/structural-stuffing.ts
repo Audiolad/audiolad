@@ -203,7 +203,8 @@ function hasNearDuplicateChain(
       }
     }
   }
-  return nearPairs >= 2 || unique.length >= 4;
+  // Similarity evidence only — never «N query-like phrases = stuffing».
+  return nearPairs >= 2;
 }
 
 function evaluateFieldStructuralStuffing(
@@ -241,13 +242,10 @@ function evaluateFieldStructuralStuffing(
     secondaryQueries,
   );
 
-  // Structural patterns decide material stuffing. Exact multi-word primary
-  // hammered 4+ times in one body field is also material (not a % threshold).
+  // Structural patterns only. exactPrimaryCount is a supporting fact for the
+  // model/tests — it must NOT force material stuffing by itself.
   const material =
-    keywordListPattern ||
-    nearDuplicateChain ||
-    neighboringSentenceRepeats ||
-    exactPrimaryCount >= 4;
+    keywordListPattern || nearDuplicateChain || neighboringSentenceRepeats;
 
   return {
     material,

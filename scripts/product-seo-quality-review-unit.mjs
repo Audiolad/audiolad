@@ -715,6 +715,18 @@ assert.ok(liveLikePkg.description.length >= 1200);
 const liveLikeSignals = buildProductQualityReviewSignals(liveLikePkg);
 assert.equal(liveLikeSignals.structuralStuffing.material, true);
 assert.equal(liveLikeSignals.structuralStuffing.description.material, true);
+// Live-like RED must come from structural patterns, not exactPrimaryCount alone.
+assert.equal(
+  liveLikeSignals.structuralStuffing.description.neighboringSentenceRepeats ||
+    liveLikeSignals.structuralStuffing.description.keywordListPattern ||
+    liveLikeSignals.structuralStuffing.description.nearDuplicateChain,
+  true,
+);
+assert.ok(
+  liveLikeSignals.structuralStuffing.description.neighboringSentenceRepeats ||
+    liveLikeSignals.structuralStuffing.description.nearDuplicateChain,
+  "live-like must trip neighboring repeats and/or near-duplicate chain",
+);
 assert.equal(liveLikeSignals.primaryPresentIn.seoTitle, true);
 assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
 // A — live-like RED description; good other fields cannot mask stuffing
@@ -977,7 +989,7 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   assert.match(systemPrompt, /НЕ используй произвольные пороги keyword density/i);
 }
 
-// No density threshold constants in structural module
+// No density / fixed occurrence quota verdicts in structural module
 {
   const structuralSrc = read(
     "src/lib/seo/product-quality-review/structural-stuffing.ts",
@@ -986,6 +998,96 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   assert.doesNotMatch(structuralSrc, /\b5%\b/);
   assert.doesNotMatch(structuralSrc, /keywordDensity/);
   assert.doesNotMatch(structuralSrc, /seoScore|SEO score/i);
+  // exactPrimaryCount must not standalone-force material
+  assert.doesNotMatch(
+    structuralSrc,
+    /exactPrimaryCount\s*>=\s*\d+/,
+  );
+  // nearDuplicateChain must not be «unique.length >= N»
+  assert.doesNotMatch(
+    structuralSrc,
+    /unique\.length\s*>=\s*\d+/,
+  );
+  assert.match(
+    structuralSrc,
+    /nearPairs\s*>=\s*2/,
+  );
+  assert.match(
+    structuralSrc,
+    /must NOT force material stuffing by itself/,
+  );
+}
+
+// FALSE-RED: long natural description with 4 spaced exact primaries → NOT material
+{
+  const filler =
+    "Спокойный вечер помогает телу замедлиться после дел. " +
+    "Мягкий фон поддерживает дыхание и даёт место для отдыха без спешки. " +
+    "Дальше текст продолжает обычным языком: тепло комнаты, приглушённый свет, ровный ритм. " +
+    "Можно просто сидеть или читать — фон остаётся мягким и человечным. ";
+  const paragraph = (n) =>
+    `Абзац ${n}. ${filler}` +
+    `В этой части один раз естественно звучит музыка для крепкого сна как фон для вечера. ` +
+    filler;
+  const naturalLong = [1, 2, 3, 4].map(paragraph).join("\n\n");
+  assert.ok(naturalLong.length >= 2000);
+  assert.ok(naturalLong.length <= 3200);
+  const pkg = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description: naturalLong,
+    seoTitle: "Музыка для крепкого сна – мягкий фон",
+    seoDescription: "Спокойная музыка для крепкого сна на вечер.",
+    usageItems: ["Перед сном", "После долгого дня", "В тихом вечере"],
+    faqItems: [
+      {
+        question: "Когда слушать?",
+        answer: "Вечером, когда хочется спокойно отдохнуть.",
+      },
+    ],
+  });
+  const signals = buildProductQualityReviewSignals(pkg);
+  assert.ok(signals.primaryExactByField.description >= 4);
+  assert.equal(signals.structuralStuffing.description.keywordListPattern, false);
+  assert.equal(
+    signals.structuralStuffing.description.neighboringSentenceRepeats,
+    false,
+  );
+  assert.equal(
+    signals.structuralStuffing.description.nearDuplicateChain,
+    false,
+  );
+  assert.equal(signals.structuralStuffing.description.material, false);
+  assert.equal(signals.structuralStuffing.material, false);
+  const reconciled = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "SEO в норме.",
+      issues: [],
+      positiveNotes: [],
+    },
+    signals,
+  );
+  assert.equal(reconciled.status, "green");
+}
+
+// FALSE-RED: 4 thematic short sentences, not near-duplicates → material=false
+{
+  const thematicFour = basePackage({
+    seoPrimaryQuery: "музыка для крепкого сна",
+    description: [
+      "Тихий вечер помогает телу замедлиться.",
+      "Мягкий фон поддерживает спокойное дыхание.",
+      "Приглушённый свет делает комнату уютнее.",
+      "Ровный ритм подходит для домашнего отдыха.",
+    ].join(" "),
+  });
+  const signals = buildProductQualityReviewSignals(thematicFour);
+  assert.equal(
+    signals.structuralStuffing.description.nearDuplicateChain,
+    false,
+  );
+  assert.equal(signals.structuralStuffing.description.material, false);
+  assert.equal(signals.structuralStuffing.material, false);
 }
 
 // Orchestrate path applies reconcile (mock GREEN on stuffed package → RED)
