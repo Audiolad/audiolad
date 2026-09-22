@@ -276,6 +276,18 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /revokeStudioObjectUrl/);
   assert.match(provider, /syncTrackMediaPlayback/);
   assert.match(provider, /planStudioMediaElementSync/);
+  assert.match(provider, /forceEnter: true/);
+  assert.match(provider, /playbackGenerationRef/);
+  assert.match(
+    provider,
+    /runtime\.activeClipId = null;\s*syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
+  );
+  assert.match(
+    provider,
+    /syncTrackMediaPlayback\(\s*runtime,\s*track,\s*nextPosition,\s*false,/,
+  );
+  assert.match(provider, /nextStudioPlaybackGeneration/);
+
   assert.match(provider, /applyStudioMediaElementSrcRefresh/);
   assert.match(provider, /studioTrackHasOverlappingClips/);
   assert.match(provider, /appendStudioClipsIfNoOverlap/);
