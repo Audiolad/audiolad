@@ -673,11 +673,13 @@ export async function resetAllowlistedTestUser(
     deletedCounts.privateAudioItemsRemoved = nonFkDeleted.privateAudioItemsRemoved;
   } catch (error) {
     console.error("test_user_reset_cleanup_failed", error);
+    const phase1Committed = deletedCounts.dbCleanupCompleted === true;
+    const status = phase1Committed ? "partial" : "failed";
 
     await writeTestUserResetAuditLog(service, {
       actorUserId: input.actorUserId,
       targetAuthUserId: targetUserId,
-      status: "failed",
+      status,
       deletedCounts,
       errorCode: "cleanup_failed",
     });
@@ -685,12 +687,14 @@ export async function resetAllowlistedTestUser(
     return {
       ok: true,
       result: {
-        status: "failed",
+        status,
         authUserId: targetUserId,
         deletedCounts,
         notDeleted: [...NOT_DELETED_ITEMS],
         errorCode: "cleanup_failed",
-        message: "Не удалось очистить связанные данные.",
+        message: phase1Committed
+          ? "Часть данных очищена, но операция завершилась не полностью. Можно безопасно повторить сброс."
+          : "Не удалось очистить связанные данные.",
         browserHint: BROWSER_HINT,
       },
     };
