@@ -30,6 +30,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 function createFakeCleanup(calls, options = {}) {
   return async (ownerUserId) => {
+    calls.sequence.push("cleanupPrivateAudio");
     calls.cleanupPrivateAudio.push(ownerUserId);
     if (options.fail) {
       throw new Error(options.failMessage ?? "fake_private_audio_cleanup_failed");
@@ -47,6 +48,8 @@ function createMockService(scenario) {
     auditInserts: [],
     tables: [],
     cleanupPrivateAudio: [],
+    deletes: [],
+    storageRemoves: [],
     rpc: [],
     sequence: [],
   };
@@ -177,6 +180,8 @@ function createMockService(scenario) {
       }
 
       if (this.#mode === "delete") {
+        calls.sequence.push(`delete:${this.#table}`);
+        calls.deletes.push(this.#table);
         if (scenario.failDeleteOn === this.#table) {
           throw new Error(`test_user_reset_delete_${this.#table}_failed`);
         }
@@ -275,6 +280,17 @@ function createMockService(scenario) {
         },
       },
     },
+    storage: {
+      from(bucket) {
+        return {
+          async remove(paths) {
+            calls.sequence.push(`storage:${bucket}`);
+            calls.storageRemoves.push({ bucket, paths });
+            return { error: null };
+          },
+        };
+      },
+    },
     async rpc(fn, args) {
       calls.sequence.push("rpc");
       calls.rpc.push({ fn, args });
@@ -364,8 +380,13 @@ async function testDeleteUserCalledWithTargetUuid() {
   );
   assert(
     service.calls.sequence.indexOf("rpc") <
+      service.calls.sequence.indexOf("cleanupPrivateAudio"),
+    "phase 1 RPC runs before non-FK cleanup",
+  );
+  assert(
+    service.calls.sequence.indexOf("cleanupPrivateAudio") <
       service.calls.sequence.indexOf("deleteUser"),
-    "phase 1 RPC runs before auth delete",
+    "non-FK cleanup runs before auth delete",
   );
   assert(result.result.deletedCounts.dbCleanupCompleted === true, "db cleanup completed");
   assert(result.result.deletedCounts.ownedAuthors === 2, "owned authors counted");
@@ -426,6 +447,12 @@ async function testDeleteUserSkippedOnCleanupFailure() {
   assert(result.result.status === "failed", "cleanup failure status");
   assert(result.result.errorCode === "cleanup_failed", "cleanup failure code");
   assert(service.calls.deleteUser.length === 0, "deleteUser not called after cleanup failure");
+  assert(service.calls.rpc.length === 1, "phase 1 succeeded before non-FK cleanup failed");
+  assert(
+    service.calls.sequence.indexOf("rpc") <
+      service.calls.sequence.indexOf("delete:email_outbox"),
+    "email cleanup starts only after phase 1",
+  );
 }
 
 async function testPrivateAudioCleanupFailureStopsAuthDelete() {
@@ -494,8 +521,11 @@ async function testPartialWhenAuthDeleteFailsAfterCleanup() {
   assert(result.result.errorCode === "auth_delete_failed", "auth delete failed code");
   assert(service.calls.deleteUser.length === 1, "deleteUser attempted after cleanup");
   assert(
-    service.calls.cleanupPrivateAudio.length === 1,
-    "cleanup runs before failed auth delete",
+    service.calls.sequence.indexOf("rpc") <
+      service.calls.sequence.indexOf("cleanupPrivateAudio") &&
+      service.calls.sequence.indexOf("cleanupPrivateAudio") <
+        service.calls.sequence.indexOf("deleteUser"),
+    "non-FK cleanup sits between phase 1 success and auth delete",
   );
   assert(result.result.deletedCounts.dbCleanupCompleted === true, "db cleanup kept after auth failure");
   assert(result.result.deletedCounts.authUserDeleted === false, "auth user not deleted");
@@ -595,6 +625,101 @@ async function testDbBlockerSkipsAuthDelete() {
   assert(service.calls.rpc.length === 1, "phase 1 RPC attempted");
   assert(service.calls.deleteUser.length === 0, "auth delete skipped when phase 1 blocks");
   assert(result.result.deletedCounts.dbCleanupCompleted === false, "rolled-back phase 1 is not complete");
+  assert(service.calls.cleanupPrivateAudio.length === 0, "private audio skipped when phase 1 blocks");
+  assert(
+    !service.calls.deletes.some((table) =>
+      [
+        "email_outbox",
+        "email_contacts",
+        "email_consents",
+        "email_preferences",
+        "email_delivery_events",
+        "analytics_events",
+        "analytics_sessions",
+      ].includes(table),
+    ),
+    "email and analytics cleanup skipped when phase 1 blocks",
+  );
+}
+
+const NON_FK_DELETE_TABLES = [
+  "email_outbox",
+  "email_contacts",
+  "email_consents",
+  "email_preferences",
+  "email_delivery_events",
+  "analytics_events",
+  "analytics_sessions",
+];
+
+async function testRpcBlockerSkipsNonFkCleanup() {
+  const targetUserId = randomUUID();
+  const service = createMockService({
+    targetUserId,
+    counts: {
+      analytics_events: 4,
+      analytics_sessions: 2,
+    },
+    rpcError: {
+      code: "P0001",
+      message: "allowlisted_test_user_reset_blocked",
+      details: "composite_fk:hidden_pair.user_id",
+    },
+    targetProfile: {
+      id: targetUserId,
+      role: LISTENER_ROLE,
+      full_name: "Reset Test",
+      email: TEST_USER_RESET_EMAIL,
+      avatar_path: `${targetUserId}/11111111-1111-4111-8111-111111111111.webp`,
+    },
+  });
+
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
+
+  assert(result.ok, "rpc blocker wrapper ok");
+  assert(result.result.status === "failed", "rpc blocker status");
+  assert(result.result.errorCode === "blocked", "rpc blocker error code");
+  assert(
+    result.result.blockers?.some((row) => row.code === "db_reset_blocked"),
+    "composite FK blocker is explicit",
+  );
+  assert(
+    result.result.blockers?.some((row) =>
+      row.message.includes("composite_fk:hidden_pair.user_id"),
+    ),
+    "composite FK detail is returned",
+  );
+  assert(service.calls.rpc.length === 1, "phase 1 RPC was called");
+  assert(
+    service.calls.rpc[0].fn === "reset_allowlisted_test_user_db",
+    "blocked call used the phase 1 RPC",
+  );
+  assert(service.calls.deleteUser.length === 0, "auth delete was not called");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 0,
+    "private-audio cleanup was not called",
+  );
+  assert(service.calls.storageRemoves.length === 0, "avatar cleanup was not called");
+  assert(
+    !service.calls.deletes.some((table) => NON_FK_DELETE_TABLES.includes(table)),
+    "email and analytics cleanup was not called",
+  );
+  assert(
+    !service.calls.sequence.includes("cleanupPrivateAudio"),
+    "non-FK cleanup sequence did not start",
+  );
+  assert(result.result.deletedCounts.dbCleanupCompleted === false, "phase 1 did not commit");
+  assert(result.result.deletedCounts.avatarRemoved === false, "avatar flag stays false");
+  assert(result.result.deletedCounts.analyticsEvents === 0, "analytics events were not deleted");
 }
 
 async function testRepeatRunAlreadyResetSafe() {
@@ -678,6 +803,7 @@ async function main() {
   await testPartialWhenAuthDeleteFailsAfterCleanup();
   await testPhase2RetryAfterDbCleanup();
   await testDbBlockerSkipsAuthDelete();
+  await testRpcBlockerSkipsNonFkCleanup();
   await testRepeatRunAlreadyResetSafe();
   console.log("test-user-reset-service-mock-unit: ok");
 }

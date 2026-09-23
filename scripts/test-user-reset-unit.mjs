@@ -204,6 +204,44 @@ function testPolicy() {
     referrerBlock.some((row) => row.code === TEST_USER_RESET_BLOCK_CODES.capacity_grants),
     "paid capacity grants stay blocked with finance",
   );
+
+  const pendingAttribution = evaluateTestUserResetBlockers({
+    resolvedEmail: TEST_USER_RESET_EMAIL,
+    profileRole: LISTENER_ROLE,
+    counts: {
+      userPractices: 0,
+      practiceAudioProgress: 0,
+      practiceListenStats: 0,
+      practiceRatings: 0,
+      practiceRatingEvents: 0,
+      playlists: 0,
+      playlistItems: 0,
+      emailContacts: 0,
+      emailPreferences: 0,
+      emailConsents: 0,
+      emailOutbox: 0,
+      emailDeliveryEvents: 0,
+      analyticsSessions: 0,
+      analyticsEvents: 0,
+      orders: 0,
+      payments: 0,
+      refundedOrders: 0,
+      personalMaterialsCreated: 0,
+      personalMaterialsClaimed: 0,
+      privateAudioItems: 0,
+      authorMembers: 1,
+      authorApplications: 0,
+      promotionCampaigns: 0,
+      personalMaterialTemplates: 0,
+      pendingReferrerAttributions: 1,
+    },
+  });
+  assert(
+    pendingAttribution.some(
+      (row) => row.code === TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution,
+    ),
+    "pending referrer-side attribution is a hard blocker",
+  );
   assert(
     !referrerBlock.some(
       (row) => row.code === TEST_USER_RESET_BLOCK_CODES.author_membership,
@@ -281,15 +319,16 @@ function testStaticWiring() {
     "phase 1 RPC name is hard-coded",
   );
   assert(reset.includes("TEST_USER_RESET_DB_RPC"), "phase 1 RPC wired");
+  const resetFlow = reset.slice(reset.indexOf("export async function resetAllowlistedTestUser"));
   assert(
-    reset.indexOf("runAllowlistedTestUserDbCleanup") <
-      reset.indexOf("auth.admin.deleteUser"),
-    "phase 1 RPC is ordered before auth delete",
+    resetFlow.indexOf("runAllowlistedTestUserDbCleanup(") <
+      resetFlow.indexOf("cleanupNonFkData("),
+    "phase 1 RPC runs before non-FK cleanup",
   );
   assert(
-    reset.indexOf("cleanupNonFkData") <
-      reset.indexOf("runAllowlistedTestUserDbCleanup"),
-    "existing consumer cleanup stays before the author RPC",
+    resetFlow.indexOf("cleanupNonFkData(") <
+      resetFlow.indexOf("deleteAllowlistedAuthUser("),
+    "non-FK cleanup runs only after phase 1 and before auth delete",
   );
   const allowlistedResetMigration = readRepoFile(
     "supabase",

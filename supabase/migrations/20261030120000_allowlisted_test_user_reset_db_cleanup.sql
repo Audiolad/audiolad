@@ -115,6 +115,7 @@ DECLARE
   v_schema text;
   v_table text;
   v_column text;
+  v_key_len integer;
 BEGIN
   IF p_target_user_id IS NULL THEN
     RAISE EXCEPTION 'allowlisted_test_user_reset_not_allowlisted'
@@ -255,6 +256,17 @@ BEGIN
       RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
         USING ERRCODE = 'P0001',
               DETAIL = 'foreign_attribution';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.author_partner_attributions AS a
+      WHERE a.referrer_author_id = ANY (v_owned)
+        AND a.invitee_user_id IS NULL
+    ) THEN
+      RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
+        USING ERRCODE = 'P0001',
+              DETAIL = 'pending_referrer_attribution';
     END IF;
   END IF;
 
@@ -426,21 +438,9 @@ BEGIN
   END LOOP;
 
   IF to_regclass('public.author_partner_attributions') IS NOT NULL THEN
-    SELECT count(*)
-    INTO v_attributions
-    FROM public.author_partner_attributions AS a
-    WHERE a.invitee_user_id = p_target_user_id
-       OR (
-         a.referrer_author_id = ANY (v_owned)
-         AND a.invitee_user_id IS NULL
-       );
-
     DELETE FROM public.author_partner_attributions AS a
-    WHERE a.invitee_user_id = p_target_user_id
-       OR (
-         a.referrer_author_id = ANY (v_owned)
-         AND a.invitee_user_id IS NULL
-       );
+    WHERE a.invitee_user_id = p_target_user_id;
+    GET DIAGNOSTICS v_attributions = ROW_COUNT;
   END IF;
 
   IF to_regclass('public.author_referrals') IS NOT NULL THEN
@@ -449,22 +449,28 @@ BEGIN
     GET DIAGNOSTICS v_referrals = ROW_COUNT;
   END IF;
 
-  -- Hidden RESTRICT / NO ACTION children of owned authors (products, studio,
-  -- royalty, media, and anything added later). Fail closed before DELETE.
+  -- Hidden RESTRICT / NO ACTION children of owned authors, including composite
+  -- keys. Single-column hits use author_fk:. Composite hits use composite_fk:.
+  -- Fail closed before DELETE. No cleanup of those rows.
   IF coalesce(array_length(v_owned, 1), 0) > 0 THEN
-    FOR v_schema, v_table, v_column IN
-      SELECT ns.nspname, cl.relname, att.attname
+    FOR v_schema, v_table, v_column, v_key_len IN
+      SELECT ns.nspname, cl.relname, att.attname, array_length(c.conkey, 1)
       FROM pg_constraint AS c
       JOIN pg_class AS cl ON cl.oid = c.conrelid
       JOIN pg_namespace AS ns ON ns.oid = cl.relnamespace
+      JOIN LATERAL unnest(c.conkey, c.confkey) AS fkcols(local_attnum, ref_attnum)
+        ON true
       JOIN pg_attribute AS att
         ON att.attrelid = c.conrelid
-       AND att.attnum = c.conkey[1]
+       AND att.attnum = fkcols.local_attnum
+      JOIN pg_attribute AS refatt
+        ON refatt.attrelid = c.confrelid
+       AND refatt.attnum = fkcols.ref_attnum
       WHERE c.contype = 'f'
         AND c.confrelid = 'public.authors'::regclass
         AND c.confdeltype IN ('a', 'r')
         AND ns.nspname = 'public'
-        AND array_length(c.conkey, 1) = 1
+        AND refatt.attname = 'id'
     LOOP
       FOREACH v_author IN ARRAY v_owned LOOP
         EXECUTE format(
@@ -479,9 +485,43 @@ BEGIN
         IF v_count > 0 THEN
           RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
             USING ERRCODE = 'P0001',
-                  DETAIL = format('author_fk:%s.%s', v_table, v_column);
+                  DETAIL = format(
+                    '%s:%s.%s',
+                    CASE WHEN v_key_len > 1 THEN 'composite_fk' ELSE 'author_fk' END,
+                    v_table,
+                    v_column
+                  );
         END IF;
       END LOOP;
+    END LOOP;
+
+    FOR v_schema, v_table IN
+      SELECT ns.nspname, cl.relname
+      FROM pg_constraint AS c
+      JOIN pg_class AS cl ON cl.oid = c.conrelid
+      JOIN pg_namespace AS ns ON ns.oid = cl.relnamespace
+      WHERE c.contype = 'f'
+        AND c.confrelid = 'public.authors'::regclass
+        AND c.confdeltype IN ('a', 'r')
+        AND ns.nspname = 'public'
+        AND array_length(c.conkey, 1) > 1
+        AND NOT EXISTS (
+          SELECT 1
+          FROM LATERAL unnest(c.conkey, c.confkey) AS fkcols(local_attnum, ref_attnum)
+          JOIN pg_attribute AS refatt
+            ON refatt.attrelid = c.confrelid
+           AND refatt.attnum = fkcols.ref_attnum
+          WHERE refatt.attname = 'id'
+        )
+    LOOP
+      EXECUTE format('SELECT count(*) FROM %I.%I', v_schema, v_table)
+      INTO v_count;
+
+      IF v_count > 0 THEN
+        RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
+          USING ERRCODE = 'P0001',
+                DETAIL = format('composite_fk:%s.*', v_table);
+      END IF;
     END LOOP;
   END IF;
 
@@ -517,21 +557,27 @@ BEGIN
     AND p.author_project_slots_partner_bonus IS DISTINCT FROM 0;
   GET DIAGNOSTICS v_bonus = ROW_COUNT;
 
-  -- Anything still RESTRICT / NO ACTION to auth.users in public would make
-  -- phase 2 auth.admin.deleteUser fail. Roll the cleanup back instead.
-  FOR v_schema, v_table, v_column IN
-    SELECT ns.nspname, cl.relname, att.attname
+  -- Anything still RESTRICT / NO ACTION to auth.users in public, including a
+  -- composite key, would make phase 2 auth.admin.deleteUser fail.
+  -- Roll the cleanup back instead. Composite hits use composite_fk:.
+  FOR v_schema, v_table, v_column, v_key_len IN
+    SELECT ns.nspname, cl.relname, att.attname, array_length(c.conkey, 1)
     FROM pg_constraint AS c
     JOIN pg_class AS cl ON cl.oid = c.conrelid
     JOIN pg_namespace AS ns ON ns.oid = cl.relnamespace
+    JOIN LATERAL unnest(c.conkey, c.confkey) AS fkcols(local_attnum, ref_attnum)
+      ON true
     JOIN pg_attribute AS att
       ON att.attrelid = c.conrelid
-     AND att.attnum = c.conkey[1]
+     AND att.attnum = fkcols.local_attnum
+    JOIN pg_attribute AS refatt
+      ON refatt.attrelid = c.confrelid
+     AND refatt.attnum = fkcols.ref_attnum
     WHERE c.contype = 'f'
       AND c.confrelid = 'auth.users'::regclass
       AND c.confdeltype IN ('a', 'r')
       AND ns.nspname = 'public'
-      AND array_length(c.conkey, 1) = 1
+      AND refatt.attname = 'id'
   LOOP
     EXECUTE format(
       'SELECT count(*) FROM %I.%I WHERE %I = $1',
@@ -545,7 +591,41 @@ BEGIN
     IF v_count2 > 0 THEN
       RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
         USING ERRCODE = 'P0001',
-              DETAIL = format('auth_fk:%s.%s', v_table, v_column);
+              DETAIL = format(
+                '%s:%s.%s',
+                CASE WHEN v_key_len > 1 THEN 'composite_fk' ELSE 'auth_fk' END,
+                v_table,
+                v_column
+              );
+    END IF;
+  END LOOP;
+
+  FOR v_schema, v_table IN
+    SELECT ns.nspname, cl.relname
+    FROM pg_constraint AS c
+    JOIN pg_class AS cl ON cl.oid = c.conrelid
+    JOIN pg_namespace AS ns ON ns.oid = cl.relnamespace
+    WHERE c.contype = 'f'
+      AND c.confrelid = 'auth.users'::regclass
+      AND c.confdeltype IN ('a', 'r')
+      AND ns.nspname = 'public'
+      AND array_length(c.conkey, 1) > 1
+      AND NOT EXISTS (
+        SELECT 1
+        FROM LATERAL unnest(c.conkey, c.confkey) AS fkcols(local_attnum, ref_attnum)
+        JOIN pg_attribute AS refatt
+          ON refatt.attrelid = c.confrelid
+         AND refatt.attnum = fkcols.ref_attnum
+        WHERE refatt.attname = 'id'
+      )
+  LOOP
+    EXECUTE format('SELECT count(*) FROM %I.%I', v_schema, v_table)
+    INTO v_count2;
+
+    IF v_count2 > 0 THEN
+      RAISE EXCEPTION 'allowlisted_test_user_reset_blocked'
+        USING ERRCODE = 'P0001',
+              DETAIL = format('composite_fk:%s.*', v_table);
     END IF;
   END LOOP;
 

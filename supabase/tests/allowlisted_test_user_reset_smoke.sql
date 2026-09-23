@@ -361,6 +361,114 @@ $$;
 
 DROP TRIGGER fail_author_delete ON public.authors;
 
+-- Pending anonymous referrer-side attribution is a hard blocker, not a delete.
+INSERT INTO public.author_partner_attributions (
+  id, referrer_author_id, invitee_user_id, bound_referral_id, status
+) VALUES (
+  '99999999-9999-4999-8999-999999999999',
+  '11111111-1111-4111-8111-111111111111',
+  NULL,
+  NULL,
+  'pending'
+);
+
+SELECT public._assert_reset_blocked(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+  'pending_referrer_attribution'
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.author_partner_attributions
+    WHERE id = '99999999-9999-4999-8999-999999999999'
+      AND invitee_user_id IS NULL
+      AND referrer_author_id = '11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'pending referrer attribution must stay unchanged';
+  END IF;
+  IF (SELECT count(*) FROM public.author_referrals
+      WHERE invitee_user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 1 THEN
+    RAISE EXCEPTION 'pending attribution block must not delete invitee referrals';
+  END IF;
+  IF (SELECT count(*) FROM public.authors
+      WHERE id IN (
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222'
+      )) <> 2 THEN
+    RAISE EXCEPTION 'pending attribution block must not delete owned authors';
+  END IF;
+  IF (SELECT author_project_slots_partner_bonus FROM public.profiles
+      WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 1 THEN
+    RAISE EXCEPTION 'pending attribution block must not clear partner bonus';
+  END IF;
+END
+$$;
+
+DELETE FROM public.author_partner_attributions
+WHERE id = '99999999-9999-4999-8999-999999999999';
+
+-- Composite RESTRICT FK to authors.id must fail closed with no partial deletes.
+ALTER TABLE public.authors
+  ADD COLUMN IF NOT EXISTS reset_audit_key uuid NOT NULL DEFAULT gen_random_uuid();
+
+ALTER TABLE public.authors
+  DROP CONSTRAINT IF EXISTS authors_reset_audit_composite_key;
+
+ALTER TABLE public.authors
+  ADD CONSTRAINT authors_reset_audit_composite_key UNIQUE (id, reset_audit_key);
+
+CREATE TABLE public.composite_author_blocker (
+  id uuid PRIMARY KEY,
+  author_id uuid NOT NULL,
+  reset_audit_key uuid NOT NULL,
+  FOREIGN KEY (author_id, reset_audit_key)
+    REFERENCES public.authors (id, reset_audit_key)
+    ON DELETE RESTRICT
+);
+
+INSERT INTO public.composite_author_blocker (id, author_id, reset_audit_key)
+SELECT
+  '88888888-8888-4888-8888-888888888888',
+  a.id,
+  a.reset_audit_key
+FROM public.authors AS a
+WHERE a.id = '11111111-1111-4111-8111-111111111111';
+
+SELECT public._assert_reset_blocked(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+  'composite_fk:composite_author_blocker.author_id'
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.composite_author_blocker
+    WHERE id = '88888888-8888-4888-8888-888888888888'
+  ) THEN
+    RAISE EXCEPTION 'composite blocker row must survive a blocked reset';
+  END IF;
+  IF (SELECT count(*) FROM public.author_referrals
+      WHERE invitee_user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 1 THEN
+    RAISE EXCEPTION 'composite FK block must not delete invitee referrals';
+  END IF;
+  IF (SELECT count(*) FROM public.authors
+      WHERE id IN (
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222'
+      )) <> 2 THEN
+    RAISE EXCEPTION 'composite FK block must not delete owned authors';
+  END IF;
+  IF (SELECT author_project_slots_partner_bonus FROM public.profiles
+      WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 1 THEN
+    RAISE EXCEPTION 'composite FK block must not clear partner bonus';
+  END IF;
+END
+$$;
+
+DROP TABLE public.composite_author_blocker;
+ALTER TABLE public.authors DROP CONSTRAINT authors_reset_audit_composite_key;
+
 -- Happy path, idempotent second call, Sergey untouched, then phase-2-shaped auth delete.
 DO $$
 DECLARE

@@ -56,6 +56,7 @@ function emptyCounts(): TestUserResetPreflightCounts {
     otherMembersOnOwnedAuthors: 0,
     referrerReferrals: 0,
     foreignAttributions: 0,
+    pendingReferrerAttributions: 0,
     authorLedgerEntries: 0,
     authorPayouts: 0,
     authorPayoutProfiles: 0,
@@ -361,6 +362,9 @@ async function loadAuthorResetScope(
 
     counts.foreignAttributions = (attributionRows ?? []).filter(
       (row) => row.invitee_user_id && row.invitee_user_id !== authUserId,
+    ).length;
+    counts.pendingReferrerAttributions = (attributionRows ?? []).filter(
+      (row) => !row.invitee_user_id,
     ).length;
 
     counts.authorLedgerEntries = await countRowsIn(

@@ -53,6 +53,7 @@ const NOT_DELETED_ITEMS = [
   "financial_orders_if_blocked",
   "other_users_referrals",
   "protected_referrer_author",
+  "pending_referrer_attributions",
   "admin_operation_log",
 ] as const;
 
@@ -611,40 +612,8 @@ export async function resetAllowlistedTestUser(
     : await findAuthUserByAllowlistedEmail(service);
 
   const targetUserId = authUser?.id ?? preflight.authUserId;
-  let deletedCounts = emptyDeletedCounts();
+  const deletedCounts = emptyDeletedCounts();
   let authDeleteFailed = false;
-
-  try {
-    deletedCounts = await cleanupNonFkData(
-      service,
-      preflight,
-      targetUserId,
-      deps,
-    );
-  } catch (error) {
-    console.error("test_user_reset_cleanup_failed", error);
-
-    await writeTestUserResetAuditLog(service, {
-      actorUserId: input.actorUserId,
-      targetAuthUserId: targetUserId,
-      status: "failed",
-      deletedCounts,
-      errorCode: "cleanup_failed",
-    });
-
-    return {
-      ok: true,
-      result: {
-        status: "failed",
-        authUserId: targetUserId,
-        deletedCounts,
-        notDeleted: [...NOT_DELETED_ITEMS],
-        errorCode: "cleanup_failed",
-        message: "Не удалось очистить связанные данные.",
-        browserHint: BROWSER_HINT,
-      },
-    };
-  }
 
   if (targetUserId) {
     const phase1 = await runAllowlistedTestUserDbCleanup(service, targetUserId);
@@ -684,6 +653,47 @@ export async function resetAllowlistedTestUser(
     deletedCounts.capacityGrants = phase1.deleted.capacityGrants;
     deletedCounts.partnerBonusCleared = phase1.deleted.partnerBonusCleared;
     deletedCounts.dbCleanupCompleted = true;
+  }
+
+  try {
+    const nonFkDeleted = await cleanupNonFkData(
+      service,
+      preflight,
+      targetUserId,
+      deps,
+    );
+    deletedCounts.emailDeliveryEvents = nonFkDeleted.emailDeliveryEvents;
+    deletedCounts.emailOutbox = nonFkDeleted.emailOutbox;
+    deletedCounts.emailConsents = nonFkDeleted.emailConsents;
+    deletedCounts.emailPreferences = nonFkDeleted.emailPreferences;
+    deletedCounts.emailContacts = nonFkDeleted.emailContacts;
+    deletedCounts.analyticsEvents = nonFkDeleted.analyticsEvents;
+    deletedCounts.analyticsSessions = nonFkDeleted.analyticsSessions;
+    deletedCounts.avatarRemoved = nonFkDeleted.avatarRemoved;
+    deletedCounts.privateAudioItemsRemoved = nonFkDeleted.privateAudioItemsRemoved;
+  } catch (error) {
+    console.error("test_user_reset_cleanup_failed", error);
+
+    await writeTestUserResetAuditLog(service, {
+      actorUserId: input.actorUserId,
+      targetAuthUserId: targetUserId,
+      status: "failed",
+      deletedCounts,
+      errorCode: "cleanup_failed",
+    });
+
+    return {
+      ok: true,
+      result: {
+        status: "failed",
+        authUserId: targetUserId,
+        deletedCounts,
+        notDeleted: [...NOT_DELETED_ITEMS],
+        errorCode: "cleanup_failed",
+        message: "Не удалось очистить связанные данные.",
+        browserHint: BROWSER_HINT,
+      },
+    };
   }
 
   if (targetUserId) {

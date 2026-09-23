@@ -20,6 +20,7 @@ export const TEST_USER_RESET_BLOCK_CODES = {
   payout_profile: "payout_profile",
   owned_author_content: "owned_author_content",
   foreign_attribution: "foreign_attribution",
+  pending_referrer_attribution: "pending_referrer_attribution",
   capacity_grants: "capacity_grants",
   protected_author: "protected_author",
   foreign_terms: "foreign_terms",
@@ -68,6 +69,7 @@ export type TestUserResetPreflightCounts = {
   otherMembersOnOwnedAuthors: number;
   referrerReferrals: number;
   foreignAttributions: number;
+  pendingReferrerAttributions: number;
   authorLedgerEntries: number;
   authorPayouts: number;
   authorPayoutProfiles: number;

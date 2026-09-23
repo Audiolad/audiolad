@@ -99,6 +99,8 @@ function getBlockMessage(code: TestUserResetBlockCode): string {
       return "У авторского пространства есть контент, студия или другие данные, которые нельзя стереть этим сбросом.";
     case TEST_USER_RESET_BLOCK_CODES.foreign_attribution:
       return "К авторскому пространству привязана атрибуция другого пользователя.";
+    case TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution:
+      return "У авторского пространства есть незавершённая реферальная атрибуция без приглашённого. Такие строки не удаляются.";
     case TEST_USER_RESET_BLOCK_CODES.capacity_grants:
       return "Есть оплаченные пакеты лимита авторских проектов. Финансовые данные нужно сохранить.";
     case TEST_USER_RESET_BLOCK_CODES.protected_author:
@@ -215,6 +217,14 @@ export function evaluateTestUserResetBlockers(input: {
   if (countOf(input.counts, "foreignAttributions") > 0) {
     blockers.push(
       buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.foreign_attribution),
+    );
+  }
+
+  if (countOf(input.counts, "pendingReferrerAttributions") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(
+        TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution,
+      ),
     );
   }
 

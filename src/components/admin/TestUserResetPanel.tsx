@@ -76,9 +76,10 @@ function PreflightList({ preflight }: { preflight: TestUserResetPreflight }) {
         {formatCount(counts.attributions)}
       </li>
       <li>
-        Partner bonus / capacity grants / referrer referrals:{" "}
+        Partner bonus / capacity grants / referrer referrals / pending attributions:{" "}
         {formatCount(counts.partnerBonus)} / {formatCount(counts.capacityGrants)} /{" "}
-        {formatCount(counts.referrerReferrals)}
+        {formatCount(counts.referrerReferrals)} /{" "}
+        {formatCount(counts.pendingReferrerAttributions)}
       </li>
       <li>Author applications: {formatCount(counts.authorApplications)}</li>
       <li>Promotion campaigns: {formatCount(counts.promotionCampaigns)}</li>

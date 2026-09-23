@@ -1368,12 +1368,16 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 Сброс тестового адреса `audiolad@mail.ru` — две фазы, не одна транзакция Postgres:
 
-1. `public.reset_allowlisted_test_user_db(uuid)` — одна транзакция, `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` только у `service_role`. Не удаляет `auth.users`.
-2. Приложение после успеха фазы 1 вызывает существующий `auth.admin.deleteUser`. Если фаза 2 не удалась, повторный вызов снова проходит фазу 1 (уже пустую) и доудаляет auth-пользователя.
+1. Владелец платформы и фраза подтверждения.
+2. `public.reset_allowlisted_test_user_db(uuid)` — одна транзакция, `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` только у `service_role`. Не удаляет `auth.users`. Если RPC блокируется, транзакция откатывается, и приложение не вызывает очистку почты, аналитики, аватара и приватного аудио.
+3. Только после успеха фазы 1 приложение чистит почту, scoped-аналитику, аватар и приватное аудио.
+4. Затем существующий `auth.admin.deleteUser`. Если фаза 2 не удалась, повторный вызов снова проходит фазу 1 (уже пустую), повторяет не-FK очистку и доудаляет auth-пользователя.
 
 `author_referrals.invitee_user_id` остаётся `ON DELETE RESTRICT`. Триггер `author_referrals_protect_activated` по-прежнему запрещает менять и удалять обычный activated referral. Исключение на `DELETE` срабатывает только вместе: transaction-local GUC `audiolad.allowlisted_test_user_reset` равен `invitee_user_id`, и email этого пользователя в `auth.users` точно `audiolad@mail.ru`.
 
-Жёсткие блокеры: заказы, платежи, возвраты, роялти, выплаты, оплаченные capacity grants, чужие membership, другие участники своих авторов, referral где тестовый аккаунт — referrer другого invitee, автор Sergey (`7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c`) и код `sergey`. Свои membership, заявки, invitee referral, атрибуции, свои пустые авторские проекты и partner bonus — цели очистки. Журнал `admin_operation_log` не удаляется.
+RPC перед удалением авторов и перед завершением транзакции сканирует `pg_catalog` на `RESTRICT` / `NO ACTION` к `public.authors` и `auth.users`, включая составные ключи. Одиночная колонка даёт `author_fk:` / `auth_fk:`. Составной ключ даёт `composite_fk:`. Такие строки не чистятся, сброс блокируется.
+
+Жёсткие блокеры: заказы, платежи, возвраты, роялти, выплаты, оплаченные capacity grants, чужие membership, другие участники своих авторов, referral где тестовый аккаунт — referrer другого invitee, незавершённая атрибуция без invitee (`pending_referrer_attribution`, `invitee_user_id IS NULL` на своём авторе), автор Sergey (`7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c`) и код `sergey`. Удаляются только атрибуции с `invitee_user_id` тестового аккаунта. Свои membership, заявки, invitee referral, свои пустые авторские проекты и partner bonus — цели очистки. Журнал `admin_operation_log` не удаляется.
 
 ## Резервное копирование
 

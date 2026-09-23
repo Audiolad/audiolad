@@ -49,6 +49,12 @@ assert(!migration.includes("DROP CONSTRAINT"), "migration does not drop constrai
 assert(!/invitee_user_id[\s\S]{0,120}ON DELETE CASCADE/.test(migration), "invitee FK not switched to cascade");
 assert(migration.includes("author_referrals RESTRICT FKs must stay unchanged"), "migration asserts RESTRICT FKs");
 assert(migration.includes("test_as_referrer"), "referrer block");
+assert(migration.includes("pending_referrer_attribution"), "pending referrer attribution block");
+assert(migration.includes("composite_fk"), "composite FK blocker label");
+assert(
+  migration.includes("DELETE FROM public.author_partner_attributions AS a\n    WHERE a.invitee_user_id = p_target_user_id;"),
+  "attributions delete is invitee-only",
+);
 assert(migration.includes("7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c"), "sergey author id guard");
 assert(migration.includes("primary_code_normalized = 'sergey'"), "sergey code guard");
 
