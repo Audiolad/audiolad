@@ -268,7 +268,8 @@ async function testNoInitDataSkipsFlow() {
 async function testVerifyLinkedFalseShowsCtaNotLink() {
   const { deps, calls } = createDeps({
     user: { id: "old-session-user" },
-    fetchImpl: async () => jsonResponse(200, { ok: true, linked: false }),
+    fetchImpl: async () =>
+      jsonResponse(200, { ok: true, linked: false, sessionMatches: false }),
   });
 
   const event = await verifyMaxSession(deps);
@@ -297,9 +298,14 @@ async function testVerifyLinkedFalseShowsCtaNotLink() {
 }
 
 async function testLinkedTrueWithSessionHidesForm() {
-  const { deps } = createDeps({
-    user: { id: "user-1" },
-    fetchImpl: async () => jsonResponse(200, { ok: true, linked: true }),
+  const { deps, calls } = createDeps({
+    user: { id: "user-a" },
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        ok: true,
+        linked: true,
+        sessionMatches: true,
+      }),
   });
   const event = await verifyMaxSession(deps);
   assert.deepEqual(event, {
@@ -313,14 +319,29 @@ async function testLinkedTrueWithSessionHidesForm() {
   assert.equal(view.phase, "linked_authenticated");
   assert.equal(view.showLoginForm, false);
   assert.equal(view.showLoginCta, false);
+  assert.equal(
+    calls.some((call) => call.type === "getUser"),
+    false,
+    "verify must trust server sessionMatches and not read the local session",
+  );
 }
 
 async function testLinkedTrueWithoutSessionShowsRelogin() {
-  const { deps } = createDeps({
+  const { deps, calls } = createDeps({
     user: null,
-    fetchImpl: async () => jsonResponse(200, { ok: true, linked: true }),
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        ok: true,
+        linked: true,
+        sessionMatches: false,
+      }),
   });
   const event = await verifyMaxSession(deps);
+  assert.deepEqual(event, {
+    type: "VERIFY_SUCCESS",
+    linked: true,
+    hasSession: false,
+  });
   const view = viewMaxShell(reduceMaxShell(INITIAL_MAX_SHELL_STATE, event));
   assert.equal(view.phase, "linked_no_session");
   assert.equal(view.reloginNotice, MAX_SHELL_LINKED_NO_SESSION);
@@ -328,6 +349,39 @@ async function testLinkedTrueWithoutSessionShowsRelogin() {
   assert.equal(view.showSignupForm, false);
   assert.equal(view.showSwitchToSignup, false);
   assert.equal(view.showLoginForm, true);
+  assert.equal(calls.some((call) => call.type === "getUser"), false);
+}
+
+async function testWrongSessionStaysOnRelogin() {
+  const { deps, calls } = createDeps({
+    user: { id: "user-b" },
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        ok: true,
+        linked: true,
+        sessionMatches: false,
+      }),
+  });
+  const event = await verifyMaxSession(deps);
+  assert.deepEqual(event, {
+    type: "VERIFY_SUCCESS",
+    linked: true,
+    hasSession: false,
+  });
+  const view = viewMaxShell(reduceMaxShell(INITIAL_MAX_SHELL_STATE, event));
+  assert.equal(view.phase, "linked_no_session");
+  assert.equal(view.showLoginForm, true);
+  assert.equal(view.reloginNotice, MAX_SHELL_LINKED_NO_SESSION);
+  assert.notEqual(view.phase, "linked_authenticated");
+  assert.equal(
+    calls.some((call) => call.type === "getUser"),
+    false,
+    "a leftover AudioLad session must not decide MAX binding",
+  );
+  assert.equal(
+    calls.some((call) => call.url === MAX_SESSION_LINK_PATH),
+    false,
+  );
 }
 
 async function testValidPasswordCallsLinkWithInitDataOnly() {
@@ -509,6 +563,17 @@ function testSourceGuards() {
     /router\.replace|\/auth\/sign-in\?registered|generateLink|auth\.admin/,
   );
   assert.match(hay, /signUpAction/);
+
+  const verifyFn = readFileSync(
+    join(repoRoot, "src/lib/max/session-shell-client.ts"),
+    "utf8",
+  );
+  const verifyBody = verifyFn.slice(
+    verifyFn.indexOf("export async function verifyMaxSession"),
+    verifyFn.indexOf("export async function loginAndLinkMaxSession"),
+  );
+  assert.match(verifyBody, /sessionMatches/);
+  assert.doesNotMatch(verifyBody, /getUser\(/);
 }
 
 function signupReadyState() {
@@ -857,6 +922,7 @@ await testNoInitDataSkipsFlow();
 await testVerifyLinkedFalseShowsCtaNotLink();
 await testLinkedTrueWithSessionHidesForm();
 await testLinkedTrueWithoutSessionShowsRelogin();
+await testWrongSessionStaysOnRelogin();
 await testValidPasswordCallsLinkWithInitDataOnly();
 await testBadPasswordDoesNotCallLink();
 await testExpiredLinkUx();
