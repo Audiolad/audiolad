@@ -65,7 +65,21 @@ function PreflightList({ preflight }: { preflight: TestUserResetPreflight }) {
         Personal materials: {formatCount(counts.personalMaterialsCreated)} created /{" "}
         {formatCount(counts.personalMaterialsClaimed)} claimed
       </li>
-      <li>Author memberships: {formatCount(counts.authorMembers)}</li>
+      <li>
+        Author memberships / foreign / other members: {formatCount(counts.authorMembers)}{" "}
+        / {formatCount(counts.foreignAuthorMemberships)} /{" "}
+        {formatCount(counts.otherMembersOnOwnedAuthors)}
+      </li>
+      <li>
+        Owned authors / invitee referrals / attributions:{" "}
+        {formatCount(counts.ownedAuthors)} / {formatCount(counts.inviteeReferrals)} /{" "}
+        {formatCount(counts.attributions)}
+      </li>
+      <li>
+        Partner bonus / capacity grants / referrer referrals:{" "}
+        {formatCount(counts.partnerBonus)} / {formatCount(counts.capacityGrants)} /{" "}
+        {formatCount(counts.referrerReferrals)}
+      </li>
       <li>Author applications: {formatCount(counts.authorApplications)}</li>
       <li>Promotion campaigns: {formatCount(counts.promotionCampaigns)}</li>
     </ul>
@@ -90,6 +104,14 @@ function ResetReport({ result }: { result: TestUserResetResult }) {
         <li>Email delivery events: {formatCount(deleted.emailDeliveryEvents)}</li>
         <li>Analytics events: {formatCount(deleted.analyticsEvents)}</li>
         <li>Analytics sessions: {formatCount(deleted.analyticsSessions)}</li>
+        <li>Invitee referrals: {formatCount(deleted.inviteeReferrals)}</li>
+        <li>Attributions: {formatCount(deleted.attributions)}</li>
+        <li>Owned authors: {formatCount(deleted.ownedAuthors)}</li>
+        <li>Author members: {formatCount(deleted.authorMembersRemoved)}</li>
+        <li>Author applications: {formatCount(deleted.authorApplicationsRemoved)}</li>
+        <li>Capacity grants: {formatCount(deleted.capacityGrants)}</li>
+        <li>Partner bonus cleared: {formatCount(deleted.partnerBonusCleared)}</li>
+        <li>DB cleanup completed: {deleted.dbCleanupCompleted ? "да" : "нет"}</li>
         <li>Auth user deleted: {deleted.authUserDeleted ? "да" : "нет"}</li>
         <li>Avatar removed: {deleted.avatarRemoved ? "да" : "нет"}</li>
       </ul>

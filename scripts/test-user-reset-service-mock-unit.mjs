@@ -47,6 +47,8 @@ function createMockService(scenario) {
     auditInserts: [],
     tables: [],
     cleanupPrivateAudio: [],
+    rpc: [],
+    sequence: [],
   };
 
   const counts = scenario.counts ?? {};
@@ -263,6 +265,7 @@ function createMockService(scenario) {
           };
         },
         async deleteUser(userId) {
+          calls.sequence.push("deleteUser");
           calls.deleteUser.push(userId);
           if (scenario.deleteUserError) {
             return { error: scenario.deleteUserError };
@@ -271,6 +274,31 @@ function createMockService(scenario) {
           return { error: null };
         },
       },
+    },
+    async rpc(fn, args) {
+      calls.sequence.push("rpc");
+      calls.rpc.push({ fn, args });
+      if (scenario.rpcError) {
+        return { data: null, error: scenario.rpcError };
+      }
+      return {
+        data: scenario.rpcData ?? {
+          ok: true,
+          dbCleanupCompleted: true,
+          alreadyClean: false,
+          targetUserId,
+          counts: {
+            inviteeReferrals: scenario.dbCounts?.inviteeReferrals ?? 1,
+            attributions: scenario.dbCounts?.attributions ?? 1,
+            ownedAuthors: scenario.dbCounts?.ownedAuthors ?? 2,
+            authorMembers: scenario.dbCounts?.authorMembers ?? 2,
+            authorApplications: scenario.dbCounts?.authorApplications ?? 1,
+            capacityGrants: 0,
+            partnerBonusCleared: scenario.dbCounts?.partnerBonusCleared ?? 1,
+          },
+        },
+        error: null,
+      };
     },
   };
 
@@ -325,6 +353,23 @@ async function testDeleteUserCalledWithTargetUuid() {
     result.result.deletedCounts.privateAudioItemsRemoved === 2,
     "cleanup removedItems surfaced in deletedCounts",
   );
+  assert(service.calls.rpc.length === 1, "phase 1 RPC called once");
+  assert(
+    service.calls.rpc[0].fn === "reset_allowlisted_test_user_db",
+    "phase 1 RPC name",
+  );
+  assert(
+    service.calls.rpc[0].args.p_target_user_id === service.targetUserId,
+    "phase 1 RPC receives target user id",
+  );
+  assert(
+    service.calls.sequence.indexOf("rpc") <
+      service.calls.sequence.indexOf("deleteUser"),
+    "phase 1 RPC runs before auth delete",
+  );
+  assert(result.result.deletedCounts.dbCleanupCompleted === true, "db cleanup completed");
+  assert(result.result.deletedCounts.ownedAuthors === 2, "owned authors counted");
+  assert(result.result.deletedCounts.authUserDeleted === true, "auth user deleted after db cleanup");
 }
 
 async function testDeleteUserSkippedOnBlocker() {
@@ -452,6 +497,104 @@ async function testPartialWhenAuthDeleteFailsAfterCleanup() {
     service.calls.cleanupPrivateAudio.length === 1,
     "cleanup runs before failed auth delete",
   );
+  assert(result.result.deletedCounts.dbCleanupCompleted === true, "db cleanup kept after auth failure");
+  assert(result.result.deletedCounts.authUserDeleted === false, "auth user not deleted");
+  assert(
+    result.result.message.includes("повторить"),
+    "partial result says the reset can be retried",
+  );
+}
+
+async function testPhase2RetryAfterDbCleanup() {
+  const scenario = {
+    counts: {
+      analytics_events: 0,
+      analytics_sessions: 0,
+    },
+    emailContacts: [],
+    deleteUserError: { message: "auth delete failed" },
+  };
+  const service = createMockService(scenario);
+
+  const first = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
+
+  assert(first.result.status === "partial", "first attempt stays partial");
+  assert(first.result.deletedCounts.dbCleanupCompleted === true, "first attempt finished phase 1");
+  assert(service.calls.deleteUser.length === 1, "first attempt called deleteUser");
+
+  scenario.deleteUserError = null;
+  scenario.dbCounts = {
+    inviteeReferrals: 0,
+    attributions: 0,
+    ownedAuthors: 0,
+    authorMembers: 0,
+    authorApplications: 0,
+    partnerBonusCleared: 0,
+  };
+
+  const second = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
+
+  assert(second.ok, "retry ok");
+  assert(second.result.status === "success", "retry completes auth delete");
+  assert(second.result.deletedCounts.authUserDeleted === true, "retry deletes auth user");
+  assert(second.result.deletedCounts.dbCleanupCompleted === true, "retry phase 1 is idempotent");
+  assert(service.calls.rpc.length === 2, "phase 1 RPC is safe to call again");
+  assert(service.calls.deleteUser.length === 2, "deleteUser retried");
+}
+
+async function testDbBlockerSkipsAuthDelete() {
+  const service = createMockService({
+    counts: {
+      analytics_events: 0,
+      analytics_sessions: 0,
+    },
+    emailContacts: [],
+    rpcError: {
+      code: "P0001",
+      message: "allowlisted_test_user_reset_blocked",
+      details: "test_as_referrer",
+    },
+  });
+
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
+
+  assert(result.ok, "db blocker wrapper ok");
+  assert(result.result.status === "failed", "db blocker fails closed");
+  assert(result.result.errorCode === "blocked", "db blocker code");
+  assert(
+    result.result.blockers?.some((row) => row.code === "test_as_referrer"),
+    "referrer blocker surfaced",
+  );
+  assert(service.calls.rpc.length === 1, "phase 1 RPC attempted");
+  assert(service.calls.deleteUser.length === 0, "auth delete skipped when phase 1 blocks");
+  assert(result.result.deletedCounts.dbCleanupCompleted === false, "rolled-back phase 1 is not complete");
 }
 
 async function testRepeatRunAlreadyResetSafe() {
@@ -533,6 +676,8 @@ async function main() {
   await testDeleteUserSkippedOnCleanupFailure();
   await testPrivateAudioCleanupFailureStopsAuthDelete();
   await testPartialWhenAuthDeleteFailsAfterCleanup();
+  await testPhase2RetryAfterDbCleanup();
+  await testDbBlockerSkipsAuthDelete();
   await testRepeatRunAlreadyResetSafe();
   console.log("test-user-reset-service-mock-unit: ok");
 }

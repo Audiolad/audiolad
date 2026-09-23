@@ -1362,6 +1362,19 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 Инкрементальные файлы: `supabase/migrations/`. Baseline для пустых БД: `supabase/baseline/` (не применять к production).
 
+## Allowlisted test-user reset после activated referral
+
+Миграция `supabase/migrations/20261030120000_allowlisted_test_user_reset_db_cleanup.sql`.
+
+Сброс тестового адреса `audiolad@mail.ru` — две фазы, не одна транзакция Postgres:
+
+1. `public.reset_allowlisted_test_user_db(uuid)` — одна транзакция, `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` только у `service_role`. Не удаляет `auth.users`.
+2. Приложение после успеха фазы 1 вызывает существующий `auth.admin.deleteUser`. Если фаза 2 не удалась, повторный вызов снова проходит фазу 1 (уже пустую) и доудаляет auth-пользователя.
+
+`author_referrals.invitee_user_id` остаётся `ON DELETE RESTRICT`. Триггер `author_referrals_protect_activated` по-прежнему запрещает менять и удалять обычный activated referral. Исключение на `DELETE` срабатывает только вместе: transaction-local GUC `audiolad.allowlisted_test_user_reset` равен `invitee_user_id`, и email этого пользователя в `auth.users` точно `audiolad@mail.ru`.
+
+Жёсткие блокеры: заказы, платежи, возвраты, роялти, выплаты, оплаченные capacity grants, чужие membership, другие участники своих авторов, referral где тестовый аккаунт — referrer другого invitee, автор Sergey (`7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c`) и код `sergey`. Свои membership, заявки, invitee referral, атрибуции, свои пустые авторские проекты и partner bonus — цели очистки. Журнал `admin_operation_log` не удаляется.
+
 ## Резервное копирование
 
 Будет заполнено позже.

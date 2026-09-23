@@ -1,11 +1,13 @@
 import { removeUserAvatarObject } from "@/lib/profile/avatar";
 import {
+  TEST_USER_RESET_DB_RPC,
   TEST_USER_RESET_EMAIL,
   TEST_USER_RESET_NORMALIZED_EMAIL,
 } from "@/lib/admin/test-user-reset/constants";
 import { writeTestUserResetAuditLog } from "@/lib/admin/test-user-reset/audit";
 import {
   assertAllowlistedTestUserEmail,
+  buildTestUserResetBlocker,
   canActorResetTestUser,
   isValidTestUserResetConfirmationPhrase,
   normalizeAllowlistedTestEmail,
@@ -14,10 +16,12 @@ import {
   getTestUserResetPreflight,
   resolveAllowlistedTestUserContext,
 } from "@/lib/admin/test-user-reset/preflight";
-import type {
-  TestUserResetDeletedCounts,
-  TestUserResetPreflight,
-  TestUserResetResult,
+import {
+  TEST_USER_RESET_BLOCK_CODES,
+  type TestUserResetBlocker,
+  type TestUserResetDeletedCounts,
+  type TestUserResetPreflight,
+  type TestUserResetResult,
 } from "@/lib/admin/test-user-reset/types";
 import {
   buildScopedAnalyticsEventFilters,
@@ -47,6 +51,9 @@ const NOT_DELETED_ITEMS = [
   "browser_session_storage",
   "service_worker_cache",
   "financial_orders_if_blocked",
+  "other_users_referrals",
+  "protected_referrer_author",
+  "admin_operation_log",
 ] as const;
 
 function emptyDeletedCounts(): TestUserResetDeletedCounts {
@@ -60,6 +67,14 @@ function emptyDeletedCounts(): TestUserResetDeletedCounts {
     analyticsSessions: 0,
     avatarRemoved: false,
     privateAudioItemsRemoved: 0,
+    inviteeReferrals: 0,
+    attributions: 0,
+    ownedAuthors: 0,
+    authorMembersRemoved: 0,
+    authorApplicationsRemoved: 0,
+    capacityGrants: 0,
+    partnerBonusCleared: 0,
+    dbCleanupCompleted: false,
     authUserDeleted: false,
   };
 }
@@ -322,6 +337,112 @@ async function cleanupNonFkData(
   return deleted;
 }
 
+type DbCleanupPayload = {
+  ok?: boolean;
+  dbCleanupCompleted?: boolean;
+  counts?: {
+    inviteeReferrals?: number;
+    attributions?: number;
+    ownedAuthors?: number;
+    authorMembers?: number;
+    authorApplications?: number;
+    capacityGrants?: number;
+    partnerBonusCleared?: number;
+  };
+};
+
+function readDbCleanupPayload(data: unknown): DbCleanupPayload | null {
+  const value = typeof data === "string" ? JSON.parse(data) : data;
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  return value as DbCleanupPayload;
+}
+
+function blockerFromDbDetail(detail: string): TestUserResetBlocker {
+  const normalized = detail.trim();
+  const known = Object.values(TEST_USER_RESET_BLOCK_CODES);
+
+  if (normalized.startsWith("owned_author_blocked:") || normalized.startsWith("author_fk:")) {
+    return buildTestUserResetBlocker(
+      TEST_USER_RESET_BLOCK_CODES.owned_author_content,
+      normalized,
+    );
+  }
+
+  const match = known.find((code) => normalized === code);
+
+  if (match) {
+    return buildTestUserResetBlocker(match, normalized);
+  }
+
+  return buildTestUserResetBlocker(
+    TEST_USER_RESET_BLOCK_CODES.db_reset_blocked,
+    normalized || "unknown",
+  );
+}
+
+function applyDbCleanupCounts(
+  deleted: TestUserResetDeletedCounts,
+  payload: DbCleanupPayload,
+): void {
+  const counts = payload.counts ?? {};
+  deleted.inviteeReferrals = Number(counts.inviteeReferrals ?? 0);
+  deleted.attributions = Number(counts.attributions ?? 0);
+  deleted.ownedAuthors = Number(counts.ownedAuthors ?? 0);
+  deleted.authorMembersRemoved = Number(counts.authorMembers ?? 0);
+  deleted.authorApplicationsRemoved = Number(counts.authorApplications ?? 0);
+  deleted.capacityGrants = Number(counts.capacityGrants ?? 0);
+  deleted.partnerBonusCleared = Number(counts.partnerBonusCleared ?? 0);
+  deleted.dbCleanupCompleted = payload.dbCleanupCompleted === true;
+}
+
+async function runAllowlistedTestUserDbCleanup(
+  service: ServiceClient,
+  userId: string,
+): Promise<
+  | { ok: true; deleted: TestUserResetDeletedCounts }
+  | { ok: false; blocked?: boolean; blocker?: TestUserResetBlocker; errorCode: string }
+> {
+  const { data, error } = await service.rpc(TEST_USER_RESET_DB_RPC, {
+    p_target_user_id: userId,
+  });
+
+  if (error) {
+    const detail = `${error.details ?? ""} ${error.message ?? ""}`.trim();
+    const blocked =
+      error.code === "P0001" ||
+      detail.includes("allowlisted_test_user_reset_blocked");
+
+    if (blocked) {
+      const detailCode =
+        (typeof error.details === "string" && error.details.trim()) ||
+        "unknown";
+      return {
+        ok: false,
+        blocked: true,
+        blocker: blockerFromDbDetail(detailCode),
+        errorCode: "blocked",
+      };
+    }
+
+    console.error("test_user_reset_db_cleanup_failed", error.message);
+    return { ok: false, errorCode: "db_cleanup_failed" };
+  }
+
+  const payload = readDbCleanupPayload(data);
+
+  if (!payload?.ok || payload.dbCleanupCompleted !== true) {
+    return { ok: false, errorCode: "db_cleanup_failed" };
+  }
+
+  const deleted = emptyDeletedCounts();
+  applyDbCleanupCounts(deleted, payload);
+  return { ok: true, deleted };
+}
+
 async function deleteAllowlistedAuthUser(
   service: ServiceClient,
   userId: string,
@@ -523,6 +644,46 @@ export async function resetAllowlistedTestUser(
         browserHint: BROWSER_HINT,
       },
     };
+  }
+
+  if (targetUserId) {
+    const phase1 = await runAllowlistedTestUserDbCleanup(service, targetUserId);
+
+    if (!phase1.ok) {
+      await writeTestUserResetAuditLog(service, {
+        actorUserId: input.actorUserId,
+        targetAuthUserId: targetUserId,
+        status: "failed",
+        deletedCounts,
+        errorCode: phase1.errorCode,
+      });
+
+      return {
+        ok: true,
+        result: {
+          status: "failed",
+          authUserId: targetUserId,
+          deletedCounts,
+          notDeleted: [...NOT_DELETED_ITEMS],
+          blockers: phase1.blocker ? [phase1.blocker] : undefined,
+          errorCode: phase1.errorCode,
+          message: phase1.blocked
+            ? "Сброс заблокирован. Устраните блокеры и повторите."
+            : "Не удалось очистить авторские и реферальные данные.",
+          browserHint: BROWSER_HINT,
+        },
+      };
+    }
+
+    deletedCounts.inviteeReferrals = phase1.deleted.inviteeReferrals;
+    deletedCounts.attributions = phase1.deleted.attributions;
+    deletedCounts.ownedAuthors = phase1.deleted.ownedAuthors;
+    deletedCounts.authorMembersRemoved = phase1.deleted.authorMembersRemoved;
+    deletedCounts.authorApplicationsRemoved =
+      phase1.deleted.authorApplicationsRemoved;
+    deletedCounts.capacityGrants = phase1.deleted.capacityGrants;
+    deletedCounts.partnerBonusCleared = phase1.deleted.partnerBonusCleared;
+    deletedCounts.dbCleanupCompleted = true;
   }
 
   if (targetUserId) {
