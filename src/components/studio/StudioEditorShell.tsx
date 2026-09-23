@@ -2582,6 +2582,8 @@ export default function StudioEditorShell({
                 <div><dt className="inline text-sky-100/70">Before / after resume: </dt><dd className="inline">{audioDebugState.stateBeforePlay ?? "—"} / {audioDebugState.stateAfterResume ?? "—"}</dd></div>
                 <div><dt className="inline text-sky-100/70">Resume: </dt><dd className="inline">{audioDebugState.lastResumeResult}</dd></div>
                 <div><dt className="inline text-sky-100/70">Resume error: </dt><dd className="inline">{audioDebugState.lastResumeError ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Media play error: </dt><dd className="inline">{audioDebugState.lastMediaPlayError ?? "—"}</dd></div>
+                <div className="sm:col-span-2"><dt className="inline text-sky-100/70">Pause audio: </dt><dd className="inline break-all">{audioDebugState.lastPauseAudio ?? "—"}</dd></div>
                 <div><dt className="inline text-sky-100/70">Recorder / live tracks: </dt><dd className="inline">{recorderDebugState.mediaRecorderState} / {recorderDebugState.activeStreamTrackCount}</dd></div>
               </dl>
             </section>

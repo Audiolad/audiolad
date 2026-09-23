@@ -86,10 +86,27 @@ import {
 import {
   findActiveStudioClip,
   isStudioPlaybackGenerationCurrent,
+  listStudioTracksAudibleAtPlayhead,
   nextStudioPlaybackGeneration,
   planStudioMediaElementSync,
   shouldCorrectStudioMediaDrift,
 } from "@/lib/studio/media-element-sync";
+import {
+  STUDIO_MEDIA_PLAY_FAILED_MESSAGE,
+  beginStudioMediaPlayback,
+  cancelStudioMediaPlayback,
+  describeStudioAudioElement,
+  formatStudioPauseAudioDiagnostics,
+  isStudioMediaPlaybackPending,
+  isStudioMediaStartBlocked,
+  listMountedStudioCatalogPreviewMedia,
+  publishStudioPauseDiagnostics,
+  runStudioAudibleStartupBarrier,
+  seekStudioMediaElementIfNeeded,
+  setStudioMediaPlaybackDebugLogging,
+  stopMountedStudioCatalogPreviews,
+  type StudioMediaPlayOutcome,
+} from "@/lib/studio/media-element-lifecycle";
 import {
   applyStudioMediaElementSrcRefresh,
   shouldRefreshStudioPlaybackUrl,
@@ -123,6 +140,8 @@ export type StudioAudioDebugState = {
   lastResumeError: string | null;
   stateBeforePlay: string | null;
   stateAfterResume: string | null;
+  lastMediaPlayError: string | null;
+  lastPauseAudio: string | null;
 };
 
 export type StudioLocalTrack = {
@@ -280,15 +299,17 @@ function createStudioMediaElement(playbackUrl: string): HTMLAudioElement {
   return media;
 }
 
-function seekStudioMediaElement(media: HTMLAudioElement, time: number) {
-  if (!Number.isFinite(time) || time < 0) {
-    return;
-  }
-  try {
-    media.currentTime = time;
-  } catch {
-    // Metadata may not be ready yet; the next sync tick retries.
-  }
+function silenceStudioTrackOutput(runtime: TrackRuntime, contextTime: number) {
+  const gain = runtime.envelopeGain.gain;
+  gain.cancelScheduledValues(contextTime);
+  const from = Number.isFinite(gain.value) ? Math.max(gain.value, 0) : 0;
+  gain.setValueAtTime(from, contextTime);
+  gain.linearRampToValueAtTime(
+    0,
+    contextTime + STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
+  );
+  runtime.sources.clear();
+  runtime.activeClipId = null;
 }
 
 function scheduleClipEnvelope(
@@ -365,8 +386,21 @@ function syncTrackMediaPlayback(
   position: number,
   playing: boolean,
   contextTime: number,
-  options: { forceEnter?: boolean } = {},
-) {
+  options: {
+    forceEnter?: boolean;
+    generation: number;
+    isGenerationCurrent: (generation: number) => boolean;
+    getTimelinePosition: () => number;
+    getContextTime: () => number;
+    onPlayFailed?: (outcome: StudioMediaPlayOutcome) => void;
+    /**
+     * Initial Play waits for every audible track before opening envelopes.
+     * Progress-loop clip changes leave this unset and open immediately.
+     */
+    deferAudibleEnvelope?: boolean;
+    queueAudibleEnvelope?: (open: () => void) => void;
+  },
+): Promise<{ started: boolean; stale: boolean }> {
   const media = runtime.mediaElement;
   const plan = planStudioMediaElementSync({
     clips: track.clips,
@@ -379,79 +413,156 @@ function syncTrackMediaPlayback(
   });
   media.loop = plan.loop;
 
-  if (plan.envelope === "silence") {
-    const gain = runtime.envelopeGain.gain;
-    gain.cancelScheduledValues(contextTime);
-    const from = Number.isFinite(gain.value) ? Math.max(gain.value, 0) : 0;
-    gain.setValueAtTime(from, contextTime);
-    gain.linearRampToValueAtTime(
-      0,
-      contextTime + STUDIO_TECHNICAL_CLIP_EDGE_RAMP_SECONDS,
-    );
-    runtime.sources.clear();
-    runtime.activeClipId = null;
-    // Park media while paused (or reset gap loop) even under a silence envelope.
+  const idle = Promise.resolve({ started: false, stale: false });
+  const already = Promise.resolve({ started: true, stale: false });
+
+  if (!plan.wantPlaying) {
+    cancelStudioMediaPlayback(media);
+    silenceStudioTrackOutput(runtime, contextTime);
     if (plan.seekTo != null) {
-      seekStudioMediaElement(media, plan.seekTo);
+      seekStudioMediaElementIfNeeded(media, plan.seekTo);
     }
-  } else if (plan.enteredClip) {
+    if (!media.paused) {
+      media.pause();
+    }
+    return idle;
+  }
+
+  // A seek/play for this generation is still settling. Assigning currentTime
+  // again would restart the seek; calling play() again would swallow another
+  // AbortError. A rejected start is latched until the next generation.
+  if (
+    isStudioMediaPlaybackPending(media) ||
+    isStudioMediaStartBlocked(media, options.generation)
+  ) {
+    return idle;
+  }
+
+  const openLiveEnvelope = (clip: StudioClip) => {
+    if (!options.isGenerationCurrent(options.generation)) return;
+    const livePosition = options.getTimelinePosition();
+    const liveClip = findActiveStudioClip(track.clips, livePosition);
+    if (!liveClip || liveClip.id !== clip.id) return;
+    const liveStart =
+      Number.isFinite(liveClip.startTime) && liveClip.startTime > 0
+        ? liveClip.startTime
+        : 0;
+    const { previous, next } = studioClipTimelineNeighbors(track.clips, liveClip);
+    scheduleClipEnvelope(
+      runtime.envelopeGain,
+      liveClip,
+      Math.max(livePosition - liveStart, 0),
+      options.getContextTime(),
+      {
+        enterHandoff: resolveStudioClipEnterHandoff({
+          clip: liveClip,
+          previous,
+          next,
+        }),
+        previous,
+        next,
+      },
+    );
+  };
+
+  const startMedia = (
+    clip: StudioClip | null,
+    openEnvelopeOnStart: boolean,
+  ): Promise<{ started: boolean; stale: boolean }> => {
+    return beginStudioMediaPlayback({
+      media,
+      generation: options.generation,
+      isGenerationCurrent: options.isGenerationCurrent,
+      targetTime: plan.seekTo,
+    }).then((outcome) => {
+      if (!options.isGenerationCurrent(options.generation) || outcome.stale) {
+        return { started: false, stale: true };
+      }
+      if (!outcome.started) {
+        if (clip && runtime.activeClipId === clip.id) {
+          runtime.activeClipId = null;
+          runtime.sources.clear();
+          const now = options.getContextTime();
+          runtime.envelopeGain.gain.cancelScheduledValues(now);
+          runtime.envelopeGain.gain.setValueAtTime(0, now);
+        }
+        options.onPlayFailed?.(outcome);
+        return { started: false, stale: false };
+      }
+      if (openEnvelopeOnStart && clip) {
+        if (options.deferAudibleEnvelope && options.queueAudibleEnvelope) {
+          options.queueAudibleEnvelope(() => openLiveEnvelope(clip));
+        } else {
+          openLiveEnvelope(clip);
+        }
+      }
+      return { started: true, stale: false };
+    });
+  };
+
+  if (plan.envelope === "silence") {
+    silenceStudioTrackOutput(runtime, contextTime);
+    if (plan.seekTo != null) {
+      seekStudioMediaElementIfNeeded(media, plan.seekTo);
+    }
+    if (media.paused) {
+      return startMedia(null, false);
+    }
+    return already;
+  }
+
+  if (plan.enteredClip) {
     const clip = findActiveStudioClip(track.clips, position);
     if (clip) {
       const { previous, next } = studioClipTimelineNeighbors(track.clips, clip);
       const enterHandoff = resolveStudioClipEnterHandoff({ clip, previous, next });
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
-      if (enterHandoff === "from-silence") {
-        // Hard enter: seek while muted, then open through technical/user envelope.
+      runtime.activeClipId = clip.id;
+      const deferEnvelope = options.deferAudibleEnvelope === true;
+      if (enterHandoff === "from-silence" || deferEnvelope) {
+        // Stay silent until seeked + play() resolve, and until every audible
+        // track in this Play is ready when deferAudibleEnvelope is set.
         runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
         runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
         if (plan.seekTo != null) {
-          seekStudioMediaElement(media, plan.seekTo);
+          seekStudioMediaElementIfNeeded(media, plan.seekTo);
         }
-        scheduleClipEnvelope(
-          runtime.envelopeGain,
-          clip,
-          plan.elapsedClipTime,
-          contextTime,
-          { enterHandoff, previous, next },
-        );
-      } else {
-        // Contiguous same-source seam: keep media rolling; flat or authored fade-in.
-        if (
-          plan.seekTo != null &&
-          shouldCorrectStudioMediaDrift(media.currentTime, plan.seekTo)
-        ) {
-          seekStudioMediaElement(media, plan.seekTo);
-        }
-        scheduleClipEnvelope(
-          runtime.envelopeGain,
-          clip,
-          plan.elapsedClipTime,
-          contextTime,
-          { enterHandoff, previous, next },
-        );
+        return startMedia(clip, true);
       }
-      runtime.activeClipId = clip.id;
+      // Contiguous same-source seam: keep media rolling; flat or authored fade-in.
+      if (
+        plan.seekTo != null &&
+        shouldCorrectStudioMediaDrift(media.currentTime, plan.seekTo)
+      ) {
+        seekStudioMediaElementIfNeeded(media, plan.seekTo);
+      }
+      scheduleClipEnvelope(
+        runtime.envelopeGain,
+        clip,
+        plan.elapsedClipTime,
+        contextTime,
+        { enterHandoff, previous, next },
+      );
+      if (media.paused) {
+        return startMedia(clip, false);
+      }
+      return already;
     }
   } else if (plan.seekTo != null) {
-    seekStudioMediaElement(media, plan.seekTo);
+    seekStudioMediaElementIfNeeded(media, plan.seekTo);
   }
 
-  if (plan.wantPlaying) {
-    if (media.paused) {
-      void media.play().catch(() => {
-        // Transport Play already consumed the user gesture; we never pause
-        // during gaps, so this retry is only for the initial start / ended loop.
-      });
-    }
-  } else if (!media.paused) {
-    media.pause();
+  if (media.paused) {
+    return startMedia(null, false);
   }
+  return already;
 }
 
 function disconnectTrackGraph(runtime: TrackRuntime) {
   runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
   runtime.fxCleanupTimers.clear();
+  cancelStudioMediaPlayback(runtime.mediaElement);
   if (!runtime.mediaElement.paused) {
     runtime.mediaElement.pause();
   }
@@ -501,6 +612,8 @@ export function StudioAudioProvider({
     lastResumeError: null,
     stateBeforePlay: null,
     stateAfterResume: null,
+    lastMediaPlayError: null,
+    lastPauseAudio: null,
   });
   const [persistenceContext, setPersistenceContext] = useState<{
     name: string | null;
@@ -519,6 +632,8 @@ export function StudioAudioProvider({
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
   const playbackGenerationRef = useRef(0);
+  /** True from Play until every audible track has seeked; freezes the transport clock. */
+  const playbackStartupHoldRef = useRef(false);
   const replacementGenerationRef = useRef(new Map<string, number>());
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
@@ -527,6 +642,7 @@ export function StudioAudioProvider({
 
   useEffect(() => {
     debugEnabledRef.current = debugEnabled;
+    setStudioMediaPlaybackDebugLogging(debugEnabled);
   }, [debugEnabled]);
 
   const updateAudioDebug = useCallback((
@@ -750,13 +866,38 @@ export function StudioAudioProvider({
   }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
+    playbackStartupHoldRef.current = false;
     // Immediate mute+pause: a scheduled gain ramp cannot audibly finish after
     // mediaElement.pause(), so do not pretend this path is a soft de-click.
+    const diagnostics = [
+      ...[...trackRuntimesRef.current.entries()].map(([trackId, runtime]) =>
+        describeStudioAudioElement({
+          role: "project-runtime",
+          trackId,
+          sourceType: runtime.sourceType ?? null,
+          media: runtime.mediaElement,
+        }),
+      ),
+      ...listMountedStudioCatalogPreviewMedia(
+        typeof document === "undefined" ? null : document,
+      ).map((media) =>
+        describeStudioAudioElement({
+          role: "catalog-preview",
+          media,
+        }),
+      ),
+    ];
+    publishStudioPauseDiagnostics(diagnostics);
+    updateAudioDebug((current) => ({
+      ...current,
+      lastPauseAudio: formatStudioPauseAudioDiagnostics(diagnostics),
+    }));
     playbackGenerationRef.current = nextStudioPlaybackGeneration(
       playbackGenerationRef.current,
     );
     const contextTime = audioContextRef.current?.currentTime ?? 0;
     for (const runtime of trackRuntimesRef.current.values()) {
+      cancelStudioMediaPlayback(runtime.mediaElement);
       if (!runtime.mediaElement.paused) {
         runtime.mediaElement.pause();
       }
@@ -765,9 +906,15 @@ export function StudioAudioProvider({
       runtime.sources.clear();
       runtime.activeClipId = null;
     }
-  }, []);
+    stopMountedStudioCatalogPreviews(
+      typeof document === "undefined" ? null : document,
+    );
+  }, [updateAudioDebug]);
 
   const getPlaybackPosition = useCallback(() => {
+    if (playbackStartupHoldRef.current) {
+      return positionRef.current;
+    }
     const context = audioContextRef.current;
     if (!context || statusRef.current !== "playing") {
       return positionRef.current;
@@ -796,6 +943,35 @@ export function StudioAudioProvider({
     setStatusValue("ready");
   }, [cancelProgressLoop, setStatusValue, stopSources]);
 
+  const bindMediaSync = useCallback(
+    (
+      extra: {
+        forceEnter?: boolean;
+        deferAudibleEnvelope?: boolean;
+        queueAudibleEnvelope?: (open: () => void) => void;
+      } = {},
+    ) => ({
+      ...extra,
+      generation: playbackGenerationRef.current,
+      isGenerationCurrent: (generation: number) =>
+        isStudioPlaybackGenerationCurrent(
+          generation,
+          playbackGenerationRef.current,
+        ),
+      getTimelinePosition: () => positionRef.current,
+      getContextTime: () => audioContextRef.current?.currentTime ?? 0,
+      onPlayFailed: (outcome: StudioMediaPlayOutcome) => {
+        if (outcome.stale || outcome.started) return;
+        updateAudioDebug((current) => ({
+          ...current,
+          lastMediaPlayError: outcome.errorName,
+        }));
+        setProjectError(STUDIO_MEDIA_PLAY_FAILED_MESSAGE);
+      },
+    }),
+    [updateAudioDebug],
+  );
+
   const startProgressLoop = useCallback(() => {
     cancelProgressLoop();
 
@@ -815,14 +991,21 @@ export function StudioAudioProvider({
         for (const track of tracksRef.current) {
           const runtime = trackRuntimesRef.current.get(track.id);
           if (!runtime) continue;
-          syncTrackMediaPlayback(runtime, track, position, true, context.currentTime);
+          syncTrackMediaPlayback(
+            runtime,
+            track,
+            position,
+            true,
+            context.currentTime,
+            bindMediaSync(),
+          );
         }
       }
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);
-  }, [cancelProgressLoop, finishPlayback, updateVisiblePosition]);
+  }, [bindMediaSync, cancelProgressLoop, finishPlayback, updateVisiblePosition]);
 
   const startSourcesAtPosition = useCallback(
     (requestedPosition: number) => {
@@ -831,6 +1014,7 @@ export function StudioAudioProvider({
         return;
       }
 
+      cancelProgressLoop();
       const position = clampStudioAudioPosition(
         requestedPosition,
         projectDurationRef.current,
@@ -839,6 +1023,14 @@ export function StudioAudioProvider({
         playbackGenerationRef.current,
       );
       playbackGenerationRef.current = generation;
+      playbackStartupHoldRef.current = true;
+      const envelopeOpeners: Array<() => void> = [];
+      const required: Array<Promise<{ started: boolean; stale: boolean }>> = [];
+      const audible = new Set(
+        listStudioTracksAudibleAtPlayhead(tracksRef.current, position),
+      );
+      // Context time here is only for the pre-start mute. The transport anchor
+      // is written later, when every audible track has actually started.
       const startAt = context.currentTime;
       for (const track of tracksRef.current) {
         const runtime = trackRuntimesRef.current.get(track.id);
@@ -847,24 +1039,93 @@ export function StudioAudioProvider({
         }
         // Every Play / playing-seek restart is a fresh enter: do not reuse a
         // stale activeClipId left by paused parking or a raced sync tick.
+        // play() runs synchronously inside sync so this loop still consumes
+        // the user gesture before the startup barrier awaits.
         runtime.activeClipId = null;
-        syncTrackMediaPlayback(runtime, track, position, true, startAt, {
-          forceEnter: true,
-        });
+        const ready = syncTrackMediaPlayback(
+          runtime,
+          track,
+          position,
+          true,
+          startAt,
+          bindMediaSync({
+            forceEnter: true,
+            deferAudibleEnvelope: audible.has(track.id),
+            queueAudibleEnvelope: audible.has(track.id)
+              ? (open) => {
+                  envelopeOpeners.push(open);
+                }
+              : undefined,
+          }),
+        );
+        if (audible.has(track.id)) {
+          required.push(ready);
+        }
       }
 
       if (!isStudioPlaybackGenerationCurrent(generation, playbackGenerationRef.current)) {
+        playbackStartupHoldRef.current = false;
         return;
       }
 
-      startedAtContextTimeRef.current = startAt;
-      startedAtPositionRef.current = position;
       positionRef.current = position;
       setCurrentTime(position);
+      // Playing before the barrier so Space/pause() can cancel the pending start.
+      // The clock and envelopes stay held until releaseStartup.
       setStatusValue("playing");
-      startProgressLoop();
+
+      const releaseStartup = () => {
+        if (
+          playbackGenerationRef.current !== generation ||
+          !playbackStartupHoldRef.current
+        ) {
+          return;
+        }
+        const now = audioContextRef.current?.currentTime ?? 0;
+        startedAtContextTimeRef.current = now;
+        startedAtPositionRef.current = position;
+        playbackStartupHoldRef.current = false;
+        for (const open of envelopeOpeners) {
+          open();
+        }
+        if (playbackGenerationRef.current !== generation) {
+          return;
+        }
+        startProgressLoop();
+      };
+
+      const abandonStartup = () => {
+        if (playbackGenerationRef.current !== generation) return;
+        playbackStartupHoldRef.current = false;
+        cancelProgressLoop();
+        stopSources();
+        setStatusValue(
+          position >= projectDurationRef.current ? "ready" : "paused",
+        );
+      };
+
+      void runStudioAudibleStartupBarrier({
+        generation,
+        isGenerationCurrent: (value) =>
+          isStudioPlaybackGenerationCurrent(
+            value,
+            playbackGenerationRef.current,
+          ),
+        pending: required,
+        onRelease: releaseStartup,
+        onStale: abandonStartup,
+        // Any required track that failed closes the whole Play. Successful
+        // siblings are paused in stopSources and their envelopes stay queued.
+        onNoneStarted: abandonStartup,
+      });
     },
-    [setStatusValue, startProgressLoop],
+    [
+      bindMediaSync,
+      cancelProgressLoop,
+      setStatusValue,
+      startProgressLoop,
+      stopSources,
+    ],
   );
 
   const playbackUrlStillReferenced = useCallback((
@@ -1328,7 +1589,7 @@ export function StudioAudioProvider({
       runtime.playbackUrl = signed.url;
       runtime.expiresAt = signed.expiresAt;
       if (refresh.srcChanged) {
-        seekStudioMediaElement(runtime.mediaElement, refresh.preservedTime);
+        seekStudioMediaElementIfNeeded(runtime.mediaElement, refresh.preservedTime);
       }
       const vault = assetVaultRef.current.get(trackId);
       if (vault) {
@@ -1922,10 +2183,14 @@ export function StudioAudioProvider({
 
     try {
       const beforePlay = context.state;
+      setProjectError((current) =>
+        current === STUDIO_MEDIA_PLAY_FAILED_MESSAGE ? null : current,
+      );
       updateAudioDebug((current) => ({
         ...current,
         ...getAudioDebugSnapshot(),
         lastPlayClickAt: new Date().toISOString(),
+        lastMediaPlayError: null,
         stateBeforePlay: beforePlay,
       }));
       if (context.state === "suspended") {
@@ -2040,6 +2305,7 @@ export function StudioAudioProvider({
                 nextPosition,
                 false,
                 context.currentTime,
+                bindMediaSync(),
               );
             }
           }
@@ -2049,7 +2315,7 @@ export function StudioAudioProvider({
         }
       }
     },
-    [cancelProgressLoop, setStatusValue, startSourcesAtPosition, stopSources],
+    [bindMediaSync, cancelProgressLoop, setStatusValue, startSourcesAtPosition, stopSources],
   );
 
   const seekRelative = useCallback(
@@ -2091,6 +2357,27 @@ export function StudioAudioProvider({
     [updateTrack],
   );
 
+  const parkPausedRuntimesAtPlayhead = useCallback(() => {
+    if (statusRef.current === "playing") {
+      return;
+    }
+    const contextTime = audioContextRef.current?.currentTime ?? 0;
+    const position = positionRef.current;
+    for (const track of tracksRef.current) {
+      const runtime = trackRuntimesRef.current.get(track.id);
+      if (!runtime) continue;
+      runtime.activeClipId = null;
+      syncTrackMediaPlayback(
+        runtime,
+        track,
+        position,
+        false,
+        contextTime,
+        bindMediaSync(),
+      );
+    }
+  }, [bindMediaSync]);
+
   const setClipLayout = useCallback(
     (trackId: string, clipId: string, layout: Partial<StudioClipLayout>) => {
       const runtime = trackRuntimesRef.current.get(trackId);
@@ -2131,8 +2418,9 @@ export function StudioAudioProvider({
       );
       positionRef.current = nextPosition;
       setCurrentTime(nextPosition);
+      parkPausedRuntimesAtPlayhead();
     },
-    [pause, updateTrack],
+    [parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const setClipFades = useCallback(
@@ -2160,8 +2448,9 @@ export function StudioAudioProvider({
               },
         ),
       }));
+      parkPausedRuntimesAtPlayhead();
     },
-    [pause, updateTrack],
+    [parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const splitClip = useCallback(
@@ -2178,9 +2467,10 @@ export function StudioAudioProvider({
           candidate.id === clipId ? [split.left, split.right] : [candidate],
         ),
       }));
+      parkPausedRuntimesAtPlayhead();
       return split.right.id;
     },
-    [pause, updateTrack],
+    [parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const removeClip = useCallback(
@@ -2190,8 +2480,9 @@ export function StudioAudioProvider({
         ...track,
         clips: track.clips.filter((clip) => clip.id !== clipId),
       }));
+      parkPausedRuntimesAtPlayhead();
     },
-    [pause, updateTrack],
+    [parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const rippleDeleteClip = useCallback(
@@ -2220,8 +2511,9 @@ export function StudioAudioProvider({
             : position;
       positionRef.current = nextPosition;
       setCurrentTime(nextPosition);
+      parkPausedRuntimesAtPlayhead();
     },
-    [getPlaybackPosition, pause, updateTrack],
+    [getPlaybackPosition, parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const pasteClips = useCallback(
@@ -2261,9 +2553,10 @@ export function StudioAudioProvider({
         ...item,
         clips: [...item.clips, ...accepted],
       }));
+      parkPausedRuntimesAtPlayhead();
       return accepted.map((clip) => clip.id);
     },
-    [pause, updateTrack],
+    [parkPausedRuntimesAtPlayhead, pause, updateTrack],
   );
 
   const duplicateTrack = useCallback((trackId: string): StudioLocalTrack | null => {
