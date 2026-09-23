@@ -165,25 +165,28 @@ assert.doesNotMatch(previous, /seo_reservation_product_not_music/);
 
 assert.equal(
   existsSync(
-    path.join(root, "supabase/migrations/20261031120100_seo_music_product_queries_seed.sql"),
+    path.join(root, "supabase/migrations/20261031120300_seo_music_product_queries_seed.sql"),
   ),
-  false,
+  true,
 );
 assert.equal(
   existsSync(path.join(root, "scripts/seo-music-product-queries-seed-unit.mjs")),
-  false,
+  true,
 );
 const pkg = JSON.parse(read("package.json"));
-assert.equal(pkg.scripts["test:seo-music-product-queries-seed"], undefined);
+assert.equal(
+  pkg.scripts["test:seo-music-product-queries-seed"],
+  "npx tsx scripts/seo-music-product-queries-seed-unit.mjs",
+);
 assert.match(
   pkg.scripts["test:seo-reservation-link-music-gate"],
   /seo-reservation-link-music-gate-unit/,
 );
 const workflow = read(".github/workflows/pr-repository-validation.yml");
-assert.doesNotMatch(workflow, /test:seo-music-product-queries-seed/);
+assert.match(workflow, /test:seo-music-product-queries-seed/);
 assert.match(workflow, /test:seo-reservation-link-music-gate/);
 assert.match(workflow, /test:music-product-rollout/);
-assert.doesNotMatch(read("docs/DATABASE.md"), /20261031120100_seo_music_product_queries_seed/);
+assert.match(read("docs/DATABASE.md"), /20261031120300_seo_music_product_queries_seed/);
 assert.match(read("docs/DATABASE.md"), /20261031120200_seo_reservation_link_music_gate/);
 
 console.log("seo-reservation-link-music-gate-unit: ok");
