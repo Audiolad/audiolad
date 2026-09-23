@@ -78,6 +78,7 @@ jobs:
           npm run test:author-create-seo-query-step
           npm run test:author-seo-discovery
           npm run test:seo-discovery-ranking
+          npm run test:product-seo-quality-review
           npm run build
           npm run typecheck
           npm run lint

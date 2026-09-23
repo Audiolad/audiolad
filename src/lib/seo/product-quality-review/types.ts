@@ -99,11 +99,16 @@ export type ProductQualityReviewFieldStructuralStuffing = {
   neighboringSentenceRepeats: boolean;
   keywordListPattern: boolean;
   nearDuplicateChain: boolean;
+  /** Comma / dash / enumeration chain of near-synonym search formulations. */
+  nearSynonymQueryChain: boolean;
 };
 
 export type ProductQualityReviewStructuralStuffing = {
   material: boolean;
+  title: ProductQualityReviewFieldStructuralStuffing;
+  subtitle: ProductQualityReviewFieldStructuralStuffing;
   description: ProductQualityReviewFieldStructuralStuffing;
+  seoTitle: ProductQualityReviewFieldStructuralStuffing;
   seoDescription: ProductQualityReviewFieldStructuralStuffing;
   usage: ProductQualityReviewFieldStructuralStuffing;
   faq: ProductQualityReviewFieldStructuralStuffing;

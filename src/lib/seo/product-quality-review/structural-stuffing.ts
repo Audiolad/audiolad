@@ -4,7 +4,9 @@ import { normalizeSeoPhrase } from "@/lib/seo/product-metadata";
 /**
  * Deterministic structural SEO-stuffing signals.
  * No percentage thresholds and no fixed "N% = red" scores.
- * Looks for query lists, near-duplicate chains, and neighboring repeats.
+ * Looks for query lists, near-duplicate chains, near-synonym enumerations,
+ * and neighboring repeats across the whole text package
+ * (title, subtitle, description, seo title, seo description, usage, faq).
  */
 
 const RU_STOPWORDS = new Set([
@@ -37,11 +39,16 @@ export type FieldStructuralStuffing = {
   neighboringSentenceRepeats: boolean;
   keywordListPattern: boolean;
   nearDuplicateChain: boolean;
+  /** Comma / dash / enumeration chain of near-synonym search formulations. */
+  nearSynonymQueryChain: boolean;
 };
 
 export type ProductStructuralStuffingSignals = {
   material: boolean;
+  title: FieldStructuralStuffing;
+  subtitle: FieldStructuralStuffing;
   description: FieldStructuralStuffing;
+  seoTitle: FieldStructuralStuffing;
   seoDescription: FieldStructuralStuffing;
   usage: FieldStructuralStuffing;
   faq: FieldStructuralStuffing;
@@ -176,6 +183,51 @@ function collectQueryLikePhrases(
   return out;
 }
 
+/**
+ * Short enumerated piece that is an artificial variant of the primary theme:
+ * a search-shaped fragment, not a prose clause that merely mentions the theme.
+ */
+function isNearSynonymSearchSegment(
+  segment: string,
+  primaryTokens: string[],
+): boolean {
+  const tokens = [...new Set(contentTokens(segment))];
+  if (tokens.length < 2 || tokens.length > 5 || primaryTokens.length === 0) {
+    return false;
+  }
+  const hit = primaryTokens.filter((token) => tokens.includes(token)).length;
+  if (hit < 2) return false;
+  const extra = tokens.length - hit;
+  return extra <= 2 && hit / tokens.length >= 0.5;
+}
+
+/**
+ * Chain of near-search formulations joined by commas, dashes, or enumeration.
+ * Similarity of the enumerated variants is required — a raw segment count is not.
+ */
+function hasNearSynonymQueryChain(
+  text: string,
+  primaryTokens: string[],
+): boolean {
+  const variants = splitListSegments(text).filter((segment) =>
+    isNearSynonymSearchSegment(segment, primaryTokens),
+  );
+  if (variants.length < 3) return false;
+
+  let nearPairs = 0;
+  for (let i = 0; i < variants.length; i += 1) {
+    const leftTokens = contentTokens(variants[i] ?? "");
+    for (let j = i + 1; j < variants.length; j += 1) {
+      const rightTokens = contentTokens(variants[j] ?? "");
+      const score = jaccard(leftTokens, rightTokens);
+      if (score >= 0.55 && leftTokens.length >= 2 && rightTokens.length >= 2) {
+        nearPairs += 1;
+      }
+    }
+  }
+  return nearPairs >= 2;
+}
+
 function hasNearDuplicateChain(
   text: string,
   primary: string,
@@ -221,6 +273,7 @@ function evaluateFieldStructuralStuffing(
       neighboringSentenceRepeats: false,
       keywordListPattern: false,
       nearDuplicateChain: false,
+      nearSynonymQueryChain: false,
     };
   }
 
@@ -241,11 +294,18 @@ function evaluateFieldStructuralStuffing(
     primaryTokens,
     secondaryQueries,
   );
+  const nearSynonymQueryChain = hasNearSynonymQueryChain(
+    trimmed,
+    primaryTokens,
+  );
 
   // Structural patterns only. exactPrimaryCount is a supporting fact for the
   // model/tests — it must NOT force material stuffing by itself.
   const material =
-    keywordListPattern || nearDuplicateChain || neighboringSentenceRepeats;
+    keywordListPattern ||
+    nearDuplicateChain ||
+    neighboringSentenceRepeats ||
+    nearSynonymQueryChain;
 
   return {
     material,
@@ -253,11 +313,15 @@ function evaluateFieldStructuralStuffing(
     neighboringSentenceRepeats,
     keywordListPattern,
     nearDuplicateChain,
+    nearSynonymQueryChain,
   };
 }
 
 export function evaluateProductStructuralStuffing(input: {
+  title: string;
+  subtitle: string;
   description: string;
+  seoTitle: string;
   seoDescription: string;
   usageItems: readonly string[];
   faqItems: ReadonlyArray<{ question: string; answer: string }>;
@@ -269,8 +333,23 @@ export function evaluateProductStructuralStuffing(input: {
     .map((item) => item.trim())
     .filter(Boolean);
 
+  const title = evaluateFieldStructuralStuffing(
+    input.title,
+    primary,
+    secondaries,
+  );
+  const subtitle = evaluateFieldStructuralStuffing(
+    input.subtitle,
+    primary,
+    secondaries,
+  );
   const description = evaluateFieldStructuralStuffing(
     input.description,
+    primary,
+    secondaries,
+  );
+  const seoTitle = evaluateFieldStructuralStuffing(
+    input.seoTitle,
     primary,
     secondaries,
   );
@@ -294,11 +373,17 @@ export function evaluateProductStructuralStuffing(input: {
 
   return {
     material:
+      title.material ||
+      subtitle.material ||
       description.material ||
+      seoTitle.material ||
       seoDescription.material ||
       usage.material ||
       faq.material,
+    title,
+    subtitle,
     description,
+    seoTitle,
     seoDescription,
     usage,
     faq,
