@@ -13,6 +13,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
+import { resolveAurafonCatalogSectionPatch } from "@/lib/author-products/aurafon-catalog-section";
 import { resolveAppreciationOverridePatch } from "@/lib/author-products/appreciation-override";
 import { seedAuthorDefaultAudioProductAuthorIfAbsent } from "@/lib/author-products/seed-default-audio-product-author";
 import {
@@ -979,6 +980,27 @@ export async function PATCH(request: Request, context: RouteContext) {
           updates.author_id = nextAuthorId;
         }
       }
+    }
+
+    const catalogSectionAuthorId =
+      typeof updates.author_id === "string" && updates.author_id
+        ? updates.author_id
+        : practice.author_id;
+    const catalogSectionPatch = resolveAurafonCatalogSectionPatch({
+      authorId: catalogSectionAuthorId,
+      present: "catalog_section" in body,
+      catalogSection: (body as { catalog_section?: unknown }).catalog_section,
+    });
+
+    if (catalogSectionPatch.action === "reject") {
+      return NextResponse.json(
+        { error: catalogSectionPatch.error },
+        { status: 400 },
+      );
+    }
+
+    if (catalogSectionPatch.action === "apply") {
+      updates.catalog_section = catalogSectionPatch.catalogSection;
     }
 
     // requirePracticeMutationAccess intentionally selects only authorization

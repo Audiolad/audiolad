@@ -1,3 +1,4 @@
+import { catalogSectionForProductForm } from "@/lib/author-products/aurafon-catalog-section";
 import {
   parseAudioPostFormat,
   parsePracticeFormat,
@@ -28,6 +29,7 @@ import type {
   AuthorProductDetail,
   AudioItemRow,
 } from "@/lib/author-products/types";
+import type { CatalogSection } from "@/lib/catalog/catalog-sections";
 import type { PracticeSeoContentInput } from "@/lib/products/practice-seo-content";
 import {
   parseCatalogVisibility,
@@ -52,6 +54,7 @@ export type ProductFormSnapshot = {
   price: number;
   isCatalogListed: boolean;
   catalogVisibility: CatalogVisibility;
+  catalogSection: CatalogSection;
   promoEnabled: boolean;
   promoTitle: string;
   promoText: string;
@@ -153,6 +156,7 @@ export function productDetailToFormSnapshot(
       practice.catalog_visibility,
       practice.is_catalog_listed,
     ),
+    catalogSection: catalogSectionForProductForm(practice),
     promoEnabled: practice.promo_enabled === true,
     promoTitle: practice.promo_title ?? "",
     promoText: practice.promo_text ?? "",
@@ -216,6 +220,7 @@ export function mergeServerProductIntoForm(
     price: current.productKind === "audio_post" ? 0 : current.price,
     isCatalogListed: current.isCatalogListed,
     catalogVisibility: current.catalogVisibility,
+    catalogSection: current.catalogSection,
     promoEnabled: current.promoEnabled,
     promoTitle: current.promoTitle,
     promoText: current.promoText,

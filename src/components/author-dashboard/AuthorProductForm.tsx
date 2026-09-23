@@ -63,6 +63,19 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isAurafonMusicWizard } from "@/lib/author-products/aurafon-music-wizard";
+import {
+  AURAFON_CATALOG_SECTION_FIELD_LABEL,
+  AURAFON_CATALOG_SECTION_OPTIONS,
+  buildAurafonCatalogSectionSaveField,
+  isAurafonCatalogSectionFieldEnabled,
+  readStoredAurafonCatalogSection,
+  suggestAurafonCatalogSection,
+  suggestAurafonCatalogSectionFromFormFields,
+} from "@/lib/author-products/aurafon-catalog-section";
+import {
+  isCatalogSection,
+  type CatalogSection,
+} from "@/lib/catalog/catalog-sections";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
 import { linkSeoReservationToProduct } from "@/lib/seo-queries/seo-reservation-product-context";
 import {
@@ -341,6 +354,7 @@ type FormState = {
   price: number;
   isCatalogListed: boolean;
   catalogVisibility: CatalogVisibility;
+  catalogSection: CatalogSection;
   promoEnabled: boolean;
   promoTitle: string;
   promoText: string;
@@ -544,6 +558,14 @@ function buildInitialForm(
     price: 99,
     isCatalogListed: true,
     catalogVisibility: CATALOG_VISIBILITY.LISTED,
+    catalogSection: suggestAurafonCatalogSection({
+      productKind: created.productKind,
+      publicationClass: created.publicationClass,
+      format:
+        created.productKind === PRODUCT_KIND.AUDIO_POST
+          ? AUDIO_POST_KIND_LABEL
+          : null,
+    }),
     promoEnabled: false,
     promoTitle: "",
     promoText: "",
@@ -683,6 +705,10 @@ function buildProductSavePayload(
         : form.productKind === PRODUCT_KIND.AUDIO_POST
           ? resolveAudioPostFormatForSave(form.formatPreset, form.customFormat)
           : resolveFormatForStorage(form.formatPreset, form.customFormat),
+    ...buildAurafonCatalogSectionSaveField({
+      authorId: form.authorId,
+      catalogSection: form.catalogSection,
+    }),
     is_free:
       form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree,
     is_catalog_listed: form.catalogVisibility === CATALOG_VISIBILITY.LISTED,
@@ -741,6 +767,36 @@ export default function AuthorProductForm({
       initialSeoReservationContext,
     ),
   );
+  const [catalogSectionOverridden, setCatalogSectionOverridden] = useState(
+    () =>
+      mode === "edit" &&
+      readStoredAurafonCatalogSection(
+        initialProduct?.practice.catalog_section,
+      ) !== null,
+  );
+  function mergeFormWithCatalogSuggestion(
+    current: FormState,
+    patch: Partial<FormState>,
+  ): FormState {
+    const next = { ...current, ...patch };
+
+    if (
+      !isAurafonCatalogSectionFieldEnabled(next.authorId) ||
+      catalogSectionOverridden
+    ) {
+      return next;
+    }
+
+    return {
+      ...next,
+      catalogSection: suggestAurafonCatalogSectionFromFormFields({
+        productKind: next.productKind,
+        publicationClass: next.publicationClass,
+        formatPreset: next.formatPreset,
+        customFormat: next.customFormat,
+      }),
+    };
+  }
   const [seoReservationContext, setSeoReservationContext] =
     useState<SeoReservationProductFormContext | null>(
       initialSeoReservationContext ?? null,
@@ -1233,6 +1289,10 @@ export default function AuthorProductForm({
               ),
             }
           : {}),
+        ...buildAurafonCatalogSectionSaveField({
+          authorId: form.authorId,
+          catalogSection: form.catalogSection,
+        }),
       }),
     });
 
@@ -1497,6 +1557,7 @@ export default function AuthorProductForm({
       seoReservationContext,
     );
     setForm(nextForm);
+    setCatalogSectionOverridden(true);
     setStudioMusicPriceDraft(String(nextForm.studioMusicPriceRubles));
     setListenerPriceDraft(String(nextForm.price));
     setAudioItems(productPayload.product.audio_items);
@@ -2956,10 +3017,11 @@ export default function AuthorProductForm({
               value={form.authorId}
               disabled={slugLocked}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  authorId: event.target.value,
-                }))
+                setForm((current) =>
+                  mergeFormWithCatalogSuggestion(current, {
+                    authorId: event.target.value,
+                  }),
+                )
               }
               className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
             >
@@ -3009,14 +3071,15 @@ export default function AuthorProductForm({
                         busy || !canChangeProductKind(form.publishedAt)
                       }
                       onChange={() => {
-                        setForm((current) => ({
-                          ...current,
-                          publicationClass: option.value,
-                          productKind: publicationClassToLegacyKind(
-                            option.value,
-                          ),
-                          musicUsagePermission: null,
-                        }));
+                        setForm((current) =>
+                          mergeFormWithCatalogSuggestion(current, {
+                            publicationClass: option.value,
+                            productKind: publicationClassToLegacyKind(
+                              option.value,
+                            ),
+                            musicUsagePermission: null,
+                          }),
+                        );
                       }}
                     />
                     <span>
@@ -3042,22 +3105,26 @@ export default function AuthorProductForm({
                     ...current,
                     formatCustom: undefined,
                   }));
-                  setForm((current) => ({
-                    ...current,
-                    formatPreset: value,
-                    customFormat:
-                      value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      formatPreset: value,
+                      customFormat:
+                        value === CUSTOM_FORMAT_VALUE
+                          ? current.customFormat
+                          : "",
+                    }),
+                  );
                 }}
                 onCustomChange={(value) => {
                   setFieldErrors((current) => ({
                     ...current,
                     formatCustom: undefined,
                   }));
-                  setForm((current) => ({
-                    ...current,
-                    customFormat: value,
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      customFormat: value,
+                    }),
+                  );
                 }}
               />
             ) : (
@@ -3075,14 +3142,15 @@ export default function AuthorProductForm({
                 checked={form.productKind === PRODUCT_KIND.PRACTICE}
                 disabled={busy || !canChangeProductKind(form.publishedAt)}
                 onChange={() => {
-                  setForm((current) => ({
-                    ...current,
-                    productKind: PRODUCT_KIND.PRACTICE,
-                    publicationClass: null,
-                    musicUsagePermission: null,
-                    formatPreset: "",
-                    customFormat: "",
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      productKind: PRODUCT_KIND.PRACTICE,
+                      publicationClass: null,
+                      musicUsagePermission: null,
+                      formatPreset: "",
+                      customFormat: "",
+                    }),
+                  );
                 }}
               />
               <span>
@@ -3100,17 +3168,18 @@ export default function AuthorProductForm({
                 checked={form.productKind === PRODUCT_KIND.MUSIC}
                 disabled={busy || !canChangeProductKind(form.publishedAt)}
                 onChange={() => {
-                  setForm((current) => ({
-                    ...current,
-                    productKind: PRODUCT_KIND.MUSIC,
-                    publicationClass: null,
-                    musicUsagePermission:
-                      current.musicUsagePermission ??
-                      MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
-                    formatPreset: "",
-                    customFormat: "",
-                    listeningNoticeEnabled: false,
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      productKind: PRODUCT_KIND.MUSIC,
+                      publicationClass: null,
+                      musicUsagePermission:
+                        current.musicUsagePermission ??
+                        MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
+                      formatPreset: "",
+                      customFormat: "",
+                      listeningNoticeEnabled: false,
+                    }),
+                  );
                   setAudioItems((current) =>
                     current.map((item, index) =>
                       isDefaultAudioTitle(item.title, index + 1)
@@ -3135,18 +3204,19 @@ export default function AuthorProductForm({
                 checked={form.productKind === PRODUCT_KIND.AUDIO_POST}
                 disabled={busy || !canChangeProductKind(form.publishedAt)}
                 onChange={() => {
-                  setForm((current) => ({
-                    ...current,
-                    productKind: PRODUCT_KIND.AUDIO_POST,
-                    publicationClass: null,
-                    musicUsagePermission: null,
-                    formatPreset: AUDIO_POST_KIND_LABEL,
-                    customFormat: "",
-                    isFree: true,
-                    price: 0,
-                    useSharedCover: true,
-                    listeningNoticeEnabled: false,
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      productKind: PRODUCT_KIND.AUDIO_POST,
+                      publicationClass: null,
+                      musicUsagePermission: null,
+                      formatPreset: AUDIO_POST_KIND_LABEL,
+                      customFormat: "",
+                      isFree: true,
+                      price: 0,
+                      useSharedCover: true,
+                      listeningNoticeEnabled: false,
+                    }),
+                  );
                 }}
               />
               <span>
@@ -3318,12 +3388,13 @@ export default function AuthorProductForm({
                 ...current,
                 formatCustom: undefined,
               }));
-              setForm((current) => ({
-                ...current,
-                formatPreset: value,
-                customFormat:
-                  value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
-              }));
+              setForm((current) =>
+                mergeFormWithCatalogSuggestion(current, {
+                  formatPreset: value,
+                  customFormat:
+                    value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
+                }),
+              );
             }}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           >
@@ -3360,10 +3431,11 @@ export default function AuthorProductForm({
                     ...current,
                     formatCustom: undefined,
                   }));
-                  setForm((current) => ({
-                    ...current,
-                    customFormat: event.target.value,
-                  }));
+                  setForm((current) =>
+                    mergeFormWithCatalogSuggestion(current, {
+                      customFormat: event.target.value,
+                    }),
+                  );
                 }}
                 placeholder="Например: молитва, настрой, звуковая практика"
                 className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
@@ -3400,25 +3472,60 @@ export default function AuthorProductForm({
                   ...current,
                   formatCustom: undefined,
                 }));
-                setForm((current) => ({
-                  ...current,
-                  formatPreset: value,
-                  customFormat:
-                    value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
-                }));
+                setForm((current) =>
+                  mergeFormWithCatalogSuggestion(current, {
+                    formatPreset: value,
+                    customFormat:
+                      value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
+                  }),
+                );
               }}
               onCustomChange={(value) => {
                 setFieldErrors((current) => ({
                   ...current,
                   formatCustom: undefined,
                 }));
-                setForm((current) => ({
-                  ...current,
-                  customFormat: value,
-                }));
+                setForm((current) =>
+                  mergeFormWithCatalogSuggestion(current, {
+                    customFormat: value,
+                  }),
+                );
               }}
             />
           </fieldset>
+        ) : null}
+
+        {isAurafonCatalogSectionFieldEnabled(form.authorId) ? (
+          <label className="block" data-aurafon-catalog-section="">
+            <span className="mb-2 block text-sm font-medium">
+              {AURAFON_CATALOG_SECTION_FIELD_LABEL}
+            </span>
+            <select
+              name="catalog_section"
+              value={form.catalogSection}
+              disabled={busy}
+              onChange={(event) => {
+                const value = event.target.value;
+
+                if (!isCatalogSection(value)) {
+                  return;
+                }
+
+                setCatalogSectionOverridden(true);
+                setForm((current) => ({
+                  ...current,
+                  catalogSection: value,
+                }));
+              }}
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+            >
+              {AURAFON_CATALOG_SECTION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
 </>

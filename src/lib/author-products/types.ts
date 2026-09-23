@@ -20,6 +20,7 @@ import {
   getVisibleAuthorProductStatusLabel,
 } from "@/lib/author-products/moderation";
 
+import { isCatalogSection, type CatalogSection } from "@/lib/catalog/catalog-sections";
 import { RECOMMENDED_PAID_PRICES_RUB } from "@/lib/pricing/money";
 import {
   parseCatalogVisibility,
@@ -102,6 +103,7 @@ export type PracticeRow = {
   is_free: boolean;
   is_catalog_listed: boolean;
   catalog_visibility: CatalogVisibility;
+  catalog_section: CatalogSection | null;
   cover_url: string | null;
   cover_image?: unknown;
   use_shared_cover: boolean;
@@ -167,6 +169,7 @@ export function coercePracticeRow(
     | "studio_music_price_minor"
     | "is_catalog_listed"
     | "catalog_visibility"
+    | "catalog_section"
     | "moderation_status"
     | "moderation_attempt"
     | "moderation_submitted_at"
@@ -204,6 +207,7 @@ export function coercePracticeRow(
     deletion_reason?: string | null;
     is_catalog_listed?: boolean | null;
     catalog_visibility?: string | null;
+    catalog_section?: string | null;
     promo_enabled?: boolean | null;
     promo_title?: string | null;
     promo_text?: string | null;
@@ -256,6 +260,9 @@ export function coercePracticeRow(
       row.catalog_visibility,
       row.is_catalog_listed,
     ),
+    catalog_section: isCatalogSection(row.catalog_section)
+      ? row.catalog_section
+      : null,
     promo_enabled: row.promo_enabled === true,
     promo_title: row.promo_title ?? null,
     promo_text: row.promo_text ?? null,

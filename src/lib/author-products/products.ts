@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { catalogSectionColumnForInsert } from "@/lib/author-products/aurafon-catalog-section";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
@@ -8,6 +9,7 @@ import {
   mapProductNormalizeJobToPrepareStatus,
   type AudioPrepareStatus,
 } from "@/lib/author-products/audio-prepare-status";
+import type { CatalogSection } from "@/lib/catalog/catalog-sections";
 import { loadAuthorPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
 import {
@@ -55,6 +57,7 @@ const PRACTICE_DETAIL_SELECT = `
   is_free,
   is_catalog_listed,
   catalog_visibility,
+  catalog_section,
   cover_url,
   cover_image,
   use_shared_cover,
@@ -511,6 +514,7 @@ export async function createDraftProduct(
     productKind?: ProductKind;
     publicationClass?: PublicationClass | string | null;
     cabinetBranch?: CabinetBranch | string | null;
+    catalogSection?: CatalogSection | null;
   },
 ): Promise<AuthorProductDetail> {
   const title = input.title.trim();
@@ -557,6 +561,7 @@ export async function createDraftProduct(
           : productKind === PRODUCT_KIND.AUDIO_POST
             ? AUDIO_POST_KIND_LABEL
             : null,
+      ...catalogSectionColumnForInsert(input.catalogSection),
     })
     .select(PRACTICE_DETAIL_SELECT)
     .single();

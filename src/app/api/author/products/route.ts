@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { resolveAurafonCatalogSectionPatch } from "@/lib/author-products/aurafon-catalog-section";
 import {
   validateTitleLength,
 } from "@/lib/author-products/limits";
@@ -82,6 +83,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
+    const catalogSectionPatch = resolveAurafonCatalogSectionPatch({
+      authorId,
+      present: "catalog_section" in body,
+      catalogSection: (body as { catalog_section?: unknown }).catalog_section,
+    });
+
+    if (catalogSectionPatch.action === "reject") {
+      return NextResponse.json(
+        { error: catalogSectionPatch.error },
+        { status: 400 },
+      );
+    }
+
     const titleError = validateTitleLength(title);
 
     if (titleError) {
@@ -104,6 +118,10 @@ export async function POST(request: Request) {
       productKind: classification.value.productKind,
       publicationClass: classification.value.publicationClass,
       cabinetBranch: classification.value.cabinetBranch,
+      catalogSection:
+        catalogSectionPatch.action === "apply"
+          ? catalogSectionPatch.catalogSection
+          : null,
     });
 
     return NextResponse.json({ product }, { status: 201 });
