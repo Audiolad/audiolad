@@ -41,6 +41,36 @@ The wrapper log parser still reads the last raw JSON line with `claimed`,
 `sent`, and `failed`. That line is the sale summary. Partner output is
 prefixed with `partner_activation_email_outbox` and does not replace it.
 
+## Timer observability
+
+During each ordinary Production Deploy, `deploy.sh` runs the idempotent
+`ensure-author-sale-email-outbox.sh` from the candidate release. It updates
+the already installed host wrapper only when its bytes differ from the
+candidate canonical wrapper; it does not add, enable, restart, or reload a
+systemd unit.
+
+The next regular timer tick preserves the existing sale summary:
+
+```text
+claimed=0 sent=0 failed=0 ...
+```
+
+and writes a separate partner result, including an idle successful queue:
+
+```text
+partner_activation_email_outbox {"claimed":0,"sent":0,"failed":0}
+```
+
+If the partner processor throws a runtime error, the wrapper records:
+
+```text
+partner_activation_email_outbox_failed <sanitised_error>
+```
+
+The wrapper redacts SMTP/Supabase variable values and email addresses in this
+additional line. Partner failure remains isolated from the sale queue and does
+not change the sale worker's existing exit-code semantics.
+
 ## Semantics
 
 - One durable outbox row per referral
