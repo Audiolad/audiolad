@@ -39,6 +39,8 @@ import {
 } from "../src/lib/seo/product-quality-review/orchestrate.ts";
 import {
   DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+  HEADING_THEME_MISSING_ISSUE_MESSAGE,
+  HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
   NATURAL_THEME_COVERED_SUMMARY,
   QUERY_CHAIN_STUFFING_RECOMMENDATION,
   SEO_TITLE_STUFFING_ISSUE_MESSAGE,
@@ -809,6 +811,7 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
 // D — primary once + natural thematic words → NOT force red
 {
   const once = basePackage({
+    title: "Музыка для крепкого сна",
     seoPrimaryQuery: "музыка для крепкого сна",
     description:
       "Спокойный фон помогает вечером расслабить тело. Мягкие звуки поддерживают отдых. Один раз естественно: музыка для крепкого сна звучит мягко.",
@@ -1068,6 +1071,7 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   assert.ok(naturalLong.length >= 2000);
   assert.ok(naturalLong.length <= 3200);
   const pkg = basePackage({
+    title: "Музыка для крепкого сна",
     seoPrimaryQuery: "музыка для крепкого сна",
     description: naturalLong,
     seoTitle: "Музыка для крепкого сна – мягкий фон",
@@ -1583,6 +1587,227 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
     );
     assert.equal(issue.recommendation, QUERY_CHAIN_STUFFING_RECOMMENDATION);
   }
+}
+
+// FALSE-GREEN: spa theme in description and search metadata, absent from both headings.
+{
+  const primary = "музыка для спа-процедур";
+  const poetic = basePackage({
+    title: "Зелёный красивый поток",
+    subtitle: "Пьеса в пяти тактах",
+    description:
+      "Музыка для спа-процедур помогает создать мягкую атмосферу во время массажа и отдыха. Спокойные тембры поддерживают расслабление, не отвлекая от процедуры. Можно включить этот фон в кабинете или дома, когда хочется тишины и ровного ритма.",
+    seoPrimaryQuery: primary,
+    seoSecondaryQueries: ["спокойная музыка для массажа"],
+    seoTitle: "Музыка для спа-процедур – слушать онлайн | АудиоЛад",
+    seoDescription:
+      "Музыка для спа-процедур: спокойный фон для массажа, ухода за лицом и отдыха. Слушайте онлайн на АудиоЛад.",
+    usageItems: [
+      "Откройте музыку для спа-процедур во время массажа.",
+      "Оставьте спокойную музыку для массажа, пока идёт уход за лицом.",
+      "Включите трек в перерыве, чтобы вернуть ровное дыхание.",
+    ],
+    faqItems: [
+      {
+        question: "Когда лучше включать музыку для спа-процедур?",
+        answer: "В начале сеанса, чтобы кабинет сразу звучал спокойно.",
+      },
+      {
+        question: "Где слушать музыку для спа-процедур онлайн?",
+        answer: "На АудиоЛад — в браузере, без отдельной установки.",
+      },
+    ],
+  });
+  const poeticSignals = buildProductQualityReviewSignals(poetic);
+  assert.equal(poeticSignals.primaryThemePresentIn.title, false);
+  assert.equal(poeticSignals.primaryThemePresentIn.subtitle, false);
+  assert.equal(poeticSignals.primaryThemePresentIn.description, true);
+  assert.equal(poeticSignals.primaryThemePresentIn.seoTitle, true);
+  assert.equal(poeticSignals.primaryThemePresentIn.seoDescription, true);
+  assert.equal(poeticSignals.primaryThemePresentIn.usage, true);
+  assert.equal(poeticSignals.primaryThemePresentIn.faq, true);
+  assert.equal(poeticSignals.structuralStuffing.material, false);
+
+  const cleanGreen = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "SEO в норме: тема понятна, без переспама.",
+      issues: [],
+      positiveNotes: ["SEO в норме."],
+    },
+    poeticSignals,
+  );
+  assert.equal(cleanGreen.status, "yellow");
+  assert.equal(cleanGreen.summary, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(cleanGreen.issues.length, 1);
+  assert.equal(cleanGreen.issues[0].message, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(
+    cleanGreen.issues[0].recommendation,
+    HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
+  );
+  assert.equal(cleanGreen.positiveNotes.length, 0);
+
+  const modelGreen = {
+    status: "green",
+    summary: "SEO в норме: тема понятна, без переспама.",
+    issues: [
+      {
+        severity: "warning",
+        field: "description",
+        message: "В описании продукта не хватает основного поискового запроса.",
+        recommendation: "Добавьте основной поисковый запрос в описание продукта.",
+      },
+      {
+        severity: "warning",
+        field: "title",
+        message: "Нужно исправить название и подназвание.",
+        recommendation:
+          "Добавьте основной поисковый запрос в название и подназвание.",
+      },
+    ],
+    positiveNotes: [
+      "Название совпадает с темой.",
+      "Описание звучит естественно.",
+    ],
+  };
+
+  const reconciled = reconcileProductQualityReviewResult(modelGreen, poeticSignals);
+  assert.equal(reconciled.status, "yellow");
+  assert.equal(reconciled.summary, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(reconciled.issues[0]?.message, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(
+    reconciled.issues[0]?.recommendation,
+    HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
+  );
+  assert.equal(
+    reconciled.issues.filter(
+      (issue) => issue.message === HEADING_THEME_MISSING_ISSUE_MESSAGE,
+    ).length,
+    1,
+  );
+  assert.equal(
+    reconciled.issues.some((issue) => /описание продукта/i.test(issue.recommendation) && /добавьте основной/i.test(issue.recommendation)),
+    false,
+  );
+  const advice = reconciled.issues.map((issue) => issue.recommendation).join("\n");
+  assert.match(advice, /название или подназвание/);
+  assert.doesNotMatch(advice, /название и подназвание/i);
+  assert.equal(
+    reconciled.positiveNotes.some((note) => /Название совпадает с темой/.test(note)),
+    false,
+  );
+  assert.equal(
+    reconciled.positiveNotes.some((note) => /Описание звучит естественно/.test(note)),
+    true,
+  );
+
+  const canonical = await reviewProductTextQualityForRequest(
+    { authorId: AURAFON_AUTHOR_ID, ...poetic },
+    {
+      fetchImpl: mockFetch([
+        () => jsonResponse(200, yandexAlt(JSON.stringify(modelGreen))),
+      ]),
+      env: yandexEnv,
+    },
+  );
+  assert.equal(canonical.ok, true);
+  assert.equal(canonical.result.status, "yellow");
+  assert.equal(canonical.result.summary, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(
+    canonical.result.issues[0]?.message,
+    HEADING_THEME_MISSING_ISSUE_MESSAGE,
+  );
+  assert.equal(
+    canonical.result.issues[0]?.recommendation,
+    HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
+  );
+
+  // Model YELLOW whose only complaints are a covered description and an exact
+  // phrase in «Когда слушать» must stay yellow because of the headings, not
+  // because the listening block lacks the literal phrase.
+  const strippedToHeadings = reconcileProductQualityReviewResult(
+    {
+      status: "yellow",
+      summary: "Поисковая тема выражена недостаточно.",
+      issues: [
+        {
+          severity: "warning",
+          field: "description",
+          message: "В описании продукта не хватает основного поискового запроса.",
+          recommendation: "Добавьте основной поисковый запрос в описание продукта.",
+        },
+        {
+          severity: "warning",
+          field: "usage",
+          message: "В блоке «Когда слушать» нет точной фразы основного запроса.",
+          recommendation:
+            "Основной поисковый запрос можно естественно использовать в одном из пунктов блока «Когда слушать».",
+        },
+      ],
+      positiveNotes: [],
+    },
+    poeticSignals,
+  );
+  assert.equal(strippedToHeadings.status, "yellow");
+  assert.equal(strippedToHeadings.issues.length, 1);
+  assert.equal(strippedToHeadings.issues[0].message, HEADING_THEME_MISSING_ISSUE_MESSAGE);
+  assert.equal(
+    strippedToHeadings.issues[0].recommendation,
+    HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
+  );
+
+  // One heading is enough: subtitle carries the theme, title stays poetic.
+  const subtitleOnly = basePackage({
+    ...poetic,
+    subtitle: "Спокойная музыка для спа-процедур",
+  });
+  const subtitleSignals = buildProductQualityReviewSignals(subtitleOnly);
+  assert.equal(subtitleSignals.primaryThemePresentIn.title, false);
+  assert.equal(subtitleSignals.primaryThemePresentIn.subtitle, true);
+  assert.equal(subtitleSignals.structuralStuffing.material, false);
+  const subtitleGreen = reconcileProductQualityReviewResult(
+    {
+      status: "green",
+      summary: "SEO в норме.",
+      issues: [],
+      positiveNotes: [],
+    },
+    subtitleSignals,
+  );
+  assert.equal(subtitleGreen.status, "green");
+  assert.equal(subtitleGreen.issues.length, 0);
+
+  // Morphology in the title is enough; the subtitle need not repeat the query.
+  const morphTitle = basePackage({
+    ...poetic,
+    title: "Музыку для спа-процедур",
+    subtitle: "Пьеса в пяти тактах",
+  });
+  const morphTitleSignals = buildProductQualityReviewSignals(morphTitle);
+  assert.equal(morphTitleSignals.primaryPresentIn.title, false);
+  assert.equal(morphTitleSignals.primaryThemePresentIn.title, true);
+  assert.equal(morphTitleSignals.primaryThemePresentIn.subtitle, false);
+  assert.equal(
+    reconcileProductQualityReviewResult(
+      {
+        status: "green",
+        summary: "SEO в норме.",
+        issues: [],
+        positiveNotes: [],
+      },
+      morphTitleSignals,
+    ).status,
+    "green",
+  );
+
+  const systemPrompt = buildProductQualityReviewSystemPrompt();
+  assert.match(
+    systemPrompt,
+    /Для GREEN основная тема должна естественно звучать в названии или в подназвании/,
+  );
+  assert.match(systemPrompt, /Не советуй править оба поля сразу/);
+  assert.ok(systemPrompt.includes(HEADING_THEME_MISSING_ISSUE_MESSAGE));
+  assert.ok(systemPrompt.includes(HEADING_THEME_MISSING_ISSUE_RECOMMENDATION));
 }
 
 console.log("product-seo-quality-review-unit: ok");
