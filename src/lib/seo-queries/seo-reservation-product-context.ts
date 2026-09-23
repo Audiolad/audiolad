@@ -41,6 +41,11 @@ export function mapSeoReservationLinkError(code: string | null | undefined): {
         message:
           "Связать запрос можно только с черновиком до отправки на модерацию.",
       };
+    case "seo_reservation_product_not_music":
+      return {
+        code,
+        message: "Связать запрос можно только с музыкальным продуктом.",
+      };
     case "seo_reservation_not_linkable":
       return {
         code,
