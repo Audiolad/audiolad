@@ -91,6 +91,23 @@ assert_author_appreciation_reconcile_release_tree() {
   return "$missing"
 }
 
+assert_author_sale_email_outbox_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required=(
+    "$release_dir/deploy/scripts/ensure-author-sale-email-outbox.sh"
+    "$release_dir/deploy/scripts/run-author-sale-email-outbox.sh"
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [[ ! -f "$path" || ! -x "$path" ]]; then
+      log_error "author_sale_email_outbox_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 assert_music_transcode_worker_release_tree() {
   local release_dir="$1"
   local missing=0
@@ -214,6 +231,11 @@ main() {
   if ! assert_author_appreciation_reconcile_release_tree "$RELEASE_DIR"; then
     log_error "author_appreciation_getcourse_reconcile_artifact_missing"
     send_deploy_alert "deploy_failed" "Reconcile deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_author_sale_email_outbox_release_tree "$RELEASE_DIR"; then
+    log_error "author_sale_email_outbox_artifact_missing"
+    send_deploy_alert "deploy_failed" "Sale email outbox deploy artifact missing for $RELEASE_NAME"
     exit 1
   fi
   if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
@@ -430,6 +452,14 @@ main() {
   rm -f "$RELEASE_DIR/.deploy-inflight"
   unset CANDIDATE_RELEASE_DIR
   prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
+  SALE_EMAIL_OUTBOX_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-author-sale-email-outbox.sh"
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SALE_EMAIL_OUTBOX_ENSURE"; then
+    log_error "author_sale_email_outbox_ensure_failed"
+    send_deploy_alert "deploy_failed" "Sale email outbox wrapper ensure failed for $RELEASE_NAME"
+    # Cutover already completed: fail the deploy result without rolling back a
+    # healthy web release, matching the existing worker ensure convention.
+    exit 1
+  fi
   if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
     log_error "author_appreciation_getcourse_reconcile_ensure_missing"
     send_deploy_alert "deploy_failed" "Reconcile ensure script missing for $RELEASE_NAME"

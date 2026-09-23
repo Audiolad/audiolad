@@ -91,6 +91,10 @@ FINISHED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 RESULT_LINE="$(
   printf '%s\n' "$OUTPUT" | awk '/^\{.*"claimed".*"sent".*"failed".*\}$/ { line=$0 } END { print line }'
 )"
+PARTNER_RESULT_LINE="$(
+  printf '%s\n' "$OUTPUT" \
+    | awk '/^partner_activation_email_outbox( |$)|^partner_activation_email_outbox_failed( |$)/ { line=$0 } END { print line }'
+)"
 
 CLAIMED="?"
 SENT="?"
@@ -104,15 +108,26 @@ if [[ -n "$RESULT_LINE" ]]; then
   FAILED="${FAILED:-?}"
 fi
 
+sanitize_output() {
+  sed -E \
+    -e 's/(AUDIOLAD_SMTP_[A-Z0-9_]*=).*/\1***/g' \
+    -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
+    -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g'
+}
+
 {
   log "start_at=$STARTED_AT finish_at=$FINISHED_AT claimed=$CLAIMED sent=$SENT failed=$FAILED exit=$EXIT_CODE release=$(basename "$CURRENT_RELEASE")"
+  if [[ -n "$PARTNER_RESULT_LINE" ]]; then
+    # The worker prefixes its partner result, so this cannot be selected by
+    # the legacy raw sale JSON parser above. Persist it even when sale exits 0.
+    printf '%s\n' "$PARTNER_RESULT_LINE" | sanitize_output
+  else
+    log "ERROR partner_activation_email_outbox_result_missing exit=$EXIT_CODE"
+  fi
   if [[ "$EXIT_CODE" -ne 0 ]]; then
     # Keep failure diagnostics, but never dump SMTP secrets or full MIME bodies.
     printf '%s\n' "$OUTPUT" \
-      | sed -E \
-        -e 's/(AUDIOLAD_SMTP_[A-Z0-9_]*=).*/\1***/g' \
-        -e 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' \
-        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
+      | sanitize_output \
       | tail -n 40
   fi
 } | tee -a "$LOG_FILE"
