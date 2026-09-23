@@ -18,6 +18,7 @@ on:
       - "supabase/tests/music_delivery_promotion_smoke.sql"
       - "supabase/tests/music_publish_playable_smoke.sql"
       - "supabase/tests/seo_wordstat_music_queries_seed_smoke.sql"
+      - "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"
       - "deploy/scripts/lib/database-migrations-plan.mjs"
       - "package.json"
 

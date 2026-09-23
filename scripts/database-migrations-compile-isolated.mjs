@@ -198,6 +198,33 @@ applyFile(
   "post-apply Wordstat music query seed smoke",
   resolve(root, "supabase/tests/seo_wordstat_music_queries_seed_smoke.sql"),
 );
+if (!pending.has("20261102120000")) {
+  throw new Error("Wordstat jazz query seed migration was not included in the disposable replay");
+}
+runPsql(databaseUrl, [
+  "-c",
+  `UPDATE public.seo_queries
+   SET query_text = 'Джаз для отдыха!!!',
+       frequency = 777,
+       frequency_checked_at = DATE '2026-01-01',
+       source = 'wordstat'
+   WHERE normalized_query = public.normalize_seo_query('джаз для отдыха');
+   UPDATE public.seo_queries
+   SET frequency = NULL,
+       frequency_checked_at = NULL,
+       intent = NULL,
+       recommended_format = NULL,
+       audio_fit = NULL
+   WHERE normalized_query = public.normalize_seo_query('джаз без слов');`,
+]);
+applyFile(
+  "reapply Wordstat jazz query seed",
+  resolve(root, "supabase/migrations/20261102120000_seo_wordstat_jazz_queries_seed.sql"),
+);
+applyFile(
+  "post-apply Wordstat jazz query seed smoke",
+  resolve(root, "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);
