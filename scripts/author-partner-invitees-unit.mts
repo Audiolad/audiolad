@@ -76,6 +76,18 @@ const activeCard = describePartnerInvitee(active);
 assert.match(activeCard.lines[1] ?? "", /20%/);
 assert.equal(activeCard.lines[1], partnerRewardUntilCopy(active.expiresAt));
 assert.match(activeCard.lines.join(" "), /не уменьшает роялти/);
+assert.match(partnerRewardUntilCopy("2029-09-23T10:00:00.000Z"), /2029 г\./);
+assert.equal(
+  partnerRewardUntilCopy("2029-09-23T10:00:00.000Z").includes("г.."),
+  false,
+  "reward copy has one terminal period after the formatted date",
+);
+assert.match(activeCard.lines[0] ?? "", /^Стал автором АудиоЛада:/);
+assert.equal(
+  /^Стал автором:/.test(activeCard.lines[0] ?? ""),
+  false,
+  "activated card no longer uses the old standalone label",
+);
 
 const leaked = parseAuthorPartnerInviteesPayload({
   ok: true,

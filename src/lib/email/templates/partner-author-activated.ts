@@ -6,7 +6,10 @@ import {
   renderBrandEmailParagraph,
   renderBrandEmailShell,
 } from "./brand-layout";
-import { formatPartnerCabinetDate } from "@/lib/author-partner/invitees";
+import {
+  formatPartnerCabinetDate,
+  partnerRewardUntilCopy,
+} from "@/lib/author-partner/invitees";
 
 export const PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT =
   "По вашей партнёрской ссылке появился новый автор";
@@ -47,7 +50,6 @@ export function renderPartnerAuthorActivatedEmailHtml(
   const partner = greetingName(input.partnerName);
   const invitee = authorName(input.inviteeAuthorName);
   const activated = formatPartnerCabinetDate(input.activatedAt);
-  const until = formatPartnerCabinetDate(input.expiresAt);
 
   const bodyHtml = [
     renderBrandEmailHeading(PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT),
@@ -58,7 +60,7 @@ export function renderPartnerAuthorActivatedEmailHtml(
     ),
     renderBrandEmailParagraph(`Дата: ${activated}`, "email-body"),
     renderBrandEmailParagraph(
-      `Вы получаете 20% от его начисленного роялти до ${until}.`,
+      partnerRewardUntilCopy(input.expiresAt),
       "email-body",
     ),
     renderBrandEmailParagraph(
@@ -93,7 +95,6 @@ export function renderPartnerAuthorActivatedEmailText(
   const partner = greetingName(input.partnerName);
   const invitee = authorName(input.inviteeAuthorName);
   const activated = formatPartnerCabinetDate(input.activatedAt);
-  const until = formatPartnerCabinetDate(input.expiresAt);
 
   return [
     PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT,
@@ -102,7 +103,7 @@ export function renderPartnerAuthorActivatedEmailText(
     "",
     `По вашей партнёрской ссылке зарегистрирован новый автор: ${invitee}.`,
     `Дата: ${activated}`,
-    `Вы получаете 20% от его начисленного роялти до ${until}.`,
+    partnerRewardUntilCopy(input.expiresAt),
     "Партнёрское вознаграждение выплачивает АудиоЛад из своей доли и не уменьшает роялти приглашённого автора.",
     "Список приглашённых авторов — в разделе «Ваши 20%».",
     cabinetUrl,

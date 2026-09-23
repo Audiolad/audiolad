@@ -72,7 +72,9 @@ export function formatPartnerCabinetDate(value: string): string {
 }
 
 export function partnerRewardUntilCopy(expiresAt: string): string {
-  return `Вы получаете 20% от его начисленного роялти до ${formatPartnerCabinetDate(expiresAt)}.`;
+  const formattedDate = formatPartnerCabinetDate(expiresAt).trimEnd();
+  const dateWithSinglePeriod = `${formattedDate.replace(/\.+$/, "")}.`;
+  return `Вы получаете 20% от его начисленного роялти до ${dateWithSinglePeriod}`;
 }
 
 function payloadHasForbiddenKey(row: Record<string, unknown>): boolean {
@@ -154,7 +156,7 @@ export function describePartnerInvitee(
   return {
     title: item.displayName,
     lines: [
-      `Стал автором: ${formatPartnerCabinetDate(item.activatedAt)}`,
+      `Стал автором АудиоЛада: ${formatPartnerCabinetDate(item.activatedAt)}`,
       partnerRewardUntilCopy(item.expiresAt),
       PARTNER_REWARD_DOES_NOT_REDUCE_ROYALTY,
     ],

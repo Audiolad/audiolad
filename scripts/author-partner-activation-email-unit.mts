@@ -100,6 +100,10 @@ assert.match(text, /Ваши 20%/);
 assert.match(text, /https:\/\/audiolad\.ru\/author-dashboard\/your-20/);
 assert.equal(text.includes("@"), false, "body has no email address");
 assert.equal(text.includes("2029"), true, "end date comes from expires_at");
+assert.match(text, /2029 г\./);
+assert.match(html, /2029 г\./);
+assert.equal(text.includes("г.."), false, "text email has one terminal period");
+assert.equal(html.includes("г.."), false, "HTML email has one terminal period");
 
 const safePayload = {
   partner_name: "Сергей",
