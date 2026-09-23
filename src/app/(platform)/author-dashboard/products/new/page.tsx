@@ -13,7 +13,7 @@ import {
 } from "@/lib/author-products/publication-class";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
 import {
   SEO_QUERY_SKIP_PARAM,
@@ -91,7 +91,10 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
   const initialAuthor =
     authors.find((item) => item.slug === params.author) ?? authors[0];
   const publicationClass = parsePublicationClass(params.class);
-  const seoBeta = isAuthorSeoDiscoveryEnabled(initialAuthor.id);
+  const seoQueryStepEnabled = isMusicCreateSeoDiscoveryEnabled({
+    authorId: initialAuthor.id,
+    publicationClass,
+  });
   const typeChooserHref = buildAuthorProductCreateHref({
     authorSlug: initialAuthor.slug,
   });
@@ -106,6 +109,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     ? await loadSeoReservationProductCreateContext(supabase, {
         reservationId: seoReservationId,
         authorId: initialAuthor.id,
+        publicationClass,
       })
     : null;
 
@@ -140,9 +144,9 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     return reservationErrorShell(reservationLoad.message, queryStepHref);
   }
 
-  // B: beta + class + no reservation + no skip → pre-create query step
+  // B: music-create discovery + class + no reservation + no skip → pre-create query step
   const hasValidReservation = Boolean(reservationLoad?.ok);
-  if (seoBeta && !hasValidReservation && !seoQuerySkip) {
+  if (seoQueryStepEnabled && !hasValidReservation && !seoQuerySkip) {
     const opportunities = await listSeoOpportunitiesForAuthor(initialAuthor.id);
     return (
       <AuthorShell
@@ -177,7 +181,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     .order("title")
     .limit(8);
 
-  const formBackHref = seoBeta ? queryStepHref : typeChooserHref;
+  const formBackHref = seoQueryStepEnabled ? queryStepHref : typeChooserHref;
 
   return (
     <AuthorShell

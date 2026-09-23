@@ -1,5 +1,5 @@
 /**
- * Aurafon music-wizard track title guidance: at least one Cyrillic letter.
+ * Music-wizard track title guidance: at least one Cyrillic letter.
  * Latin-only titles (e.g. from filename autofill) are allowed in drafts
  * but block Save & Continue / Preview / Publish for the music wizard.
  */
@@ -18,7 +18,7 @@ export function musicTrackTitleHasCyrillic(
   return CYRILLIC_LETTER.test(title);
 }
 
-export function validateMusicTrackTitleForAurafonWizard(
+export function validateMusicTrackTitleCyrillic(
   title: string | null | undefined,
 ): string | null {
   if (musicTrackTitleHasCyrillic(title)) {

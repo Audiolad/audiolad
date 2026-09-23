@@ -99,7 +99,11 @@ export default function AuthorSeoDiscoveryPanel({
     const response = await fetch("/api/author/seo-reservations", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ author_id: authorId, query_id: queryId }),
+      body: JSON.stringify({
+        author_id: authorId,
+        query_id: queryId,
+        ...(publicationClass ? { publication_class: publicationClass } : {}),
+      }),
     });
     const payload = await response.json();
     setPendingId(null);
@@ -183,7 +187,11 @@ export default function AuthorSeoDiscoveryPanel({
     const response = await fetch("/api/author/seo/discovery", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ author_id: authorId, phrase }),
+      body: JSON.stringify({
+        author_id: authorId,
+        phrase,
+        ...(publicationClass ? { publication_class: publicationClass } : {}),
+      }),
     });
     const payload = await response.json();
     setDiscoverPending(false);
@@ -227,6 +235,7 @@ export default function AuthorSeoDiscoveryPanel({
         author_id: authorId,
         seed_phrase: discoverySeedPhrase,
         phrase: item.phrase,
+        ...(publicationClass ? { publication_class: publicationClass } : {}),
       }),
     });
     const payload = await response.json();

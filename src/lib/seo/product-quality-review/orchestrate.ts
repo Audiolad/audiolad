@@ -54,7 +54,10 @@ export async function reviewProductTextQuality(
   }
 
   try {
-    assertAuthorProductQualityReviewEnabled(parsed.request.authorId);
+    assertAuthorProductQualityReviewEnabled(parsed.request.authorId, {
+      productKind: parsed.request.productKind,
+      publicationClass: parsed.request.publicationClass,
+    });
   } catch {
     return {
       ok: false,

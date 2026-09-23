@@ -13,8 +13,8 @@ import {
   loadRankedAnalyzedQueriesForSeed,
 } from "@/lib/seo-queries/author-discovery-repository";
 import {
-  assertAuthorSeoDiscoveryEnabled,
-  isAuthorSeoDiscoveryEnabled,
+  assertMusicCreateSeoDiscoveryEnabled,
+  isMusicCreateSeoDiscoveryEnabled,
 } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import {
@@ -78,8 +78,10 @@ function databaseMatchStatus(input: {
 }
 
 /**
- * Closed-beta discovery: ranked analyzed database matches + Wordstat additions.
- * Client sends only { author_id, phrase }.
+ * Discovery for the Aurafon SEO beta and for any author creating a release.
+ * Client sends { author_id, phrase, publication_class? }.
+ * publication_class=release opens the music create path. Omitting it keeps
+ * the standalone dashboard Aurafon-only.
  */
 export async function POST(request: Request) {
   try {
@@ -92,11 +94,17 @@ export async function POST(request: Request) {
 
     const authorId = readString(body, "author_id");
     const phrase = readString(body, "phrase");
+    const publicationClass = readString(body, "publication_class");
     if (!authorId || !phrase) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    if (!isAuthorSeoDiscoveryEnabled(authorId)) {
+    if (
+      !isMusicCreateSeoDiscoveryEnabled({
+        authorId,
+        publicationClass,
+      })
+    ) {
       return NextResponse.json(
         { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
         { status: 403 },
@@ -104,7 +112,7 @@ export async function POST(request: Request) {
     }
 
     const { user } = await requireAuthorMembership(authorId);
-    assertAuthorSeoDiscoveryEnabled(authorId);
+    assertMusicCreateSeoDiscoveryEnabled({ authorId, publicationClass });
 
     let databaseMatches: Array<Record<string, unknown>> = [];
     let seedNormalized: string | null = null;

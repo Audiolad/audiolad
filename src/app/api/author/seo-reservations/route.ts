@@ -4,9 +4,24 @@ import {
   handleAuthorRouteError,
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
+import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
+}
+
+function seoDiscoveryDisabledResponse() {
+  return NextResponse.json(
+    { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+    { status: 403 },
+  );
+}
+
+function musicCreateSeoDiscoveryAllowed(body: Record<string, unknown>): boolean {
+  return isMusicCreateSeoDiscoveryEnabled({
+    authorId: readString(body, "author_id"),
+    publicationClass: readString(body, "publication_class"),
+  });
 }
 
 function mapReservationError(error: unknown) {
@@ -47,6 +62,7 @@ export async function POST(request: Request) {
     const authorId = readString(body, "author_id");
     const queryId = readString(body, "query_id");
     if (!authorId || !queryId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("reserve_seo_query", {
@@ -69,6 +85,7 @@ export async function DELETE(request: Request) {
     const authorId = readString(body, "author_id");
     const reservationId = readString(body, "reservation_id");
     if (!authorId || !reservationId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("release_seo_query_reservation", {
@@ -93,6 +110,7 @@ export async function PATCH(request: Request) {
     if (!authorId || !reservationId || !productId) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
+    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("link_seo_reservation_to_product", {

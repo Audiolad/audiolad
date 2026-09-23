@@ -1396,6 +1396,12 @@ RPC перед удалением авторов и перед завершен�
 
 Жёсткие блокеры: заказы, платежи, возвраты, роялти, выплаты, оплаченные capacity grants, чужие membership, другие участники своих авторов, referral где тестовый аккаунт — referrer другого invitee, незавершённая атрибуция без invitee (`pending_referrer_attribution`, `invitee_user_id IS NULL` на своём авторе), автор Sergey (`7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c`) и код `sergey`. Удаляются только атрибуции с `invitee_user_id` тестового аккаунта. Свои membership, заявки, invitee referral, свои пустые авторские проекты и partner bonus — цели очистки. Журнал `admin_operation_log` не удаляется.
 
+## seo_queries — музыкальные направления
+
+Миграция `supabase/migrations/20261031120100_seo_music_product_queries_seed.sql`.
+
+Идемпотентный seed естественных запросов «музыка для …»: `analysis_status = analyzed`, `intent = music`, `recommended_format = Музыка`, `audio_fit = high`, `frequency` NULL. `ON CONFLICT (normalized_query)` обновляет статус анализа и пустые intent / format / audio_fit и не перезаписывает `frequency`, `frequency_checked_at`, `source`, `query_text`. Новой колонки нет. Строки spa/massage из `20261022120000_seo_spa_massage_queries_seed.sql` не повторяются.
+
 ## Резервное копирование
 
 Будет заполнено позже.

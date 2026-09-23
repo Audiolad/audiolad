@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { resolveAurafonCatalogSectionPatch } from "@/lib/author-products/aurafon-catalog-section";
+import { resolveCatalogSectionPatch } from "@/lib/author-products/catalog-section-field";
 import {
   validateTitleLength,
 } from "@/lib/author-products/limits";
@@ -83,8 +83,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const catalogSectionPatch = resolveAurafonCatalogSectionPatch({
+    const catalogSectionPatch = resolveCatalogSectionPatch({
       authorId,
+      productKind: classification.value.productKind,
+      publicationClass: classification.value.publicationClass,
       present: "catalog_section" in body,
       catalogSection: (body as { catalog_section?: unknown }).catalog_section,
     });

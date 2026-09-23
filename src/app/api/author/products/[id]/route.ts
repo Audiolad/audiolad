@@ -13,7 +13,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { resolveAurafonCatalogSectionPatch } from "@/lib/author-products/aurafon-catalog-section";
+import { resolveCatalogSectionPatch } from "@/lib/author-products/catalog-section-field";
 import { resolveAppreciationOverridePatch } from "@/lib/author-products/appreciation-override";
 import { seedAuthorDefaultAudioProductAuthorIfAbsent } from "@/lib/author-products/seed-default-audio-product-author";
 import {
@@ -986,8 +986,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof updates.author_id === "string" && updates.author_id
         ? updates.author_id
         : practice.author_id;
-    const catalogSectionPatch = resolveAurafonCatalogSectionPatch({
+    const catalogSectionPatch = resolveCatalogSectionPatch({
       authorId: catalogSectionAuthorId,
+      productKind: nextProductKind,
+      publicationClass: nextPublicationClass,
       present: "catalog_section" in body,
       catalogSection: (body as { catalog_section?: unknown }).catalog_section,
     });
