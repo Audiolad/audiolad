@@ -189,6 +189,9 @@ const opportunitiesPage = read(
   "src/app/(platform)/author-dashboard/seo-opportunities/page.tsx",
 );
 const panel = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
+const seoQueryStep = read(
+  "src/components/author-dashboard/AuthorProductSeoQueryStep.tsx",
+);
 const seoSection = read("src/components/author-dashboard/AuthorProductSeoSection.tsx");
 const createRoute = read("src/app/api/author/products/route.ts");
 const updateRoute = read("src/app/api/author/products/[id]/route.ts");
@@ -219,6 +222,9 @@ assert.match(reservationRoute, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(reservationRoute, /publication_class/);
 assert.match(reservationRoute, /seo_discovery_beta_disabled/);
 assert.match(panel, /publication_class: publicationClass/);
+assert.doesNotMatch(seoQueryStep, />\s*Бета\s*</);
+assert.doesNotMatch(panel, />\s*Бета\s*</);
+assert.match(panel, /"Что ищут слушатели"/);
 
 assert.match(nav, /isAuthorSeoDiscoveryEnabled/);
 assert.doesNotMatch(nav, /isMusicCreateSeoDiscoveryEnabled/);

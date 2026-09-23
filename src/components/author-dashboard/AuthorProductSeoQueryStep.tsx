@@ -49,10 +49,7 @@ export default function AuthorProductSeoQueryStep({
   return (
     <div className="space-y-5" data-testid="author-product-seo-query-step">
       <section className="rounded-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">
-          Бета
-        </p>
-        <h2 className="mt-1 text-lg font-semibold text-[#25135c]">
+        <h2 className="text-lg font-semibold text-[#25135c]">
           {copy.title}
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#4c3d78]">
