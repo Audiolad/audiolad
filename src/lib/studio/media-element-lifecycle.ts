@@ -10,6 +10,10 @@
  * that was mid-seek while a zero-offset track, whose `play()` already
  * settled, stays paused.
  *
+ * A second `play()` runs only after AbortError caused by that in-flight
+ * seek, and only if the seek has finished and the generation is still
+ * current. Other rejections are final.
+ *
  * Only the current playback generation may start or keep an element playing.
  * Query strings are stripped from diagnostic src values so signed URLs are
  * not retained.
@@ -431,49 +435,78 @@ export async function beginStudioMediaPlayback(input: {
       }
       guardPlaySettlement(media, playPromise, isStale);
 
-      if (needsWait && target != null) {
-        const waited = await waitForStudioMediaSeek(media, target, isStale);
-        if (isStale() || waited === "stale") {
-          media.pause();
-          return finish({ started: false, stale: true, playSettled: "pending" });
-        }
-        if (waited === "failed") {
-          errorName = errorName ?? "SeekFailed";
-          playSettled = "rejected";
-          media.pause();
-          return finish({ started: false, stale: false, playSettled, errorName });
-        }
-      }
+      const playResult = playPromise.then(
+        () => ({ ok: true as const }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
 
-      if (isStale()) {
-        media.pause();
-        return finish({ started: false, stale: true, playSettled: "pending" });
-      }
-
-      try {
-        await playPromise;
-        playSettled = "resolved";
-        errorName = null;
-      } catch (error) {
+      const settledPlay = await playResult;
+      if (!settledPlay.ok) {
         playSettled = "rejected";
-        errorName = studioMediaErrorName(error);
+        errorName = studioMediaErrorName(settledPlay.error);
         if (isStale()) {
           media.pause();
           return finish({ started: false, stale: true, playSettled, errorName });
         }
-        try {
-          playCalled = true;
-          const retry = media.play();
-          guardPlaySettlement(media, retry, isStale);
-          await retry;
-          playSettled = "resolved";
-          errorName = null;
-        } catch (retryError) {
-          playSettled = "rejected";
-          errorName = studioMediaErrorName(retryError);
+        // Only a seek-interrupted play is retried, and only after seeked.
+        if (errorName === "AbortError" && needsWait && target != null) {
+          const waited = await waitForStudioMediaSeek(media, target, isStale);
+          if (isStale() || waited === "stale") {
+            media.pause();
+            return finish({ started: false, stale: true, playSettled, errorName });
+          }
+          if (waited === "failed") {
+            errorName = "SeekFailed";
+            media.pause();
+            return finish({ started: false, stale: false, playSettled, errorName });
+          }
+          if (isStale()) {
+            media.pause();
+            return finish({ started: false, stale: true, playSettled, errorName });
+          }
+          try {
+            playCalled = true;
+            const retry = media.play();
+            guardPlaySettlement(media, retry, isStale);
+            await retry;
+            if (isStale()) {
+              media.pause();
+              return finish({ started: false, stale: true, playSettled: "resolved", errorName: null });
+            }
+            playSettled = "resolved";
+            errorName = null;
+          } catch (retryError) {
+            playSettled = "rejected";
+            errorName = studioMediaErrorName(retryError);
+            media.pause();
+            return finish({ started: false, stale: false, playSettled, errorName });
+          }
+        } else {
           media.pause();
           return finish({ started: false, stale: false, playSettled, errorName });
         }
+      } else if (needsWait && target != null) {
+        const waited = await waitForStudioMediaSeek(media, target, isStale);
+        if (isStale() || waited === "stale") {
+          media.pause();
+          return finish({ started: false, stale: true, playSettled: "resolved" });
+        }
+        if (waited === "failed") {
+          errorName = "SeekFailed";
+          playSettled = "rejected";
+          media.pause();
+          return finish({ started: false, stale: false, playSettled, errorName });
+        }
+        playSettled = "resolved";
+        errorName = null;
+      } else {
+        playSettled = "resolved";
+        errorName = null;
+      }
+
+      if (isStale()) {
+        media.pause();
+        return finish({ started: false, stale: true, playSettled });
       }
     } else if (needsWait && target != null) {
       const waited = await waitForStudioMediaSeek(media, target, isStale);
@@ -526,6 +559,41 @@ export async function beginStudioMediaPlayback(input: {
       playSettled: "rejected",
     });
   }
+}
+
+export type StudioAudibleStartupDecision = "release" | "stale" | "none-started";
+
+/**
+ * Wait until every required track for this Play has settled, then run exactly
+ * one release. The transport clock and audible envelopes stay with `onRelease`
+ * so a fast track cannot become audible while a slower seek is still pending.
+ */
+export async function runStudioAudibleStartupBarrier(input: {
+  generation: number;
+  isGenerationCurrent: (generation: number) => boolean;
+  pending: ReadonlyArray<Promise<{ started: boolean; stale: boolean }>>;
+  onRelease: () => void;
+  onStale: () => void;
+  onNoneStarted: () => void;
+}): Promise<StudioAudibleStartupDecision> {
+  const results = await Promise.all(input.pending);
+  if (
+    !input.isGenerationCurrent(input.generation) ||
+    results.some((result) => result.stale)
+  ) {
+    input.onStale();
+    return "stale";
+  }
+  if (input.pending.length > 0 && results.every((result) => !result.started)) {
+    input.onNoneStarted();
+    return "none-started";
+  }
+  if (!input.isGenerationCurrent(input.generation)) {
+    input.onStale();
+    return "stale";
+  }
+  input.onRelease();
+  return "release";
 }
 
 export function beginStudioCatalogPreviewPlay(

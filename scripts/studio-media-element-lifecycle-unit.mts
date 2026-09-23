@@ -6,6 +6,7 @@ import {
   beginStudioCatalogPreviewPlay,
   beginStudioMediaPlayback,
   cancelStudioMediaPlayback,
+  runStudioAudibleStartupBarrier,
   describeStudioAudioElement,
   formatStudioPauseAudioDiagnostics,
   isStudioMediaStartBlocked,
@@ -18,8 +19,10 @@ import {
 } from "../src/lib/studio/media-element-lifecycle";
 import {
   getStudioClipMediaTime,
+  listStudioTracksAudibleAtPlayhead,
   planStudioMediaElementSync,
   planStudioProviderPlayRestart,
+  shouldCorrectStudioMediaDrift,
 } from "../src/lib/studio/media-element-sync";
 
 type FakeOptions = {
@@ -29,6 +32,7 @@ type FakeOptions = {
   autoSeek: boolean;
   holdPlay: boolean;
   rejectPlayWith: string | null;
+  scheduleSeek: ((emit: () => void) => void) | null;
 };
 
 type PlayHold = {
@@ -44,6 +48,7 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
     autoSeek: true,
     holdPlay: false,
     rejectPlayWith: null,
+    scheduleSeek: null,
     ...partial,
   };
   const listeners = new Map<string, Set<() => void>>();
@@ -62,6 +67,7 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
     networkState: 2,
     loop: false,
     playCalls: 0,
+    playSeekingAtCall: [] as boolean[],
     pauseCalls: 0,
     loadCalls: 0,
     seekAssignments: 0,
@@ -82,11 +88,14 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
       media.seekAssignments += 1;
       pendingSeek = value;
       seeking = true;
-      if (options.autoSeek) {
-        queueMicrotask(() => {
-          if (serial !== seekSerial) return;
-          emitSeeked();
-        });
+      const emitIfCurrent = () => {
+        if (serial !== seekSerial) return;
+        emitSeeked();
+      };
+      if (options.scheduleSeek) {
+        options.scheduleSeek(emitIfCurrent);
+      } else if (options.autoSeek) {
+        queueMicrotask(emitIfCurrent);
       }
     },
     get paused() {
@@ -103,6 +112,7 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
     },
     play() {
       media.playCalls += 1;
+      media.playSeekingAtCall.push(seeking);
       playArmed = true;
       if (options.rejectPlayWith) {
         return Promise.reject(
@@ -212,6 +222,53 @@ async function flush() {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+
+async function drain() {
+  for (let step = 0; step < 12; step += 1) {
+    await Promise.resolve();
+  }
+}
+
+function createVirtualClock(onNow?: (now: number) => void) {
+  let now = 0;
+  const timers: Array<{ at: number; fn: () => void }> = [];
+  return {
+    get now() {
+      return now;
+    },
+    after(delayMs: number, fn: () => void) {
+      timers.push({ at: now + delayMs, fn });
+    },
+    async advance(ms: number) {
+      const target = now + ms;
+      await drain();
+      while (true) {
+        let nextIndex = -1;
+        for (let index = 0; index < timers.length; index += 1) {
+          const timer = timers[index];
+          if (!timer || timer.at > target) continue;
+          if (
+            nextIndex < 0 ||
+            timer.at < (timers[nextIndex]?.at ?? Number.POSITIVE_INFINITY)
+          ) {
+            nextIndex = index;
+          }
+        }
+        if (nextIndex < 0) break;
+        const next = timers[nextIndex];
+        timers.splice(nextIndex, 1);
+        if (!next) break;
+        now = next.at;
+        onNow?.(now);
+        next.fn();
+        await drain();
+      }
+      now = target;
+      onNow?.(now);
+      await drain();
+    },
+  };
 }
 
 async function startAt(
@@ -514,6 +571,7 @@ async function testRejectedPlayDoesNotPretendToStart() {
   assert.equal(outcome.playCalled, true);
   assert.equal(outcome.playSettled, "rejected");
   assert.equal(outcome.errorName, "NotAllowedError");
+  assert.equal(media.playCalls, 1);
   assert.equal(media.paused, true);
   assert.equal(isStudioMediaStartBlocked(media, generation), true);
   const calls = media.playCalls;
@@ -522,6 +580,321 @@ async function testRejectedPlayDoesNotPretendToStart() {
   }
   assert.equal(media.playCalls, calls);
   assert.equal(STUDIO_MEDIA_PLAY_FAILED_MESSAGE.length > 0, true);
+}
+
+async function testAbortErrorRetriesOnceAfterSeeked() {
+  const gate = generationGate();
+  const media = createFakeMedia({
+    autoSeek: false,
+    rejectPlayWhileSeeking: true,
+    resumeOnSeeked: false,
+    resumeOnResolve: true,
+  });
+  const generation = gate.bump();
+  let settled = false;
+  const pending = startAt(media, gate, 22, generation).then((outcome) => {
+    settled = true;
+    return outcome;
+  });
+  await drain();
+  assert.equal(settled, false);
+  assert.equal(media.playCalls, 1);
+  assert.deepEqual(media.playSeekingAtCall, [true]);
+  assert.equal(media.seeking, true);
+  assert.equal(media.paused, true);
+
+  media.emitSeeked();
+  const outcome = await pending;
+  assert.equal(media.playCalls, 2);
+  assert.deepEqual(media.playSeekingAtCall, [true, false]);
+  assert.equal(outcome.started, true);
+  assert.equal(outcome.stale, false);
+  assert.equal(outcome.errorName, null);
+  assert.equal(outcome.playSettled, "resolved");
+  assert.equal(media.currentTime, 22);
+  assert.equal(media.paused, false);
+  assert.equal(media.seekAssignments, 1);
+}
+
+async function testNamedPlayErrorDoesNotRetry(
+  errorName: "NotAllowedError" | "NotSupportedError",
+) {
+  const gate = generationGate();
+  const media = createFakeMedia({
+    autoSeek: false,
+    rejectPlayWith: errorName,
+    resumeOnSeeked: false,
+    resumeOnResolve: true,
+  });
+  const generation = gate.bump();
+  const outcome = await startAt(media, gate, 22, generation);
+  assert.equal(media.playCalls, 1, errorName);
+  assert.equal(outcome.started, false, errorName);
+  assert.equal(outcome.stale, false, errorName);
+  assert.equal(outcome.playSettled, "rejected", errorName);
+  assert.equal(outcome.errorName, errorName);
+  assert.equal(media.paused, true, errorName);
+  assert.equal(media.seeking, true, errorName);
+  media.emitSeeked();
+  await drain();
+  assert.equal(media.playCalls, 1, `${errorName} after late seeked`);
+  assert.equal(media.paused, true, `${errorName} stays paused`);
+  assert.equal(isStudioMediaStartBlocked(media, generation), true);
+}
+
+function createDelayedStartupTracks(clock: { after: (delayMs: number, fn: () => void) => void }) {
+  const clips = {
+    "voice-a": { id: "a", startTime: 0, offset: 0, duration: 120 },
+    "voice-b": { id: "b", startTime: 0, offset: 2, duration: 120 },
+    music: { id: "m", startTime: 0, offset: 8, duration: 180 },
+  };
+  return [
+    {
+      id: "voice-a" as const,
+      clip: clips["voice-a"],
+      media: createFakeMedia({
+        autoSeek: true,
+        rejectPlayWhileSeeking: true,
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+      }),
+    },
+    {
+      id: "voice-b" as const,
+      clip: clips["voice-b"],
+      media: createFakeMedia({
+        autoSeek: false,
+        rejectPlayWhileSeeking: true,
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+        scheduleSeek: (emit) => clock.after(100, emit),
+      }),
+    },
+    {
+      id: "music" as const,
+      clip: clips.music,
+      media: createFakeMedia({
+        autoSeek: false,
+        rejectPlayWhileSeeking: true,
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+        scheduleSeek: (emit) => clock.after(700, emit),
+      }),
+    },
+  ];
+}
+
+async function testDelayedMultiTrackStartSharesOneAnchor() {
+  const gate = generationGate();
+  const generation = gate.bump();
+  let contextTime = 0;
+  const clock = createVirtualClock((now) => {
+    contextTime = now;
+  });
+  const tracks = createDelayedStartupTracks(clock);
+  const timeline = 40;
+  assert.deepEqual(
+    listStudioTracksAudibleAtPlayhead(
+      tracks.map((track) => ({
+        id: track.id,
+        muted: false,
+        clips: [track.clip],
+      })),
+      timeline,
+    ),
+    ["voice-a", "voice-b", "music"],
+  );
+
+  let hold = true;
+  const status = "playing" as const;
+  let anchorContext = -1;
+  let anchorTimeline = -1;
+  const position = timeline;
+  const opened: Array<{
+    id: string;
+    contextTime: number;
+    timeline: number;
+    mediaTime: number;
+  }> = [];
+  const openers: Array<() => void> = [];
+
+  const transportPosition = () => {
+    if (hold || status !== "playing" || anchorContext < 0) return position;
+    return anchorTimeline + (contextTime - anchorContext);
+  };
+
+  const pending = tracks.map((track) => {
+    const target = getStudioClipMediaTime(track.clip, timeline);
+    return beginStudioMediaPlayback({
+      media: track.media,
+      generation,
+      isGenerationCurrent: (value) => gate.isCurrent(value),
+      targetTime: target,
+    }).then((outcome) => {
+      if (outcome.started && gate.isCurrent(generation)) {
+        openers.push(() => {
+          opened.push({
+            id: track.id,
+            contextTime,
+            timeline: transportPosition(),
+            mediaTime: track.media.currentTime,
+          });
+        });
+      }
+      return { started: outcome.started, stale: outcome.stale };
+    });
+  });
+
+  for (const track of tracks) {
+    assert.equal(track.media.playCalls, 1, `${track.id} gesture play`);
+    assert.equal(track.media.playSeekingAtCall[0], true, `${track.id} play during seek`);
+  }
+  assert.equal(opened.length, 0);
+
+  let decision = "pending";
+  const barrier = runStudioAudibleStartupBarrier({
+    generation,
+    isGenerationCurrent: (value) => gate.isCurrent(value),
+    pending,
+    onRelease: () => {
+      anchorContext = contextTime;
+      anchorTimeline = timeline;
+      hold = false;
+      for (const open of openers) open();
+      decision = "release";
+    },
+    onStale: () => {
+      decision = "stale";
+    },
+    onNoneStarted: () => {
+      decision = "none";
+    },
+  });
+
+  await drain();
+  const voiceA = tracks[0];
+  const voiceB = tracks[1];
+  const music = tracks[2];
+  assert.ok(voiceA && voiceB && music);
+  assert.equal(voiceA.media.paused, false);
+  assert.equal(voiceA.media.currentTime, 40);
+  assert.equal(voiceB.media.seeking, true);
+  assert.equal(music.media.seeking, true);
+  assert.equal(opened.length, 0);
+  contextTime = 0.7;
+  assert.equal(transportPosition(), 40);
+  assert.equal(decision, "pending");
+
+  await clock.advance(100);
+  assert.equal(clock.now, 100);
+  assert.equal(voiceB.media.paused, false);
+  assert.equal(voiceB.media.currentTime, 42);
+  assert.equal(music.media.seeking, true);
+  assert.equal(music.media.currentTime, 0);
+  assert.equal(opened.length, 0, "voice must stay silent while catalog music seeks");
+  assert.equal(transportPosition(), 40);
+  assert.equal(decision, "pending");
+
+  await clock.advance(600);
+  await barrier;
+  assert.equal(clock.now, 700);
+  assert.equal(decision, "release");
+  assert.equal(anchorTimeline, 40);
+  assert.equal(anchorContext, 700);
+  assert.equal(opened.length, 3);
+  assert.deepEqual(
+    opened.map((row) => row.id),
+    ["voice-a", "voice-b", "music"],
+  );
+  for (const row of opened) {
+    assert.equal(row.timeline, 40, row.id);
+    assert.equal(row.contextTime, 700, row.id);
+  }
+  const releaseTimeline = transportPosition();
+  assert.ok(Math.abs(releaseTimeline - 40) < 1e-9);
+  for (const track of tracks) {
+    const target = getStudioClipMediaTime(track.clip, 40);
+    assert.equal(track.media.seekAssignments, 1, track.id);
+    assert.equal(track.media.currentTime, target, track.id);
+    assert.equal(track.media.paused, false, track.id);
+    const frameLater = getStudioClipMediaTime(track.clip, 40.016);
+    assert.equal(
+      shouldCorrectStudioMediaDrift(track.media.currentTime, frameLater),
+      false,
+      `${track.id} frame drift`,
+    );
+    seekStudioMediaElementIfNeeded(track.media, frameLater);
+    assert.equal(track.media.seekAssignments, 1, `${track.id} no corrective seek`);
+    const spentInSeek = getStudioClipMediaTime(track.clip, 40.7);
+    assert.equal(
+      shouldCorrectStudioMediaDrift(track.media.currentTime, spentInSeek),
+      true,
+      `${track.id} would seek if the clock had run during startup`,
+    );
+  }
+}
+
+async function testSpaceDuringDelayedStartupCancelsEveryTrack() {
+  const gate = generationGate();
+  const generation = gate.bump();
+  const clock = createVirtualClock();
+  const tracks = createDelayedStartupTracks(clock);
+  const timeline = 40;
+  const openers: Array<() => void> = [];
+  let resumed = 0;
+  const pending = tracks.map((track) =>
+    beginStudioMediaPlayback({
+      media: track.media,
+      generation,
+      isGenerationCurrent: (value) => gate.isCurrent(value),
+      targetTime: getStudioClipMediaTime(track.clip, timeline),
+    }).then((outcome) => {
+      if (outcome.started && gate.isCurrent(generation)) {
+        openers.push(() => {
+          resumed += 1;
+        });
+      }
+      return { started: outcome.started, stale: outcome.stale };
+    }),
+  );
+
+  let decision = "pending";
+  const barrier = runStudioAudibleStartupBarrier({
+    generation,
+    isGenerationCurrent: (value) => gate.isCurrent(value),
+    pending,
+    onRelease: () => {
+      for (const open of openers) open();
+      decision = "release";
+    },
+    onStale: () => {
+      decision = "stale";
+    },
+    onNoneStarted: () => {
+      decision = "none";
+    },
+  });
+
+  await drain();
+  assert.equal(tracks[0]?.media.paused, false);
+  assert.equal(tracks[2]?.media.seeking, true);
+  gate.bump();
+  const callsAfterCancel = tracks.map((track) => {
+    cancelStudioMediaPlayback(track.media);
+    track.media.pause();
+    return track.media.playCalls;
+  });
+  await clock.advance(700);
+  const result = await barrier;
+  assert.equal(result, "stale");
+  assert.equal(decision, "stale");
+  assert.equal(resumed, 0);
+  for (let index = 0; index < tracks.length; index += 1) {
+    const track = tracks[index];
+    assert.ok(track);
+    assert.equal(track.media.paused, true, track.id);
+    assert.equal(track.media.playCalls, callsAfterCancel[index], track.id);
+  }
 }
 
 async function testCatalogPreviewStopsOnAddAndClose() {
@@ -673,6 +1046,28 @@ async function testProviderAndCatalogWiring() {
     "utf8",
   );
   assert.match(provider, /beginStudioMediaPlayback/);
+  assert.match(provider, /runStudioAudibleStartupBarrier/);
+  assert.match(provider, /playbackStartupHoldRef/);
+  assert.match(
+    provider,
+    /if \(playbackStartupHoldRef\.current\) \{\s*return positionRef\.current;\s*\}/,
+  );
+  assert.match(provider, /playbackStartupHoldRef\.current = false/);
+  const startFn = provider.slice(
+    provider.indexOf("const startSourcesAtPosition"),
+    provider.indexOf("const playbackUrlStillReferenced"),
+  );
+  const prelude = startFn.slice(0, startFn.indexOf("const releaseStartup"));
+  const releaseBody = startFn.slice(
+    startFn.indexOf("const releaseStartup"),
+    startFn.indexOf("void runStudioAudibleStartupBarrier"),
+  );
+  assert.doesNotMatch(prelude, /startProgressLoop\(/);
+  assert.doesNotMatch(prelude, /startedAtContextTimeRef/);
+  assert.match(releaseBody, /startedAtContextTimeRef\.current = now/);
+  assert.match(releaseBody, /startedAtPositionRef\.current = position/);
+  assert.match(releaseBody, /startProgressLoop\(\)/);
+  assert.match(startFn, /deferAudibleEnvelope: audible\.has\(track\.id\)/);
   assert.match(provider, /if \(!outcome\.started\)/);
   assert.match(provider, /scheduleClipEnvelope/);
   assert.match(provider, /parkPausedRuntimesAtPlayhead\(\)/);
@@ -706,6 +1101,11 @@ await testTrimStartNonZeroOffset();
 await testPauseStopsEveryProjectElement();
 await testPendingPlayCannotResumeAfterPause();
 await testRejectedPlayDoesNotPretendToStart();
+await testAbortErrorRetriesOnceAfterSeeked();
+await testNamedPlayErrorDoesNotRetry("NotAllowedError");
+await testNamedPlayErrorDoesNotRetry("NotSupportedError");
+await testDelayedMultiTrackStartSharesOneAnchor();
+await testSpaceDuringDelayedStartupCancelsEveryTrack();
 await testCatalogPreviewStopsOnAddAndClose();
 await testRapidSeekPlayPauseKeepsEveryTrack();
 testPauseDiagnosticsIdentifyProjectAndPreview();

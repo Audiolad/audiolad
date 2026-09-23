@@ -280,7 +280,7 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /playbackGenerationRef/);
   assert.match(
     provider,
-    /runtime\.activeClipId = null;\s*syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
+    /runtime\.activeClipId = null;\s*(?:const\s+\w+\s*=\s*)?syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
   );
   assert.match(
     provider,

@@ -86,6 +86,7 @@ import {
 import {
   findActiveStudioClip,
   isStudioPlaybackGenerationCurrent,
+  listStudioTracksAudibleAtPlayhead,
   nextStudioPlaybackGeneration,
   planStudioMediaElementSync,
   shouldCorrectStudioMediaDrift,
@@ -100,6 +101,7 @@ import {
   isStudioMediaStartBlocked,
   listMountedStudioCatalogPreviewMedia,
   publishStudioPauseDiagnostics,
+  runStudioAudibleStartupBarrier,
   seekStudioMediaElementIfNeeded,
   setStudioMediaPlaybackDebugLogging,
   stopMountedStudioCatalogPreviews,
@@ -391,8 +393,14 @@ function syncTrackMediaPlayback(
     getTimelinePosition: () => number;
     getContextTime: () => number;
     onPlayFailed?: (outcome: StudioMediaPlayOutcome) => void;
+    /**
+     * Initial Play waits for every audible track before opening envelopes.
+     * Progress-loop clip changes leave this unset and open immediately.
+     */
+    deferAudibleEnvelope?: boolean;
+    queueAudibleEnvelope?: (open: () => void) => void;
   },
-) {
+): Promise<{ started: boolean; stale: boolean }> {
   const media = runtime.mediaElement;
   const plan = planStudioMediaElementSync({
     clips: track.clips,
@@ -405,6 +413,9 @@ function syncTrackMediaPlayback(
   });
   media.loop = plan.loop;
 
+  const idle = Promise.resolve({ started: false, stale: false });
+  const already = Promise.resolve({ started: true, stale: false });
+
   if (!plan.wantPlaying) {
     cancelStudioMediaPlayback(media);
     silenceStudioTrackOutput(runtime, contextTime);
@@ -414,7 +425,7 @@ function syncTrackMediaPlayback(
     if (!media.paused) {
       media.pause();
     }
-    return;
+    return idle;
   }
 
   // A seek/play for this generation is still settling. Assigning currentTime
@@ -424,18 +435,48 @@ function syncTrackMediaPlayback(
     isStudioMediaPlaybackPending(media) ||
     isStudioMediaStartBlocked(media, options.generation)
   ) {
-    return;
+    return idle;
   }
 
-  const startMedia = (clip: StudioClip | null, openEnvelopeOnStart: boolean) => {
-    void beginStudioMediaPlayback({
+  const openLiveEnvelope = (clip: StudioClip) => {
+    if (!options.isGenerationCurrent(options.generation)) return;
+    const livePosition = options.getTimelinePosition();
+    const liveClip = findActiveStudioClip(track.clips, livePosition);
+    if (!liveClip || liveClip.id !== clip.id) return;
+    const liveStart =
+      Number.isFinite(liveClip.startTime) && liveClip.startTime > 0
+        ? liveClip.startTime
+        : 0;
+    const { previous, next } = studioClipTimelineNeighbors(track.clips, liveClip);
+    scheduleClipEnvelope(
+      runtime.envelopeGain,
+      liveClip,
+      Math.max(livePosition - liveStart, 0),
+      options.getContextTime(),
+      {
+        enterHandoff: resolveStudioClipEnterHandoff({
+          clip: liveClip,
+          previous,
+          next,
+        }),
+        previous,
+        next,
+      },
+    );
+  };
+
+  const startMedia = (
+    clip: StudioClip | null,
+    openEnvelopeOnStart: boolean,
+  ): Promise<{ started: boolean; stale: boolean }> => {
+    return beginStudioMediaPlayback({
       media,
       generation: options.generation,
       isGenerationCurrent: options.isGenerationCurrent,
       targetTime: plan.seekTo,
     }).then((outcome) => {
-      if (!options.isGenerationCurrent(options.generation)) {
-        return;
+      if (!options.isGenerationCurrent(options.generation) || outcome.stale) {
+        return { started: false, stale: true };
       }
       if (!outcome.started) {
         if (clip && runtime.activeClipId === clip.id) {
@@ -445,39 +486,17 @@ function syncTrackMediaPlayback(
           runtime.envelopeGain.gain.cancelScheduledValues(now);
           runtime.envelopeGain.gain.setValueAtTime(0, now);
         }
-        if (!outcome.stale) {
-          options.onPlayFailed?.(outcome);
+        options.onPlayFailed?.(outcome);
+        return { started: false, stale: false };
+      }
+      if (openEnvelopeOnStart && clip) {
+        if (options.deferAudibleEnvelope && options.queueAudibleEnvelope) {
+          options.queueAudibleEnvelope(() => openLiveEnvelope(clip));
+        } else {
+          openLiveEnvelope(clip);
         }
-        return;
       }
-      if (!openEnvelopeOnStart || !clip) {
-        return;
-      }
-      const livePosition = options.getTimelinePosition();
-      const liveClip = findActiveStudioClip(track.clips, livePosition);
-      if (!liveClip || liveClip.id !== clip.id) {
-        return;
-      }
-      const liveStart =
-        Number.isFinite(liveClip.startTime) && liveClip.startTime > 0
-          ? liveClip.startTime
-          : 0;
-      const { previous, next } = studioClipTimelineNeighbors(track.clips, liveClip);
-      scheduleClipEnvelope(
-        runtime.envelopeGain,
-        liveClip,
-        Math.max(livePosition - liveStart, 0),
-        options.getContextTime(),
-        {
-          enterHandoff: resolveStudioClipEnterHandoff({
-            clip: liveClip,
-            previous,
-            next,
-          }),
-          previous,
-          next,
-        },
-      );
+      return { started: true, stale: false };
     });
   };
 
@@ -487,9 +506,9 @@ function syncTrackMediaPlayback(
       seekStudioMediaElementIfNeeded(media, plan.seekTo);
     }
     if (media.paused) {
-      startMedia(null, false);
+      return startMedia(null, false);
     }
-    return;
+    return already;
   }
 
   if (plan.enteredClip) {
@@ -500,15 +519,16 @@ function syncTrackMediaPlayback(
       runtime.sources.clear();
       runtime.sources.set(clip.id, { envelopeGain: runtime.envelopeGain });
       runtime.activeClipId = clip.id;
-      if (enterHandoff === "from-silence") {
-        // Stay silent until seeked + play() actually resolve for this generation.
+      const deferEnvelope = options.deferAudibleEnvelope === true;
+      if (enterHandoff === "from-silence" || deferEnvelope) {
+        // Stay silent until seeked + play() resolve, and until every audible
+        // track in this Play is ready when deferAudibleEnvelope is set.
         runtime.envelopeGain.gain.cancelScheduledValues(contextTime);
         runtime.envelopeGain.gain.setValueAtTime(0, contextTime);
         if (plan.seekTo != null) {
           seekStudioMediaElementIfNeeded(media, plan.seekTo);
         }
-        startMedia(clip, true);
-        return;
+        return startMedia(clip, true);
       }
       // Contiguous same-source seam: keep media rolling; flat or authored fade-in.
       if (
@@ -525,17 +545,18 @@ function syncTrackMediaPlayback(
         { enterHandoff, previous, next },
       );
       if (media.paused) {
-        startMedia(clip, false);
+        return startMedia(clip, false);
       }
-      return;
+      return already;
     }
   } else if (plan.seekTo != null) {
     seekStudioMediaElementIfNeeded(media, plan.seekTo);
   }
 
   if (media.paused) {
-    startMedia(null, false);
+    return startMedia(null, false);
   }
+  return already;
 }
 
 function disconnectTrackGraph(runtime: TrackRuntime) {
@@ -611,6 +632,8 @@ export function StudioAudioProvider({
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
   const playbackGenerationRef = useRef(0);
+  /** True from Play until every audible track has seeked; freezes the transport clock. */
+  const playbackStartupHoldRef = useRef(false);
   const replacementGenerationRef = useRef(new Map<string, number>());
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
@@ -843,6 +866,7 @@ export function StudioAudioProvider({
   }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
+    playbackStartupHoldRef.current = false;
     // Immediate mute+pause: a scheduled gain ramp cannot audibly finish after
     // mediaElement.pause(), so do not pretend this path is a soft de-click.
     const diagnostics = [
@@ -888,6 +912,9 @@ export function StudioAudioProvider({
   }, [updateAudioDebug]);
 
   const getPlaybackPosition = useCallback(() => {
+    if (playbackStartupHoldRef.current) {
+      return positionRef.current;
+    }
     const context = audioContextRef.current;
     if (!context || statusRef.current !== "playing") {
       return positionRef.current;
@@ -917,7 +944,13 @@ export function StudioAudioProvider({
   }, [cancelProgressLoop, setStatusValue, stopSources]);
 
   const bindMediaSync = useCallback(
-    (extra: { forceEnter?: boolean } = {}) => ({
+    (
+      extra: {
+        forceEnter?: boolean;
+        deferAudibleEnvelope?: boolean;
+        queueAudibleEnvelope?: (open: () => void) => void;
+      } = {},
+    ) => ({
       ...extra,
       generation: playbackGenerationRef.current,
       isGenerationCurrent: (generation: number) =>
@@ -981,6 +1014,7 @@ export function StudioAudioProvider({
         return;
       }
 
+      cancelProgressLoop();
       const position = clampStudioAudioPosition(
         requestedPosition,
         projectDurationRef.current,
@@ -989,6 +1023,14 @@ export function StudioAudioProvider({
         playbackGenerationRef.current,
       );
       playbackGenerationRef.current = generation;
+      playbackStartupHoldRef.current = true;
+      const envelopeOpeners: Array<() => void> = [];
+      const required: Array<Promise<{ started: boolean; stale: boolean }>> = [];
+      const audible = new Set(
+        listStudioTracksAudibleAtPlayhead(tracksRef.current, position),
+      );
+      // Context time here is only for the pre-start mute. The transport anchor
+      // is written later, when every audible track has actually started.
       const startAt = context.currentTime;
       for (const track of tracksRef.current) {
         const runtime = trackRuntimesRef.current.get(track.id);
@@ -997,24 +1039,91 @@ export function StudioAudioProvider({
         }
         // Every Play / playing-seek restart is a fresh enter: do not reuse a
         // stale activeClipId left by paused parking or a raced sync tick.
+        // play() runs synchronously inside sync so this loop still consumes
+        // the user gesture before the startup barrier awaits.
         runtime.activeClipId = null;
-        syncTrackMediaPlayback(runtime, track, position, true, startAt, bindMediaSync({
-          forceEnter: true,
-        }));
+        const ready = syncTrackMediaPlayback(
+          runtime,
+          track,
+          position,
+          true,
+          startAt,
+          bindMediaSync({
+            forceEnter: true,
+            deferAudibleEnvelope: audible.has(track.id),
+            queueAudibleEnvelope: audible.has(track.id)
+              ? (open) => {
+                  envelopeOpeners.push(open);
+                }
+              : undefined,
+          }),
+        );
+        if (audible.has(track.id)) {
+          required.push(ready);
+        }
       }
 
       if (!isStudioPlaybackGenerationCurrent(generation, playbackGenerationRef.current)) {
+        playbackStartupHoldRef.current = false;
         return;
       }
 
-      startedAtContextTimeRef.current = startAt;
-      startedAtPositionRef.current = position;
       positionRef.current = position;
       setCurrentTime(position);
+      // Playing before the barrier so Space/pause() can cancel the pending start.
+      // The clock and envelopes stay held until releaseStartup.
       setStatusValue("playing");
-      startProgressLoop();
+
+      const releaseStartup = () => {
+        if (
+          playbackGenerationRef.current !== generation ||
+          !playbackStartupHoldRef.current
+        ) {
+          return;
+        }
+        const now = audioContextRef.current?.currentTime ?? 0;
+        startedAtContextTimeRef.current = now;
+        startedAtPositionRef.current = position;
+        playbackStartupHoldRef.current = false;
+        for (const open of envelopeOpeners) {
+          open();
+        }
+        if (playbackGenerationRef.current !== generation) {
+          return;
+        }
+        startProgressLoop();
+      };
+
+      const abandonStartup = () => {
+        if (playbackGenerationRef.current !== generation) return;
+        playbackStartupHoldRef.current = false;
+        cancelProgressLoop();
+        stopSources();
+        setStatusValue(
+          position >= projectDurationRef.current ? "ready" : "paused",
+        );
+      };
+
+      void runStudioAudibleStartupBarrier({
+        generation,
+        isGenerationCurrent: (value) =>
+          isStudioPlaybackGenerationCurrent(
+            value,
+            playbackGenerationRef.current,
+          ),
+        pending: required,
+        onRelease: releaseStartup,
+        onStale: abandonStartup,
+        onNoneStarted: abandonStartup,
+      });
     },
-    [bindMediaSync, setStatusValue, startProgressLoop],
+    [
+      bindMediaSync,
+      cancelProgressLoop,
+      setStatusValue,
+      startProgressLoop,
+      stopSources,
+    ],
   );
 
   const playbackUrlStillReferenced = useCallback((

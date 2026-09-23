@@ -324,7 +324,7 @@ async function testProviderAndHydrationContracts() {
   // startSourcesAtPosition: disarm then forceEnter (Pause→seek→Play restart).
   assert.match(
     provider,
-    /runtime\.activeClipId = null;\s*syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
+    /runtime\.activeClipId = null;\s*(?:const\s+\w+\s*=\s*)?syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
   );
   assert.match(provider, /beginStudioMediaPlayback/);
   assert.match(provider, /seekStudioMediaElementIfNeeded/);
