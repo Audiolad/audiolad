@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon.ts";
+import { countExactNormalizedSeoPhrase } from "../src/lib/seo/primary-query-overuse.ts";
 import { isAuthorProductQualityReviewEnabled } from "../src/lib/seo/product-quality-review/beta.ts";
 import {
   buildProductQualityReviewFingerprint,
@@ -11,10 +12,14 @@ import {
 } from "../src/lib/seo/product-quality-review/fingerprint.ts";
 import {
   buildProductQualityReviewSystemPrompt,
+  buildProductQualityReviewUserPrompt,
   PRODUCT_QUALITY_REVIEW_JSON_SCHEMA,
 } from "../src/lib/seo/product-quality-review/prompt.ts";
 import { runProductQualityReviewModel } from "../src/lib/seo/product-quality-review/provider.ts";
-import { buildProductQualityReviewSignals } from "../src/lib/seo/product-quality-review/signals.ts";
+import {
+  buildProductQualityReviewSignals,
+  textHasPrimaryTheme,
+} from "../src/lib/seo/product-quality-review/signals.ts";
 import {
   PRODUCT_SEO_AI_MAX_OUTPUT_TOKENS,
   PRODUCT_SEO_AI_RESPONSES_URL,
@@ -34,6 +39,7 @@ import {
 } from "../src/lib/seo/product-quality-review/orchestrate.ts";
 import {
   DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+  NATURAL_THEME_COVERED_SUMMARY,
   reconcileProductQualityReviewResult,
 } from "../src/lib/seo/product-quality-review/reconcile.ts";
 import {
@@ -949,25 +955,28 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
 
 // T — green/yellow semantics otherwise preserved (no false stuffing)
 {
-  assert.equal(
-    reconcileProductQualityReviewResult(
-      {
-        status: "yellow",
-        summary: "Тема слабая.",
-        issues: [
-          {
-            severity: "warning",
-            field: "seoDescription",
-            message: "Основной запрос почти не отражён.",
-            recommendation:
-              "Добавьте основной поисковый запрос естественно в описание для поиска.",
-          },
-        ],
-        positiveNotes: [],
-      },
-      buildProductQualityReviewSignals(weakSeo),
-    ).status,
-    "yellow",
+  const weakReconciled = reconcileProductQualityReviewResult(
+    {
+      status: "yellow",
+      summary: "Тема слабая.",
+      issues: [
+        {
+          severity: "warning",
+          field: "seoDescription",
+          message: "Основной запрос почти не отражён.",
+          recommendation:
+            "Добавьте основной поисковый запрос естественно в описание для поиска.",
+        },
+      ],
+      positiveNotes: [],
+    },
+    buildProductQualityReviewSignals(weakSeo),
+  );
+  assert.equal(weakReconciled.status, "yellow");
+  assert.equal(weakReconciled.issues.length, 1);
+  assert.match(
+    weakReconciled.issues[0].recommendation,
+    /описание для поиска/i,
   );
   assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.green.title, "SEO в норме");
   assert.equal(PRODUCT_QUALITY_REVIEW_STATUS_COPY.yellow.title, "SEO слишком слабое");
@@ -987,6 +996,20 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   assert.match(systemPrompt, /Вопросы и ответы/);
   assert.doesNotMatch(systemPrompt, /\d+\s*%\s*=\s*red/i);
   assert.match(systemPrompt, /НЕ используй произвольные пороги keyword density/i);
+  assert.match(systemPrompt, /false НЕ значит, что темы нет/i);
+  assert.match(systemPrompt, /музыку/);
+  assert.match(systemPrompt, /само по себе НЕ делает вердикт YELLOW/);
+  assert.match(systemPrompt, /Много точных совпадений само по себе НЕ делает GREEN/);
+}
+
+{
+  const userPrompt = buildProductQualityReviewUserPrompt({
+    package: weakSeo,
+    signals: weakSignals,
+  });
+  assert.match(userPrompt, /false НЕ значит, что темы нет/);
+  assert.match(userPrompt, /музыка → музыку/);
+  assert.match(userPrompt, /не YELLOW/);
 }
 
 // No density / fixed occurrence quota verdicts in structural module
@@ -1016,6 +1039,14 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
     structuralSrc,
     /must NOT force material stuffing by itself/,
   );
+  const reconcileSrc = read("src/lib/seo/product-quality-review/reconcile.ts");
+  const signalsSrc = read("src/lib/seo/product-quality-review/signals.ts");
+  for (const src of [structuralSrc, reconcileSrc, signalsSrc]) {
+    assert.doesNotMatch(src, /exactPrimaryCount\s*>=\s*\d+/);
+    assert.doesNotMatch(src, /unique\.length\s*>=\s*\d+/);
+    assert.doesNotMatch(src, /primaryExactByField\.total\s*>=\s*\d+/);
+  }
+  assert.match(reconcileSrc, /Do not promote GREEN from exactPrimaryCount/);
 }
 
 // FALSE-RED: long natural description with 4 spaced exact primaries → NOT material
@@ -1107,5 +1138,208 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   );
 }
 
+
+// FALSE-YELLOW: live-like «музыка для спа-процедур» — morphology is not absence
+{
+  const primary = "музыка для спа-процедур";
+  assert.equal(
+    countExactNormalizedSeoPhrase(
+      "Откройте музыку для спа-процедур во время массажа.",
+      primary,
+    ),
+    0,
+  );
+  assert.equal(
+    textHasPrimaryTheme(
+      "Откройте музыку для спа-процедур во время массажа.",
+      primary,
+    ),
+    true,
+  );
+  assert.equal(
+    textHasPrimaryTheme(
+      "Когда лучше включать музыку для спа-процедур?",
+      primary,
+    ),
+    true,
+  );
+  assert.equal(
+    textHasPrimaryTheme("Спокойные звуки для отдыха.", primary),
+    false,
+  );
+  assert.equal(
+    textHasPrimaryTheme(
+      "Музыку включили в зале, а процедуры идут отдельно от спа.",
+      primary,
+    ),
+    false,
+  );
+
+  const spaPkg = basePackage({
+    title: "Музыка для спа-процедур",
+    subtitle: "Музыка для спа-процедур: спокойный фон для массажа и отдыха",
+    description:
+      "Музыка для спа-процедур помогает создать мягкую атмосферу во время массажа и отдыха. Спокойные тембры поддерживают расслабление, не отвлекая от процедуры. Можно включить этот фон в кабинете или дома, когда хочется тишины и ровного ритма.",
+    seoPrimaryQuery: primary,
+    seoSecondaryQueries: ["спокойная музыка для массажа"],
+    seoTitle: "Музыка для спа-процедур – слушать онлайн | АудиоЛад",
+    seoDescription:
+      "Музыка для спа-процедур: спокойный фон для массажа, ухода за лицом и отдыха. Слушайте онлайн на АудиоЛад.",
+    usageItems: [
+      "Откройте музыку для спа-процедур во время массажа.",
+      "Оставьте спокойную музыку для массажа, пока идёт уход за лицом.",
+      "Включите трек в перерыве, чтобы вернуть ровное дыхание.",
+    ],
+    faqItems: [
+      {
+        question: "Когда лучше включать музыку для спа-процедур?",
+        answer: "В начале сеанса, чтобы кабинет сразу звучал спокойно.",
+      },
+      {
+        question: "Где слушать музыку для спа-процедур онлайн?",
+        answer: "На АудиоЛад — в браузере, без отдельной установки.",
+      },
+    ],
+  });
+  const spaSignals = buildProductQualityReviewSignals(spaPkg);
+  assert.equal(spaSignals.primaryPresentIn.title, true);
+  assert.equal(spaSignals.primaryPresentIn.subtitle, true);
+  assert.equal(spaSignals.primaryPresentIn.description, true);
+  assert.equal(spaSignals.primaryPresentIn.seoTitle, true);
+  assert.equal(spaSignals.primaryPresentIn.seoDescription, true);
+  assert.equal(spaSignals.primaryPresentIn.usage, false);
+  assert.equal(spaSignals.primaryPresentIn.faq, false);
+  assert.equal(spaSignals.primaryThemePresentIn.description, true);
+  assert.equal(spaSignals.primaryThemePresentIn.seoDescription, true);
+  assert.equal(spaSignals.primaryThemePresentIn.usage, true);
+  assert.equal(spaSignals.primaryThemePresentIn.faq, true);
+  assert.equal(spaSignals.structuralStuffing.material, false);
+
+  const spaYellow = {
+    status: "yellow",
+    summary: "Поисковая тема выражена недостаточно.",
+    issues: [
+      {
+        severity: "warning",
+        field: "description",
+        message: "В описании продукта не хватает основного поискового запроса.",
+        recommendation: "Добавьте основной поисковый запрос в описание продукта.",
+      },
+      {
+        severity: "warning",
+        field: "seoDescription",
+        message: "В описании для поиска нет основного поискового запроса.",
+        recommendation:
+          "Добавьте основной поисковый запрос в описание для поиска.",
+      },
+      {
+        severity: "warning",
+        field: "usage",
+        message:
+          "В блоке «Когда слушать» нет точной фразы основного запроса.",
+        recommendation:
+          "Основной поисковый запрос можно естественно использовать в одном из пунктов блока «Когда слушать».",
+      },
+      {
+        severity: "warning",
+        field: "faq",
+        message: "В блоке «Вопросы и ответы» нет точной фразы.",
+        recommendation:
+          "Добавьте основной поисковый запрос в блок «Вопросы и ответы».",
+      },
+    ],
+    positiveNotes: ["Название совпадает с темой."],
+  };
+
+  const spaReconciled = reconcileProductQualityReviewResult(
+    spaYellow,
+    spaSignals,
+  );
+  assert.equal(spaReconciled.status, "green");
+  assert.equal(spaReconciled.summary, NATURAL_THEME_COVERED_SUMMARY);
+  assert.equal(spaReconciled.issues.length, 0);
+  assert.doesNotMatch(
+    spaReconciled.issues.map((issue) => issue.recommendation).join("\n"),
+    /добавьте основной поисковый запрос в описание/i,
+  );
+
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, yandexAlt(JSON.stringify(spaYellow))),
+  ]);
+  const canonical = await reviewProductTextQualityForRequest(
+    { authorId: AURAFON_AUTHOR_ID, ...spaPkg },
+    { fetchImpl, env: yandexEnv },
+  );
+  assert.equal(canonical.ok, true);
+  assert.equal(canonical.result.status, "green");
+  assert.equal(canonical.result.issues.length, 0);
+  assert.equal(canonical.result.summary, NATURAL_THEME_COVERED_SUMMARY);
+
+  // Morphology-only description still blocks «add primary to description».
+  const morphDescription = basePackage({
+    title: "Музыка для спа-процедур",
+    subtitle: "Спокойный фон для кабинета",
+    description:
+      "Откройте музыку для спа-процедур дома: мягкий фон помогает расслабиться во время отдыха и не мешает процедуре.",
+    seoPrimaryQuery: primary,
+    seoSecondaryQueries: [],
+    seoTitle: "Музыка для спа-процедур – слушать онлайн",
+    seoDescription:
+      "Музыка для спа-процедур: спокойный фон для массажа и отдыха.",
+    usageItems: ["Во время массажа", "После сеанса", "В тишине кабинета"],
+    faqItems: [
+      {
+        question: "Подойдёт ли для дома?",
+        answer: "Да, как спокойный фон.",
+      },
+    ],
+  });
+  const morphSignals = buildProductQualityReviewSignals(morphDescription);
+  assert.equal(morphSignals.primaryPresentIn.description, false);
+  assert.equal(morphSignals.primaryThemePresentIn.description, true);
+  assert.equal(morphSignals.primaryPresentIn.seoDescription, true);
+  assert.equal(morphSignals.structuralStuffing.material, false);
+  const morphReconciled = reconcileProductQualityReviewResult(
+    {
+      status: "yellow",
+      summary: "В описании нет запроса.",
+      issues: [
+        {
+          severity: "warning",
+          field: "description",
+          message: "Описание продукта не содержит основной поисковый запрос.",
+          recommendation:
+            "Добавьте основной поисковый запрос в описание продукта.",
+        },
+      ],
+      positiveNotes: [],
+    },
+    morphSignals,
+  );
+  assert.equal(morphReconciled.status, "green");
+  assert.equal(morphReconciled.issues.length, 0);
+
+  // Covered theme must not auto-GREEN when a real gap remains.
+  const secondaryGap = reconcileProductQualityReviewResult(
+    {
+      status: "yellow",
+      summary: "Дополнительный запрос не использован.",
+      issues: [
+        {
+          severity: "warning",
+          field: "usage",
+          message: "Дополнительный запрос не отражён в тексте.",
+          recommendation:
+            "Дополнительный запрос «спокойная музыка для массажа» можно естественно использовать в одном из пунктов блока «Когда слушать».",
+        },
+      ],
+      positiveNotes: [],
+    },
+    spaSignals,
+  );
+  assert.equal(secondaryGap.status, "yellow");
+  assert.equal(secondaryGap.issues.length, 1);
+  assert.match(secondaryGap.issues[0].recommendation, /Дополнительный запрос/);
+}
 
 console.log("product-seo-quality-review-unit: ok");
