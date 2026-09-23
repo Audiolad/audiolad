@@ -23,7 +23,7 @@ function formatMonthlyFrequency(value: number | null) {
 }
 
 /**
- * Pre-create SEO query selection for Aurafon closed beta.
+ * Pre-create SEO query selection for Aurafon and for any music release.
  * Not a wizard step — sits between type chooser and AuthorProductForm.
  */
 export default function AuthorProductSeoQueryStep({

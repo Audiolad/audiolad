@@ -1,4 +1,4 @@
-/** Aurafon music-wizard helpers for the credited audio-product author field. */
+/** Music-wizard helpers for the credited audio-product author field. */
 
 export const AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE = "Укажите автора музыки.";
 

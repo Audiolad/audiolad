@@ -105,7 +105,7 @@ const loader = read(
   "src/lib/seo-queries/load-seo-reservation-product-create-context.ts",
 );
 assert.match(loader, /import "server-only"/);
-assert.match(loader, /isAuthorSeoDiscoveryEnabled/);
+assert.match(loader, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(loader, /seo_query_reservations/);
 assert.match(loader, /author_id !== input\.authorId/);
 assert.match(loader, /code:\s*"expired"/);

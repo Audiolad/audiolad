@@ -41,6 +41,11 @@ export function mapSeoReservationLinkError(code: string | null | undefined): {
         message:
           "Связать запрос можно только с черновиком до отправки на модерацию.",
       };
+    case "seo_reservation_product_not_music":
+      return {
+        code,
+        message: "Связать запрос можно только с музыкальным продуктом.",
+      };
     case "seo_reservation_not_linkable":
       return {
         code,
@@ -64,6 +69,7 @@ export async function linkSeoReservationToProduct(input: {
   authorId: string;
   reservationId: string;
   productId: string;
+  publicationClass?: string | null;
 }): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
   const response = await fetch("/api/author/seo-reservations", {
     method: "PATCH",
@@ -72,6 +78,9 @@ export async function linkSeoReservationToProduct(input: {
       author_id: input.authorId,
       reservation_id: input.reservationId,
       product_id: input.productId,
+      ...(input.publicationClass
+        ? { publication_class: input.publicationClass }
+        : {}),
     }),
   });
 

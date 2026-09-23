@@ -5,18 +5,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  AURAFON_CATALOG_SECTION_FIELD_LABEL,
-  AURAFON_CATALOG_SECTION_OPTIONS,
-  applyAurafonCatalogSectionSuggestion,
-  aurafonCatalogSectionValues,
-  buildAurafonCatalogSectionSaveField,
+  CATALOG_SECTION_FIELD_LABEL,
+  CATALOG_SECTION_FIELD_OPTIONS,
+  applyCatalogSectionSuggestion,
+  catalogSectionFieldValues,
+  buildCatalogSectionSaveField,
   catalogSectionColumnForInsert,
   catalogSectionForProductForm,
-  isAurafonCatalogSectionFieldEnabled,
-  resolveAurafonCatalogSectionPatch,
-  suggestAurafonCatalogSection,
-  suggestAurafonCatalogSectionFromFormFields,
-} from "../src/lib/author-products/aurafon-catalog-section.ts";
+  isCatalogSectionFieldEnabled,
+  resolveCatalogSectionPatch,
+  suggestCatalogSection,
+  suggestCatalogSectionFromFormFields,
+} from "../src/lib/author-products/catalog-section-field.ts";
 import { productDetailToFormSnapshot } from "../src/lib/author-products/form-merge.ts";
 import { PRODUCT_KIND } from "../src/lib/author-products/product-kind.ts";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon.ts";
@@ -30,47 +30,82 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
 const OTHER = "00000000-0000-4000-8000-000000000099";
 
-assert.equal(AURAFON_CATALOG_SECTION_FIELD_LABEL, "Категория в каталоге");
+assert.equal(CATALOG_SECTION_FIELD_LABEL, "Категория в каталоге");
 
-// 1. Field is enabled only for the Aurafon author workspace.
-assert.equal(isAurafonCatalogSectionFieldEnabled(AURAFON_AUTHOR_ID), true);
+// 1. Aurafon keeps the field on every type. Other authors only for music/release.
+assert.equal(isCatalogSectionFieldEnabled({ authorId: AURAFON_AUTHOR_ID }), true);
 assert.equal(
-  isAurafonCatalogSectionFieldEnabled(`  ${AURAFON_AUTHOR_ID}  `),
+  isCatalogSectionFieldEnabled({ authorId: `  ${AURAFON_AUTHOR_ID}  ` }),
   true,
 );
-assert.equal(isAurafonCatalogSectionFieldEnabled(OTHER), false);
-assert.equal(isAurafonCatalogSectionFieldEnabled(null), false);
-assert.equal(isAurafonCatalogSectionFieldEnabled(undefined), false);
-assert.equal(isAurafonCatalogSectionFieldEnabled(""), false);
-assert.equal(isAurafonCatalogSectionFieldEnabled("   "), false);
+assert.equal(
+  isCatalogSectionFieldEnabled({
+    authorId: AURAFON_AUTHOR_ID,
+    productKind: "practice",
+    publicationClass: "practice",
+  }),
+  true,
+);
+assert.equal(isCatalogSectionFieldEnabled({ authorId: OTHER }), false);
+assert.equal(
+  isCatalogSectionFieldEnabled({
+    authorId: OTHER,
+    productKind: "practice",
+    publicationClass: "practice",
+  }),
+  false,
+);
+assert.equal(
+  isCatalogSectionFieldEnabled({
+    authorId: OTHER,
+    productKind: "practice",
+    publicationClass: "course",
+  }),
+  false,
+);
+assert.equal(
+  isCatalogSectionFieldEnabled({ authorId: OTHER, productKind: "music" }),
+  true,
+);
+assert.equal(
+  isCatalogSectionFieldEnabled({
+    authorId: OTHER,
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(isCatalogSectionFieldEnabled({ authorId: null }), false);
+assert.equal(isCatalogSectionFieldEnabled({ authorId: undefined }), false);
+assert.equal(isCatalogSectionFieldEnabled({ authorId: "" }), false);
+assert.equal(isCatalogSectionFieldEnabled({ authorId: "   " }), false);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(
   form,
-  /isAurafonCatalogSectionFieldEnabled\(form\.authorId\) \? \([\s\S]*?data-aurafon-catalog-section=""[\s\S]*?AURAFON_CATALOG_SECTION_FIELD_LABEL[\s\S]*?name="catalog_section"[\s\S]*?AURAFON_CATALOG_SECTION_OPTIONS\.map/,
+  /isCatalogSectionFieldEnabled\(\{[\s\S]*?authorId: form\.authorId,[\s\S]*?productKind: form\.productKind,[\s\S]*?publicationClass: form\.publicationClass,[\s\S]*?\}\) \? \([\s\S]*?data-catalog-section=""[\s\S]*?CATALOG_SECTION_FIELD_LABEL[\s\S]*?name="catalog_section"[\s\S]*?CATALOG_SECTION_FIELD_OPTIONS\.map/,
 );
 const formatAt = form.indexOf("Публичный формат");
-const fieldAt = form.indexOf("data-aurafon-catalog-section");
+const fieldAt = form.indexOf("data-catalog-section");
 const step3At = form.indexOf("showWizardStep(3) ? (");
 const secondStep1At = form.indexOf("showWizardStep(1)", step3At);
 assert.ok(formatAt > 0 && fieldAt > formatAt);
 assert.ok(secondStep1At > step3At && fieldAt > secondStep1At);
-assert.equal(form.split("data-aurafon-catalog-section").length - 1, 1);
+assert.equal(form.split("data-catalog-section").length - 1, 1);
 
 // 2. Exactly the five existing catalog_section values, with author labels.
-assert.equal(AURAFON_CATALOG_SECTION_OPTIONS.length, 5);
+assert.equal(CATALOG_SECTION_FIELD_OPTIONS.length, 5);
 assert.equal(CATALOG_SECTIONS.length, 5);
 assert.deepEqual(
-  AURAFON_CATALOG_SECTION_OPTIONS.map((option) => option.value),
+  CATALOG_SECTION_FIELD_OPTIONS.map((option) => option.value),
   ["meditations", "music", "education", "stories", "books"],
 );
 assert.deepEqual(
-  [...aurafonCatalogSectionValues()].sort(),
+  [...catalogSectionFieldValues()].sort(),
   [...CATALOG_SECTIONS].sort(),
 );
 assert.deepEqual(
   Object.fromEntries(
-    AURAFON_CATALOG_SECTION_OPTIONS.map((option) => [option.value, option.label]),
+    CATALOG_SECTION_FIELD_OPTIONS.map((option) => [option.value, option.label]),
   ),
   {
     meditations: "Практики",
@@ -80,7 +115,7 @@ assert.deepEqual(
     books: "Книги",
   },
 );
-assert.equal(new Set(AURAFON_CATALOG_SECTION_OPTIONS.map((option) => option.value)).size, 5);
+assert.equal(new Set(CATALOG_SECTION_FIELD_OPTIONS.map((option) => option.value)).size, 5);
 assert.equal(CATALOG_SECTION_LABELS.meditations, "Медитации");
 assert.equal(PUBLIC_CATALOG_SECTION_CARDS.length, 4);
 assert.equal(
@@ -101,7 +136,7 @@ for (const value of ["music", "meditations", "education", "stories", "books"]) {
 
 // 3. Create, save, and edit persistence of catalog_section.
 assert.deepEqual(
-  buildAurafonCatalogSectionSaveField({
+  buildCatalogSectionSaveField({
     authorId: AURAFON_AUTHOR_ID,
     catalogSection: "books",
   }),
@@ -112,7 +147,7 @@ assert.deepEqual(catalogSectionColumnForInsert("stories"), {
 });
 assert.deepEqual(catalogSectionColumnForInsert(null), {});
 assert.deepEqual(
-  resolveAurafonCatalogSectionPatch({
+  resolveCatalogSectionPatch({
     authorId: AURAFON_AUTHOR_ID,
     present: true,
     catalogSection: "education",
@@ -120,7 +155,7 @@ assert.deepEqual(
   { action: "apply", catalogSection: "education" },
 );
 assert.deepEqual(
-  resolveAurafonCatalogSectionPatch({
+  resolveCatalogSectionPatch({
     authorId: AURAFON_AUTHOR_ID,
     present: false,
     catalogSection: "education",
@@ -128,7 +163,7 @@ assert.deepEqual(
   { action: "omit" },
 );
 assert.deepEqual(
-  resolveAurafonCatalogSectionPatch({
+  resolveCatalogSectionPatch({
     authorId: AURAFON_AUTHOR_ID,
     present: true,
     catalogSection: "podcasts",
@@ -136,15 +171,15 @@ assert.deepEqual(
   { action: "reject", error: "invalid_catalog_section" },
 );
 
-assert.match(form, /buildAurafonCatalogSectionSaveField\(\{[\s\S]*?authorId: form\.authorId,[\s\S]*?catalogSection: form\.catalogSection,[\s\S]*?\}\),/);
-assert.equal(form.split("buildAurafonCatalogSectionSaveField(").length - 1, 2);
+assert.match(form, /buildCatalogSectionSaveField\(\{[\s\S]*?authorId: form\.authorId,[\s\S]*?catalogSection: form\.catalogSection,[\s\S]*?\}\),/);
+assert.equal(form.split("buildCatalogSectionSaveField(").length - 1, 2);
 
 const createRoute = read("src/app/api/author/products/route.ts");
 const updateRoute = read("src/app/api/author/products/[id]/route.ts");
 const products = read("src/lib/author-products/products.ts");
-assert.match(createRoute, /resolveAurafonCatalogSectionPatch/);
+assert.match(createRoute, /resolveCatalogSectionPatch/);
 assert.match(createRoute, /catalogSection:\s*\n?\s*catalogSectionPatch\.action === "apply"/);
-assert.match(updateRoute, /resolveAurafonCatalogSectionPatch/);
+assert.match(updateRoute, /resolveCatalogSectionPatch/);
 assert.match(updateRoute, /updates\.catalog_section = catalogSectionPatch\.catalogSection/);
 assert.match(products, /catalog_section,/);
 assert.match(products, /catalogSectionColumnForInsert\(input\.catalogSection\)/);
@@ -233,9 +268,10 @@ const edited = productDetailToFormSnapshot({
 });
 assert.equal(edited.catalogSection, "music");
 
-// 4. Non-Aurafon authors do not see or persist the field.
+// 4. Non-music products of other authors do not persist the field.
+// Music / release does persist, including an author override.
 assert.deepEqual(
-  buildAurafonCatalogSectionSaveField({
+  buildCatalogSectionSaveField({
     authorId: OTHER,
     catalogSection: "books",
   }),
@@ -243,7 +279,7 @@ assert.deepEqual(
 );
 assert.equal(
   Object.prototype.hasOwnProperty.call(
-    buildAurafonCatalogSectionSaveField({
+    buildCatalogSectionSaveField({
       authorId: OTHER,
       catalogSection: "books",
     }),
@@ -252,7 +288,7 @@ assert.equal(
   false,
 );
 assert.deepEqual(
-  resolveAurafonCatalogSectionPatch({
+  resolveCatalogSectionPatch({
     authorId: OTHER,
     present: true,
     catalogSection: "books",
@@ -260,13 +296,64 @@ assert.deepEqual(
   { action: "omit" },
 );
 assert.deepEqual(
-  resolveAurafonCatalogSectionPatch({
+  resolveCatalogSectionPatch({
     authorId: OTHER,
     present: true,
     catalogSection: "not-a-section",
   }),
   { action: "omit" },
 );
+assert.deepEqual(
+  resolveCatalogSectionPatch({
+    authorId: OTHER,
+    productKind: "practice",
+    publicationClass: "course",
+    present: true,
+    catalogSection: "books",
+  }),
+  { action: "omit" },
+);
+assert.deepEqual(
+  buildCatalogSectionSaveField({
+    authorId: OTHER,
+    productKind: "music",
+    publicationClass: "release",
+    catalogSection: "education",
+  }),
+  { catalog_section: "education" },
+);
+assert.deepEqual(
+  resolveCatalogSectionPatch({
+    authorId: OTHER,
+    productKind: "music",
+    publicationClass: "release",
+    present: true,
+    catalogSection: "stories",
+  }),
+  { action: "apply", catalogSection: "stories" },
+);
+assert.deepEqual(
+  resolveCatalogSectionPatch({
+    authorId: OTHER,
+    publicationClass: "release",
+    present: true,
+    catalogSection: "music",
+  }),
+  { action: "apply", catalogSection: "music" },
+);
+assert.deepEqual(
+  resolveCatalogSectionPatch({
+    authorId: OTHER,
+    productKind: "music",
+    present: true,
+    catalogSection: "not-a-section",
+  }),
+  { action: "reject", error: "invalid_catalog_section" },
+);
+assert.match(createRoute, /productKind: classification\.value\.productKind/);
+assert.match(createRoute, /publicationClass: classification\.value\.publicationClass/);
+assert.match(updateRoute, /productKind: nextProductKind/);
+assert.match(updateRoute, /publicationClass: nextPublicationClass/);
 
 const adminActions = read("src/app/(platform)/admin/catalog-sections/actions.ts");
 const adminPage = read("src/app/(platform)/admin/catalog-sections/page.tsx");
@@ -292,11 +379,11 @@ const suggestions = [
 ];
 
 for (const [input, expected] of suggestions) {
-  assert.equal(suggestAurafonCatalogSection(input), expected, JSON.stringify(input));
+  assert.equal(suggestCatalogSection(input), expected, JSON.stringify(input));
 }
 
 assert.equal(
-  suggestAurafonCatalogSectionFromFormFields({
+  suggestCatalogSectionFromFormFields({
     productKind: "practice",
     publicationClass: "practice",
     formatPreset: "Лекция",
@@ -305,7 +392,7 @@ assert.equal(
   "education",
 );
 
-const overridden = applyAurafonCatalogSectionSuggestion({
+const overridden = applyCatalogSectionSuggestion({
   overridden: true,
   current: "books",
   productKind: "practice",
@@ -315,7 +402,7 @@ const overridden = applyAurafonCatalogSectionSuggestion({
 });
 assert.equal(overridden, "books");
 assert.deepEqual(
-  buildAurafonCatalogSectionSaveField({
+  buildCatalogSectionSaveField({
     authorId: AURAFON_AUTHOR_ID,
     catalogSection: overridden,
   }),
@@ -332,7 +419,7 @@ assert.match(
   /mergeFormWithCatalogSuggestion\(current, \{[\s\S]*?formatPreset: value/,
 );
 
-const suggestedAgain = applyAurafonCatalogSectionSuggestion({
+const suggestedAgain = applyCatalogSectionSuggestion({
   overridden: false,
   current: "books",
   productKind: "practice",

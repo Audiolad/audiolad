@@ -54,6 +54,10 @@ export function parseProductQualityReviewRequest(
     typeof raw.description === "string" ? raw.description.trim() : "";
   const productKind =
     typeof raw.productKind === "string" ? raw.productKind.trim() : "";
+  const publicationClass =
+    typeof raw.publicationClass === "string"
+      ? raw.publicationClass.trim()
+      : "";
   const seoTitle = typeof raw.seoTitle === "string" ? raw.seoTitle.trim() : "";
   const seoDescription =
     typeof raw.seoDescription === "string" ? raw.seoDescription.trim() : "";
@@ -83,6 +87,7 @@ export function parseProductQualityReviewRequest(
       subtitle,
       description,
       productKind,
+      publicationClass,
       seoPrimaryQuery,
       seoSecondaryQueries,
       seoTitle,

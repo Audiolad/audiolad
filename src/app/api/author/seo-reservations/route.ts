@@ -4,9 +4,25 @@ import {
   handleAuthorRouteError,
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
+import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isSeoReservationProductLinkAllowed } from "@/lib/seo-queries/reservation-product-link-gate";
 
 function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
+}
+
+function seoDiscoveryDisabledResponse() {
+  return NextResponse.json(
+    { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+    { status: 403 },
+  );
+}
+
+function musicCreateSeoDiscoveryAllowed(body: Record<string, unknown>): boolean {
+  return isMusicCreateSeoDiscoveryEnabled({
+    authorId: readString(body, "author_id"),
+    publicationClass: readString(body, "publication_class"),
+  });
 }
 
 function mapReservationError(error: unknown) {
@@ -38,7 +54,25 @@ function mapReservationError(error: unknown) {
   if (message.includes("seo_reservation_product_not_linkable")) {
     return { error: "seo_reservation_product_not_linkable", message: "Связать запрос можно только с черновиком до отправки на модерацию.", status: 409 };
   }
+  if (message.includes("seo_reservation_product_not_music")) {
+    return {
+      error: "seo_reservation_product_not_music",
+      message: "Связать запрос можно только с музыкальным продуктом.",
+      status: 403,
+    };
+  }
   return null;
+}
+
+function seoReservationProductNotMusicResponse() {
+  return NextResponse.json(
+    {
+      error: "seo_reservation_product_not_music",
+      code: "seo_reservation_product_not_music",
+      message: "Связать запрос можно только с музыкальным продуктом.",
+    },
+    { status: 403 },
+  );
 }
 
 export async function POST(request: Request) {
@@ -47,6 +81,7 @@ export async function POST(request: Request) {
     const authorId = readString(body, "author_id");
     const queryId = readString(body, "query_id");
     if (!authorId || !queryId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("reserve_seo_query", {
@@ -69,6 +104,7 @@ export async function DELETE(request: Request) {
     const authorId = readString(body, "author_id");
     const reservationId = readString(body, "reservation_id");
     if (!authorId || !reservationId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("release_seo_query_reservation", {
@@ -95,6 +131,33 @@ export async function PATCH(request: Request) {
     }
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { data: practice, error: practiceError } = await supabase
+      .from("practices")
+      .select("id, author_id, product_kind, publication_class, deleted_at")
+      .eq("id", productId)
+      .maybeSingle();
+
+    if (
+      practiceError
+      || !practice?.id
+      || practice.deleted_at
+      || typeof practice.author_id !== "string"
+    ) {
+      return NextResponse.json({ error: "practice_not_found" }, { status: 404 });
+    }
+
+    // Body publication_class is not proof. The loaded practices row is.
+    if (
+      !isSeoReservationProductLinkAllowed({
+        authorId: practice.author_id,
+        productKind: typeof practice.product_kind === "string" ? practice.product_kind : null,
+        publicationClass:
+          typeof practice.publication_class === "string" ? practice.publication_class : null,
+      })
+    ) {
+      return seoReservationProductNotMusicResponse();
+    }
+
     const { data, error } = await supabase.rpc("link_seo_reservation_to_product", {
       p_reservation_id: reservationId,
       p_product_id: productId,

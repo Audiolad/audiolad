@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
 
 export type SeoReservationProductCreateContext = SeoReservationProductFormContext;
@@ -37,6 +37,7 @@ export async function loadSeoReservationProductCreateContext(
   input: {
     reservationId: string | null | undefined;
     authorId: string;
+    publicationClass?: string | null;
   },
 ): Promise<SeoReservationProductCreateLoadResult> {
   const reservationId =
@@ -50,7 +51,12 @@ export async function loadSeoReservationProductCreateContext(
     };
   }
 
-  if (!isAuthorSeoDiscoveryEnabled(input.authorId)) {
+  if (
+    !isMusicCreateSeoDiscoveryEnabled({
+      authorId: input.authorId,
+      publicationClass: input.publicationClass,
+    })
+  ) {
     return {
       ok: false,
       code: "beta_disabled",

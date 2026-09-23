@@ -358,6 +358,44 @@ assert.doesNotMatch(section, /reviewStatus[\s\S]{0,80}publish/i);
 // M — beta gate
 assert.equal(isAuthorProductQualityReviewEnabled(AURAFON_AUTHOR_ID), true);
 assert.equal(isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000"), false);
+assert.equal(
+  isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000", {
+    productKind: "music",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000", {
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorProductQualityReviewEnabled(AURAFON_AUTHOR_ID, {
+    productKind: "practice",
+    publicationClass: "course",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000", {
+    productKind: "practice",
+    publicationClass: "practice",
+  }),
+  false,
+);
+assert.equal(
+  isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000", {
+    publicationClass: "audiobook",
+  }),
+  false,
+);
+assert.equal(
+  isAuthorProductQualityReviewEnabled("00000000-0000-4000-8000-000000000000", {
+    publicationClass: "post",
+  }),
+  false,
+);
 const route = read("src/app/api/author/seo/product-quality-review/route.ts");
 assert.match(route, /isAuthorProductQualityReviewEnabled/);
 assert.match(route, /product_quality_review_beta_disabled/);

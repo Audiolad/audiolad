@@ -93,15 +93,15 @@ assert.doesNotMatch(
 
 // --- Create page orchestration (I) ---
 assert.match(createPage, /AuthorProductSeoQueryStep/);
-assert.match(createPage, /isAuthorSeoDiscoveryEnabled/);
+assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(createPage, /isSeoQuerySkipParam/);
 assert.match(createPage, /listSeoOpportunitiesForAuthor/);
 assert.match(createPage, /AuthorCreateWizard/);
 assert.match(createPage, /if \(!publicationClass\)/);
-assert.match(createPage, /seoBeta && !hasValidReservation && !seoQuerySkip/);
+assert.match(createPage, /seoQueryStepEnabled && !hasValidReservation && !seoQuerySkip/);
 assert.match(createPage, /AuthorProductForm/);
 assert.match(createPage, /initialSeoReservationContext/);
-assert.match(createPage, /formBackHref = seoBeta \? queryStepHref : typeChooserHref/);
+assert.match(createPage, /formBackHref = seoQueryStepEnabled \? queryStepHref : typeChooserHref/);
 assert.match(createPage, /internalBackHref=\{typeChooserHref\}/);
 
 // --- Query step structure ---

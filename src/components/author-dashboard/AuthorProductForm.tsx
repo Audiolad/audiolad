@@ -62,16 +62,16 @@ import {
   PRODUCT_WIZARD_STEP_COUNT,
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
-import { isAurafonMusicWizard } from "@/lib/author-products/aurafon-music-wizard";
+import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
 import {
-  AURAFON_CATALOG_SECTION_FIELD_LABEL,
-  AURAFON_CATALOG_SECTION_OPTIONS,
-  buildAurafonCatalogSectionSaveField,
-  isAurafonCatalogSectionFieldEnabled,
-  readStoredAurafonCatalogSection,
-  suggestAurafonCatalogSection,
-  suggestAurafonCatalogSectionFromFormFields,
-} from "@/lib/author-products/aurafon-catalog-section";
+  CATALOG_SECTION_FIELD_LABEL,
+  CATALOG_SECTION_FIELD_OPTIONS,
+  buildCatalogSectionSaveField,
+  isCatalogSectionFieldEnabled,
+  readStoredCatalogSection,
+  suggestCatalogSection,
+  suggestCatalogSectionFromFormFields,
+} from "@/lib/author-products/catalog-section-field";
 import {
   isCatalogSection,
   type CatalogSection,
@@ -82,7 +82,7 @@ import {
   AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
   hasAudioProductAuthor,
 } from "@/lib/author-products/audio-product-author";
-import { validateMusicTrackTitleForAurafonWizard } from "@/lib/author-products/music-track-title";
+import { validateMusicTrackTitleCyrillic } from "@/lib/author-products/music-track-title";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
   AUDIO_POST_CUSTOM_TYPE_LABEL,
@@ -558,7 +558,7 @@ function buildInitialForm(
     price: 99,
     isCatalogListed: true,
     catalogVisibility: CATALOG_VISIBILITY.LISTED,
-    catalogSection: suggestAurafonCatalogSection({
+    catalogSection: suggestCatalogSection({
       productKind: created.productKind,
       publicationClass: created.publicationClass,
       format:
@@ -705,8 +705,10 @@ function buildProductSavePayload(
         : form.productKind === PRODUCT_KIND.AUDIO_POST
           ? resolveAudioPostFormatForSave(form.formatPreset, form.customFormat)
           : resolveFormatForStorage(form.formatPreset, form.customFormat),
-    ...buildAurafonCatalogSectionSaveField({
+    ...buildCatalogSectionSaveField({
       authorId: form.authorId,
+      productKind: form.productKind,
+      publicationClass: form.publicationClass,
       catalogSection: form.catalogSection,
     }),
     is_free:
@@ -770,7 +772,7 @@ export default function AuthorProductForm({
   const [catalogSectionOverridden, setCatalogSectionOverridden] = useState(
     () =>
       mode === "edit" &&
-      readStoredAurafonCatalogSection(
+      readStoredCatalogSection(
         initialProduct?.practice.catalog_section,
       ) !== null,
   );
@@ -781,7 +783,11 @@ export default function AuthorProductForm({
     const next = { ...current, ...patch };
 
     if (
-      !isAurafonCatalogSectionFieldEnabled(next.authorId) ||
+      !isCatalogSectionFieldEnabled({
+        authorId: next.authorId,
+        productKind: next.productKind,
+        publicationClass: next.publicationClass,
+      }) ||
       catalogSectionOverridden
     ) {
       return next;
@@ -789,7 +795,7 @@ export default function AuthorProductForm({
 
     return {
       ...next,
-      catalogSection: suggestAurafonCatalogSectionFromFormFields({
+      catalogSection: suggestCatalogSectionFromFormFields({
         productKind: next.productKind,
         publicationClass: next.publicationClass,
         formatPreset: next.formatPreset,
@@ -1189,7 +1195,13 @@ export default function AuthorProductForm({
   const canBypassProductModeration =
     selectedAuthor?.canBypassProductModeration === true;
 
-  const wizardEnabled = isAuthorProductWizardEnabled(form.authorId);
+  const musicProductWizard = isMusicProductWizardEnabled({
+    authorId: form.authorId,
+    productKind: form.productKind,
+    publicationClass: form.publicationClass,
+  });
+  const wizardEnabled =
+    isAuthorProductWizardEnabled(form.authorId) || musicProductWizard;
   const publishedProductStatus =
     initialProduct?.practice.status === "published";
   const hasRelationalPrimarySeoQuery = Boolean(
@@ -1202,10 +1214,6 @@ export default function AuthorProductForm({
     isAuthorSeoDiscoveryEnabled(form.authorId) &&
     !hasRelationalPrimarySeoQuery;
 
-  const aurafonMusicWizard = isAurafonMusicWizard({
-    authorId: form.authorId,
-    productKind: form.productKind,
-  });
   const showWizardStep = (step: ProductWizardStep) =>
     shouldShowProductWizardStep({
       wizardEnabled,
@@ -1289,8 +1297,10 @@ export default function AuthorProductForm({
               ),
             }
           : {}),
-        ...buildAurafonCatalogSectionSaveField({
+        ...buildCatalogSectionSaveField({
           authorId: form.authorId,
+          productKind: form.productKind,
+          publicationClass: form.publicationClass,
           catalogSection: form.catalogSection,
         }),
       }),
@@ -1745,6 +1755,7 @@ export default function AuthorProductForm({
           authorId: formForSave.authorId || reloaded.practice.author_id,
           reservationId: seoReservationContext.reservationId,
           productId: id,
+          publicationClass: formForSave.publicationClass,
         });
         if (!linkResult.ok) {
           setError(linkResult.message);
@@ -1812,7 +1823,7 @@ export default function AuthorProductForm({
   }
 
   async function openPublishPreviewTab(): Promise<boolean> {
-    if (!assertAurafonMusicReadyForPublish()) {
+    if (!assertMusicProductReadyForPublish()) {
       return false;
     }
     setBusy(true);
@@ -1892,7 +1903,7 @@ export default function AuthorProductForm({
       return;
     }
 
-    if (!assertAurafonMusicReadyForPublish()) {
+    if (!assertMusicProductReadyForPublish()) {
       return;
     }
 
@@ -2804,8 +2815,8 @@ export default function AuthorProductForm({
     return Boolean(practiceIdRef.current || practiceId);
   }
 
-  function applyAurafonMusicAuthorFieldError(): boolean {
-    if (!aurafonMusicWizard) {
+  function applyMusicAuthorFieldError(): boolean {
+    if (!musicProductWizard) {
       return false;
     }
     if (hasAudioProductAuthor(form.audioProductAuthor)) {
@@ -2818,15 +2829,15 @@ export default function AuthorProductForm({
     return true;
   }
 
-  function applyAurafonMusicTrackTitleErrors(): boolean {
-    if (!aurafonMusicWizard) {
+  function applyMusicTrackTitleErrors(): boolean {
+    if (!musicProductWizard) {
       return false;
     }
     let hasInvalid = false;
     const nextErrors: Record<string, { title?: string; description?: string }> =
       { ...audioFieldErrors };
     for (const item of audioItems) {
-      const titleError = validateMusicTrackTitleForAurafonWizard(item.title);
+      const titleError = validateMusicTrackTitleCyrillic(item.title);
       if (titleError) {
         hasInvalid = true;
         nextErrors[item.id] = {
@@ -2841,16 +2852,16 @@ export default function AuthorProductForm({
     return hasInvalid;
   }
 
-  function assertAurafonMusicReadyForPublish(): boolean {
-    if (!aurafonMusicWizard) {
+  function assertMusicProductReadyForPublish(): boolean {
+    if (!musicProductWizard) {
       return true;
     }
-    if (applyAurafonMusicAuthorFieldError()) {
+    if (applyMusicAuthorFieldError()) {
       goToWizardStep(1);
       requestScrollToFirstSubmitIssue();
       return false;
     }
-    if (applyAurafonMusicTrackTitleErrors()) {
+    if (applyMusicTrackTitleErrors()) {
       goToWizardStep(2);
       requestScrollToFirstSubmitIssue();
       return false;
@@ -2860,13 +2871,13 @@ export default function AuthorProductForm({
 
   async function saveWizardStep() {
     await saveDraft();
-    if (aurafonMusicWizard && wizardStep === 1) {
-      if (applyAurafonMusicAuthorFieldError()) {
+    if (musicProductWizard && wizardStep === 1) {
+      if (applyMusicAuthorFieldError()) {
         requestScrollToFirstSubmitIssue();
       }
     }
-    if (aurafonMusicWizard && wizardStep === 2) {
-      if (applyAurafonMusicTrackTitleErrors()) {
+    if (musicProductWizard && wizardStep === 2) {
+      if (applyMusicTrackTitleErrors()) {
         requestScrollToFirstSubmitIssue();
       }
     }
@@ -2881,14 +2892,14 @@ export default function AuthorProductForm({
     }
     setMessage("Черновик сохранён.");
 
-    if (aurafonMusicWizard && wizardStep === 1) {
-      if (applyAurafonMusicAuthorFieldError()) {
+    if (musicProductWizard && wizardStep === 1) {
+      if (applyMusicAuthorFieldError()) {
         requestScrollToFirstSubmitIssue();
         return;
       }
     }
-    if (aurafonMusicWizard && wizardStep === 2) {
-      if (applyAurafonMusicTrackTitleErrors()) {
+    if (musicProductWizard && wizardStep === 2) {
+      if (applyMusicTrackTitleErrors()) {
         requestScrollToFirstSubmitIssue();
         return;
       }
@@ -3285,10 +3296,7 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
-        {isAurafonMusicWizard({
-          authorId: form.authorId,
-          productKind: form.productKind,
-        }) ? (
+        {musicProductWizard ? (
           <label
             className="block"
             data-submit-issue={fieldErrors.audioProductAuthor ? "" : undefined}
@@ -3495,10 +3503,14 @@ export default function AuthorProductForm({
           </fieldset>
         ) : null}
 
-        {isAurafonCatalogSectionFieldEnabled(form.authorId) ? (
-          <label className="block" data-aurafon-catalog-section="">
+        {isCatalogSectionFieldEnabled({
+          authorId: form.authorId,
+          productKind: form.productKind,
+          publicationClass: form.publicationClass,
+        }) ? (
+          <label className="block" data-catalog-section="">
             <span className="mb-2 block text-sm font-medium">
-              {AURAFON_CATALOG_SECTION_FIELD_LABEL}
+              {CATALOG_SECTION_FIELD_LABEL}
             </span>
             <select
               name="catalog_section"
@@ -3519,7 +3531,7 @@ export default function AuthorProductForm({
               }}
               className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
             >
-              {AURAFON_CATALOG_SECTION_OPTIONS.map((option) => (
+              {CATALOG_SECTION_FIELD_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -3533,14 +3545,14 @@ export default function AuthorProductForm({
 
 <div
         className={
-          aurafonMusicWizard && wizardStep === 4
+          musicProductWizard && wizardStep === 4
             ? "flex flex-col gap-6"
             : "contents"
         }
       >
         <div
           className={
-            aurafonMusicWizard && wizardStep === 4 ? "order-2" : undefined
+            musicProductWizard && wizardStep === 4 ? "order-2" : undefined
           }
         >
 {showWizardStep(4) ? (
@@ -3548,12 +3560,12 @@ export default function AuthorProductForm({
         {form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
-              {aurafonMusicWizard
+              {musicProductWizard
                 ? "Использование музыки в Студии АудиоЛада"
                 : "Условия использования музыки"}
             </legend>
             <p className="text-sm leading-5 text-[#7d70a2]">
-              {aurafonMusicWizard
+              {musicProductWizard
                 ? "Другие авторы могут использовать вашу музыку при создании медитаций, практик и других аудиопродуктов в Студии АудиоЛада. За каждое такое использование вы получаете оплату."
                 : MUSIC_USAGE_PERMISSION_INTRO}
             </p>
@@ -3613,7 +3625,7 @@ export default function AuthorProductForm({
                 />
                 <span>
                   <span className="block text-sm font-medium text-[#3f3560]">
-                    {aurafonMusicWizard
+                    {musicProductWizard
                       ? value === MUSIC_USAGE_PERMISSION.LISTEN_ONLY
                         ? "Только для прослушивания"
                         : "Разрешить использование в Студии АудиоЛада"
@@ -3640,12 +3652,12 @@ export default function AuthorProductForm({
           MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
-              {aurafonMusicWizard
+              {musicProductWizard
                 ? "Стоимость использования музыки в Студии"
                 : "Использование в Студии АудиоЛада"}
             </legend>
             <p className="text-sm leading-5 text-[#7d70a2]">
-              {aurafonMusicWizard ? (
+              {musicProductWizard ? (
                 <>
                   Выберите стоимость использования вашей музыки другим автором.
                   Минимальная стоимость — {MIN_STUDIO_MUSIC_PRICE_RUBLES} ₽.
@@ -3904,12 +3916,12 @@ export default function AuthorProductForm({
 
         <div
           className={
-            aurafonMusicWizard && wizardStep === 4 ? "order-1" : undefined
+            musicProductWizard && wizardStep === 4 ? "order-1" : undefined
           }
         >
 {showWizardStep(4) ? (
         <>
-        {aurafonMusicWizard ? (
+        {musicProductWizard ? (
           <div className="mb-2">
             <h3 className="text-[18px] font-semibold text-[#3f3560]">
               Доступ для слушателей АудиоЛада
@@ -3922,7 +3934,7 @@ export default function AuthorProductForm({
         {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
         <div>
           <span className="mb-2 block text-sm font-medium">
-            {aurafonMusicWizard ? "Цена для слушателей" : "Цена"}
+            {musicProductWizard ? "Цена для слушателей" : "Цена"}
           </span>
           <div className="flex flex-wrap gap-3">
             <button
@@ -4121,7 +4133,7 @@ export default function AuthorProductForm({
         </div>
         <div
           className={
-            aurafonMusicWizard && wizardStep === 4 ? "order-3" : undefined
+            musicProductWizard && wizardStep === 4 ? "order-3" : undefined
           }
         >
 {showWizardStep(4) ? (
@@ -4398,7 +4410,7 @@ export default function AuthorProductForm({
 
               <label className="mt-4 block">
                 <span className="mb-2 block text-sm font-medium">
-                  {aurafonMusicWizard
+                  {musicProductWizard
                     ? "Название (обязательно, на русском языке)"
                     : "Название"}
                 </span>
@@ -4457,7 +4469,7 @@ export default function AuthorProductForm({
 
               <label className="mt-4 block">
                 <span className="mb-2 block text-sm font-medium">
-                  {aurafonMusicWizard
+                  {musicProductWizard
                     ? "Подназвание (необязательно)"
                     : "Краткое описание"}
                 </span>
@@ -4762,6 +4774,7 @@ export default function AuthorProductForm({
         description={form.description}
         productKind={form.productKind}
         authorId={form.authorId}
+        publicationClass={form.publicationClass}
         isFree={form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree}
         seoPrimaryQuery={form.seoPrimaryQuery}
         primaryQueryLocked={Boolean(

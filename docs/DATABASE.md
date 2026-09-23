@@ -1396,6 +1396,12 @@ RPC перед удалением авторов и перед завершен�
 
 Жёсткие блокеры: заказы, платежи, возвраты, роялти, выплаты, оплаченные capacity grants, чужие membership, другие участники своих авторов, referral где тестовый аккаунт — referrer другого invitee, незавершённая атрибуция без invitee (`pending_referrer_attribution`, `invitee_user_id IS NULL` на своём авторе), автор Sergey (`7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c`) и код `sergey`. Удаляются только атрибуции с `invitee_user_id` тестового аккаунта. Свои membership, заявки, invitee referral, свои пустые авторские проекты и partner bonus — цели очистки. Журнал `admin_operation_log` не удаляется.
 
+## Связывание SEO-брони с продуктом — music gate
+
+Миграция `supabase/migrations/20261031120200_seo_reservation_link_music_gate.sql`.
+
+`link_seo_reservation_to_product(uuid, uuid)` по-прежнему выполняется ролью `authenticated`: прямого вызова RPC недостаточно, чтобы обойти проверку. Функция загружает фактическую строку `practices` и не принимает `publication_class` от клиента. Для автора «Аурафон» (`59c7e5b8-eae4-4394-82fb-b815a10be6c2`) сохраняется прежний beta-flow, включая продукты не-music. Для остальных linking разрешён только если `product_kind = music` или `publication_class = release`. Идемпотентность, блокировки и прежние отказы RPC не меняются. Seed `seo_queries` миграция не добавляет.
+
 ## Резервное копирование
 
 Будет заполнено позже.

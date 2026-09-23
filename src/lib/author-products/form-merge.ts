@@ -1,4 +1,4 @@
-import { catalogSectionForProductForm } from "@/lib/author-products/aurafon-catalog-section";
+import { catalogSectionForProductForm } from "@/lib/author-products/catalog-section-field";
 import {
   parseAudioPostFormat,
   parsePracticeFormat,

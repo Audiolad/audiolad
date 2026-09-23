@@ -79,6 +79,10 @@ jobs:
           npm run test:author-seo-discovery
           npm run test:seo-discovery-ranking
           npm run test:product-seo-quality-review
+          npm run test:music-product-rollout
+          npm run test:seo-reservation-link-music-gate
+          npm run test:author-product-aurafon-music-wizard
+          npm run test:author-product-aurafon-catalog-section
           npx tsx scripts/author-email-outbox-cycle-unit.mts
           npm run build
           npm run typecheck

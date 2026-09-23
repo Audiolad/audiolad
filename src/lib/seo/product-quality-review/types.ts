@@ -63,6 +63,7 @@ export type ProductQualityReviewResult = {
 
 export type ProductQualityReviewRequest = ProductQualityReviewPackage & {
   authorId: string;
+  publicationClass?: string;
 };
 
 export type ProductQualityReviewFieldCounts = {

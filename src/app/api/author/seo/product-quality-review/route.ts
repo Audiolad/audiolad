@@ -25,7 +25,7 @@ async function requireQualityReviewAccess(authorId: string) {
 }
 
 /**
- * Aurafon-only on-page product text quality review.
+ * On-page product text quality review for Aurafon and for any music/release.
  * Analysis only: no save, PATCH, publish, or reservation changes.
  */
 export async function POST(request: Request) {
@@ -37,15 +37,28 @@ export async function POST(request: Request) {
       body = null;
     }
 
+    const record =
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
+        : null;
     const authorId =
-      body &&
-      typeof body === "object" &&
-      !Array.isArray(body) &&
-      typeof (body as Record<string, unknown>).authorId === "string"
-        ? String((body as Record<string, unknown>).authorId).trim()
+      record && typeof record.authorId === "string" ? record.authorId.trim() : "";
+    const productKind =
+      record && typeof record.productKind === "string"
+        ? record.productKind.trim()
+        : "";
+    const publicationClass =
+      record && typeof record.publicationClass === "string"
+        ? record.publicationClass.trim()
         : "";
 
-    if (!authorId || !isAuthorProductQualityReviewEnabled(authorId)) {
+    if (
+      !authorId ||
+      !isAuthorProductQualityReviewEnabled(authorId, {
+        productKind,
+        publicationClass,
+      })
+    ) {
       return NextResponse.json(
         {
           error: "Проверка текстов доступна только в закрытой бете.",

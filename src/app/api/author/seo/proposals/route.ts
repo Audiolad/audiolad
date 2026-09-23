@@ -9,7 +9,7 @@ import {
   proposeAuthorSeoQuery,
 } from "@/lib/seo-queries/author-discovery";
 import { createAuthorProposalRepository } from "@/lib/seo-queries/author-discovery-repository";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
 import { sendSeoQueryProposalAdminAlertEmail } from "@/lib/email/send-seo-query-proposal-admin-alert-email";
@@ -46,11 +46,17 @@ export async function POST(request: Request) {
     const authorId = readString(body, "author_id");
     const seedPhrase = readString(body, "seed_phrase");
     const phrase = readString(body, "phrase");
+    const publicationClass = readString(body, "publication_class");
     if (!authorId || !seedPhrase || !phrase) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    if (!isAuthorSeoDiscoveryEnabled(authorId)) {
+    if (
+      !isMusicCreateSeoDiscoveryEnabled({
+        authorId,
+        publicationClass,
+      })
+    ) {
       return NextResponse.json(
         { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
         { status: 403 },

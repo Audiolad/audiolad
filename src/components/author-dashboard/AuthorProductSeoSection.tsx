@@ -106,8 +106,9 @@ export type AuthorProductSeoSectionProps = {
   subtitle: string;
   description: string;
   productKind: string;
-  /** Author workspace id — gates Aurafon-only quality review. */
+  /** Author workspace id — quality review is Aurafon or music/release. */
   authorId?: string;
+  publicationClass?: string | null;
   /** Authoritative form access flag (`isFree` / `is_free`). */
   isFree: boolean;
   seoPrimaryQuery: string;
@@ -148,6 +149,7 @@ export default function AuthorProductSeoSection({
   description,
   productKind,
   authorId = "",
+  publicationClass = null,
   isFree,
   seoPrimaryQuery,
   seoSecondaryQueries,
@@ -348,7 +350,10 @@ export default function AuthorProductSeoSection({
     seoRelatedCount: seoContent.relatedPracticeIds.filter(Boolean).length,
     publicPath,
   };
-  const qualityReviewEnabled = isAuthorProductQualityReviewEnabled(authorId);
+  const qualityReviewEnabled = isAuthorProductQualityReviewEnabled(authorId, {
+    productKind,
+    publicationClass,
+  });
   const reviewPackage = useMemo(
     () => ({
       title,
@@ -463,6 +468,7 @@ export default function AuthorProductSeoSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           authorId,
+          publicationClass,
           ...reviewPackage,
         }),
       });

@@ -12,6 +12,7 @@ import { isEffectiveSeoReservation } from "../src/lib/seo-queries/reservation-ef
 import {
   AURAFON_AUTHOR_ID,
   isAuthorSeoDiscoveryEnabled,
+  isMusicCreateSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
   countActiveAuthorSeoReservations,
@@ -543,16 +544,66 @@ assert.equal(isAuthorSeoDiscoveryEnabled(AURAFON_AUTHOR_ID), true);
 assert.equal(isAuthorSeoDiscoveryEnabled(otherAuthorId), false);
 assert.equal(isAuthorSeoDiscoveryEnabled(""), false);
 assert.equal(isAuthorSeoDiscoveryEnabled(null), false);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({ authorId: AURAFON_AUTHOR_ID }),
+  true,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: AURAFON_AUTHOR_ID,
+    publicationClass: "practice",
+  }),
+  true,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({ authorId: otherAuthorId }),
+  false,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "practice",
+  }),
+  false,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "course",
+  }),
+  false,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "audiobook",
+  }),
+  false,
+);
+assert.equal(
+  isMusicCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "post",
+  }),
+  false,
+);
 
 const aurafonIdentity = read("src/lib/authors/aurafon.ts");
 assert.match(aurafonIdentity, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 const discoveryBeta = read("src/lib/seo-queries/discovery-beta.ts");
 assert.match(discoveryBeta, /from "@\/lib\/authors\/aurafon"/);
 assert.doesNotMatch(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
-assert.match(discoveryRoute, /isAuthorSeoDiscoveryEnabled/);
+assert.match(discoveryRoute, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
 assert.match(discoveryRoute, /seo_discovery_context_failed/);
-assert.match(proposalsRoute, /isAuthorSeoDiscoveryEnabled/);
+assert.match(proposalsRoute, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(proposalsRoute, /seo_discovery_beta_disabled/);
 
 const page = read("src/app/(platform)/author-dashboard/seo-opportunities/page.tsx");
@@ -580,6 +631,7 @@ assert.doesNotMatch(dash, /href=\{\`\/author-dashboard\/seo-opportunities/);
 
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
 assert.match(nav, /isAuthorSeoDiscoveryEnabled/);
+assert.doesNotMatch(nav, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(nav, /Что ищут слушатели/);
 
 // Shared panel: opportunities + product-create variants
@@ -678,7 +730,7 @@ assert.equal(
 assert.doesNotMatch(dash, /isAuthorSeoDiscoveryEnabled\(selectedAuthor\.id\)/);
 assert.doesNotMatch(dash, /seoActiveReservationCounts/);
 assert.match(createStep, /AuthorSeoDiscoveryPanel/);
-assert.match(createPage, /isAuthorSeoDiscoveryEnabled/);
+assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
 
 // G — seo-opportunities uses canonical counter
 assert.match(ui, /countActiveAuthorSeoReservations\(items\)/);
@@ -693,7 +745,7 @@ assert.doesNotMatch(dash, /wordstat/i);
 assert.match(dash, /\/api\/author\/products/);
 
 // I — beta gate lives on create page + opportunities (not products dashboard)
-assert.match(createPage, /isAuthorSeoDiscoveryEnabled/);
+assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
 assert.match(page, /isAuthorSeoDiscoveryEnabled/);
 
 // J — single shared panel (create step + opportunities)

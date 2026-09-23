@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { catalogSectionColumnForInsert } from "@/lib/author-products/aurafon-catalog-section";
+import { catalogSectionColumnForInsert } from "@/lib/author-products/catalog-section-field";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";

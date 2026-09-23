@@ -2,6 +2,7 @@ import {
   resolveAudioPostFormatForStorage,
   resolveFormatForStorage,
 } from "@/lib/author-products/format";
+import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
 import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
 import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
 import {
@@ -11,15 +12,16 @@ import {
 } from "@/lib/catalog/catalog-sections";
 
 /**
- * Closed-beta catalog section picker for the Aurafon author cabinet.
- * Gate is the existing product-wizard beta (Aurafon UUID only).
+ * Catalog section picker on the author product form.
+ * Aurafon closed beta keeps the field on every product type.
+ * Every other author sees it only for music / release.
  * Values are the existing practices.catalog_section check set.
  * Author-facing «Практики» is the meditations option; admin copy stays «Медитации».
  */
 
-export const AURAFON_CATALOG_SECTION_FIELD_LABEL = "Категория в каталоге";
+export const CATALOG_SECTION_FIELD_LABEL = "Категория в каталоге";
 
-export const AURAFON_CATALOG_SECTION_OPTIONS: ReadonlyArray<{
+export const CATALOG_SECTION_FIELD_OPTIONS: ReadonlyArray<{
   value: CatalogSection;
   label: string;
 }> = [
@@ -30,19 +32,29 @@ export const AURAFON_CATALOG_SECTION_OPTIONS: ReadonlyArray<{
   { value: "books", label: "Книги" },
 ];
 
-export function isAurafonCatalogSectionFieldEnabled(
-  authorId: string | null | undefined,
-): boolean {
-  return isAuthorProductWizardEnabled(authorId);
+export function isCatalogSectionFieldEnabled(input: {
+  authorId?: string | null;
+  productKind?: string | null;
+  publicationClass?: string | null;
+}): boolean {
+  if (isAuthorProductWizardEnabled(input.authorId)) {
+    return true;
+  }
+
+  return isMusicProductWizardEnabled({
+    authorId: input.authorId,
+    productKind: input.productKind,
+    publicationClass: input.publicationClass,
+  });
 }
 
-export function readStoredAurafonCatalogSection(
+export function readStoredCatalogSection(
   value: unknown,
 ): CatalogSection | null {
   return isCatalogSection(value) ? value : null;
 }
 
-export function suggestAurafonCatalogSection(input: {
+export function suggestCatalogSection(input: {
   productKind?: string | null;
   publicationClass?: string | null;
   format?: string | null;
@@ -98,13 +110,13 @@ function storedFormatForSuggestion(input: {
   return resolveFormatForStorage(input.formatPreset, input.customFormat);
 }
 
-export function suggestAurafonCatalogSectionFromFormFields(input: {
+export function suggestCatalogSectionFromFormFields(input: {
   productKind?: string | null;
   publicationClass?: string | null;
   formatPreset: string;
   customFormat: string;
 }): CatalogSection {
-  return suggestAurafonCatalogSection({
+  return suggestCatalogSection({
     productKind: input.productKind,
     publicationClass: input.publicationClass,
     format: storedFormatForSuggestion(input),
@@ -115,7 +127,7 @@ export function suggestAurafonCatalogSectionFromFormFields(input: {
  * Soft default until the author picks a section.
  * An explicit choice (overridden) is kept when type or format changes.
  */
-export function applyAurafonCatalogSectionSuggestion(input: {
+export function applyCatalogSectionSuggestion(input: {
   overridden: boolean;
   current: CatalogSection;
   productKind?: string | null;
@@ -127,7 +139,7 @@ export function applyAurafonCatalogSectionSuggestion(input: {
     return input.current;
   }
 
-  return suggestAurafonCatalogSectionFromFormFields(input);
+  return suggestCatalogSectionFromFormFields(input);
 }
 
 export function catalogSectionForProductForm(practice: {
@@ -137,8 +149,8 @@ export function catalogSectionForProductForm(practice: {
   format?: string | null;
 }): CatalogSection {
   return (
-    readStoredAurafonCatalogSection(practice.catalog_section) ??
-    suggestAurafonCatalogSection({
+    readStoredCatalogSection(practice.catalog_section) ??
+    suggestCatalogSection({
       productKind: practice.product_kind,
       publicationClass: practice.publication_class,
       format: practice.format,
@@ -146,15 +158,23 @@ export function catalogSectionForProductForm(practice: {
   );
 }
 
-export function buildAurafonCatalogSectionSaveField(input: {
+export function buildCatalogSectionSaveField(input: {
   authorId: string | null | undefined;
+  productKind?: string | null;
+  publicationClass?: string | null;
   catalogSection: unknown;
 }): { catalog_section: CatalogSection } | Record<string, never> {
-  if (!isAurafonCatalogSectionFieldEnabled(input.authorId)) {
+  if (
+    !isCatalogSectionFieldEnabled({
+      authorId: input.authorId,
+      productKind: input.productKind,
+      publicationClass: input.publicationClass,
+    })
+  ) {
     return {};
   }
 
-  const catalogSection = readStoredAurafonCatalogSection(input.catalogSection);
+  const catalogSection = readStoredCatalogSection(input.catalogSection);
   if (!catalogSection) {
     return {};
   }
@@ -172,22 +192,34 @@ export function catalogSectionColumnForInsert(
   return { catalog_section: catalogSection };
 }
 
-export type AurafonCatalogSectionPatch =
+export type CatalogSectionPatch =
   | { action: "omit" }
   | { action: "apply"; catalogSection: CatalogSection }
   | { action: "reject"; error: "invalid_catalog_section" };
 
 /**
- * Canonical create/edit write. Other authors never update catalog_section,
- * including when the body contains the key. Aurafon persists one of the five
- * allowed values. Admin catalog-sections remains a separate correction path.
+ * Canonical create/edit write.
+ * Aurafon persists one of the five allowed values for any product type.
+ * Any author persists catalog_section for music / release.
+ * Other authors on practice, course, audiobook, and post never update the
+ * column, including when the body contains the key.
+ * Admin catalog-sections remains a separate correction path.
  */
-export function resolveAurafonCatalogSectionPatch(input: {
+export function resolveCatalogSectionPatch(input: {
   authorId: string | null | undefined;
+  productKind?: string | null;
+  publicationClass?: string | null;
   present: boolean;
   catalogSection: unknown;
-}): AurafonCatalogSectionPatch {
-  if (!input.present || !isAurafonCatalogSectionFieldEnabled(input.authorId)) {
+}): CatalogSectionPatch {
+  if (
+    !input.present ||
+    !isCatalogSectionFieldEnabled({
+      authorId: input.authorId,
+      productKind: input.productKind,
+      publicationClass: input.publicationClass,
+    })
+  ) {
     return { action: "omit" };
   }
 
@@ -198,6 +230,6 @@ export function resolveAurafonCatalogSectionPatch(input: {
   return { action: "apply", catalogSection: input.catalogSection };
 }
 
-export function aurafonCatalogSectionValues(): readonly CatalogSection[] {
+export function catalogSectionFieldValues(): readonly CatalogSection[] {
   return CATALOG_SECTIONS;
 }
