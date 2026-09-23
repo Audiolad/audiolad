@@ -15,6 +15,7 @@ import {
   isAllowedMaxVerifyOrigin,
   MAX_VERIFY_BODY_MAX_BYTES,
   POST,
+  setResolveMaxSessionBindingForTests,
   setTouchExternalIdentityForTests,
 } from "../src/app/api/max/session/verify/route.ts";
 
@@ -78,9 +79,14 @@ process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 
 const touchCalls = [];
 const linkCalls = [];
+const bindingCalls = [];
 setTouchExternalIdentityForTests(async (provider, providerUserId) => {
   touchCalls.push({ provider, providerUserId });
   return { ok: true, linked: false };
+});
+setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
+  bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
+  throw new Error("session binding must not run unless linked=true");
 });
 setLinkExternalIdentityForTests(async (provider, providerUserId, userId) => {
   linkCalls.push({ provider, providerUserId, userId });
@@ -92,26 +98,95 @@ try {
     await POST(maxRequest({ initData: currentInitData() })),
   );
   assert.equal(valid.status, 200);
-  assert.deepEqual(valid.body, { ok: true, linked: false });
+  assert.deepEqual(valid.body, {
+    ok: true,
+    linked: false,
+    sessionMatches: false,
+  });
   assert.equal("data" in valid.body, false);
   assert.equal("reason" in valid.body, false);
   assert.equal("provider_user_id" in valid.body, false);
+  assert.equal("user_id" in valid.body, false);
+  assert.equal("email" in valid.body, false);
+  assert.equal("initData" in valid.body, false);
   assert.equal(JSON.stringify(valid.body).includes("101"), false);
   assert.equal(touchCalls.length, 1);
+  assert.equal(bindingCalls.length, 0, "linked=false must not resolve session binding");
   assert.deepEqual(touchCalls[0], {
     provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
     providerUserId: "101",
   });
 
-  setTouchExternalIdentityForTests(async () => ({ ok: true, linked: true }));
+  setTouchExternalIdentityForTests(async (provider, providerUserId) => {
+    touchCalls.push({ provider, providerUserId });
+    return { ok: true, linked: true };
+  });
+  setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
+    bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
+    return { ok: true, sessionMatches: true };
+  });
   const linked = await readJson(
     await POST(maxRequest({ initData: currentInitData() })),
   );
   assert.equal(linked.status, 200);
-  assert.deepEqual(linked.body, { ok: true, linked: true });
+  assert.deepEqual(linked.body, {
+    ok: true,
+    linked: true,
+    sessionMatches: true,
+  });
+  assert.equal(JSON.stringify(linked.body).includes("101"), false);
+  assert.doesNotMatch(JSON.stringify(linked.body), /[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  assert.equal(bindingCalls.length, 1);
+  assert.deepEqual(bindingCalls[0], {
+    provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
+    providerUserId: "101",
+    hasRequest: true,
+  });
+
+  setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
+    bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
+    return { ok: true, sessionMatches: false };
+  });
+  const linkedNoSession = await readJson(
+    await POST(maxRequest({ initData: currentInitData() })),
+  );
+  assert.equal(linkedNoSession.status, 200);
+  assert.deepEqual(linkedNoSession.body, {
+    ok: true,
+    linked: true,
+    sessionMatches: false,
+  });
+  const linkedWrongSession = await readJson(
+    await POST(maxRequest({ initData: currentInitData() })),
+  );
+  assert.equal(linkedWrongSession.status, 200);
+  assert.deepEqual(linkedWrongSession.body, linkedNoSession.body);
+  assert.equal(JSON.stringify(linkedWrongSession.body).includes("101"), false);
+  assert.equal("email" in linkedWrongSession.body, false);
+  assert.equal("initData" in linkedWrongSession.body, false);
+
+  setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
+    bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
+    return { ok: false, reason: "storage_unavailable" };
+  });
+  const bindingStorageFail = await readJson(
+    await POST(maxRequest({ initData: currentInitData() })),
+  );
+  assert.equal(bindingStorageFail.status, 503);
+  assert.deepEqual(bindingStorageFail.body, {
+    ok: false,
+    reason: "storage_unavailable",
+  });
+  assert.equal(JSON.stringify(bindingStorageFail.body).includes("101"), false);
+
+  const bindingCountAfterLinked = bindingCalls.length;
   setTouchExternalIdentityForTests(async (provider, providerUserId) => {
     touchCalls.push({ provider, providerUserId });
     return { ok: true, linked: false };
+  });
+  setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
+    bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
+    throw new Error("session binding must not run unless linked=true");
   });
 
   const touchCountAfterValid = touchCalls.length;
@@ -128,6 +203,11 @@ try {
   assert.equal(JSON.stringify(invalid.body).includes(FICTIONAL_BOT_TOKEN), false);
   assert.doesNotMatch(JSON.stringify(invalid.body), /expected|hmac|signature/i);
   assert.equal(touchCalls.length, touchCountAfterValid, "invalid HMAC must not touch");
+  assert.equal(
+    bindingCalls.length,
+    bindingCountAfterLinked,
+    "invalid HMAC must not resolve session binding",
+  );
 
   const expired = await readJson(
     await POST(
@@ -142,6 +222,11 @@ try {
   assert.equal(expired.status, 401);
   assert.equal(expired.body.reason, "expired");
   assert.equal(touchCalls.length, touchCountAfterValid, "expired HMAC must not touch");
+  assert.equal(
+    bindingCalls.length,
+    bindingCountAfterLinked,
+    "expired initData must not resolve session binding",
+  );
 
   const empty = await readJson(await POST(maxRequest("", { raw: "" })));
   assert.equal(empty.status, 400);
@@ -237,8 +322,14 @@ try {
   assert.equal(storageFail.body.ok === true, false);
   assert.equal(touchCalls.length, touchCountAfterValid + 1);
   assert.equal(linkCalls.length, 0, "verify must not call link");
+  assert.equal(
+    bindingCalls.length,
+    bindingCountAfterLinked,
+    "touch storage failure must not resolve session binding",
+  );
 } finally {
   setTouchExternalIdentityForTests(null);
+  setResolveMaxSessionBindingForTests(null);
   setLinkExternalIdentityForTests(null);
   if (previousToken === undefined) {
     delete process.env.MAX_BOT_TOKEN;
@@ -253,7 +344,19 @@ const routeSource = readFileSync(
 );
 assert.match(routeSource, /process\.env\.MAX_BOT_TOKEN/);
 assert.match(routeSource, /touchExternalIdentity/);
-assert.match(routeSource, /linked: touch\.linked/);
+assert.match(routeSource, /resolveMaxSessionBinding/);
+assert.match(routeSource, /sessionMatches: false/);
+assert.match(routeSource, /sessionMatches: binding\.sessionMatches/);
+assert.ok(
+  routeSource.indexOf("verifyMaxInitData(") <
+    routeSource.indexOf("resolveMaxSessionBinding("),
+  "HMAC verification must run before session binding",
+);
+assert.ok(
+  routeSource.indexOf("if (!touch.linked)") <
+    routeSource.indexOf("resolveMaxSessionBinding("),
+  "unlinked MAX must return before session binding",
+);
 assert.doesNotMatch(routeSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(routeSource, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(routeSource, /createServiceRoleClient|createClient\(/);
@@ -270,6 +373,7 @@ const maxTree = [
   "src/lib/max/proxy-policy.ts",
   "src/lib/max/bridge.ts",
   "src/lib/max/touch-external-identity.ts",
+  "src/lib/max/session-binding.ts",
   "src/lib/max/session-http.ts",
   "src/components/max/MaxBridgeScript.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",

@@ -10,15 +10,13 @@ import type {
   MaxShellSignupError,
 } from "@/lib/max/session-shell";
 
-type AuthUser = { id: string };
-
 export type MaxAuthClient = {
   auth: {
     signInWithPassword: (credentials: {
       email: string;
       password: string;
     }) => Promise<{ error: { message?: string } | null }>;
-    getUser: () => Promise<{ data: { user: AuthUser | null } }>;
+    getUser: () => Promise<{ data: { user: { id: string } | null } }>;
     signOut: () => Promise<unknown>;
   };
 };
@@ -52,10 +50,6 @@ function defaultDeps(): MaxShellClientDeps {
     getAuthClient: () => createClient() as unknown as MaxAuthClient,
     fetch: (input, init) => globalThis.fetch(input, init),
   };
-}
-
-function hasAuthUser(user: AuthUser | null | undefined): boolean {
-  return typeof user?.id === "string" && user.id.length > 0;
 }
 
 async function readJsonBody(response: Response): Promise<unknown> {
@@ -102,15 +96,6 @@ export function mapLinkResponseToEvent(
   return { type: "LINK_SERVER_ERROR" };
 }
 
-async function readSessionUser(deps: MaxShellClientDeps): Promise<boolean> {
-  try {
-    const { data } = await deps.getAuthClient().auth.getUser();
-    return hasAuthUser(data.user);
-  } catch {
-    return false;
-  }
-}
-
 export async function verifyMaxSession(
   deps: MaxShellClientDeps = defaultDeps(),
 ): Promise<MaxShellEvent> {
@@ -140,7 +125,9 @@ export async function verifyMaxSession(
     }
 
     const linked = (payload as { linked?: unknown }).linked === true;
-    const hasSession = linked ? await readSessionUser(deps) : false;
+    const hasSession =
+      linked &&
+      (payload as { sessionMatches?: unknown }).sessionMatches === true;
     return { type: "VERIFY_SUCCESS", linked, hasSession };
   } catch {
     return { type: "VERIFY_FAILURE" };

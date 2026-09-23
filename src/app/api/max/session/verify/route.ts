@@ -5,14 +5,16 @@ import {
   isAllowedMaxSessionOrigin,
   MAX_SESSION_BODY_MAX_BYTES,
 } from "@/lib/max/session-http";
+import { resolveMaxSessionBinding } from "@/lib/max/session-binding";
 import {
   MAX_EXTERNAL_IDENTITY_PROVIDER,
   touchExternalIdentity,
 } from "@/lib/max/touch-external-identity";
-
-export { setTouchExternalIdentityForTests } from "@/lib/max/touch-external-identity";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
+
+export { setResolveMaxSessionBindingForTests } from "@/lib/max/session-binding";
+export { setTouchExternalIdentityForTests } from "@/lib/max/touch-external-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -133,5 +135,26 @@ export async function POST(request: Request) {
     return errorResponse("storage_unavailable", 503);
   }
 
-  return Response.json({ ok: true, linked: touch.linked });
+  if (!touch.linked) {
+    return Response.json({
+      ok: true,
+      linked: false,
+      sessionMatches: false,
+    });
+  }
+
+  const binding = await resolveMaxSessionBinding(
+    request,
+    MAX_EXTERNAL_IDENTITY_PROVIDER,
+    result.data.user.id,
+  );
+  if (!binding.ok) {
+    return errorResponse("storage_unavailable", 503);
+  }
+
+  return Response.json({
+    ok: true,
+    linked: true,
+    sessionMatches: binding.sessionMatches,
+  });
 }

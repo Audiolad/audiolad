@@ -247,6 +247,12 @@ assert.doesNotMatch(
   /MAX_SESSION_LINK_PATH|session\/link/,
   "verify must not auto-link",
 );
+assert.match(verifyFn, /sessionMatches/);
+assert.doesNotMatch(
+  verifyFn,
+  /getUser\(/,
+  "verify must not treat a local Supabase session as the linked account",
+);
 assert.match(
   verifyClientSource,
   /MAX_SESSION_LINK_PATH/,
