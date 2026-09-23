@@ -1400,13 +1400,7 @@ RPC перед удалением авторов и перед завершен�
 
 Миграция `supabase/migrations/20261031120200_seo_reservation_link_music_gate.sql`.
 
-`link_seo_reservation_to_product(uuid, uuid)` по-прежнему выполняется ролью `authenticated`: прямого вызова RPC недостаточно, чтобы обойти проверку. Функция загружает фактическую строку `practices` и не принимает `publication_class` от клиента. Для автора «Аурафон» (`59c7e5b8-eae4-4394-82fb-b815a10be6c2`) сохраняется прежний beta-flow, включая продукты не-music. Для остальных linking разрешён только если `product_kind = music` или `publication_class = release`. Идемпотентность, блокировки и прежние отказы RPC не меняются. Новых таблиц и колонок нет.
-
-## seo_queries — музыкальные направления
-
-Миграция `supabase/migrations/20261031120300_seo_music_product_queries_seed.sql`.
-
-Идемпотентный seed естественных запросов «музыка для …»: `analysis_status = analyzed`, `intent = music`, `recommended_format = Музыка`, `audio_fit = high`, `frequency` NULL. `ON CONFLICT (normalized_query)` обновляет статус анализа и пустые intent / format / audio_fit и не перезаписывает `frequency`, `frequency_checked_at`, `source`, `query_text`. Новой колонки нет. Строки spa/massage из `20261022120000_seo_spa_massage_queries_seed.sql` не повторяются.
+`link_seo_reservation_to_product(uuid, uuid)` по-прежнему выполняется ролью `authenticated`: прямого вызова RPC недостаточно, чтобы обойти проверку. Функция загружает фактическую строку `practices` и не принимает `publication_class` от клиента. Для автора «Аурафон» (`59c7e5b8-eae4-4394-82fb-b815a10be6c2`) сохраняется прежний beta-flow, включая продукты не-music. Для остальных linking разрешён только если `product_kind = music` или `publication_class = release`. Идемпотентность, блокировки и прежние отказы RPC не меняются. Seed `seo_queries` миграция не добавляет.
 
 ## Резервное копирование
 
