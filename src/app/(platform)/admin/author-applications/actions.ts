@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { AdminAuthorApplicationActionState } from "@/app/(platform)/admin/author-applications/action-state";
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
 import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";
 import { createClient } from "@/lib/supabase/server";
 
@@ -149,6 +150,8 @@ export async function approveAuthorApplication(
   if (!rpc.ok) {
     return { ok: false, error: rpc.error };
   }
+
+  await drainPartnerActivationEmailIfNeeded(rpc.result);
 
   revalidateApplicationPaths(applicationId);
 

@@ -1342,6 +1342,21 @@ Ownership: триггер `enforce_quick_offer_product_owner` запрещает
 
 Claim (INSERT) выполняется до SMTP. Повторный вызов с тем же `user_id` не отправляет письмо. Не использовать author sale / moderation outbox workers для welcome.
 
+### Приглашённые авторы и письмо о первой активации (2026-10-31)
+
+Миграция: `supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql`.
+
+Денежный реестр 20% не создаётся. Окно атрибуции, first-touch и бонусный слот не меняются.
+
+| Сущность | Роль |
+|----------|------|
+| `author_referrals` | Канонический ряд. Ожидающий: `status = attributed`, `activated_at IS NULL`, дата регистрации = `attributed_at`. Активированный: `activated_at`, `expires_at`, `invitee_author_id`. |
+| `list_author_partner_invitees(author_id)` | Читает только владелец (`author_partner_is_owner`) и только `referrer_author_id = author_id`. В ответе нет email и auth id. Имя активированного — `authors.name`. |
+| `author_partner_activation_email_outbox` | Одно письмо на `referral_id` (`UNIQUE` + `ON CONFLICT DO NOTHING`). Паттерн lease как у `author_sale_email_outbox`. |
+| Триггер `author_referrals_enqueue_activation_email_trg` | `AFTER UPDATE`, только переход `activated_at` NULL → значение и `status = activated`. Регистрация слушателя (INSERT `attributed`) письмо не ставит. |
+
+Получатель письма — email владельца-партнёра. Отправитель — каноническая личность `authors` (`authors@audiolad.ru`). Отдельного ящика `author@audiolad.ru` в конфиге нет.
+
 ## Analytics heavy RPC (2026-08-28)
 
 Миграция: `supabase/migrations/20260902120100_analytics_heavy_rpc_idempotent.sql`.

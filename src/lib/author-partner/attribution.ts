@@ -1,5 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
+
 import { shouldSetPartnerAttributionCookie } from "./cookie";
 import { logPartnerAttribution } from "./log";
 import {
@@ -117,6 +119,8 @@ export async function touchPartnerInvite(input: {
     if (!result) {
       return { ok: false, error: "touch_failed", setCookie: false };
     }
+
+    await drainPartnerActivationEmailIfNeeded(data);
 
     // Prefer explicit SQL flag; never invent a ghost cookie without a server attribution row.
     const setCookie = shouldSetPartnerAttributionCookie({
@@ -307,6 +311,8 @@ export async function claimPartnerAttribution(input: {
       return { ok: false, error: err };
     }
 
+    await drainPartnerActivationEmailIfNeeded(data);
+
     const result = asString(row.result) ?? "bound";
     const event =
       input.source === "signup"
@@ -403,6 +409,8 @@ export async function bindManualPartnerCode(input: {
       }
       return { ok: false, error: err };
     }
+
+    await drainPartnerActivationEmailIfNeeded(data);
 
     const result = asString(row.result) ?? "bound";
     if (result === "preserved_first_touch") {

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
 import {
   AuthorAccessError,
   listAuthorWorkspacesForUser,
@@ -257,6 +258,8 @@ export async function createAuthorProjectViaRpc(
   ) {
     throw new AuthorAccessError("internal_error", 500);
   }
+
+  await drainPartnerActivationEmailIfNeeded(data);
 
   return {
     authorId: payload.author_id,

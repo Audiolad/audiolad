@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAdminExactUuid } from "@/lib/admin/users-search";
+import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -131,6 +132,9 @@ export async function provisionStudioAuthorWorkspace(
   }
 
   const result = parseStudioProvisionResult(data);
+  if (result) {
+    await drainPartnerActivationEmailIfNeeded(data);
+  }
   return result
     ? { ok: true, result }
     : { ok: false, error: "Не удалось создать авторское пространство. Попробуйте ещё раз." };

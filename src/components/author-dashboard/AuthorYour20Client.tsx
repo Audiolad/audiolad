@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorPartnerInvitees from "@/components/author-dashboard/AuthorPartnerInvitees";
 import {
   buildAuthorPartnerInviteMessage,
   buildAuthorPartnerInviteUrl,
@@ -13,6 +14,7 @@ import {
   changeAuthorPartnerCodeAction,
   ensureAuthorPartnerProfileAction,
 } from "@/lib/author-partner/your-20-actions";
+import type { PartnerInviteeView } from "@/lib/author-partner/invitees";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type Props = {
@@ -20,6 +22,8 @@ type Props = {
   initialAuthorId: string;
   initialProfile: AuthorPartnerProfileView | null;
   initialLoadError?: string | null;
+  initialInvitees: PartnerInviteeView[];
+  initialInviteesError?: string | null;
   siteOrigin: string;
 };
 
@@ -28,6 +32,8 @@ export default function AuthorYour20Client({
   initialAuthorId,
   initialProfile,
   initialLoadError = null,
+  initialInvitees,
+  initialInviteesError = null,
   siteOrigin,
 }: Props) {
   const router = useRouter();
@@ -169,6 +175,11 @@ export default function AuthorYour20Client({
           <p className="mt-1">Сейчас мы проверяем создание ссылки, код приглашения, привязку нового автора и бонусное авторское пространство. Начисление партнёрского вознаграждения будет подключено отдельным этапом.</p>
         </div>
       </section>
+
+      <AuthorPartnerInvitees
+        invitees={initialInvitees}
+        loadError={initialInviteesError}
+      />
 
       {!profile ? (
         <section className="rounded-[24px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-5 sm:px-5">

@@ -8,6 +8,10 @@ import {
   canAccessAuthorPartnerYour20Ui,
   isAuthorPartnerUiBetaEnabled,
 } from "@/lib/author-partner/ui-beta";
+import {
+  parseAuthorPartnerInviteesPayload,
+  PARTNER_INVITEES_LOAD_ERROR,
+} from "@/lib/author-partner/invitees";
 import { parseAuthorPartnerProfilePayload } from "@/lib/author-partner/profile-types";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
@@ -100,6 +104,15 @@ export default async function AuthorYour20Page({
     ? null
     : parseAuthorPartnerProfilePayload(data, selected.id);
 
+  const { data: inviteesData, error: inviteesError } = await supabase.rpc(
+    "list_author_partner_invitees",
+    { p_author_id: selected.id },
+  );
+  const initialInvitees = inviteesError
+    ? []
+    : parseAuthorPartnerInviteesPayload(inviteesData);
+  const initialInviteesError = inviteesError ? PARTNER_INVITEES_LOAD_ERROR : null;
+
   return (
     <AuthorShell
       title="Ваши 20%"
@@ -107,11 +120,13 @@ export default async function AuthorYour20Page({
       internalBackHref="/author-dashboard"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
-                <AuthorYour20Client
+        <AuthorYour20Client
           authors={authors}
           initialAuthorId={selected.id}
           initialProfile={initialProfile}
           initialLoadError={initialLoadError}
+          initialInvitees={initialInvitees}
+          initialInviteesError={initialInviteesError}
           siteOrigin={getAppOrigin()}
         />
       </Suspense>
