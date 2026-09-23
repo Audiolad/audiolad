@@ -111,7 +111,13 @@ export type ProductQualityReviewStructuralStuffing = {
 
 export type ProductQualityReviewSignals = {
   primaryExactByField: ProductQualityReviewFieldCounts;
+  /** Literal normalized phrase only. `false` is not semantic absence. */
   primaryPresentIn: ProductQualityReviewPrimaryPresence;
+  /**
+   * Exact phrase or a close same-order morphological variant.
+   * Diagnostic only — never a green/yellow/red verdict by itself.
+   */
+  primaryThemePresentIn: ProductQualityReviewPrimaryPresence;
   titleEqualsPrimary: boolean;
   primaryOveruseSoft: boolean;
   secondaryCount: number;
