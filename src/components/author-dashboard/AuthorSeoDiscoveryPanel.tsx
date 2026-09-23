@@ -280,6 +280,8 @@ export default function AuthorSeoDiscoveryPanel({
   const subtitle =
     "Введите одну тему — сначала покажем проверенные запросы из базы АудиоЛада, затем дополнительные варианты из Яндекса.";
 
+  // «Бета» остаётся только контекстом Aurafon-only возможностей, без badge
+  // в music product-create.
   return (
     <section className="rounded-[24px] border border-[#d7c4f5] bg-white p-5 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
       <h2 className="text-lg font-semibold text-[#25135c]">
