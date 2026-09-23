@@ -87,8 +87,23 @@ const STUFFING_FIELD_COPY: Record<
 export const NATURAL_THEME_COVERED_SUMMARY =
   "Поисковая тема естественно выражена в описании продукта и в полях для поиска.";
 
+export const HEADING_THEME_MISSING_ISSUE_MESSAGE =
+  "Основная поисковая тема не отражена в названии и подназвании.";
+
+export const HEADING_THEME_MISSING_ISSUE_RECOMMENDATION =
+  "Добавьте основной поисковый запрос или его естественную близкую формулировку в название или подназвание.";
+
 const ADD_MORE_KEYS_RE =
   /добавьте\s+(?:ещё\s+)?(?:основн\p{L}*\s+|дополнительн\p{L}*\s+)?(?:поисков\p{L}*\s+)?(?:запрос|ключ|фраз)/iu;
+
+/** Advice that both headings must be changed. One of them is enough. */
+const FIX_BOTH_HEADINGS_RE =
+  /(?:добав|впиш|укаж|исправ|внес|постав)\p{L}*.{0,80}назван\p{L}*\s+и\s+подназван|назван\p{L}*\s+и\s+подназван\p{L}*.{0,40}(?:добав|впиш|исправ|внес)/iu;
+
+const HEADING_ALREADY_HAS_THEME_RE =
+  /(?:назван|подназван)\p{L}*.{0,60}(?:уже\s+)?(?:совпад|отража|содерж|переда[её]т|есть\s+(?:основн|тем|запрос))/iu;
+
+const BALANCED_SUMMARY_RE = /в норме|сбалансир/iu;
 
 /**
  * Advice that the primary query is missing or should be inserted.
@@ -149,6 +164,29 @@ function themeCoveredInDescriptionAndSearch(
     theme.description &&
     (theme.seoDescription || theme.seoTitle) &&
     !signals.structuralStuffing.material
+  );
+}
+
+/** GREEN needs the primary theme in the title or the subtitle. One field is enough. */
+function primaryThemeInTitleOrSubtitle(
+  signals: ProductQualityReviewSignals,
+): boolean {
+  const theme = signals.primaryThemePresentIn;
+  return theme.title || theme.subtitle;
+}
+
+function requiresBothHeadings(issue: ProductQualityReviewIssue): boolean {
+  return FIX_BOTH_HEADINGS_RE.test(issueText(issue));
+}
+
+function claimsHeadingAlreadyHasTheme(text: string): boolean {
+  if (/не\s+(?:отраж|совпад|содерж|переда)/iu.test(text)) return false;
+  return HEADING_ALREADY_HAS_THEME_RE.test(text);
+}
+
+function summaryClaimsBalanced(summary: string): boolean {
+  return (
+    summary === NATURAL_THEME_COVERED_SUMMARY || BALANCED_SUMMARY_RE.test(summary)
   );
 }
 
@@ -263,14 +301,56 @@ export function reconcileProductQualityReviewResult(
     }
     // Do not promote GREEN from exactPrimaryCount or any occurrence quota.
     // Yellow is cleared only when description and search metadata already
-    // carry the theme and every remaining issue contradicted that coverage.
+    // carry the theme, at least one of title/subtitle carries it, and every
+    // remaining issue contradicted that coverage.
     if (
       status === "yellow" &&
       themeCoveredInDescriptionAndSearch(signals) &&
-      issues.length === 0
+      issues.length === 0 &&
+      primaryThemeInTitleOrSubtitle(signals)
     ) {
       status = "green";
       summary = NATURAL_THEME_COVERED_SUMMARY;
+    }
+
+    // Theme in the description and search metadata is not enough for GREEN
+    // when neither heading carries it. One of title/subtitle is enough.
+    if (!primaryThemeInTitleOrSubtitle(signals)) {
+      const headingGapBlocksGreen =
+        status === "green" ||
+        summaryClaimsBalanced(summary) ||
+        themeCoveredInDescriptionAndSearch(signals);
+      if (headingGapBlocksGreen) {
+        issues = issues.filter(
+          (issue) =>
+            !requiresBothHeadings(issue) &&
+            !claimsHeadingAlreadyHasTheme(issueText(issue)),
+        );
+        positiveNotes = positiveNotes.filter(
+          (note) =>
+            !claimsHeadingAlreadyHasTheme(note) && !BALANCED_SUMMARY_RE.test(note),
+        );
+        if (status === "green" || summaryClaimsBalanced(summary)) {
+          status = "yellow";
+          summary = HEADING_THEME_MISSING_ISSUE_MESSAGE;
+        }
+        if (
+          !issues.some(
+            (issue) => issue.message === HEADING_THEME_MISSING_ISSUE_MESSAGE,
+          )
+        ) {
+          const headingIssue: ProductQualityReviewIssue = {
+            severity: "warning",
+            field: "title",
+            message: HEADING_THEME_MISSING_ISSUE_MESSAGE,
+            recommendation: HEADING_THEME_MISSING_ISSUE_RECOMMENDATION,
+          };
+          issues = [headingIssue, ...issues].slice(
+            0,
+            PRODUCT_QUALITY_REVIEW_ISSUES_MAX,
+          );
+        }
+      }
     }
   }
 
