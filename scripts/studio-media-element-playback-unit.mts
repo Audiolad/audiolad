@@ -326,6 +326,12 @@ async function testProviderAndHydrationContracts() {
     provider,
     /runtime\.activeClipId = null;\s*syncTrackMediaPlayback\([\s\S]*?forceEnter: true/,
   );
+  assert.match(provider, /beginStudioMediaPlayback/);
+  assert.match(provider, /seekStudioMediaElementIfNeeded/);
+  assert.match(provider, /isStudioMediaPlaybackPending/);
+  assert.match(provider, /cancelStudioMediaPlayback/);
+  assert.match(provider, /parkPausedRuntimesAtPlayhead\(\)/);
+  assert.doesNotMatch(provider, /media\.play\(\)\.catch\(\(\) => \{/);
   // Paused seek must call sync with playing=false (park only).
   assert.match(
     provider,

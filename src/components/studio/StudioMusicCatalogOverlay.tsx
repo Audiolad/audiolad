@@ -23,6 +23,12 @@ import {
   STUDIO_LICENSE_FREE_ACQUIRED_NOTICE,
   STUDIO_LICENSE_GUEST_FREE_HINT,
 } from "@/lib/studio-music/license-ui-copy";
+import {
+  STUDIO_CATALOG_PREVIEW_AUDIO_ROLE,
+  beginStudioCatalogPreviewPlay,
+  cancelStudioMediaPlayback,
+  stopStudioCatalogPreview,
+} from "@/lib/studio/media-element-lifecycle";
 
 const FILTERS: Array<{
   id: StudioMusicCatalogFilter;
@@ -74,12 +80,7 @@ function StudioMusicCatalogOverlayBody({
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const stopPreview = () => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    }
+    stopStudioCatalogPreview(audioRef.current);
     setActivePreviewKey(null);
     setPreviewTitle(null);
     setPreviewCurrentTime(0);
@@ -152,23 +153,25 @@ function StudioMusicCatalogOverlayBody({
   }, [filter, debouncedQuery]);
 
   useEffect(() => {
-    const audio = audioRef.current;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        stopPreview();
+        stopStudioCatalogPreview(audioRef.current);
         onClose();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      if (audio) {
-        audio.pause();
-        audio.removeAttribute("src");
-      }
     };
   }, [onClose]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      stopStudioCatalogPreview(audio);
+    };
+  }, []);
 
   const playPreview = (
     publicationId: string,
@@ -191,7 +194,7 @@ function StudioMusicCatalogOverlayBody({
     audio.src = `/api/studio/music/preview?${params.toString()}`;
     setActivePreviewKey(key);
     setPreviewTitle(trackTitle);
-    void audio.play().catch(() => {
+    void beginStudioCatalogPreviewPlay(audio).catch(() => {
       setError("Не удалось включить превью");
       stopPreview();
     });
@@ -597,6 +600,7 @@ function StudioMusicCatalogOverlayBody({
                   void acquirePublication(next);
                 }}
                 onAdd={(next, audioItemId) => {
+                  stopPreview();
                   onAdd?.(next.publication_id, audioItemId);
                 }}
                 onOpenLicenseInfo={() => setLicenseInfoOpen(true)}
@@ -640,8 +644,15 @@ function StudioMusicCatalogOverlayBody({
                 onClick={() => {
                   const audio = audioRef.current;
                   if (!audio) return;
-                  if (audio.paused) void audio.play();
-                  else audio.pause();
+                  if (audio.paused) {
+                    void beginStudioCatalogPreviewPlay(audio).catch(() => {
+                      setError("Не удалось включить превью");
+                      stopPreview();
+                    });
+                  } else {
+                    cancelStudioMediaPlayback(audio);
+                    audio.pause();
+                  }
                 }}
                 className="rounded-md bg-[#7650bd] px-3 py-1 text-xs font-semibold text-white"
               >
@@ -675,6 +686,7 @@ function StudioMusicCatalogOverlayBody({
 
       <audio
         ref={audioRef}
+        data-studio-audio-role={STUDIO_CATALOG_PREVIEW_AUDIO_ROLE}
         className="sr-only"
         preload="none"
         onEnded={stopPreview}
