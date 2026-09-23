@@ -1,0 +1,53 @@
+name: Author Partner Invitees Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/author-partner-invitees-isolated.yml"
+      - "scripts/author-partner-invitees-sql-unit.mjs"
+      - "scripts/lib/author-partner-program-sql-stub.sql"
+      - "supabase/migrations/20261024120000_author_partner_program_foundation.sql"
+      - "supabase/migrations/20261025120000_author_partner_attribution.sql"
+      - "supabase/migrations/20261027120100_author_partner_activation_bonus.sql"
+      - "supabase/migrations/20261028120000_author_partner_generate_code_extensions_path.sql"
+      - "supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql"
+      - "supabase/tests/author_partner_invitees_email_smoke.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  author-partner-invitees-isolated:
+    name: Author Partner Invitees Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: audiolad_author_partner_invitees_isolated
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d audiolad_author_partner_invitees_isolated"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local SQL toolchain
+        run: |
+          set -euo pipefail
+          psql --version
+          pg_isready --host 127.0.0.1 --port 5432 --username postgres --dbname audiolad_author_partner_invitees_isolated
+      - name: Execute invitee and activation-email smoke
+        env:
+          AUDIOLAD_AUTHOR_PARTNER_INVITEES_ISOLATED: "1"
+          AUDIOLAD_AUTHOR_PARTNER_INVITEES_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/audiolad_author_partner_invitees_isolated
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          npm run test:author-partner-invitees:isolated

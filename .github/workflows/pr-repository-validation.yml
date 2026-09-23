@@ -79,6 +79,7 @@ jobs:
           npm run test:author-seo-discovery
           npm run test:seo-discovery-ranking
           npm run test:product-seo-quality-review
+          npx tsx scripts/author-email-outbox-cycle-unit.mts
           npm run build
           npm run typecheck
           npm run lint

@@ -1342,6 +1342,23 @@ Ownership: триггер `enforce_quick_offer_product_owner` запрещает
 
 Claim (INSERT) выполняется до SMTP. Повторный вызов с тем же `user_id` не отправляет письмо. Не использовать author sale / moderation outbox workers для welcome.
 
+### Приглашённые авторы и письмо о первой активации (2026-10-31)
+
+Миграция: `supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql`.
+
+Денежный реестр 20% не создаётся. Окно атрибуции, first-touch и бонусный слот не меняются.
+
+| Сущность | Роль |
+|----------|------|
+| `author_referrals` | Канонический ряд. Ожидающий: `status = attributed`, `activated_at IS NULL`. Момент фиксации приглашения — `attributed_at` (новый или уже существующий слушатель, не «дата регистрации»). Активированный: канонические `activated_at`, `expires_at`, `invitee_author_id`. |
+| `list_author_partner_invitees(author_id)` | Читает только владелец (`author_partner_is_owner`) и только `referrer_author_id = author_id`. В ответе нет email и auth id. Имя активированного — `authors.name`. |
+| `author_partner_activation_email_outbox` | Одна устойчивая строка на `referral_id` (`UNIQUE` + `ON CONFLICT DO NOTHING`). Постановка в очередь в той же транзакции, что и первая активация: ошибки INSERT не глотаются. Доставка воркером — at-least-once, не строгий SMTP exactly-once. Lease как у `author_sale_email_outbox`. Стабильный Message-ID и best-effort защита от дублей. |
+| Триггер `author_referrals_enqueue_activation_email_trg` | `AFTER UPDATE`, только переход `activated_at` NULL → значение и `status = activated`. Запись слушателя (INSERT `attributed`) письмо не ставит. Если email владельца-партнёра нет, активация откатывается (`partner_activation_email_recipient_missing`). SMTP в этой транзакции нет. |
+
+Получатель письма — email владельца-партнёра. Отправитель — каноническая личность `authors` (`authors@audiolad.ru`). Отдельного ящика `author@audiolad.ru` в конфиге нет.
+
+Повторные попытки не ждут следующего запроса активации и не требуют нового systemd unit. Уже установленный `audiolad-author-sale-email-outbox.timer` каждые 2 минуты запускает код текущего релиза: `run-author-sale-email-outbox.sh` → `npm run run:author-sale-email-outbox`. Этот скрипт дренирует и sale outbox, и `author_partner_activation_email_outbox`. Очереди изолированы: свой lease, свой Message-ID, сбой одной не пропускает другую. Обычный Production Deploy обновляет release, следующий тик таймера подхватывает новую очередь без `systemctl enable`. Сразу после активации приложение может сделать best-effort drain; он не заменяет таймер. Подробности: `deploy/docs/AUTHOR_PARTNER_ACTIVATION_EMAIL_OUTBOX.md`.
+
 ## Analytics heavy RPC (2026-08-28)
 
 Миграция: `supabase/migrations/20260902120100_analytics_heavy_rpc_idempotent.sql`.
