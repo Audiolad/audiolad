@@ -290,6 +290,7 @@
     "test:author-default-audio-product-author": "npx tsx scripts/author-default-audio-product-author-unit.mjs",
     "test:seo-spa-massage-queries-seed": "npx tsx scripts/seo-spa-massage-queries-seed-unit.mjs",
     "test:music-product-rollout": "npx tsx scripts/music-product-rollout-unit.mjs",
+    "test:seo-music-product-queries-seed": "npx tsx scripts/seo-music-product-queries-seed-unit.mjs",
     "test:seo-reservation-link-music-gate": "npx tsx scripts/seo-reservation-link-music-gate-unit.mjs && node scripts/seo-reservation-link-music-gate-sql-unit.mjs",
     "test:seo-reservation-product-create": "npx tsx scripts/seo-reservation-product-create-unit.mjs",
     "test:author-published-product-seo-link": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-published-product-seo-link-unit.mjs",
