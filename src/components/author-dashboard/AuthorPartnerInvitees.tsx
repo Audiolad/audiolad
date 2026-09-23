@@ -17,7 +17,7 @@ export default function AuthorPartnerInvitees({ invitees, loadError }: Props) {
         Приглашённые авторы
       </h3>
       <p className="mt-1 text-sm text-[#7d70a2]">
-        Люди, которые перешли по вашей ссылке и зарегистрировались в АудиоЛаде.
+        Люди, чьё приглашение уже зафиксировано. Это может быть новый слушатель или тот, кто уже был в АудиоЛаде.
       </p>
 
       {loadError ? (

@@ -1,7 +1,9 @@
 import { payloadIndicatesFirstPartnerActivation } from "@/lib/author-partner/activation-email-policy";
 
 /**
- * After a request that just committed a first activation, drain the outbox.
+ * Best-effort immediate send after a request that just committed a first
+ * activation. This is not the retry path: a failed row with next_attempt_at
+ * is claimed later by audiolad-author-partner-activation-email-outbox.timer.
  * No-ops for registration, missing referral, and already-activated retries.
  * Failures are logged and do not change the caller result.
  */

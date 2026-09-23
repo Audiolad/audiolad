@@ -49,7 +49,13 @@ assert.equal(pendingView.registeredAt, pending.registered_at);
 assert.equal("expiresAt" in pendingView, false, "pending has no expires_at");
 const pendingCard = describePartnerInvitee(pendingView);
 assert.equal(pendingCard.badge, PARTNER_PENDING_STATUS);
-assert.match(pendingCard.title, /зарегистрировался по вашей ссылке/);
+assert.match(pendingCard.title, /Приглашение зафиксировано/);
+assert.match(pendingCard.lines[0] ?? "", /Приглашение зафиксировано:/);
+assert.equal(
+  pendingCard.lines.some((line) => /Дата регистрации|зарегистрировался/.test(line)),
+  false,
+  "pending copy does not call attributed_at a signup date",
+);
 assert.equal(
   pendingCard.lines.some((line) => /20%/.test(line)),
   false,
@@ -116,7 +122,8 @@ assert.equal(
 );
 
 assert.equal(parseAuthorPartnerInviteesPayload({ ok: false, invitees: [pending] }).length, 0);
-assert.equal(PARTNER_INVITEES_EMPTY.includes("пока никто"), true);
+assert.equal(PARTNER_INVITEES_EMPTY.includes("зафиксированных приглашений"), true);
+assert.equal(/зарегистрировался/.test(PARTNER_INVITEES_EMPTY), false);
 
 const resorted = sortPartnerInvitees(
   parseAuthorPartnerInviteesPayload({

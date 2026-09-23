@@ -11,6 +11,7 @@ import {
 import { partnerActivationEmailFromAddress } from "@/lib/email/send-partner-author-activated-email";
 import {
   PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT,
+  renderPartnerAuthorActivatedEmailHtml,
   renderPartnerAuthorActivatedEmailText,
 } from "@/lib/email/templates/partner-author-activated";
 
@@ -82,7 +83,17 @@ const text = renderPartnerAuthorActivatedEmailText({
   siteOrigin: "https://audiolad.ru",
 });
 assert.match(text, /Здравствуйте, Сергей!/);
-assert.match(text, /Мария Соколова стал автором/);
+assert.match(text, /зарегистрирован новый автор: Мария Соколова/);
+assert.equal(/стал автором/.test(text), false, "email copy is not gendered");
+const html = renderPartnerAuthorActivatedEmailHtml({
+  partnerName: "Сергей",
+  inviteeAuthorName: "Мария Соколова",
+  activatedAt: "2026-09-23T10:00:00.000Z",
+  expiresAt: "2029-09-23T10:00:00.000Z",
+  siteOrigin: "https://audiolad.ru",
+});
+assert.match(html, /зарегистрирован новый автор: Мария Соколова/);
+assert.equal(/стал автором/.test(html), false);
 assert.match(text, /20%/);
 assert.match(text, /не уменьшает роялти/);
 assert.match(text, /Ваши 20%/);

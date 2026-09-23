@@ -10,9 +10,16 @@
 -- transitions from NULL to a timestamp and status becomes 'activated'
 -- (the same statement finalize_author_partner_referral uses). Listener
 -- registration inserts attributed rows and does not fire the trigger.
--- Exactly-once enqueue: UNIQUE (referral_id) + ON CONFLICT DO NOTHING.
+-- Idempotent enqueue: UNIQUE (referral_id) + ON CONFLICT DO NOTHING.
+-- The INSERT commits in the same transaction as activation. There is no
+-- EXCEPTION handler: if the outbox row cannot be written, activation rolls
+-- back. SMTP runs later in the systemd worker and cannot roll activation back.
+-- Delivery is at-least-once (lease + stable Message-ID), not strict SMTP exactly-once.
 -- A retry that returns already_activated does not update activated_at, so
 -- the trigger does not run again.
+-- Due rows (including failed rows whose next_attempt_at has passed) are
+-- claimed by systemd timer audiolad-author-partner-activation-email-outbox.timer
+-- every 2 minutes. An inline request drain is only a best-effort fast path.
 
 BEGIN;
 
@@ -54,7 +61,7 @@ CREATE INDEX IF NOT EXISTS author_partner_activation_email_outbox_due_idx
   WHERE status IN ('pending', 'failed');
 
 COMMENT ON TABLE public.author_partner_activation_email_outbox IS
-  'audiolad:author-partner:v4; exactly-once email when a referred listener first becomes an author. Payload has partner and public author names plus canonical activated_at/expires_at. No invitee email, no ledger.';
+  'audiolad:author-partner:v4; one durable row per referral when a referred listener first becomes an author. Worker delivery is at-least-once. Payload has partner and public author names plus canonical activated_at/expires_at. No invitee email, no ledger.';
 
 ALTER TABLE public.author_partner_activation_email_outbox ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.author_partner_activation_email_outbox FROM PUBLIC;
@@ -90,74 +97,65 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  BEGIN
-    SELECT
-      coalesce(
-        nullif(lower(btrim(p.contact_email)), ''),
-        nullif(lower(btrim(p.email)), ''),
-        nullif(lower(btrim(u.email)), '')
-      ),
-      coalesce(nullif(btrim(p.full_name), ''), nullif(btrim(referrer.name), ''), 'партнёр')
-    INTO v_email, v_partner_name
-    FROM public.profiles AS p
-    LEFT JOIN auth.users AS u ON u.id = p.id
-    LEFT JOIN public.authors AS referrer ON referrer.id = NEW.referrer_author_id
-    WHERE p.id = NEW.referrer_owner_user_id;
+  -- No EXCEPTION handler. A failed INSERT aborts activation so the
+  -- outbox row cannot be lost while the referral stays activated.
+  -- SMTP is not in this transaction.
+  SELECT
+    coalesce(
+      nullif(lower(btrim(p.contact_email)), ''),
+      nullif(lower(btrim(p.email)), ''),
+      nullif(lower(btrim(u.email)), '')
+    ),
+    coalesce(nullif(btrim(p.full_name), ''), nullif(btrim(referrer.name), ''), 'партнёр')
+  INTO v_email, v_partner_name
+  FROM public.profiles AS p
+  LEFT JOIN auth.users AS u ON u.id = p.id
+  LEFT JOIN public.authors AS referrer ON referrer.id = NEW.referrer_author_id
+  WHERE p.id = NEW.referrer_owner_user_id;
 
-    IF v_partner_name IS NULL OR position('@' in v_partner_name) > 0 THEN
-      v_partner_name := 'партнёр';
-    END IF;
+  IF v_partner_name IS NULL OR position('@' in v_partner_name) > 0 THEN
+    v_partner_name := 'партнёр';
+  END IF;
 
-    SELECT coalesce(nullif(btrim(a.name), ''), 'Автор')
-    INTO v_invitee_name
-    FROM public.authors AS a
-    WHERE a.id = NEW.invitee_author_id;
+  SELECT coalesce(nullif(btrim(a.name), ''), 'Автор')
+  INTO v_invitee_name
+  FROM public.authors AS a
+  WHERE a.id = NEW.invitee_author_id;
 
-    IF v_invitee_name IS NULL OR position('@' in v_invitee_name) > 0 THEN
-      v_invitee_name := 'Автор';
-    END IF;
+  IF v_invitee_name IS NULL OR position('@' in v_invitee_name) > 0 THEN
+    v_invitee_name := 'Автор';
+  END IF;
 
-    IF v_email IS NULL OR position('@' in v_email) < 2 THEN
-      RAISE LOG 'audiolad_partner_event %', jsonb_build_object(
-        'event', 'partner_activation_email_skipped',
-        'reason', 'referrer_email_missing',
-        'referral_id', NEW.id
-      );
-      RETURN NEW;
-    END IF;
+  IF v_email IS NULL OR position('@' in v_email) < 2 THEN
+    RAISE EXCEPTION 'partner_activation_email_recipient_missing'
+      USING ERRCODE = 'P0001',
+            DETAIL = 'referrer owner email is required so the outbox row commits with activation';
+  END IF;
 
-    INSERT INTO public.author_partner_activation_email_outbox (
-      referral_id,
-      idempotency_key,
-      recipient_email,
-      payload
-    ) VALUES (
-      NEW.id,
-      'partner_author_activated:' || NEW.id::text,
-      v_email,
-      jsonb_build_object(
-        'partner_name', v_partner_name,
-        'invitee_author_name', v_invitee_name,
-        'activated_at', NEW.activated_at,
-        'expires_at', NEW.expires_at
-      )
+  INSERT INTO public.author_partner_activation_email_outbox (
+    referral_id,
+    idempotency_key,
+    recipient_email,
+    payload
+  ) VALUES (
+    NEW.id,
+    'partner_author_activated:' || NEW.id::text,
+    v_email,
+    jsonb_build_object(
+      'partner_name', v_partner_name,
+      'invitee_author_name', v_invitee_name,
+      'activated_at', NEW.activated_at,
+      'expires_at', NEW.expires_at
     )
-    ON CONFLICT (referral_id) DO NOTHING;
-  EXCEPTION WHEN OTHERS THEN
-    -- Email must not roll back activation, bonus, or immutability.
-    RAISE LOG 'audiolad_partner_event %', jsonb_build_object(
-      'event', 'partner_activation_email_enqueue_failed',
-      'referral_id', NEW.id,
-      'sqlstate', SQLSTATE
-    );
-  END;
+  )
+  ON CONFLICT (referral_id) DO NOTHING;
 
   RETURN NEW;
 END;
 $$;
 
 COMMENT ON FUNCTION public.enqueue_author_partner_activation_email() IS
-  'audiolad:author-partner:v4; AFTER UPDATE trigger. Enqueues one partner email when activated_at is first set. Does not change referral identity or bonus.';
+  'audiolad:author-partner:v4; AFTER UPDATE trigger. Idempotent outbox insert in the activation transaction. Does not swallow enqueue errors. Does not send SMTP.';
 
 REVOKE ALL ON FUNCTION public.enqueue_author_partner_activation_email()
   FROM PUBLIC, anon, authenticated;
@@ -178,6 +176,9 @@ CREATE TRIGGER author_referrals_enqueue_activation_email_trg
 
 -- ---------------------------------------------------------------------------
 -- 3. Claim / complete / fail (service role worker)
+-- At-least-once delivery. Lease + SKIP LOCKED reduce duplicates.
+-- SMTP itself is not exactly-once: a crash after accept and before sent_at
+-- can retry. The app sets a stable Message-ID from referral_id.
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.claim_author_partner_activation_email_outbox(

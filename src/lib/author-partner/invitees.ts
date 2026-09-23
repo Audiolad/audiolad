@@ -1,5 +1,5 @@
 export const PARTNER_INVITEES_EMPTY =
-  "По вашей ссылке пока никто не зарегистрировался.";
+  "По вашей ссылке пока нет зафиксированных приглашений.";
 
 export const PARTNER_INVITEES_LOAD_ERROR =
   "Не удалось загрузить список приглашённых. Обновите страницу.";
@@ -114,7 +114,7 @@ export function inviteeSortInstant(item: PartnerInviteeView): number {
   return new Date(raw).getTime();
 }
 
-/** Newest registration or activation first. Dates stay the canonical strings. */
+/** Newest recorded invite or activation first. Dates stay the canonical strings. */
 export function sortPartnerInvitees(
   items: readonly PartnerInviteeView[],
 ): PartnerInviteeView[] {
@@ -143,9 +143,9 @@ export function describePartnerInvitee(
 ): PartnerInviteeCard {
   if (item.state === "pending") {
     return {
-      title: "Пользователь зарегистрировался по вашей ссылке",
+      title: "Приглашение зафиксировано",
       lines: [
-        `Дата регистрации: ${formatPartnerCabinetDate(item.registeredAt)}`,
+        `Приглашение зафиксировано: ${formatPartnerCabinetDate(item.registeredAt)}`,
       ],
       badge: PARTNER_PENDING_STATUS,
     };

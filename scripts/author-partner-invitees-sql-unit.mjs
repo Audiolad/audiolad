@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
  * Contract checks for the invitee list + activation email migration.
- * Does not open a database and never writes to production.
+ * Real SQL runs only when AUDIOLAD_AUTHOR_PARTNER_INVITEES_ISOLATED=1
+ * against AUDIOLAD_AUTHOR_PARTNER_INVITEES_DATABASE_URL (scratch CI Postgres).
+ * Never writes to production.
  */
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,7 +44,10 @@ assert(sql.includes("r.attributed_at"), "pending date is attributed_at");
 assert(sql.includes("'activated_at', r.activated_at"), "canonical activated_at");
 assert(sql.includes("'expires_at', r.expires_at"), "canonical expires_at");
 assert(sql.includes("r.status = 'attributed'"), "pending is attributed");
-assert(enqueueSql.includes("EXCEPTION WHEN OTHERS"), "email failure does not abort activation");
+assert(!enqueueSql.includes("EXCEPTION WHEN OTHERS"), "enqueue does not swallow insert failures");
+assert(sql.includes("partner_activation_email_recipient_missing"), "missing recipient aborts activation");
+assert(sql.includes("not strict SMTP exactly-once"), "docs do not claim SMTP exactly-once");
+assert(sql.includes("audiolad-author-partner-activation-email-outbox.timer"), "retry timer is named");
 assert(!/FROM auth\.users/.test(listSql), "list does not read auth users");
 assert(!/\.email/.test(listSql), "list payload has no email column");
 assert(!/invitee_user_id/.test(listSql), "list does not return invitee user id");
@@ -53,4 +59,74 @@ assert(
   "claim is not public",
 );
 
+const timerPath = join(
+  repoRoot,
+  "deploy/systemd/audiolad-author-partner-activation-email-outbox.timer",
+);
+const servicePath = join(
+  repoRoot,
+  "deploy/systemd/audiolad-author-partner-activation-email-outbox.service",
+);
+const wrapperPath = join(
+  repoRoot,
+  "deploy/scripts/run-author-partner-activation-email-outbox.sh",
+);
+const timer = readFileSync(timerPath, "utf8");
+const service = readFileSync(servicePath, "utf8");
+const wrapper = readFileSync(wrapperPath, "utf8");
+const packageJson = readFileSync(join(repoRoot, "package.json"), "utf8");
+assert(timer.includes("OnUnitActiveSec=2min"), "timer every 2 minutes");
+assert(timer.includes("audiolad-author-partner-activation-email-outbox.service"), "timer starts the service");
+assert(service.includes("/usr/local/lib/audiolad/run-author-partner-activation-email-outbox.sh"), "service exec");
+assert(
+  wrapper.includes("run run:author-partner-activation-email"),
+  "wrapper npm script",
+);
+assert(packageJson.includes('"run:author-partner-activation-email"'), "package script");
+assert(wrapper.includes("SMTP is not exactly-once"), "wrapper matches at-least-once semantics");
+
 console.log("author-partner-invitees-sql-unit: ok");
+
+function runIsolatedSmoke() {
+  if (process.env.AUDIOLAD_AUTHOR_PARTNER_INVITEES_ISOLATED !== "1") {
+    console.log("author-partner-invitees isolated sql: skipped (not isolated)");
+    return;
+  }
+
+  const databaseUrl = process.env.AUDIOLAD_AUTHOR_PARTNER_INVITEES_DATABASE_URL || "";
+  if (!databaseUrl) {
+    throw new Error("AUDIOLAD_AUTHOR_PARTNER_INVITEES_DATABASE_URL is required for isolated sql");
+  }
+  if (/audiolad\.ru|72\.56\.232\.160/i.test(databaseUrl)) {
+    throw new Error("isolated sql refuses production-looking database urls");
+  }
+
+  const files = [
+    "scripts/lib/author-partner-program-sql-stub.sql",
+    "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
+    "supabase/migrations/20261028120000_author_partner_generate_code_extensions_path.sql",
+    "supabase/migrations/20261025120000_author_partner_attribution.sql",
+    "supabase/migrations/20261027120100_author_partner_activation_bonus.sql",
+    "supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql",
+    "supabase/tests/author_partner_invitees_email_smoke.sql",
+  ].map((relative) => join(repoRoot, relative));
+
+  for (const file of files) {
+    if (!existsSync(file)) throw new Error(`missing sql file: ${file}`);
+    try {
+      execFileSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", file], {
+        encoding: "utf8",
+        maxBuffer: 30 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      const stdout = error && error.stdout ? String(error.stdout) : "";
+      const stderr = error && error.stderr ? String(error.stderr) : "";
+      throw new Error(`psql failed for ${file}\n${stdout}\n${stderr}`);
+    }
+  }
+
+  console.log("author-partner-invitees isolated sql: ok");
+}
+
+runIsolatedSmoke();

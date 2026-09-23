@@ -53,7 +53,7 @@ export function renderPartnerAuthorActivatedEmailHtml(
     renderBrandEmailHeading(PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT),
     renderBrandEmailParagraph(`Здравствуйте, ${partner}!`, "email-greeting"),
     renderBrandEmailParagraph(
-      `По вашей партнёрской ссылке ${invitee} стал автором АудиоЛада.`,
+      `По вашей партнёрской ссылке зарегистрирован новый автор: ${invitee}.`,
       "email-body",
     ),
     renderBrandEmailParagraph(`Дата: ${activated}`, "email-body"),
@@ -75,7 +75,7 @@ export function renderPartnerAuthorActivatedEmailHtml(
 
   return renderBrandEmailShell({
     title: PARTNER_AUTHOR_ACTIVATED_EMAIL_SUBJECT,
-    preheader: `${invitee} стал автором по вашей ссылке`,
+    preheader: `По вашей партнёрской ссылке зарегистрирован новый автор: ${invitee}`,
     logoUrl,
     bodyHtml,
     footerLines: [
@@ -100,7 +100,7 @@ export function renderPartnerAuthorActivatedEmailText(
     "",
     `Здравствуйте, ${partner}!`,
     "",
-    `По вашей партнёрской ссылке ${invitee} стал автором АудиоЛада.`,
+    `По вашей партнёрской ссылке зарегистрирован новый автор: ${invitee}.`,
     `Дата: ${activated}`,
     `Вы получаете 20% от его начисленного роялти до ${until}.`,
     "Партнёрское вознаграждение выплачивает АудиоЛад из своей доли и не уменьшает роялти приглашённого автора.",

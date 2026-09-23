@@ -1350,12 +1350,14 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 | Сущность | Роль |
 |----------|------|
-| `author_referrals` | Канонический ряд. Ожидающий: `status = attributed`, `activated_at IS NULL`, дата регистрации = `attributed_at`. Активированный: `activated_at`, `expires_at`, `invitee_author_id`. |
+| `author_referrals` | Канонический ряд. Ожидающий: `status = attributed`, `activated_at IS NULL`. Момент фиксации приглашения — `attributed_at` (новый или уже существующий слушатель, не «дата регистрации»). Активированный: канонические `activated_at`, `expires_at`, `invitee_author_id`. |
 | `list_author_partner_invitees(author_id)` | Читает только владелец (`author_partner_is_owner`) и только `referrer_author_id = author_id`. В ответе нет email и auth id. Имя активированного — `authors.name`. |
-| `author_partner_activation_email_outbox` | Одно письмо на `referral_id` (`UNIQUE` + `ON CONFLICT DO NOTHING`). Паттерн lease как у `author_sale_email_outbox`. |
-| Триггер `author_referrals_enqueue_activation_email_trg` | `AFTER UPDATE`, только переход `activated_at` NULL → значение и `status = activated`. Регистрация слушателя (INSERT `attributed`) письмо не ставит. |
+| `author_partner_activation_email_outbox` | Одна устойчивая строка на `referral_id` (`UNIQUE` + `ON CONFLICT DO NOTHING`). Постановка в очередь в той же транзакции, что и первая активация: ошибки INSERT не глотаются. Доставка воркером — at-least-once, не строгий SMTP exactly-once. Lease как у `author_sale_email_outbox`. Стабильный Message-ID и best-effort защита от дублей. |
+| Триггер `author_referrals_enqueue_activation_email_trg` | `AFTER UPDATE`, только переход `activated_at` NULL → значение и `status = activated`. Запись слушателя (INSERT `attributed`) письмо не ставит. Если email владельца-партнёра нет, активация откатывается (`partner_activation_email_recipient_missing`). SMTP в этой транзакции нет. |
 
 Получатель письма — email владельца-партнёра. Отправитель — каноническая личность `authors` (`authors@audiolad.ru`). Отдельного ящика `author@audiolad.ru` в конфиге нет.
+
+Повторные попытки не ждут следующего запроса активации. Таймер `audiolad-author-partner-activation-email-outbox.timer` (каждые 2 минуты) вызывает `run:author-partner-activation-email`. Сразу после активации приложение может сделать best-effort drain; он не заменяет таймер. Установка unit описана в `deploy/docs/AUTHOR_PARTNER_ACTIVATION_EMAIL_OUTBOX.md`. Этот репозиторный change таймер на сервере не включает.
 
 ## Analytics heavy RPC (2026-08-28)
 
