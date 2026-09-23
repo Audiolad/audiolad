@@ -564,9 +564,11 @@ export async function beginStudioMediaPlayback(input: {
 export type StudioAudibleStartupDecision = "release" | "stale" | "none-started";
 
 /**
- * Wait until every required track for this Play has settled, then run exactly
- * one release. The transport clock and audible envelopes stay with `onRelease`
- * so a fast track cannot become audible while a slower seek is still pending.
+ * Wait until every required audible track for this Play has settled.
+ * Release only when each required result started. One failure
+ * (`started: false`, not stale) abandons the whole Play, so a voice that
+ * is already ready cannot become audible while catalog music stays silent.
+ * An empty required set (playhead in a gap) still releases.
  */
 export async function runStudioAudibleStartupBarrier(input: {
   generation: number;
@@ -584,7 +586,7 @@ export async function runStudioAudibleStartupBarrier(input: {
     input.onStale();
     return "stale";
   }
-  if (input.pending.length > 0 && results.every((result) => !result.started)) {
+  if (results.some((result) => !result.started && !result.stale)) {
     input.onNoneStarted();
     return "none-started";
   }

@@ -32,6 +32,7 @@ type FakeOptions = {
   autoSeek: boolean;
   holdPlay: boolean;
   rejectPlayWith: string | null;
+  rejectUnseekingPlayWith: string | null;
   scheduleSeek: ((emit: () => void) => void) | null;
 };
 
@@ -48,6 +49,7 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
     autoSeek: true,
     holdPlay: false,
     rejectPlayWith: null,
+    rejectUnseekingPlayWith: null,
     scheduleSeek: null,
     ...partial,
   };
@@ -125,6 +127,11 @@ function createFakeMedia(partial: Partial<FakeOptions> = {}) {
             "The play() request was interrupted by a seek.",
             "AbortError",
           ),
+        );
+      }
+      if (options.rejectUnseekingPlayWith) {
+        return Promise.reject(
+          new DOMException("play rejected", options.rejectUnseekingPlayWith),
         );
       }
       paused = false;
@@ -897,6 +904,222 @@ async function testSpaceDuringDelayedStartupCancelsEveryTrack() {
   }
 }
 
+function abandonPartialStartup(
+  tracks: ReadonlyArray<{ media: { pause: () => void } }>,
+) {
+  for (const track of tracks) {
+    cancelStudioMediaPlayback(track.media);
+    track.media.pause();
+  }
+}
+
+async function testPartialStartupFailureDoesNotRelease() {
+  const gate = generationGate();
+  const generation = gate.bump();
+  const timeline = 40;
+  const clips = {
+    "voice-a": { id: "a", startTime: 0, offset: 0, duration: 120 },
+    "voice-b": { id: "b", startTime: 0, offset: 2, duration: 120 },
+    music: { id: "m", startTime: 0, offset: 8, duration: 180 },
+  };
+  const tracks = [
+    {
+      id: "voice-a" as const,
+      clip: clips["voice-a"],
+      media: createFakeMedia({
+        autoSeek: true,
+        rejectPlayWhileSeeking: true,
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+      }),
+    },
+    {
+      id: "voice-b" as const,
+      clip: clips["voice-b"],
+      media: createFakeMedia({
+        autoSeek: true,
+        rejectPlayWhileSeeking: true,
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+      }),
+    },
+    {
+      id: "music" as const,
+      clip: clips.music,
+      media: createFakeMedia({
+        autoSeek: false,
+        rejectPlayWith: "NotSupportedError",
+        resumeOnSeeked: false,
+        resumeOnResolve: true,
+      }),
+    },
+  ];
+  const audible = listStudioTracksAudibleAtPlayhead(
+    [
+      ...tracks.map((track) => ({
+        id: track.id,
+        muted: false,
+        clips: [track.clip],
+      })),
+      {
+        id: "muted-bed",
+        muted: true,
+        clips: [{ id: "muted", startTime: 0, offset: 0, duration: 120 }],
+      },
+    ],
+    timeline,
+  );
+  assert.deepEqual(audible, ["voice-a", "voice-b", "music"]);
+
+  let opened = 0;
+  let progressStarted = false;
+  let transport = timeline;
+  const errors: string[] = [];
+  const envelopeOpeners: Array<() => void> = [];
+  const pending = tracks.map((track) =>
+    beginStudioMediaPlayback({
+      media: track.media,
+      generation,
+      isGenerationCurrent: (value) => gate.isCurrent(value),
+      targetTime: getStudioClipMediaTime(track.clip, timeline),
+    }).then((outcome) => {
+      if (!outcome.started && !outcome.stale && outcome.errorName) {
+        errors.push(`${track.id}:${outcome.errorName}`);
+      }
+      if (outcome.started && gate.isCurrent(generation)) {
+        envelopeOpeners.push(() => {
+          opened += 1;
+        });
+      }
+      return { started: outcome.started, stale: outcome.stale };
+    }),
+  );
+
+  let decision = "pending";
+  const barrier = runStudioAudibleStartupBarrier({
+    generation,
+    isGenerationCurrent: (value) => gate.isCurrent(value),
+    pending,
+    onRelease: () => {
+      transport = timeline + 0.7;
+      progressStarted = true;
+      for (const open of envelopeOpeners) open();
+      decision = "release";
+    },
+    onStale: () => {
+      decision = "stale";
+    },
+    onNoneStarted: () => {
+      assert.equal(tracks[0]?.media.paused, false);
+      assert.equal(tracks[1]?.media.paused, false);
+      abandonPartialStartup(tracks);
+      decision = "none-started";
+    },
+  });
+
+  const result = await barrier;
+  assert.equal(result, "none-started");
+  assert.equal(decision, "none-started");
+  assert.equal(opened, 0);
+  assert.equal(progressStarted, false);
+  assert.equal(transport, 40);
+  assert.deepEqual(errors, ["music:NotSupportedError"]);
+  assert.equal(tracks[2]?.media.playCalls, 1);
+  for (const track of tracks) {
+    assert.equal(track.media.paused, true, track.id);
+  }
+}
+
+async function testAbortErrorRetryExhaustedAbandonsStartup() {
+  const gate = generationGate();
+  const generation = gate.bump();
+  const timeline = 40;
+  const voice = {
+    id: "voice",
+    clip: { id: "v", startTime: 0, offset: 0, duration: 120 },
+    media: createFakeMedia({
+      autoSeek: true,
+      rejectPlayWhileSeeking: true,
+      resumeOnSeeked: false,
+      resumeOnResolve: true,
+    }),
+  };
+  const music = {
+    id: "music",
+    clip: { id: "m", startTime: 0, offset: 8, duration: 180 },
+    media: createFakeMedia({
+      autoSeek: false,
+      rejectPlayWhileSeeking: true,
+      rejectUnseekingPlayWith: "AbortError",
+      resumeOnSeeked: false,
+      resumeOnResolve: true,
+    }),
+  };
+  const tracks = [voice, music];
+  let opened = 0;
+  let progressStarted = false;
+  let transport = timeline;
+  const errors: string[] = [];
+  const envelopeOpeners: Array<() => void> = [];
+  const pending = tracks.map((track) =>
+    beginStudioMediaPlayback({
+      media: track.media,
+      generation,
+      isGenerationCurrent: (value) => gate.isCurrent(value),
+      targetTime: getStudioClipMediaTime(track.clip, timeline),
+    }).then((outcome) => {
+      if (!outcome.started && !outcome.stale && outcome.errorName) {
+        errors.push(`${track.id}:${outcome.errorName}`);
+      }
+      if (outcome.started && gate.isCurrent(generation)) {
+        envelopeOpeners.push(() => {
+          opened += 1;
+        });
+      }
+      return { started: outcome.started, stale: outcome.stale };
+    }),
+  );
+  let decision = "pending";
+  const barrier = runStudioAudibleStartupBarrier({
+    generation,
+    isGenerationCurrent: (value) => gate.isCurrent(value),
+    pending,
+    onRelease: () => {
+      transport = timeline + 0.7;
+      progressStarted = true;
+      for (const open of envelopeOpeners) open();
+      decision = "release";
+    },
+    onStale: () => {
+      decision = "stale";
+    },
+    onNoneStarted: () => {
+      assert.equal(voice.media.paused, false);
+      assert.equal(music.media.playCalls, 2);
+      abandonPartialStartup(tracks);
+      decision = "none-started";
+    },
+  });
+
+  await drain();
+  assert.equal(decision, "pending");
+  assert.equal(voice.media.paused, false);
+  assert.equal(music.media.playCalls, 1);
+  assert.equal(music.media.seeking, true);
+  music.media.emitSeeked();
+  const result = await barrier;
+  assert.equal(result, "none-started");
+  assert.equal(decision, "none-started");
+  assert.equal(opened, 0);
+  assert.equal(progressStarted, false);
+  assert.equal(transport, 40);
+  assert.deepEqual(errors, ["music:AbortError"]);
+  assert.equal(music.media.playCalls, 2);
+  assert.deepEqual(music.media.playSeekingAtCall, [true, false]);
+  assert.equal(voice.media.paused, true);
+  assert.equal(music.media.paused, true);
+}
+
 async function testCatalogPreviewStopsOnAddAndClose() {
   const preview = createFakeMedia({
     autoSeek: false,
@@ -1047,6 +1270,18 @@ async function testProviderAndCatalogWiring() {
   );
   assert.match(provider, /beginStudioMediaPlayback/);
   assert.match(provider, /runStudioAudibleStartupBarrier/);
+  const lifecycle = await readFile(
+    new URL("../src/lib/studio/media-element-lifecycle.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    lifecycle,
+    /results\.some\(\(result\) => !result\.started && !result\.stale\)/,
+  );
+  assert.doesNotMatch(
+    lifecycle,
+    /results\.every\(\(result\) => !result\.started\)/,
+  );
   assert.match(provider, /playbackStartupHoldRef/);
   assert.match(
     provider,
@@ -1106,6 +1341,8 @@ await testNamedPlayErrorDoesNotRetry("NotAllowedError");
 await testNamedPlayErrorDoesNotRetry("NotSupportedError");
 await testDelayedMultiTrackStartSharesOneAnchor();
 await testSpaceDuringDelayedStartupCancelsEveryTrack();
+await testPartialStartupFailureDoesNotRelease();
+await testAbortErrorRetryExhaustedAbandonsStartup();
 await testCatalogPreviewStopsOnAddAndClose();
 await testRapidSeekPlayPauseKeepsEveryTrack();
 testPauseDiagnosticsIdentifyProjectAndPreview();

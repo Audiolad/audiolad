@@ -1114,6 +1114,8 @@ export function StudioAudioProvider({
         pending: required,
         onRelease: releaseStartup,
         onStale: abandonStartup,
+        // Any required track that failed closes the whole Play. Successful
+        // siblings are paused in stopSources and their envelopes stay queued.
         onNoneStarted: abandonStartup,
       });
     },
