@@ -8,5 +8,8 @@ export const TEST_USER_RESET_CONFIRMATION_PHRASE =
 
 export const TEST_USER_RESET_OPERATION = "test_user_reset" as const;
 
+/** Phase 1 DB cleanup. Phase 2 remains auth.admin.deleteUser in the app. */
+export const TEST_USER_RESET_DB_RPC = "reset_allowlisted_test_user_db" as const;
+
 export const TEST_USER_RESET_AUDIT_TARGET_MARKER =
   "allowlisted:audiolad@mail.ru" as const;

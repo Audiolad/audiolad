@@ -80,9 +80,35 @@ function getBlockMessage(code: TestUserResetBlockCode): string {
     case TEST_USER_RESET_BLOCK_CODES.refunds:
       return "У пользователя есть возвраты. Финансовые данные нужно сохранить.";
     case TEST_USER_RESET_BLOCK_CODES.author_membership:
-      return "Аккаунт связан с авторским пространством.";
+      return "Аккаунт связан с чужим авторским пространством.";
     case TEST_USER_RESET_BLOCK_CODES.author_applications:
       return "У пользователя есть заявки автора.";
+    case TEST_USER_RESET_BLOCK_CODES.foreign_membership:
+      return "Аккаунт состоит в чужом авторском пространстве.";
+    case TEST_USER_RESET_BLOCK_CODES.other_members_on_owned_authors:
+      return "В авторском пространстве тестового аккаунта есть другие участники.";
+    case TEST_USER_RESET_BLOCK_CODES.test_as_referrer:
+      return "Тестовый аккаунт пригласил другого пользователя. Такие рефералы не удаляются.";
+    case TEST_USER_RESET_BLOCK_CODES.royalty:
+      return "У авторского пространства есть роялти или журнал начислений.";
+    case TEST_USER_RESET_BLOCK_CODES.payout:
+      return "У авторского пространства есть выплаты.";
+    case TEST_USER_RESET_BLOCK_CODES.payout_profile:
+      return "У авторского пространства есть профиль выплат.";
+    case TEST_USER_RESET_BLOCK_CODES.owned_author_content:
+      return "У авторского пространства есть контент, студия или другие данные, которые нельзя стереть этим сбросом.";
+    case TEST_USER_RESET_BLOCK_CODES.foreign_attribution:
+      return "К авторскому пространству привязана атрибуция другого пользователя.";
+    case TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution:
+      return "У авторского пространства есть незавершённая реферальная атрибуция без приглашённого. Такие строки не удаляются.";
+    case TEST_USER_RESET_BLOCK_CODES.capacity_grants:
+      return "Есть оплаченные пакеты лимита авторских проектов. Финансовые данные нужно сохранить.";
+    case TEST_USER_RESET_BLOCK_CODES.protected_author:
+      return "Сброс затронул бы автора Sergey или код sergey.";
+    case TEST_USER_RESET_BLOCK_CODES.foreign_terms:
+      return "В авторском пространстве есть принятие условий другого пользователя.";
+    case TEST_USER_RESET_BLOCK_CODES.db_reset_blocked:
+      return "Сброс остановлен защитой базы данных.";
     case TEST_USER_RESET_BLOCK_CODES.personal_materials:
       return "У пользователя есть персональные материалы.";
     case TEST_USER_RESET_BLOCK_CODES.promotion_campaigns:
@@ -100,11 +126,26 @@ function getBlockMessage(code: TestUserResetBlockCode): string {
 
 export function buildTestUserResetBlocker(
   code: TestUserResetBlockCode,
+  detail?: string | null,
 ): TestUserResetBlocker {
+  const message = getBlockMessage(code);
+  const extra = detail?.trim();
+
   return {
     code,
-    message: getBlockMessage(code),
+    message:
+      extra && code === TEST_USER_RESET_BLOCK_CODES.db_reset_blocked
+        ? `${message} (${extra})`
+        : message,
   };
+}
+
+function countOf(
+  counts: TestUserResetPreflightCounts,
+  key: keyof TestUserResetPreflightCounts,
+): number {
+  const value = counts[key];
+  return typeof value === "number" ? value : 0;
 }
 
 export function evaluateTestUserResetBlockers(input: {
@@ -153,15 +194,65 @@ export function evaluateTestUserResetBlockers(input: {
     );
   }
 
-  if (input.counts.authorMembers > 0) {
+  if (countOf(input.counts, "foreignAuthorMemberships") > 0) {
     blockers.push(
-      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.author_membership),
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.foreign_membership),
     );
   }
 
-  if (input.counts.authorApplications > 0) {
+  if (countOf(input.counts, "otherMembersOnOwnedAuthors") > 0) {
     blockers.push(
-      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.author_applications),
+      buildTestUserResetBlocker(
+        TEST_USER_RESET_BLOCK_CODES.other_members_on_owned_authors,
+      ),
+    );
+  }
+
+  if (countOf(input.counts, "referrerReferrals") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.test_as_referrer),
+    );
+  }
+
+  if (countOf(input.counts, "foreignAttributions") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.foreign_attribution),
+    );
+  }
+
+  if (countOf(input.counts, "pendingReferrerAttributions") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(
+        TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution,
+      ),
+    );
+  }
+
+  if (countOf(input.counts, "authorLedgerEntries") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.royalty),
+    );
+  }
+
+  if (countOf(input.counts, "authorPayouts") > 0) {
+    blockers.push(buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.payout));
+  }
+
+  if (countOf(input.counts, "authorPayoutProfiles") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.payout_profile),
+    );
+  }
+
+  if (countOf(input.counts, "ownedAuthorContent") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.owned_author_content),
+    );
+  }
+
+  if (countOf(input.counts, "capacityGrants") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.capacity_grants),
     );
   }
 

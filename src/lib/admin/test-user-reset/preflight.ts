@@ -47,6 +47,20 @@ function emptyCounts(): TestUserResetPreflightCounts {
     authorApplications: 0,
     promotionCampaigns: 0,
     personalMaterialTemplates: 0,
+    inviteeReferrals: 0,
+    attributions: 0,
+    ownedAuthors: 0,
+    partnerBonus: 0,
+    capacityGrants: 0,
+    foreignAuthorMemberships: 0,
+    otherMembersOnOwnedAuthors: 0,
+    referrerReferrals: 0,
+    foreignAttributions: 0,
+    pendingReferrerAttributions: 0,
+    authorLedgerEntries: 0,
+    authorPayouts: 0,
+    authorPayoutProfiles: 0,
+    ownedAuthorContent: 0,
   };
 }
 
@@ -241,6 +255,175 @@ async function countAnalyticsScope(
   };
 }
 
+type MembershipRow = {
+  author_id: string;
+  role: string;
+  user_id: string;
+};
+
+async function loadAuthorResetScope(
+  service: ServiceClient,
+  authUserId: string,
+  counts: TestUserResetPreflightCounts,
+): Promise<void> {
+  const { data: membershipRows, error: membershipError } = await service
+    .from("author_members")
+    .select("author_id, role, user_id")
+    .eq("user_id", authUserId);
+
+  if (membershipError) {
+    throw new Error("test_user_reset_preflight_author_members_failed");
+  }
+
+  const memberships = (membershipRows ?? []) as MembershipRow[];
+  const ownerAuthorIds = memberships
+    .filter((row) => row.role === "owner")
+    .map((row) => row.author_id);
+
+  let otherMembersOnOwnedAuthors = 0;
+
+  if (ownerAuthorIds.length > 0) {
+    const { data: ownedMemberRows, error: ownedMembersError } = await service
+      .from("author_members")
+      .select("author_id, user_id")
+      .in("author_id", ownerAuthorIds);
+
+    if (ownedMembersError) {
+      throw new Error("test_user_reset_preflight_owned_members_failed");
+    }
+
+    otherMembersOnOwnedAuthors = (ownedMemberRows ?? []).filter(
+      (row) => row.user_id !== authUserId,
+    ).length;
+  }
+
+  counts.authorMembers = memberships.length;
+  counts.ownedAuthors = ownerAuthorIds.length;
+  counts.foreignAuthorMemberships = memberships.filter(
+    (row) => row.role !== "owner",
+  ).length;
+  counts.otherMembersOnOwnedAuthors = otherMembersOnOwnedAuthors;
+
+  const { data: inviteeReferralRows, error: inviteeReferralError } =
+    await service
+      .from("author_referrals")
+      .select("id")
+      .eq("invitee_user_id", authUserId);
+
+  if (inviteeReferralError) {
+    throw new Error("test_user_reset_preflight_invitee_referrals_failed");
+  }
+
+  counts.inviteeReferrals = inviteeReferralRows?.length ?? 0;
+
+  const { data: referrerByOwnerRows, error: referrerByOwnerError } =
+    await service
+      .from("author_referrals")
+      .select("id, invitee_user_id")
+      .eq("referrer_owner_user_id", authUserId);
+
+  if (referrerByOwnerError) {
+    throw new Error("test_user_reset_preflight_referrer_referrals_failed");
+  }
+
+  const referrerIds = new Set<string>();
+
+  for (const row of referrerByOwnerRows ?? []) {
+    if (row.invitee_user_id && row.invitee_user_id !== authUserId && row.id) {
+      referrerIds.add(row.id);
+    }
+  }
+
+  if (ownerAuthorIds.length > 0) {
+    const { data: referrerByAuthorRows, error: referrerByAuthorError } =
+      await service
+        .from("author_referrals")
+        .select("id, invitee_user_id")
+        .in("referrer_author_id", ownerAuthorIds);
+
+    if (referrerByAuthorError) {
+      throw new Error("test_user_reset_preflight_referrer_author_referrals_failed");
+    }
+
+    for (const row of referrerByAuthorRows ?? []) {
+      if (row.invitee_user_id && row.invitee_user_id !== authUserId && row.id) {
+        referrerIds.add(row.id);
+      }
+    }
+
+    const { data: attributionRows, error: attributionError } = await service
+      .from("author_partner_attributions")
+      .select("id, invitee_user_id")
+      .in("referrer_author_id", ownerAuthorIds);
+
+    if (attributionError) {
+      throw new Error("test_user_reset_preflight_attributions_failed");
+    }
+
+    counts.foreignAttributions = (attributionRows ?? []).filter(
+      (row) => row.invitee_user_id && row.invitee_user_id !== authUserId,
+    ).length;
+    counts.pendingReferrerAttributions = (attributionRows ?? []).filter(
+      (row) => !row.invitee_user_id,
+    ).length;
+
+    counts.authorLedgerEntries = await countRowsIn(
+      service,
+      "author_ledger_entries",
+      "author_id",
+      ownerAuthorIds,
+    );
+    counts.authorPayouts = await countRowsIn(
+      service,
+      "author_payouts",
+      "author_id",
+      ownerAuthorIds,
+    );
+    counts.authorPayoutProfiles = await countRowsIn(
+      service,
+      "author_payout_profiles",
+      "author_id",
+      ownerAuthorIds,
+    );
+
+    const contentTables = [
+      "practices",
+      "studio_projects",
+      "audiobook_projects",
+      "author_commercial_applications",
+    ] as const;
+
+    for (const table of contentTables) {
+      counts.ownedAuthorContent += await countRowsIn(
+        service,
+        table,
+        "author_id",
+        ownerAuthorIds,
+      );
+    }
+  }
+
+  counts.referrerReferrals = referrerIds.size;
+
+  const { data: inviteeAttributions, error: inviteeAttributionError } =
+    await service
+      .from("author_partner_attributions")
+      .select("id")
+      .eq("invitee_user_id", authUserId);
+
+  if (inviteeAttributionError) {
+    throw new Error("test_user_reset_preflight_invitee_attributions_failed");
+  }
+
+  counts.attributions = inviteeAttributions?.length ?? 0;
+  counts.capacityGrants = await countRows(
+    service,
+    "author_project_capacity_grants",
+    "user_id",
+    authUserId,
+  );
+}
+
 export async function getTestUserResetPreflight(
   service: ServiceClient,
   options?: { actorUserId?: string | null },
@@ -257,12 +440,13 @@ export async function getTestUserResetPreflight(
     role: string;
     full_name: string | null;
     email: string | null;
+    author_project_slots_partner_bonus?: number | null;
   } | null = null;
 
   if (authUserId) {
     const { data, error } = await service
       .from("profiles")
-      .select("id, role, full_name, email")
+      .select("id, role, full_name, email, author_project_slots_partner_bonus")
       .eq("id", authUserId)
       .maybeSingle();
 
@@ -358,12 +542,8 @@ export async function getTestUserResetPreflight(
       "owner_user_id",
       authUserId,
     );
-    counts.authorMembers = await countRows(
-      service,
-      "author_members",
-      "user_id",
-      authUserId,
-    );
+    counts.partnerBonus = Number(profile?.author_project_slots_partner_bonus ?? 0);
+    await loadAuthorResetScope(service, authUserId, counts);
     counts.authorApplications = await countRows(
       service,
       "author_applications",

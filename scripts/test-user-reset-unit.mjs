@@ -109,6 +109,146 @@ function testPolicy() {
     "orders blocker",
   );
 
+  const ownAuthorCleanup = evaluateTestUserResetBlockers({
+    resolvedEmail: TEST_USER_RESET_EMAIL,
+    profileRole: LISTENER_ROLE,
+    counts: {
+      userPractices: 0,
+      practiceAudioProgress: 0,
+      practiceListenStats: 0,
+      practiceRatings: 0,
+      practiceRatingEvents: 0,
+      playlists: 0,
+      playlistItems: 0,
+      emailContacts: 0,
+      emailPreferences: 0,
+      emailConsents: 0,
+      emailOutbox: 0,
+      emailDeliveryEvents: 0,
+      analyticsSessions: 0,
+      analyticsEvents: 0,
+      orders: 0,
+      payments: 0,
+      refundedOrders: 0,
+      personalMaterialsCreated: 0,
+      personalMaterialsClaimed: 0,
+      privateAudioItems: 0,
+      authorMembers: 2,
+      authorApplications: 1,
+      promotionCampaigns: 0,
+      personalMaterialTemplates: 0,
+      inviteeReferrals: 1,
+      attributions: 1,
+      ownedAuthors: 2,
+      partnerBonus: 1,
+      capacityGrants: 0,
+      foreignAuthorMemberships: 0,
+      otherMembersOnOwnedAuthors: 0,
+      referrerReferrals: 0,
+      foreignAttributions: 0,
+      authorLedgerEntries: 0,
+      authorPayouts: 0,
+      authorPayoutProfiles: 0,
+      ownedAuthorContent: 0,
+    },
+  });
+  assert(
+    ownAuthorCleanup.length === 0,
+    "own memberships, applications, invitee referrals and bonus are cleanup targets",
+  );
+
+  const referrerBlock = evaluateTestUserResetBlockers({
+    resolvedEmail: TEST_USER_RESET_EMAIL,
+    profileRole: LISTENER_ROLE,
+    counts: {
+      userPractices: 0,
+      practiceAudioProgress: 0,
+      practiceListenStats: 0,
+      practiceRatings: 0,
+      practiceRatingEvents: 0,
+      playlists: 0,
+      playlistItems: 0,
+      emailContacts: 0,
+      emailPreferences: 0,
+      emailConsents: 0,
+      emailOutbox: 0,
+      emailDeliveryEvents: 0,
+      analyticsSessions: 0,
+      analyticsEvents: 0,
+      orders: 0,
+      payments: 0,
+      refundedOrders: 0,
+      personalMaterialsCreated: 0,
+      personalMaterialsClaimed: 0,
+      privateAudioItems: 0,
+      authorMembers: 1,
+      authorApplications: 0,
+      promotionCampaigns: 0,
+      personalMaterialTemplates: 0,
+      referrerReferrals: 1,
+      foreignAuthorMemberships: 1,
+      capacityGrants: 1,
+    },
+  });
+  assert(
+    referrerBlock.some((row) => row.code === TEST_USER_RESET_BLOCK_CODES.test_as_referrer),
+    "test account as referrer is a hard blocker",
+  );
+  assert(
+    referrerBlock.some(
+      (row) => row.code === TEST_USER_RESET_BLOCK_CODES.foreign_membership,
+    ),
+    "foreign membership is a hard blocker",
+  );
+  assert(
+    referrerBlock.some((row) => row.code === TEST_USER_RESET_BLOCK_CODES.capacity_grants),
+    "paid capacity grants stay blocked with finance",
+  );
+
+  const pendingAttribution = evaluateTestUserResetBlockers({
+    resolvedEmail: TEST_USER_RESET_EMAIL,
+    profileRole: LISTENER_ROLE,
+    counts: {
+      userPractices: 0,
+      practiceAudioProgress: 0,
+      practiceListenStats: 0,
+      practiceRatings: 0,
+      practiceRatingEvents: 0,
+      playlists: 0,
+      playlistItems: 0,
+      emailContacts: 0,
+      emailPreferences: 0,
+      emailConsents: 0,
+      emailOutbox: 0,
+      emailDeliveryEvents: 0,
+      analyticsSessions: 0,
+      analyticsEvents: 0,
+      orders: 0,
+      payments: 0,
+      refundedOrders: 0,
+      personalMaterialsCreated: 0,
+      personalMaterialsClaimed: 0,
+      privateAudioItems: 0,
+      authorMembers: 1,
+      authorApplications: 0,
+      promotionCampaigns: 0,
+      personalMaterialTemplates: 0,
+      pendingReferrerAttributions: 1,
+    },
+  });
+  assert(
+    pendingAttribution.some(
+      (row) => row.code === TEST_USER_RESET_BLOCK_CODES.pending_referrer_attribution,
+    ),
+    "pending referrer-side attribution is a hard blocker",
+  );
+  assert(
+    !referrerBlock.some(
+      (row) => row.code === TEST_USER_RESET_BLOCK_CODES.author_membership,
+    ),
+    "legacy author_membership code is not the allowlisted blocker",
+  );
+
   const wrongEmail = evaluateTestUserResetBlockers({
     resolvedEmail: "other@mail.ru",
     profileRole: LISTENER_ROLE,
@@ -167,6 +307,67 @@ function testStaticWiring() {
   assert(panel.includes("TEST_USER_RESET_CONFIRMATION_PHRASE"), "panel phrase constant");
   assert(panel.includes("Очистить локальные тестовые данные"), "local clear button");
   assert(reset.includes("auth.admin.deleteUser"), "auth admin delete used");
+  const resetConstants = readRepoFile(
+    "src",
+    "lib",
+    "admin",
+    "test-user-reset",
+    "constants.ts",
+  );
+  assert(
+    resetConstants.includes('reset_allowlisted_test_user_db'),
+    "phase 1 RPC name is hard-coded",
+  );
+  assert(reset.includes("TEST_USER_RESET_DB_RPC"), "phase 1 RPC wired");
+  const resetFlow = reset.slice(reset.indexOf("export async function resetAllowlistedTestUser"));
+  assert(
+    resetFlow.indexOf("runAllowlistedTestUserDbCleanup(") <
+      resetFlow.indexOf("cleanupNonFkData("),
+    "phase 1 RPC runs before non-FK cleanup",
+  );
+  assert(
+    resetFlow.indexOf("cleanupNonFkData(") <
+      resetFlow.indexOf("deleteAllowlistedAuthUser("),
+    "non-FK cleanup runs only after phase 1 and before auth delete",
+  );
+  const allowlistedResetMigration = readRepoFile(
+    "supabase",
+    "migrations",
+    "20261030120000_allowlisted_test_user_reset_db_cleanup.sql",
+  );
+  assert(
+    allowlistedResetMigration.includes("SET search_path = ''"),
+    "reset RPC locks search_path",
+  );
+  assert(
+    allowlistedResetMigration.includes("GRANT EXECUTE ON FUNCTION public.reset_allowlisted_test_user_db(uuid) TO service_role"),
+    "reset RPC is granted only to service_role",
+  );
+  assert(
+    allowlistedResetMigration.includes("FROM authenticated"),
+    "reset RPC revoked from authenticated",
+  );
+  assert(
+    allowlistedResetMigration.includes("audiolad@mail.ru"),
+    "allowlist is hard-coded in SQL",
+  );
+  assert(
+    allowlistedResetMigration.includes("set_config('audiolad.allowlisted_test_user_reset'"),
+    "reset context is a transaction-local GUC",
+  );
+  assert(
+    !allowlistedResetMigration.includes("DELETE FROM auth.users"),
+    "phase 1 RPC does not delete auth.users",
+  );
+  assert(
+    !/invitee_user_id[\s\S]{0,80}ON DELETE CASCADE/.test(allowlistedResetMigration),
+    "migration does not cascade invitee_user_id",
+  );
+  assert(
+    !allowlistedResetMigration.includes("DROP CONSTRAINT") ||
+      !allowlistedResetMigration.includes("author_referrals_invitee_user_id_fkey"),
+    "migration does not drop the invitee RESTRICT constraint",
+  );
   assert(
     !reset.includes("analytics_first_touches"),
     "reset does not manually delete analytics_first_touches",

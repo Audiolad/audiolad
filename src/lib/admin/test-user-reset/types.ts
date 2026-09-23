@@ -12,6 +12,19 @@ export const TEST_USER_RESET_BLOCK_CODES = {
   personal_material_templates: "personal_material_templates",
   author_workspace_references: "author_workspace_references",
   self_reset: "self_reset",
+  foreign_membership: "foreign_membership",
+  other_members_on_owned_authors: "other_members_on_owned_authors",
+  test_as_referrer: "test_as_referrer",
+  royalty: "royalty",
+  payout: "payout",
+  payout_profile: "payout_profile",
+  owned_author_content: "owned_author_content",
+  foreign_attribution: "foreign_attribution",
+  pending_referrer_attribution: "pending_referrer_attribution",
+  capacity_grants: "capacity_grants",
+  protected_author: "protected_author",
+  foreign_terms: "foreign_terms",
+  db_reset_blocked: "db_reset_blocked",
 } as const;
 
 export type TestUserResetBlockCode =
@@ -47,6 +60,20 @@ export type TestUserResetPreflightCounts = {
   authorApplications: number;
   promotionCampaigns: number;
   personalMaterialTemplates: number;
+  inviteeReferrals: number;
+  attributions: number;
+  ownedAuthors: number;
+  partnerBonus: number;
+  capacityGrants: number;
+  foreignAuthorMemberships: number;
+  otherMembersOnOwnedAuthors: number;
+  referrerReferrals: number;
+  foreignAttributions: number;
+  pendingReferrerAttributions: number;
+  authorLedgerEntries: number;
+  authorPayouts: number;
+  authorPayoutProfiles: number;
+  ownedAuthorContent: number;
 };
 
 export type TestUserResetPreflight = {
@@ -74,6 +101,14 @@ export type TestUserResetDeletedCounts = {
   analyticsSessions: number;
   avatarRemoved: boolean;
   privateAudioItemsRemoved: number;
+  inviteeReferrals: number;
+  attributions: number;
+  ownedAuthors: number;
+  authorMembersRemoved: number;
+  authorApplicationsRemoved: number;
+  capacityGrants: number;
+  partnerBonusCleared: number;
+  dbCleanupCompleted: boolean;
   authUserDeleted: boolean;
 };
 
