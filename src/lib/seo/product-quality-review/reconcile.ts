@@ -4,6 +4,7 @@ import type {
   ProductQualityReviewPrimaryPresence,
   ProductQualityReviewResult,
   ProductQualityReviewSignals,
+  ProductQualityReviewStructuralStuffing,
 } from "@/lib/seo/product-quality-review/types";
 import { PRODUCT_QUALITY_REVIEW_ISSUES_MAX } from "@/lib/seo/product-quality-review/types";
 import { humanizeProductQualityReviewText } from "@/lib/seo/product-quality-review/ui";
@@ -13,6 +14,75 @@ export const DESCRIPTION_STUFFING_ISSUE_MESSAGE =
 
 export const DESCRIPTION_STUFFING_ISSUE_RECOMMENDATION =
   "Сократите повторения основного и близких поисковых запросов. Оставьте их только там, где они звучат естественно для читателя.";
+
+export const QUERY_CHAIN_STUFFING_RECOMMENDATION =
+  "Оставьте одну естественную формулировку и уберите перечисление похожих поисковых запросов.";
+
+export const TITLE_STUFFING_ISSUE_MESSAGE =
+  "Название перегружено близкими поисковыми формулировками.";
+
+export const SUBTITLE_STUFFING_ISSUE_MESSAGE =
+  "Подназвание перегружено близкими поисковыми формулировками.";
+
+export const SEO_TITLE_STUFFING_ISSUE_MESSAGE =
+  "Заголовок для поиска перегружен близкими поисковыми формулировками.";
+
+export const SEO_DESCRIPTION_STUFFING_ISSUE_MESSAGE =
+  "Описание для поиска перегружено близкими поисковыми формулировками.";
+
+export const USAGE_STUFFING_ISSUE_MESSAGE =
+  "Блок «Когда слушать» перегружен близкими поисковыми формулировками.";
+
+export const FAQ_STUFFING_ISSUE_MESSAGE =
+  "Блок «Вопросы и ответы» перегружен близкими поисковыми формулировками.";
+
+const STUFFING_FIELD_ORDER = [
+  "description",
+  "title",
+  "subtitle",
+  "seoTitle",
+  "seoDescription",
+  "usage",
+  "faq",
+] as const satisfies ReadonlyArray<
+  Exclude<keyof ProductQualityReviewStructuralStuffing, "material">
+>;
+
+type StuffingField = (typeof STUFFING_FIELD_ORDER)[number];
+
+const STUFFING_FIELD_COPY: Record<
+  StuffingField,
+  { message: string; recommendation: string }
+> = {
+  description: {
+    message: DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+    recommendation: DESCRIPTION_STUFFING_ISSUE_RECOMMENDATION,
+  },
+  title: {
+    message: TITLE_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+  subtitle: {
+    message: SUBTITLE_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+  seoTitle: {
+    message: SEO_TITLE_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+  seoDescription: {
+    message: SEO_DESCRIPTION_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+  usage: {
+    message: USAGE_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+  faq: {
+    message: FAQ_STUFFING_ISSUE_MESSAGE,
+    recommendation: QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  },
+};
 
 export const NATURAL_THEME_COVERED_SUMMARY =
   "Поисковая тема естественно выражена в описании продукта и в полях для поиска.";
@@ -115,12 +185,15 @@ function isAddMoreKeysAdvice(issue: ProductQualityReviewIssue): boolean {
   );
 }
 
-function hasDescriptionStuffingIssue(issues: ProductQualityReviewIssue[]): boolean {
+function hasFieldStuffingIssue(
+  issues: ProductQualityReviewIssue[],
+  field: StuffingField,
+): boolean {
   return issues.some(
     (issue) =>
-      issue.field === "description" &&
+      issue.field === field &&
       (/перегружен|переспам|повтор|набор поисков|ключев/i.test(issue.message) ||
-        issue.message === DESCRIPTION_STUFFING_ISSUE_MESSAGE),
+        issue.message === STUFFING_FIELD_COPY[field].message),
   );
 }
 
@@ -160,17 +233,21 @@ export function reconcileProductQualityReviewResult(
     );
     issues = stripAddMoreKeysAdvice(issues);
 
-    if (stuffing.description.material && !hasDescriptionStuffingIssue(issues)) {
-      const descriptionIssue: ProductQualityReviewIssue = {
+    const injected: ProductQualityReviewIssue[] = [];
+    for (const field of STUFFING_FIELD_ORDER) {
+      if (!stuffing[field].material || hasFieldStuffingIssue(issues, field)) {
+        continue;
+      }
+      const copy = STUFFING_FIELD_COPY[field];
+      injected.push({
         severity: "critical",
-        field: "description",
-        message: DESCRIPTION_STUFFING_ISSUE_MESSAGE,
-        recommendation: DESCRIPTION_STUFFING_ISSUE_RECOMMENDATION,
-      };
-      issues = [descriptionIssue, ...issues].slice(
-        0,
-        PRODUCT_QUALITY_REVIEW_ISSUES_MAX,
-      );
+        field,
+        message: copy.message,
+        recommendation: copy.recommendation,
+      });
+    }
+    if (injected.length > 0) {
+      issues = [...injected, ...issues].slice(0, PRODUCT_QUALITY_REVIEW_ISSUES_MAX);
     }
 
     // Prefer reduce-spam advice first; drop contradictory "add more" positives.

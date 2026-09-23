@@ -277,7 +277,10 @@ export function buildProductQualityReviewSignals(
   }
 
   const structuralStuffing = evaluateProductStructuralStuffing({
+    title: input.title,
+    subtitle: input.subtitle,
     description: input.description,
+    seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
     usageItems: input.usageItems,
     faqItems: input.faqItems,

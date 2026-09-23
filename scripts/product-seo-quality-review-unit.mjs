@@ -40,6 +40,10 @@ import {
 import {
   DESCRIPTION_STUFFING_ISSUE_MESSAGE,
   NATURAL_THEME_COVERED_SUMMARY,
+  QUERY_CHAIN_STUFFING_RECOMMENDATION,
+  SEO_TITLE_STUFFING_ISSUE_MESSAGE,
+  SUBTITLE_STUFFING_ISSUE_MESSAGE,
+  TITLE_STUFFING_ISSUE_MESSAGE,
   reconcileProductQualityReviewResult,
 } from "../src/lib/seo/product-quality-review/reconcile.ts";
 import {
@@ -1340,6 +1344,245 @@ assert.equal(liveLikeSignals.primaryPresentIn.seoDescription, true);
   assert.equal(secondaryGap.status, "yellow");
   assert.equal(secondaryGap.issues.length, 1);
   assert.match(secondaryGap.issues[0].recommendation, /Дополнительный запрос/);
+}
+
+// FALSE-YELLOW: stuffed subtitle query-chain must be RED via the canonical path.
+// Same healthy package as the SPA morphology fixture, except the subtitle.
+{
+  const primary = "музыка для спа-процедур";
+  const naturalSubtitle =
+    "Музыка для спа-процедур – мягкое сопровождение для ухода, отдыха и спокойной атмосферы пространства";
+  const stuffedSubtitle =
+    "Музыка для спа-процедур – музыка для спа, спа-музыка, музыка для процедур, музыка для релакса и спа";
+
+  function spaPackage(overrides = {}) {
+    return basePackage({
+      title: "Музыка для спа-процедур",
+      subtitle: naturalSubtitle,
+      description:
+        "Музыка для спа-процедур помогает создать мягкую атмосферу во время массажа и отдыха. Спокойные тембры поддерживают расслабление, не отвлекая от процедуры. Можно включить этот фон в кабинете или дома, когда хочется тишины и ровного ритма.",
+      seoPrimaryQuery: primary,
+      seoSecondaryQueries: ["спокойная музыка для массажа"],
+      seoTitle: "Музыка для спа-процедур – слушать онлайн | АудиоЛад",
+      seoDescription:
+        "Музыка для спа-процедур: спокойный фон для массажа, ухода за лицом и отдыха. Слушайте онлайн на АудиоЛад.",
+      usageItems: [
+        "Откройте музыку для спа-процедур во время массажа.",
+        "Оставьте спокойную музыку для массажа, пока идёт уход за лицом.",
+        "Включите трек в перерыве, чтобы вернуть ровное дыхание.",
+      ],
+      faqItems: [
+        {
+          question: "Когда лучше включать музыку для спа-процедур?",
+          answer: "В начале сеанса, чтобы кабинет сразу звучал спокойно.",
+        },
+        {
+          question: "Где слушать музыку для спа-процедур онлайн?",
+          answer: "На АудиоЛад — в браузере, без отдельной установки.",
+        },
+      ],
+      ...overrides,
+    });
+  }
+
+  const healthy = spaPackage();
+  const healthySignals = buildProductQualityReviewSignals(healthy);
+  assert.equal(healthySignals.titleEqualsPrimary, true);
+  assert.equal(healthySignals.structuralStuffing.title.material, false);
+  assert.equal(healthySignals.structuralStuffing.title.nearSynonymQueryChain, false);
+  assert.equal(healthySignals.structuralStuffing.subtitle.material, false);
+  assert.equal(
+    healthySignals.structuralStuffing.subtitle.nearSynonymQueryChain,
+    false,
+  );
+  assert.equal(healthySignals.structuralStuffing.seoTitle.material, false);
+  assert.equal(healthySignals.structuralStuffing.material, false);
+
+  const healthyYellow = {
+    status: "yellow",
+    summary: "Поисковая тема выражена недостаточно.",
+    issues: [
+      {
+        severity: "warning",
+        field: "description",
+        message: "В описании продукта не хватает основного поискового запроса.",
+        recommendation: "Добавьте основной поисковый запрос в описание продукта.",
+      },
+      {
+        severity: "warning",
+        field: "seoDescription",
+        message: "В описании для поиска нет основного поискового запроса.",
+        recommendation: "Добавьте основной поисковый запрос в описание для поиска.",
+      },
+      {
+        severity: "warning",
+        field: "usage",
+        message: "В блоке «Когда слушать» нет точной фразы основного запроса.",
+        recommendation:
+          "Основной поисковый запрос можно естественно использовать в одном из пунктов блока «Когда слушать».",
+      },
+    ],
+    positiveNotes: ["Название совпадает с темой."],
+  };
+  const healthyReconciled = reconcileProductQualityReviewResult(
+    healthyYellow,
+    healthySignals,
+  );
+  assert.equal(healthyReconciled.status, "green");
+  assert.equal(healthyReconciled.summary, NATURAL_THEME_COVERED_SUMMARY);
+  assert.equal(healthyReconciled.issues.length, 0);
+
+  const healthyCanonical = await reviewProductTextQualityForRequest(
+    { authorId: AURAFON_AUTHOR_ID, ...healthy },
+    {
+      fetchImpl: mockFetch([
+        () => jsonResponse(200, yandexAlt(JSON.stringify(healthyYellow))),
+      ]),
+      env: yandexEnv,
+    },
+  );
+  assert.equal(healthyCanonical.ok, true);
+  assert.equal(healthyCanonical.result.status, "green");
+  assert.equal(healthyCanonical.result.issues.length, 0);
+
+  // Title equal to the primary query, with no query-chain, must not become RED.
+  const titleOnly = spaPackage({
+    subtitle: "",
+    description: "Спокойный фон для кабинета и домашнего отдыха.",
+    seoTitle: "Спокойный фон",
+    seoDescription: "Мягкие звуки для отдыха.",
+    seoSecondaryQueries: [],
+    usageItems: ["Во время отдыха", "После сеанса", "Дома"],
+    faqItems: [{ question: "Можно дома?", answer: "Да, как фон." }],
+  });
+  const titleOnlySignals = buildProductQualityReviewSignals(titleOnly);
+  assert.equal(titleOnlySignals.titleEqualsPrimary, true);
+  assert.equal(titleOnlySignals.structuralStuffing.title.material, false);
+  assert.equal(titleOnlySignals.structuralStuffing.material, false);
+  assert.equal(
+    reconcileProductQualityReviewResult(
+      {
+        status: "yellow",
+        summary: "Тема почти только в названии.",
+        issues: [
+          {
+            severity: "warning",
+            field: "description",
+            message: "Основной запрос есть только в названии.",
+            recommendation:
+              "Добавьте основной поисковый запрос естественно в описание продукта.",
+          },
+        ],
+        positiveNotes: [],
+      },
+      titleOnlySignals,
+    ).status,
+    "yellow",
+  );
+  assert.equal(
+    reconcileProductQualityReviewResult(
+      { status: "green", summary: "ok", issues: [], positiveNotes: [] },
+      titleOnlySignals,
+    ).status,
+    "green",
+  );
+
+  const stuffed = spaPackage({ subtitle: stuffedSubtitle });
+  const stuffedSignals = buildProductQualityReviewSignals(stuffed);
+  assert.equal(stuffedSignals.structuralStuffing.subtitle.nearSynonymQueryChain, true);
+  assert.equal(stuffedSignals.structuralStuffing.subtitle.material, true);
+  assert.equal(stuffedSignals.structuralStuffing.title.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.description.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.seoTitle.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.seoDescription.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.usage.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.faq.material, false);
+  assert.equal(stuffedSignals.structuralStuffing.material, true);
+
+  const modelYellow = {
+    status: "yellow",
+    summary: "Поисковая тема выражена недостаточно.",
+    issues: [
+      {
+        severity: "warning",
+        field: "description",
+        message: "В описании продукта не хватает основного поискового запроса.",
+        recommendation: "Добавьте основной поисковый запрос в описание продукта.",
+      },
+      {
+        severity: "warning",
+        field: "seoDescription",
+        message: "Добавьте дополнительный поисковый запрос в описание для поиска.",
+        recommendation: "Добавьте дополнительный запрос естественным языком.",
+      },
+    ],
+    positiveNotes: ["Добавьте ещё ключ в текст"],
+  };
+  const modelGreen = {
+    status: "green",
+    summary: "SEO в норме.",
+    issues: [],
+    positiveNotes: ["Тема звучит естественно."],
+  };
+
+  for (const model of [modelYellow, modelGreen]) {
+    const reconciled = reconcileProductQualityReviewResult(model, stuffedSignals);
+    assert.equal(reconciled.status, "red");
+    const subtitleIssue = reconciled.issues.find((issue) => issue.field === "subtitle");
+    assert.ok(subtitleIssue);
+    assert.equal(subtitleIssue.message, SUBTITLE_STUFFING_ISSUE_MESSAGE);
+    assert.equal(subtitleIssue.recommendation, QUERY_CHAIN_STUFFING_RECOMMENDATION);
+    const joined = [
+      reconciled.summary,
+      ...reconciled.issues.map((issue) => `${issue.message}\n${issue.recommendation}`),
+      ...reconciled.positiveNotes,
+    ].join("\n");
+    assert.doesNotMatch(
+      joined,
+      /добавьте\s+(ещё\s+)?(основной\s+|дополнительн\w*\s+)?(поисков\w*\s+)?(запрос|ключ)/i,
+    );
+
+    const canonical = await reviewProductTextQualityForRequest(
+      { authorId: AURAFON_AUTHOR_ID, ...stuffed },
+      {
+        fetchImpl: mockFetch([
+          () => jsonResponse(200, yandexAlt(JSON.stringify(model))),
+        ]),
+        env: yandexEnv,
+      },
+    );
+    assert.equal(canonical.ok, true);
+    assert.equal(canonical.result.status, "red");
+    assert.equal(
+      canonical.result.issues.some(
+        (issue) =>
+          issue.field === "subtitle" &&
+          issue.message === SUBTITLE_STUFFING_ISSUE_MESSAGE &&
+          issue.recommendation === QUERY_CHAIN_STUFFING_RECOMMENDATION,
+      ),
+      true,
+    );
+  }
+
+  for (const field of ["title", "seoTitle"]) {
+    const chained = spaPackage({ [field]: stuffedSubtitle });
+    const signals = buildProductQualityReviewSignals(chained);
+    assert.equal(signals.structuralStuffing[field].nearSynonymQueryChain, true);
+    assert.equal(signals.structuralStuffing[field].material, true);
+    assert.equal(signals.structuralStuffing.subtitle.material, false);
+    const reconciled = reconcileProductQualityReviewResult(
+      { status: "green", summary: "ok", issues: [], positiveNotes: [] },
+      signals,
+    );
+    assert.equal(reconciled.status, "red");
+    const issue = reconciled.issues.find((item) => item.field === field);
+    assert.ok(issue);
+    assert.equal(
+      issue.message,
+      field === "title" ? TITLE_STUFFING_ISSUE_MESSAGE : SEO_TITLE_STUFFING_ISSUE_MESSAGE,
+    );
+    assert.equal(issue.recommendation, QUERY_CHAIN_STUFFING_RECOMMENDATION);
+  }
 }
 
 console.log("product-seo-quality-review-unit: ok");
