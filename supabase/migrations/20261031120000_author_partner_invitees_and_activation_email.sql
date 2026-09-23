@@ -18,8 +18,11 @@
 -- A retry that returns already_activated does not update activated_at, so
 -- the trigger does not run again.
 -- Due rows (including failed rows whose next_attempt_at has passed) are
--- claimed by systemd timer audiolad-author-partner-activation-email-outbox.timer
--- every 2 minutes. An inline request drain is only a best-effort fast path.
+-- claimed by the already installed audiolad-author-sale-email-outbox.timer.
+-- That timer runs npm run run:author-sale-email-outbox from the current
+-- release, which drains this outbox in the same process as the sale outbox.
+-- No separate partner timer is installed. An inline request drain is only
+-- a best-effort fast path.
 
 BEGIN;
 

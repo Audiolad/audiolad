@@ -1357,7 +1357,7 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 Получатель письма — email владельца-партнёра. Отправитель — каноническая личность `authors` (`authors@audiolad.ru`). Отдельного ящика `author@audiolad.ru` в конфиге нет.
 
-Повторные попытки не ждут следующего запроса активации. Таймер `audiolad-author-partner-activation-email-outbox.timer` (каждые 2 минуты) вызывает `run:author-partner-activation-email`. Сразу после активации приложение может сделать best-effort drain; он не заменяет таймер. Установка unit описана в `deploy/docs/AUTHOR_PARTNER_ACTIVATION_EMAIL_OUTBOX.md`. Этот репозиторный change таймер на сервере не включает.
+Повторные попытки не ждут следующего запроса активации и не требуют нового systemd unit. Уже установленный `audiolad-author-sale-email-outbox.timer` каждые 2 минуты запускает код текущего релиза: `run-author-sale-email-outbox.sh` → `npm run run:author-sale-email-outbox`. Этот скрипт дренирует и sale outbox, и `author_partner_activation_email_outbox`. Очереди изолированы: свой lease, свой Message-ID, сбой одной не пропускает другую. Обычный Production Deploy обновляет release, следующий тик таймера подхватывает новую очередь без `systemctl enable`. Сразу после активации приложение может сделать best-effort drain; он не заменяет таймер. Подробности: `deploy/docs/AUTHOR_PARTNER_ACTIVATION_EMAIL_OUTBOX.md`.
 
 ## Analytics heavy RPC (2026-08-28)
 

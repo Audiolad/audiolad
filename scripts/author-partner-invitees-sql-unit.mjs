@@ -47,7 +47,11 @@ assert(sql.includes("r.status = 'attributed'"), "pending is attributed");
 assert(!enqueueSql.includes("EXCEPTION WHEN OTHERS"), "enqueue does not swallow insert failures");
 assert(sql.includes("partner_activation_email_recipient_missing"), "missing recipient aborts activation");
 assert(sql.includes("not strict SMTP exactly-once"), "docs do not claim SMTP exactly-once");
-assert(sql.includes("audiolad-author-partner-activation-email-outbox.timer"), "retry timer is named");
+assert(sql.includes("audiolad-author-sale-email-outbox.timer"), "retries use the installed sale timer");
+assert(sql.includes("run:author-sale-email-outbox"), "retries use the release npm script");
+assert(!sql.includes("audiolad-author-partner-activation-email-outbox.timer"), "no separate partner timer");
+assert(sql.includes("status IN ('pending', 'failed')"), "claim includes failed rows");
+assert(sql.includes("next_attempt_at <= now()"), "claim waits until next_attempt_at");
 assert(!/FROM auth\.users/.test(listSql), "list does not read auth users");
 assert(!/\.email/.test(listSql), "list payload has no email column");
 assert(!/invitee_user_id/.test(listSql), "list does not return invitee user id");
@@ -59,31 +63,31 @@ assert(
   "claim is not public",
 );
 
-const timerPath = join(
-  repoRoot,
-  "deploy/systemd/audiolad-author-partner-activation-email-outbox.timer",
+const saleWrapper = readFileSync(
+  join(repoRoot, "deploy/scripts/run-author-sale-email-outbox.sh"),
+  "utf8",
 );
-const servicePath = join(
-  repoRoot,
-  "deploy/systemd/audiolad-author-partner-activation-email-outbox.service",
+const saleRunner = readFileSync(
+  join(repoRoot, "scripts/process-author-sale-email-outbox.ts"),
+  "utf8",
 );
-const wrapperPath = join(
-  repoRoot,
-  "deploy/scripts/run-author-partner-activation-email-outbox.sh",
-);
-const timer = readFileSync(timerPath, "utf8");
-const service = readFileSync(servicePath, "utf8");
-const wrapper = readFileSync(wrapperPath, "utf8");
 const packageJson = readFileSync(join(repoRoot, "package.json"), "utf8");
-assert(timer.includes("OnUnitActiveSec=2min"), "timer every 2 minutes");
-assert(timer.includes("audiolad-author-partner-activation-email-outbox.service"), "timer starts the service");
-assert(service.includes("/usr/local/lib/audiolad/run-author-partner-activation-email-outbox.sh"), "service exec");
+assert(saleWrapper.includes("run run:author-sale-email-outbox"), "installed wrapper still calls the release script");
+assert(saleWrapper.includes('"claimed".*"sent".*"failed"'), "sale log parser stays");
+assert(saleRunner.includes("runInstalledAuthorEmailOutboxCycle"), "release script drains both queues");
 assert(
-  wrapper.includes("run run:author-partner-activation-email"),
-  "wrapper npm script",
+  packageJson.includes(
+    '"run:author-sale-email-outbox": "npx tsx scripts/process-author-sale-email-outbox.ts"',
+  ),
+  "package script name unchanged",
 );
-assert(packageJson.includes('"run:author-partner-activation-email"'), "package script");
-assert(wrapper.includes("SMTP is not exactly-once"), "wrapper matches at-least-once semantics");
+assert(
+  !existsSync(
+    join(repoRoot, "deploy/systemd/audiolad-author-partner-activation-email-outbox.timer"),
+  ),
+  "separate partner timer is not shipped",
+);
+assert(saleWrapper.includes("SMTP is not exactly-once"), "wrapper matches at-least-once semantics");
 
 console.log("author-partner-invitees-sql-unit: ok");
 

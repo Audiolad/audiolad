@@ -3,7 +3,8 @@ import { payloadIndicatesFirstPartnerActivation } from "@/lib/author-partner/act
 /**
  * Best-effort immediate send after a request that just committed a first
  * activation. This is not the retry path: a failed row with next_attempt_at
- * is claimed later by audiolad-author-partner-activation-email-outbox.timer.
+ * is claimed later by the installed audiolad-author-sale-email-outbox.timer
+ * via `npm run run:author-sale-email-outbox` in the current release.
  * No-ops for registration, missing referral, and already-activated retries.
  * Failures are logged and do not change the caller result.
  */

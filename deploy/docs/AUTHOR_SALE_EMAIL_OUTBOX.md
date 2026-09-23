@@ -40,6 +40,15 @@ Resolved every run from the active release symlink:
 # → timeout 90s npm run run:author-sale-email-outbox
 ```
 
+That npm script drains `author_sale_email_outbox` and, in the same process,
+`author_partner_activation_email_outbox`. The installed timer and wrapper do
+not change. A normal Production Deploy of the release is enough for the next
+tick to retry partner rows. See `deploy/docs/AUTHOR_PARTNER_ACTIVATION_EMAIL_OUTBOX.md`.
+
+The wrapper summary line stays the sale JSON object (`claimed`, `sent`,
+`failed`). Partner lines are prefixed and are not that summary. A failure in
+one queue does not skip the other.
+
 ## Locks
 
 | Layer | Mechanism |
