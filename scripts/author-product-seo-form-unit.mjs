@@ -210,6 +210,7 @@ const form = {
   isFree: snapshot.isFree,
   price: snapshot.price,
   catalogVisibility: snapshot.catalogVisibility,
+  catalogSection: snapshot.catalogSection,
   listeningNoticeEnabled: snapshot.listeningNoticeEnabled,
   listeningNoticeTitle: snapshot.listeningNoticeTitle,
   listeningNoticeText: snapshot.listeningNoticeText,
