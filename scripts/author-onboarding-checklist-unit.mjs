@@ -19,6 +19,7 @@ import {
   resolveCommercialApplicationStatus,
 } from "../src/lib/author-dashboard/commercial-onboarding.ts";
 import {
+  AUTHOR_ONBOARDING_STEP_COUNT,
   buildAuthorOnboardingStorageKey,
   evaluateAuthorOnboardingChecklist,
   focusProductSuitabilityScore,
@@ -32,6 +33,10 @@ import {
   selectFocusProduct,
   serializeAuthorOnboardingUiPreference,
 } from "../src/lib/author-dashboard/onboarding-checklist.ts";
+import {
+  AUTHOR_TELEGRAM_CHAT_NAME,
+  AUTHOR_TELEGRAM_CHAT_URL,
+} from "../src/lib/authors/community.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -632,7 +637,21 @@ function testSourceGuards() {
   const dashboard = read(
     "src/components/author-dashboard/AuthorDashboardClient.tsx",
   );
+  const onboarding = read("src/lib/author-dashboard/onboarding-checklist.ts");
   assert.match(dashboard, /AuthorOnboardingChecklist/);
+  assert.match(dashboard, /Чат «\{AUTHOR_TELEGRAM_CHAT_NAME\}» в Telegram/);
+  assert.match(dashboard, /AUTHOR_TELEGRAM_CHAT_URL/);
+  assert.match(dashboard, /target="_blank"/);
+  assert.match(dashboard, /rel="noopener noreferrer"/);
+  assert.ok(
+    dashboard.indexOf("Присоединиться к чату")
+      < dashboard.indexOf("<AuthorOnboardingChecklist"),
+    "Telegram card precedes the onboarding checklist",
+  );
+  assert.equal(AUTHOR_TELEGRAM_CHAT_NAME, "АудиоЛад Авторы");
+  assert.equal(AUTHOR_TELEGRAM_CHAT_URL, "https://t.me/+ErmJLvvLQjE4Y2M6");
+  assert.equal(AUTHOR_ONBOARDING_STEP_COUNT, 5);
+  assert.doesNotMatch(onboarding, /telegram|community/i);
   assert.match(dashboard, /AuthorAccessStatusBanner/);
   assert.match(dashboard, /FREE_AUTHOR_PRODUCTS_EMPTY_STATE/);
   assert.match(dashboard, /Создать бесплатный продукт|ctaLabel/);

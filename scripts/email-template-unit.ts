@@ -11,6 +11,10 @@ import { resolveAuthorsEmailTransport } from "../src/lib/email/authors-email-tra
 import { getSenderIdentity } from "../src/lib/email/sender-identities";
 import { PRODUCTION_APP_ORIGIN } from "../src/lib/seo/app-origin";
 import {
+  AUTHOR_TELEGRAM_CHAT_NAME,
+  AUTHOR_TELEGRAM_CHAT_URL,
+} from "../src/lib/authors/community";
+import {
   AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
@@ -216,6 +220,9 @@ async function testAuthorApplicationApprovedTemplate() {
   assert.match(html, /Здравствуйте!/);
   assert.match(html, /Открыть кабинет автора/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/author-dashboard"/);
+  assert.match(html, new RegExp(`Присоединяйтесь к чату «${AUTHOR_TELEGRAM_CHAT_NAME}»`));
+  assert.match(html, new RegExp(AUTHOR_TELEGRAM_CHAT_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(html, /Присоединиться к чату/);
   assert.match(html, /С чего начать/);
   assert.match(html, /Оформите профиль автора/);
   assert.match(html, /#f4f1ff/);
@@ -232,6 +239,9 @@ async function testAuthorApplicationApprovedTemplate() {
 
   assert.match(text, /Поздравляем! Ваша заявка одобрена/);
   assert.match(text, /Открыть кабинет автора: https:\/\/audiolad\.ru\/author-dashboard/);
+  assert.match(text, new RegExp(`Присоединяйтесь к чату «${AUTHOR_TELEGRAM_CHAT_NAME}»`));
+  assert.match(text, new RegExp(`^${AUTHOR_TELEGRAM_CHAT_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+  assert.match(text, /Присоединиться к чату:/);
   assert.match(text, /С чего начать/);
   assert.match(text, /Важно/);
   assert.match(text, /отличный от email вашего аккаунта/);
@@ -241,6 +251,19 @@ async function testAuthorApplicationApprovedTemplate() {
     getAuthorDashboardUrl("https://audiolad.ru"),
     "https://audiolad.ru/author-dashboard",
   );
+  assert.equal(
+    AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
+    "author-application-approved-v4-20260924",
+  );
+  const approvedTemplate = readRepoFile(
+    "src",
+    "lib",
+    "email",
+    "templates",
+    "author-application-approved.ts",
+  );
+  assert.match(approvedTemplate, /renderBrandEmailInfoBlock/);
+  assert.match(approvedTemplate, /renderBrandEmailButton/);
 
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
