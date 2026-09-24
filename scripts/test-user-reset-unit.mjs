@@ -147,6 +147,7 @@ function testPolicy() {
       referrerReferrals: 0,
       foreignAttributions: 0,
       authorLedgerEntries: 0,
+      partnerRewardLedgerEntries: 0,
       authorPayouts: 0,
       authorPayoutProfiles: 0,
       ownedAuthorContent: 0,
@@ -155,6 +156,18 @@ function testPolicy() {
   assert(
     ownAuthorCleanup.length === 0,
     "own memberships, applications, invitee referrals and bonus are cleanup targets",
+  );
+
+  const partnerRewardBlock = evaluateTestUserResetBlockers({
+    resolvedEmail: TEST_USER_RESET_EMAIL,
+    profileRole: LISTENER_ROLE,
+    counts: { partnerRewardLedgerEntries: 1 },
+  });
+  assert(
+    partnerRewardBlock.some(
+      (row) => row.code === TEST_USER_RESET_BLOCK_CODES.partner_reward,
+    ),
+    "partner financial history is a hard blocker",
   );
 
   const referrerBlock = evaluateTestUserResetBlockers({

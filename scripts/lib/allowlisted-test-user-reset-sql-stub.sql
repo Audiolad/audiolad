@@ -104,6 +104,13 @@ CREATE TABLE IF NOT EXISTS public.author_ledger_entries (
   author_id uuid NOT NULL REFERENCES public.authors (id) ON DELETE RESTRICT
 );
 
+CREATE TABLE IF NOT EXISTS public.author_partner_reward_ledger_entries (
+  id uuid PRIMARY KEY,
+  referral_id uuid NOT NULL REFERENCES public.author_referrals (id) ON DELETE RESTRICT,
+  partner_author_id uuid NOT NULL REFERENCES public.authors (id) ON DELETE RESTRICT,
+  invitee_author_id uuid NOT NULL REFERENCES public.authors (id) ON DELETE RESTRICT
+);
+
 CREATE TABLE IF NOT EXISTS public.author_payouts (
   id uuid PRIMARY KEY,
   author_id uuid NOT NULL REFERENCES public.authors (id) ON DELETE RESTRICT

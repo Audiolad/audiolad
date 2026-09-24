@@ -469,6 +469,35 @@ $$;
 DROP TABLE public.composite_author_blocker;
 ALTER TABLE public.authors DROP CONSTRAINT authors_reset_audit_composite_key;
 
+-- Financial partner rows are a hard blocker. The reset must leave both the
+-- referral and owned author untouched, then the fixture removes only its own
+-- synthetic financial row before the no-finance happy path below.
+INSERT INTO public.author_partner_reward_ledger_entries (
+  id, referral_id, partner_author_id, invitee_author_id
+) VALUES (
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  '44444444-4444-4444-8444-444444444444',
+  '11111111-1111-4111-8111-111111111111',
+  '11111111-1111-4111-8111-111111111111'
+);
+DO $$
+DECLARE v_detail text;
+BEGIN
+  BEGIN
+    PERFORM public.reset_allowlisted_test_user_db('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
+    RAISE EXCEPTION 'partner reward financial row must block reset';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    GET STACKED DIAGNOSTICS v_detail = PG_EXCEPTION_DETAIL;
+    IF v_detail IS DISTINCT FROM 'partner_reward' THEN RAISE; END IF;
+  END;
+  IF NOT EXISTS (SELECT 1 FROM public.author_referrals WHERE id = '44444444-4444-4444-8444-444444444444')
+     OR NOT EXISTS (SELECT 1 FROM public.authors WHERE id = '11111111-1111-4111-8111-111111111111') THEN
+    RAISE EXCEPTION 'partner reward block must not clean fixture rows';
+  END IF;
+END $$;
+DELETE FROM public.author_partner_reward_ledger_entries
+WHERE id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
 -- Happy path, idempotent second call, Sergey untouched, then phase-2-shaped auth delete.
 DO $$
 DECLARE

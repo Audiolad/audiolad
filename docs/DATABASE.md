@@ -1344,9 +1344,17 @@ Claim (INSERT) выполняется до SMTP. Повторный вызов �
 
 ### Приглашённые авторы и письмо о первой активации (2026-10-31)
 
-Миграция: `supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql`.
+Миграции: `supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql`,
+`20261103120000_author_partner_reward_ledger_pr4a.sql`.
 
-Денежный реестр 20% не создаётся. Окно атрибуции, first-touch и бонусный слот не меняются.
+PR4A добавляет отдельный append-only `author_partner_reward_ledger_entries` и
+устойчивую очередь `author_partner_reward_obligations`. Это не payout и не UI:
+partner reward считается только от фактически записанного
+`author_ledger_entries.sale_accrual`, с отдельным floor policy
+`partner_reward_floor_v1`. Первый accrual eligibility использует
+`source.effective_at ∈ [referral.activated_at, referral.expires_at)`;
+последующие refund reversals корректируют уже созданное начисление независимо
+от текущего expiry. Migration не делает historical backfill.
 
 | Сущность | Роль |
 |----------|------|

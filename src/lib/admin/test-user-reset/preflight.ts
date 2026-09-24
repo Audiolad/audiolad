@@ -58,6 +58,7 @@ function emptyCounts(): TestUserResetPreflightCounts {
     foreignAttributions: 0,
     pendingReferrerAttributions: 0,
     authorLedgerEntries: 0,
+    partnerRewardLedgerEntries: 0,
     authorPayouts: 0,
     authorPayoutProfiles: 0,
     ownedAuthorContent: 0,
@@ -373,6 +374,25 @@ async function loadAuthorResetScope(
       "author_id",
       ownerAuthorIds,
     );
+    const partnerRewardFilters = [
+      `partner_author_id.in.(${ownerAuthorIds.join(",")})`,
+      `invitee_author_id.in.(${ownerAuthorIds.join(",")})`,
+    ];
+    if (inviteeReferralRows?.length) {
+      partnerRewardFilters.push(
+        `referral_id.in.(${inviteeReferralRows.map((row) => row.id).join(",")})`,
+      );
+    }
+    const { data: partnerRewardRows, error: partnerRewardError } = await service
+      .from("author_partner_reward_ledger_entries")
+      .select("id")
+      .or(partnerRewardFilters.join(","));
+    if (partnerRewardError) {
+      throw new Error("test_user_reset_preflight_partner_reward_ledger_failed");
+    }
+    counts.partnerRewardLedgerEntries = new Set(
+      (partnerRewardRows ?? []).map((row) => row.id),
+    ).size;
     counts.authorPayouts = await countRowsIn(
       service,
       "author_payouts",
