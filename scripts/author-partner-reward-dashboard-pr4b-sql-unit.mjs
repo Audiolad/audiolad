@@ -32,14 +32,25 @@ assert(
 );
 assert(migration.includes("least(coalesce(p_history_limit, 25), 100)"), "history is bounded");
 assert(migration.includes("'paid_minor', 0"), "paid balance remains zero");
-assert(migration.includes("'invariant_ok'"), "balance invariant is projected");
+assert(!migration.includes("invariant_ok"), "public invariant flag is absent");
+assert(
+  migration.includes("jsonb_build_array(\n      jsonb_build_object(\n        'currency', 'RUB'"),
+  "empty ledger returns canonical zero RUB balance",
+);
 assert(
   migration.includes("'invitee_author_name'") && migration.includes("JOIN public.authors AS invitee"),
   "history exposes only the safe invitee author name",
 );
 assert(
-  migration.includes("btrim(coalesce(invitee.name, '')) IN ('', '@') THEN 'Автор'"),
-  "blank or @ invitee names use the public fallback",
+  migration.includes("position('@' IN btrim(coalesce(invitee.name, ''))) > 0"),
+  "blank or email-shaped invitee names use the public fallback",
+);
+assert(migration.includes("'entry_type', row.entry_type"), "history uses entry_type contract field");
+assert(!migration.includes("'type', row.entry_type"), "history does not expose legacy type field");
+assert(
+  migration.includes("audiolad.pr4b_obligation_rows_before")
+    && migration.includes("partner reward obligation count"),
+  "migration post-check preserves obligation count",
 );
 assert(
   migration.includes("ORDER BY row.effective_at DESC, row.created_at DESC, row.id DESC"),
@@ -52,6 +63,10 @@ assert(
 assert(!migration.includes("author_partner_payouts ("), "migration creates no payouts");
 assert(smoke.includes("non-owner must not read partner dashboard"), "smoke covers owner isolation");
 assert(smoke.includes("dashboard history must be bounded and safe"), "smoke covers safe history");
+assert(smoke.includes("invitee@example.test"), "smoke covers email-shaped invitee names");
+assert(smoke.includes("blank invitee names"), "smoke covers blank invitee names");
+assert(smoke.includes("normal invitee names"), "smoke covers normal invitee names");
+assert(smoke.includes("empty ledger must return the zero RUB dashboard"), "smoke covers empty ledger zero response");
 
 const db = "audiolad_partner_reward_pr4b_test";
 try {

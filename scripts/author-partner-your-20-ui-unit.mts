@@ -206,13 +206,12 @@ test("reward dashboard parse: currency-aware balances and safe history", () => {
         held_minor: -500,
         available_minor: 2000,
         paid_minor: 0,
-        invariant_ok: true,
       },
     ],
     history: [
       {
         invitee_author_name: "Автор",
-        type: "reward_reversal",
+        entry_type: "reward_reversal",
         amount_minor: -500,
         currency: "RUB",
         effective_at: "2026-11-03T12:00:00Z",
@@ -228,13 +227,12 @@ test("reward dashboard parse: currency-aware balances and safe history", () => {
         heldMinor: -500,
         availableMinor: 2000,
         paidMinor: 0,
-        invariantOk: true,
       },
     ],
     history: [
       {
         inviteeAuthorName: "Автор",
-        type: "reward_reversal",
+        entryType: "reward_reversal",
         amountMinor: -500,
         currency: "RUB",
         effectiveAt: "2026-11-03T12:00:00Z",
@@ -245,6 +243,35 @@ test("reward dashboard parse: currency-aware balances and safe history", () => {
   assert.equal(PARTNER_REWARD_LOAD_ERROR.length > 0, true);
 });
 
+test("reward dashboard parse: canonical zero RUB response is successful", () => {
+  assert.deepEqual(
+    parsePartnerRewardDashboardPayload({
+      balances: [
+        {
+          currency: "RUB",
+          accrued_minor: 0,
+          held_minor: 0,
+          available_minor: 0,
+          paid_minor: 0,
+        },
+      ],
+      history: [],
+    }),
+    {
+      balances: [
+        {
+          currency: "RUB",
+          accruedMinor: 0,
+          heldMinor: 0,
+          availableMinor: 0,
+          paidMinor: 0,
+        },
+      ],
+      history: [],
+    },
+  );
+});
+
 test("reward dashboard parse: malformed or private history fails closed", () => {
   assert.equal(
     parsePartnerRewardDashboardPayload({
@@ -252,6 +279,41 @@ test("reward dashboard parse: malformed or private history fails closed", () => 
       history: [
         {
           id: "should-not-be-here",
+          invitee_author_name: "Автор",
+          entry_type: "reward_accrual",
+          amount_minor: 100,
+          currency: "RUB",
+          effective_at: "2026-11-03T12:00:00Z",
+          availability_state: "available",
+        },
+      ],
+    }),
+    null,
+  );
+});
+
+test("reward dashboard parse: legacy or extra contract fields fail closed", () => {
+  assert.equal(
+    parsePartnerRewardDashboardPayload({
+      balances: [
+        {
+          currency: "RUB",
+          accrued_minor: 0,
+          held_minor: 0,
+          available_minor: 0,
+          paid_minor: 0,
+          invariant_ok: true,
+        },
+      ],
+      history: [],
+    }),
+    null,
+  );
+  assert.equal(
+    parsePartnerRewardDashboardPayload({
+      balances: [],
+      history: [
+        {
           invitee_author_name: "Автор",
           type: "reward_accrual",
           amount_minor: 100,
@@ -320,4 +382,8 @@ test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   assert.match(rewardsSrc, /Выплачено/);
   assert.match(rewardsSrc, /следующим этапом/);
   assert.match(rewardsSrc, /История начислений/);
+  assert.match(rewardsSrc, /История начислений пока пуста/);
+  assert.match(rewardsSrc, /!loadError && dashboard \?/);
+  assert.doesNotMatch(rewardsSrc, /invariantOk/);
+  assert.match(rewardsSrc, /!loadError\s*\n\s*\? dashboard\?\.balances\.map/);
 });

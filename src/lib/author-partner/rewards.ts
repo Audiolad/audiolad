@@ -4,12 +4,11 @@ export type PartnerRewardBalance = {
   heldMinor: number;
   availableMinor: number;
   paidMinor: number;
-  invariantOk: boolean;
 };
 
 export type PartnerRewardHistoryRow = {
   inviteeAuthorName: string;
-  type: "reward_accrual" | "reward_reversal";
+  entryType: "reward_accrual" | "reward_reversal";
   amountMinor: number;
   currency: string;
   effectiveAt: string;
@@ -60,14 +59,12 @@ function parseBalance(value: unknown): PartnerRewardBalance | null {
       "held_minor",
       "available_minor",
       "paid_minor",
-      "invariant_ok",
     ]) ||
     !isCurrency(row.currency) ||
     accruedMinor === null ||
     heldMinor === null ||
     availableMinor === null ||
-    paidMinor === null ||
-    typeof row.invariant_ok !== "boolean"
+    paidMinor === null
   ) {
     return null;
   }
@@ -78,7 +75,6 @@ function parseBalance(value: unknown): PartnerRewardBalance | null {
     heldMinor,
     availableMinor,
     paidMinor,
-    invariantOk: row.invariant_ok,
   };
 }
 
@@ -90,14 +86,14 @@ function parseHistoryRow(value: unknown): PartnerRewardHistoryRow | null {
   if (
     !hasOnlyKeys(row, [
       "invitee_author_name",
-      "type",
+      "entry_type",
       "amount_minor",
       "currency",
       "effective_at",
       "availability_state",
     ]) ||
     typeof row.invitee_author_name !== "string" ||
-    (row.type !== "reward_accrual" && row.type !== "reward_reversal") ||
+    (row.entry_type !== "reward_accrual" && row.entry_type !== "reward_reversal") ||
     amountMinor === null ||
     !isCurrency(row.currency) ||
     !isTimestamp(row.effective_at) ||
@@ -108,7 +104,7 @@ function parseHistoryRow(value: unknown): PartnerRewardHistoryRow | null {
 
   return {
     inviteeAuthorName: row.invitee_author_name,
-    type: row.type,
+    entryType: row.entry_type,
     amountMinor,
     currency: row.currency,
     effectiveAt: row.effective_at,

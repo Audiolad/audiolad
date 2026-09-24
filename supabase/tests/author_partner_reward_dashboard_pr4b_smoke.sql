@@ -38,7 +38,7 @@ INSERT INTO auth.users (id, email) VALUES
 INSERT INTO public.authors (id, name) VALUES
   ('10000000-0000-0000-0000-000000000001', 'Partner'),
   ('10000000-0000-0000-0000-000000000002', 'Other partner'),
-  ('20000000-0000-0000-0000-000000000001', '@');
+  ('20000000-0000-0000-0000-000000000001', 'invitee@example.test');
 
 INSERT INTO public.author_members (author_id, user_id, role) VALUES
   ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'owner'),
@@ -146,9 +146,10 @@ BEGIN
     OR (v_balance ->> 'held_minor')::bigint <> 1000
     OR (v_balance ->> 'available_minor')::bigint <> 1500
     OR (v_balance ->> 'paid_minor')::bigint <> 0
-    OR (v_balance ->> 'invariant_ok')::boolean IS NOT TRUE
+    OR (SELECT count(*) FROM jsonb_object_keys(v_balance)) <> 5
+    OR v_balance ? 'invariant_ok'
   THEN
-    RAISE EXCEPTION 'dashboard balances must be currency-aware and invariant';
+    RAISE EXCEPTION 'dashboard balances must use the canonical five-field contract';
   END IF;
 
   IF jsonb_array_length(v_history) <> 1
@@ -159,10 +160,47 @@ BEGIN
     OR (v_history -> 0) ? 'source_event_ledger_entry_id'
     OR (v_history -> 0) ? 'available_at'
     OR (v_history -> 0) ->> 'invitee_author_name' <> 'Автор'
-    OR (v_history -> 0) ->> 'type' <> 'reward_accrual'
+    OR (v_history -> 0) ->> 'entry_type' <> 'reward_accrual'
+    OR (v_history -> 0) ? 'type'
     OR (v_history -> 0) ->> 'availability_state' <> 'held'
   THEN
     RAISE EXCEPTION 'dashboard history must be bounded and safe';
+  END IF;
+END;
+$$;
+
+RESET ROLE;
+UPDATE public.authors
+SET name = '   '
+WHERE id = '20000000-0000-0000-0000-000000000001';
+SET ROLE authenticated;
+
+DO $$
+DECLARE v_history jsonb;
+BEGIN
+  v_history := public.get_author_partner_reward_dashboard(
+    '10000000-0000-0000-0000-000000000001', 1
+  ) -> 'history';
+  IF v_history -> 0 ->> 'invitee_author_name' <> 'Автор' THEN
+    RAISE EXCEPTION 'blank invitee names must use the public fallback';
+  END IF;
+END;
+$$;
+
+RESET ROLE;
+UPDATE public.authors
+SET name = 'Обычный автор'
+WHERE id = '20000000-0000-0000-0000-000000000001';
+SET ROLE authenticated;
+
+DO $$
+DECLARE v_history jsonb;
+BEGIN
+  v_history := public.get_author_partner_reward_dashboard(
+    '10000000-0000-0000-0000-000000000001', 1
+  ) -> 'history';
+  IF v_history -> 0 ->> 'invitee_author_name' <> 'Обычный автор' THEN
+    RAISE EXCEPTION 'normal invitee names must be preserved';
   END IF;
 END;
 $$;
@@ -177,6 +215,29 @@ BEGIN
   RAISE EXCEPTION 'non-owner must not read partner dashboard';
 EXCEPTION WHEN insufficient_privilege THEN
   NULL;
+END;
+$$;
+
+SET request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+
+DO $$
+DECLARE v_dashboard jsonb;
+BEGIN
+  v_dashboard := public.get_author_partner_reward_dashboard(
+    '10000000-0000-0000-0000-000000000002', 25
+  );
+  IF v_dashboard <> jsonb_build_object(
+    'balances', jsonb_build_array(jsonb_build_object(
+      'currency', 'RUB',
+      'accrued_minor', 0,
+      'held_minor', 0,
+      'available_minor', 0,
+      'paid_minor', 0
+    )),
+    'history', '[]'::jsonb
+  ) THEN
+    RAISE EXCEPTION 'empty ledger must return the zero RUB dashboard';
+  END IF;
 END;
 $$;
 

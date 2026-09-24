@@ -52,7 +52,7 @@ function availabilityLabel(row: PartnerRewardHistoryRow): string {
 }
 
 function entryLabel(row: PartnerRewardHistoryRow): string {
-  return row.type === "reward_accrual"
+  return row.entryType === "reward_accrual"
     ? "Начисление"
     : "Корректировка после возврата";
 }
@@ -73,13 +73,6 @@ export default function AuthorPartnerRewards({
       {loadError ? (
         <p className="mt-4 rounded-[16px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b2c2c]">
           {loadError}
-        </p>
-      ) : null}
-
-      {!loadError && dashboard?.balances.length === 0 ? (
-        <p className="mt-4 rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-4 py-4 text-sm text-[#4a3f6b]">
-          Начислений пока нет. Они появятся здесь после продаж продуктов
-          приглашённых вами авторов.
         </p>
       ) : null}
 
@@ -115,41 +108,42 @@ export default function AuthorPartnerRewards({
                 «Доступно» означает, что срок удержания завершён, но выплата ещё
                 не выполняется.
               </p>
-              {!balance.invariantOk ? (
-                <p className="mt-2 text-xs text-[#9b2c2c]">
-                  Не удалось подтвердить целостность баланса.
-                </p>
-              ) : null}
             </div>
           ))
         : null}
 
-      {!loadError && dashboard && dashboard.history.length > 0 ? (
+      {!loadError && dashboard ? (
         <div className="mt-5 border-t border-[#f0e8fb] pt-4">
           <h4 className="text-[15px] font-semibold text-[#2b2144]">
             История начислений
           </h4>
-          <ul className="mt-3 space-y-2">
-            {dashboard.history.map((row, index) => (
-              <li
-                key={`${row.effectiveAt}-${row.type}-${index}`}
-                className="flex flex-wrap items-start justify-between gap-2 rounded-[18px] border border-[#f0e8fb] bg-[#fdfbff] px-3 py-3"
-              >
-                <span>
-                  <span className="block text-sm font-semibold text-[#2b2144]">
-                    {row.inviteeAuthorName}
+          {dashboard.history.length === 0 ? (
+            <p className="mt-3 text-sm text-[#7d70a2]">
+              История начислений пока пуста.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {dashboard.history.map((row, index) => (
+                <li
+                  key={`${row.effectiveAt}-${row.entryType}-${index}`}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-[18px] border border-[#f0e8fb] bg-[#fdfbff] px-3 py-3"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-[#2b2144]">
+                      {row.inviteeAuthorName}
+                    </span>
+                    <span className="mt-1 block text-xs text-[#9a8fbf]">
+                      {entryLabel(row)} · {formatDate(row.effectiveAt)} ·{" "}
+                      {availabilityLabel(row)}
+                    </span>
                   </span>
-                  <span className="mt-1 block text-xs text-[#9a8fbf]">
-                    {entryLabel(row)} · {formatDate(row.effectiveAt)} ·{" "}
-                    {availabilityLabel(row)}
+                  <span className="text-right text-sm font-semibold text-[#2b2144]">
+                    {formatPartnerRewardMoney(row.amountMinor, row.currency)}
                   </span>
-                </span>
-                <span className="text-right text-sm font-semibold text-[#2b2144]">
-                  {formatPartnerRewardMoney(row.amountMinor, row.currency)}
-                </span>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
     </section>

@@ -5,10 +5,14 @@
 DO $$
 DECLARE
   v_reward_rows bigint;
+  v_obligation_rows bigint;
   v_payout_rows text := '';
 BEGIN
   SELECT count(*) INTO v_reward_rows
   FROM public.author_partner_reward_ledger_entries;
+
+  SELECT count(*) INTO v_obligation_rows
+  FROM public.author_partner_reward_obligations;
 
   IF to_regclass('public.author_partner_payouts') IS NOT NULL THEN
     EXECUTE 'SELECT count(*) FROM public.author_partner_payouts'
@@ -17,6 +21,9 @@ BEGIN
 
   PERFORM set_config(
     'audiolad.pr4b_reward_rows_before', v_reward_rows::text, false
+  );
+  PERFORM set_config(
+    'audiolad.pr4b_obligation_rows_before', v_obligation_rows::text, false
   );
   PERFORM set_config(
     'audiolad.pr4b_payout_rows_before', v_payout_rows, false
@@ -54,13 +61,19 @@ BEGIN
         'accrued_minor', totals.accrued_minor,
         'held_minor', totals.held_minor,
         'available_minor', totals.available_minor,
-        'paid_minor', 0,
-        'invariant_ok',
-          totals.accrued_minor = totals.held_minor + totals.available_minor
+        'paid_minor', 0
       )
       ORDER BY totals.currency
     ),
-    '[]'::jsonb
+    jsonb_build_array(
+      jsonb_build_object(
+        'currency', 'RUB',
+        'accrued_minor', 0,
+        'held_minor', 0,
+        'available_minor', 0,
+        'paid_minor', 0
+      )
+    )
   )
   INTO v_balances
   FROM (
@@ -82,7 +95,7 @@ BEGIN
     jsonb_agg(
       jsonb_build_object(
         'invitee_author_name', row.invitee_author_name,
-        'type', row.entry_type,
+        'entry_type', row.entry_type,
         'amount_minor', row.amount_minor,
         'currency', row.currency,
         'effective_at', row.effective_at,
@@ -107,7 +120,9 @@ BEGIN
       e.available_at,
       e.created_at,
       CASE
-        WHEN btrim(coalesce(invitee.name, '')) IN ('', '@') THEN 'Автор'
+        WHEN btrim(coalesce(invitee.name, '')) = ''
+          OR position('@' IN btrim(coalesce(invitee.name, ''))) > 0
+          THEN 'Автор'
         ELSE btrim(invitee.name)
       END AS invitee_author_name
     FROM public.author_partner_reward_ledger_entries AS e
@@ -135,12 +150,17 @@ GRANT EXECUTE ON FUNCTION public.get_author_partner_reward_dashboard(uuid, integ
 DO $$
 DECLARE
   v_reward_rows_before bigint;
+  v_obligation_rows_before bigint;
   v_payout_rows_before text;
   v_reward_rows bigint;
+  v_obligation_rows bigint;
   v_payout_rows bigint;
 BEGIN
   v_reward_rows_before := current_setting(
     'audiolad.pr4b_reward_rows_before', true
+  )::bigint;
+  v_obligation_rows_before := current_setting(
+    'audiolad.pr4b_obligation_rows_before', true
   )::bigint;
   v_payout_rows_before := current_setting(
     'audiolad.pr4b_payout_rows_before', true
@@ -151,6 +171,13 @@ BEGIN
 
   IF v_reward_rows IS DISTINCT FROM v_reward_rows_before THEN
     RAISE EXCEPTION 'Post-check failed: PR4B changed partner reward ledger count';
+  END IF;
+
+  SELECT count(*) INTO v_obligation_rows
+  FROM public.author_partner_reward_obligations;
+
+  IF v_obligation_rows IS DISTINCT FROM v_obligation_rows_before THEN
+    RAISE EXCEPTION 'Post-check failed: PR4B changed partner reward obligation count';
   END IF;
 
   IF to_regclass('public.author_partner_payouts') IS NOT NULL THEN
