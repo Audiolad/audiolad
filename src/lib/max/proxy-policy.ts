@@ -1,6 +1,7 @@
 import {
   isMaxCatalogPath,
   isMaxPlaybackAudioPath,
+  isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
   isMaxProductPath,
   isMaxHostname,
@@ -65,7 +66,8 @@ export function resolveMaxProxyAction(
       isMaxCatalogPath(pathname) ||
       isMaxProductPath(pathname) ||
       isMaxPlaybackSessionPath(pathname) ||
-      isMaxPlaybackAudioPath(pathname))
+      isMaxPlaybackAudioPath(pathname) ||
+      isMaxPlaybackPreviewPath(pathname))
   ) {
     return { action: "pass_through" };
   }

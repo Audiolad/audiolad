@@ -71,6 +71,8 @@ try {
 
   const allowed = await getMaxPlaybackSession(userId, "author", "product");
   assert.equal(allowed.ok, true);
+  assert.equal(allowed.playbackMode, "full");
+  assert.equal(allowed.session.playbackMode, "full");
   assert.equal(allowed.session.tracks[0].trackId, "track-1");
   assert.equal(allowed.session.practiceId, undefined);
   assert.equal(JSON.stringify(allowed.session).includes(userId), false);
@@ -93,9 +95,10 @@ try {
     listCatalog: async () => catalog(),
     getPractice: async () => ({ practice: listedPractice, error: false }),
     loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    resolvePreview: async () => ({ ok: false, reason: "preview_unavailable" }),
   });
   const denied = await getMaxPlaybackSession(userId, "author", "product");
-  assert.deepEqual(denied, { ok: false, reason: "access_required" });
+  assert.deepEqual(denied, { ok: false, reason: "preview_unavailable" });
 
   setMaxPlaybackDepsForTests({
     createClient: () => ({}),

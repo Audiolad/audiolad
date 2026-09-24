@@ -2,7 +2,11 @@
 
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
-import { shouldDisableMaxPrimaryPlayWhilePreparing } from "@/lib/max/max-audio-playback";
+import {
+  isMaxPreviewPlaybackMode,
+  shouldDisableMaxPrimaryPlayWhilePreparing,
+  shouldShowMaxTrackNavigation,
+} from "@/lib/max/max-audio-playback";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
 
 function formatClock(seconds: number): string {
@@ -20,7 +24,9 @@ export default function MaxAudioPlayer({
   fetchAudio: (
     trackId: string,
     signal: AbortSignal,
-  ) => Promise<{ ok: true; url: string } | { ok: false; reason: string }>;
+  ) => Promise<
+    { ok: true; url: string; objectUrl?: boolean } | { ok: false; reason: string }
+  >;
 }) {
   const {
     audioRef,
@@ -31,6 +37,7 @@ export default function MaxAudioPlayer({
     currentTime,
     duration,
     error,
+    previewEnded,
     play,
     pause,
     seek,
@@ -42,12 +49,23 @@ export default function MaxAudioPlayer({
     canGoNext,
   } = useMaxAudioPlayback({ session, fetchAudio });
 
+  const isPreview = isMaxPreviewPlaybackMode(session.playbackMode);
+  const showNavigation = shouldShowMaxTrackNavigation(session.playbackMode);
   const currentTitle = currentTrack?.title ?? session.title;
-  const sliderMax = duration > 0 ? duration : 0;
+  const previewDuration =
+    isPreview && typeof currentTrack?.durationSeconds === "number"
+      ? currentTrack.durationSeconds
+      : 0;
+  const sliderMax = isPreview && previewDuration > 0 ? previewDuration : duration > 0 ? duration : 0;
 
   return (
     <section className="mt-6 rounded-2xl border border-[#e8def5] bg-white p-4">
       <audio ref={audioRef} preload="none" />
+      {isPreview ? (
+        <p className="mb-2 text-xs font-medium text-[#7042c5]">
+          Предпрослушивание · до 1 минуты
+        </p>
+      ) : null}
       <p className="text-sm font-medium text-[#25135c]">{currentTitle}</p>
       {isPreparing ? (
         <p className="mt-2 text-sm text-[#6c5d94]">Подготавливаем аудио…</p>
@@ -55,16 +73,21 @@ export default function MaxAudioPlayer({
       {error ? (
         <p className="mt-2 text-sm text-[#8a3a5a]">{error}</p>
       ) : null}
+      {previewEnded ? (
+        <p className="mt-2 text-sm text-[#6c5d94]">Предпрослушивание завершено.</p>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={previousTrack}
-          disabled={!canGoPrevious}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
-        >
-          Пред
-        </button>
+        {showNavigation ? (
+          <button
+            type="button"
+            onClick={previousTrack}
+            disabled={!canGoPrevious}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
+          >
+            Пред
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => skipBy(-15)}
@@ -87,14 +110,16 @@ export default function MaxAudioPlayer({
         >
           +15
         </button>
-        <button
-          type="button"
-          onClick={nextTrack}
-          disabled={!canGoNext}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
-        >
-          След
-        </button>
+        {showNavigation ? (
+          <button
+            type="button"
+            onClick={nextTrack}
+            disabled={!canGoNext}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
+          >
+            След
+          </button>
+        ) : null}
       </div>
 
       <input
@@ -108,34 +133,36 @@ export default function MaxAudioPlayer({
         aria-label="Положение трека"
       />
       <p className="mt-1 text-xs text-[#6c5d94]">
-        {formatClock(currentTime)} / {formatClock(duration)}
+        {formatClock(currentTime)} / {formatClock(sliderMax)}
       </p>
 
-      <ol className="mt-4 space-y-2">
-        {session.tracks.map((track, index) => {
-          const active = index === trackIndex;
-          return (
-            <li key={track.trackId}>
-              <button
-                type="button"
-                onClick={() => selectTrack(index)}
-                className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm ${
-                  active ? "bg-[#f3edfb] font-medium text-[#7042c5]" : "text-[#25135c]"
-                }`}
-              >
-                <span>
-                  {track.position}. {track.title}
-                </span>
-                {track.durationSeconds !== null ? (
-                  <span className="text-xs text-[#6c5d94]">
-                    {formatMaxDuration(track.durationSeconds)}
+      {showNavigation || session.tracks.length > 1 ? (
+        <ol className="mt-4 space-y-2">
+          {session.tracks.map((track, index) => {
+            const active = index === trackIndex;
+            return (
+              <li key={track.trackId}>
+                <button
+                  type="button"
+                  onClick={() => selectTrack(index)}
+                  className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm ${
+                    active ? "bg-[#f3edfb] font-medium text-[#7042c5]" : "text-[#25135c]"
+                  }`}
+                >
+                  <span>
+                    {track.position}. {track.title}
                   </span>
-                ) : null}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+                  {track.durationSeconds !== null ? (
+                    <span className="text-xs text-[#6c5d94]">
+                      {formatMaxDuration(track.durationSeconds)}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
     </section>
   );
 }

@@ -20,6 +20,8 @@ const home = readFileSync(
 assert.match(bridge, /view\.phase === "linked_authenticated"/);
 assert.match(bridge, /<MaxAuthenticatedHome/);
 assert.match(home, /MAX_CATALOG_PATH/);
+assert.match(home, /MAX_PLAYBACK_PREVIEW_PATH/);
+assert.match(home, /Предпрослушивание пока недоступно/);
 assert.match(home, /method: "POST"/);
 assert.match(home, /cache: "no-store"/);
 assert.match(home, /Загружаем каталог/);

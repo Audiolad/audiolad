@@ -7,6 +7,7 @@ import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
   MAX_CATALOG_PATH,
   MAX_PLAYBACK_AUDIO_PATH,
+  MAX_PLAYBACK_PREVIEW_PATH,
   MAX_PLAYBACK_SESSION_PATH,
   MAX_PRODUCT_PATH,
 } from "@/lib/max/host";
@@ -40,6 +41,7 @@ type MaxPlaybackState =
   | { status: "loading" }
   | { status: "ready"; session: MaxPlaybackSession; playbackTicket: string }
   | { status: "access_required" }
+  | { status: "preview_unavailable" }
   | { status: "no_audio" }
   | { status: "error" };
 
@@ -185,6 +187,9 @@ export default function MaxAuthenticatedHome() {
       }))
       .then(({ status, payload }) => {
         if (controller.signal.aborted) return;
+        if (status === 403 && payload?.reason === "preview_unavailable") {
+          return setPlayback({ status: "preview_unavailable" });
+        }
         if (status === 403) return setPlayback({ status: "access_required" });
         if (status === 404 && payload?.reason === "no_audio") {
           return setPlayback({ status: "no_audio" });
@@ -195,6 +200,7 @@ export default function MaxAuthenticatedHome() {
         if (
           session &&
           playbackTicket &&
+          (session.playbackMode === "full" || session.playbackMode === "preview") &&
           Array.isArray(session.tracks) &&
           session.tracks.every((track: { trackId?: unknown }) => typeof track.trackId === "string")
         ) {
@@ -326,6 +332,9 @@ export default function MaxAuthenticatedHome() {
               {playback.status === "access_required" ? (
                 <p className="mt-4 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
               ) : null}
+              {playback.status === "preview_unavailable" ? (
+                <p className="mt-4 text-sm text-[#6c5d94]">Предпрослушивание пока недоступно.</p>
+              ) : null}
               {playback.status === "no_audio" ? (
                 <p className="mt-4 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
               ) : null}
@@ -336,6 +345,29 @@ export default function MaxAuthenticatedHome() {
                 <MaxAudioPlayer
                   session={playback.session}
                   fetchAudio={async (trackId, signal) => {
+                    if (playback.session.playbackMode === "preview") {
+                      const response = await fetch(MAX_PLAYBACK_PREVIEW_PATH, {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          playbackTicket: playback.playbackTicket,
+                          trackId,
+                        }),
+                        cache: "no-store",
+                        signal,
+                      });
+                      if (!response.ok) {
+                        const payload = await response.json().catch(() => null);
+                        return { ok: false, reason: payload?.reason ?? "error" };
+                      }
+                      const blob = await response.blob();
+                      return {
+                        ok: true,
+                        url: URL.createObjectURL(blob),
+                        objectUrl: true,
+                      };
+                    }
                     const response = await fetch(MAX_PLAYBACK_AUDIO_PATH, {
                       method: "POST",
                       credentials: "same-origin",

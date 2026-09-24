@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   isMaxCatalogPath,
   isMaxPlaybackAudioPath,
+  isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
   isMaxProductPath,
   isMaxHostname,
@@ -20,6 +21,7 @@ import {
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
   MAX_PLAYBACK_AUDIO_PATH,
+  MAX_PLAYBACK_PREVIEW_PATH,
   MAX_PLAYBACK_SESSION_PATH,
   MAX_PRODUCT_PATH,
   MAX_SESSION_LINK_PATH,
@@ -95,6 +97,9 @@ assert.equal(isMaxPlaybackSessionPath(`${MAX_PLAYBACK_SESSION_PATH}/`), false);
 assert.equal(isMaxPlaybackAudioPath(MAX_PLAYBACK_AUDIO_PATH), true);
 assert.equal(isMaxPlaybackAudioPath("/api/max/playback"), false);
 assert.equal(isMaxPlaybackAudioPath("/api/max/playback/"), false);
+assert.equal(isMaxPlaybackPreviewPath(MAX_PLAYBACK_PREVIEW_PATH), true);
+assert.equal(isMaxPlaybackPreviewPath(`${MAX_PLAYBACK_PREVIEW_PATH}/`), false);
+assert.equal(isMaxPlaybackPreviewPath("/api/max/playback"), false);
 
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
@@ -107,12 +112,14 @@ assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_SESSION_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_AUDIO_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_PREVIEW_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_SESSION_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_AUDIO_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_PREVIEW_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/playback", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/playback/", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/listen/author/product/audio/1", "not_found");
