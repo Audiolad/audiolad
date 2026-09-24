@@ -38,7 +38,7 @@ type MaxProductDetailState =
 type MaxPlaybackState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; session: MaxPlaybackSession }
+  | { status: "ready"; session: MaxPlaybackSession; playbackTicket: string }
   | { status: "access_required" }
   | { status: "no_audio" }
   | { status: "error" };
@@ -190,12 +190,15 @@ export default function MaxAuthenticatedHome() {
           return setPlayback({ status: "no_audio" });
         }
         const session = payload?.session;
+        const playbackTicket =
+          typeof payload?.playbackTicket === "string" ? payload.playbackTicket : "";
         if (
           session &&
+          playbackTicket &&
           Array.isArray(session.tracks) &&
           session.tracks.every((track: { trackId?: unknown }) => typeof track.trackId === "string")
         ) {
-          setPlayback({ status: "ready", session });
+          setPlayback({ status: "ready", session, playbackTicket });
         } else {
           setPlayback({ status: "error" });
         }
@@ -333,18 +336,12 @@ export default function MaxAuthenticatedHome() {
                 <MaxAudioPlayer
                   session={playback.session}
                   fetchAudio={async (trackId, signal) => {
-                    const initData = readMaxInitData();
-                    if (!initData || !selected) {
-                      return { ok: false, reason: "invalid_request" };
-                    }
                     const response = await fetch(MAX_PLAYBACK_AUDIO_PATH, {
                       method: "POST",
                       credentials: "same-origin",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
-                        initData,
-                        authorSlug: selected.authorSlug,
-                        productSlug: selected.slug,
+                        playbackTicket: playback.playbackTicket,
                         trackId,
                       }),
                       cache: "no-store",

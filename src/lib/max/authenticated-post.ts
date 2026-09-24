@@ -10,9 +10,15 @@ import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "@/lib/max/touch-external-identit
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
+export type MaxJsonPostSuccess = {
+  ok: true;
+  body: Record<string, unknown>;
+};
+
 export type MaxAuthenticatedPostSuccess = {
   ok: true;
   userId: string;
+  providerUserId: string;
   body: Record<string, unknown>;
 };
 
@@ -35,20 +41,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export async function readMaxAuthenticatedPost(
+export async function readMaxJsonPost(
   request: Request,
-  requiredStringFields: readonly string[],
-): Promise<MaxAuthenticatedPostSuccess | MaxAuthenticatedPostFailure> {
+): Promise<MaxJsonPostSuccess | MaxAuthenticatedPostFailure> {
   if (!isMaxHostname(getHostnameFromHeaders(request.headers))) {
     return fail("forbidden_host", 404);
   }
   if (!isAllowedMaxSessionOrigin(request)) {
     return fail("forbidden_origin", 403);
-  }
-
-  const botToken = process.env.MAX_BOT_TOKEN?.trim();
-  if (!botToken) {
-    return fail("service_unavailable", 503);
   }
 
   const contentLength = request.headers.get("content-length");
@@ -79,16 +79,33 @@ export async function readMaxAuthenticatedPost(
     return fail("invalid_request", 400);
   }
 
-  if (typeof parsed.initData !== "string") {
+  return { ok: true, body: parsed };
+}
+
+export async function readMaxAuthenticatedPost(
+  request: Request,
+  requiredStringFields: readonly string[],
+): Promise<MaxAuthenticatedPostSuccess | MaxAuthenticatedPostFailure> {
+  const parsed = await readMaxJsonPost(request);
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const botToken = process.env.MAX_BOT_TOKEN?.trim();
+  if (!botToken) {
+    return fail("service_unavailable", 503);
+  }
+
+  if (typeof parsed.body.initData !== "string") {
     return fail("invalid_request", 400);
   }
   for (const field of requiredStringFields) {
-    if (typeof parsed[field] !== "string" || parsed[field].trim() === "") {
+    if (typeof parsed.body[field] !== "string" || parsed.body[field].trim() === "") {
       return fail("invalid_request", 400);
     }
   }
 
-  const verified = verifyMaxInitData(parsed.initData, botToken);
+  const verified = verifyMaxInitData(parsed.body.initData, botToken);
   if (!verified.ok) {
     const status = ["invalid_hash", "expired", "future"].includes(verified.reason)
       ? 401
@@ -107,5 +124,10 @@ export async function readMaxAuthenticatedPost(
     return fail("unlinked", 403);
   }
 
-  return { ok: true, userId: native.userId, body: parsed };
+  return {
+    ok: true,
+    userId: native.userId,
+    providerUserId: verified.data.user.id,
+    body: parsed.body,
+  };
 }

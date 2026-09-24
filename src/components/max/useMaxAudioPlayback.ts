@@ -10,6 +10,8 @@ import {
   nextMaxTrackIndex,
   previousMaxTrackIndex,
   shouldAcceptMaxAudioResponse,
+  shouldApplyMaxSeekRestore,
+  shouldResetMaxRecoveryCycle,
   shouldResumeAfterMaxResign,
   skipMaxPlayback,
 } from "@/lib/max/max-audio-playback";
@@ -27,6 +29,16 @@ type UseMaxAudioPlaybackInput = {
   ) => Promise<MaxAudioFetchResult>;
 };
 
+function playbackErrorMessage(reason: string): string {
+  if (reason === "access_required") {
+    return "Для прослушивания нужен доступ к продукту.";
+  }
+  if (reason === "playback_expired") {
+    return "Сессия прослушивания устарела. Закройте и снова откройте АудиоЛад в MAX.";
+  }
+  return "Не удалось загрузить аудио.";
+}
+
 export function useMaxAudioPlayback({
   session,
   fetchAudio,
@@ -37,6 +49,8 @@ export function useMaxAudioPlayback({
   const intendedPlayingRef = useRef(false);
   const recoveryAttemptedRef = useRef(false);
   const hadPlayingRef = useRef(false);
+  const currentTrackIdRef = useRef<string | null>(null);
+  const seekRestoreRef = useRef<(() => void) | null>(null);
 
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -47,6 +61,15 @@ export function useMaxAudioPlayback({
 
   const tracks = session.tracks;
   const currentTrack: MaxPlaybackTrack | null = tracks[trackIndex] ?? null;
+
+  const clearSeekRestore = useCallback(() => {
+    const audio = audioRef.current;
+    const restore = seekRestoreRef.current;
+    if (audio && restore) {
+      audio.removeEventListener("loadedmetadata", restore);
+    }
+    seekRestoreRef.current = null;
+  }, []);
 
   const stopRequests = useCallback(() => {
     abortRef.current?.abort();
@@ -65,24 +88,55 @@ export function useMaxAudioPlayback({
     setIsPreparing(false);
   }, []);
 
+  const invalidatePlayback = useCallback(() => {
+    stopRequests();
+    generationRef.current += 1;
+    clearSeekRestore();
+    pauseAndClear();
+  }, [clearSeekRestore, pauseAndClear, stopRequests]);
+
   const applySource = useCallback(
-    async (url: string, resumeAt: number, shouldPlay: boolean) => {
+    async (input: {
+      url: string;
+      resumeAt: number;
+      shouldPlay: boolean;
+      generation: number;
+      trackId: string;
+    }) => {
       const audio = audioRef.current;
       if (!audio) {
         return;
       }
 
-      audio.src = url;
+      clearSeekRestore();
+      audio.src = input.url;
       audio.load();
-      if (resumeAt > 0) {
+      if (input.resumeAt > 0) {
         const restore = () => {
-          audio.currentTime = clampMaxSeek(resumeAt, audio.duration || resumeAt);
+          if (
+            !shouldApplyMaxSeekRestore({
+              listenerGeneration: input.generation,
+              liveGeneration: generationRef.current,
+              listenerTrackId: input.trackId,
+              liveTrackId: currentTrackIdRef.current,
+            })
+          ) {
+            return;
+          }
+          audio.currentTime = clampMaxSeek(
+            input.resumeAt,
+            audio.duration || input.resumeAt,
+          );
           audio.removeEventListener("loadedmetadata", restore);
+          if (seekRestoreRef.current === restore) {
+            seekRestoreRef.current = null;
+          }
         };
+        seekRestoreRef.current = restore;
         audio.addEventListener("loadedmetadata", restore);
       }
 
-      if (shouldPlay) {
+      if (input.shouldPlay) {
         try {
           await audio.play();
         } catch {
@@ -91,7 +145,7 @@ export function useMaxAudioPlayback({
         }
       }
     },
-    [],
+    [clearSeekRestore],
   );
 
   const loadTrack = useCallback(
@@ -102,12 +156,14 @@ export function useMaxAudioPlayback({
       }
 
       stopRequests();
+      clearSeekRestore();
       generationRef.current += 1;
       const generation = generationRef.current;
       const controller = new AbortController();
       abortRef.current = controller;
       recoveryAttemptedRef.current = false;
       hadPlayingRef.current = false;
+      currentTrackIdRef.current = track.trackId;
       setError(null);
       setIsPreparing(true);
       setTrackIndex(index);
@@ -125,18 +181,20 @@ export function useMaxAudioPlayback({
 
       if (!result.ok) {
         setIsPreparing(false);
-        setError(
-          result.reason === "access_required"
-            ? "Для прослушивания нужен доступ к продукту."
-            : "Не удалось загрузить аудио.",
-        );
+        setError(playbackErrorMessage(result.reason));
         return;
       }
 
       setIsPreparing(false);
-      await applySource(result.url, resumeAt, shouldPlay);
+      await applySource({
+        url: result.url,
+        resumeAt,
+        shouldPlay,
+        generation,
+        trackId: track.trackId,
+      });
     },
-    [applySource, fetchAudio, stopRequests, tracks],
+    [applySource, clearSeekRestore, fetchAudio, stopRequests, tracks],
   );
 
   const play = useCallback(() => {
@@ -179,18 +237,29 @@ export function useMaxAudioPlayback({
 
   const selectTrack = useCallback(
     (index: number) => {
+      if (index < 0 || index >= tracks.length) {
+        return;
+      }
       intendedPlayingRef.current = true;
       void loadTrack(index, true);
     },
-    [loadTrack],
+    [loadTrack, tracks.length],
   );
 
   const nextTrack = useCallback(() => {
-    selectTrack(nextMaxTrackIndex(trackIndex, tracks.length));
+    const next = nextMaxTrackIndex(trackIndex, tracks.length);
+    if (next === null) {
+      return;
+    }
+    selectTrack(next);
   }, [selectTrack, trackIndex, tracks.length]);
 
   const previousTrack = useCallback(() => {
-    selectTrack(previousMaxTrackIndex(trackIndex, tracks.length));
+    const previous = previousMaxTrackIndex(trackIndex, tracks.length);
+    if (previous === null) {
+      return;
+    }
+    selectTrack(previous);
   }, [selectTrack, trackIndex, tracks.length]);
 
   useEffect(() => {
@@ -201,25 +270,35 @@ export function useMaxAudioPlayback({
 
     const onTime = () => setCurrentTime(audio.currentTime);
     const onDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
-    const onPlay = () => {
+    const onPlay = () => setIsPlaying(true);
+    const onPlaying = () => {
       setIsPlaying(true);
       hadPlayingRef.current = true;
+      if (shouldResetMaxRecoveryCycle("playing")) {
+        recoveryAttemptedRef.current = false;
+      }
     };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
-      setIsPlaying(false);
-      intendedPlayingRef.current = false;
+      const next = nextMaxTrackIndex(trackIndex, tracks.length);
+      if (next === null) {
+        setIsPlaying(false);
+        intendedPlayingRef.current = false;
+        return;
+      }
+      intendedPlayingRef.current = true;
+      void loadTrack(next, true);
     };
     const onError = () => {
       const decision = decideMaxSignedUrlRecovery({
         mediaErrorCode: audio.error?.code ?? null,
         hadSuccessfulPlaying: hadPlayingRef.current,
         recoveryUrlAttempted: recoveryAttemptedRef.current,
-        currentTrackId: currentTrack?.trackId ?? null,
+        currentTrackId: currentTrackIdRef.current,
         hasSrc: Boolean(audio.src),
       });
 
-      if (decision.action !== "resign" || !currentTrack) {
+      if (decision.action !== "resign" || !currentTrackIdRef.current) {
         if (decision.errorMessage) {
           setError(decision.errorMessage);
         }
@@ -231,9 +310,10 @@ export function useMaxAudioPlayback({
       const resumeAt = captureMaxRecoveryPosition(audio.currentTime);
       const shouldPlay = shouldResumeAfterMaxResign(intendedPlayingRef.current);
       const generation = generationRef.current;
+      const trackId = currentTrackIdRef.current;
       const controller = new AbortController();
       abortRef.current = controller;
-      void fetchAudio(currentTrack.trackId, controller.signal).then(async (result) => {
+      void fetchAudio(trackId, controller.signal).then(async (result) => {
         if (
           controller.signal.aborted ||
           isStaleMaxAudioRequest(generation, generationRef.current)
@@ -241,16 +321,27 @@ export function useMaxAudioPlayback({
           return;
         }
         if (!result.ok) {
-          setError("Не удалось обновить аудио. Попробуйте ещё раз.");
+          setError(
+            result.reason === "playback_expired"
+              ? playbackErrorMessage(result.reason)
+              : "Не удалось обновить аудио. Попробуйте ещё раз.",
+          );
           return;
         }
-        await applySource(result.url, resumeAt, shouldPlay);
+        await applySource({
+          url: result.url,
+          resumeAt,
+          shouldPlay,
+          generation,
+          trackId,
+        });
       });
     };
 
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("durationchange", onDuration);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
@@ -259,18 +350,18 @@ export function useMaxAudioPlayback({
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("durationchange", onDuration);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [applySource, currentTrack, fetchAudio]);
+  }, [applySource, fetchAudio, loadTrack, trackIndex, tracks.length]);
 
   useEffect(() => {
     return () => {
-      stopRequests();
-      pauseAndClear();
+      invalidatePlayback();
     };
-  }, [pauseAndClear, stopRequests]);
+  }, [invalidatePlayback]);
 
   return {
     audioRef,
@@ -288,9 +379,8 @@ export function useMaxAudioPlayback({
     selectTrack,
     nextTrack,
     previousTrack,
-    stop: () => {
-      stopRequests();
-      pauseAndClear();
-    },
+    canGoPrevious: previousMaxTrackIndex(trackIndex, tracks.length) !== null,
+    canGoNext: nextMaxTrackIndex(trackIndex, tracks.length) !== null,
+    stop: invalidatePlayback,
   };
 }

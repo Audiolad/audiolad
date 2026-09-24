@@ -37,6 +37,8 @@ export default function MaxAudioPlayer({
     selectTrack,
     nextTrack,
     previousTrack,
+    canGoPrevious,
+    canGoNext,
   } = useMaxAudioPlayback({ session, fetchAudio });
 
   const currentTitle = currentTrack?.title ?? session.title;
@@ -57,7 +59,8 @@ export default function MaxAudioPlayer({
         <button
           type="button"
           onClick={previousTrack}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5]"
+          disabled={!canGoPrevious}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
         >
           Пред
         </button>
@@ -85,7 +88,8 @@ export default function MaxAudioPlayer({
         <button
           type="button"
           onClick={nextTrack}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5]"
+          disabled={!canGoNext}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
         >
           След
         </button>

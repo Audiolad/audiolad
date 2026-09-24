@@ -302,6 +302,25 @@ try {
     },
   );
   assert.deepEqual(courseForbidden, { ok: false, reason: "forbidden" });
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => {
+      throw new Error("service client exploded");
+    },
+  });
+  const sessionThrow = await getMaxPlaybackSession(userId, "author", "product");
+  assert.deepEqual(sessionThrow, { ok: false, reason: "storage_unavailable" });
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({ practice: listedPractice, error: false }),
+    signAudio: async () => {
+      throw new Error("sign exploded");
+    },
+  });
+  const signThrow = await signMaxPlaybackAudio(userId, "author", "product", "track-1");
+  assert.deepEqual(signThrow, { ok: false, reason: "storage_unavailable" });
 } finally {
   setMaxPlaybackDepsForTests(null);
 }

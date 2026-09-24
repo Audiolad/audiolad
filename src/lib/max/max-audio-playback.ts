@@ -80,16 +80,45 @@ export function isCurrentMaxRecovery(input: {
   return shouldApplySignedUrlRecovery(input);
 }
 
-export function nextMaxTrackIndex(current: number, length: number): number {
-  if (length <= 0) {
-    return 0;
+export function nextMaxTrackIndex(current: number, length: number): number | null {
+  if (length <= 0 || current + 1 >= length) {
+    return null;
   }
-  return Math.min(current + 1, length - 1);
+  return current + 1;
 }
 
-export function previousMaxTrackIndex(current: number, length: number): number {
-  if (length <= 0) {
-    return 0;
+export function previousMaxTrackIndex(current: number, length: number): number | null {
+  if (length <= 0 || current <= 0) {
+    return null;
   }
-  return Math.max(current - 1, 0);
+  return current - 1;
+}
+
+export function canGoToNextMaxTrack(current: number, length: number): boolean {
+  return nextMaxTrackIndex(current, length) !== null;
+}
+
+export function canGoToPreviousMaxTrack(current: number, length: number): boolean {
+  return previousMaxTrackIndex(current, length) !== null;
+}
+
+export function shouldAdvanceAfterMaxTrackEnd(current: number, length: number): boolean {
+  return nextMaxTrackIndex(current, length) !== null;
+}
+
+export function shouldResetMaxRecoveryCycle(event: "playing" | "play" | "src" | "fetch"): boolean {
+  return event === "playing";
+}
+
+export function shouldApplyMaxSeekRestore(input: {
+  listenerGeneration: number;
+  liveGeneration: number;
+  listenerTrackId: string;
+  liveTrackId: string | null;
+}): boolean {
+  return (
+    input.listenerGeneration === input.liveGeneration &&
+    input.liveTrackId !== null &&
+    input.listenerTrackId === input.liveTrackId
+  );
 }

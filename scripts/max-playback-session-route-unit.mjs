@@ -6,9 +6,11 @@ import {
   MAX_PLAYBACK_SESSION_PATH,
 } from "../src/lib/max/host.ts";
 import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "../src/lib/max/touch-external-identity.ts";
+import { MAX_PLAYBACK_TICKET_TTL_SECONDS } from "../src/lib/max/playback-ticket.ts";
 import {
   POST,
   setMaxPlaybackDepsForTests,
+  setMaxPlaybackTicketNowForTests,
   setResolveMaxNativeUserForTests,
 } from "../src/app/api/max/playback/session/route.ts";
 
@@ -90,10 +92,15 @@ try {
   assert.equal(ok.ok, true);
   assert.equal(ok.session.tracks[0].trackId, "track-1");
   assert.equal(ok.session.practiceId, undefined);
+  assert.equal(typeof ok.playbackTicket, "string");
+  assert.equal(ok.playbackTicketExpiresIn, MAX_PLAYBACK_TICKET_TTL_SECONDS);
+  assert.match(ok.playbackTicket, /^v1\./);
   assert.equal(JSON.stringify(ok).includes(userId), false);
   assert.equal(JSON.stringify(ok).includes("browser-user"), false);
   assert.equal(JSON.stringify(ok).includes("initData"), false);
   assert.equal(JSON.stringify(ok).includes("access_token"), false);
+  assert.equal(ok.playbackTicket.includes(userId), false);
+  assert.equal(ok.playbackTicket.includes("providerUserId"), false);
   assert.equal(r.headers.get("cache-control"), "no-store");
 
   const before = sessions;
@@ -134,6 +141,7 @@ try {
 } finally {
   setResolveMaxNativeUserForTests(null);
   setMaxPlaybackDepsForTests(null);
+  setMaxPlaybackTicketNowForTests(null);
 }
 
 console.log("max-playback-session-route-unit: ok");

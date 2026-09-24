@@ -118,15 +118,14 @@ export async function getMaxPlaybackSession(
   productSlug: string,
   deps?: MaxPlaybackDeps,
 ): Promise<GetMaxPlaybackSessionResult> {
-  const listed = await resolveListedPractice(authorSlug, productSlug, deps);
-  if (!listed.ok) {
-    return listed;
-  }
-
-  const supabase = client(deps);
-  const loadSession = deps?.loadSession ?? playbackDeps?.loadSession ?? loadListenSessionPayload;
-
   try {
+    const listed = await resolveListedPractice(authorSlug, productSlug, deps);
+    if (!listed.ok) {
+      return listed;
+    }
+
+    const supabase = client(deps);
+    const loadSession = deps?.loadSession ?? playbackDeps?.loadSession ?? loadListenSessionPayload;
     const payload = await loadSession(supabase, authorSlug, productSlug, userId, {
       forceStartAtBeginning: true,
       serviceRole: supabase,
@@ -161,20 +160,24 @@ export async function signMaxPlaybackAudio(
   trackId: string,
   deps?: MaxPlaybackDeps,
 ): Promise<SignMaxPlaybackAudioResult> {
-  const listed = await resolveListedPractice(authorSlug, productSlug, deps);
-  if (!listed.ok) {
-    return listed;
-  }
+  try {
+    const listed = await resolveListedPractice(authorSlug, productSlug, deps);
+    if (!listed.ok) {
+      return listed;
+    }
 
-  const signAudio = deps?.signAudio ?? playbackDeps?.signAudio ?? signEntitledListenAudio;
-  return signAudio(
-    {
-      userId,
-      authorSlug,
-      productSlug,
-      audioId: trackId,
-      practice: listed.practice,
-    },
-    { createClient: deps?.createClient ?? playbackDeps?.createClient },
-  );
+    const signAudio = deps?.signAudio ?? playbackDeps?.signAudio ?? signEntitledListenAudio;
+    return await signAudio(
+      {
+        userId,
+        authorSlug,
+        productSlug,
+        audioId: trackId,
+        practice: listed.practice,
+      },
+      { createClient: deps?.createClient ?? playbackDeps?.createClient },
+    );
+  } catch {
+    return { ok: false, reason: "storage_unavailable" };
+  }
 }

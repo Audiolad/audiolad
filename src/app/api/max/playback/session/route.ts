@@ -2,10 +2,12 @@ import "server-only";
 
 import { readMaxAuthenticatedPost } from "@/lib/max/authenticated-post";
 import { getMaxPlaybackSession } from "@/lib/max/playback";
+import { mintMaxPlaybackTicket } from "@/lib/max/playback-ticket";
 
 export const dynamic = "force-dynamic";
 export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setMaxPlaybackDepsForTests } from "@/lib/max/playback";
+export { setMaxPlaybackTicketNowForTests } from "@/lib/max/playback-ticket";
 
 function fail(reason: string, status: number) {
   return Response.json(
@@ -15,31 +17,46 @@ function fail(reason: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await readMaxAuthenticatedPost(request, [
-    "authorSlug",
-    "productSlug",
-  ]);
-  if (!authenticated.ok) {
-    return authenticated.response;
-  }
+  try {
+    const authenticated = await readMaxAuthenticatedPost(request, [
+      "authorSlug",
+      "productSlug",
+    ]);
+    if (!authenticated.ok) {
+      return authenticated.response;
+    }
 
-  const authorSlug = String(authenticated.body.authorSlug).trim();
-  const productSlug = String(authenticated.body.productSlug).trim();
-  const result = await getMaxPlaybackSession(
-    authenticated.userId,
-    authorSlug,
-    productSlug,
-  );
+    const authorSlug = String(authenticated.body.authorSlug).trim();
+    const productSlug = String(authenticated.body.productSlug).trim();
+    const result = await getMaxPlaybackSession(
+      authenticated.userId,
+      authorSlug,
+      productSlug,
+    );
 
-  if (!result.ok) {
-    if (result.reason === "not_found") return fail("not_found", 404);
-    if (result.reason === "access_required") return fail("access_required", 403);
-    if (result.reason === "no_audio") return fail("no_audio", 404);
+    if (!result.ok) {
+      if (result.reason === "not_found") return fail("not_found", 404);
+      if (result.reason === "access_required") return fail("access_required", 403);
+      if (result.reason === "no_audio") return fail("no_audio", 404);
+      return fail("storage_unavailable", 503);
+    }
+
+    const ticket = mintMaxPlaybackTicket({
+      providerUserId: authenticated.providerUserId,
+      authorSlug,
+      productSlug,
+    });
+
+    return Response.json(
+      {
+        ok: true,
+        session: result.session,
+        playbackTicket: ticket.token,
+        playbackTicketExpiresIn: ticket.expiresIn,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch {
     return fail("storage_unavailable", 503);
   }
-
-  return Response.json(
-    { ok: true, session: result.session },
-    { headers: { "Cache-Control": "no-store" } },
-  );
 }
