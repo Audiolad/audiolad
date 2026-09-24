@@ -15,15 +15,18 @@ import {
   shouldApplyMaxSeekRestore,
   shouldIgnoreMaxTeardownMediaError,
   shouldPlayMaxAppliedSource,
+  shouldAdvanceAfterMaxPreviewEnd,
   shouldResetMaxRecoveryCycle,
+  shouldShowMaxTrackNavigation,
   shouldResumeAfterMaxResign,
+  shouldRevokeMaxAudioObjectUrl,
   shouldStartMaxPrimaryPlayFetch,
   skipMaxPlayback,
 } from "@/lib/max/max-audio-playback";
 import type { MaxPlaybackSession, MaxPlaybackTrack } from "@/lib/max/playback-types";
 
 export type MaxAudioFetchResult =
-  | { ok: true; url: string }
+  | { ok: true; url: string; objectUrl?: boolean }
   | { ok: false; reason: string };
 
 type UseMaxAudioPlaybackInput = {
@@ -41,6 +44,9 @@ function playbackErrorMessage(reason: string): string {
   if (reason === "playback_expired") {
     return "Сессия прослушивания устарела. Закройте и снова откройте АудиоЛад в MAX.";
   }
+  if (reason === "preview_unavailable") {
+    return "Предпрослушивание пока недоступно.";
+  }
   return "Не удалось загрузить аудио.";
 }
 
@@ -56,6 +62,7 @@ export function useMaxAudioPlayback({
   const hadPlayingRef = useRef(false);
   const currentTrackIdRef = useRef<string | null>(null);
   const seekRestoreRef = useRef<(() => void) | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -63,6 +70,7 @@ export function useMaxAudioPlayback({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [previewEnded, setPreviewEnded] = useState(false);
 
   const tracks = session.tracks;
   const currentTrack: MaxPlaybackTrack | null = tracks[trackIndex] ?? null;
@@ -81,6 +89,14 @@ export function useMaxAudioPlayback({
     abortRef.current = null;
   }, []);
 
+  const revokeObjectUrl = useCallback(() => {
+    const current = objectUrlRef.current;
+    if (shouldRevokeMaxAudioObjectUrl(current) && current) {
+      URL.revokeObjectURL(current);
+    }
+    objectUrlRef.current = null;
+  }, []);
+
   const clearCurrentMediaSource = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) {
@@ -97,11 +113,13 @@ export function useMaxAudioPlayback({
     clearSeekRestore();
     intendedPlayingRef.current = false;
     clearCurrentMediaSource();
+    revokeObjectUrl();
     setIsPlaying(false);
     setIsPreparing(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [clearCurrentMediaSource, clearSeekRestore, stopRequests]);
+    setPreviewEnded(false);
+  }, [clearCurrentMediaSource, clearSeekRestore, revokeObjectUrl, stopRequests]);
 
   const applySource = useCallback(
     async (input: {
@@ -110,6 +128,7 @@ export function useMaxAudioPlayback({
       shouldPlay: boolean;
       generation: number;
       trackId: string;
+      objectUrl?: boolean;
     }) => {
       const audio = audioRef.current;
       if (!audio) {
@@ -117,6 +136,12 @@ export function useMaxAudioPlayback({
       }
 
       clearSeekRestore();
+      if (objectUrlRef.current && objectUrlRef.current !== input.url) {
+        revokeObjectUrl();
+      }
+      if (input.objectUrl) {
+        objectUrlRef.current = input.url;
+      }
       audio.src = input.url;
       audio.load();
       if (input.resumeAt > 0) {
@@ -157,7 +182,7 @@ export function useMaxAudioPlayback({
         }
       }
     },
-    [clearSeekRestore],
+    [clearSeekRestore, revokeObjectUrl],
   );
 
   const loadTrack = useCallback(
@@ -177,11 +202,16 @@ export function useMaxAudioPlayback({
       hadPlayingRef.current = false;
       currentTrackIdRef.current = track.trackId;
       setError(null);
+      setPreviewEnded(false);
       setTrackIndex(index);
       const visible = maxTrackSwitchVisibleReset();
       setIsPlaying(visible.isPlaying);
       setCurrentTime(visible.currentTime);
-      setDuration(visible.duration);
+      setDuration(
+        session.playbackMode === "preview" && typeof track.durationSeconds === "number"
+          ? track.durationSeconds
+          : visible.duration,
+      );
       setIsPreparing(visible.isPreparing);
       clearCurrentMediaSource();
 
@@ -193,6 +223,9 @@ export function useMaxAudioPlayback({
           liveGeneration: generationRef.current,
         })
       ) {
+        if (result.ok && result.objectUrl && shouldRevokeMaxAudioObjectUrl(result.url)) {
+          URL.revokeObjectURL(result.url);
+        }
         return;
       }
 
@@ -209,9 +242,10 @@ export function useMaxAudioPlayback({
         shouldPlay,
         generation,
         trackId: track.trackId,
+        objectUrl: result.objectUrl,
       });
     },
-    [applySource, clearCurrentMediaSource, clearSeekRestore, fetchAudio, stopRequests, tracks],
+    [applySource, clearCurrentMediaSource, clearSeekRestore, fetchAudio, session.playbackMode, stopRequests, tracks],
   );
 
   const play = useCallback(() => {
@@ -273,20 +307,26 @@ export function useMaxAudioPlayback({
   );
 
   const nextTrack = useCallback(() => {
+    if (!shouldShowMaxTrackNavigation(session.playbackMode)) {
+      return;
+    }
     const next = nextMaxTrackIndex(trackIndex, tracks.length);
     if (next === null) {
       return;
     }
     selectTrack(next);
-  }, [selectTrack, trackIndex, tracks.length]);
+  }, [selectTrack, session.playbackMode, trackIndex, tracks.length]);
 
   const previousTrack = useCallback(() => {
+    if (!shouldShowMaxTrackNavigation(session.playbackMode)) {
+      return;
+    }
     const previous = previousMaxTrackIndex(trackIndex, tracks.length);
     if (previous === null) {
       return;
     }
     selectTrack(previous);
-  }, [selectTrack, trackIndex, tracks.length]);
+  }, [selectTrack, session.playbackMode, trackIndex, tracks.length]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -306,6 +346,12 @@ export function useMaxAudioPlayback({
     };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
+      if (!shouldAdvanceAfterMaxPreviewEnd(session.playbackMode)) {
+        intendedPlayingRef.current = false;
+        setIsPlaying(false);
+        setPreviewEnded(true);
+        return;
+      }
       const next = nextMaxTrackIndex(trackIndex, tracks.length);
       if (next === null) {
         setIsPlaying(false);
@@ -348,6 +394,9 @@ export function useMaxAudioPlayback({
           controller.signal.aborted ||
           isStaleMaxAudioRequest(generation, generationRef.current)
         ) {
+          if (result.ok && result.objectUrl && shouldRevokeMaxAudioObjectUrl(result.url)) {
+            URL.revokeObjectURL(result.url);
+          }
           return;
         }
         if (!result.ok) {
@@ -367,6 +416,7 @@ export function useMaxAudioPlayback({
           }),
           generation,
           trackId,
+          objectUrl: result.objectUrl,
         });
       });
     };
@@ -388,7 +438,7 @@ export function useMaxAudioPlayback({
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [applySource, fetchAudio, loadTrack, trackIndex, tracks.length]);
+  }, [applySource, fetchAudio, loadTrack, session.playbackMode, trackIndex, tracks.length]);
 
   useEffect(() => {
     return () => {
@@ -405,6 +455,7 @@ export function useMaxAudioPlayback({
     currentTime,
     duration,
     error,
+    previewEnded,
     play,
     pause,
     seek,
@@ -412,8 +463,12 @@ export function useMaxAudioPlayback({
     selectTrack,
     nextTrack,
     previousTrack,
-    canGoPrevious: previousMaxTrackIndex(trackIndex, tracks.length) !== null,
-    canGoNext: nextMaxTrackIndex(trackIndex, tracks.length) !== null,
+    canGoPrevious:
+      shouldShowMaxTrackNavigation(session.playbackMode) &&
+      previousMaxTrackIndex(trackIndex, tracks.length) !== null,
+    canGoNext:
+      shouldShowMaxTrackNavigation(session.playbackMode) &&
+      nextMaxTrackIndex(trackIndex, tracks.length) !== null,
     stop: invalidatePlayback,
   };
 }

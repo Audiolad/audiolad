@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     if (!result.ok) {
       if (result.reason === "not_found") return fail("not_found", 404);
       if (result.reason === "access_required") return fail("access_required", 403);
+      if (result.reason === "preview_unavailable") return fail("preview_unavailable", 403);
       if (result.reason === "no_audio") return fail("no_audio", 404);
       return fail("storage_unavailable", 503);
     }
@@ -50,9 +51,13 @@ export async function POST(request: Request) {
     return Response.json(
       {
         ok: true,
+        playbackMode: result.playbackMode,
         session: result.session,
         playbackTicket: ticket.token,
         playbackTicketExpiresIn: ticket.expiresIn,
+        ...(result.playbackMode === "preview"
+          ? { previewDurationSeconds: result.previewDurationSeconds }
+          : {}),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

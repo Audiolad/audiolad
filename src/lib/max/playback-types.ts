@@ -1,3 +1,5 @@
+export type MaxPlaybackMode = "full" | "preview";
+
 export type MaxPlaybackTrack = {
   trackId: string;
   title: string;
@@ -14,4 +16,5 @@ export type MaxPlaybackSession = {
   formatLabel: string | null;
   coverUrl: string | null;
   tracks: MaxPlaybackTrack[];
+  playbackMode: MaxPlaybackMode;
 };

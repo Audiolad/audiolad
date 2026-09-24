@@ -113,6 +113,26 @@ export function shouldDisableMaxPrimaryPlayWhilePreparing(isPreparing: boolean):
   return isPreparing;
 }
 
+export function isMaxPreviewPlaybackMode(mode: string | null | undefined): boolean {
+  return mode === "preview";
+}
+
+export function shouldShowMaxTrackNavigation(mode: string | null | undefined): boolean {
+  return !isMaxPreviewPlaybackMode(mode);
+}
+
+export function shouldAdvanceAfterMaxPreviewEnd(mode: string | null | undefined): boolean {
+  return !isMaxPreviewPlaybackMode(mode);
+}
+
+export function isMaxBlobObjectUrl(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.startsWith("blob:");
+}
+
+export function shouldRevokeMaxAudioObjectUrl(url: string | null | undefined): boolean {
+  return isMaxBlobObjectUrl(url);
+}
+
 export function settleMaxResignFailure(reason: "stale" | "aborted" | "failed") {
   return settleSignedUrlRecoveryFailure({ ok: false, reason });
 }

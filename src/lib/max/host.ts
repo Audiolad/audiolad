@@ -22,6 +22,9 @@ export const MAX_PLAYBACK_SESSION_PATH = "/api/max/playback/session";
 /** HMAC-verify linked MAX identity, then sign one entitled track. */
 export const MAX_PLAYBACK_AUDIO_PATH = "/api/max/playback/audio";
 
+/** Ticket-authenticated storefront preview clip. MAX host only. */
+export const MAX_PLAYBACK_PREVIEW_PATH = "/api/max/playback/preview";
+
 export function isMaxHostname(hostname: string): boolean {
   return hostname === MAX_HOSTNAME;
 }
@@ -47,6 +50,10 @@ export function isMaxPlaybackSessionPath(pathname: string): boolean {
 
 export function isMaxPlaybackAudioPath(pathname: string): boolean {
   return pathname === MAX_PLAYBACK_AUDIO_PATH;
+}
+
+export function isMaxPlaybackPreviewPath(pathname: string): boolean {
+  return pathname === MAX_PLAYBACK_PREVIEW_PATH;
 }
 
 export function isMaxSitePath(pathname: string): boolean {

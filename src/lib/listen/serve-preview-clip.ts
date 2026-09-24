@@ -91,16 +91,17 @@ function writeClipCache(key: string, bytes: Uint8Array) {
   });
 }
 
-async function downloadPracticeAudio(
+async function downloadStorageSource(
   storageClient: SupabaseClient,
-  audioPath: string,
+  bucket: string,
+  path: string,
 ): Promise<{
   source: Uint8Array | ReadableStream<Uint8Array>;
   abort: () => void;
 }> {
   const { data, error } = await storageClient.storage
-    .from("practice-audio")
-    .createSignedUrl(audioPath, PREVIEW_SOURCE_SIGN_TTL_SECONDS);
+    .from(bucket)
+    .createSignedUrl(path, PREVIEW_SOURCE_SIGN_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
     throw new Error("preview_source_sign_failed");
@@ -136,6 +137,38 @@ async function downloadPracticeAudio(
   }
 
   return { source: buffer, abort: () => controller.abort() };
+}
+
+export async function buildPreviewClipFromStorageSource(input: {
+  storageClient: SupabaseClient;
+  bucket: string;
+  path: string;
+  startMs: number;
+  endMs: number;
+  cacheKey: string;
+}): Promise<Uint8Array> {
+  const cached = readClipCache(input.cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const downloaded = await downloadStorageSource(
+    input.storageClient,
+    input.bucket,
+    input.path,
+  );
+  const extracted =
+    downloaded.source instanceof Uint8Array
+      ? extractMp3TimeRange(downloaded.source, input.startMs, input.endMs)
+      : await extractMp3TimeRangeFromStream(
+          downloaded.source,
+          input.startMs,
+          input.endMs,
+          { abort: downloaded.abort },
+        );
+
+  writeClipCache(input.cacheKey, extracted.bytes);
+  return extracted.bytes;
 }
 
 export async function buildPracticePreviewClip(input: {
@@ -197,32 +230,17 @@ export async function buildPracticePreviewClip(input: {
     window.startMs,
     endMs,
   );
-  const cached = readClipCache(key);
-
-  if (cached) {
-    return {
-      bytes: cached,
-      startMs: window.startMs,
-      endMs,
-      expiresIn: LISTEN_SIGNED_URL_TTL_SECONDS,
-    };
-  }
-
-  const downloaded = await downloadPracticeAudio(input.storageClient, audioPath);
-  const extracted =
-    downloaded.source instanceof Uint8Array
-      ? extractMp3TimeRange(downloaded.source, window.startMs, endMs)
-      : await extractMp3TimeRangeFromStream(
-          downloaded.source,
-          window.startMs,
-          endMs,
-          { abort: downloaded.abort },
-        );
-
-  writeClipCache(key, extracted.bytes);
+  const bytes = await buildPreviewClipFromStorageSource({
+    storageClient: input.storageClient,
+    bucket: "practice-audio",
+    path: audioPath,
+    startMs: window.startMs,
+    endMs,
+    cacheKey: key,
+  });
 
   return {
-    bytes: extracted.bytes,
+    bytes,
     startMs: window.startMs,
     endMs,
     expiresIn: LISTEN_SIGNED_URL_TTL_SECONDS,

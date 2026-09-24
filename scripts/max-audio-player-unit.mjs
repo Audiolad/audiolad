@@ -13,7 +13,12 @@ import {
   previousMaxTrackIndex,
   settleMaxResignFailure,
   shouldAcceptMaxAudioResponse,
+  isMaxBlobObjectUrl,
+  isMaxPreviewPlaybackMode,
+  shouldAdvanceAfterMaxPreviewEnd,
   shouldAdvanceAfterMaxTrackEnd,
+  shouldRevokeMaxAudioObjectUrl,
+  shouldShowMaxTrackNavigation,
   shouldApplyMaxSeekRestore,
   shouldDisableMaxPrimaryPlayWhilePreparing,
   shouldIgnoreMaxTeardownMediaError,
@@ -34,6 +39,11 @@ assert.equal(previousMaxTrackIndex(0, 3), null);
 assert.equal(previousMaxTrackIndex(1, 3), 0);
 assert.equal(shouldAdvanceAfterMaxTrackEnd(0, 3), true);
 assert.equal(shouldAdvanceAfterMaxTrackEnd(2, 3), false);
+assert.equal(isMaxPreviewPlaybackMode("preview"), true);
+assert.equal(shouldShowMaxTrackNavigation("preview"), false);
+assert.equal(shouldAdvanceAfterMaxPreviewEnd("preview"), false);
+assert.equal(shouldRevokeMaxAudioObjectUrl("blob:https://max.audiolad.ru/1"), true);
+assert.equal(isMaxBlobObjectUrl("https://cdn.example/a.mp3"), false);
 assert.equal(captureMaxRecoveryPosition(3650), 3650);
 assert.equal(isStaleMaxAudioRequest(1, 2), true);
 assert.equal(
@@ -188,7 +198,8 @@ assert.match(loadTrackFn, /clearCurrentMediaSource\(\)/);
 assert.match(loadTrackFn, /maxTrackSwitchVisibleReset\(\)/);
 assert.match(loadTrackFn, /setIsPlaying\(visible\.isPlaying\)/);
 assert.match(loadTrackFn, /setCurrentTime\(visible\.currentTime\)/);
-assert.match(loadTrackFn, /setDuration\(visible\.duration\)/);
+assert.match(loadTrackFn, /visible\.duration/);
+assert.match(loadTrackFn, /setDuration\(/);
 assert.doesNotMatch(loadTrackFn, /intendedPlayingRef\.current = false/);
 assert.ok(loadTrackFn.indexOf("clearCurrentMediaSource()") < loadTrackFn.indexOf("fetchAudio"));
 
@@ -218,6 +229,7 @@ assert.doesNotMatch(source, /localStorage|sessionStorage/);
 assert.doesNotMatch(source, /window\.location|openLink|\/listen\/|\/practice\//);
 assert.match(home, /MAX_PLAYBACK_SESSION_PATH/);
 assert.match(home, /MAX_PLAYBACK_AUDIO_PATH/);
+assert.match(home, /MAX_PLAYBACK_PREVIEW_PATH/);
 assert.match(home, /playbackTicket: playback\.playbackTicket/);
 const audioFetch = home.slice(home.indexOf("fetchAudio={async"));
 assert.match(audioFetch, /MAX_PLAYBACK_AUDIO_PATH/);

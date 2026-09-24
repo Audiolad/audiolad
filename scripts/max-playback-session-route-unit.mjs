@@ -90,6 +90,8 @@ try {
   assert.equal(r.status, 200);
   const ok = await r.json();
   assert.equal(ok.ok, true);
+  assert.equal(ok.playbackMode, "full");
+  assert.equal(ok.session.playbackMode, "full");
   assert.equal(ok.session.tracks[0].trackId, "track-1");
   assert.equal(ok.session.practiceId, undefined);
   assert.equal(typeof ok.playbackTicket, "string");
@@ -134,10 +136,11 @@ try {
     listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
     getPractice: async () => ({ practice: { id: "practice-1" }, error: false }),
     loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    resolvePreview: async () => ({ ok: false, reason: "preview_unavailable" }),
   });
   r = await POST(request({ initData: init(), authorSlug: "author", productSlug: "product" }));
   assert.equal(r.status, 403);
-  assert.equal((await r.json()).reason, "access_required");
+  assert.equal((await r.json()).reason, "preview_unavailable");
 } finally {
   setResolveMaxNativeUserForTests(null);
   setMaxPlaybackDepsForTests(null);
