@@ -6,9 +6,7 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { createClient } from "@/lib/supabase/server";
-import {
-  evaluatePartnerYour20Access,
-} from "@/lib/author-partner/ui-beta";
+import { evaluatePartnerYour20Access } from "@/lib/author-partner/access";
 import {
   parsePartnerRpcErrorCode,
   partnerCodeUserMessage,
@@ -37,7 +35,7 @@ export type PartnerYour20ActionResult =
  * 1) support-mode blocked
  * 2) requireAuthorMembership → role must be owner
  * 3) load authors.slug by authorId (server SoT)
- * 4) slug must be sergey-petrov
+ * 4) resolved slug must belong to that owner membership
  *
  * Never trusts a client-supplied slug.
  */

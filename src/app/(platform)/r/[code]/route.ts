@@ -28,7 +28,7 @@ export async function GET(
   return handlePartnerInviteRequest({
     request,
     rawCode,
-    landing: "for-authors",
+    landing: "home",
     existingToken,
     inviteeUserId,
   });

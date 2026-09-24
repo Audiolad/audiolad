@@ -7,6 +7,7 @@ import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav
 import AuthorPartnerInvitees from "@/components/author-dashboard/AuthorPartnerInvitees";
 import AuthorPartnerRewards from "@/components/author-dashboard/AuthorPartnerRewards";
 import {
+  buildAuthorPartnerHomeUrl,
   buildAuthorPartnerInviteMessage,
   buildAuthorPartnerInviteUrl,
 } from "@/lib/author-partner/invite-link";
@@ -69,6 +70,10 @@ export default function AuthorYour20Client({
   const [info, setInfo] = useState<string | null>(null);
   const [copyFlash, setCopyFlash] = useState<string | null>(null);
 
+  const homeUrl =
+    profile && profile.exists
+      ? buildAuthorPartnerHomeUrl(profile.primaryCode, siteOrigin)
+      : "";
   const inviteUrl =
     profile && profile.exists
       ? buildAuthorPartnerInviteUrl(profile.primaryCode, siteOrigin)
@@ -214,7 +219,29 @@ export default function AuthorYour20Client({
       ) : (
         <>
           <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
-            <h3 className="text-[17px] font-semibold">Ваша ссылка</h3>
+            <h3 className="text-[17px] font-semibold">Посмотреть АудиоЛад</h3>
+            <p className="mt-1 text-sm text-[#7d70a2]">
+              Ссылка ведёт на главную АудиоЛад и сохраняет ваше приглашение.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
+                {homeUrl}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyText(homeUrl, "Ссылка скопирована")}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+              >
+                Скопировать
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
+            <h3 className="text-[17px] font-semibold">Стать автором</h3>
+            <p className="mt-1 text-sm text-[#7d70a2]">
+              Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение.
+            </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
                 {inviteUrl}
@@ -224,7 +251,7 @@ export default function AuthorYour20Client({
                 onClick={() => copyText(inviteUrl, "Ссылка скопирована")}
                 className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
               >
-                Скопировать ссылку
+                Скопировать
               </button>
             </div>
           </section>
@@ -264,7 +291,10 @@ export default function AuthorYour20Client({
                 type="button"
                 onClick={() =>
                   copyText(
-                    buildAuthorPartnerInviteMessage(inviteUrl),
+                    buildAuthorPartnerInviteMessage({
+                      homeUrl,
+                      authorUrl: inviteUrl,
+                    }),
                     "Приглашение скопировано",
                   )
                 }

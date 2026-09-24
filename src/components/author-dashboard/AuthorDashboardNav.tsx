@@ -7,7 +7,7 @@ import { Suspense } from "react";
 import AuthorCreateProjectCta from "@/components/author-dashboard/AuthorCreateProjectCta";
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
-import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/ui-beta";
+import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function ProfileIcon() {
