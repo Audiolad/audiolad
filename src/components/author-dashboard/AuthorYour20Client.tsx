@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorPartnerInvitees from "@/components/author-dashboard/AuthorPartnerInvitees";
+import AuthorPartnerRewards from "@/components/author-dashboard/AuthorPartnerRewards";
 import {
   buildAuthorPartnerInviteMessage,
   buildAuthorPartnerInviteUrl,
@@ -15,6 +16,7 @@ import {
   ensureAuthorPartnerProfileAction,
 } from "@/lib/author-partner/your-20-actions";
 import type { PartnerInviteeView } from "@/lib/author-partner/invitees";
+import type { PartnerRewardDashboard } from "@/lib/author-partner/rewards";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type Props = {
@@ -24,6 +26,8 @@ type Props = {
   initialLoadError?: string | null;
   initialInvitees: PartnerInviteeView[];
   initialInviteesError?: string | null;
+  initialRewards: PartnerRewardDashboard | null;
+  initialRewardsError?: string | null;
   siteOrigin: string;
 };
 
@@ -34,6 +38,8 @@ export default function AuthorYour20Client({
   initialLoadError = null,
   initialInvitees,
   initialInviteesError = null,
+  initialRewards,
+  initialRewardsError = null,
   siteOrigin,
 }: Props) {
   const router = useRouter();
@@ -170,11 +176,12 @@ export default function AuthorYour20Client({
           Ваш доход не уменьшает роялти приглашённого автора – партнёрское вознаграждение выплачивает АудиоЛад из своей доли.
         </div>
 
-        <div className="mt-4 rounded-[18px] border border-[#f0e2b8] bg-[#fff9e9] px-4 py-3 text-sm leading-relaxed text-[#6a5a2a]">
-          <p className="font-semibold">Тестовый режим</p>
-          <p className="mt-1">Сейчас мы проверяем создание ссылки, код приглашения, привязку нового автора и бонусное авторское пространство. Начисление партнёрского вознаграждения будет подключено отдельным этапом.</p>
-        </div>
       </section>
+
+      <AuthorPartnerRewards
+        dashboard={initialRewards}
+        loadError={initialRewardsError}
+      />
 
       <AuthorPartnerInvitees
         invitees={initialInvitees}
