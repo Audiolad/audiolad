@@ -255,7 +255,7 @@ function main() {
     "src/components/author-dashboard/AuthorProjectSwitcher.tsx",
   );
   assert.match(switcher, /Текущий проект/);
-  assert.match(switcher, /Создать новый проект/);
+  assert.match(switcher, /Создать новый проект \(новый артист\)/);
   assert.match(switcher, /Лимит проектов/);
   assert.match(switcher, /Безлимит/);
   assert.match(switcher, /AuthorProjectCapacityOfferDialog/);

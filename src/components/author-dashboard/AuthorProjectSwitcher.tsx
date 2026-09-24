@@ -140,14 +140,18 @@ export default function AuthorProjectSwitcher({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div
+      ref={rootRef}
+      className="flex flex-col gap-3 sm:flex-row sm:items-stretch"
+    >
+      <div className="relative min-w-0 flex-1">
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full min-w-0 items-center justify-between gap-3 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-left shadow-[0_6px_16px_rgba(91,62,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="flex h-full w-full min-w-0 items-center justify-between gap-3 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-left shadow-[0_6px_16px_rgba(91,62,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         <span className="min-w-0">
           <span className="block text-xs font-medium text-[#7d70a2]">
@@ -202,18 +206,17 @@ export default function AuthorProjectSwitcher({
               );
             })}
           </ul>
-          <div className="border-t border-[#f0e8fa] p-2">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={handleCreateClick}
-              className="flex w-full items-center rounded-[14px] px-3 py-2.5 text-left text-sm font-semibold text-[#7042c5] hover:bg-[#f6f0ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              ＋ Создать новый проект
-            </button>
-          </div>
         </div>
       ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleCreateClick}
+        className="inline-flex w-full shrink-0 items-center justify-center rounded-[18px] border border-[#c6afe6] bg-white px-4 py-3 text-center text-sm font-semibold leading-5 text-[#7042c5] shadow-[0_6px_16px_rgba(91,62,145,0.04)] transition hover:border-[#7042c5] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto sm:max-w-[17.5rem] sm:self-stretch"
+      >
+        Создать новый проект (новый артист)
+      </button>
 
       <AuthorProjectCapacityOfferDialog
         open={upsellOpen}
