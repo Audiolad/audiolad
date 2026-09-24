@@ -136,4 +136,4 @@ export function parsePartnerRewardDashboardPayload(
 }
 
 export const PARTNER_REWARD_LOAD_ERROR =
-  "Не удалось загрузить партнёрские начисления. Обновите страницу.";
+  "Не удалось загрузить данные о начислениях. Обновите страницу.";

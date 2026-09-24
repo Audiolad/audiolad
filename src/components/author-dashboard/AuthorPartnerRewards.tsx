@@ -27,10 +27,12 @@ function formatDate(value: string): string {
 function Card({
   label,
   value,
+  hint,
   tone = "default",
 }: {
   label: string;
   value: string;
+  hint?: string;
   tone?: "default" | "accent";
 }) {
   return (
@@ -45,12 +47,19 @@ function Card({
       <p className="mt-1 text-[20px] font-semibold leading-tight text-[#2b2144]">
         {value}
       </p>
+      {hint ? <p className="mt-1 text-xs text-[#7d70a2]">{hint}</p> : null}
     </div>
   );
 }
 
 function availabilityLabel(row: PartnerRewardHistoryRow): string {
   return row.availabilityState === "available" ? "Доступно" : "На удержании";
+}
+
+function entryLabel(row: PartnerRewardHistoryRow): string {
+  return row.type === "reward_accrual"
+    ? "Начисление"
+    : "Корректировка после возврата";
 }
 
 export default function AuthorPartnerRewards({
@@ -74,8 +83,8 @@ export default function AuthorPartnerRewards({
 
       {!loadError && dashboard?.balances.length === 0 ? (
         <p className="mt-4 rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-4 py-4 text-sm text-[#4a3f6b]">
-          Партнёрских начислений пока нет. Они появятся после начисления роялти
-          приглашённому автору.
+          Начислений пока нет. Они появятся здесь после продаж продуктов
+          приглашённых вами авторов.
         </p>
       ) : null}
 
@@ -89,6 +98,7 @@ export default function AuthorPartnerRewards({
                 <Card
                   label="Начислено"
                   value={formatRewardAmount(balance.accruedMinor, balance.currency)}
+                  hint="С учётом возвратов"
                 />
                 <Card
                   label="На удержании"
@@ -102,8 +112,14 @@ export default function AuthorPartnerRewards({
                 <Card
                   label="Выплачено"
                   value={formatRewardAmount(balance.paidMinor, balance.currency)}
+                  hint="Выплаты подключим следующим этапом"
                 />
               </div>
+              <p className="mt-2 text-xs text-[#7d70a2]">
+                Выплаты партнёрского вознаграждения пока не подключены. Сумма
+                «Доступно» означает, что срок удержания завершён, но выплата ещё
+                не выполняется.
+              </p>
               {!balance.invariantOk ? (
                 <p className="mt-2 text-xs text-[#9b2c2c]">
                   Не удалось подтвердить целостность баланса.
@@ -116,7 +132,7 @@ export default function AuthorPartnerRewards({
       {!loadError && dashboard && dashboard.history.length > 0 ? (
         <div className="mt-5 border-t border-[#f0e8fb] pt-4">
           <h4 className="text-[15px] font-semibold text-[#2b2144]">
-            Последние операции
+            История начислений
           </h4>
           <ul className="mt-3 space-y-2">
             {dashboard.history.map((row, index) => (
@@ -129,7 +145,8 @@ export default function AuthorPartnerRewards({
                     {row.name}
                   </span>
                   <span className="mt-1 block text-xs text-[#9a8fbf]">
-                    {formatDate(row.effectiveAt)} · {availabilityLabel(row)}
+                    {entryLabel(row)} · {formatDate(row.effectiveAt)} ·{" "}
+                    {availabilityLabel(row)}
                   </span>
                 </span>
                 <span className="text-right text-sm font-semibold text-[#2b2144]">

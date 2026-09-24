@@ -308,5 +308,5 @@ test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   assert.match(rewardsSrc, /На удержании/);
   assert.match(rewardsSrc, /Доступно/);
   assert.match(rewardsSrc, /Выплачено/);
-  assert.match(rewardsSrc, /Последние операции/);
+  assert.match(rewardsSrc, /История начислений/);
 });
