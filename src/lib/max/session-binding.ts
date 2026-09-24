@@ -7,6 +7,17 @@ export type MaxSessionBindingResult =
   | { ok: true; sessionMatches: boolean }
   | { ok: false; reason: "storage_unavailable" };
 
+/**
+ * Server-only MAX-native identity resolution. Callers must supply an identity
+ * obtained from fresh, verified MAX initData; never from browser input.
+ *
+ * Future MAX personal APIs must use this linked AudioLad user as their
+ * identity authority, not an unrelated Supabase cookie session.
+ */
+export type ResolveMaxNativeUserResult =
+  | { ok: true; userId: string | null }
+  | { ok: false; reason: "storage_unavailable" };
+
 type SessionAuthClient = {
   auth: {
     getUser: () => Promise<{
@@ -42,6 +53,7 @@ export type MaxIdentityLookupClient = {
 export type ResolveMaxSessionBindingDeps = {
   getRequestAuthClient?: (request: Request) => Promise<SessionAuthClient>;
   getIdentityClient?: () => MaxIdentityLookupClient;
+  linkedUserId?: string | null;
 };
 
 export type ResolveMaxSessionBindingFn = (
@@ -50,11 +62,20 @@ export type ResolveMaxSessionBindingFn = (
   providerUserId: string,
 ) => Promise<MaxSessionBindingResult>;
 
+export type ResolveMaxNativeUserFn = (
+  provider: string,
+  providerUserId: string,
+) => Promise<ResolveMaxNativeUserResult>;
+
 function noMatch(): MaxSessionBindingResult {
   return { ok: true, sessionMatches: false };
 }
 
 function storageUnavailable(): MaxSessionBindingResult {
+  return { ok: false, reason: "storage_unavailable" };
+}
+
+function nativeStorageUnavailable(): ResolveMaxNativeUserResult {
   return { ok: false, reason: "storage_unavailable" };
 }
 
@@ -80,11 +101,17 @@ async function readSessionUserId(
   }
 }
 
-async function readLinkedUserId(
+async function resolveMaxNativeUserImpl(
   provider: string,
   providerUserId: string,
-  deps: ResolveMaxSessionBindingDeps,
-): Promise<{ ok: true; userId: string | null } | { ok: false }> {
+  deps: Pick<ResolveMaxSessionBindingDeps, "getIdentityClient"> = {},
+): Promise<ResolveMaxNativeUserResult> {
+  const trimmedProvider = provider.trim();
+  const trimmedProviderUserId = providerUserId.trim();
+  if (trimmedProvider.length === 0 || trimmedProviderUserId.length === 0) {
+    return nativeStorageUnavailable();
+  }
+
   try {
     const client = deps.getIdentityClient
       ? deps.getIdentityClient()
@@ -92,12 +119,12 @@ async function readLinkedUserId(
     const { data, error } = await client
       .from("external_identities")
       .select("user_id")
-      .eq("provider", provider)
-      .eq("provider_user_id", providerUserId)
+      .eq("provider", trimmedProvider)
+      .eq("provider_user_id", trimmedProviderUserId)
       .maybeSingle();
 
     if (error) {
-      return { ok: false };
+      return nativeStorageUnavailable();
     }
 
     const userId = data?.user_id;
@@ -107,8 +134,33 @@ async function readLinkedUserId(
 
     return { ok: true, userId };
   } catch {
-    return { ok: false };
+    return nativeStorageUnavailable();
   }
+}
+
+let nativeUserImpl: (
+  provider: string,
+  providerUserId: string,
+  deps?: Pick<ResolveMaxSessionBindingDeps, "getIdentityClient">,
+) => Promise<ResolveMaxNativeUserResult> = resolveMaxNativeUserImpl;
+
+export async function resolveMaxNativeUser(
+  provider: string,
+  providerUserId: string,
+  deps: Pick<ResolveMaxSessionBindingDeps, "getIdentityClient"> = {},
+): Promise<ResolveMaxNativeUserResult> {
+  return nativeUserImpl(provider, providerUserId, deps);
+}
+
+export function setResolveMaxNativeUserForTests(
+  fn: ResolveMaxNativeUserFn | null,
+): void {
+  if (fn === null) {
+    nativeUserImpl = resolveMaxNativeUserImpl;
+    return;
+  }
+
+  nativeUserImpl = (provider, providerUserId) => fn(provider, providerUserId);
 }
 
 async function resolveMaxSessionBindingImpl(
@@ -117,22 +169,15 @@ async function resolveMaxSessionBindingImpl(
   providerUserId: string,
   deps: ResolveMaxSessionBindingDeps = {},
 ): Promise<MaxSessionBindingResult> {
-  const trimmedProvider = provider.trim();
-  const trimmedProviderUserId = providerUserId.trim();
-  if (trimmedProvider.length === 0 || trimmedProviderUserId.length === 0) {
-    return storageUnavailable();
-  }
-
   const sessionUserId = await readSessionUserId(request, deps);
   if (!sessionUserId) {
     return noMatch();
   }
 
-  const linked = await readLinkedUserId(
-    trimmedProvider,
-    trimmedProviderUserId,
-    deps,
-  );
+  const linked =
+    deps.linkedUserId === undefined
+      ? await resolveMaxNativeUser(provider, providerUserId, deps)
+      : { ok: true as const, userId: deps.linkedUserId };
   if (!linked.ok) {
     return storageUnavailable();
   }

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  resolveMaxNativeUser,
   resolveMaxSessionBinding,
   setResolveMaxSessionBindingForTests,
 } from "../src/lib/max/session-binding.ts";
@@ -32,6 +33,8 @@ assert.match(helperSource, /createClientFromRequest/);
 assert.match(helperSource, /createServiceRoleClient/);
 assert.match(helperSource, /external_identities/);
 assert.match(helperSource, /select\("user_id"\)/);
+assert.match(helperSource, /MAX-native identity resolution/);
+assert.match(helperSource, /not an unrelated Supabase cookie session/);
 assert.doesNotMatch(helperSource, /linkExternalIdentity|link_external_identity/);
 assert.doesNotMatch(helperSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(helperSource, /console\.(log|info|debug|warn|error)/);
@@ -126,6 +129,42 @@ assert.deepEqual(matchingLookup.calls, [
 ]);
 assertNoIdentityLeak(matching);
 assert.equal(JSON.stringify(matching).includes("hidden@example.test"), false);
+
+const nativeLookup = identityClient(() => ({
+  data: { user_id: USER_A },
+  error: null,
+}));
+const native = await resolveMaxNativeUser("max", MAX_ID, {
+  getIdentityClient: () => nativeLookup.client,
+});
+assert.deepEqual(native, { ok: true, userId: USER_A });
+assert.deepEqual(nativeLookup.calls, [
+  {
+    table: "external_identities",
+    columns: "user_id",
+    filters: [
+      { column: "provider", value: "max" },
+      { column: "provider_user_id", value: MAX_ID },
+    ],
+  },
+]);
+
+const nativeMissing = await resolveMaxNativeUser("max", MAX_ID, {
+  getIdentityClient: () => identityClient(() => ({ data: null, error: null })).client,
+});
+assert.deepEqual(nativeMissing, { ok: true, userId: null });
+
+const nativeStorageFailure = await resolveMaxNativeUser("max", MAX_ID, {
+  getIdentityClient: () =>
+    identityClient(() => ({
+      data: null,
+      error: { message: "read failed" },
+    })).client,
+});
+assert.deepEqual(nativeStorageFailure, {
+  ok: false,
+  reason: "storage_unavailable",
+});
 
 const wrongLookup = identityClient(() => ({
   data: { user_id: USER_A },

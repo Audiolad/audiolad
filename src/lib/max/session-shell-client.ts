@@ -151,10 +151,18 @@ export async function verifyMaxSession(
     }
 
     const linked = (payload as { linked?: unknown }).linked === true;
-    const hasSession =
+    const maxAuthenticated =
       linked &&
-      (payload as { sessionMatches?: unknown }).sessionMatches === true;
-    return { type: "VERIFY_SUCCESS", linked, hasSession };
+      (payload as { maxAuthenticated?: unknown }).maxAuthenticated === true;
+    const webSessionMatches =
+      maxAuthenticated &&
+      (payload as { webSessionMatches?: unknown }).webSessionMatches === true;
+    return {
+      type: "VERIFY_SUCCESS",
+      linked,
+      maxAuthenticated,
+      webSessionMatches,
+    };
   } catch {
     return { type: "VERIFY_FAILURE" };
   }
