@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildDependencyHealthResult,
   DEPENDENCY_HEALTH_CACHE_CONTROL,
-} from "../src/lib/health/dependencies.ts";
+} from "../src/lib/health/dependencies";
 
 const ok = buildDependencyHealthResult(true);
 assert.equal(ok.httpStatus, 200);
