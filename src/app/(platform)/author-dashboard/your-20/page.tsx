@@ -121,6 +121,22 @@ export default async function AuthorYour20Page({
   const initialRewardsError =
     rewardsError || !initialRewards ? PARTNER_REWARD_LOAD_ERROR : null;
 
+  const { data: templateData, error: templateError } = await supabase.rpc(
+    "get_author_partner_invite_template",
+    { p_author_id: selected.id },
+  );
+  const templateRow =
+    templateData && typeof templateData === "object"
+      ? (templateData as { template?: unknown })
+      : null;
+  const initialInviteTemplate =
+    templateError || typeof templateRow?.template !== "string"
+      ? null
+      : templateRow.template;
+  const initialInviteTemplateError = templateError
+    ? "Не удалось загрузить текст приглашения. Обновите страницу."
+    : null;
+
   return (
     <AuthorShell
       title="Ваши 20%"
@@ -137,6 +153,8 @@ export default async function AuthorYour20Page({
           initialInviteesError={initialInviteesError}
           initialRewards={initialRewards}
           initialRewardsError={initialRewardsError}
+          initialInviteTemplate={initialInviteTemplate}
+          initialInviteTemplateError={initialInviteTemplateError}
           siteOrigin={getAppOrigin()}
         />
       </Suspense>

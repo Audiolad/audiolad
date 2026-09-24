@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
@@ -8,13 +8,16 @@ import AuthorPartnerInvitees from "@/components/author-dashboard/AuthorPartnerIn
 import AuthorPartnerRewards from "@/components/author-dashboard/AuthorPartnerRewards";
 import {
   buildAuthorPartnerHomeUrl,
-  buildAuthorPartnerInviteMessage,
   buildAuthorPartnerInviteUrl,
 } from "@/lib/author-partner/invite-link";
+import {
+  renderAuthorPartnerInviteTemplate,
+} from "@/lib/author-partner/invite-template";
 import type { AuthorPartnerProfileView } from "@/lib/author-partner/profile-types";
 import {
   changeAuthorPartnerCodeAction,
   ensureAuthorPartnerProfileAction,
+  saveAuthorPartnerInviteTemplateAction,
 } from "@/lib/author-partner/your-20-actions";
 import type { PartnerInviteeView } from "@/lib/author-partner/invitees";
 import type { PartnerRewardDashboard } from "@/lib/author-partner/rewards";
@@ -29,6 +32,8 @@ type Props = {
   initialInviteesError?: string | null;
   initialRewards: PartnerRewardDashboard | null;
   initialRewardsError?: string | null;
+  initialInviteTemplate?: string | null;
+  initialInviteTemplateError?: string | null;
   siteOrigin: string;
 };
 
@@ -41,6 +46,8 @@ export default function AuthorYour20Client({
   initialInviteesError = null,
   initialRewards,
   initialRewardsError = null,
+  initialInviteTemplate = null,
+  initialInviteTemplateError = null,
   siteOrigin,
 }: Props) {
   const router = useRouter();
@@ -69,6 +76,18 @@ export default function AuthorYour20Client({
   const [error, setError] = useState<string | null>(initialLoadError);
   const [info, setInfo] = useState<string | null>(null);
   const [copyFlash, setCopyFlash] = useState<string | null>(null);
+  const [messageDraft, setMessageDraft] = useState(() =>
+    renderAuthorPartnerInviteTemplate(
+      initialInviteTemplate,
+      initialProfile?.exists
+        ? buildAuthorPartnerHomeUrl(initialProfile.primaryCode, siteOrigin)
+        : "",
+      initialProfile?.exists
+        ? buildAuthorPartnerInviteUrl(initialProfile.primaryCode, siteOrigin)
+        : "",
+    ),
+  );
+  const linkRef = useRef({ homeUrl: "", inviteUrl: "" });
 
   const homeUrl =
     profile && profile.exists
@@ -78,6 +97,39 @@ export default function AuthorYour20Client({
     profile && profile.exists
       ? buildAuthorPartnerInviteUrl(profile.primaryCode, siteOrigin)
       : "";
+
+  useEffect(() => {
+    const previous = linkRef.current;
+    if (!homeUrl || !inviteUrl) {
+      linkRef.current = { homeUrl, inviteUrl };
+      return;
+    }
+    if (previous.homeUrl === homeUrl && previous.inviteUrl === inviteUrl) {
+      return;
+    }
+    if (previous.homeUrl && previous.inviteUrl) {
+      setMessageDraft((current) =>
+        renderAuthorPartnerInviteTemplate(
+          current
+            .split(previous.inviteUrl)
+            .join("{AUTHOR_PARTNER_LINK}")
+            .split(previous.homeUrl)
+            .join("{HOME_PARTNER_LINK}"),
+          homeUrl,
+          inviteUrl,
+        ),
+      );
+    } else {
+      setMessageDraft(
+        renderAuthorPartnerInviteTemplate(
+          initialInviteTemplate,
+          homeUrl,
+          inviteUrl,
+        ),
+      );
+    }
+    linkRef.current = { homeUrl, inviteUrl };
+  }, [homeUrl, inviteUrl, initialInviteTemplate]);
 
   function flashCopy(label: string) {
     setCopyFlash(label);
@@ -138,6 +190,28 @@ export default function AuthorYour20Client({
     });
   }
 
+  function onSaveMessage() {
+    if (!selectedAuthor || !homeUrl || !inviteUrl) return;
+    setError(null);
+    setInfo(null);
+    startTransition(async () => {
+      const result = await saveAuthorPartnerInviteTemplateAction(
+        selectedAuthor.id,
+        messageDraft,
+        homeUrl,
+        inviteUrl,
+      );
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setMessageDraft(
+        renderAuthorPartnerInviteTemplate(result.template, homeUrl, inviteUrl),
+      );
+      setInfo("Текст приглашения сохранён");
+    });
+  }
+
   if (!selectedAuthor) {
     return (
       <p className="text-sm text-[#7d70a2]">
@@ -183,16 +257,6 @@ export default function AuthorYour20Client({
 
       </section>
 
-      <AuthorPartnerRewards
-        dashboard={initialRewards}
-        loadError={initialRewardsError}
-      />
-
-      <AuthorPartnerInvitees
-        invitees={initialInvitees}
-        loadError={initialInviteesError}
-      />
-
       {!profile ? (
         <section className="rounded-[24px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-5 sm:px-5">
           <h3 className="text-[17px] font-semibold text-[#9b2c2c]">
@@ -219,40 +283,47 @@ export default function AuthorYour20Client({
       ) : (
         <>
           <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
-            <h3 className="text-[17px] font-semibold">Посмотреть АудиоЛад</h3>
+            <h3 className="text-[17px] font-semibold">Ваши ссылки</h3>
             <p className="mt-1 text-sm text-[#7d70a2]">
-              Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение.
+              Это ваши персональные ссылки. Код в них можно изменить на свой – например, использовать имя, название проекта или другой свободный вариант.
             </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
-                {homeUrl}
-              </div>
-              <button
-                type="button"
-                onClick={() => copyText(homeUrl, "Ссылка скопирована")}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
-              >
-                Скопировать
-              </button>
-            </div>
-          </section>
 
-          <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
-            <h3 className="text-[17px] font-semibold">Стать автором</h3>
-            <p className="mt-1 text-sm text-[#7d70a2]">
-              Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
-                {inviteUrl}
+            <div className="mt-4">
+              <h4 className="text-[15px] font-semibold text-[#2b2144]">Посмотреть АудиоЛад</h4>
+              <p className="mt-1 text-sm text-[#7d70a2]">
+                Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
+                  {homeUrl}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(homeUrl, "Ссылка скопирована")}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+                >
+                  Скопировать
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => copyText(inviteUrl, "Ссылка скопирована")}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
-              >
-                Скопировать
-              </button>
+            </div>
+
+            <div className="mt-5">
+              <h4 className="text-[15px] font-semibold text-[#2b2144]">Стать автором</h4>
+              <p className="mt-1 text-sm text-[#7d70a2]">
+                Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
+                  {inviteUrl}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(inviteUrl, "Ссылка скопирована")}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+                >
+                  Скопировать
+                </button>
+              </div>
             </div>
           </section>
 
@@ -287,17 +358,36 @@ export default function AuthorYour20Client({
               >
                 Скопировать код
               </button>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
+            <h3 className="text-[17px] font-semibold">Ваш текст приглашения</h3>
+            <p className="mt-1 text-sm text-[#7d70a2]">
+              Отредактируйте текст под себя. Мы сохраним вашу версию, чтобы вы могли использовать её снова.
+            </p>
+            {initialInviteTemplateError ? (
+              <p className="mt-3 text-sm text-[#9b2c2c]">{initialInviteTemplateError}</p>
+            ) : null}
+            <textarea
+              value={messageDraft}
+              onChange={(event) => setMessageDraft(event.target.value)}
+              rows={12}
+              className="mt-3 w-full rounded-[16px] border border-[#eadff8] px-3 py-3 text-sm leading-relaxed text-[#2b2144] outline-none focus:border-[#7042c5]"
+              aria-label="Ваш текст приглашения"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  copyText(
-                    buildAuthorPartnerInviteMessage({
-                      homeUrl,
-                      authorUrl: inviteUrl,
-                    }),
-                    "Приглашение скопировано",
-                  )
-                }
+                disabled={isPending}
+                onClick={onSaveMessage}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {isPending ? "Сохраняем…" : "Сохранить текст"}
+              </button>
+              <button
+                type="button"
+                onClick={() => copyText(messageDraft, "Приглашение скопировано")}
                 className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
               >
                 Скопировать приглашение
@@ -306,6 +396,14 @@ export default function AuthorYour20Client({
           </section>
         </>
       )}
+      <AuthorPartnerInvitees
+        invitees={initialInvitees}
+        loadError={initialInviteesError}
+      />
+      <AuthorPartnerRewards
+        dashboard={initialRewards}
+        loadError={initialRewardsError}
+      />
       {error ? (
         <p className="rounded-[16px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b2c2c]">
           {error}

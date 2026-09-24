@@ -15,6 +15,11 @@ import {
   buildAuthorPartnerInviteUrl,
 } from "../src/lib/author-partner/invite-link";
 import { handlePartnerInviteRequest } from "../src/lib/author-partner/invite-route";
+import {
+  captureAuthorPartnerInviteTemplate,
+  defaultAuthorPartnerInviteTemplate,
+  renderAuthorPartnerInviteTemplate,
+} from "../src/lib/author-partner/invite-template";
 import type { PartnerTouchResult } from "../src/lib/author-partner/attribution";
 import {
   parsePartnerRpcErrorCode,
@@ -544,4 +549,68 @@ test("invalid /r code is 404 and alias code is passed through unchanged", async 
     },
   });
   assert.equal(blank.status, 404);
+});
+
+test("default invitation template resolves the current primary code", () => {
+  const rendered = renderAuthorPartnerInviteTemplate(
+    null,
+    "https://audiolad.ru/r/sergey",
+    "https://audiolad.ru/invite/sergey",
+  );
+  assert.match(rendered, /https:\/\/audiolad\.ru\/r\/sergey/);
+  assert.match(rendered, /https:\/\/audiolad\.ru\/invite\/sergey/);
+  assert.match(
+    rendered,
+    /Когда вы зарегистрируетесь как автор по моей пригласительной ссылке, АудиоЛад бесплатно добавит вам дополнительное авторское пространство\./,
+  );
+  assert.equal(defaultAuthorPartnerInviteTemplate().includes("{HOME_PARTNER_LINK}"), true);
+});
+
+test("saved template keeps tokens so a new primary code refreshes both links", () => {
+  const displayed = renderAuthorPartnerInviteTemplate(
+    "Посмотреть:\n{HOME_PARTNER_LINK}\nСтать автором:\n{AUTHOR_PARTNER_LINK}",
+    "https://audiolad.ru/r/sergey",
+    "https://audiolad.ru/invite/sergey",
+  );
+  assert.equal(displayed.includes("https://audiolad.ru/r/sergey"), true);
+  const stored = captureAuthorPartnerInviteTemplate(
+    displayed,
+    "https://audiolad.ru/r/sergey",
+    "https://audiolad.ru/invite/sergey",
+  );
+  assert.equal(stored.includes("https://audiolad.ru/r/sergey"), false);
+  const next = renderAuthorPartnerInviteTemplate(
+    stored,
+    "https://audiolad.ru/r/anna",
+    "https://audiolad.ru/invite/anna",
+  );
+  assert.match(next, /https:\/\/audiolad\.ru\/r\/anna/);
+  assert.match(next, /https:\/\/audiolad\.ru\/invite\/anna/);
+  assert.equal(next.includes("sergey"), false);
+});
+
+test("copy uses the current editor text", () => {
+  const src = readFileSync(
+    new URL("../src/components/author-dashboard/AuthorYour20Client.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(src, /Ваш текст приглашения/);
+  assert.match(src, /copyText\(messageDraft, "Приглашение скопировано"\)/);
+  assert.match(src, /Сохранить текст/);
+  assert.match(
+    src,
+    /Это ваши персональные ссылки\. Код в них можно изменить на свой – например, использовать имя, название проекта или другой свободный вариант\./,
+  );
+  const order = [
+    "Ваши 20%",
+    "Ваши ссылки",
+    "Код приглашения",
+    "Ваш текст приглашения",
+    "<AuthorPartnerInvitees",
+    "<AuthorPartnerRewards",
+  ].map((marker) => src.indexOf(marker));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  assert.equal(order.every((index) => index >= 0), true);
+  const codeBlock = src.slice(src.indexOf("Код приглашения"), src.indexOf("Ваш текст приглашения"));
+  assert.equal(codeBlock.includes("Скопировать приглашение"), false);
 });

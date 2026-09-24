@@ -13,6 +13,7 @@ import {
   type PartnerCodeUserErrorCode,
 } from "@/lib/author-partner/rpc-user-messages";
 import { logPartnerYour20RpcFailure } from "@/lib/author-partner/log";
+import { captureAuthorPartnerInviteTemplate } from "@/lib/author-partner/invite-template";
 import {
   parseAuthorPartnerProfilePayload,
   type AuthorPartnerProfileView,
@@ -218,4 +219,65 @@ export async function changeAuthorPartnerCodeAction(
     previousCodeKeptAsAlias: previousKept,
     profile: parseAuthorPartnerProfilePayload(reload.data, authorId),
   };
+}
+
+export type PartnerInviteTemplateActionResult =
+  | { ok: true; template: string | null }
+  | { ok: false; code: PartnerCodeUserErrorCode; message: string };
+
+export async function loadAuthorPartnerInviteTemplateAction(
+  authorId: string,
+): Promise<PartnerInviteTemplateActionResult> {
+  const gate = await assertPartnerYour20MutationAccess(authorId);
+  if (!gate.ok) return gate;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "get_author_partner_invite_template",
+    { p_author_id: authorId },
+  );
+  if (error) {
+    const code = parsePartnerRpcErrorCode(error);
+    return { ok: false, code, message: partnerCodeUserMessage(code) };
+  }
+  const row = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  const template = typeof row?.template === "string" ? row.template : null;
+  return { ok: true, template };
+}
+
+export async function saveAuthorPartnerInviteTemplateAction(
+  authorId: string,
+  displayedText: string,
+  homeUrl: string,
+  authorUrl: string,
+): Promise<PartnerInviteTemplateActionResult> {
+  const gate = await assertPartnerYour20MutationAccess(authorId);
+  if (!gate.ok) return gate;
+
+  const template = captureAuthorPartnerInviteTemplate(
+    displayedText,
+    homeUrl,
+    authorUrl,
+  );
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "set_author_partner_invite_template",
+    { p_author_id: authorId, p_template: template },
+  );
+  if (error) {
+    logPartnerYour20RpcFailure({
+      event: "author_partner_invite_template_rpc_failed",
+      authorId,
+      postgresCode: error.code,
+      messageToken: error.message,
+      detailsToken: typeof error.details === "string" ? error.details : null,
+      hintToken: typeof error.hint === "string" ? error.hint : null,
+    });
+    const code = parsePartnerRpcErrorCode(error);
+    return { ok: false, code, message: partnerCodeUserMessage(code) };
+  }
+  const row = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  const saved = typeof row?.template === "string" ? row.template : null;
+  return { ok: true, template: saved };
 }

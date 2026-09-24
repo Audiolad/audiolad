@@ -39,7 +39,10 @@ export function logPartnerAttribution(fields: PartnerAttributionLogFields): void
 }
 
 type PartnerYour20RpcLogFields = {
-  event: "author_partner_change_code_rpc_failed" | "author_partner_ensure_rpc_failed";
+  event:
+    | "author_partner_change_code_rpc_failed"
+    | "author_partner_ensure_rpc_failed"
+    | "author_partner_invite_template_rpc_failed";
   authorId: string;
   postgresCode?: string | null;
   /** Sanitized / truncated PostgREST message — never JWT, cookie, email. */
