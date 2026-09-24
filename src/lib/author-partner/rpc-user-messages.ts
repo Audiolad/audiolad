@@ -11,6 +11,7 @@ export type PartnerCodeUserErrorCode =
   | "partner_profile_missing"
   | "forbidden"
   | "support_mode_blocked"
+  | "invite_template_too_long"
   | "load_failed"
   | "unknown";
 
@@ -24,6 +25,8 @@ const MESSAGES: Record<PartnerCodeUserErrorCode, string> = {
   forbidden: "Недостаточно прав для этого действия.",
   support_mode_blocked:
     "В режиме поддержки нельзя создавать или менять код приглашения.",
+  invite_template_too_long:
+    "Текст приглашения слишком длинный. Сократите его и сохраните снова.",
   load_failed: "Не удалось загрузить данные ссылки. Обновите страницу.",
   unknown: "Не удалось сохранить код. Попробуйте ещё раз.",
 };
@@ -47,6 +50,7 @@ export function parsePartnerRpcErrorCode(
   if (raw.includes("reserved_code")) return "reserved_code";
   if (raw.includes("invalid_code")) return "invalid_code";
   if (raw.includes("partner_profile_disabled")) return "partner_profile_disabled";
+  if (raw.includes("invite_template_too_long")) return "invite_template_too_long";
   if (raw.includes("partner_profile_missing")) return "partner_profile_missing";
   if (raw.includes("forbidden") || raw.includes("42501")) return "forbidden";
   return "unknown";
