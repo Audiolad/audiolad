@@ -78,6 +78,8 @@ function jsonResponse(status, body) {
 function createDeps({
   initData = "user=%7B%22id%22%3A1%7D",
   signInError = null,
+  accessToken = "test-access-token",
+  session = undefined,
   user = null,
   fetchImpl,
   signUpImpl,
@@ -89,7 +91,17 @@ function createDeps({
       auth: {
         signInWithPassword: async (credentials) => {
           calls.push({ type: "signin", credentials });
-          return { error: signInError };
+          return {
+            data: {
+              session:
+                session === undefined
+                  ? signInError
+                    ? null
+                    : { access_token: accessToken }
+                  : session,
+            },
+            error: signInError,
+          };
         },
         getUser: async () => {
           calls.push({ type: "getUser" });
@@ -384,7 +396,7 @@ async function testWrongSessionStaysOnRelogin() {
   );
 }
 
-async function testValidPasswordCallsLinkWithInitDataOnly() {
+async function testValidPasswordCallsLinkWithBearerAuth() {
   const initData = "raw-window-webapp-init-data";
   const { deps, calls } = createDeps({
     initData,
@@ -404,10 +416,13 @@ async function testValidPasswordCallsLinkWithInitDataOnly() {
   assert.equal(calls[1].type, "fetch");
   assert.equal(calls[1].url, MAX_SESSION_LINK_PATH);
   assert.equal(calls[1].init.credentials, "same-origin");
+  assert.equal(calls[1].init.headers.Authorization, "Bearer test-access-token");
   assert.deepEqual(calls[1].body, { initData });
   assert.equal("user_id" in calls[1].body, false);
   assert.equal("max_user_id" in calls[1].body, false);
   assert.equal("user" in calls[1].body, false);
+  assert.equal(JSON.stringify(calls[1].body).includes("test-access-token"), false);
+  assert.equal(String(calls[1].url).includes("test-access-token"), false);
 }
 
 async function testBadPasswordDoesNotCallLink() {
@@ -430,6 +445,23 @@ async function testBadPasswordDoesNotCallLink() {
     event,
   );
   assert.equal(failed.loginError, SIGN_IN_GENERIC_ERROR);
+}
+
+async function testMissingAccessTokenDoesNotCallLink() {
+  const { deps, calls } = createDeps({
+    session: null,
+    fetchImpl: async () => {
+      throw new Error("link must not run without an access token");
+    },
+  });
+
+  const event = await loginAndLinkMaxSession(
+    { email: "user@yandex.ru", password: "secret" },
+    deps,
+  );
+  assert.deepEqual(event, { type: "LINK_SERVER_ERROR" });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].type, "signin");
 }
 
 async function testExpiredLinkUx() {
@@ -574,6 +606,25 @@ function testSourceGuards() {
   );
   assert.match(verifyBody, /sessionMatches/);
   assert.doesNotMatch(verifyBody, /getUser\(/);
+
+  const maxClientSource = readFileSync(
+    join(repoRoot, "src/lib/max/supabase-client.ts"),
+    "utf8",
+  );
+  assert.match(maxClientSource, /createBrowserClient/);
+  assert.match(maxClientSource, /path:\s*["']\/["']/);
+  assert.match(maxClientSource, /sameSite:\s*["']none["']/);
+  assert.match(maxClientSource, /secure:\s*true/);
+  assert.doesNotMatch(maxClientSource, /\bdomain\s*:/i);
+  assert.doesNotMatch(maxClientSource, /localStorage|refresh_token|service.role|auth\.admin/i);
+
+  const sessionClientSource = readFileSync(
+    join(repoRoot, "src/lib/max/session-shell-client.ts"),
+    "utf8",
+  );
+  assert.match(sessionClientSource, /createMaxSupabaseClient/);
+  assert.match(sessionClientSource, /Authorization:\s*`Bearer \$\{accessToken\}`/);
+  assert.doesNotMatch(sessionClientSource, /refresh_token|localStorage|console\.(log|info|debug|warn|error)/);
 }
 
 function signupReadyState() {
@@ -687,10 +738,17 @@ async function testSignupCaseALinksWithInitData() {
   assert.equal(calls[0].input.legalConsent, true);
   assert.equal(calls[0].input.marketingConsent, false);
   assert.equal(calls[0].input.next, null);
-  assert.equal(calls[1].type, "fetch");
-  assert.equal(calls[1].url, MAX_SESSION_LINK_PATH);
-  assert.deepEqual(calls[1].body, { initData });
-  assert.equal("user_id" in calls[1].body, false);
+  assert.equal(calls[1].type, "signin");
+  assert.deepEqual(calls[1].credentials, {
+    email: "new-user@yandex.ru",
+    password: "password123",
+  });
+  assert.equal(calls[2].type, "fetch");
+  assert.equal(calls[2].url, MAX_SESSION_LINK_PATH);
+  assert.equal(calls[2].init.headers.Authorization, "Bearer test-access-token");
+  assert.deepEqual(calls[2].body, { initData });
+  assert.equal("user_id" in calls[2].body, false);
+  assert.equal(JSON.stringify(calls[2].body).includes("test-access-token"), false);
 
   const state = reduceAll(
     [
@@ -703,6 +761,29 @@ async function testSignupCaseALinksWithInitData() {
     ],
   );
   assert.equal(viewMaxShell(state).statusLine, MAX_SHELL_SIGNUP_CREATED_LINKED);
+}
+
+async function testSignupCaseAMissingAccessTokenDoesNotLink() {
+  const { deps, calls } = createDeps({
+    session: null,
+    signUpImpl: async () => ({
+      ok: true,
+      destination: "/my-practices",
+      hasSession: true,
+    }),
+    fetchImpl: async () => {
+      throw new Error("link must not run without an access token");
+    },
+  });
+
+  const event = await signUpAndLinkMaxSession(VALID_SIGNUP, deps);
+  assert.deepEqual(event, { type: "LINK_SERVER_ERROR" });
+  assert.equal(calls[0].type, "signup");
+  assert.equal(calls[1].type, "signin");
+  assert.equal(
+    calls.some((call) => call.url === MAX_SESSION_LINK_PATH),
+    false,
+  );
 }
 
 async function testSignupFailureDoesNotLink() {
@@ -923,11 +1004,13 @@ await testVerifyLinkedFalseShowsCtaNotLink();
 await testLinkedTrueWithSessionHidesForm();
 await testLinkedTrueWithoutSessionShowsRelogin();
 await testWrongSessionStaysOnRelogin();
-await testValidPasswordCallsLinkWithInitDataOnly();
+await testValidPasswordCallsLinkWithBearerAuth();
 await testBadPasswordDoesNotCallLink();
+await testMissingAccessTokenDoesNotCallLink();
 await testExpiredLinkUx();
 await testConflictAndServerUx();
 await testSignupCaseALinksWithInitData();
+await testSignupCaseAMissingAccessTokenDoesNotLink();
 await testSignupFailureDoesNotLink();
 await testSignupExistingEmailSwitchesToLogin();
 await testSignupPasswordTooShortDoesNotSucceed();

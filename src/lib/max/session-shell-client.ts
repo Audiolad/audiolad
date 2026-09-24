@@ -1,21 +1,26 @@
 import { SIGNUP_GENERIC_ERROR } from "@/lib/auth/email";
-import { createClient } from "@/lib/supabase/client";
 import { readMaxInitData } from "@/lib/max/bridge";
 import {
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
 } from "@/lib/max/host";
+import { createMaxSupabaseClient } from "@/lib/max/supabase-client";
 import type {
   MaxShellEvent,
   MaxShellSignupError,
 } from "@/lib/max/session-shell";
+
+type AuthSession = { access_token: string };
 
 export type MaxAuthClient = {
   auth: {
     signInWithPassword: (credentials: {
       email: string;
       password: string;
-    }) => Promise<{ error: { message?: string } | null }>;
+    }) => Promise<{
+      data: { session: AuthSession | null };
+      error: { message?: string } | null;
+    }>;
     getUser: () => Promise<{ data: { user: { id: string } | null } }>;
     signOut: () => Promise<unknown>;
   };
@@ -47,7 +52,7 @@ export type MaxShellClientDeps = {
 function defaultDeps(): MaxShellClientDeps {
   return {
     readInitData: readMaxInitData,
-    getAuthClient: () => createClient() as unknown as MaxAuthClient,
+    getAuthClient: () => createMaxSupabaseClient() as unknown as MaxAuthClient,
     fetch: (input, init) => globalThis.fetch(input, init),
   };
 }
@@ -94,6 +99,27 @@ export function mapLinkResponseToEvent(
     return { type: "LINK_USER_CONFLICT" };
   }
   return { type: "LINK_SERVER_ERROR" };
+}
+
+async function linkMaxSession(
+  initData: string,
+  accessToken: string,
+  deps: Pick<MaxShellClientDeps, "fetch">,
+): Promise<MaxShellEvent> {
+  try {
+    const response = await deps.fetch(MAX_SESSION_LINK_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ initData }),
+    });
+    return mapLinkResponseToEvent(response.status, await readJsonBody(response));
+  } catch {
+    return { type: "LINK_SERVER_ERROR" };
+  }
 }
 
 export async function verifyMaxSession(
@@ -144,7 +170,7 @@ export async function loginAndLinkMaxSession(
     return { type: "INIT_DATA_MISSING" };
   }
 
-  const { error } = await deps.getAuthClient().auth.signInWithPassword({
+  const { data, error } = await deps.getAuthClient().auth.signInWithPassword({
     email: credentials.email,
     password: credentials.password,
   });
@@ -152,19 +178,14 @@ export async function loginAndLinkMaxSession(
     return { type: "LOGIN_FAILURE" };
   }
 
-  hooks.onPasswordAccepted?.();
-
-  try {
-    const response = await deps.fetch(MAX_SESSION_LINK_PATH, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData }),
-    });
-    return mapLinkResponseToEvent(response.status, await readJsonBody(response));
-  } catch {
+  const accessToken = data.session?.access_token;
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
     return { type: "LINK_SERVER_ERROR" };
   }
+
+  hooks.onPasswordAccepted?.();
+
+  return linkMaxSession(initData, accessToken, deps);
 }
 
 export async function signUpAndLinkMaxSession(
@@ -211,19 +232,17 @@ export async function signUpAndLinkMaxSession(
     return { type: "SIGNUP_PENDING" };
   }
 
-  hooks.onSessionCreated?.();
-
-  try {
-    const response = await resolved.fetch(MAX_SESSION_LINK_PATH, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData }),
-    });
-    return mapLinkResponseToEvent(response.status, await readJsonBody(response));
-  } catch {
+  const { data, error } = await resolved.getAuthClient().auth.signInWithPassword({
+    email: input.email,
+    password: input.password,
+  });
+  const accessToken = data.session?.access_token;
+  if (error || typeof accessToken !== "string" || accessToken.length === 0) {
     return { type: "LINK_SERVER_ERROR" };
   }
+
+  hooks.onSessionCreated?.();
+  return linkMaxSession(initData, accessToken, resolved);
 }
 
 export async function signOutMaxSession(

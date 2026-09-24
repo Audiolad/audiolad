@@ -283,7 +283,10 @@ async function testLoginAndLinkDoesNotSend() {
         auth: {
           async signInWithPassword(credentials) {
             signInCalls.push(credentials);
-            return { error: null };
+            return {
+              data: { session: { access_token: "test-access-token" } },
+              error: null,
+            };
           },
           async getUser() {
             return { data: { user: { id: USER_ID } } };
@@ -333,7 +336,10 @@ async function testVerifyAndLinkAndSecondCreateDoNotSendAgain() {
     getAuthClient: () => ({
       auth: {
         async signInWithPassword() {
-          return { error: null };
+          return {
+            data: { session: { access_token: "test-access-token" } },
+            error: null,
+          };
         },
         async getUser() {
           return { data: { user: { id: USER_ID } } };
