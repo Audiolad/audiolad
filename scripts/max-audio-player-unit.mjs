@@ -6,15 +6,21 @@ import {
   captureMaxRecoveryPosition,
   clampMaxSeek,
   decideMaxSignedUrlRecovery,
+  hasMaxAudioElementSource,
   isStaleMaxAudioRequest,
+  maxTrackSwitchVisibleReset,
   nextMaxTrackIndex,
   previousMaxTrackIndex,
   settleMaxResignFailure,
   shouldAcceptMaxAudioResponse,
   shouldAdvanceAfterMaxTrackEnd,
   shouldApplyMaxSeekRestore,
+  shouldDisableMaxPrimaryPlayWhilePreparing,
+  shouldIgnoreMaxTeardownMediaError,
+  shouldPlayMaxAppliedSource,
   shouldResetMaxRecoveryCycle,
   shouldResumeAfterMaxResign,
+  shouldStartMaxPrimaryPlayFetch,
   skipMaxPlayback,
 } from "../src/lib/max/max-audio-playback.ts";
 
@@ -100,6 +106,51 @@ const afterPlayingReset = decideMaxSignedUrlRecovery({
 });
 assert.equal(afterPlayingReset.action, "resign");
 
+function fakeAudio(srcAttribute, currentSrc) {
+  return {
+    getAttribute: (name) => (name === "src" ? srcAttribute : null),
+    currentSrc,
+  };
+}
+
+assert.equal(hasMaxAudioElementSource(fakeAudio("https://cdn.example/a", "https://cdn.example/a")), true);
+assert.equal(hasMaxAudioElementSource(fakeAudio(null, "")), false);
+assert.equal(shouldIgnoreMaxTeardownMediaError(fakeAudio(null, "")), true);
+assert.equal(shouldIgnoreMaxTeardownMediaError(fakeAudio("", "")), true);
+assert.equal(shouldIgnoreMaxTeardownMediaError(fakeAudio("https://cdn.example/a", "")), false);
+assert.equal(
+  shouldPlayMaxAppliedSource({ requestedShouldPlay: true, liveIntendedPlaying: true }),
+  true,
+);
+assert.equal(
+  shouldPlayMaxAppliedSource({ requestedShouldPlay: true, liveIntendedPlaying: false }),
+  false,
+);
+assert.equal(
+  shouldPlayMaxAppliedSource({ requestedShouldPlay: false, liveIntendedPlaying: true }),
+  false,
+);
+assert.deepEqual(maxTrackSwitchVisibleReset(), {
+  isPlaying: false,
+  currentTime: 0,
+  duration: 0,
+  isPreparing: true,
+});
+assert.equal(shouldStartMaxPrimaryPlayFetch({ isPreparing: true, hasSource: false }), false);
+assert.equal(shouldStartMaxPrimaryPlayFetch({ isPreparing: false, hasSource: false }), true);
+assert.equal(shouldStartMaxPrimaryPlayFetch({ isPreparing: false, hasSource: true }), false);
+assert.equal(shouldDisableMaxPrimaryPlayWhilePreparing(true), true);
+assert.equal(shouldDisableMaxPrimaryPlayWhilePreparing(false), false);
+
+const teardownIgnored = decideMaxSignedUrlRecovery({
+  mediaErrorCode: 4,
+  hadSuccessfulPlaying: true,
+  recoveryUrlAttempted: false,
+  currentTrackId: "track-b",
+  hasSrc: hasMaxAudioElementSource(fakeAudio(null, "")),
+});
+assert.notEqual(teardownIgnored.action, "resign");
+
 const hook = readFileSync(join(process.cwd(), "src/components/max/useMaxAudioPlayback.ts"), "utf8");
 const player = readFileSync(join(process.cwd(), "src/components/max/MaxAudioPlayer.tsx"), "utf8");
 const home = readFileSync(join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"), "utf8");
@@ -115,6 +166,7 @@ assert.match(player, /nextTrack/);
 assert.match(player, /selectTrack/);
 assert.match(player, /disabled=\{!canGoPrevious\}/);
 assert.match(player, /disabled=\{!canGoNext\}/);
+assert.match(player, /shouldDisableMaxPrimaryPlayWhilePreparing\(isPreparing\)/);
 assert.match(hook, /AbortController/);
 assert.match(hook, /shouldAcceptMaxAudioResponse/);
 assert.match(hook, /decideMaxSignedUrlRecovery/);
@@ -127,6 +179,41 @@ assert.match(hook, /removeEventListener\("loadedmetadata"/);
 assert.match(hook, /generationRef\.current \+= 1/);
 assert.match(hook, /nextMaxTrackIndex\(trackIndex, tracks\.length\)/);
 assert.match(hook, /Сессия прослушивания устарела/);
+
+const loadTrackFn = hook.slice(hook.indexOf("const loadTrack"), hook.indexOf("const play ="));
+assert.match(loadTrackFn, /stopRequests\(\)/);
+assert.match(loadTrackFn, /clearSeekRestore\(\)/);
+assert.match(loadTrackFn, /generationRef\.current \+= 1/);
+assert.match(loadTrackFn, /clearCurrentMediaSource\(\)/);
+assert.match(loadTrackFn, /maxTrackSwitchVisibleReset\(\)/);
+assert.match(loadTrackFn, /setIsPlaying\(visible\.isPlaying\)/);
+assert.match(loadTrackFn, /setCurrentTime\(visible\.currentTime\)/);
+assert.match(loadTrackFn, /setDuration\(visible\.duration\)/);
+assert.doesNotMatch(loadTrackFn, /intendedPlayingRef\.current = false/);
+assert.ok(loadTrackFn.indexOf("clearCurrentMediaSource()") < loadTrackFn.indexOf("fetchAudio"));
+
+const clearSource = hook.slice(
+  hook.indexOf("const clearCurrentMediaSource"),
+  hook.indexOf("const invalidatePlayback"),
+);
+assert.match(clearSource, /audio\.pause\(\)/);
+assert.match(clearSource, /removeAttribute\("src"\)/);
+assert.match(clearSource, /audio\.load\(\)/);
+assert.doesNotMatch(clearSource, /intendedPlayingRef\.current = false/);
+
+const onErrorFn = hook.slice(hook.indexOf("const onError"), hook.indexOf("audio.addEventListener(\"timeupdate\""));
+assert.match(onErrorFn, /shouldIgnoreMaxTeardownMediaError\(audio\)/);
+assert.ok(
+  onErrorFn.indexOf("shouldIgnoreMaxTeardownMediaError(audio)") <
+    onErrorFn.indexOf("decideMaxSignedUrlRecovery"),
+);
+assert.match(hook, /shouldPlayMaxAppliedSource\(\{\s*requestedShouldPlay: input\.shouldPlay/);
+assert.match(
+  hook,
+  /shouldPlay: shouldPlayMaxAppliedSource\(\{\s*requestedShouldPlay: capturedShouldPlay,\s*liveIntendedPlaying: intendedPlayingRef\.current/,
+);
+assert.match(hook, /shouldStartMaxPrimaryPlayFetch/);
+assert.match(hook, /intendedPlayingRef\.current = true;\s*void loadTrack\(next, true\)/);
 assert.doesNotMatch(source, /localStorage|sessionStorage/);
 assert.doesNotMatch(source, /window\.location|openLink|\/listen\/|\/practice\//);
 assert.match(home, /MAX_PLAYBACK_SESSION_PATH/);

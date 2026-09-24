@@ -67,6 +67,52 @@ export function shouldResumeAfterMaxResign(wasIntendedPlaying: boolean): boolean
   return wasIntendedPlaying;
 }
 
+export function hasMaxAudioElementSource(audio: {
+  getAttribute: (name: string) => string | null;
+  currentSrc: string;
+}): boolean {
+  return Boolean(audio.getAttribute("src") || audio.currentSrc);
+}
+
+export function shouldIgnoreMaxTeardownMediaError(audio: {
+  getAttribute: (name: string) => string | null;
+  currentSrc: string;
+}): boolean {
+  return !hasMaxAudioElementSource(audio);
+}
+
+export function shouldPlayMaxAppliedSource(input: {
+  requestedShouldPlay: boolean;
+  liveIntendedPlaying: boolean;
+}): boolean {
+  return input.requestedShouldPlay && input.liveIntendedPlaying;
+}
+
+export function maxTrackSwitchVisibleReset(): {
+  isPlaying: false;
+  currentTime: 0;
+  duration: 0;
+  isPreparing: true;
+} {
+  return {
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    isPreparing: true,
+  };
+}
+
+export function shouldStartMaxPrimaryPlayFetch(input: {
+  isPreparing: boolean;
+  hasSource: boolean;
+}): boolean {
+  return !input.hasSource && !input.isPreparing;
+}
+
+export function shouldDisableMaxPrimaryPlayWhilePreparing(isPreparing: boolean): boolean {
+  return isPreparing;
+}
+
 export function settleMaxResignFailure(reason: "stale" | "aborted" | "failed") {
   return settleSignedUrlRecoveryFailure({ ok: false, reason });
 }

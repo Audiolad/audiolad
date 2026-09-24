@@ -2,6 +2,7 @@
 
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
+import { shouldDisableMaxPrimaryPlayWhilePreparing } from "@/lib/max/max-audio-playback";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
 
 function formatClock(seconds: number): string {
@@ -74,7 +75,8 @@ export default function MaxAudioPlayer({
         <button
           type="button"
           onClick={isPlaying ? pause : play}
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white"
+          disabled={shouldDisableMaxPrimaryPlayWhilePreparing(isPreparing)}
+          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-40"
         >
           {isPlaying ? "Пауза" : "Слушать"}
         </button>
