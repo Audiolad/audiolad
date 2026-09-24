@@ -170,12 +170,24 @@ function runTests() {
 
   // Invite route must not redirect browsers to loopback in production.
   const inviteSource = readFileSync(
+    join(ROOT, "src/lib/author-partner/invite-route.ts"),
+    "utf8",
+  );
+  const inviteRoute = readFileSync(
     join(ROOT, "src/app/(platform)/invite/[code]/route.ts"),
     "utf8",
   );
+  const homeRoute = readFileSync(
+    join(ROOT, "src/app/(platform)/r/[code]/route.ts"),
+    "utf8",
+  );
+  assert.match(inviteRoute, /landing:\s*"for-authors"/);
+  assert.match(homeRoute, /landing:\s*"home"/);
+  assert.match(inviteRoute, /handlePartnerInviteRequest/);
+  assert.match(homeRoute, /handlePartnerInviteRequest/);
   assert.match(inviteSource, /buildPublicRedirectUrl/);
   assert.match(inviteSource, /FOR_AUTHORS_PATH/);
-  assert.match(inviteSource, /redirectToForAuthors/);
+  assert.match(inviteSource, /landing === "home" \? "\/" : FOR_AUTHORS_PATH/);
   assert.doesNotMatch(
     inviteSource,
     /new URL\(\s*["']\/become-author["']\s*,\s*request\.url\s*\)/,
@@ -184,25 +196,16 @@ function runTests() {
     inviteSource,
     /new URL\([^\n]+,\s*request\.url\)/,
   );
-  // Successful invite lands on /for-authors (no ?invited=1).
-  assert.match(
-    inviteSource,
-    /buildPublicRedirectUrl\(\s*FOR_AUTHORS_PATH\s*,\s*request\s*\)/,
-  );
   assert.doesNotMatch(
     inviteSource,
     /searchParams\.set\(\s*["']invited["']/,
   );
-  // already_author branch still redirects to /become-author.
   assert.match(
     inviteSource,
     /buildPublicRedirectUrl\(\s*["']\/become-author["']\s*,\s*request\s*\)/,
   );
   assert.match(inviteSource, /already_author/);
-  assert.match(
-    inviteSource,
-    /redirectToBecomeAuthor\(\s*request\s*\)/,
-  );
+  assert.match(inviteSource, /touchPartnerInvite/);
 
   const inviteProdLike = requestAt("http://localhost:3001/invite/sergey", {
     host: "audiolad.ru",

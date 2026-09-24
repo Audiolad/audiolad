@@ -3,16 +3,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  PARTNER_UI_BETA_AUTHOR_SLUG,
   canAccessAuthorPartnerYour20Ui,
   evaluatePartnerYour20Access,
-  isAuthorPartnerUiBetaEnabled,
-} from "../src/lib/author-partner/ui-beta";
+  selectOwnedAuthorWorkspace,
+} from "../src/lib/author-partner/access";
 import {
+  buildAuthorPartnerHomePath,
+  buildAuthorPartnerHomeUrl,
   buildAuthorPartnerInviteMessage,
   buildAuthorPartnerInvitePath,
   buildAuthorPartnerInviteUrl,
 } from "../src/lib/author-partner/invite-link";
+import { handlePartnerInviteRequest } from "../src/lib/author-partner/invite-route";
+import type { PartnerTouchResult } from "../src/lib/author-partner/attribution";
 import {
   parsePartnerRpcErrorCode,
   partnerCodeUserMessage,
@@ -24,64 +27,18 @@ import {
 } from "../src/lib/author-partner/rewards";
 import { formatPartnerRewardMoney } from "../src/lib/author-partner/money-format";
 
-const BETA = PARTNER_UI_BETA_AUTHOR_SLUG;
-
-test("A: slug sergey-petrov + owner → beta nav visible", () => {
+test("owner of any author workspace can open Ваши 20%", () => {
   assert.equal(
     canAccessAuthorPartnerYour20Ui({
-      authorSlug: BETA,
+      authorSlug: "anna-meditation",
       role: "owner",
       isSupportMode: false,
     }),
     true,
   );
-});
-
-test("B: other slug + owner → hidden", () => {
-  assert.equal(
-    canAccessAuthorPartnerYour20Ui({
-      authorSlug: "other-author",
-      role: "owner",
-      isSupportMode: false,
-    }),
-    false,
-  );
-});
-
-test("C: sergey-petrov + editor → hidden", () => {
-  assert.equal(
-    canAccessAuthorPartnerYour20Ui({
-      authorSlug: BETA,
-      role: "editor",
-      isSupportMode: false,
-    }),
-    false,
-  );
-});
-
-test("D: sergey-petrov + support mode → hidden", () => {
-  assert.equal(
-    canAccessAuthorPartnerYour20Ui({
-      authorSlug: BETA,
-      role: "owner",
-      isSupportMode: true,
-    }),
-    false,
-  );
-});
-
-test("E: arbitrary UUID alone does NOT enable beta", () => {
-  // isAuthorPartnerUiBetaEnabled no longer accepts authorId — only slug.
-  assert.equal(isAuthorPartnerUiBetaEnabled({ authorSlug: undefined }), false);
-  assert.equal(isAuthorPartnerUiBetaEnabled("7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c"), false);
-  assert.equal(isAuthorPartnerUiBetaEnabled({ authorSlug: "7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c" }), false);
-  assert.equal(isAuthorPartnerUiBetaEnabled({ authorSlug: BETA }), true);
-});
-
-test("F: mutation auth — resolved slug sergey-petrov + owner → allowed", () => {
   assert.equal(
     evaluatePartnerYour20Access({
-      resolvedAuthorSlug: BETA,
+      resolvedAuthorSlug: "natalya",
       role: "owner",
       isSupportMode: false,
     }),
@@ -89,46 +46,37 @@ test("F: mutation auth — resolved slug sergey-petrov + owner → allowed", () 
   );
 });
 
-test("G: mutation auth — resolved slug other → beta_disabled", () => {
+test("editor cannot open Ваши 20%", () => {
   assert.equal(
-    evaluatePartnerYour20Access({
-      resolvedAuthorSlug: "aurafon",
-      role: "owner",
+    canAccessAuthorPartnerYour20Ui({
+      authorSlug: "anna-meditation",
+      role: "editor",
       isSupportMode: false,
     }),
-    "beta_disabled",
-  );
-});
-
-test("H: client cannot spoof slug — decision uses resolvedAuthorSlug only", () => {
-  // Even if a client claimed sergey-petrov, the server passes the DB-resolved slug.
-  assert.equal(
-    evaluatePartnerYour20Access({
-      resolvedAuthorSlug: "not-sergey",
-      role: "owner",
-      isSupportMode: false,
-    }),
-    "beta_disabled",
+    false,
   );
   assert.equal(
     evaluatePartnerYour20Access({
-      resolvedAuthorSlug: null,
-      role: "owner",
-      isSupportMode: false,
-    }),
-    "beta_disabled",
-  );
-  assert.equal(
-    evaluatePartnerYour20Access({
-      resolvedAuthorSlug: BETA,
+      resolvedAuthorSlug: "anna-meditation",
       role: "editor",
       isSupportMode: false,
     }),
     "forbidden",
   );
+});
+
+test("support mode cannot open Ваши 20%", () => {
+  assert.equal(
+    canAccessAuthorPartnerYour20Ui({
+      authorSlug: "anna-meditation",
+      role: "owner",
+      isSupportMode: true,
+    }),
+    false,
+  );
   assert.equal(
     evaluatePartnerYour20Access({
-      resolvedAuthorSlug: BETA,
+      resolvedAuthorSlug: "anna-meditation",
       role: "owner",
       isSupportMode: true,
     }),
@@ -136,19 +84,107 @@ test("H: client cannot spoof slug — decision uses resolvedAuthorSlug only", ()
   );
 });
 
-test("invite URL builder", () => {
-  assert.equal(buildAuthorPartnerInvitePath("SERGEY"), "/invite/SERGEY");
+test("owner selection ignores editor workspaces", () => {
+  const memberships = [
+    { slug: "editor-first", role: "editor" },
+    { slug: "owner-second", role: "owner" },
+    { slug: "editor-later", role: "editor" },
+  ];
   assert.equal(
-    buildAuthorPartnerInviteUrl("SERGEY20", "https://audiolad.ru"),
-    "https://audiolad.ru/invite/SERGEY20",
+    selectOwnedAuthorWorkspace(memberships, null)?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "owner-second")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "editor-first")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "sergey-petrov")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(
+      [{ slug: "editor-only", role: "editor" }],
+      null,
+    ),
+    null,
   );
 });
 
-test("copy invitation builder; no promo wording", () => {
-  const msg = buildAuthorPartnerInviteMessage("https://audiolad.ru/invite/SERGEY");
-  assert.match(msg, /АудиоЛад/);
-  assert.match(msg, /https:\/\/audiolad\.ru\/invite\/SERGEY/);
-  assert.equal(/промокод/i.test(msg), false);
+test("foreign workspace query does not select another author", () => {
+  const owned = selectOwnedAuthorWorkspace(
+    [
+      { slug: "anna-meditation", role: "owner", id: "own" },
+      { slug: "second-project", role: "owner", id: "own-2" },
+    ],
+    "sergey-petrov",
+  );
+  assert.equal(owned?.slug, "anna-meditation");
+  assert.equal(
+    selectOwnedAuthorWorkspace(
+      [{ slug: "anna-meditation", role: "owner", id: "own" }],
+      "anna-meditation",
+    )?.id,
+    "own",
+  );
+  assert.equal(
+    canAccessAuthorPartnerYour20Ui({
+      authorSlug: "",
+      role: "owner",
+      isSupportMode: false,
+    }),
+    false,
+  );
+  assert.equal(
+    evaluatePartnerYour20Access({
+      resolvedAuthorSlug: null,
+      role: "owner",
+      isSupportMode: false,
+    }),
+    "forbidden",
+  );
+});
+
+test("invite and home URL builders use the current primary code", () => {
+  assert.equal(buildAuthorPartnerInvitePath("sergey"), "/invite/sergey");
+  assert.equal(buildAuthorPartnerHomePath("sergey"), "/r/sergey");
+  assert.equal(
+    buildAuthorPartnerInviteUrl("natalya", "https://audiolad.ru"),
+    "https://audiolad.ru/invite/natalya",
+  );
+  assert.equal(
+    buildAuthorPartnerHomeUrl("natalya", "https://audiolad.ru"),
+    "https://audiolad.ru/r/natalya",
+  );
+  assert.equal(
+    buildAuthorPartnerHomeUrl("anna-meditation", "https://audiolad.ru"),
+    "https://audiolad.ru/r/anna-meditation",
+  );
+});
+
+test("copied invitation contains both links and the bonus sentence", () => {
+  const msg = buildAuthorPartnerInviteMessage({
+    homeUrl: "https://audiolad.ru/r/sergey",
+    authorUrl: "https://audiolad.ru/invite/sergey",
+  });
+  assert.equal(
+    msg,
+    [
+      "Хочу познакомить вас с АудиоЛадом — платформой авторских аудиопрактик, медитаций, аудиокурсов, музыки и программ.",
+      "",
+      "Посмотреть АудиоЛад:",
+      "https://audiolad.ru/r/sergey",
+      "",
+      "Если захотите стать автором АудиоЛада, здесь можно посмотреть возможности для авторов и перейти к регистрации:",
+      "https://audiolad.ru/invite/sergey",
+      "",
+      "Когда вы зарегистрируетесь как автор по моей пригласительной ссылке, АудиоЛад бесплатно добавит вам дополнительное авторское пространство.",
+    ].join("\n"),
+  );
 });
 
 test("RPC error UX mapping", () => {
@@ -336,8 +372,8 @@ test("reward money formatter: exact RUB and safe fallback", () => {
 });
 
 test("your-20 route keeps ?author=sergey-petrov", () => {
-  const href = `/author-dashboard/your-20?author=${encodeURIComponent(BETA)}`;
-  assert.equal(href, "/author-dashboard/your-20?author=sergey-petrov");
+  const href = `/author-dashboard/your-20?author=${encodeURIComponent("anna-meditation")}`;
+  assert.equal(href, "/author-dashboard/your-20?author=anna-meditation");
 });
 
 test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
@@ -386,4 +422,126 @@ test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   assert.match(rewardsSrc, /!loadError && dashboard \?/);
   assert.doesNotMatch(rewardsSrc, /invariantOk/);
   assert.match(rewardsSrc, /!loadError\s*\n\s*\? dashboard\?\.balances\.map/);
+  assert.match(collapsed, /Посмотреть АудиоЛад/);
+  assert.match(collapsed, /Стать автором/);
+  assert.match(
+    collapsed,
+    /Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение\./,
+  );
+  assert.match(
+    collapsed,
+    /Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение\./,
+  );
+  assert.match(collapsed, /buildAuthorPartnerHomeUrl\(profile\.primaryCode/);
+  assert.match(collapsed, /buildAuthorPartnerInviteUrl\(profile\.primaryCode/);
+});
+
+function requestFor(path: string): Request {
+  return new Request(`https://audiolad.ru${path}`, {
+    headers: { host: "audiolad.ru" },
+  });
+}
+
+test("/r and /invite share one touch and keep first-touch", async () => {
+  const calls: Array<{ code: string; existingToken: string | null | undefined }> = [];
+  let firstCode = "";
+  const touch = async (input: {
+    code: string;
+    existingToken: string | null | undefined;
+    inviteeUserId?: string | null;
+  }): Promise<PartnerTouchResult> => {
+    calls.push({ code: input.code, existingToken: input.existingToken });
+    if (!firstCode) {
+      firstCode = input.code;
+      return {
+        ok: true,
+        result: "created",
+        setCookie: true,
+        token: "token-sergey",
+        code: input.code,
+        referrerAuthorId: "referrer-sergey",
+      };
+    }
+    return {
+      ok: true,
+      result: "preserved_first_touch",
+      setCookie: false,
+      code: firstCode,
+      referrerAuthorId: "referrer-sergey",
+    };
+  };
+
+  const home = await handlePartnerInviteRequest({
+    request: requestFor("/r/sergey"),
+    rawCode: "sergey",
+    landing: "home",
+    existingToken: null,
+    inviteeUserId: null,
+    touch,
+  });
+  assert.equal(home.status, 307);
+  assert.equal(home.headers.get("location"), "https://audiolad.ru/");
+
+  const author = await handlePartnerInviteRequest({
+    request: requestFor("/invite/natalya"),
+    rawCode: "natalya",
+    landing: "for-authors",
+    existingToken: "token-sergey",
+    inviteeUserId: null,
+    touch,
+  });
+  assert.equal(author.status, 307);
+  assert.equal(author.headers.get("location"), "https://audiolad.ru/for-authors");
+  assert.deepEqual(calls, [
+    { code: "sergey", existingToken: null },
+    { code: "natalya", existingToken: "token-sergey" },
+  ]);
+  assert.equal(calls[1]?.code, "natalya");
+  assert.notEqual(calls[0]?.code, "");
+});
+
+test("invalid /r code is 404 and alias code is passed through unchanged", async () => {
+  const seen: string[] = [];
+  const missing = await handlePartnerInviteRequest({
+    request: requestFor("/r/missing"),
+    rawCode: "missing",
+    landing: "home",
+    existingToken: null,
+    inviteeUserId: null,
+    touch: async () => ({ ok: false, error: "not_found", setCookie: false }),
+  });
+  assert.equal(missing.status, 404);
+
+  const alias = await handlePartnerInviteRequest({
+    request: requestFor("/invite/old-sergey"),
+    rawCode: "old-sergey",
+    landing: "for-authors",
+    existingToken: null,
+    inviteeUserId: null,
+    touch: async (input) => {
+      seen.push(input.code);
+      return {
+        ok: true,
+        result: "created",
+        setCookie: true,
+        token: "alias-token",
+        code: input.code,
+        referrerAuthorId: "referrer-sergey",
+      };
+    },
+  });
+  assert.equal(alias.headers.get("location"), "https://audiolad.ru/for-authors");
+  assert.deepEqual(seen, ["old-sergey"]);
+
+  const blank = await handlePartnerInviteRequest({
+    request: requestFor("/r/"),
+    rawCode: " ",
+    landing: "home",
+    existingToken: null,
+    inviteeUserId: null,
+    touch: async () => {
+      throw new Error("touch must not run for an empty code");
+    },
+  });
+  assert.equal(blank.status, 404);
 });

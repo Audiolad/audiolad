@@ -6,8 +6,8 @@ import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorYour20Client from "@/components/author-dashboard/AuthorYour20Client";
 import {
   canAccessAuthorPartnerYour20Ui,
-  isAuthorPartnerUiBetaEnabled,
-} from "@/lib/author-partner/ui-beta";
+  selectOwnedAuthorWorkspace,
+} from "@/lib/author-partner/access";
 import {
   parseAuthorPartnerInviteesPayload,
   PARTNER_INVITEES_LOAD_ERROR,
@@ -72,10 +72,10 @@ export default async function AuthorYour20Page({
   const slugParam = Array.isArray(params.author)
     ? params.author[0]
     : params.author;
-  const selected =
-    (slugParam
-      ? authors.find((author) => author.slug === slugParam)
-      : null) ?? authors[0];
+  const selected = selectOwnedAuthorWorkspace(authors, slugParam);
+  if (!selected) {
+    return <NoAuthorAccess />;
+  }
 
   if (
     !canAccessAuthorPartnerYour20Ui({
@@ -84,16 +84,10 @@ export default async function AuthorYour20Page({
       isSupportMode: false,
     })
   ) {
-    // Non-beta workspace, editor, etc. — hide by redirect (not only nav).
     const q = selected.slug
       ? `?author=${encodeURIComponent(selected.slug)}`
       : "";
     redirect(`/author-dashboard${q}`);
-  }
-
-  // Defense in depth: beta allowlist alone.
-  if (!isAuthorPartnerUiBetaEnabled({ authorSlug: selected.slug })) {
-    redirect("/author-dashboard");
   }
 
   const { data, error } = await supabase.rpc("get_author_partner_profile", {

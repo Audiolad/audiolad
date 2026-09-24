@@ -11,7 +11,6 @@ export type PartnerCodeUserErrorCode =
   | "partner_profile_missing"
   | "forbidden"
   | "support_mode_blocked"
-  | "beta_disabled"
   | "load_failed"
   | "unknown";
 
@@ -25,7 +24,6 @@ const MESSAGES: Record<PartnerCodeUserErrorCode, string> = {
   forbidden: "Недостаточно прав для этого действия.",
   support_mode_blocked:
     "В режиме поддержки нельзя создавать или менять код приглашения.",
-  beta_disabled: "Раздел пока недоступен для этого авторского пространства.",
   load_failed: "Не удалось загрузить данные ссылки. Обновите страницу.",
   unknown: "Не удалось сохранить код. Попробуйте ещё раз.",
 };
