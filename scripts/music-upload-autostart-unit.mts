@@ -110,7 +110,11 @@ const formSource = readFileSync(
   "utf8",
 );
 
-assert.match(formSource, /startReadyMusicUploads\(stagedIds\)/);
+assert.match(formSource, /Подготавливаем треки/);
+assert.match(formSource, /Создано \{albumBatchProgress\.created\} из \{albumBatchProgress\.total\}/);
+assert.match(formSource, /setAlbumBatchProgress\(\{ created: 0, total: plan\.accepted\.length \}\)/);
+assert.match(formSource, /setAlbumBatchProgress\(null\)/);
+assert.match(formSource, /animate-spin/);
 assert.match(formSource, /startReadyMusicUploads\(\[audioItem\.id\]\)/);
 assert.match(formSource, /Продолжить загрузку/);
 assert.match(formSource, /musicQueueRef\.current/);
@@ -131,7 +135,12 @@ const albumBody = functionBody(formSource, "addAlbumTracks");
 const loopStart = albumBody.indexOf("for (const file of plan.accepted)");
 const loopEnd = albumBody.indexOf("} catch");
 const startCall = albumBody.indexOf("startReadyMusicUploads(stagedIds)");
+const progressSet = albumBody.indexOf("setAlbumBatchProgress({ created: 0");
+const emptyReturn = albumBody.indexOf("plan.accepted.length === 0");
 assert.ok(loopStart >= 0 && startCall > loopEnd);
+assert.ok(emptyReturn >= 0 && emptyReturn < progressSet);
+assert.ok(progressSet < albumBody.indexOf("ensurePracticeId"));
 assert.doesNotMatch(albumBody.slice(loopStart, loopEnd), /startReadyMusicUploads/);
+assert.match(albumBody, /setAlbumBatchProgress\(null\)/);
 
 console.log("music-upload-autostart-unit: ok");

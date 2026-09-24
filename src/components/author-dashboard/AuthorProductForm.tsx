@@ -921,6 +921,10 @@ export default function AuthorProductForm({
   const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
   const [albumDropActive, setAlbumDropActive] = useState(false);
   const [albumBatchNotice, setAlbumBatchNotice] = useState<string | null>(null);
+  const [albumBatchProgress, setAlbumBatchProgress] = useState<{
+    created: number;
+    total: number;
+  } | null>(null);
   const albumFileInputRef = useRef<HTMLInputElement | null>(null);
   const musicQueueRef = useRef(musicQueue);
   const musicFilesRef = useRef(new Map<string, File>());
@@ -2637,6 +2641,7 @@ export default function AuthorProductForm({
     addAudioInFlightRef.current = true;
     setBusy(true);
     setError(null);
+    setAlbumBatchProgress({ created: 0, total: plan.accepted.length });
     let created = 0;
     const stagedIds: string[] = [];
 
@@ -2673,6 +2678,7 @@ export default function AuthorProductForm({
         stageMusicTrackFile(audioItem.id, file);
         stagedIds.push(audioItem.id);
         created += 1;
+        setAlbumBatchProgress({ created, total: plan.accepted.length });
       }
     } catch {
       const failedName = plan.accepted[created]?.name ?? "файл";
@@ -2682,6 +2688,7 @@ export default function AuthorProductForm({
     } finally {
       addAudioInFlightRef.current = false;
       setBusy(false);
+      setAlbumBatchProgress(null);
       if (stagedIds.length > 0) {
         startReadyMusicUploads(stagedIds);
       }
@@ -4835,6 +4842,7 @@ export default function AuthorProductForm({
               event.preventDefault();
               if (
                 !busy &&
+                !albumBatchProgress &&
                 canEditPublicFields &&
                 !musicQueueBlocksTrackCreation(musicQueue)
               ) {
@@ -4851,15 +4859,35 @@ export default function AuthorProductForm({
             onDrop={(event) => {
               event.preventDefault();
               setAlbumDropActive(false);
+              if (albumBatchProgress || addAudioInFlightRef.current) {
+                return;
+              }
               const dropped = Array.from(event.dataTransfer.files);
               void addAlbumTracks(dropped);
             }}
             className={`rounded-[20px] border border-dashed px-4 py-5 text-center ${
-              albumDropActive
+              albumBatchProgress
                 ? "border-[#7042c5] bg-[#f4ecff]"
-                : "border-[#c6afe6] bg-[#fbf8ff]"
+                : albumDropActive
+                  ? "border-[#7042c5] bg-[#f4ecff]"
+                  : "border-[#c6afe6] bg-[#fbf8ff]"
             }`}
           >
+            {albumBatchProgress ? (
+              <div>
+                <span
+                  className="mx-auto inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#c6afe6] border-t-[#7042c5]"
+                  aria-hidden="true"
+                />
+                <p className="mt-3 text-sm font-semibold text-[#25135c]">
+                  Подготавливаем треки…
+                </p>
+                <p className="mt-1 text-sm text-[#5f5484]">
+                  Создано {albumBatchProgress.created} из {albumBatchProgress.total}
+                </p>
+              </div>
+            ) : (
+            <>
             <p className="text-sm font-semibold text-[#25135c]">
               Добавить треки альбома
             </p>
@@ -4900,7 +4928,9 @@ export default function AuthorProductForm({
             <p className="mt-3 text-sm text-[#7d70a2]">
               Можно выбрать до {MAX_MUSIC_ALBUM_BATCH_FILES} файлов одновременно.
             </p>
-            {musicQueueBlocksTrackCreation(musicQueue) ? (
+            </>
+            )}
+            {musicQueueBlocksTrackCreation(musicQueue) && !albumBatchProgress ? (
               <p className="mt-3 text-sm text-[#9b3d3d]">
                 Дождитесь завершения текущей загрузки, затем добавьте треки.
               </p>
