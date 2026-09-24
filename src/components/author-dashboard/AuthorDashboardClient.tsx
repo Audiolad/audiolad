@@ -300,20 +300,23 @@ export default function AuthorDashboardClient({
         newProductHref={newProductHref}
       />
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-6 rounded-[22px] border border-[#d7c4f5] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
         <p className="text-sm text-[#5f5484]">
           Продукты текущего проекта{" "}
           <span className="font-semibold text-[#25135c]">
             «{selectedAuthor.name}»
           </span>
         </p>
+        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+          Новый альбом или практика создаются внутри этого проекта.
+        </p>
 
         <Link
           href={newProductHref}
           aria-disabled={!canMutateContent}
-          className={`inline-flex items-center justify-center gap-2 rounded-[22px] px-5 py-4 text-center font-semibold text-white ${
+          className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[22px] px-6 py-4 text-center text-base font-semibold text-white shadow-[0_10px_24px_rgba(112,66,197,0.28)] sm:w-auto ${
             canMutateContent
-              ? "bg-[#7042c5]"
+              ? "bg-[#7042c5] hover:bg-[#5e32ad]"
               : "pointer-events-none bg-[#b7a5df] opacity-70"
           }`}
         >
