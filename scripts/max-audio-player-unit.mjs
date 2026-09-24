@@ -17,6 +17,8 @@ import {
   isMaxPreviewPlaybackMode,
   shouldAdvanceAfterMaxPreviewEnd,
   shouldAdvanceAfterMaxTrackEnd,
+  shouldClearMaxPreviewEndedAfterSeek,
+  shouldReplayMaxPreviewFromStart,
   shouldRevokeMaxAudioObjectUrl,
   shouldShowMaxTrackNavigation,
   shouldApplyMaxSeekRestore,
@@ -42,6 +44,23 @@ assert.equal(shouldAdvanceAfterMaxTrackEnd(2, 3), false);
 assert.equal(isMaxPreviewPlaybackMode("preview"), true);
 assert.equal(shouldShowMaxTrackNavigation("preview"), false);
 assert.equal(shouldAdvanceAfterMaxPreviewEnd("preview"), false);
+assert.equal(
+  shouldReplayMaxPreviewFromStart({
+    playbackMode: "full",
+    previewEnded: true,
+    hasSource: true,
+  }),
+  false,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: false,
+    nextTime: 10,
+    currentTime: 20,
+    duration: 80,
+  }),
+  false,
+);
 assert.equal(shouldRevokeMaxAudioObjectUrl("blob:https://max.audiolad.ru/1"), true);
 assert.equal(isMaxBlobObjectUrl("https://cdn.example/a.mp3"), false);
 assert.equal(captureMaxRecoveryPosition(3650), 3650);

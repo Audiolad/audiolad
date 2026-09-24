@@ -6,6 +6,8 @@ import {
   isMaxBlobObjectUrl,
   isMaxPreviewPlaybackMode,
   shouldAdvanceAfterMaxPreviewEnd,
+  shouldClearMaxPreviewEndedAfterSeek,
+  shouldReplayMaxPreviewFromStart,
   shouldRevokeMaxAudioObjectUrl,
   shouldShowMaxTrackNavigation,
   skipMaxPlayback,
@@ -23,6 +25,83 @@ assert.equal(shouldRevokeMaxAudioObjectUrl("blob:https://max.audiolad.ru/abc"), 
 assert.equal(shouldRevokeMaxAudioObjectUrl("https://cdn.example/audio.mp3"), false);
 assert.equal(skipMaxPlayback(50, 15, 60), 60);
 assert.equal(skipMaxPlayback(10, -15, 60), 0);
+assert.equal(
+  shouldReplayMaxPreviewFromStart({
+    playbackMode: "preview",
+    previewEnded: true,
+    hasSource: true,
+  }),
+  true,
+);
+assert.equal(
+  shouldReplayMaxPreviewFromStart({
+    playbackMode: "preview",
+    previewEnded: true,
+    hasSource: false,
+  }),
+  false,
+);
+assert.equal(
+  shouldReplayMaxPreviewFromStart({
+    playbackMode: "preview",
+    previewEnded: false,
+    hasSource: true,
+  }),
+  false,
+);
+assert.equal(
+  shouldReplayMaxPreviewFromStart({
+    playbackMode: "full",
+    previewEnded: true,
+    hasSource: true,
+  }),
+  false,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: true,
+    nextTime: 45,
+    currentTime: 60,
+    duration: 60,
+  }),
+  true,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: true,
+    nextTime: skipMaxPlayback(60, -15, 60),
+    currentTime: 60,
+    duration: 60,
+  }),
+  true,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: true,
+    nextTime: skipMaxPlayback(60, 15, 60),
+    currentTime: 60,
+    duration: 60,
+  }),
+  false,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: true,
+    nextTime: 60,
+    currentTime: 60,
+    duration: 60,
+  }),
+  false,
+);
+assert.equal(
+  shouldClearMaxPreviewEndedAfterSeek({
+    previewEnded: false,
+    nextTime: 20,
+    currentTime: 60,
+    duration: 60,
+  }),
+  false,
+);
 
 const hook = readFileSync(join(process.cwd(), "src/components/max/useMaxAudioPlayback.ts"), "utf8");
 const player = readFileSync(join(process.cwd(), "src/components/max/MaxAudioPlayer.tsx"), "utf8");
@@ -36,6 +115,35 @@ assert.match(player, /shouldShowMaxTrackNavigation\(session\.playbackMode\)/);
 assert.match(player, /previewDuration/);
 assert.match(hook, /shouldAdvanceAfterMaxPreviewEnd\(session\.playbackMode\)/);
 assert.match(hook, /setPreviewEnded\(true\)/);
+const playFn = hook.slice(hook.indexOf("const play ="), hook.indexOf("const pause ="));
+assert.match(playFn, /shouldReplayMaxPreviewFromStart/);
+assert.match(playFn, /setPreviewEnded\(false\)/);
+assert.match(playFn, /audio\.currentTime = 0/);
+assert.match(playFn, /intendedPlayingRef\.current = true/);
+assert.ok(
+  playFn.indexOf("shouldReplayMaxPreviewFromStart") < playFn.indexOf("shouldStartMaxPrimaryPlayFetch"),
+);
+const replayBlock = playFn.slice(
+  playFn.indexOf("shouldReplayMaxPreviewFromStart"),
+  playFn.indexOf("shouldStartMaxPrimaryPlayFetch"),
+);
+assert.doesNotMatch(replayBlock, /loadTrack|fetchAudio|revokeObjectUrl|createObjectURL/);
+assert.match(playFn, /loadTrack\(trackIndex, true\)/);
+const seekFn = hook.slice(hook.indexOf("const seek ="), hook.indexOf("const skipBy ="));
+assert.match(seekFn, /shouldClearMaxPreviewEndedAfterSeek/);
+assert.match(seekFn, /setPreviewEnded\(false\)/);
+const skipFn = hook.slice(hook.indexOf("const skipBy ="), hook.indexOf("const selectTrack ="));
+assert.match(skipFn, /shouldClearMaxPreviewEndedAfterSeek/);
+assert.match(skipFn, /setPreviewEnded\(false\)/);
+const onEndedFn = hook.slice(hook.indexOf("const onEnded ="), hook.indexOf("const onError ="));
+assert.match(onEndedFn, /shouldAdvanceAfterMaxPreviewEnd\(session\.playbackMode\)/);
+assert.match(onEndedFn, /setPreviewEnded\(true\)/);
+const previewEndReturn = onEndedFn.slice(
+  onEndedFn.indexOf("if (!shouldAdvanceAfterMaxPreviewEnd"),
+  onEndedFn.indexOf("const next = nextMaxTrackIndex"),
+);
+assert.match(previewEndReturn, /setPreviewEnded\(true\)/);
+assert.doesNotMatch(previewEndReturn, /loadTrack/);
 assert.match(hook, /shouldRevokeMaxAudioObjectUrl/);
 assert.match(hook, /URL\.revokeObjectURL/);
 assert.match(hook, /objectUrlRef/);

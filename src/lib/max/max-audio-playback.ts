@@ -125,6 +125,41 @@ export function shouldAdvanceAfterMaxPreviewEnd(mode: string | null | undefined)
   return !isMaxPreviewPlaybackMode(mode);
 }
 
+export function shouldReplayMaxPreviewFromStart(input: {
+  playbackMode: string | null | undefined;
+  previewEnded: boolean;
+  hasSource: boolean;
+}): boolean {
+  return (
+    isMaxPreviewPlaybackMode(input.playbackMode) &&
+    input.previewEnded &&
+    input.hasSource
+  );
+}
+
+/**
+ * After a natural preview end, seeking/skipping backward must drop the
+ * "preview finished" state. Staying at the clip end (e.g. +15 there)
+ * must not clear it.
+ */
+export function shouldClearMaxPreviewEndedAfterSeek(input: {
+  previewEnded: boolean;
+  nextTime: number;
+  currentTime: number;
+  duration: number;
+}): boolean {
+  if (!input.previewEnded) {
+    return false;
+  }
+
+  const end =
+    Number.isFinite(input.duration) && input.duration > 0
+      ? input.duration
+      : input.currentTime;
+  const next = clampMaxSeek(input.nextTime, end);
+  return next < end;
+}
+
 export function isMaxBlobObjectUrl(url: string | null | undefined): boolean {
   return typeof url === "string" && url.startsWith("blob:");
 }

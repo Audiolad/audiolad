@@ -16,6 +16,8 @@ import {
   shouldIgnoreMaxTeardownMediaError,
   shouldPlayMaxAppliedSource,
   shouldAdvanceAfterMaxPreviewEnd,
+  shouldClearMaxPreviewEndedAfterSeek,
+  shouldReplayMaxPreviewFromStart,
   shouldResetMaxRecoveryCycle,
   shouldShowMaxTrackNavigation,
   shouldResumeAfterMaxResign,
@@ -249,9 +251,27 @@ export function useMaxAudioPlayback({
   );
 
   const play = useCallback(() => {
-    intendedPlayingRef.current = true;
     const audio = audioRef.current;
     const hasSource = audio ? hasMaxAudioElementSource(audio) : false;
+    if (
+      audio &&
+      shouldReplayMaxPreviewFromStart({
+        playbackMode: session.playbackMode,
+        previewEnded,
+        hasSource,
+      })
+    ) {
+      setPreviewEnded(false);
+      intendedPlayingRef.current = true;
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      void audio.play().catch(() => {
+        setError("Не удалось начать воспроизведение.");
+      });
+      return;
+    }
+
+    intendedPlayingRef.current = true;
     if (hasSource && audio) {
       void audio.play().catch(() => {
         setError("Не удалось начать воспроизведение.");
@@ -267,7 +287,7 @@ export function useMaxAudioPlayback({
       return;
     }
     void loadTrack(trackIndex, true);
-  }, [isPreparing, loadTrack, trackIndex]);
+  }, [isPreparing, loadTrack, previewEnded, session.playbackMode, trackIndex]);
 
   const pause = useCallback(() => {
     intendedPlayingRef.current = false;
@@ -280,20 +300,40 @@ export function useMaxAudioPlayback({
     if (!audio) {
       return;
     }
-    audio.currentTime = clampMaxSeek(nextTime, audio.duration || duration);
-  }, [duration]);
+    const clipDuration = audio.duration || duration;
+    const next = clampMaxSeek(nextTime, clipDuration);
+    if (
+      shouldClearMaxPreviewEndedAfterSeek({
+        previewEnded,
+        nextTime: next,
+        currentTime: audio.currentTime,
+        duration: clipDuration,
+      })
+    ) {
+      setPreviewEnded(false);
+    }
+    audio.currentTime = next;
+  }, [duration, previewEnded]);
 
   const skipBy = useCallback((delta: number) => {
     const audio = audioRef.current;
     if (!audio) {
       return;
     }
-    audio.currentTime = skipMaxPlayback(
-      audio.currentTime,
-      delta,
-      audio.duration || duration,
-    );
-  }, [duration]);
+    const clipDuration = audio.duration || duration;
+    const next = skipMaxPlayback(audio.currentTime, delta, clipDuration);
+    if (
+      shouldClearMaxPreviewEndedAfterSeek({
+        previewEnded,
+        nextTime: next,
+        currentTime: audio.currentTime,
+        duration: clipDuration,
+      })
+    ) {
+      setPreviewEnded(false);
+    }
+    audio.currentTime = next;
+  }, [duration, previewEnded]);
 
   const selectTrack = useCallback(
     (index: number) => {
