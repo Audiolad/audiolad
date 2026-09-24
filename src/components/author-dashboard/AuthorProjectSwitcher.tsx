@@ -213,7 +213,7 @@ export default function AuthorProjectSwitcher({
       <button
         type="button"
         onClick={handleCreateClick}
-        className="inline-flex w-full shrink-0 items-center justify-center rounded-[18px] border border-[#c6afe6] bg-white px-4 py-3 text-center text-sm font-semibold leading-5 text-[#7042c5] shadow-[0_6px_16px_rgba(91,62,145,0.04)] transition hover:border-[#7042c5] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto sm:max-w-[17.5rem] sm:self-stretch"
+        className="inline-flex min-h-12 w-full shrink-0 items-center justify-center rounded-[22px] bg-[#7042c5] px-5 py-3 text-center text-sm font-semibold leading-5 text-white shadow-[0_10px_24px_rgba(112,66,197,0.28)] transition hover:bg-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto sm:max-w-[18rem] sm:self-center"
       >
         Создать новый проект (новый артист)
       </button>

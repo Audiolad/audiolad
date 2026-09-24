@@ -343,7 +343,6 @@ function main() {
 
   // Call sites no longer wire unreachable dialog success callbacks
   for (const rel of [
-    "src/components/author-dashboard/AuthorCreateProjectCta.tsx",
     "src/components/author-dashboard/AuthorProjectSwitcher.tsx",
     "src/components/author-dashboard/AuthorCreateProjectForm.tsx",
   ]) {
@@ -358,12 +357,10 @@ function main() {
   assert.match(migration, /already_granted/);
   assert.match(migration, /ON CONFLICT \(order_id\) DO NOTHING/);
 
-  const cta = read("src/components/author-dashboard/AuthorCreateProjectCta.tsx");
-  assert.match(cta, /Создать новый проект/);
-  assert.match(cta, /＋/);
-
   const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
-  assert.match(nav, /AuthorCreateProjectCta/);
+  assert.doesNotMatch(nav, /AuthorCreateProjectCta/);
+  const switcher = read("src/components/author-dashboard/AuthorProjectSwitcher.tsx");
+  assert.match(switcher, /Создать новый проект \(новый артист\)/);
 
   const startTochka = read("src/lib/payments/start-tochka-checkout.ts");
   assert.match(startTochka, /AUTHOR_PROJECT_CAPACITY_ORDER_KIND/);
