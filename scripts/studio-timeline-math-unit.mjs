@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   clampPixelsPerSecond,
+  DEFAULT_PIXELS_PER_SECOND,
   clampTimelineScrollLeft,
   getAnchoredTimelineScrollLeft,
   getFitPixelsPerSecond,
@@ -122,6 +123,61 @@ assert.doesNotMatch(timelineSource, /orientationchange/);
 assert.doesNotMatch(editorSource, /screen\.orientation/);
 assert.doesNotMatch(editorSource, /innerWidth/);
 assert.match(editorSource, /fixed inset-0 z-30 hidden flex-col/);
+
+const CONTROL_COLUMN_PX = 190;
+const rulerClass = timelineSource.match(
+  /className="([^"]*h-8 border-b border-white\/10 text-\[10px\][^"]*)"/,
+);
+assert.ok(rulerClass, "ruler container class must exist");
+assert.match(rulerClass[1], /(^|\s)relative(\s|$)/);
+assert.doesNotMatch(rulerClass[1], /ml-\[190px\]/);
+
+const rulerMarks = timelineSource.slice(
+  timelineSource.indexOf("rulerMarks.map"),
+  timelineSource.indexOf("{tracks.map"),
+);
+assert.match(rulerMarks, /left: timeToTimelineX\(time, pixelsPerSecond\)/);
+assert.doesNotMatch(rulerMarks, /190/);
+assert.match(
+  timelineSource,
+  /const playheadX = timeToTimelineX\(currentTime, pixelsPerSecond\)/,
+);
+assert.match(timelineSource, /ml-\[190px\][\s\S]{0,400}left: playheadX/);
+assert.match(
+  timelineSource,
+  /const clipLeft = timeToTimelineX\(\s*layout\.startTime,\s*pixelsPerSecond\s*\)/,
+);
+
+const projectDuration = 180;
+const currentTime = 165;
+let zoom = DEFAULT_PIXELS_PER_SECOND;
+const zoomLevels = [
+  zoom,
+  getFitPixelsPerSecond(projectDuration, 1100),
+  clampPixelsPerSecond(0.4),
+  clampPixelsPerSecond(240),
+];
+zoom = stepPixelsPerSecond(zoom, 1);
+zoomLevels.push(zoom);
+zoom = stepPixelsPerSecond(zoom, 1);
+zoomLevels.push(zoom);
+zoom = stepPixelsPerSecond(zoom, -1);
+zoomLevels.push(zoom);
+
+for (const pixelsPerSecond of zoomLevels) {
+  const contentX = timeToTimelineX(currentTime, pixelsPerSecond);
+  const rulerVisualX = CONTROL_COLUMN_PX + contentX;
+  const clipVisualX = CONTROL_COLUMN_PX + contentX;
+  const playheadVisualX = CONTROL_COLUMN_PX + contentX;
+  assert.equal(rulerVisualX, clipVisualX);
+  assert.equal(clipVisualX, playheadVisualX);
+  assert.equal(playheadVisualX - contentX, CONTROL_COLUMN_PX);
+  assert.equal(timelineXToTime(contentX, pixelsPerSecond), currentTime);
+  assert.notEqual(contentX, playheadVisualX);
+  assert.equal(currentTime, 165);
+  assert.equal(projectDuration, 180);
+}
+
 assert.match(editorSource, /stepPixelsPerSecond/);
 assert.match(editorSource, /TIMELINE_ZOOM_STEP|stepPixelsPerSecond\(current, 1\)/);
 assert.doesNotMatch(editorSource, /1\.25/);

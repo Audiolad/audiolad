@@ -440,7 +440,7 @@ function StudioTimeline({
         >
           <div className="sticky left-0 z-20 h-8 border-b border-r border-white/10 bg-[#101722]" />
           <div
-            className="h-8 border-b border-white/10 text-[10px] text-[#9ba7bb]"
+            className="relative h-8 border-b border-white/10 text-[10px] text-[#9ba7bb]"
             style={{ width: timelineWidth }}
             onPointerUp={() => onSelectClip(null)}
           >
