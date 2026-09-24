@@ -280,6 +280,17 @@ function findLocalAudioMatch(
   return unconsumed ?? null;
 }
 
+/** Append one newly created row. Existing local media and text stay as they are. */
+export function appendCreatedAudioItem(
+  localItems: AudioItemRow[],
+  created: AudioItemRow,
+): AudioItemRow[] {
+  if (localItems.some((item) => item.id === created.id)) {
+    return localItems;
+  }
+  return [...localItems, created];
+}
+
 /** Keep local titles/descriptions; refresh file metadata and ids from server. */
 export function mergeServerAudioItems(
   localItems: AudioItemRow[],

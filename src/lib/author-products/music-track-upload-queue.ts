@@ -51,6 +51,12 @@ export function musicQueueHasReady(snapshot: MusicQueueSnapshot): boolean {
   return snapshot.entries.some((entry) => entry.phase === "ready");
 }
 
+export function musicQueueBlocksTrackCreation(snapshot: MusicQueueSnapshot): boolean {
+  return snapshot.entries.some(
+    (entry) => entry.phase === "queued" || entry.phase === "uploading",
+  );
+}
+
 function fillSlots(entries: MusicQueueEntry[]): {
   entries: MusicQueueEntry[];
   launchIds: string[];
