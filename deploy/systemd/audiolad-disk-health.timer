@@ -1,0 +1,11 @@
+[Unit]
+Description=Audiolad root disk health check every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=audiolad-disk-health.service
+
+[Install]
+WantedBy=timers.target

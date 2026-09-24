@@ -55,7 +55,7 @@ ancestry и zero-downtime cutover остаются внутри `deploy.sh`.
 
 ## Что делает deploy.sh
 
-1. Проверяет диск и доступность Git.
+1. Проверяет, что на диске свободно не меньше `DEPLOY_MIN_FREE_MB` (12288 MB), и доступность Git. Меньше этого порога deploy останавливается до создания candidate release. Rollback этот порог не использует.
 2. Создаёт новый релиз из commit.
 3. Подключает `shared/.env.production`.
 4. Выполняет `npm ci`, `npm run lint`, `npm run build`.

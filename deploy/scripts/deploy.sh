@@ -184,7 +184,7 @@ main() {
   ensure_dirs
   acquire_deploy_lock
   # Retention/cleanup runs only after successful health-watch (never mid-deploy).
-  check_disk_space 2048
+  check_disk_space "$DEPLOY_MIN_FREE_MB"
 
   if [[ ! -f "$DEPLOY_ROOT/shared/.env.production" ]]; then
     log_error "Missing $DEPLOY_ROOT/shared/.env.production"

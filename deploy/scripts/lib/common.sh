@@ -21,6 +21,10 @@ READINESS_PROBE_SCRIPT="${READINESS_PROBE_SCRIPT:-$_AUDIOLAD_SCRIPTS_LIB_DIR/rea
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://audiolad.ru}"
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/audiolad-deploy.lock}"
 DEPLOY_LOCK_FD="${DEPLOY_LOCK_FD:-9}"
+# Free space required before a candidate release is created.
+# 12 GiB covers one ~1.4G release, transient npm/Next files, and an 8G
+# PostgreSQL emergency reserve. Rollback does not use this gate.
+DEPLOY_MIN_FREE_MB="${DEPLOY_MIN_FREE_MB:-12288}"
 __AUDIOLAD_DEPLOY_LOCK_ACQUIRED="${__AUDIOLAD_DEPLOY_LOCK_ACQUIRED:-0}"
 
 log() {
@@ -304,13 +308,27 @@ require_command() {
   }
 }
 
+# Prints "pass" or "reject". Rejects when available MB is below the minimum.
+disk_space_guard_status() {
+  local avail_mb="$1"
+  local min_mb="${2:-$DEPLOY_MIN_FREE_MB}"
+
+  if (( avail_mb < min_mb )); then
+    printf 'reject\n'
+    return 1
+  fi
+
+  printf 'pass\n'
+  return 0
+}
+
 check_disk_space() {
-  local min_mb="${1:-2048}"
+  local min_mb="${1:-$DEPLOY_MIN_FREE_MB}"
   local avail_kb
   avail_kb="$(df -Pk "$DEPLOY_ROOT" | awk 'NR==2 {print $4}')"
   local avail_mb=$((avail_kb / 1024))
 
-  if (( avail_mb < min_mb )); then
+  if ! disk_space_guard_status "$avail_mb" "$min_mb" >/dev/null; then
     log_error "Insufficient disk space: ${avail_mb}MB available, need at least ${min_mb}MB"
     exit 1
   fi

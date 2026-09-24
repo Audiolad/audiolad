@@ -61,6 +61,18 @@ sudo systemctl enable --now audiolad-ipv6-health.timer
 journalctl -t audiolad-ipv6-health --since today
 ```
 
+## Зависимость от базы
+
+`/api/health/build` не проверяет Postgres. Для этого есть отдельный endpoint:
+
+| Monitor | Type | URL | Expected |
+|---------|------|-----|----------|
+| Dependencies | HTTP(s) keyword | `https://audiolad.ru/api/health/dependencies` | 200, keyword `"database":"ok"`; down on 503 |
+
+## Диск хоста
+
+Шаблоны `deploy/systemd/audiolad-disk-health.*` каждые 5 минут читают `df /` и пушат две независимые Kuma Push-проверки: warning при used >= 85%, critical при used >= 90%. Скрипт ничего не удаляет. Push URL лежит только в `/etc/audiolad/disk-health.env`. Подробности: `deploy/docs/DISK_INCIDENT_HARDENING.md`.
+
 ## Уведомления
 
 Настройте Telegram / email / webhook внутри Uptime Kuma.

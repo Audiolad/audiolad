@@ -1,0 +1,77 @@
+# Logging-only override for the production Supabase compose project.
+# Install later as /opt/supabase/docker/docker-compose.override.yml.
+# Do not apply from this repository change. Existing containers keep their
+# current LogConfig until they are recreated.
+services:
+  studio:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  kong:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  auth:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  rest:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  realtime:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  storage:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  imgproxy:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  meta:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  functions:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  db:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  supavisor:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  templates-server:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
