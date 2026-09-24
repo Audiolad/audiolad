@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * Focused unit: attach SEO query to published Aurafon products (retrofit).
+ * Focused unit: attach SEO query to already published products (retrofit).
+ *
+ * Aurafon keeps the existing attach surface for every product kind.
+ * Other authors get the same linker only for factual music / release,
+ * including legacy albums where publication_class is null.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -8,36 +12,172 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isAuthorProductWizardEnabled } from "../src/lib/author-products/product-wizard-beta.ts";
-import { isAuthorSeoDiscoveryEnabled } from "../src/lib/seo-queries/discovery-beta.ts";
+import {
+  isAuthorSeoDiscoveryEnabled,
+  isMusicCreateSeoDiscoveryEnabled,
+} from "../src/lib/seo-queries/discovery-beta.ts";
+import {
+  assertPublishedProductSeoAttachEnabled,
+  isPublishedProductSeoAttachEnabled,
+} from "../src/lib/seo-queries/published-product-seo-attach-gate.ts";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon.ts";
 import { mapPublishedSeoAttachError } from "../src/lib/seo-queries/published-product-seo-attach.ts";
 import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
+import { PRODUCT_KIND } from "../src/lib/author-products/product-kind.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
 
+const OTHER_AUTHOR_ID = "00000000-0000-4000-8000-000000000099";
 const migName = "20261023120000_attach_published_seo_query_to_product.sql";
 const mig = read(`supabase/migrations/${migName}`);
 const route = read("src/app/api/author/products/[id]/seo-primary-query/route.ts");
 const lib = read("src/lib/seo-queries/published-product-seo-attach.ts");
+const gate = read("src/lib/seo-queries/published-product-seo-attach-gate.ts");
 const linker = read(
   "src/components/author-dashboard/AuthorPublishedProductSeoQueryLinker.tsx",
 );
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const wizardBeta = read("src/lib/author-products/product-wizard-beta.ts");
+const discoveryBeta = read("src/lib/seo-queries/discovery-beta.ts");
 const draftLinkMig = read(
   "supabase/migrations/20261021120000_seo_reservation_product_primary_sync.sql",
+);
+const occupancySql = read(
+  "supabase/tests/author_published_product_seo_attach_behavior.sql",
 );
 
 // Compatibility: wizard by authorId, not product age / product_kind
 assert.equal(isAuthorProductWizardEnabled(AURAFON_AUTHOR_ID), true);
 assert.equal(isAuthorSeoDiscoveryEnabled(AURAFON_AUTHOR_ID), true);
-assert.equal(isAuthorProductWizardEnabled("00000000-0000-0000-0000-000000000099"), false);
+assert.equal(isAuthorProductWizardEnabled(OTHER_AUTHOR_ID), false);
+assert.equal(isAuthorSeoDiscoveryEnabled(OTHER_AUTHOR_ID), false);
 assert.match(wizardBeta, /isAurafonAuthor/);
 assert.match(form, /isAuthorProductWizardEnabled\(form\.authorId\)/);
 assert.match(form, /showPublishedSeoLinker/);
-assert.doesNotMatch(form, /showPublishedSeoLinker[\s\S]{0,200}product_kind/);
-assert.doesNotMatch(form, /showPublishedSeoLinker[\s\S]{0,200}PRODUCT_KIND\.MUSIC/);
+
+// A. Aurafon published product → attach enabled, as before.
+assert.equal(
+  isPublishedProductSeoAttachEnabled({ authorId: AURAFON_AUTHOR_ID }),
+  true,
+);
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: AURAFON_AUTHOR_ID,
+    productKind: PRODUCT_KIND.PRACTICE,
+    publicationClass: "practice",
+  }),
+  true,
+);
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: AURAFON_AUTHOR_ID,
+    productKind: PRODUCT_KIND.PRACTICE,
+    publicationClass: "course",
+  }),
+  true,
+);
+
+// B. non-Aurafon + productKind=music → published attach enabled.
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    productKind: PRODUCT_KIND.MUSIC,
+  }),
+  true,
+);
+
+// C. non-Aurafon + publicationClass=release → enabled.
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    publicationClass: "release",
+  }),
+  true,
+);
+
+// D. legacy music: productKind=music + publicationClass null → enabled.
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    productKind: PRODUCT_KIND.MUSIC,
+    publicationClass: null,
+  }),
+  true,
+);
+
+// E / F. non-Aurafon practice / course stay closed.
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    productKind: PRODUCT_KIND.PRACTICE,
+    publicationClass: "practice",
+  }),
+  false,
+);
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    productKind: PRODUCT_KIND.PRACTICE,
+    publicationClass: "course",
+  }),
+  false,
+);
+assert.equal(
+  isPublishedProductSeoAttachEnabled({
+    authorId: OTHER_AUTHOR_ID,
+    productKind: PRODUCT_KIND.AUDIO_POST,
+    publicationClass: "post",
+  }),
+  false,
+);
+assert.throws(
+  () =>
+    assertPublishedProductSeoAttachEnabled({
+      authorId: OTHER_AUTHOR_ID,
+      productKind: PRODUCT_KIND.PRACTICE,
+      publicationClass: "practice",
+    }),
+  (error) =>
+    error instanceof Error &&
+    error.message === "seo_discovery_beta_disabled" &&
+    error.code === "seo_discovery_beta_disabled" &&
+    error.status === 403,
+);
+
+// Standalone dashboard gate stays Aurafon-only.
+assert.equal(isMusicCreateSeoDiscoveryEnabled({ authorId: OTHER_AUTHOR_ID }), false);
+assert.match(discoveryBeta, /isAuthorSeoDiscoveryEnabled/);
+assert.doesNotMatch(
+  discoveryBeta,
+  /isPublishedProductSeoAttachEnabled/,
+);
+
+// G / H. Form uses the canonical published attach gate, not Aurafon-only discovery.
+assert.match(form, /isPublishedProductSeoAttachEnabled\(\{/);
+assert.match(form, /authorId:\s*form\.authorId/);
+assert.match(form, /productKind:\s*form\.productKind/);
+assert.match(form, /publicationClass:\s*form\.publicationClass/);
+assert.match(
+  form,
+  /showPublishedSeoLinker =\s*\n\s*mode === "edit" &&\s*\n\s*publishedProductStatus &&\s*\n\s*publishedSeoAttachEnabled &&\s*\n\s*!hasRelationalPrimarySeoQuery/,
+);
+assert.doesNotMatch(form, /isAuthorSeoDiscoveryEnabled\(form\.authorId\)/);
+assert.doesNotMatch(form, /from "@\/lib\/seo-queries\/discovery-beta"/);
+
+// I. Route uses the same canonical gate and factual server-side fields.
+assert.match(route, /assertPublishedProductSeoAttachEnabled/);
+assert.match(route, /from "@\/lib\/seo-queries\/published-product-seo-attach-gate"/);
+assert.match(route, /authorId:\s*practice\.author_id/);
+assert.match(route, /productKind:\s*practice\.product_kind/);
+assert.match(route, /publicationClass:\s*practice\.publication_class/);
+assert.doesNotMatch(route, /assertPublishedSeoAttachBeta/);
+assert.doesNotMatch(route, /isAuthorSeoDiscoveryEnabled/);
+assert.doesNotMatch(lib, /assertPublishedSeoAttachBeta/);
+assert.doesNotMatch(lib, /isAuthorSeoDiscoveryEnabled/);
+assert.match(gate, /isAuthorSeoDiscoveryEnabled\(input\.authorId\)/);
+assert.match(gate, /isMusicProductWizardEnabled/);
+assert.doesNotMatch(gate, /import "server-only"/);
 
 // Migration: one additive function, service_role only
 assert.match(mig, /attach_published_seo_query_to_product/);
@@ -81,7 +221,6 @@ assert.equal(after[0], migName, "published SEO attach must immediately follow sp
 // API security + operations
 assert.match(route, /requirePracticeMutationAccess/);
 assert.match(route, /createServiceRoleClient/);
-assert.match(route, /assertPublishedSeoAttachBeta|isAuthorSeoDiscoveryEnabled/);
 assert.match(route, /searchPublishedProductSeoQueries/);
 assert.match(route, /attachPublishedProductSeoQuery/);
 assert.match(route, /query_id/);
@@ -92,7 +231,7 @@ assert.match(lib, /import "server-only"/);
 assert.match(lib, /attach_published_seo_query_to_product/);
 assert.match(lib, /frequency:\s*\n\s*typeof row\.frequency === "number"/);
 
-// UI
+// J / K. Existing one-click legacy CTA and manual search/attach stay.
 assert.match(linker, /Закрепить поисковый запрос/);
 assert.match(linker, /Поиск по базе запросов/);
 assert.match(linker, /Сейчас в продукте указан запрос:/);
@@ -110,7 +249,6 @@ assert.match(form, /AuthorPublishedProductSeoQueryLinker/);
 assert.match(form, /Для опубликованного продукта закрепите основной запрос через блок выше/);
 assert.match(form, /Запрос закреплён за этим продуктом/);
 assert.match(form, /linked:\s*true/);
-
 
 // Pre-merge cleanup: exact lookup ignores analysis_status; fuzzy stays analyzed
 assert.match(lib, /Exact match ignores analysis_status/);
@@ -154,6 +292,17 @@ assert.match(
   mapPublishedSeoAttachError("seo_query_too_long_for_product").message,
   /слишком длинный/,
 );
+
+// L–N occupancy stays in attach_published_seo_query_to_product.
+// Proof: supabase/tests/author_published_product_seo_attach_behavior.sql
+//   C own active unlinked → used
+//   D used by another product → seo_query_already_used
+//   G same product / same query → idempotent
+assert.match(occupancySql, /own active unlinked → converted to used/);
+assert.match(occupancySql, /used by another → seo_query_already_used/);
+assert.match(occupancySql, /same product \/ same query → idempotent/);
+assert.match(lib, /availability = "used_other"/);
+assert.match(lib, /Уже используется/);
 
 // Admin correction path report fixture: used not releasable
 const adminRelease = draftLinkMig;
