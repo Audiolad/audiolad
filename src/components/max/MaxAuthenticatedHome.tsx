@@ -279,9 +279,11 @@ export default function MaxAuthenticatedHome() {
                     </p>
                   ) : null}
                   <p className="mt-2 text-xs text-[#6c5d94]">{product.formatLabel}</p>
-                  <p className="mt-1 text-sm font-medium text-[#7042c5]">
-                    {product.priceLabel}
-                  </p>
+                  {!product.isFree ? (
+                    <p className="mt-1 text-sm font-medium text-[#7042c5]">
+                      {product.priceLabel}
+                    </p>
+                  ) : null}
                 </div>
               </button></li>
             ))}
@@ -305,7 +307,6 @@ export default function MaxAuthenticatedHome() {
                   className="mt-4 aspect-square w-full max-w-[280px] mx-auto rounded-2xl object-cover"
                 />
               ) : null}
-              <p className="mt-3 text-sm text-[#6c5d94]">{detail.product.formatLabel}</p>
               <h2 className="mt-2 text-2xl font-semibold">{detail.product.title}</h2>
               {detail.product.subtitle ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p>
@@ -313,24 +314,23 @@ export default function MaxAuthenticatedHome() {
               {detail.product.authorName ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.authorName}</p>
               ) : null}
-              <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
               {detail.product.statsLabel ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p>
               ) : null}
-              {detail.product.description ? (
-                <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p>
+              {!selected.isFree ? (
+                <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
               ) : null}
               {playback.status === "loading" ? (
-                <p className="mt-6 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
+                <p className="mt-4 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
               ) : null}
               {playback.status === "access_required" ? (
-                <p className="mt-6 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
+                <p className="mt-4 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
               ) : null}
               {playback.status === "no_audio" ? (
-                <p className="mt-6 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
+                <p className="mt-4 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
               ) : null}
               {playback.status === "error" ? (
-                <p className="mt-6 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
+                <p className="mt-4 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
               ) : null}
               {playback.status === "ready" ? (
                 <MaxAudioPlayer
@@ -354,7 +354,11 @@ export default function MaxAuthenticatedHome() {
                     return { ok: false, reason: payload?.reason ?? "error" };
                   }}
                 />
-              ) : detail.product.contents.length ? (
+              ) : null}
+              {detail.product.description ? (
+                <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p>
+              ) : null}
+              {playback.status !== "ready" && detail.product.contents.length ? (
                 <ol className="mt-6 space-y-2 text-sm">
                   {detail.product.contents.map((track) => (
                     <li key={`${track.position}-${track.title}`}>

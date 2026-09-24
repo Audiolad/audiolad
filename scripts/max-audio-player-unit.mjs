@@ -227,5 +227,16 @@ assert.doesNotMatch(audioFetch, /authorSlug:/);
 assert.match(home, /Для прослушивания нужен доступ к продукту/);
 assert.match(home, /max-w-\[280px\]/);
 assert.doesNotMatch(home, /h-24\s+w-20/);
+const readyHome = home.slice(home.indexOf('{detail.status === "ready" ?'));
+assert.ok(
+  readyHome.indexOf("<MaxAudioPlayer") < readyHome.indexOf("detail.product.description"),
+  "detail description stays after MaxAudioPlayer",
+);
+assert.ok(
+  readyHome.indexOf("detail.product.statsLabel") < readyHome.indexOf("<MaxAudioPlayer"),
+  "stats stay before MaxAudioPlayer",
+);
+assert.match(home, /!selected\.isFree/);
+assert.match(home, /!product\.isFree/);
 
 console.log("max-audio-player-unit: ok");

@@ -33,14 +33,31 @@ assert.doesNotMatch(catalogBlock, /h-24|w-20/);
 assert.match(source.slice(readyStart), /max-w-\[280px\]/);
 assert.match(source.slice(readyStart), /aspect-square/);
 const readyBlock = source.slice(readyStart);
+const headerEnd = Math.min(
+  ...["MaxAudioPlayer", 'playback.status === "loading"', "detail.product.description"]
+    .map((marker) => readyBlock.indexOf(marker))
+    .filter((index) => index >= 0),
+);
+assert.ok(headerEnd > 0, "ready detail has a header before playback/description");
+const detailHeader = readyBlock.slice(0, headerEnd);
+assert.doesNotMatch(detailHeader, /detail\.product\.formatLabel/);
+assert.match(catalogBlock, /product\.formatLabel/);
+assert.match(catalogBlock, /!product\.isFree/);
+assert.match(catalogBlock, /product\.priceLabel/);
+assert.doesNotMatch(catalogBlock, /priceLabel !== "Подарок"/);
+assert.match(readyBlock, /!selected\.isFree/);
+assert.match(readyBlock, /detail\.product\.priceLabel/);
+assert.doesNotMatch(readyBlock, /priceLabel !== "Подарок"/);
+
 const fieldOrder = [
   "detail.product.coverUrl",
-  "detail.product.formatLabel",
   "detail.product.title",
   "detail.product.subtitle",
   "detail.product.authorName",
-  "detail.product.priceLabel",
   "detail.product.statsLabel",
+  "selected.isFree",
+  "detail.product.priceLabel",
+  "MaxAudioPlayer",
   "detail.product.description",
   "detail.product.contents",
 ];
@@ -51,5 +68,23 @@ for (const field of fieldOrder) {
   assert.ok(index > lastIndex, `ready UI order includes ${field} after previous field`);
   lastIndex = index;
 }
+
+assert.ok(
+  readyBlock.indexOf("detail.product.statsLabel") < readyBlock.indexOf("MaxAudioPlayer"),
+  "statsLabel is before player",
+);
+assert.ok(
+  readyBlock.indexOf("detail.product.priceLabel") < readyBlock.indexOf("MaxAudioPlayer"),
+  "paid price is before player",
+);
+assert.ok(
+  readyBlock.indexOf("MaxAudioPlayer") < readyBlock.indexOf("detail.product.description"),
+  "description is after player",
+);
+assert.ok(
+  readyBlock.indexOf('playback.status === "loading"') <
+    readyBlock.indexOf("detail.product.description"),
+  "playback states are before description",
+);
 
 console.log("max-product-detail-unit: ok");
