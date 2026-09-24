@@ -1,4 +1,4 @@
-import { formatRubFromMinor } from "@/lib/admin/analytics-money-format";
+import { formatPartnerRewardMoney } from "@/lib/author-partner/money-format";
 import type {
   PartnerRewardDashboard,
   PartnerRewardHistoryRow,
@@ -8,11 +8,6 @@ type Props = {
   dashboard: PartnerRewardDashboard | null;
   loadError?: string | null;
 };
-
-function formatRewardAmount(amountMinor: number, currency: string): string {
-  if (currency === "RUB") return formatRubFromMinor(amountMinor);
-  return `${amountMinor.toLocaleString("ru-RU")} ${currency} (мин. ед.)`;
-}
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -72,7 +67,7 @@ export default function AuthorPartnerRewards({
         Партнёрские начисления
       </h3>
       <p className="mt-1 text-sm text-[#7d70a2]">
-        Начисления рассчитываются от роялти приглашённых авторов.
+        Вознаграждения рассчитываются автоматически от роялти приглашённых авторов.
       </p>
 
       {loadError ? (
@@ -97,21 +92,21 @@ export default function AuthorPartnerRewards({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Card
                   label="Начислено"
-                  value={formatRewardAmount(balance.accruedMinor, balance.currency)}
+                  value={formatPartnerRewardMoney(balance.accruedMinor, balance.currency)}
                   hint="С учётом возвратов"
                 />
                 <Card
                   label="На удержании"
-                  value={formatRewardAmount(balance.heldMinor, balance.currency)}
+                  value={formatPartnerRewardMoney(balance.heldMinor, balance.currency)}
                 />
                 <Card
                   label="Доступно"
-                  value={formatRewardAmount(balance.availableMinor, balance.currency)}
+                  value={formatPartnerRewardMoney(balance.availableMinor, balance.currency)}
                   tone="accent"
                 />
                 <Card
                   label="Выплачено"
-                  value={formatRewardAmount(balance.paidMinor, balance.currency)}
+                  value={formatPartnerRewardMoney(balance.paidMinor, balance.currency)}
                   hint="Выплаты подключим следующим этапом"
                 />
               </div>
@@ -142,7 +137,7 @@ export default function AuthorPartnerRewards({
               >
                 <span>
                   <span className="block text-sm font-semibold text-[#2b2144]">
-                    {row.name}
+                    {row.inviteeAuthorName}
                   </span>
                   <span className="mt-1 block text-xs text-[#9a8fbf]">
                     {entryLabel(row)} · {formatDate(row.effectiveAt)} ·{" "}
@@ -150,7 +145,7 @@ export default function AuthorPartnerRewards({
                   </span>
                 </span>
                 <span className="text-right text-sm font-semibold text-[#2b2144]">
-                  {formatRewardAmount(row.amountMinor, row.currency)}
+                  {formatPartnerRewardMoney(row.amountMinor, row.currency)}
                 </span>
               </li>
             ))}

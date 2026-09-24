@@ -8,7 +8,7 @@ export type PartnerRewardBalance = {
 };
 
 export type PartnerRewardHistoryRow = {
-  name: string;
+  inviteeAuthorName: string;
   type: "reward_accrual" | "reward_reversal";
   amountMinor: number;
   currency: string;
@@ -89,14 +89,14 @@ function parseHistoryRow(value: unknown): PartnerRewardHistoryRow | null {
 
   if (
     !hasOnlyKeys(row, [
-      "name",
+      "invitee_author_name",
       "type",
       "amount_minor",
       "currency",
       "effective_at",
       "availability_state",
     ]) ||
-    typeof row.name !== "string" ||
+    typeof row.invitee_author_name !== "string" ||
     (row.type !== "reward_accrual" && row.type !== "reward_reversal") ||
     amountMinor === null ||
     !isCurrency(row.currency) ||
@@ -107,7 +107,7 @@ function parseHistoryRow(value: unknown): PartnerRewardHistoryRow | null {
   }
 
   return {
-    name: row.name,
+    inviteeAuthorName: row.invitee_author_name,
     type: row.type,
     amountMinor,
     currency: row.currency,

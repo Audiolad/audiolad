@@ -38,7 +38,7 @@ INSERT INTO auth.users (id, email) VALUES
 INSERT INTO public.authors (id, name) VALUES
   ('10000000-0000-0000-0000-000000000001', 'Partner'),
   ('10000000-0000-0000-0000-000000000002', 'Other partner'),
-  ('20000000-0000-0000-0000-000000000001', 'Invitee');
+  ('20000000-0000-0000-0000-000000000001', '@');
 
 INSERT INTO public.author_members (author_id, user_id, role) VALUES
   ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'owner'),
@@ -77,6 +77,16 @@ INSERT INTO public.author_ledger_entries (
     '50000000-0000-0000-0000-000000000001',
     now() - interval '1 day',
     now() + interval '1 day'
+  ),
+  (
+    '40000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000001',
+    'sale_accrual',
+    5000,
+    'RUB',
+    '50000000-0000-0000-0000-000000000002',
+    now() - interval '1 hour',
+    now() + interval '1 day'
   );
 
 INSERT INTO public.author_partner_reward_ledger_entries (
@@ -90,7 +100,7 @@ INSERT INTO public.author_partner_reward_ledger_entries (
     '10000000-0000-0000-0000-000000000001',
     '20000000-0000-0000-0000-000000000001',
     '40000000-0000-0000-0000-000000000001',
-    '40000000-0000-0000-0000-000000000002',
+    '40000000-0000-0000-0000-000000000001',
     'reward_accrual', 2000, 'RUB', now() - interval '2 days', now() - interval '1 day',
     'dashboard-accrual'
   ),
@@ -100,9 +110,19 @@ INSERT INTO public.author_partner_reward_ledger_entries (
     '10000000-0000-0000-0000-000000000001',
     '20000000-0000-0000-0000-000000000001',
     '40000000-0000-0000-0000-000000000001',
-    '40000000-0000-0000-0000-000000000001',
-    'reward_reversal', -500, 'RUB', now() - interval '1 day', now() + interval '1 day',
+    '40000000-0000-0000-0000-000000000002',
+    'reward_reversal', -500, 'RUB', now() - interval '1 day', now() - interval '1 day',
     'dashboard-reversal'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000003',
+    '30000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    '40000000-0000-0000-0000-000000000003',
+    '40000000-0000-0000-0000-000000000003',
+    'reward_accrual', 1000, 'RUB', now() - interval '1 hour', now() + interval '1 day',
+    'dashboard-held-accrual'
   );
 
 SET ROLE authenticated;
@@ -122,9 +142,9 @@ BEGIN
 
   IF jsonb_array_length(v_dashboard -> 'balances') <> 1
     OR v_balance ->> 'currency' <> 'RUB'
-    OR (v_balance ->> 'accrued_minor')::bigint <> 1500
-    OR (v_balance ->> 'held_minor')::bigint <> -500
-    OR (v_balance ->> 'available_minor')::bigint <> 2000
+    OR (v_balance ->> 'accrued_minor')::bigint <> 2500
+    OR (v_balance ->> 'held_minor')::bigint <> 1000
+    OR (v_balance ->> 'available_minor')::bigint <> 1500
     OR (v_balance ->> 'paid_minor')::bigint <> 0
     OR (v_balance ->> 'invariant_ok')::boolean IS NOT TRUE
   THEN
@@ -134,7 +154,12 @@ BEGIN
   IF jsonb_array_length(v_history) <> 1
     OR (v_history -> 0) ? 'id'
     OR (v_history -> 0) ? 'partner_author_id'
+    OR (v_history -> 0) ? 'invitee_author_id'
+    OR (v_history -> 0) ? 'source_sale_ledger_entry_id'
+    OR (v_history -> 0) ? 'source_event_ledger_entry_id'
     OR (v_history -> 0) ? 'available_at'
+    OR (v_history -> 0) ->> 'invitee_author_name' <> 'Автор'
+    OR (v_history -> 0) ->> 'type' <> 'reward_accrual'
     OR (v_history -> 0) ->> 'availability_state' <> 'held'
   THEN
     RAISE EXCEPTION 'dashboard history must be bounded and safe';

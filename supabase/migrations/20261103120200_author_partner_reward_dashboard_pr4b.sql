@@ -81,7 +81,7 @@ BEGIN
   SELECT coalesce(
     jsonb_agg(
       jsonb_build_object(
-        'name', 'Партнёрское вознаграждение',
+        'invitee_author_name', row.invitee_author_name,
         'type', row.entry_type,
         'amount_minor', row.amount_minor,
         'currency', row.currency,
@@ -92,22 +92,28 @@ BEGIN
             ELSE 'available'
           END
       )
-      ORDER BY row.effective_at DESC, row.created_at DESC
+      ORDER BY row.effective_at DESC, row.created_at DESC, row.id DESC
     ),
     '[]'::jsonb
   )
   INTO v_history
   FROM (
     SELECT
+      e.id,
       e.entry_type,
       e.amount_minor,
       e.currency,
       e.effective_at,
       e.available_at,
-      e.created_at
+      e.created_at,
+      CASE
+        WHEN btrim(coalesce(invitee.name, '')) IN ('', '@') THEN 'Автор'
+        ELSE btrim(invitee.name)
+      END AS invitee_author_name
     FROM public.author_partner_reward_ledger_entries AS e
+    JOIN public.authors AS invitee ON invitee.id = e.invitee_author_id
     WHERE e.partner_author_id = p_author_id
-    ORDER BY e.effective_at DESC, e.created_at DESC
+    ORDER BY e.effective_at DESC, e.created_at DESC, e.id DESC
     LIMIT v_limit
   ) AS row;
 

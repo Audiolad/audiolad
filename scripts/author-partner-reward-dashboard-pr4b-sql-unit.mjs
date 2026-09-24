@@ -34,6 +34,18 @@ assert(migration.includes("least(coalesce(p_history_limit, 25), 100)"), "history
 assert(migration.includes("'paid_minor', 0"), "paid balance remains zero");
 assert(migration.includes("'invariant_ok'"), "balance invariant is projected");
 assert(
+  migration.includes("'invitee_author_name'") && migration.includes("JOIN public.authors AS invitee"),
+  "history exposes only the safe invitee author name",
+);
+assert(
+  migration.includes("btrim(coalesce(invitee.name, '')) IN ('', '@') THEN 'Автор'"),
+  "blank or @ invitee names use the public fallback",
+);
+assert(
+  migration.includes("ORDER BY row.effective_at DESC, row.created_at DESC, row.id DESC"),
+  "history ordering has an internal deterministic id tie-breaker",
+);
+assert(
   !migration.includes("INSERT INTO public.author_partner_reward_ledger_entries"),
   "migration does not write partner rewards",
 );

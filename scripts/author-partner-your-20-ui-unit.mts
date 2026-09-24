@@ -22,6 +22,7 @@ import {
   parsePartnerRewardDashboardPayload,
   PARTNER_REWARD_LOAD_ERROR,
 } from "../src/lib/author-partner/rewards";
+import { formatPartnerRewardMoney } from "../src/lib/author-partner/money-format";
 
 const BETA = PARTNER_UI_BETA_AUTHOR_SLUG;
 
@@ -210,7 +211,7 @@ test("reward dashboard parse: currency-aware balances and safe history", () => {
     ],
     history: [
       {
-        name: "Партнёрское вознаграждение",
+        invitee_author_name: "Автор",
         type: "reward_reversal",
         amount_minor: -500,
         currency: "RUB",
@@ -232,7 +233,7 @@ test("reward dashboard parse: currency-aware balances and safe history", () => {
     ],
     history: [
       {
-        name: "Партнёрское вознаграждение",
+        inviteeAuthorName: "Автор",
         type: "reward_reversal",
         amountMinor: -500,
         currency: "RUB",
@@ -251,7 +252,7 @@ test("reward dashboard parse: malformed or private history fails closed", () => 
       history: [
         {
           id: "should-not-be-here",
-          name: "Партнёрское вознаграждение",
+          invitee_author_name: "Автор",
           type: "reward_accrual",
           amount_minor: 100,
           currency: "RUB",
@@ -262,6 +263,14 @@ test("reward dashboard parse: malformed or private history fails closed", () => 
     }),
     null,
   );
+});
+
+test("reward money formatter: exact RUB and safe fallback", () => {
+  assert.equal(formatPartnerRewardMoney(1500, "RUB"), "15 ₽");
+  assert.equal(formatPartnerRewardMoney(-1501, "RUB"), "−15,01 ₽");
+  assert.equal(formatPartnerRewardMoney(1.5, "RUB"), "—");
+  assert.equal(formatPartnerRewardMoney(1500, "USD"), "—");
+  assert.equal(formatPartnerRewardMoney(1500, "rub"), "—");
 });
 
 test("your-20 route keeps ?author=sergey-petrov", () => {
@@ -303,10 +312,12 @@ test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   );
   assert.doesNotMatch(collapsed, /Тестовый режим/);
   assert.doesNotMatch(collapsed, /будет подключено отдельным этапом/);
-  assert.match(rewardsSrc, /formatRubFromMinor/);
+  assert.match(rewardsSrc, /formatPartnerRewardMoney/);
+  assert.match(rewardsSrc, /рассчитываются автоматически/);
   assert.match(rewardsSrc, /Начислено/);
   assert.match(rewardsSrc, /На удержании/);
   assert.match(rewardsSrc, /Доступно/);
   assert.match(rewardsSrc, /Выплачено/);
+  assert.match(rewardsSrc, /следующим этапом/);
   assert.match(rewardsSrc, /История начислений/);
 });
