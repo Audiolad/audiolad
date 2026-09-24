@@ -9,11 +9,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  isMaxCatalogPath,
   isMaxHostname,
   isMaxSessionLinkPath,
   isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_HOSTNAME,
+  MAX_CATALOG_PATH,
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
   MAX_SITE_PATH,
@@ -77,6 +79,9 @@ assert.equal(isMaxSessionLinkPath(MAX_SESSION_LINK_PATH), true);
 assert.equal(isMaxSessionLinkPath(`${MAX_SESSION_LINK_PATH}/`), false);
 assert.equal(isMaxSessionLinkPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath("/api/foo"), false);
+assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
+assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
+assert.equal(isMaxCatalogPath("/api/max"), false);
 
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
@@ -85,8 +90,10 @@ assertMaxAction(MAX_HOSTNAME, "/sw.js", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/health/build", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/session", "not_found");
@@ -123,6 +130,7 @@ assertMaxAction("www.audiolad.ru", "/", "pass_through");
 assertMaxAction(SCHOOL_HOSTNAME, "/", "pass_through");
 assertMaxAction("audiolad.ru", MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction("audiolad.ru", MAX_SESSION_LINK_PATH, "pass_through");
+assertMaxAction("audiolad.ru", MAX_CATALOG_PATH, "pass_through");
 
 // School policy still owns school host isolation.
 assertSchoolAction(SCHOOL_HOSTNAME, "/", "rewrite_school_landing");
@@ -197,6 +205,7 @@ const maxClientSources = [
   "src/components/max/MaxLoginForm.tsx",
   "src/components/max/MaxSignupForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
+  "src/components/max/MaxAuthenticatedHome.tsx",
   "src/app/(platform)/max-site/page.tsx",
   "src/app/(platform)/max-site/layout.tsx",
 ]

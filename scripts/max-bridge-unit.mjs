@@ -13,7 +13,7 @@ import {
   readMaxInitData,
   resolveMaxBridgeSnapshot,
 } from "../src/lib/max/bridge.ts";
-import { MAX_SESSION_VERIFY_PATH } from "../src/lib/max/host.ts";
+import { MAX_CATALOG_PATH, MAX_SESSION_VERIFY_PATH } from "../src/lib/max/host.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -63,8 +63,8 @@ const screen = readFileSync(
   join(repoRoot, "src/components/max/MaxMiniAppScreen.tsx"),
   "utf8",
 );
-assert.match(screen, /Музыка, медитации, аудиопрактики и аудиокурсы/);
-assert.doesNotMatch(screen, /ListenerAppShell|ProductCard|catalog/);
+assert.match(screen, /MaxBridgeScript/);
+assert.doesNotMatch(screen, /ListenerAppShell|ProductCard/);
 assert.doesNotMatch(screen, /подтверждено|user\.id|query_id/);
 
 const bridgeSource = readFileSync(join(repoRoot, "src/lib/max/bridge.ts"), "utf8");
@@ -83,6 +83,7 @@ const shellCopySource = readFileSync(
 assert.match(scriptSource, /MAX_WEB_APP_SCRIPT_SRC/);
 assert.match(scriptSource, /afterInteractive/);
 assert.match(scriptSource, /verifyMaxSession/);
+assert.match(scriptSource, /MaxAuthenticatedHome/);
 assert.match(shellCopySource, /АудиоЛад открыт внутри MAX/);
 assert.match(shellCopySource, /Подключение к MAX…/);
 assert.match(shellCopySource, /Подключение к MAX подтверждено/);
@@ -100,5 +101,6 @@ assert.doesNotMatch(
   /\.ready\s*\(/,
 );
 assert.equal(MAX_SESSION_VERIFY_PATH, "/api/max/session/verify");
+assert.equal(MAX_CATALOG_PATH, "/api/max/catalog");
 
 console.log("max-bridge-unit: ok");
