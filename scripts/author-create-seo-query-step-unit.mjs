@@ -145,11 +145,13 @@ assert.equal(getProductSeoQueryStepCopy("course").title, "Выберите по�
 assert.equal(getProductSeoQueryStepCopy(undefined).title, "Выберите поисковый запрос");
 
 // E — database frequency NULL stays null in API DTO
+const discoveryStatus = read("src/lib/seo-queries/author-discovery-status.ts");
 assert.match(
-  discoveryRoute,
+  discoveryStatus,
   /frequency:\s*typeof item\.frequency === "number" \? item\.frequency : null/,
 );
 assert.doesNotMatch(discoveryRoute, /frequency:\s*item\.frequency \?\? 0/);
+assert.doesNotMatch(discoveryStatus, /frequency:\s*item\.frequency \?\? 0/);
 
 // F/G — null-safe frequency display; Wordstat label template retained
 assert.match(panel, /frequency:\s*number\s*\|\s*null/);

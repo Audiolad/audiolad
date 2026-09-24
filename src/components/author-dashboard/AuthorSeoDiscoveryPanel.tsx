@@ -11,6 +11,10 @@ import {
   nextActiveReservationCountAfterReserve,
 } from "@/lib/seo-queries/types";
 import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
+import {
+  authorSeoDiscoverySurfaceFromPanelVariant,
+  isHiddenFromProductCreateDiscoveryUi,
+} from "@/lib/seo-queries/author-discovery-status";
 
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
@@ -190,6 +194,7 @@ export default function AuthorSeoDiscoveryPanel({
       body: JSON.stringify({
         author_id: authorId,
         phrase,
+        surface: authorSeoDiscoverySurfaceFromPanelVariant(variant),
         ...(publicationClass ? { publication_class: publicationClass } : {}),
       }),
     });
@@ -274,6 +279,10 @@ export default function AuthorSeoDiscoveryPanel({
     setDiscoverMessage(payload.message ?? "Запрос отправлен на проверку.");
   }
 
+  const visibleDatabaseMatches = isProductCreate
+    ? databaseMatches.filter((item) => !isHiddenFromProductCreateDiscoveryUi(item))
+    : databaseMatches;
+
   const heading = isProductCreate
     ? "Найти другой поисковый запрос"
     : "Что ищут слушатели";
@@ -312,7 +321,7 @@ export default function AuthorSeoDiscoveryPanel({
         </p>
       ) : null}
 
-      {databaseMatches.length > 0 || discoverResults.length > 0 || discoverySeedPhrase ? (
+      {visibleDatabaseMatches.length > 0 || discoverResults.length > 0 || discoverySeedPhrase ? (
         <div className="mt-5 space-y-6">
           <div>
             <h3 className="text-base font-semibold text-[#25135c]">
@@ -321,13 +330,13 @@ export default function AuthorSeoDiscoveryPanel({
             <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
               Эти запросы уже проверены АудиоЛадом. Свободный запрос можно сразу взять в работу.
             </p>
-            {databaseMatches.length === 0 ? (
+            {visibleDatabaseMatches.length === 0 ? (
               <p className="mt-3 text-sm text-[#796ba0]">
                 В базе АудиоЛада пока нет подходящих проверенных запросов.
               </p>
             ) : (
               <div className="mt-3 grid gap-3">
-                {databaseMatches.map((item) => (
+                {visibleDatabaseMatches.map((item) => (
                   <article
                     key={`db-${item.queryId ?? item.phrase}`}
                     className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4"
@@ -342,10 +351,13 @@ export default function AuthorSeoDiscoveryPanel({
                         ) : null}
                       </div>
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                        {item.statusLabel}
+                        {item.status === "published"
+                          ? "Опубликован"
+                          : item.statusLabel}
                       </span>
                     </div>
-                    {item.status === "own" && item.productTitle ? (
+                    {(item.status === "own" || item.status === "published") &&
+                    item.productTitle ? (
                       <p className="mt-2 text-sm text-[#5f5484]">Продукт: {item.productTitle}</p>
                     ) : null}
                     {item.canReserve && item.queryId ? (
@@ -357,6 +369,16 @@ export default function AuthorSeoDiscoveryPanel({
                       >
                         {isProductCreate ? "Взять в работу и продолжить" : "Взять в работу"}
                       </button>
+                    ) : null}
+                    {item.status === "published" && item.productId ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <Link
+                          href={`/author-dashboard/products/${item.productId}`}
+                          className="text-sm font-semibold text-[#7042c5]"
+                        >
+                          Открыть продукт
+                        </Link>
+                      </div>
                     ) : null}
                     {item.status === "own" && item.reservationId ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">

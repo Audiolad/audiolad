@@ -1,9 +1,12 @@
 import "server-only";
 
+import { resolveAuthorDiscoveryReservationState } from "@/lib/seo-queries/author-discovery-status";
+
 export type AuthorDiscoveryStatus =
   | "available"
   | "occupied"
   | "own"
+  | "published"
   | "pending_review"
   | "not_applicable"
   | "new"
@@ -13,6 +16,7 @@ export type AuthorDiscoveryLabel =
   | "Свободен"
   | "Занят"
   | "У вас в работе"
+  | "Опубликован"
   | "На проверке"
   | "Не подходит для SEO-возможностей"
   | "Нет в базе АудиоЛада";
@@ -53,6 +57,7 @@ const STATUS_LABEL: Record<AuthorDiscoveryStatus, AuthorDiscoveryLabel> = {
   available: "Свободен",
   occupied: "Занят",
   own: "У вас в работе",
+  published: "Опубликован",
   pending_review: "На проверке",
   not_applicable: "Не подходит для SEO-возможностей",
   new: "Нет в базе АудиоЛада",
@@ -113,14 +118,15 @@ export function reconcileAuthorDiscoverySuggestion(input: {
   }
 
   if (reservation && (reservation.status === "active" || reservation.status === "used")) {
-    if (reservation.authorId === authorId) {
-      return result(phrase, frequency, "own", {
-        queryId: query.id,
-        reservationId: reservation.id,
-        productTitle: reservation.productTitle,
-      });
-    }
-    return result(phrase, frequency, "occupied", { queryId: query.id });
+    const state = resolveAuthorDiscoveryReservationState({
+      authorId,
+      reservation,
+    });
+    return result(phrase, frequency, state.status, {
+      queryId: query.id,
+      reservationId: state.reservationId,
+      productTitle: state.productTitle,
+    });
   }
 
   return result(phrase, frequency, "available", {
