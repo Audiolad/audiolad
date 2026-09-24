@@ -232,11 +232,45 @@ export default function MaxAuthenticatedHome() {
           <button type="button" onClick={() => { setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
             ← Назад в каталог
           </button>
-          <h2 className="mt-5 text-2xl font-semibold">{detail.status === "ready" ? detail.product.title : selected.title}</h2>
           {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
           {detail.status === "not_found" ? <p className="mt-6 text-sm text-[#6c5d94]">Продукт недоступен.</p> : null}
           {detail.status === "error" ? <p className="mt-6 text-sm text-[#6c5d94]">Не удалось загрузить продукт.</p> : null}
-          {detail.status === "ready" ? <>{detail.product.coverUrl ? <img src={detail.product.coverUrl} alt="" className="mt-4 h-48 w-full rounded-2xl object-cover" /> : null}<p className="mt-3 text-sm">{detail.product.formatLabel} · {detail.product.priceLabel}</p>{detail.product.subtitle ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p> : null}{detail.product.authorName ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.authorName}</p> : null}{detail.product.statsLabel ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p> : null}{detail.product.description ? <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p> : null}{detail.product.contents.length ? <ol className="mt-6 space-y-2 text-sm">{detail.product.contents.map((track) => <li key={`${track.position}-${track.title}`}>{track.position}. {track.title}{track.durationSeconds !== null ? ` · ${formatMaxDuration(track.durationSeconds)}` : ""}</li>)}</ol> : null}</> : null}
+          {detail.status === "ready" ? (
+            <>
+              {detail.product.coverUrl ? (
+                <img
+                  src={detail.product.coverUrl}
+                  alt=""
+                  className="mt-4 aspect-square w-full max-w-[280px] mx-auto rounded-2xl object-cover"
+                />
+              ) : null}
+              <p className="mt-3 text-sm text-[#6c5d94]">{detail.product.formatLabel}</p>
+              <h2 className="mt-2 text-2xl font-semibold">{detail.product.title}</h2>
+              {detail.product.subtitle ? (
+                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p>
+              ) : null}
+              {detail.product.authorName ? (
+                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.authorName}</p>
+              ) : null}
+              <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
+              {detail.product.statsLabel ? (
+                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p>
+              ) : null}
+              {detail.product.description ? (
+                <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p>
+              ) : null}
+              {detail.product.contents.length ? (
+                <ol className="mt-6 space-y-2 text-sm">
+                  {detail.product.contents.map((track) => (
+                    <li key={`${track.position}-${track.title}`}>
+                      {track.position}. {track.title}
+                      {track.durationSeconds !== null ? ` · ${formatMaxDuration(track.durationSeconds)}` : ""}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </>
+          ) : null}
         </div>
       ) : null}
     </section>

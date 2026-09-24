@@ -15,6 +15,7 @@ import {
 import {
   isAdminAnalyticsRoute,
   shouldEnableYandexMetrika,
+  shouldShowYandexAnalyticsConsentBanner,
 } from "../src/lib/analytics/yandex-metrika-environment.ts";
 import { sanitizeMetrikaPageUrl } from "../src/lib/analytics/yandex-metrika-url.ts";
 import {
@@ -139,6 +140,45 @@ assert.equal(
   }),
   false,
   "access-link landing does not send metrika",
+);
+assert.equal(
+  shouldEnableYandexMetrika({
+    pathname: "/",
+    hostname: "audiolad.ru",
+  }),
+  true,
+  "audiolad.ru production Yandex behavior unchanged",
+);
+assert.equal(
+  shouldEnableYandexMetrika({
+    pathname: "/",
+    hostname: "max.audiolad.ru",
+  }),
+  false,
+  "max.audiolad.ru disables Yandex Metrika",
+);
+assert.equal(
+  shouldEnableYandexMetrika({
+    pathname: "/",
+    hostname: "localhost",
+  }),
+  false,
+  "localhost Yandex remains disabled",
+);
+assert.equal(
+  shouldShowYandexAnalyticsConsentBanner({ hostname: "max.audiolad.ru" }),
+  false,
+  "MAX suppresses consent banner",
+);
+assert.equal(
+  shouldShowYandexAnalyticsConsentBanner({ hostname: "audiolad.ru" }),
+  true,
+  "ordinary audiolad.ru consent banner still eligible",
+);
+assert.equal(
+  shouldShowYandexAnalyticsConsentBanner({ hostname: "localhost" }),
+  true,
+  "localhost consent banner eligibility unchanged",
 );
 
 const dedupeKey = "session:accepted:banner";

@@ -9,6 +9,7 @@ import {
   ANALYTICS_CONSENT_BANNER_Z_INDEX_CLASS,
 } from "@/lib/analytics/consent-banner-layout";
 import { writeAnalyticsConsent } from "@/lib/analytics/analytics-consent";
+import { shouldShowYandexAnalyticsConsentBanner } from "@/lib/analytics/yandex-metrika-environment";
 import { useAnalyticsConsent } from "@/lib/analytics/use-analytics-consent";
 
 function useClientMounted(): boolean {
@@ -23,7 +24,11 @@ export default function AnalyticsConsentBanner() {
   const consent = useAnalyticsConsent();
   const mounted = useClientMounted();
 
-  if (consent !== "unknown" || !mounted) {
+  if (
+    consent !== "unknown" ||
+    !mounted ||
+    !shouldShowYandexAnalyticsConsentBanner()
+  ) {
     return null;
   }
 
