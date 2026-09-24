@@ -1,8 +1,16 @@
 "use client";
 
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
+import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
 import { readMaxInitData } from "@/lib/max/bridge";
-import { MAX_CATALOG_PATH, MAX_PRODUCT_PATH } from "@/lib/max/host";
+import { formatMaxDuration } from "@/lib/max/format-duration";
+import {
+  MAX_CATALOG_PATH,
+  MAX_PLAYBACK_AUDIO_PATH,
+  MAX_PLAYBACK_SESSION_PATH,
+  MAX_PRODUCT_PATH,
+} from "@/lib/max/host";
+import type { MaxPlaybackSession } from "@/lib/max/playback-types";
 import { useEffect, useState } from "react";
 
 type MaxCatalogProduct = {
@@ -27,14 +35,15 @@ type MaxProductDetailState =
   | { status: "ready"; product: { title: string; subtitle: string | null; description: string | null; authorName: string | null; formatLabel: string; coverUrl: string | null; priceLabel: string; statsLabel: string | null; contents: Array<{ title: string; position: number; durationSeconds: number | null }> } }
   | { status: "not_found" }
   | { status: "error" };
+type MaxPlaybackState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; session: MaxPlaybackSession; playbackTicket: string }
+  | { status: "access_required" }
+  | { status: "no_audio" }
+  | { status: "error" };
 
-export function formatMaxDuration(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const rest = String(safe % 60).padStart(2, "0");
-  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
-}
+export { formatMaxDuration } from "@/lib/max/format-duration";
 
 function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -86,6 +95,7 @@ export default function MaxAuthenticatedHome() {
   );
   const [selected, setSelected] = useState<MaxCatalogProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
+  const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
 
   useEffect(() => {
     const initData = readMaxInitData();
@@ -148,6 +158,57 @@ export default function MaxAuthenticatedHome() {
     return () => controller.abort();
   }, [selected]);
 
+  useEffect(() => {
+    if (!selected || detail.status !== "ready") {
+      return;
+    }
+    const initData = readMaxInitData();
+    if (!initData) {
+      return;
+    }
+    const controller = new AbortController();
+    void fetch(MAX_PLAYBACK_SESSION_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        initData,
+        authorSlug: selected.authorSlug,
+        productSlug: selected.slug,
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => ({
+        status: response.status,
+        payload: await response.json().catch(() => null),
+      }))
+      .then(({ status, payload }) => {
+        if (controller.signal.aborted) return;
+        if (status === 403) return setPlayback({ status: "access_required" });
+        if (status === 404 && payload?.reason === "no_audio") {
+          return setPlayback({ status: "no_audio" });
+        }
+        const session = payload?.session;
+        const playbackTicket =
+          typeof payload?.playbackTicket === "string" ? payload.playbackTicket : "";
+        if (
+          session &&
+          playbackTicket &&
+          Array.isArray(session.tracks) &&
+          session.tracks.every((track: { trackId?: unknown }) => typeof track.trackId === "string")
+        ) {
+          setPlayback({ status: "ready", session, playbackTicket });
+        } else {
+          setPlayback({ status: "error" });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPlayback({ status: "error" });
+      });
+    return () => controller.abort();
+  }, [detail.status, selected]);
+
   return (
     <section className="min-h-screen bg-[#faf8ff] px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] text-[#25135c]">
       <header className="flex min-h-11 items-center border-b border-[#e8def5] pb-3">
@@ -191,7 +252,7 @@ export default function MaxAuthenticatedHome() {
             {catalog.items.map((product) => (
               <li key={`${product.authorSlug}/${product.slug}`}><button
                 type="button"
-                onClick={() => { setDetail({ status: "loading" }); setSelected(product); }}
+                onClick={() => { setDetail({ status: "loading" }); setPlayback({ status: "loading" }); setSelected(product); }}
                 className="flex min-h-28 w-full items-start gap-3 rounded-2xl border border-[#e8def5] bg-white p-3 text-left"
               >
                 <div className="aspect-square w-24 shrink-0 overflow-hidden rounded-xl bg-[#ede6f8]">
@@ -229,7 +290,7 @@ export default function MaxAuthenticatedHome() {
       </div>
       {selected ? (
         <div className="fixed inset-0 overflow-y-auto bg-[#faf8ff] p-4">
-          <button type="button" onClick={() => { setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
+          <button type="button" onClick={() => { setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
             ← Назад в каталог
           </button>
           {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
@@ -259,7 +320,41 @@ export default function MaxAuthenticatedHome() {
               {detail.product.description ? (
                 <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p>
               ) : null}
-              {detail.product.contents.length ? (
+              {playback.status === "loading" ? (
+                <p className="mt-6 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
+              ) : null}
+              {playback.status === "access_required" ? (
+                <p className="mt-6 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
+              ) : null}
+              {playback.status === "no_audio" ? (
+                <p className="mt-6 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
+              ) : null}
+              {playback.status === "error" ? (
+                <p className="mt-6 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
+              ) : null}
+              {playback.status === "ready" ? (
+                <MaxAudioPlayer
+                  session={playback.session}
+                  fetchAudio={async (trackId, signal) => {
+                    const response = await fetch(MAX_PLAYBACK_AUDIO_PATH, {
+                      method: "POST",
+                      credentials: "same-origin",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        playbackTicket: playback.playbackTicket,
+                        trackId,
+                      }),
+                      cache: "no-store",
+                      signal,
+                    });
+                    const payload = await response.json().catch(() => null);
+                    if (response.ok && typeof payload?.url === "string") {
+                      return { ok: true, url: payload.url };
+                    }
+                    return { ok: false, reason: payload?.reason ?? "error" };
+                  }}
+                />
+              ) : detail.product.contents.length ? (
                 <ol className="mt-6 space-y-2 text-sm">
                   {detail.product.contents.map((track) => (
                     <li key={`${track.position}-${track.title}`}>

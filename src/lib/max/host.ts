@@ -16,6 +16,12 @@ export const MAX_SESSION_LINK_PATH = "/api/max/session/link";
 export const MAX_CATALOG_PATH = "/api/max/catalog";
 export const MAX_PRODUCT_PATH = "/api/max/product";
 
+/** HMAC-verify linked MAX identity, then return a playable session if entitled. */
+export const MAX_PLAYBACK_SESSION_PATH = "/api/max/playback/session";
+
+/** HMAC-verify linked MAX identity, then sign one entitled track. */
+export const MAX_PLAYBACK_AUDIO_PATH = "/api/max/playback/audio";
+
 export function isMaxHostname(hostname: string): boolean {
   return hostname === MAX_HOSTNAME;
 }
@@ -33,6 +39,14 @@ export function isMaxCatalogPath(pathname: string): boolean {
 }
 export function isMaxProductPath(pathname: string): boolean {
   return pathname === MAX_PRODUCT_PATH;
+}
+
+export function isMaxPlaybackSessionPath(pathname: string): boolean {
+  return pathname === MAX_PLAYBACK_SESSION_PATH;
+}
+
+export function isMaxPlaybackAudioPath(pathname: string): boolean {
+  return pathname === MAX_PLAYBACK_AUDIO_PATH;
 }
 
 export function isMaxSitePath(pathname: string): boolean {
