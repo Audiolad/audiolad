@@ -11,6 +11,14 @@ DECLARE
   before_sale uuid := '88888888-8888-4888-8888-888888888888';
   expiry_sale uuid := '99999999-9999-4999-8999-999999999999';
   manual_event uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  delayed_invitee uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+  delayed_referral uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5';
+  delayed_sale uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6';
+  delayed_payment uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7';
+  delayed_user uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa0';
+  retry_payment uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+  retry_sale uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+  retry_refund uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa10';
   net bigint;
   count_before integer;
 BEGIN
@@ -82,6 +90,46 @@ BEGIN
   SELECT coalesce(sum(amount_minor), 0) INTO net
   FROM public.author_partner_reward_ledger_entries WHERE source_sale_ledger_entry_id = sale;
   IF net <> 0 THEN RAISE EXCEPTION 'expected full refund partner net 0, got %', net; END IF;
+
+  -- The economic timestamp, not processing time, decides eligibility.
+  INSERT INTO auth.users (id, email) VALUES (delayed_user, 'delayed@example.test');
+  INSERT INTO public.authors (id, name) VALUES (delayed_invitee, 'Delayed Invitee');
+  INSERT INTO public.author_referrals (
+    id, referrer_author_id, invitee_author_id, invitee_user_id, status, activated_at, expires_at
+  ) VALUES (
+    delayed_referral, partner, delayed_invitee, delayed_user, 'expired',
+    '2000-01-01T00:00:00Z', '2001-01-01T00:00:00Z'
+  );
+  INSERT INTO public.author_ledger_entries (
+    id, author_id, entry_type, amount_minor, currency, payment_id, effective_at, available_at
+  ) VALUES (
+    delayed_sale, delayed_invitee, 'sale_accrual', 101, 'RUB', delayed_payment,
+    '2000-06-01T00:00:00Z', '2000-06-15T00:00:00Z'
+  );
+  PERFORM public.process_due_author_partner_reward_obligations(50);
+  IF (SELECT amount_minor FROM public.author_partner_reward_ledger_entries
+      WHERE source_sale_ledger_entry_id = delayed_sale) <> 20 THEN
+    RAISE EXCEPTION 'delayed processing after expiry must use source effective_at';
+  END IF;
+
+  -- A refund queued before its sale is retryable. Once the sale arrives,
+  -- the same deterministic refund event converges without a duplicate.
+  INSERT INTO public.author_ledger_entries (
+    id, author_id, entry_type, amount_minor, currency, payment_id, effective_at
+  ) VALUES (retry_refund, invitee, 'refund_reversal', -10, 'RUB', retry_payment, now());
+  PERFORM public.process_due_author_partner_reward_obligations(50);
+  IF (SELECT status FROM public.author_partner_reward_obligations
+      WHERE source_event_ledger_entry_id = retry_refund) <> 'failed' THEN
+    RAISE EXCEPTION 'out-of-order refund must remain retryable';
+  END IF;
+  INSERT INTO public.author_ledger_entries (
+    id, author_id, entry_type, amount_minor, currency, payment_id, effective_at, available_at
+  ) VALUES (retry_sale, invitee, 'sale_accrual', 100, 'RUB', retry_payment, '2026-06-01T00:00:00Z', '2026-06-15T00:00:00Z');
+  PERFORM public.process_due_author_partner_reward_obligations(50);
+  IF (SELECT coalesce(sum(amount_minor), 0) FROM public.author_partner_reward_ledger_entries
+      WHERE source_sale_ledger_entry_id = retry_sale) <> 18 THEN
+    RAISE EXCEPTION 'out-of-order source events did not converge';
+  END IF;
 
   BEGIN
     UPDATE public.author_partner_reward_ledger_entries SET amount_minor = 1;
