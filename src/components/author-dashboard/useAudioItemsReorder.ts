@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
-import { mergeServerAudioItems } from "@/lib/author-products/form-merge";
+import { mergeAudioReorderPreservingLocalMedia } from "@/lib/author-products/form-merge";
 import type { AudioItemRow, AuthorProductDetail } from "@/lib/author-products/types";
 
 const REORDER_ERROR_MESSAGE = "Не удалось изменить порядок аудио.";
@@ -128,7 +128,10 @@ export function useAudioItemsReorder({
         }
 
         setAudioItems((current) =>
-          mergeServerAudioItems(current, payload.product!.audio_items),
+          mergeAudioReorderPreservingLocalMedia(
+            current,
+            payload.product!.audio_items,
+          ),
         );
         return true;
       } catch {
