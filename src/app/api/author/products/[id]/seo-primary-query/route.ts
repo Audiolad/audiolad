@@ -5,8 +5,8 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { assertPublishedProductSeoAttachEnabled } from "@/lib/seo-queries/published-product-seo-attach-gate";
 import {
-  assertPublishedSeoAttachBeta,
   attachPublishedProductSeoQuery,
   mapPublishedSeoAttachError,
   searchPublishedProductSeoQueries,
@@ -18,11 +18,17 @@ type RouteContext = {
 
 function betaOrLifecycleGate(practice: {
   author_id: string;
+  product_kind?: string | null;
+  publication_class?: string | null;
   status: string;
   deleted_at: string | null;
   primary_seo_query_id: string | null;
 }) {
-  assertPublishedSeoAttachBeta(practice.author_id);
+  assertPublishedProductSeoAttachEnabled({
+    authorId: practice.author_id,
+    productKind: practice.product_kind,
+    publicationClass: practice.publication_class,
+  });
   if (practice.deleted_at) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -100,7 +106,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
-/** Attach existing or create+attach query to a published Aurafon product. */
+/** Attach existing or create+attach query to a published Aurafon or music product. */
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;

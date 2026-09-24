@@ -3,7 +3,6 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { isEffectiveSeoReservation } from "@/lib/seo-queries/reservation-effective";
 
 export type PublishedSeoQuerySearchMatch = {
@@ -323,16 +322,4 @@ export async function attachPublishedProductSeoQuery(
     createdQuery: Boolean(payload.created_query),
     idempotent: Boolean(payload.idempotent),
   };
-}
-
-export function assertPublishedSeoAttachBeta(authorId: string): void {
-  if (!isAuthorSeoDiscoveryEnabled(authorId)) {
-    const error = new Error("seo_discovery_beta_disabled") as Error & {
-      code: string;
-      status: number;
-    };
-    error.code = "seo_discovery_beta_disabled";
-    error.status = 403;
-    throw error;
-  }
 }

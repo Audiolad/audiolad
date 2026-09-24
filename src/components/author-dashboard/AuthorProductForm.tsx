@@ -49,7 +49,7 @@ import {
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
 import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
-import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isPublishedProductSeoAttachEnabled } from "@/lib/seo-queries/published-product-seo-attach-gate";
 import {
   buildAuthorProductEditPath,
   buildWizardStepHref,
@@ -1252,10 +1252,15 @@ export default function AuthorProductForm({
     initialProduct?.practice.primary_seo_query_id ||
       seoReservationContext?.linked,
   );
+  const publishedSeoAttachEnabled = isPublishedProductSeoAttachEnabled({
+    authorId: form.authorId,
+    productKind: form.productKind,
+    publicationClass: form.publicationClass,
+  });
   const showPublishedSeoLinker =
     mode === "edit" &&
     publishedProductStatus &&
-    isAuthorSeoDiscoveryEnabled(form.authorId) &&
+    publishedSeoAttachEnabled &&
     !hasRelationalPrimarySeoQuery;
 
   const showWizardStep = (step: ProductWizardStep) =>
@@ -5142,7 +5147,7 @@ export default function AuthorProductForm({
         />
       ) : null}
       {hasRelationalPrimarySeoQuery &&
-      isAuthorSeoDiscoveryEnabled(form.authorId) &&
+      publishedSeoAttachEnabled &&
       publishedProductStatus ? (
         <div className="mb-4 rounded-[22px] border border-[#eadff8] bg-white p-4">
           <p className="text-sm font-semibold text-[#25135c]">
