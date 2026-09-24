@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+const source = readFileSync(join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"), "utf8");
+assert.match(source, /key=\{`\$\{product\.authorSlug\}\/\$\{product\.slug\}`\}/);
+assert.match(source, /<ul[\s\S]*<li[\s\S]*<button/);
+assert.match(source, /status: "loading"/);
+assert.match(source, /status: "not_found"/);
+assert.match(source, /status: "error"/);
+assert.match(source, /AbortController/);
+assert.match(source, /controller\.abort/);
+assert.match(source, /formatMaxDuration/);
+assert.match(source, /detail\.product\.coverUrl/);
+assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
+assert.equal(source.includes("setDetail({ status: \"idle\" }); setSelected(null)"), true);
+console.log("max-product-detail-unit: ok");

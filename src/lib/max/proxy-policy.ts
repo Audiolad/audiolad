@@ -1,5 +1,6 @@
 import {
   isMaxCatalogPath,
+  isMaxProductPath,
   isMaxHostname,
   isMaxSessionLinkPath,
   isMaxSessionVerifyPath,
@@ -27,7 +28,7 @@ export const MAX_PUBLIC_ASSET_PATHS = [
  * - MAX host exposes no catalog, studio, listen, or author-cabinet routes.
  * - `/sitemap.xml` is 404 on MAX (do not leak the apex catalog sitemap).
  * - `/robots.txt` still passes through so the host can emit a disallow-all file.
- * - Stages 3A–4B open only the exact MAX session and catalog endpoints on
+ * - Stages 3A–4C open only the exact MAX session, catalog, and product endpoints on
  *   the MAX host. Not `/api/*`, not `/api/max/*`, and not `/auth/*`.
  */
 export type MaxProxyAction =
@@ -58,7 +59,8 @@ export function resolveMaxProxyAction(
     isMaxHostname(hostname) &&
     (isMaxSessionVerifyPath(pathname) ||
       isMaxSessionLinkPath(pathname) ||
-      isMaxCatalogPath(pathname))
+      isMaxCatalogPath(pathname) ||
+      isMaxProductPath(pathname))
   ) {
     return { action: "pass_through" };
   }

@@ -10,12 +10,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   isMaxCatalogPath,
+  isMaxProductPath,
   isMaxHostname,
   isMaxSessionLinkPath,
   isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
+  MAX_PRODUCT_PATH,
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
   MAX_SITE_PATH,
@@ -82,6 +84,8 @@ assert.equal(isMaxSessionLinkPath("/api/foo"), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
 assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
 assert.equal(isMaxCatalogPath("/api/max"), false);
+assert.equal(isMaxProductPath(MAX_PRODUCT_PATH), true);
+assert.equal(isMaxProductPath(`${MAX_PRODUCT_PATH}/`), false);
 
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
@@ -91,9 +95,11 @@ assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/health/build", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/session", "not_found");

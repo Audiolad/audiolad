@@ -14,6 +14,7 @@ export const MAX_SESSION_LINK_PATH = "/api/max/session/link";
 
 /** HMAC-verify linked MAX identity, then return the read-only MAX catalog. */
 export const MAX_CATALOG_PATH = "/api/max/catalog";
+export const MAX_PRODUCT_PATH = "/api/max/product";
 
 export function isMaxHostname(hostname: string): boolean {
   return hostname === MAX_HOSTNAME;
@@ -29,6 +30,9 @@ export function isMaxSessionLinkPath(pathname: string): boolean {
 
 export function isMaxCatalogPath(pathname: string): boolean {
   return pathname === MAX_CATALOG_PATH;
+}
+export function isMaxProductPath(pathname: string): boolean {
+  return pathname === MAX_PRODUCT_PATH;
 }
 
 export function isMaxSitePath(pathname: string): boolean {

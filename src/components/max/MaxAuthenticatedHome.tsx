@@ -2,10 +2,11 @@
 
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import { readMaxInitData } from "@/lib/max/bridge";
-import { MAX_CATALOG_PATH } from "@/lib/max/host";
+import { MAX_CATALOG_PATH, MAX_PRODUCT_PATH } from "@/lib/max/host";
 import { useEffect, useState } from "react";
 
 type MaxCatalogProduct = {
+  authorSlug: string;
   slug: string;
   title: string;
   subtitle: string | null;
@@ -20,6 +21,20 @@ type MaxCatalogState =
   | { status: "loading" }
   | { status: "ready"; items: MaxCatalogProduct[] }
   | { status: "error" };
+type MaxProductDetailState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; product: { title: string; subtitle: string | null; description: string | null; authorName: string | null; formatLabel: string; coverUrl: string | null; priceLabel: string; statsLabel: string | null; contents: Array<{ title: string; position: number; durationSeconds: number | null }> } }
+  | { status: "not_found" }
+  | { status: "error" };
+
+export function formatMaxDuration(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const rest = String(safe % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+}
 
 function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -39,6 +54,7 @@ function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
     const product = item as Partial<MaxCatalogProduct>;
     if (
       typeof product.slug !== "string" ||
+      typeof product.authorSlug !== "string" ||
       typeof product.title !== "string" ||
       typeof product.formatLabel !== "string" ||
       typeof product.priceLabel !== "string" ||
@@ -49,6 +65,7 @@ function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
 
     return [
       {
+        authorSlug: product.authorSlug,
         slug: product.slug,
         title: product.title,
         subtitle: typeof product.subtitle === "string" ? product.subtitle : null,
@@ -67,6 +84,8 @@ export default function MaxAuthenticatedHome() {
   const [catalog, setCatalog] = useState<MaxCatalogState>(() =>
     readMaxInitData() ? { status: "loading" } : { status: "error" },
   );
+  const [selected, setSelected] = useState<MaxCatalogProduct | null>(null);
+  const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
 
   useEffect(() => {
     const initData = readMaxInitData();
@@ -100,6 +119,34 @@ export default function MaxAuthenticatedHome() {
 
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+    const initData = readMaxInitData();
+    if (!initData) return;
+    const controller = new AbortController();
+    void fetch(MAX_PRODUCT_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, authorSlug: selected.authorSlug, productSlug: selected.slug }),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => ({ status: response.status, payload: await response.json().catch(() => null) }))
+      .then(({ status, payload }) => {
+        if (controller.signal.aborted) return;
+        if (status === 404) return setDetail({ status: "not_found" });
+        const product = payload?.product;
+        if (product && Array.isArray(product.contents)) {
+          setDetail({ status: "ready", product });
+        } else setDetail({ status: "error" });
+      })
+      .catch(() => { if (!controller.signal.aborted) setDetail({ status: "error" }); });
+    return () => controller.abort();
+  }, [selected]);
 
   return (
     <section className="min-h-screen bg-[#faf8ff] px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] text-[#25135c]">
@@ -142,9 +189,10 @@ export default function MaxAuthenticatedHome() {
         {catalog.status === "ready" && catalog.items.length > 0 ? (
           <ul className="mt-5 grid gap-3">
             {catalog.items.map((product) => (
-              <li
-                key={product.slug}
-                className="flex min-h-28 gap-3 rounded-2xl border border-[#e8def5] bg-white p-3"
+              <li key={`${product.authorSlug}/${product.slug}`}><button
+                type="button"
+                onClick={() => { setDetail({ status: "loading" }); setSelected(product); }}
+                className="flex min-h-28 w-full gap-3 rounded-2xl border border-[#e8def5] bg-white p-3 text-left"
               >
                 <div className="h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-[#ede6f8]">
                   {product.coverUrl ? (
@@ -174,11 +222,23 @@ export default function MaxAuthenticatedHome() {
                     {product.priceLabel}
                   </p>
                 </div>
-              </li>
+              </button></li>
             ))}
           </ul>
         ) : null}
       </div>
+      {selected ? (
+        <div className="fixed inset-0 overflow-y-auto bg-[#faf8ff] p-4">
+          <button type="button" onClick={() => { setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
+            ← Назад в каталог
+          </button>
+          <h2 className="mt-5 text-2xl font-semibold">{detail.status === "ready" ? detail.product.title : selected.title}</h2>
+          {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
+          {detail.status === "not_found" ? <p className="mt-6 text-sm text-[#6c5d94]">Продукт недоступен.</p> : null}
+          {detail.status === "error" ? <p className="mt-6 text-sm text-[#6c5d94]">Не удалось загрузить продукт.</p> : null}
+          {detail.status === "ready" ? <>{detail.product.coverUrl ? <img src={detail.product.coverUrl} alt="" className="mt-4 h-48 w-full rounded-2xl object-cover" /> : null}<p className="mt-3 text-sm">{detail.product.formatLabel} · {detail.product.priceLabel}</p>{detail.product.subtitle ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p> : null}{detail.product.authorName ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.authorName}</p> : null}{detail.product.statsLabel ? <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p> : null}{detail.product.description ? <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p> : null}{detail.product.contents.length ? <ol className="mt-6 space-y-2 text-sm">{detail.product.contents.map((track) => <li key={`${track.position}-${track.title}`}>{track.position}. {track.title}{track.durationSeconds !== null ? ` · ${formatMaxDuration(track.durationSeconds)}` : ""}</li>)}</ol> : null}</> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
