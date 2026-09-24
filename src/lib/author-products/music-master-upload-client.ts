@@ -14,9 +14,51 @@ type StartPayload = {
   message?: string;
 };
 
+export type MusicMasterLifecycleState =
+  | "uploading"
+  | "verified"
+  | "rejected"
+  | "abandoned";
+
+export type MusicMasterTranscodeStatus =
+  | "queued"
+  | "processing"
+  | "ready"
+  | "failed";
+
 export type MusicMasterUploadResult =
-  | { ok: true; message: string }
+  | {
+      ok: true;
+      message: string;
+      assetId: string | null;
+      lifecycleState: MusicMasterLifecycleState | null;
+      transcodeStatus: MusicMasterTranscodeStatus | null;
+    }
   | { ok: false; error?: string; message?: string; status: number };
+
+function readLifecycleState(value: unknown): MusicMasterLifecycleState | null {
+  if (
+    value === "uploading" ||
+    value === "verified" ||
+    value === "rejected" ||
+    value === "abandoned"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function readTranscodeStatus(value: unknown): MusicMasterTranscodeStatus | null {
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "ready" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+  return null;
+}
 
 async function readJson<T>(response: Response): Promise<T | null> {
   const text = await response.text();
@@ -55,6 +97,7 @@ export async function uploadMusicMasterDirect(input: {
   practiceId: string;
   audioId: string;
   file: File;
+  signal?: AbortSignal;
 }): Promise<MusicMasterUploadResult> {
   const validation = validateMusicMasterFileClient(input.file);
   if (validation) {
@@ -75,6 +118,7 @@ export async function uploadMusicMasterDirect(input: {
         file_size: input.file.size,
         mime_type: input.file.type,
       }),
+      signal: input.signal,
     },
   );
   const started = await readJson<StartPayload>(start);
@@ -114,14 +158,27 @@ export async function uploadMusicMasterDirect(input: {
           upload_path: started.upload_path,
           file_size: input.file.size,
         }),
+        signal: input.signal,
       },
     );
-    const payload = await readJson<{ error?: string; message?: string }>(finalized);
+    const payload = await readJson<{
+      error?: string;
+      message?: string;
+      asset_id?: string;
+      lifecycle_state?: string;
+      transcode_status?: string;
+    }>(finalized);
     if (!finalized.ok) {
       await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
       return { ok: false, error: payload?.error, message: payload?.message, status: finalized.status };
     }
-    return { ok: true, message: "Файл загружен. Подготавливаем версию для прослушивания…" };
+    return {
+      ok: true,
+      message: "Файл загружен. Подготавливаем версию для прослушивания…",
+      assetId: payload?.asset_id ?? started.asset_id,
+      lifecycleState: readLifecycleState(payload?.lifecycle_state),
+      transcodeStatus: readTranscodeStatus(payload?.transcode_status),
+    };
   } catch {
     await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
     return { ok: false, status: 500 };

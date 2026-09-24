@@ -22,6 +22,7 @@ type AuthorProductFormActionsProps = {
   publicPath: string;
   publishPreviewPath: string;
   deleteLockedAfterPaidPurchase: boolean;
+  saveDisabled?: boolean;
   error: string | null;
   onSaveDraft: () => void;
   onUnpublish: () => void;
@@ -51,6 +52,7 @@ export default function AuthorProductFormActions({
   publicPath,
   publishPreviewPath,
   deleteLockedAfterPaidPurchase,
+  saveDisabled = false,
   error,
   onSaveDraft,
   onUnpublish,
@@ -65,7 +67,7 @@ export default function AuthorProductFormActions({
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <button
         type="button"
-        disabled={busy || !canEditPublicFields}
+        disabled={busy || saveDisabled || !canEditPublicFields}
         onClick={() => void onSaveDraft()}
         className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
       >

@@ -91,6 +91,7 @@ export async function uploadAuthorProductAudioDirect(input: {
   practiceId: string;
   audioId: string;
   file: File;
+  signal?: AbortSignal;
 }): Promise<AuthorProductAudioUploadResult> {
   const validationError = validateProductAudioFileClient(input.file);
   if (validationError) {
@@ -115,6 +116,7 @@ export async function uploadAuthorProductAudioDirect(input: {
         file_size: input.file.size,
         mime_type: input.file.type,
       }),
+      signal: input.signal,
     },
   );
   const started = await readJson<StartPayload>(startResponse);
@@ -171,6 +173,7 @@ export async function uploadAuthorProductAudioDirect(input: {
           file_name: input.file.name,
           file_size: input.file.size,
         }),
+        signal: input.signal,
       },
     );
     const finalized = await readJson<FinalizePayload>(finalizeResponse);

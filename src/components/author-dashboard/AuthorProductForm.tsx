@@ -173,11 +173,27 @@ import {
   validateStudioMusicPaidPriceInputDraft,
 } from "@/lib/author-products/price-input-draft";
 import {
+  applyMusicAudioItemDeletion,
   mergeServerAudioItems,
   mergeServerProductIntoForm,
+  patchAudioItemAfterMusicMasterFinalize,
+  patchAudioItemFromUpload,
   productDetailToFormSnapshot,
   resolveAudioItemIdAfterDraftCreate,
 } from "@/lib/author-products/form-merge";
+import {
+  dropMusicUpload,
+  emptyMusicQueue,
+  enqueueReadyMusicUploads,
+  finishMusicUpload,
+  musicQueueEntry,
+  musicQueueHasLocalFile,
+  musicQueueHasReady,
+  retargetMusicUpload,
+  retryMusicUpload,
+  stageMusicFile,
+  type MusicQueueSnapshot,
+} from "@/lib/author-products/music-track-upload-queue";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import {
@@ -892,6 +908,17 @@ export default function AuthorProductForm({
   const [publishing, setPublishing] = useState(false);
   const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
+  const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
+  const musicQueueRef = useRef(musicQueue);
+  const musicFilesRef = useRef(new Map<string, File>());
+  const musicAbortRef = useRef(new Map<string, AbortController>());
+  const musicLaunchRef = useRef<(audioId: string) => void>(() => undefined);
+  const audioItemsRef = useRef(audioItems);
+  audioItemsRef.current = audioItems;
+  const ensurePracticeInFlightRef = useRef<Promise<PracticeContext | null> | null>(
+    null,
+  );
+  musicQueueRef.current = musicQueue;
   const [savingSharedCover, setSavingSharedCover] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     title?: string;
@@ -986,6 +1013,22 @@ export default function AuthorProductForm({
   }, [audioItems, form.productKind, practiceId]);
 
   useEffect(() => {
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC ||
+      !musicQueueHasLocalFile(musicQueue)
+    ) {
+      return;
+    }
+
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [form.productKind, musicQueue]);
+
+  useEffect(() => {
     const audioId = pendingFocusAudioIdRef.current;
 
     if (!audioId) {
@@ -1023,6 +1066,7 @@ export default function AuthorProductForm({
     practiceId,
     audioItems,
     setAudioItems,
+    preserveLocalMedia: form.productKind === PRODUCT_KIND.MUSIC,
   });
 
   const loadAudioPreview = useCallback(
@@ -1582,6 +1626,15 @@ export default function AuthorProductForm({
   async function saveProduct(): Promise<boolean> {
     if (isSubmitted) {
       setError(PRODUCT_UNDER_MODERATION_MESSAGE);
+      return false;
+    }
+    if (
+      form.productKind === PRODUCT_KIND.MUSIC &&
+      musicQueueHasLocalFile(musicQueueRef.current)
+    ) {
+      setError(
+        "Сначала загрузите выбранные треки или уберите файлы, которые ещё не отправлены. Сохранение сейчас сотрёт их.",
+      );
       return false;
     }
 
@@ -2385,9 +2438,26 @@ export default function AuthorProductForm({
     }
 
     if (payload.product) {
-      setAudioItems((current) =>
-        mergeServerAudioItems(current, payload.product!.audio_items),
-      );
+      setAudioItems((current) => {
+        if (form.productKind === PRODUCT_KIND.MUSIC) {
+          const serverItem = payload.product!.audio_items.find(
+            (item) => item.id === audioId,
+          );
+          if (!serverItem) {
+            return current;
+          }
+          return current.map((item) =>
+            item.id === audioId
+              ? {
+                  ...item,
+                  title: item.title.trim() ? item.title : serverItem.title,
+                  description: item.description ?? serverItem.description,
+                }
+              : item,
+          );
+        }
+        return mergeServerAudioItems(current, payload.product!.audio_items);
+      });
       setAudioFieldErrors((current) => {
         const next = { ...current };
         delete next[audioId];
@@ -2506,6 +2576,255 @@ export default function AuthorProductForm({
     }
   }
 
+  function commitMusicQueue(next: MusicQueueSnapshot) {
+    musicQueueRef.current = next;
+    setMusicQueue(next);
+  }
+
+  function launchMusicQueueIds(audioIds: string[]) {
+    for (const audioId of audioIds) {
+      musicLaunchRef.current(audioId);
+    }
+  }
+
+  function forgetMusicTrack(audioId: string) {
+    musicAbortRef.current.get(audioId)?.abort();
+    musicAbortRef.current.delete(audioId);
+    musicFilesRef.current.delete(audioId);
+    const step = dropMusicUpload(musicQueueRef.current, audioId);
+    commitMusicQueue(step.snapshot);
+    launchMusicQueueIds(step.launchIds);
+  }
+
+  async function ensurePracticeIdShared() {
+    if (practiceIdRef.current) {
+      return ensurePracticeId(audioItemsRef.current);
+    }
+    if (!ensurePracticeInFlightRef.current) {
+      ensurePracticeInFlightRef.current = ensurePracticeId(
+        audioItemsRef.current,
+      ).finally(() => {
+        ensurePracticeInFlightRef.current = null;
+      });
+    }
+    return ensurePracticeInFlightRef.current;
+  }
+
+  async function launchMusicUpload(requestedAudioId: string) {
+    const started = musicQueueEntry(musicQueueRef.current, requestedAudioId);
+    if (!started || started.phase !== "uploading") {
+      return;
+    }
+    const generation = started.generation;
+    const kind = started.kind;
+    let audioId = requestedAudioId;
+    const controller = new AbortController();
+    musicAbortRef.current.set(audioId, controller);
+
+    const failUpload = (message: string) => {
+      setAudioUploadErrors((current) => ({ ...current, [audioId]: message }));
+      const step = finishMusicUpload(
+        musicQueueRef.current,
+        audioId,
+        generation,
+        message,
+      );
+      if (step.ignored) {
+        return;
+      }
+      commitMusicQueue(step.snapshot);
+      launchMusicQueueIds(step.launchIds);
+    };
+
+    try {
+      const file = musicFilesRef.current.get(audioId);
+      if (!file) {
+        failUpload("Не удалось загрузить аудио.");
+        return;
+      }
+      const ensured = await ensurePracticeIdShared();
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (!ensured) {
+        failUpload(
+          kind === "master"
+            ? "Не удалось загрузить WAV-мастер."
+            : "Не удалось загрузить аудио.",
+        );
+        return;
+      }
+      const targetAudioId = resolveAudioItemIdAfterDraftCreate(
+        audioId,
+        audioItemsRef.current,
+        ensured.audioItems,
+      );
+      if (targetAudioId !== audioId) {
+        musicFilesRef.current.set(targetAudioId, file);
+        musicFilesRef.current.delete(audioId);
+        musicAbortRef.current.delete(audioId);
+        musicAbortRef.current.set(targetAudioId, controller);
+        commitMusicQueue(
+          retargetMusicUpload(musicQueueRef.current, audioId, targetAudioId),
+        );
+        audioId = targetAudioId;
+      }
+      const currentEntry = musicQueueEntry(musicQueueRef.current, audioId);
+      if (!currentEntry || currentEntry.generation !== generation) {
+        return;
+      }
+      const slotNumber =
+        audioItemsRef.current.findIndex((item) => item.id === audioId) + 1;
+      const currentTitle =
+        audioItemsRef.current.find((item) => item.id === audioId)?.title ?? "";
+      const result =
+        kind === "master"
+          ? await uploadMusicMasterDirect({
+              practiceId: ensured.practiceId,
+              audioId,
+              file,
+              signal: controller.signal,
+            })
+          : await uploadAuthorProductAudioDirect({
+              practiceId: ensured.practiceId,
+              audioId,
+              file,
+              signal: controller.signal,
+            });
+      const after = musicQueueEntry(musicQueueRef.current, audioId);
+      if (!after || after.generation !== generation || controller.signal.aborted) {
+        return;
+      }
+      if (!result.ok) {
+        failUpload(
+          getAudioUploadErrorMessage(result.error, result.status, result.message),
+        );
+        return;
+      }
+      if ("product" in result) {
+        const serverItem = result.product.audio_items.find(
+          (item) => item.id === audioId,
+        );
+        if (serverItem) {
+          setAudioItems((current) =>
+            patchAudioItemFromUpload(current, audioId, serverItem),
+          );
+        }
+        setForm((current) => mergeServerProductIntoForm(current, result.product));
+        setContentLockedAfterSale(result.product.contentLockedAfterSale === true);
+        setDeleteLockedAfterPaidPurchase(
+          result.product.deleteLockedAfterPaidPurchase === true,
+        );
+        setMessage("Аудио загружено.");
+      } else if (result.assetId) {
+        setAudioItems((current) =>
+          patchAudioItemAfterMusicMasterFinalize(current, audioId, {
+            assetId: result.assetId!,
+            lifecycleState: result.lifecycleState,
+            transcodeStatus: result.transcodeStatus,
+          }),
+        );
+        setMessage(result.message);
+      } else {
+        setMessage(result.message);
+      }
+      musicFilesRef.current.delete(audioId);
+      setAudioUploadErrors((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      const step = finishMusicUpload(musicQueueRef.current, audioId, generation);
+      if (!step.ignored) {
+        commitMusicQueue(step.snapshot);
+        launchMusicQueueIds(step.launchIds);
+        void autofillAudioTitleFromFile(audioId, file, currentTitle, slotNumber);
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        failUpload(
+          kind === "master"
+            ? "Не удалось загрузить WAV-мастер."
+            : "Не удалось загрузить аудио.",
+        );
+      }
+    } finally {
+      if (musicAbortRef.current.get(audioId) === controller) {
+        musicAbortRef.current.delete(audioId);
+      }
+    }
+  }
+
+  musicLaunchRef.current = (audioId: string) => {
+    void launchMusicUpload(audioId);
+  };
+
+  function stageMusicTrackFile(audioId: string, file: File) {
+    const mode = resolveMusicUploadMode(file);
+    if (!mode) {
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: MUSIC_DELIVERY_UNSUPPORTED_TEXT,
+      }));
+      return;
+    }
+    const validationError =
+      mode === "master"
+        ? validateMusicMasterFileClient(file)
+        : validateOrdinaryProductAudioFileClient(file);
+    if (validationError) {
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: validationError,
+      }));
+      return;
+    }
+    musicAbortRef.current.get(audioId)?.abort();
+    musicAbortRef.current.delete(audioId);
+    musicFilesRef.current.set(audioId, file);
+    const step = stageMusicFile(
+      musicQueueRef.current,
+      audioId,
+      mode,
+      file.name,
+    );
+    commitMusicQueue(step.snapshot);
+    launchMusicQueueIds(step.launchIds);
+    setAudioUploadErrors((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
+  }
+
+  function uploadAllMusicTracks() {
+    const step = enqueueReadyMusicUploads(
+      musicQueueRef.current,
+      audioItemsRef.current.map((item) => item.id),
+    );
+    commitMusicQueue(step.snapshot);
+    launchMusicQueueIds(step.launchIds);
+  }
+
+  function retryMusicTrack(audioId: string) {
+    setAudioUploadErrors((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
+    const step = retryMusicUpload(musicQueueRef.current, audioId);
+    commitMusicQueue(step.snapshot);
+    launchMusicQueueIds(step.launchIds);
+  }
+
+  function applyMusicProductLevel(product: AuthorProductDetail) {
+    setForm((current) => mergeServerProductIntoForm(current, product));
+    setContentLockedAfterSale(product.contentLockedAfterSale === true);
+    setDeleteLockedAfterPaidPurchase(
+      product.deleteLockedAfterPaidPurchase === true,
+    );
+  }
+
   async function deleteAudioItem(audioId: string, hasFile: boolean) {
     const target = audioItems.find((item) => item.id === audioId);
     if (
@@ -2527,6 +2846,10 @@ export default function AuthorProductForm({
       !window.confirm("Удалить это аудио вместе с загруженным файлом?")
     ) {
       return;
+    }
+
+    if (form.productKind === PRODUCT_KIND.MUSIC) {
+      forgetMusicTrack(audioId);
     }
 
     if (!practiceId || audioId.startsWith("temp-")) {
@@ -2553,7 +2876,16 @@ export default function AuthorProductForm({
       return;
     }
 
-    if (payload.product) {
+    if (payload.product && form.productKind === PRODUCT_KIND.MUSIC) {
+      applyMusicProductLevel(payload.product);
+      setAudioItems((current) =>
+        applyMusicAudioItemDeletion(
+          current,
+          audioId,
+          payload.product!.audio_items,
+        ),
+      );
+    } else if (payload.product) {
       applyServerProductPreservingDraft(payload.product);
     }
   }
@@ -2688,6 +3020,10 @@ export default function AuthorProductForm({
       return;
     }
 
+    if (form.productKind === PRODUCT_KIND.MUSIC) {
+      forgetMusicTrack(audioId);
+    }
+
     setDeletingAudioFileId(audioId);
     setAudioUploadErrors((current) => {
       const next = { ...current };
@@ -2760,7 +3096,19 @@ export default function AuthorProductForm({
         return;
       }
 
-      applyServerProductPreservingDraft(payload.product);
+      if (form.productKind === PRODUCT_KIND.MUSIC) {
+        applyMusicProductLevel(payload.product);
+        const serverItem = payload.product.audio_items.find(
+          (item) => item.id === targetAudioId,
+        );
+        if (serverItem) {
+          setAudioItems((current) =>
+            patchAudioItemFromUpload(current, targetAudioId, serverItem),
+          );
+        }
+      } else {
+        applyServerProductPreservingDraft(payload.product);
+      }
       setAudioPreviewUrls((current) => {
         const next = { ...current };
         delete next[targetAudioId];
@@ -4557,12 +4905,20 @@ export default function AuthorProductForm({
                 <div className="text-sm text-[#5f5484]">
                   <p className="font-medium text-[#3f3560]">
                     {form.productKind === PRODUCT_KIND.MUSIC
-                      ? musicCabinetStatus({
-                          hasLegacyAudioPath: Boolean(audioItem.audio_path),
-                          hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
-                          lifecycleState: audioItem.music_master?.lifecycleState,
-                          transcodeStatus: audioItem.music_master?.transcodeStatus,
-                        }).text
+                      ? (musicQueueEntry(musicQueue, audioItem.id)?.phase === "ready"
+                          ? "Файл выбран"
+                          : musicQueueEntry(musicQueue, audioItem.id)?.phase === "queued"
+                            ? "В очереди"
+                            : musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                              ? "Загрузка…"
+                              : musicQueueEntry(musicQueue, audioItem.id)?.phase === "error"
+                                ? "Ошибка"
+                                : musicCabinetStatus({
+                                    hasLegacyAudioPath: Boolean(audioItem.audio_path),
+                                    hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
+                                    lifecycleState: audioItem.music_master?.lifecycleState,
+                                    transcodeStatus: audioItem.music_master?.transcodeStatus,
+                                  }).text)
                       : isAudioPrepareInFlight(audioItem.audio_prepare_status)
                         ? AUDIO_PREPARE_PROCESSING_STATUS
                         : audioItem.audio_prepare_status === "failed"
@@ -4573,6 +4929,13 @@ export default function AuthorProductForm({
                   </p>
                   {isAudioPrepareInFlight(audioItem.audio_prepare_status) ? (
                     <p className="mt-2">{AUDIO_PREPARE_PROCESSING_HINT}</p>
+                  ) : null}
+                  {form.productKind === PRODUCT_KIND.MUSIC &&
+                  musicQueueEntry(musicQueue, audioItem.id)?.fileName &&
+                  musicQueueEntry(musicQueue, audioItem.id)?.phase !== "uploading" ? (
+                    <p className="mt-2">
+                      {musicQueueEntry(musicQueue, audioItem.id)?.fileName}
+                    </p>
                   ) : null}
                   {audioItem.audio_path ? (
                     <div className="mt-2 space-y-1">
@@ -4622,12 +4985,14 @@ export default function AuthorProductForm({
                     <label
                       className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
                         uploadingAudioId === audioItem.id ||
-                        deletingAudioFileId === audioItem.id
+                        deletingAudioFileId === audioItem.id ||
+                        musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
                           ? "cursor-not-allowed opacity-60"
                           : "cursor-pointer"
                       }`}
                     >
-                      {uploadingAudioId === audioItem.id
+                      {uploadingAudioId === audioItem.id ||
+                      musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
                         ? "Загрузка…"
                         : form.productKind === PRODUCT_KIND.MUSIC
                           ? audioItem.audio_path || audioItem.music_master
@@ -4646,22 +5011,15 @@ export default function AuthorProductForm({
                         className="hidden"
                         disabled={
                           uploadingAudioId === audioItem.id ||
-                          deletingAudioFileId === audioItem.id
+                          deletingAudioFileId === audioItem.id ||
+                          musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
                         }
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           event.target.value = "";
                           if (!file) return;
                           if (form.productKind === PRODUCT_KIND.MUSIC) {
-                            const mode = resolveMusicUploadMode(file);
-                            if (!mode) {
-                              setAudioUploadErrors((current) => ({
-                                ...current,
-                                [audioItem.id]: MUSIC_DELIVERY_UNSUPPORTED_TEXT,
-                              }));
-                              return;
-                            }
-                            void uploadAudio(audioItem.id, file, mode);
+                            stageMusicTrackFile(audioItem.id, file);
                             return;
                           }
                           void uploadAudio(audioItem.id, file, "legacy");
@@ -4712,6 +5070,17 @@ export default function AuthorProductForm({
                   ) : null}
                 </div>
 
+                {form.productKind === PRODUCT_KIND.MUSIC &&
+                musicQueueEntry(musicQueue, audioItem.id)?.phase === "error" ? (
+                  <button
+                    type="button"
+                    onClick={() => retryMusicTrack(audioItem.id)}
+                    className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d]"
+                  >
+                    Повторить
+                  </button>
+                ) : null}
+
                 {audioUploadErrors[audioItem.id] ? (
                   <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
                     {audioUploadErrors[audioItem.id]}
@@ -4720,6 +5089,22 @@ export default function AuthorProductForm({
               </div>
             </article>
           ))}
+
+          {form.productKind === PRODUCT_KIND.MUSIC && musicQueueHasReady(musicQueue) ? (
+            <button
+              type="button"
+              onClick={uploadAllMusicTracks}
+              className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Загрузить все треки
+            </button>
+          ) : null}
+          {form.productKind === PRODUCT_KIND.MUSIC &&
+          musicQueueHasLocalFile(musicQueue) ? (
+            <p className="text-sm text-[#7d70a2]">
+              Выбранные файлы ещё не сохранены на сервере. Не уходите со страницы и не сохраняйте черновик, пока загрузка не закончится.
+            </p>
+          ) : null}
 
           {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
           <button
@@ -4836,7 +5221,7 @@ export default function AuthorProductForm({
           showBack={wizardStep > 1}
           showContinue
           busy={busy}
-          canSave={canEditPublicFields}
+          canSave={canEditPublicFields && !musicQueueHasLocalFile(musicQueue)}
           onBack={goWizardBack}
           onSave={() => void saveWizardStep()}
           onSaveAndContinue={() => void saveWizardStepAndContinue()}
@@ -4871,6 +5256,7 @@ export default function AuthorProductForm({
         publicPath={publicPath}
         publishPreviewPath={publishPreviewPath}
         deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
+        saveDisabled={musicQueueHasLocalFile(musicQueue)}
         error={error}
         onSaveDraft={() => void saveDraft()}
         onUnpublish={() => void unpublishProduct()}
@@ -4903,6 +5289,7 @@ export default function AuthorProductForm({
           publicPath={publicPath}
           publishPreviewPath={publishPreviewPath}
           deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
+          saveDisabled={musicQueueHasLocalFile(musicQueue)}
           error={error}
           onSaveDraft={() => void saveDraft()}
           onUnpublish={() => void unpublishProduct()}
