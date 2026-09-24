@@ -179,6 +179,7 @@ function testStateMachineCopy() {
   assert.equal(maxNativeView.showLoginForm, false);
   assert.equal(maxNativeView.showSignupForm, false);
   assert.equal(maxNativeView.showSignupCta, false);
+  assert.equal(maxNativeView.showSignOut, false);
   assert.equal(maxNativeView.reloginNotice, null);
   const signupFromLinked = reduceMaxShell(linkedNoWebSession, {
     type: "OPEN_SIGNUP",
@@ -199,6 +200,7 @@ function testStateMachineCopy() {
   assert.equal(linkedView.showLoginCta, false);
   assert.equal(linkedView.showSignupCta, false);
   assert.equal(linkedView.showSignupForm, false);
+  assert.equal(linkedView.showSignOut, false);
 
   const afterLoginLink = reduceAll(
     [

@@ -376,7 +376,9 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
           state.formMode === "signup"
             ? MAX_SHELL_SIGNUP_CREATED_LINKED
             : MAX_SHELL_LINKED_STATUS,
-        showSignOut: true,
+        // MAX-native auth persists until a future explicit unlink flow.
+        // A Supabase web-session sign-out is not a MAX Mini App logout.
+        showSignOut: false,
       };
     case "expired":
       return {
