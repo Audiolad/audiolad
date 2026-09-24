@@ -5,7 +5,10 @@ import {
   isAllowedMaxSessionOrigin,
   MAX_SESSION_BODY_MAX_BYTES,
 } from "@/lib/max/session-http";
-import { resolveMaxSessionBinding } from "@/lib/max/session-binding";
+import {
+  resolveMaxNativeUser,
+  resolveMaxSessionBinding,
+} from "@/lib/max/session-binding";
 import {
   MAX_EXTERNAL_IDENTITY_PROVIDER,
   touchExternalIdentity,
@@ -14,6 +17,7 @@ import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
 export { setResolveMaxSessionBindingForTests } from "@/lib/max/session-binding";
+export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setTouchExternalIdentityForTests } from "@/lib/max/touch-external-identity";
 
 export const dynamic = "force-dynamic";
@@ -139,14 +143,24 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       linked: false,
-      sessionMatches: false,
+      maxAuthenticated: false,
+      webSessionMatches: false,
     });
+  }
+
+  const nativeUser = await resolveMaxNativeUser(
+    MAX_EXTERNAL_IDENTITY_PROVIDER,
+    result.data.user.id,
+  );
+  if (!nativeUser.ok || !nativeUser.userId) {
+    return errorResponse("storage_unavailable", 503);
   }
 
   const binding = await resolveMaxSessionBinding(
     request,
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     result.data.user.id,
+    { linkedUserId: nativeUser.userId },
   );
   if (!binding.ok) {
     return errorResponse("storage_unavailable", 503);
@@ -155,6 +169,7 @@ export async function POST(request: Request) {
   return Response.json({
     ok: true,
     linked: true,
-    sessionMatches: binding.sessionMatches,
+    maxAuthenticated: true,
+    webSessionMatches: binding.sessionMatches,
   });
 }

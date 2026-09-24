@@ -247,7 +247,8 @@ assert.doesNotMatch(
   /MAX_SESSION_LINK_PATH|session\/link/,
   "verify must not auto-link",
 );
-assert.match(verifyFn, /sessionMatches/);
+assert.match(verifyFn, /maxAuthenticated/);
+assert.match(verifyFn, /webSessionMatches/);
 assert.doesNotMatch(
   verifyFn,
   /getUser\(/,

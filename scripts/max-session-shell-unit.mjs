@@ -21,7 +21,6 @@ import {
   MAX_APEX_PRIVACY_HREF,
   MAX_SHELL_EXPIRED,
   MAX_SHELL_IDENTITY_ALREADY_LINKED,
-  MAX_SHELL_LINKED_NO_SESSION,
   MAX_SHELL_LINKED_STATUS,
   MAX_SHELL_LOGIN_CTA,
   MAX_SHELL_PENDING_CONFIRMATION,
@@ -140,7 +139,8 @@ function testStateMachineCopy() {
   const guestUnlinked = reduceMaxShell(verifying, {
     type: "VERIFY_SUCCESS",
     linked: false,
-    hasSession: true,
+    maxAuthenticated: false,
+    webSessionMatches: true,
   });
   const guestView = viewMaxShell(guestUnlinked);
   assert.equal(guestUnlinked.phase, "guest_unlinked");
@@ -155,7 +155,8 @@ function testStateMachineCopy() {
   const leftoverSessionDoesNotSkipCta = reduceMaxShell(verifying, {
     type: "VERIFY_SUCCESS",
     linked: false,
-    hasSession: true,
+    maxAuthenticated: false,
+    webSessionMatches: true,
   });
   assert.equal(leftoverSessionDoesNotSkipCta.phase, "guest_unlinked");
 
@@ -167,29 +168,29 @@ function testStateMachineCopy() {
   assert.equal(loginView.showSwitchToSignup, true);
   assert.equal(loginView.reloginNotice, null);
 
-  const linkedNoSession = reduceMaxShell(verifying, {
+  const linkedNoWebSession = reduceMaxShell(verifying, {
     type: "VERIFY_SUCCESS",
     linked: true,
-    hasSession: false,
+    maxAuthenticated: true,
+    webSessionMatches: false,
   });
-  const reloginView = viewMaxShell(linkedNoSession);
-  assert.equal(linkedNoSession.phase, "linked_no_session");
-  assert.equal(reloginView.showLoginForm, true);
-  assert.equal(reloginView.showSignupForm, false);
-  assert.equal(reloginView.showSignupCta, false);
-  assert.equal(reloginView.showSwitchToSignup, false);
-  assert.equal(reloginView.reloginNotice, MAX_SHELL_LINKED_NO_SESSION);
-  assert.doesNotMatch(reloginView.reloginNotice, /новым|новой связ|нового аккаунт/i);
-  const signupFromLinked = reduceMaxShell(linkedNoSession, {
+  const maxNativeView = viewMaxShell(linkedNoWebSession);
+  assert.equal(linkedNoWebSession.phase, "linked_authenticated");
+  assert.equal(maxNativeView.showLoginForm, false);
+  assert.equal(maxNativeView.showSignupForm, false);
+  assert.equal(maxNativeView.showSignupCta, false);
+  assert.equal(maxNativeView.reloginNotice, null);
+  const signupFromLinked = reduceMaxShell(linkedNoWebSession, {
     type: "OPEN_SIGNUP",
   });
-  assert.equal(signupFromLinked.phase, "linked_no_session");
+  assert.equal(signupFromLinked.phase, "linked_authenticated");
   assert.equal(viewMaxShell(signupFromLinked).showSignupForm, false);
 
   const linkedAuth = reduceMaxShell(verifying, {
     type: "VERIFY_SUCCESS",
     linked: true,
-    hasSession: true,
+    maxAuthenticated: true,
+    webSessionMatches: true,
   });
   const linkedView = viewMaxShell(linkedAuth);
   assert.equal(linkedAuth.phase, "linked_authenticated");
@@ -202,7 +203,12 @@ function testStateMachineCopy() {
   const afterLoginLink = reduceAll(
     [
       { type: "VERIFY_START" },
-      { type: "VERIFY_SUCCESS", linked: false, hasSession: false },
+      {
+        type: "VERIFY_SUCCESS",
+        linked: false,
+        maxAuthenticated: false,
+        webSessionMatches: false,
+      },
       { type: "OPEN_LOGIN" },
       { type: "LOGIN_START" },
       { type: "LINK_START" },
@@ -281,14 +287,20 @@ async function testVerifyLinkedFalseShowsCtaNotLink() {
   const { deps, calls } = createDeps({
     user: { id: "old-session-user" },
     fetchImpl: async () =>
-      jsonResponse(200, { ok: true, linked: false, sessionMatches: false }),
+      jsonResponse(200, {
+        ok: true,
+        linked: false,
+        maxAuthenticated: false,
+        webSessionMatches: false,
+      }),
   });
 
   const event = await verifyMaxSession(deps);
   assert.deepEqual(event, {
     type: "VERIFY_SUCCESS",
     linked: false,
-    hasSession: false,
+    maxAuthenticated: false,
+    webSessionMatches: false,
   });
   const state = reduceMaxShell(
     reduceMaxShell(INITIAL_MAX_SHELL_STATE, { type: "VERIFY_START" }),
@@ -307,6 +319,36 @@ async function testVerifyLinkedFalseShowsCtaNotLink() {
     false,
     "leftover session must not be read or auto-linked when verify linked=false",
   );
+  assert.equal("user_id" in calls[0].body, false);
+  assert.equal("max_user_id" in calls[0].body, false);
+  assert.equal("maxAuthenticated" in calls[0].body, false);
+  assert.equal("webSessionMatches" in calls[0].body, false);
+}
+
+async function testClientCannotDeclareMaxAuthentication() {
+  const { deps, calls } = createDeps({
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        ok: true,
+        linked: true,
+        maxAuthenticated: false,
+        webSessionMatches: true,
+      }),
+  });
+
+  const event = await verifyMaxSession(deps);
+  assert.deepEqual(event, {
+    type: "VERIFY_SUCCESS",
+    linked: true,
+    maxAuthenticated: false,
+    webSessionMatches: false,
+  });
+  assert.equal(
+    reduceMaxShell(INITIAL_MAX_SHELL_STATE, event).phase,
+    "guest_unlinked",
+  );
+  assert.equal("maxAuthenticated" in calls[0].body, false);
+  assert.equal("webSessionMatches" in calls[0].body, false);
 }
 
 async function testLinkedTrueWithSessionHidesForm() {
@@ -316,14 +358,16 @@ async function testLinkedTrueWithSessionHidesForm() {
       jsonResponse(200, {
         ok: true,
         linked: true,
-        sessionMatches: true,
+        maxAuthenticated: true,
+        webSessionMatches: true,
       }),
   });
   const event = await verifyMaxSession(deps);
   assert.deepEqual(event, {
     type: "VERIFY_SUCCESS",
     linked: true,
-    hasSession: true,
+    maxAuthenticated: true,
+    webSessionMatches: true,
   });
   const view = viewMaxShell(
     reduceMaxShell(INITIAL_MAX_SHELL_STATE, event),
@@ -334,61 +378,63 @@ async function testLinkedTrueWithSessionHidesForm() {
   assert.equal(
     calls.some((call) => call.type === "getUser"),
     false,
-    "verify must trust server sessionMatches and not read the local session",
+    "verify must trust server MAX-native authentication and not read the local session",
   );
 }
 
-async function testLinkedTrueWithoutSessionShowsRelogin() {
+async function testLinkedTrueWithoutSessionIsMaxNativeAuthenticated() {
   const { deps, calls } = createDeps({
     user: null,
     fetchImpl: async () =>
       jsonResponse(200, {
         ok: true,
         linked: true,
-        sessionMatches: false,
+        maxAuthenticated: true,
+        webSessionMatches: false,
       }),
   });
   const event = await verifyMaxSession(deps);
   assert.deepEqual(event, {
     type: "VERIFY_SUCCESS",
     linked: true,
-    hasSession: false,
+    maxAuthenticated: true,
+    webSessionMatches: false,
   });
   const view = viewMaxShell(reduceMaxShell(INITIAL_MAX_SHELL_STATE, event));
-  assert.equal(view.phase, "linked_no_session");
-  assert.equal(view.reloginNotice, MAX_SHELL_LINKED_NO_SESSION);
+  assert.equal(view.phase, "linked_authenticated");
+  assert.equal(view.reloginNotice, null);
   assert.equal(view.showSignupCta, false);
   assert.equal(view.showSignupForm, false);
-  assert.equal(view.showSwitchToSignup, false);
-  assert.equal(view.showLoginForm, true);
+  assert.equal(view.showLoginForm, false);
   assert.equal(calls.some((call) => call.type === "getUser"), false);
 }
 
-async function testWrongSessionStaysOnRelogin() {
+async function testWrongSessionStaysMaxNativeAuthenticated() {
   const { deps, calls } = createDeps({
     user: { id: "user-b" },
     fetchImpl: async () =>
       jsonResponse(200, {
         ok: true,
         linked: true,
-        sessionMatches: false,
+        maxAuthenticated: true,
+        webSessionMatches: false,
       }),
   });
   const event = await verifyMaxSession(deps);
   assert.deepEqual(event, {
     type: "VERIFY_SUCCESS",
     linked: true,
-    hasSession: false,
+    maxAuthenticated: true,
+    webSessionMatches: false,
   });
   const view = viewMaxShell(reduceMaxShell(INITIAL_MAX_SHELL_STATE, event));
-  assert.equal(view.phase, "linked_no_session");
-  assert.equal(view.showLoginForm, true);
-  assert.equal(view.reloginNotice, MAX_SHELL_LINKED_NO_SESSION);
-  assert.notEqual(view.phase, "linked_authenticated");
+  assert.equal(view.phase, "linked_authenticated");
+  assert.equal(view.showLoginForm, false);
+  assert.equal(view.reloginNotice, null);
   assert.equal(
     calls.some((call) => call.type === "getUser"),
     false,
-    "a leftover AudioLad session must not decide MAX binding",
+    "a leftover AudioLad session must not decide MAX-native identity",
   );
   assert.equal(
     calls.some((call) => call.url === MAX_SESSION_LINK_PATH),
@@ -604,7 +650,8 @@ function testSourceGuards() {
     verifyFn.indexOf("export async function verifyMaxSession"),
     verifyFn.indexOf("export async function loginAndLinkMaxSession"),
   );
-  assert.match(verifyBody, /sessionMatches/);
+  assert.match(verifyBody, /maxAuthenticated/);
+  assert.match(verifyBody, /webSessionMatches/);
   assert.doesNotMatch(verifyBody, /getUser\(/);
 
   const maxClientSource = readFileSync(
@@ -625,12 +672,23 @@ function testSourceGuards() {
   assert.match(sessionClientSource, /createMaxSupabaseClient/);
   assert.match(sessionClientSource, /Authorization:\s*`Bearer \$\{accessToken\}`/);
   assert.doesNotMatch(sessionClientSource, /refresh_token|localStorage|console\.(log|info|debug|warn|error)/);
+
+  const shellSource = readFileSync(
+    join(repoRoot, "src/lib/max/session-shell.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(shellSource, /Этот MAX уже связан с АудиоЛадом/);
 }
 
 function signupReadyState() {
   return reduceAll([
     { type: "VERIFY_START" },
-    { type: "VERIFY_SUCCESS", linked: false, hasSession: false },
+    {
+      type: "VERIFY_SUCCESS",
+      linked: false,
+      maxAuthenticated: false,
+      webSessionMatches: false,
+    },
     { type: "OPEN_SIGNUP" },
   ]);
 }
@@ -638,7 +696,12 @@ function signupReadyState() {
 function testSignupStateMachine() {
   const guest = reduceAll([
     { type: "VERIFY_START" },
-    { type: "VERIFY_SUCCESS", linked: false, hasSession: false },
+    {
+      type: "VERIFY_SUCCESS",
+      linked: false,
+      maxAuthenticated: false,
+      webSessionMatches: false,
+    },
   ]);
   assert.equal(viewMaxShell(guest).showLoginCta, true);
   assert.equal(viewMaxShell(guest).showSignupCta, true);
@@ -753,7 +816,12 @@ async function testSignupCaseALinksWithInitData() {
   const state = reduceAll(
     [
       { type: "VERIFY_START" },
-      { type: "VERIFY_SUCCESS", linked: false, hasSession: false },
+      {
+        type: "VERIFY_SUCCESS",
+        linked: false,
+        maxAuthenticated: false,
+        webSessionMatches: false,
+      },
       { type: "OPEN_SIGNUP" },
       { type: "SIGNUP_START" },
       { type: "LINK_START" },
@@ -1001,9 +1069,10 @@ testStateMachineCopy();
 testSignupStateMachine();
 await testNoInitDataSkipsFlow();
 await testVerifyLinkedFalseShowsCtaNotLink();
+await testClientCannotDeclareMaxAuthentication();
 await testLinkedTrueWithSessionHidesForm();
-await testLinkedTrueWithoutSessionShowsRelogin();
-await testWrongSessionStaysOnRelogin();
+await testLinkedTrueWithoutSessionIsMaxNativeAuthenticated();
+await testWrongSessionStaysMaxNativeAuthenticated();
 await testValidPasswordCallsLinkWithBearerAuth();
 await testBadPasswordDoesNotCallLink();
 await testMissingAccessTokenDoesNotCallLink();

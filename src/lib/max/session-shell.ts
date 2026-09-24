@@ -12,8 +12,6 @@ export const MAX_SHELL_PENDING_CONFIRMATION =
 export const MAX_SHELL_SWITCH_TO_LOGIN = "Уже есть аккаунт? Войти";
 export const MAX_SHELL_LINKED_STATUS = "Аккаунт АудиоЛада подключён";
 export const MAX_SHELL_SIGNED_IN_STATUS = "Вы вошли в АудиоЛад";
-export const MAX_SHELL_LINKED_NO_SESSION =
-  "Этот MAX уже связан с АудиоЛадом. Войдите в свой аккаунт для доступа к личным материалам.";
 export const MAX_SHELL_EXPIRED =
   "Сессия MAX устарела. Закройте и снова откройте АудиоЛад.";
 export const MAX_SHELL_IDENTITY_ALREADY_LINKED =
@@ -39,13 +37,12 @@ export type MaxShellPhase =
   | "pending_confirmation"
   | "linking"
   | "linked_authenticated"
-  | "linked_no_session"
   | "expired"
   | "identity_already_linked"
   | "user_already_has_max_identity"
   | "server_error";
 
-export type MaxShellFormMode = "first_link" | "relogin" | "signup";
+export type MaxShellFormMode = "first_link" | "signup";
 
 export type MaxShellSignupField =
   | "firstName"
@@ -71,7 +68,12 @@ export type MaxShellState = {
 export type MaxShellEvent =
   | { type: "INIT_DATA_MISSING" }
   | { type: "VERIFY_START" }
-  | { type: "VERIFY_SUCCESS"; linked: boolean; hasSession: boolean }
+  | {
+      type: "VERIFY_SUCCESS";
+      linked: boolean;
+      maxAuthenticated: boolean;
+      webSessionMatches: boolean;
+    }
   | { type: "VERIFY_FAILURE" }
   | { type: "OPEN_LOGIN" }
   | { type: "OPEN_SIGNUP" }
@@ -135,9 +137,6 @@ function canOpenFirstLinkLogin(state: MaxShellState): boolean {
 }
 
 function canOpenSignup(state: MaxShellState): boolean {
-  if (state.formMode === "relogin" || state.phase === "linked_no_session") {
-    return false;
-  }
   return (
     state.phase === "guest_unlinked" ||
     state.phase === "logging_in" ||
@@ -163,7 +162,7 @@ export function reduceMaxShell(
         formMode: null,
       };
     case "VERIFY_SUCCESS":
-      if (event.linked && event.hasSession) {
+      if (event.linked && event.maxAuthenticated) {
         return {
           phase: "linked_authenticated",
           submitting: false,
@@ -171,9 +170,6 @@ export function reduceMaxShell(
           signupError: null,
           formMode: null,
         };
-      }
-      if (event.linked) {
-        return withForm("linked_no_session", "relogin");
       }
       return {
         phase: "guest_unlinked",
@@ -186,9 +182,6 @@ export function reduceMaxShell(
       if (!canOpenFirstLinkLogin(state) && state.phase !== "logging_in") {
         return state;
       }
-      if (state.formMode === "relogin" || state.phase === "linked_no_session") {
-        return state;
-      }
       return withForm("logging_in", "first_link");
     case "OPEN_SIGNUP":
       if (!canOpenSignup(state)) {
@@ -198,7 +191,6 @@ export function reduceMaxShell(
     case "LOGIN_START":
       if (
         state.phase !== "logging_in" &&
-        state.phase !== "linked_no_session" &&
         state.phase !== "server_error"
       ) {
         return state;
@@ -210,11 +202,7 @@ export function reduceMaxShell(
         signupError: null,
       };
     case "LOGIN_FAILURE":
-      return withForm(
-        state.formMode === "relogin" ? "linked_no_session" : "logging_in",
-        state.formMode === "relogin" ? "relogin" : "first_link",
-        SIGN_IN_GENERIC_ERROR,
-      );
+      return withForm("logging_in", "first_link", SIGN_IN_GENERIC_ERROR);
     case "SIGNUP_START":
       if (state.phase !== "signup_form") {
         return state;
@@ -294,11 +282,12 @@ export function reduceMaxShell(
         MAX_SHELL_SERVER_ERROR,
       );
     case "SIGN_OUT":
-      if (
-        state.phase === "linked_authenticated" ||
-        state.phase === "identity_already_linked"
-      ) {
-        return withForm("linked_no_session", "relogin");
+      if (state.phase === "linked_authenticated") {
+        // MAX-native authentication remains valid after a web-session sign-out.
+        return state;
+      }
+      if (state.phase === "identity_already_linked") {
+        return withForm("guest_unlinked", "first_link");
       }
       if (state.phase === "user_already_has_max_identity") {
         return withForm("logging_in", "first_link");
@@ -348,9 +337,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
         ...empty,
         statusLine: MAX_SHELL_STATUS_VERIFIED,
         showLoginForm: true,
-        showSwitchToSignup: state.formMode !== "relogin",
-        reloginNotice:
-          state.formMode === "relogin" ? MAX_SHELL_LINKED_NO_SESSION : null,
+        showSwitchToSignup: true,
       };
     case "signup_form":
     case "signing_up":
@@ -380,9 +367,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
         ...empty,
         statusLine: MAX_SHELL_STATUS_VERIFIED,
         showLoginForm: true,
-        showSwitchToSignup: state.formMode !== "relogin",
-        reloginNotice:
-          state.formMode === "relogin" ? MAX_SHELL_LINKED_NO_SESSION : null,
+        showSwitchToSignup: true,
       };
     case "linked_authenticated":
       return {
@@ -392,13 +377,6 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
             ? MAX_SHELL_SIGNUP_CREATED_LINKED
             : MAX_SHELL_LINKED_STATUS,
         showSignOut: true,
-      };
-    case "linked_no_session":
-      return {
-        ...empty,
-        statusLine: MAX_SHELL_STATUS_VERIFIED,
-        showLoginForm: true,
-        reloginNotice: MAX_SHELL_LINKED_NO_SESSION,
       };
     case "expired":
       return {

@@ -15,6 +15,7 @@ import {
   isAllowedMaxVerifyOrigin,
   MAX_VERIFY_BODY_MAX_BYTES,
   POST,
+  setResolveMaxNativeUserForTests,
   setResolveMaxSessionBindingForTests,
   setTouchExternalIdentityForTests,
 } from "../src/app/api/max/session/verify/route.ts";
@@ -80,6 +81,7 @@ process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 const touchCalls = [];
 const linkCalls = [];
 const bindingCalls = [];
+const nativeUserCalls = [];
 setTouchExternalIdentityForTests(async (provider, providerUserId) => {
   touchCalls.push({ provider, providerUserId });
   return { ok: true, linked: false };
@@ -87,6 +89,10 @@ setTouchExternalIdentityForTests(async (provider, providerUserId) => {
 setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
   bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
   throw new Error("session binding must not run unless linked=true");
+});
+setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+  nativeUserCalls.push({ provider, providerUserId });
+  throw new Error("MAX-native user lookup must not run unless linked=true");
 });
 setLinkExternalIdentityForTests(async (provider, providerUserId, userId) => {
   linkCalls.push({ provider, providerUserId, userId });
@@ -101,7 +107,8 @@ try {
   assert.deepEqual(valid.body, {
     ok: true,
     linked: false,
-    sessionMatches: false,
+    maxAuthenticated: false,
+    webSessionMatches: false,
   });
   assert.equal("data" in valid.body, false);
   assert.equal("reason" in valid.body, false);
@@ -112,6 +119,11 @@ try {
   assert.equal(JSON.stringify(valid.body).includes("101"), false);
   assert.equal(touchCalls.length, 1);
   assert.equal(bindingCalls.length, 0, "linked=false must not resolve session binding");
+  assert.equal(
+    nativeUserCalls.length,
+    0,
+    "linked=false must not resolve a MAX-native user",
+  );
   assert.deepEqual(touchCalls[0], {
     provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
     providerUserId: "101",
@@ -120,6 +132,10 @@ try {
   setTouchExternalIdentityForTests(async (provider, providerUserId) => {
     touchCalls.push({ provider, providerUserId });
     return { ok: true, linked: true };
+  });
+  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+    nativeUserCalls.push({ provider, providerUserId });
+    return { ok: true, userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" };
   });
   setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
     bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
@@ -132,17 +148,36 @@ try {
   assert.deepEqual(linked.body, {
     ok: true,
     linked: true,
-    sessionMatches: true,
+    maxAuthenticated: true,
+    webSessionMatches: true,
   });
   assert.equal(JSON.stringify(linked.body).includes("101"), false);
   assert.doesNotMatch(JSON.stringify(linked.body), /[0-9a-f]{8}-[0-9a-f]{4}-/i);
   assert.equal(bindingCalls.length, 1);
+  assert.equal(nativeUserCalls.length, 1);
   assert.deepEqual(bindingCalls[0], {
     provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
     providerUserId: "101",
     hasRequest: true,
   });
 
+  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+    nativeUserCalls.push({ provider, providerUserId });
+    return { ok: false, reason: "storage_unavailable" };
+  });
+  const nativeStorageFail = await readJson(
+    await POST(maxRequest({ initData: currentInitData() })),
+  );
+  assert.equal(nativeStorageFail.status, 503);
+  assert.deepEqual(nativeStorageFail.body, {
+    ok: false,
+    reason: "storage_unavailable",
+  });
+
+  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+    nativeUserCalls.push({ provider, providerUserId });
+    return { ok: true, userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" };
+  });
   setResolveMaxSessionBindingForTests(async (request, provider, providerUserId) => {
     bindingCalls.push({ provider, providerUserId, hasRequest: request instanceof Request });
     return { ok: true, sessionMatches: false };
@@ -154,7 +189,8 @@ try {
   assert.deepEqual(linkedNoSession.body, {
     ok: true,
     linked: true,
-    sessionMatches: false,
+    maxAuthenticated: true,
+    webSessionMatches: false,
   });
   const linkedWrongSession = await readJson(
     await POST(maxRequest({ initData: currentInitData() })),
@@ -180,6 +216,7 @@ try {
   assert.equal(JSON.stringify(bindingStorageFail.body).includes("101"), false);
 
   const bindingCountAfterLinked = bindingCalls.length;
+  const nativeUserCountAfterLinked = nativeUserCalls.length;
   setTouchExternalIdentityForTests(async (provider, providerUserId) => {
     touchCalls.push({ provider, providerUserId });
     return { ok: true, linked: false };
@@ -208,6 +245,11 @@ try {
     bindingCountAfterLinked,
     "invalid HMAC must not resolve session binding",
   );
+  assert.equal(
+    nativeUserCalls.length,
+    nativeUserCountAfterLinked,
+    "invalid HMAC must not resolve a MAX-native user",
+  );
 
   const expired = await readJson(
     await POST(
@@ -226,6 +268,11 @@ try {
     bindingCalls.length,
     bindingCountAfterLinked,
     "expired initData must not resolve session binding",
+  );
+  assert.equal(
+    nativeUserCalls.length,
+    nativeUserCountAfterLinked,
+    "expired initData must not resolve a MAX-native user",
   );
 
   const empty = await readJson(await POST(maxRequest("", { raw: "" })));
@@ -329,6 +376,7 @@ try {
   );
 } finally {
   setTouchExternalIdentityForTests(null);
+  setResolveMaxNativeUserForTests(null);
   setResolveMaxSessionBindingForTests(null);
   setLinkExternalIdentityForTests(null);
   if (previousToken === undefined) {
@@ -345,17 +393,20 @@ const routeSource = readFileSync(
 assert.match(routeSource, /process\.env\.MAX_BOT_TOKEN/);
 assert.match(routeSource, /touchExternalIdentity/);
 assert.match(routeSource, /resolveMaxSessionBinding/);
-assert.match(routeSource, /sessionMatches: false/);
-assert.match(routeSource, /sessionMatches: binding\.sessionMatches/);
+assert.match(routeSource, /maxAuthenticated: false/);
+assert.match(routeSource, /webSessionMatches: false/);
+assert.match(routeSource, /maxAuthenticated: true/);
+assert.match(routeSource, /webSessionMatches: binding\.sessionMatches/);
+assert.match(routeSource, /resolveMaxNativeUser/);
 assert.ok(
   routeSource.indexOf("verifyMaxInitData(") <
-    routeSource.indexOf("resolveMaxSessionBinding("),
-  "HMAC verification must run before session binding",
+    routeSource.indexOf("resolveMaxNativeUser("),
+  "HMAC verification must run before MAX-native identity resolution",
 );
 assert.ok(
   routeSource.indexOf("if (!touch.linked)") <
-    routeSource.indexOf("resolveMaxSessionBinding("),
-  "unlinked MAX must return before session binding",
+    routeSource.indexOf("resolveMaxNativeUser("),
+  "unlinked MAX must return before MAX-native identity resolution",
 );
 assert.doesNotMatch(routeSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(routeSource, /console\.(log|info|debug|warn|error)/);
