@@ -1,4 +1,8 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
+import {
+  AUTHOR_TELEGRAM_CHAT_NAME,
+  AUTHOR_TELEGRAM_CHAT_URL,
+} from "@/lib/authors/community";
 
 import { AUTHOR_APPLICATION_SUBMITTED_IMPORTANT_NOTE } from "./author-application-submitted";
 import {
@@ -14,7 +18,7 @@ export const AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT =
 export const AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY =
   "author_application_approved";
 export const AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION =
-  "author-application-approved-v3-20260804";
+  "author-application-approved-v4-20260924";
 
 export type AuthorApplicationApprovedEmailInput = {
   siteOrigin?: string;
@@ -52,6 +56,38 @@ function renderGettingStartedChecklistText(): string[] {
     "1. Оформите профиль автора — добавьте информацию о себе, аватар и баннер.",
     "2. Опубликуйте первый бесплатный аудиопродукт — это обязательный шаг перед заявкой на коммерческий статус. Подойдёт практика, музыка или альбом.",
     "3. Проверьте публичную страницу автора — убедитесь, что профиль и аудиопродукт выглядят именно так, как вы задумали.",
+    "",
+  ];
+}
+
+function renderAuthorTelegramChatHtml(): string {
+  return renderBrandEmailInfoBlock(
+    [
+      renderBrandEmailParagraph(
+        `<strong>Присоединяйтесь к чату «${AUTHOR_TELEGRAM_CHAT_NAME}»</strong>`,
+        "email-body",
+        "0 0 8px",
+      ),
+      renderBrandEmailParagraph(
+        "Там мы будем публиковать новости для авторов, обучающие ролики, полезные материалы и важные обновления платформы.",
+        "email-body",
+        "0 0 16px",
+      ),
+      renderBrandEmailButton(AUTHOR_TELEGRAM_CHAT_URL, "Присоединиться к чату", {
+        msoWidth: 280,
+      }),
+    ].join("\n"),
+  );
+}
+
+function renderAuthorTelegramChatText(): string[] {
+  return [
+    `Присоединяйтесь к чату «${AUTHOR_TELEGRAM_CHAT_NAME}»`,
+    "",
+    "Там мы будем публиковать новости для авторов, обучающие ролики, полезные материалы и важные обновления платформы.",
+    "",
+    "Присоединиться к чату:",
+    AUTHOR_TELEGRAM_CHAT_URL,
     "",
   ];
 }
@@ -101,6 +137,7 @@ export function renderAuthorApplicationApprovedEmailHtml(
       "0 0 24px",
     ),
     renderBrandEmailButton(dashboardUrl, "Открыть кабинет автора", { msoWidth: 320 }),
+    renderAuthorTelegramChatHtml(),
     renderGettingStartedChecklistHtml(),
     renderBrandEmailInfoBlock(
       [
@@ -170,6 +207,7 @@ export function renderAuthorApplicationApprovedEmailText(
     "",
     `Открыть кабинет автора: ${dashboardUrl}`,
     "",
+    ...renderAuthorTelegramChatText(),
     ...renderGettingStartedChecklistText(),
     "Важно",
     AUTHOR_APPLICATION_SUBMITTED_IMPORTANT_NOTE,

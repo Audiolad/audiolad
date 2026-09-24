@@ -14,6 +14,10 @@ import {
   AUTHOR_PRODUCT_FREE_PRICE_LABEL,
   FREE_AUTHOR_PRODUCTS_EMPTY_STATE,
 } from "@/lib/author-dashboard/free-author-first-step";
+import {
+  AUTHOR_TELEGRAM_CHAT_NAME,
+  AUTHOR_TELEGRAM_CHAT_URL,
+} from "@/lib/authors/community";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import {
   getAudioPostDisplayLabel,
@@ -49,6 +53,20 @@ function PlusIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="m20.6 4.3-2.8 14.1c-.2 1-.8 1.2-1.6.8l-4.5-3.3-2.2 2.1c-.2.2-.5.5-.9.5l.3-4.6 8.4-7.6c.4-.3-.1-.5-.6-.2L6.3 12.1l-4.4-1.4c-1-.3-1-1 .2-1.4L19.3 2.7c.8-.3 1.5.2 1.3 1.6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -252,6 +270,28 @@ export default function AuthorDashboardClient({
         accessStatus={selectedAuthor.accessStatus}
         productCount={loading ? -1 : products.length}
       />
+
+      <section className="mt-4 rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-semibold text-[#25135c]">
+              Чат «{AUTHOR_TELEGRAM_CHAT_NAME}» в Telegram
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-[#5f5484]">
+              Новости АудиоЛада для авторов, обучающие материалы, полезные подсказки и важные обновления.
+            </p>
+          </div>
+          <a
+            href={AUTHOR_TELEGRAM_CHAT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white"
+          >
+            <TelegramIcon />
+            Присоединиться к чату
+          </a>
+        </div>
+      </section>
 
       <AuthorOnboardingChecklist
         key={selectedAuthor.id}
