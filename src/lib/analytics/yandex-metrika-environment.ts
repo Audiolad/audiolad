@@ -1,3 +1,4 @@
+import { isMaxHostname } from "@/lib/max/host";
 import { isAccessTokenAnalyticsRoute } from "@/lib/products/access-links";
 
 const NON_PRODUCTION_HOSTS = new Set([
@@ -35,6 +36,31 @@ export function isNonProductionAnalyticsHost(hostname: string | null | undefined
   return false;
 }
 
+function resolveAnalyticsHostname(hostname?: string | null): string {
+  return (
+    hostname ??
+    (typeof window !== "undefined" ? window.location.hostname : null) ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+export function isMaxYandexAnalyticsHost(hostname?: string | null): boolean {
+  const normalized = resolveAnalyticsHostname(hostname);
+  return normalized.length > 0 && isMaxHostname(normalized);
+}
+
+/**
+ * Yandex Metrika cookie-consent banner is MAX-host-only suppression.
+ * Ordinary audiolad.ru eligibility (localhost/admin/recovery) stays unchanged.
+ */
+export function shouldShowYandexAnalyticsConsentBanner(input?: {
+  hostname?: string | null;
+}): boolean {
+  return !isMaxYandexAnalyticsHost(input?.hostname);
+}
+
 export function shouldEnableYandexMetrika(input?: {
   pathname?: string | null;
   hostname?: string | null;
@@ -43,11 +69,14 @@ export function shouldEnableYandexMetrika(input?: {
     return false;
   }
 
-  const hostname =
-    input?.hostname ??
-    (typeof window !== "undefined" ? window.location.hostname : null);
+  const hostname = resolveAnalyticsHostname(input?.hostname);
 
   if (isNonProductionAnalyticsHost(hostname)) {
+    return false;
+  }
+
+  // MAX Mini App WebView: do not load Yandex Metrika. Host-based, not pathname.
+  if (isMaxYandexAnalyticsHost(hostname)) {
     return false;
   }
 

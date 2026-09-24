@@ -11,6 +11,34 @@ assert.match(source, /AbortController/);
 assert.match(source, /controller\.abort/);
 assert.match(source, /formatMaxDuration/);
 assert.match(source, /detail\.product\.coverUrl/);
+assert.match(source, /aspect-square/);
+assert.match(source, /max-w-\[280px\]/);
+assert.match(source, /mx-auto/);
+assert.match(source, /object-cover/);
+assert.doesNotMatch(source, /h-48/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.equal(source.includes("setDetail({ status: \"idle\" }); setSelected(null)"), true);
+
+const readyStart = source.indexOf('{detail.status === "ready" ?');
+assert.notEqual(readyStart, -1, "ready detail block exists");
+const readyBlock = source.slice(readyStart);
+const fieldOrder = [
+  "detail.product.coverUrl",
+  "detail.product.formatLabel",
+  "detail.product.title",
+  "detail.product.subtitle",
+  "detail.product.authorName",
+  "detail.product.priceLabel",
+  "detail.product.statsLabel",
+  "detail.product.description",
+  "detail.product.contents",
+];
+let lastIndex = -1;
+for (const field of fieldOrder) {
+  const index = readyBlock.indexOf(field);
+  assert.notEqual(index, -1, `ready UI renders ${field}`);
+  assert.ok(index > lastIndex, `ready UI order includes ${field} after previous field`);
+  lastIndex = index;
+}
+
 console.log("max-product-detail-unit: ok");
