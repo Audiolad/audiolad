@@ -1,0 +1,13 @@
+[Unit]
+Description=Audiolad read-only root disk health check
+Documentation=file:/var/www/audiolad/deploy/docs/DISK_INCIDENT_HARDENING.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/audiolad/disk-health.env
+ExecStart=/usr/local/lib/audiolad/audiolad-disk-health.sh
+Nice=10
+SyslogIdentifier=audiolad-disk-health
+NoNewPrivileges=true

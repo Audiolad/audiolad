@@ -2,6 +2,8 @@
 
 Safe daily disk hygiene via systemd timer. No PM2/Nginx/Docker restarts.
 
+Ночная уборка не смотрит Docker json logs и не будит себя при заполнении диска. Отдельный read-only watcher и порог deploy описаны в `deploy/docs/DISK_INCIDENT_HARDENING.md`.
+
 ## Files
 
 | Path | Role |
