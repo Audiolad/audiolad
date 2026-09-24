@@ -70,11 +70,10 @@ export function orderAlbumBatchFiles<T extends { name: string }>(files: readonly
 export function planMusicAlbumBatch<T extends AlbumBatchFile>(
   files: readonly T[],
 ): AlbumBatchPlan<T> {
-  const ordered = orderAlbumBatchFiles(files);
   const valid: T[] = [];
   const skipped: AlbumBatchSkip[] = [];
 
-  for (const file of ordered) {
+  for (const file of files) {
     const mode = resolveMusicUploadMode(file);
     const reason =
       mode == null
@@ -89,10 +88,12 @@ export function planMusicAlbumBatch<T extends AlbumBatchFile>(
     valid.push(file);
   }
 
+  const ordered = orderAlbumBatchFiles(valid);
+
   return {
-    accepted: valid.slice(0, MAX_MUSIC_ALBUM_BATCH_FILES),
+    accepted: ordered.slice(0, MAX_MUSIC_ALBUM_BATCH_FILES),
     skipped,
-    overflow: valid.slice(MAX_MUSIC_ALBUM_BATCH_FILES).map((file) => file.name),
+    overflow: ordered.slice(MAX_MUSIC_ALBUM_BATCH_FILES).map((file) => file.name),
   };
 }
 

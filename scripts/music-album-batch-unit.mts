@@ -146,6 +146,23 @@ assert.equal(deriveAlbumTrackTitle("01.wav"), "01");
 }
 
 {
+  const plan = planMusicAlbumBatch([
+    named("01 - A.wav"),
+    named("notes.txt", "text/plain", 20),
+    named("10 - C.wav"),
+    named("02 - B.wav"),
+  ]);
+  assert.deepEqual(
+    plan.accepted.map((file) => file.name),
+    ["01 - A.wav", "02 - B.wav", "10 - C.wav"],
+  );
+  assert.deepEqual(
+    plan.skipped.map((entry) => entry.name),
+    ["notes.txt"],
+  );
+}
+
+{
   const staged = stageMusicFile(emptyMusicQueue(), "new", "master", "01 - A.wav");
   assert.deepEqual(staged.launchIds, []);
   assert.equal(staged.snapshot.entries[0]?.phase, "ready");
