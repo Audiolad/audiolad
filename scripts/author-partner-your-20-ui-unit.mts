@@ -18,6 +18,11 @@ import {
   partnerCodeUserMessage,
 } from "../src/lib/author-partner/rpc-user-messages";
 import { parseAuthorPartnerProfilePayload } from "../src/lib/author-partner/profile-types";
+import {
+  parsePartnerRewardDashboardPayload,
+  PARTNER_REWARD_LOAD_ERROR,
+} from "../src/lib/author-partner/rewards";
+import { formatPartnerRewardMoney } from "../src/lib/author-partner/money-format";
 
 const BETA = PARTNER_UI_BETA_AUTHOR_SLUG;
 
@@ -192,14 +197,156 @@ test("profile parse: alias list preserved", () => {
   }
 });
 
+test("reward dashboard parse: currency-aware balances and safe history", () => {
+  const dashboard = parsePartnerRewardDashboardPayload({
+    balances: [
+      {
+        currency: "RUB",
+        accrued_minor: 1500,
+        held_minor: -500,
+        available_minor: 2000,
+        paid_minor: 0,
+      },
+    ],
+    history: [
+      {
+        invitee_author_name: "Автор",
+        entry_type: "reward_reversal",
+        amount_minor: -500,
+        currency: "RUB",
+        effective_at: "2026-11-03T12:00:00Z",
+        availability_state: "held",
+      },
+    ],
+  });
+  assert.deepEqual(dashboard, {
+    balances: [
+      {
+        currency: "RUB",
+        accruedMinor: 1500,
+        heldMinor: -500,
+        availableMinor: 2000,
+        paidMinor: 0,
+      },
+    ],
+    history: [
+      {
+        inviteeAuthorName: "Автор",
+        entryType: "reward_reversal",
+        amountMinor: -500,
+        currency: "RUB",
+        effectiveAt: "2026-11-03T12:00:00Z",
+        availabilityState: "held",
+      },
+    ],
+  });
+  assert.equal(PARTNER_REWARD_LOAD_ERROR.length > 0, true);
+});
+
+test("reward dashboard parse: canonical zero RUB response is successful", () => {
+  assert.deepEqual(
+    parsePartnerRewardDashboardPayload({
+      balances: [
+        {
+          currency: "RUB",
+          accrued_minor: 0,
+          held_minor: 0,
+          available_minor: 0,
+          paid_minor: 0,
+        },
+      ],
+      history: [],
+    }),
+    {
+      balances: [
+        {
+          currency: "RUB",
+          accruedMinor: 0,
+          heldMinor: 0,
+          availableMinor: 0,
+          paidMinor: 0,
+        },
+      ],
+      history: [],
+    },
+  );
+});
+
+test("reward dashboard parse: malformed or private history fails closed", () => {
+  assert.equal(
+    parsePartnerRewardDashboardPayload({
+      balances: [],
+      history: [
+        {
+          id: "should-not-be-here",
+          invitee_author_name: "Автор",
+          entry_type: "reward_accrual",
+          amount_minor: 100,
+          currency: "RUB",
+          effective_at: "2026-11-03T12:00:00Z",
+          availability_state: "available",
+        },
+      ],
+    }),
+    null,
+  );
+});
+
+test("reward dashboard parse: legacy or extra contract fields fail closed", () => {
+  assert.equal(
+    parsePartnerRewardDashboardPayload({
+      balances: [
+        {
+          currency: "RUB",
+          accrued_minor: 0,
+          held_minor: 0,
+          available_minor: 0,
+          paid_minor: 0,
+          invariant_ok: true,
+        },
+      ],
+      history: [],
+    }),
+    null,
+  );
+  assert.equal(
+    parsePartnerRewardDashboardPayload({
+      balances: [],
+      history: [
+        {
+          invitee_author_name: "Автор",
+          type: "reward_accrual",
+          amount_minor: 100,
+          currency: "RUB",
+          effective_at: "2026-11-03T12:00:00Z",
+          availability_state: "available",
+        },
+      ],
+    }),
+    null,
+  );
+});
+
+test("reward money formatter: exact RUB and safe fallback", () => {
+  assert.equal(formatPartnerRewardMoney(1500, "RUB"), "15 ₽");
+  assert.equal(formatPartnerRewardMoney(-1501, "RUB"), "−15,01 ₽");
+  assert.equal(formatPartnerRewardMoney(1.5, "RUB"), "—");
+  assert.equal(formatPartnerRewardMoney(1500, "USD"), "—");
+  assert.equal(formatPartnerRewardMoney(1500, "rub"), "—");
+});
+
 test("your-20 route keeps ?author=sergey-petrov", () => {
   const href = `/author-dashboard/your-20?author=${encodeURIComponent(BETA)}`;
   assert.equal(href, "/author-dashboard/your-20?author=sergey-petrov");
 });
 
-test("copy: three paragraphs explain 20%, 3-year window from author activation, bonus space", () => {
+test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   const src = readFileSync(
     new URL("../src/components/author-dashboard/AuthorYour20Client.tsx", import.meta.url),
+    "utf8",
+  );
+  const rewardsSrc = readFileSync(
+    new URL("../src/components/author-dashboard/AuthorPartnerRewards.tsx", import.meta.url),
     "utf8",
   );
   const collapsed = src.replace(/\s+/g, " ");
@@ -225,4 +372,18 @@ test("copy: three paragraphs explain 20%, 3-year window from author activation, 
     collapsed,
     /фактически начисленной приглашённому автору, в течение трёх лет\./,
   );
+  assert.doesNotMatch(collapsed, /Тестовый режим/);
+  assert.doesNotMatch(collapsed, /будет подключено отдельным этапом/);
+  assert.match(rewardsSrc, /formatPartnerRewardMoney/);
+  assert.match(rewardsSrc, /рассчитываются автоматически/);
+  assert.match(rewardsSrc, /Начислено/);
+  assert.match(rewardsSrc, /На удержании/);
+  assert.match(rewardsSrc, /Доступно/);
+  assert.match(rewardsSrc, /Выплачено/);
+  assert.match(rewardsSrc, /следующим этапом/);
+  assert.match(rewardsSrc, /История начислений/);
+  assert.match(rewardsSrc, /История начислений пока пуста/);
+  assert.match(rewardsSrc, /!loadError && dashboard \?/);
+  assert.doesNotMatch(rewardsSrc, /invariantOk/);
+  assert.match(rewardsSrc, /!loadError\s*\n\s*\? dashboard\?\.balances\.map/);
 });

@@ -13,6 +13,10 @@ import {
   PARTNER_INVITEES_LOAD_ERROR,
 } from "@/lib/author-partner/invitees";
 import { parseAuthorPartnerProfilePayload } from "@/lib/author-partner/profile-types";
+import {
+  parsePartnerRewardDashboardPayload,
+  PARTNER_REWARD_LOAD_ERROR,
+} from "@/lib/author-partner/rewards";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { getAppOrigin } from "@/lib/seo/app-origin";
@@ -113,6 +117,16 @@ export default async function AuthorYour20Page({
     : parseAuthorPartnerInviteesPayload(inviteesData);
   const initialInviteesError = inviteesError ? PARTNER_INVITEES_LOAD_ERROR : null;
 
+  const { data: rewardsData, error: rewardsError } = await supabase.rpc(
+    "get_author_partner_reward_dashboard",
+    { p_author_id: selected.id },
+  );
+  const initialRewards = rewardsError
+    ? null
+    : parsePartnerRewardDashboardPayload(rewardsData);
+  const initialRewardsError =
+    rewardsError || !initialRewards ? PARTNER_REWARD_LOAD_ERROR : null;
+
   return (
     <AuthorShell
       title="Ваши 20%"
@@ -127,6 +141,8 @@ export default async function AuthorYour20Page({
           initialLoadError={initialLoadError}
           initialInvitees={initialInvitees}
           initialInviteesError={initialInviteesError}
+          initialRewards={initialRewards}
+          initialRewardsError={initialRewardsError}
           siteOrigin={getAppOrigin()}
         />
       </Suspense>
