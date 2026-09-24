@@ -117,6 +117,8 @@ export type CatalogQueryOptions = {
   catalogSection?: CatalogSection | null;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
   productKind?: ProductKind | null;
+  /** Throw the canonical query failure to a trusted server caller. */
+  throwOnStorageError?: boolean;
   /**
    * Combines ordinary visibility eligibility and optional price-teaser identity.
    * Omit for listed-only public showcases: home, sitemap, topic hubs, author page.
@@ -367,6 +369,9 @@ export async function getPublishedCatalogProducts(
   const { data: practices, error } = await query;
 
   if (error) {
+    if (options?.throwOnStorageError) {
+      throw new Error("published_catalog_storage_unavailable");
+    }
     return [];
   }
 

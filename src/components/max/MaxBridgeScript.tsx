@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useCallback, useRef, useState } from "react";
 
 import { signUpAction } from "@/app/(platform)/auth/sign-up/actions";
+import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import {
   MAX_WEB_APP_SCRIPT_SRC,
   readMaxBridgeSnapshot,
@@ -29,6 +30,7 @@ import {
 
 import MaxLoginForm from "./MaxLoginForm";
 import MaxSignupForm from "./MaxSignupForm";
+import MaxAuthenticatedHome from "./MaxAuthenticatedHome";
 
 /**
  * Loads official MAX Bridge CDN only on the MAX entry surface.
@@ -197,6 +199,20 @@ export default function MaxBridgeScript() {
         data-max-platform={snapshot.platform ?? ""}
         data-max-version={snapshot.version ?? ""}
       />
+      {view.phase === "linked_authenticated" ? <MaxAuthenticatedHome /> : (
+        <section className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
+          <AudioladHorizontalLogo
+            className="h-16 w-auto max-w-full object-contain object-center"
+            linkClassName="inline-flex max-w-full justify-center rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            priority
+            sizes="256px"
+          />
+          <h1 className="mt-8 text-[32px] font-semibold leading-tight text-[#25135c]">
+            АудиоЛад
+          </h1>
+          <p className="mt-3 max-w-sm text-[17px] leading-6 text-[#4a3d73]">
+            Музыка, медитации, аудиопрактики и аудиокурсы
+          </p>
       <p className="mt-8 text-sm font-medium text-[#7042c5]">{view.statusLine}</p>
       {view.reloginNotice ? (
         <p className="mt-4 max-w-sm text-sm leading-6 text-[#4a3d73]">
@@ -305,6 +321,8 @@ export default function MaxBridgeScript() {
           {MAX_SHELL_SIGN_OUT_LABEL}
         </button>
       ) : null}
+        </section>
+      )}
     </>
   );
 }
