@@ -213,6 +213,8 @@ const albumBody = functionBody(formSource, "addAlbumTracks");
 assert.match(albumBody, /planMusicAlbumBatch/);
 assert.match(albumBody, /stageMusicTrackFile/);
 assert.doesNotMatch(albumBody, /enqueueReadyMusicUploads/);
+assert.ok(albumBody.indexOf("stageMusicTrackFile") < albumBody.indexOf("startReadyMusicUploads"));
+assert.match(albumBody, /if \(stagedIds\.length > 0\)/);
 assert.match(albumBody, /musicQueueBlocksTrackCreation/);
 assert.match(functionBody(formSource, "addAudioItem"), /musicQueueBlocksTrackCreation/);
 assert.match(functionBody(formSource, "addAudioItem"), /PRODUCT_KIND\.MUSIC/);

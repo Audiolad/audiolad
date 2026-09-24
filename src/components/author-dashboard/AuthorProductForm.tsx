@@ -2638,6 +2638,7 @@ export default function AuthorProductForm({
     setBusy(true);
     setError(null);
     let created = 0;
+    const stagedIds: string[] = [];
 
     try {
       const ensured = await ensurePracticeId();
@@ -2670,6 +2671,7 @@ export default function AuthorProductForm({
         const audioItem = payload.audio_item;
         setAudioItems((current) => appendCreatedAudioItem(current, audioItem));
         stageMusicTrackFile(audioItem.id, file);
+        stagedIds.push(audioItem.id);
         created += 1;
       }
     } catch {
@@ -2680,6 +2682,9 @@ export default function AuthorProductForm({
     } finally {
       addAudioInFlightRef.current = false;
       setBusy(false);
+      if (stagedIds.length > 0) {
+        startReadyMusicUploads(stagedIds);
+      }
     }
   }
 
@@ -2904,13 +2909,34 @@ export default function AuthorProductForm({
     });
   }
 
-  function uploadAllMusicTracks() {
-    const step = enqueueReadyMusicUploads(
-      musicQueueRef.current,
-      audioItemsRef.current.map((item) => item.id),
-    );
+  function startReadyMusicUploads(extraOrderedIds: readonly string[] = []) {
+    const order: string[] = [];
+    const seen = new Set<string>();
+    const pushId = (audioId: string) => {
+      if (seen.has(audioId)) {
+        return;
+      }
+      seen.add(audioId);
+      order.push(audioId);
+    };
+    for (const audioId of audioItemsRef.current.map((item) => item.id)) {
+      pushId(audioId);
+    }
+    for (const audioId of extraOrderedIds) {
+      pushId(audioId);
+    }
+    for (const entry of musicQueueRef.current.entries) {
+      if (entry.phase === "ready") {
+        pushId(entry.audioId);
+      }
+    }
+    const step = enqueueReadyMusicUploads(musicQueueRef.current, order);
     commitMusicQueue(step.snapshot);
     launchMusicQueueIds(step.launchIds);
+  }
+
+  function uploadAllMusicTracks() {
+    startReadyMusicUploads();
   }
 
   function retryMusicTrack(audioId: string) {
@@ -5209,6 +5235,7 @@ export default function AuthorProductForm({
                           if (!file) return;
                           if (form.productKind === PRODUCT_KIND.MUSIC) {
                             stageMusicTrackFile(audioItem.id, file);
+                            startReadyMusicUploads([audioItem.id]);
                             return;
                           }
                           void uploadAudio(audioItem.id, file, "legacy");
@@ -5285,7 +5312,7 @@ export default function AuthorProductForm({
               onClick={uploadAllMusicTracks}
               className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
             >
-              Загрузить все треки
+              Продолжить загрузку
             </button>
           ) : null}
           {form.productKind === PRODUCT_KIND.MUSIC &&
