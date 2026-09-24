@@ -7,6 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export const MAX_CATALOG_LIMIT = 24;
 
 export type MaxCatalogProduct = {
+  authorSlug: string;
   slug: string;
   title: string;
   subtitle: string | null;
@@ -24,6 +25,7 @@ export type MaxCatalogResult =
 export type ListMaxPublishedCatalogFn = () => Promise<MaxCatalogResult>;
 
 function toMaxCatalogProduct(product: {
+  authorSlug: string | null;
   slug: string;
   title: string;
   subtitle: string | null;
@@ -34,6 +36,7 @@ function toMaxCatalogProduct(product: {
   isFree: boolean;
 }): MaxCatalogProduct {
   return {
+    authorSlug: product.authorSlug ?? "",
     slug: product.slug,
     title: product.title,
     subtitle: product.subtitle,
@@ -62,7 +65,10 @@ async function listMaxPublishedCatalogImpl(
 
     return {
       ok: true,
-      items: products.slice(0, MAX_CATALOG_LIMIT).map(toMaxCatalogProduct),
+      items: products
+        .filter((product) => Boolean(product.authorSlug))
+        .slice(0, MAX_CATALOG_LIMIT)
+        .map(toMaxCatalogProduct),
     };
   } catch {
     return { ok: false, reason: "storage_unavailable" };
