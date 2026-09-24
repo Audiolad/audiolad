@@ -192,9 +192,9 @@ export default function MaxAuthenticatedHome() {
               <li key={`${product.authorSlug}/${product.slug}`}><button
                 type="button"
                 onClick={() => { setDetail({ status: "loading" }); setSelected(product); }}
-                className="flex min-h-28 w-full gap-3 rounded-2xl border border-[#e8def5] bg-white p-3 text-left"
+                className="flex min-h-28 w-full items-start gap-3 rounded-2xl border border-[#e8def5] bg-white p-3 text-left"
               >
-                <div className="h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-[#ede6f8]">
+                <div className="aspect-square w-24 shrink-0 overflow-hidden rounded-xl bg-[#ede6f8]">
                   {product.coverUrl ? (
                     <img
                       src={product.coverUrl}

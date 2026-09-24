@@ -16,11 +16,22 @@ assert.match(source, /max-w-\[280px\]/);
 assert.match(source, /mx-auto/);
 assert.match(source, /object-cover/);
 assert.doesNotMatch(source, /h-48/);
+assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.equal(source.includes("setDetail({ status: \"idle\" }); setSelected(null)"), true);
 
+const catalogStart = source.indexOf("catalog.items.map");
+assert.notEqual(catalogStart, -1, "catalog list exists");
 const readyStart = source.indexOf('{detail.status === "ready" ?');
 assert.notEqual(readyStart, -1, "ready detail block exists");
+const catalogBlock = source.slice(catalogStart, readyStart);
+assert.match(catalogBlock, /aspect-square/);
+assert.match(catalogBlock, /w-24/);
+assert.match(catalogBlock, /shrink-0/);
+assert.match(catalogBlock, /h-full w-full object-cover/);
+assert.doesNotMatch(catalogBlock, /h-24|w-20/);
+assert.match(source.slice(readyStart), /max-w-\[280px\]/);
+assert.match(source.slice(readyStart), /aspect-square/);
 const readyBlock = source.slice(readyStart);
 const fieldOrder = [
   "detail.product.coverUrl",
