@@ -243,6 +243,48 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### One-shot disk space recover (`confirm=OPS_DISK_SPACE_RECOVER`)
+
+Тот же workflow, но `confirm=OPS_DISK_SPACE_RECOVER` запускает job
+**Ops disk space recover**: SSH как `deploy`, фиксированная one-shot
+последовательность. Удаляет **только** три пункта `SAFE TO DELETE` из
+audit run `36043301016`:
+
+- `/var/www/audiolad-deploy/releases/20260924-161850-35872951`
+- `/tmp/cursor-sandbox-cache`
+- `/tmp/node-compile-cache`
+
+Нет cutover, нет `audiolad-deploy`, нет `deploy.sh`, нет nginx/PM2/DB/Storage
+мутаций, нет произвольного remote shell. CURRENT / PREVIOUS обязаны быть
+разрезолвлены до delete релиза. Кандидат должен быть реальным каталогом
+(не symlink) под `releases/` и не совпадать с current/previous.
+`/tmp` cache: exact path, не symlink, не follow symlink; если живой процесс
+держит cwd/fd внутри каталога — SKIP, процессы не убиваются.
+`/tmp/audiolad-render-stage` и `/tmp/audiolad-timeline-ruler` не трогать.
+После cleanup требуется ≥ 3500 MB free; иначе `RESULT=NEEDS_MORE_SPACE`
+без дополнительных delete.
+
+Exact flags:
+
+```text
+FREE_MB_BEFORE=
+FREE_MB_AFTER=
+FREED_MB=
+CURRENT_RELEASE_INTACT = YES/NO
+PREVIOUS_RELEASE_INTACT = YES/NO
+RESULT = OK/NEEDS_MORE_SPACE
+CUTOVER = NO
+MODE = disk_space_recover
+```
+
+Локальный/operator эквивалент:
+
+```bash
+bash deploy/scripts/audiolad-disk-space-recover.sh
+```
+
+**Ограничение GitHub Environment:** dispatch только с branch **`main`**.
+
 ### Read-only Studio duplicate-asset diagnostic (`confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG`)
 
 Тот же workflow, но `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` запускает job
@@ -585,6 +627,10 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 - `confirm=OPS_DISK_STORAGE_CLEANUP` с `main` — только hardcoded allowlist
   cleanup 13 пунктов audit run 34113627251, без cutover и без
   `audiolad-deploy`.
+- `confirm=OPS_DISK_SPACE_RECOVER` с PR-ветки при environment protection —
+  recover job не стартует; deploy job пропускается.
+- `confirm=OPS_DISK_SPACE_RECOVER` с `main` — только три пути из audit
+  run 36043301016, без cutover и без `audiolad-deploy`.
 - `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с PR-ветки при environment
   protection — diagnostic job не стартует; deploy job пропускается.
 - `confirm=OPS_STUDIO_DUPLICATE_ASSET_DIAG` с `main` — только read-only
