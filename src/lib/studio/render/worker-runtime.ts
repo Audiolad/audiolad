@@ -45,6 +45,144 @@ import {
 const assetsBucket = "studio-draft-assets";
 const outputBucket = "studio-renders";
 
+export const STUDIO_RENDER_PREPARE_FAILED_MESSAGE =
+  "Не удалось подготовить экспорт. Исходники проекта сохранены.";
+
+export type StudioRenderFailureStage =
+  | "timeline"
+  | "disk"
+  | "workspace"
+  | "asset_download"
+  | "catalog_materialize"
+  | "ffmpeg"
+  | "access"
+  | "lease"
+  | "upload"
+  | "unknown";
+
+export class StudioRenderStageError extends Error {
+  readonly stage: Exclude<StudioRenderFailureStage, "unknown">;
+  readonly code: string;
+  readonly safeMessage: string;
+
+  constructor(input: {
+    stage: Exclude<StudioRenderFailureStage, "unknown">;
+    code: string;
+    message: string;
+    safeMessage?: string;
+  }) {
+    super(input.message);
+    this.name = "StudioRenderStageError";
+    this.stage = input.stage;
+    this.code = input.code;
+    this.safeMessage = input.safeMessage ?? STUDIO_RENDER_PREPARE_FAILED_MESSAGE;
+  }
+}
+
+const STORAGE_PATH_REPLACE_ERROR = "Cannot read properties of undefined (reading 'replace')";
+
+export function readStudioRenderErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    error
+    && typeof error === "object"
+    && "message" in error
+    && typeof error.message === "string"
+    && error.message
+  ) {
+    return error.message;
+  }
+  return "unknown_error";
+}
+
+export function sanitizeStudioRenderErrorMessage(error: unknown): string {
+  return readStudioRenderErrorMessage(error)
+    .replace(/(^|[^A-Za-z0-9_])(token|access_token|apikey|authorization)=[^&#\s]+/gi, "$1$2=redacted")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[redacted]")
+    .slice(0, 500);
+}
+
+function isStoragePathReplaceTypeError(error: unknown): boolean {
+  return error instanceof TypeError && error.message === STORAGE_PATH_REPLACE_ERROR;
+}
+
+export function studioRenderAssetDownloadError(cause: unknown): StudioRenderStageError {
+  const storagePathMissing = cause instanceof Error && cause.message === "storage_path_missing";
+  return new StudioRenderStageError({
+    stage: "asset_download",
+    code: "asset_download_failed",
+    message: storagePathMissing || isStoragePathReplaceTypeError(cause)
+      ? STORAGE_PATH_REPLACE_ERROR
+      : sanitizeStudioRenderErrorMessage(cause),
+  });
+}
+
+export function classifyStudioRenderFailure(error: unknown): {
+  stage: StudioRenderFailureStage;
+  errorCode: string;
+  errorMessageSafe: string;
+  internalMessage: string;
+} {
+  const internalMessage = sanitizeStudioRenderErrorMessage(error);
+  if (error instanceof StudioRenderStageError) {
+    return {
+      stage: error.stage,
+      errorCode: error.code,
+      errorMessageSafe: error.safeMessage,
+      internalMessage,
+    };
+  }
+  const catalogUnavailable =
+    (error instanceof StudioCatalogMusicUnavailableError)
+    || (error instanceof Error && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE);
+  if (catalogUnavailable) {
+    return {
+      stage: "catalog_materialize",
+      errorCode: CATALOG_MUSIC_UNAVAILABLE,
+      errorMessageSafe: CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE,
+      internalMessage,
+    };
+  }
+  if (error instanceof StudioRenderDiskSpaceError) {
+    return {
+      stage: "disk",
+      errorCode: error.code,
+      errorMessageSafe: "Недостаточно места на диске для экспорта. Попробуйте позже или сократите проект.",
+      internalMessage,
+    };
+  }
+  if (error instanceof StudioRenderTimelineGuardError) {
+    return {
+      stage: "timeline",
+      errorCode: error.code,
+      errorMessageSafe: "Некорректная длительность проекта для экспорта. Проверьте расположение клипов на таймлайне.",
+      internalMessage,
+    };
+  }
+  if (error instanceof StudioRenderDurationError) {
+    return {
+      stage: "ffmpeg",
+      errorCode: error.code,
+      errorMessageSafe: STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+      internalMessage,
+    };
+  }
+  if (isStoragePathReplaceTypeError(error)) {
+    return {
+      stage: "asset_download",
+      errorCode: "asset_download_failed",
+      errorMessageSafe: STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+      internalMessage,
+    };
+  }
+  return {
+    stage: "unknown",
+    errorCode: "render_failed",
+    errorMessageSafe: STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+    internalMessage,
+  };
+}
+
 export function createStudioRenderWorkerPort(
   service: SupabaseClient,
   options: { leaseSeconds?: number } = {},
@@ -126,26 +264,66 @@ export async function executeClaimedStudioRenderJob(
   const snapshot = job.project_snapshot;
   const timelineDurationSeconds = assertTimeline(snapshot);
   await assertDiskSpace({ durationSeconds: timelineDurationSeconds });
-  const workspace = await createWorkspace({ jobId: job.id });
+  let workspace: string;
+  try {
+    workspace = await createWorkspace({ jobId: job.id });
+  } catch (error) {
+    if (error instanceof StudioRenderDiskSpaceError || error instanceof StudioRenderAbandonedError) {
+      throw error;
+    }
+    throw new StudioRenderStageError({
+      stage: "workspace",
+      code: "workspace_failed",
+      message: sanitizeStudioRenderErrorMessage(error),
+    });
+  }
   try {
     const paths = new Map<string, string>();
     for (const asset of snapshot.assets) {
+      if (signal.aborted) throw new StudioRenderAbandonedError();
       if (isStudioRenderCatalogAsset(asset)) {
-        const path = await materializeCatalogRenderSource(service, {
-          jobProjectId: job.project_id,
-          asset,
-          workspace,
-        });
-        paths.set(asset.id, path);
+        try {
+          const path = await materializeCatalogRenderSource(service, {
+            jobProjectId: job.project_id,
+            asset,
+            workspace,
+          });
+          paths.set(asset.id, path);
+        } catch (error) {
+          if (error instanceof StudioRenderAbandonedError || signal.aborted) {
+            throw error instanceof StudioRenderAbandonedError ? error : new StudioRenderAbandonedError();
+          }
+          if (error instanceof StudioCatalogMusicUnavailableError) throw error;
+          throw new StudioRenderStageError({
+            stage: "catalog_materialize",
+            code: "catalog_materialize_failed",
+            message: sanitizeStudioRenderErrorMessage(error),
+          });
+        }
         continue;
       }
       if (!isStudioRenderFileAsset(asset)) {
-        throw new Error("source_unavailable");
+        throw studioRenderAssetDownloadError(new Error("source_unavailable"));
       }
-      const { data, error: downloadError } = await service.storage
-        .from(assetsBucket)
-        .download(asset.storagePath);
-      if (downloadError || !data) throw new Error("source_unavailable");
+      if (typeof asset.storagePath !== "string" || asset.storagePath.trim() === "") {
+        throw studioRenderAssetDownloadError(new Error("storage_path_missing"));
+      }
+      let data: { arrayBuffer: () => Promise<ArrayBuffer> } | null = null;
+      let downloadError: unknown = null;
+      try {
+        const downloaded = await service.storage
+          .from(assetsBucket)
+          .download(asset.storagePath);
+        data = downloaded.data;
+        downloadError = downloaded.error;
+      } catch (error) {
+        if (error instanceof StudioRenderAbandonedError || signal.aborted) {
+          throw error instanceof StudioRenderAbandonedError ? error : new StudioRenderAbandonedError();
+        }
+        throw studioRenderAssetDownloadError(error);
+      }
+      if (signal.aborted) throw new StudioRenderAbandonedError();
+      if (downloadError || !data) throw studioRenderAssetDownloadError(downloadError ?? new Error("source_unavailable"));
       const path = join(workspace, `${asset.id}.audio`);
       await writeFile(path, Buffer.from(await data.arrayBuffer()));
       paths.set(asset.id, path);
@@ -161,7 +339,18 @@ export async function executeClaimedStudioRenderJob(
       if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
         throw new StudioRenderAbandonedError();
       }
-      throw error;
+      if (
+        error instanceof StudioRenderDurationError
+        || error instanceof StudioRenderStageError
+        || error instanceof StudioRenderAbandonedError
+      ) {
+        throw error;
+      }
+      throw new StudioRenderStageError({
+        stage: "ffmpeg",
+        code: "ffmpeg_failed",
+        message: sanitizeStudioRenderErrorMessage(error),
+      });
     }
     console.log(JSON.stringify({
       event: "studio_render_completed",
@@ -180,10 +369,20 @@ export async function executeClaimedStudioRenderJob(
     }));
     const outputPath = renderOutputPath(job.id);
     if (snapshotHasCatalogMusic(snapshot)) {
-      await assertCatalogRenderAccessStillValid(service, {
-        jobProjectId: job.project_id,
-        snapshot,
-      });
+      try {
+        await assertCatalogRenderAccessStillValid(service, {
+          jobProjectId: job.project_id,
+          snapshot,
+        });
+      } catch (error) {
+        if (error instanceof StudioCatalogMusicUnavailableError) throw error;
+        if (signal.aborted) throw new StudioRenderAbandonedError();
+        throw new StudioRenderStageError({
+          stage: "access",
+          code: "catalog_access_failed",
+          message: sanitizeStudioRenderErrorMessage(error),
+        });
+      }
     }
     const mayUpload = await allowStudioRenderOutputUpload(signal, async () => {
       const { data, error } = await service.rpc("renew_studio_render_job_lease", {
@@ -208,7 +407,13 @@ export async function executeClaimedStudioRenderJob(
           duplex: "half",
         });
       if (signal.aborted) throw new StudioRenderAbandonedError();
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        throw new StudioRenderStageError({
+          stage: "upload",
+          code: "output_upload_failed",
+          message: sanitizeStudioRenderErrorMessage(uploadError),
+        });
+      }
     } finally {
       signal.removeEventListener("abort", onAbort);
       stream.destroy();
@@ -270,41 +475,22 @@ export async function failClaimedStudioRenderJob(
   if (error instanceof StudioRenderAbandonedError || error instanceof StudioRenderChildAbortedError) {
     return false;
   }
-  const catalogUnavailable =
-    (error instanceof StudioCatalogMusicUnavailableError)
-    || (error instanceof Error && (error as { code?: string }).code === CATALOG_MUSIC_UNAVAILABLE);
-  const diskSpace = error instanceof StudioRenderDiskSpaceError;
-  const timelineGuard = error instanceof StudioRenderTimelineGuardError;
-  const errorCode = catalogUnavailable
-    ? CATALOG_MUSIC_UNAVAILABLE
-    : diskSpace
-      ? error.code
-      : timelineGuard
-        ? error.code
-        : error instanceof StudioRenderDurationError
-          ? error.code
-          : "render_failed";
-  const errorMessageSafe = catalogUnavailable
-    ? CATALOG_MUSIC_EXPORT_UNAVAILABLE_MESSAGE
-    : diskSpace
-      ? "Недостаточно места на диске для экспорта. Попробуйте позже или сократите проект."
-      : timelineGuard
-        ? "Некорректная длительность проекта для экспорта. Проверьте расположение клипов на таймлайне."
-        : "Не удалось подготовить экспорт. Исходники проекта сохранены.";
+  const classified = classifyStudioRenderFailure(error);
   console.error(JSON.stringify({
     event: "studio_render_failed",
     jobId: job.id,
     projectId: job.project_id,
     snapshotRevision: (job.project_snapshot as StudioRenderSnapshot).project?.revision ?? null,
-    errorCode,
-    error: error instanceof Error ? error.message : "unknown_error",
+    stage: classified.stage,
+    errorCode: classified.errorCode,
+    error: classified.internalMessage,
   }));
   const { data: failedJob, error: failureUpdateError } = await service
     .from("studio_render_jobs")
     .update({
       status: "failed",
-      error_code: errorCode,
-      error_message_safe: errorMessageSafe,
+      error_code: classified.errorCode,
+      error_message_safe: classified.errorMessageSafe,
       lease_expires_at: null,
       lease_token: null,
       updated_at: new Date().toISOString(),
