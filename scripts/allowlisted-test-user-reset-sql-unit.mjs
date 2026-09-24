@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationName = "20261030120000_allowlisted_test_user_reset_db_cleanup.sql";
 const migrationPath = join(repoRoot, "supabase/migrations", migrationName);
+const partnerRewardGuardPath = join(
+  repoRoot,
+  "supabase/migrations/20261103120100_allowlisted_test_user_reset_partner_reward_blocker.sql",
+);
 const stubPath = join(repoRoot, "scripts/lib/allowlisted-test-user-reset-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/allowlisted_test_user_reset_smoke.sql");
 const dbName = "audiolad_allowlisted_test_user_reset";
@@ -32,7 +36,21 @@ function localPostgresAvailable() {
   }
 }
 
+function dockerAvailable() {
+  try {
+    execFileSync(
+      "docker",
+      ["exec", "supabase-db", "psql", "-U", "postgres", "-c", "SELECT 1"],
+      { stdio: "ignore" },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const migration = readFileSync(migrationPath, "utf8");
+const partnerRewardGuard = readFileSync(partnerRewardGuardPath, "utf8");
 
 assert(migration.includes("CREATE OR REPLACE FUNCTION public.reset_allowlisted_test_user_db(p_target_user_id uuid)"), "rpc signature");
 assert(migration.includes("SECURITY DEFINER"), "security definer");
@@ -57,6 +75,11 @@ assert(
 );
 assert(migration.includes("7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c"), "sergey author id guard");
 assert(migration.includes("primary_code_normalized = 'sergey'"), "sergey code guard");
+assert(partnerRewardGuard.includes("DETAIL = 'partner_reward'"), "partner reward reset blocker");
+assert(
+  !/DELETE FROM public\.author_partner_reward_ledger_entries/.test(partnerRewardGuard),
+  "reset never deletes partner financial history",
+);
 
 function runPsql(database, sql) {
   execFileSync(
@@ -74,12 +97,35 @@ function runIsolatedSql() {
   const sql = [
     readFileSync(stubPath, "utf8"),
     migration,
+    partnerRewardGuard,
     readFileSync(smokePath, "utf8"),
   ].join("\n");
 
-  if (!localPostgresAvailable()) {
-    return null;
+  if (dockerAvailable()) {
+    execFileSync(
+      "docker",
+      ["exec", "supabase-db", "psql", "-U", "postgres", "-c", `DROP DATABASE IF EXISTS ${dbName} WITH (FORCE);`],
+      { stdio: "ignore" },
+    );
+    execFileSync(
+      "docker",
+      ["exec", "supabase-db", "psql", "-U", "postgres", "-c", `CREATE DATABASE ${dbName};`],
+      { stdio: "ignore" },
+    );
+    execFileSync(
+      "docker",
+      ["exec", "-i", "supabase-db", "psql", "-U", "postgres", "-d", dbName, "-v", "ON_ERROR_STOP=1"],
+      { input: sql, stdio: ["pipe", "pipe", "inherit"] },
+    );
+    execFileSync(
+      "docker",
+      ["exec", "supabase-db", "psql", "-U", "postgres", "-c", `DROP DATABASE IF EXISTS ${dbName} WITH (FORCE);`],
+      { stdio: "ignore" },
+    );
+    return "docker:supabase-db";
   }
+
+  if (!localPostgresAvailable()) return null;
 
   execFileSync(
     "sudo",

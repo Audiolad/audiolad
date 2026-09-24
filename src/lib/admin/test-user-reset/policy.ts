@@ -91,6 +91,8 @@ function getBlockMessage(code: TestUserResetBlockCode): string {
       return "Тестовый аккаунт пригласил другого пользователя. Такие рефералы не удаляются.";
     case TEST_USER_RESET_BLOCK_CODES.royalty:
       return "У авторского пространства есть роялти или журнал начислений.";
+    case TEST_USER_RESET_BLOCK_CODES.partner_reward:
+      return "У авторского пространства есть финансовые партнёрские начисления.";
     case TEST_USER_RESET_BLOCK_CODES.payout:
       return "У авторского пространства есть выплаты.";
     case TEST_USER_RESET_BLOCK_CODES.payout_profile:
@@ -231,6 +233,12 @@ export function evaluateTestUserResetBlockers(input: {
   if (countOf(input.counts, "authorLedgerEntries") > 0) {
     blockers.push(
       buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.royalty),
+    );
+  }
+
+  if (countOf(input.counts, "partnerRewardLedgerEntries") > 0) {
+    blockers.push(
+      buildTestUserResetBlocker(TEST_USER_RESET_BLOCK_CODES.partner_reward),
     );
   }
 

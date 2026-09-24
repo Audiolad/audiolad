@@ -303,6 +303,27 @@ export async function processDueFinanceObligations(
   };
 }
 
+/**
+ * Best-effort post-commit drain for the separate partner reward queue.
+ * Its durable source event was inserted with the author ledger row, so a
+ * failure here never affects buyer commerce and remains retryable.
+ */
+export async function processDueAuthorPartnerRewardObligations(
+  limit = 50,
+): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.rpc(
+    "process_due_author_partner_reward_obligations",
+    { p_limit: limit },
+  );
+  if (error) {
+    console.error(
+      "process_due_author_partner_reward_obligations_error",
+      error.message,
+    );
+  }
+}
+
 async function findObligationId(
   obligationType: FinanceObligationType,
   subjectId: string,
@@ -346,7 +367,9 @@ export async function ensureFinanceObligationProcessed(input: {
     );
 
     if (obligationId) {
-      return await processFinanceObligation(obligationId);
+      const result = await processFinanceObligation(obligationId);
+      await processDueAuthorPartnerRewardObligations();
+      return result;
     }
 
     // The outbox insert did not survive (it is allowed to fail silently), so
@@ -362,7 +385,7 @@ export async function ensureFinanceObligationProcessed(input: {
             correlationId: input.fallbackCorrelationId ?? null,
           });
 
-    return {
+    const result = {
       ok: direct.ok,
       outcome: direct.outcome,
       status: null,
@@ -370,6 +393,8 @@ export async function ensureFinanceObligationProcessed(input: {
       obligationId: null,
       ledgerEntryId: direct.entry?.id ?? null,
     };
+    await processDueAuthorPartnerRewardObligations();
+    return result;
   } catch (error) {
     console.error(
       "ensure_finance_obligation_processed_error",
