@@ -150,13 +150,16 @@ function testDraftCourseAudioGates() {
   );
 
   const signedAudio = read("src/lib/listen/signed-audio.ts");
-  assert.match(signedAudio, /canPlayCourseAudioItem/);
-  assert.match(signedAudio, /shouldEnforcePublishedAudioItemForEntitledSignedUrl/);
+  assert.match(signedAudio, /signEntitledListenAudio/);
   assert.match(signedAudio, /createServiceRoleClient/);
   assert.doesNotMatch(
     signedAudio,
     /mode === "author_preview"[\s\S]{0,80}isCourse/,
   );
+
+  const entitledAudio = read("src/lib/listen/sign-entitled-audio.ts");
+  assert.match(entitledAudio, /canPlayCourseAudioItem/);
+  assert.match(entitledAudio, /shouldEnforcePublishedAudioItemForEntitledSignedUrl/);
 
   const sessionLoader = read("src/lib/listen/load-session-payload.ts");
   assert.match(sessionLoader, /shouldApplyEntitledPublishedAudioFilter/);

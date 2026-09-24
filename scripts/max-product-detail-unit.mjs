@@ -18,7 +18,7 @@ assert.match(source, /object-cover/);
 assert.doesNotMatch(source, /h-48/);
 assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
-assert.equal(source.includes("setDetail({ status: \"idle\" }); setSelected(null)"), true);
+assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 
 const catalogStart = source.indexOf("catalog.items.map");
 assert.notEqual(catalogStart, -1, "catalog list exists");

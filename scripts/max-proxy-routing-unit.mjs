@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   isMaxCatalogPath,
+  isMaxPlaybackAudioPath,
+  isMaxPlaybackSessionPath,
   isMaxProductPath,
   isMaxHostname,
   isMaxSessionLinkPath,
@@ -17,6 +19,8 @@ import {
   isMaxSitePath,
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
+  MAX_PLAYBACK_AUDIO_PATH,
+  MAX_PLAYBACK_SESSION_PATH,
   MAX_PRODUCT_PATH,
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
@@ -86,6 +90,11 @@ assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
 assert.equal(isMaxCatalogPath("/api/max"), false);
 assert.equal(isMaxProductPath(MAX_PRODUCT_PATH), true);
 assert.equal(isMaxProductPath(`${MAX_PRODUCT_PATH}/`), false);
+assert.equal(isMaxPlaybackSessionPath(MAX_PLAYBACK_SESSION_PATH), true);
+assert.equal(isMaxPlaybackSessionPath(`${MAX_PLAYBACK_SESSION_PATH}/`), false);
+assert.equal(isMaxPlaybackAudioPath(MAX_PLAYBACK_AUDIO_PATH), true);
+assert.equal(isMaxPlaybackAudioPath("/api/max/playback"), false);
+assert.equal(isMaxPlaybackAudioPath("/api/max/playback/"), false);
 
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
@@ -96,10 +105,21 @@ assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_SESSION_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_AUDIO_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_SESSION_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_AUDIO_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/playback", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/playback/", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/listen/author/product/audio/1", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/listen/author/product", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/practice/author/product", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/my-practices", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/my-library/private-audio/1", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/health/build", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/session", "not_found");
@@ -212,6 +232,9 @@ const maxClientSources = [
   "src/components/max/MaxSignupForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/components/max/MaxAuthenticatedHome.tsx",
+  "src/components/max/MaxAudioPlayer.tsx",
+  "src/components/max/useMaxAudioPlayback.ts",
+  "src/lib/max/max-audio-playback.ts",
   "src/app/(platform)/max-site/page.tsx",
   "src/app/(platform)/max-site/layout.tsx",
 ]

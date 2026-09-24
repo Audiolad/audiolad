@@ -1332,9 +1332,13 @@ assert.doesNotMatch(page, /from\("course_lessons"\)/);
 assert.doesNotMatch(page, /app\/api\/learn/);
 
 const signedAudio = read("src/lib/listen/signed-audio.ts");
-assert.match(signedAudio, /canPlayCourseAudioItem/);
+assert.match(signedAudio, /signEntitledListenAudio/);
 assert.match(signedAudio, /isCoursePublication/);
-assert.match(signedAudio, /shouldEnforcePublishedAudioItemForEntitledSignedUrl/);
+
+const entitledAudio = read("src/lib/listen/sign-entitled-audio.ts");
+assert.match(entitledAudio, /canPlayCourseAudioItem/);
+assert.match(entitledAudio, /isCoursePublication/);
+assert.match(entitledAudio, /shouldEnforcePublishedAudioItemForEntitledSignedUrl/);
 
 const sessionLoader = read("src/lib/listen/load-session-payload.ts");
 assert.match(sessionLoader, /listAccessibleCourseAudioItemIds/);

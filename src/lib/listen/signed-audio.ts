@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 
-import {
-  canPlayCourseAudioItem,
-  listCourseStorefrontPreviewAudioItemIds,
-} from "@/lib/course-content/learner-assets";
+import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/learner-assets";
 import { isCourseStorefrontPreviewClipEligible } from "@/lib/course-content/storefront-preview";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import { loadListenApiContext } from "@/lib/listen/api-context";
-import { shouldEnforcePublishedAudioItemForEntitledSignedUrl } from "@/lib/listen/course-audio-status";
 import { buildListenPreviewClipPath } from "@/lib/listen/preview-clip-http";
 import { resolvePreviewClipWindow } from "@/lib/listen/serve-preview-clip";
+import {
+  signEntitledListenAudio,
+  type SignEntitledListenAudioResult,
+} from "@/lib/listen/sign-entitled-audio";
 import {
   LISTEN_SIGNED_URL_TTL_SECONDS,
   normalizeStorageSignedUrl,
 } from "@/lib/listen/signed-url";
-import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 import { buildListenApiBase } from "@/lib/products/paths";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -90,6 +89,26 @@ async function signListenStoragePath(
   });
 }
 
+function respondEntitledSignedAudio(result: SignEntitledListenAudioResult) {
+  if (result.ok) {
+    return NextResponse.json({
+      url: result.url,
+      expires_in: result.expiresIn,
+    });
+  }
+
+  if (result.reason === "not_found" || result.reason === "audio_missing") {
+    return NextResponse.json({ error: result.reason }, { status: 404 });
+  }
+  if (result.reason === "forbidden" || result.reason === "access_required") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (result.reason === "sign_failed") {
+    return NextResponse.json({ error: "sign_failed" }, { status: 500 });
+  }
+  return NextResponse.json({ error: "internal_error" }, { status: 500 });
+}
+
 export async function serveListenSignedAudio(
   request: Request,
   authorSlug: string,
@@ -109,7 +128,7 @@ export async function serveListenSignedAudio(
     return loaded.response;
   }
 
-  const { storageClient, supabase, practice, access, userId } = loaded.context;
+  const { storageClient, practice, access, userId } = loaded.context;
   const isCourse = isCoursePublication(
     practice.publication_class,
     practice.product_kind,
@@ -170,65 +189,16 @@ export async function serveListenSignedAudio(
     }
   }
 
-  if (isCourse) {
-    try {
-      const serviceRole = createServiceRoleClient();
-      const playable = await canPlayCourseAudioItem({
-        supabase,
-        serviceRole,
-        practice,
+  if (access.mode !== "catalog_preview") {
+    return respondEntitledSignedAudio(
+      await signEntitledListenAudio({
         userId,
-        audioItemId: audioId,
-      });
-
-      if (!playable) {
-        return NextResponse.json({ error: "forbidden" }, { status: 403 });
-      }
-
-      const { data: courseAudio, error: courseAudioError } = await serviceRole
-        .from("audio_items")
-        .select(
-          "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms",
-        )
-        .eq("id", audioId)
-        .eq("practice_id", practice.id)
-        .maybeSingle();
-
-      if (courseAudioError) {
-        console.error("listen_course_audio_item_error", courseAudioError.message);
-        return NextResponse.json({ error: "internal_error" }, { status: 500 });
-      }
-
-      const audioPath = courseAudio?.audio_path?.trim() ?? null;
-      if (!courseAudio?.id || !audioPath) {
-        return NextResponse.json(
-          { error: courseAudio?.id ? "audio_missing" : "not_found" },
-          { status: 404 },
-        );
-      }
-
-      const { data: signedData, error: signedError } = await serviceRole.storage
-        .from("practice-audio")
-        .createSignedUrl(audioPath, LISTEN_SIGNED_URL_TTL_SECONDS);
-
-      if (signedError || !signedData?.signedUrl) {
-        console.error("listen_audio_sign_error", signedError?.message);
-        return NextResponse.json({ error: "sign_failed" }, { status: 500 });
-      }
-
-      const url = normalizeStorageSignedUrl(signedData.signedUrl);
-      if (!url) {
-        return NextResponse.json({ error: "sign_failed" }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        url,
-        expires_in: LISTEN_SIGNED_URL_TTL_SECONDS,
-      });
-    } catch (error) {
-      console.error("listen_course_audio_access_error", error);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
+        authorSlug,
+        productSlug,
+        audioId,
+        practice,
+      }),
+    );
   }
 
   const { data: audioItem, error: audioLookupError } = await storageClient
@@ -328,21 +298,5 @@ export async function serveListenSignedAudio(
     return signListenStoragePath(previewMode.bucket, previewMode.path);
   }
 
-  if (
-    access.mode === "entitled" &&
-    shouldEnforcePublishedAudioItemForEntitledSignedUrl(isCourse)
-  ) {
-    if (!canEntitledUserAccessPracticeStatus(practice.status)) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
-    }
-
-    if (audioStatus !== "published") {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
-    }
-  }
-
-  if (listenSource.kind === "missing") {
-    return NextResponse.json({ error: "audio_missing" }, { status: 404 });
-  }
-  return signListenStoragePath(listenSource.bucket, listenSource.path);
+  return NextResponse.json({ error: "forbidden" }, { status: 403 });
 }
