@@ -481,6 +481,64 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### Canonical disk maintenance (`OPS_MAINTENANCE_DRY_RUN` / `OPS_MAINTENANCE_APPLY`)
+
+Тот же workflow, `confirm=OPS_MAINTENANCE_DRY_RUN` или
+`OPS_MAINTENANCE_APPLY`. **Не** `OPS_DISK_STORAGE_AUDIT` и **не**
+`OPS_DISK_STORAGE_CLEANUP` (тот one-shot allowlist остаётся отдельным).
+
+Единственная remote-реализация — `deploy/scripts/audiolad-maintenance-ops.sh`,
+забранная с trusted `origin_main_sha` через GitHub Contents API (как
+course-upgrade helper). Job **не** exec-ит maintenance из PR-ветки и
+**не** подменяет `/usr/local/lib/audiolad/audiolad-maintenance.sh`.
+
+Privilege discovery: **no existing** narrow deploy-user sudo contract can
+run maintenance. `/usr/local/sbin/audiolad-deploy` is deploy-only.
+`/usr/local/sbin/audiolad-maintenance.sh` is a `"$@"` convenience wrapper
+with **no** `/etc/sudoers.d` fragment in-repo. The systemd unit
+`audiolad-maintenance.service` runs `--apply` as root on the timer and is
+not startable by `deploy` without new sudo.
+
+This PR adds Draft no-arg wrappers + sudoers only. **Do not install them
+from this PR, from CI, or from the new ops jobs.** Until a later explicit
+bootstrap, both confirms fail closed with `PRIVILEGED_MAINTENANCE=NEED_INSTALL`.
+
+| Asset | Repo path | Intended server path |
+|-------|-----------|----------------------|
+| Dry-run wrapper | `deploy/scripts/audiolad-maintenance-dry-run.sh` | `/usr/local/sbin/audiolad-maintenance-dry-run` |
+| Apply wrapper | `deploy/scripts/audiolad-maintenance-apply.sh` | `/usr/local/sbin/audiolad-maintenance-apply` |
+| Dry-run sudoers | `deploy/sudoers/audiolad-maintenance-dry-run` | `/etc/sudoers.d/audiolad-maintenance-dry-run` |
+| Apply sudoers | `deploy/sudoers/audiolad-maintenance-apply` | `/etc/sudoers.d/audiolad-maintenance-apply` |
+
+Exact privileged commands after bootstrap (hardcoded, no extra argv):
+
+```text
+sudo -n /usr/local/sbin/audiolad-maintenance-dry-run
+sudo -n /usr/local/sbin/audiolad-maintenance-apply
+```
+
+sudoers contract (empty-argument list `""`, no wildcards, no `ALL`, no
+`SETENV`):
+
+```text
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance-dry-run ""
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance-apply ""
+```
+
+Fail-closed version check: installed
+`/usr/local/lib/audiolad/audiolad-maintenance.sh` and
+`/usr/local/lib/audiolad/release-retention.sh` git-blob SHAs must match
+the files at trusted `origin_main_sha`. Mismatch refuses sudo.
+
+`KEEP_EXTRA_RELEASES` stays `1`. No new cleanup categories.
+
+```text
+CUTOVER=NO
+audiolad_deploy=NOT_INVOKED
+```
+
+DEPLOY NOT IN SCOPE. Do not dispatch these confirms from this PR.
+
 ### Privileged web PM2 logdiag wrapper (Draft only — do not install)
 
 In-repo discovery found **no** existing narrow read-only privilege

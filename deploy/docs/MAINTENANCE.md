@@ -78,6 +78,16 @@ journalctl -t audiolad-maintenance --since today
 sudo /usr/local/sbin/audiolad-maintenance.sh --apply
 ```
 
+GitHub Actions `confirm=OPS_MAINTENANCE_DRY_RUN` /
+`OPS_MAINTENANCE_APPLY` (`docs/production-deploy-github-actions.md`)
+are intended to call **no-arg** wrappers
+`/usr/local/sbin/audiolad-maintenance-dry-run` and
+`/usr/local/sbin/audiolad-maintenance-apply`. Those wrappers and their
+narrow sudoers are Draft only and are **not** installed by merging or
+by the ops jobs. Until a later explicit bootstrap the GHA confirms
+fail closed (`PRIVILEGED_MAINTENANCE=NEED_INSTALL`). They do not call
+`audiolad-deploy` and do not change `KEEP_EXTRA_RELEASES`.
+
 ## Related read-only audit
 
 GitHub Actions `confirm=OPS_DISK_STORAGE_AUDIT` (`docs/production-deploy-github-actions.md`)
