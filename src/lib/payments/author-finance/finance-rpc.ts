@@ -276,6 +276,7 @@ export type FinanceObligationBatchResult = {
   skipped: number;
   requiresReview: number;
   failed: number;
+  partnerFailed: number;
 };
 
 export async function processDueFinanceObligations(
@@ -294,13 +295,15 @@ export async function processDueFinanceObligations(
 
   const row = (data ?? {}) as Record<string, unknown>;
 
-  return {
+  const result = {
     attempted: asNumber(row.attempted),
     processed: asNumber(row.processed),
     skipped: asNumber(row.skipped),
     requiresReview: asNumber(row.requires_review),
     failed: asNumber(row.failed),
   };
+  const partner = await processDueAuthorPartnerRewardObligations(limit);
+  return { ...result, partnerFailed: partner?.failed ?? 0 };
 }
 
 /**
@@ -310,9 +313,9 @@ export async function processDueFinanceObligations(
  */
 export async function processDueAuthorPartnerRewardObligations(
   limit = 50,
-): Promise<void> {
+): Promise<{ failed: number } | null> {
   const supabase = createServiceRoleClient();
-  const { error } = await supabase.rpc(
+  const { data, error } = await supabase.rpc(
     "process_due_author_partner_reward_obligations",
     { p_limit: limit },
   );
@@ -321,7 +324,10 @@ export async function processDueAuthorPartnerRewardObligations(
       "process_due_author_partner_reward_obligations_error",
       error.message,
     );
+    return null;
   }
+  const row = (data ?? {}) as Record<string, unknown>;
+  return { failed: asNumber(row.failed) };
 }
 
 async function findObligationId(

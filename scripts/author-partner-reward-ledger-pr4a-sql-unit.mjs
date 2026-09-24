@@ -31,10 +31,21 @@ assert(migration.includes("source_event_ledger_entry_id"), "event provenance is 
 assert(migration.includes("ON DELETE RESTRICT"), "financial FKs are fail-closed");
 assert(migration.includes("author_partner_reward_ledger_append_only"), "ledger is append-only");
 assert(migration.includes("NEW.entry_type IN ('sale_accrual', 'refund_reversal')"), "only confirmed source types enqueue");
+assert(
+  migration.includes("WHERE id = v_sale.id\n  FOR UPDATE"),
+  "all reconciliation for a source sale uses a canonical sale lock",
+);
+assert(
+  !migration.includes("r.status IN ('activated', 'expired')"),
+  "initial eligibility uses immutable activation facts, not mutable referral status",
+);
+assert(migration.includes("'failed', v_failed"), "partner batch reports failed count");
 assert(!migration.includes("INSERT INTO public.author_partner_reward_ledger_entries\nSELECT"), "migration has no backfill");
 assert(stub.includes("author_ledger_entries"), "isolated source ledger stub exists");
 assert(smoke.includes("expected -667 partner reversal"), "cumulative rounding smoke exists");
 assert(smoke.includes("2030-01-01"), "refund after expiry smoke exists");
+assert(smoke.includes("'void'"), "void referral delayed sale regression exists");
+assert(smoke.includes("out-of-order refund must remain retryable"), "out-of-order retry smoke exists");
 assert(smoke.includes("append-only UPDATE"), "immutability smoke exists");
 
 const db = "audiolad_partner_reward_pr4a_test";

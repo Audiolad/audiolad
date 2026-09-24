@@ -134,7 +134,6 @@ AS $$
   SELECT r.*
   FROM public.author_referrals AS r
   WHERE r.invitee_author_id = p_invitee_author_id
-    AND r.status IN ('activated', 'expired')
     AND r.activated_at IS NOT NULL
     AND r.expires_at IS NOT NULL
     AND p_effective_at >= r.activated_at
@@ -225,7 +224,10 @@ BEGIN
     IF NOT FOUND THEN
       UPDATE public.author_partner_reward_obligations
       SET status = 'failed', result_code = 'source_sale_missing',
-          attempts = attempts + 1, next_retry_at = now(),
+          attempts = attempts + 1,
+          next_retry_at = now() + make_interval(
+            mins => least(60, power(2, least(attempts, 6))::integer)
+          ),
           last_error = 'source_sale_missing', updated_at = now()
       WHERE id = v_obligation.id;
       RETURN jsonb_build_object('ok', false, 'outcome', 'failed', 'result_code', 'source_sale_missing');
@@ -241,6 +243,14 @@ BEGIN
     END IF;
     SELECT * INTO v_referral FROM public.author_referrals WHERE id = v_existing.referral_id;
   END IF;
+
+  -- Serialize every event for this source sale before reading the current
+  -- partner position and appending its delta. Refund rows alone are distinct
+  -- locks and therefore insufficient under concurrent reconciliation.
+  SELECT * INTO v_sale
+  FROM public.author_ledger_entries
+  WHERE id = v_sale.id
+  FOR UPDATE;
 
   SELECT coalesce(sum(amount_minor), 0)::bigint INTO v_author_net
   FROM public.author_ledger_entries
@@ -331,6 +341,7 @@ DECLARE
   v_processed integer := 0;
   v_skipped integer := 0;
   v_review integer := 0;
+  v_failed integer := 0;
 BEGIN
   FOR v_id IN
     SELECT id FROM public.author_partner_reward_obligations
@@ -357,6 +368,7 @@ BEGIN
     CASE v_result ->> 'outcome'
       WHEN 'processed' THEN v_processed := v_processed + 1;
       WHEN 'skipped' THEN v_skipped := v_skipped + 1;
+      WHEN 'failed' THEN v_failed := v_failed + 1;
       ELSE v_review := v_review + 1;
     END CASE;
   END LOOP;
@@ -364,7 +376,8 @@ BEGIN
     'attempted', v_total,
     'processed', v_processed,
     'skipped', v_skipped,
-    'requires_review', v_review
+    'requires_review', v_review,
+    'failed', v_failed
   );
 END;
 $$;

@@ -97,7 +97,7 @@ BEGIN
   INSERT INTO public.author_referrals (
     id, referrer_author_id, invitee_author_id, invitee_user_id, status, activated_at, expires_at
   ) VALUES (
-    delayed_referral, partner, delayed_invitee, delayed_user, 'expired',
+    delayed_referral, partner, delayed_invitee, delayed_user, 'void',
     '2000-01-01T00:00:00Z', '2001-01-01T00:00:00Z'
   );
   INSERT INTO public.author_ledger_entries (
