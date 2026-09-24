@@ -173,6 +173,7 @@ import {
   validateStudioMusicPaidPriceInputDraft,
 } from "@/lib/author-products/price-input-draft";
 import {
+  applyMusicAudioItemDeletion,
   mergeServerAudioItems,
   mergeServerProductIntoForm,
   patchAudioItemAfterMusicMasterFinalize,
@@ -1065,6 +1066,7 @@ export default function AuthorProductForm({
     practiceId,
     audioItems,
     setAudioItems,
+    preserveLocalMedia: form.productKind === PRODUCT_KIND.MUSIC,
   });
 
   const loadAudioPreview = useCallback(
@@ -2716,11 +2718,11 @@ export default function AuthorProductForm({
         setMessage("Аудио загружено.");
       } else if (result.assetId) {
         setAudioItems((current) =>
-          patchAudioItemAfterMusicMasterFinalize(
-            current,
-            audioId,
-            result.assetId!,
-          ),
+          patchAudioItemAfterMusicMasterFinalize(current, audioId, {
+            assetId: result.assetId!,
+            lifecycleState: result.lifecycleState,
+            transcodeStatus: result.transcodeStatus,
+          }),
         );
         setMessage(result.message);
       } else {
@@ -2815,10 +2817,15 @@ export default function AuthorProductForm({
     launchMusicQueueIds(step.launchIds);
   }
 
+  function applyMusicProductLevel(product: AuthorProductDetail) {
+    setForm((current) => mergeServerProductIntoForm(current, product));
+    setContentLockedAfterSale(product.contentLockedAfterSale === true);
+    setDeleteLockedAfterPaidPurchase(
+      product.deleteLockedAfterPaidPurchase === true,
+    );
+  }
+
   async function deleteAudioItem(audioId: string, hasFile: boolean) {
-    if (form.productKind === PRODUCT_KIND.MUSIC) {
-      forgetMusicTrack(audioId);
-    }
     const target = audioItems.find((item) => item.id === audioId);
     if (
       form.productKind !== PRODUCT_KIND.MUSIC &&
@@ -2839,6 +2846,10 @@ export default function AuthorProductForm({
       !window.confirm("Удалить это аудио вместе с загруженным файлом?")
     ) {
       return;
+    }
+
+    if (form.productKind === PRODUCT_KIND.MUSIC) {
+      forgetMusicTrack(audioId);
     }
 
     if (!practiceId || audioId.startsWith("temp-")) {
@@ -2865,7 +2876,16 @@ export default function AuthorProductForm({
       return;
     }
 
-    if (payload.product) {
+    if (payload.product && form.productKind === PRODUCT_KIND.MUSIC) {
+      applyMusicProductLevel(payload.product);
+      setAudioItems((current) =>
+        applyMusicAudioItemDeletion(
+          current,
+          audioId,
+          payload.product!.audio_items,
+        ),
+      );
+    } else if (payload.product) {
       applyServerProductPreservingDraft(payload.product);
     }
   }
@@ -2986,12 +3006,6 @@ export default function AuthorProductForm({
   }
 
   async function deleteAudioFile(audioId: string) {
-    if (
-      form.productKind === PRODUCT_KIND.MUSIC &&
-      musicQueueEntry(musicQueueRef.current, audioId)?.phase === "uploading"
-    ) {
-      forgetMusicTrack(audioId);
-    }
     const target = audioItems.find((item) => item.id === audioId);
     if (
       form.productKind !== PRODUCT_KIND.MUSIC &&
@@ -3004,6 +3018,10 @@ export default function AuthorProductForm({
     }
     if (!window.confirm("Удалить аудио?")) {
       return;
+    }
+
+    if (form.productKind === PRODUCT_KIND.MUSIC) {
+      forgetMusicTrack(audioId);
     }
 
     setDeletingAudioFileId(audioId);
@@ -3078,7 +3096,19 @@ export default function AuthorProductForm({
         return;
       }
 
-      applyServerProductPreservingDraft(payload.product);
+      if (form.productKind === PRODUCT_KIND.MUSIC) {
+        applyMusicProductLevel(payload.product);
+        const serverItem = payload.product.audio_items.find(
+          (item) => item.id === targetAudioId,
+        );
+        if (serverItem) {
+          setAudioItems((current) =>
+            patchAudioItemFromUpload(current, targetAudioId, serverItem),
+          );
+        }
+      } else {
+        applyServerProductPreservingDraft(payload.product);
+      }
       setAudioPreviewUrls((current) => {
         const next = { ...current };
         delete next[targetAudioId];

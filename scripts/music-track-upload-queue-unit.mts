@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import {
   mergeAudioReorderPreservingLocalMedia,
+  applyMusicAudioItemDeletion,
   patchAudioItemAfterMusicMasterFinalize,
   patchAudioItemFromUpload,
 } from "../src/lib/author-products/form-merge";
@@ -106,7 +107,7 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
 }
 
 {
-  const snapshot = stageAll([
+  let snapshot = stageAll([
     { id: "a", kind: "legacy" },
     { id: "b", kind: "master" },
   ]);
@@ -200,10 +201,14 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
       position: 2,
     }),
   ];
-  const patched = patchAudioItemAfterMusicMasterFinalize(local, "a", "asset-a");
+  const patched = patchAudioItemAfterMusicMasterFinalize(local, "a", {
+    assetId: "asset-a",
+    lifecycleState: "verified",
+    transcodeStatus: "processing",
+  });
   assert.equal(patched[0]?.music_master?.assetId, "asset-a");
   assert.equal(patched[0]?.music_master?.lifecycleState, "verified");
-  assert.equal(patched[0]?.music_master?.transcodeStatus, "queued");
+  assert.equal(patched[0]?.music_master?.transcodeStatus, "processing");
   assert.equal(patched[0]?.title, "A");
   assert.equal(patched[1]?.audio_path, "practices/p/audio/b.mp3");
   assert.equal(patched[1]?.music_master, undefined);
@@ -223,6 +228,92 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   assert.equal(merged.find((entry) => entry.id === "a")?.title, "Новый A");
   assert.equal(merged.find((entry) => entry.id === "a")?.position, 2);
   assert.equal(merged.find((entry) => entry.id === "b")?.audio_path, "b.mp3");
+}
+
+function functionBody(source: string, name: string): string {
+  const start = source.indexOf(`async function ${name}`);
+  assert.ok(start >= 0, name);
+  const next = source.indexOf("\n  async function ", start + 1);
+  return source.slice(start, next === -1 ? undefined : next);
+}
+
+{
+  const deleteItem = functionBody(formSource, "deleteAudioItem");
+  const lengthGuard = deleteItem.indexOf("audioItems.length <= 1");
+  const confirm = deleteItem.indexOf("window.confirm");
+  const forget = deleteItem.indexOf("forgetMusicTrack");
+  assert.ok(lengthGuard >= 0 && lengthGuard < forget);
+  assert.ok(confirm >= 0 && confirm < forget);
+  const deleteFile = functionBody(formSource, "deleteAudioFile");
+  assert.ok(deleteFile.indexOf("window.confirm") < deleteFile.indexOf("forgetMusicTrack"));
+  assert.match(deleteFile, /productKind === PRODUCT_KIND\.MUSIC\) \{\s*forgetMusicTrack/);
+}
+
+{
+  const ready = stageMusicFile(emptyMusicQueue(), "a", "legacy", "a.mp3").snapshot;
+  assert.equal(dropMusicUpload(ready, "a").snapshot.entries.length, 0);
+  const queued = enqueueReadyMusicUploads(
+    stageAll([
+      { id: "a", kind: "legacy" },
+      { id: "b", kind: "legacy" },
+      { id: "c", kind: "legacy" },
+      { id: "d", kind: "legacy" },
+    ]),
+    ["a", "b", "c", "d"],
+  ).snapshot;
+  assert.equal(queued.entries.find((entry) => entry.audioId === "d")?.phase, "queued");
+  const droppedQueued = dropMusicUpload(queued, "d");
+  assert.equal(droppedQueued.wasUploading, false);
+  assert.equal(droppedQueued.snapshot.entries.some((entry) => entry.audioId === "d"), false);
+  const errored = finishMusicUpload(
+    enqueueReadyMusicUploads(stageAll([{ id: "a", kind: "legacy" }]), ["a"]).snapshot,
+    "a",
+    1,
+    "fail",
+  ).snapshot;
+  assert.equal(errored.entries[0]?.phase, "error");
+  assert.equal(dropMusicUpload(errored, "a").snapshot.entries.length, 0);
+  const uploading = enqueueReadyMusicUploads(stageAll([{ id: "a", kind: "legacy" }]), ["a"]).snapshot;
+  const droppedUploading = dropMusicUpload(uploading, "a");
+  assert.equal(droppedUploading.wasUploading, true);
+  assert.equal(
+    finishMusicUpload(droppedUploading.snapshot, "a", droppedUploading.generation ?? 0).ignored,
+    true,
+  );
+}
+
+{
+  const local = [
+    item({ id: "a", title: "A", position: 1, audio_path: "old-a.mp3" }),
+    item({
+      id: "b",
+      title: "Новый B",
+      position: 2,
+      audio_path: "new-b.mp3",
+      duration_seconds: 12,
+    }),
+  ];
+  const staleServer = [
+    item({ id: "b", title: "Старый B", position: 1, audio_path: null, duration_seconds: null }),
+  ];
+  const next = applyMusicAudioItemDeletion(local, "a", staleServer);
+  assert.equal(next.some((entry) => entry.id === "a"), false);
+  assert.equal(next[0]?.id, "b");
+  assert.equal(next[0]?.audio_path, "new-b.mp3");
+  assert.equal(next[0]?.title, "Новый B");
+  assert.equal(next[0]?.position, 1);
+  assert.equal(next[0]?.duration_seconds, 12);
+}
+
+{
+  const reorderSource = readFileSync(
+    new URL("../src/components/author-dashboard/useAudioItemsReorder.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(reorderSource, /preserveLocalMedia = false/);
+  assert.match(reorderSource, /preserveLocalMedia\s*\?/);
+  assert.match(reorderSource, /mergeServerAudioItems\(current, payload\.product!\.audio_items\)/);
+  assert.match(formSource, /preserveLocalMedia: form\.productKind === PRODUCT_KIND\.MUSIC/);
 }
 
 assert.match(formSource, /Загрузить все треки/);

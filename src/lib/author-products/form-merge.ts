@@ -341,11 +341,15 @@ export function patchAudioItemFromUpload(
   });
 }
 
-/** WAV master finalize does not return the product. Reflect the known lifecycle. */
+/** WAV master finalize does not return the product. Reflect the finalize payload. */
 export function patchAudioItemAfterMusicMasterFinalize(
   localItems: AudioItemRow[],
   audioId: string,
-  assetId: string,
+  input: {
+    assetId: string;
+    lifecycleState?: NonNullable<AudioItemRow["music_master"]>["lifecycleState"] | null;
+    transcodeStatus?: NonNullable<AudioItemRow["music_master"]>["transcodeStatus"] | null;
+  },
 ): AudioItemRow[] {
   return localItems.map((item) => {
     if (item.id !== audioId) {
@@ -354,15 +358,38 @@ export function patchAudioItemAfterMusicMasterFinalize(
 
     return {
       ...item,
-      desired_music_master_asset_id: assetId,
+      desired_music_master_asset_id: input.assetId,
       music_master: {
-        assetId,
-        lifecycleState: "verified",
-        transcodeStatus: "queued",
+        assetId: input.assetId,
+        lifecycleState: input.lifecycleState ?? "verified",
+        transcodeStatus: input.transcodeStatus ?? "queued",
         hasActiveDelivery: item.music_master?.hasActiveDelivery === true,
       },
     };
   });
+}
+
+/** Drop one track and take sibling positions from the server. Keep local media and text. */
+export function applyMusicAudioItemDeletion(
+  localItems: AudioItemRow[],
+  deletedAudioId: string,
+  serverItems: AudioItemRow[],
+): AudioItemRow[] {
+  const serverById = new Map(serverItems.map((item) => [item.id, item]));
+
+  return localItems
+    .filter((item) => item.id !== deletedAudioId)
+    .map((item) => {
+      const serverItem = serverById.get(item.id);
+      if (!serverItem) {
+        return item;
+      }
+
+      return {
+        ...item,
+        position: serverItem.position,
+      };
+    });
 }
 
 /** Reorder changes position only. Keep local media, titles, and descriptions. */

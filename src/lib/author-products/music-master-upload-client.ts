@@ -14,9 +14,51 @@ type StartPayload = {
   message?: string;
 };
 
+export type MusicMasterLifecycleState =
+  | "uploading"
+  | "verified"
+  | "rejected"
+  | "abandoned";
+
+export type MusicMasterTranscodeStatus =
+  | "queued"
+  | "processing"
+  | "ready"
+  | "failed";
+
 export type MusicMasterUploadResult =
-  | { ok: true; message: string; assetId: string | null }
+  | {
+      ok: true;
+      message: string;
+      assetId: string | null;
+      lifecycleState: MusicMasterLifecycleState | null;
+      transcodeStatus: MusicMasterTranscodeStatus | null;
+    }
   | { ok: false; error?: string; message?: string; status: number };
+
+function readLifecycleState(value: unknown): MusicMasterLifecycleState | null {
+  if (
+    value === "uploading" ||
+    value === "verified" ||
+    value === "rejected" ||
+    value === "abandoned"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function readTranscodeStatus(value: unknown): MusicMasterTranscodeStatus | null {
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "ready" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+  return null;
+}
 
 async function readJson<T>(response: Response): Promise<T | null> {
   const text = await response.text();
@@ -123,6 +165,8 @@ export async function uploadMusicMasterDirect(input: {
       error?: string;
       message?: string;
       asset_id?: string;
+      lifecycle_state?: string;
+      transcode_status?: string;
     }>(finalized);
     if (!finalized.ok) {
       await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
@@ -132,6 +176,8 @@ export async function uploadMusicMasterDirect(input: {
       ok: true,
       message: "Файл загружен. Подготавливаем версию для прослушивания…",
       assetId: payload?.asset_id ?? started.asset_id,
+      lifecycleState: readLifecycleState(payload?.lifecycle_state),
+      transcodeStatus: readTranscodeStatus(payload?.transcode_status),
     };
   } catch {
     await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });

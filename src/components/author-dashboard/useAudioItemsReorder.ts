@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 
-import { mergeAudioReorderPreservingLocalMedia } from "@/lib/author-products/form-merge";
+import {
+  mergeAudioReorderPreservingLocalMedia,
+  mergeServerAudioItems,
+} from "@/lib/author-products/form-merge";
 import type { AudioItemRow, AuthorProductDetail } from "@/lib/author-products/types";
 
 const REORDER_ERROR_MESSAGE = "Не удалось изменить порядок аудио.";
@@ -11,6 +14,7 @@ type UseAudioItemsReorderOptions = {
   practiceId: string | null;
   audioItems: AudioItemRow[];
   setAudioItems: React.Dispatch<React.SetStateAction<AudioItemRow[]>>;
+  preserveLocalMedia?: boolean;
 };
 
 function withSequentialPositions(items: AudioItemRow[]): AudioItemRow[] {
@@ -63,6 +67,7 @@ export function useAudioItemsReorder({
   practiceId,
   audioItems,
   setAudioItems,
+  preserveLocalMedia = false,
 }: UseAudioItemsReorderOptions) {
   const [reorderNotice, setReorderNotice] = useState<string | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
@@ -128,10 +133,12 @@ export function useAudioItemsReorder({
         }
 
         setAudioItems((current) =>
-          mergeAudioReorderPreservingLocalMedia(
-            current,
-            payload.product!.audio_items,
-          ),
+          preserveLocalMedia
+            ? mergeAudioReorderPreservingLocalMedia(
+                current,
+                payload.product!.audio_items,
+              )
+            : mergeServerAudioItems(current, payload.product!.audio_items),
         );
         return true;
       } catch {
@@ -143,7 +150,7 @@ export function useAudioItemsReorder({
         setReorderBusy(false);
       }
     },
-    [audioItems, practiceId, setAudioItems],
+    [audioItems, practiceId, preserveLocalMedia, setAudioItems],
   );
 
   const moveAudioItem = useCallback(
