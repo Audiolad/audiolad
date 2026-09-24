@@ -8,6 +8,15 @@ import {
   proposeAuthorSeoQuery,
   reconcileAuthorDiscoverySuggestion,
 } from "../src/lib/seo-queries/author-discovery.ts";
+import {
+  AUTHOR_SEO_DISCOVERY_SURFACES,
+  authorSeoDiscoverySurfaceFromPanelVariant,
+  buildAuthorDiscoveryDatabaseMatches,
+  isHiddenFromProductCreateDiscovery,
+  parseAuthorSeoDiscoverySurface,
+  resolveAuthorDiscoveryReservationState,
+  shouldOmitFromWordstatAdditions,
+} from "../src/lib/seo-queries/author-discovery-status.ts";
 import { isEffectiveSeoReservation } from "../src/lib/seo-queries/reservation-effective.ts";
 import {
   AURAFON_AUTHOR_ID,
@@ -72,6 +81,7 @@ assert.match(panel, /Найти запросы/);
 assert.match(panel, /Запросов в месяц/);
 assert.doesNotMatch(panel, /normalized:/);
 assert.match(panel, /\/api\/author\/seo\/discovery/);
+assert.match(panel, /surface: authorSeoDiscoverySurfaceFromPanelVariant\(variant\)/);
 assert.match(panel, /\/api\/author\/seo\/proposals/);
 assert.match(panel, /\/api\/author\/seo-reservations/);
 assert.match(panel, /Отправить на проверку/);
@@ -760,5 +770,258 @@ assert.doesNotMatch(dash, /async function runDiscovery/);
 
 // K — chunk size 8 regression (asserted above)
 assert.equal(SEO_DISCOVERY_IN_CHUNK_SIZE, 8);
+
+const discoveryStatusSource = read("src/lib/seo-queries/author-discovery-status.ts");
+assert.match(discoveryRoute, /parseAuthorSeoDiscoverySurface\(body\.surface\)/);
+assert.match(discoveryRoute, /buildAuthorDiscoveryDatabaseMatches/);
+assert.match(discoveryRoute, /shouldOmitFromWordstatAdditions/);
+assert.doesNotMatch(discoveryRoute, /databaseMatchStatus/);
+assert.doesNotMatch(discoveryStatusSource, /import "server-only"/);
+assert.doesNotMatch(discoveryBeta, /product_create/);
+assert.equal(
+  authorSeoDiscoverySurfaceFromPanelVariant("product-create"),
+  AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE,
+);
+assert.equal(
+  authorSeoDiscoverySurfaceFromPanelVariant("opportunities"),
+  AUTHOR_SEO_DISCOVERY_SURFACES.OPPORTUNITIES,
+);
+assert.equal(parseAuthorSeoDiscoverySurface("product_create"), "product_create");
+assert.equal(parseAuthorSeoDiscoverySurface("opportunities"), "opportunities");
+assert.equal(parseAuthorSeoDiscoverySurface("release"), null);
+assert.equal(parseAuthorSeoDiscoverySurface(undefined), null);
+
+const eveningJazzReservation = {
+  id: "res-evening-jazz",
+  authorId: authorA,
+  status: "used",
+  productId: "prod-evening-jazz",
+  productTitle: "Вечерний джаз",
+};
+
+// A. own + active + product_id=null → «У вас в работе», visible in product-create
+{
+  const ownActive = reservation({
+    authorId: authorA,
+    status: "active",
+    productId: null,
+    productTitle: null,
+  });
+  const semantic = resolveAuthorDiscoveryReservationState({
+    authorId: authorA,
+    reservation: ownActive,
+  });
+  assert.equal(semantic.status, "own");
+  assert.equal(semantic.statusLabel, "У вас в работе");
+  assert.equal(isHiddenFromProductCreateDiscovery(ownActive), false);
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-active",
+        queryText: "джаз лаунж",
+        normalizedQuery: "джаз лаунж",
+        frequency: 80,
+        reservation: ownActive,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 1);
+  assert.equal(built.matches[0].status, "own");
+  assert.equal(built.matches[0].statusLabel, "У вас в работе");
+  assert.match(panel, /Выбрать и продолжить/);
+}
+
+// B. own + used → «Опубликован», not «У вас в работе»
+{
+  const semantic = resolveAuthorDiscoveryReservationState({
+    authorId: authorA,
+    reservation: eveningJazzReservation,
+  });
+  assert.equal(semantic.status, "published");
+  assert.equal(semantic.statusLabel, "Опубликован");
+  assert.notEqual(semantic.statusLabel, "У вас в работе");
+  const reconciled = reconcileAuthorDiscoverySuggestion({
+    suggestion: { phrase: "вечерний джаз", count: 210 },
+    authorId: authorA,
+    query: { id: "q-evening", analysisStatus: "analyzed" },
+    reservation: {
+      id: eveningJazzReservation.id,
+      queryId: "q-evening",
+      authorId: authorA,
+      status: "used",
+      productId: eveningJazzReservation.productId,
+      expiresAt: null,
+      productTitle: "Вечерний джаз",
+    },
+    alreadyProposedByAuthor: false,
+  });
+  assert.equal(reconciled.status, "published");
+  assert.equal(reconciled.statusLabel, "Опубликован");
+}
+
+// C / J. product-create + own used «вечерний джаз» is absent
+{
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-evening",
+        queryText: "вечерний джаз",
+        normalizedQuery: "вечерний джаз",
+        frequency: 210,
+        reservation: eveningJazzReservation,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 0);
+  assert.deepEqual(built.hiddenNormalizedQueries, ["вечерний джаз"]);
+  assert.equal(
+    built.matches.some((item) => item.phrase === "вечерний джаз"),
+    false,
+  );
+}
+
+// D. product-create + foreign used is absent, not shown as «Занят»
+{
+  const foreignUsed = {
+    ...eveningJazzReservation,
+    authorId: authorB,
+    productTitle: "Чужой джаз",
+  };
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-foreign-used",
+        queryText: "джаз для отдыха",
+        normalizedQuery: "джаз для отдыха",
+        frequency: 90,
+        reservation: foreignUsed,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 0);
+  assert.equal(isHiddenFromProductCreateDiscovery(foreignUsed), true);
+}
+
+// E. opportunities + own used → «Опубликован»
+{
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-evening",
+        queryText: "вечерний джаз",
+        normalizedQuery: "вечерний джаз",
+        frequency: 210,
+        reservation: eveningJazzReservation,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 1);
+  assert.equal(built.matches[0].status, "published");
+  assert.equal(built.matches[0].statusLabel, "Опубликован");
+  assert.equal(built.matches[0].productTitle, "Вечерний джаз");
+  assert.match(panel, /Опубликован/);
+  assert.match(panel, /item\.status === "published"/);
+}
+
+// F. used analyzed query hidden from databaseMatches does not reappear in Wordstat
+{
+  const databaseNormalized = new Set( ["вечерний джаз"]);
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "product_create",
+      analysisStatus: "analyzed",
+      reservation: eveningJazzReservation,
+      normalized: "вечерний джаз",
+      databaseNormalized: new Set(),
+    }),
+    true,
+  );
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "product_create",
+      analysisStatus: "analyzed",
+      reservation: eveningJazzReservation,
+      normalized: "вечерний джаз",
+      databaseNormalized,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "opportunities",
+      analysisStatus: "not_analyzed",
+      reservation: eveningJazzReservation,
+      normalized: "вечерний джаз",
+      databaseNormalized: new Set(),
+    }),
+    true,
+  );
+}
+
+// G. available query remains selectable
+{
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-free",
+        queryText: "jazz lounge",
+        normalizedQuery: "jazz lounge",
+        frequency: 40,
+        reservation: null,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 1);
+  assert.equal(built.matches[0].status, "available");
+  assert.equal(built.matches[0].canReserve, true);
+}
+
+// H. own active unlinked remains selectable in product-create
+assert.match(panel, /isHiddenFromProductCreateDiscoveryUi/);
+assert.match(panel, /visibleDatabaseMatches/);
+
+// I. published/used do not consume active reservation slots
+assert.equal(
+  countActiveAuthorSeoReservations([
+    { reservationId: "r-used", lifecycle: "published" },
+    { reservationId: "r-active", lifecycle: "in_progress" },
+  ]),
+  1,
+);
+
+// Active already linked to a product is also hidden from product-create
+{
+  const linkedActive = reservation({
+    authorId: authorA,
+    status: "active",
+    productId: "prod-draft",
+    productTitle: "Черновик",
+  });
+  assert.equal(isHiddenFromProductCreateDiscovery(linkedActive), true);
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-linked",
+        queryText: "связанный запрос",
+        normalizedQuery: "связанный запрос",
+        frequency: 12,
+        reservation: linkedActive,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 0);
+}
 
 console.log("author-seo-discovery-unit: ok");

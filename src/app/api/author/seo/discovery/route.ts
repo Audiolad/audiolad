@@ -9,6 +9,11 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
 import {
+  buildAuthorDiscoveryDatabaseMatches,
+  parseAuthorSeoDiscoverySurface,
+  shouldOmitFromWordstatAdditions,
+} from "@/lib/seo-queries/author-discovery-status";
+import {
   loadDiscoveryContextForPhrases,
   loadRankedAnalyzedQueriesForSeed,
 } from "@/lib/seo-queries/author-discovery-repository";
@@ -29,57 +34,10 @@ function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
 }
 
-function databaseMatchStatus(input: {
-  authorId: string;
-  reservation: {
-    authorId: string;
-    status: string;
-    id: string;
-    productId: string | null;
-    productTitle: string | null;
-  } | null;
-}): {
-  status: "available" | "occupied" | "own";
-  statusLabel: "Свободен" | "Занят" | "У вас в работе";
-  canReserve: boolean;
-  reservationId: string | null;
-  productId: string | null;
-  productTitle: string | null;
-} {
-  const reservation = input.reservation;
-  if (reservation && (reservation.status === "active" || reservation.status === "used")) {
-    if (reservation.authorId === input.authorId) {
-      return {
-        status: "own",
-        statusLabel: "У вас в работе",
-        canReserve: false,
-        reservationId: reservation.id,
-        productId: reservation.productId,
-        productTitle: reservation.productTitle,
-      };
-    }
-    return {
-      status: "occupied",
-      statusLabel: "Занят",
-      canReserve: false,
-      reservationId: null,
-      productId: null,
-      productTitle: null,
-    };
-  }
-  return {
-    status: "available",
-    statusLabel: "Свободен",
-    canReserve: true,
-    reservationId: null,
-    productId: null,
-    productTitle: null,
-  };
-}
-
 /**
  * Discovery for the Aurafon SEO beta and for any author creating a release.
- * Client sends { author_id, phrase, publication_class? }.
+ * Client sends { author_id, phrase, surface, publication_class? }.
+ * `surface` is the authoritative UI context: product_create hides used queries.
  * publication_class=release opens the music create path. Omitting it keeps
  * the standalone dashboard Aurafon-only.
  */
@@ -95,7 +53,8 @@ export async function POST(request: Request) {
     const authorId = readString(body, "author_id");
     const phrase = readString(body, "phrase");
     const publicationClass = readString(body, "publication_class");
-    if (!authorId || !phrase) {
+    const surface = parseAuthorSeoDiscoverySurface(body.surface);
+    if (!authorId || !phrase || !surface) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
@@ -123,26 +82,18 @@ export async function POST(request: Request) {
         seedPhrase: phrase,
       });
       seedNormalized = ranked.seedNormalized;
-      databaseMatches = ranked.matches.map((item) => {
-        databaseNormalized.add(item.normalizedQuery);
-        const status = databaseMatchStatus({
-          authorId,
-          reservation: item.reservation,
-        });
-        return {
-          phrase: item.queryText,
-          frequency: typeof item.frequency === "number" ? item.frequency : null,
-          status: status.status,
-          statusLabel: status.statusLabel,
-          queryId: item.id,
-          reservationId: status.reservationId,
-          productId: status.productId,
-          productTitle: status.productTitle,
-          canReserve: status.canReserve,
-          canPropose: false,
-          source: "database" as const,
-        };
+      const built = buildAuthorDiscoveryDatabaseMatches({
+        surface,
+        authorId,
+        items: ranked.matches,
       });
+      databaseMatches = built.matches;
+      for (const item of ranked.matches) {
+        databaseNormalized.add(item.normalizedQuery);
+      }
+      for (const hidden of built.hiddenNormalizedQueries) {
+        databaseNormalized.add(hidden);
+      }
     } catch (loadError) {
       console.error(
         "author_seo_discovery_database_error",
@@ -197,13 +148,15 @@ export async function POST(request: Request) {
         ? context.reservationByQueryId.get(query.id) ?? null
         : null;
 
-      // Hide not_applicable from Wordstat additions.
-      if (query?.analysisStatus === "not_applicable") continue;
-
-      // Do not duplicate analyzed queries already shown in the database block.
-      if (query?.analysisStatus === "analyzed") {
-        if (normalized && databaseNormalized.has(normalized)) continue;
-        // Analyzed but not in top-7: still skip "missing" framing — omit from bottom.
+      if (
+        shouldOmitFromWordstatAdditions({
+          surface,
+          analysisStatus: query?.analysisStatus,
+          reservation,
+          normalized,
+          databaseNormalized,
+        })
+      ) {
         continue;
       }
 
