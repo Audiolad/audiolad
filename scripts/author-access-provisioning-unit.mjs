@@ -158,8 +158,14 @@ function testAuthorApplicationActionsModuleExportsOnlyAsyncFunctions() {
     formSource,
     /ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE/,
   );
-  assert.match(formSource, /from "@\/app\/admin\/author-applications\/action-state"/);
-  assert.match(formSource, /from "@\/app\/admin\/author-applications\/actions"/);
+  assert.match(
+    formSource,
+    /from "@\/app\/\(platform\)\/admin\/author-applications\/action-state"/,
+  );
+  assert.match(
+    formSource,
+    /from "@\/app\/\(platform\)\/admin\/author-applications\/actions"/,
+  );
   assert.doesNotMatch(actionsSource, /export \{ INITIAL_STATE/);
   assert.match(
     actionStateSource,
