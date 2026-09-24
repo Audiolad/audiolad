@@ -119,6 +119,27 @@ try {
   });
   assert.equal(getUserCalls.length, 1);
 
+  setGetRequestUserForTests(async (request) => {
+    getUserCalls.push(request.headers.get("authorization"));
+    return { id: USER_A };
+  });
+  const bearerSession = await readJson(
+    await POST(
+      maxRequest(
+        { initData: currentInitData() },
+        { headers: { authorization: "Bearer test-access-token" } },
+      ),
+    ),
+  );
+  assert.equal(bearerSession.status, 200);
+  assert.deepEqual(bearerSession.body, { ok: true, linked: true });
+  assert.equal(getUserCalls.at(-1), "Bearer test-access-token");
+  assert.deepEqual(linkCalls.at(-1), {
+    provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
+    providerUserId: "101",
+    userId: USER_A,
+  });
+
   setLinkExternalIdentityForTests(async (provider, providerUserId, userId) => {
     linkCalls.push({ provider, providerUserId, userId });
     return { ok: true, status: "already_linked_same_user" };
@@ -309,5 +330,14 @@ const helperSource = readFileSync(
   "utf8",
 );
 assert.doesNotMatch(`${routeSource}\n${helperSource}`, /CREATE TABLE|alter table/i);
+
+const requestClientSource = readFileSync(
+  join(repoRoot, "src/lib/supabase/request-client.ts"),
+  "utf8",
+);
+assert.match(requestClientSource, /authorization/);
+assert.match(requestClientSource, /Bearer /);
+assert.match(requestClientSource, /Authorization:\s*`Bearer \$\{bearerToken\}`/);
+assert.doesNotMatch(requestClientSource, /service.role|auth\.admin|generateLink/i);
 
 console.log("max-session-link-route-unit: ok");
