@@ -597,6 +597,20 @@ test("copy uses the current editor text", () => {
   assert.match(src, /Ваш текст приглашения/);
   assert.match(src, /copyText\(messageDraft, "Приглашение скопировано"\)/);
   assert.match(src, /Сохранить текст/);
+  assert.match(
+    src,
+    /Это ваши персональные ссылки\. Код в них можно изменить на свой – например, использовать имя, название проекта или другой свободный вариант\./,
+  );
+  const order = [
+    "Ваши 20%",
+    "Ваши ссылки",
+    "Код приглашения",
+    "Ваш текст приглашения",
+    "<AuthorPartnerInvitees",
+    "<AuthorPartnerRewards",
+  ].map((marker) => src.indexOf(marker));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  assert.equal(order.every((index) => index >= 0), true);
   const codeBlock = src.slice(src.indexOf("Код приглашения"), src.indexOf("Ваш текст приглашения"));
   assert.equal(codeBlock.includes("Скопировать приглашение"), false);
 });

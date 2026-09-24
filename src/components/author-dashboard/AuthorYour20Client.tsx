@@ -257,16 +257,6 @@ export default function AuthorYour20Client({
 
       </section>
 
-      <AuthorPartnerRewards
-        dashboard={initialRewards}
-        loadError={initialRewardsError}
-      />
-
-      <AuthorPartnerInvitees
-        invitees={initialInvitees}
-        loadError={initialInviteesError}
-      />
-
       {!profile ? (
         <section className="rounded-[24px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-5 sm:px-5">
           <h3 className="text-[17px] font-semibold text-[#9b2c2c]">
@@ -293,40 +283,47 @@ export default function AuthorYour20Client({
       ) : (
         <>
           <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
-            <h3 className="text-[17px] font-semibold">Посмотреть АудиоЛад</h3>
+            <h3 className="text-[17px] font-semibold">Ваши ссылки</h3>
             <p className="mt-1 text-sm text-[#7d70a2]">
-              Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение.
+              Это ваши персональные ссылки. Код в них можно изменить на свой – например, использовать имя, название проекта или другой свободный вариант.
             </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
-                {homeUrl}
-              </div>
-              <button
-                type="button"
-                onClick={() => copyText(homeUrl, "Ссылка скопирована")}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
-              >
-                Скопировать
-              </button>
-            </div>
-          </section>
 
-          <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
-            <h3 className="text-[17px] font-semibold">Стать автором</h3>
-            <p className="mt-1 text-sm text-[#7d70a2]">
-              Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
-                {inviteUrl}
+            <div className="mt-4">
+              <h4 className="text-[15px] font-semibold text-[#2b2144]">Посмотреть АудиоЛад</h4>
+              <p className="mt-1 text-sm text-[#7d70a2]">
+                Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
+                  {homeUrl}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(homeUrl, "Ссылка скопирована")}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+                >
+                  Скопировать
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => copyText(inviteUrl, "Ссылка скопирована")}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
-              >
-                Скопировать
-              </button>
+            </div>
+
+            <div className="mt-5">
+              <h4 className="text-[15px] font-semibold text-[#2b2144]">Стать автором</h4>
+              <p className="mt-1 text-sm text-[#7d70a2]">
+                Ссылка ведёт на страницу возможностей для авторов и сохраняет ваше приглашение.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
+                  {inviteUrl}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(inviteUrl, "Ссылка скопирована")}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+                >
+                  Скопировать
+                </button>
+              </div>
             </div>
           </section>
 
@@ -399,6 +396,14 @@ export default function AuthorYour20Client({
           </section>
         </>
       )}
+      <AuthorPartnerInvitees
+        invitees={initialInvitees}
+        loadError={initialInviteesError}
+      />
+      <AuthorPartnerRewards
+        dashboard={initialRewards}
+        loadError={initialRewardsError}
+      />
       {error ? (
         <p className="rounded-[16px] border border-[#f3c6c6] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b2c2c]">
           {error}
