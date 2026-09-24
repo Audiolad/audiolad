@@ -54,20 +54,20 @@ export function evaluatePartnerYour20Access(input: {
 }
 
 /**
- * Pick a workspace the current user already owns.
- * A foreign `?author=` slug falls back to the user's own list and never
- * selects an author outside it.
+ * Pick an owner workspace from the current user's memberships.
+ * Editor rows are ignored. A foreign or editor `?author=` slug falls back
+ * to the first owner workspace and never authorizes a non-owner role.
  */
-export function selectOwnedAuthorWorkspace<T extends { slug: string }>(
-  authors: readonly T[],
-  slugParam: string | null | undefined,
-): T | null {
-  if (authors.length === 0) {
+export function selectOwnedAuthorWorkspace<
+  T extends { slug: string; role?: string | null },
+>(authors: readonly T[], slugParam: string | null | undefined): T | null {
+  const owners = authors.filter((author) => author.role === "owner");
+  if (owners.length === 0) {
     return null;
   }
   const requested = typeof slugParam === "string" ? slugParam.trim() : "";
-  const owned = requested
-    ? authors.find((author) => author.slug === requested)
+  const matched = requested
+    ? owners.find((author) => author.slug === requested)
     : undefined;
-  return owned ?? authors[0] ?? null;
+  return matched ?? owners[0] ?? null;
 }

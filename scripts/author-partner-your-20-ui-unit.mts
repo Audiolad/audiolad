@@ -84,18 +84,49 @@ test("support mode cannot open Ваши 20%", () => {
   );
 });
 
+test("owner selection ignores editor workspaces", () => {
+  const memberships = [
+    { slug: "editor-first", role: "editor" },
+    { slug: "owner-second", role: "owner" },
+    { slug: "editor-later", role: "editor" },
+  ];
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, null)?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "owner-second")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "editor-first")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(memberships, "sergey-petrov")?.slug,
+    "owner-second",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(
+      [{ slug: "editor-only", role: "editor" }],
+      null,
+    ),
+    null,
+  );
+});
+
 test("foreign workspace query does not select another author", () => {
   const owned = selectOwnedAuthorWorkspace(
     [
-      { slug: "anna-meditation", id: "own" },
-      { slug: "second-project", id: "own-2" },
+      { slug: "anna-meditation", role: "owner", id: "own" },
+      { slug: "second-project", role: "owner", id: "own-2" },
     ],
     "sergey-petrov",
   );
   assert.equal(owned?.slug, "anna-meditation");
   assert.equal(
     selectOwnedAuthorWorkspace(
-      [{ slug: "anna-meditation", id: "own" }],
+      [{ slug: "anna-meditation", role: "owner", id: "own" }],
       "anna-meditation",
     )?.id,
     "own",
@@ -395,7 +426,7 @@ test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
   assert.match(collapsed, /Стать автором/);
   assert.match(
     collapsed,
-    /Ссылка ведёт на главную АудиоЛад и сохраняет ваше приглашение\./,
+    /Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение\./,
   );
   assert.match(
     collapsed,

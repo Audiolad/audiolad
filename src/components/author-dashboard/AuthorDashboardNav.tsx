@@ -164,7 +164,7 @@ function DocumentsIcon() {
 type AuthorDashboardNavProps = {
   authorSlug?: string;
   authorId?: string;
-  /** Owner/editor role of the current workspace; needed for partner beta tab. */
+  /** Owner/editor role of the current workspace; used to show the partner tab. */
   authorRole?: "owner" | "editor" | string | null;
 };
 

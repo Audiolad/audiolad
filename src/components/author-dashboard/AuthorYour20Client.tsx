@@ -221,7 +221,7 @@ export default function AuthorYour20Client({
           <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
             <h3 className="text-[17px] font-semibold">Посмотреть АудиоЛад</h3>
             <p className="mt-1 text-sm text-[#7d70a2]">
-              Ссылка ведёт на главную АудиоЛад и сохраняет ваше приглашение.
+              Ссылка ведёт на главную АудиоЛада и сохраняет ваше приглашение.
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1 break-all rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm text-[#2b2144]">
