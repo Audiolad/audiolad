@@ -84,6 +84,8 @@ jobs:
           npm run test:author-product-aurafon-music-wizard
           npm run test:author-product-aurafon-catalog-section
           npx tsx scripts/author-email-outbox-cycle-unit.mts
+          npx tsx scripts/music-album-batch-unit.mts
+          npx tsx scripts/music-track-upload-queue-unit.mts
           npm run build
           npm run typecheck
           npm run lint

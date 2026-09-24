@@ -173,6 +173,15 @@ import {
   validateStudioMusicPaidPriceInputDraft,
 } from "@/lib/author-products/price-input-draft";
 import {
+  formatAlbumBatchCreateFailure,
+  formatAlbumBatchOverflowMessage,
+  formatAlbumBatchSkipMessage,
+  MAX_MUSIC_ALBUM_BATCH_FILES,
+  planMusicAlbumBatch,
+  deriveAlbumTrackTitle,
+} from "@/lib/author-products/music-album-batch";
+import {
+  appendCreatedAudioItem,
   applyMusicAudioItemDeletion,
   mergeServerAudioItems,
   mergeServerProductIntoForm,
@@ -186,6 +195,7 @@ import {
   emptyMusicQueue,
   enqueueReadyMusicUploads,
   finishMusicUpload,
+  musicQueueBlocksTrackCreation,
   musicQueueEntry,
   musicQueueHasLocalFile,
   musicQueueHasReady,
@@ -909,6 +919,9 @@ export default function AuthorProductForm({
   const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
   const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
+  const [albumDropActive, setAlbumDropActive] = useState(false);
+  const [albumBatchNotice, setAlbumBatchNotice] = useState<string | null>(null);
+  const albumFileInputRef = useRef<HTMLInputElement | null>(null);
   const musicQueueRef = useRef(musicQueue);
   const musicFilesRef = useRef(new Map<string, File>());
   const musicAbortRef = useRef(new Map<string, AbortController>());
@@ -2530,6 +2543,13 @@ export default function AuthorProductForm({
     if (addAudioInFlightRef.current || busy) {
       return;
     }
+    if (
+      form.productKind === PRODUCT_KIND.MUSIC &&
+      musicQueueBlocksTrackCreation(musicQueueRef.current)
+    ) {
+      setError("Дождитесь завершения текущей загрузки, затем добавьте трек.");
+      return;
+    }
 
     addAudioInFlightRef.current = true;
     setBusy(true);
@@ -2543,6 +2563,7 @@ export default function AuthorProductForm({
       }
 
       const id = ensured.practiceId;
+      const isMusic = form.productKind === PRODUCT_KIND.MUSIC;
 
       const response = await fetch(`/api/author/products/${id}/audio`, {
         method: "POST",
@@ -2557,7 +2578,7 @@ export default function AuthorProductForm({
         audio_item?: AudioItemRow;
       };
 
-      if (!response.ok || !payload.product) {
+      if (!response.ok || !payload.product || (isMusic && !payload.audio_item)) {
         setError("Не удалось добавить аудио.");
         return;
       }
@@ -2570,11 +2591,92 @@ export default function AuthorProductForm({
         pendingFocusAudioIdRef.current = newAudioId;
       }
 
-      setAudioItems((current) =>
-        mergeServerAudioItems(current, payload.product!.audio_items),
-      );
+      if (isMusic && payload.audio_item) {
+        applyMusicProductLevel(payload.product);
+        setAudioItems((current) =>
+          appendCreatedAudioItem(current, payload.audio_item!),
+        );
+      } else {
+        setAudioItems((current) =>
+          mergeServerAudioItems(current, payload.product!.audio_items),
+        );
+      }
     } catch {
       setError("Не удалось добавить аудио.");
+    } finally {
+      addAudioInFlightRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function addAlbumTracks(files: File[]) {
+    if (
+      form.productKind !== PRODUCT_KIND.MUSIC ||
+      addAudioInFlightRef.current ||
+      busy
+    ) {
+      return;
+    }
+    if (musicQueueBlocksTrackCreation(musicQueueRef.current)) {
+      setAlbumBatchNotice(
+        "Дождитесь завершения текущей загрузки, затем добавьте треки.",
+      );
+      return;
+    }
+
+    const plan = planMusicAlbumBatch(files);
+    const notices = [
+      formatAlbumBatchSkipMessage(plan.skipped),
+      formatAlbumBatchOverflowMessage(plan.overflow),
+    ].filter((notice): notice is string => Boolean(notice));
+    setAlbumBatchNotice(notices.length > 0 ? notices.join(" ") : null);
+    if (plan.accepted.length === 0) {
+      return;
+    }
+
+    addAudioInFlightRef.current = true;
+    setBusy(true);
+    setError(null);
+    let created = 0;
+
+    try {
+      const ensured = await ensurePracticeId();
+      if (!ensured) {
+        return;
+      }
+
+      for (const file of plan.accepted) {
+        const response = await fetch(
+          `/api/author/products/${ensured.practiceId}/audio`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: deriveAlbumTrackTitle(file.name) }),
+          },
+        );
+        const payload = (await response.json()) as {
+          product?: AuthorProductDetail;
+          audio_item?: AudioItemRow;
+        };
+        if (!response.ok || !payload.audio_item) {
+          setError(
+            formatAlbumBatchCreateFailure(created, plan.accepted.length, file.name),
+          );
+          return;
+        }
+        if (payload.product) {
+          applyMusicProductLevel(payload.product);
+        }
+        const audioItem = payload.audio_item;
+        setAudioItems((current) => appendCreatedAudioItem(current, audioItem));
+        stageMusicTrackFile(audioItem.id, file);
+        created += 1;
+      }
+    } catch {
+      const failedName = plan.accepted[created]?.name ?? "файл";
+      setError(
+        formatAlbumBatchCreateFailure(created, plan.accepted.length, failedName),
+      );
     } finally {
       addAudioInFlightRef.current = false;
       setBusy(false);
@@ -4701,6 +4803,88 @@ export default function AuthorProductForm({
           <p className="text-sm text-[#9b3d3d]">{reorderNotice}</p>
         ) : null}
 
+        {form.productKind === PRODUCT_KIND.MUSIC ? (
+          <div
+            onDragEnter={(event) => {
+              event.preventDefault();
+              if (
+                !busy &&
+                canEditPublicFields &&
+                !musicQueueBlocksTrackCreation(musicQueue)
+              ) {
+                setAlbumDropActive(true);
+              }
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setAlbumDropActive(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setAlbumDropActive(false);
+              const dropped = Array.from(event.dataTransfer.files);
+              void addAlbumTracks(dropped);
+            }}
+            className={`rounded-[20px] border border-dashed px-4 py-5 text-center ${
+              albumDropActive
+                ? "border-[#7042c5] bg-[#f4ecff]"
+                : "border-[#c6afe6] bg-[#fbf8ff]"
+            }`}
+          >
+            <p className="text-sm font-semibold text-[#25135c]">
+              Добавить треки альбома
+            </p>
+            <p className="mt-2 text-sm text-[#5f5484]">
+              Перетащите сюда WAV или MP3
+            </p>
+            <p className="my-2 text-sm text-[#7d70a2]">или</p>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                reorderBusy ||
+                !canEditPublicFields ||
+                musicQueueBlocksTrackCreation(musicQueue)
+              }
+              onClick={() => albumFileInputRef.current?.click()}
+              className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Выбрать файлы
+            </button>
+            <input
+              ref={albumFileInputRef}
+              type="file"
+              multiple
+              accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
+              className="hidden"
+              disabled={
+                busy ||
+                !canEditPublicFields ||
+                musicQueueBlocksTrackCreation(musicQueue)
+              }
+              onChange={(event) => {
+                const selected = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                void addAlbumTracks(selected);
+              }}
+            />
+            <p className="mt-3 text-sm text-[#7d70a2]">
+              Можно выбрать до {MAX_MUSIC_ALBUM_BATCH_FILES} файлов одновременно.
+            </p>
+            {musicQueueBlocksTrackCreation(musicQueue) ? (
+              <p className="mt-3 text-sm text-[#9b3d3d]">
+                Дождитесь завершения текущей загрузки, затем добавьте треки.
+              </p>
+            ) : null}
+            {albumBatchNotice ? (
+              <p className="mt-3 text-sm text-[#9b3d3d]">{albumBatchNotice}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="space-y-4">
           {audioItems.map((audioItem, index) => (
             <article
@@ -5112,14 +5296,28 @@ export default function AuthorProductForm({
           ) : null}
 
           {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
+          <>
           <button
             type="button"
-            disabled={busy || reorderBusy || !canEditPublicFields}
+            disabled={
+              busy ||
+              reorderBusy ||
+              !canEditPublicFields ||
+              (form.productKind === PRODUCT_KIND.MUSIC &&
+                musicQueueBlocksTrackCreation(musicQueue))
+            }
             onClick={() => void addAudioItem()}
             className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
           >
             Добавить аудио
           </button>
+          {form.productKind === PRODUCT_KIND.MUSIC &&
+          musicQueueBlocksTrackCreation(musicQueue) ? (
+            <p className="text-sm text-[#9b3d3d]">
+              Дождитесь завершения текущей загрузки, затем добавьте трек.
+            </p>
+          ) : null}
+          </>
           ) : null}
         </div>
       </section>
