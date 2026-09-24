@@ -120,11 +120,18 @@ const merged = spawnSync(
   { input: fixture, encoding: "utf8" },
 );
 
-if (merged.status !== 0) {
-  console.log("supabase-log-rotation-override-unit: structural checks passed");
-  console.log("docker compose config skipped or failed; not required for the file contract");
-  console.log((merged.stderr || "").slice(0, 400));
-  process.exit(0);
+if (merged.error || merged.status !== 0) {
+  console.error("docker compose config failed");
+  if (merged.error) {
+    console.error(merged.error.message);
+  }
+  if (merged.stderr) {
+    console.error(merged.stderr);
+  }
+  if (merged.stdout) {
+    console.error(merged.stdout);
+  }
+  process.exit(merged.status && merged.status !== 0 ? merged.status : 1);
 }
 
 const config = JSON.parse(merged.stdout);
