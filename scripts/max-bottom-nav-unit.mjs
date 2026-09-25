@@ -13,6 +13,7 @@ const tabs = read("src/lib/max/primary-tabs.ts");
 const nav = read("src/components/max/MaxBottomNav.tsx");
 const placeholder = read("src/components/max/MaxTabPlaceholder.tsx");
 const home = read("src/components/max/MaxAuthenticatedHome.tsx");
+const catalogSearch = read("src/components/max/MaxCatalogSearch.tsx");
 const hook = read("src/components/max/useMaxAudioPlayback.ts");
 const icons = read("src/components/BottomNavIcons.tsx");
 const pkg = read("package.json");
@@ -98,13 +99,13 @@ assert.match(placeholder, /Раздел готовится\./);
 assert.match(home, /setActiveTab\(next\)/);
 
 assert.match(
-  home,
+  catalogSearch,
   /<ul className="mt-5 -mx-4 grid grid-cols-2 gap-\[6px\] px-\[6px\]">/,
 );
-assert.match(home, /grid-cols-2/);
-assert.match(home, /gap-\[6px\]/);
-assert.match(home, /-mx-4/);
-assert.match(home, /px-\[6px\]/);
+assert.match(catalogSearch, /grid-cols-2/);
+assert.match(catalogSearch, /gap-\[6px\]/);
+assert.match(catalogSearch, /-mx-4/);
+assert.match(catalogSearch, /px-\[6px\]/);
 
 const gate = home.indexOf('{activeTab === "catalog" && selected ? (');
 const player = home.indexOf("<MaxAudioPlayer");
