@@ -92,17 +92,15 @@ assert.doesNotMatch(search, /AudioladHorizontalLogo/);
 assert.doesNotMatch(search, /<h1/);
 assert.doesNotMatch(search, /Результаты поиска/);
 assert.doesNotMatch(search, /Аудиопрактики, музыка и курсы АудиоЛада/);
-const topicsAt = search.indexOf("data-max-catalog-topics");
+const topicsAt = search.indexOf("<MaxCatalogTopicsSheet");
 const sectionsAt = search.indexOf("<MaxCatalogSections");
 const gridAt = search.indexOf("<CatalogGrid");
 assert.ok(search.indexOf("data-max-catalog-search-row") < topicsAt);
 assert.ok(topicsAt < sectionsAt && sectionsAt < gridAt);
-const topics = search.slice(search.lastIndexOf("<button", topicsAt), sectionsAt);
-assert.match(topics, /type="button"/);
-assert.match(topics, />\s*Темы\s*</);
+assert.match(search, /onApply=\{applyTopicKeys\}/);
 assert.doesNotMatch(
-  topics,
-  /<Link|<a[\s>]|href=|onClick|router\.push|window\.location|openLink/,
+  search,
+  /CatalogMobileFilters|buildCatalogHref|<Link|<a[\s>]|router\.push|window\.location|openLink/,
 );
 assert.match(search, /Ищем…/);
 assert.match(search, /По запросу „\{resultQuery\}“ ничего не найдено\./);
@@ -119,7 +117,7 @@ assert.doesNotMatch(
   /searchStatus === "searching" \|\| searchStatus === "error"\s*\?\s*\[\]/,
 );
 const gridChoice = search.slice(
-  search.indexOf("const gridItems = activeSection"),
+  search.indexOf("const gridItems = activeTopicParam"),
   search.indexOf("const showSearchEmpty"),
 );
 assert.match(gridChoice, /usingSearchResults\s*\?\s*searchItems\s*:\s*sectionScopeItems/);

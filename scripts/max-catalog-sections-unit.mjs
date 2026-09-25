@@ -87,7 +87,7 @@ assert.doesNotMatch(search, /CatalogSectionCards|buildCatalogHref/);
 
 const rowAt = search.indexOf("data-max-catalog-search-row");
 const formEnd = search.indexOf("</form>");
-const topicsAt = search.indexOf("data-max-catalog-topics");
+const topicsAt = search.indexOf("<MaxCatalogTopicsSheet");
 const sectionsAt = search.indexOf("<MaxCatalogSections");
 const gridAt = search.indexOf("<CatalogGrid");
 assert.ok(
@@ -97,13 +97,12 @@ assert.ok(
     topicsAt < sectionsAt &&
     sectionsAt < gridAt,
 );
-const topics = search.slice(search.lastIndexOf("<button", topicsAt), sectionsAt);
-assert.match(topics, /type="button"/);
-assert.match(topics, /aria-label="Темы"/);
-assert.match(topics, />\s*Темы\s*</);
+assert.match(search, /activeTopicKeys=\{activeTopicKeys\}/);
+assert.match(search, /onApply=\{applyTopicKeys\}/);
+assert.match(search, /onReset=\{resetTopicKeys\}/);
 assert.doesNotMatch(
-  topics,
-  /<Link|<a[\s>]|href=|onClick|router\.push|window\.location|openLink|useRouter|useSearchParams/,
+  search,
+  /CatalogMobileFilters|buildCatalogHref|<Link|<a[\s>]|router\.push|window\.location|openLink|useRouter|useSearchParams/,
 );
 const between = search.slice(sectionsAt, gridAt);
 assert.doesNotMatch(between, /<h1|Аудиопрактики, музыка и курсы АудиоЛада|AudioladHorizontalLogo|Результаты поиска/);

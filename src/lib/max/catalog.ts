@@ -5,6 +5,11 @@ import {
   normalizeCatalogSearchQuery,
   searchPublishedCatalogProducts,
 } from "@/lib/catalog/search";
+import {
+  CATALOG_TOPIC_FILTER_MAX,
+  parseCatalogTopicKeyList,
+  serializeCatalogTopicParam,
+} from "@/lib/catalog/topic-filter";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
 import {
   getPublishedCatalogProducts,
@@ -33,10 +38,48 @@ export type MaxCatalogResult =
 export type ListMaxPublishedCatalogInput = {
   query?: string | null;
   section?: PublicCatalogSection | null;
+  topicKey?: string | null;
   getCatalogProducts?: typeof getPublishedCatalogProducts;
   searchCatalogProducts?: typeof searchPublishedCatalogProducts;
   getServiceClient?: typeof createServiceRoleClient;
 };
+
+export function parseMaxCatalogTopicParam(
+  value: unknown,
+): { ok: true; topicKey: string | null } | { ok: false } {
+  if (value == null) {
+    return { ok: true, topicKey: null };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  if (!value.trim()) {
+    return { ok: true, topicKey: null };
+  }
+
+  const parts = value
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 0);
+
+  if (parts.length > CATALOG_TOPIC_FILTER_MAX) {
+    return { ok: false };
+  }
+
+  const parsed = parseCatalogTopicKeyList(value);
+  const unique = [...new Set(parts)];
+
+  if (
+    parsed.length !== unique.length ||
+    parsed.some((key, index) => key !== unique[index])
+  ) {
+    return { ok: false };
+  }
+
+  return { ok: true, topicKey: serializeCatalogTopicParam(parsed) };
+}
 
 export type ListMaxPublishedCatalogFn = (
   input?: ListMaxPublishedCatalogInput,
@@ -80,6 +123,7 @@ async function listMaxPublishedCatalogImpl(
     const service = (input.getServiceClient ?? createServiceRoleClient)();
     const normalizedQuery = normalizeCatalogSearchQuery(input.query);
     const catalogSection = input.section ?? null;
+    const topicKey = input.topicKey?.trim() ? input.topicKey.trim() : null;
     const products = normalizedQuery
       ? await (input.searchCatalogProducts ?? searchPublishedCatalogProducts)(
           service,
@@ -87,6 +131,7 @@ async function listMaxPublishedCatalogImpl(
             query: normalizedQuery,
             viewer: GUEST_ORDINARY_CATALOG_VIEWER,
             ...(catalogSection ? { catalogSection } : {}),
+            ...(topicKey ? { topicKey } : {}),
           },
         )
       : await (input.getCatalogProducts ?? getPublishedCatalogProducts)(
@@ -95,6 +140,7 @@ async function listMaxPublishedCatalogImpl(
             viewer: GUEST_ORDINARY_CATALOG_VIEWER,
             throwOnStorageError: true,
             ...(catalogSection ? { catalogSection } : {}),
+            ...(topicKey ? { topicKey } : {}),
           },
         );
 
