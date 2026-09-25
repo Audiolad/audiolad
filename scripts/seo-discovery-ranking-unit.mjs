@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT,
   SEO_DISCOVERY_DATABASE_LIMIT,
   rankAnalyzedQueriesForSeed,
   scoreAnalyzedQueryAgainstSeed,
@@ -58,8 +59,22 @@ const ranked = rankAnalyzedQueriesForSeed({
 });
 
 assert.equal(ranked[0].normalizedQuery, "джаз для отдыха");
+assert.equal(SEO_DISCOVERY_DATABASE_LIMIT, 7);
+assert.equal(SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT, 250);
 assert.ok(ranked.length <= SEO_DISCOVERY_DATABASE_LIMIT);
 assert.ok(ranked.length >= 3, "jazz seed should find jazz matches");
+const rankedWide = rankAnalyzedQueriesForSeed({
+  seedPhrase: seed,
+  seedNormalized: "джаз для отдыха",
+  queries: [
+    ...pool,
+    q({ id: "12", queryText: "джаз лаунж", frequency: 50 }),
+    q({ id: "13", queryText: "ночной джаз", frequency: 40 }),
+    q({ id: "14", queryText: "джаз кафе", frequency: 30 }),
+  ],
+  limit: SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT,
+});
+assert.ok(rankedWide.length > SEO_DISCOVERY_DATABASE_LIMIT);
 assert.ok(ranked.every((item) => item.analysisStatus === "analyzed"));
 assert.doesNotMatch(ranked.map((i) => i.id).join(","), /10|11/);
 assert.ok(ranked.every((item) => /джаз|отдых/.test(item.normalizedQuery)));
@@ -207,6 +222,8 @@ assert.equal(isAuthorSeoDiscoveryEnabled(otherAuthor), false);
 const repo = read("src/lib/seo-queries/author-discovery-repository.ts");
 assert.match(repo, /export const SEO_DISCOVERY_IN_CHUNK_SIZE = 8/);
 assert.match(repo, /loadRankedAnalyzedQueriesForSeed/);
+assert.match(repo, /SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT/);
+assert.match(repo, /takeRankedDiscoveryItemsUntilVisible/);
 assert.doesNotMatch(repo, /seo_discovery_analyzed_fallback_load_failed/);
 assert.doesNotMatch(
   repo,
@@ -243,6 +260,7 @@ assert.equal(truncated, 0, "zero truncated endings");
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
 assert.match(discoveryRoute, /databaseMatches/);
 assert.match(discoveryRoute, /loadRankedAnalyzedQueriesForSeed/);
+assert.match(discoveryRoute, /visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT/);
 assert.match(discoveryRoute, /fetchWordstatSuggestions/);
 // Wordstat block still returned even when DB empty — route always calls Wordstat
 assert.match(discoveryRoute, /const wordstat = await fetchWordstatSuggestions/);

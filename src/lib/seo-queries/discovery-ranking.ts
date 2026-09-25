@@ -1,6 +1,10 @@
 /** Deterministic relevance ranking for analyzed SEO queries vs an author seed phrase. */
 
+/** Visible databaseMatches cap after reservation hide / backfill. */
 export const SEO_DISCOVERY_DATABASE_LIMIT = 7;
+
+/** Ranked pool before product_create hide. Not a UI cap. */
+export const SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT = 250;
 
 const STOPWORDS = new Set([
   "и", "в", "во", "на", "по", "для", "с", "со", "к", "ко", "от", "из", "у", "о", "об",

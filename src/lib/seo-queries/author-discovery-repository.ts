@@ -11,9 +11,17 @@ import type {
 import { isEffectiveSeoReservation } from "./reservation-effective";
 import { classifySeoQuery } from "./classifier";
 import {
+  AUTHOR_SEO_DISCOVERY_SURFACES,
+  isHiddenFromProductCreateDiscovery,
+  takeRankedDiscoveryItemsUntilVisible,
+  type AuthorSeoDiscoverySurface,
+} from "./author-discovery-status";
+import {
   rankAnalyzedQueriesForSeed,
   tokenizeSeoPhrase,
   type RankableSeoQuery,
+  SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT,
+  SEO_DISCOVERY_DATABASE_LIMIT,
 } from "./discovery-ranking";
 
 
@@ -276,6 +284,7 @@ const ANALYZED_CANDIDATE_LIMIT = 250;
 export async function loadRankedAnalyzedQueriesForSeed(input: {
   authorId: string;
   seedPhrase: string;
+  surface?: AuthorSeoDiscoverySurface;
 }): Promise<{
   seedNormalized: string | null;
   matches: Array<
@@ -366,80 +375,115 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
   // leave candidates empty so the DB block stays empty for the author.
 
   const seedClass = classifySeoQuery({ queryText: input.seedPhrase });
+  const rankingLimit =
+    input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE
+      ? SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT
+      : SEO_DISCOVERY_DATABASE_LIMIT;
   const ranked = rankAnalyzedQueriesForSeed({
     seedPhrase: input.seedPhrase,
     seedNormalized,
     queries: [...candidates.values()],
+    limit: rankingLimit,
     seedIntentHint: seedClass.intent,
     seedFormatHint: seedClass.recommendedFormat,
   });
 
-  const queryIds = ranked.map((item) => item.id);
   const reservationByQueryId = new Map<string, DiscoveryReservationRow>();
-  if (queryIds.length > 0) {
+  if (ranked.length > 0) {
     await supabase.rpc("expire_seo_query_reservation", {
       p_author_id: input.authorId,
     });
-    for (const batch of chunkList(queryIds)) {
-      if (batch.length === 0) continue;
-      const { data: reservations, error } = await supabase
-        .from("seo_query_reservations")
-        .select("id, query_id, author_id, status, product_id, expires_at")
-        .in("query_id", batch)
-        .in("status", ["active", "used"]);
-      if (error) throw new Error("seo_discovery_reservations_load_failed");
-      const productIds = (reservations ?? [])
-        .map((row) => row.product_id as string | null)
-        .filter((id): id is string => Boolean(id));
-      const productTitleById = new Map<string, string>();
-      if (productIds.length > 0) {
-        for (const productBatch of chunkList([...new Set(productIds)])) {
-          const { data: products, error: productError } = await supabase
-            .from("practices")
-            .select("id, title")
-            .in("id", productBatch);
-          if (productError) throw new Error("seo_discovery_products_load_failed");
-          for (const product of products ?? []) {
-            if (typeof product.title === "string") {
-              productTitleById.set(product.id as string, product.title);
-            }
+  }
+
+  const attached: Array<(typeof ranked)[number] & {
+    reservation: DiscoveryReservationRow | null;
+  }> = [];
+
+  for (const batch of chunkList(ranked)) {
+    if (batch.length === 0) continue;
+
+    const batchIds = batch.map((item) => item.id);
+    const { data: reservations, error } = await supabase
+      .from("seo_query_reservations")
+      .select("id, query_id, author_id, status, product_id, expires_at")
+      .in("query_id", batchIds)
+      .in("status", ["active", "used"]);
+    if (error) throw new Error("seo_discovery_reservations_load_failed");
+    const productIds = (reservations ?? [])
+      .map((row) => row.product_id as string | null)
+      .filter((id): id is string => Boolean(id));
+    const productTitleById = new Map<string, string>();
+    if (productIds.length > 0) {
+      for (const productBatch of chunkList([...new Set(productIds)])) {
+        const { data: products, error: productError } = await supabase
+          .from("practices")
+          .select("id, title")
+          .in("id", productBatch);
+        if (productError) throw new Error("seo_discovery_products_load_failed");
+        for (const product of products ?? []) {
+          if (typeof product.title === "string") {
+            productTitleById.set(product.id as string, product.title);
           }
         }
       }
-      const now = new Date();
-      for (const row of reservations ?? []) {
-        const productId =
-          typeof row.product_id === "string" ? row.product_id : null;
-        const expiresAt =
-          typeof row.expires_at === "string" ? row.expires_at : null;
-        if (
-          !isEffectiveSeoReservation(
-            { status: row.status as string, productId, expiresAt },
-            now,
-          )
-        ) {
-          continue;
-        }
-        reservationByQueryId.set(row.query_id as string, {
-          id: row.id as string,
-          queryId: row.query_id as string,
-          authorId: row.author_id as string,
-          status: row.status as string,
-          productId,
-          expiresAt,
-          productTitle: productId
-            ? productTitleById.get(productId) ?? null
-            : null,
-        });
+    }
+    const now = new Date();
+    for (const row of reservations ?? []) {
+      const productId =
+        typeof row.product_id === "string" ? row.product_id : null;
+      const expiresAt =
+        typeof row.expires_at === "string" ? row.expires_at : null;
+      if (
+        !isEffectiveSeoReservation(
+          { status: row.status as string, productId, expiresAt },
+          now,
+        )
+      ) {
+        continue;
       }
+      reservationByQueryId.set(row.query_id as string, {
+        id: row.id as string,
+        queryId: row.query_id as string,
+        authorId: row.author_id as string,
+        status: row.status as string,
+        productId,
+        expiresAt,
+        productTitle: productId
+          ? productTitleById.get(productId) ?? null
+          : null,
+      });
+    }
+
+    for (const item of batch) {
+      attached.push({
+        ...item,
+        reservation: reservationByQueryId.get(item.id) ?? null,
+      });
+    }
+    if (
+      input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE &&
+      takeRankedDiscoveryItemsUntilVisible({
+        surface: input.surface,
+        items: attached,
+        visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+      }).filter((item) => !isHiddenFromProductCreateDiscovery(item.reservation))
+        .length >= SEO_DISCOVERY_DATABASE_LIMIT
+    ) {
+      break;
     }
   }
 
+  const matches =
+    input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE
+      ? takeRankedDiscoveryItemsUntilVisible({
+          surface: input.surface,
+          items: attached,
+          visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+        })
+      : attached;
+
   return {
     seedNormalized,
-    matches: ranked.map((item) => ({
-      ...item,
-      reservation: reservationByQueryId.get(item.id) ?? null,
-    })),
+    matches,
   };
 }
