@@ -23,7 +23,9 @@ Server-owned body fields (the browser never sends these):
 - `folderId` — from env
 - `regions` — default `["225"]` (Russia)
 - `devices` — `["DEVICE_ALL"]`
-- `numPhrases` — conservative UX value `20` (official range 1–2000)
+- `numPhrases` — default conservative UX value `20` (official range 1–2000).
+  `surface=product_create` discovery asks for `200` raw candidates, then
+  keeps only counts in `50..2000`, sorts DESC, and returns at most `20`.
 
 Client request is only `{ "phrase": "<text>" }`. Phrase is trimmed,
 normalized, and capped at the official 400-character limit.

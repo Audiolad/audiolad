@@ -12,7 +12,11 @@ import {
   fetchWordstatSuggestions,
   isWordstatInvalidQueryResponse,
 } from "../src/lib/seo/wordstat/client.ts";
-import { createWordstatMemoryCache } from "../src/lib/seo/wordstat/cache.ts";
+import {
+  buildWordstatCacheKey,
+  createWordstatMemoryCache,
+} from "../src/lib/seo/wordstat/cache.ts";
+import { resolveWordstatNumPhrases } from "../src/lib/seo/wordstat/num-phrases.ts";
 import {
   consumeWordstatOutboundSlot,
   createWordstatRateLimitStore,
@@ -37,6 +41,8 @@ import {
 import { suggestPrimaryQuerySeeds } from "../src/lib/seo/product-autofill/ui.ts";
 import { PRODUCT_CONTENT_LIMITS } from "../src/lib/author-products/limits.ts";
 import {
+  PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
+  WORDSTAT_API_NUM_PHRASES_MAX,
   WORDSTAT_GET_TOP_URL,
   WORDSTAT_NUM_PHRASES,
 } from "../src/lib/seo/wordstat/types.ts";
@@ -839,6 +845,92 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(nextMiss.ok, false);
   assert.equal(nextMiss.error.code, "RATE_LIMITED");
   assert.equal(fetchImpl.calls.length, 1);
+});
+
+assert.equal(resolveWordstatNumPhrases(undefined), WORDSTAT_NUM_PHRASES);
+assert.equal(resolveWordstatNumPhrases(200), PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT);
+assert.equal(resolveWordstatNumPhrases(0), null);
+assert.equal(resolveWordstatNumPhrases(WORDSTAT_API_NUM_PHRASES_MAX + 1), null);
+assert.equal(resolveWordstatNumPhrases(20.5), null);
+assert.equal(resolveWordstatNumPhrases("200"), null);
+
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, sampleUpstream()),
+  ]);
+  const result = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit: createWordstatRateLimitStore(),
+    userId: "user-expanded",
+    sleepImpl: async () => {},
+    numPhrases: PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
+  });
+  assert.equal(result.ok, true);
+  const sent = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(sent.numPhrases, 200);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => {
+      throw new Error("invalid numPhrases must not call Yandex");
+    },
+  ]);
+  const result = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache: createWordstatMemoryCache(),
+    rateLimit: createWordstatRateLimitStore(),
+    userId: "user-bad-num",
+    sleepImpl: async () => {},
+    numPhrases: 5000,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "INVALID_QUERY");
+  assert.equal(fetchImpl.calls.length, 0);
+});
+
+await withEnvAsync(enabledEnv(), async () => {
+  const fetchImpl = mockFetch([
+    () => jsonResponse(200, sampleUpstream()),
+    () => jsonResponse(200, sampleUpstream()),
+  ]);
+  const cache = createWordstatMemoryCache();
+  const rateLimit = createWordstatRateLimitStore();
+  const first = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache,
+    rateLimit,
+    userId: "user-cache-split-a",
+    sleepImpl: async () => {},
+    numPhrases: WORDSTAT_NUM_PHRASES,
+  });
+  const expanded = await fetchWordstatSuggestions("медитация", {
+    fetchImpl,
+    cache,
+    rateLimit,
+    userId: "user-cache-split-b",
+    sleepImpl: async () => {},
+    numPhrases: PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
+  });
+  assert.equal(first.ok, true);
+  assert.equal(expanded.ok, true);
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(
+    buildWordstatCacheKey({
+      phrase: "медитация",
+      regionId: "225",
+      device: "DEVICE_ALL",
+      numPhrases: 20,
+    }) ===
+      buildWordstatCacheKey({
+        phrase: "медитация",
+        regionId: "225",
+        device: "DEVICE_ALL",
+        numPhrases: 200,
+      }),
+    false,
+  );
 });
 
 assert.equal(classifyWordstatHttpError({ status: 400 }), "UPSTREAM_ERROR");

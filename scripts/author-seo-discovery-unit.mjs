@@ -17,6 +17,13 @@ import {
   resolveAuthorDiscoveryReservationState,
   shouldOmitFromWordstatAdditions,
 } from "../src/lib/seo-queries/author-discovery-status.ts";
+import {
+  PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
+  PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT,
+  selectProductCreateWordstatAdditions,
+  wordstatNumPhrasesForDiscoverySurface,
+} from "../src/lib/seo-queries/product-create-wordstat.ts";
+import { WORDSTAT_NUM_PHRASES } from "../src/lib/seo/wordstat/types.ts";
 import { isEffectiveSeoReservation } from "../src/lib/seo-queries/reservation-effective.ts";
 import {
   AURAFON_AUTHOR_ID,
@@ -52,7 +59,10 @@ const discoveryRepo = read("src/lib/seo-queries/author-discovery-repository.ts")
 const effectiveHelper = read("src/lib/seo-queries/reservation-effective.ts");
 
 assert.match(discoveryRoute, /requireAuthorMembership\(authorId\)/);
-assert.match(discoveryRoute, /fetchWordstatSuggestions\(phrase, \{ userId: user\.id \}\)/);
+assert.match(discoveryRoute, /fetchWordstatSuggestions\(phrase, \{/);
+assert.match(discoveryRoute, /numPhrases: wordstatNumPhrasesForDiscoverySurface\(surface\)/);
+assert.match(discoveryRoute, /selectProductCreateWordstatAdditions/);
+assert.doesNotMatch(proposalsRoute, /selectProductCreateWordstatAdditions/);
 assert.match(discoveryRoute, /suggestion\.count/);
 assert.doesNotMatch(discoveryRoute, /topicTotalCount/);
 assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY|NEXT_PUBLIC_YANDEX/);
@@ -1022,6 +1032,161 @@ assert.equal(
     ],
   });
   assert.equal(built.matches.length, 0);
+}
+
+assert.equal(
+  wordstatNumPhrasesForDiscoverySurface("product_create"),
+  PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
+);
+assert.equal(PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT, 200);
+assert.equal(
+  wordstatNumPhrasesForDiscoverySurface("opportunities"),
+  WORDSTAT_NUM_PHRASES,
+);
+assert.equal(WORDSTAT_NUM_PHRASES, 20);
+assert.equal(PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT, 20);
+
+// 1 / 2. product_create frequency window 50..2000, sort DESC
+{
+  const ranked = selectProductCreateWordstatAdditions([
+    { phrase: "джаз", count: 300000 },
+    { phrase: "джаз музыка", count: 10000 },
+    { phrase: "джаз для вечера", count: 1999 },
+    { phrase: "вечерний джаз лаунж", count: 1500 },
+    { phrase: "спокойный джаз", count: 800 },
+    { phrase: "тихий джаз", count: 50 },
+    { phrase: "редкий джаз", count: 49 },
+  ]);
+  assert.deepEqual(
+    ranked.map((item) => item.count),
+    [1999, 1500, 800, 50],
+  );
+  assert.equal(
+    ranked.some((item) => item.phrase === "джаз" || item.count > 2000),
+    false,
+  );
+  assert.equal(
+    ranked.some((item) => item.count < 50),
+    false,
+  );
+}
+
+{
+  const ranked = selectProductCreateWordstatAdditions([
+    { phrase: "low", count: 50 },
+    { phrase: "mid", count: 800 },
+    { phrase: "high", count: 1500 },
+  ]);
+  assert.deepEqual(
+    ranked.map((item) => item.phrase),
+    ["high", "mid", "low"],
+  );
+}
+
+// 3. used «вечерний джаз» stays out of both sections
+{
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-evening",
+        queryText: "вечерний джаз",
+        normalizedQuery: "вечерний джаз",
+        frequency: 210,
+        reservation: eveningJazzReservation,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 0);
+  assert.deepEqual(built.hiddenNormalizedQueries, ["вечерний джаз"]);
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "product_create",
+      analysisStatus: "analyzed",
+      reservation: eveningJazzReservation,
+      normalized: "вечерний джаз",
+      databaseNormalized: new Set(built.hiddenNormalizedQueries),
+    }),
+    true,
+  );
+}
+
+// 4. active unlinked own query stays in database section
+{
+  const ownActive = reservation({
+    authorId: authorA,
+    status: "active",
+    productId: null,
+    productTitle: null,
+  });
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: [
+      {
+        id: "q-active",
+        queryText: "джаз лаунж",
+        normalizedQuery: "джаз лаунж",
+        frequency: 80,
+        reservation: ownActive,
+      },
+    ],
+  });
+  assert.equal(built.matches.length, 1);
+  assert.equal(built.matches[0].status, "own");
+}
+
+// 5. databaseMatches phrase is omitted from Wordstat additions
+{
+  const databaseNormalized = new Set(["джаз для работы"]);
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "product_create",
+      analysisStatus: null,
+      reservation: null,
+      normalized: "джаз для работы",
+      databaseNormalized,
+    }),
+    true,
+  );
+}
+
+// 6. expanded pool: first 20 Yandex rows >2000, useful 1800 still survives
+{
+  const raw = [];
+  for (let index = 0; index < 20; index += 1) {
+    raw.push({ phrase: `громкий джаз ${index}`, count: 300000 - index });
+  }
+  raw.push({ phrase: "полезный джаз", count: 1800 });
+  const ranked = selectProductCreateWordstatAdditions(raw);
+  assert.deepEqual(
+    ranked.map((item) => item.phrase),
+    ["полезный джаз"],
+  );
+}
+
+// 7. opportunities keep default 20 and do not use the product_create filter
+assert.equal(wordstatNumPhrasesForDiscoverySurface("opportunities"), 20);
+assert.match(
+  discoveryRoute,
+  /surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE/,
+);
+assert.doesNotMatch(
+  read("src/app/api/author/seo/wordstat/suggestions/route.ts"),
+  /selectProductCreateWordstatAdditions|PRODUCT_CREATE_WORDSTAT/,
+);
+
+// 8. result cap = 20
+{
+  const raw = [];
+  for (let index = 0; index < 25; index += 1) {
+    raw.push({ phrase: `джаз ${index}`, count: 50 + index });
+  }
+  const ranked = selectProductCreateWordstatAdditions(raw);
+  assert.equal(ranked.length, PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT);
+  assert.equal(ranked[0].count, 74);
+  assert.equal(ranked[19].count, 55);
 }
 
 console.log("author-seo-discovery-unit: ok");
