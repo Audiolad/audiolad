@@ -216,7 +216,13 @@ export default function AuthorSeoDiscoveryPanel({
     if (!response.ok) {
       const code = typeof payload.code === "string" ? payload.code : "";
       if (code === "seo_discovery_beta_disabled") {
-        setDiscoverMessage("Эта функция пока доступна только в закрытой бете.");
+        setDiscoverMessage(
+          typeof payload.message === "string" && payload.message.trim()
+            ? payload.message
+            : "Эта функция пока доступна только в закрытой бете.",
+        );
+      } else if (typeof payload.message === "string" && payload.message.trim()) {
+        setDiscoverMessage(payload.message);
       } else if (typeof payload.error === "string" && payload.error.trim()) {
         setDiscoverMessage(payload.error);
       } else {

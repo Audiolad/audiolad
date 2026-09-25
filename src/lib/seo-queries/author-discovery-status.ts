@@ -1,3 +1,5 @@
+import type { PublishedSeoQueryOccupancy } from "@/lib/seo-queries/published-query-occupancy";
+
 /**
  * Shared author-facing discovery reservation semantics.
  *
@@ -80,7 +82,10 @@ export function authorSeoDiscoverySurfaceFromPanelVariant(
  */
 export function isHiddenFromProductCreateDiscovery(
   reservation: Pick<DiscoveryReservationLike, "status" | "productId"> | null,
+  publishedOccupancy?: Pick<PublishedSeoQueryOccupancy, "productId"> | null,
 ): boolean {
+  // Published-product occupancy is injected before the available decision.
+  if (publishedOccupancy?.productId) return true;
   if (!reservation) return false;
   if (reservation.status === "used") return true;
   return reservation.status === "active" && Boolean(reservation.productId);
@@ -89,7 +94,33 @@ export function isHiddenFromProductCreateDiscovery(
 export function resolveAuthorDiscoveryReservationState(input: {
   authorId: string;
   reservation: DiscoveryReservationLike | null;
+  publishedOccupancy?: PublishedSeoQueryOccupancy | null;
 }): AuthorDiscoveryReservationState {
+  const occupancy = input.publishedOccupancy ?? null;
+  if (occupancy?.productId) {
+    if (occupancy.authorId === input.authorId) {
+      return {
+        status: "published",
+        statusLabel: "Опубликован",
+        canReserve: false,
+        reservationId:
+          input.reservation?.authorId === input.authorId
+            ? input.reservation.id
+            : null,
+        productId: occupancy.productId,
+        productTitle: occupancy.productTitle,
+      };
+    }
+    return {
+      status: "occupied",
+      statusLabel: "Занят",
+      canReserve: false,
+      reservationId: null,
+      productId: null,
+      productTitle: null,
+    };
+  }
+
   const reservation = input.reservation;
   if (!reservation) {
     return AVAILABLE_STATE;
@@ -146,6 +177,7 @@ export type AuthorDiscoveryDatabaseMatchInput = {
   normalizedQuery: string;
   frequency: number | null;
   reservation: DiscoveryReservationLike | null;
+  publishedOccupancy?: PublishedSeoQueryOccupancy | null;
 };
 
 export type AuthorDiscoveryDatabaseMatch = {
@@ -170,6 +202,7 @@ export type AuthorDiscoveryDatabaseMatch = {
 export function takeRankedDiscoveryItemsUntilVisible<
   T extends {
     reservation: Pick<DiscoveryReservationLike, "status" | "productId"> | null;
+    publishedOccupancy?: Pick<PublishedSeoQueryOccupancy, "productId"> | null;
   },
 >(input: {
   surface: AuthorSeoDiscoverySurface;
@@ -185,7 +218,12 @@ export function takeRankedDiscoveryItemsUntilVisible<
   let visible = 0;
   for (const item of input.items) {
     walked.push(item);
-    if (!isHiddenFromProductCreateDiscovery(item.reservation)) {
+    if (
+      !isHiddenFromProductCreateDiscovery(
+        item.reservation,
+        item.publishedOccupancy,
+      )
+    ) {
       visible += 1;
       if (visible >= input.visibleLimit) break;
     }
@@ -208,7 +246,10 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
   for (const item of input.items) {
     const hideForProductCreate =
       input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE &&
-      isHiddenFromProductCreateDiscovery(item.reservation);
+      isHiddenFromProductCreateDiscovery(
+        item.reservation,
+        item.publishedOccupancy,
+      );
 
     if (hideForProductCreate) {
       hiddenNormalizedQueries.push(item.normalizedQuery);
@@ -225,6 +266,7 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
     const state = resolveAuthorDiscoveryReservationState({
       authorId: input.authorId,
       reservation: item.reservation,
+      publishedOccupancy: item.publishedOccupancy ?? null,
     });
 
     matches.push({
@@ -249,11 +291,13 @@ export function shouldOmitFromWordstatAdditions(input: {
   surface: AuthorSeoDiscoverySurface;
   analysisStatus?: string | null;
   reservation?: Pick<DiscoveryReservationLike, "status" | "productId"> | null;
+  publishedOccupancy?: Pick<PublishedSeoQueryOccupancy, "productId"> | null;
   normalized?: string | null;
   databaseNormalized: ReadonlySet<string>;
 }): boolean {
   if (input.analysisStatus === "not_applicable") return true;
   if (input.analysisStatus === "analyzed") return true;
+  if (input.publishedOccupancy?.productId) return true;
   if (input.reservation?.status === "used") return true;
   if (
     input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE &&

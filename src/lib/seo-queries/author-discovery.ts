@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveAuthorDiscoveryReservationState } from "@/lib/seo-queries/author-discovery-status";
+import type { PublishedSeoQueryOccupancy } from "@/lib/seo-queries/published-query-occupancy";
 
 export type AuthorDiscoveryStatus =
   | "available"
@@ -95,8 +96,10 @@ export function reconcileAuthorDiscoverySuggestion(input: {
   query: DiscoveryQueryRow | null;
   reservation: DiscoveryReservationRow | null;
   alreadyProposedByAuthor: boolean;
+  publishedOccupancy?: PublishedSeoQueryOccupancy | null;
 }): AuthorDiscoveryResult {
-  const { suggestion, authorId, query, reservation, alreadyProposedByAuthor } = input;
+  const { suggestion, authorId, query, reservation } = input;
+  const publishedOccupancy = input.publishedOccupancy ?? null;
   const phrase = suggestion.phrase;
   const frequency = suggestion.count;
 
@@ -117,15 +120,22 @@ export function reconcileAuthorDiscoverySuggestion(input: {
     return result(phrase, frequency, "pending_review", { queryId: query.id });
   }
 
-  if (reservation && (reservation.status === "active" || reservation.status === "used")) {
+  const reservationOpen =
+    reservation &&
+    (reservation.status === "active" || reservation.status === "used")
+      ? reservation
+      : null;
+  if (publishedOccupancy?.productId || reservationOpen) {
     const state = resolveAuthorDiscoveryReservationState({
       authorId,
-      reservation,
+      reservation: reservationOpen,
+      publishedOccupancy,
     });
     return result(phrase, frequency, state.status, {
       queryId: query.id,
       reservationId: state.reservationId,
       productTitle: state.productTitle,
+      canReserve: state.canReserve,
     });
   }
 

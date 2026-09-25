@@ -5,6 +5,7 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { catalogPickSeoPrimaryFields } from "@/lib/seo-queries/published-query-occupancy";
 import { assertPublishedProductSeoAttachEnabled } from "@/lib/seo-queries/published-product-seo-attach-gate";
 import {
   attachPublishedProductSeoQuery,
@@ -137,7 +138,11 @@ export async function POST(request: Request, context: RouteContext) {
     const queryText =
       typeof body.query_text === "string" ? body.query_text.trim() : "";
 
-    if (!queryId && !queryText) {
+    const picked = catalogPickSeoPrimaryFields({
+      queryId: queryId || null,
+      queryText: queryText || null,
+    });
+    if (!picked.primary_seo_query_id && !picked.seo_primary_query) {
       return NextResponse.json(
         { error: "seo_query_required", message: "Введите поисковый запрос." },
         { status: 400 },
@@ -147,8 +152,8 @@ export async function POST(request: Request, context: RouteContext) {
     const service = createServiceRoleClient();
     const result = await attachPublishedProductSeoQuery(service, {
       productId: practice.id,
-      queryId: queryId || null,
-      queryText: queryId ? null : queryText,
+      queryId: picked.primary_seo_query_id,
+      queryText: picked.primary_seo_query_id ? null : picked.seo_primary_query,
     });
 
     return NextResponse.json({

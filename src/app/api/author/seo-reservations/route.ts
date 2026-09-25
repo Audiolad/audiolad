@@ -4,7 +4,11 @@ import {
   handleAuthorRouteError,
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
-import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import {
+  SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
+  isMusicCreateSeoDiscoveryEnabled,
+} from "@/lib/seo-queries/discovery-beta";
+import { SEO_QUERY_OCCUPIED_BY_PUBLISHED_PRODUCT_MESSAGE } from "@/lib/seo-queries/published-query-occupancy";
 import { isSeoReservationProductLinkAllowed } from "@/lib/seo-queries/reservation-product-link-gate";
 
 function readString(body: Record<string, unknown>, key: string): string {
@@ -13,8 +17,33 @@ function readString(body: Record<string, unknown>, key: string): string {
 
 function seoDiscoveryDisabledResponse() {
   return NextResponse.json(
-    { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+    {
+      error: "seo_discovery_beta_disabled",
+      code: "seo_discovery_beta_disabled",
+      message: SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
+    },
     { status: 403 },
+  );
+}
+
+function reservationErrorResponse(
+  mapped: { error: string; message: string; status: number } | null,
+  fallbackError: string,
+  fallbackMessage: string,
+) {
+  if (!mapped) {
+    return NextResponse.json(
+      {
+        error: fallbackError,
+        code: fallbackError,
+        message: fallbackMessage,
+      },
+      { status: 400 },
+    );
+  }
+  return NextResponse.json(
+    { error: mapped.error, code: mapped.error, message: mapped.message },
+    { status: mapped.status },
   );
 }
 
@@ -30,6 +59,13 @@ function mapReservationError(error: unknown) {
     error && typeof error === "object" && "message" in error
       ? String(error.message)
       : "";
+  if (message.includes("seo_query_occupied_by_published_product")) {
+    return {
+      error: "seo_query_occupied_by_published_product",
+      message: SEO_QUERY_OCCUPIED_BY_PUBLISHED_PRODUCT_MESSAGE,
+      status: 409,
+    };
+  }
   if (message.includes("seo_query_already_reserved")) {
     return { error: "seo_query_already_reserved", message: "Этот запрос уже взял другой автор. Выберите другой.", status: 409 };
   }
@@ -80,7 +116,16 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const authorId = readString(body, "author_id");
     const queryId = readString(body, "query_id");
-    if (!authorId || !queryId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!authorId || !queryId) {
+      return NextResponse.json(
+        {
+          error: "invalid_request",
+          code: "invalid_request",
+          message: "Укажите автора и поисковый запрос.",
+        },
+        { status: 400 },
+      );
+    }
     if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
@@ -89,8 +134,11 @@ export async function POST(request: Request) {
       p_author_id: authorId,
     });
     if (error) {
-      const mapped = mapReservationError(error);
-      return NextResponse.json(mapped ?? { error: "seo_reservation_failed" }, { status: mapped?.status ?? 400 });
+      return reservationErrorResponse(
+        mapReservationError(error),
+        "seo_reservation_failed",
+        "Не удалось закрепить запрос.",
+      );
     }
     return NextResponse.json({ reservation: data, message: "Запрос закреплен за вами" }, { status: 201 });
   } catch (error) {
@@ -103,7 +151,16 @@ export async function DELETE(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const authorId = readString(body, "author_id");
     const reservationId = readString(body, "reservation_id");
-    if (!authorId || !reservationId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    if (!authorId || !reservationId) {
+      return NextResponse.json(
+        {
+          error: "invalid_request",
+          code: "invalid_request",
+          message: "Укажите автора и бронирование.",
+        },
+        { status: 400 },
+      );
+    }
     if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
@@ -111,8 +168,11 @@ export async function DELETE(request: Request) {
       p_reservation_id: reservationId,
     });
     if (error) {
-      const mapped = mapReservationError(error);
-      return NextResponse.json(mapped ?? { error: "seo_reservation_release_failed" }, { status: mapped?.status ?? 400 });
+      return reservationErrorResponse(
+        mapReservationError(error),
+        "seo_reservation_release_failed",
+        "Не удалось освободить запрос.",
+      );
     }
     return NextResponse.json({ reservation: data });
   } catch (error) {
@@ -127,7 +187,14 @@ export async function PATCH(request: Request) {
     const reservationId = readString(body, "reservation_id");
     const productId = readString(body, "product_id");
     if (!authorId || !reservationId || !productId) {
-      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "invalid_request",
+          code: "invalid_request",
+          message: "Укажите автора, бронирование и продукт.",
+        },
+        { status: 400 },
+      );
     }
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
@@ -143,7 +210,14 @@ export async function PATCH(request: Request) {
       || practice.deleted_at
       || typeof practice.author_id !== "string"
     ) {
-      return NextResponse.json({ error: "practice_not_found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "practice_not_found",
+          code: "practice_not_found",
+          message: "Продукт не найден.",
+        },
+        { status: 404 },
+      );
     }
 
     // Body publication_class is not proof. The loaded practices row is.
@@ -163,8 +237,11 @@ export async function PATCH(request: Request) {
       p_product_id: productId,
     });
     if (error) {
-      const mapped = mapReservationError(error);
-      return NextResponse.json(mapped ?? { error: "seo_reservation_link_failed" }, { status: mapped?.status ?? 400 });
+      return reservationErrorResponse(
+        mapReservationError(error),
+        "seo_reservation_link_failed",
+        "Не удалось связать запрос с продуктом.",
+      );
     }
     return NextResponse.json({ reservation: data });
   } catch (error) {
