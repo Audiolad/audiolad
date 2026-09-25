@@ -3,7 +3,18 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { toggleCatalogDraftTopics } from "@/lib/catalog/topic-filter";
+import {
+  CATALOG_ACCESS_FILTER_OPTIONS,
+  CATALOG_CLASS_FILTER_OPTIONS,
+} from "@/lib/catalog/catalog-filter-ui";
+import type {
+  CatalogAccessFilter,
+  CatalogClassFilter,
+} from "@/lib/catalog/listing-contract";
+import {
+  countCatalogFilterGroups,
+  toggleCatalogDraftTopics,
+} from "@/lib/catalog/topic-filter";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_CATALOG_TOPICS_PATH } from "@/lib/max/host";
 import { useSheetScrollLock } from "@/lib/listener/use-sheet-scroll-lock";
@@ -15,7 +26,13 @@ export type MaxCatalogTopicOption = {
 
 type MaxCatalogTopicsSheetProps = {
   activeTopicKeys: readonly string[];
-  onApply: (keys: string[]) => void;
+  activeAccess: CatalogAccessFilter;
+  activeClass: CatalogClassFilter;
+  onApply: (
+    keys: string[],
+    access: CatalogAccessFilter,
+    publicationClass: CatalogClassFilter,
+  ) => void;
   onReset: () => void;
 };
 
@@ -70,6 +87,8 @@ function TopicChip({
 
 export default function MaxCatalogTopicsSheet({
   activeTopicKeys,
+  activeAccess,
+  activeClass,
   onApply,
   onReset,
 }: MaxCatalogTopicsSheetProps) {
@@ -77,6 +96,8 @@ export default function MaxCatalogTopicsSheet({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [draftTopics, setDraftTopics] = useState<string[]>([]);
+  const [draftAccess, setDraftAccess] = useState<CatalogAccessFilter>("all");
+  const [draftClass, setDraftClass] = useState<CatalogClassFilter>("all");
   const [topics, setTopics] = useState<MaxCatalogTopicOption[]>([]);
   const [topicsStatus, setTopicsStatus] = useState<"idle" | "loading" | "ready" | "error">(
     "idle",
@@ -192,19 +213,27 @@ export default function MaxCatalogTopicsSheet({
 
   function openSheet() {
     setDraftTopics([...activeTopicKeys]);
+    setDraftAccess(activeAccess);
+    setDraftClass(activeClass);
     setTopicsStatus("loading");
     setOpen(true);
   }
 
   function applyDraft() {
-    onApply(draftTopics);
+    onApply(draftTopics, draftAccess, draftClass);
     setOpen(false);
   }
 
-  function resetTopics() {
+  function resetFilters() {
     onReset();
     setOpen(false);
   }
+
+  const activeFilterCount = countCatalogFilterGroups({
+    topicKeys: activeTopicKeys,
+    access: activeAccess,
+    class: activeClass,
+  });
 
   const sheet = open ? (
     <div
@@ -233,7 +262,7 @@ export default function MaxCatalogTopicsSheet({
               <button
                 type="button"
                 data-max-catalog-topics-reset
-                onClick={resetTopics}
+                onClick={resetFilters}
                 className="rounded-full px-2 py-1 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc]"
               >
                 Сбросить
@@ -264,6 +293,11 @@ export default function MaxCatalogTopicsSheet({
             ) : null}
             {topicsStatus === "ready" && topics.length > 0 ? (
               <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
+                <TopicChip
+                  label="Все"
+                  isActive={draftTopics.length === 0}
+                  onSelect={() => setDraftTopics([])}
+                />
                 {topics.map((topic) => (
                   <TopicChip
                     key={topic.key}
@@ -276,6 +310,34 @@ export default function MaxCatalogTopicsSheet({
                 ))}
               </div>
             ) : null}
+          </section>
+
+          <section className="mt-6" aria-label="Доступ">
+            <h3 className="text-sm font-semibold text-[#25135c]">Доступ</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATALOG_ACCESS_FILTER_OPTIONS.map((option) => (
+                <TopicChip
+                  key={option.value}
+                  label={option.label}
+                  isActive={option.value === draftAccess}
+                  onSelect={() => setDraftAccess(option.value)}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6" aria-label="Тип">
+            <h3 className="text-sm font-semibold text-[#25135c]">Тип</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATALOG_CLASS_FILTER_OPTIONS.map((option) => (
+                <TopicChip
+                  key={option.value}
+                  label={option.label}
+                  isActive={option.value === draftClass}
+                  onSelect={() => setDraftClass(option.value)}
+                />
+              ))}
+            </div>
           </section>
         </div>
 
@@ -305,12 +367,12 @@ export default function MaxCatalogTopicsSheet({
         className="inline-flex h-[52px] shrink-0 items-center rounded-[18px] border border-[#ded1f1] bg-white px-3 text-sm font-medium text-[#7042c5] shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         Темы
-        {activeTopicKeys.length > 0 ? (
+        {activeFilterCount > 0 ? (
           <span
             data-max-catalog-topics-count
             className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-[#7042c5] px-1.5 text-[11px] font-semibold text-white"
           >
-            {activeTopicKeys.length}
+            {activeFilterCount}
           </span>
         ) : null}
       </button>
