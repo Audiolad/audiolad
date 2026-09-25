@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { buildCsv, downloadCsv } from "@/lib/admin/analytics-csv";
+import { formatListeningTimeNotice } from "@/lib/admin/format-listening-time";
 import type {
   AdminAnalyticsAcquisitionRow,
   AdminAnalyticsAuthorRow,
@@ -112,6 +113,9 @@ export default function AdminAnalyticsBreakdownPanel({
     sort: string;
     sortDir: "asc" | "desc";
     error: string | null;
+    listeningTimeValidFrom: string | null;
+    listeningTimePartial: boolean;
+    listeningTimeUnmeasured: boolean;
   };
   authors: {
     total: number;
@@ -157,6 +161,7 @@ export default function AdminAnalyticsBreakdownPanel({
             "unique_listeners",
             "completions",
             "saves",
+            "listened_ms",
           ],
           filteredPractices.map((row) => [
             row.title,
@@ -167,6 +172,7 @@ export default function AdminAnalyticsBreakdownPanel({
             row.uniqueListeners,
             row.completions,
             row.saves,
+            row.listenedMs ?? "",
           ]),
         ),
       );
@@ -357,6 +363,11 @@ export default function AdminAnalyticsBreakdownPanel({
                       Дослуш.{practices.sort === "completions" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
                     </button>
                   </th>
+                  <th className="px-2 py-2">
+                    <button type="button" onClick={() => onPracticesSort("listened_ms")}>
+                      Время прослушивания{practices.sort === "listened_ms" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
+                    </button>
+                  </th>
                   <th className="px-2 py-2">Сохр.</th>
                 </tr>
               </thead>
@@ -382,6 +393,7 @@ export default function AdminAnalyticsBreakdownPanel({
                     <td className="px-2 py-3">{row.playStarts.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.uniqueListeners.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.completions.toLocaleString("ru-RU")}</td>
+                    <td className="px-2 py-3">{row.listeningTimeLabel}</td>
                     <td className="px-2 py-3">{row.saves.toLocaleString("ru-RU")}</td>
                   </tr>
                 ))}
@@ -389,7 +401,17 @@ export default function AdminAnalyticsBreakdownPanel({
             </table>
             <p className="mt-2 text-xs text-[#9485b4]">
               Показано {filteredPractices.length} из {practices.total.toLocaleString("ru-RU")}
+              {practices.sort === "listened_ms"
+                ? " · Топ практик по времени прослушивания"
+                : ""}
             </p>
+            {practices.listeningTimePartial || practices.listeningTimeUnmeasured ? (
+              <p className="mt-1 text-xs text-[#7042c5]">
+                {practices.listeningTimeValidFrom
+                  ? formatListeningTimeNotice(practices.listeningTimeValidFrom)
+                  : "Время прослушивания собирается с момента включения учёта"}
+              </p>
+            ) : null}
           </div>
         )
       ) : null}

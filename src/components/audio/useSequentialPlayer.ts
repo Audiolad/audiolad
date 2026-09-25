@@ -85,7 +85,9 @@ import {
   readListenStatsClientAuthenticated,
   reportListenStatsHeartbeat,
   shouldReportListenStatsHeartbeat,
+  shouldReportPlaybackUsageHeartbeat,
 } from "@/lib/listen/listen-stats-client";
+import type { PlaybackUsagePhase } from "@/lib/listen/playback-usage";
 import {
   DEFAULT_REPEAT_MODE,
   resolveNaturalEndedRepeatAction,
@@ -93,6 +95,14 @@ import {
 } from "@/lib/listen/repeat-mode";
 
 type TracksExhaustedResult = "advanced" | "completed" | "none";
+
+type FlushListenStatsOptions = {
+  keepalive?: boolean;
+  phase?: PlaybackUsagePhase;
+  positionSeconds?: number;
+  audioItemId?: string;
+  isPlaying?: boolean;
+};
 
 type PrefetchedSource = {
   audioItemId: string;
@@ -259,8 +269,12 @@ export function useSequentialPlayer({
   const lastIntervalSavedPositionRef = useRef(-1);
   const lastListenStatsPositionMsRef = useRef<number | null>(null);
   const lastListenStatsTrackIdRef = useRef<string | null>(null);
+  const lastHonestPositionMsRef = useRef<number | null>(null);
+  const usageSeekingRef = useRef(false);
   const flushProgressRef = useRef<() => Promise<void>>(async () => {});
-  const flushListenStatsRef = useRef<(keepalive?: boolean) => void>(() => {});
+  const flushListenStatsRef = useRef<
+    (options?: boolean | FlushListenStatsOptions) => void
+  >(() => {});
   const loadSignedUrlRef = useRef<
     (audioItemId: string) => Promise<LoadSignedUrlRecoveryResult>
   >(async () => ({ ok: false, reason: "failed", status: null }));
@@ -678,19 +692,32 @@ export function useSequentialPlayer({
   }, [flushProgress]);
 
   const reportListenStats = useCallback(
-    (options?: { keepalive?: boolean; positionSeconds?: number }) => {
-      const track = currentTrackRef.current;
+    (options?: FlushListenStatsOptions) => {
+      const audioItemId = options?.audioItemId ?? currentTrackRef.current?.id;
 
-      if (
-        !track ||
-        !shouldReportListenStatsHeartbeat({
-          isPrivateAudio: isPrivateAudioRef.current,
-          isPreviewMode: isPreviewModeRef.current,
-          guestProgressMode: guestProgressModeRef.current,
-          audioItemId: track.id,
-          isAuthenticated: readListenStatsClientAuthenticated(),
-        })
-      ) {
+      if (!audioItemId) {
+        return;
+      }
+
+      const reportUsage = shouldReportPlaybackUsageHeartbeat({
+        isPrivateAudio: isPrivateAudioRef.current,
+        audioItemId,
+      });
+      const reportRating = shouldReportListenStatsHeartbeat({
+        isPrivateAudio: isPrivateAudioRef.current,
+        isPreviewMode: isPreviewModeRef.current,
+        guestProgressMode: guestProgressModeRef.current,
+        audioItemId,
+        isAuthenticated: readListenStatsClientAuthenticated(),
+      });
+
+      if (!reportUsage && !reportRating) {
+        return;
+      }
+
+      const phase = options?.phase ?? "advance";
+
+      if (phase === "advance" && usageSeekingRef.current) {
         return;
       }
 
@@ -698,29 +725,41 @@ export function useSequentialPlayer({
       const positionSeconds =
         options?.positionSeconds ?? audio?.currentTime ?? currentTimeRef.current;
       const positionMs = Math.max(0, Math.floor(positionSeconds * 1000));
-      const sameTrack = lastListenStatsTrackIdRef.current === track.id;
+      const sameTrack = lastListenStatsTrackIdRef.current === audioItemId;
       const priorPositionMs = sameTrack
         ? lastListenStatsPositionMsRef.current
         : null;
 
       reportListenStatsHeartbeat({
         apiBase: listenApiBaseRef.current,
-        audioItemId: track.id,
+        audioItemId,
         positionMs,
         priorPositionMs,
         playbackRate: PLAYBACK_RATES[playbackRateIndex],
         keepalive: options?.keepalive === true,
+        practiceId: reportUsage ? practiceIdRef.current : null,
+        phase,
+        isPlaying: options?.isPlaying ?? isPlayingRef.current,
       });
 
-      lastListenStatsTrackIdRef.current = track.id;
+      lastListenStatsTrackIdRef.current = audioItemId;
       lastListenStatsPositionMsRef.current = positionMs;
+
+      if (phase !== "seek") {
+        lastHonestPositionMsRef.current = positionMs;
+      }
     },
     [playbackRateIndex],
   );
 
   useEffect(() => {
-    flushListenStatsRef.current = (keepalive?: boolean) => {
-      reportListenStats({ keepalive });
+    flushListenStatsRef.current = (options?: boolean | FlushListenStatsOptions) => {
+      if (typeof options === "boolean") {
+        reportListenStats({ keepalive: options });
+        return;
+      }
+
+      reportListenStats(options);
     };
   }, [reportListenStats]);
 
@@ -903,6 +942,14 @@ export function useSequentialPlayer({
       if (previousTrack) {
         const previousPosition =
           audioRef.current?.currentTime ?? currentTimeRef.current;
+        flushListenStatsRef.current({
+          phase: "advance",
+          audioItemId: previousTrack.id,
+          positionSeconds: previousPosition,
+          keepalive: true,
+          isPlaying: true,
+        });
+        usageSeekingRef.current = false;
         const persistOutgoing = () =>
           saveProgress(
             previousTrack.id,
@@ -1264,6 +1311,13 @@ export function useSequentialPlayer({
       currentTimeRef.current = audio.currentTime;
       setCurrentTime(audio.currentTime);
 
+      if (!usageSeekingRef.current) {
+        lastHonestPositionMsRef.current = Math.max(
+          0,
+          Math.floor(audio.currentTime * 1000),
+        );
+      }
+
       if (
         hasPreviewWindowRef.current &&
         audio.currentTime >= previewEndSecondsRef.current - 0.05
@@ -1314,8 +1368,46 @@ export function useSequentialPlayer({
         return;
       }
 
+      if (!usageSeekingRef.current) {
+        flushListenStatsRef.current({ phase: "pause", isPlaying: false });
+      }
+
       setPlayingState(false);
       debugSnapshot("audio-event", "pause");
+    };
+
+    const handleSeeking = () => {
+      if (!isHandlerCurrent() || usageSeekingRef.current) {
+        return;
+      }
+
+      const honestMs = lastHonestPositionMsRef.current;
+      if (honestMs != null) {
+        flushListenStatsRef.current({
+          phase: "advance",
+          positionSeconds: honestMs / 1000,
+          isPlaying: true,
+        });
+      }
+
+      usageSeekingRef.current = true;
+    };
+
+    const handleSeeked = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
+      usageSeekingRef.current = false;
+      flushListenStatsRef.current({
+        phase: "seek",
+        positionSeconds: audio.currentTime,
+        isPlaying: !audio.paused,
+      });
+      lastHonestPositionMsRef.current = Math.max(
+        0,
+        Math.floor(audio.currentTime * 1000),
+      );
     };
 
     const handleWaiting = () => {
@@ -1422,6 +1514,12 @@ export function useSequentialPlayer({
       if (!isHandlerCurrent() || !currentTrack) {
         return;
       }
+
+      flushListenStatsRef.current({
+        phase: "ended",
+        positionSeconds: audio.duration || audio.currentTime,
+        isPlaying: false,
+      });
 
       if (hasPreviewWindowRef.current) {
         finishPreview();
@@ -1644,6 +1742,8 @@ export function useSequentialPlayer({
     audio.addEventListener("stalled", handleStalled);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("seeking", handleSeeking);
+    audio.addEventListener("seeked", handleSeeked);
     audio.addEventListener("error", handleError);
 
     audio.playbackRate = PLAYBACK_RATES[playbackRateIndex];
@@ -1659,6 +1759,8 @@ export function useSequentialPlayer({
       audio.removeEventListener("stalled", handleStalled);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("seeking", handleSeeking);
+      audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("error", handleError);
     };
   }, [
@@ -1748,8 +1850,10 @@ export function useSequentialPlayer({
       return;
     }
 
+    flushListenStatsRef.current({ phase: "advance", isPlaying: true });
+
     const intervalId = window.setInterval(() => {
-      flushListenStatsRef.current();
+      flushListenStatsRef.current({ phase: "advance", isPlaying: true });
     }, LISTEN_STATS_HEARTBEAT_MS);
 
     return () => {

@@ -1013,6 +1013,40 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 - `DELETE /progress` и rewind **не** чистят эту таблицу.
 - Admin test-user-reset считает `practice_listen_stats`; полное удаление тестового `auth.users` снимает строки через CASCADE.
 
+## playback_usage_facts (period listening time)
+
+Миграция: `supabase/migrations/20261126120000_playback_usage_facts.sql`.
+
+Это **не** рейтинг и **не** замена `practice_listen_stats`.  
+`practice_listen_stats.real_listened_ms` остаётся накопленным MEDIA-TIME для eligibility (user_id NOT NULL, без дневной истории, анонимы не покрыты). Его **нельзя** суммировать за период.  
+Канон аналитики «Время прослушивания» — append-only `playback_usage_facts.listened_ms`: сервер принял продвижение `HTMLMediaElement.currentTime`. Это нейтральный факт использования, не royalty.
+
+`listening_time_valid_from` в singleton `playback_usage_settings` ставится в `now()` в момент применения миграции. Исторического backfill нет. Окно целиком до этой даты — неизмеренное (`listened_ms` JSON null, в UI «—»), не ноль. Частичное окно показывает измеренную сумму и текст «Время прослушивания собирается с …».
+
+| Колонка / объект | Назначение |
+|---------|------------|
+| `playback_usage_facts.id` | уникальный факт |
+| `client_event_id` | idempotency key одного физического heartbeat; UNIQUE |
+| `listening_key` | контекст `practiceId:audioItemId:startedAt`, тот же формат, что у ListenAnalyticsTracker |
+| `context_id` | строка `playback_usage_contexts` (baseline позиции) |
+| `session_id` | analytics session, если anonymous_id сессии совпал; иначе NULL |
+| `user_id` | NULL для анонима; SET NULL при удалении пользователя |
+| `anonymous_id` / `visitor_key` | существующая анонимная идентичность |
+| `practice_id` / `audio_item_id` | продукт и трек |
+| `listened_ms` | принятые миллисекунды этого тика, включая 0 |
+| `occurred_at` | серверное время принятия |
+| `author_id_snapshot` | автор продукта на момент принятия; для будущего закрытого ledger |
+| `business_account_id`, `venue_id`, `billing_period_start`, `royalty_eligible_ms` | NULL-задел. Биллинг и royalty в этой миграции не считаются |
+| `playback_usage_contexts` | последняя позиция и сумма по контексту, чтобы следующий тик не доверял клиентской дельте |
+
+Правила принятия (зеркало `evaluatePlaybackUsageTick` / `apply_playback_usage_heartbeat`): первый сэмпл контекста +0; seek и смена трека +0 и новый baseline; отрицательная дельта +0; явный невозможный скачок (кандидат > wall×1.5+2000 и > wall×1.5×2) +0; иначе cap `min(дельта, wall×1.5, остаток lifetime×1.5)`. Client `playback_rate` только телеметрия и потолок 1.5 не поднимает. Повтор того же `client_event_id` возвращает уже принятые ms и не добавляет время. Пауза, ended и flush дописывают честный хвост по тем же правилам. Потеря последнего события может недосчитать до ~5 с и не может задвоить.
+
+Админ читает только `listened_ms > 0` через `playback_usage_admin_facts` (текущий `practices.author_id`, UTM/device через session-touch, те же исключения staff/test/bot). RPC: `admin_analytics_listening_time`, `admin_analytics_listening_time_timeseries`, расширенный `admin_analytics_p2_practices` (сорт `listened_ms`). Существующие summary/timeseries product-event RPC не переписаны.
+
+RLS включён, политик нет. `REVOKE` у `anon` / `authenticated` / `PUBLIC`, `GRANT` только `service_role`. Анонимный `PUT .../listen-stats` с usage-полями пишет факт и **не** создаёт `practice_listen_stats`. `GET` без сессии по-прежнему 401.
+
+Протокол ручной проверки: `docs/playback-usage-listening-time.md`.
+
 ## practice_ratings (current active rating)
 
 Миграция: `supabase/migrations/20260921120000_practice_ratings.sql`.

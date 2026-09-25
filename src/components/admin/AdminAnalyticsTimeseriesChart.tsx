@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { AdminAnalyticsTimeseriesPoint } from "@/lib/admin/analytics-queries";
+import { formatListeningDuration } from "@/lib/admin/format-listening-time";
 
 const SERIES = [
   { key: "visitors", label: "Посетители", color: "#7042c5" },
@@ -20,10 +21,12 @@ export default function AdminAnalyticsTimeseriesChart({
   points,
   granularity,
   error,
+  listeningTimeNotice,
 }: {
   points: AdminAnalyticsTimeseriesPoint[];
   granularity: "day" | "week";
   error: string | null;
+  listeningTimeNotice?: string | null;
 }) {
   const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>({
     visitors: true,
@@ -34,6 +37,7 @@ export default function AdminAnalyticsTimeseriesChart({
     completions: false,
     saves: false,
   });
+  const [listeningEnabled, setListeningEnabled] = useState(true);
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
 
@@ -77,6 +81,49 @@ export default function AdminAnalyticsTimeseriesChart({
     return { max: maxValue, pathMap: paths };
   }, [activeSeries, points]);
 
+  const listeningPath = useMemo(() => {
+    const samples = points.map((point) => point.listenedMinutes);
+    const maxMinutes = Math.max(
+      0,
+      ...samples.filter((value): value is number => value != null),
+    );
+    if (!listeningEnabled || maxMinutes <= 0) {
+      return { d: "", maxMinutes, titles: [] as Array<{ x: number; y: number; label: string }> };
+    }
+
+    const width = 640;
+    const height = 220;
+    const padX = 28;
+    const padY = 20;
+    const titles: Array<{ x: number; y: number; label: string }> = [];
+    let segmentStart = true;
+    const d = samples
+      .map((minutes, index) => {
+        const x =
+          padX +
+          (points.length === 1
+            ? (width - padX * 2) / 2
+            : (index / Math.max(points.length - 1, 1)) * (width - padX * 2));
+        if (minutes == null) {
+          segmentStart = true;
+          return "";
+        }
+        const y = height - padY - (minutes / maxMinutes) * (height - padY * 2);
+        titles.push({
+          x,
+          y,
+          label: `${points[index]?.bucket}: ${formatListeningDuration(points[index]?.listenedMs ?? 0)}`,
+        });
+        const command = `${segmentStart ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+        segmentStart = false;
+        return command;
+      })
+      .filter(Boolean)
+      .join(" ");
+
+    return { d, maxMinutes, titles };
+  }, [listeningEnabled, points]);
+
   return (
     <section
       aria-labelledby="admin-timeseries-heading"
@@ -91,10 +138,26 @@ export default function AdminAnalyticsTimeseriesChart({
             {granularity === "week" ? "По неделям" : "По дням"} · Europe/Moscow ·
             пустые периоды = 0
           </p>
+          {listeningTimeNotice ? (
+            <p className="mt-1 text-sm text-[#7042c5]">{listeningTimeNotice}</p>
+          ) : null}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setListeningEnabled((current) => !current)}
+          className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+            listeningEnabled
+              ? "border-transparent text-white"
+              : "border-[#eadff8] bg-white text-[#7042c5]"
+          }`}
+          style={listeningEnabled ? { backgroundColor: "#1f7a4d" } : undefined}
+          aria-pressed={listeningEnabled}
+        >
+          Время прослушивания
+        </button>
         {SERIES.map((series) => {
           const active = enabled[series.key];
 
@@ -147,6 +210,11 @@ export default function AdminAnalyticsTimeseriesChart({
             <text x="8" y="24" className="fill-[#9485b4]" fontSize="11">
               {max.toLocaleString("ru-RU")}
             </text>
+            {listeningEnabled && listeningPath.maxMinutes > 0 ? (
+              <text x="500" y="24" className="fill-[#1f7a4d]" fontSize="11">
+                {formatListeningDuration(listeningPath.maxMinutes * 60_000)}
+              </text>
+            ) : null}
             {activeSeries.map((series) => (
               <path
                 key={series.key}
@@ -158,6 +226,25 @@ export default function AdminAnalyticsTimeseriesChart({
                 strokeLinejoin="round"
               />
             ))}
+            {listeningEnabled && listeningPath.d ? (
+              <path
+                d={listeningPath.d}
+                fill="none"
+                stroke="#1f7a4d"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+            {listeningEnabled
+              ? listeningPath.titles.map((title) => (
+                  <g key={`${title.x}-${title.label}`}>
+                    <circle cx={title.x} cy={title.y} r="6" fill="transparent">
+                      <title>{title.label}</title>
+                    </circle>
+                  </g>
+                ))
+              : null}
           </svg>
           <div className="mt-1 flex justify-between text-[11px] text-[#9485b4]">
             <span>{points[0]?.bucket}</span>
