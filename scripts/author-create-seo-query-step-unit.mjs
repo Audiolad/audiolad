@@ -16,6 +16,16 @@ import {
   isSeoQuerySkipParam,
 } from "../src/lib/seo-queries/reservation-product-create-href.ts";
 import { getProductSeoQueryStepCopy } from "../src/lib/seo-queries/product-seo-query-step-copy.ts";
+import { authorDiscoveryRowAfterOwnReservationRelease } from "../src/lib/seo-queries/author-discovery-status.ts";
+import {
+  RELEASE_SEO_QUERY_FALLBACK_MESSAGE,
+  activeReservationCountAfterRelease,
+  opportunitiesAfterOwnReservationRelease,
+  releaseSeoQueryConfirmCopy,
+  requestReleaseSeoReservation,
+  selectOwnUnlinkedSeoOpportunities,
+} from "../src/lib/seo-queries/release-own-seo-reservation.ts";
+import { countActiveAuthorSeoReservations } from "../src/lib/seo-queries/types.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
@@ -29,6 +39,8 @@ const wizard = read("src/components/author-dashboard/AuthorCreateWizard.tsx");
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
 const opportunitiesUi = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
+const reservationRoute = read("src/app/api/author/seo-reservations/route.ts");
+const releaseLib = read("src/lib/seo-queries/release-own-seo-reservation.ts");
 
 // --- Dashboard: discovery removed ---
 assert.doesNotMatch(dash, /AuthorSeoDiscoveryPanel/);
@@ -106,7 +118,9 @@ assert.match(createPage, /internalBackHref=\{typeChooserHref\}/);
 
 // --- Query step structure ---
 assert.match(createStep, /Ваши запросы в работе/);
-assert.match(createStep, /!item\.productId/);
+assert.match(createStep, /selectOwnUnlinkedSeoOpportunities/);
+assert.match(releaseLib, /!item\.productId/);
+assert.match(releaseLib, /item\.lifecycle !== "published"/);
 assert.match(createStep, /variant="product-create"/);
 assert.match(createStep, /seoQuerySkip:\s*true/);
 assert.doesNotMatch(createStep, /AuthorSeoPromptBuilder/);
@@ -189,5 +203,244 @@ for (const name of afterSpa) {
   const body = read(`supabase/migrations/${name}`);
   assert.doesNotMatch(body, /author-create-seo-query|seo_query.?skip|product-create/i);
 }
+
+// --- Release own unlinked query on the pre-create step ---
+assert.match(reservationRoute, /release_seo_query_reservation/);
+assert.match(reservationRoute, /export async function DELETE/);
+assert.doesNotMatch(releaseLib, /supabase\.rpc/);
+assert.doesNotMatch(createStep, /supabase\.rpc/);
+assert.doesNotMatch(createStep, /Удалить|Отменить SEO/);
+assert.match(createStep, /Освободить запрос/);
+assert.match(createStep, /Освобождаем…/);
+assert.match(createStep, /Выбрать и продолжить/);
+assert.match(createStep, /requestReleaseSeoReservation/);
+assert.match(createStep, /activeReservationCount=\{activeCount\}/);
+assert.match(createStep, /releasedReservationIds=\{releasedReservationIds\}/);
+assert.match(createStep, /router\.refresh\(\)/);
+assert.match(panel, /authorDiscoveryRowAfterOwnReservationRelease/);
+assert.match(panel, /releasedReservationIds/);
+
+const releaseButton = createStep.slice(
+  Math.max(0, createStep.indexOf('data-testid="author-product-seo-query-release"') - 500),
+  createStep.indexOf('data-testid="author-product-seo-query-release"'),
+);
+assert.match(releaseButton, /border border-\[#bda6e1\]/);
+assert.doesNotMatch(releaseButton, /d64545|destructive|bg-red/);
+assert.match(releaseButton, /setConfirmTarget\(item\)/);
+assert.doesNotMatch(releaseButton, /requestReleaseSeoReservation/);
+
+const confirmFn = createStep.slice(
+  createStep.indexOf("async function confirmRelease"),
+  createStep.indexOf("return ("),
+);
+assert.match(confirmFn, /publicationClass/);
+assert.ok(
+  confirmFn.indexOf("if (!result.ok)") < confirmFn.indexOf("setReleasedReservationIds"),
+  "failed DELETE does not drop the reservation",
+);
+assert.ok(
+  confirmFn.indexOf("if (!result.ok)") < confirmFn.indexOf("router.refresh"),
+  "refresh only after successful DELETE",
+);
+
+const confirmCopy = releaseSeoQueryConfirmCopy("музыка для сна");
+assert.equal(confirmCopy.title, "Освободить запрос „музыка для сна“?");
+assert.equal(confirmCopy.description, "Он снова станет доступен другим авторам.");
+assert.match(createStep, /Отмена/);
+assert.match(createStep, />\s*\{pendingId \? "Освобождаем…" : "Освободить"\}\s*</);
+
+function opportunity(overrides) {
+  return {
+    id: "q-own",
+    queryText: "музыка для сна",
+    source: "manual",
+    frequency: 1200,
+    clusterName: null,
+    intent: null,
+    recommendedFormat: null,
+    audioFit: null,
+    lifecycle: "in_progress",
+    reservationId: "res-own",
+    expiresAt: "2026-10-01T00:00:00.000Z",
+    productId: null,
+    productTitle: null,
+    ...overrides,
+  };
+}
+
+const own = opportunity({});
+const published = opportunity({
+  id: "q-published",
+  queryText: "вечерний джаз",
+  lifecycle: "published",
+  reservationId: "res-published",
+  productId: "prod-1",
+  productTitle: "Вечерний джаз",
+});
+const linked = opportunity({
+  id: "q-linked",
+  queryText: "джаз для отдыха",
+  reservationId: "res-linked",
+  productId: "prod-draft",
+  productTitle: "Черновик",
+});
+const otherOwn = opportunity({
+  id: "q-other",
+  queryText: "музыка для медитации",
+  reservationId: "res-other",
+});
+const block = selectOwnUnlinkedSeoOpportunities([own, published, linked, otherOwn]);
+assert.deepEqual(
+  block.map((item) => item.reservationId),
+  ["res-own", "res-other"],
+  "published and product-linked stay out of the block",
+);
+
+const beforeCount = countActiveAuthorSeoReservations([own, published, linked, otherOwn]);
+assert.equal(beforeCount, 3);
+const releasedItems = opportunitiesAfterOwnReservationRelease(
+  [own, published, linked, otherOwn],
+  ["res-own"],
+);
+assert.equal(
+  selectOwnUnlinkedSeoOpportunities(releasedItems).some((item) => item.reservationId === "res-own"),
+  false,
+  "successful release removes the card",
+);
+assert.equal(
+  selectOwnUnlinkedSeoOpportunities(releasedItems).map((item) => item.reservationId).join(","),
+  "res-other",
+);
+assert.equal(countActiveAuthorSeoReservations(releasedItems), beforeCount - 1);
+assert.equal(
+  activeReservationCountAfterRelease([own, published, linked, otherOwn], ["res-own"], true),
+  beforeCount - 1,
+);
+assert.equal(
+  activeReservationCountAfterRelease([own, published, linked, otherOwn], ["res-own"], false),
+  beforeCount,
+  "failed DELETE keeps the count",
+);
+assert.equal(activeReservationCountAfterRelease([], ["missing"], true), 0);
+assert.equal(
+  selectOwnUnlinkedSeoOpportunities(
+    opportunitiesAfterOwnReservationRelease([own], ["res-own"]),
+  ).length,
+  0,
+);
+
+const calls = [];
+const released = await requestReleaseSeoReservation({
+  authorId: "author-1",
+  reservationId: "res-own",
+  publicationClass: "release",
+  fetchImpl: async (url, init) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ reservation: { id: "res-own" } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  },
+});
+assert.equal(released.ok, true);
+assert.equal(calls.length, 1);
+assert.equal(calls[0].url, "/api/author/seo-reservations");
+assert.equal(calls[0].init.method, "DELETE");
+assert.deepEqual(JSON.parse(calls[0].init.body), {
+  author_id: "author-1",
+  reservation_id: "res-own",
+  publication_class: "release",
+});
+
+const lifecycleLocked = await requestReleaseSeoReservation({
+  authorId: "author-1",
+  reservationId: "res-own",
+  publicationClass: "release",
+  fetchImpl: async () =>
+    new Response(
+      JSON.stringify({
+        error: "seo_reservation_product_lifecycle_locked",
+        message:
+          "Запрос нельзя освободить после отправки продукта на модерацию или публикации.",
+      }),
+      { status: 409, headers: { "content-type": "application/json" } },
+    ),
+});
+assert.equal(lifecycleLocked.ok, false);
+assert.equal(
+  lifecycleLocked.message,
+  "Запрос нельзя освободить после отправки продукта на модерацию или публикации.",
+);
+
+const unnamedFailure = await requestReleaseSeoReservation({
+  authorId: "author-1",
+  reservationId: "res-own",
+  publicationClass: "release",
+  fetchImpl: async () =>
+    new Response(JSON.stringify({ error: "seo_reservation_release_failed" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    }),
+});
+assert.equal(unnamedFailure.ok, false);
+assert.equal(unnamedFailure.message, RELEASE_SEO_QUERY_FALLBACK_MESSAGE);
+assert.equal(unnamedFailure.message, "Не удалось освободить запрос.");
+
+const ownDiscovery = {
+  phrase: "музыка для сна",
+  frequency: 1200,
+  status: "own",
+  statusLabel: "У вас в работе",
+  canReserve: false,
+  canPropose: false,
+  queryId: "q-own",
+  reservationId: "res-own",
+  productId: null,
+  productTitle: null,
+};
+const clearedDiscovery = authorDiscoveryRowAfterOwnReservationRelease(
+  ownDiscovery,
+  new Set(["res-own"]),
+);
+assert.equal(clearedDiscovery.status, "available");
+assert.equal(clearedDiscovery.statusLabel, "Свободен");
+assert.equal(clearedDiscovery.canReserve, true);
+assert.equal(clearedDiscovery.reservationId, null);
+assert.notEqual(clearedDiscovery.statusLabel, "У вас в работе");
+assert.equal(
+  authorDiscoveryRowAfterOwnReservationRelease(ownDiscovery, new Set()).statusLabel,
+  "У вас в работе",
+);
+assert.equal(
+  authorDiscoveryRowAfterOwnReservationRelease(
+    {
+      ...ownDiscovery,
+      status: "published",
+      statusLabel: "Опубликован",
+      productId: "prod-1",
+      productTitle: "Вечерний джаз",
+    },
+    new Set(["res-published"]),
+  ).statusLabel,
+  "Опубликован",
+);
+assert.equal(
+  authorDiscoveryRowAfterOwnReservationRelease(
+    { ...ownDiscovery, reservationId: "res-linked", productId: "prod-draft", productTitle: "Черновик" },
+    new Set(["res-linked"]),
+  ).statusLabel,
+  "У вас в работе",
+);
+
+const opportunitiesRelease = opportunitiesUi.slice(
+  opportunitiesUi.indexOf("async function release"),
+  opportunitiesUi.indexOf("async function link"),
+);
+assert.match(opportunitiesRelease, /method: "DELETE"/);
+assert.match(opportunitiesRelease, /author_id: authorId, reservation_id: reservationId/);
+assert.doesNotMatch(opportunitiesRelease, /publication_class/);
+assert.match(opportunitiesRelease, /payload\.message \?\? "Не удалось освободить запрос\."/);
+assert.match(opportunitiesRelease, /lifecycle: "available"/);
+assert.match(opportunitiesUi, />Освободить<\/button>/);
 
 console.log("author-create-seo-query-step-unit: ok");

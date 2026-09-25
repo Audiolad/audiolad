@@ -1,12 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
 import { getProductSeoQueryStepCopy } from "@/lib/seo-queries/product-seo-query-step-copy";
 import {
-  buildAuthorProductCreateHref,
-} from "@/lib/seo-queries/reservation-product-create-href";
+  opportunitiesAfterOwnReservationRelease,
+  releaseSeoQueryConfirmCopy,
+  requestReleaseSeoReservation,
+  selectOwnUnlinkedSeoOpportunities,
+} from "@/lib/seo-queries/release-own-seo-reservation";
+import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
 import { countActiveAuthorSeoReservations } from "@/lib/seo-queries/types";
 
@@ -32,19 +38,57 @@ export default function AuthorProductSeoQueryStep({
   publicationClass,
   opportunities,
 }: Props) {
-  const activeCount = countActiveAuthorSeoReservations(opportunities);
-  const ownUnlinked = opportunities.filter(
-    (item) =>
-      Boolean(item.reservationId) &&
-      item.lifecycle !== "published" &&
-      !item.productId,
+  const router = useRouter();
+  const [releasedReservationIds, setReleasedReservationIds] = useState<string[]>([]);
+  const [confirmTarget, setConfirmTarget] = useState<SeoQueryOpportunity | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [releaseError, setReleaseError] = useState<{
+    reservationId: string;
+    message: string;
+  } | null>(null);
+
+  const visibleOpportunities = useMemo(
+    () => opportunitiesAfterOwnReservationRelease(opportunities, releasedReservationIds),
+    [opportunities, releasedReservationIds],
   );
+  const activeCount = countActiveAuthorSeoReservations(visibleOpportunities);
+  const ownUnlinked = selectOwnUnlinkedSeoOpportunities(visibleOpportunities);
   const skipHref = buildAuthorProductCreateHref({
     authorSlug,
     publicationClass,
     seoQuerySkip: true,
   });
   const copy = getProductSeoQueryStepCopy(publicationClass);
+  const confirmCopy = confirmTarget
+    ? releaseSeoQueryConfirmCopy(confirmTarget.queryText)
+    : null;
+  const confirmError =
+    confirmTarget?.reservationId &&
+    releaseError?.reservationId === confirmTarget.reservationId
+      ? releaseError.message
+      : null;
+
+  async function confirmRelease() {
+    const reservationId = confirmTarget?.reservationId;
+    if (!reservationId || pendingId) return;
+    setPendingId(reservationId);
+    setReleaseError(null);
+    const result = await requestReleaseSeoReservation({
+      authorId,
+      reservationId,
+      publicationClass,
+    });
+    setPendingId(null);
+    if (!result.ok) {
+      setReleaseError({ reservationId, message: result.message });
+      return;
+    }
+    setReleasedReservationIds((current) =>
+      current.includes(reservationId) ? current : [...current, reservationId],
+    );
+    setConfirmTarget(null);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-5" data-testid="author-product-seo-query-step">
@@ -68,6 +112,7 @@ export default function AuthorProductSeoQueryStep({
           <div className="mt-3 grid gap-3">
             {ownUnlinked.map((item) => {
               const frequencyLabel = formatMonthlyFrequency(item.frequency);
+              const releasing = pendingId === item.reservationId;
               return (
               <article
                 key={item.reservationId ?? item.id}
@@ -89,16 +134,32 @@ export default function AuthorProductSeoQueryStep({
                   </span>
                 </div>
                 {item.reservationId ? (
-                  <Link
-                    href={buildAuthorProductCreateHref({
-                      authorSlug,
-                      publicationClass,
-                      reservationId: item.reservationId,
-                    })}
-                    className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
-                  >
-                    Выбрать и продолжить
-                  </Link>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <Link
+                      href={buildAuthorProductCreateHref({
+                        authorSlug,
+                        publicationClass,
+                        reservationId: item.reservationId,
+                      })}
+                      className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+                    >
+                      Выбрать и продолжить
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={releasing}
+                      onClick={() => setConfirmTarget(item)}
+                      className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] bg-white px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-50"
+                      data-testid="author-product-seo-query-release"
+                    >
+                      {releasing ? "Освобождаем…" : "Освободить запрос"}
+                    </button>
+                  </div>
+                ) : null}
+                {releaseError?.reservationId === item.reservationId ? (
+                  <p role="alert" className="mt-2 text-sm font-medium text-[#9b3d3d]">
+                    {releaseError.message}
+                  </p>
                 ) : null}
               </article>
               );
@@ -113,6 +174,7 @@ export default function AuthorProductSeoQueryStep({
         variant="product-create"
         publicationClass={publicationClass}
         activeReservationCount={activeCount}
+        releasedReservationIds={releasedReservationIds}
       />
 
       <div className="flex justify-center pt-1">
@@ -124,6 +186,56 @@ export default function AuthorProductSeoQueryStep({
           Продолжить без поискового запроса
         </Link>
       </div>
+
+      {confirmTarget && confirmCopy ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(36,24,58,0.45)] p-4 sm:items-center"
+          role="presentation"
+          onClick={() => {
+            if (!pendingId) setConfirmTarget(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="release-seo-query-title"
+            aria-describedby="release-seo-query-description"
+            className="w-full max-w-md rounded-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_18px_40px_rgba(91,62,145,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="release-seo-query-title" className="text-[18px] font-semibold text-[#25135c]">
+              {confirmCopy.title}
+            </h2>
+            <p id="release-seo-query-description" className="mt-3 text-sm leading-6 text-[#5f5484]">
+              {confirmCopy.description}
+            </p>
+            {confirmError ? (
+              <p role="alert" className="mt-3 text-sm font-medium text-[#9b3d3d]">
+                {confirmError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmTarget(null)}
+                disabled={Boolean(pendingId)}
+                className="min-h-11 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmRelease()}
+                disabled={Boolean(pendingId)}
+                className="min-h-11 rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6237ad] disabled:opacity-60"
+                data-testid="author-product-seo-query-release-confirm"
+              >
+                {pendingId ? "Освобождаем…" : "Освободить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
