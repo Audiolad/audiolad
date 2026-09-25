@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS } from "@/lib/seo-queries/discovery-beta";
+import {
+  buildReleaseSeoReservationBody,
+  releaseSeoReservationErrorMessage,
+} from "@/lib/seo-queries/release-own-seo-reservation";
 import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -86,20 +90,16 @@ export default function AuthorSeoOpportunitiesClient({
     setMessage(null);
     const response = await fetch("/api/author/seo-reservations", {
       method: "DELETE", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        author_id: authorId,
-        reservation_id: reservationId,
-        publication_class: SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS,
-      }),
+      body: JSON.stringify(buildReleaseSeoReservationBody({
+        authorId,
+        reservationId,
+        publicationClass: SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS,
+      })),
     });
     const payload = await response.json().catch(() => ({}));
     setPendingId(null);
     if (!response.ok) {
-      return setMessage(
-        typeof payload.message === "string" && payload.message.trim()
-          ? payload.message
-          : "Не удалось освободить запрос.",
-      );
+      return setMessage(releaseSeoReservationErrorMessage(payload));
     }
     setItems((current) => current.map((item) => item.reservationId === reservationId
       ? { ...item, reservationId: null, expiresAt: null, productId: null, productTitle: null, lifecycle: "available" }
