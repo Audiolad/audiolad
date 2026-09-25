@@ -274,3 +274,36 @@ export function isHiddenFromProductCreateDiscoveryUi(item: {
   if (item.status === "published") return true;
   return item.status === "own" && Boolean(item.productId);
 }
+
+/**
+ * After a successful release, an open discovery row must not keep
+ * «У вас в работе». Published and product-linked rows stay unchanged.
+ */
+export function authorDiscoveryRowAfterOwnReservationRelease<
+  T extends {
+    status: string;
+    statusLabel: string;
+    canReserve: boolean;
+    canPropose: boolean;
+    reservationId: string | null;
+    productId: string | null;
+    productTitle: string | null;
+  },
+>(item: T, releasedReservationIds: ReadonlySet<string>): T {
+  if (releasedReservationIds.size === 0) return item;
+  if (item.status !== "own") return item;
+  if (!item.reservationId || !releasedReservationIds.has(item.reservationId)) {
+    return item;
+  }
+  if (item.productId) return item;
+  return {
+    ...item,
+    status: "available",
+    statusLabel: "Свободен",
+    canReserve: true,
+    canPropose: false,
+    reservationId: null,
+    productId: null,
+    productTitle: null,
+  };
+}

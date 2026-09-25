@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
 import type { AuthorSeoPromptRelatedCandidate } from "@/lib/seo-queries/author-seo-product-prompt";
@@ -12,9 +12,12 @@ import {
 } from "@/lib/seo-queries/types";
 import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 import {
+  authorDiscoveryRowAfterOwnReservationRelease,
   authorSeoDiscoverySurfaceFromPanelVariant,
   isHiddenFromProductCreateDiscoveryUi,
 } from "@/lib/seo-queries/author-discovery-status";
+
+const EMPTY_RELEASED_RESERVATION_IDS: readonly string[] = [];
 
 export type AuthorSeoDiscoveryResult = {
   phrase: string;
@@ -45,6 +48,11 @@ type Props = {
   /** opportunities = SEO page; product-create = pre-create query selection */
   variant: "opportunities" | "product-create";
   activeReservationCount: number;
+  /**
+   * Reservation ids released on the product-create step. Open discovery rows
+   * for those ids drop «У вас в работе» without a new search.
+   */
+  releasedReservationIds?: readonly string[];
   /** Required on product-create so reserve/select can continue into the form. */
   publicationClass?: string | null;
   /** Analyzed SEO opportunities for related-query ranking (opportunities only). */
@@ -66,6 +74,7 @@ export default function AuthorSeoDiscoveryPanel({
   authorSlug,
   variant,
   activeReservationCount,
+  releasedReservationIds = EMPTY_RELEASED_RESERVATION_IDS,
   publicationClass = null,
   analyzedOpportunities = [],
   onReserved,
@@ -96,6 +105,10 @@ export default function AuthorSeoDiscoveryPanel({
     });
   }
   const effectiveActiveCount = activeCountSync.local;
+  const releasedReservationIdSet = useMemo(
+    () => new Set(releasedReservationIds),
+    [releasedReservationIds],
+  );
 
   async function reserve(queryId: string) {
     setPendingId(queryId);
@@ -279,9 +292,13 @@ export default function AuthorSeoDiscoveryPanel({
     setDiscoverMessage(payload.message ?? "Запрос отправлен на проверку.");
   }
 
-  const visibleDatabaseMatches = isProductCreate
-    ? databaseMatches.filter((item) => !isHiddenFromProductCreateDiscoveryUi(item))
-    : databaseMatches;
+  const visibleDatabaseMatches = (
+    isProductCreate
+      ? databaseMatches.filter((item) => !isHiddenFromProductCreateDiscoveryUi(item))
+      : databaseMatches
+  ).map((item) =>
+    authorDiscoveryRowAfterOwnReservationRelease(item, releasedReservationIdSet),
+  );
 
   const heading = isProductCreate
     ? "Найти другой поисковый запрос"
@@ -433,7 +450,11 @@ export default function AuthorSeoDiscoveryPanel({
               <p className="mt-3 text-sm text-[#796ba0]">Дополнительных вариантов из Яндекса сейчас нет.</p>
             ) : (
               <div className="mt-3 grid gap-3">
-                {discoverResults.map((item) => {
+                {discoverResults.map((rawItem) => {
+                  const item = authorDiscoveryRowAfterOwnReservationRelease(
+                    rawItem,
+                    releasedReservationIdSet,
+                  );
                   const proposeKey = item.phrase;
                   const proposing = proposePendingKey === proposeKey;
                   return (
