@@ -53,7 +53,7 @@ assert.match(preview, /resolveMusicListenSource/);
 assert.match(preview, /MUSIC_STREAMS|music-streams|source\.bucket/);
 assert.doesNotMatch(form, /eslint-disable-next-line react-hooks\/exhaustive-deps/);
 
-const statusIdx = form.indexOf("musicCabinetStatus({");
+const statusIdx = form.indexOf("musicAuthorTrackStatusText({");
 const playerIdx = form.indexOf("<audio");
 const hintIdx = form.indexOf("? MUSIC_DELIVERY_UPLOAD_HINT");
 const replaceIdx = form.lastIndexOf("MUSIC_DELIVERY_REPLACE_LABEL");

@@ -24,6 +24,10 @@ import {
   isProductContentLockedDbError,
 } from "@/lib/author-products/sale-lock";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
+import {
+  claimMusicTrackUploadGeneration,
+  removeMusicStorageObjectsBestEffort,
+} from "@/lib/author-products/server/music-track-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   inspectAudioMediaFile,
@@ -85,6 +89,15 @@ async function loadMusicAudioItem(
   if (error) throw new MusicMasterUploadError("internal_error", 500);
   if (!data?.id) throw new MusicMasterUploadError("not_found", 404);
   return data;
+}
+
+function readMusicAssetLifecycle(data: unknown): string | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object" || !("lifecycle_state" in row)) {
+    return null;
+  }
+  const lifecycle = (row as { lifecycle_state?: unknown }).lifecycle_state;
+  return typeof lifecycle === "string" ? lifecycle : null;
 }
 
 function musicPointersFromItem(item: OwnedMusicAudioItem): MusicCurrentAudioPointers {
@@ -180,6 +193,15 @@ export async function startMusicMasterDirectUpload(input: {
 
   const assetId = randomUUID();
   const storagePath = buildMusicMasterStoragePath(input.practiceId, input.audioId, assetId);
+  let uploadGeneration: number;
+  try {
+    uploadGeneration = await claimMusicTrackUploadGeneration({
+      practiceId: input.practiceId,
+      audioId: input.audioId,
+    });
+  } catch {
+    throw new MusicMasterUploadError("internal_error", 500);
+  }
   const service = createServiceRoleClient();
   const { error: assetError } = await service.from("music_audio_assets").insert({
     id: assetId,
@@ -190,6 +212,7 @@ export async function startMusicMasterDirectUpload(input: {
     original_file_name: input.fileName,
     accepted_mime_type: input.mimeType || "application/octet-stream",
     lifecycle_state: "uploading",
+    upload_generation: uploadGeneration,
   });
   if (assetError) throw new MusicMasterUploadError("internal_error", 500);
 
@@ -253,11 +276,20 @@ export async function finalizeMusicMasterDirectUpload(input: {
       throw new MusicMasterUploadError("invalid_file_type", 400);
     }
 
-    const { error: finalizeError } = await service.rpc("finalize_music_master_asset", {
-      p_asset_id: input.assetId,
-      p_size_bytes: objectSize,
-      p_duration_seconds: Math.round(media.durationSeconds),
-    });
+    const { data: finalizedAsset, error: finalizeError } = await service.rpc(
+      "finalize_music_master_asset",
+      {
+        p_asset_id: input.assetId,
+        p_size_bytes: objectSize,
+        p_duration_seconds: Math.round(media.durationSeconds),
+      },
+    );
+    if (readMusicAssetLifecycle(finalizedAsset) === "abandoned") {
+      await removeMusicStorageObjectsBestEffort(service, [
+        { bucket: MUSIC_MASTERS_BUCKET, path: input.uploadPath },
+      ]);
+      throw new MusicMasterUploadError("stale_music_upload", 409);
+    }
     if (finalizeError) {
       if (isProductContentLockedDbError(finalizeError)) {
         throw new MusicMasterUploadError(
@@ -279,7 +311,10 @@ export async function finalizeMusicMasterDirectUpload(input: {
     });
     return { asset_id: input.assetId, lifecycle_state: "verified", transcode_status: "queued" };
   } catch (error) {
-    if (asset.lifecycle_state === "uploading") {
+    if (
+      asset.lifecycle_state === "uploading" &&
+      !(error instanceof MusicMasterUploadError && error.code === "stale_music_upload")
+    ) {
       await markAssetRejected(input.assetId);
       try {
         await service.storage.from(MUSIC_MASTERS_BUCKET).remove([input.uploadPath]);

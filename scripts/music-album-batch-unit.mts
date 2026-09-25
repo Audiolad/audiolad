@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { appendCreatedAudioItem } from "../src/lib/author-products/form-merge";
 import {
   deriveAlbumTrackTitle,
+  resolveAlbumTrackTitle,
   formatAlbumBatchCreateFailure,
   MAX_MUSIC_ALBUM_BATCH_FILES,
   orderAlbumBatchFiles,
@@ -51,6 +52,10 @@ assert.equal(deriveAlbumTrackTitle("2026 Mix.wav"), "2026 Mix");
 assert.equal(deriveAlbumTrackTitle("100 Years.mp3"), "100 Years");
 assert.equal(deriveAlbumTrackTitle("Track 01.wav"), "Track 01");
 assert.equal(deriveAlbumTrackTitle("01.wav"), "01");
+assert.equal(resolveAlbumTrackTitle("01 - Morning Light.wav", 4), "Morning Light");
+assert.equal(resolveAlbumTrackTitle(".wav", 4), "Аудио 4");
+assert.equal(resolveAlbumTrackTitle("???.mp3", 2), "Аудио 2");
+assert.equal(resolveAlbumTrackTitle("", 1), "Аудио 1");
 
 {
   const ordered = orderAlbumBatchFiles([
@@ -216,6 +221,9 @@ assert.doesNotMatch(albumBody, /enqueueReadyMusicUploads/);
 assert.ok(albumBody.indexOf("stageMusicTrackFile") < albumBody.indexOf("startReadyMusicUploads"));
 assert.match(albumBody, /if \(stagedIds\.length > 0\)/);
 assert.match(albumBody, /musicQueueBlocksTrackCreation/);
+assert.match(albumBody, /failedNames/);
+assert.match(albumBody, /resolveAlbumTrackTitle/);
+assert.match(albumBody, /continue/);
 assert.match(functionBody(formSource, "addAudioItem"), /musicQueueBlocksTrackCreation/);
 assert.match(functionBody(formSource, "addAudioItem"), /PRODUCT_KIND\.MUSIC/);
 

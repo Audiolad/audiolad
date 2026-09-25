@@ -82,6 +82,7 @@ import {
   AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
   hasAudioProductAuthor,
 } from "@/lib/author-products/audio-product-author";
+import { musicTrackHasServerAudio } from "@/lib/author-products/music-track-lifecycle";
 import { validateMusicTrackTitleCyrillic } from "@/lib/author-products/music-track-title";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
@@ -130,7 +131,7 @@ import {
   MUSIC_DELIVERY_UPLOAD_HINT,
   MUSIC_DELIVERY_UPLOAD_LABEL,
   hasPlayableAuthorAudioPreview,
-  musicCabinetStatus,
+  musicAuthorTrackStatusText,
   resolveMusicUploadMode,
 } from "@/lib/listen/music-delivery";
 import {
@@ -178,7 +179,8 @@ import {
   formatAlbumBatchSkipMessage,
   MAX_MUSIC_ALBUM_BATCH_FILES,
   planMusicAlbumBatch,
-  deriveAlbumTrackTitle,
+  isUsableMusicTrackTitle,
+  resolveAlbumTrackTitle,
 } from "@/lib/author-products/music-album-batch";
 import {
   appendCreatedAudioItem,
@@ -481,7 +483,7 @@ function deriveTitleFromFilename(fileName: string): {
 } {
   const withoutExtension = fileName.trim().replace(/\.(mp3|wav|m4a|aac)$/i, "").trim();
 
-  if (!withoutExtension) {
+  if (!withoutExtension || !isUsableMusicTrackTitle(withoutExtension)) {
     return { title: "", truncated: false };
   }
 
@@ -2644,6 +2646,7 @@ export default function AuthorProductForm({
     setAlbumBatchProgress({ created: 0, total: plan.accepted.length });
     let created = 0;
     const stagedIds: string[] = [];
+    const failedNames: string[] = [];
 
     try {
       const ensured = await ensurePracticeId();
@@ -2652,39 +2655,44 @@ export default function AuthorProductForm({
       }
 
       for (const file of plan.accepted) {
-        const response = await fetch(
-          `/api/author/products/${ensured.practiceId}/audio`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: deriveAlbumTrackTitle(file.name) }),
-          },
-        );
-        const payload = (await response.json()) as {
-          product?: AuthorProductDetail;
-          audio_item?: AudioItemRow;
-        };
-        if (!response.ok || !payload.audio_item) {
-          setError(
-            formatAlbumBatchCreateFailure(created, plan.accepted.length, file.name),
+        try {
+          const response = await fetch(
+            `/api/author/products/${ensured.practiceId}/audio`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: resolveAlbumTrackTitle(
+                  file.name,
+                  audioItems.length + created + 1,
+                ),
+              }),
+            },
           );
-          return;
+          const payload = (await response.json()) as {
+            product?: AuthorProductDetail;
+            audio_item?: AudioItemRow;
+          };
+          if (!response.ok || !payload.audio_item) {
+            failedNames.push(file.name);
+            continue;
+          }
+          if (payload.product) {
+            applyMusicProductLevel(payload.product);
+          }
+          const audioItem = payload.audio_item;
+          setAudioItems((current) => appendCreatedAudioItem(current, audioItem));
+          stageMusicTrackFile(audioItem.id, file);
+          stagedIds.push(audioItem.id);
+          created += 1;
+          setAlbumBatchProgress({ created, total: plan.accepted.length });
+        } catch {
+          failedNames.push(file.name);
         }
-        if (payload.product) {
-          applyMusicProductLevel(payload.product);
-        }
-        const audioItem = payload.audio_item;
-        setAudioItems((current) => appendCreatedAudioItem(current, audioItem));
-        stageMusicTrackFile(audioItem.id, file);
-        stagedIds.push(audioItem.id);
-        created += 1;
-        setAlbumBatchProgress({ created, total: plan.accepted.length });
       }
     } catch {
-      const failedName = plan.accepted[created]?.name ?? "файл";
-      setError(
-        formatAlbumBatchCreateFailure(created, plan.accepted.length, failedName),
-      );
+      const failedName = plan.accepted[created + failedNames.length]?.name ?? "файл";
+      failedNames.push(failedName);
     } finally {
       addAudioInFlightRef.current = false;
       setBusy(false);
@@ -2692,6 +2700,15 @@ export default function AuthorProductForm({
         startReadyMusicUploads(stagedIds);
       }
       setAlbumBatchProgress(null);
+    }
+    if (failedNames.length > 0) {
+      setError(
+        formatAlbumBatchCreateFailure(
+          created,
+          plan.accepted.length,
+          failedNames[0] ?? "файл",
+        ),
+      );
     }
   }
 
@@ -3010,6 +3027,15 @@ export default function AuthorProductForm({
       product?: AuthorProductDetail;
       message?: string;
     };
+
+    if (response.status === 404) {
+      setAudioItems((items) =>
+        items
+          .filter((item) => item.id !== audioId)
+          .map((item, index) => ({ ...item, position: index + 1 })),
+      );
+      return;
+    }
 
     if (!response.ok) {
       setError(payload.message ?? "Не удалось удалить аудио.");
@@ -5150,20 +5176,13 @@ export default function AuthorProductForm({
                 <div className="text-sm text-[#5f5484]">
                   <p className="font-medium text-[#3f3560]">
                     {form.productKind === PRODUCT_KIND.MUSIC
-                      ? (musicQueueEntry(musicQueue, audioItem.id)?.phase === "ready"
-                          ? "Файл выбран"
-                          : musicQueueEntry(musicQueue, audioItem.id)?.phase === "queued"
-                            ? "В очереди"
-                            : musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
-                              ? "Загрузка…"
-                              : musicQueueEntry(musicQueue, audioItem.id)?.phase === "error"
-                                ? "Ошибка"
-                                : musicCabinetStatus({
-                                    hasLegacyAudioPath: Boolean(audioItem.audio_path),
-                                    hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
-                                    lifecycleState: audioItem.music_master?.lifecycleState,
-                                    transcodeStatus: audioItem.music_master?.transcodeStatus,
-                                  }).text)
+                      ? musicAuthorTrackStatusText({
+                          queuePhase: musicQueueEntry(musicQueue, audioItem.id)?.phase ?? null,
+                          hasLegacyAudioPath: Boolean(audioItem.audio_path),
+                          hasActiveDelivery: Boolean(audioItem.music_master?.hasActiveDelivery),
+                          lifecycleState: audioItem.music_master?.lifecycleState,
+                          transcodeStatus: audioItem.music_master?.transcodeStatus,
+                        })
                       : isAudioPrepareInFlight(audioItem.audio_prepare_status)
                         ? AUDIO_PREPARE_PROCESSING_STATUS
                         : audioItem.audio_prepare_status === "failed"
@@ -5274,7 +5293,7 @@ export default function AuthorProductForm({
                     </label>
                   )}
 
-                  {audioItem.audio_path &&
+                  {musicTrackHasServerAudio(audioItem) &&
                   !contentLockedAfterSale &&
                   (form.productKind === PRODUCT_KIND.MUSIC ||
                     !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
@@ -5306,7 +5325,7 @@ export default function AuthorProductForm({
                       onClick={() =>
                         void deleteAudioItem(
                           audioItem.id,
-                          Boolean(audioItem.audio_path),
+                          musicTrackHasServerAudio(audioItem),
                         )
                       }
                       className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d] disabled:opacity-60"
@@ -5314,18 +5333,19 @@ export default function AuthorProductForm({
                       Удалить
                     </button>
                   ) : null}
-                </div>
 
-                {form.productKind === PRODUCT_KIND.MUSIC &&
-                musicQueueEntry(musicQueue, audioItem.id)?.phase === "error" ? (
-                  <button
-                    type="button"
-                    onClick={() => retryMusicTrack(audioItem.id)}
-                    className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d]"
-                  >
-                    Повторить
-                  </button>
-                ) : null}
+                  {form.productKind === PRODUCT_KIND.MUSIC &&
+                  !contentLockedAfterSale &&
+                  musicQueueEntry(musicQueue, audioItem.id)?.phase === "error" ? (
+                    <button
+                      type="button"
+                      onClick={() => retryMusicTrack(audioItem.id)}
+                      className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d]"
+                    >
+                      Повторить
+                    </button>
+                  ) : null}
+                </div>
 
                 {audioUploadErrors[audioItem.id] ? (
                   <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">

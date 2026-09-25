@@ -15,6 +15,7 @@ export const MUSIC_DELIVERY_PREPARING_WITH_CURRENT_TEXT =
 export const MUSIC_DELIVERY_READY_TEXT = "Аудио готово к прослушиванию";
 export const MUSIC_DELIVERY_FAILED_TEXT =
   "Не удалось подготовить версию для прослушивания. Загрузите файл ещё раз.";
+export const MUSIC_TRACK_UPLOAD_FAILED_TEXT = "Не удалось загрузить";
 export const MUSIC_DELIVERY_UNSUPPORTED_TEXT =
   "Загрузите аудио в формате WAV или MP3.";
 
@@ -172,4 +173,34 @@ export function musicCabinetStatus(input: {
     return { kind: "ready", text: MUSIC_DELIVERY_READY_TEXT };
   }
   return { kind: "empty", text: MUSIC_DELIVERY_EMPTY_TEXT };
+}
+
+/** Author cabinet line. A live queue phase wins; a persisted uploading/rejected row with no queue is an interrupted upload. */
+export function musicAuthorTrackStatusText(input: {
+  queuePhase?: string | null;
+  hasLegacyAudioPath: boolean;
+  hasActiveDelivery: boolean;
+  lifecycleState: string | null | undefined;
+  transcodeStatus: string | null | undefined;
+}): string {
+  switch (input.queuePhase) {
+    case "ready":
+      return "Файл выбран";
+    case "queued":
+      return "В очереди";
+    case "uploading":
+      return "Загрузка…";
+    case "error":
+      return MUSIC_TRACK_UPLOAD_FAILED_TEXT;
+    default:
+      break;
+  }
+  if (
+    input.lifecycleState === "uploading" ||
+    input.lifecycleState === "rejected" ||
+    input.lifecycleState === "abandoned"
+  ) {
+    return MUSIC_TRACK_UPLOAD_FAILED_TEXT;
+  }
+  return musicCabinetStatus(input).text;
 }

@@ -36,6 +36,26 @@ export function deriveAlbumTrackTitle(fileName: string): string {
   return resolved.slice(0, PRODUCT_CONTENT_LIMITS.audioTitle);
 }
 
+const USABLE_TRACK_TITLE = /[\p{L}\p{N}]/u;
+
+export function isUsableMusicTrackTitle(title: string | null | undefined): boolean {
+  return typeof title === "string" && USABLE_TRACK_TITLE.test(title);
+}
+
+export function fallbackMusicTrackTitle(slotNumber: number): string {
+  const slot = Number.isInteger(slotNumber) && slotNumber > 0 ? slotNumber : 1;
+  return `Аудио ${slot}`;
+}
+
+/** Filename title, or «Аудио N» when parsing yields nothing usable. */
+export function resolveAlbumTrackTitle(fileName: string, slotNumber: number): string {
+  const derived = deriveAlbumTrackTitle(fileName).trim();
+  if (!isUsableMusicTrackTitle(derived)) {
+    return fallbackMusicTrackTitle(slotNumber);
+  }
+  return derived;
+}
+
 export function leadingAlbumTrackNumber(fileName: string): number | null {
   const base = fileName.trim().replace(AUDIO_EXTENSION, "").trim();
   const match = LEADING_TRACK_NUMBER.exec(base);

@@ -316,6 +316,44 @@ function functionBody(source: string, name: string): string {
   assert.match(formSource, /preserveLocalMedia: form\.productKind === PRODUCT_KIND\.MUSIC/);
 }
 
+{
+  let snapshot = enqueueReadyMusicUploads(
+    stageAll([
+      { id: "a", kind: "master" },
+      { id: "b", kind: "legacy" },
+    ]),
+    ["a", "b"],
+  ).snapshot;
+  const first = snapshot.entries.find((entry) => entry.audioId === "a")!;
+  const replacedOnce = stageMusicFile(snapshot, "a", "master", "second.wav");
+  snapshot = enqueueReadyMusicUploads(replacedOnce.snapshot, ["a", "b"]).snapshot;
+  const second = snapshot.entries.find((entry) => entry.audioId === "a")!;
+  assert.ok(second.generation > first.generation);
+  const lateFirst = finishMusicUpload(snapshot, "a", first.generation, "stale");
+  assert.equal(lateFirst.ignored, true);
+  assert.equal(snapshot.entries.find((entry) => entry.audioId === "a")?.fileName, "second.wav");
+  const replacedTwice = stageMusicFile(snapshot, "a", "master", "third.wav");
+  snapshot = enqueueReadyMusicUploads(replacedTwice.snapshot, ["a"]).snapshot;
+  const third = snapshot.entries.find((entry) => entry.audioId === "a")!;
+  assert.ok(third.generation > second.generation);
+  assert.equal(third.fileName, "third.wav");
+  const lateSecond = finishMusicUpload(snapshot, "a", second.generation);
+  assert.equal(lateSecond.ignored, true);
+  assert.equal(lateSecond.snapshot.entries.find((entry) => entry.audioId === "a")?.fileName, "third.wav");
+  const failed = finishMusicUpload(snapshot, "b", snapshot.entries.find((entry) => entry.audioId === "b")!.generation, "boom");
+  assert.equal(failed.snapshot.entries.find((entry) => entry.audioId === "b")?.phase, "error");
+  assert.equal(failed.snapshot.entries.find((entry) => entry.audioId === "a")?.fileName, "third.wav");
+  const retried = retryMusicUpload(failed.snapshot, "b");
+  assert.equal(retried.snapshot.entries.find((entry) => entry.audioId === "b")?.phase === "error", false);
+  assert.equal(retried.snapshot.entries.some((entry) => entry.audioId === "a"), true);
+}
+
+assert.match(formSource, /Не удалось загрузить/);
+assert.match(formSource, /musicAuthorTrackStatusText/);
+assert.match(formSource, /Повторить/);
+assert.match(formSource, /musicTrackHasServerAudio\(audioItem\)/);
+assert.match(formSource, /response\.status === 404/);
+
 assert.match(formSource, /Продолжить загрузку/);
 assert.match(formSource, /stageMusicTrackFile\(audioItem\.id, file\)/);
 assert.match(formSource, /uploadAudio\(audioItem\.id, file, "legacy"\)/);

@@ -78,7 +78,7 @@ assert.match(client, /contentType: "audio\/wav"/);
 assert.doesNotMatch(client, /contentType: input\.file\.type/);
 assert.match(client, /upsert: false/);
 assert.match(form, /MUSIC_DELIVERY_UPLOAD_LABEL/);
-assert.match(form, /musicCabinetStatus/);
+assert.match(form, /musicAuthorTrackStatusText/);
 assert.doesNotMatch(form, /Загрузить WAV-мастер/);
 assert.doesNotMatch(form, /Загрузить legacy MP3/);
 assert.match(legacyServer, /PRACTICE_AUDIO_BUCKET/);

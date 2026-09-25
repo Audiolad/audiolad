@@ -38,6 +38,8 @@ export function getAudioUploadErrorMessage(
       return PRODUCT_AUDIO_TOO_LARGE_MESSAGE;
     case "upload_not_complete":
       return "Загрузка аудио не завершена. Попробуйте ещё раз.";
+    case "stale_music_upload":
+      return "Не удалось загрузить аудио. Попробуйте ещё раз.";
     case "invalid_audio_duration":
       return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
     case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":

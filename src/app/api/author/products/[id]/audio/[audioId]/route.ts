@@ -26,6 +26,7 @@ import {
   AUDIO_PREPARING_MESSAGE,
   isProductAudioNormalizeInFlight,
 } from "@/lib/author-products/server/direct-audio-upload";
+import { teardownMusicTrackDelivery } from "@/lib/author-products/server/music-track-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -147,7 +148,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
     const serviceSupabase = createServiceRoleClient();
 
     try {
@@ -196,38 +197,66 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    if (await isProductAudioNormalizeInFlight(id, audioId)) {
+    const isMusic = practice.product_kind === "music";
+
+    if (!isMusic && (await isProductAudioNormalizeInFlight(id, audioId))) {
       return NextResponse.json(
         { error: AUDIO_PREPARING_CODE, message: AUDIO_PREPARING_MESSAGE },
         { status: 409 },
       );
     }
 
-    if (audioItem.audio_path) {
-      await supabase.storage
-        .from("practice-audio")
-        .remove([audioItem.audio_path]);
+    if (isMusic) {
+      try {
+        const torn = await teardownMusicTrackDelivery({
+          practiceId: id,
+          audioId,
+          deleteItem: true,
+        });
+        if (torn.status === "not_found") {
+          return NextResponse.json({ error: "not_found" }, { status: 404 });
+        }
+      } catch (error) {
+        if (isProductContentLockedDbError(error)) {
+          return NextResponse.json(
+            saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+            { status: 409 },
+          );
+        }
+
+        console.error(
+          "author_audio_delete_error",
+          error instanceof Error ? error.message : "unknown",
+        );
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+    } else {
+      if (audioItem.audio_path) {
+        await supabase.storage
+          .from("practice-audio")
+          .remove([audioItem.audio_path]);
+      }
+
+      const { error: deleteError } = await supabase
+        .from("audio_items")
+        .delete()
+        .eq("id", audioId)
+        .eq("practice_id", id);
+
+      if (deleteError) {
+        if (isProductContentLockedDbError(deleteError)) {
+          return NextResponse.json(
+            saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+            { status: 409 },
+          );
+        }
+
+        console.error("author_audio_delete_error", deleteError.message);
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
     }
 
     await removeTrackCoverFiles(supabase, id, audioId);
-
-    const { error: deleteError } = await supabase
-      .from("audio_items")
-      .delete()
-      .eq("id", audioId)
-      .eq("practice_id", id);
-
-    if (deleteError) {
-      if (isProductContentLockedDbError(deleteError)) {
-        return NextResponse.json(
-          saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
-          { status: 409 },
-        );
-      }
-
-      console.error("author_audio_delete_error", deleteError.message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
 
     const { data: remaining, error: remainingError } = await supabase
       .from("audio_items")

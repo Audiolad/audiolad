@@ -31,6 +31,8 @@ import {
   isProductContentLockedDbError,
 } from "@/lib/author-products/sale-lock";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
+import { staleUploadCleanupPaths } from "@/lib/author-products/music-track-lifecycle";
+import { claimMusicTrackUploadGeneration } from "@/lib/author-products/server/music-track-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   probeStudioAudioFile,
@@ -383,6 +385,17 @@ export async function startProductAudioDirectUpload(input: {
           versionId,
           format,
         );
+  if (isMusic) {
+    try {
+      await claimMusicTrackUploadGeneration({
+        practiceId: input.practiceId,
+        audioId: input.audioId,
+        storagePath: uploadPath,
+      });
+    } catch {
+      throw new ProductAudioUploadError("internal_error", 500);
+    }
+  }
   const signedUpload = await createSignedUpload(uploadPath);
   return { upload_path: signedUpload.path, signedUpload };
 }
@@ -497,8 +510,32 @@ export async function finalizeProductAudioDirectUpload(input: {
       throw new ProductAudioUploadError("internal_error", 500);
     }
     if (activated !== true) {
-      await deletePracticeAudioPaths([uploadPath]);
-      throw new ProductAudioUploadError("update_failed", 500);
+      let livePath = previousPath;
+      let itemMissing = false;
+      try {
+        const current = await loadOwnedAudioItem(
+          supabase,
+          input.practiceId,
+          input.audioId,
+        );
+        livePath = current.audio_path;
+      } catch (error) {
+        if (!(error instanceof ProductAudioUploadError) || error.status !== 404) {
+          throw error;
+        }
+        itemMissing = true;
+        livePath = null;
+      }
+      await deletePracticeAudioPaths(
+        staleUploadCleanupPaths({
+          failedPath: uploadPath,
+          livePaths: [livePath, previousPath],
+        }),
+      );
+      throw new ProductAudioUploadError(
+        itemMissing ? "not_found" : "stale_music_upload",
+        itemMissing ? 404 : 409,
+      );
     }
   } else {
     const service = createServiceRoleClient();

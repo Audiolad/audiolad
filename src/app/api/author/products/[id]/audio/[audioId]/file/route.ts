@@ -18,6 +18,7 @@ import {
   AUDIO_PREPARING_MESSAGE,
   isProductAudioNormalizeInFlight,
 } from "@/lib/author-products/server/direct-audio-upload";
+import { teardownMusicTrackDelivery } from "@/lib/author-products/server/music-track-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -27,7 +28,7 @@ type RouteContext = {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
     const serviceSupabase = createServiceRoleClient();
 
     try {
@@ -59,11 +60,43 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    if (await isProductAudioNormalizeInFlight(id, audioId)) {
+    const isMusic = practice.product_kind === "music";
+
+    if (!isMusic && (await isProductAudioNormalizeInFlight(id, audioId))) {
       return NextResponse.json(
         { error: AUDIO_PREPARING_CODE, message: AUDIO_PREPARING_MESSAGE },
         { status: 409 },
       );
+    }
+
+    if (isMusic) {
+      try {
+        const torn = await teardownMusicTrackDelivery({
+          practiceId: id,
+          audioId,
+          deleteItem: false,
+        });
+        if (torn.status === "not_found") {
+          return NextResponse.json({ error: "not_found" }, { status: 404 });
+        }
+      } catch (error) {
+        if (isProductContentLockedDbError(error)) {
+          return NextResponse.json(
+            saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+            { status: 409 },
+          );
+        }
+
+        console.error(
+          "author_audio_file_delete_update_error",
+          error instanceof Error ? error.message : "unknown",
+        );
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      await syncPracticeAudioCompatibility(supabase, id);
+      const product = await getAuthorProductDetail(supabase, id);
+      return NextResponse.json({ product });
     }
 
     if (audioItem.audio_path) {
