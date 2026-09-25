@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_CATALOG_PATH } from "@/lib/max/host";
+import MaxCatalogSections from "@/components/max/MaxCatalogSections";
 
 /** Matches ordinary catalog URL debounce without importing catalog routing. */
 const MAX_CATALOG_SEARCH_DEBOUNCE_MS = 300;
@@ -25,6 +27,12 @@ type DefaultCatalogState =
   | { status: "loading" }
   | { status: "ready"; items: MaxCatalogProduct[] }
   | { status: "error" };
+
+type SectionListingState =
+  | { status: "idle" }
+  | { status: "loading"; section: PublicCatalogSection }
+  | { status: "ready"; section: PublicCatalogSection; items: MaxCatalogProduct[] }
+  | { status: "error"; section: PublicCatalogSection };
 
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
@@ -115,56 +123,22 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   const [defaultCatalog, setDefaultCatalog] = useState<DefaultCatalogState>(() =>
     readMaxInitData() ? { status: "loading" } : { status: "error" },
   );
+  const [activeSection, setActiveSection] = useState<PublicCatalogSection | null>(null);
+  const [sectionListing, setSectionListing] = useState<SectionListingState>({
+    status: "idle",
+  });
   const [searchInput, setSearchInput] = useState("");
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const [searchItems, setSearchItems] = useState<MaxCatalogProduct[] | null>(null);
   const [resultQuery, setResultQuery] = useState("");
+  const [resultSection, setResultSection] = useState<PublicCatalogSection | null>(null);
   const searchInputRef = useRef("");
+  const activeSectionRef = useRef<PublicCatalogSection | null>(null);
+  const defaultCatalogRef = useRef(defaultCatalog);
+  const sectionCacheRef = useRef(new Map<PublicCatalogSection, MaxCatalogProduct[]>());
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
-
-  useEffect(() => {
-    const initData = readMaxInitData();
-    if (!initData) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const response = await fetch(MAX_CATALOG_PATH, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData }),
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json().catch(() => null);
-        const items = response.ok ? readCatalogPayload(payload) : null;
-        if (!controller.signal.aborted) {
-          setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setDefaultCatalog({ status: "error" });
-        }
-      }
-    })();
-
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current !== null) {
-        window.clearTimeout(debounceRef.current);
-      }
-      abortRef.current?.abort();
-    };
-  }, []);
 
   function cancelPendingSearch() {
     if (debounceRef.current !== null) {
@@ -179,11 +153,15 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   function restoreDefaultCatalog() {
     cancelPendingSearch();
     setResultQuery("");
+    setResultSection(null);
     setSearchStatus("idle");
     setSearchItems(null);
   }
 
-  function beginSearch(normalized: string) {
+  function beginSearch(
+    normalized: string,
+    section: PublicCatalogSection | null = activeSectionRef.current,
+  ) {
     const requestId = ++requestGenerationRef.current;
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -205,7 +183,9 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData, query: normalized }),
+          body: section
+            ? JSON.stringify({ initData, query: normalized, section })
+            : JSON.stringify({ initData, query: normalized }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -220,6 +200,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         }
         setSearchItems(items);
         setResultQuery(normalized);
+        setResultSection(section);
         setSearchStatus("ready");
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -238,7 +219,22 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
     const normalized = normalizeCatalogSearchQuery(rawQuery);
     if (!normalized) {
+      const section = activeSectionRef.current;
+      if (section && !sectionCacheRef.current.has(section)) {
+        loadSectionCatalog(section);
+        return;
+      }
+      if (!section && defaultCatalogRef.current.status !== "ready") {
+        loadRootCatalog();
+        return;
+      }
       restoreDefaultCatalog();
+      if (section) {
+        const cached = sectionCacheRef.current.get(section);
+        if (cached) {
+          setSectionListing({ status: "ready", section, items: cached });
+        }
+      }
       return;
     }
 
@@ -260,7 +256,22 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
     if (!normalized) {
+      const section = activeSectionRef.current;
+      if (section && !sectionCacheRef.current.has(section)) {
+        loadSectionCatalog(section);
+        return;
+      }
+      if (!section && defaultCatalogRef.current.status !== "ready") {
+        loadRootCatalog();
+        return;
+      }
       restoreDefaultCatalog();
+      if (section) {
+        const cached = sectionCacheRef.current.get(section);
+        if (cached) {
+          setSectionListing({ status: "ready", section, items: cached });
+        }
+      }
       return;
     }
 
@@ -270,7 +281,18 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   function clearSearch() {
     searchInputRef.current = "";
     setSearchInput("");
+    const section = activeSectionRef.current;
+    if (section && !sectionCacheRef.current.has(section)) {
+      loadSectionCatalog(section);
+      return;
+    }
     restoreDefaultCatalog();
+    if (section) {
+      const cached = sectionCacheRef.current.get(section);
+      if (cached) {
+        setSectionListing({ status: "ready", section, items: cached });
+      }
+    }
   }
 
   function handleInputChange(nextValue: string) {
@@ -279,15 +301,249 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     scheduleSearch(nextValue);
   }
 
+  function selectSection(section: PublicCatalogSection | null) {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    activeSectionRef.current = section;
+    setActiveSection(section);
+
+    const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
+    if (normalized) {
+      beginSearch(normalized, section);
+      return;
+    }
+
+    if (section === null && defaultCatalogRef.current.status === "ready") {
+      restoreDefaultCatalog();
+      return;
+    }
+
+    if (section === null) {
+      loadRootCatalog();
+      return;
+    }
+
+    const cached = sectionCacheRef.current.get(section);
+    if (cached) {
+      cancelPendingSearch();
+      setResultQuery("");
+      setResultSection(null);
+      setSearchStatus("idle");
+      setSearchItems(null);
+      setSectionListing({ status: "ready", section, items: cached });
+      return;
+    }
+
+    loadSectionCatalog(section);
+  }
+
+  function loadRootCatalog() {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const requestId = ++requestGenerationRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setResultQuery("");
+    setResultSection(null);
+    setSearchStatus("idle");
+    setSearchItems(null);
+    if (defaultCatalogRef.current.status !== "ready") {
+      setDefaultCatalog({ status: "loading" });
+    }
+
+    void (async () => {
+      try {
+        const initData = readMaxInitData();
+        if (!initData) {
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          setDefaultCatalog({ status: "error" });
+          return;
+        }
+
+        const response = await fetch(MAX_CATALOG_PATH, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        const items = response.ok ? readCatalogPayload(payload) : null;
+        setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
+      } catch {
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        setDefaultCatalog({ status: "error" });
+      }
+    })();
+  }
+
+  function loadSectionCatalog(section: PublicCatalogSection) {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const requestId = ++requestGenerationRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setResultQuery("");
+    setResultSection(null);
+    setSearchStatus("idle");
+    setSearchItems(null);
+    setSectionListing({ status: "loading", section });
+
+    void (async () => {
+      try {
+        const initData = readMaxInitData();
+        if (!initData) {
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          setSectionListing({ status: "error", section });
+          return;
+        }
+
+        const response = await fetch(MAX_CATALOG_PATH, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData, section }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        const items = response.ok ? readCatalogPayload(payload) : null;
+        if (!items) {
+          setSectionListing({ status: "error", section });
+          return;
+        }
+        sectionCacheRef.current.set(section, items);
+        setSectionListing({ status: "ready", section, items });
+      } catch {
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        setSectionListing({ status: "error", section });
+      }
+    })();
+  }
+
+  useEffect(() => {
+    defaultCatalogRef.current = defaultCatalog;
+  }, [defaultCatalog]);
+
+  useEffect(() => {
+    const initData = readMaxInitData();
+    if (!initData) {
+      return;
+    }
+
+    const requestId = ++requestGenerationRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    void (async () => {
+      try {
+        const response = await fetch(MAX_CATALOG_PATH, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        const items = response.ok ? readCatalogPayload(payload) : null;
+        setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
+      } catch {
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        setDefaultCatalog({ status: "error" });
+      }
+    })();
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+      }
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const normalizedInput = normalizeCatalogSearchQuery(searchInput);
-  const usingSearchResults = searchItems !== null && searchStatus !== "idle";
-  const gridItems = usingSearchResults ? searchItems : defaultCatalog.status === "ready" ? defaultCatalog.items : [];
-  const showSearchHeading = resultQuery.length > 0 && searchItems !== null && searchStatus !== "idle";
+  const usingSearchResults =
+    searchItems !== null && searchStatus !== "idle" && resultSection === activeSection;
+  const rootOrSearchItems = usingSearchResults ? searchItems : defaultCatalog.status === "ready" ? defaultCatalog.items : [];
+  const sectionGridItems =
+    sectionListing.status === "ready" && sectionListing.section === activeSection
+      ? sectionListing.items
+      : [];
+  const gridItems = usingSearchResults
+    ? searchItems
+    : searchStatus === "searching" || searchStatus === "error"
+      ? []
+      : activeSection
+        ? sectionGridItems
+        : rootOrSearchItems;
+  const showSearchHeading =
+    resultQuery.length > 0 &&
+    searchItems !== null &&
+    searchStatus !== "idle" &&
+    resultSection === activeSection;
   const showSearchEmpty =
+    usingSearchResults &&
     searchItems !== null &&
     searchItems.length === 0 &&
-    resultQuery.length > 0 &&
-    searchStatus !== "idle";
+    resultQuery.length > 0;
+  const showRootLoading =
+    !activeSection && searchStatus === "idle" && defaultCatalog.status === "loading";
+  const showSectionLoading =
+    Boolean(activeSection) &&
+    searchStatus === "idle" &&
+    sectionListing.status === "loading" &&
+    sectionListing.section === activeSection;
+  const showRootError =
+    !activeSection && searchStatus === "idle" && defaultCatalog.status === "error";
+  const showSectionError =
+    Boolean(activeSection) &&
+    searchStatus === "idle" &&
+    sectionListing.status === "error" &&
+    sectionListing.section === activeSection;
+  const showRootEmpty =
+    !activeSection &&
+    searchStatus === "idle" &&
+    defaultCatalog.status === "ready" &&
+    defaultCatalog.items.length === 0;
+  const showSectionEmpty =
+    Boolean(activeSection) &&
+    searchStatus === "idle" &&
+    sectionListing.status === "ready" &&
+    sectionListing.section === activeSection &&
+    sectionListing.items.length === 0;
 
   return (
     <>
@@ -331,6 +587,11 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         ) : null}
       </form>
 
+      <MaxCatalogSections
+        activeSection={activeSection}
+        onSelectSection={selectSection}
+      />
+
       <h1 className="mt-5 text-[26px] font-semibold leading-tight">
         {showSearchHeading ? "Результаты поиска" : "Каталог"}
       </h1>
@@ -351,12 +612,12 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         <p className="mt-3 text-sm text-[#6c5d94]">Не удалось выполнить поиск.</p>
       ) : null}
 
-      {!usingSearchResults && defaultCatalog.status === "loading" ? (
+      {showRootLoading || showSectionLoading ? (
         <p className="py-10 text-center text-sm text-[#6c5d94]">
           Загружаем каталог…
         </p>
       ) : null}
-      {!usingSearchResults && defaultCatalog.status === "error" ? (
+      {showRootError || showSectionError ? (
         <div className="mt-6 rounded-2xl border border-[#eadce7] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
             Не удалось загрузить каталог
@@ -366,12 +627,17 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           </p>
         </div>
       ) : null}
-      {!usingSearchResults &&
-      defaultCatalog.status === "ready" &&
-      defaultCatalog.items.length === 0 ? (
+      {showRootEmpty ? (
         <div className="mt-6 rounded-2xl border border-[#e8def5] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
             В каталоге пока нет опубликованных аудиопродуктов.
+          </p>
+        </div>
+      ) : null}
+      {showSectionEmpty ? (
+        <div className="mt-6 rounded-2xl border border-[#e8def5] bg-white px-5 py-6 text-center">
+          <p className="text-sm font-medium text-[#5f3f9d]">
+            В разделе пока нет аудиопродуктов.
           </p>
         </div>
       ) : null}
