@@ -21,6 +21,8 @@ type AudioladHorizontalLogoProps = {
   priority?: boolean;
   sizes?: string;
   variant?: "default" | "profile";
+  /** Pass null for a non-link mark. Omitted value keeps the ordinary home link. */
+  href?: string | null;
 };
 
 const DEFAULT_LOGO_SIZES = "(min-width: 768px) 128px, 192px";
@@ -31,23 +33,32 @@ export default function AudioladHorizontalLogo({
   priority = false,
   sizes = DEFAULT_LOGO_SIZES,
   variant = "default",
+  href = "/",
 }: AudioladHorizontalLogoProps) {
   const resolvedLinkClassName =
     linkClassName ??
     (variant === "profile"
       ? audioladHorizontalLogoProfileLinkClassName
       : audioladHorizontalLogoLinkClassName);
+  const image = (
+    <Image
+      src="/brand/audiolad-logo-horizontal.png"
+      alt="АудиоЛад"
+      width={HORIZONTAL_LOGO_WIDTH}
+      height={HORIZONTAL_LOGO_HEIGHT}
+      className={className}
+      sizes={sizes}
+      priority={priority}
+    />
+  );
+
+  if (href === null) {
+    return <span className={resolvedLinkClassName}>{image}</span>;
+  }
+
   return (
-    <Link href="/" className={resolvedLinkClassName}>
-      <Image
-        src="/brand/audiolad-logo-horizontal.png"
-        alt="АудиоЛад"
-        width={HORIZONTAL_LOGO_WIDTH}
-        height={HORIZONTAL_LOGO_HEIGHT}
-        className={className}
-        sizes={sizes}
-        priority={priority}
-      />
+    <Link href={href} className={resolvedLinkClassName}>
+      {image}
     </Link>
   );
 }

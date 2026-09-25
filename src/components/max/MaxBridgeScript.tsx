@@ -204,6 +204,7 @@ export default function MaxBridgeScript() {
           <AudioladHorizontalLogo
             className="h-16 w-auto max-w-full object-contain object-center"
             linkClassName="inline-flex max-w-full justify-center rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            href={null}
             priority
             sizes="256px"
           />

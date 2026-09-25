@@ -2,6 +2,8 @@
 
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
+import MaxBottomNav from "@/components/max/MaxBottomNav";
+import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
@@ -12,6 +14,12 @@ import {
   MAX_PRODUCT_PATH,
 } from "@/lib/max/host";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
+import {
+  MAX_INITIAL_PRIMARY_TAB,
+  MAX_PRIMARY_TABS,
+  MAX_SHELL_CONTENT_BOTTOM_PADDING,
+  type MaxPrimaryTab,
+} from "@/lib/max/primary-tabs";
 import { useEffect, useState } from "react";
 
 type MaxCatalogProduct = {
@@ -98,6 +106,7 @@ export default function MaxAuthenticatedHome() {
   const [selected, setSelected] = useState<MaxCatalogProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
   const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
+  const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
 
   useEffect(() => {
     const initData = readMaxInitData();
@@ -215,16 +224,34 @@ export default function MaxAuthenticatedHome() {
     return () => controller.abort();
   }, [detail.status, selected]);
 
+  function selectMaxTab(next: MaxPrimaryTab) {
+    if (next === activeTab) {
+      return;
+    }
+    if (activeTab === "catalog") {
+      setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
+    }
+    setActiveTab(next);
+  }
+
+  const activeTabLabel =
+    MAX_PRIMARY_TABS.find((tab) => tab.id === activeTab)?.label ?? "";
+
   return (
-    <section className="min-h-screen bg-[#faf8ff] px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] text-[#25135c]">
+    <section
+      className="min-h-screen bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))] text-[#25135c]"
+      style={{ paddingBottom: MAX_SHELL_CONTENT_BOTTOM_PADDING }}
+    >
       <header className="flex min-h-11 items-center border-b border-[#e8def5] pb-3">
         <AudioladHorizontalLogo
           className="h-8 w-auto max-w-full object-contain object-left"
           linkClassName="inline-flex rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          href={null}
           priority
           sizes="144px"
         />
       </header>
+      {activeTab === "catalog" ? (
       <div className="mx-auto max-w-lg">
         <h1 className="mt-5 text-[26px] font-semibold leading-tight">Каталог</h1>
         <p className="mt-1 text-sm leading-5 text-[#6c5d94]">
@@ -293,7 +320,10 @@ export default function MaxAuthenticatedHome() {
           </ul>
         ) : null}
       </div>
-      {selected ? (
+      ) : (
+        <MaxTabPlaceholder title={activeTabLabel} />
+      )}
+      {activeTab === "catalog" && selected ? (
         <div className="fixed inset-0 overflow-y-auto bg-[#faf8ff] p-4">
           <button type="button" onClick={() => { setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
             ← Назад в каталог
@@ -401,6 +431,9 @@ export default function MaxAuthenticatedHome() {
           ) : null}
         </div>
       ) : null}
+      {selected ? null : (
+        <MaxBottomNav activeTab={activeTab} onSelectTab={selectMaxTab} />
+      )}
     </section>
   );
 }
