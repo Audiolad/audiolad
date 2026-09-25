@@ -20,13 +20,15 @@ assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 
-const catalogStart = source.indexOf('<ul className="mt-5 grid grid-cols-2 gap-[6px]">');
+const catalogStart = source.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
 assert.notEqual(catalogStart, -1, "catalog list exists");
 const readyStart = source.indexOf('{detail.status === "ready" ?');
 assert.notEqual(readyStart, -1, "ready detail block exists");
 const catalogBlock = source.slice(catalogStart, readyStart);
 assert.match(catalogBlock, /grid-cols-2/);
 assert.match(catalogBlock, /gap-\[6px\]/);
+assert.match(catalogBlock, /-mx-4/);
+assert.match(catalogBlock, /px-\[6px\]/);
 assert.match(catalogBlock, /className="min-w-0"/);
 assert.match(catalogBlock, /flex-col/);
 assert.match(catalogBlock, /rounded-\[20px\]/);

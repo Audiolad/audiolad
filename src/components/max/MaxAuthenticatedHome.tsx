@@ -254,7 +254,7 @@ export default function MaxAuthenticatedHome() {
           </div>
         ) : null}
         {catalog.status === "ready" && catalog.items.length > 0 ? (
-          <ul className="mt-5 grid grid-cols-2 gap-[6px]">
+          <ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">
             {catalog.items.map((product) => (
               <li key={`${product.authorSlug}/${product.slug}`} className="min-w-0">
                 <button
