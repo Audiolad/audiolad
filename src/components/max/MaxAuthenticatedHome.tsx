@@ -246,6 +246,7 @@ export default function MaxAuthenticatedHome() {
         <AudioladHorizontalLogo
           className="h-8 w-auto max-w-full object-contain object-left"
           linkClassName="inline-flex rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          href={null}
           priority
           sizes="144px"
         />

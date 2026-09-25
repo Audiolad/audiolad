@@ -157,4 +157,42 @@ assert.ok(
 assert.match(pkg, /"test:max-bottom-nav": "node scripts\/max-bottom-nav-unit\.mjs"/);
 assert.match(pkg, /npm run test:max-bottom-nav/);
 
+const logo = read("src/components/brand/AudioladHorizontalLogo.tsx");
+const bridge = read("src/components/max/MaxBridgeScript.tsx");
+assert.match(logo, /href\?: string \| null/);
+assert.match(logo, /href = "\/"/);
+assert.match(logo, /if \(href === null\)/);
+const nullLogoBranch = logo.slice(logo.indexOf("if (href === null)"), logo.indexOf("<Link"));
+assert.match(nullLogoBranch, /<span className=\{resolvedLinkClassName\}>/);
+assert.doesNotMatch(nullLogoBranch, /<Link|href=|router\.push|window\.location|openLink/);
+assert.match(logo, /<Link href=\{href\}/);
+assert.doesNotMatch(strip(logo), /router\.push|window\.location|openLink/);
+
+function logoCall(source, label) {
+  const start = source.indexOf("<AudioladHorizontalLogo");
+  assert.ok(start >= 0, `${label} renders the shared logo`);
+  const end = source.indexOf("/>", start);
+  assert.ok(end > start, `${label} logo call is closed`);
+  return source.slice(start, end + 2);
+}
+
+const homeLogo = logoCall(home, "MAX header");
+assert.match(homeLogo, /href=\{null\}/);
+assert.doesNotMatch(homeLogo, /href=["']\/|onClick|router\.push|window\.location|openLink|<Link|<a[\s>]/);
+const bridgeLogo = logoCall(bridge, "MAX guest");
+assert.match(bridgeLogo, /href=\{null\}/);
+assert.doesNotMatch(bridgeLogo, /href=["']\/|onClick|router\.push|window\.location|openLink/);
+
+for (const ordinary of [
+  "src/components/home/HomePageShell.tsx",
+  "src/components/become-author/BecomeAuthorContent.tsx",
+  "src/components/legal/LegalPageShell.tsx",
+  "src/components/listener/HomeMobileHeader.tsx",
+  "src/app/(platform)/studio/meditation/page.tsx",
+]) {
+  const source = read(ordinary);
+  const call = logoCall(source, ordinary);
+  assert.doesNotMatch(call, /href=\{null\}|href=/);
+}
+
 console.log("max-bottom-nav-unit: ok");
