@@ -13,9 +13,12 @@ import {
   serializeCatalogTopicParam,
   toggleCatalogDraftTopics,
 } from "../src/lib/catalog/topic-filter.ts";
+import { CATALOG_LISTING_SEARCH_LIMIT } from "../src/lib/catalog/listing.ts";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "../src/lib/catalog/visibility-query.ts";
 import {
   listMaxPublishedCatalog,
+  parseMaxCatalogAccessParam,
+  parseMaxCatalogClassParam,
   parseMaxCatalogTopicParam,
   setListMaxPublishedCatalogForTests,
 } from "../src/lib/max/catalog.ts";
@@ -104,6 +107,18 @@ assert.equal(parseMaxCatalogTopicParam("not a key").ok, false);
 assert.equal(parseMaxCatalogTopicParam("ключ").ok, false);
 assert.equal(parseMaxCatalogTopicParam(1).ok, false);
 assert.equal(parseMaxCatalogTopicParam({ key: "sleep" }).ok, false);
+
+assert.deepEqual(parseMaxCatalogAccessParam(undefined), { ok: true, access: "all" });
+assert.deepEqual(parseMaxCatalogAccessParam(" FREE "), { ok: true, access: "free" });
+assert.deepEqual(parseMaxCatalogAccessParam("paid"), { ok: true, access: "paid" });
+assert.equal(parseMaxCatalogAccessParam("gift").ok, false);
+assert.equal(parseMaxCatalogAccessParam(1).ok, false);
+
+assert.deepEqual(parseMaxCatalogClassParam(undefined), { ok: true, class: "all" });
+assert.deepEqual(parseMaxCatalogClassParam(" RELEASE "), { ok: true, class: "release" });
+assert.deepEqual(parseMaxCatalogClassParam("audiobook"), { ok: true, class: "audiobook" });
+assert.equal(parseMaxCatalogClassParam("music").ok, false);
+assert.equal(parseMaxCatalogClassParam({}).ok, false);
 
 const topicsLib = readFileSync(join(repoRoot, "src/lib/max/catalog-topics.ts"), "utf8");
 const topicsRoute = readFileSync(
@@ -206,7 +221,86 @@ assert.equal(searchCalls[0].query, "джаз");
 assert.equal(searchCalls[0].catalogSection, "music");
 assert.equal(searchCalls[0].topicKey, "for-sleep,energy");
 assert.deepEqual(searchCalls[0].viewer, GUEST_ORDINARY_CATALOG_VIEWER);
-assert.equal(searchCalls[0].limit, undefined);
+assert.equal(searchCalls[0].limit, CATALOG_LISTING_SEARCH_LIMIT);
+
+function catalogProduct(overrides) {
+  const isFree = overrides.isFree ?? false;
+  const price = isFree ? 0 : (overrides.price ?? 490);
+  return {
+    id: overrides.id,
+    authorId: "author-id",
+    title: overrides.title ?? overrides.id,
+    slug: overrides.slug,
+    subtitle: null,
+    description: null,
+    format: overrides.format ?? "Аудиопрактика",
+    productKind: overrides.productKind ?? "practice",
+    publicationClass: overrides.publicationClass ?? null,
+    price,
+    compareAtPrice: null,
+    isFree,
+    coverUrl: null,
+    coverImage: null,
+    updatedAt: null,
+    authorName: "Автор",
+    authorSlug: "author",
+    href: `/practice/author/${overrides.slug}`,
+    meta: null,
+    statsLabel: null,
+    productTypeLabel: overrides.productTypeLabel ?? "Аудиопрактика",
+    priceLabel: isFree ? "Бесплатно" : `${price} ₽`,
+    sortTimestamp: overrides.sortTimestamp ?? 1,
+    durationSeconds: 600,
+    publishedAt: "2026-01-01T00:00:00.000Z",
+    gallery: [],
+  };
+}
+
+const canonicalProducts = [
+  catalogProduct({
+    id: "free-practice",
+    slug: "free-practice",
+    isFree: true,
+    publicationClass: "practice",
+  }),
+  catalogProduct({
+    id: "paid-music",
+    slug: "paid-music",
+    productKind: "music",
+    publicationClass: "release",
+    productTypeLabel: "Музыка",
+    price: 790,
+  }),
+  catalogProduct({
+    id: "paid-audiobook",
+    slug: "paid-audiobook",
+    publicationClass: "audiobook",
+    productTypeLabel: "Аудиокнига",
+    price: 990,
+  }),
+];
+
+const accessFiltered = await listMaxPublishedCatalog({
+  access: "free",
+  ...deps([], canonicalProducts),
+});
+assert.equal(accessFiltered.ok, true);
+assert.deepEqual(accessFiltered.items.map((item) => item.slug), ["free-practice"]);
+
+const classFiltered = await listMaxPublishedCatalog({
+  class: "release",
+  ...deps([], canonicalProducts),
+});
+assert.equal(classFiltered.ok, true);
+assert.deepEqual(classFiltered.items.map((item) => item.slug), ["paid-music"]);
+
+const combinedFiltered = await listMaxPublishedCatalog({
+  access: "paid",
+  class: "audiobook",
+  ...deps([], canonicalProducts),
+});
+assert.equal(combinedFiltered.ok, true);
+assert.deepEqual(combinedFiltered.items.map((item) => item.slug), ["paid-audiobook"]);
 
 const previousToken = process.env.MAX_BOT_TOKEN;
 process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
@@ -245,6 +339,8 @@ try {
       query: "джаз",
       section: "music",
       topic: "for-sleep",
+      access: "paid",
+      class: "release",
     }),
   );
   assert.equal(combined.status, 200);
@@ -253,6 +349,8 @@ try {
     query: "джаз",
     section: "music",
     topicKey: "for-sleep",
+    access: "paid",
+    class: "release",
   });
 
   async function assertRejected(topic) {
@@ -271,6 +369,22 @@ try {
   await assertRejected("ключ");
   await assertRejected(2);
   await assertRejected(["sleep"]);
+
+  async function assertRejectedFilter(bodyPatch) {
+    const before = catalogCalls.length;
+    const response = await postCatalog(
+      request("/api/max/catalog", { initData: currentInitData(), ...bodyPatch }),
+    );
+    const body = await response.json();
+    assert.equal(response.status, 400, JSON.stringify(bodyPatch));
+    assert.equal(body.reason, "invalid_request");
+    assert.equal(catalogCalls.length, before);
+  }
+
+  await assertRejectedFilter({ access: "gift" });
+  await assertRejectedFilter({ access: 1 });
+  await assertRejectedFilter({ class: "music" });
+  await assertRejectedFilter({ class: ["release"] });
 
   const beforeAuth = catalogCalls.length;
   const expired = await postCatalog(
