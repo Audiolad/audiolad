@@ -82,12 +82,12 @@ assert.match(nav, /shadow-\[0_-8px_30px_rgba\(86,52,141,0\.08\)\]/);
 assert.match(nav, /text-\[#7042c5\]/);
 assert.match(nav, /text-\[#81759f\]/);
 assert.match(nav, /pb-\[env\(safe-area-inset-bottom,0px\)\]/);
-assert.match(tabs, /MAX_BOTTOM_NAV_MAIN_HEIGHT_PX = 68/);
+assert.match(tabs, /MAX_TAB_BAR_HEIGHT_PX = 68/);
 assert.match(
   tabs,
-  /calc\(\$\{MAX_BOTTOM_NAV_MAIN_HEIGHT_PX\}px \+ env\(safe-area-inset-bottom, 0px\) \+ 16px\)/,
+  /calc\(\$\{MAX_TAB_BAR_HEIGHT_PX\}px \+ env\(safe-area-inset-bottom, 0px\) \+ 16px\)/,
 );
-assert.match(nav, /height: `\$\{MAX_BOTTOM_NAV_MAIN_HEIGHT_PX\}px`/);
+assert.match(nav, /height: `\$\{MAX_TAB_BAR_HEIGHT_PX\}px`/);
 assert.match(home, /paddingBottom: MAX_SHELL_CONTENT_BOTTOM_PADDING/);
 
 assert.match(home, /activeTab === "catalog" \?/);

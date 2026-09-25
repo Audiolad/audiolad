@@ -10,8 +10,8 @@ import {
   ProfileNavIcon,
 } from "@/components/BottomNavIcons";
 import {
-  MAX_BOTTOM_NAV_MAIN_HEIGHT_PX,
   MAX_PRIMARY_TABS,
+  MAX_TAB_BAR_HEIGHT_PX,
   type MaxPrimaryTab,
 } from "@/lib/max/primary-tabs";
 
@@ -42,7 +42,7 @@ export default function MaxBottomNav({
     >
       <div
         className="mx-auto grid w-full grid-cols-5 items-stretch px-1"
-        style={{ height: `${MAX_BOTTOM_NAV_MAIN_HEIGHT_PX}px` }}
+        style={{ height: `${MAX_TAB_BAR_HEIGHT_PX}px` }}
       >
         {MAX_PRIMARY_TABS.map((tab) => {
           const active = tab.id === activeTab;

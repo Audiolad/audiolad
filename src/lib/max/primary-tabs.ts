@@ -25,10 +25,10 @@ export const MAX_PRIMARY_TABS: readonly MaxPrimaryTabItem[] = [
 export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "catalog";
 
 /** Icon row height. Same 68px as the ordinary mobile tab bar, without its routes. */
-export const MAX_BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
+export const MAX_TAB_BAR_HEIGHT_PX = 68;
 
 /**
  * Scroll clearance so the last catalog cards sit above the fixed tab bar
  * and the home-indicator inset.
  */
-export const MAX_SHELL_CONTENT_BOTTOM_PADDING = `calc(${MAX_BOTTOM_NAV_MAIN_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 16px)`;
+export const MAX_SHELL_CONTENT_BOTTOM_PADDING = `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 16px)`;
