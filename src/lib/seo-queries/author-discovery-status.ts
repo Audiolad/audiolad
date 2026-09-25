@@ -162,10 +162,42 @@ export type AuthorDiscoveryDatabaseMatch = {
   source: "database";
 };
 
+/**
+ * Walk ranked items in order. Product-create keeps hidden used/linked rows
+ * in the walked prefix (for Wordstat dedupe) and stops once `visibleLimit`
+ * showable rows are collected. Other surfaces just slice the ranked prefix.
+ */
+export function takeRankedDiscoveryItemsUntilVisible<
+  T extends {
+    reservation: Pick<DiscoveryReservationLike, "status" | "productId"> | null;
+  },
+>(input: {
+  surface: AuthorSeoDiscoverySurface;
+  items: readonly T[];
+  visibleLimit: number;
+}): T[] {
+  if (input.visibleLimit <= 0) return [];
+  if (input.surface !== AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE) {
+    return input.items.slice(0, input.visibleLimit);
+  }
+
+  const walked: T[] = [];
+  let visible = 0;
+  for (const item of input.items) {
+    walked.push(item);
+    if (!isHiddenFromProductCreateDiscovery(item.reservation)) {
+      visible += 1;
+      if (visible >= input.visibleLimit) break;
+    }
+  }
+  return walked;
+}
+
 export function buildAuthorDiscoveryDatabaseMatches(input: {
   surface: AuthorSeoDiscoverySurface;
   authorId: string;
   items: AuthorDiscoveryDatabaseMatchInput[];
+  visibleLimit?: number;
 }): {
   matches: AuthorDiscoveryDatabaseMatch[];
   hiddenNormalizedQueries: string[];
@@ -180,6 +212,13 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
 
     if (hideForProductCreate) {
       hiddenNormalizedQueries.push(item.normalizedQuery);
+      continue;
+    }
+
+    if (
+      typeof input.visibleLimit === "number" &&
+      matches.length >= input.visibleLimit
+    ) {
       continue;
     }
 

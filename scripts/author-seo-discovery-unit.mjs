@@ -16,7 +16,9 @@ import {
   parseAuthorSeoDiscoverySurface,
   resolveAuthorDiscoveryReservationState,
   shouldOmitFromWordstatAdditions,
+  takeRankedDiscoveryItemsUntilVisible,
 } from "../src/lib/seo-queries/author-discovery-status.ts";
+import { SEO_DISCOVERY_DATABASE_LIMIT } from "../src/lib/seo-queries/discovery-ranking.ts";
 import {
   PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT,
   PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT,
@@ -1187,6 +1189,126 @@ assert.doesNotMatch(
   assert.equal(ranked.length, PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT);
   assert.equal(ranked[0].count, 74);
   assert.equal(ranked[19].count, 55);
+}
+
+assert.match(discoveryRoute, /surface,/);
+assert.match(discoveryRoute, /visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT/);
+assert.match(
+  discoveryRepo,
+  /SEO_DISCOVERY_DATABASE_CANDIDATE_LIMIT/,
+);
+assert.match(discoveryRepo, /takeRankedDiscoveryItemsUntilVisible/);
+assert.equal(SEO_DISCOVERY_DATABASE_LIMIT, 7);
+
+function dbMatchItem(id, reservation) {
+  return {
+    id,
+    queryText: `джаз ${id}`,
+    normalizedQuery: `джаз ${id}`,
+    frequency: 100,
+    reservation,
+  };
+}
+
+function usedReservation(id) {
+  return reservation({
+    id: `res-${id}`,
+    queryId: id,
+    authorId: authorA,
+    status: "used",
+    productId: `prod-${id}`,
+    productTitle: `Продукт ${id}`,
+  });
+}
+
+{
+  const usedIds = new Set(["2", "3", "5", "7"]);
+  const rankedItems = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"].map(
+    (id) => dbMatchItem(id, usedIds.has(id) ? usedReservation(id) : null),
+  );
+  const walked = takeRankedDiscoveryItemsUntilVisible({
+    surface: "product_create",
+    items: rankedItems,
+    visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+  });
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: walked,
+    visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+  });
+  // 1. BACKFILL: 4 used in top-7, free 8–11 fill the visible 7
+  assert.equal(built.matches.length, 7);
+  assert.deepEqual(
+    built.matches.map((item) => item.phrase),
+    [
+      "джаз 1",
+      "джаз 4",
+      "джаз 6",
+      "джаз 8",
+      "джаз 9",
+      "джаз 10",
+      "джаз 11",
+    ],
+  );
+  assert.ok(built.hiddenNormalizedQueries.includes("джаз 2"));
+  assert.ok(built.hiddenNormalizedQueries.includes("джаз 7"));
+  // 6. ORDER: surviving ranked order is preserved
+  assert.deepEqual(
+    walked
+      .filter((item) => !isHiddenFromProductCreateDiscovery(item.reservation))
+      .map((item) => item.id),
+    ["1", "4", "6", "8", "9", "10", "11"],
+  );
+}
+
+{
+  // 2. MAX: 10+ free → exactly 7
+  const rankedItems = Array.from({ length: 12 }, (_, index) =>
+    dbMatchItem(String(index + 1), null),
+  );
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: takeRankedDiscoveryItemsUntilVisible({
+      surface: "product_create",
+      items: rankedItems,
+      visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+    }),
+    visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+  });
+  assert.equal(built.matches.length, 7);
+}
+
+{
+  // 3. SHORT: only 4 available
+  const rankedItems = ["1", "2", "3", "4"].map((id) => dbMatchItem(id, null));
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: takeRankedDiscoveryItemsUntilVisible({
+      surface: "product_create",
+      items: rankedItems,
+      visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+    }),
+    visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
+  });
+  assert.equal(built.matches.length, 4);
+}
+
+{
+  // 7. hidden used stays out of Wordstat additions
+  const hiddenUsed = usedReservation("evening");
+  assert.equal(
+    shouldOmitFromWordstatAdditions({
+      surface: "product_create",
+      analysisStatus: "analyzed",
+      reservation: hiddenUsed,
+      normalized: "вечерний джаз",
+      databaseNormalized: new Set(["вечерний джаз"]),
+    }),
+    true,
+  );
 }
 
 console.log("author-seo-discovery-unit: ok");

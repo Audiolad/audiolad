@@ -14,6 +14,7 @@ import {
   parseAuthorSeoDiscoverySurface,
   shouldOmitFromWordstatAdditions,
 } from "@/lib/seo-queries/author-discovery-status";
+import { SEO_DISCOVERY_DATABASE_LIMIT } from "@/lib/seo-queries/discovery-ranking";
 import {
   selectProductCreateWordstatAdditions,
   wordstatNumPhrasesForDiscoverySurface,
@@ -85,12 +86,14 @@ export async function POST(request: Request) {
       const ranked = await loadRankedAnalyzedQueriesForSeed({
         authorId,
         seedPhrase: phrase,
+        surface,
       });
       seedNormalized = ranked.seedNormalized;
       const built = buildAuthorDiscoveryDatabaseMatches({
         surface,
         authorId,
         items: ranked.matches,
+        visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
       });
       databaseMatches = built.matches;
       for (const item of ranked.matches) {
