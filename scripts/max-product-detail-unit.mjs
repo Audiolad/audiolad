@@ -20,16 +20,42 @@ assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 
-const catalogStart = source.indexOf("catalog.items.map");
+const catalogStart = source.indexOf('<ul className="mt-5 grid grid-cols-2 gap-[6px]">');
 assert.notEqual(catalogStart, -1, "catalog list exists");
 const readyStart = source.indexOf('{detail.status === "ready" ?');
 assert.notEqual(readyStart, -1, "ready detail block exists");
 const catalogBlock = source.slice(catalogStart, readyStart);
-assert.match(catalogBlock, /aspect-square/);
-assert.match(catalogBlock, /w-24/);
-assert.match(catalogBlock, /shrink-0/);
+assert.match(catalogBlock, /grid-cols-2/);
+assert.match(catalogBlock, /gap-\[6px\]/);
+assert.match(catalogBlock, /className="min-w-0"/);
+assert.match(catalogBlock, /flex-col/);
+assert.match(catalogBlock, /rounded-\[20px\]/);
+assert.match(catalogBlock, /aspect-square w-full/);
 assert.match(catalogBlock, /h-full w-full object-cover/);
+assert.match(catalogBlock, /line-clamp-2/);
+assert.doesNotMatch(catalogBlock, /flex min-h-28/);
+assert.doesNotMatch(catalogBlock, /w-24/);
+assert.doesNotMatch(catalogBlock, /shrink-0/);
 assert.doesNotMatch(catalogBlock, /h-24|w-20/);
+assert.doesNotMatch(catalogBlock, /Подарок|Бесплатно/);
+assert.doesNotMatch(catalogBlock, /CatalogProductHeart|CatalogProductPlay|favorite/i);
+assert.match(catalogBlock, /setSelected\(product\)/);
+assert.ok(
+  catalogBlock.indexOf("product.formatLabel") < catalogBlock.indexOf("product.title"),
+  "catalog card shows format above title",
+);
+assert.ok(
+  catalogBlock.indexOf("product.title") < catalogBlock.indexOf("product.subtitle"),
+  "catalog card shows title above subtitle",
+);
+assert.ok(
+  catalogBlock.indexOf("product.subtitle") < catalogBlock.indexOf("product.authorName"),
+  "catalog card shows subtitle above author",
+);
+assert.ok(
+  catalogBlock.indexOf("product.authorName") < catalogBlock.indexOf("!product.isFree"),
+  "catalog card shows author above paid price",
+);
 assert.match(source.slice(readyStart), /max-w-\[280px\]/);
 assert.match(source.slice(readyStart), /aspect-square/);
 const readyBlock = source.slice(readyStart);
