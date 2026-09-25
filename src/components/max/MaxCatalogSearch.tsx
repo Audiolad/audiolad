@@ -311,6 +311,14 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
     if (normalized) {
+      if (section) {
+        const cached = sectionCacheRef.current.get(section);
+        setSectionListing(
+          cached
+            ? { status: "ready", section, items: cached }
+            : { status: "idle" },
+        );
+      }
       beginSearch(normalized, section);
       return;
     }
@@ -498,17 +506,15 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   const usingSearchResults =
     searchItems !== null && searchStatus !== "idle" && resultSection === activeSection;
   const rootOrSearchItems = usingSearchResults ? searchItems : defaultCatalog.status === "ready" ? defaultCatalog.items : [];
-  const sectionGridItems =
+  const sectionScopeItems =
     sectionListing.status === "ready" && sectionListing.section === activeSection
       ? sectionListing.items
       : [];
-  const gridItems = usingSearchResults
-    ? searchItems
-    : searchStatus === "searching" || searchStatus === "error"
-      ? []
-      : activeSection
-        ? sectionGridItems
-        : rootOrSearchItems;
+  const gridItems = activeSection
+    ? usingSearchResults
+      ? searchItems
+      : sectionScopeItems
+    : rootOrSearchItems;
   const showSearchHeading =
     resultQuery.length > 0 &&
     searchItems !== null &&

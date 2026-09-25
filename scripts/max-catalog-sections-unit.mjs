@@ -122,6 +122,11 @@ const restoreAt = select.indexOf("restoreDefaultCatalog()");
 const refetchRootAt = select.indexOf("loadRootCatalog()");
 assert.ok(readyAt !== -1 && readyAt < restoreAt && restoreAt < refetchRootAt);
 assert.match(select, /sectionCacheRef\.current\.get\(section\)/);
+assert.match(select, /setSectionListing\(\s*cached/);
+assert.match(select, /\? \{ status: "ready", section, items: cached \}/);
+assert.match(select, /: \{ status: "idle" \}/);
+const queryBranch = select.slice(0, select.indexOf("if (section === null"));
+assert.ok(queryBranch.indexOf("setSectionListing(") < queryBranch.indexOf("beginSearch(normalized, section)"));
 assert.match(select, /window\.clearTimeout\(debounceRef\.current\)/);
 assert.doesNotMatch(select, /localStorage|sessionStorage|router|useSearchParams/);
 
@@ -159,6 +164,36 @@ assert.ok(beginGuardAt !== -1 && beginGuardAt < beginApplyAt);
 assert.match(begin, /JSON\.stringify\(\{ initData, query: normalized, section \}\)/);
 assert.match(begin, /JSON\.stringify\(\{ initData, query: normalized \}\)/);
 assert.match(begin, /setResultSection\(section\)/);
+assert.doesNotMatch(begin, /setSearchItems\(null\)/);
+assert.match(begin, /setSearchStatus\("searching"\)/);
+assert.match(begin, /setSearchStatus\("error"\)/);
+const searchingAt = begin.indexOf('setSearchStatus("searching")');
+const applyItemsAt = begin.indexOf("setSearchItems(items)");
+assert.ok(searchingAt !== -1 && searchingAt < applyItemsAt);
+assert.equal(begin.slice(searchingAt, applyItemsAt).includes("setSearchItems"), false);
+
+const gridChoice = search.slice(
+  search.indexOf("const usingSearchResults ="),
+  search.indexOf("const showSearchHeading"),
+);
+assert.match(
+  gridChoice,
+  /searchItems !== null && searchStatus !== "idle" && resultSection === activeSection/,
+);
+assert.match(
+  gridChoice,
+  /usingSearchResults \? searchItems : defaultCatalog\.status === "ready"/,
+);
+assert.match(
+  gridChoice,
+  /sectionListing\.status === "ready" && sectionListing\.section === activeSection/,
+);
+assert.match(gridChoice, /usingSearchResults\s*\?\s*searchItems\s*:\s*sectionScopeItems/);
+assert.match(gridChoice, /: rootOrSearchItems/);
+assert.doesNotMatch(
+  gridChoice,
+  /searchStatus === "searching" \|\| searchStatus === "error"\s*\?\s*\[\]/,
+);
 
 const restore = search.slice(
   search.indexOf("function restoreDefaultCatalog"),
