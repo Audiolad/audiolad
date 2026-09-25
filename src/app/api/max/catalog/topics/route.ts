@@ -1,35 +1,24 @@
 import "server-only";
 
-import {
-  parsePublicCatalogSection,
-  type PublicCatalogSection,
-} from "@/lib/catalog/catalog-sections";
-import {
-  listMaxPublishedCatalog,
-  parseMaxCatalogTopicParam,
-} from "@/lib/max/catalog";
+import { loadMaxCatalogTopics } from "@/lib/max/catalog-topics";
 import { isMaxHostname } from "@/lib/max/host";
 import {
   isAllowedMaxSessionOrigin,
   MAX_SESSION_BODY_MAX_BYTES,
 } from "@/lib/max/session-http";
-import {
-  MAX_EXTERNAL_IDENTITY_PROVIDER,
-} from "@/lib/max/touch-external-identity";
-import {
-  resolveMaxNativeUser,
-} from "@/lib/max/session-binding";
+import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "@/lib/max/touch-external-identity";
+import { resolveMaxNativeUser } from "@/lib/max/session-binding";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
 export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
-export { setListMaxPublishedCatalogForTests } from "@/lib/max/catalog";
+export { setListMaxCatalogTopicsForTests } from "@/lib/max/catalog-topics";
 
 export const dynamic = "force-dynamic";
-export const MAX_CATALOG_BODY_MAX_BYTES = MAX_SESSION_BODY_MAX_BYTES;
-export const isAllowedMaxCatalogOrigin = isAllowedMaxSessionOrigin;
+export const MAX_CATALOG_TOPICS_BODY_MAX_BYTES = MAX_SESSION_BODY_MAX_BYTES;
+export const isAllowedMaxCatalogTopicsOrigin = isAllowedMaxSessionOrigin;
 
-type CatalogErrorReason =
+type TopicsErrorReason =
   | "forbidden_host"
   | "forbidden_origin"
   | "service_unavailable"
@@ -51,7 +40,7 @@ type CatalogErrorReason =
   | "unlinked"
   | "storage_unavailable";
 
-const PARSE_REASONS = new Set<CatalogErrorReason>([
+const PARSE_REASONS = new Set<TopicsErrorReason>([
   "empty_init_data",
   "missing_hash",
   "duplicate_hash",
@@ -64,30 +53,11 @@ const PARSE_REASONS = new Set<CatalogErrorReason>([
   "invalid_auth_date",
 ]);
 
-function errorResponse(reason: CatalogErrorReason, status: number) {
+function errorResponse(reason: TopicsErrorReason, status: number) {
   return Response.json({ ok: false, reason }, { status });
 }
 
-function parseMaxCatalogSection(
-  value: unknown,
-): { ok: true; section: PublicCatalogSection | null } | { ok: false } {
-  if (value == null) {
-    return { ok: true, section: null };
-  }
-
-  if (typeof value !== "string") {
-    return { ok: false };
-  }
-
-  const section = parsePublicCatalogSection(value);
-  if (!section) {
-    return { ok: false };
-  }
-
-  return { ok: true, section };
-}
-
-function statusForReason(reason: CatalogErrorReason): number {
+function statusForReason(reason: TopicsErrorReason): number {
   if (reason === "payload_too_large") return 413;
   if (reason === "storage_unavailable" || reason === "service_unavailable") {
     return 503;
@@ -106,7 +76,7 @@ export async function POST(request: Request) {
     return errorResponse("forbidden_host", 404);
   }
 
-  if (!isAllowedMaxCatalogOrigin(request)) {
+  if (!isAllowedMaxCatalogTopicsOrigin(request)) {
     return errorResponse("forbidden_origin", 403);
   }
 
@@ -118,7 +88,7 @@ export async function POST(request: Request) {
   const contentLength = request.headers.get("content-length");
   if (contentLength) {
     const declared = Number(contentLength);
-    if (Number.isFinite(declared) && declared > MAX_CATALOG_BODY_MAX_BYTES) {
+    if (Number.isFinite(declared) && declared > MAX_CATALOG_TOPICS_BODY_MAX_BYTES) {
       return errorResponse("payload_too_large", 413);
     }
   }
@@ -127,7 +97,7 @@ export async function POST(request: Request) {
   if (rawBody.byteLength === 0) {
     return errorResponse("invalid_request", 400);
   }
-  if (rawBody.byteLength > MAX_CATALOG_BODY_MAX_BYTES) {
+  if (rawBody.byteLength > MAX_CATALOG_TOPICS_BODY_MAX_BYTES) {
     return errorResponse("payload_too_large", 413);
   }
 
@@ -142,13 +112,7 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
-  const body = parsed as {
-    initData?: unknown;
-    query?: unknown;
-    section?: unknown;
-    topic?: unknown;
-  };
-  const initData = body.initData;
+  const initData = (parsed as { initData?: unknown }).initData;
   if (typeof initData !== "string") {
     return errorResponse("invalid_request", 400);
   }
@@ -162,20 +126,6 @@ export async function POST(request: Request) {
     return errorResponse(verified.reason, statusForReason(verified.reason));
   }
 
-  if (body.query != null && typeof body.query !== "string") {
-    return errorResponse("invalid_request", 400);
-  }
-
-  const section = parseMaxCatalogSection(body.section);
-  if (!section.ok) {
-    return errorResponse("invalid_request", 400);
-  }
-
-  const topic = parseMaxCatalogTopicParam(body.topic);
-  if (!topic.ok) {
-    return errorResponse("invalid_request", 400);
-  }
-
   const nativeUser = await resolveMaxNativeUser(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     verified.data.user.id,
@@ -187,28 +137,13 @@ export async function POST(request: Request) {
     return errorResponse("unlinked", 403);
   }
 
-  const catalogInput: {
-    query?: string;
-    section?: PublicCatalogSection;
-    topicKey?: string;
-  } = {};
-  if (typeof body.query === "string") {
-    catalogInput.query = body.query;
-  }
-  if (section.section) {
-    catalogInput.section = section.section;
-  }
-  if (topic.topicKey) {
-    catalogInput.topicKey = topic.topicKey;
-  }
-
-  const catalog = await listMaxPublishedCatalog(catalogInput);
-  if (!catalog.ok) {
+  const topics = await loadMaxCatalogTopics();
+  if (!topics.ok) {
     return errorResponse("storage_unavailable", 503);
   }
 
   return Response.json(
-    { ok: true, items: catalog.items },
+    { ok: true, topics: topics.topics },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   isMaxCatalogPath,
+  isMaxCatalogTopicsPath,
   isMaxPlaybackAudioPath,
   isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
@@ -20,6 +21,7 @@ import {
   isMaxSitePath,
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
+  MAX_CATALOG_TOPICS_PATH,
   MAX_PLAYBACK_AUDIO_PATH,
   MAX_PLAYBACK_PREVIEW_PATH,
   MAX_PLAYBACK_SESSION_PATH,
@@ -89,7 +91,12 @@ assert.equal(isMaxSessionLinkPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath("/api/foo"), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
 assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
+assert.equal(isMaxCatalogPath(MAX_CATALOG_TOPICS_PATH), false);
 assert.equal(isMaxCatalogPath("/api/max"), false);
+assert.equal(isMaxCatalogTopicsPath(MAX_CATALOG_TOPICS_PATH), true);
+assert.equal(isMaxCatalogTopicsPath(`${MAX_CATALOG_TOPICS_PATH}/`), false);
+assert.equal(isMaxCatalogTopicsPath(MAX_CATALOG_PATH), false);
+assert.equal(isMaxCatalogTopicsPath("/api/max/catalog/topics/extra"), false);
 assert.equal(isMaxProductPath(MAX_PRODUCT_PATH), true);
 assert.equal(isMaxProductPath(`${MAX_PRODUCT_PATH}/`), false);
 assert.equal(isMaxPlaybackSessionPath(MAX_PLAYBACK_SESSION_PATH), true);
@@ -109,6 +116,7 @@ assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_TOPICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_SESSION_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_AUDIO_PATH, "pass_through");
@@ -116,6 +124,8 @@ assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_PREVIEW_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_TOPICS_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/catalog/topics/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_SESSION_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYBACK_AUDIO_PATH}/`, "not_found");

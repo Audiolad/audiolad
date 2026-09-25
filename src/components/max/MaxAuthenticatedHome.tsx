@@ -154,15 +154,17 @@ export default function MaxAuthenticatedHome() {
       className="min-h-screen bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))] text-[#25135c]"
       style={{ paddingBottom: MAX_SHELL_CONTENT_BOTTOM_PADDING }}
     >
-      <header className="flex min-h-11 items-center border-b border-[#e8def5] pb-3">
-        <AudioladHorizontalLogo
-          className="h-8 w-auto max-w-full object-contain object-left"
-          linkClassName="inline-flex rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          href={null}
-          priority
-          sizes="144px"
-        />
-      </header>
+      {activeTab === "catalog" ? null : (
+        <header className="flex min-h-11 items-center border-b border-[#e8def5] pb-3">
+          <AudioladHorizontalLogo
+            className="h-8 w-auto max-w-full object-contain object-left"
+            linkClassName="inline-flex rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            href={null}
+            priority
+            sizes="144px"
+          />
+        </header>
+      )}
       <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog"}>
         <MaxCatalogSearch onSelectProduct={openCatalogProduct} />
       </div>

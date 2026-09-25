@@ -14,6 +14,9 @@ export const MAX_SESSION_LINK_PATH = "/api/max/session/link";
 
 /** HMAC-verify linked MAX identity, then return the read-only MAX catalog. */
 export const MAX_CATALOG_PATH = "/api/max/catalog";
+
+/** HMAC-verify linked MAX identity, then return catalog topics with products. */
+export const MAX_CATALOG_TOPICS_PATH = "/api/max/catalog/topics";
 export const MAX_PRODUCT_PATH = "/api/max/product";
 
 /** HMAC-verify linked MAX identity, then return a playable session if entitled. */
@@ -39,6 +42,10 @@ export function isMaxSessionLinkPath(pathname: string): boolean {
 
 export function isMaxCatalogPath(pathname: string): boolean {
   return pathname === MAX_CATALOG_PATH;
+}
+
+export function isMaxCatalogTopicsPath(pathname: string): boolean {
+  return pathname === MAX_CATALOG_TOPICS_PATH;
 }
 export function isMaxProductPath(pathname: string): boolean {
   return pathname === MAX_PRODUCT_PATH;

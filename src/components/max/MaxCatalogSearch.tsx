@@ -4,9 +4,11 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
+import { serializeCatalogTopicParam } from "@/lib/catalog/topic-filter";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_CATALOG_PATH } from "@/lib/max/host";
 import MaxCatalogSections from "@/components/max/MaxCatalogSections";
+import MaxCatalogTopicsSheet from "@/components/max/MaxCatalogTopicsSheet";
 
 /** Matches ordinary catalog URL debounce without importing catalog routing. */
 const MAX_CATALOG_SEARCH_DEBOUNCE_MS = 300;
@@ -33,6 +35,17 @@ type SectionListingState =
   | { status: "loading"; section: PublicCatalogSection }
   | { status: "ready"; section: PublicCatalogSection; items: MaxCatalogProduct[] }
   | { status: "error"; section: PublicCatalogSection };
+
+type TopicListingState =
+  | { status: "idle" }
+  | { status: "loading"; section: PublicCatalogSection | null; topic: string }
+  | {
+      status: "ready";
+      section: PublicCatalogSection | null;
+      topic: string;
+      items: MaxCatalogProduct[];
+    }
+  | { status: "error"; section: PublicCatalogSection | null; topic: string };
 
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
@@ -132,8 +145,12 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   const [searchItems, setSearchItems] = useState<MaxCatalogProduct[] | null>(null);
   const [resultQuery, setResultQuery] = useState("");
   const [resultSection, setResultSection] = useState<PublicCatalogSection | null>(null);
+  const [resultTopic, setResultTopic] = useState<string | null>(null);
+  const [activeTopicKeys, setActiveTopicKeys] = useState<string[]>([]);
+  const [topicListing, setTopicListing] = useState<TopicListingState>({ status: "idle" });
   const searchInputRef = useRef("");
   const activeSectionRef = useRef<PublicCatalogSection | null>(null);
+  const activeTopicParamRef = useRef<string | null>(null);
   const defaultCatalogRef = useRef(defaultCatalog);
   const sectionCacheRef = useRef(new Map<PublicCatalogSection, MaxCatalogProduct[]>());
   const debounceRef = useRef<number | null>(null);
@@ -154,6 +171,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     cancelPendingSearch();
     setResultQuery("");
     setResultSection(null);
+    setResultTopic(null);
     setSearchStatus("idle");
     setSearchItems(null);
   }
@@ -161,6 +179,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   function beginSearch(
     normalized: string,
     section: PublicCatalogSection | null = activeSectionRef.current,
+    topicParam: string | null = activeTopicParamRef.current,
   ) {
     const requestId = ++requestGenerationRef.current;
     abortRef.current?.abort();
@@ -183,9 +202,13 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: section
-            ? JSON.stringify({ initData, query: normalized, section })
-            : JSON.stringify({ initData, query: normalized }),
+          body: topicParam
+            ? section
+              ? JSON.stringify({ initData, query: normalized, section, topic: topicParam })
+              : JSON.stringify({ initData, query: normalized, topic: topicParam })
+            : section
+              ? JSON.stringify({ initData, query: normalized, section })
+              : JSON.stringify({ initData, query: normalized }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -201,6 +224,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         setSearchItems(items);
         setResultQuery(normalized);
         setResultSection(section);
+        setResultTopic(topicParam);
         setSearchStatus("ready");
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -220,6 +244,11 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     const normalized = normalizeCatalogSearchQuery(rawQuery);
     if (!normalized) {
       const section = activeSectionRef.current;
+      const topicParam = activeTopicParamRef.current;
+      if (topicParam) {
+        loadTopicCatalog(section, topicParam);
+        return;
+      }
       if (section && !sectionCacheRef.current.has(section)) {
         loadSectionCatalog(section);
         return;
@@ -257,6 +286,11 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
     if (!normalized) {
       const section = activeSectionRef.current;
+      const topicParam = activeTopicParamRef.current;
+      if (topicParam) {
+        loadTopicCatalog(section, topicParam);
+        return;
+      }
       if (section && !sectionCacheRef.current.has(section)) {
         loadSectionCatalog(section);
         return;
@@ -282,6 +316,11 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     searchInputRef.current = "";
     setSearchInput("");
     const section = activeSectionRef.current;
+    const topicParam = activeTopicParamRef.current;
+    if (topicParam) {
+      loadTopicCatalog(section, topicParam);
+      return;
+    }
     if (section && !sectionCacheRef.current.has(section)) {
       loadSectionCatalog(section);
       return;
@@ -310,6 +349,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setActiveSection(section);
 
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
+    const topicParam = activeTopicParamRef.current;
     if (normalized) {
       if (section) {
         const cached = sectionCacheRef.current.get(section);
@@ -319,7 +359,16 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
             : { status: "idle" },
         );
       }
+      if (topicParam) {
+        beginSearch(normalized, section, topicParam);
+        return;
+      }
       beginSearch(normalized, section);
+      return;
+    }
+
+    if (topicParam) {
+      loadTopicCatalog(section, topicParam);
       return;
     }
 
@@ -338,6 +387,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
       cancelPendingSearch();
       setResultQuery("");
       setResultSection(null);
+      setResultTopic(null);
       setSearchStatus("idle");
       setSearchItems(null);
       setSectionListing({ status: "ready", section, items: cached });
@@ -358,6 +408,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     abortRef.current = controller;
     setResultQuery("");
     setResultSection(null);
+    setResultTopic(null);
     setSearchStatus("idle");
     setSearchItems(null);
     if (defaultCatalogRef.current.status !== "ready") {
@@ -409,6 +460,7 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     abortRef.current = controller;
     setResultQuery("");
     setResultSection(null);
+    setResultTopic(null);
     setSearchStatus("idle");
     setSearchItems(null);
     setSectionListing({ status: "loading", section });
@@ -452,9 +504,115 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     })();
   }
 
+  function loadTopicCatalog(
+    section: PublicCatalogSection | null,
+    topicParam: string,
+  ) {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const requestId = ++requestGenerationRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setResultQuery("");
+    setResultSection(null);
+    setResultTopic(null);
+    setSearchStatus("idle");
+    setSearchItems(null);
+    setTopicListing({ status: "loading", section, topic: topicParam });
+
+    void (async () => {
+      try {
+        const initData = readMaxInitData();
+        if (!initData) {
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          setTopicListing({ status: "error", section, topic: topicParam });
+          return;
+        }
+
+        const response = await fetch(MAX_CATALOG_PATH, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: section
+            ? JSON.stringify({ initData, section, topic: topicParam })
+            : JSON.stringify({ initData, topic: topicParam }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        const items = response.ok ? readCatalogPayload(payload) : null;
+        if (!items) {
+          setTopicListing({ status: "error", section, topic: topicParam });
+          return;
+        }
+        setTopicListing({ status: "ready", section, topic: topicParam, items });
+      } catch {
+        if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+          return;
+        }
+        setTopicListing({ status: "error", section, topic: topicParam });
+      }
+    })();
+  }
+
+  function reloadUnfilteredScope(section: PublicCatalogSection | null) {
+    if (section && !sectionCacheRef.current.has(section)) {
+      loadSectionCatalog(section);
+      return;
+    }
+    if (!section && defaultCatalogRef.current.status !== "ready") {
+      loadRootCatalog();
+      return;
+    }
+    restoreDefaultCatalog();
+    if (section) {
+      const cached = sectionCacheRef.current.get(section);
+      if (cached) {
+        setSectionListing({ status: "ready", section, items: cached });
+      }
+    }
+  }
+
+  function applyTopicKeys(keys: string[]) {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const topicParam = serializeCatalogTopicParam(keys);
+    activeTopicParamRef.current = topicParam;
+    setActiveTopicKeys(keys);
+    const section = activeSectionRef.current;
+    const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
+    if (normalized) {
+      beginSearch(normalized, section, topicParam);
+      return;
+    }
+    if (!topicParam) {
+      reloadUnfilteredScope(section);
+      return;
+    }
+    loadTopicCatalog(section, topicParam);
+  }
+
+  function resetTopicKeys() {
+    applyTopicKeys([]);
+  }
+
   useEffect(() => {
     defaultCatalogRef.current = defaultCatalog;
   }, [defaultCatalog]);
+
+  useEffect(() => {
+    activeTopicParamRef.current = serializeCatalogTopicParam(activeTopicKeys);
+  }, [activeTopicKeys]);
 
   useEffect(() => {
     const initData = readMaxInitData();
@@ -503,113 +661,145 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   }, []);
 
   const normalizedInput = normalizeCatalogSearchQuery(searchInput);
+  const activeTopicParam = serializeCatalogTopicParam(activeTopicKeys);
   const usingSearchResults =
-    searchItems !== null && searchStatus !== "idle" && resultSection === activeSection;
+    searchItems !== null && searchStatus !== "idle" && resultSection === activeSection && resultTopic === activeTopicParam;
   const rootOrSearchItems = usingSearchResults ? searchItems : defaultCatalog.status === "ready" ? defaultCatalog.items : [];
   const sectionScopeItems =
     sectionListing.status === "ready" && sectionListing.section === activeSection
       ? sectionListing.items
       : [];
-  const gridItems = activeSection
+  const topicScopeItems =
+    topicListing.status === "ready" &&
+    topicListing.section === activeSection &&
+    topicListing.topic === activeTopicParam
+      ? topicListing.items
+      : [];
+  const gridItems = activeTopicParam
     ? usingSearchResults
       ? searchItems
-      : sectionScopeItems
-    : rootOrSearchItems;
-  const showSearchHeading =
-    resultQuery.length > 0 &&
-    searchItems !== null &&
-    searchStatus !== "idle" &&
-    resultSection === activeSection;
+      : topicScopeItems
+    : activeSection
+      ? usingSearchResults
+        ? searchItems
+        : sectionScopeItems
+      : rootOrSearchItems;
   const showSearchEmpty =
     usingSearchResults &&
     searchItems !== null &&
     searchItems.length === 0 &&
     resultQuery.length > 0;
   const showRootLoading =
-    !activeSection && searchStatus === "idle" && defaultCatalog.status === "loading";
+    !activeTopicParam &&
+    !activeSection &&
+    searchStatus === "idle" &&
+    defaultCatalog.status === "loading";
   const showSectionLoading =
+    !activeTopicParam &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "loading" &&
     sectionListing.section === activeSection;
+  const showTopicLoading =
+    Boolean(activeTopicParam) &&
+    searchStatus === "idle" &&
+    topicListing.status === "loading" &&
+    topicListing.section === activeSection &&
+    topicListing.topic === activeTopicParam;
   const showRootError =
-    !activeSection && searchStatus === "idle" && defaultCatalog.status === "error";
+    !activeTopicParam &&
+    !activeSection &&
+    searchStatus === "idle" &&
+    defaultCatalog.status === "error";
   const showSectionError =
+    !activeTopicParam &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "error" &&
     sectionListing.section === activeSection;
+  const showTopicError =
+    Boolean(activeTopicParam) &&
+    searchStatus === "idle" &&
+    topicListing.status === "error" &&
+    topicListing.section === activeSection &&
+    topicListing.topic === activeTopicParam;
   const showRootEmpty =
+    !activeTopicParam &&
     !activeSection &&
     searchStatus === "idle" &&
     defaultCatalog.status === "ready" &&
     defaultCatalog.items.length === 0;
   const showSectionEmpty =
+    !activeTopicParam &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "ready" &&
     sectionListing.section === activeSection &&
     sectionListing.items.length === 0;
+  const showTopicEmpty =
+    Boolean(activeTopicParam) &&
+    searchStatus === "idle" &&
+    topicListing.status === "ready" &&
+    topicListing.section === activeSection &&
+    topicListing.topic === activeTopicParam &&
+    topicListing.items.length === 0;
 
   return (
     <>
-      <form
-        role="search"
-        onSubmit={submitSearch}
-        className="relative mt-4 flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
+      <div
+        data-max-catalog-search-row
+        className="mt-4 flex items-start gap-2"
       >
-        <label htmlFor={inputId} className="sr-only">
-          Поиск аудиопродуктов в каталоге
-        </label>
-        <button
-          type="submit"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
+        <form
+          role="search"
+          onSubmit={submitSearch}
+          className="relative flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
         >
-          <SearchIcon />
-        </button>
-        <input
-          id={inputId}
-          type="search"
-          value={searchInput}
-          onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Поиск по каталогу"
-          autoComplete="off"
-          enterKeyHint="search"
-          maxLength={CATALOG_SEARCH_MAX_LENGTH}
-          aria-label="Поиск аудиопродуктов в каталоге"
-          className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
-        />
-        {normalizedInput.length > 0 ? (
+          <label htmlFor={inputId} className="sr-only">
+            Поиск аудиопродуктов в каталоге
+          </label>
           <button
-            type="button"
-            onClick={clearSearch}
-            aria-label="Очистить поиск"
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            type="submit"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
           >
-            <ClearIcon />
+            <SearchIcon />
           </button>
-        ) : null}
-      </form>
+          <input
+            id={inputId}
+            type="search"
+            value={searchInput}
+            onChange={(event) => handleInputChange(event.target.value)}
+            placeholder="Поиск по каталогу"
+            autoComplete="off"
+            enterKeyHint="search"
+            maxLength={CATALOG_SEARCH_MAX_LENGTH}
+            aria-label="Поиск аудиопродуктов в каталоге"
+            className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
+          />
+          {normalizedInput.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Очистить поиск"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              <ClearIcon />
+            </button>
+          ) : null}
+        </form>
+        <MaxCatalogTopicsSheet
+          activeTopicKeys={activeTopicKeys}
+          onApply={applyTopicKeys}
+          onReset={resetTopicKeys}
+        />
+      </div>
 
       <MaxCatalogSections
         activeSection={activeSection}
         onSelectSection={selectSection}
       />
-
-      <h1 className="mt-5 text-[26px] font-semibold leading-tight">
-        {showSearchHeading ? "Результаты поиска" : "Каталог"}
-      </h1>
-      {showSearchHeading ? (
-        <p className="mt-1 text-sm leading-5 text-[#6c5d94]">
-          По запросу „{resultQuery}“
-        </p>
-      ) : (
-        <p className="mt-1 text-sm leading-5 text-[#6c5d94]">
-          Аудиопрактики, музыка и курсы АудиоЛада
-        </p>
-      )}
 
       {searchStatus === "searching" ? (
         <p className="mt-3 text-sm text-[#6c5d94]">Ищем…</p>
@@ -618,12 +808,12 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         <p className="mt-3 text-sm text-[#6c5d94]">Не удалось выполнить поиск.</p>
       ) : null}
 
-      {showRootLoading || showSectionLoading ? (
+      {showRootLoading || showSectionLoading || showTopicLoading ? (
         <p className="py-10 text-center text-sm text-[#6c5d94]">
           Загружаем каталог…
         </p>
       ) : null}
-      {showRootError || showSectionError ? (
+      {showRootError || showSectionError || showTopicError ? (
         <div className="mt-6 rounded-2xl border border-[#eadce7] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
             Не удалось загрузить каталог
@@ -644,6 +834,13 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         <div className="mt-6 rounded-2xl border border-[#e8def5] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
             В разделе пока нет аудиопродуктов.
+          </p>
+        </div>
+      ) : null}
+      {showTopicEmpty ? (
+        <div className="mt-6 rounded-2xl border border-[#e8def5] bg-white px-5 py-6 text-center">
+          <p className="text-sm font-medium text-[#5f3f9d]">
+            По выбранным темам пока нет аудиопродуктов.
           </p>
         </div>
       ) : null}
