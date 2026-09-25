@@ -32,7 +32,12 @@ assert.match(catalogBlock, /flex-col/);
 assert.match(catalogBlock, /rounded-\[20px\]/);
 assert.match(catalogBlock, /aspect-square w-full/);
 assert.match(catalogBlock, /h-full w-full object-cover/);
-assert.match(catalogBlock, /line-clamp-2/);
+assert.match(catalogBlock, /line-clamp-2 min-h-10 text-\[14px\]/);
+assert.match(catalogBlock, /px-2\.5 pb-2\.5 pt-2/);
+assert.match(catalogBlock, /min-h-5/);
+assert.match(catalogBlock, /whitespace-nowrap text-xs/);
+assert.match(catalogBlock, /border-\[#eadff8\]/);
+assert.doesNotMatch(catalogBlock, /product\.subtitle/);
 assert.doesNotMatch(catalogBlock, /flex min-h-28/);
 assert.doesNotMatch(catalogBlock, /w-24/);
 assert.doesNotMatch(catalogBlock, /shrink-0/);
@@ -45,12 +50,8 @@ assert.ok(
   "catalog card shows format above title",
 );
 assert.ok(
-  catalogBlock.indexOf("product.title") < catalogBlock.indexOf("product.subtitle"),
-  "catalog card shows title above subtitle",
-);
-assert.ok(
-  catalogBlock.indexOf("product.subtitle") < catalogBlock.indexOf("product.authorName"),
-  "catalog card shows subtitle above author",
+  catalogBlock.indexOf("product.title") < catalogBlock.indexOf("product.authorName"),
+  "catalog card shows title above author",
 );
 assert.ok(
   catalogBlock.indexOf("product.authorName") < catalogBlock.indexOf("!product.isFree"),
