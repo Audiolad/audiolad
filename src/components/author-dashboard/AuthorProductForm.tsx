@@ -2688,10 +2688,10 @@ export default function AuthorProductForm({
     } finally {
       addAudioInFlightRef.current = false;
       setBusy(false);
-      setAlbumBatchProgress(null);
       if (stagedIds.length > 0) {
         startReadyMusicUploads(stagedIds);
       }
+      setAlbumBatchProgress(null);
     }
   }
 
