@@ -25,12 +25,19 @@ assert.match(sheet, /role="dialog"/);
 assert.match(sheet, /aria-modal="true"/);
 assert.match(sheet, /data-max-catalog-topics/);
 assert.match(sheet, />\s*Темы\s*</);
-assert.match(sheet, /activeTopicKeys\.length > 0/);
+assert.match(sheet, /countCatalogFilterGroups/);
 assert.match(sheet, /data-max-catalog-topics-count/);
-assert.match(sheet, /\{activeTopicKeys\.length\}/);
+assert.match(sheet, /\{activeFilterCount\}/);
 assert.match(sheet, /toggleCatalogDraftTopics\(current, topic\.key\)/);
-assert.match(sheet, /onApply\(draftTopics\)/);
-assert.match(sheet, /function resetTopics\(\) \{\s*onReset\(\);/s);
+assert.match(sheet, /onApply\(draftTopics, draftAccess, draftClass\)/);
+assert.match(sheet, /function resetFilters\(\) \{\s*onReset\(\);/s);
+assert.match(sheet, /CATALOG_ACCESS_FILTER_OPTIONS/);
+assert.match(sheet, /CATALOG_CLASS_FILTER_OPTIONS/);
+assert.match(sheet, /aria-label="Доступ"/);
+assert.match(sheet, /aria-label="Тип"/);
+assert.match(sheet, /label="Все"/);
+assert.match(sheet, /setDraftAccess\(activeAccess\)/);
+assert.match(sheet, /setDraftClass\(activeClass\)/);
 assert.match(sheet, /MAX_CATALOG_TOPICS_PATH/);
 assert.match(sheet, /JSON\.stringify\(\{ initData \}\)/);
 assert.match(sheet, /useSheetScrollLock\(open, "max-catalog-topics"\)/);
@@ -38,7 +45,7 @@ assert.match(sheet, /createPortal\(sheet, document\.body\)/);
 assert.match(sheet, /Сбросить/);
 assert.match(sheet, /Закрыть/);
 assert.match(sheet, /Применить/);
-assert.doesNotMatch(sheet, /Доступ|Тип|CatalogMobileFilters|buildCatalogHref/);
+assert.doesNotMatch(sheet, /CatalogMobileFilters|buildCatalogHref/);
 assert.doesNotMatch(
   sheet,
   /useRouter|useSearchParams|router\.push|window\.location|openLink|localStorage|sessionStorage|from "next\/link"|from "next\/navigation"|href="\/catalog"/,
@@ -56,28 +63,28 @@ assert.match(closeFn, /setOpen\(false\)/);
 assert.doesNotMatch(closeFn, /onApply|onReset/);
 assert.match(sheet, /if \(event\.target === event\.currentTarget\) \{\s*close\(\);/s);
 
-const applyFn = sheet.slice(sheet.indexOf("function applyDraft"), sheet.indexOf("function resetTopics"));
-assert.match(applyFn, /onApply\(draftTopics\)/);
+const applyFn = sheet.slice(sheet.indexOf("function applyDraft"), sheet.indexOf("function resetFilters"));
+assert.match(applyFn, /onApply\(draftTopics, draftAccess, draftClass\)/);
 assert.doesNotMatch(applyFn, /router|window\.location|openLink|href/);
 
 assert.match(search, /<MaxCatalogTopicsSheet/);
 assert.match(search, /activeTopicKeys=\{activeTopicKeys\}/);
-assert.match(search, /onApply=\{applyTopicKeys\}/);
-assert.match(search, /onReset=\{resetTopicKeys\}/);
+assert.match(search, /activeAccess=\{activeAccess\}/);
+assert.match(search, /activeClass=\{activeClass\}/);
+assert.match(search, /onApply=\{applyFilters\}/);
+assert.match(search, /onReset=\{resetFilters\}/);
 assert.match(search, /serializeCatalogTopicParam/);
-assert.match(
-  search,
-  /searchItems !== null && searchStatus !== "idle" && resultSection === activeSection && resultTopic === activeTopicParam/,
-);
-assert.match(
-  search,
-  /activeTopicParam\s*\?\s*usingSearchResults\s*\?\s*searchItems\s*:\s*topicScopeItems/,
-);
-assert.match(search, /topicListing\.topic === activeTopicParam/);
-assert.match(search, /JSON\.stringify\(\{ initData, topic: topicParam \}\)/);
-assert.match(search, /JSON\.stringify\(\{ initData, section, topic: topicParam \}\)/);
-assert.match(search, /JSON\.stringify\(\{ initData, query: normalized, topic: topicParam \}\)/);
-assert.match(search, /JSON\.stringify\(\{ initData, query: normalized, section, topic: topicParam \}\)/);
+assert.match(search, /resultSection === activeSection/);
+assert.match(search, /resultTopic === activeTopicParam/);
+assert.match(search, /resultAccess === activeAccess/);
+assert.match(search, /resultClass === activeClass/);
+assert.match(search, /hasActiveCatalogFilters/);
+assert.match(search, /filterListing\.topic === activeTopicParam/);
+assert.match(search, /filterListing\.access === activeAccess/);
+assert.match(search, /filterListing\.publicationClass === activeClass/);
+assert.match(search, /buildMaxCatalogRequestBody/);
+assert.match(search, /body\.access = input\.access/);
+assert.match(search, /body\.class = input\.publicationClass/);
 assert.match(
   search,
   /<ul className="mt-5 -mx-4 grid grid-cols-2 gap-\[6px\] px-\[6px\]">/,
@@ -90,20 +97,22 @@ assert.doesNotMatch(
 );
 
 const apply = search.slice(
-  search.indexOf("function applyTopicKeys"),
-  search.indexOf("function resetTopicKeys"),
+  search.indexOf("function applyFilters"),
+  search.indexOf("function resetFilters"),
 );
 assert.match(apply, /serializeCatalogTopicParam\(keys\)/);
 assert.match(apply, /activeTopicParamRef\.current = topicParam/);
-assert.match(apply, /beginSearch\(normalized, section, topicParam\)/);
-assert.match(apply, /loadTopicCatalog\(section, topicParam\)/);
+assert.match(apply, /activeAccessRef\.current = access/);
+assert.match(apply, /activeClassRef\.current = publicationClass/);
+assert.match(apply, /beginSearch\(normalized, section, topicParam, access, publicationClass\)/);
+assert.match(apply, /loadFilteredCatalog\(section, topicParam, access, publicationClass\)/);
 assert.doesNotMatch(apply, /setSearchInput\(|setActiveSection\(/);
 
 const reset = search.slice(
-  search.indexOf("function resetTopicKeys"),
+  search.indexOf("function resetFilters"),
   search.indexOf("useEffect("),
 );
-assert.match(reset, /applyTopicKeys\(\[\]\)/);
+assert.match(reset, /applyFilters\(\[\], "all", "all"\)/);
 assert.doesNotMatch(reset, /setSearchInput\(|setActiveSection\(/);
 
 const clear = search.slice(
@@ -111,29 +120,30 @@ const clear = search.slice(
   search.indexOf("function handleInputChange"),
 );
 assert.match(clear, /activeTopicParamRef\.current/);
-assert.match(clear, /loadTopicCatalog\(section, topicParam\)/);
-assert.doesNotMatch(clear, /setActiveTopicKeys\(|setActiveSection\(/);
-assert.ok(clear.indexOf("if (topicParam)") < clear.indexOf("restoreDefaultCatalog()"));
+assert.match(clear, /activeAccessRef\.current/);
+assert.match(clear, /activeClassRef\.current/);
+assert.match(clear, /loadFilteredCatalog\(section, topicParam, access, publicationClass\)/);
+assert.doesNotMatch(clear, /setActiveTopicKeys\(|setActiveAccess\(|setActiveClass\(|setActiveSection\(/);
+assert.ok(
+  clear.indexOf("hasActiveCatalogFilters") < clear.indexOf("restoreDefaultCatalog()"),
+);
 
 const select = search.slice(
   search.indexOf("function selectSection"),
   search.indexOf("function loadRootCatalog"),
 );
-const zeroTopicSearch = select.indexOf("beginSearch(normalized, section);");
-const afterZeroTopicSearch = select.slice(zeroTopicSearch);
-assert.ok(
-  afterZeroTopicSearch.indexOf("loadTopicCatalog(section, topicParam)") <
-    afterZeroTopicSearch.indexOf("sectionCacheRef.current.get(section)"),
-);
-assert.doesNotMatch(select, /setActiveTopicKeys\(/);
+assert.match(select, /hasActiveCatalogFilters\(topicParam, access, publicationClass\)/);
+assert.match(select, /loadFilteredCatalog\(section, topicParam, access, publicationClass\)/);
+assert.doesNotMatch(select, /setActiveTopicKeys\(|setActiveAccess\(|setActiveClass\(/);
 
-const loadTopic = search.slice(
-  search.indexOf("function loadTopicCatalog"),
+const loadFiltered = search.slice(
+  search.indexOf("function loadFilteredCatalog"),
   search.indexOf("function reloadUnfilteredScope"),
 );
-assert.doesNotMatch(loadTopic, /sectionCacheRef/);
-assert.match(loadTopic, /\+\+requestGenerationRef\.current/);
-assert.match(loadTopic, /abortRef\.current\?\.abort\(\)/);
+assert.doesNotMatch(loadFiltered, /sectionCacheRef/);
+assert.match(loadFiltered, /\+\+requestGenerationRef\.current/);
+assert.match(loadFiltered, /abortRef\.current\?\.abort\(\)/);
+assert.match(loadFiltered, /buildMaxCatalogRequestBody/);
 
 assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
 const back = home.slice(
