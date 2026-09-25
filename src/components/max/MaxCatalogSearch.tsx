@@ -3,6 +3,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
+import type {
+  CatalogAccessFilter,
+  CatalogClassFilter,
+} from "@/lib/catalog/listing-contract";
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { serializeCatalogTopicParam } from "@/lib/catalog/topic-filter";
 import { readMaxInitData } from "@/lib/max/bridge";
@@ -36,16 +40,30 @@ type SectionListingState =
   | { status: "ready"; section: PublicCatalogSection; items: MaxCatalogProduct[] }
   | { status: "error"; section: PublicCatalogSection };
 
-type TopicListingState =
+type FilterListingState =
   | { status: "idle" }
-  | { status: "loading"; section: PublicCatalogSection | null; topic: string }
+  | {
+      status: "loading";
+      section: PublicCatalogSection | null;
+      topic: string | null;
+      access: CatalogAccessFilter;
+      publicationClass: CatalogClassFilter;
+    }
   | {
       status: "ready";
       section: PublicCatalogSection | null;
-      topic: string;
+      topic: string | null;
+      access: CatalogAccessFilter;
+      publicationClass: CatalogClassFilter;
       items: MaxCatalogProduct[];
     }
-  | { status: "error"; section: PublicCatalogSection | null; topic: string };
+  | {
+      status: "error";
+      section: PublicCatalogSection | null;
+      topic: string | null;
+      access: CatalogAccessFilter;
+      publicationClass: CatalogClassFilter;
+    };
 
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
@@ -131,6 +149,42 @@ function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
   });
 }
 
+function hasActiveCatalogFilters(
+  topicParam: string | null,
+  access: CatalogAccessFilter,
+  publicationClass: CatalogClassFilter,
+): boolean {
+  return Boolean(topicParam) || access !== "all" || publicationClass !== "all";
+}
+
+function buildMaxCatalogRequestBody(input: {
+  initData: string;
+  query?: string;
+  section?: PublicCatalogSection | null;
+  topicParam?: string | null;
+  access?: CatalogAccessFilter;
+  publicationClass?: CatalogClassFilter;
+}): string {
+  const body: {
+    initData: string;
+    query?: string;
+    section?: PublicCatalogSection;
+    topic?: string;
+    access?: CatalogAccessFilter;
+    class?: CatalogClassFilter;
+  } = { initData: input.initData };
+
+  if (input.query) body.query = input.query;
+  if (input.section) body.section = input.section;
+  if (input.topicParam) body.topic = input.topicParam;
+  if (input.access && input.access !== "all") body.access = input.access;
+  if (input.publicationClass && input.publicationClass !== "all") {
+    body.class = input.publicationClass;
+  }
+
+  return JSON.stringify(body);
+}
+
 export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchProps) {
   const inputId = useId();
   const [defaultCatalog, setDefaultCatalog] = useState<DefaultCatalogState>(() =>
@@ -146,11 +200,17 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   const [resultQuery, setResultQuery] = useState("");
   const [resultSection, setResultSection] = useState<PublicCatalogSection | null>(null);
   const [resultTopic, setResultTopic] = useState<string | null>(null);
+  const [resultAccess, setResultAccess] = useState<CatalogAccessFilter>("all");
+  const [resultClass, setResultClass] = useState<CatalogClassFilter>("all");
   const [activeTopicKeys, setActiveTopicKeys] = useState<string[]>([]);
-  const [topicListing, setTopicListing] = useState<TopicListingState>({ status: "idle" });
+  const [activeAccess, setActiveAccess] = useState<CatalogAccessFilter>("all");
+  const [activeClass, setActiveClass] = useState<CatalogClassFilter>("all");
+  const [filterListing, setFilterListing] = useState<FilterListingState>({ status: "idle" });
   const searchInputRef = useRef("");
   const activeSectionRef = useRef<PublicCatalogSection | null>(null);
   const activeTopicParamRef = useRef<string | null>(null);
+  const activeAccessRef = useRef<CatalogAccessFilter>("all");
+  const activeClassRef = useRef<CatalogClassFilter>("all");
   const defaultCatalogRef = useRef(defaultCatalog);
   const sectionCacheRef = useRef(new Map<PublicCatalogSection, MaxCatalogProduct[]>());
   const debounceRef = useRef<number | null>(null);
@@ -172,6 +232,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setResultQuery("");
     setResultSection(null);
     setResultTopic(null);
+    setResultAccess("all");
+    setResultClass("all");
     setSearchStatus("idle");
     setSearchItems(null);
   }
@@ -180,6 +242,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     normalized: string,
     section: PublicCatalogSection | null = activeSectionRef.current,
     topicParam: string | null = activeTopicParamRef.current,
+    access: CatalogAccessFilter = activeAccessRef.current,
+    publicationClass: CatalogClassFilter = activeClassRef.current,
   ) {
     const requestId = ++requestGenerationRef.current;
     abortRef.current?.abort();
@@ -202,13 +266,14 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: topicParam
-            ? section
-              ? JSON.stringify({ initData, query: normalized, section, topic: topicParam })
-              : JSON.stringify({ initData, query: normalized, topic: topicParam })
-            : section
-              ? JSON.stringify({ initData, query: normalized, section })
-              : JSON.stringify({ initData, query: normalized }),
+          body: buildMaxCatalogRequestBody({
+            initData,
+            query: normalized,
+            section,
+            topicParam,
+            access,
+            publicationClass,
+          }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -225,6 +290,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         setResultQuery(normalized);
         setResultSection(section);
         setResultTopic(topicParam);
+        setResultAccess(access);
+        setResultClass(publicationClass);
         setSearchStatus("ready");
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -245,8 +312,10 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     if (!normalized) {
       const section = activeSectionRef.current;
       const topicParam = activeTopicParamRef.current;
-      if (topicParam) {
-        loadTopicCatalog(section, topicParam);
+      const access = activeAccessRef.current;
+      const publicationClass = activeClassRef.current;
+      if (hasActiveCatalogFilters(topicParam, access, publicationClass)) {
+        loadFilteredCatalog(section, topicParam, access, publicationClass);
         return;
       }
       if (section && !sectionCacheRef.current.has(section)) {
@@ -287,8 +356,10 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     if (!normalized) {
       const section = activeSectionRef.current;
       const topicParam = activeTopicParamRef.current;
-      if (topicParam) {
-        loadTopicCatalog(section, topicParam);
+      const access = activeAccessRef.current;
+      const publicationClass = activeClassRef.current;
+      if (hasActiveCatalogFilters(topicParam, access, publicationClass)) {
+        loadFilteredCatalog(section, topicParam, access, publicationClass);
         return;
       }
       if (section && !sectionCacheRef.current.has(section)) {
@@ -317,8 +388,10 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setSearchInput("");
     const section = activeSectionRef.current;
     const topicParam = activeTopicParamRef.current;
-    if (topicParam) {
-      loadTopicCatalog(section, topicParam);
+    const access = activeAccessRef.current;
+    const publicationClass = activeClassRef.current;
+    if (hasActiveCatalogFilters(topicParam, access, publicationClass)) {
+      loadFilteredCatalog(section, topicParam, access, publicationClass);
       return;
     }
     if (section && !sectionCacheRef.current.has(section)) {
@@ -350,6 +423,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
     const topicParam = activeTopicParamRef.current;
+    const access = activeAccessRef.current;
+    const publicationClass = activeClassRef.current;
     if (normalized) {
       if (section) {
         const cached = sectionCacheRef.current.get(section);
@@ -359,16 +434,12 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
             : { status: "idle" },
         );
       }
-      if (topicParam) {
-        beginSearch(normalized, section, topicParam);
-        return;
-      }
-      beginSearch(normalized, section);
+      beginSearch(normalized, section, topicParam, access, publicationClass);
       return;
     }
 
-    if (topicParam) {
-      loadTopicCatalog(section, topicParam);
+    if (hasActiveCatalogFilters(topicParam, access, publicationClass)) {
+      loadFilteredCatalog(section, topicParam, access, publicationClass);
       return;
     }
 
@@ -388,6 +459,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
       setResultQuery("");
       setResultSection(null);
       setResultTopic(null);
+      setResultAccess("all");
+      setResultClass("all");
       setSearchStatus("idle");
       setSearchItems(null);
       setSectionListing({ status: "ready", section, items: cached });
@@ -409,6 +482,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setResultQuery("");
     setResultSection(null);
     setResultTopic(null);
+    setResultAccess("all");
+    setResultClass("all");
     setSearchStatus("idle");
     setSearchItems(null);
     if (defaultCatalogRef.current.status !== "ready") {
@@ -461,6 +536,8 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setResultQuery("");
     setResultSection(null);
     setResultTopic(null);
+    setResultAccess("all");
+    setResultClass("all");
     setSearchStatus("idle");
     setSearchItems(null);
     setSectionListing({ status: "loading", section });
@@ -504,9 +581,11 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     })();
   }
 
-  function loadTopicCatalog(
+  function loadFilteredCatalog(
     section: PublicCatalogSection | null,
-    topicParam: string,
+    topicParam: string | null,
+    access: CatalogAccessFilter,
+    publicationClass: CatalogClassFilter,
   ) {
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
@@ -519,9 +598,17 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     setResultQuery("");
     setResultSection(null);
     setResultTopic(null);
+    setResultAccess("all");
+    setResultClass("all");
     setSearchStatus("idle");
     setSearchItems(null);
-    setTopicListing({ status: "loading", section, topic: topicParam });
+    setFilterListing({
+      status: "loading",
+      section,
+      topic: topicParam,
+      access,
+      publicationClass,
+    });
 
     void (async () => {
       try {
@@ -530,7 +617,13 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
             return;
           }
-          setTopicListing({ status: "error", section, topic: topicParam });
+          setFilterListing({
+            status: "error",
+            section,
+            topic: topicParam,
+            access,
+            publicationClass,
+          });
           return;
         }
 
@@ -538,9 +631,13 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: section
-            ? JSON.stringify({ initData, section, topic: topicParam })
-            : JSON.stringify({ initData, topic: topicParam }),
+          body: buildMaxCatalogRequestBody({
+            initData,
+            section,
+            topicParam,
+            access,
+            publicationClass,
+          }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -550,15 +647,34 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         }
         const items = response.ok ? readCatalogPayload(payload) : null;
         if (!items) {
-          setTopicListing({ status: "error", section, topic: topicParam });
+          setFilterListing({
+            status: "error",
+            section,
+            topic: topicParam,
+            access,
+            publicationClass,
+          });
           return;
         }
-        setTopicListing({ status: "ready", section, topic: topicParam, items });
+        setFilterListing({
+          status: "ready",
+          section,
+          topic: topicParam,
+          access,
+          publicationClass,
+          items,
+        });
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        setTopicListing({ status: "error", section, topic: topicParam });
+        setFilterListing({
+          status: "error",
+          section,
+          topic: topicParam,
+          access,
+          publicationClass,
+        });
       }
     })();
   }
@@ -581,29 +697,37 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     }
   }
 
-  function applyTopicKeys(keys: string[]) {
+  function applyFilters(
+    keys: string[],
+    access: CatalogAccessFilter,
+    publicationClass: CatalogClassFilter,
+  ) {
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
     const topicParam = serializeCatalogTopicParam(keys);
     activeTopicParamRef.current = topicParam;
+    activeAccessRef.current = access;
+    activeClassRef.current = publicationClass;
     setActiveTopicKeys(keys);
+    setActiveAccess(access);
+    setActiveClass(publicationClass);
     const section = activeSectionRef.current;
     const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
     if (normalized) {
-      beginSearch(normalized, section, topicParam);
+      beginSearch(normalized, section, topicParam, access, publicationClass);
       return;
     }
-    if (!topicParam) {
+    if (!hasActiveCatalogFilters(topicParam, access, publicationClass)) {
       reloadUnfilteredScope(section);
       return;
     }
-    loadTopicCatalog(section, topicParam);
+    loadFilteredCatalog(section, topicParam, access, publicationClass);
   }
 
-  function resetTopicKeys() {
-    applyTopicKeys([]);
+  function resetFilters() {
+    applyFilters([], "all", "all");
   }
 
   useEffect(() => {
@@ -613,6 +737,14 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   useEffect(() => {
     activeTopicParamRef.current = serializeCatalogTopicParam(activeTopicKeys);
   }, [activeTopicKeys]);
+
+  useEffect(() => {
+    activeAccessRef.current = activeAccess;
+  }, [activeAccess]);
+
+  useEffect(() => {
+    activeClassRef.current = activeClass;
+  }, [activeClass]);
 
   useEffect(() => {
     const initData = readMaxInitData();
@@ -662,23 +794,40 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
   const normalizedInput = normalizeCatalogSearchQuery(searchInput);
   const activeTopicParam = serializeCatalogTopicParam(activeTopicKeys);
+  const hasActiveFilters = hasActiveCatalogFilters(
+    activeTopicParam,
+    activeAccess,
+    activeClass,
+  );
   const usingSearchResults =
-    searchItems !== null && searchStatus !== "idle" && resultSection === activeSection && resultTopic === activeTopicParam;
-  const rootOrSearchItems = usingSearchResults ? searchItems : defaultCatalog.status === "ready" ? defaultCatalog.items : [];
+    searchItems !== null &&
+    searchStatus !== "idle" &&
+    resultSection === activeSection &&
+    resultTopic === activeTopicParam &&
+    resultAccess === activeAccess &&
+    resultClass === activeClass;
+  const rootOrSearchItems =
+    usingSearchResults
+      ? searchItems
+      : defaultCatalog.status === "ready"
+        ? defaultCatalog.items
+        : [];
   const sectionScopeItems =
     sectionListing.status === "ready" && sectionListing.section === activeSection
       ? sectionListing.items
       : [];
-  const topicScopeItems =
-    topicListing.status === "ready" &&
-    topicListing.section === activeSection &&
-    topicListing.topic === activeTopicParam
-      ? topicListing.items
+  const filteredScopeItems =
+    filterListing.status === "ready" &&
+    filterListing.section === activeSection &&
+    filterListing.topic === activeTopicParam &&
+    filterListing.access === activeAccess &&
+    filterListing.publicationClass === activeClass
+      ? filterListing.items
       : [];
-  const gridItems = activeTopicParam
+  const gridItems = hasActiveFilters
     ? usingSearchResults
       ? searchItems
-      : topicScopeItems
+      : filteredScopeItems
     : activeSection
       ? usingSearchResults
         ? searchItems
@@ -690,59 +839,65 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
     searchItems.length === 0 &&
     resultQuery.length > 0;
   const showRootLoading =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     !activeSection &&
     searchStatus === "idle" &&
     defaultCatalog.status === "loading";
   const showSectionLoading =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "loading" &&
     sectionListing.section === activeSection;
-  const showTopicLoading =
-    Boolean(activeTopicParam) &&
+  const showFilterLoading =
+    hasActiveFilters &&
     searchStatus === "idle" &&
-    topicListing.status === "loading" &&
-    topicListing.section === activeSection &&
-    topicListing.topic === activeTopicParam;
+    filterListing.status === "loading" &&
+    filterListing.section === activeSection &&
+    filterListing.topic === activeTopicParam &&
+    filterListing.access === activeAccess &&
+    filterListing.publicationClass === activeClass;
   const showRootError =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     !activeSection &&
     searchStatus === "idle" &&
     defaultCatalog.status === "error";
   const showSectionError =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "error" &&
     sectionListing.section === activeSection;
-  const showTopicError =
-    Boolean(activeTopicParam) &&
+  const showFilterError =
+    hasActiveFilters &&
     searchStatus === "idle" &&
-    topicListing.status === "error" &&
-    topicListing.section === activeSection &&
-    topicListing.topic === activeTopicParam;
+    filterListing.status === "error" &&
+    filterListing.section === activeSection &&
+    filterListing.topic === activeTopicParam &&
+    filterListing.access === activeAccess &&
+    filterListing.publicationClass === activeClass;
   const showRootEmpty =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     !activeSection &&
     searchStatus === "idle" &&
     defaultCatalog.status === "ready" &&
     defaultCatalog.items.length === 0;
   const showSectionEmpty =
-    !activeTopicParam &&
+    !hasActiveFilters &&
     Boolean(activeSection) &&
     searchStatus === "idle" &&
     sectionListing.status === "ready" &&
     sectionListing.section === activeSection &&
     sectionListing.items.length === 0;
-  const showTopicEmpty =
-    Boolean(activeTopicParam) &&
+  const showFilterEmpty =
+    hasActiveFilters &&
     searchStatus === "idle" &&
-    topicListing.status === "ready" &&
-    topicListing.section === activeSection &&
-    topicListing.topic === activeTopicParam &&
-    topicListing.items.length === 0;
+    filterListing.status === "ready" &&
+    filterListing.section === activeSection &&
+    filterListing.topic === activeTopicParam &&
+    filterListing.access === activeAccess &&
+    filterListing.publicationClass === activeClass &&
+    filterListing.items.length === 0;
 
   return (
     <>
@@ -791,8 +946,10 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         </form>
         <MaxCatalogTopicsSheet
           activeTopicKeys={activeTopicKeys}
-          onApply={applyTopicKeys}
-          onReset={resetTopicKeys}
+          activeAccess={activeAccess}
+          activeClass={activeClass}
+          onApply={applyFilters}
+          onReset={resetFilters}
         />
       </div>
 
@@ -808,12 +965,12 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
         <p className="mt-3 text-sm text-[#6c5d94]">Не удалось выполнить поиск.</p>
       ) : null}
 
-      {showRootLoading || showSectionLoading || showTopicLoading ? (
+      {showRootLoading || showSectionLoading || showFilterLoading ? (
         <p className="py-10 text-center text-sm text-[#6c5d94]">
           Загружаем каталог…
         </p>
       ) : null}
-      {showRootError || showSectionError || showTopicError ? (
+      {showRootError || showSectionError || showFilterError ? (
         <div className="mt-6 rounded-2xl border border-[#eadce7] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
             Не удалось загрузить каталог
@@ -837,10 +994,10 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
           </p>
         </div>
       ) : null}
-      {showTopicEmpty ? (
+      {showFilterEmpty ? (
         <div className="mt-6 rounded-2xl border border-[#e8def5] bg-white px-5 py-6 text-center">
           <p className="text-sm font-medium text-[#5f3f9d]">
-            По выбранным темам пока нет аудиопродуктов.
+            По выбранным фильтрам пока нет аудиопродуктов.
           </p>
         </div>
       ) : null}
