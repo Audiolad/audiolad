@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  parsePublicCatalogSection,
+  type PublicCatalogSection,
+} from "@/lib/catalog/catalog-sections";
 import { listMaxPublishedCatalog } from "@/lib/max/catalog";
 import { isMaxHostname } from "@/lib/max/host";
 import {
@@ -61,6 +65,25 @@ function errorResponse(reason: CatalogErrorReason, status: number) {
   return Response.json({ ok: false, reason }, { status });
 }
 
+function parseMaxCatalogSection(
+  value: unknown,
+): { ok: true; section: PublicCatalogSection | null } | { ok: false } {
+  if (value == null) {
+    return { ok: true, section: null };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  const section = parsePublicCatalogSection(value);
+  if (!section) {
+    return { ok: false };
+  }
+
+  return { ok: true, section };
+}
+
 function statusForReason(reason: CatalogErrorReason): number {
   if (reason === "payload_too_large") return 413;
   if (reason === "storage_unavailable" || reason === "service_unavailable") {
@@ -116,7 +139,11 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
-  const body = parsed as { initData?: unknown; query?: unknown };
+  const body = parsed as {
+    initData?: unknown;
+    query?: unknown;
+    section?: unknown;
+  };
   const initData = body.initData;
   if (typeof initData !== "string") {
     return errorResponse("invalid_request", 400);
@@ -135,6 +162,11 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
+  const section = parseMaxCatalogSection(body.section);
+  if (!section.ok) {
+    return errorResponse("invalid_request", 400);
+  }
+
   const nativeUser = await resolveMaxNativeUser(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     verified.data.user.id,
@@ -146,9 +178,15 @@ export async function POST(request: Request) {
     return errorResponse("unlinked", 403);
   }
 
-  const catalog = await listMaxPublishedCatalog(
-    typeof body.query === "string" ? { query: body.query } : {},
-  );
+  const catalogInput: { query?: string; section?: PublicCatalogSection } = {};
+  if (typeof body.query === "string") {
+    catalogInput.query = body.query;
+  }
+  if (section.section) {
+    catalogInput.section = section.section;
+  }
+
+  const catalog = await listMaxPublishedCatalog(catalogInput);
   if (!catalog.ok) {
     return errorResponse("storage_unavailable", 503);
   }

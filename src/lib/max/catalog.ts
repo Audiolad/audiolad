@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import {
   normalizeCatalogSearchQuery,
   searchPublishedCatalogProducts,
@@ -31,6 +32,7 @@ export type MaxCatalogResult =
 
 export type ListMaxPublishedCatalogInput = {
   query?: string | null;
+  section?: PublicCatalogSection | null;
   getCatalogProducts?: typeof getPublishedCatalogProducts;
   searchCatalogProducts?: typeof searchPublishedCatalogProducts;
   getServiceClient?: typeof createServiceRoleClient;
@@ -77,12 +79,14 @@ async function listMaxPublishedCatalogImpl(
   try {
     const service = (input.getServiceClient ?? createServiceRoleClient)();
     const normalizedQuery = normalizeCatalogSearchQuery(input.query);
+    const catalogSection = input.section ?? null;
     const products = normalizedQuery
       ? await (input.searchCatalogProducts ?? searchPublishedCatalogProducts)(
           service,
           {
             query: normalizedQuery,
             viewer: GUEST_ORDINARY_CATALOG_VIEWER,
+            ...(catalogSection ? { catalogSection } : {}),
           },
         )
       : await (input.getCatalogProducts ?? getPublishedCatalogProducts)(
@@ -90,6 +94,7 @@ async function listMaxPublishedCatalogImpl(
           {
             viewer: GUEST_ORDINARY_CATALOG_VIEWER,
             throwOnStorageError: true,
+            ...(catalogSection ? { catalogSection } : {}),
           },
         );
 

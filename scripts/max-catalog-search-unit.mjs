@@ -94,6 +94,24 @@ assert.match(search, /Очистить поиск/);
 assert.match(search, /Не удалось выполнить поиск\./);
 assert.match(search, /defaultCatalog/);
 assert.match(search, /usingSearchResults \? searchItems : defaultCatalog\.status === "ready"/);
+assert.match(
+  search,
+  /searchItems !== null && searchStatus !== "idle" && resultSection === activeSection/,
+);
+assert.doesNotMatch(
+  search,
+  /searchStatus === "searching" \|\| searchStatus === "error"\s*\?\s*\[\]/,
+);
+const gridChoice = search.slice(
+  search.indexOf("const gridItems = activeSection"),
+  search.indexOf("const showSearchHeading"),
+);
+assert.match(gridChoice, /usingSearchResults\s*\?\s*searchItems\s*:\s*sectionScopeItems/);
+assert.match(gridChoice, /: rootOrSearchItems/);
+assert.match(
+  search,
+  /sectionListing\.status === "ready" && sectionListing\.section === activeSection/,
+);
 
 assert.match(
   search,
