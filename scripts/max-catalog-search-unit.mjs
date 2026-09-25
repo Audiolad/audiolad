@@ -35,7 +35,9 @@ assert.match(search, /h-\[52px\]/);
 assert.match(search, /rounded-\[18px\]/);
 assert.match(search, /border border-\[#ded1f1\]/);
 assert.match(search, /bg-white/);
-assert.match(search, /className="relative mt-4 flex h-\[52px\]/);
+assert.match(search, /data-max-catalog-search-row/);
+assert.match(search, /className="mt-4 flex items-start gap-2"/);
+assert.match(search, /className="relative flex h-\[52px\]/);
 
 assert.match(search, /normalizedInput\.length > 0/);
 assert.match(search, /aria-label="Очистить поиск"/);
@@ -86,8 +88,22 @@ assert.match(search, /JSON\.stringify\(\{ initData \}\)/);
 assert.match(search, /JSON\.stringify\(\{ initData, query: normalized \}\)/);
 assert.doesNotMatch(search, /user_id|max_user_id|maxAuthenticated/);
 
-assert.match(search, /Результаты поиска/);
-assert.match(search, /По запросу „\{resultQuery\}“/);
+assert.doesNotMatch(search, /AudioladHorizontalLogo/);
+assert.doesNotMatch(search, /<h1/);
+assert.doesNotMatch(search, /Результаты поиска/);
+assert.doesNotMatch(search, /Аудиопрактики, музыка и курсы АудиоЛада/);
+const topicsAt = search.indexOf("data-max-catalog-topics");
+const sectionsAt = search.indexOf("<MaxCatalogSections");
+const gridAt = search.indexOf("<CatalogGrid");
+assert.ok(search.indexOf("data-max-catalog-search-row") < topicsAt);
+assert.ok(topicsAt < sectionsAt && sectionsAt < gridAt);
+const topics = search.slice(search.lastIndexOf("<button", topicsAt), sectionsAt);
+assert.match(topics, /type="button"/);
+assert.match(topics, />\s*Темы\s*</);
+assert.doesNotMatch(
+  topics,
+  /<Link|<a[\s>]|href=|onClick|router\.push|window\.location|openLink/,
+);
 assert.match(search, /Ищем…/);
 assert.match(search, /По запросу „\{resultQuery\}“ ничего не найдено\./);
 assert.match(search, /Очистить поиск/);
@@ -104,7 +120,7 @@ assert.doesNotMatch(
 );
 const gridChoice = search.slice(
   search.indexOf("const gridItems = activeSection"),
-  search.indexOf("const showSearchHeading"),
+  search.indexOf("const showSearchEmpty"),
 );
 assert.match(gridChoice, /usingSearchResults\s*\?\s*searchItems\s*:\s*sectionScopeItems/);
 assert.match(gridChoice, /: rootOrSearchItems/);

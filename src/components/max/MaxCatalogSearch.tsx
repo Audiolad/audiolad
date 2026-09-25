@@ -515,11 +515,6 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
       ? searchItems
       : sectionScopeItems
     : rootOrSearchItems;
-  const showSearchHeading =
-    resultQuery.length > 0 &&
-    searchItems !== null &&
-    searchStatus !== "idle" &&
-    resultSection === activeSection;
   const showSearchEmpty =
     usingSearchResults &&
     searchItems !== null &&
@@ -553,63 +548,63 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
 
   return (
     <>
-      <form
-        role="search"
-        onSubmit={submitSearch}
-        className="relative mt-4 flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
+      <div
+        data-max-catalog-search-row
+        className="mt-4 flex items-start gap-2"
       >
-        <label htmlFor={inputId} className="sr-only">
-          Поиск аудиопродуктов в каталоге
-        </label>
-        <button
-          type="submit"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
+        <form
+          role="search"
+          onSubmit={submitSearch}
+          className="relative flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
         >
-          <SearchIcon />
-        </button>
-        <input
-          id={inputId}
-          type="search"
-          value={searchInput}
-          onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Поиск по каталогу"
-          autoComplete="off"
-          enterKeyHint="search"
-          maxLength={CATALOG_SEARCH_MAX_LENGTH}
-          aria-label="Поиск аудиопродуктов в каталоге"
-          className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
-        />
-        {normalizedInput.length > 0 ? (
+          <label htmlFor={inputId} className="sr-only">
+            Поиск аудиопродуктов в каталоге
+          </label>
           <button
-            type="button"
-            onClick={clearSearch}
-            aria-label="Очистить поиск"
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            type="submit"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
           >
-            <ClearIcon />
+            <SearchIcon />
           </button>
-        ) : null}
-      </form>
+          <input
+            id={inputId}
+            type="search"
+            value={searchInput}
+            onChange={(event) => handleInputChange(event.target.value)}
+            placeholder="Поиск по каталогу"
+            autoComplete="off"
+            enterKeyHint="search"
+            maxLength={CATALOG_SEARCH_MAX_LENGTH}
+            aria-label="Поиск аудиопродуктов в каталоге"
+            className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
+          />
+          {normalizedInput.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Очистить поиск"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              <ClearIcon />
+            </button>
+          ) : null}
+        </form>
+        <button
+          type="button"
+          data-max-catalog-topics
+          aria-label="Темы"
+          className="inline-flex h-[52px] shrink-0 items-center rounded-[18px] border border-[#ded1f1] bg-white px-3 text-sm font-medium text-[#7042c5] shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          Темы
+        </button>
+      </div>
 
       <MaxCatalogSections
         activeSection={activeSection}
         onSelectSection={selectSection}
       />
-
-      <h1 className="mt-5 text-[26px] font-semibold leading-tight">
-        {showSearchHeading ? "Результаты поиска" : "Каталог"}
-      </h1>
-      {showSearchHeading ? (
-        <p className="mt-1 text-sm leading-5 text-[#6c5d94]">
-          По запросу „{resultQuery}“
-        </p>
-      ) : (
-        <p className="mt-1 text-sm leading-5 text-[#6c5d94]">
-          Аудиопрактики, музыка и курсы АудиоЛада
-        </p>
-      )}
 
       {searchStatus === "searching" ? (
         <p className="mt-3 text-sm text-[#6c5d94]">Ищем…</p>

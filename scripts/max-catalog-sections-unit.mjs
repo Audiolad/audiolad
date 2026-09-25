@@ -85,10 +85,31 @@ assert.match(search, /activeSection=\{activeSection\}/);
 assert.match(search, /onSelectSection=\{selectSection\}/);
 assert.doesNotMatch(search, /CatalogSectionCards|buildCatalogHref/);
 
+const rowAt = search.indexOf("data-max-catalog-search-row");
 const formEnd = search.indexOf("</form>");
+const topicsAt = search.indexOf("data-max-catalog-topics");
 const sectionsAt = search.indexOf("<MaxCatalogSections");
-const headingAt = search.indexOf('<h1 className="mt-5');
-assert.ok(formEnd !== -1 && formEnd < sectionsAt && sectionsAt < headingAt);
+const gridAt = search.indexOf("<CatalogGrid");
+assert.ok(
+  rowAt !== -1 &&
+    rowAt < formEnd &&
+    formEnd < topicsAt &&
+    topicsAt < sectionsAt &&
+    sectionsAt < gridAt,
+);
+const topics = search.slice(search.lastIndexOf("<button", topicsAt), sectionsAt);
+assert.match(topics, /type="button"/);
+assert.match(topics, /aria-label="Темы"/);
+assert.match(topics, />\s*Темы\s*</);
+assert.doesNotMatch(
+  topics,
+  /<Link|<a[\s>]|href=|onClick|router\.push|window\.location|openLink|useRouter|useSearchParams/,
+);
+const between = search.slice(sectionsAt, gridAt);
+assert.doesNotMatch(between, /<h1|Аудиопрактики, музыка и курсы АудиоЛада|AudioladHorizontalLogo|Результаты поиска/);
+assert.doesNotMatch(search, /AudioladHorizontalLogo/);
+assert.doesNotMatch(search, /<h1/);
+assert.doesNotMatch(search, /Аудиопрактики, музыка и курсы АудиоЛада/);
 
 assert.match(
   search,
@@ -174,7 +195,7 @@ assert.equal(begin.slice(searchingAt, applyItemsAt).includes("setSearchItems"), 
 
 const gridChoice = search.slice(
   search.indexOf("const usingSearchResults ="),
-  search.indexOf("const showSearchHeading"),
+  search.indexOf("const showSearchEmpty"),
 );
 assert.match(
   gridChoice,
@@ -205,6 +226,17 @@ assert.match(search, /По запросу „\{resultQuery\}“ ничего н�
 
 assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
 assert.match(home, /<MaxCatalogSearch onSelectProduct=\{openCatalogProduct\} \/>/);
+assert.match(home, /activeTab === "catalog" \? null : \(/);
+const catalogPane = home.slice(
+  home.indexOf('hidden={activeTab !== "catalog"}'),
+  home.indexOf("<MaxTabPlaceholder"),
+);
+assert.doesNotMatch(catalogPane, /AudioladHorizontalLogo/);
+const catalogHeader = home.slice(
+  home.indexOf('activeTab === "catalog" ? null'),
+  home.indexOf('hidden={activeTab !== "catalog"}'),
+);
+assert.match(catalogHeader, /<AudioladHorizontalLogo/);
 assert.doesNotMatch(home, /activeTab === "catalog" \?[\s\S]{0,120}<MaxCatalogSearch/);
 const back = home.slice(
   home.indexOf("← Назад в каталог") - 220,
