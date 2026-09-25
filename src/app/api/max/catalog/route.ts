@@ -6,6 +6,8 @@ import {
 } from "@/lib/catalog/catalog-sections";
 import {
   listMaxPublishedCatalog,
+  parseMaxCatalogAccessParam,
+  parseMaxCatalogClassParam,
   parseMaxCatalogTopicParam,
 } from "@/lib/max/catalog";
 import { isMaxHostname } from "@/lib/max/host";
@@ -147,6 +149,8 @@ export async function POST(request: Request) {
     query?: unknown;
     section?: unknown;
     topic?: unknown;
+    access?: unknown;
+    class?: unknown;
   };
   const initData = body.initData;
   if (typeof initData !== "string") {
@@ -176,6 +180,16 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
+  const access = parseMaxCatalogAccessParam(body.access);
+  if (!access.ok) {
+    return errorResponse("invalid_request", 400);
+  }
+
+  const publicationClass = parseMaxCatalogClassParam(body.class);
+  if (!publicationClass.ok) {
+    return errorResponse("invalid_request", 400);
+  }
+
   const nativeUser = await resolveMaxNativeUser(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     verified.data.user.id,
@@ -191,6 +205,8 @@ export async function POST(request: Request) {
     query?: string;
     section?: PublicCatalogSection;
     topicKey?: string;
+    access?: typeof access.access;
+    class?: typeof publicationClass.class;
   } = {};
   if (typeof body.query === "string") {
     catalogInput.query = body.query;
@@ -200,6 +216,12 @@ export async function POST(request: Request) {
   }
   if (topic.topicKey) {
     catalogInput.topicKey = topic.topicKey;
+  }
+  if (access.access !== "all") {
+    catalogInput.access = access.access;
+  }
+  if (publicationClass.class !== "all") {
+    catalogInput.class = publicationClass.class;
   }
 
   const catalog = await listMaxPublishedCatalog(catalogInput);
