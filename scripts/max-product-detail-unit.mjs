@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 const source = readFileSync(join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"), "utf8");
-assert.match(source, /key=\{`\$\{product\.authorSlug\}\/\$\{product\.slug\}`\}/);
-assert.match(source, /<ul[\s\S]*<li[\s\S]*<button/);
+const catalogSource = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
+assert.match(catalogSource, /key=\{`\$\{product\.authorSlug\}\/\$\{product\.slug\}`\}/);
+assert.match(catalogSource, /<ul[\s\S]*<li[\s\S]*<button/);
 assert.match(source, /status: "loading"/);
 assert.match(source, /status: "not_found"/);
 assert.match(source, /status: "error"/);
@@ -20,11 +21,11 @@ assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 
-const catalogStart = source.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
+const catalogStart = catalogSource.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
 assert.notEqual(catalogStart, -1, "catalog list exists");
 const readyStart = source.indexOf('{detail.status === "ready" ?');
 assert.notEqual(readyStart, -1, "ready detail block exists");
-const catalogBlock = source.slice(catalogStart, readyStart);
+const catalogBlock = catalogSource.slice(catalogStart);
 assert.match(catalogBlock, /grid-cols-2/);
 assert.match(catalogBlock, /gap-\[6px\]/);
 assert.match(catalogBlock, /-mx-4/);
@@ -46,7 +47,8 @@ assert.doesNotMatch(catalogBlock, /shrink-0/);
 assert.doesNotMatch(catalogBlock, /h-24|w-20/);
 assert.doesNotMatch(catalogBlock, /Подарок|Бесплатно/);
 assert.doesNotMatch(catalogBlock, /CatalogProductHeart|CatalogProductPlay|favorite/i);
-assert.match(catalogBlock, /setSelected\(product\)/);
+assert.match(catalogBlock, /onSelectProduct\(product\)/);
+assert.match(source, /setSelected\(product\)/);
 assert.ok(
   catalogBlock.indexOf("product.formatLabel") < catalogBlock.indexOf("product.title"),
   "catalog card shows format above title",

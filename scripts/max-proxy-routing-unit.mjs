@@ -239,6 +239,7 @@ const maxClientSources = [
   "src/components/max/MaxSignupForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/components/max/MaxAuthenticatedHome.tsx",
+  "src/components/max/MaxCatalogSearch.tsx",
   "src/components/max/MaxBottomNav.tsx",
   "src/components/max/MaxTabPlaceholder.tsx",
   "src/lib/max/primary-tabs.ts",

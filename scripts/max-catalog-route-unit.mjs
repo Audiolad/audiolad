@@ -72,8 +72,8 @@ setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
   nativeCalls.push({ provider, providerUserId });
   return { ok: true, userId: USER_A };
 });
-setListMaxPublishedCatalogForTests(async () => {
-  catalogCalls.push("catalog");
+setListMaxPublishedCatalogForTests(async (input) => {
+  catalogCalls.push(input ?? {});
   return {
     ok: true,
     items: [
@@ -92,16 +92,18 @@ setListMaxPublishedCatalogForTests(async () => {
 });
 
 try {
-  const success = await readJson(
-    await POST(
-      maxRequest({
-        initData: currentInitData(),
-        user_id: "browser-selected-user",
-        max_user_id: "browser-selected-max",
-        maxAuthenticated: true,
-      }),
-    ),
+  const successResponse = await POST(
+    maxRequest({
+      initData: currentInitData(),
+      user_id: "browser-selected-user",
+      max_user_id: "browser-selected-max",
+      maxAuthenticated: true,
+    }),
   );
+  const success = {
+    status: successResponse.status,
+    body: await successResponse.json(),
+  };
   assert.equal(success.status, 200);
   assert.equal(success.body.ok, true);
   assert.deepEqual(success.body.items, [
@@ -127,6 +129,8 @@ try {
     providerUserId: "101",
   });
   assert.equal(catalogCalls.length, 1);
+  assert.deepEqual(catalogCalls[0], {});
+  assert.equal(successResponse.headers.get("cache-control"), "no-store");
 
   const callsAfterSuccess = {
     native: nativeCalls.length,
@@ -200,6 +204,120 @@ try {
     reason: "storage_unavailable",
   });
 
+  const searchItems = [
+    {
+      authorSlug: "author",
+      slug: "found-product",
+      title: "Найденный продукт",
+      subtitle: null,
+      coverUrl: "https://cdn.example.test/found.webp",
+      authorName: "Автор",
+      formatLabel: "Аудиопрактика",
+      priceLabel: "490 ₽",
+      isFree: false,
+    },
+  ];
+  setListMaxPublishedCatalogForTests(async (input) => {
+    catalogCalls.push(input ?? {});
+    return { ok: true, items: searchItems };
+  });
+  const beforeSearch = catalogCalls.length;
+  const searchResponse = await POST(
+    maxRequest({
+      initData: currentInitData(),
+      query: "  сон  ",
+      user_id: USER_A,
+      max_user_id: "101",
+      maxAuthenticated: true,
+    }),
+  );
+  const search = {
+    status: searchResponse.status,
+    body: await searchResponse.json(),
+  };
+  assert.equal(search.status, 200);
+  assert.equal(search.body.ok, true);
+  assert.deepEqual(search.body.items, searchItems);
+  assert.equal(search.body.user_id, undefined);
+  assert.equal(search.body.initData, undefined);
+  assert.equal(JSON.stringify(search.body).includes(USER_A), false);
+  assert.equal(JSON.stringify(search.body).includes("storage"), false);
+  assert.equal(searchResponse.headers.get("cache-control"), "no-store");
+  assert.equal(catalogCalls.length, beforeSearch + 1);
+  assert.deepEqual(catalogCalls.at(-1), { query: "  сон  " });
+
+  const blankResponse = await POST(
+    maxRequest({ initData: currentInitData(), query: "   \n\t  " }),
+  );
+  assert.equal(blankResponse.status, 200);
+  assert.deepEqual(catalogCalls.at(-1), { query: "   \n\t  " });
+
+  const callsBeforeRejectedSearch = catalogCalls.length;
+  const expiredSearch = await readJson(
+    await POST(
+      maxRequest({
+        initData: signInitData({
+          auth_date: String(Math.floor(Date.now() / 1000) - 4000),
+          user: '{"id":101,"first_name":"Catalog"}',
+        }),
+        query: "сон",
+      }),
+    ),
+  );
+  assert.equal(expiredSearch.status, 401);
+  assert.equal(expiredSearch.body.reason, "expired");
+  assert.equal(catalogCalls.length, callsBeforeRejectedSearch);
+
+  const invalidSearch = await readJson(
+    await POST(
+      maxRequest({
+        initData: currentInitData().replace(/hash=[0-9a-f]+/, "hash=ff"),
+        query: "сон",
+      }),
+    ),
+  );
+  assert.equal(invalidSearch.status, 401);
+  assert.equal(catalogCalls.length, callsBeforeRejectedSearch);
+
+  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+    nativeCalls.push({ provider, providerUserId });
+    return { ok: true, userId: null };
+  });
+  const unlinkedSearch = await readJson(
+    await POST(maxRequest({ initData: currentInitData(), query: "сон" })),
+  );
+  assert.equal(unlinkedSearch.status, 403);
+  assert.equal(catalogCalls.length, callsBeforeRejectedSearch);
+
+  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
+    nativeCalls.push({ provider, providerUserId });
+    return { ok: true, userId: USER_A };
+  });
+  setListMaxPublishedCatalogForTests(async () => ({
+    ok: false,
+    reason: "storage_unavailable",
+  }));
+  const searchStorage = await readJson(
+    await POST(maxRequest({ initData: currentInitData(), query: "сон" })),
+  );
+  assert.equal(searchStorage.status, 503);
+  assert.deepEqual(searchStorage.body, {
+    ok: false,
+    reason: "storage_unavailable",
+  });
+
+  const badQuery = await readJson(
+    await POST(
+      maxRequest({
+        initData: currentInitData(),
+        query: { q: "сон" },
+        user_id: USER_A,
+      }),
+    ),
+  );
+  assert.equal(badQuery.status, 400);
+  assert.equal(badQuery.body.reason, "invalid_request");
+
   const oversize = await readJson(
     await POST(maxRequest("x".repeat(MAX_CATALOG_BODY_MAX_BYTES + 1))),
   );
@@ -243,7 +361,12 @@ assert.doesNotMatch(routeSource, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(routeSource, /auth\.getUser|createClientFromRequest|linkExternalIdentity|auth\.admin/);
 assert.doesNotMatch(routeSource, /access_token|refresh_token/);
 assert.match(catalogSource, /getPublishedCatalogProducts/);
+assert.match(catalogSource, /searchPublishedCatalogProducts/);
+assert.match(catalogSource, /normalizeCatalogSearchQuery/);
 assert.match(catalogSource, /GUEST_ORDINARY_CATALOG_VIEWER/);
+assert.match(catalogSource, /\.slice\(0, MAX_CATALOG_LIMIT\)/);
+assert.doesNotMatch(catalogSource, /CATALOG_SEARCH_SUGGEST_MIN_LENGTH/);
 assert.doesNotMatch(catalogSource, /userId|visitorId|localStorage|auth\.admin/);
+assert.doesNotMatch(routeSource, /searchParams|localStorage|body\.user_id|max_user_id|maxAuthenticated/);
 
 console.log("max-catalog-route-unit: ok");

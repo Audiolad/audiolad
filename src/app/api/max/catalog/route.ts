@@ -116,7 +116,8 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
-  const initData = (parsed as { initData?: unknown }).initData;
+  const body = parsed as { initData?: unknown; query?: unknown };
+  const initData = body.initData;
   if (typeof initData !== "string") {
     return errorResponse("invalid_request", 400);
   }
@@ -130,6 +131,10 @@ export async function POST(request: Request) {
     return errorResponse(verified.reason, statusForReason(verified.reason));
   }
 
+  if (body.query != null && typeof body.query !== "string") {
+    return errorResponse("invalid_request", 400);
+  }
+
   const nativeUser = await resolveMaxNativeUser(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     verified.data.user.id,
@@ -141,7 +146,9 @@ export async function POST(request: Request) {
     return errorResponse("unlinked", 403);
   }
 
-  const catalog = await listMaxPublishedCatalog();
+  const catalog = await listMaxPublishedCatalog(
+    typeof body.query === "string" ? { query: body.query } : {},
+  );
   if (!catalog.ok) {
     return errorResponse("storage_unavailable", 503);
   }

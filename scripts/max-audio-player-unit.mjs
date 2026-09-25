@@ -268,6 +268,7 @@ assert.ok(
   "stats stay before MaxAudioPlayer",
 );
 assert.match(home, /!selected\.isFree/);
-assert.match(home, /!product\.isFree/);
+const catalogSearch = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
+assert.match(catalogSearch, /!product\.isFree/);
 
 console.log("max-audio-player-unit: ok");
