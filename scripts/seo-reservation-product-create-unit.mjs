@@ -261,7 +261,9 @@ const products = read("src/lib/author-products/products.ts");
 assert.match(products, /primary_seo_query_id/);
 
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
-assert.match(discoveryRoute, /productId/);
+assert.match(discoveryRoute, /buildAuthorDiscoveryDatabaseMatches/);
+const discoveryStatus = read("src/lib/seo-queries/author-discovery-status.ts");
+assert.match(discoveryStatus, /productId: state\.productId/);
 
 // H — npm script registered
 const pkg = JSON.parse(read("package.json"));

@@ -17,6 +17,17 @@ export {
   AURAFON_AUTHOR_SLUG,
 } from "@/lib/authors/aurafon";
 
+/**
+ * The only publication class that opens SEO reservation for a non-Aurafon
+ * author. Practice, course, audiobook, and post stay closed.
+ * The opportunities page has no per-card product class, so its claim uses
+ * this same music-release path.
+ */
+export const SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS = "release" as const;
+
+export const SEO_DISCOVERY_BETA_DISABLED_MESSAGE =
+  "Закрепление поискового запроса доступно для музыкальных релизов.";
+
 export function isAuthorSeoDiscoveryEnabled(
   authorId: string | null | undefined,
 ): boolean {
@@ -43,7 +54,10 @@ export function isMusicCreateSeoDiscoveryEnabled(input: {
     return true;
   }
 
-  return input.publicationClass?.trim() === "release";
+  return (
+    input.publicationClass?.trim() ===
+    SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS
+  );
 }
 
 export function assertMusicCreateSeoDiscoveryEnabled(input: {

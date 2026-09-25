@@ -437,9 +437,12 @@ const opportunitiesRelease = opportunitiesUi.slice(
   opportunitiesUi.indexOf("async function link"),
 );
 assert.match(opportunitiesRelease, /method: "DELETE"/);
-assert.match(opportunitiesRelease, /author_id: authorId, reservation_id: reservationId/);
-assert.doesNotMatch(opportunitiesRelease, /publication_class/);
-assert.match(opportunitiesRelease, /payload\.message \?\? "Не удалось освободить запрос\."/);
+assert.match(opportunitiesRelease, /buildReleaseSeoReservationBody/);
+assert.match(
+  opportunitiesRelease,
+  /publicationClass: SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS/,
+);
+assert.match(opportunitiesRelease, /releaseSeoReservationErrorMessage/);
 assert.match(opportunitiesRelease, /lifecycle: "available"/);
 assert.match(opportunitiesUi, />Освободить<\/button>/);
 

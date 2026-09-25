@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS } from "@/lib/seo-queries/discovery-beta";
+import {
+  buildReleaseSeoReservationBody,
+  releaseSeoReservationErrorMessage,
+} from "@/lib/seo-queries/release-own-seo-reservation";
 import { buildSeoReservationProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -58,12 +63,20 @@ export default function AuthorSeoOpportunitiesClient({
     setMessage(null);
     const response = await fetch("/api/author/seo-reservations", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ author_id: authorId, query_id: queryId }),
+      body: JSON.stringify({
+        author_id: authorId,
+        query_id: queryId,
+        publication_class: SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS,
+      }),
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     setPendingId(null);
     if (!response.ok) {
-      setMessage(payload.message ?? "Не удалось закрепить запрос.");
+      setMessage(
+        typeof payload.message === "string" && payload.message.trim()
+          ? payload.message
+          : "Не удалось закрепить запрос.",
+      );
       return;
     }
     setItems((current) => current.map((item) => item.id === queryId
@@ -77,11 +90,17 @@ export default function AuthorSeoOpportunitiesClient({
     setMessage(null);
     const response = await fetch("/api/author/seo-reservations", {
       method: "DELETE", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ author_id: authorId, reservation_id: reservationId }),
+      body: JSON.stringify(buildReleaseSeoReservationBody({
+        authorId,
+        reservationId,
+        publicationClass: SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS,
+      })),
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     setPendingId(null);
-    if (!response.ok) return setMessage(payload.message ?? "Не удалось освободить запрос.");
+    if (!response.ok) {
+      return setMessage(releaseSeoReservationErrorMessage(payload));
+    }
     setItems((current) => current.map((item) => item.reservationId === reservationId
       ? { ...item, reservationId: null, expiresAt: null, productId: null, productTitle: null, lifecycle: "available" }
       : item));
@@ -94,9 +113,15 @@ export default function AuthorSeoOpportunitiesClient({
       method: "PATCH", headers: { "content-type": "application/json" },
       body: JSON.stringify({ author_id: authorId, reservation_id: reservationId, product_id: productId }),
     });
-    await response.json();
+    const payload = await response.json().catch(() => ({}));
     setPendingId(null);
-    if (!response.ok) return setMessage("Не удалось связать запрос с продуктом.");
+    if (!response.ok) {
+      return setMessage(
+        typeof payload.message === "string" && payload.message.trim()
+          ? payload.message
+          : "Не удалось связать запрос с продуктом.",
+      );
+    }
     const product = products.find((item) => item.id === productId);
     setItems((current) => current.map((item) => item.reservationId === reservationId
       ? { ...item, productId, productTitle: product?.title ?? null, expiresAt: null }

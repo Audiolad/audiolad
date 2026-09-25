@@ -24,6 +24,7 @@ import {
   loadRankedAnalyzedQueriesForSeed,
 } from "@/lib/seo-queries/author-discovery-repository";
 import {
+  SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
   assertMusicCreateSeoDiscoveryEnabled,
   isMusicCreateSeoDiscoveryEnabled,
 } from "@/lib/seo-queries/discovery-beta";
@@ -71,7 +72,11 @@ export async function POST(request: Request) {
       })
     ) {
       return NextResponse.json(
-        { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+        {
+          error: "seo_discovery_beta_disabled",
+          code: "seo_discovery_beta_disabled",
+          message: SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
+        },
         { status: 403 },
       );
     }
@@ -212,7 +217,11 @@ export async function POST(request: Request) {
       error.message === "seo_discovery_beta_disabled"
     ) {
       return NextResponse.json(
-        { error: "seo_discovery_beta_disabled", code: "seo_discovery_beta_disabled" },
+        {
+          error: "seo_discovery_beta_disabled",
+          code: "seo_discovery_beta_disabled",
+          message: SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
+        },
         { status: 403 },
       );
     }

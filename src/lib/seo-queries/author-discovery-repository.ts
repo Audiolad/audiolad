@@ -8,6 +8,12 @@ import type {
   DiscoveryQueryRow,
   DiscoveryReservationRow,
 } from "./author-discovery";
+import { loadPublishedSeoOccupancyForQueries } from "./load-published-seo-occupancy";
+import {
+  toPublishedSeoQueryOccupancy,
+  type PublishedSeoQueryOccupancy,
+  type SeoOccupancyHit,
+} from "./published-query-occupancy";
 import { isEffectiveSeoReservation } from "./reservation-effective";
 import { classifySeoQuery } from "./classifier";
 import {
@@ -389,6 +395,17 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
   });
 
   const reservationByQueryId = new Map<string, DiscoveryReservationRow>();
+  const occupancyByQueryId: Map<string, SeoOccupancyHit> =
+    ranked.length > 0
+      ? await loadPublishedSeoOccupancyForQueries(
+          supabase,
+          ranked.map((item) => ({
+            id: item.id,
+            queryText: item.queryText,
+            normalizedQuery: item.normalizedQuery,
+          })),
+        )
+      : new Map();
   if (ranked.length > 0) {
     await supabase.rpc("expire_seo_query_reservation", {
       p_author_id: input.authorId,
@@ -397,6 +414,7 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
 
   const attached: Array<(typeof ranked)[number] & {
     reservation: DiscoveryReservationRow | null;
+    publishedOccupancy: PublishedSeoQueryOccupancy | null;
   }> = [];
 
   for (const batch of chunkList(ranked)) {
@@ -455,9 +473,13 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
     }
 
     for (const item of batch) {
+      const occupancy = occupancyByQueryId.get(item.id) ?? null;
       attached.push({
         ...item,
         reservation: reservationByQueryId.get(item.id) ?? null,
+        publishedOccupancy: occupancy
+          ? toPublishedSeoQueryOccupancy(occupancy)
+          : null,
       });
     }
     if (
@@ -466,8 +488,13 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
         surface: input.surface,
         items: attached,
         visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
-      }).filter((item) => !isHiddenFromProductCreateDiscovery(item.reservation))
-        .length >= SEO_DISCOVERY_DATABASE_LIMIT
+      }).filter(
+        (item) =>
+          !isHiddenFromProductCreateDiscovery(
+            item.reservation,
+            item.publishedOccupancy,
+          ),
+      ).length >= SEO_DISCOVERY_DATABASE_LIMIT
     ) {
       break;
     }
