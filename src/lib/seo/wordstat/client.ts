@@ -6,6 +6,7 @@ import {
   type WordstatConfig,
 } from "@/lib/seo/wordstat/config";
 import { wordstatError } from "@/lib/seo/wordstat/errors";
+import { resolveWordstatNumPhrases } from "@/lib/seo/wordstat/num-phrases";
 import { normalizeWordstatSuggestions } from "@/lib/seo/wordstat/normalize";
 import { normalizeWordstatPhrase } from "@/lib/seo/wordstat/phrase";
 import {
@@ -34,6 +35,8 @@ export type WordstatClientOptions = {
   cache?: WordstatCacheStore;
   rateLimit?: WordstatRateLimitStore;
   userId?: string;
+  /** Server-only. Validated 1..2000. Callers must not pass client input. */
+  numPhrases?: number;
 };
 
 type WordstatRequestError = "timeout" | "network";
@@ -285,11 +288,17 @@ export async function fetchWordstatSuggestions(
     return redactResult(wordstatError("NOT_CONFIGURED"), env);
   }
 
+  const numPhrases = resolveWordstatNumPhrases(options.numPhrases);
+  if (numPhrases === null) {
+    return redactResult(wordstatError("INVALID_QUERY"), env);
+  }
+
   const cache = options.cache ?? getProcessWordstatCache();
   const cacheKey = buildWordstatCacheKey({
     phrase: normalized,
     regionId: config.regionId,
     device: config.device,
+    numPhrases,
   });
 
   if (cacheKey) {
@@ -319,7 +328,7 @@ export async function fetchWordstatSuggestions(
   const requestBody = JSON.stringify({
     phrase: normalized,
     folderId: config.folderId,
-    numPhrases: config.numPhrases,
+    numPhrases,
     regions: [config.regionId],
     devices: [config.device],
   });

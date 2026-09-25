@@ -5,8 +5,21 @@ export const WORDSTAT_GET_TOP_URL = `${WORDSTAT_API_ORIGIN}${WORDSTAT_GET_TOP_PA
 /** Official GetTop phrase limit. */
 export const WORDSTAT_MAX_PHRASE_LENGTH = 400;
 
+/** Official GetTop numPhrases range. */
+export const WORDSTAT_API_NUM_PHRASES_MIN = 1;
+export const WORDSTAT_API_NUM_PHRASES_MAX = 2000;
+
 /** Official default; conservative UX value. Do not request thousands. */
 export const WORDSTAT_NUM_PHRASES = 20;
+
+/** Expanded GetTop pool for product_create only. Not a global default. */
+export const PRODUCT_CREATE_WORDSTAT_CANDIDATE_LIMIT = 200;
+
+/** UI cap after product_create frequency filter + sort. */
+export const PRODUCT_CREATE_WORDSTAT_RESULT_LIMIT = 20;
+
+export const PRODUCT_CREATE_WORDSTAT_MIN_COUNT = 50;
+export const PRODUCT_CREATE_WORDSTAT_MAX_COUNT = 2000;
 
 export const WORDSTAT_DEFAULT_REGION_ID = "225";
 export const WORDSTAT_RUSSIA_REGION_LABEL = "Россия";

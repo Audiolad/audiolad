@@ -9,10 +9,15 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
 import {
+  AUTHOR_SEO_DISCOVERY_SURFACES,
   buildAuthorDiscoveryDatabaseMatches,
   parseAuthorSeoDiscoverySurface,
   shouldOmitFromWordstatAdditions,
 } from "@/lib/seo-queries/author-discovery-status";
+import {
+  selectProductCreateWordstatAdditions,
+  wordstatNumPhrasesForDiscoverySurface,
+} from "@/lib/seo-queries/product-create-wordstat";
 import {
   loadDiscoveryContextForPhrases,
   loadRankedAnalyzedQueriesForSeed,
@@ -110,7 +115,10 @@ export async function POST(request: Request) {
 
     if (seedNormalized) databaseNormalized.add(seedNormalized);
 
-    const wordstat = await fetchWordstatSuggestions(phrase, { userId: user.id });
+    const wordstat = await fetchWordstatSuggestions(phrase, {
+      userId: user.id,
+      numPhrases: wordstatNumPhrasesForDiscoverySurface(surface),
+    });
     if (!wordstat.ok) {
       return NextResponse.json(
         { error: wordstat.error.message, code: wordstat.error.code },
@@ -138,7 +146,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const results = [];
+    const pending = [];
     for (const suggestion of wordstat.data.suggestions) {
       const normalized = await context.normalize(suggestion.phrase);
       const query = normalized
@@ -160,18 +168,30 @@ export async function POST(request: Request) {
         continue;
       }
 
-      results.push(
-        reconcileAuthorDiscoverySuggestion({
-          suggestion: { phrase: suggestion.phrase, count: suggestion.count },
-          authorId,
-          query,
-          reservation,
-          alreadyProposedByAuthor: query
-            ? context.proposedQueryIds.has(query.id)
-            : false,
-        }),
-      );
+      pending.push({
+        phrase: suggestion.phrase,
+        count: suggestion.count,
+        query,
+        reservation,
+      });
     }
+
+    const selected =
+      surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE
+        ? selectProductCreateWordstatAdditions(pending)
+        : pending;
+
+    const results = selected.map((item) =>
+      reconcileAuthorDiscoverySuggestion({
+        suggestion: { phrase: item.phrase, count: item.count },
+        authorId,
+        query: item.query,
+        reservation: item.reservation,
+        alreadyProposedByAuthor: item.query
+          ? context.proposedQueryIds.has(item.query.id)
+          : false,
+      }),
+    );
 
     return NextResponse.json({
       phrase: wordstat.data.phrase,

@@ -17,13 +17,14 @@ export function buildWordstatCacheKey(input: {
   phrase: string;
   regionId: string;
   device: string;
+  numPhrases: number;
 }): string | null {
   const phrase = normalizeWordstatPhrase(input.phrase);
   if (!phrase) {
     return null;
   }
 
-  return `${phrase.toLocaleLowerCase("ru-RU")}|${input.regionId}|${input.device}`;
+  return `${phrase.toLocaleLowerCase("ru-RU")}|${input.regionId}|${input.device}|${input.numPhrases}`;
 }
 
 export function createWordstatMemoryCache(
