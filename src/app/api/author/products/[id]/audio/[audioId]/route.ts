@@ -26,6 +26,7 @@ import {
   AUDIO_PREPARING_MESSAGE,
   isProductAudioNormalizeInFlight,
 } from "@/lib/author-products/server/direct-audio-upload";
+import { musicDraftMayDeleteLastTrack } from "@/lib/author-products/music-album-batch";
 import { teardownMusicTrackDelivery } from "@/lib/author-products/server/music-track-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -174,7 +175,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    if ((count ?? 0) <= 1) {
+    if (
+      (count ?? 0) <= 1 &&
+      !musicDraftMayDeleteLastTrack({
+        productKind: practice.product_kind,
+        status: practice.status,
+      })
+    ) {
       return NextResponse.json(
         { error: "last_audio_required", message: "У продукта должно остаться хотя бы одно аудио." },
         { status: 400 },

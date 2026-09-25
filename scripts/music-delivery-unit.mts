@@ -31,7 +31,7 @@ const studio = read("deploy/studio-render-worker.ecosystem.config.cjs");
 const worker = read("scripts/run-music-transcode-worker.mts");
 const products = read("src/lib/author-products/products.ts");
 
-assert.match(form, /MUSIC_DELIVERY_UPLOAD_LABEL/);
+assert.doesNotMatch(form, /MUSIC_DELIVERY_UPLOAD_LABEL/);
 assert.match(form, /MUSIC_DELIVERY_REPLACE_LABEL/);
 assert.match(form, /MUSIC_DELIVERY_UPLOAD_HINT/);
 assert.match(form, /audio\/wav,audio\/x-wav,audio\/wave,\.wav,audio\/mpeg,\.mp3/);

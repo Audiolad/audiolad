@@ -138,3 +138,23 @@ export function formatAlbumBatchCreateFailure(
 ): string {
   return `Добавлено ${created} из ${planned} треков. Не удалось добавить ${fileName}.`;
 }
+
+/** New music albums start empty. Every track comes from the album drop zone. */
+export function musicAlbumSkipsDefaultAudioItem(input: {
+  productKind?: string | null;
+  publicationClass?: string | null;
+}): boolean {
+  return input.productKind === "music" || input.publicationClass === "release";
+}
+
+/**
+ * A music draft may lose its last track, including a legacy empty «Трек 1» / «Аудио 1».
+ * The title and whether a file exists are not part of the decision.
+ * A published or unpublished listing keeps at least one track.
+ */
+export function musicDraftMayDeleteLastTrack(input: {
+  productKind?: string | null;
+  status?: string | null;
+}): boolean {
+  return input.productKind === "music" && input.status === "draft";
+}

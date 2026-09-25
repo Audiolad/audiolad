@@ -129,7 +129,6 @@ import {
   MUSIC_DELIVERY_REPLACE_LABEL,
   MUSIC_DELIVERY_UNSUPPORTED_TEXT,
   MUSIC_DELIVERY_UPLOAD_HINT,
-  MUSIC_DELIVERY_UPLOAD_LABEL,
   hasPlayableAuthorAudioPreview,
   musicAuthorTrackStatusText,
   resolveMusicUploadMode,
@@ -180,6 +179,8 @@ import {
   MAX_MUSIC_ALBUM_BATCH_FILES,
   planMusicAlbumBatch,
   isUsableMusicTrackTitle,
+  musicAlbumSkipsDefaultAudioItem,
+  musicDraftMayDeleteLastTrack,
   resolveAlbumTrackTitle,
 } from "@/lib/author-products/music-album-batch";
 import {
@@ -846,7 +847,18 @@ export default function AuthorProductForm({
       return initialProduct.audio_items;
     }
 
-    if (!shouldCreateDefaultAudioItem(initialPublicationClass)) {
+    const createClassification = resolveCreateClassification({
+      publicationClass: initialPublicationClass,
+    });
+    if (
+      !shouldCreateDefaultAudioItem(initialPublicationClass) ||
+      musicAlbumSkipsDefaultAudioItem({
+        productKind: createClassification.ok
+          ? createClassification.value.productKind
+          : null,
+        publicationClass: initialPublicationClass,
+      })
+    ) {
       return [];
     }
 
@@ -854,11 +866,7 @@ export default function AuthorProductForm({
       {
         id: "temp-1",
         practice_id: "temp",
-        title:
-          initialProduct?.practice.product_kind === PRODUCT_KIND.MUSIC ||
-          initialPublicationClass === "release"
-            ? "Трек 1"
-            : "Аудио 1",
+        title: "Аудио 1",
         description: null,
         audio_path: null,
         cover_url: null,
@@ -2546,14 +2554,10 @@ export default function AuthorProductForm({
   }
 
   async function addAudioItem() {
-    if (addAudioInFlightRef.current || busy) {
+    if (form.productKind === PRODUCT_KIND.MUSIC) {
       return;
     }
-    if (
-      form.productKind === PRODUCT_KIND.MUSIC &&
-      musicQueueBlocksTrackCreation(musicQueueRef.current)
-    ) {
-      setError("Дождитесь завершения текущей загрузки, затем добавьте трек.");
+    if (addAudioInFlightRef.current || busy) {
       return;
     }
 
@@ -2569,7 +2573,6 @@ export default function AuthorProductForm({
       }
 
       const id = ensured.practiceId;
-      const isMusic = form.productKind === PRODUCT_KIND.MUSIC;
 
       const response = await fetch(`/api/author/products/${id}/audio`, {
         method: "POST",
@@ -2584,7 +2587,7 @@ export default function AuthorProductForm({
         audio_item?: AudioItemRow;
       };
 
-      if (!response.ok || !payload.product || (isMusic && !payload.audio_item)) {
+      if (!response.ok || !payload.product) {
         setError("Не удалось добавить аудио.");
         return;
       }
@@ -2597,16 +2600,9 @@ export default function AuthorProductForm({
         pendingFocusAudioIdRef.current = newAudioId;
       }
 
-      if (isMusic && payload.audio_item) {
-        applyMusicProductLevel(payload.product);
-        setAudioItems((current) =>
-          appendCreatedAudioItem(current, payload.audio_item!),
-        );
-      } else {
-        setAudioItems((current) =>
-          mergeServerAudioItems(current, payload.product!.audio_items),
-        );
-      }
+      setAudioItems((current) =>
+        mergeServerAudioItems(current, payload.product!.audio_items),
+      );
     } catch {
       setError("Не удалось добавить аудио.");
     } finally {
@@ -2993,7 +2989,13 @@ export default function AuthorProductForm({
       );
       return;
     }
-    if (audioItems.length <= 1) {
+    if (
+      audioItems.length <= 1 &&
+      !musicDraftMayDeleteLastTrack({
+        productKind: form.productKind,
+        status: form.status,
+      })
+    ) {
       setError("У продукта должно остаться хотя бы одно аудио.");
       return;
     }
@@ -5245,48 +5247,66 @@ export default function AuthorProductForm({
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  {contentLockedAfterSale && audioItem.audio_path ? null : (
+                  {form.productKind === PRODUCT_KIND.MUSIC ? (
+                    musicTrackHasServerAudio(audioItem) && !contentLockedAfterSale ? (
+                      <label
+                        className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
+                          uploadingAudioId === audioItem.id ||
+                          deletingAudioFileId === audioItem.id ||
+                          musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer"
+                        }`}
+                      >
+                        {uploadingAudioId === audioItem.id ||
+                        musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                          ? "Загрузка…"
+                          : MUSIC_DELIVERY_REPLACE_LABEL}
+                        <input
+                          type="file"
+                          accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
+                          className="hidden"
+                          disabled={
+                            uploadingAudioId === audioItem.id ||
+                            deletingAudioFileId === audioItem.id ||
+                            musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                          }
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            if (!file) return;
+                            stageMusicTrackFile(audioItem.id, file);
+                            startReadyMusicUploads([audioItem.id]);
+                          }}
+                        />
+                      </label>
+                    ) : null
+                  ) : contentLockedAfterSale && audioItem.audio_path ? null : (
                     <label
                       className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
                         uploadingAudioId === audioItem.id ||
-                        deletingAudioFileId === audioItem.id ||
-                        musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                        deletingAudioFileId === audioItem.id
                           ? "cursor-not-allowed opacity-60"
                           : "cursor-pointer"
                       }`}
                     >
-                      {uploadingAudioId === audioItem.id ||
-                      musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                      {uploadingAudioId === audioItem.id
                         ? "Загрузка…"
-                        : form.productKind === PRODUCT_KIND.MUSIC
-                          ? audioItem.audio_path || audioItem.music_master
-                            ? MUSIC_DELIVERY_REPLACE_LABEL
-                            : MUSIC_DELIVERY_UPLOAD_LABEL
-                          : audioItem.audio_path || isAudioPrepareInFlight(audioItem.audio_prepare_status)
-                            ? "Заменить аудио"
-                            : "Загрузить аудио"}
+                        : audioItem.audio_path || isAudioPrepareInFlight(audioItem.audio_prepare_status)
+                          ? "Заменить аудио"
+                          : "Загрузить аудио"}
                       <input
                         type="file"
-                        accept={
-                          form.productKind === PRODUCT_KIND.MUSIC
-                            ? "audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
-                            : PRODUCT_AUDIO_FILE_ACCEPT
-                        }
+                        accept={PRODUCT_AUDIO_FILE_ACCEPT}
                         className="hidden"
                         disabled={
                           uploadingAudioId === audioItem.id ||
-                          deletingAudioFileId === audioItem.id ||
-                          musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                          deletingAudioFileId === audioItem.id
                         }
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           event.target.value = "";
                           if (!file) return;
-                          if (form.productKind === PRODUCT_KIND.MUSIC) {
-                            stageMusicTrackFile(audioItem.id, file);
-                            startReadyMusicUploads([audioItem.id]);
-                            return;
-                          }
                           void uploadAudio(audioItem.id, file, "legacy");
                         }}
                       />
@@ -5312,7 +5332,11 @@ export default function AuthorProductForm({
                     </button>
                   ) : null}
 
-                  {audioItems.length > 1 &&
+                  {(audioItems.length > 1 ||
+                    musicDraftMayDeleteLastTrack({
+                      productKind: form.productKind,
+                      status: form.status,
+                    })) &&
                   !contentLockedAfterSale &&
                   (form.productKind === PRODUCT_KIND.MUSIC ||
                     !isAudioPrepareInFlight(audioItem.audio_prepare_status)) ? (
@@ -5372,29 +5396,16 @@ export default function AuthorProductForm({
             </p>
           ) : null}
 
-          {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
-          <>
+          {form.productKind !== PRODUCT_KIND.AUDIO_POST &&
+          form.productKind !== PRODUCT_KIND.MUSIC ? (
           <button
             type="button"
-            disabled={
-              busy ||
-              reorderBusy ||
-              !canEditPublicFields ||
-              (form.productKind === PRODUCT_KIND.MUSIC &&
-                musicQueueBlocksTrackCreation(musicQueue))
-            }
+            disabled={busy || reorderBusy || !canEditPublicFields}
             onClick={() => void addAudioItem()}
             className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
           >
             Добавить аудио
           </button>
-          {form.productKind === PRODUCT_KIND.MUSIC &&
-          musicQueueBlocksTrackCreation(musicQueue) ? (
-            <p className="text-sm text-[#9b3d3d]">
-              Дождитесь завершения текущей загрузки, затем добавьте трек.
-            </p>
-          ) : null}
-          </>
           ) : null}
         </div>
       </section>
