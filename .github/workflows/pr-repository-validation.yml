@@ -86,6 +86,7 @@ jobs:
           npx tsx scripts/author-email-outbox-cycle-unit.mts
           npx tsx scripts/music-album-batch-unit.mts
           npx tsx scripts/music-track-upload-queue-unit.mts
+          npx tsx scripts/music-upload-autostart-unit.mts
           npm run build
           npm run typecheck
           npm run lint

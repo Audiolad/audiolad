@@ -316,7 +316,7 @@ function functionBody(source: string, name: string): string {
   assert.match(formSource, /preserveLocalMedia: form\.productKind === PRODUCT_KIND\.MUSIC/);
 }
 
-assert.match(formSource, /Загрузить все треки/);
+assert.match(formSource, /Продолжить загрузку/);
 assert.match(formSource, /stageMusicTrackFile\(audioItem\.id, file\)/);
 assert.match(formSource, /uploadAudio\(audioItem\.id, file, "legacy"\)/);
 assert.match(formSource, /audio\/wav,audio\/x-wav,audio\/wave,\.wav,audio\/mpeg,\.mp3/);
