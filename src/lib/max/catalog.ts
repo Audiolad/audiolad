@@ -2,6 +2,17 @@ import "server-only";
 
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import {
+  CATALOG_ACCESS_FILTERS,
+  CATALOG_CLASS_FILTERS,
+  type CatalogAccessFilter,
+  type CatalogClassFilter,
+} from "@/lib/catalog/listing-contract";
+import {
+  CATALOG_LISTING_SEARCH_LIMIT,
+  filterCatalogListingItems,
+  mapCatalogProductToListingItem,
+} from "@/lib/catalog/listing";
+import {
   normalizeCatalogSearchQuery,
   searchPublishedCatalogProducts,
 } from "@/lib/catalog/search";
@@ -39,6 +50,8 @@ export type ListMaxPublishedCatalogInput = {
   query?: string | null;
   section?: PublicCatalogSection | null;
   topicKey?: string | null;
+  access?: CatalogAccessFilter | null;
+  class?: CatalogClassFilter | null;
   getCatalogProducts?: typeof getPublishedCatalogProducts;
   searchCatalogProducts?: typeof searchPublishedCatalogProducts;
   getServiceClient?: typeof createServiceRoleClient;
@@ -80,6 +93,46 @@ export function parseMaxCatalogTopicParam(
 
   return { ok: true, topicKey: serializeCatalogTopicParam(parsed) };
 }
+
+
+export function parseMaxCatalogAccessParam(
+  value: unknown,
+): { ok: true; access: CatalogAccessFilter } | { ok: false } {
+  if (value == null) {
+    return { ok: true, access: "all" };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!(CATALOG_ACCESS_FILTERS as readonly string[]).includes(normalized)) {
+    return { ok: false };
+  }
+
+  return { ok: true, access: normalized as CatalogAccessFilter };
+}
+
+export function parseMaxCatalogClassParam(
+  value: unknown,
+): { ok: true; class: CatalogClassFilter } | { ok: false } {
+  if (value == null) {
+    return { ok: true, class: "all" };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!(CATALOG_CLASS_FILTERS as readonly string[]).includes(normalized)) {
+    return { ok: false };
+  }
+
+  return { ok: true, class: normalized as CatalogClassFilter };
+}
+
 
 export type ListMaxPublishedCatalogFn = (
   input?: ListMaxPublishedCatalogInput,
@@ -124,6 +177,8 @@ async function listMaxPublishedCatalogImpl(
     const normalizedQuery = normalizeCatalogSearchQuery(input.query);
     const catalogSection = input.section ?? null;
     const topicKey = input.topicKey?.trim() ? input.topicKey.trim() : null;
+    const access = input.access ?? "all";
+    const publicationClass = input.class ?? "all";
     const products = normalizedQuery
       ? await (input.searchCatalogProducts ?? searchPublishedCatalogProducts)(
           service,
@@ -132,6 +187,7 @@ async function listMaxPublishedCatalogImpl(
             viewer: GUEST_ORDINARY_CATALOG_VIEWER,
             ...(catalogSection ? { catalogSection } : {}),
             ...(topicKey ? { topicKey } : {}),
+            limit: CATALOG_LISTING_SEARCH_LIMIT,
           },
         )
       : await (input.getCatalogProducts ?? getPublishedCatalogProducts)(
@@ -144,9 +200,30 @@ async function listMaxPublishedCatalogImpl(
           },
         );
 
+    const filteredProducts =
+      access === "all" && publicationClass === "all"
+        ? products
+        : (() => {
+            const candidates = products.flatMap((product) => {
+              try {
+                return [mapCatalogProductToListingItem(product)];
+              } catch {
+                return [];
+              }
+            });
+            const allowedIds = new Set(
+              filterCatalogListingItems(candidates, {
+                access,
+                class: publicationClass,
+              }).map((item) => item.publication_id),
+            );
+
+            return products.filter((product) => allowedIds.has(product.id));
+          })();
+
     return {
       ok: true,
-      items: toMaxCatalogProducts(products),
+      items: toMaxCatalogProducts(filteredProducts),
     };
   } catch {
     return { ok: false, reason: "storage_unavailable" };
