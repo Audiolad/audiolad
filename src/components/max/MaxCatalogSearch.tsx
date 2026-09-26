@@ -743,11 +743,19 @@ export default function MaxCatalogSearch({
     const topicKey = topicNavigationRequest?.key.trim();
     if (!topicKey) return;
 
-    setSearchInput("");
-    searchInputRef.current = "";
-    setActiveSection(null);
-    activeSectionRef.current = null;
-    applyFilters([topicKey], "all", "all");
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSearchInput("");
+      searchInputRef.current = "";
+      setActiveSection(null);
+      activeSectionRef.current = null;
+      applyFilters([topicKey], "all", "all");
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [topicNavigationRequest?.requestId]);
 
   useEffect(() => {
