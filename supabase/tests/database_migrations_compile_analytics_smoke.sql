@@ -69,6 +69,12 @@ DECLARE
   v_fact_author uuid;
   v_fact_user uuid;
   v_cascade integer;
+  v_payload jsonb;
+  v_platform bigint;
+  v_platform_after bigint;
+  v_platform_author bigint;
+  v_ordinary_listeners integer;
+  v_ordinary_starts integer;
 BEGIN
   IF to_regprocedure('public.apply_playback_usage_heartbeat(uuid,text,bigint,uuid,text,uuid,uuid,uuid,bigint,bigint,numeric,text,timestamptz)') IS NULL THEN
     RAISE EXCEPTION 'apply_playback_usage_heartbeat is missing';
@@ -203,6 +209,75 @@ BEGIN
   FROM public.playback_usage_facts
   WHERE listening_key = v_key;
 
+  -- Averages use listeners/starts from valid_from forward, including All.
+  -- Ordinary period KPIs still count the earlier audio_play_started.
+  UPDATE public.playback_usage_settings
+  SET listening_time_valid_from = v_t0
+  WHERE singleton;
+
+  INSERT INTO public.analytics_events (
+    id, event_name, practice_id, occurred_at, anonymous_session_id
+  ) VALUES
+    (
+      'f6666666-6666-4666-8666-666666666661',
+      'audio_play_started',
+      v_practice,
+      v_t0 - interval '1 day',
+      'usage-before-valid'
+    ),
+    (
+      'f6666666-6666-4666-8666-666666666662',
+      'audio_play_started',
+      v_practice,
+      v_t0 + interval '1 minute',
+      'usage-after-valid'
+    );
+
+  SELECT public.admin_analytics_listening_time(
+    v_t0 - interval '2 days', v_t0 + interval '1 day', false, NULL, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+  IF (v_payload ->> 'listened_ms')::bigint <> 5000
+    OR (v_payload ->> 'measured_listeners')::integer <> 1
+    OR (v_payload ->> 'measured_play_starts')::integer <> 1
+    OR (v_payload ->> 'partial')::boolean IS NOT TRUE
+  THEN
+    RAISE EXCEPTION 'partial measured window wrong: %', v_payload;
+  END IF;
+
+  SELECT public.admin_analytics_listening_time(NULL, NULL, false, NULL, v_practice, NULL, NULL)
+  INTO v_payload;
+  IF (v_payload ->> 'listened_ms')::bigint <> 5000
+    OR (v_payload ->> 'measured_listeners')::integer <> 1
+    OR (v_payload ->> 'measured_play_starts')::integer <> 1
+    OR (v_payload ->> 'partial')::boolean IS NOT TRUE
+  THEN
+    RAISE EXCEPTION 'All measured window wrong: %', v_payload;
+  END IF;
+
+  SELECT
+    (v_metrics ->> 'listeners')::integer,
+    (v_metrics ->> 'play_starts')::integer
+  INTO v_ordinary_listeners, v_ordinary_starts
+  FROM (
+    SELECT public.admin_analytics_p2_window_metrics(
+      v_t0 - interval '2 days', v_t0 + interval '1 day', false, NULL, v_practice, NULL, NULL
+    ) AS v_metrics
+  ) AS ordinary;
+  IF v_ordinary_listeners <> 2 OR v_ordinary_starts <> 2 THEN
+    RAISE EXCEPTION
+      'ordinary period KPIs changed: listeners % starts %',
+      v_ordinary_listeners, v_ordinary_starts;
+  END IF;
+
+  SELECT (public.admin_analytics_listening_time(
+    NULL, NULL, false, NULL, NULL, NULL, NULL
+  ) ->> 'listened_ms')::bigint
+  INTO v_platform;
+  IF v_platform <> 5000 THEN
+    RAISE EXCEPTION 'platform total before delete was %', v_platform;
+  END IF;
+
   DELETE FROM public.audio_items WHERE id = v_audio;
   DELETE FROM public.practices WHERE id = v_practice;
   DELETE FROM public.authors WHERE id = v_author;
@@ -227,6 +302,20 @@ BEGIN
     RAISE EXCEPTION
       'usage fact did not survive source deletion: count % practice % audio % author % user %',
       v_total, v_fact_practice, v_fact_audio, v_fact_author, v_fact_user;
+  END IF;
+
+  SELECT (public.admin_analytics_listening_time(
+    NULL, NULL, false, NULL, NULL, NULL, NULL
+  ) ->> 'listened_ms')::bigint
+  INTO v_platform_after;
+  SELECT (public.admin_analytics_listening_time(
+    NULL, NULL, false, v_author, NULL, NULL, NULL
+  ) ->> 'listened_ms')::bigint
+  INTO v_platform_author;
+  IF v_platform_after <> v_platform OR v_platform_author <> v_platform THEN
+    RAISE EXCEPTION
+      'platform total lost historical usage: before % after % author %',
+      v_platform, v_platform_after, v_platform_author;
   END IF;
 END
 $$;

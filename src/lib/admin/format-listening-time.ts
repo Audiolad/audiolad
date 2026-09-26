@@ -22,6 +22,37 @@ export function formatAverageListening(totalMs: number, count: number): string {
   return formatListeningDuration(totalMs / count);
 }
 
+/**
+ * Listening averages use the measured window, not the selected-period KPIs.
+ * effective_from = valid_from when the selection starts earlier or is All.
+ */
+export function effectiveListeningFrom(
+  selectedFrom: string | null,
+  validFrom: string | null,
+): string | null {
+  if (!validFrom) {
+    return selectedFrom;
+  }
+  if (!selectedFrom || selectedFrom < validFrom) {
+    return validFrom;
+  }
+  return selectedFrom;
+}
+
+export function listeningAverageLabels(
+  listenedMs: number | null,
+  measuredListeners: number,
+  measuredStarts: number,
+): { perListener: string; perStart: string } {
+  if (listenedMs == null) {
+    return { perListener: "—", perStart: "—" };
+  }
+  return {
+    perListener: formatAverageListening(listenedMs, measuredListeners),
+    perStart: formatAverageListening(listenedMs, measuredStarts),
+  };
+}
+
 export function formatListeningTimeNotice(validFromIso: string): string {
   const date = new Date(validFromIso);
 

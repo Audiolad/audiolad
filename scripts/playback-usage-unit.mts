@@ -17,10 +17,12 @@ import {
   resolvePlaybackUsageListeningKey,
 } from "../src/lib/analytics/listening-context-store";
 import {
+  effectiveListeningFrom,
   formatAverageListening,
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
+  listeningAverageLabels,
 } from "../src/lib/admin/format-listening-time";
 import {
   buildListenStatsHeartbeatBody,
@@ -637,6 +639,21 @@ function testFormatting() {
   assert.match(notice, /26/);
   assert.match(notice, /ноября/);
   assert.match(notice, /2026/);
+
+  const validFrom = "2026-09-01T00:00:00.000Z";
+  assert.equal(effectiveListeningFrom("2026-01-01T00:00:00.000Z", validFrom), validFrom);
+  assert.equal(effectiveListeningFrom(null, validFrom), validFrom);
+  assert.equal(
+    effectiveListeningFrom("2026-10-01T00:00:00.000Z", validFrom),
+    "2026-10-01T00:00:00.000Z",
+  );
+  const measured = listeningAverageLabels(10_000, 1, 2);
+  const fullPeriod = listeningAverageLabels(10_000, 4, 8);
+  assert.equal(measured.perListener, formatListeningDuration(10_000));
+  assert.equal(measured.perStart, formatListeningDuration(5_000));
+  assert.notEqual(measured.perListener, fullPeriod.perListener);
+  assert.notEqual(measured.perStart, fullPeriod.perStart);
+  assert.equal(listeningAverageLabels(null, 4, 8).perListener, "—");
 }
 
 function testSourceContracts() {
@@ -678,6 +695,16 @@ function testSourceContracts() {
   assert.match(migration, /author_id_snapshot uuid NULL/);
   assert.match(migration, /WHEN unique_violation THEN/);
   assert.match(migration, /GRANT ALL ON TABLE public\.playback_usage_facts TO service_role/);
+  assert.match(migration, /LEFT JOIN public\.practices AS pr ON pr\.id = f\.practice_id/);
+  assert.match(migration, /coalesce\(f\.author_id_snapshot, pr\.author_id\)/);
+  assert.equal(
+    migration.includes("\n  JOIN public.practices AS pr ON pr.id = f.practice_id"),
+    false,
+  );
+  assert.match(migration, /measured_listeners/);
+  assert.match(migration, /measured_play_starts/);
+  assert.match(migration, /v_effective_from := v_valid_from/);
+  assert.match(migration, /Удалённая практика/);
   assert.match(migration, /WHEN 'listened_ms' THEN ps\.listened_ms::numeric/);
   assert.match(migration, /audiolad:platform-analytics:p2/);
   assert.doesNotMatch(migration, /UPDATE public\.practice_listen_stats/);
@@ -716,6 +743,10 @@ function testSourceContracts() {
   assert.match(chart, /minutes == null/);
   assert.match(breakdown, /Топ практик по времени прослушивания/);
   assert.match(breakdown, /listened_ms/);
+  assert.match(queries, /measured_listeners/);
+  assert.match(queries, /measured_play_starts/);
+  assert.match(queries, /listeningAverageLabels/);
+  assert.doesNotMatch(queries, /presentListeningTime\(\s*[^,]+,\s*overviewBase\.listeners/);
   assert.match(queries, /admin_analytics_listening_time/);
   assert.match(queries, /admin_analytics_listening_time_timeseries/);
   assert.match(queries, /rawMs == null \? null : asNonNegativeInt\(rawMs\)/);

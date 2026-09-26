@@ -14,7 +14,7 @@ import {
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 import {
-  formatAverageListening,
+  listeningAverageLabels,
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
@@ -307,12 +307,12 @@ function asOptionalIso(value: unknown): string | null {
 function presentListeningTime(
   raw: {
     listened_ms?: number | null;
+    measured_listeners?: number | null;
+    measured_play_starts?: number | null;
     valid_from?: string | null;
     partial?: boolean;
     unmeasured?: boolean;
   } | null,
-  listeners: number,
-  playStarts: number,
   unavailable = false,
 ): Pick<
   AdminAnalyticsProductOverview,
@@ -340,15 +340,18 @@ function presentListeningTime(
   const partial = raw.partial === true;
   const listenedMs = unmeasured ? null : asNonNegativeInt(raw.listened_ms);
   const validFrom = asOptionalIso(raw.valid_from);
+  const averages = listeningAverageLabels(
+    listenedMs,
+    asNonNegativeInt(raw.measured_listeners),
+    asNonNegativeInt(raw.measured_play_starts),
+  );
 
   return {
     listenedMs,
     listeningTimeLabel:
       listenedMs == null ? "—" : formatListeningDuration(listenedMs),
-    averagePerListenerLabel:
-      listenedMs == null ? "—" : formatAverageListening(listenedMs, listeners),
-    averagePerStartLabel:
-      listenedMs == null ? "—" : formatAverageListening(listenedMs, playStarts),
+    averagePerListenerLabel: averages.perListener,
+    averagePerStartLabel: averages.perStart,
     listeningTimeNotice:
       validFrom && (partial || unmeasured)
         ? formatListeningTimeNotice(validFrom)
@@ -968,6 +971,8 @@ export async function getAdminAnalyticsSummaryBundle(
     : mapTimeseriesPoints(timeseriesData.points);
   const listeningSnapshot = (listeningRes.data ?? null) as {
     listened_ms?: number | null;
+    measured_listeners?: number | null;
+    measured_play_starts?: number | null;
     valid_from?: string | null;
     partial?: boolean;
     unmeasured?: boolean;
@@ -977,8 +982,6 @@ export async function getAdminAnalyticsSummaryBundle(
   );
   const listeningTime = presentListeningTime(
     listeningRes.error ? null : listeningSnapshot,
-    overviewBase.listeners,
-    overviewBase.playStarts,
     Boolean(listeningRes.error),
   );
   const listeningByBucket = new Map<string, number | null>();

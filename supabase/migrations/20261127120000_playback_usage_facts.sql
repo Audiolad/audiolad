@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.playback_usage_facts (
 );
 
 COMMENT ON TABLE public.playback_usage_facts IS
-  'audiolad:playback-usage; append-only server-accepted MEDIA-TIME where listened_ms > 0. Not a royalty. UNIQUE(client_event_id) plus context last_sample_seq. practice_id, audio_item_id, and author_id_snapshot are immutable snapshots with no FK, so product deletion cannot erase history. Admin analytics still join the current practice.';
+  'audiolad:playback-usage; append-only server-accepted MEDIA-TIME where listened_ms > 0. Not a royalty. UNIQUE(client_event_id) plus context last_sample_seq. practice_id, audio_item_id, and author_id_snapshot are immutable snapshots with no FK, so product deletion cannot erase history. Admin totals keep those rows; author filters use author_id_snapshot.';
 
 COMMENT ON COLUMN public.playback_usage_facts.practice_id IS
   'Snapshot of the practice at accept time. No foreign key: deleting the practice must not delete the fact.';
@@ -473,8 +473,10 @@ GRANT EXECUTE ON FUNCTION public.apply_playback_usage_heartbeat(
 ) TO service_role;
 
 -- Filtered positive facts for admin period analytics.
--- Author filter uses the current practice author. UTM and device use the linked
--- analytics session (session-touch), the same predicate as product events.
+-- Author attribution is the author at consumption (author_id_snapshot), so a
+-- later product transfer does not rewrite the past. A missing practice does
+-- not drop the row: platform totals keep historical facts. UTM and device use
+-- the linked analytics session (session-touch), the same predicate as product events.
 CREATE OR REPLACE FUNCTION public.playback_usage_admin_facts(
   p_from timestamptz DEFAULT NULL,
   p_to timestamptz DEFAULT NULL,
@@ -491,7 +493,8 @@ RETURNS TABLE (
   occurred_at timestamptz,
   visitor_key text,
   session_id uuid,
-  user_id uuid
+  user_id uuid,
+  author_id_snapshot uuid
 )
 LANGUAGE sql
 STABLE
@@ -509,14 +512,18 @@ AS $$
       f.occurred_at
     ),
     f.session_id,
-    f.user_id
+    f.user_id,
+    coalesce(f.author_id_snapshot, pr.author_id)
   FROM public.playback_usage_facts AS f
-  JOIN public.practices AS pr ON pr.id = f.practice_id
+  LEFT JOIN public.practices AS pr ON pr.id = f.practice_id
   LEFT JOIN public.analytics_sessions AS s ON s.id = f.session_id
   WHERE f.listened_ms > 0
     AND (p_from IS NULL OR f.occurred_at >= p_from)
     AND (p_to IS NULL OR f.occurred_at < p_to)
-    AND (p_author_id IS NULL OR pr.author_id = p_author_id)
+    AND (
+      p_author_id IS NULL
+      OR coalesce(f.author_id_snapshot, pr.author_id) = p_author_id
+    )
     AND (p_practice_id IS NULL OR f.practice_id = p_practice_id)
     AND public.admin_analytics_p2_utm_matches(p_utm_source, s.utm_source)
     AND (
@@ -542,7 +549,7 @@ AS $$
       OR NOT EXISTS (
         SELECT 1
         FROM public.author_members AS am
-        WHERE am.author_id = pr.author_id
+        WHERE am.author_id = coalesce(f.author_id_snapshot, pr.author_id)
           AND am.user_id = f.user_id
       )
     );
@@ -551,7 +558,7 @@ $$;
 COMMENT ON FUNCTION public.playback_usage_admin_facts(
   timestamptz, timestamptz, boolean, uuid, uuid, text, text
 ) IS
-  'audiolad:playback-usage; positive listened_ms facts with the existing admin session-touch and self-traffic filters.';
+  'audiolad:playback-usage; positive listened_ms facts. Author filter is author_id_snapshot at consumption. Deleted practices stay in the platform total. Session-touch UTM/device and self-traffic filters match product events.';
 
 REVOKE ALL ON FUNCTION public.playback_usage_admin_facts(
   timestamptz, timestamptz, boolean, uuid, uuid, text, text
@@ -577,9 +584,13 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_valid_from timestamptz;
+  v_effective_from timestamptz;
   v_unmeasured boolean := false;
   v_partial boolean := false;
   v_listened bigint := 0;
+  v_listeners integer := 0;
+  v_starts integer := 0;
+  v_metrics jsonb;
 BEGIN
   SELECT s.listening_time_valid_from
   INTO v_valid_from
@@ -591,16 +602,42 @@ BEGIN
     AND v_valid_from IS NOT NULL
     AND (p_from IS NULL OR p_from < v_valid_from);
 
+  -- GREATEST(NULL, valid_from) is NULL, so All (p_from NULL) must take valid_from.
+  IF v_valid_from IS NULL THEN
+    v_effective_from := p_from;
+  ELSIF p_from IS NULL OR p_from < v_valid_from THEN
+    v_effective_from := v_valid_from;
+  ELSE
+    v_effective_from := p_from;
+  END IF;
+
   IF NOT v_unmeasured THEN
     SELECT coalesce(sum(f.listened_ms), 0)::bigint
     INTO v_listened
     FROM public.playback_usage_admin_facts(
-      p_from, p_to, p_include_test, p_author_id, p_practice_id, p_utm_source, p_device_type
+      v_effective_from, p_to, p_include_test, p_author_id, p_practice_id, p_utm_source, p_device_type
     ) AS f;
+
+    -- Denominators share this measured window and the same filters.
+    -- Ordinary listener/start KPIs stay on the selected period elsewhere.
+    v_metrics := public.admin_analytics_p2_window_metrics(
+      v_effective_from,
+      p_to,
+      coalesce(p_include_test, false),
+      p_author_id,
+      p_practice_id,
+      p_utm_source,
+      p_device_type
+    );
+    v_listeners := coalesce((v_metrics ->> 'listeners')::integer, 0);
+    v_starts := coalesce((v_metrics ->> 'play_starts')::integer, 0);
   END IF;
 
   RETURN jsonb_build_object(
     'listened_ms', CASE WHEN v_unmeasured THEN NULL ELSE v_listened END,
+    'measured_listeners', CASE WHEN v_unmeasured THEN NULL ELSE v_listeners END,
+    'measured_play_starts', CASE WHEN v_unmeasured THEN NULL ELSE v_starts END,
+    'effective_from', CASE WHEN v_unmeasured THEN NULL ELSE v_effective_from END,
     'valid_from', v_valid_from,
     'partial', v_partial,
     'unmeasured', v_unmeasured
@@ -611,7 +648,7 @@ $$;
 COMMENT ON FUNCTION public.admin_analytics_listening_time(
   timestamptz, timestamptz, boolean, uuid, uuid, text, text
 ) IS
-  'audiolad:playback-usage; SUM(listened_ms) for the admin activity cards. Null when the whole window is before listening_time_valid_from.';
+  'audiolad:playback-usage; SUM(listened_ms) plus measured-window listeners and audio_play_started for averages. effective_from is greatest(selected_from, listening_time_valid_from), with NULL selected_from meaning All. Null listened_ms when the whole window is before valid_from. Does not replace period KPIs.';
 
 REVOKE ALL ON FUNCTION public.admin_analytics_listening_time(
   timestamptz, timestamptz, boolean, uuid, uuid, text, text
@@ -826,7 +863,10 @@ BEGIN
       AND (v_device IS NULL OR device_type = v_device)
   ),
   usage_by_practice AS (
-    SELECT practice_id, coalesce(sum(listened_ms), 0)::bigint AS listened_ms
+    SELECT
+      practice_id,
+      coalesce(sum(listened_ms), 0)::bigint AS listened_ms,
+      (array_agg(author_id_snapshot) FILTER (WHERE author_id_snapshot IS NOT NULL))[1] AS author_id_snapshot
     FROM public.playback_usage_admin_facts(
       p_from, p_to, v_include_test, p_author_id, p_practice_id, p_utm_source, p_device_type
     )
@@ -856,7 +896,8 @@ BEGIN
       count(DISTINCT e.visitor_key) FILTER (
         WHERE e.event_name = 'first_manual_library_save' AND e.visitor_key IS NOT NULL
       )::int AS unique_savers,
-      coalesce(max(u.listened_ms), 0)::bigint AS listened_ms
+      coalesce(max(u.listened_ms), 0)::bigint AS listened_ms,
+      (array_agg(u.author_id_snapshot) FILTER (WHERE u.author_id_snapshot IS NOT NULL))[1] AS author_id_snapshot
     FROM practice_ids AS ids
     LEFT JOIN included_events AS e ON e.practice_id = ids.practice_id
     LEFT JOIN usage_by_practice AS u ON u.practice_id = ids.practice_id
@@ -900,8 +941,11 @@ BEGIN
       SELECT jsonb_agg(
         jsonb_build_object(
           'practiceId', pg.practice_id,
-          'title', coalesce(nullif(btrim(pr.title), ''), 'Практика'),
-          'authorId', pr.author_id,
+          'title', CASE
+            WHEN pr.id IS NULL THEN 'Удалённая практика'
+            ELSE coalesce(nullif(btrim(pr.title), ''), 'Практика')
+          END,
+          'authorId', coalesce(pr.author_id, pg.author_id_snapshot),
           'authorName', coalesce(nullif(btrim(a.name), ''), 'Автор'),
           'authorSlug', a.slug,
           'practiceSlug', pr.slug,
@@ -930,7 +974,7 @@ BEGIN
       )
       FROM page AS pg
       LEFT JOIN public.practices AS pr ON pr.id = pg.practice_id
-      LEFT JOIN public.authors AS a ON a.id = pr.author_id
+      LEFT JOIN public.authors AS a ON a.id = coalesce(pr.author_id, pg.author_id_snapshot)
     ), '[]'::jsonb)
   )
   INTO v_result;
