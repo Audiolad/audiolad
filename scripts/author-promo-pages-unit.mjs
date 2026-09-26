@@ -212,9 +212,9 @@ function testPublishedLinkVisibility() {
     "copy link only in published branch",
   );
   assert(
-    pagesClient.includes("buildMaxPromoDeepLink") &&
-      pagesClient.includes("Скопировать MAX-ссылку"),
-    "published promo pages expose MAX deep link",
+    !pagesClient.includes("buildMaxPromoDeepLink") &&
+      !pagesClient.includes("Скопировать MAX-ссылку"),
+    "MAX deep links stay hidden until Mini App bot binding is ready",
   );
   assert(form.includes("isPublished"), "form read-only when published");
   assert(!preview.includes("buildPromoPageUrl"), "preview does not expose public url builder");

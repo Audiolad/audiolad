@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import AuthorPromoPageForm from "@/components/author-dashboard/AuthorPromoPageForm";
 import PromoPagePreviewModal from "@/components/promo-pages/PromoPagePreviewModal";
 import type { PromoPagePresentationProduct } from "@/components/promo-pages/PromoPagePresentation";
-import { buildMaxPromoDeepLink } from "@/lib/max/startapp";
 import { buildPromoPagePath } from "@/lib/promo-pages/paths";
 import { mapPublicPromoPageCtaBlock } from "@/lib/promo-pages/public-page";
 import {
@@ -47,7 +46,6 @@ export default function AuthorPromoPagesClient({
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [copiedPageId, setCopiedPageId] = useState<string | null>(null);
-  const [copiedMaxPageId, setCopiedMaxPageId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
@@ -264,17 +262,6 @@ export default function AuthorPromoPagesClient({
     }
   }
 
-  async function handleCopyMaxLink(page: PromoPageListItem) {
-    const url = buildMaxPromoDeepLink(page.id);
-    if (!url) return;
-
-    const ok = await copyTextToClipboard(url);
-    if (ok) {
-      setCopiedMaxPageId(page.id);
-      window.setTimeout(() => setCopiedMaxPageId(null), 1800);
-    }
-  }
-
   const sortedPages = useMemo(
     () =>
       [...pages].sort(
@@ -434,15 +421,6 @@ export default function AuthorPromoPagesClient({
                         className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5]"
                       >
                         {copiedPageId === page.id ? "Ссылка скопирована" : "Скопировать ссылку"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyMaxLink(page)}
-                        className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5]"
-                      >
-                        {copiedMaxPageId === page.id
-                          ? "MAX-ссылка скопирована"
-                          : "Скопировать MAX-ссылку"}
                       </button>
                     </>
                   )}

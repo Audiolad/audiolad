@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 
-import AuthorMaxDeepLinkCard from "@/components/author-dashboard/AuthorMaxDeepLinkCard";
 import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { AuthorAccessError, listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
@@ -10,7 +9,6 @@ import {
 } from "@/lib/author-products/dashboard-edit-page";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
-import { buildMaxProductDeepLink } from "@/lib/max/startapp";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -107,36 +105,24 @@ export default async function EditAuthorProductPage({
     .order("title")
     .limit(8);
 
-  const maxProductDeepLink =
-    product.practice.status === "published" &&
-    product.practice.is_catalog_listed === true &&
-    product.practice.catalog_visibility === "listed"
-      ? buildMaxProductDeepLink(product.practice.id)
-      : null;
-
   return (
     <AuthorShell
       title="Редактировать аудиопродукт"
       subtitle={product.practice.title}
       internalBackHref="/author-dashboard"
     >
-      <div className="space-y-6">
-        {maxProductDeepLink ? (
-          <AuthorMaxDeepLinkCard url={maxProductDeepLink} />
-        ) : null}
-        <AuthorProductForm
-          authors={authors}
-          relatedProductOptions={(relatedProducts ?? []).map((item) => ({
-            value: item.id,
-            label: item.title,
-          }))}
-          initialProduct={product}
-          initialWizardStep={initialWizardStep}
-          initialSeoReservationContext={initialSeoReservationContext}
-          topicFormData={topicFormData}
-          mode="edit"
-        />
-      </div>
+      <AuthorProductForm
+        authors={authors}
+        relatedProductOptions={(relatedProducts ?? []).map((item) => ({
+          value: item.id,
+          label: item.title,
+        }))}
+        initialProduct={product}
+        initialWizardStep={initialWizardStep}
+        initialSeoReservationContext={initialSeoReservationContext}
+        topicFormData={topicFormData}
+        mode="edit"
+      />
     </AuthorShell>
   );
 }

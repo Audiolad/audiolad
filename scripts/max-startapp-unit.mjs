@@ -81,18 +81,6 @@ const home = readFileSync(
   join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"),
   "utf8",
 );
-const promoPages = readFileSync(
-  join(process.cwd(), "src/components/author-dashboard/AuthorPromoPagesClient.tsx"),
-  "utf8",
-);
-const productPage = readFileSync(
-  join(process.cwd(), "src/app/(platform)/author-dashboard/products/[id]/page.tsx"),
-  "utf8",
-);
-const maxCard = readFileSync(
-  join(process.cwd(), "src/components/author-dashboard/AuthorMaxDeepLinkCard.tsx"),
-  "utf8",
-);
 
 assert.ok(
   verifyRoute.indexOf("verifyMaxInitData(initData, botToken)") <
@@ -110,12 +98,6 @@ assert.match(bridge, /initialStartTarget=\{startTarget\}/);
 assert.match(home, /initialStartTarget\?\.kind === "promo"/);
 assert.match(home, /initialStartTarget\?\.kind === "product"/);
 assert.match(home, /productSlug: initialStartTarget\.productSlug/);
-assert.match(promoPages, /buildMaxPromoDeepLink\(page\.id\)/);
-assert.match(promoPages, /Скопировать MAX-ссылку/);
-assert.match(productPage, /buildMaxProductDeepLink\(product\.practice\.id\)/);
-assert.match(productPage, /AuthorMaxDeepLinkCard/);
-assert.match(maxCard, /Ссылка для MAX/);
-assert.match(maxCard, /Скопировать MAX-ссылку/);
 assert.doesNotMatch(
   `${verifyRoute}\n${resolver}`,
   /initDataUnsafe/,
