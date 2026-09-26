@@ -8,6 +8,11 @@ import {
   AUTHOR_PROJECT_DESCRIPTION_MAX,
   AUTHOR_PROJECT_NAME_MAX,
 } from "@/lib/author-projects/constants";
+import {
+  AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
+  AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
 import { setAuthorProjectCookieClient } from "@/lib/author-projects/selection";
 import {
   slugifyAuthorProjectName,
@@ -31,6 +36,7 @@ export default function AuthorCreateProjectForm() {
     return slugifyAuthorProjectName(name);
   }, [name]);
   const slug = slugManual ?? previewSlug;
+  const latinNameError = getAuthorProjectNameCyrillicError(name);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -115,11 +121,26 @@ export default function AuthorCreateProjectForm() {
             <input
               value={name}
               maxLength={AUTHOR_PROJECT_NAME_MAX}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError(null);
+              }}
               className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-              placeholder="Например, Аурафон"
+              placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
+              aria-invalid={Boolean(latinNameError)}
+              aria-describedby={
+                latinNameError ? "project-name-hint project-name-error" : "project-name-hint"
+              }
               required
             />
+            <span id="project-name-hint" className="mt-1.5 block text-xs leading-5 text-[#8a7daf]">
+              {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
+            </span>
+            {latinNameError ? (
+              <span id="project-name-error" className="mt-1.5 block text-sm text-[#9b3d3d]" role="alert">
+                {latinNameError}
+              </span>
+            ) : null}
           </label>
 
           <label className="mt-4 block">
@@ -165,7 +186,7 @@ export default function AuthorCreateProjectForm() {
 
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || Boolean(latinNameError)}
           className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
         >
           {busy ? "Создаём…" : "Создать проект"}

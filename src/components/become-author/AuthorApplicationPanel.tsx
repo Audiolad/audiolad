@@ -40,6 +40,11 @@ import type {
   BecomeAuthorAudience,
 } from "@/lib/author-applications/types";
 import {
+  AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
+  AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
+import {
   AUTHOR_APPLICATION_LIMITS,
   buildAuthorApplicationFormData,
   rowToFormValues,
@@ -214,12 +219,22 @@ function AuthorApplicationForm({
 
   const hasContactPreview =
     values.contactEmail.trim().length > 0 || values.contactDetails.trim().length > 0;
+  const displayNameLatinError = updateContactsOnly
+    ? null
+    : getAuthorProjectNameCyrillicError(values.displayName);
+  const displayNameError = displayNameLatinError ?? errors.displayName;
 
   return (
     <form
       className="space-y-4 pb-2"
       onSubmit={(event) => {
         event.preventDefault();
+        if (
+          !updateContactsOnly &&
+          getAuthorProjectNameCyrillicError(values.displayName)
+        ) {
+          return;
+        }
         onSubmit();
       }}
     >
@@ -258,12 +273,18 @@ function AuthorApplicationForm({
           maxLength={AUTHOR_APPLICATION_LIMITS.displayNameMax}
           value={values.displayName}
           onChange={(event) => patchValues({ displayName: event.currentTarget.value })}
-          aria-invalid={Boolean(errors.displayName)}
-          aria-describedby={errors.displayName ? "displayName-error" : undefined}
+          placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
+          aria-invalid={Boolean(displayNameError)}
+          aria-describedby={
+            displayNameError ? "displayName-hint displayName-error" : "displayName-hint"
+          }
           className={becomeAuthorInputClass}
           disabled={isPending}
         />
-        <FieldError id="displayName-error" message={errors.displayName} />
+        <p id="displayName-hint" className="mt-2 text-xs leading-5 text-[#8a7ca9]">
+          {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
+        </p>
+        <FieldError id="displayName-error" message={displayNameError} />
       </div>
 
       <AuthorApplicationDirectionPicker
@@ -530,7 +551,7 @@ function AuthorApplicationForm({
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || Boolean(displayNameLatinError)}
         aria-busy={isPending}
         className="flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >

@@ -3,6 +3,7 @@ import {
   AUTHOR_PROJECT_NAME_MIN,
   AUTHOR_PROJECT_SLUG_MAX,
 } from "@/lib/author-projects/constants";
+import { getAuthorProjectNameCyrillicError } from "@/lib/author-projects/cyrillic-name";
 
 const CYRILLIC =
   "абвгдеёжзийклмнопрстуфхцчшщъыьэюя";
@@ -35,6 +36,11 @@ export function validateAuthorProjectName(
   name: string,
 ): string | null {
   const trimmed = name.trim();
+  const cyrillicError = getAuthorProjectNameCyrillicError(trimmed);
+  if (cyrillicError) {
+    return cyrillicError;
+  }
+
   if (
     trimmed.length < AUTHOR_PROJECT_NAME_MIN ||
     trimmed.length > AUTHOR_PROJECT_NAME_MAX

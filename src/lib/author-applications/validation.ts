@@ -1,3 +1,4 @@
+import { getAuthorProjectNameCyrillicError } from "@/lib/author-projects/cyrillic-name";
 import {
   getEmailValidationMessage,
   validateEmailForRegistrationServer,
@@ -233,7 +234,12 @@ export function validateAuthorApplicationFormValues(
   const errors: AuthorApplicationFieldErrors = {};
   const requireConsent = options?.requireConsent ?? true;
 
-  if (
+  const displayNameCyrillicError = getAuthorProjectNameCyrillicError(
+    values.displayName,
+  );
+  if (displayNameCyrillicError) {
+    errors.displayName = displayNameCyrillicError;
+  } else if (
     values.displayName.length < AUTHOR_APPLICATION_LIMITS.displayNameMin ||
     values.displayName.length > AUTHOR_APPLICATION_LIMITS.displayNameMax
   ) {

@@ -31,6 +31,12 @@ import {
   getAuthorContactUrlError,
 } from "@/lib/authors/contacts-validation";
 import {
+  AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
+  AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
+  AUTHOR_PROJECT_NAME_LATIN_ERROR,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
+import {
   getFullBioLengthError,
   getShortPositioningLengthError,
 } from "@/lib/authors/validation";
@@ -197,6 +203,13 @@ export default function AuthorProfileClient({
       return;
     }
 
+    const nameLatinError = getAuthorProjectNameCyrillicError(name);
+    if (nameLatinError) {
+      setError(nameLatinError);
+      setSuccess(null);
+      return;
+    }
+
     const fullBioError = getFullBioLengthError(fullBio.trim().length);
 
     if (fullBioError) {
@@ -250,7 +263,13 @@ export default function AuthorProfileClient({
       });
 
       if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
+        const payload = (await response.json()) as {
+          error?: string;
+          message?: string;
+        };
+        if (payload.error === "invalid_project_name" && payload.message) {
+          throw new Error(payload.message);
+        }
         throw new Error(payload.error ?? "save_failed");
       }
 
@@ -272,7 +291,9 @@ export default function AuthorProfileClient({
       setSuccess("Изменения сохранены.");
     } catch (saveError) {
       setError(
-        saveError instanceof Error && saveError.message === "featured_product_forbidden"
+        saveError instanceof Error && saveError.message === AUTHOR_PROJECT_NAME_LATIN_ERROR
+          ? AUTHOR_PROJECT_NAME_LATIN_ERROR
+          : saveError instanceof Error && saveError.message === "featured_product_forbidden"
           ? "Можно добавлять только собственные опубликованные продукты."
           : saveError instanceof Error && saveError.message === "invalid_contacts"
             ? "Проверьте контакты: нужна ссылка https или email, название и не больше 120 символов в коротком тексте."
@@ -301,6 +322,7 @@ export default function AuthorProfileClient({
 
   const shortPositioningLength = shortPositioning.trim().length;
   const fullBioLength = fullBio.length;
+  const nameLatinError = getAuthorProjectNameCyrillicError(name);
 
   if (!selectedAuthor) {
     return null;
@@ -327,8 +349,30 @@ export default function AuthorProfileClient({
                 onChange={(event) => setName(event.target.value)}
                 maxLength={120}
                 required
+                placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
+                aria-invalid={Boolean(nameLatinError)}
+                aria-describedby={
+                  nameLatinError
+                    ? "author-project-name-hint author-project-name-error"
+                    : "author-project-name-hint"
+                }
                 className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm"
               />
+              <span
+                id="author-project-name-hint"
+                className="mt-1.5 block text-xs leading-5 text-[#7d70a2]"
+              >
+                {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
+              </span>
+              {nameLatinError ? (
+                <span
+                  id="author-project-name-error"
+                  className="mt-1.5 block text-sm text-[#9b3d3d]"
+                  role="alert"
+                >
+                  {nameLatinError}
+                </span>
+              ) : null}
             </label>
 
             <label className="mt-5 block">
@@ -560,7 +604,7 @@ export default function AuthorProfileClient({
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || Boolean(nameLatinError)}
               className="inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
             >
               {saving ? "Сохранение…" : "Сохранить"}

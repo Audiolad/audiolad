@@ -1,22 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { createStudioWorkspace } from "@/app/(platform)/admin/authors/new/actions";
 import { CREATE_STUDIO_WORKSPACE_INITIAL_STATE } from "@/lib/admin/studio-author-workspace-form-state";
+import {
+  AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
+  AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
 
 export default function CreateStudioWorkspaceForm() {
   const [state, action, pending] = useActionState(
     createStudioWorkspace,
     CREATE_STUDIO_WORKSPACE_INITIAL_STATE,
   );
+  const [name, setName] = useState("");
+  const latinNameError = getAuthorProjectNameCyrillicError(name);
 
   return (
     <div className="space-y-5">
       <form
         action={action}
         className="space-y-5 rounded-[22px] border border-[#eadff8] bg-white p-5"
+        onSubmit={(event) => {
+          if (getAuthorProjectNameCyrillicError(name)) {
+            event.preventDefault();
+          }
+        }}
       >
         <div>
           <h2 className="text-lg font-semibold text-[#25135c]">Новая студия</h2>
@@ -32,8 +44,23 @@ export default function CreateStudioWorkspaceForm() {
             name="name"
             minLength={2}
             maxLength={100}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
+            aria-invalid={Boolean(latinNameError)}
+            aria-describedby={
+              latinNameError ? "studio-name-hint studio-name-error" : "studio-name-hint"
+            }
             className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#25135c]"
           />
+          <span id="studio-name-hint" className="mt-1.5 block text-xs leading-5 text-[#796ba0]">
+            {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
+          </span>
+          {latinNameError ? (
+            <span id="studio-name-error" className="mt-1.5 block text-sm text-[#b34f63]" role="alert">
+              {latinNameError}
+            </span>
+          ) : null}
         </label>
 
         <label className="block">
@@ -74,7 +101,7 @@ export default function CreateStudioWorkspaceForm() {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || Boolean(latinNameError)}
           className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
         >
           {pending ? "Создание…" : "Создать студию"}
