@@ -114,7 +114,7 @@ export default function MaxBridgeScript() {
         return;
       }
       if (event.type === "VERIFY_SUCCESS") {
-        setStartTarget(event.startTarget);
+        setStartTarget(event.startTarget ?? null);
       }
       applyEvent(event);
     })();
