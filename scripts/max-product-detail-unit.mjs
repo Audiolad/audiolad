@@ -20,6 +20,9 @@ assert.doesNotMatch(source, /h-48/);
 assert.doesNotMatch(source, /h-24\s+w-20/);
 assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
+assert.doesNotMatch(source, /description:\s*string \| null/);
+assert.match(source, /Array\.isArray\(product\.topics\)/);
+assert.match(source, /Array\.isArray\(product\.recommendations\)/);
 
 const catalogStart = catalogSource.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
 assert.notEqual(catalogStart, -1, "catalog list exists");
@@ -65,7 +68,7 @@ assert.match(source.slice(readyStart), /max-w-\[280px\]/);
 assert.match(source.slice(readyStart), /aspect-square/);
 const readyBlock = source.slice(readyStart);
 const headerEnd = Math.min(
-  ...["MaxAudioPlayer", 'playback.status === "loading"', "detail.product.description"]
+  ...["MaxAudioPlayer", 'playback.status === "loading"']
     .map((marker) => readyBlock.indexOf(marker))
     .filter((index) => index >= 0),
 );
@@ -86,11 +89,12 @@ const fieldOrder = [
   "detail.product.subtitle",
   "detail.product.authorName",
   "detail.product.statsLabel",
+  "detail.product.topics",
   "selected.isFree",
   "detail.product.priceLabel",
   "MaxAudioPlayer",
-  "detail.product.description",
   "detail.product.contents",
+  "detail.product.recommendations",
 ];
 let lastIndex = -1;
 for (const field of fieldOrder) {
@@ -108,14 +112,18 @@ assert.ok(
   readyBlock.indexOf("detail.product.priceLabel") < readyBlock.indexOf("MaxAudioPlayer"),
   "paid price is before player",
 );
+assert.doesNotMatch(readyBlock, /detail\.product\.description/);
+assert.match(readyBlock, /aria-label="Темы продукта"/);
+assert.match(readyBlock, /Ещё от автора/);
+assert.match(readyBlock, /onClick=\{\(\) => openCatalogProduct\(product\)\}/);
 assert.ok(
-  readyBlock.indexOf("MaxAudioPlayer") < readyBlock.indexOf("detail.product.description"),
-  "description is after player",
+  readyBlock.indexOf("detail.product.topics") < readyBlock.indexOf("MaxAudioPlayer"),
+  "topics are before player",
 );
 assert.ok(
-  readyBlock.indexOf('playback.status === "loading"') <
-    readyBlock.indexOf("detail.product.description"),
-  "playback states are before description",
+  readyBlock.indexOf("detail.product.contents") <
+    readyBlock.indexOf("detail.product.recommendations"),
+  "recommendations are after the product content",
 );
 
 console.log("max-product-detail-unit: ok");
