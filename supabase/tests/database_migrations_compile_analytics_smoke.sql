@@ -109,7 +109,7 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.authors (id, name, slug, access_status)
-  VALUES (v_author, 'Playback Usage Smoke', 'playback-usage-smoke', 'commercial');
+  VALUES (v_author, 'Проверка прослушивания', 'playback-usage-smoke', 'commercial');
 
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class
