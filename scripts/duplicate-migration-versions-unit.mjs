@@ -19,12 +19,14 @@ const EXPECTED_RENAMES = [
   ["20260830120300_public_playlist_selected_visibility.sql", "20260901120300_public_playlist_selected_visibility.sql"],
   ["20260830120400_fix_visibility_allowlist_author_policy.sql", "20260901120400_fix_visibility_allowlist_author_policy.sql"],
   ["20260901130000_author_support_mode.sql", "20260902120200_author_support_mode.sql"],
+  ["20261126120000_music_draft_track_teardown.sql", "20261126121000_music_draft_track_teardown.sql"],
 ];
 
 const EXPECTED_KEEP = [
   "20260716180000_author_applications_wants_training.sql",
   "20260716190000_author_applications_interested_in_school.sql",
   "20260728120000_author_payout_profiles.sql",
+  "20261126120000_author_project_name_cyrillic.sql",
 ];
 
 function main() {

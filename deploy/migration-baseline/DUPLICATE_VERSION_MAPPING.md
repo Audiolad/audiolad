@@ -23,6 +23,8 @@ Chronological order versus neighboring files is preserved.
 | `20260830120300_public_playlist_selected_visibility.sql` | `20260901120300_public_playlist_selected_visibility.sql` | RENAME |
 | `20260830120400_fix_visibility_allowlist_author_policy.sql` | `20260901120400_fix_visibility_allowlist_author_policy.sql` | RENAME |
 | `20260901130000_author_support_mode.sql` | `20260902120200_author_support_mode.sql` | RENAME |
+| `20261126120000_author_project_name_cyrillic.sql` | `20261126120000_author_project_name_cyrillic.sql` | KEEP |
+| `20261126120000_music_draft_track_teardown.sql` | `20261126121000_music_draft_track_teardown.sql` | RENAME |
 
 ## Why these new timestamps
 
@@ -33,6 +35,7 @@ remain after the kept file and before the next unrelated neighbor.
 - `20260716180000` (kept) → `20260716181000` → `20260716182000` → then `20260716190000`
 - `20260716190000` (kept) → `20260716191000` → then `20260716200000`
 - `20260728120000` (kept) → `20260728121000` → then `20260728140000`
+- `20261126120000` (kept, `author_project_name_cyrillic`) → `20261126121000` (`music_draft_track_teardown`). No later `20261126` neighbor.
 
 History-hole reissue (SQL unchanged; only versions moved after production max
 `20260831120000` and local max `20260901120000`):
