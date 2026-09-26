@@ -36,6 +36,7 @@ type MaxProductDetailState =
         formatLabel: string;
         coverUrl: string | null;
         priceLabel: string;
+        isFree: boolean;
         statsLabel: string | null;
         topics: Array<{ key: string; title: string }>;
         contents: Array<{ title: string; position: number; durationSeconds: number | null }>;
@@ -207,7 +208,10 @@ export default function MaxAuthenticatedHome() {
                   className="mt-4 aspect-square w-full max-w-[280px] mx-auto rounded-2xl object-cover"
                 />
               ) : null}
-              <h2 className="mt-2 text-2xl font-semibold">{detail.product.title}</h2>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
+                {detail.product.formatLabel}
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold">{detail.product.title}</h2>
               {detail.product.subtitle ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p>
               ) : null}
@@ -229,7 +233,7 @@ export default function MaxAuthenticatedHome() {
                   ))}
                 </ul>
               ) : null}
-              {!selected.isFree ? (
+              {!detail.product.isFree ? (
                 <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
               ) : null}
               {playback.status === "loading" ? (
