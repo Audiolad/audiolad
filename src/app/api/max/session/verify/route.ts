@@ -159,7 +159,7 @@ export async function POST(request: Request) {
       linked: false,
       maxAuthenticated: false,
       webSessionMatches: false,
-      startTarget,
+      ...(startTarget ? { startTarget } : {}),
     });
   }
 
@@ -186,6 +186,6 @@ export async function POST(request: Request) {
     linked: true,
     maxAuthenticated: true,
     webSessionMatches: binding.sessionMatches,
-    startTarget,
+    ...(startTarget ? { startTarget } : {}),
   });
 }
