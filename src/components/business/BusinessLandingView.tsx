@@ -315,21 +315,23 @@ export default function BusinessLandingView({
           </div>
         </section>
 
-        <section className="business-section" aria-labelledby="business-sources-title">
+        <section className="business-section business-section--sources" aria-labelledby="business-sources-title">
           <div className="business-wrap business-sources">
             <h2 id="business-sources-title" className="business-h2">
               Публичные источники
             </h2>
             <p className="business-lead">{BUSINESS_SOURCES_NOTE}</p>
-            <Poster
-              file="15-authoritative-sources.webp"
-              alt="Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
-              width={2172}
-              height={724}
-              sizes="(min-width: 1280px) 1320px, 100vw"
-              eager
-              className="business-poster business-sources-composite"
-            />
+            <div className="business-sources-frame">
+              <Poster
+                file="15-authoritative-sources.webp"
+                alt="Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
+                width={2172}
+                height={724}
+                sizes="(min-width: 1280px) 1320px, 100vw"
+                eager
+                className="business-poster business-sources-composite"
+              />
+            </div>
             <div className="business-logo-scroll" aria-label="Логотипы источников">
               {BUSINESS_SOURCES.map((source) => {
                 const image = (

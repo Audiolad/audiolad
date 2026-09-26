@@ -277,9 +277,11 @@ export const BUSINESS_SOURCES_NOTE =
   "Ссылки ведут на публичные страницы. Это не означает, что эти организации рекомендуют Аудиолад Бизнес.";
 
 /**
- * Baked-in quotes on cards 16/17/18 were checked against the Civil Code,
- * rao.ru and RBC. They are paraphrases, not the source text, so the
- * carousel stays off. Do not render these strings while the flag is false.
+ * Cards 16–18 stay off. Do not render them or reserve their height.
+ * 16 paraphrases GK RF art. 1270 (public performance needs consent); it is not a literal quote.
+ * 17 calls RAO a rightsholder via «например, с РАО» and skips related rights.
+ * 18’s footer says RBC; the concrete article that supports the sense is Kommersant
+ * (https://www.kommersant.ru/doc/8516425), so the asset attribution does not match.
  */
 export const BUSINESS_LEGAL_QUOTE_CARDS_ENABLED = false;
 
