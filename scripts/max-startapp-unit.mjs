@@ -96,7 +96,7 @@ const maxCard = readFileSync(
 
 assert.ok(
   verifyRoute.indexOf("verifyMaxInitData(initData, botToken)") <
-    verifyRoute.indexOf("resolveMaxStartTarget"),
+    verifyRoute.indexOf("(resolveMaxStartTargetImpl ?? resolveMaxStartTarget)"),
   "start target must be resolved only after HMAC verification",
 );
 assert.match(verifyRoute, /result\.data\.start_param/);
