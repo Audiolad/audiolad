@@ -140,32 +140,37 @@ export default function BusinessLandingView({
 
       <main id="content" className="business-main">
         <section className="business-section business-section--tight" aria-labelledby="business-hero-title">
-          <div className="business-wrap business-hero">
-            <div>
-              <p className="business-kicker">Аудиолад Бизнес</p>
-              <h1 id="business-hero-title" className="business-h1">
-                {BUSINESS_LANDING_H1}
-              </h1>
-              <p className="business-lead">{BUSINESS_LANDING_SUBCOPY}</p>
-              <p className="business-micro">{BUSINESS_HERO_MICRO}</p>
-              <div className="business-actions">
-                <a className="business-btn business-btn--primary" href="#venues">
-                  {BUSINESS_PICK_LABEL}
-                </a>
-                <p className="business-trust">{BUSINESS_HERO_TRUST}</p>
-                <a className="business-btn business-btn--secondary" href="#listen">
-                  {BUSINESS_LISTEN_LABEL}
-                </a>
+          <div className="business-wrap">
+            <div className="business-hero-banner" data-business-hero="banner">
+              <div className="business-hero-banner__copy">
+                <p className="business-kicker">Аудиолад Бизнес</p>
+                <h1 id="business-hero-title" className="business-h1">
+                  {BUSINESS_LANDING_H1}
+                </h1>
+                <p className="business-lead">{BUSINESS_LANDING_SUBCOPY}</p>
+                <p className="business-micro">{BUSINESS_HERO_MICRO}</p>
+                <div className="business-actions">
+                  <a className="business-btn business-btn--primary" href="#venues">
+                    {BUSINESS_PICK_LABEL}
+                  </a>
+                  <p className="business-trust">{BUSINESS_HERO_TRUST}</p>
+                  <a className="business-btn business-btn--secondary" href="#listen">
+                    {BUSINESS_LISTEN_LABEL}
+                  </a>
+                </div>
+              </div>
+              <div className="business-hero-banner__visual" aria-hidden="true">
+                <Poster
+                  file="01-business-music.webp"
+                  alt=""
+                  width={1254}
+                  height={1254}
+                  sizes="(min-width: 1100px) 480px, 92vw"
+                  priority
+                  className="business-hero-banner__photo"
+                />
               </div>
             </div>
-            <Poster
-              file="01-business-music.webp"
-              alt=""
-              width={1254}
-              height={1254}
-              sizes="(min-width: 1100px) 46vw, 100vw"
-              priority
-            />
           </div>
         </section>
 

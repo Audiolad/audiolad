@@ -42,7 +42,7 @@
 
 .business-header__bar,
 .business-wrap {
-  width: min(1120px, calc(100% - 28px));
+  width: min(1200px, calc(100% - 32px));
   margin-inline: auto;
 }
 
@@ -160,10 +160,41 @@
   max-width: 40rem;
 }
 
-.business-hero {
+.business-hero-banner {
   display: grid;
-  gap: 28px;
-  align-items: center;
+  gap: 22px;
+}
+
+.business-hero-banner__copy {
+  min-width: 0;
+}
+
+.business-hero-banner__visual {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  aspect-ratio: 4 / 3;
+  background: #efe4d8;
+  pointer-events: none;
+}
+
+/*
+ * 01-business-music.webp is a square poster with the same headline, subcopy
+ * and CTA baked into the left half and category labels along the bottom.
+ * The photo is scaled so the banner shows only the lifestyle crop
+ * (source x 62–96%, y from 12%): portrait, plants and laptop.
+ * The far-right shop lettering and the left marketing plate stay outside the frame.
+ */
+.business-hero-banner__photo {
+  position: absolute;
+  width: calc(100% / 0.34);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 1;
+  right: calc(100% * -0.04 / 0.34);
+  top: 0;
+  transform: translateY(-12%);
+  object-fit: cover;
 }
 
 .business-actions {
@@ -696,7 +727,7 @@ body:has(.business-landing) .global-mini-player {
 @media (min-width: 1100px) {
   .business-header__bar,
   .business-wrap {
-    width: min(1280px, calc(100% - 72px));
+    width: min(1200px, calc(100% - 80px));
   }
 
   .business-section {
@@ -704,11 +735,10 @@ body:has(.business-landing) .global-mini-player {
   }
 
   .business-section--tight {
-    padding-top: 8px;
-    padding-bottom: 12px;
+    padding-top: 20px;
+    padding-bottom: 16px;
   }
 
-  .business-hero,
   .business-split--half,
   .business-split--compose {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -716,8 +746,76 @@ body:has(.business-landing) .global-mini-player {
     align-items: center;
   }
 
-  .business-hero {
-    min-height: calc(100dvh - 92px);
+  .business-hero-banner {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+    gap: 0;
+    align-items: stretch;
+    min-height: 520px;
+    overflow: hidden;
+    border: 1px solid var(--bl-line);
+    border-radius: 32px;
+    background: #fffdfb;
+    box-shadow: 0 22px 50px rgba(88, 52, 16, 0.07);
+  }
+
+  .business-hero-banner__copy {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 40px 20px 40px 44px;
+  }
+
+  .business-hero-banner__copy .business-h1 {
+    max-width: 16ch;
+    font-size: clamp(40px, 3.1vw, 52px);
+  }
+
+  .business-hero-banner__copy .business-lead,
+  .business-hero-banner__copy .business-micro {
+    max-width: 34rem;
+  }
+
+  .business-hero-banner .business-actions {
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+  }
+
+  .business-hero-banner .business-btn--primary {
+    order: 1;
+  }
+
+  .business-hero-banner .business-btn--secondary {
+    order: 2;
+  }
+
+  .business-hero-banner .business-trust {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .business-hero-banner__visual {
+    height: auto;
+    min-height: 100%;
+    margin-left: -48px;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+
+  .business-hero-banner__visual::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      #fffdfb 0%,
+      rgba(255, 253, 251, 0.78) 12%,
+      rgba(255, 253, 251, 0) 34%
+    );
+    pointer-events: none;
   }
 
   .business-h1 {
@@ -795,13 +893,6 @@ body:has(.business-landing) .global-mini-player {
 
   .business-sources .business-source-list {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1600px) {
-  .business-header__bar,
-  .business-wrap {
-    width: min(1440px, calc(100% - 96px));
   }
 }
 

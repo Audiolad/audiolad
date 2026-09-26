@@ -103,6 +103,39 @@ assert.match(view, /BUSINESS_PICK_LABEL/);
 assert.match(view, /Как звучит ваш бизнес\?/);
 assert.match(view, /business-trust/);
 assert.match(view, /business-header__menu/);
+assert.match(view, /data-business-hero="banner"/);
+assert.match(view, /business-hero-banner__visual/);
+assert.match(view, /file="01-business-music\.webp"/);
+assert.doesNotMatch(view, /className="business-hero"/);
+
+const businessCss = read("src/components/business/business-landing.css");
+assert.match(businessCss, /min\(1200px,\s*calc\(100% - 80px\)\)/);
+assert.doesNotMatch(businessCss, /1440px/);
+assert.doesNotMatch(businessCss, /100dvh - 92px/);
+assert.match(
+  businessCss,
+  /\.business-hero-banner__photo\s*\{[^}]*width:\s*calc\(100% \/ 0\.34\)/,
+);
+assert.match(businessCss, /translateY\(-12%\)/);
+assert.match(businessCss, /right:\s*calc\(100% \* -0\.04 \/ 0\.34\)/);
+
+const businessUiFiles = [
+  "src/components/business/BusinessLandingView.tsx",
+  "src/components/business/BusinessInquiryForm.tsx",
+  "src/components/business/BusinessListenStudio.tsx",
+  "src/components/business/BusinessListenRail.tsx",
+  "src/components/business/BusinessSnapCarousel.tsx",
+  "src/components/business/BusinessSocialProofSlot.tsx",
+  "src/components/business/business-landing.css",
+  "src/lib/business/landing.ts",
+  "src/lib/business/metadata.ts",
+  "src/lib/business/listen-selection.ts",
+];
+for (const relativePath of businessUiFiles) {
+  const source = read(relativePath);
+  assert.doesNotMatch(source, /\u2014/, `${relativePath} uses an em dash`);
+  assert.doesNotMatch(source, /Audiolad Business/i, relativePath);
+}
 const studio = read("src/components/business/BusinessListenStudio.tsx");
 assert.match(studio, /Музыка подобрана под выбранную атмосферу|BUSINESS_LISTEN_MATCHED/);
 assert.match(studio, /Послушать музыку|BUSINESS_LISTEN_PLAY/);
