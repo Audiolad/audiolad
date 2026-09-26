@@ -98,7 +98,7 @@ export function BizHelpIcon({ active = false, className }: IconProps) {
   );
 }
 
-export function BizMoreIcon({ active = false, className }: IconProps) {
+export function BizMoreIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={`${iconBase} ${className ?? ""}`} aria-hidden focusable="false">
       <circle cx="6" cy="12" r="1.6" fill="currentColor" />

@@ -86,26 +86,22 @@ function NavLink({
   );
 }
 
+function readInitialCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const stored = window.localStorage.getItem(BUSINESS_SIDEBAR_STORAGE_KEY);
+    if (stored === "collapsed") return true;
+    if (stored === "expanded") return false;
+    return window.matchMedia("(max-width: 1200px)").matches;
+  } catch {
+    return false;
+  }
+}
+
 export default function BusinessSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [collapsed, setCollapsed] = useState(readInitialCollapsed);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(BUSINESS_SIDEBAR_STORAGE_KEY);
-      if (stored === "collapsed") setCollapsed(true);
-      else if (stored === "expanded") setCollapsed(false);
-      else if (window.matchMedia("(max-width: 1200px)").matches) {
-        setCollapsed(true);
-      }
-    } catch {
-      // ignore storage errors
-    }
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
     const width = collapsed
       ? BUSINESS_SIDEBAR_COLLAPSED_WIDTH_PX
       : BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX;
@@ -121,7 +117,7 @@ export default function BusinessSidebar() {
     } catch {
       // ignore
     }
-  }, [collapsed, ready]);
+  }, [collapsed]);
 
   const owner = BUSINESS_HOME_MOCK.owner;
   const location = BUSINESS_HOME_MOCK.location;
