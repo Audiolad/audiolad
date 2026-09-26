@@ -17,16 +17,19 @@ export default function BusinessListenRail({ items }: BusinessListenRailProps) {
   if (items.length === 0) {
     return (
       <div className="business-fallback" data-business-listen-state="fallback">
-        <p>
-          Сейчас в каталоге нет опубликованной музыки, которую можно показать
-          как пример для SPA, мягкого джаза, лаунжа, спокойного пиано или фона.
-          Заглушку со звуком мы не ставим.
-        </p>
-        <div className="business-actions">
-          <Link href="/catalog" className="business-btn business-btn--primary">
-            Открыть каталог
-          </Link>
+        <div className="business-fallback__copy">
+          <p>
+            Сейчас в каталоге нет опубликованной музыки, которую можно показать
+            как пример для SPA, мягкого джаза, лаунжа, спокойного пиано или фона.
+            Заглушку со звуком мы не ставим.
+          </p>
+          <div className="business-actions">
+            <Link href="/catalog" className="business-btn business-btn--primary">
+              Открыть каталог
+            </Link>
+          </div>
         </div>
+        <div className="business-fallback__art" aria-hidden="true" />
       </div>
     );
   }

@@ -40,6 +40,7 @@ function Poster({
   height,
   sizes,
   priority = false,
+  eager = false,
   className = "business-poster",
 }: {
   file: Parameters<typeof businessAssetPath>[0];
@@ -48,6 +49,7 @@ function Poster({
   height: number;
   sizes: string;
   priority?: boolean;
+  eager?: boolean;
   className?: string;
 }) {
   return (
@@ -58,6 +60,7 @@ function Poster({
       height={height}
       sizes={sizes}
       priority={priority}
+      loading={priority || eager ? "eager" : "lazy"}
       className={className}
     />
   );
@@ -113,7 +116,7 @@ export default function BusinessLandingView({
               alt=""
               width={1254}
               height={1254}
-              sizes="(min-width: 900px) 520px, 100vw"
+              sizes="(min-width: 1100px) 46vw, 100vw"
               priority
             />
           </div>
@@ -146,7 +149,7 @@ export default function BusinessLandingView({
                     alt=""
                     width={1254}
                     height={1254}
-                    sizes="(min-width: 1024px) 42vw, 84vw"
+                    sizes="(min-width: 1100px) 42vw, 88vw"
                   />
                   <p className="sr-only">{venue.name}</p>
                 </article>
@@ -177,13 +180,13 @@ export default function BusinessLandingView({
             <h2 id="business-how-title" className="business-h2">
               {BUSINESS_HOW_LABEL}
             </h2>
-            <div className="business-split">
+            <div className="business-split business-split--compose">
               <Poster
                 file="10-how-it-works.webp"
                 alt=""
                 width={1254}
                 height={1254}
-                sizes="(min-width: 900px) 520px, 100vw"
+                sizes="(min-width: 1100px) 46vw, 100vw"
               />
               <ol className="business-steps">
                 {BUSINESS_STEPS.map((step, index) => (
@@ -221,7 +224,7 @@ export default function BusinessLandingView({
         </section>
 
         <section className="business-section" id="trial" aria-labelledby="business-trial-title">
-          <div className="business-wrap business-split">
+          <div className="business-wrap business-split business-split--half">
             <div>
               <h2 id="business-trial-title" className="business-h2">
                 Попробовать
@@ -247,19 +250,19 @@ export default function BusinessLandingView({
               alt=""
               width={1254}
               height={1254}
-              sizes="(min-width: 900px) 520px, 100vw"
+              sizes="(min-width: 1100px) 46vw, 100vw"
             />
           </div>
         </section>
 
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
-          <div className="business-wrap business-split">
+          <div className="business-wrap business-split business-split--half">
             <Poster
               file="11-rights-documents.webp"
               alt=""
               width={1254}
               height={1254}
-              sizes="(min-width: 900px) 520px, 100vw"
+              sizes="(min-width: 1100px) 46vw, 100vw"
             />
             <div>
               <h2 id="business-rights-title" className="business-h2">
@@ -305,14 +308,15 @@ export default function BusinessLandingView({
               alt="Иллюстрация: легальная музыка и опора на публичные источники."
               width={1676}
               height={939}
-              sizes="(min-width: 1120px) 1120px, 100vw"
+              sizes="(min-width: 1280px) 1320px, 100vw"
+              eager
               className="business-banner"
             />
           </div>
         </section>
 
         <section className="business-section" aria-labelledby="business-sources-title">
-          <div className="business-wrap">
+          <div className="business-wrap business-sources">
             <h2 id="business-sources-title" className="business-h2">
               Публичные источники
             </h2>
@@ -322,7 +326,8 @@ export default function BusinessLandingView({
               alt="Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
               width={2172}
               height={724}
-              sizes="(min-width: 1120px) 1120px, 100vw"
+              sizes="(min-width: 1280px) 1320px, 100vw"
+              eager
               className="business-poster business-sources-composite"
             />
             <div className="business-logo-scroll" aria-label="Логотипы источников">
@@ -420,18 +425,16 @@ export default function BusinessLandingView({
         </section>
 
         <section className="business-section" id="connect" aria-labelledby="business-connect-title">
-          <div className="business-wrap business-split">
-            <div>
-              <h2 id="business-connect-title" className="business-h2">
-                Подключить
-              </h2>
-              <p className="business-lead">
-                Опубликованного тарифа нет, поэтому цена здесь не указана. Напишите,
-                сколько точек нужно подключить.
-              </p>
-              <div className="business-inquiry">
-                <BusinessInquiryForm />
-              </div>
+          <div className="business-wrap">
+            <h2 id="business-connect-title" className="business-h2">
+              Подключить
+            </h2>
+            <p className="business-lead">
+              Опубликованного тарифа нет, поэтому цена здесь не указана. Напишите,
+              сколько точек нужно подключить.
+            </p>
+            <div className="business-inquiry">
+              <BusinessInquiryForm />
             </div>
             <p className="business-copy">
               Заявка не создаёт аккаунт и не проводит оплату. Если почтовая
@@ -458,13 +461,13 @@ export default function BusinessLandingView({
         </section>
 
         <section className="business-section" aria-labelledby="business-final-title">
-          <div className="business-wrap business-split">
+          <div className="business-wrap business-split business-split--half">
             <Poster
               file="13-handshake-agreement.webp"
               alt=""
               width={1312}
               height={1199}
-              sizes="(min-width: 900px) 520px, 100vw"
+              sizes="(min-width: 1100px) 46vw, 100vw"
             />
             <div>
               <h2 id="business-final-title" className="business-h2">
