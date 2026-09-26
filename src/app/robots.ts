@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 
+import { isBusinessHostname } from "@/lib/business-app/host";
+import { buildBusinessAppRobotsRoute } from "@/lib/business-app/seo";
 import { isMaxHostname } from "@/lib/max/host";
 import { buildMaxRobotsRoute } from "@/lib/max/seo";
 import { getHostnameFromHeaders, isSchoolHostname } from "@/lib/school/host";
@@ -16,6 +18,10 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
 
   if (isMaxHostname(hostname)) {
     return buildMaxRobotsRoute();
+  }
+
+  if (isBusinessHostname(hostname)) {
+    return buildBusinessAppRobotsRoute();
   }
 
   return buildRobotsRoute();

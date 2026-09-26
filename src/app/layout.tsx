@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 
 import BaseProviders from "@/components/providers/BaseProviders";
 import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
+import { isBusinessHostname } from "@/lib/business-app/host";
+import { getHostnameFromHeaders } from "@/lib/school/host";
 import { getAppOriginUrl } from "@/lib/seo/app-origin";
 import {
   HOME_SEO_DESCRIPTION,
@@ -46,15 +49,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const hostname = getHostnameFromHeaders(await headers());
+  const isBusinessHost = isBusinessHostname(hostname);
+
   return (
     <html lang="ru" className="bg-platform-surface">
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
-        <BaseProviders>{children}</BaseProviders>
+        {isBusinessHost ? children : <BaseProviders>{children}</BaseProviders>}
       </body>
     </html>
   );
