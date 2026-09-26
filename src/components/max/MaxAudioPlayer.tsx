@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
@@ -19,6 +21,7 @@ function formatClock(seconds: number): string {
 export default function MaxAudioPlayer({
   session,
   fetchAudio,
+  onBindPlay,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -27,6 +30,7 @@ export default function MaxAudioPlayer({
   ) => Promise<
     { ok: true; url: string; objectUrl?: boolean } | { ok: false; reason: string }
   >;
+  onBindPlay?: (play: () => void) => void;
 }) {
   const {
     audioRef,
@@ -48,6 +52,9 @@ export default function MaxAudioPlayer({
     canGoPrevious,
     canGoNext,
   } = useMaxAudioPlayback({ session, fetchAudio });
+  useEffect(() => {
+    onBindPlay?.(play);
+  }, [onBindPlay, play]);
 
   const isPreview = isMaxPreviewPlaybackMode(session.playbackMode);
   const showNavigation = shouldShowMaxTrackNavigation(session.playbackMode);

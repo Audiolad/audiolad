@@ -18,15 +18,8 @@ import {
   getProductCoverSymbol,
 } from "@/lib/products/cover-display";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
-import { hasAcceptedCurrentAppreciationTerms } from "@/lib/author-appreciation/current-terms";
-import {
-  resolveAuthorAppreciationSettings,
-  resolveAuthorAppreciationVisibility,
-} from "@/lib/author-appreciation/effective-visibility";
-import {
-  getAuthorAppreciationRolloutConfig,
-  isAuthorAppreciationRolloutEnabled,
-} from "@/lib/author-appreciation/config";
+import { resolveAuthorAppreciationSettings } from "@/lib/author-appreciation/effective-visibility";
+import { isPublicPracticeAppreciationVisible } from "@/lib/author-appreciation/public-product-visibility";
 import {
   getMusicProductTypeLabel,
   isAudioPostProductKind,
@@ -657,27 +650,20 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         }
       : null,
   );
-  const rollout = getAuthorAppreciationRolloutConfig();
-  const currentTermsAccepted = await hasAcceptedCurrentAppreciationTerms(
-    practice.author_id,
-  );
-  const showAuthorAppreciationPrototype =
-    isAuthorAppreciationRolloutEnabled(rollout) &&
-    resolveAuthorAppreciationVisibility({
-      surface: "product",
-      currentTermsAccepted,
-      accessStatus: appreciationAuthor?.access_status,
-      settings: appreciationSettings,
-      product: {
-        status: practice.status,
-        isFree: practice.is_free,
-        publicationClass: practice.publication_class,
-        productKind: practice.product_kind,
-        catalogVisibility: practice.catalog_visibility,
-        isCatalogListed: practice.is_catalog_listed,
-        override: practice.listener_appreciation_override,
-      },
-    });
+  const showAuthorAppreciationPrototype = await isPublicPracticeAppreciationVisible({
+    authorId: practice.author_id,
+    accessStatus: appreciationAuthor?.access_status,
+    settings: appreciationSettings,
+    product: {
+      status: practice.status,
+      isFree: practice.is_free,
+      publicationClass: practice.publication_class,
+      productKind: practice.product_kind,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
+      override: practice.listener_appreciation_override,
+    },
+  });
   const musicTypeLabel = isMusicProductKind(productKind)
     ? getMusicProductTypeLabel()
     : null;

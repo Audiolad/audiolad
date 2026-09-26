@@ -16,6 +16,18 @@ const home = readFileSync(
   join(repoRoot, "src/components/max/MaxAuthenticatedHome.tsx"),
   "utf8",
 );
+const detailView = readFileSync(
+  join(repoRoot, "src/components/max/MaxProductDetailView.tsx"),
+  "utf8",
+);
+const ratingView = readFileSync(
+  join(repoRoot, "src/components/max/MaxProductRating.tsx"),
+  "utf8",
+);
+const appreciationView = readFileSync(
+  join(repoRoot, "src/components/max/MaxAuthorAppreciation.tsx"),
+  "utf8",
+);
 const catalogSearch = readFileSync(
   join(repoRoot, "src/components/max/MaxCatalogSearch.tsx"),
   "utf8",
@@ -49,14 +61,15 @@ assert.match(catalogSearch, /whitespace-nowrap text-xs/);
 const catalogStart = catalogSearch.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
 const readyStart = home.indexOf('{detail.status === "ready" ?');
 assert.ok(catalogStart >= 0 && readyStart >= 0, "catalog grid and detail both exist");
+assert.match(detailView, /product\.subtitle/);
 const catalogBlock = catalogSearch.slice(catalogStart);
 assert.doesNotMatch(catalogBlock, /product\.subtitle/);
-assert.match(home.slice(readyStart), /detail\.product\.subtitle/);
+assert.match(detailView, /product\.subtitle/);
 assert.doesNotMatch(catalogSearch, /flex min-h-28/);
 assert.doesNotMatch(catalogSearch, /w-24 shrink-0/);
 assert.doesNotMatch(`${home}\n${catalogSearch}`, /Подарок|Бесплатно/);
 assert.doesNotMatch(`${home}\n${catalogSearch}`, /CatalogProductHeart|CatalogProductPlay/);
-const maxHomeSource = `${bridge}\n${home}\n${catalogSearch}`
+const maxHomeSource = `${bridge}\n${home}\n${catalogSearch}\n${detailView}\n${ratingView}\n${appreciationView}`
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/.*$/gm, "");
 assert.doesNotMatch(

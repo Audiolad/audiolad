@@ -177,15 +177,20 @@ assert.doesNotMatch(source, /\/api\/max\/playback\/preview\//);
 assert.doesNotMatch(source, /searchParams|URLSearchParams/);
 
 const readyHome = home.slice(home.indexOf('{detail.status === "ready" ?'));
-assert.ok(
-  readyHome.indexOf("<MaxAudioPlayer") < readyHome.indexOf("detail.product.description"),
-  "description stays below preview player",
+const detailView = readFileSync(
+  join(process.cwd(), "src/components/max/MaxProductDetailView.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(
+  `${readyHome}\n${detailView}`,
+  /detail\.product\.description|product\.description|О продукте|faqItems|usageItems/,
 );
 assert.ok(
-  readyHome.indexOf("preview_unavailable") < readyHome.indexOf("detail.product.description"),
+  readyHome.indexOf("preview_unavailable") < readyHome.indexOf("<MaxAudioPlayer"),
 );
 assert.ok(
-  readyHome.indexOf("detail.product.priceLabel") < readyHome.indexOf("<MaxAudioPlayer"),
+  detailView.indexOf("product.priceLabel") < detailView.indexOf("{listenSlot}"),
+  "price stays before the listen slot",
 );
 
 assert.match(hook, /if \(result\.ok && result\.objectUrl && shouldRevokeMaxAudioObjectUrl\(result\.url\)\)/);

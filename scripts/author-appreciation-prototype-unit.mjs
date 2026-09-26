@@ -108,12 +108,14 @@ const practicePage = read(
   "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
 );
 assert.ok(practicePage.includes('author_appreciation_preview?: string'));
-assert.ok(practicePage.includes("resolveAuthorAppreciationVisibility"));
+assert.ok(practicePage.includes("isPublicPracticeAppreciationVisible"));
 assert.ok(practicePage.includes("isMusicProductKind"));
 assert.ok(practicePage.includes("showAuthorAppreciationPrototype"));
+const appreciationVisibility = read(
+  "src/lib/author-appreciation/public-product-visibility.ts",
+);
 assert.ok(
-  practicePage.includes("isAppreciationProductEligible") ||
-    practicePage.includes("resolveAuthorAppreciationVisibility"),
+  appreciationVisibility.includes("resolveAuthorAppreciationVisibility"),
   "music shares the practice PDP visibility path",
 );
 

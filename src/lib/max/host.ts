@@ -19,6 +19,15 @@ export const MAX_CATALOG_PATH = "/api/max/catalog";
 export const MAX_CATALOG_TOPICS_PATH = "/api/max/catalog/topics";
 export const MAX_PRODUCT_PATH = "/api/max/product";
 
+/** HMAC-verify linked MAX identity, then read or write the canonical practice rating. */
+export const MAX_RATING_PATH = "/api/max/rating";
+
+/**
+ * HMAC-verify linked MAX identity, then start the canonical author-appreciation
+ * checkout. Returns a payment link only; it never marks a payment successful.
+ */
+export const MAX_APPRECIATION_PATH = "/api/max/appreciation";
+
 /** HMAC-verify linked MAX identity, then return a playable session if entitled. */
 export const MAX_PLAYBACK_SESSION_PATH = "/api/max/playback/session";
 
@@ -49,6 +58,14 @@ export function isMaxCatalogTopicsPath(pathname: string): boolean {
 }
 export function isMaxProductPath(pathname: string): boolean {
   return pathname === MAX_PRODUCT_PATH;
+}
+
+export function isMaxRatingPath(pathname: string): boolean {
+  return pathname === MAX_RATING_PATH;
+}
+
+export function isMaxAppreciationPath(pathname: string): boolean {
+  return pathname === MAX_APPRECIATION_PATH;
 }
 
 export function isMaxPlaybackSessionPath(pathname: string): boolean {

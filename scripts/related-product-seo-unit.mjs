@@ -184,6 +184,8 @@ assert.deepEqual(published, {
   practiceId: "33333333-3333-4333-8333-333333333333",
   title: "Лавандовый сон",
   href: "/practice/sergey/lavandovyy-son",
+  authorSlug: "sergey",
+  slug: "lavandovyy-son",
   authorName: "Сергей",
   formatLabel: "Медитация",
   durationLabel: "12 мин",

@@ -1,14 +1,21 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
+import {
+  FEATURED_CARD_ACTIONS_CLASS,
+  FEATURED_CARD_PRIMARY_CTA_CLASS,
+} from "@/components/home/FeaturedProductCard";
+import { PlayIcon } from "@/components/home/HomeIcons";
 import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
 import MaxBottomNav from "@/components/max/MaxBottomNav";
 import MaxCatalogSearch, {
   type MaxCatalogProduct,
 } from "@/components/max/MaxCatalogSearch";
+import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
-import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
   MAX_PLAYBACK_AUDIO_PATH,
   MAX_PLAYBACK_PREVIEW_PATH,
@@ -16,33 +23,20 @@ import {
   MAX_PRODUCT_PATH,
 } from "@/lib/max/host";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
+import { readMaxProductDetail, type MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
 import {
   MAX_INITIAL_PRIMARY_TAB,
   MAX_PRIMARY_TABS,
   MAX_SHELL_CONTENT_BOTTOM_PADDING,
+  MAX_TAB_BAR_HEIGHT_PX,
   type MaxPrimaryTab,
 } from "@/lib/max/primary-tabs";
-import { useEffect, useState } from "react";
+import { PLAY_ACTION_LABEL, PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type MaxProductDetailState =
   | { status: "idle" }
   | { status: "loading" }
-  | {
-      status: "ready";
-      product: {
-        title: string;
-        subtitle: string | null;
-        authorName: string | null;
-        formatLabel: string;
-        coverUrl: string | null;
-        priceLabel: string;
-        isFree: boolean;
-        statsLabel: string | null;
-        topics: Array<{ key: string; title: string }>;
-        contents: Array<{ title: string; position: number; durationSeconds: number | null }>;
-        recommendations: MaxCatalogProduct[];
-      };
-    }
+  | { status: "ready"; product: MaxProductDetailModel }
   | { status: "not_found" }
   | { status: "error" };
 type MaxPlaybackState =
@@ -60,9 +54,27 @@ export default function MaxAuthenticatedHome() {
   const [selected, setSelected] = useState<MaxCatalogProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
   const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
+  const [listenArmed, setListenArmed] = useState(false);
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
+  const playRef = useRef<(() => void) | null>(null);
+  const pendingPlayRef = useRef(false);
+  const bindPlay = useCallback((play: () => void) => {
+    playRef.current = play;
+    if (pendingPlayRef.current) {
+      pendingPlayRef.current = false;
+      play();
+    }
+  }, []);
+
+  function closeProductDetail() {
+    pendingPlayRef.current = false;
+    setListenArmed(false);
+    setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
+  }
 
   function openCatalogProduct(product: MaxCatalogProduct) {
+    pendingPlayRef.current = false;
+    setListenArmed(false);
     setDetail({ status: "loading" });
     setPlayback({ status: "loading" });
     setSelected(product);
@@ -87,15 +99,9 @@ export default function MaxAuthenticatedHome() {
       .then(({ status, payload }) => {
         if (controller.signal.aborted) return;
         if (status === 404) return setDetail({ status: "not_found" });
-        const product = payload?.product;
-        if (
-          product &&
-          Array.isArray(product.contents) &&
-          Array.isArray(product.topics) &&
-          Array.isArray(product.recommendations)
-        ) {
-          setDetail({ status: "ready", product });
-        } else setDetail({ status: "error" });
+        const product = readMaxProductDetail(payload?.product);
+        if (product) setDetail({ status: "ready", product });
+        else setDetail({ status: "error" });
       })
       .catch(() => { if (!controller.signal.aborted) setDetail({ status: "error" }); });
     return () => controller.abort();
@@ -158,12 +164,21 @@ export default function MaxAuthenticatedHome() {
 
   function selectMaxTab(next: MaxPrimaryTab) {
     if (next === activeTab) {
+      if (next === "catalog" && selected) closeProductDetail();
       return;
     }
     if (activeTab === "catalog") {
+      pendingPlayRef.current = false;
+      setListenArmed(false);
       setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
     }
     setActiveTab(next);
+  }
+
+  function startListening() {
+    setListenArmed(true);
+    if (playRef.current) playRef.current();
+    else pendingPlayRef.current = true;
   }
 
   const activeTabLabel =
@@ -192,68 +207,48 @@ export default function MaxAuthenticatedHome() {
         <MaxTabPlaceholder title={activeTabLabel} />
       )}
       {activeTab === "catalog" && selected ? (
-        <div className="fixed inset-0 overflow-y-auto bg-[#faf8ff] p-4">
-          <button type="button" onClick={() => { setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null); }} className="min-h-11 text-sm font-medium text-[#7042c5]">
+        <div
+          className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"
+          style={{ bottom: `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))` }}
+        >
+          <div className="mx-auto max-w-lg pb-6">
+          <button type="button" onClick={closeProductDetail} className="min-h-11 text-sm font-medium text-[#7042c5]">
             ← Назад в каталог
           </button>
           {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
           {detail.status === "not_found" ? <p className="mt-6 text-sm text-[#6c5d94]">Продукт недоступен.</p> : null}
           {detail.status === "error" ? <p className="mt-6 text-sm text-[#6c5d94]">Не удалось загрузить продукт.</p> : null}
           {detail.status === "ready" ? (
-            <>
-              {detail.product.coverUrl ? (
-                <img
-                  src={detail.product.coverUrl}
-                  alt=""
-                  className="mt-4 aspect-square w-full max-w-[280px] mx-auto rounded-2xl object-cover"
-                />
-              ) : null}
-              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-                {detail.product.formatLabel}
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold">{detail.product.title}</h2>
-              {detail.product.subtitle ? (
-                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p>
-              ) : null}
-              {detail.product.authorName ? (
-                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.authorName}</p>
-              ) : null}
-              {detail.product.statsLabel ? (
-                <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p>
-              ) : null}
-              {detail.product.topics.length ? (
-                <ul className="mt-3 flex flex-wrap gap-2" aria-label="Темы продукта">
-                  {detail.product.topics.map((topic) => (
-                    <li
-                      key={topic.key}
-                      className="rounded-full border border-[#ddcfef] bg-white px-3 py-1.5 text-xs font-medium text-[#7042c5]"
+            <MaxProductDetailView
+              authorSlug={selected.authorSlug}
+              productSlug={selected.slug}
+              product={detail.product}
+              onOpenRecommendation={openCatalogProduct}
+              listenSlot={
+                <>
+                  {playback.status === "loading" ? (
+                    <p className="mt-4 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
+                  ) : null}
+                  {playback.status === "access_required" ? (
+                    <p className="mt-4 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
+                  ) : null}
+                  {playback.status === "preview_unavailable" ? (
+                    <p className="mt-4 text-sm text-[#6c5d94]">Предпрослушивание пока недоступно.</p>
+                  ) : null}
+                  {playback.status === "no_audio" ? (
+                    <p className="mt-4 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
+                  ) : null}
+                  {playback.status === "error" ? (
+                    <p className="mt-4 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
+                  ) : null}
+                  {playback.status === "ready" ? (
+                    <div
+                      className={listenArmed ? undefined : "pointer-events-none absolute h-px w-px overflow-hidden"}
+                      inert={listenArmed ? undefined : true}
                     >
-                      {topic.title}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {!detail.product.isFree ? (
-                <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
-              ) : null}
-              {playback.status === "loading" ? (
-                <p className="mt-4 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
-              ) : null}
-              {playback.status === "access_required" ? (
-                <p className="mt-4 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
-              ) : null}
-              {playback.status === "preview_unavailable" ? (
-                <p className="mt-4 text-sm text-[#6c5d94]">Предпрослушивание пока недоступно.</p>
-              ) : null}
-              {playback.status === "no_audio" ? (
-                <p className="mt-4 text-sm text-[#6c5d94]">В этом продукте пока нет аудио.</p>
-              ) : null}
-              {playback.status === "error" ? (
-                <p className="mt-4 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
-              ) : null}
-              {playback.status === "ready" ? (
                 <MaxAudioPlayer
                   session={playback.session}
+                  onBindPlay={bindPlay}
                   fetchAudio={async (trackId, signal) => {
                     if (playback.session.playbackMode === "preview") {
                       const response = await fetch(MAX_PLAYBACK_PREVIEW_PATH, {
@@ -296,71 +291,37 @@ export default function MaxAuthenticatedHome() {
                     return { ok: false, reason: payload?.reason ?? "error" };
                   }}
                 />
-              ) : null}
-              {playback.status !== "ready" && detail.product.contents.length ? (
-                <ol className="mt-6 space-y-2 text-sm">
-                  {detail.product.contents.map((track) => (
-                    <li key={`${track.position}-${track.title}`}>
-                      {track.position}. {track.title}
-                      {track.durationSeconds !== null ? ` · ${formatMaxDuration(track.durationSeconds)}` : ""}
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-              {detail.product.recommendations.length ? (
-                <section className="mt-8 pb-6" aria-labelledby="max-author-recommendations-title">
-                  <h3
-                    id="max-author-recommendations-title"
-                    className="text-lg font-semibold text-[#25135c]"
-                  >
-                    Ещё от автора
-                  </h3>
-                  <ul className="mt-3 grid grid-cols-2 gap-2">
-                    {detail.product.recommendations.map((product) => (
-                      <li
-                        key={`${product.authorSlug}/${product.slug}`}
-                        className="min-w-0"
+                    </div>
+                  ) : null}
+                  {!listenArmed &&
+                  playback.status !== "access_required" &&
+                  playback.status !== "preview_unavailable" &&
+                  playback.status !== "no_audio" &&
+                  playback.status !== "error" ? (
+                    <div
+                      data-practice-hero-actions
+                      className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+                    >
+                      <button
+                        type="button"
+                        onClick={startListening}
+                        className={FEATURED_CARD_PRIMARY_CTA_CLASS}
                       >
-                        <button
-                          type="button"
-                          onClick={() => openCatalogProduct(product)}
-                          className="flex w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#eadff8] bg-white text-left shadow-[0_4px_14px_rgba(91,62,145,0.05)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        >
-                          <div className="aspect-square w-full bg-[#ede6f8]">
-                            {product.coverUrl ? (
-                              <img
-                                src={product.coverUrl}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="px-2.5 pb-2.5 pt-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-                              {product.formatLabel}
-                            </p>
-                            <p className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c]">
-                              {product.title}
-                            </p>
-                            {!product.isFree ? (
-                              <p className="mt-1 whitespace-nowrap text-xs font-semibold leading-4 text-[#7042c5]">
-                                {product.priceLabel}
-                              </p>
-                            ) : null}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-            </>
+                        <PlayIcon />
+                        {playback.status === "ready" && playback.session.playbackMode === "preview"
+                          ? PREVIEW_ACTION_LABEL
+                          : PLAY_ACTION_LABEL}
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              }
+            />
           ) : null}
+          </div>
         </div>
       ) : null}
-      {selected ? null : (
-        <MaxBottomNav activeTab={activeTab} onSelectTab={selectMaxTab} />
-      )}
+      <MaxBottomNav activeTab={activeTab} onSelectTab={selectMaxTab} />
     </section>
   );
 }

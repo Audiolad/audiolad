@@ -345,11 +345,8 @@ assert.match(provider, /return_payment_link: 1/);
 assert.doesNotMatch(provider, /deal_number:\s*input\./);
 assert.doesNotMatch(provider, /localDealNumber/);
 
-for (const page of [
-  "src/app/(platform)/(listener)/authors/[slug]/page.tsx",
-  "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
-]) {
-  const source = read(page);
+{
+  const source = read("src/app/(platform)/(listener)/authors/[slug]/page.tsx");
   assert.match(source, /author_appreciation_preview/);
   assert.match(source, /getAuthorAppreciationRolloutConfig/);
   assert.match(source, /isAuthorAppreciationRolloutEnabled\(rollout\)/);
@@ -358,6 +355,20 @@ for (const page of [
   assert.match(source, /currentTermsAccepted/);
   assert.doesNotMatch(source, /isAuthorAppreciationPreviewActive/);
   assert.doesNotMatch(source, /allowedAuthorIds|isAuthorAppreciationRolloutEnabled\(rollout,/);
+}
+{
+  const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+  const visibility = read("src/lib/author-appreciation/public-product-visibility.ts");
+  assert.match(practicePage, /author_appreciation_preview/);
+  assert.match(practicePage, /isPublicPracticeAppreciationVisible/);
+  assert.doesNotMatch(practicePage, /isAuthorAppreciationPreviewActive/);
+  assert.doesNotMatch(practicePage, /allowedAuthorIds/);
+  assert.match(visibility, /getAuthorAppreciationRolloutConfig/);
+  assert.match(visibility, /isAuthorAppreciationRolloutEnabled\(rollout\)/);
+  assert.match(visibility, /resolveAuthorAppreciationVisibility/);
+  assert.match(visibility, /hasAcceptedCurrentAppreciationTerms/);
+  assert.match(visibility, /currentTermsAccepted/);
+  assert.match(visibility, /surface: "product"/);
 }
 
 const financeMigration = read(

@@ -19,11 +19,20 @@ function request(body, headers={}) {
 }
 const productSource = readFileSync(join(process.cwd(), "src/lib/max/product.ts"), "utf8");
 assert.match(productSource, /loadPublicPracticeTopicsSafe/);
-assert.match(productSource, /MAX_AUTHOR_RECOMMENDATIONS_LIMIT = 5/);
-assert.match(productSource, /item\.id !== product\.id/);
-assert.match(productSource, /item\.authorSlug === normalizedAuthor/);
-assert.match(productSource, /\.slice\(0, MAX_AUTHOR_RECOMMENDATIONS_LIMIT\)/);
+assert.match(productSource, /loadPublicPracticeSeoContent/);
+assert.match(productSource, /mapCuratedMaxRecommendations/);
+assert.match(productSource, /isPublicPracticeAppreciationVisible/);
+assert.match(productSource, /getPracticeRatingAggregate/);
+assert.match(productSource, /MAX_AUTHOR_RECOMMENDATIONS_LIMIT = MAX_AUTHOR_RECOMMENDATIONS/);
 assert.doesNotMatch(productSource, /description:\s*product\.description/);
+assert.doesNotMatch(
+  productSource.slice(productSource.indexOf("const recommendations = mapCuratedMaxRecommendations")),
+  /authorSlug === normalizedAuthor/,
+);
+const recommendationSource = readFileSync(join(process.cwd(), "src/lib/max/product-recommendations.ts"), "utf8");
+assert.match(recommendationSource, /practiceId === input\.currentPracticeId/);
+assert.match(recommendationSource, /limitPublicRelatedProducts/);
+assert.doesNotMatch(recommendationSource, /href|normalizedAuthor|other products by author/);
 
 process.env.MAX_BOT_TOKEN=token;
 let native=0, lookup=0;

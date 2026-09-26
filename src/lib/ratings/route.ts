@@ -21,6 +21,14 @@ import { createClientFromRequest } from "@/lib/supabase/request-client";
 const RATING_PUT_LIMIT = 30;
 const RATING_PUT_WINDOW_MS = 60_000;
 
+export function isPracticeRatingWriteRateLimited(userId: string): boolean {
+  return !checkAnalyticsRateLimit(
+    `practice-rating:${userId}`,
+    RATING_PUT_LIMIT,
+    RATING_PUT_WINDOW_MS,
+  );
+}
+
 export async function handlePracticeRatingGet(
   request: Request,
   authorSlug: string,
@@ -89,13 +97,7 @@ export async function handlePracticeRatingPut(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  if (
-    !checkAnalyticsRateLimit(
-      `practice-rating:${userId}`,
-      RATING_PUT_LIMIT,
-      RATING_PUT_WINDOW_MS,
-    )
-  ) {
+  if (isPracticeRatingWriteRateLimited(userId)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
