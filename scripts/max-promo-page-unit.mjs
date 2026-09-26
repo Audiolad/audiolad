@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  buildPublicPromoFallbackUrl,
   parseMaxPromoTarget,
+  resolveMaxPromoBrowserFallback,
 } from "../src/lib/max/promo-target.ts";
 import { readMaxPromoPage } from "../src/lib/max/promo-view.ts";
 
@@ -34,6 +36,54 @@ for (const value of [
   assert.equal(parseMaxPromoTarget(value), null);
 }
 
+
+
+const fallbackTarget = {
+  authorSlug: "sergey-and-zoya",
+  promoSlug: "3-kvantmeditatsii-v-podarok",
+};
+assert.equal(
+  buildPublicPromoFallbackUrl(
+    "https://max.audiolad.ru/?promo=sergey-and-zoya%2F3-kvantmeditatsii-v-podarok&utm_source=max&utm_campaign=gift&source=ads",
+    fallbackTarget,
+  ),
+  "https://audiolad.ru/promo/sergey-and-zoya/3-kvantmeditatsii-v-podarok?utm_source=max&utm_campaign=gift&source=ads",
+);
+assert.equal(
+  resolveMaxPromoBrowserFallback({
+    locationHref:
+      "https://max.audiolad.ru/?promo=sergey-and-zoya%2F3-kvantmeditatsii-v-podarok&utm_source=max",
+    inMax: false,
+    initData: null,
+  }),
+  "https://audiolad.ru/promo/sergey-and-zoya/3-kvantmeditatsii-v-podarok?utm_source=max",
+);
+assert.equal(
+  resolveMaxPromoBrowserFallback({
+    locationHref:
+      "https://max.audiolad.ru/?promo=sergey-and-zoya%2F3-kvantmeditatsii-v-podarok&utm_source=max",
+    inMax: true,
+    initData: null,
+  }),
+  null,
+);
+assert.equal(
+  resolveMaxPromoBrowserFallback({
+    locationHref:
+      "https://max.audiolad.ru/?promo=sergey-and-zoya%2F3-kvantmeditatsii-v-podarok",
+    inMax: false,
+    initData: "signed",
+  }),
+  null,
+);
+assert.equal(
+  resolveMaxPromoBrowserFallback({
+    locationHref: "https://max.audiolad.ru/?promo=bad",
+    inMax: false,
+    initData: null,
+  }),
+  null,
+);
 
 const parsedPage = readMaxPromoPage({
   promoPageId: "11111111-1111-4111-8111-111111111111",

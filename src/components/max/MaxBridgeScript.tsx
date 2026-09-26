@@ -11,6 +11,7 @@ import {
   readMaxInitData,
   type MaxBridgeSnapshot,
 } from "@/lib/max/bridge";
+import { resolveMaxPromoBrowserFallback } from "@/lib/max/promo-target";
 import {
   loginAndLinkMaxSession,
   signOutMaxSession,
@@ -81,9 +82,22 @@ export default function MaxBridgeScript() {
   }, []);
 
   const refreshAndVerify = useCallback(() => {
-    setSnapshot(readMaxBridgeSnapshot());
+    const nextSnapshot = readMaxBridgeSnapshot();
+    const initData = readMaxInitData();
+    setSnapshot(nextSnapshot);
 
-    if (!readMaxInitData()) {
+    if (!initData) {
+      if (typeof window !== "undefined") {
+        const fallback = resolveMaxPromoBrowserFallback({
+          locationHref: window.location.href,
+          inMax: nextSnapshot.inMax,
+          initData,
+        });
+        if (fallback) {
+          window.location.replace(fallback);
+          return;
+        }
+      }
       applyEvent({ type: "INIT_DATA_MISSING" });
       return;
     }
