@@ -747,10 +747,9 @@ body:has(.business-landing) .global-mini-player {
   }
 
   .business-hero-banner {
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
-    gap: 0;
-    align-items: stretch;
-    min-height: 520px;
+    position: relative;
+    display: block;
+    min-height: 480px;
     overflow: hidden;
     border: 1px solid var(--bl-line);
     border-radius: 32px;
@@ -764,7 +763,17 @@ body:has(.business-landing) .global-mini-player {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 40px 20px 40px 44px;
+    box-sizing: border-box;
+    width: min(720px, 68%);
+    min-height: 480px;
+    padding: 44px 48px 44px 48px;
+    background: linear-gradient(
+      90deg,
+      #fffdfb 0%,
+      #fffdfb 68%,
+      rgba(255, 253, 251, 0.92) 84%,
+      rgba(255, 253, 251, 0) 100%
+    );
   }
 
   .business-hero-banner__copy .business-h1 {
@@ -798,9 +807,12 @@ body:has(.business-landing) .global-mini-player {
   }
 
   .business-hero-banner__visual {
+    position: absolute;
+    inset: 0 0 0 36%;
+    width: auto;
     height: auto;
-    min-height: 100%;
-    margin-left: -48px;
+    min-height: 0;
+    margin: 0;
     aspect-ratio: auto;
     border-radius: 0;
   }
@@ -812,8 +824,8 @@ body:has(.business-landing) .global-mini-player {
     background: linear-gradient(
       90deg,
       #fffdfb 0%,
-      rgba(255, 253, 251, 0.78) 12%,
-      rgba(255, 253, 251, 0) 34%
+      rgba(255, 253, 251, 0.72) 16%,
+      rgba(255, 253, 251, 0) 42%
     );
     pointer-events: none;
   }

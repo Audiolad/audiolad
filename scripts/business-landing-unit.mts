@@ -196,6 +196,8 @@ const businessCss = read("src/components/business/business-landing.css");
 assert.match(businessCss, /min\(1200px,\s*calc\(100% - 80px\)\)/);
 assert.doesNotMatch(businessCss, /1440px/);
 assert.doesNotMatch(businessCss, /100dvh - 92px/);
+assert.doesNotMatch(businessCss, /minmax\(340px,\s*440px\)/);
+assert.match(businessCss, /\.business-hero-banner__visual\s*\{[^}]*inset:\s*0 0 0 36%/);
 assert.match(
   businessCss,
   /\.business-hero-banner__photo\s*\{[^}]*width:\s*calc\(100% \/ 0\.34\)/,
