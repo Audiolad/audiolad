@@ -67,6 +67,18 @@ const applyFn = sheet.slice(sheet.indexOf("function applyDraft"), sheet.indexOf(
 assert.match(applyFn, /onApply\(draftTopics, draftAccess, draftClass\)/);
 assert.doesNotMatch(applyFn, /router|window\.location|openLink|href/);
 
+assert.match(search, /type MaxCatalogTopicRequest/);
+assert.match(search, /topicRequest\?\.requestId/);
+assert.match(search, /setSearchInput\(""\)/);
+assert.match(search, /setActiveSection\(null\)/);
+assert.match(search, /setActiveTopicKeys\(\[topicKey\]\)/);
+assert.match(search, /setActiveAccess\("all"\)/);
+assert.match(search, /setActiveClass\("all"\)/);
+assert.match(search, /loadFilteredCatalog\(null, topicParam, "all", "all"\)/);
+assert.match(home, /topicRequest=\{catalogTopicRequest\}/);
+assert.match(home, /onOpenTopic=\{openCatalogTopic\}/);
+assert.match(home, /setCatalogTopicRequest/);
+
 assert.match(search, /<MaxCatalogTopicsSheet/);
 assert.match(search, /activeTopicKeys=\{activeTopicKeys\}/);
 assert.match(search, /activeAccess=\{activeAccess\}/);
