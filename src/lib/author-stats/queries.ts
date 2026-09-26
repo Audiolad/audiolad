@@ -96,6 +96,7 @@ function mapSummary(raw: unknown): AuthorStatsSummary | null {
     listeningTimeValidFrom: null,
     listeningTimePartial: false,
     listeningTimeUnmeasured: true,
+    listeningAveragesWithheld: false,
   };
 }
 

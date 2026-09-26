@@ -324,15 +324,15 @@ $$;
 -- author_id_snapshot, without rewriting ordinary author KPI counts.
 DO $$
 DECLARE
-  v_author_a uuid := 'a1111111-1111-4111-8111-111111111111';
-  v_author_b uuid := 'a2222222-2222-4222-8222-222222222222';
-  v_practice uuid := 'c1111111-1111-4111-8111-111111111111';
-  v_deleted uuid := 'c2222222-2222-4222-8222-222222222222';
-  v_practice_b uuid := 'c3333333-3333-4333-8333-333333333333';
-  v_human uuid := 'd1111111-1111-4111-8111-111111111111';
-  v_auth uuid := 'd2222222-2222-4222-8222-222222222222';
-  v_member uuid := 'd3333333-3333-4333-8333-333333333333';
-  v_pdel_user uuid := 'd4444444-4444-4444-8444-444444444444';
+  v_author_a uuid := 'a8111111-1111-4111-8111-111111111181';
+  v_author_b uuid := 'a8222222-2222-4222-8222-222222222182';
+  v_practice uuid := 'c8111111-1111-4111-8111-111111111181';
+  v_deleted uuid := 'c8222222-2222-4222-8222-222222222182';
+  v_practice_b uuid := 'c8333333-3333-4333-8333-333333333183';
+  v_human uuid := 'd8111111-1111-4111-8111-111111111181';
+  v_auth uuid := 'd8222222-2222-4222-8222-222222222182';
+  v_member uuid := 'd8333333-3333-4333-8333-333333333183';
+  v_pdel_user uuid := 'd8444444-8444-4444-8444-444444444184';
   v_staff_session uuid := 'e1111111-1111-4111-8111-111111111111';
   v_valid timestamptz := timestamptz '2026-09-26 00:00:00+03';
   v_from timestamptz := timestamptz '2026-09-24 00:00:00+03';
@@ -371,8 +371,8 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.authors (id, name, slug, access_status) VALUES
-    (v_author_a, 'Author Listen A', 'author-listen-a', 'commercial'),
-    (v_author_b, 'Author Listen B', 'author-listen-b', 'commercial');
+    (v_author_a, 'Автор Прослушивание А', 'author-listen-a', 'commercial'),
+    (v_author_b, 'Автор Прослушивание Б', 'author-listen-b', 'commercial');
 
   INSERT INTO public.author_members (author_id, user_id, role)
   VALUES (v_author_a, v_member, 'owner');
@@ -491,6 +491,10 @@ BEGIN
   IF v_plays_after <> v_plays
     OR (v_payload ->> 'listened_ms')::bigint <> 14000
     OR (v_other ->> 'listened_ms')::bigint <> 9000
+    OR (v_payload ->> 'averages_withheld')::boolean IS NOT TRUE
+    OR v_payload -> 'measured_play_starts' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'average_listen_per_start_ms' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'average_listen_per_listener_ms' IS DISTINCT FROM 'null'::jsonb
   THEN
     RAISE EXCEPTION 'snapshot attribution or ordinary plays changed: plays % -> % A % B %',
       v_plays, v_plays_after, v_payload, v_other;
@@ -510,6 +514,9 @@ BEGIN
   IF (v_payload ->> 'listened_ms')::bigint <> 14000
     OR v_slug_sum <> 3000
     OR v_all_rows <> 14000
+    OR (v_payload ->> 'averages_withheld')::boolean IS NOT TRUE
+    OR v_payload -> 'average_listen_per_start_ms' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'measured_listeners' IS DISTINCT FROM 'null'::jsonb
   THEN
     RAISE EXCEPTION 'deleted practice left the author total: summary % products %', v_payload, v_products;
   END IF;

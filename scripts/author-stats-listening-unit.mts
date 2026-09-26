@@ -58,6 +58,7 @@ function summary(): AuthorStatsSummary {
     listeningTimeValidFrom: null,
     listeningTimePartial: false,
     listeningTimeUnmeasured: true,
+    listeningAveragesWithheld: false,
   };
 }
 
@@ -125,6 +126,7 @@ function listeningSummary(
     listeningTimeValidFrom: VALID_FROM,
     listeningTimePartial: true,
     listeningTimeUnmeasured: false,
+    listeningAveragesWithheld: false,
     ...overrides,
   };
 }
@@ -162,6 +164,22 @@ function testAveragesUseMeasuredDenominators() {
   assert.equal(unmeasured.averageListenPerListenerMs, null);
   assert.equal(unmeasured.averageListenPerStartMs, null);
   assert.notEqual(unmeasured.listenedMs, 0);
+
+  const remainingStarts = 3;
+  const withheld = applyListeningSummary(
+    summary(),
+    listeningSummary({
+      listenedMs: 7000,
+      measuredListeners: null,
+      measuredPlayStarts: null,
+      listeningAveragesWithheld: true,
+    }),
+  );
+  assert.equal(withheld.listenedMs, 7000);
+  assert.equal(withheld.listeningAveragesWithheld, true);
+  assert.equal(withheld.averageListenPerStartMs, null);
+  assert.equal(withheld.averageListenPerListenerMs, null);
+  assert.notEqual(withheld.averageListenPerStartMs, Math.round(7000 / remainingStarts));
 }
 
 function testTimeseriesBeforeValidFromIsUnmeasured() {

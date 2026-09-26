@@ -179,6 +179,36 @@ BEGIN
     RAISE EXCEPTION 'current products did not match summary: %', v_products;
   END IF;
 
+  -- Author A still owns the practice, with a listening fact and a start.
+  -- Transfer it. Snapshot minutes stay with A. Starts follow the new owner.
+  -- The average must not become 7000 divided by the starts that remain.
+  UPDATE public.practices SET author_id = v_author_b WHERE id = v_deleted;
+
+  SELECT count(*)::int
+  INTO v_wide_starts
+  FROM public.analytics_product_event_facts(NULL, NULL, v_author_a, NULL, false)
+  WHERE event_name = 'audio_play_started';
+
+  SELECT public.author_stats_listening_summary(v_author_a, NULL, NULL) INTO v_payload;
+  SELECT public.author_stats_listening_summary(v_author_b, NULL, NULL) INTO v_series;
+  IF (v_payload ->> 'listened_ms')::bigint <> 7000
+    OR (v_series ->> 'listened_ms')::bigint <> 9000
+    OR (v_payload ->> 'averages_withheld')::boolean IS NOT TRUE
+    OR v_payload -> 'measured_listeners' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'measured_play_starts' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'average_listen_per_listener_ms' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'average_listen_per_start_ms' IS DISTINCT FROM 'null'::jsonb
+    OR (
+      v_wide_starts > 0
+      AND v_payload -> 'average_listen_per_start_ms'
+        IS NOT DISTINCT FROM to_jsonb(round(7000::numeric / v_wide_starts)::bigint)
+    )
+  THEN
+    RAISE EXCEPTION
+      'transfer inflated the average or moved the historical total: A % B % remaining starts %',
+      v_payload, v_series, v_wide_starts;
+  END IF;
+
   IF (
     SELECT coalesce(sum((row ->> 'listened_ms')::bigint), 0)
     FROM jsonb_array_elements(v_products -> 'rows') AS row
@@ -201,7 +231,9 @@ BEGIN
   WHERE row ->> 'product_slug' IS NOT NULL;
   IF (v_payload ->> 'listened_ms')::bigint <> 14000
     OR (v_series ->> 'listened_ms')::bigint <> 9000
-    OR v_slug_sum <> 7000
+    OR v_slug_sum <> 3000
+    OR (v_payload ->> 'averages_withheld')::boolean IS NOT TRUE
+    OR v_payload -> 'average_listen_per_start_ms' IS DISTINCT FROM 'null'::jsonb
   THEN
     RAISE EXCEPTION
       'snapshot attribution failed: A % B % products %',
@@ -222,6 +254,9 @@ BEGIN
   IF (v_payload ->> 'listened_ms')::bigint <> 14000
     OR v_slug_sum <> 3000
     OR v_all_rows <> 14000
+    OR (v_payload ->> 'averages_withheld')::boolean IS NOT TRUE
+    OR v_payload -> 'average_listen_per_listener_ms' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'average_listen_per_start_ms' IS DISTINCT FROM 'null'::jsonb
     OR EXISTS (
       SELECT 1
       FROM jsonb_array_elements(v_products -> 'rows') AS row

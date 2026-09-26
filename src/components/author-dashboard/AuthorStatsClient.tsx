@@ -547,6 +547,13 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                 {formatListeningTimeNotice(summary.listeningTimeValidFrom)}
               </p>
             ) : null}
+            {summary.listeningAveragesWithheld ? (
+              <p className="text-sm text-[#7d70a2]">
+                Среднее время не считаем: в сумме есть прослушивания продукта,
+                который вам больше не принадлежит, и для них нет сопоставимого
+                числа запусков. Историческую сумму на оставшиеся запуски не делим.
+              </p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Время прослушивания"

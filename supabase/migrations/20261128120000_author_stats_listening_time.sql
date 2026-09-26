@@ -143,6 +143,10 @@ DECLARE
   v_listened bigint := 0;
   v_listeners integer := 0;
   v_starts integer := 0;
+  -- True when snapshot minutes include a practice this author no longer owns.
+  -- audio_play_started is attributed by current practices.author_id, so those
+  -- starts leave this denominator. The total stays; the average is withheld.
+  v_averages_withheld boolean := false;
 BEGIN
   IF p_author_id IS NULL THEN
     RAISE EXCEPTION 'author_required' USING ERRCODE = '22023';
@@ -164,32 +168,59 @@ BEGIN
     INTO v_listened
     FROM public.author_stats_listening_facts(p_author_id, v_effective_from, p_to) AS f;
 
-    -- Same product-event filter as author stats plays (include_test false,
-    -- current practice owner, member/staff/test exclusion), but only inside
-    -- the measured window. Ordinary period play/listener KPIs are not used.
-    SELECT
-      coalesce(count(DISTINCT visitor_key) FILTER (
-        WHERE event_name = 'audio_play_started' AND visitor_key IS NOT NULL
-      ), 0)::int,
-      coalesce(count(*) FILTER (WHERE event_name = 'audio_play_started'), 0)::int
-    INTO v_listeners, v_starts
-    FROM public.analytics_product_event_facts(
-      v_effective_from, p_to, p_author_id, NULL, false
-    );
+    -- playback_usage_facts stores accepted media deltas and visitor identity,
+    -- not audio_play_started. Counting listening_key would not be that start
+    -- metric, so v1 does not gain a second start ledger. Starts stay on
+    -- analytics_product_event_facts, which joins the current practice owner.
+    -- After delete or transfer those starts are no longer this author's, while
+    -- author_id_snapshot minutes remain. Dividing that historical total by the
+    -- starts that are still on current products would inflate the average.
+    -- Withhold it instead. When every fact's practice is still owned here,
+    -- snapshot author and current owner match, and the measured-window
+    -- denominators below are the same set as the numerator.
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.author_stats_listening_facts(p_author_id, v_effective_from, p_to) AS f
+      LEFT JOIN public.practices AS pr ON pr.id = f.practice_id
+      WHERE pr.id IS NULL OR pr.author_id IS DISTINCT FROM p_author_id
+    )
+    INTO v_averages_withheld;
+
+    IF NOT v_averages_withheld THEN
+      -- Same product-event filter as author stats plays (include_test false,
+      -- current practice owner, member/staff/test exclusion), but only inside
+      -- the measured window. Ordinary period play/listener KPIs are not used.
+      SELECT
+        coalesce(count(DISTINCT visitor_key) FILTER (
+          WHERE event_name = 'audio_play_started' AND visitor_key IS NOT NULL
+        ), 0)::int,
+        coalesce(count(*) FILTER (WHERE event_name = 'audio_play_started'), 0)::int
+      INTO v_listeners, v_starts
+      FROM public.analytics_product_event_facts(
+        v_effective_from, p_to, p_author_id, NULL, false
+      );
+    END IF;
   END IF;
 
   RETURN jsonb_build_object(
     'listened_ms', CASE WHEN v_unmeasured THEN NULL ELSE v_listened END,
-    'measured_listeners', CASE WHEN v_unmeasured THEN NULL ELSE v_listeners END,
-    'measured_play_starts', CASE WHEN v_unmeasured THEN NULL ELSE v_starts END,
+    'measured_listeners', CASE
+      WHEN v_unmeasured OR v_averages_withheld THEN NULL
+      ELSE v_listeners
+    END,
+    'measured_play_starts', CASE
+      WHEN v_unmeasured OR v_averages_withheld THEN NULL
+      ELSE v_starts
+    END,
     'average_listen_per_listener_ms', CASE
-      WHEN v_unmeasured OR v_listeners <= 0 OR v_listened <= 0 THEN NULL
+      WHEN v_unmeasured OR v_averages_withheld OR v_listeners <= 0 OR v_listened <= 0 THEN NULL
       ELSE round(v_listened::numeric / v_listeners)::bigint
     END,
     'average_listen_per_start_ms', CASE
-      WHEN v_unmeasured OR v_starts <= 0 OR v_listened <= 0 THEN NULL
+      WHEN v_unmeasured OR v_averages_withheld OR v_starts <= 0 OR v_listened <= 0 THEN NULL
       ELSE round(v_listened::numeric / v_starts)::bigint
     END,
+    'averages_withheld', v_averages_withheld,
     'valid_from', v_valid_from,
     'effective_from', CASE WHEN v_unmeasured THEN NULL ELSE v_effective_from END,
     'partial', v_partial,
@@ -199,7 +230,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.author_stats_listening_summary(uuid, timestamptz, timestamptz) IS
-  'audiolad:author-stats; trusted listened_ms for author_id_snapshot plus measured-window unique listeners and audio_play_started. Does not rewrite author_stats_summary.';
+  'audiolad:author-stats; trusted listened_ms for author_id_snapshot. Averages use measured-window listeners and audio_play_started only while every fact practice is still owned by that author. Otherwise averages_withheld and the denominators are null; the historical total is not divided by current-product starts.';
 
 -- Daily Europe/Moscow buckets, same calendar as author_stats_timeseries.
 -- A day that ends at or before listening_time_valid_from is JSON null, not zero.

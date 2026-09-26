@@ -127,6 +127,7 @@ function testUi() {
     "supabase/migrations/20261128120000_author_stats_listening_time.sql",
   );
   assert(listeningSql.includes("f.author_id_snapshot = p_author_id"), "snapshot key");
+  assert(listeningSql.includes("averages_withheld"), "withhold incomparable averages");
   assert(!listeningSql.includes("coalesce(f.author_id_snapshot"), "no current-owner fallback");
   assert(listeningSql.includes("author_members"), "self traffic excluded");
   assert(listeningSql.includes("GRANT EXECUTE") && listeningSql.includes("service_role"), "service role only");

@@ -19,6 +19,7 @@ export type AuthorListeningSummary = {
   listeningTimeValidFrom: string | null;
   listeningTimePartial: boolean;
   listeningTimeUnmeasured: boolean;
+  listeningAveragesWithheld: boolean;
 };
 
 export type AuthorListeningTimeseries = {
@@ -103,6 +104,7 @@ export function readAuthorListeningSummary(raw: unknown): AuthorListeningSummary
     listeningTimeValidFrom: asText(row.valid_from),
     listeningTimePartial: row.partial === true,
     listeningTimeUnmeasured: unmeasured,
+    listeningAveragesWithheld: !unmeasured && row.averages_withheld === true,
   };
 }
 
@@ -126,6 +128,7 @@ export function applyListeningSummary(
     listeningTimeValidFrom: listening.listeningTimeValidFrom,
     listeningTimePartial: listening.listeningTimePartial,
     listeningTimeUnmeasured: listening.listeningTimeUnmeasured,
+    listeningAveragesWithheld: listening.listeningAveragesWithheld,
   };
 }
 

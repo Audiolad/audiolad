@@ -32,12 +32,24 @@ export type AuthorStatsSummary = {
   appreciationAuthorAccruedMinor: number;
   /** Trusted playback_usage_facts listened_ms. Null when the window is unmeasured. */
   listenedMs: number | null;
-  /** Unique listeners inside the measured window. Not the selected-period KPI. */
+  /**
+   * Unique listeners inside the measured window. Not the selected-period KPI.
+   * Null when the window is unmeasured, or when averages are withheld.
+   */
   measuredListeners: number | null;
-  /** audio_play_started inside the measured window. Not the selected-period KPI. */
+  /**
+   * audio_play_started inside the measured window. Not the selected-period KPI.
+   * Null when the window is unmeasured, or when averages are withheld.
+   */
   measuredPlayStarts: number | null;
   averageListenPerListenerMs: number | null;
   averageListenPerStartMs: number | null;
+  /**
+   * Snapshot listened_ms includes a deleted or transferred practice, so
+   * audio_play_started can no longer be lined up with that total. Averages
+   * are null instead of dividing the historical total by current-product starts.
+   */
+  listeningAveragesWithheld: boolean;
   listeningTimeValidFrom: string | null;
   listeningTimePartial: boolean;
   listeningTimeUnmeasured: boolean;

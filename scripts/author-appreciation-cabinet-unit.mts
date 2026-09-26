@@ -167,6 +167,7 @@ function emptySummary(): AuthorStatsSummary {
     listeningTimeValidFrom: null,
     listeningTimePartial: false,
     listeningTimeUnmeasured: true,
+    listeningAveragesWithheld: false,
   };
 }
 
