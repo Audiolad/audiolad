@@ -220,6 +220,9 @@ export async function createAuthorProjectViaRpc(
     if (message.includes("project_slug_taken") || error.code === "23505") {
       throw new AuthorAccessError("project_slug_taken", 409);
     }
+    if (message.includes("invalid_project_name_latin")) {
+      throw new AuthorAccessError("invalid_project_name_latin", 400);
+    }
     if (message.includes("invalid_project_name")) {
       throw new AuthorAccessError("invalid_project_name", 400);
     }

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { AUTHOR_PROJECT_NAME_LATIN_ERROR } from "@/lib/author-projects/cyrillic-name";
+
 export type AuthorApplicationRpcResult = {
   ok: boolean;
   idempotent?: boolean;
@@ -38,6 +40,10 @@ export function parseAuthorApplicationRpcResult(
 }
 
 export function mapAuthorApplicationRpcError(message: string): string {
+  if (message.includes("invalid_project_name_latin")) {
+    return AUTHOR_PROJECT_NAME_LATIN_ERROR;
+  }
+
   if (message.includes("forbidden")) {
     return "Недостаточно прав для этого действия.";
   }

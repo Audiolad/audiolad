@@ -12,6 +12,7 @@ import {
   createAuthorProjectViaRpc,
   getAuthorProjectsSummary,
 } from "@/lib/author-projects/server";
+import { AUTHOR_PROJECT_NAME_LATIN_ERROR } from "@/lib/author-projects/cyrillic-name";
 import {
   validateAuthorProjectName,
   validateAuthorProjectSlug,
@@ -126,6 +127,19 @@ export async function POST(request: Request) {
           show_capacity_offer: true,
         },
         { status: 403 },
+      );
+    }
+
+    if (
+      error instanceof AuthorAccessError &&
+      error.code === "invalid_project_name_latin"
+    ) {
+      return NextResponse.json(
+        {
+          error: "invalid_project_name",
+          message: AUTHOR_PROJECT_NAME_LATIN_ERROR,
+        },
+        { status: 400 },
       );
     }
 

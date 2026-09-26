@@ -90,6 +90,7 @@ jobs:
           npx tsx scripts/music-upload-autostart-unit.mts
           npm run build
           npm run typecheck
+          npm run test:author-project-cyrillic-name
           npm run lint
 
       - name: Remove PR temporary stores

@@ -3,6 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAdminExactUuid } from "@/lib/admin/users-search";
+import {
+  AUTHOR_PROJECT_NAME_LATIN_ERROR,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
 import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -30,6 +34,11 @@ export function validateStudioProvisionInput(input: {
   const name = input.name.trim();
   const slug = input.slug.trim();
   const owner = input.owner.trim();
+
+  const cyrillicError = getAuthorProjectNameCyrillicError(name);
+  if (cyrillicError) {
+    return { ok: false, error: cyrillicError };
+  }
 
   if (name.length < 2 || name.length > 100) {
     return { ok: false, error: "Название студии должно содержать от 2 до 100 символов." };
@@ -111,6 +120,9 @@ export function mapStudioProvisionError(message: string): string {
   if (message.includes("forbidden")) return "Недостаточно прав для создания студии.";
   if (message.includes("studio_slug_taken")) return "Этот slug уже занят.";
   if (message.includes("owner_user_not_found")) return "Пользователь-владелец не найден.";
+  if (message.includes("invalid_project_name_latin")) {
+    return AUTHOR_PROJECT_NAME_LATIN_ERROR;
+  }
   if (message.includes("invalid_studio_name")) return "Некорректное название студии.";
   if (message.includes("invalid_studio_slug")) return "Некорректный slug.";
   return "Не удалось создать авторское пространство. Попробуйте ещё раз.";

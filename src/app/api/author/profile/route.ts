@@ -14,6 +14,10 @@ import {
 } from "@/lib/authors/profile";
 import { normalizeAuthorContacts } from "@/lib/authors/contacts-validation";
 import {
+  AUTHOR_PROJECT_NAME_LATIN_ERROR,
+  getAuthorProjectNameCyrillicError,
+} from "@/lib/author-projects/cyrillic-name";
+import {
   normalizeAuthorType,
   normalizeFeaturedProductIds,
   normalizeFullBio,
@@ -88,6 +92,14 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "invalid_name" }, { status: 400 });
       }
 
+      const cyrillicError = getAuthorProjectNameCyrillicError(name);
+      if (cyrillicError) {
+        return NextResponse.json(
+          { error: "invalid_project_name", message: cyrillicError },
+          { status: 400 },
+        );
+      }
+
       updates.name = name;
     }
 
@@ -147,6 +159,16 @@ export async function PATCH(request: Request) {
         .eq("id", authorId);
 
       if (updateError) {
+        if (updateError.message.includes("invalid_project_name_latin")) {
+          return NextResponse.json(
+            {
+              error: "invalid_project_name",
+              message: AUTHOR_PROJECT_NAME_LATIN_ERROR,
+            },
+            { status: 400 },
+          );
+        }
+
         console.error("author_profile_update_error", updateError.message);
         return NextResponse.json({ error: "internal_error" }, { status: 500 });
       }
