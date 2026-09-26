@@ -140,32 +140,37 @@ export default function BusinessLandingView({
 
       <main id="content" className="business-main">
         <section className="business-section business-section--tight" aria-labelledby="business-hero-title">
-          <div className="business-wrap business-hero">
-            <div>
-              <p className="business-kicker">Аудиолад Бизнес</p>
-              <h1 id="business-hero-title" className="business-h1">
-                {BUSINESS_LANDING_H1}
-              </h1>
-              <p className="business-lead">{BUSINESS_LANDING_SUBCOPY}</p>
-              <p className="business-micro">{BUSINESS_HERO_MICRO}</p>
-              <div className="business-actions">
-                <a className="business-btn business-btn--primary" href="#venues">
-                  {BUSINESS_PICK_LABEL}
-                </a>
-                <p className="business-trust">{BUSINESS_HERO_TRUST}</p>
-                <a className="business-btn business-btn--secondary" href="#listen">
-                  {BUSINESS_LISTEN_LABEL}
-                </a>
+          <div className="business-wrap">
+            <div className="business-hero-banner" data-business-hero="banner">
+              <div className="business-hero-banner__copy">
+                <p className="business-kicker">Аудиолад Бизнес</p>
+                <h1 id="business-hero-title" className="business-h1">
+                  {BUSINESS_LANDING_H1}
+                </h1>
+                <p className="business-lead">{BUSINESS_LANDING_SUBCOPY}</p>
+                <p className="business-micro">{BUSINESS_HERO_MICRO}</p>
+                <div className="business-actions">
+                  <a className="business-btn business-btn--primary" href="#venues">
+                    {BUSINESS_PICK_LABEL}
+                  </a>
+                  <p className="business-trust">{BUSINESS_HERO_TRUST}</p>
+                  <a className="business-btn business-btn--secondary" href="#listen">
+                    {BUSINESS_LISTEN_LABEL}
+                  </a>
+                </div>
+              </div>
+              <div className="business-hero-banner__visual">
+                <Poster
+                  file="01-business-music.webp"
+                  alt="Женщина с ноутбуком в светлом зале с растениями."
+                  width={1254}
+                  height={1254}
+                  sizes="(min-width: 1100px) 480px, 92vw"
+                  priority
+                  className="business-hero-banner__photo"
+                />
               </div>
             </div>
-            <Poster
-              file="01-business-music.webp"
-              alt=""
-              width={1254}
-              height={1254}
-              sizes="(min-width: 1100px) 46vw, 100vw"
-              priority
-            />
           </div>
         </section>
 
@@ -216,7 +221,7 @@ export default function BusinessLandingView({
             <div className="business-split business-split--compose">
               <Poster
                 file="10-how-it-works.webp"
-                alt=""
+                alt="Три шага: выбрать бизнес, атмосферу и включить музыку."
                 width={1254}
                 height={1254}
                 sizes="(min-width: 1100px) 46vw, 100vw"
@@ -268,12 +273,11 @@ export default function BusinessLandingView({
                 >
                   <Poster
                     file={venue.file}
-                    alt=""
+                    alt={venue.imageAlt}
                     width={1254}
                     height={1254}
                     sizes="(min-width: 1100px) 42vw, 88vw"
                   />
-                  <p className="sr-only">{venue.name}</p>
                 </article>
               ))}
             </BusinessSnapCarousel>
@@ -363,9 +367,9 @@ export default function BusinessLandingView({
 
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
           <div className="business-wrap business-split business-split--half">
-            <Poster
+              <Poster
               file="11-rights-documents.webp"
-              alt=""
+              alt="Документы и папка на столе рядом с ноутбуком."
               width={1254}
               height={1254}
               sizes="(min-width: 1100px) 46vw, 100vw"
@@ -403,7 +407,7 @@ export default function BusinessLandingView({
             </h2>
             <Poster
               file="14-legal-music-banner.webp"
-              alt="Иллюстрация: легальная музыка и опора на публичные источники."
+              alt="Иллюстрация: легальная музыка и публичные источники."
               width={1676}
               height={939}
               sizes="(min-width: 1280px) 1320px, 100vw"
@@ -422,7 +426,7 @@ export default function BusinessLandingView({
             <div className="business-sources-frame">
               <Poster
                 file="15-authoritative-sources.webp"
-                alt="Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
+                alt="Логотипы: Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
                 width={2172}
                 height={724}
                 sizes="(min-width: 1280px) 1320px, 100vw"
@@ -591,7 +595,7 @@ export default function BusinessLandingView({
             </div>
             <Poster
               file="12-free-trial.webp"
-              alt=""
+              alt="Телефон в руке, на экране надпись «7 дней бесплатно»."
               width={1254}
               height={1254}
               sizes="(min-width: 1100px) 46vw, 100vw"
@@ -651,7 +655,7 @@ export default function BusinessLandingView({
           <div className="business-wrap business-split business-split--half">
             <Poster
               file="13-handshake-agreement.webp"
-              alt=""
+              alt="Рукопожатие над документами."
               width={1312}
               height={1199}
               sizes="(min-width: 1100px) 46vw, 100vw"
