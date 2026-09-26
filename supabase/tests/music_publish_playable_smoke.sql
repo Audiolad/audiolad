@@ -36,7 +36,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.authors (id, name, slug, access_status)
-  VALUES (v_author, 'Publish Smoke', 'music-publish-playable-smoke', 'commercial');
+  VALUES (v_author, 'Проверка публикации', 'music-publish-playable-smoke', 'commercial');
 
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class

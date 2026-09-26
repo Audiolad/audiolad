@@ -42,7 +42,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.authors (id, name, slug)
-  VALUES (v_author, 'Slice3 Smoke', 'slice3-music-delivery-smoke');
+  VALUES (v_author, 'Срез три', 'slice3-music-delivery-smoke');
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class
   ) VALUES (
