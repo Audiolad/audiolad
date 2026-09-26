@@ -79,7 +79,8 @@ assert.match(catalogBlock, /product\.formatLabel/);
 assert.match(catalogBlock, /!product\.isFree/);
 assert.match(catalogBlock, /product\.priceLabel/);
 assert.doesNotMatch(catalogBlock, /priceLabel !== "Подарок"/);
-assert.match(readyBlock, /!selected\.isFree/);
+assert.match(readyBlock, /detail\.product\.formatLabel/);
+assert.match(readyBlock, /!detail\.product\.isFree/);
 assert.match(readyBlock, /detail\.product\.priceLabel/);
 assert.doesNotMatch(readyBlock, /priceLabel !== "Подарок"/);
 
@@ -88,9 +89,13 @@ const fieldOrder = [
   "detail.product.title",
   "detail.product.subtitle",
   "detail.product.authorName",
+  "detail.product.formatLabel",
+  "detail.product.title",
+  "detail.product.subtitle",
+  "detail.product.authorName",
   "detail.product.statsLabel",
   "detail.product.topics",
-  "selected.isFree",
+  "detail.product.isFree",
   "detail.product.priceLabel",
   "MaxAudioPlayer",
   "detail.product.contents",
