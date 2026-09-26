@@ -11,10 +11,10 @@ export const BUSINESS_LANDING_TITLE =
   "Музыка для бизнеса – Аудиолад Бизнес";
 
 export const BUSINESS_LANDING_DESCRIPTION =
-  "Музыка для вашего бизнеса — быстро, просто, легально. Без надоедливых повторов и лишних забот. Работает даже без интернета. Аудиолад Бизнес.";
+  "Музыка для вашего бизнеса – быстро, просто, легально. Без надоедливых повторов и лишних забот. Работает даже без интернета. Аудиолад Бизнес.";
 
 export const BUSINESS_LANDING_H1 =
-  "Музыка для вашего бизнеса — быстро, просто, легально";
+  "Музыка для вашего бизнеса – быстро, просто, легально";
 
 export const BUSINESS_LANDING_SUBCOPY =
   "Без надоедливых повторов и лишних забот. Работает даже без интернета.";
@@ -33,6 +33,7 @@ export const BUSINESS_CLOSER = "Одной заботой становится �
 
 export const BUSINESS_TRIAL_FREE = "7 дней бесплатно";
 export const BUSINESS_TRIAL_CARD = "Без привязки карты";
+export const BUSINESS_HERO_TRUST = "7 дней бесплатно · без привязки карты";
 
 export const BUSINESS_ASSET_FILES = [
   "01-business-music.webp",
@@ -137,7 +138,7 @@ export const BUSINESS_BENEFITS = [
   {
     id: "legal",
     title: "Спокойно с юридической стороны",
-    text: "Права и документы для коммерческого использования — в одном месте.",
+    text: "Права и документы для коммерческого использования – в одном месте.",
   },
   {
     id: "offline",
@@ -191,12 +192,19 @@ export const BUSINESS_ATMOSPHERES = [
 
 export const BUSINESS_LISTEN_LEAD =
   "Выберите формат и атмосферу. Аудиолад подбирает музыку под ваш зал: без сотен станций и без ручной сборки плейлистов.";
+export const BUSINESS_LISTEN_MATCHED = "Музыка подобрана под выбранную атмосферу";
+export const BUSINESS_LISTEN_PLAY = "Послушать музыку";
 
 export const BUSINESS_VARIETY_TITLE = "Музыка, которая не надоедает";
 export const BUSINESS_VARIETY_LEAD =
   "Одни и те же треки и исполнители не будут звучать по кругу весь рабочий день.";
 export const BUSINESS_VARIETY_BODY =
   "Аудиолад следит за разнообразием музыки, сохраняя выбранную атмосферу.";
+export const BUSINESS_VARIETY_POINTS = [
+  "Без повторов одних и тех же треков",
+  "Исполнители не идут по кругу",
+  "Разнообразная музыка весь рабочий день",
+] as const;
 
 export const BUSINESS_CONTROL_TITLE = "Настройте атмосферу под себя";
 export const BUSINESS_CONTROL_LEAD =
@@ -218,7 +226,7 @@ export const BUSINESS_DAYPARTS = [
   { id: "evening", title: "Вечер", text: "Мягко и атмосферно" },
 ] as const;
 
-export const BUSINESS_OFFLINE_TITLE = "Интернет пропал — музыка продолжает играть";
+export const BUSINESS_OFFLINE_TITLE = "Интернет пропал – музыка продолжает играть";
 export const BUSINESS_OFFLINE_LEAD =
   "Аудиолад заранее сохраняет запас музыки на устройстве и продолжает воспроизведение при временных проблемах со связью.";
 
@@ -226,7 +234,7 @@ export const BUSINESS_LEGAL_LEAD =
   "Понятные условия. Необходимые документы. Прозрачная информация о правах. Всё в одном месте.";
 
 export const BUSINESS_STAFF_TITLE =
-  "Ваш бизнес звучит одинаково — независимо от смены сотрудников";
+  "Ваш бизнес звучит одинаково – независимо от смены сотрудников";
 export const BUSINESS_STAFF_LEAD =
   "Правила задаёт владелец. У смены остаются только разрешённые действия.";
 export const BUSINESS_ROLES = [
@@ -244,10 +252,10 @@ export const BUSINESS_LOCATION_PREVIEW = [
   { id: "office", name: "Офис", now: "Лёгкая", status: "offline" },
 ] as const;
 
-export const BUSINESS_SUPPORT_TITLE = "Если понадобится помощь — мы рядом";
+export const BUSINESS_SUPPORT_TITLE = "Если понадобится помощь – мы рядом";
 export const BUSINESS_SUPPORT_LEAD =
   "Поможем с подключением, настройкой музыки и работой сервиса.";
-export const BUSINESS_SUPPORT_NOTE = "Менеджер — только если вы сами этого хотите.";
+export const BUSINESS_SUPPORT_NOTE = "Менеджер – только если вы сами этого хотите.";
 
 export const BUSINESS_PRICE_TITLE = "Понятная цена. Никаких неожиданных списаний.";
 export const BUSINESS_PRICE_ROWS = [
@@ -503,12 +511,16 @@ export function listBusinessLandingCopy(): string[] {
     BUSINESS_CLOSER,
     BUSINESS_TRIAL_FREE,
     BUSINESS_TRIAL_CARD,
+    BUSINESS_HERO_TRUST,
+    BUSINESS_LISTEN_MATCHED,
+    BUSINESS_LISTEN_PLAY,
     BUSINESS_RELIEF_HEADING,
     BUSINESS_RELIEF_CLOSER,
     BUSINESS_LISTEN_LEAD,
     BUSINESS_VARIETY_TITLE,
     BUSINESS_VARIETY_LEAD,
     BUSINESS_VARIETY_BODY,
+    ...BUSINESS_VARIETY_POINTS,
     BUSINESS_CONTROL_TITLE,
     BUSINESS_CONTROL_LEAD,
     BUSINESS_DAYPART_TITLE,

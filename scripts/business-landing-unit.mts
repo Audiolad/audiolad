@@ -39,7 +39,7 @@ assert.equal(existsSync(join(root, "src/app/(platform)/b/[slug]/page.tsx")), fal
 
 assert.equal(
   BUSINESS_LANDING_H1,
-  "Музыка для вашего бизнеса — быстро, просто, легально",
+  "Музыка для вашего бизнеса – быстро, просто, легально",
 );
 assert.equal(BUSINESS_LANDING_TITLE, "Музыка для бизнеса – Аудиолад Бизнес");
 assert.equal(BUSINESS_LANDING_CANONICAL, "https://audiolad.ru/b");
@@ -91,12 +91,25 @@ assert.equal(
 assert.match(copy, /7 дней бесплатно/);
 assert.match(copy, /Без привязки карты/);
 assert.match(copy, /Музыка не надоедает/);
-assert.match(copy, /Интернет пропал — музыка продолжает играть/);
+assert.match(copy, /Интернет пропал – музыка продолжает играть/);
+assert.match(copy, /7 дней бесплатно · без привязки карты/);
+assert.match(copy, /Без повторов одних и тех же треков/);
+assert.match(copy, /Музыка подобрана под выбранную атмосферу/);
+assert.doesNotMatch(copy, /\u2014/);
 assert.doesNotMatch(copy, /Создать мой эфир|эфир|опубликованн|условия под рукой|пока не/);
 assert.doesNotMatch(view, /штрафов не будет|Создать мой эфир|эфир|Про иллюстрацию|не обещаем/);
 assert.match(copy, /Подобрать музыку/);
 assert.match(view, /BUSINESS_PICK_LABEL/);
 assert.match(view, /Как звучит ваш бизнес\?/);
+assert.match(view, /business-trust/);
+assert.match(view, /business-header__menu/);
+const studio = read("src/components/business/BusinessListenStudio.tsx");
+assert.match(studio, /Музыка подобрана под выбранную атмосферу|BUSINESS_LISTEN_MATCHED/);
+assert.match(studio, /Послушать музыку|BUSINESS_LISTEN_PLAY/);
+assert.match(studio, /Салон красоты|beauty/);
+assert.doesNotMatch(studio, /\u2014/);
+assert.doesNotMatch(read("src/components/business/BusinessListenRail.tsx"), /\u2014/);
+assert.doesNotMatch(read("src/lib/business/landing.ts"), /\u2014/);
 assert.match(view, /id="variety"/);
 assert.match(view, /id="offline"/);
 assert.match(view, /id="network"/);

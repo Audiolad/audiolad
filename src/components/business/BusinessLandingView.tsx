@@ -2,12 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 import BusinessInquiryForm from "@/components/business/BusinessInquiryForm";
-import BusinessListenRail from "@/components/business/BusinessListenRail";
+import BusinessListenStudio from "@/components/business/BusinessListenStudio";
 import BusinessSnapCarousel from "@/components/business/BusinessSnapCarousel";
 import BusinessSocialProofSlot from "@/components/business/BusinessSocialProofSlot";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
 import {
-  BUSINESS_ATMOSPHERES,
   BUSINESS_BENEFITS,
   BUSINESS_CLOSER,
   BUSINESS_CONTROL_ACTIONS,
@@ -17,8 +16,8 @@ import {
   BUSINESS_DAYPART_TITLE,
   BUSINESS_DAYPARTS,
   BUSINESS_FAQ,
-  BUSINESS_FORMATS,
   BUSINESS_HERO_MICRO,
+  BUSINESS_HERO_TRUST,
   BUSINESS_HOW_HELP,
   BUSINESS_HOW_LABEL,
   BUSINESS_HOW_NOTE,
@@ -28,7 +27,7 @@ import {
   BUSINESS_LEGAL_LEAD,
   BUSINESS_LEGAL_QUOTE_CARDS_ENABLED,
   BUSINESS_LISTEN_LABEL,
-  BUSINESS_LISTEN_LEAD,
+  BUSINESS_VARIETY_POINTS,
   BUSINESS_LOCATION_PREVIEW,
   BUSINESS_NETWORK_LEAD,
   BUSINESS_NETWORK_TITLE,
@@ -120,6 +119,17 @@ export default function BusinessLandingView({
             <a href="#rights">Условия</a>
             <a href="#connect">Подключить</a>
           </nav>
+          <details className="business-header__menu">
+            <summary aria-label="Меню">
+              <span className="business-header__burger" aria-hidden="true" />
+            </summary>
+            <nav aria-label="Разделы страницы">
+              <a href="#how">{BUSINESS_HOW_LABEL}</a>
+              <a href="#listen">Послушать</a>
+              <a href="#rights">Условия</a>
+              <a href="#connect">Подключить</a>
+            </nav>
+          </details>
           <div className="business-header__cta">
             <a className="business-btn business-btn--primary" href="#venues">
               {BUSINESS_PICK_LABEL}
@@ -142,6 +152,7 @@ export default function BusinessLandingView({
                 <a className="business-btn business-btn--primary" href="#venues">
                   {BUSINESS_PICK_LABEL}
                 </a>
+                <p className="business-trust">{BUSINESS_HERO_TRUST}</p>
                 <a className="business-btn business-btn--secondary" href="#listen">
                   {BUSINESS_LISTEN_LABEL}
                 </a>
@@ -274,45 +285,7 @@ export default function BusinessLandingView({
             <h2 id="business-listen-title" className="business-h2">
               Как звучит ваш бизнес?
             </h2>
-            <p className="business-lead">{BUSINESS_LISTEN_LEAD}</p>
-            <fieldset className="business-fieldset">
-              <legend className="business-kicker">Ваш бизнес</legend>
-              <div className="business-chips">
-                {BUSINESS_FORMATS.map((format, index) => (
-                  <label key={format.id} className="business-chip">
-                    <input
-                      type="radio"
-                      name="business-format"
-                      defaultChecked={index === 0}
-                    />
-                    <span>{format.name}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="business-fieldset">
-              <legend className="business-kicker">Атмосфера</legend>
-              <div className="business-chips">
-                {BUSINESS_ATMOSPHERES.map((atmosphere, index) => (
-                  <label key={atmosphere} className="business-chip">
-                    <input
-                      type="radio"
-                      name="business-atmosphere"
-                      defaultChecked={index === 0}
-                    />
-                    <span>{atmosphere}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <div className="business-actions">
-              <a className="business-btn business-btn--primary" href="#listen-now">
-                {BUSINESS_LISTEN_LABEL}
-              </a>
-            </div>
-            <div className="mt-6" id="listen-now">
-              <BusinessListenRail items={listenExamples} />
-            </div>
+            <BusinessListenStudio items={listenExamples} />
           </div>
         </section>
 
@@ -323,6 +296,14 @@ export default function BusinessLandingView({
             </h2>
             <p className="business-lead">{BUSINESS_VARIETY_LEAD}</p>
             <p className="business-copy">{BUSINESS_VARIETY_BODY}</p>
+            <ul className="business-card-grid business-variety">
+              {BUSINESS_VARIETY_POINTS.map((point) => (
+                <li key={point} className="business-card business-variety-card">
+                  <span className="business-variety-card__mark" aria-hidden="true" />
+                  <p>{point}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
