@@ -90,6 +90,13 @@ assert.match(detailSource, /product\.recommendationsTitle/);
 assert.match(detailSource, /Рекомендации автора|recommendationsTitle/);
 assert.match(detailSource, /aria-label="Темы практики"/);
 assert.match(detailSource, /Темы/);
+assert.match(detailSource, /onClick=\{\(\) => onOpenTopic\(topic\.key\)\}/);
+assert.match(detailSource, /data-max-product-legal-footer/);
+assert.match(detailSource, /LEGAL_LINKS\.map/);
+assert.match(detailSource, /buildAudioladPublicUrl/);
+assert.match(detailSource, /openMaxExternalUrl/);
+assert.match(detailSource, /Публичная оферта|LEGAL_LINKS/);
+assert.match(detailSource, /1@audiolad\.ru/);
 assert.doesNotMatch(detailSource, /product\.description|О продукте|Как слушать|Как использовать/);
 
 const coverIndex = detailSource.indexOf("product.coverUrl");
