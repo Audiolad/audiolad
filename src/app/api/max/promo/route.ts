@@ -6,6 +6,13 @@ import { getMaxPromoPage } from "@/lib/max/promo";
 export const dynamic = "force-dynamic";
 export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 
+type GetMaxPromoPage = typeof getMaxPromoPage;
+let getMaxPromoPageImpl: GetMaxPromoPage | null = null;
+
+export function setGetMaxPromoPageForTests(impl: GetMaxPromoPage | null) {
+  getMaxPromoPageImpl = impl;
+}
+
 function fail(reason: string, status: number) {
   return Response.json(
     { ok: false, reason },
@@ -22,7 +29,7 @@ export async function POST(request: Request) {
 
   const authorSlug = String(authenticated.body.authorSlug).trim();
   const promoSlug = String(authenticated.body.promoSlug).trim();
-  const result = await getMaxPromoPage(authorSlug, promoSlug);
+  const result = await (getMaxPromoPageImpl ?? getMaxPromoPage)(authorSlug, promoSlug);
 
   if (!result.ok) {
     return fail(result.reason, result.reason === "not_found" ? 404 : 503);
