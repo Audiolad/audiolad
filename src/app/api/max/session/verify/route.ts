@@ -141,9 +141,14 @@ export async function POST(request: Request) {
     return errorResponse(result.reason, statusForReason(result.reason));
   }
 
-  const startTarget = await (resolveMaxStartTargetImpl ?? resolveMaxStartTarget)(
-    result.data.start_param,
-  );
+  let startTarget = null;
+  try {
+    startTarget = await (resolveMaxStartTargetImpl ?? resolveMaxStartTarget)(
+      result.data.start_param,
+    );
+  } catch {
+    // Navigation resolution is best-effort and must not block MAX authentication.
+  }
 
   const touch = await touchExternalIdentity(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
