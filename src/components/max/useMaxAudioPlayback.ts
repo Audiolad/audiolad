@@ -73,6 +73,7 @@ export function useMaxAudioPlayback({
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [previewEnded, setPreviewEnded] = useState(false);
+  const [completed, setCompleted] = useState(false);
 
   const tracks = session.tracks;
   const currentTrack: MaxPlaybackTrack | null = tracks[trackIndex] ?? null;
@@ -121,6 +122,7 @@ export function useMaxAudioPlayback({
     setCurrentTime(0);
     setDuration(0);
     setPreviewEnded(false);
+    setCompleted(false);
   }, [clearCurrentMediaSource, clearSeekRestore, revokeObjectUrl, stopRequests]);
 
   const applySource = useCallback(
@@ -205,6 +207,7 @@ export function useMaxAudioPlayback({
       currentTrackIdRef.current = track.trackId;
       setError(null);
       setPreviewEnded(false);
+      setCompleted(false);
       setTrackIndex(index);
       const visible = maxTrackSwitchVisibleReset();
       setIsPlaying(visible.isPlaying);
@@ -390,12 +393,14 @@ export function useMaxAudioPlayback({
         intendedPlayingRef.current = false;
         setIsPlaying(false);
         setPreviewEnded(true);
+        setCompleted(true);
         return;
       }
       const next = nextMaxTrackIndex(trackIndex, tracks.length);
       if (next === null) {
         setIsPlaying(false);
         intendedPlayingRef.current = false;
+        setCompleted(true);
         return;
       }
       intendedPlayingRef.current = true;
@@ -496,6 +501,7 @@ export function useMaxAudioPlayback({
     duration,
     error,
     previewEnded,
+    completed,
     play,
     pause,
     seek,
