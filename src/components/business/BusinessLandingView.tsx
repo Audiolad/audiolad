@@ -159,10 +159,10 @@ export default function BusinessLandingView({
                   </a>
                 </div>
               </div>
-              <div className="business-hero-banner__visual" aria-hidden="true">
+              <div className="business-hero-banner__visual">
                 <Poster
                   file="01-business-music.webp"
-                  alt=""
+                  alt="Женщина с ноутбуком в светлом зале с растениями."
                   width={1254}
                   height={1254}
                   sizes="(min-width: 1100px) 480px, 92vw"
@@ -221,7 +221,7 @@ export default function BusinessLandingView({
             <div className="business-split business-split--compose">
               <Poster
                 file="10-how-it-works.webp"
-                alt=""
+                alt="Три шага: выбрать бизнес, атмосферу и включить музыку."
                 width={1254}
                 height={1254}
                 sizes="(min-width: 1100px) 46vw, 100vw"
@@ -273,7 +273,7 @@ export default function BusinessLandingView({
                 >
                   <Poster
                     file={venue.file}
-                    alt={venue.name}
+                    alt={venue.imageAlt}
                     width={1254}
                     height={1254}
                     sizes="(min-width: 1100px) 42vw, 88vw"
@@ -367,9 +367,9 @@ export default function BusinessLandingView({
 
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
           <div className="business-wrap business-split business-split--half">
-            <Poster
+              <Poster
               file="11-rights-documents.webp"
-              alt=""
+              alt="Документы и папка на столе рядом с ноутбуком."
               width={1254}
               height={1254}
               sizes="(min-width: 1100px) 46vw, 100vw"
@@ -407,7 +407,7 @@ export default function BusinessLandingView({
             </h2>
             <Poster
               file="14-legal-music-banner.webp"
-              alt="Иллюстрация: легальная музыка и опора на публичные источники."
+              alt="Иллюстрация: легальная музыка и публичные источники."
               width={1676}
               height={939}
               sizes="(min-width: 1280px) 1320px, 100vw"
@@ -426,7 +426,7 @@ export default function BusinessLandingView({
             <div className="business-sources-frame">
               <Poster
                 file="15-authoritative-sources.webp"
-                alt="Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
+                alt="Логотипы: Гражданский кодекс РФ, Роспатент, Верховный суд, РАО, Коммерсантъ и РБК."
                 width={2172}
                 height={724}
                 sizes="(min-width: 1280px) 1320px, 100vw"
@@ -595,7 +595,7 @@ export default function BusinessLandingView({
             </div>
             <Poster
               file="12-free-trial.webp"
-              alt=""
+              alt="Телефон в руке, на экране надпись «7 дней бесплатно»."
               width={1254}
               height={1254}
               sizes="(min-width: 1100px) 46vw, 100vw"
@@ -655,7 +655,7 @@ export default function BusinessLandingView({
           <div className="business-wrap business-split business-split--half">
             <Poster
               file="13-handshake-agreement.webp"
-              alt=""
+              alt="Рукопожатие над документами."
               width={1312}
               height={1199}
               sizes="(min-width: 1100px) 46vw, 100vw"

@@ -130,9 +130,15 @@ assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/|["'])/);
 assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 2);
 assert.match(nextConfig, /source:\s*"\/auth\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/d\/:path\*"[\s\S]*X-Robots-Tag/);
-assert.match(view, /alt=\{venue\.name\}/);
+assert.match(view, /alt=\{venue\.imageAlt\}/);
+assert.match(view, /alt="Женщина с ноутбуком в светлом зале с растениями\."/);
 assert.match(view, /alt="Иллюстрация: легальная музыка/);
 assert.match(view, /alt=\{source\.name\}/);
+assert.doesNotMatch(view, /alt=""/);
+for (const venue of BUSINESS_VENUES) {
+  assert.ok(venue.imageAlt.trim().length > 8, venue.id);
+  assert.doesNotMatch(venue.imageAlt, /\u2014|штраф|без РАО|без ВОИС/i);
+}
 
 assert.deepEqual(
   BUSINESS_VENUES.map((venue) => [venue.id, venue.futurePath]),
