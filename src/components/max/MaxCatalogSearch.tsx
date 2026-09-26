@@ -67,8 +67,14 @@ type FilterListingState =
 
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
+export type MaxCatalogTopicNavigationRequest = {
+  key: string;
+  requestId: number;
+};
+
 type MaxCatalogSearchProps = {
   onSelectProduct: (product: MaxCatalogProduct) => void;
+  topicNavigationRequest?: MaxCatalogTopicNavigationRequest | null;
 };
 
 function SearchIcon() {
@@ -185,7 +191,10 @@ function buildMaxCatalogRequestBody(input: {
   return JSON.stringify(body);
 }
 
-export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchProps) {
+export default function MaxCatalogSearch({
+  onSelectProduct,
+  topicNavigationRequest = null,
+}: MaxCatalogSearchProps) {
   const inputId = useId();
   const [defaultCatalog, setDefaultCatalog] = useState<DefaultCatalogState>(() =>
     readMaxInitData() ? { status: "loading" } : { status: "error" },
@@ -729,6 +738,17 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   function resetFilters() {
     applyFilters([], "all", "all");
   }
+
+  useEffect(() => {
+    const topicKey = topicNavigationRequest?.key.trim();
+    if (!topicKey) return;
+
+    setSearchInput("");
+    searchInputRef.current = "";
+    setActiveSection(null);
+    activeSectionRef.current = null;
+    applyFilters([topicKey], "all", "all");
+  }, [topicNavigationRequest?.requestId]);
 
   useEffect(() => {
     defaultCatalogRef.current = defaultCatalog;
