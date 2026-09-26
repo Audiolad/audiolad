@@ -11,6 +11,12 @@ import {
   MAX_PLAYBACK_SESSION_PATH,
   MAX_PROMO_PATH,
 } from "@/lib/max/host";
+import {
+  trackMaxPromoCompletedOnce,
+  trackMaxPromoCtaClicked,
+  trackMaxPromoPlayStartedOnce,
+  trackMaxPromoViewedOnce,
+} from "@/lib/max/promo-analytics-client";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
 import {
   readMaxPromoPage,
@@ -137,7 +143,13 @@ export default function MaxPromoLanding({
     return () => controller.abort();
   }, [target.authorSlug, target.promoSlug]);
 
-  async function startProduct(product: MaxPromoProduct) {
+  useEffect(() => {
+    if (load.status === "ready") {
+      trackMaxPromoViewedOnce(load.page.promoPageId);
+    }
+  }, [load]);
+
+    async function startProduct(product: MaxPromoProduct) {
     const initData = readMaxInitData();
     if (!initData) {
       setPlayback({
@@ -315,8 +327,21 @@ export default function MaxPromoLanding({
                     onBindPlay={(play) => {
                       if (pendingAutoPlayRef.current === product.practiceId) {
                         pendingAutoPlayRef.current = null;
+                        trackMaxPromoPlayStartedOnce(
+                          page.promoPageId,
+                          product.practiceId,
+                          playback.session.tracks[0]?.trackId ?? null,
+                        );
                         play();
                       }
+                    }}
+                    onPlaybackCompleted={({ trackId, durationSeconds }) => {
+                      trackMaxPromoCompletedOnce(
+                        page.promoPageId,
+                        product.practiceId,
+                        trackId,
+                        durationSeconds,
+                      );
                     }}
                     fetchAudio={async (trackId, signal) => {
                       if (playback.session.playbackMode === "preview") {
@@ -382,7 +407,15 @@ export default function MaxPromoLanding({
             ) : null}
             <button
               type="button"
-              onClick={() => openPromoCta(page)}
+              onClick={() => {
+                trackMaxPromoCtaClicked(page.promoPageId, {
+                  position: "after_practices",
+                  destination_kind: page.cta?.kind ?? "external",
+                  destination_host: page.cta?.host ?? null,
+                  open_mode: page.cta?.openInNewTab ? "new_tab" : "same_tab",
+                });
+                openPromoCta(page);
+              }}
               className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
             >
               {page.cta.label}
