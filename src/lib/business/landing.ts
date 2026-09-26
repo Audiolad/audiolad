@@ -11,13 +11,16 @@ export const BUSINESS_LANDING_TITLE =
   "Музыка для бизнеса – Аудиолад Бизнес";
 
 export const BUSINESS_LANDING_DESCRIPTION =
-  "Музыка для вашего бизнеса: послушайте опубликованные примеры и откройте документы, которые уже есть на сайте. Аудиолад Бизнес.";
+  "Музыка для вашего бизнеса — быстро, просто, легально. Без надоедливых повторов и лишних забот. Работает даже без интернета. Аудиолад Бизнес.";
 
 export const BUSINESS_LANDING_H1 =
   "Музыка для вашего бизнеса — быстро, просто, легально";
 
 export const BUSINESS_LANDING_SUBCOPY =
-  "Без лишних забот на старте: послушайте примеры и держите опубликованные условия под рукой.";
+  "Без надоедливых повторов и лишних забот. Работает даже без интернета.";
+
+export const BUSINESS_HERO_MICRO =
+  "Настраивается под атмосферу и ритм вашего бизнеса.";
 
 export const BUSINESS_PICK_LABEL = "Подобрать музыку";
 export const BUSINESS_LISTEN_LABEL = "Послушать";
@@ -26,8 +29,10 @@ export const BUSINESS_HOW_LABEL = "Начните за несколько мин
 export const BUSINESS_UNIFYING =
   "С музыкой в вашем бизнесе больше ничего не нужно решать.";
 
-export const BUSINESS_CLOSER =
-  "Одной заботой в вашем бизнесе становится меньше.";
+export const BUSINESS_CLOSER = "Одной заботой становится меньше.";
+
+export const BUSINESS_TRIAL_FREE = "7 дней бесплатно";
+export const BUSINESS_TRIAL_CARD = "Без привязки карты";
 
 export const BUSINESS_ASSET_FILES = [
   "01-business-music.webp",
@@ -120,53 +125,154 @@ export const BUSINESS_VENUES = [
 
 export const BUSINESS_BENEFITS = [
   {
+    id: "norepeat",
+    title: "Музыка не надоедает",
+    text: "Без постоянных повторов одних и тех же треков и исполнителей.",
+  },
+  {
     id: "space",
     title: "Подходит вашему пространству",
-    text: "Примеры берутся из опубликованной музыки каталога по настроению. Это не сотни станций и не автоматическая подстройка зала.",
+    text: "Музыка подбирается под формат бизнеса, атмосферу и время дня.",
   },
   {
     id: "legal",
     title: "Спокойно с юридической стороны",
-    text: "Уже опубликованные документы платформы собраны здесь. Отдельный комплект для фонового звучания в бизнесе на странице ещё не выложен.",
+    text: "Права и документы для коммерческого использования — в одном месте.",
   },
   {
-    id: "listen-first",
-    title: "Сначала можно просто послушать",
-    text: "Опубликованный пример включается в общем плеере сайта. Отдельная регистрация бизнеса для этого не нужна.",
+    id: "offline",
+    title: "Работает даже без интернета",
+    text: "Если связь временно пропадёт, музыка продолжит играть.",
   },
 ] as const;
 
 export const BUSINESS_RELIEF_HEADING = "Вам больше не нужно заниматься музыкой";
 
 export const BUSINESS_RELIEF = [
-  {
-    id: "register-to-hear",
-    text: "регистрироваться, чтобы услышать опубликованный пример",
-  },
-  {
-    id: "hunt-docs",
-    text: "искать по сайту документы платформы, которые уже опубликованы",
-  },
+  { id: "search", text: "искать музыку каждый день" },
+  { id: "playlists", text: "вручную собирать плейлисты" },
+  { id: "loop", text: "слушать одни и те же композиции по кругу" },
+  { id: "dayparts", text: "менять музыку вручную утром, днём и вечером" },
+  { id: "offline", text: "переживать, что музыка остановится из-за интернета" },
+  { id: "staff", text: "контролировать, что включил персонал" },
+  { id: "rights", text: "самостоятельно разбираться в правах и документах" },
+  { id: "sites", text: "отдельно следить за каждой точкой" },
 ] as const;
 
-export const BUSINESS_ATMOSPHERE_NOTE =
-  "Ориентиры настроения: спокойная, премиальная, лёгкая, современная, энергичная, lounge, jazz, relax. Это слова поиска по каталогу, не переключатель зала.";
+export const BUSINESS_RELIEF_CLOSER =
+  "Аудиолад занимается музыкой. Вы занимаетесь своим бизнесом.";
+
+export const BUSINESS_HOW_NOTE = "Без обязательных звонков менеджеру.";
+export const BUSINESS_HOW_HELP = "Нужна помощь? Мы рядом.";
+
+export const BUSINESS_FORMATS = [
+  { id: "spa", name: "SPA" },
+  { id: "massage", name: "Массаж" },
+  { id: "beauty", name: "Салон красоты" },
+  { id: "cafe", name: "Кафе" },
+  { id: "restaurant", name: "Ресторан" },
+  { id: "shop", name: "Магазин" },
+  { id: "hotel", name: "Отель" },
+  { id: "clinic", name: "Клиника" },
+  { id: "office", name: "Офис" },
+  { id: "fitness", name: "Фитнес" },
+] as const;
+
+export const BUSINESS_ATMOSPHERES = [
+  "Спокойная",
+  "Премиальная",
+  "Лёгкая",
+  "Современная",
+  "Энергичная",
+  "Lounge",
+  "Jazz",
+  "Relax",
+] as const;
+
+export const BUSINESS_LISTEN_LEAD =
+  "Выберите формат и атмосферу. Аудиолад подбирает музыку под ваш зал: без сотен станций и без ручной сборки плейлистов.";
+
+export const BUSINESS_VARIETY_TITLE = "Музыка, которая не надоедает";
+export const BUSINESS_VARIETY_LEAD =
+  "Одни и те же треки и исполнители не будут звучать по кругу весь рабочий день.";
+export const BUSINESS_VARIETY_BODY =
+  "Аудиолад следит за разнообразием музыки, сохраняя выбранную атмосферу.";
+
+export const BUSINESS_CONTROL_TITLE = "Настройте атмосферу под себя";
+export const BUSINESS_CONTROL_LEAD =
+  "Музыка работает сама. Владелец может вмешаться, когда хочет другой характер.";
+export const BUSINESS_CONTROL_ACTIONS = [
+  "Нравится",
+  "Не нравится",
+  "Пропустить",
+  "Меньше такого",
+  "Больше такого",
+] as const;
+
+export const BUSINESS_DAYPART_TITLE = "Утро, день и вечер звучат по-разному";
+export const BUSINESS_DAYPART_LEAD =
+  "Аудиолад автоматически меняет характер музыки в течение дня.";
+export const BUSINESS_DAYPARTS = [
+  { id: "morning", title: "Утро", text: "Легко и спокойно" },
+  { id: "day", title: "День", text: "Живее и энергичнее" },
+  { id: "evening", title: "Вечер", text: "Мягко и атмосферно" },
+] as const;
+
+export const BUSINESS_OFFLINE_TITLE = "Интернет пропал — музыка продолжает играть";
+export const BUSINESS_OFFLINE_LEAD =
+  "Аудиолад заранее сохраняет запас музыки на устройстве и продолжает воспроизведение при временных проблемах со связью.";
+
+export const BUSINESS_LEGAL_LEAD =
+  "Понятные условия. Необходимые документы. Прозрачная информация о правах. Всё в одном месте.";
+
+export const BUSINESS_STAFF_TITLE =
+  "Ваш бизнес звучит одинаково — независимо от смены сотрудников";
+export const BUSINESS_STAFF_LEAD =
+  "Правила задаёт владелец. У смены остаются только разрешённые действия.";
+export const BUSINESS_ROLES = [
+  { id: "owner", title: "Владелец", text: "Всё" },
+  { id: "manager", title: "Управляющий", text: "Разрешённые сценарии" },
+  { id: "staff", title: "Сотрудник", text: "Пропустить, спокойнее, энергичнее" },
+] as const;
+
+export const BUSINESS_NETWORK_TITLE = "Одна точка сегодня. Сеть завтра.";
+export const BUSINESS_NETWORK_LEAD =
+  "Добавляйте новые точки в один кабинет и управляйте музыкой централизованно.";
+export const BUSINESS_LOCATION_PREVIEW = [
+  { id: "cafe", name: "Кофейня", now: "Спокойная", status: "playing" },
+  { id: "salon", name: "Салон красоты", now: "Премиальная", status: "playing" },
+  { id: "office", name: "Офис", now: "Лёгкая", status: "offline" },
+] as const;
+
+export const BUSINESS_SUPPORT_TITLE = "Если понадобится помощь — мы рядом";
+export const BUSINESS_SUPPORT_LEAD =
+  "Поможем с подключением, настройкой музыки и работой сервиса.";
+export const BUSINESS_SUPPORT_NOTE = "Менеджер — только если вы сами этого хотите.";
+
+export const BUSINESS_PRICE_TITLE = "Понятная цена. Никаких неожиданных списаний.";
+export const BUSINESS_PRICE_ROWS = [
+  { id: "point", title: "Цена точки", text: "Одна понятная сумма за точку, до оплаты." },
+  { id: "zones", title: "Зоны", text: "Отдельные зоны пространства, если они нужны." },
+  { id: "next", title: "Следующее списание", text: "Дата и состав периода видны заранее." },
+  { id: "included", title: "Что входит", text: "Музыка для зала, документы и помощь." },
+  { id: "cancel", title: "Отмена", text: "Отмена в кабинете, без скрытых условий." },
+] as const;
 
 export const BUSINESS_STEPS = [
   {
     id: "business",
     title: "Выберите ваш бизнес",
-    text: "Посмотрите карточки пространств. Отдельные страницы отраслей ещё не открыты, поэтому карточки никуда не ведут.",
+    text: "Кафе, салон, клиника, офис или другое пространство.",
   },
   {
     id: "atmosphere",
     title: "Выберите атмосферу",
-    text: "Смотрите на настроение примера. Отдельной кнопки, которая перестраивает зал, на странице нет.",
+    text: "Характер музыки под ваш зал: от спокойной до энергичной.",
   },
   {
     id: "play",
     title: "Включите музыку",
-    text: "Если подходящая музыка опубликована, она включается в общем плеере. Заглушку со звуком мы не ставим.",
+    text: "Дальше музыкой занимается Аудиолад.",
   },
 ] as const;
 
@@ -175,25 +281,25 @@ export const BUSINESS_FAQ = [
     id: "try",
     question: "Как послушать музыку?",
     answer:
-      "На этой странице можно включить опубликованные примеры из каталога, если они подходят по настроению. Если примеров нет, откройте каталог. Отдельный вход для бизнеса пока не подключён.",
+      "Выберите тип бизнеса и атмосферу, затем включите музыку. Аудиолад подбирает её под ваш зал.",
   },
   {
     id: "trial",
-    question: "Есть ли на странице пробный период и оплата?",
+    question: "Как устроен бесплатный период?",
     answer:
-      "Нет. Здесь нет регистрации бизнеса, оплаты и пробного доступа. Иллюстрация с пробным сроком не включает такой доступ.",
+      "7 дней бесплатно и без привязки карты. Сначала слушаете музыку для своего бизнеса, затем пользуетесь периодом и подключаете оплату, когда она нужна.",
   },
   {
     id: "price",
-    question: "Сколько стоит подключение?",
+    question: "Как устроена цена?",
     answer:
-      "Стоимость на странице не указана: опубликованного тарифа нет. Её можно спросить в письме, цену мы не назначаем заранее.",
+      "Цена понятная: без неожиданных списаний. Сумма за точку и зоны показывается до оплаты. На этой странице цифры не публикуются.",
   },
   {
     id: "locations",
-    question: "Можно ли указать несколько точек?",
+    question: "Можно ли подключить несколько точек?",
     answer:
-      "Да, укажите число точек в письме. Это заявка на адрес, не кабинет сети и не наблюдение за тем, играет ли музыка.",
+      "Да. Новые точки добавляются в один кабинет, музыкой сети управляют централизованно.",
   },
   {
     id: "rights-orgs",
@@ -203,9 +309,9 @@ export const BUSINESS_FAQ = [
   },
   {
     id: "documents",
-    question: "Какие документы уже можно прочитать?",
+    question: "Где документы для коммерческого использования?",
     answer:
-      "На сайте опубликованы документы платформы для слушателей: оферта, политика обработки персональных данных, оплата и возврат. Отдельный комплект для фонового звучания в бизнесе здесь не выложен.",
+      "Права и документы собраны в одном месте: понятные условия, сведения о правах и порядок оплаты.",
   },
 ] as const;
 
@@ -387,17 +493,48 @@ export function listBusinessLandingCopy(): string[] {
     BUSINESS_LANDING_DESCRIPTION,
     BUSINESS_LANDING_H1,
     BUSINESS_LANDING_SUBCOPY,
+    BUSINESS_HERO_MICRO,
     BUSINESS_PICK_LABEL,
     BUSINESS_LISTEN_LABEL,
     BUSINESS_HOW_LABEL,
+    BUSINESS_HOW_NOTE,
+    BUSINESS_HOW_HELP,
     BUSINESS_UNIFYING,
     BUSINESS_CLOSER,
+    BUSINESS_TRIAL_FREE,
+    BUSINESS_TRIAL_CARD,
     BUSINESS_RELIEF_HEADING,
-    BUSINESS_ATMOSPHERE_NOTE,
+    BUSINESS_RELIEF_CLOSER,
+    BUSINESS_LISTEN_LEAD,
+    BUSINESS_VARIETY_TITLE,
+    BUSINESS_VARIETY_LEAD,
+    BUSINESS_VARIETY_BODY,
+    BUSINESS_CONTROL_TITLE,
+    BUSINESS_CONTROL_LEAD,
+    BUSINESS_DAYPART_TITLE,
+    BUSINESS_DAYPART_LEAD,
+    BUSINESS_OFFLINE_TITLE,
+    BUSINESS_OFFLINE_LEAD,
+    BUSINESS_LEGAL_LEAD,
+    BUSINESS_STAFF_TITLE,
+    BUSINESS_STAFF_LEAD,
+    BUSINESS_NETWORK_TITLE,
+    BUSINESS_NETWORK_LEAD,
+    BUSINESS_SUPPORT_TITLE,
+    BUSINESS_SUPPORT_LEAD,
+    BUSINESS_SUPPORT_NOTE,
+    BUSINESS_PRICE_TITLE,
     BUSINESS_SOURCES_NOTE,
     ...BUSINESS_BENEFITS.flatMap((item) => [item.title, item.text]),
     ...BUSINESS_RELIEF.map((item) => item.text),
     ...BUSINESS_STEPS.flatMap((item) => [item.title, item.text]),
+    ...BUSINESS_FORMATS.map((item) => item.name),
+    ...BUSINESS_ATMOSPHERES,
+    ...BUSINESS_CONTROL_ACTIONS,
+    ...BUSINESS_DAYPARTS.flatMap((item) => [item.title, item.text]),
+    ...BUSINESS_ROLES.flatMap((item) => [item.title, item.text]),
+    ...BUSINESS_LOCATION_PREVIEW.flatMap((item) => [item.name, item.now, item.status]),
+    ...BUSINESS_PRICE_ROWS.flatMap((item) => [item.title, item.text]),
     ...BUSINESS_FAQ.flatMap((item) => [item.question, item.answer]),
     ...BUSINESS_VENUES.map((item) => item.name),
     ...BUSINESS_SOURCES.flatMap((item) => [item.name, item.linkLabel]),

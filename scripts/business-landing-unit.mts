@@ -84,11 +84,22 @@ const copy = listBusinessLandingCopy().join("\n");
 assert.doesNotMatch(copy, /Audiolad Business/i);
 assert.doesNotMatch(copy, /без РАО|без ВОИС/);
 assert.doesNotMatch(copy, /\d[\d\s]*₽|\d[\d\s]*руб/);
-assert.doesNotMatch(copy, /7 дней бесплатно|Без привязки карты|Создать мой эфир|эфир/);
-assert.doesNotMatch(view, /7 дней бесплатно|штрафов не будет|Создать мой эфир/);
+assert.equal(
+  copy.includes("Без надоедливых повторов и лишних забот. Работает даже без интернета."),
+  true,
+);
+assert.match(copy, /7 дней бесплатно/);
+assert.match(copy, /Без привязки карты/);
+assert.match(copy, /Музыка не надоедает/);
+assert.match(copy, /Интернет пропал — музыка продолжает играть/);
+assert.doesNotMatch(copy, /Создать мой эфир|эфир|опубликованн|условия под рукой|пока не/);
+assert.doesNotMatch(view, /штрафов не будет|Создать мой эфир|эфир|Про иллюстрацию|не обещаем/);
 assert.match(copy, /Подобрать музыку/);
 assert.match(view, /BUSINESS_PICK_LABEL/);
 assert.match(view, /Как звучит ваш бизнес\?/);
+assert.match(view, /id="variety"/);
+assert.match(view, /id="offline"/);
+assert.match(view, /id="network"/);
 assert.match(read("src/components/business/BusinessSocialProofSlot.tsx"), /return null/);
 assert.equal(
   BUSINESS_FAQ.some((item) => item.question.includes("РАО") && item.question.includes("ВОИС")),

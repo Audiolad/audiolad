@@ -7,24 +7,55 @@ import BusinessSnapCarousel from "@/components/business/BusinessSnapCarousel";
 import BusinessSocialProofSlot from "@/components/business/BusinessSocialProofSlot";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
 import {
-  BUSINESS_ATMOSPHERE_NOTE,
+  BUSINESS_ATMOSPHERES,
   BUSINESS_BENEFITS,
   BUSINESS_CLOSER,
+  BUSINESS_CONTROL_ACTIONS,
+  BUSINESS_CONTROL_LEAD,
+  BUSINESS_CONTROL_TITLE,
+  BUSINESS_DAYPART_LEAD,
+  BUSINESS_DAYPART_TITLE,
+  BUSINESS_DAYPARTS,
   BUSINESS_FAQ,
+  BUSINESS_FORMATS,
+  BUSINESS_HERO_MICRO,
+  BUSINESS_HOW_HELP,
   BUSINESS_HOW_LABEL,
+  BUSINESS_HOW_NOTE,
   BUSINESS_INQUIRY_EMAIL,
   BUSINESS_LANDING_H1,
   BUSINESS_LANDING_SUBCOPY,
+  BUSINESS_LEGAL_LEAD,
   BUSINESS_LEGAL_QUOTE_CARDS_ENABLED,
   BUSINESS_LISTEN_LABEL,
+  BUSINESS_LISTEN_LEAD,
+  BUSINESS_LOCATION_PREVIEW,
+  BUSINESS_NETWORK_LEAD,
+  BUSINESS_NETWORK_TITLE,
+  BUSINESS_OFFLINE_LEAD,
+  BUSINESS_OFFLINE_TITLE,
   BUSINESS_PICK_LABEL,
+  BUSINESS_PRICE_ROWS,
+  BUSINESS_PRICE_TITLE,
   BUSINESS_RELIEF,
+  BUSINESS_RELIEF_CLOSER,
   BUSINESS_RELIEF_HEADING,
+  BUSINESS_ROLES,
   BUSINESS_SEO_ARTICLES,
   BUSINESS_SOURCES,
   BUSINESS_SOURCES_NOTE,
+  BUSINESS_STAFF_LEAD,
+  BUSINESS_STAFF_TITLE,
   BUSINESS_STEPS,
+  BUSINESS_SUPPORT_LEAD,
+  BUSINESS_SUPPORT_NOTE,
+  BUSINESS_SUPPORT_TITLE,
+  BUSINESS_TRIAL_CARD,
+  BUSINESS_TRIAL_FREE,
   BUSINESS_UNIFYING,
+  BUSINESS_VARIETY_BODY,
+  BUSINESS_VARIETY_LEAD,
+  BUSINESS_VARIETY_TITLE,
   BUSINESS_VENUES,
   buildBusinessSeoArticlePath,
   businessAssetPath,
@@ -106,6 +137,7 @@ export default function BusinessLandingView({
                 {BUSINESS_LANDING_H1}
               </h1>
               <p className="business-lead">{BUSINESS_LANDING_SUBCOPY}</p>
+              <p className="business-micro">{BUSINESS_HERO_MICRO}</p>
               <div className="business-actions">
                 <a className="business-btn business-btn--primary" href="#venues">
                   {BUSINESS_PICK_LABEL}
@@ -129,9 +161,9 @@ export default function BusinessLandingView({
         <section className="business-section" aria-labelledby="business-benefits-title">
           <div className="business-wrap">
             <h2 id="business-benefits-title" className="sr-only">
-              Что уже можно сделать
+              Что получает ваш бизнес
             </h2>
-            <ul className="business-card-grid">
+            <ul className="business-card-grid business-card-grid--benefits">
               {BUSINESS_BENEFITS.map((benefit) => (
                 <li key={benefit.id} className="business-card">
                   <h3>{benefit.title}</h3>
@@ -147,23 +179,21 @@ export default function BusinessLandingView({
             <h2 id="business-unifying-title" className="business-h2 business-statement">
               {BUSINESS_UNIFYING}
             </h2>
+            <p className="business-lead">{BUSINESS_CLOSER}</p>
           </div>
         </section>
 
-        <section className="business-section" aria-labelledby="business-relief-title">
+        <section className="business-section" id="relief" aria-labelledby="business-relief-title">
           <div className="business-wrap">
             <h2 id="business-relief-title" className="business-h2">
               {BUSINESS_RELIEF_HEADING}
             </h2>
-            <p className="business-lead">
-              Здесь только то, что страница уже умеет. Остальное не обещаем.
-            </p>
             <ul className="business-relief">
               {BUSINESS_RELIEF.map((item) => (
                 <li key={item.id}>{item.text}</li>
               ))}
             </ul>
-            <p className="business-copy">{BUSINESS_CLOSER}</p>
+            <p className="business-copy">{BUSINESS_RELIEF_CLOSER}</p>
           </div>
         </section>
 
@@ -192,6 +222,10 @@ export default function BusinessLandingView({
                 ))}
               </ol>
             </div>
+            <p className="business-copy">{BUSINESS_HOW_NOTE}</p>
+            <p className="business-copy">
+              <a href="#support">{BUSINESS_HOW_HELP}</a>
+            </p>
             <div className="business-actions">
               <a className="business-btn business-btn--primary" href="#listen">
                 {BUSINESS_LISTEN_LABEL}
@@ -206,8 +240,7 @@ export default function BusinessLandingView({
               Где звучит наша музыка
             </h2>
             <p className="business-lead">
-              Примеры пространств. Отдельные страницы отраслей ещё не опубликованы,
-              поэтому карточки не ведут на пустые адреса.
+              Музыка для кафе, салонов, клиник, магазинов, отелей и офисов.
             </p>
             <BusinessSnapCarousel
               ariaLabel="Где звучит наша музыка"
@@ -241,41 +274,109 @@ export default function BusinessLandingView({
             <h2 id="business-listen-title" className="business-h2">
               Как звучит ваш бизнес?
             </h2>
-            <p className="business-lead">
-              Вы смотрите пространство и слушаете опубликованные примеры. Плейлисты
-              зала здесь не собираются. Звук идёт через общий плеер сайта и не
-              разрешает включать музыку для гостей.
-            </p>
-            <p className="business-note">{BUSINESS_ATMOSPHERE_NOTE}</p>
-            <div className="mt-6">
+            <p className="business-lead">{BUSINESS_LISTEN_LEAD}</p>
+            <fieldset className="business-fieldset">
+              <legend className="business-kicker">Ваш бизнес</legend>
+              <div className="business-chips">
+                {BUSINESS_FORMATS.map((format, index) => (
+                  <label key={format.id} className="business-chip">
+                    <input
+                      type="radio"
+                      name="business-format"
+                      defaultChecked={index === 0}
+                    />
+                    <span>{format.name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="business-fieldset">
+              <legend className="business-kicker">Атмосфера</legend>
+              <div className="business-chips">
+                {BUSINESS_ATMOSPHERES.map((atmosphere, index) => (
+                  <label key={atmosphere} className="business-chip">
+                    <input
+                      type="radio"
+                      name="business-atmosphere"
+                      defaultChecked={index === 0}
+                    />
+                    <span>{atmosphere}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="business-actions">
+              <a className="business-btn business-btn--primary" href="#listen-now">
+                {BUSINESS_LISTEN_LABEL}
+              </a>
+            </div>
+            <div className="mt-6" id="listen-now">
               <BusinessListenRail items={listenExamples} />
             </div>
           </div>
         </section>
 
-        <section className="business-section" id="trial" aria-labelledby="business-trial-title">
-          <div className="business-wrap business-split business-split--half">
-            <div>
-              <h2 id="business-trial-title" className="business-h2">
-                Про иллюстрацию
-              </h2>
-              <p className="business-lead">
-                На картинке нарисован пробный срок. Кнопки страницы его не
-                включают: регистрации бизнеса, оплаты и пробного доступа здесь нет.
-              </p>
-              <div className="business-actions">
-                <a className="business-btn business-btn--primary" href="#listen">
-                  {BUSINESS_LISTEN_LABEL}
-                </a>
-              </div>
+        <section className="business-section" id="variety" aria-labelledby="business-variety-title">
+          <div className="business-wrap">
+            <h2 id="business-variety-title" className="business-h2">
+              {BUSINESS_VARIETY_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_VARIETY_LEAD}</p>
+            <p className="business-copy">{BUSINESS_VARIETY_BODY}</p>
+          </div>
+        </section>
+
+        <section className="business-section" id="control" aria-labelledby="business-control-title">
+          <div className="business-wrap">
+            <h2 id="business-control-title" className="business-h2">
+              {BUSINESS_CONTROL_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_CONTROL_LEAD}</p>
+            <div className="business-mood">
+              <span>Спокойнее</span>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                defaultValue={1}
+                aria-label="Спокойнее или энергичнее"
+              />
+              <span>Энергичнее</span>
             </div>
-            <Poster
-              file="12-free-trial.webp"
-              alt=""
-              width={1254}
-              height={1254}
-              sizes="(min-width: 1100px) 46vw, 100vw"
-            />
+            <div className="business-chips" role="group" aria-label="Реакция на музыку">
+              {BUSINESS_CONTROL_ACTIONS.map((action) => (
+                <label key={action} className="business-chip">
+                  <input type="checkbox" name="business-reaction" value={action} />
+                  <span>{action}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="business-section" id="dayparts" aria-labelledby="business-dayparts-title">
+          <div className="business-wrap">
+            <h2 id="business-dayparts-title" className="business-h2">
+              {BUSINESS_DAYPART_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_DAYPART_LEAD}</p>
+            <ul className="business-card-grid business-dayparts">
+              {BUSINESS_DAYPARTS.map((part) => (
+                <li key={part.id} className="business-card">
+                  <h3>{part.title}</h3>
+                  <p>{part.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="business-section" id="offline" aria-labelledby="business-offline-title">
+          <div className="business-wrap">
+            <h2 id="business-offline-title" className="business-h2">
+              {BUSINESS_OFFLINE_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_OFFLINE_LEAD}</p>
           </div>
         </section>
 
@@ -292,15 +393,7 @@ export default function BusinessLandingView({
               <h2 id="business-rights-title" className="business-h2">
                 Спокойно с юридической стороны
               </h2>
-              <p className="business-lead">
-                Условия должны быть ясны до того, как музыка зазвучит для гостей.
-                Конкретный объём прав фиксируется документами, а не картинкой на
-                странице.
-              </p>
-              <p className="business-copy">
-                Сейчас опубликованы документы платформы для слушателей. Отдельный
-                комплект для фонового звучания в бизнесе здесь не выложен.
-              </p>
+              <p className="business-lead">{BUSINESS_LEGAL_LEAD}</p>
               <ul className="business-source-list">
                 <li>
                   <Link className="business-source-link" href="/offer">
@@ -434,15 +527,60 @@ export default function BusinessLandingView({
           </section>
         ) : null}
 
-        <section className="business-section" aria-labelledby="business-support-title">
+        <section className="business-section" id="staff" aria-labelledby="business-staff-title">
+          <div className="business-wrap">
+            <h2 id="business-staff-title" className="business-h2">
+              {BUSINESS_STAFF_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_STAFF_LEAD}</p>
+            <ul className="business-card-grid business-roles">
+              {BUSINESS_ROLES.map((role) => (
+                <li key={role.id} className="business-card">
+                  <h3>{role.title}</h3>
+                  <p>{role.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="business-section" id="network" aria-labelledby="business-network-title">
+          <div className="business-wrap">
+            <h2 id="business-network-title" className="business-h2">
+              {BUSINESS_NETWORK_TITLE}
+            </h2>
+            <p className="business-lead">{BUSINESS_NETWORK_LEAD}</p>
+            <ul className="business-points" aria-label="Точки в кабинете">
+              {BUSINESS_LOCATION_PREVIEW.map((point) => (
+                <li key={point.id} className="business-point">
+                  <span
+                    className={
+                      point.status === "playing"
+                        ? "business-point__dot"
+                        : "business-point__dot business-point__dot--offline"
+                    }
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <strong>{point.name}</strong>
+                    <span className="business-point__now">{point.now}</span>
+                  </span>
+                  <span className="business-point__status">
+                    {point.status === "playing" ? "Музыка играет" : "Offline"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="business-section" id="support" aria-labelledby="business-support-title">
           <div className="business-wrap">
             <h2 id="business-support-title" className="business-h2">
-              Если понадобится помощь — мы рядом
+              {BUSINESS_SUPPORT_TITLE}
             </h2>
-            <p className="business-lead">
-              Не нужно разбираться во всём самостоятельно. Поможем с подключением,
-              настройкой музыки и использованием сервиса.
-            </p>
+            <p className="business-lead">{BUSINESS_SUPPORT_LEAD}</p>
+            <p className="business-copy">{BUSINESS_SUPPORT_NOTE}</p>
             <div className="business-actions">
               <Link className="business-btn business-btn--secondary" href="/help/support">
                 Написать в поддержку
@@ -451,27 +589,62 @@ export default function BusinessLandingView({
           </div>
         </section>
 
+        <section className="business-section" id="trial" aria-labelledby="business-trial-title">
+          <div className="business-wrap business-split business-split--half">
+            <div>
+              <h2 id="business-trial-title" className="business-h2">
+                {BUSINESS_TRIAL_FREE}
+              </h2>
+              <p className="business-lead">{BUSINESS_TRIAL_CARD}</p>
+              <p className="business-copy">
+                Сначала слушаете музыку, затем пользуетесь периодом и подключаете оплату, когда она нужна.
+              </p>
+              <div className="business-actions">
+                <a className="business-btn business-btn--primary" href="#listen">
+                  {BUSINESS_TRIAL_FREE}
+                </a>
+                <a className="business-btn business-btn--secondary" href="#venues">
+                  {BUSINESS_TRIAL_CARD}
+                </a>
+              </div>
+            </div>
+            <Poster
+              file="12-free-trial.webp"
+              alt=""
+              width={1254}
+              height={1254}
+              sizes="(min-width: 1100px) 46vw, 100vw"
+            />
+          </div>
+        </section>
+
+        <section className="business-section" id="price" aria-labelledby="business-price-title">
+          <div className="business-wrap">
+            <h2 id="business-price-title" className="business-h2">
+              {BUSINESS_PRICE_TITLE}
+            </h2>
+            <dl className="business-price">
+              {BUSINESS_PRICE_ROWS.map((row) => (
+                <div key={row.id}>
+                  <dt>{row.title}</dt>
+                  <dd>{row.text}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
         <section className="business-section" id="connect" aria-labelledby="business-connect-title">
           <div className="business-wrap">
             <h2 id="business-connect-title" className="business-h2">
-              Одна точка сегодня. Сеть завтра.
+              Нужна помощь с подключением?
             </h2>
             <p className="business-lead">
-              У вас сеть или нужна помощь с подключением? Напишите, сколько точек
-              нужно указать. Письмо сохраняет число точек. Кабинета сети и
-              наблюдения за тем, играет ли музыка, на странице нет.
-            </p>
-            <p className="business-copy">
-              Опубликованного тарифа нет, поэтому цена здесь не указана.
+              Напишите, если хотите помощь со стартом или сетью. Это по вашей просьбе.
             </p>
             <div className="business-inquiry">
               <BusinessInquiryForm />
             </div>
-            <p className="business-copy">
-              Заявка не создаёт аккаунт и не проводит оплату. Если почтовая
-              программа не открылась, напишите на{" "}
-              <a href={`mailto:${BUSINESS_INQUIRY_EMAIL}`}>{BUSINESS_INQUIRY_EMAIL}</a>.
-            </p>
           </div>
         </section>
 

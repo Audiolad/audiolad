@@ -841,6 +841,168 @@ body:has(.business-landing) .global-mini-player {
   }
 }
 
+.business-micro {
+  margin: 12px 0 0;
+  color: var(--bl-ink);
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.business-fieldset {
+  border: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.business-fieldset .business-kicker {
+  margin-bottom: 10px;
+}
+
+.business-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.business-chip {
+  position: relative;
+}
+
+.business-chip input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.business-chip span {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--bl-line);
+  background: #fff;
+  color: var(--bl-ink);
+  font-size: 15px;
+}
+
+.business-chip input:checked + span {
+  border-color: var(--bl-accent);
+  background: #f3ebff;
+  color: var(--bl-accent);
+}
+
+.business-chip input:focus-visible + span {
+  outline: 2px solid var(--bl-accent);
+  outline-offset: 2px;
+}
+
+.business-mood {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: 28px;
+  background: var(--bl-card);
+  border: 1px solid var(--bl-line);
+  font-weight: 700;
+}
+
+.business-mood input[type="range"] {
+  flex: 1 1 180px;
+  accent-color: var(--bl-accent);
+}
+
+.business-points {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-point {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--bl-card);
+  border: 1px solid var(--bl-line);
+}
+
+.business-point strong {
+  display: block;
+  font-size: 18px;
+}
+
+.business-point__now,
+.business-point__status {
+  color: var(--bl-muted);
+  font-size: 15px;
+}
+
+.business-point__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f9d55;
+}
+
+.business-point__dot--offline {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px #b7ab9a;
+}
+
+.business-price {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.business-price div {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--bl-card);
+  border: 1px solid var(--bl-line);
+}
+
+.business-price dt {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.business-price dd {
+  margin: 6px 0 0;
+  color: var(--bl-muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+@media (min-width: 720px) {
+  .business-card-grid--benefits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .business-card-grid--benefits {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .business-dayparts,
+  .business-roles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .business-snap,
   .business-logo-scroll {
