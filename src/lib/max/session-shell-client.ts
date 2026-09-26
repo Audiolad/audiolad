@@ -158,14 +158,15 @@ export async function verifyMaxSession(
     const webSessionMatches =
       maxAuthenticated &&
       (payload as { webSessionMatches?: unknown }).webSessionMatches === true;
+    const startTarget = readMaxResolvedStartTarget(
+      (payload as { startTarget?: unknown }).startTarget,
+    );
     return {
       type: "VERIFY_SUCCESS",
       linked,
       maxAuthenticated,
       webSessionMatches,
-      startTarget: readMaxResolvedStartTarget(
-        (payload as { startTarget?: unknown }).startTarget,
-      ),
+      ...(startTarget ? { startTarget } : {}),
     };
   } catch {
     return { type: "VERIFY_FAILURE" };
