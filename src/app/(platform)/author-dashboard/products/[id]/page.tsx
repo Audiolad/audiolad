@@ -105,7 +105,6 @@ export default async function EditAuthorProductPage({
     .order("title")
     .limit(8);
 
-
   return (
     <AuthorShell
       title="Редактировать аудиопродукт"
@@ -113,15 +112,15 @@ export default async function EditAuthorProductPage({
       internalBackHref="/author-dashboard"
     >
       <AuthorProductForm
-          authors={authors}
-          relatedProductOptions={(relatedProducts ?? []).map((item) => ({
-            value: item.id,
-            label: item.title,
-          }))}
-          initialProduct={product}
-          initialWizardStep={initialWizardStep}
-          initialSeoReservationContext={initialSeoReservationContext}
-          topicFormData={topicFormData}
+        authors={authors}
+        relatedProductOptions={(relatedProducts ?? []).map((item) => ({
+          value: item.id,
+          label: item.title,
+        }))}
+        initialProduct={product}
+        initialWizardStep={initialWizardStep}
+        initialSeoReservationContext={initialSeoReservationContext}
+        topicFormData={topicFormData}
         mode="edit"
       />
     </AuthorShell>
