@@ -1,33 +1,9 @@
 import "server-only";
 
 import { loadPublicPromoPage } from "@/lib/promo-pages/public-page";
-import type { PublicPromoPageCtaBlock } from "@/lib/promo-pages/types";
 import { mapPublicPromoPageCtaBlock } from "@/lib/promo-pages/public-page";
+import type { MaxPromoPage } from "@/lib/max/promo-view";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-
-export type MaxPromoProduct = {
-  practiceId: string;
-  slug: string;
-  title: string;
-  format: string | null;
-  durationMinutes: number | null;
-  coverUrl: string | null;
-  authorName: string;
-  authorSlug: string;
-};
-
-export type MaxPromoPage = {
-  promoPageId: string;
-  authorSlug: string;
-  promoSlug: string;
-  publicTitle: string;
-  publicDescription: string | null;
-  footerText: string | null;
-  bannerUrl: string | null;
-  authorName: string | null;
-  cta: PublicPromoPageCtaBlock | null;
-  products: MaxPromoProduct[];
-};
 
 export async function getMaxPromoPage(
   authorSlug: string,
