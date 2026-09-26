@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   parseMaxPromoTarget,
 } from "../src/lib/max/promo-target.ts";
+import { readMaxPromoPage } from "../src/lib/max/promo-view.ts";
 
 assert.deepEqual(
   parseMaxPromoTarget("sergey-and-zoya/3-kvantmeditatsii-v-podarok"),
@@ -33,6 +34,40 @@ for (const value of [
   assert.equal(parseMaxPromoTarget(value), null);
 }
 
+
+const parsedPage = readMaxPromoPage({
+  promoPageId: "11111111-1111-4111-8111-111111111111",
+  authorSlug: "sergey-and-zoya",
+  promoSlug: "3-kvantmeditatsii-v-podarok",
+  publicTitle: "3 КвантМедитации в подарок",
+  publicDescription: "Короткие практики",
+  footerText: "Выберите первую практику",
+  bannerUrl: null,
+  authorName: "Сергей и Зоя",
+  cta: {
+    heading: "Вернуться в чат в Максе",
+    description: null,
+    label: "Продолжить в MAX",
+    href: "https://max.ru/id507305817690_bot",
+    kind: "external",
+    host: "max.ru",
+    openInNewTab: false,
+  },
+  products: [{
+    practiceId: "22222222-2222-4222-8222-222222222222",
+    slug: "eliksir-molodosti",
+    title: "Эликсир Молодости",
+    format: "Квант-Медитация",
+    durationMinutes: 5,
+    coverUrl: null,
+    authorName: "Сергей и Зоя",
+    authorSlug: "sergey-and-zoya",
+  }],
+});
+assert.equal(parsedPage?.products.length, 1);
+assert.equal(parsedPage?.cta?.host, "max.ru");
+assert.equal(readMaxPromoPage({ ...parsedPage, products: [] }), null);
+
 const home = readFileSync(
   join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"),
   "utf8",
@@ -60,6 +95,14 @@ assert.match(promo, /page\.cta\.heading/);
 assert.match(promo, /page\.cta\.label/);
 assert.match(promo, /openMaxExternalLink/);
 assert.match(promo, /page\.footerText/);
+
+assert.match(promo, /trackMaxPromoViewedOnce/);
+assert.match(promo, /trackMaxPromoPlayStartedOnce/);
+assert.match(promo, /trackMaxPromoCompletedOnce/);
+assert.match(promo, /trackMaxPromoCtaClicked/);
+assert.match(promo, /onPlaybackStarted/);
+assert.match(promo, /onPlaybackCompleted/);
+
 assert.match(promo, /← В каталог/);
 assert.doesNotMatch(promo, /from "next\/link"|from "next\/navigation"|router\.push|window\.location\s*=/);
 assert.doesNotMatch(promo, /\/practice\//);
