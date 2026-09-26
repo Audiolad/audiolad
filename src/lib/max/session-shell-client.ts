@@ -1,5 +1,6 @@
 import { SIGNUP_GENERIC_ERROR } from "@/lib/auth/email";
 import { readMaxInitData } from "@/lib/max/bridge";
+import { readMaxResolvedStartTarget } from "@/lib/max/startapp";
 import {
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
@@ -162,6 +163,9 @@ export async function verifyMaxSession(
       linked,
       maxAuthenticated,
       webSessionMatches,
+      startTarget: readMaxResolvedStartTarget(
+        (payload as { startTarget?: unknown }).startTarget,
+      ),
     };
   } catch {
     return { type: "VERIFY_FAILURE" };
