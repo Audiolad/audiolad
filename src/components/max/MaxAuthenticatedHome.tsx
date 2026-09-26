@@ -64,12 +64,22 @@ export default function MaxAuthenticatedHome() {
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
   const [catalogTopicNavigation, setCatalogTopicNavigation] =
     useState<MaxCatalogTopicNavigationRequest | null>(null);
-  const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(() =>
-    readMaxPromoTargetFromLocation(),
-  );
+  const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(null);
   const playRef = useRef<(() => void) | null>(null);
   const pendingPlayRef = useRef(false);
-  const bindPlay = useCallback((play: () => void) => {
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPromoTarget(readMaxPromoTargetFromLocation());
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+    const bindPlay = useCallback((play: () => void) => {
     playRef.current = play;
     if (pendingPlayRef.current) {
       pendingPlayRef.current = false;
