@@ -211,6 +211,11 @@ function testPublishedLinkVisibility() {
       pagesClient.includes("isDraftLike"),
     "copy link only in published branch",
   );
+  assert(
+    pagesClient.includes("buildMaxPromoDeepLink") &&
+      pagesClient.includes("Скопировать MAX-ссылку"),
+    "published promo pages expose MAX deep link",
+  );
   assert(form.includes("isPublished"), "form read-only when published");
   assert(!preview.includes("buildPromoPageUrl"), "preview does not expose public url builder");
 }
