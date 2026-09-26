@@ -68,6 +68,7 @@ assert.match(applyFn, /onApply\(draftTopics, draftAccess, draftClass\)/);
 assert.doesNotMatch(applyFn, /router|window\.location|openLink|href/);
 
 assert.match(search, /topicNavigationRequest/);
+assert.match(search, /queueMicrotask\(\(\) => \{/);
 assert.match(search, /setSearchInput\(""\)/);
 assert.match(search, /searchInputRef\.current = ""/);
 assert.match(search, /setActiveSection\(null\)/);
