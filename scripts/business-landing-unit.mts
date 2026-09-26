@@ -3,11 +3,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { isPrivateRoute } from "../src/lib/auth/routes";
 import {
   BUSINESS_ASSET_FILES,
   BUSINESS_FAQ,
   BUSINESS_INQUIRY_EMAIL,
   BUSINESS_LANDING_CANONICAL,
+  BUSINESS_LANDING_DESCRIPTION,
   BUSINESS_LANDING_H1,
   BUSINESS_LANDING_TITLE,
   BUSINESS_LEGAL_QUOTE_CARDS_ENABLED,
@@ -22,6 +24,15 @@ import {
 } from "../src/lib/business/landing";
 import { selectBusinessListenCandidates } from "../src/lib/business/listen-selection";
 import { buildBusinessLandingMetadata } from "../src/lib/business/metadata";
+import { PRODUCTION_APP_ORIGIN } from "../src/lib/seo/app-origin";
+import {
+  SEO_ROBOTS_DISALLOWED_PATHS,
+  buildRobotsRoute,
+} from "../src/lib/seo/robots-config";
+import {
+  STATIC_SITEMAP_PAGES,
+  toAbsoluteSitemapUrl,
+} from "../src/lib/seo/sitemap-data";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -49,12 +60,79 @@ assert.doesNotMatch(view, /<h1[^>]*>\s*<Image/);
 
 const metadata = buildBusinessLandingMetadata();
 assert.equal(metadata.title, BUSINESS_LANDING_TITLE);
+assert.equal(metadata.description, BUSINESS_LANDING_DESCRIPTION);
 assert.equal(metadata.alternates && "canonical" in metadata.alternates
   ? metadata.alternates.canonical
   : null, "https://audiolad.ru/b");
 assert.deepEqual(metadata.robots, { index: true, follow: true });
-assert.doesNotMatch(page, /noindex/);
-assert.doesNotMatch(view, /noindex/);
+assert.doesNotMatch(page, /noindex|nofollow/);
+assert.doesNotMatch(view, /noindex|nofollow/);
+assert.doesNotMatch(page, /"use client"|redirect\(/);
+assert.equal(isPrivateRoute("/b"), false);
+assert.equal(isPrivateRoute("/b/"), false);
+
+function robotsRuleBlocksPath(rule: string, pathname: string): boolean {
+  if (rule === "/") {
+    return true;
+  }
+
+  const exact = rule.endsWith("/") ? rule.slice(0, -1) : rule;
+  const prefix = rule.endsWith("/") ? rule : `${rule}/`;
+  return pathname === exact || pathname.startsWith(prefix);
+}
+
+assert.equal(
+  SEO_ROBOTS_DISALLOWED_PATHS.some((rule) => robotsRuleBlocksPath(rule, "/b")),
+  false,
+);
+
+const runtimeEnv = process.env as Record<string, string | undefined>;
+const previousNodeEnv = runtimeEnv.NODE_ENV;
+const previousSeo = runtimeEnv.SEO_INDEXING;
+const previousAppUrl = runtimeEnv.NEXT_PUBLIC_APP_URL;
+runtimeEnv.NODE_ENV = "production";
+runtimeEnv.SEO_INDEXING = "true";
+runtimeEnv.NEXT_PUBLIC_APP_URL = PRODUCTION_APP_ORIGIN;
+
+try {
+  const robots = buildRobotsRoute();
+  const rule = Array.isArray(robots.rules) ? robots.rules[0] : robots.rules;
+  const disallow = rule && "disallow" in rule ? rule.disallow : [];
+  const disallowList = Array.isArray(disallow) ? disallow : disallow ? [disallow] : [];
+  assert.equal(disallowList.includes("/"), false);
+  assert.equal(
+    disallowList.some((entry) => robotsRuleBlocksPath(entry, "/b")),
+    false,
+  );
+  assert.equal(robots.sitemap, "https://audiolad.ru/sitemap.xml");
+} finally {
+  function restoreEnv(name: string, value: string | undefined) {
+    if (value === undefined) {
+      delete runtimeEnv[name];
+    } else {
+      runtimeEnv[name] = value;
+    }
+  }
+
+  restoreEnv("NODE_ENV", previousNodeEnv);
+  restoreEnv("SEO_INDEXING", previousSeo);
+  restoreEnv("NEXT_PUBLIC_APP_URL", previousAppUrl);
+}
+
+assert.equal(
+  STATIC_SITEMAP_PAGES.filter((entry) => entry.path === "/b").length,
+  1,
+);
+assert.equal(toAbsoluteSitemapUrl("/b", PRODUCTION_APP_ORIGIN), "https://audiolad.ru/b");
+
+const nextConfig = read("next.config.ts");
+assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/|["'])/);
+assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 2);
+assert.match(nextConfig, /source:\s*"\/auth\/:path\*"[\s\S]*X-Robots-Tag/);
+assert.match(nextConfig, /source:\s*"\/d\/:path\*"[\s\S]*X-Robots-Tag/);
+assert.match(view, /alt=\{venue\.name\}/);
+assert.match(view, /alt="Иллюстрация: легальная музыка/);
+assert.match(view, /alt=\{source\.name\}/);
 
 assert.deepEqual(
   BUSINESS_VENUES.map((venue) => [venue.id, venue.futurePath]),

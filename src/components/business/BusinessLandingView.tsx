@@ -273,12 +273,11 @@ export default function BusinessLandingView({
                 >
                   <Poster
                     file={venue.file}
-                    alt=""
+                    alt={venue.name}
                     width={1254}
                     height={1254}
                     sizes="(min-width: 1100px) 42vw, 88vw"
                   />
-                  <p className="sr-only">{venue.name}</p>
                 </article>
               ))}
             </BusinessSnapCarousel>
