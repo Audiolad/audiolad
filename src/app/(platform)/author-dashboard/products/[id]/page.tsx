@@ -107,6 +107,13 @@ export default async function EditAuthorProductPage({
     .order("title")
     .limit(8);
 
+  const maxProductDeepLink =
+    product.practice.status === "published" &&
+    product.practice.is_catalog_listed === true &&
+    product.practice.catalog_visibility === "listed"
+      ? buildMaxProductDeepLink(product.practice.id)
+      : null;
+
   return (
     <AuthorShell
       title="Редактировать аудиопродукт"
@@ -114,13 +121,8 @@ export default async function EditAuthorProductPage({
       internalBackHref="/author-dashboard"
     >
       <div className="space-y-6">
-        {product.practice.status === "published" &&
-        product.practice.is_catalog_listed === true &&
-        product.practice.catalog_visibility === "listed" ? (
-          (() => {
-            const maxUrl = buildMaxProductDeepLink(product.practice.id);
-            return maxUrl ? <AuthorMaxDeepLinkCard url={maxUrl} /> : null;
-          })()
+        {maxProductDeepLink ? (
+          <AuthorMaxDeepLinkCard url={maxProductDeepLink} />
         ) : null}
         <AuthorProductForm
           authors={authors}
