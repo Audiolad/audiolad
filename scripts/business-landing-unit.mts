@@ -39,7 +39,7 @@ assert.equal(existsSync(join(root, "src/app/(platform)/b/[slug]/page.tsx")), fal
 
 assert.equal(
   BUSINESS_LANDING_H1,
-  "Музыка для бизнеса – просто, красиво и с понятными условиями использования",
+  "Музыка для вашего бизнеса — быстро, просто, легально",
 );
 assert.equal(BUSINESS_LANDING_TITLE, "Музыка для бизнеса – Аудиолад Бизнес");
 assert.equal(BUSINESS_LANDING_CANONICAL, "https://audiolad.ru/b");
@@ -84,6 +84,12 @@ const copy = listBusinessLandingCopy().join("\n");
 assert.doesNotMatch(copy, /Audiolad Business/i);
 assert.doesNotMatch(copy, /без РАО|без ВОИС/);
 assert.doesNotMatch(copy, /\d[\d\s]*₽|\d[\d\s]*руб/);
+assert.doesNotMatch(copy, /7 дней бесплатно|Без привязки карты|Создать мой эфир|эфир/);
+assert.doesNotMatch(view, /7 дней бесплатно|штрафов не будет|Создать мой эфир/);
+assert.match(copy, /Подобрать музыку/);
+assert.match(view, /BUSINESS_PICK_LABEL/);
+assert.match(view, /Как звучит ваш бизнес\?/);
+assert.match(read("src/components/business/BusinessSocialProofSlot.tsx"), /return null/);
 assert.equal(
   BUSINESS_FAQ.some((item) => item.question.includes("РАО") && item.question.includes("ВОИС")),
   true,

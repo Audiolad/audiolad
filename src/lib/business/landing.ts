@@ -11,16 +11,23 @@ export const BUSINESS_LANDING_TITLE =
   "Музыка для бизнеса – Аудиолад Бизнес";
 
 export const BUSINESS_LANDING_DESCRIPTION =
-  "Подберите атмосферу для пространства, включите музыку и используйте её на понятных условиях. Аудиолад Бизнес.";
+  "Музыка для вашего бизнеса: послушайте опубликованные примеры и откройте документы, которые уже есть на сайте. Аудиолад Бизнес.";
 
 export const BUSINESS_LANDING_H1 =
-  "Музыка для бизнеса – просто, красиво и с понятными условиями использования";
+  "Музыка для вашего бизнеса — быстро, просто, легально";
 
 export const BUSINESS_LANDING_SUBCOPY =
-  "Подберите атмосферу для вашего пространства, включите музыку и используйте её в рамках понятных условий.";
+  "Без лишних забот на старте: послушайте примеры и держите опубликованные условия под рукой.";
 
-export const BUSINESS_TRY_LABEL = "Попробовать бесплатно";
-export const BUSINESS_HOW_LABEL = "Как это работает";
+export const BUSINESS_PICK_LABEL = "Подобрать музыку";
+export const BUSINESS_LISTEN_LABEL = "Послушать";
+export const BUSINESS_HOW_LABEL = "Начните за несколько минут";
+
+export const BUSINESS_UNIFYING =
+  "С музыкой в вашем бизнесе больше ничего не нужно решать.";
+
+export const BUSINESS_CLOSER =
+  "Одной заботой в вашем бизнесе становится меньше.";
 
 export const BUSINESS_ASSET_FILES = [
   "01-business-music.webp",
@@ -82,7 +89,7 @@ export const BUSINESS_VENUES = [
   {
     id: "retail",
     file: "05-retail-boutique.webp",
-    name: "Магазины и бутики",
+    name: "Магазины",
     futurePath: "/b/retail",
   },
   {
@@ -100,85 +107,73 @@ export const BUSINESS_VENUES = [
   {
     id: "offices",
     file: "08-business-centers.webp",
-    name: "Бизнес-центры",
+    name: "Бизнес-центры и офисы",
     futurePath: "/b/offices",
   },
   {
     id: "hotels",
     file: "09-hotels.webp",
-    name: "Отели и гостиницы",
+    name: "Отели",
     futurePath: "/b/hotels",
   },
 ] as const;
 
-export const BUSINESS_PILLARS = [
+export const BUSINESS_BENEFITS = [
   {
-    id: "beautiful",
-    title: "Красиво",
-    text: "Музыка создаёт атмосферу вашего пространства.",
+    id: "space",
+    title: "Подходит вашему пространству",
+    text: "Примеры берутся из опубликованной музыки каталога по настроению. Это не сотни станций и не автоматическая подстройка зала.",
   },
   {
-    id: "simple",
-    title: "Просто",
-    text: "Легко выбрать и подключить.",
+    id: "legal",
+    title: "Спокойно с юридической стороны",
+    text: "Уже опубликованные документы платформы собраны здесь. Отдельный комплект для фонового звучания в бизнесе на странице ещё не выложен.",
   },
   {
-    id: "clear",
-    title: "Понятно",
-    text: "Условия использования прозрачны.",
+    id: "listen-first",
+    title: "Сначала можно просто послушать",
+    text: "Опубликованный пример включается в общем плеере сайта. Отдельная регистрация бизнеса для этого не нужна.",
   },
 ] as const;
 
-export const BUSINESS_PROBLEM_HEADING = "Красиво, просто и понятно";
+export const BUSINESS_RELIEF_HEADING = "Вам больше не нужно заниматься музыкой";
 
-export const BUSINESS_PROBLEM_LEAD =
-  "Музыка для гостей должна создавать атмосферу, подключаться без лишней сложности и использоваться на условиях, которые можно прочитать заранее.";
+export const BUSINESS_RELIEF = [
+  {
+    id: "register-to-hear",
+    text: "регистрироваться, чтобы услышать опубликованный пример",
+  },
+  {
+    id: "hunt-docs",
+    text: "искать по сайту документы платформы, которые уже опубликованы",
+  },
+] as const;
+
+export const BUSINESS_ATMOSPHERE_NOTE =
+  "Ориентиры настроения: спокойная, премиальная, лёгкая, современная, энергичная, lounge, jazz, relax. Это слова поиска по каталогу, не переключатель зала.";
 
 export const BUSINESS_STEPS = [
   {
-    id: "choose",
+    id: "business",
+    title: "Выберите ваш бизнес",
+    text: "Посмотрите карточки пространств. Отдельные страницы отраслей ещё не открыты, поэтому карточки никуда не ведут.",
+  },
+  {
+    id: "atmosphere",
     title: "Выберите атмосферу",
-    text: "Подберите звучание под ваше пространство.",
+    text: "Смотрите на настроение примера. Отдельной кнопки, которая перестраивает зал, на странице нет.",
   },
   {
     id: "play",
     title: "Включите музыку",
-    text: "Запустите пример на сайте или откройте каталог.",
-  },
-  {
-    id: "use",
-    title: "Используйте в своём пространстве",
-    text: "Оставьте музыку фоном там, где бывают гости.",
-  },
-  {
-    id: "terms",
-    title: "Получите понятные условия",
-    text: "Сверьтесь с документами до включения музыки для гостей. Отдельный комплект для бизнеса на этой странице ещё не опубликован.",
-  },
-] as const;
-
-export const BUSINESS_WHY = [
-  {
-    id: "listen",
-    title: "Примеры из каталога",
-    text: "Если в каталоге есть опубликованная подходящая музыка, она включается в общем плеере сайта. Чужой звук и выдуманные записи сюда не подставляются.",
-  },
-  {
-    id: "locations",
-    title: "Несколько точек в одной заявке",
-    text: "Напишите, сколько площадок нужно подключить. Письмо уходит на контактный адрес, отдельной CRM на странице нет.",
-  },
-  {
-    id: "limits",
-    title: "Обещания совпадают с тем, что уже есть",
-    text: "Тариф и бизнес-документы на сайте не опубликованы, поэтому страница не называет цену и не заменяет договор.",
+    text: "Если подходящая музыка опубликована, она включается в общем плеере. Заглушку со звуком мы не ставим.",
   },
 ] as const;
 
 export const BUSINESS_FAQ = [
   {
     id: "try",
-    question: "Как попробовать музыку?",
+    question: "Как послушать музыку?",
     answer:
       "На этой странице можно включить опубликованные примеры из каталога, если они подходят по настроению. Если примеров нет, откройте каталог. Отдельный вход для бизнеса пока не подключён.",
   },
@@ -192,13 +187,13 @@ export const BUSINESS_FAQ = [
     id: "price",
     question: "Сколько стоит подключение?",
     answer:
-      "Стоимость на странице не указана: опубликованного тарифа нет. Её можно спросить в заявке, цену мы не назначаем заранее.",
+      "Стоимость на странице не указана: опубликованного тарифа нет. Её можно спросить в письме, цену мы не назначаем заранее.",
   },
   {
     id: "locations",
-    question: "Можно ли подключить несколько точек?",
+    question: "Можно ли указать несколько точек?",
     answer:
-      "Да, укажите число точек в заявке. Это письмо на контактный адрес, не личный кабинет сети.",
+      "Да, укажите число точек в письме. Это заявка на адрес, не кабинет сети и не наблюдение за тем, играет ли музыка.",
   },
   {
     id: "rights-orgs",
@@ -392,14 +387,17 @@ export function listBusinessLandingCopy(): string[] {
     BUSINESS_LANDING_DESCRIPTION,
     BUSINESS_LANDING_H1,
     BUSINESS_LANDING_SUBCOPY,
-    BUSINESS_TRY_LABEL,
+    BUSINESS_PICK_LABEL,
+    BUSINESS_LISTEN_LABEL,
     BUSINESS_HOW_LABEL,
-    BUSINESS_PROBLEM_HEADING,
-    BUSINESS_PROBLEM_LEAD,
+    BUSINESS_UNIFYING,
+    BUSINESS_CLOSER,
+    BUSINESS_RELIEF_HEADING,
+    BUSINESS_ATMOSPHERE_NOTE,
     BUSINESS_SOURCES_NOTE,
-    ...BUSINESS_PILLARS.flatMap((item) => [item.title, item.text]),
+    ...BUSINESS_BENEFITS.flatMap((item) => [item.title, item.text]),
+    ...BUSINESS_RELIEF.map((item) => item.text),
     ...BUSINESS_STEPS.flatMap((item) => [item.title, item.text]),
-    ...BUSINESS_WHY.flatMap((item) => [item.title, item.text]),
     ...BUSINESS_FAQ.flatMap((item) => [item.question, item.answer]),
     ...BUSINESS_VENUES.map((item) => item.name),
     ...BUSINESS_SOURCES.flatMap((item) => [item.name, item.linkLabel]),

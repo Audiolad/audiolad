@@ -95,6 +95,27 @@
   padding-top: 12px;
 }
 
+.business-statement {
+  max-width: 18ch;
+}
+
+.business-relief {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-relief li {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--bl-card);
+  border: 1px solid var(--bl-line);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
 .business-kicker {
   margin: 0;
   color: var(--bl-accent);
