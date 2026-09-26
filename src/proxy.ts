@@ -7,6 +7,7 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
+import { resolveBusinessProxyAction } from "@/lib/business-app/proxy-policy";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
   createCourseUpgradeRequestId,
@@ -34,8 +35,13 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const schoolAction = resolveSchoolProxyAction(hostname, pathname);
   const maxAction = resolveMaxProxyAction(hostname, pathname);
+  const businessAction = resolveBusinessProxyAction(hostname, pathname);
 
-  if (schoolAction.action === "not_found" || maxAction.action === "not_found") {
+  if (
+    schoolAction.action === "not_found" ||
+    maxAction.action === "not_found" ||
+    businessAction.action === "not_found"
+  ) {
     return new NextResponse(null, { status: 404 });
   }
 
@@ -45,6 +51,12 @@ export async function proxy(request: NextRequest) {
 
   if (maxAction.action === "rewrite_max_landing") {
     return updateSession(request, { rewritePathname: MAX_SITE_PATH });
+  }
+
+  if (businessAction.action === "rewrite_business_app") {
+    return updateSession(request, {
+      rewritePathname: businessAction.pathname,
+    });
   }
 
   return runCourseUpgradeProtectedUpdateSession({
