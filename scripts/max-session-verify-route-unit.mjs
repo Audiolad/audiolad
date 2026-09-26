@@ -17,6 +17,7 @@ import {
   POST,
   setResolveMaxNativeUserForTests,
   setResolveMaxSessionBindingForTests,
+  setResolveMaxStartTargetForTests,
   setTouchExternalIdentityForTests,
 } from "../src/app/api/max/session/verify/route.ts";
 
@@ -82,6 +83,7 @@ const touchCalls = [];
 const linkCalls = [];
 const bindingCalls = [];
 const nativeUserCalls = [];
+const startTargetCalls = [];
 setTouchExternalIdentityForTests(async (provider, providerUserId) => {
   touchCalls.push({ provider, providerUserId });
   return { ok: true, linked: false };
@@ -97,6 +99,18 @@ setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
 setLinkExternalIdentityForTests(async (provider, providerUserId, userId) => {
   linkCalls.push({ provider, providerUserId, userId });
   return { ok: true, status: "linked" };
+});
+setResolveMaxStartTargetForTests(async (payload) => {
+  startTargetCalls.push(payload ?? null);
+  if (payload === "p_11111111111141118111111111111111") {
+    return {
+      kind: "product",
+      practiceId: "11111111-1111-4111-8111-111111111111",
+      authorSlug: "sergey-and-zoya",
+      productSlug: "eliksir-molodosti",
+    };
+  }
+  return null;
 });
 
 try {
@@ -128,6 +142,28 @@ try {
     provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
     providerUserId: "101",
   });
+
+  const signedStart = await readJson(
+    await POST(
+      maxRequest({
+        initData: currentInitData({
+          start_param: "p_11111111111141118111111111111111",
+        }),
+      }),
+    ),
+  );
+  assert.equal(signedStart.status, 200);
+  assert.deepEqual(signedStart.body.startTarget, {
+    kind: "product",
+    practiceId: "11111111-1111-4111-8111-111111111111",
+    authorSlug: "sergey-and-zoya",
+    productSlug: "eliksir-molodosti",
+  });
+  assert.equal(
+    startTargetCalls.includes("p_11111111111141118111111111111111"),
+    true,
+    "signed start_param must reach the resolver",
+  );
 
   setTouchExternalIdentityForTests(async (provider, providerUserId) => {
     touchCalls.push({ provider, providerUserId });
@@ -378,7 +414,8 @@ try {
   setTouchExternalIdentityForTests(null);
   setResolveMaxNativeUserForTests(null);
   setResolveMaxSessionBindingForTests(null);
-  setLinkExternalIdentityForTests(null);
+  setResolveMaxStartTargetForTests(null);
+    setLinkExternalIdentityForTests(null);
   if (previousToken === undefined) {
     delete process.env.MAX_BOT_TOKEN;
   } else {
