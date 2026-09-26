@@ -169,7 +169,9 @@ export async function uploadMusicMasterDirect(input: {
       transcode_status?: string;
     }>(finalized);
     if (!finalized.ok) {
-      await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
+      if (payload?.error !== "stale_music_upload") {
+        await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
+      }
       return { ok: false, error: payload?.error, message: payload?.message, status: finalized.status };
     }
     return {

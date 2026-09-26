@@ -476,8 +476,9 @@ const products = read("src/lib/author-products/products.ts");
 assert.match(products, /shouldCreateDefaultAudioItem/);
 assert.match(
   products,
-  /if \(!shouldCreateDefaultAudioItem\(publicationClass\)\)/,
+  /!shouldCreateDefaultAudioItem\(publicationClass\) \|\|/,
 );
+assert.match(products, /musicAlbumSkipsDefaultAudioItem/);
 assert.match(products, /audio_items: \[\]/);
 
 function coursePractice(overrides = {}) {

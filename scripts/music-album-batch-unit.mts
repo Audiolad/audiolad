@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { appendCreatedAudioItem } from "../src/lib/author-products/form-merge";
+import {
+  appendCreatedAudioItem,
+  applyMusicAudioItemDeletion,
+} from "../src/lib/author-products/form-merge";
 import {
   deriveAlbumTrackTitle,
+  resolveAlbumTrackTitle,
   formatAlbumBatchCreateFailure,
   MAX_MUSIC_ALBUM_BATCH_FILES,
+  musicAlbumSkipsDefaultAudioItem,
+  musicDraftMayDeleteLastTrack,
   orderAlbumBatchFiles,
   planMusicAlbumBatch,
   type AlbumBatchFile,
@@ -51,6 +57,10 @@ assert.equal(deriveAlbumTrackTitle("2026 Mix.wav"), "2026 Mix");
 assert.equal(deriveAlbumTrackTitle("100 Years.mp3"), "100 Years");
 assert.equal(deriveAlbumTrackTitle("Track 01.wav"), "Track 01");
 assert.equal(deriveAlbumTrackTitle("01.wav"), "01");
+assert.equal(resolveAlbumTrackTitle("01 - Morning Light.wav", 4), "Morning Light");
+assert.equal(resolveAlbumTrackTitle(".wav", 4), "Аудио 4");
+assert.equal(resolveAlbumTrackTitle("???.mp3", 2), "Аудио 2");
+assert.equal(resolveAlbumTrackTitle("", 1), "Аудио 1");
 
 {
   const ordered = orderAlbumBatchFiles([
@@ -195,7 +205,6 @@ const formSource = readFileSync(
 
 assert.match(formSource, /Добавить треки альбома/);
 assert.match(formSource, /type="file"\s+multiple/);
-assert.match(formSource, /appendCreatedAudioItem\(current, payload\.audio_item!\)/);
 assert.match(formSource, /appendCreatedAudioItem\(current, audioItem\)/);
 assert.match(formSource, /stageMusicTrackFile\(audioItem\.id, file\)/);
 assert.match(formSource, /mergeServerAudioItems\(current, payload\.product!\.audio_items\)/);
@@ -216,7 +225,76 @@ assert.doesNotMatch(albumBody, /enqueueReadyMusicUploads/);
 assert.ok(albumBody.indexOf("stageMusicTrackFile") < albumBody.indexOf("startReadyMusicUploads"));
 assert.match(albumBody, /if \(stagedIds\.length > 0\)/);
 assert.match(albumBody, /musicQueueBlocksTrackCreation/);
-assert.match(functionBody(formSource, "addAudioItem"), /musicQueueBlocksTrackCreation/);
+assert.match(albumBody, /failedNames/);
+assert.match(albumBody, /resolveAlbumTrackTitle/);
+assert.match(albumBody, /continue/);
 assert.match(functionBody(formSource, "addAudioItem"), /PRODUCT_KIND\.MUSIC/);
+assert.match(functionBody(formSource, "addAudioItem"), /return;/);
+assert.match(formSource, /musicAlbumSkipsDefaultAudioItem/);
+assert.match(formSource, /musicDraftMayDeleteLastTrack/);
+assert.doesNotMatch(formSource, /Трек 1/);
+assert.match(
+  formSource,
+  /productKind !== PRODUCT_KIND\.MUSIC \? \([\s\S]*?Добавить аудио/,
+);
+assert.doesNotMatch(formSource, /MUSIC_DELIVERY_UPLOAD_LABEL/);
+
+{
+  assert.equal(
+    musicAlbumSkipsDefaultAudioItem({ productKind: "music", publicationClass: "release" }),
+    true,
+  );
+  assert.equal(
+    musicAlbumSkipsDefaultAudioItem({ productKind: "practice", publicationClass: "practice" }),
+    false,
+  );
+  assert.equal(musicDraftMayDeleteLastTrack({ productKind: "music", status: "draft" }), true);
+  assert.equal(musicDraftMayDeleteLastTrack({ productKind: "music", status: "published" }), false);
+  assert.equal(musicDraftMayDeleteLastTrack({ productKind: "music", status: "unpublished" }), false);
+  assert.equal(musicDraftMayDeleteLastTrack({ productKind: "practice", status: "draft" }), false);
+
+  let tracks: AudioItemRow[] = [];
+  assert.equal(tracks.length, 0, "new music album starts empty");
+  tracks = appendCreatedAudioItem(tracks, item({ id: "one", title: "01", position: 1 }));
+  assert.equal(tracks.length, 1);
+  tracks = applyMusicAudioItemDeletion(tracks, "one", []);
+  assert.equal(tracks.length, 0, "deleting the only track leaves an empty album");
+
+  for (let index = 1; index <= 5; index += 1) {
+    tracks = appendCreatedAudioItem(
+      tracks,
+      item({ id: `t${index}`, title: `Трек ${index}`, position: index }),
+    );
+  }
+  assert.equal(tracks.length, 5);
+  const afterFirst = tracks
+    .filter((entry) => entry.id !== "t1")
+    .map((entry, index) => ({ ...entry, position: index + 1 }));
+  tracks = applyMusicAudioItemDeletion(tracks, "t1", afterFirst);
+  assert.equal(tracks.length, 4, "deleting the first of five leaves four");
+  assert.equal(tracks[0]?.id, "t2");
+
+  for (const title of ["Трек 1", "Аудио 1", "Track", ""]) {
+    const placeholder = [item({ id: "legacy", title, position: 1, audio_path: null, duration_seconds: null })];
+    assert.equal(
+      musicDraftMayDeleteLastTrack({ productKind: "music", status: "draft" }),
+      true,
+      title || "empty title",
+    );
+    assert.equal(applyMusicAudioItemDeletion(placeholder, "legacy", []).length, 0);
+  }
+}
+
+const productsSource = readFileSync(
+  new URL("../src/lib/author-products/products.ts", import.meta.url),
+  "utf8",
+);
+const deleteRouteSource = readFileSync(
+  new URL("../src/app/api/author/products/[id]/audio/[audioId]/route.ts", import.meta.url),
+  "utf8",
+);
+assert.match(productsSource, /musicAlbumSkipsDefaultAudioItem/);
+assert.doesNotMatch(productsSource, /Трек 1/);
+assert.match(deleteRouteSource, /musicDraftMayDeleteLastTrack/);
 
 console.log("music-album-batch-unit: ok");

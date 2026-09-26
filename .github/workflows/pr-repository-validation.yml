@@ -88,6 +88,8 @@ jobs:
           npx tsx scripts/music-album-batch-unit.mts
           npx tsx scripts/music-track-upload-queue-unit.mts
           npx tsx scripts/music-upload-autostart-unit.mts
+          node scripts/music-draft-track-delete-sql-unit.mjs
+          npx tsx scripts/music-draft-track-delete-unit.mts
           npm run build
           npm run typecheck
           npm run test:author-project-cyrillic-name

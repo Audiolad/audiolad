@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { catalogSectionColumnForInsert } from "@/lib/author-products/catalog-section-field";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
+import { musicAlbumSkipsDefaultAudioItem } from "@/lib/author-products/music-album-batch";
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -570,7 +571,10 @@ export async function createDraftProduct(
     throw new Error("draft_create_failed");
   }
 
-  if (!shouldCreateDefaultAudioItem(publicationClass)) {
+  if (
+    !shouldCreateDefaultAudioItem(publicationClass) ||
+    musicAlbumSkipsDefaultAudioItem({ productKind, publicationClass })
+  ) {
     return {
       practice: coercePracticeRow(practice as PracticeRow),
       audio_items: [],
@@ -590,7 +594,7 @@ export async function createDraftProduct(
     .from("audio_items")
     .insert({
       practice_id: practice.id,
-      title: productKind === PRODUCT_KIND.MUSIC ? "Трек 1" : "Аудио 1",
+      title: "Аудио 1",
       position: 1,
       status: "draft",
     })

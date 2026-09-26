@@ -178,11 +178,13 @@ export async function uploadAuthorProductAudioDirect(input: {
     );
     const finalized = await readJson<FinalizePayload>(finalizeResponse);
     if (!finalizeResponse.ok || !finalized?.product) {
-      await abandonProductAudioUpload({
-        practiceId: input.practiceId,
-        audioId: input.audioId,
-        uploadPath,
-      });
+      if (finalized?.error !== "stale_music_upload") {
+        await abandonProductAudioUpload({
+          practiceId: input.practiceId,
+          audioId: input.audioId,
+          uploadPath,
+        });
+      }
       return {
         ok: false,
         error: finalized?.error,

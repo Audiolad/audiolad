@@ -36,6 +36,26 @@ export function deriveAlbumTrackTitle(fileName: string): string {
   return resolved.slice(0, PRODUCT_CONTENT_LIMITS.audioTitle);
 }
 
+const USABLE_TRACK_TITLE = /[\p{L}\p{N}]/u;
+
+export function isUsableMusicTrackTitle(title: string | null | undefined): boolean {
+  return typeof title === "string" && USABLE_TRACK_TITLE.test(title);
+}
+
+export function fallbackMusicTrackTitle(slotNumber: number): string {
+  const slot = Number.isInteger(slotNumber) && slotNumber > 0 ? slotNumber : 1;
+  return `Аудио ${slot}`;
+}
+
+/** Filename title, or «Аудио N» when parsing yields nothing usable. */
+export function resolveAlbumTrackTitle(fileName: string, slotNumber: number): string {
+  const derived = deriveAlbumTrackTitle(fileName).trim();
+  if (!isUsableMusicTrackTitle(derived)) {
+    return fallbackMusicTrackTitle(slotNumber);
+  }
+  return derived;
+}
+
 export function leadingAlbumTrackNumber(fileName: string): number | null {
   const base = fileName.trim().replace(AUDIO_EXTENSION, "").trim();
   const match = LEADING_TRACK_NUMBER.exec(base);
@@ -117,4 +137,24 @@ export function formatAlbumBatchCreateFailure(
   fileName: string,
 ): string {
   return `Добавлено ${created} из ${planned} треков. Не удалось добавить ${fileName}.`;
+}
+
+/** New music albums start empty. Every track comes from the album drop zone. */
+export function musicAlbumSkipsDefaultAudioItem(input: {
+  productKind?: string | null;
+  publicationClass?: string | null;
+}): boolean {
+  return input.productKind === "music" || input.publicationClass === "release";
+}
+
+/**
+ * A music draft may lose its last track, including a legacy empty «Трек 1» / «Аудио 1».
+ * The title and whether a file exists are not part of the decision.
+ * A published or unpublished listing keeps at least one track.
+ */
+export function musicDraftMayDeleteLastTrack(input: {
+  productKind?: string | null;
+  status?: string | null;
+}): boolean {
+  return input.productKind === "music" && input.status === "draft";
 }
