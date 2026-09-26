@@ -12,7 +12,11 @@ import {
   MAX_PROMO_PATH,
 } from "@/lib/max/host";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
-import type { MaxPromoPage, MaxPromoProduct } from "@/lib/max/promo";
+import {
+  readMaxPromoPage,
+  type MaxPromoPage,
+  type MaxPromoProduct,
+} from "@/lib/max/promo-view";
 import type { MaxPromoTarget } from "@/lib/max/promo-target";
 
 type PromoLoadState =
@@ -85,8 +89,13 @@ export default function MaxPromoLanding({
   useEffect(() => {
     const initData = readMaxInitData();
     if (!initData) {
-      setLoad({ status: "error" });
-      return;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) setLoad({ status: "error" });
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     const controller = new AbortController();
     void fetch(MAX_PROMO_PATH, {
@@ -111,11 +120,16 @@ export default function MaxPromoLanding({
           setLoad({ status: "not_found" });
           return;
         }
-        if (!payload?.ok || !payload.page || typeof payload.page !== "object") {
+        if (!payload?.ok) {
           setLoad({ status: "error" });
           return;
         }
-        setLoad({ status: "ready", page: payload.page as MaxPromoPage });
+        const page = readMaxPromoPage(payload.page);
+        if (!page) {
+          setLoad({ status: "error" });
+          return;
+        }
+        setLoad({ status: "ready", page });
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoad({ status: "error" });
