@@ -12,6 +12,7 @@ import {
   type MaxBridgeSnapshot,
 } from "@/lib/max/bridge";
 import { resolveMaxPromoBrowserFallback } from "@/lib/max/promo-target";
+import type { MaxResolvedStartTarget } from "@/lib/max/startapp";
 import {
   loginAndLinkMaxSession,
   signOutMaxSession,
@@ -75,6 +76,8 @@ export default function MaxBridgeScript() {
   const [password, setPassword] = useState("");
   const [legalConsent, setLegalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [startTarget, setStartTarget] =
+    useState<MaxResolvedStartTarget | null>(null);
   const actionGeneration = useRef(0);
 
   const applyEvent = useCallback((event: MaxShellEvent) => {
@@ -109,6 +112,9 @@ export default function MaxBridgeScript() {
       const event = await verifyMaxSession();
       if (generation !== actionGeneration.current) {
         return;
+      }
+      if (event.type === "VERIFY_SUCCESS") {
+        setStartTarget(event.startTarget ?? null);
       }
       applyEvent(event);
     })();
@@ -213,7 +219,9 @@ export default function MaxBridgeScript() {
         data-max-platform={snapshot.platform ?? ""}
         data-max-version={snapshot.version ?? ""}
       />
-      {view.phase === "linked_authenticated" ? <MaxAuthenticatedHome /> : (
+      {view.phase === "linked_authenticated" ? (
+        <MaxAuthenticatedHome initialStartTarget={startTarget} />
+      ) : (
         <section className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
           <AudioladHorizontalLogo
             className="h-16 w-auto max-w-full object-contain object-center"

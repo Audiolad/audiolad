@@ -1,4 +1,5 @@
 import { SIGN_IN_GENERIC_ERROR } from "@/lib/auth/sign-in-messages";
+import type { MaxResolvedStartTarget } from "@/lib/max/startapp";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
 export const MAX_SHELL_STATUS_NEUTRAL = "АудиоЛад открыт внутри MAX";
@@ -73,6 +74,7 @@ export type MaxShellEvent =
       linked: boolean;
       maxAuthenticated: boolean;
       webSessionMatches: boolean;
+      startTarget?: MaxResolvedStartTarget | null;
     }
   | { type: "VERIFY_FAILURE" }
   | { type: "OPEN_LOGIN" }

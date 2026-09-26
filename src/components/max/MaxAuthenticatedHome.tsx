@@ -37,7 +37,10 @@ import {
   MAX_TAB_BAR_HEIGHT_PX,
   type MaxPrimaryTab,
 } from "@/lib/max/primary-tabs";
+import type { MaxResolvedStartTarget } from "@/lib/max/startapp";
 import { PLAY_ACTION_LABEL, PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
+
+type MaxSelectedProduct = Pick<MaxCatalogProduct, "authorSlug" | "slug">;
 
 type MaxProductDetailState =
   | { status: "idle" }
@@ -56,8 +59,12 @@ type MaxPlaybackState =
 
 export { formatMaxDuration } from "@/lib/max/format-duration";
 
-export default function MaxAuthenticatedHome() {
-  const [selected, setSelected] = useState<MaxCatalogProduct | null>(null);
+export default function MaxAuthenticatedHome({
+  initialStartTarget = null,
+}: {
+  initialStartTarget?: MaxResolvedStartTarget | null;
+}) {
+  const [selected, setSelected] = useState<MaxSelectedProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
   const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
   const [listenArmed, setListenArmed] = useState(false);
@@ -70,14 +77,37 @@ export default function MaxAuthenticatedHome() {
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) {
-        setPromoTarget(readMaxPromoTargetFromLocation());
+      if (cancelled) return;
+
+      if (initialStartTarget?.kind === "promo") {
+        setActiveTab("catalog");
+        setSelected(null);
+        setPromoTarget({
+          authorSlug: initialStartTarget.authorSlug,
+          promoSlug: initialStartTarget.promoSlug,
+        });
+        return;
       }
+
+      if (initialStartTarget?.kind === "product") {
+        setActiveTab("catalog");
+        setPromoTarget(null);
+        setListenArmed(false);
+        setDetail({ status: "loading" });
+        setPlayback({ status: "loading" });
+        setSelected({
+          authorSlug: initialStartTarget.authorSlug,
+          slug: initialStartTarget.productSlug,
+        });
+        return;
+      }
+
+      setPromoTarget(readMaxPromoTargetFromLocation());
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialStartTarget]);
 
     const bindPlay = useCallback((play: () => void) => {
     playRef.current = play;
