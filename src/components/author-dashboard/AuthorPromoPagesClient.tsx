@@ -422,15 +422,6 @@ export default function AuthorPromoPagesClient({
                       >
                         {copiedPageId === page.id ? "Ссылка скопирована" : "Скопировать ссылку"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyMaxLink(page)}
-                        className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5]"
-                      >
-                        {copiedMaxPageId === page.id
-                          ? "MAX-ссылка скопирована"
-                          : "Скопировать MAX-ссылку"}
-                      </button>
                     </>
                   )}
                 </div>
