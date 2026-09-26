@@ -74,7 +74,7 @@ export type MaxShellEvent =
       linked: boolean;
       maxAuthenticated: boolean;
       webSessionMatches: boolean;
-      startTarget: MaxResolvedStartTarget | null;
+      startTarget?: MaxResolvedStartTarget | null;
     }
   | { type: "VERIFY_FAILURE" }
   | { type: "OPEN_LOGIN" }
