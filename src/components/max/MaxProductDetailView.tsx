@@ -11,6 +11,7 @@ import FeaturedProductCard, {
 } from "@/components/home/FeaturedProductCard";
 import MaxAuthorAppreciation from "@/components/max/MaxAuthorAppreciation";
 import MaxProductRating from "@/components/max/MaxProductRating";
+import MaxProductLegalFooter from "@/components/max/MaxProductLegalFooter";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
@@ -29,6 +30,7 @@ type MaxProductDetailViewProps = {
   product: MaxProductDetailModel;
   listenSlot: ReactNode;
   onOpenRecommendation: (product: MaxCatalogProduct) => void;
+  onOpenTopic: (topicKey: string) => void;
 };
 
 function toHeroCover(slug: string, title: string, coverUrl: string | null): PracticePageCoverData {
@@ -53,6 +55,7 @@ export default function MaxProductDetailView({
   product,
   listenSlot,
   onOpenRecommendation,
+  onOpenTopic,
 }: MaxProductDetailViewProps) {
   const slides: CatalogSlide[] = product.gallery.map((slide, index) => ({
     id: slide.id,
@@ -122,9 +125,13 @@ export default function MaxProductDetailView({
           <ul className="flex flex-row flex-wrap items-center gap-2">
             {product.topics.map((topic) => (
               <li key={topic.key} className="max-w-full shrink-0">
-                <span className="inline-flex min-h-11 max-w-full items-center whitespace-normal rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-2.5 py-1 text-[10px] font-medium leading-tight text-[#7042c5]">
+                <button
+                  type="button"
+                  onClick={() => onOpenTopic(topic.key)}
+                  className="inline-flex min-h-11 max-w-full items-center whitespace-normal rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-2.5 py-1 text-[10px] font-medium leading-tight text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
                   {topic.title}
-                </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -190,6 +197,8 @@ export default function MaxProductDetailView({
           </ul>
         </section>
       ) : null}
+
+      <MaxProductLegalFooter />
     </div>
   );
 }
