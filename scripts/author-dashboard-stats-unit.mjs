@@ -124,7 +124,7 @@ function testUi() {
   assert(client.includes("Среднее время на запуск"), "average per start");
   assert(client.includes("formatListeningDuration"), "duration format");
   const listeningSql = read(
-    "supabase/migrations/20261128120000_author_stats_listening_time.sql",
+    "supabase/migrations/20261130120000_author_stats_listening_time.sql",
   );
   assert(listeningSql.includes("f.author_id_snapshot = p_author_id"), "snapshot key");
   assert(listeningSql.includes("averages_withheld"), "withhold incomparable averages");

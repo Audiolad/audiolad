@@ -1,5 +1,5 @@
 -- Isolated checks for author_stats_listening_*. The harness creates the
--- minimal schema and then applies 20261128120000_author_stats_listening_time.sql.
+-- minimal schema and then applies 20261130120000_author_stats_listening_time.sql.
 DO $$
 DECLARE
   v_author_a uuid := 'a1111111-1111-4111-8111-111111111111';

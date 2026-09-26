@@ -237,7 +237,7 @@ $$;
 function main() {
   recreateDb();
   psql(TEST_DB, bootstrap);
-  psqlFile(TEST_DB, join(ROOT, "supabase/migrations/20261128120000_author_stats_listening_time.sql"));
+  psqlFile(TEST_DB, join(ROOT, "supabase/migrations/20261130120000_author_stats_listening_time.sql"));
   psqlFile(TEST_DB, join(ROOT, "supabase/tests/author_stats_listening_isolated.sql"));
   psql("postgres", `DROP DATABASE IF EXISTS ${TEST_DB};`);
   console.log("author-stats-listening-sql-unit: ok");
