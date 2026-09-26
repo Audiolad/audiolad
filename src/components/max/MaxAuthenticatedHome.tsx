@@ -12,6 +12,7 @@ import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
 import MaxBottomNav from "@/components/max/MaxBottomNav";
 import MaxCatalogSearch, {
   type MaxCatalogProduct,
+  type MaxCatalogTopicRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
@@ -56,6 +57,9 @@ export default function MaxAuthenticatedHome() {
   const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
   const [listenArmed, setListenArmed] = useState(false);
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
+  const [catalogTopicRequest, setCatalogTopicRequest] =
+    useState<MaxCatalogTopicRequest | null>(null);
+  const topicRequestIdRef = useRef(0);
   const playRef = useRef<(() => void) | null>(null);
   const pendingPlayRef = useRef(false);
   const bindPlay = useCallback((play: () => void) => {
@@ -78,6 +82,18 @@ export default function MaxAuthenticatedHome() {
     setDetail({ status: "loading" });
     setPlayback({ status: "loading" });
     setSelected(product);
+  }
+
+  function openCatalogTopic(topicKey: string) {
+    const key = topicKey.trim();
+    if (!key) return;
+    closeProductDetail();
+    setActiveTab("catalog");
+    topicRequestIdRef.current += 1;
+    setCatalogTopicRequest({
+      key,
+      requestId: topicRequestIdRef.current,
+    });
   }
 
   useEffect(() => {
@@ -201,7 +217,10 @@ export default function MaxAuthenticatedHome() {
         </header>
       )}
       <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog"}>
-        <MaxCatalogSearch onSelectProduct={openCatalogProduct} />
+        <MaxCatalogSearch
+          onSelectProduct={openCatalogProduct}
+          topicRequest={catalogTopicRequest}
+        />
       </div>
       {activeTab === "catalog" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
@@ -224,6 +243,7 @@ export default function MaxAuthenticatedHome() {
               productSlug={selected.slug}
               product={detail.product}
               onOpenRecommendation={openCatalogProduct}
+              onOpenTopic={openCatalogTopic}
               listenSlot={
                 <>
                   {playback.status === "loading" ? (
