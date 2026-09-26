@@ -67,8 +67,14 @@ type FilterListingState =
 
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
+export type MaxCatalogTopicRequest = {
+  key: string;
+  requestId: number;
+};
+
 type MaxCatalogSearchProps = {
   onSelectProduct: (product: MaxCatalogProduct) => void;
+  topicRequest?: MaxCatalogTopicRequest | null;
 };
 
 function SearchIcon() {
@@ -185,7 +191,10 @@ function buildMaxCatalogRequestBody(input: {
   return JSON.stringify(body);
 }
 
-export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchProps) {
+export default function MaxCatalogSearch({
+  onSelectProduct,
+  topicRequest = null,
+}: MaxCatalogSearchProps) {
   const inputId = useId();
   const [defaultCatalog, setDefaultCatalog] = useState<DefaultCatalogState>(() =>
     readMaxInitData() ? { status: "loading" } : { status: "error" },
@@ -729,6 +738,29 @@ export default function MaxCatalogSearch({ onSelectProduct }: MaxCatalogSearchPr
   function resetFilters() {
     applyFilters([], "all", "all");
   }
+
+  useEffect(() => {
+    if (!topicRequest) return;
+    const topicKey = topicRequest.key.trim();
+    if (!topicKey) return;
+
+    searchInputRef.current = "";
+    activeSectionRef.current = null;
+    activeAccessRef.current = "all";
+    activeClassRef.current = "all";
+    const topicParam = serializeCatalogTopicParam([topicKey]);
+    activeTopicParamRef.current = topicParam;
+
+    setSearchInput("");
+    setActiveSection(null);
+    setSectionListing({ status: "idle" });
+    setActiveTopicKeys([topicKey]);
+    setActiveAccess("all");
+    setActiveClass("all");
+    loadFilteredCatalog(null, topicParam, "all", "all");
+    // requestId intentionally retriggers the same topic after returning from a product.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicRequest?.requestId]);
 
   useEffect(() => {
     defaultCatalogRef.current = defaultCatalog;
