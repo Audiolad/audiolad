@@ -71,6 +71,11 @@ const bridgeSource = readFileSync(join(repoRoot, "src/lib/max/bridge.ts"), "utf8
 assert.doesNotMatch(bridgeSource, /WebApp\.ready\(/);
 assert.doesNotMatch(bridgeSource, /MAX_BOT|BOT_TOKEN|process\.env\.\w*BOT/);
 assert.match(bridgeSource, /initDataUnsafe/);
+assert.match(bridgeSource, /openMaxExternalLink/);
+assert.match(bridgeSource, /parsed\.protocol !== "https:"/);
+assert.match(bridgeSource, /typeof webApp\?\.openLink === "function"/);
+assert.match(bridgeSource, /window\.open\(parsed\.toString\(\), "_blank", "noopener,noreferrer"\)/);
+
 
 const scriptSource = readFileSync(
   join(repoRoot, "src/components/max/MaxBridgeScript.tsx"),

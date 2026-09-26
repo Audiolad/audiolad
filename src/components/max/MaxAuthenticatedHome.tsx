@@ -12,6 +12,7 @@ import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
 import MaxBottomNav from "@/components/max/MaxBottomNav";
 import MaxCatalogSearch, {
   type MaxCatalogProduct,
+  type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
@@ -56,6 +57,8 @@ export default function MaxAuthenticatedHome() {
   const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
   const [listenArmed, setListenArmed] = useState(false);
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
+  const [catalogTopicNavigation, setCatalogTopicNavigation] =
+    useState<MaxCatalogTopicNavigationRequest | null>(null);
   const playRef = useRef<(() => void) | null>(null);
   const pendingPlayRef = useRef(false);
   const bindPlay = useCallback((play: () => void) => {
@@ -78,6 +81,17 @@ export default function MaxAuthenticatedHome() {
     setDetail({ status: "loading" });
     setPlayback({ status: "loading" });
     setSelected(product);
+  }
+
+  function openCatalogTopic(topicKey: string) {
+    const key = topicKey.trim();
+    if (!key) return;
+    closeProductDetail();
+    setActiveTab("catalog");
+    setCatalogTopicNavigation((current) => ({
+      key,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
   }
 
   useEffect(() => {
@@ -201,7 +215,10 @@ export default function MaxAuthenticatedHome() {
         </header>
       )}
       <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog"}>
-        <MaxCatalogSearch onSelectProduct={openCatalogProduct} />
+        <MaxCatalogSearch
+          onSelectProduct={openCatalogProduct}
+          topicNavigationRequest={catalogTopicNavigation}
+        />
       </div>
       {activeTab === "catalog" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
@@ -224,6 +241,7 @@ export default function MaxAuthenticatedHome() {
               productSlug={selected.slug}
               product={detail.product}
               onOpenRecommendation={openCatalogProduct}
+              onOpenTopic={openCatalogTopic}
               listenSlot={
                 <>
                   {playback.status === "loading" ? (

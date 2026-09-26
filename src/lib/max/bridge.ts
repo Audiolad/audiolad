@@ -25,6 +25,7 @@ type MaxWebAppLike = {
   initData?: unknown;
   platform?: unknown;
   version?: unknown;
+  openLink?: (url: string) => void;
 };
 
 const EMPTY_SNAPSHOT: MaxBridgeSnapshot = {
@@ -96,6 +97,26 @@ export function resolveMaxBridgeSnapshot(input: {
     platform: asNonEmptyString(webApp?.platform),
     version: asNonEmptyString(webApp?.version),
   };
+}
+
+export function openMaxExternalLink(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+
+  const webApp = getWindowWebApp();
+  if (typeof webApp?.openLink === "function") {
+    webApp.openLink(parsed.toString());
+    return true;
+  }
+
+  window.open(parsed.toString(), "_blank", "noopener,noreferrer");
+  return true;
 }
 
 export function readMaxBridgeSnapshot(): MaxBridgeSnapshot {
