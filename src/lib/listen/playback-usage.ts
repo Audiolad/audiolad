@@ -136,3 +136,80 @@ export function evaluatePlaybackUsageTick(
 
   return finish(acceptedMs, acceptedMs > 0 ? null : "non_positive");
 }
+
+export type PlaybackUsageContextState = PlaybackUsageState & {
+  lastSampleSeq: number;
+  lastClientEventId: string | null;
+};
+
+export type PlaybackUsageSampleInput = PlaybackUsageTickInput & {
+  sampleSeq: number;
+  clientEventId: string;
+};
+
+export type PlaybackUsageSampleResult = {
+  state: PlaybackUsageContextState | null;
+  acceptedMs: number;
+  duplicate: boolean;
+  stale: boolean;
+  /** True only when this call should insert a durable fact (acceptedMs > 0). */
+  storeFact: boolean;
+};
+
+/**
+ * Monotonic sample_seq within one listening context.
+ * A seq that is not newer than last_sample_seq is stale: accepted 0 and the
+ * baseline is unchanged, so a later tick cannot re-credit that media range.
+ * The same client_event_id is idempotent. Zero accepts do not store a fact.
+ */
+export function applyPlaybackUsageSample(
+  state: PlaybackUsageContextState | null,
+  facts: ReadonlyMap<string, number>,
+  input: PlaybackUsageSampleInput,
+): PlaybackUsageSampleResult {
+  const known = facts.get(input.clientEventId);
+  if (known !== undefined) {
+    return {
+      state,
+      acceptedMs: known,
+      duplicate: true,
+      stale: false,
+      storeFact: false,
+    };
+  }
+
+  if (!Number.isInteger(input.sampleSeq) || input.sampleSeq < 1) {
+    throw new Error("playback_usage_invalid_args");
+  }
+
+  const lastSeq = state?.lastSampleSeq ?? 0;
+  if (
+    state &&
+    (state.lastClientEventId === input.clientEventId || input.sampleSeq <= lastSeq)
+  ) {
+    return {
+      state,
+      acceptedMs: 0,
+      duplicate: state.lastClientEventId === input.clientEventId,
+      stale: input.sampleSeq <= lastSeq,
+      storeFact: false,
+    };
+  }
+
+  const tick = evaluatePlaybackUsageTick(state, input);
+  return {
+    state: {
+      audioItemId: tick.audioItemId,
+      lastPositionMs: tick.lastPositionMs,
+      lastReportedAtMs: tick.lastReportedAtMs,
+      createdAtMs: tick.createdAtMs,
+      acceptedListenedMs: tick.acceptedListenedMs,
+      lastSampleSeq: input.sampleSeq,
+      lastClientEventId: input.clientEventId,
+    },
+    acceptedMs: tick.acceptedMs,
+    duplicate: false,
+    stale: false,
+    storeFact: tick.acceptedMs > 0,
+  };
+}

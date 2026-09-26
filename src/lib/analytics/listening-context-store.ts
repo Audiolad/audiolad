@@ -25,6 +25,14 @@ type UsageListeningContext = PublishedListeningKey & {
 
 let publishedAnalyticsKey: PublishedListeningKey | null = null;
 let usageContext: UsageListeningContext | null = null;
+const sampleSeqByListeningKey = new Map<string, number>();
+
+/** Next physical sample for this listening_key. Retries must reuse the value. */
+export function nextPlaybackUsageSampleSeq(listeningKey: string): number {
+  const next = (sampleSeqByListeningKey.get(listeningKey) ?? 0) + 1;
+  sampleSeqByListeningKey.set(listeningKey, next);
+  return next;
+}
 
 export function publishAnalyticsListeningKey(input: PublishedListeningKey): void {
   publishedAnalyticsKey = input;
@@ -82,4 +90,5 @@ export function resolvePlaybackUsageListeningKey(input: {
 export function resetPlaybackListeningContextForTests(): void {
   publishedAnalyticsKey = null;
   usageContext = null;
+  sampleSeqByListeningKey.clear();
 }

@@ -1,6 +1,9 @@
 import { getCachedAnalyticsSessionId } from "@/lib/analytics/client";
 import { readAnonymousId } from "@/lib/analytics/identity-storage";
-import { resolvePlaybackUsageListeningKey } from "@/lib/analytics/listening-context-store";
+import {
+  nextPlaybackUsageSampleSeq,
+  resolvePlaybackUsageListeningKey,
+} from "@/lib/analytics/listening-context-store";
 import { LISTEN_STATS_HEARTBEAT_MS } from "@/lib/listen/listen-stats-constants";
 import type { PlaybackUsagePhase } from "@/lib/listen/playback-usage";
 import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
@@ -38,6 +41,7 @@ export type ListenStatsHeartbeatPayload = {
   phase?: PlaybackUsagePhase;
   clientEventId?: string | null;
   listeningKey?: string | null;
+  sampleSeq?: number | null;
   sessionId?: string | null;
   isPlaying?: boolean;
 };
@@ -133,10 +137,17 @@ export function buildListenStatsHeartbeatBody(
   const phase = input.phase ?? "advance";
   const practiceId = input.practiceId?.trim() ?? "";
   const clientEventId = input.clientEventId?.trim() ?? "";
+  const sampleSeq =
+    typeof input.sampleSeq === "number" &&
+    Number.isInteger(input.sampleSeq) &&
+    input.sampleSeq >= 1
+      ? input.sampleSeq
+      : null;
 
   if (
     practiceId &&
     clientEventId &&
+    sampleSeq !== null &&
     USAGE_EVENT_ID_PATTERN.test(clientEventId)
   ) {
     const listeningKey =
@@ -150,6 +161,7 @@ export function buildListenStatsHeartbeatBody(
 
     body.client_event_id = clientEventId;
     body.listening_key = listeningKey;
+    body.sample_seq = sampleSeq;
     body.playback_phase = phase;
 
     const sessionId = input.sessionId ?? getCachedAnalyticsSessionId();
@@ -187,10 +199,23 @@ export function reportListenStatsHeartbeat(input: {
   }
 
   const clientEventId = createPlaybackUsageEventId();
+  const practiceId = input.practiceId?.trim() ?? "";
+  const phase = input.phase ?? "advance";
+  const listeningKey = practiceId
+    ? resolvePlaybackUsageListeningKey({
+        practiceId,
+        audioItemId: input.audioItemId,
+        now: Date.now(),
+        isPlaying: input.isPlaying !== false && phase !== "track_change",
+      })
+    : null;
+  const sampleSeq = listeningKey ? nextPlaybackUsageSampleSeq(listeningKey) : null;
   const payload = JSON.stringify(
     buildListenStatsHeartbeatBody({
       ...input,
       clientEventId,
+      listeningKey,
+      sampleSeq,
     }),
   );
   const url = `${input.apiBase}/listen-stats`;

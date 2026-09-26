@@ -5,10 +5,17 @@ BEGIN;
 -- not a source for these facts. No historical backfill: listening_time_valid_from
 -- is the moment this migration is applied in an environment.
 --
--- Load (v1, no rollup): one row per heartbeat, including accepted 0, so retries
--- are unique at client_event_id. Cadence stays ~5s. 20 concurrent listeners
--- are about 3.5e5 rows/day. Admin sums use the partial index WHERE listened_ms > 0.
--- A later rollup may be derived; raw facts remain the source of truth.
+-- Load: playback_usage_facts stores only accepted listened_ms > 0.
+-- Baseline, seek, stale, duplicate, and other +0 samples update the single
+-- context row (last_sample_seq, position, idempotency) and do not insert a fact.
+-- Continuous play still writes about one fact per 5s heartbeat:
+--   20 concurrent × 24h ≈ 3.5e5 fact rows/day
+--   100 concurrent × 24h ≈ 1.7e6/day
+--   1 000 concurrent × 24h ≈ 1.7e7/day
+--   100 venues × 12h one stream ≈ 8.6e5/day
+--   100 venues × 24h one stream ≈ 1.7e6/day
+-- Context rows are one per listening_key, not per heartbeat. A later rollup
+-- may be derived; raw positive facts stay the source of truth.
 --
 -- listened_ms is a neutral usage fact, not a royalty amount. business_account_id,
 -- venue_id, billing_period_start, royalty_eligible_ms and author_id_snapshot are
@@ -40,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.playback_usage_contexts (
   last_reported_at timestamptz NULL,
   accepted_listened_ms bigint NOT NULL DEFAULT 0,
   last_client_event_id uuid NULL,
+  last_sample_seq bigint NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   ended_at timestamptz NULL,
@@ -49,11 +57,12 @@ CREATE TABLE IF NOT EXISTS public.playback_usage_contexts (
   CONSTRAINT playback_usage_contexts_listening_key_length_check
     CHECK (char_length(listening_key) BETWEEN 1 AND 200),
   CONSTRAINT playback_usage_contexts_last_position_check CHECK (last_position_ms >= 0),
-  CONSTRAINT playback_usage_contexts_accepted_check CHECK (accepted_listened_ms >= 0)
+  CONSTRAINT playback_usage_contexts_accepted_check CHECK (accepted_listened_ms >= 0),
+  CONSTRAINT playback_usage_contexts_sample_seq_check CHECK (last_sample_seq >= 0)
 );
 
 COMMENT ON TABLE public.playback_usage_contexts IS
-  'audiolad:playback-usage; baseline for one listening_key. Not an analytics aggregate. Two tabs are two keys.';
+  'audiolad:playback-usage; baseline and monotonic sample_seq for one listening_key. Operational state, not the durable fact. Practice delete may remove the context. It must not remove playback_usage_facts.';
 
 CREATE INDEX IF NOT EXISTS playback_usage_contexts_practice_idx
   ON public.playback_usage_contexts (practice_id);
@@ -61,14 +70,17 @@ CREATE INDEX IF NOT EXISTS playback_usage_contexts_practice_idx
 CREATE TABLE IF NOT EXISTS public.playback_usage_facts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_event_id uuid NOT NULL,
-  context_id uuid NOT NULL REFERENCES public.playback_usage_contexts (id) ON DELETE CASCADE,
+  sample_seq bigint NOT NULL,
+  -- Nullable so a deleted context cannot cascade into the fact.
+  context_id uuid NULL REFERENCES public.playback_usage_contexts (id) ON DELETE SET NULL,
   listening_key text NOT NULL,
   session_id uuid NULL REFERENCES public.analytics_sessions (id) ON DELETE SET NULL,
   user_id uuid NULL REFERENCES auth.users (id) ON DELETE SET NULL,
   anonymous_id text NULL,
   visitor_key text NULL,
-  practice_id uuid NOT NULL REFERENCES public.practices (id) ON DELETE CASCADE,
-  audio_item_id uuid NULL REFERENCES public.audio_items (id) ON DELETE SET NULL,
+  -- Snapshot UUIDs. No FK: practice, audio, and author deletes must not remove history.
+  practice_id uuid NOT NULL,
+  audio_item_id uuid NULL,
   listened_ms bigint NOT NULL,
   position_ms bigint NOT NULL,
   prior_position_ms bigint NULL,
@@ -83,7 +95,8 @@ CREATE TABLE IF NOT EXISTS public.playback_usage_facts (
   royalty_eligible_ms bigint NULL,
   billing_period_start date NULL,
   CONSTRAINT playback_usage_facts_client_event_id_key UNIQUE (client_event_id),
-  CONSTRAINT playback_usage_facts_listened_ms_check CHECK (listened_ms >= 0),
+  CONSTRAINT playback_usage_facts_sample_seq_check CHECK (sample_seq >= 1),
+  CONSTRAINT playback_usage_facts_listened_ms_check CHECK (listened_ms > 0),
   CONSTRAINT playback_usage_facts_position_ms_check CHECK (position_ms >= 0),
   CONSTRAINT playback_usage_facts_phase_check CHECK (
     phase IN ('advance', 'seek', 'pause', 'ended', 'track_change')
@@ -94,10 +107,19 @@ CREATE TABLE IF NOT EXISTS public.playback_usage_facts (
 );
 
 COMMENT ON TABLE public.playback_usage_facts IS
-  'audiolad:playback-usage; append-only server-accepted MEDIA-TIME. listened_ms is usage, not a royalty. Idempotency is UNIQUE(client_event_id). author_id_snapshot is the product author at accept time for a future closed ledger; admin analytics still join the current practice author.';
+  'audiolad:playback-usage; append-only server-accepted MEDIA-TIME where listened_ms > 0. Not a royalty. UNIQUE(client_event_id) plus context last_sample_seq. practice_id, audio_item_id, and author_id_snapshot are immutable snapshots with no FK, so product deletion cannot erase history. Admin analytics still join the current practice.';
+
+COMMENT ON COLUMN public.playback_usage_facts.practice_id IS
+  'Snapshot of the practice at accept time. No foreign key: deleting the practice must not delete the fact.';
+
+COMMENT ON COLUMN public.playback_usage_facts.audio_item_id IS
+  'Snapshot of the audio item at accept time. No foreign key.';
+
+COMMENT ON COLUMN public.playback_usage_facts.author_id_snapshot IS
+  'Snapshot of practices.author_id at accept time. No foreign key. Author workspace deletion must not rewrite or remove it.';
 
 COMMENT ON COLUMN public.playback_usage_facts.listened_ms IS
-  'Server-accepted advance of media currentTime in milliseconds. Zero rows exist so a retry cannot be applied twice. Not wall-clock.';
+  'Server-accepted advance of media currentTime in milliseconds. Only increments greater than zero are stored. Not wall-clock.';
 
 COMMENT ON COLUMN public.playback_usage_facts.royalty_eligible_ms IS
   'Reserved. Not written in v1. Future per business account/venue royalty must not reuse listened_ms as money.';
@@ -131,6 +153,7 @@ GRANT ALL ON TABLE public.playback_usage_facts TO service_role;
 CREATE OR REPLACE FUNCTION public.apply_playback_usage_heartbeat(
   p_client_event_id uuid,
   p_listening_key text,
+  p_sample_seq bigint,
   p_user_id uuid,
   p_anonymous_id text,
   p_session_id uuid,
@@ -179,6 +202,8 @@ BEGIN
     OR char_length(p_listening_key) > 200
     OR p_practice_id IS NULL
     OR p_audio_item_id IS NULL
+    OR p_sample_seq IS NULL
+    OR p_sample_seq < 1
   THEN
     RAISE EXCEPTION 'playback_usage_invalid_args';
   END IF;
@@ -273,6 +298,17 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Same physical sample, or an older sample_seq. Do not move the baseline:
+  -- rolling last_position_ms backward would let a later tick re-credit media.
+  IF v_row.last_client_event_id = p_client_event_id
+    OR p_sample_seq <= v_row.last_sample_seq
+  THEN
+    accepted_ms := 0;
+    duplicate := v_row.last_client_event_id = p_client_event_id;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
   v_prior := v_row.last_position_ms;
 
   IF v_row.last_reported_at IS NULL THEN
@@ -332,45 +368,76 @@ BEGIN
     END IF;
   END IF;
 
-  BEGIN
-    INSERT INTO public.playback_usage_facts (
-      client_event_id,
-      context_id,
-      listening_key,
-      session_id,
-      user_id,
-      anonymous_id,
-      visitor_key,
-      practice_id,
-      audio_item_id,
-      listened_ms,
-      position_ms,
-      prior_position_ms,
-      playback_rate,
-      phase,
-      reject_reason,
-      occurred_at,
-      author_id_snapshot
-    ) VALUES (
-      p_client_event_id,
-      v_row.id,
-      p_listening_key,
-      v_session_id,
-      p_user_id,
-      v_anonymous,
-      v_visitor,
-      p_practice_id,
-      p_audio_item_id,
-      v_accepted,
-      v_position,
-      v_prior,
-      v_rate,
-      p_phase,
-      v_reason,
-      v_now,
-      v_author
-    );
+  IF v_accepted > 0 THEN
+    BEGIN
+      INSERT INTO public.playback_usage_facts (
+        client_event_id,
+        sample_seq,
+        context_id,
+        listening_key,
+        session_id,
+        user_id,
+        anonymous_id,
+        visitor_key,
+        practice_id,
+        audio_item_id,
+        listened_ms,
+        position_ms,
+        prior_position_ms,
+        playback_rate,
+        phase,
+        reject_reason,
+        occurred_at,
+        author_id_snapshot
+      ) VALUES (
+        p_client_event_id,
+        p_sample_seq,
+        v_row.id,
+        p_listening_key,
+        v_session_id,
+        p_user_id,
+        v_anonymous,
+        v_visitor,
+        p_practice_id,
+        p_audio_item_id,
+        v_accepted,
+        v_position,
+        v_prior,
+        v_rate,
+        p_phase,
+        v_reason,
+        v_now,
+        v_author
+      );
 
+      UPDATE public.playback_usage_contexts
+      SET
+        user_id = COALESCE(p_user_id, user_id),
+        anonymous_id = COALESCE(v_anonymous, anonymous_id),
+        visitor_key = COALESCE(v_visitor, visitor_key),
+        session_id = COALESCE(v_session_id, session_id),
+        audio_item_id = p_audio_item_id,
+        last_position_ms = v_position,
+        last_reported_at = v_now,
+        accepted_listened_ms = accepted_listened_ms + v_accepted,
+        last_client_event_id = p_client_event_id,
+        last_sample_seq = p_sample_seq,
+        updated_at = v_now,
+        ended_at = CASE WHEN p_phase = 'ended' THEN v_now ELSE ended_at END
+      WHERE id = v_row.id;
+    EXCEPTION
+      WHEN unique_violation THEN
+        SELECT f.listened_ms
+        INTO v_existing
+        FROM public.playback_usage_facts AS f
+        WHERE f.client_event_id = p_client_event_id;
+
+        v_accepted := COALESCE(v_existing, 0);
+        v_duplicate := true;
+    END;
+  ELSE
+    -- +0 still advances the monotonic cursor and the position baseline.
+    -- It does not insert a durable fact row.
     UPDATE public.playback_usage_contexts
     SET
       user_id = COALESCE(p_user_id, user_id),
@@ -380,21 +447,12 @@ BEGIN
       audio_item_id = p_audio_item_id,
       last_position_ms = v_position,
       last_reported_at = v_now,
-      accepted_listened_ms = accepted_listened_ms + v_accepted,
       last_client_event_id = p_client_event_id,
+      last_sample_seq = p_sample_seq,
       updated_at = v_now,
       ended_at = CASE WHEN p_phase = 'ended' THEN v_now ELSE ended_at END
     WHERE id = v_row.id;
-  EXCEPTION
-    WHEN unique_violation THEN
-      SELECT f.listened_ms
-      INTO v_existing
-      FROM public.playback_usage_facts AS f
-      WHERE f.client_event_id = p_client_event_id;
-
-      v_accepted := COALESCE(v_existing, 0);
-      v_duplicate := true;
-  END;
+  END IF;
 
   accepted_ms := v_accepted;
   duplicate := v_duplicate;
@@ -403,15 +461,15 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.apply_playback_usage_heartbeat(
-  uuid, text, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
+  uuid, text, bigint, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
 ) IS
-  'audiolad:playback-usage; atomic MEDIA-TIME accept. service_role only. Does not update practice_listen_stats. Client playback_rate cannot raise the 1.5x wall or lifetime cap. Gaps are not awarded as wall-clock; only currentTime advance within the cap counts. Seek and impossible jumps accept +0 and move the baseline. UNIQUE(client_event_id) makes retries idempotent.';
+  'audiolad:playback-usage; atomic MEDIA-TIME accept. service_role only. Does not update practice_listen_stats. Client playback_rate cannot raise the 1.5x wall or lifetime cap. sample_seq must increase within a listening_key; a stale seq returns +0 and does not move last_position_ms. Only listened_ms > 0 is inserted. UNIQUE(client_event_id) makes a positive retry idempotent.';
 
 REVOKE ALL ON FUNCTION public.apply_playback_usage_heartbeat(
-  uuid, text, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
+  uuid, text, bigint, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.apply_playback_usage_heartbeat(
-  uuid, text, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
+  uuid, text, bigint, uuid, text, uuid, uuid, uuid, bigint, bigint, numeric, text, timestamptz
 ) TO service_role;
 
 -- Filtered positive facts for admin period analytics.

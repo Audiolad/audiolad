@@ -25,6 +25,7 @@ function parseMs(value: number | string | null | undefined): number {
 
 export async function applyPlaybackUsageHeartbeat(input: {
   clientEventId: string;
+  sampleSeq: number;
   listeningKey: string;
   userId: string | null;
   anonymousId: string | null;
@@ -39,6 +40,7 @@ export async function applyPlaybackUsageHeartbeat(input: {
   const writer = createServiceRoleClient();
   const { data, error } = await writer.rpc("apply_playback_usage_heartbeat", {
     p_client_event_id: input.clientEventId,
+    p_sample_seq: input.sampleSeq,
     p_listening_key: input.listeningKey,
     p_user_id: input.userId,
     p_anonymous_id: input.anonymousId,

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { LISTENING_SESSION_GAP_MS } from "../src/lib/analytics/constants";
 import {
+  nextPlaybackUsageSampleSeq,
   publishAnalyticsListeningKey,
   resetPlaybackListeningContextForTests,
   resolvePlaybackUsageListeningKey,
@@ -28,9 +29,11 @@ import {
   shouldReportPlaybackUsageHeartbeat,
 } from "../src/lib/listen/listen-stats-client";
 import {
+  applyPlaybackUsageSample,
   evaluatePlaybackUsageTick,
   PLAYBACK_USAGE_IMPOSSIBLE_ABS_MS,
   PLAYBACK_USAGE_MAX_RATE,
+  type PlaybackUsageContextState,
   type PlaybackUsagePhase,
   type PlaybackUsageState,
   type PlaybackUsageTickResult,
@@ -455,6 +458,7 @@ function testClientPayload() {
     phase: "advance",
     clientEventId: eventId,
     listeningKey: `${practiceId}:${audioItemId}:10`,
+    sampleSeq: 3,
     sessionId,
     isPlaying: true,
   });
@@ -467,10 +471,12 @@ function testClientPayload() {
     phase: "advance",
     clientEventId: eventId,
     listeningKey: `${practiceId}:${audioItemId}:10`,
+    sampleSeq: 3,
     sessionId,
     isPlaying: true,
   });
   assert.equal(body.client_event_id, eventId);
+  assert.equal(body.sample_seq, 3);
   assert.deepEqual(body, retry);
   assert.equal(body.listening_key, `${practiceId}:${audioItemId}:10`);
   assert.equal(body.playback_phase, "advance");
@@ -487,10 +493,134 @@ function testClientPayload() {
   assert.equal("listening_key" in legacy, false);
   assert.equal("playback_phase" in legacy, false);
 
+  const withoutSeq = buildListenStatsHeartbeatBody({
+    audioItemId,
+    positionMs: 1_000,
+    practiceId,
+    clientEventId: eventId,
+    phase: "pause",
+  });
+  assert.equal("sample_seq" in withoutSeq, false);
+  assert.equal("client_event_id" in withoutSeq, false);
+
+  resetPlaybackListeningContextForTests();
+  const key = `${practiceId}:${audioItemId}:10`;
+  assert.equal(nextPlaybackUsageSampleSeq(key), 1);
+  assert.equal(nextPlaybackUsageSampleSeq(key), 2);
+  assert.equal(nextPlaybackUsageSampleSeq(`${practiceId}:${audioItemId}:11`), 1);
+  resetPlaybackListeningContextForTests();
+
   const client = read("src/lib/listen/listen-stats-client.ts");
   assert.match(client, /const clientEventId = createPlaybackUsageEventId\(\)/);
   assert.match(client, /return postListenStats\(url, payload, false\)/);
   assert.match(client, /Same client_event_id on the single retry/);
+  assert.match(client, /nextPlaybackUsageSampleSeq\(listeningKey\)/);
+}
+
+function deliver(
+  state: PlaybackUsageContextState | null,
+  facts: Map<string, number>,
+  input: {
+    clientEventId: string;
+    sampleSeq: number;
+    positionMs: number;
+    nowMs: number;
+    phase?: PlaybackUsagePhase;
+    audioItemId?: string;
+  },
+) {
+  const result = applyPlaybackUsageSample(state, facts, {
+    audioItemId: input.audioItemId ?? "track-a",
+    positionMs: input.positionMs,
+    nowMs: input.nowMs,
+    phase: input.phase ?? "advance",
+    sampleSeq: input.sampleSeq,
+    clientEventId: input.clientEventId,
+  });
+  if (result.storeFact) {
+    facts.set(input.clientEventId, result.acceptedMs);
+  }
+  return result;
+}
+
+function factSum(facts: Map<string, number>): number {
+  let total = 0;
+  for (const value of facts.values()) {
+    total += value;
+  }
+  return total;
+}
+
+function testOutOfOrder() {
+  const facts = new Map<string, number>();
+  let state: PlaybackUsageContextState | null = null;
+
+  const seq2 = deliver(state, facts, {
+    clientEventId: "event-2",
+    sampleSeq: 2,
+    positionMs: 15_000,
+    nowMs: 0,
+  });
+  assert.equal(seq2.acceptedMs, 0);
+  assert.equal(seq2.storeFact, false);
+  assert.equal(seq2.state?.lastPositionMs, 15_000);
+  assert.equal(seq2.state?.lastSampleSeq, 2);
+  state = seq2.state;
+
+  const late = deliver(state, facts, {
+    clientEventId: "event-1",
+    sampleSeq: 1,
+    positionMs: 10_000,
+    nowMs: 1_000,
+  });
+  assert.equal(late.stale, true);
+  assert.equal(late.acceptedMs, 0);
+  assert.equal(late.storeFact, false);
+  assert.equal(late.state, state);
+  assert.equal(late.state?.lastPositionMs, 15_000);
+  assert.equal(late.state?.lastReportedAtMs, 0);
+  assert.equal(late.state?.audioItemId, "track-a");
+  assert.equal(late.state?.acceptedListenedMs, 0);
+  assert.equal(late.state?.lastSampleSeq, 2);
+
+  const seq3 = deliver(state, facts, {
+    clientEventId: "event-3",
+    sampleSeq: 3,
+    positionMs: 20_000,
+    nowMs: 5_000,
+  });
+  assert.equal(seq3.acceptedMs, 5_000);
+  assert.equal(seq3.storeFact, true);
+  state = seq3.state;
+  assert.equal(factSum(facts), 5_000);
+
+  const retry = deliver(state, facts, {
+    clientEventId: "event-3",
+    sampleSeq: 3,
+    positionMs: 20_000,
+    nowMs: 5_000,
+  });
+  assert.equal(retry.duplicate, true);
+  assert.equal(retry.acceptedMs, 5_000);
+  assert.equal(retry.storeFact, false);
+  assert.equal(factSum(facts), 5_000);
+
+  for (const phase of ["seek", "pause", "ended", "track_change"] as const) {
+    const before = state;
+    const sample = deliver(state, facts, {
+      clientEventId: `event-${phase}`,
+      sampleSeq: (state?.lastSampleSeq ?? 0) + 1,
+      positionMs: phase === "track_change" ? 0 : 20_000,
+      nowMs: 6_000,
+      phase,
+      audioItemId: phase === "track_change" ? "track-b" : "track-a",
+    });
+    assert.equal(sample.stale, false);
+    assert.equal(sample.storeFact, false);
+    assert.equal(sample.state?.lastSampleSeq, (before?.lastSampleSeq ?? 0) + 1);
+    state = sample.state;
+  }
+  assert.equal(factSum(facts), 5_000);
 }
 
 function testFormatting() {
@@ -510,7 +640,7 @@ function testFormatting() {
 }
 
 function testSourceContracts() {
-  const migration = read("supabase/migrations/20261126120000_playback_usage_facts.sql");
+  const migration = read("supabase/migrations/20261127120000_playback_usage_facts.sql");
   const rating = read("supabase/migrations/20260920120000_practice_listen_stats.sql");
   const player = read("src/components/audio/useSequentialPlayer.ts");
   const route = read("src/lib/listen/listen-stats-route.ts");
@@ -523,6 +653,21 @@ function testSourceContracts() {
 
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.playback_usage_facts/);
   assert.match(migration, /UNIQUE \(client_event_id\)/);
+  assert.match(migration, /p_sample_seq <= v_row\.last_sample_seq/);
+  assert.match(migration, /IF v_accepted > 0 THEN/);
+  assert.match(migration, /CHECK \(listened_ms > 0\)/);
+  assert.match(migration, /last_sample_seq bigint NOT NULL DEFAULT 0/);
+  const factsDdl = migration.slice(
+    migration.indexOf("CREATE TABLE IF NOT EXISTS public.playback_usage_facts"),
+    migration.indexOf("COMMENT ON TABLE public.playback_usage_facts"),
+  );
+  assert.doesNotMatch(factsDdl, /ON DELETE CASCADE/);
+  assert.doesNotMatch(factsDdl, /REFERENCES public\.practices/);
+  assert.doesNotMatch(factsDdl, /REFERENCES public\.audio_items/);
+  assert.doesNotMatch(factsDdl, /REFERENCES public\.authors/);
+  assert.match(factsDdl, /ON DELETE SET NULL/);
+  assert.match(factsDdl, /practice_id uuid NOT NULL/);
+  assert.match(factsDdl, /author_id_snapshot uuid NULL/);
   assert.match(migration, /listening_time_valid_from timestamptz NOT NULL/);
   assert.match(migration, /v_wall_cap := FLOOR\(v_elapsed_ms \* 1\.5\)/);
   assert.match(migration, /v_candidate > v_wall_cap \+ 2000 AND v_candidate > v_wall_cap \* 2/);
@@ -593,6 +738,7 @@ function printControlledTable() {
 testAcceptance();
 testListeningContext();
 testClientPayload();
+testOutOfOrder();
 testFormatting();
 testSourceContracts();
 printControlledTable();

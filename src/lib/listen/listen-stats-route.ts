@@ -68,6 +68,18 @@ function parseListeningKey(
   return trimmed;
 }
 
+function parseSampleSeq(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    return null;
+  }
+
+  if (value > Number.MAX_SAFE_INTEGER) {
+    return null;
+  }
+
+  return value;
+}
+
 function parseOptionalMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     return null;
@@ -212,6 +224,9 @@ export async function handleListenStatsPut(
   const phase = parsePlaybackPhase(
     "playback_phase" in body ? body.playback_phase : undefined,
   );
+  const sampleSeq = parseSampleSeq(
+    "sample_seq" in body ? body.sample_seq : undefined,
+  );
   const usageRequested =
     ("client_event_id" in body && body.client_event_id != null) ||
     ("listening_key" in body && body.listening_key != null) ||
@@ -271,16 +286,17 @@ export async function handleListenStatsPut(
       )
     : null;
 
-  if (usageRequested && (!clientEventId || !listeningKey || !phase)) {
+  if (usageRequested && (!clientEventId || !listeningKey || !phase || sampleSeq === null)) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   try {
     let acceptedUsageMs: number | null = null;
 
-    if (usageRequested && clientEventId && listeningKey && phase) {
+    if (usageRequested && clientEventId && listeningKey && phase && sampleSeq !== null) {
       const usage = await applyPlaybackUsageHeartbeat({
         clientEventId,
+        sampleSeq,
         listeningKey,
         userId,
         anonymousId,

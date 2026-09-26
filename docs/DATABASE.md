@@ -1015,7 +1015,7 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 
 ## playback_usage_facts (period listening time)
 
-Миграция: `supabase/migrations/20261126120000_playback_usage_facts.sql`.
+Миграция: `supabase/migrations/20261127120000_playback_usage_facts.sql`.
 
 Это **не** рейтинг и **не** замена `practice_listen_stats`.  
 `practice_listen_stats.real_listened_ms` остаётся накопленным MEDIA-TIME для eligibility (user_id NOT NULL, без дневной истории, анонимы не покрыты). Его **нельзя** суммировать за период.  
@@ -1027,19 +1027,24 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 |---------|------------|
 | `playback_usage_facts.id` | уникальный факт |
 | `client_event_id` | idempotency key одного физического heartbeat; UNIQUE |
+| `sample_seq` | монотонный номер сэмпла внутри `listening_key` |
 | `listening_key` | контекст `practiceId:audioItemId:startedAt`, тот же формат, что у ListenAnalyticsTracker |
-| `context_id` | строка `playback_usage_contexts` (baseline позиции) |
+| `context_id` | строка `playback_usage_contexts`; `ON DELETE SET NULL`, не CASCADE |
 | `session_id` | analytics session, если anonymous_id сессии совпал; иначе NULL |
 | `user_id` | NULL для анонима; SET NULL при удалении пользователя |
 | `anonymous_id` / `visitor_key` | существующая анонимная идентичность |
-| `practice_id` / `audio_item_id` | продукт и трек |
-| `listened_ms` | принятые миллисекунды этого тика, включая 0 |
+| `practice_id` / `audio_item_id` | снимки UUID без FK: удаление продукта или трека не удаляет факт |
+| `listened_ms` | принятые миллисекунды этого тика; в таблицу попадают только значения > 0 |
 | `occurred_at` | серверное время принятия |
 | `author_id_snapshot` | автор продукта на момент принятия; для будущего закрытого ledger |
 | `business_account_id`, `venue_id`, `billing_period_start`, `royalty_eligible_ms` | NULL-задел. Биллинг и royalty в этой миграции не считаются |
 | `playback_usage_contexts` | последняя позиция и сумма по контексту, чтобы следующий тик не доверял клиентской дельте |
 
-Правила принятия (зеркало `evaluatePlaybackUsageTick` / `apply_playback_usage_heartbeat`): первый сэмпл контекста +0; seek и смена трека +0 и новый baseline; отрицательная дельта +0; явный невозможный скачок (кандидат > wall×1.5+2000 и > wall×1.5×2) +0; иначе cap `min(дельта, wall×1.5, остаток lifetime×1.5)`. Client `playback_rate` только телеметрия и потолок 1.5 не поднимает. Повтор того же `client_event_id` возвращает уже принятые ms и не добавляет время. Пауза, ended и flush дописывают честный хвост по тем же правилам. Потеря последнего события может недосчитать до ~5 с и не может задвоить.
+Правила принятия (зеркало `evaluatePlaybackUsageTick` / `applyPlaybackUsageSample` / `apply_playback_usage_heartbeat`): клиент увеличивает `sample_seq` на каждый новый физический сэмпл, включая seek, pause, ended и смену трека. `sample_seq > last_sample_seq` обрабатывается. `sample_seq <= last_sample_seq` — устаревший порядок: accepted 0 и baseline (`last_position_ms`, `last_reported_at`, `audio_item_id`, сумма) не меняется. Первый сэмпл контекста +0; seek и смена трека +0 и новый baseline; отрицательная дельта +0; явный невозможный скачок (кандидат > wall×1.5+2000 и > wall×1.5×2) +0; иначе cap `min(дельта, wall×1.5, остаток lifetime×1.5)`. Нулевые сэмплы обновляют только строку контекста. Факт пишется только при `listened_ms > 0`. Client `playback_rate` только телеметрия и потолок 1.5 не поднимает. Повтор того же `client_event_id` возвращает уже принятые ms и не добавляет время. Пауза, ended и flush дописывают честный хвост по тем же правилам. Потеря последнего события может недосчитать до ~5 с и не может задвоить.
+
+FK факта: `user_id` → `auth.users` ON DELETE SET NULL, `session_id` → `analytics_sessions` ON DELETE SET NULL, `context_id` → `playback_usage_contexts` ON DELETE SET NULL. `practice_id`, `audio_item_id` и `author_id_snapshot` — снимки без FK. Удаление пользователя, практики, трека или автора не удаляет исторический факт. Контекст практики может исчезнуть вместе с продуктом (`practice_id` контекста ON DELETE CASCADE); цепочка до фактов этим не продолжается.
+
+Нагрузка v1 без нулевых строк фактов, один положительный факт примерно на 5 с реального воспроизведения: 20 одновременных слушателей ≈ 3,5×10⁵ строк/сутки; 100 ≈ 1,7×10⁶; 1 000 ≈ 1,7×10⁷; 100 площадок × 12 ч ≈ 8,6×10⁵; × 24 ч ≈ 1,7×10⁶. Rollup в v1 нет.
 
 Админ читает только `listened_ms > 0` через `playback_usage_admin_facts` (текущий `practices.author_id`, UTM/device через session-touch, те же исключения staff/test/bot). RPC: `admin_analytics_listening_time`, `admin_analytics_listening_time_timeseries`, расширенный `admin_analytics_p2_practices` (сорт `listened_ms`). Существующие summary/timeseries product-event RPC не переписаны.
 
