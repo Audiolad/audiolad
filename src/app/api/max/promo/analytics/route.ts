@@ -16,6 +16,13 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export const dynamic = "force-dynamic";
 export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 
+type CreateClient = typeof createServiceRoleClient;
+let createClientImpl: CreateClient | null = null;
+
+export function setMaxPromoAnalyticsClientForTests(impl: CreateClient | null) {
+  createClientImpl = impl;
+}
+
 function fail(reason: string, status: number) {
   return Response.json(
     { ok: false, reason },
@@ -110,7 +117,7 @@ export async function POST(request: Request) {
       : {};
 
   try {
-    const service = createServiceRoleClient();
+    const service = (createClientImpl ?? createServiceRoleClient)();
     const { data, error } = await service.rpc("insert_analytics_event", {
       p_event_name: eventName,
       p_practice_id: practiceId,
