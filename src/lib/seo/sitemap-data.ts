@@ -40,6 +40,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   priority: number;
 }> = [
   { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/b", changeFrequency: "weekly", priority: 0.8 },
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
   { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
