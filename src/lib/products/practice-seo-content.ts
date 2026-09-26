@@ -23,6 +23,8 @@ export type PublicRelatedProduct = {
   practiceId: string;
   title: string;
   href: string;
+  authorSlug: string;
+  slug: string;
   authorName: string | null;
   formatLabel: string | null;
   durationLabel: string | null;
@@ -262,6 +264,8 @@ export function mapPublicRelatedProduct(target: {
     practiceId,
     title,
     href: `/practice/${author.slug}/${slug}`,
+    authorSlug: author.slug,
+    slug,
     authorName: author.name,
     formatLabel: getDisplayFormat(typeof target.format === "string" ? target.format : null),
     durationLabel: formatProductDuration(

@@ -113,8 +113,10 @@ const navUse = home.indexOf("<MaxBottomNav");
 assert.ok(gate >= 0, "product detail stays on the catalog tab");
 assert.equal(home.split("<MaxAudioPlayer").length - 1, 1);
 assert.ok(player > gate, "player stays inside the catalog detail gate");
-assert.ok(navUse > player, "bottom nav is outside the detail overlay");
-assert.match(home, /\{selected \? null : \(\s*<MaxBottomNav/);
+assert.ok(navUse > player, "bottom nav stays after the detail player in source");
+assert.match(home, /<MaxBottomNav activeTab=\{activeTab\} onSelectTab=\{selectMaxTab\} \/>/);
+assert.doesNotMatch(home, /\{selected \? null : \(\s*<MaxBottomNav/);
+assert.match(home, /MAX_TAB_BAR_HEIGHT_PX/);
 assert.match(
   home,
   /← Назад в каталог[\s\S]*setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)|setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)[\s\S]*← Назад в каталог/,
@@ -125,6 +127,7 @@ const selectFn = home.slice(
   home.indexOf("const activeTabLabel"),
 );
 assert.match(selectFn, /if \(next === activeTab\)/);
+assert.match(selectFn, /if \(next === "catalog" && selected\) closeProductDetail\(\)/);
 assert.match(selectFn, /if \(activeTab === "catalog"\)/);
 assert.match(
   selectFn,
@@ -145,14 +148,12 @@ assert.match(home, /objectUrl: true/);
 assert.match(home, /Предпрослушивание пока недоступно/);
 assert.match(home, /Для прослушивания нужен доступ к продукту/);
 const readyHome = home.slice(home.indexOf('{detail.status === "ready" ?'));
+const detailView = read("src/components/max/MaxProductDetailView.tsx");
+assert.doesNotMatch(`${readyHome}\n${detailView}`, /detail\.product\.description|product\.description/);
+assert.match(detailView, /data-max-product-price/);
+assert.match(detailView, /product\.priceLabel/);
 assert.ok(
-  readyHome.indexOf("detail.product.priceLabel") < readyHome.indexOf("<MaxAudioPlayer"),
-);
-assert.ok(
-  readyHome.indexOf("<MaxAudioPlayer") < readyHome.indexOf("detail.product.description"),
-);
-assert.ok(
-  readyHome.indexOf("preview_unavailable") < readyHome.indexOf("detail.product.description"),
+  readyHome.indexOf("preview_unavailable") < readyHome.indexOf("<MaxAudioPlayer"),
 );
 
 assert.match(pkg, /"test:max-bottom-nav": "node scripts\/max-bottom-nav-unit\.mjs"/);

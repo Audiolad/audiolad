@@ -256,18 +256,17 @@ assert.match(audioFetch, /playbackTicket: playback\.playbackTicket/);
 assert.doesNotMatch(audioFetch, /initData/);
 assert.doesNotMatch(audioFetch, /authorSlug:/);
 assert.match(home, /Для прослушивания нужен доступ к продукту/);
-assert.match(home, /max-w-\[280px\]/);
+assert.doesNotMatch(home, /max-w-\[280px\]/);
 assert.doesNotMatch(home, /h-24\s+w-20/);
 const readyHome = home.slice(home.indexOf('{detail.status === "ready" ?'));
+const detailView = readFileSync(join(process.cwd(), "src/components/max/MaxProductDetailView.tsx"), "utf8");
+assert.doesNotMatch(`${readyHome}\n${detailView}`, /detail\.product\.description|О продукте|faqItems|usageItems/);
 assert.ok(
-  readyHome.indexOf("<MaxAudioPlayer") < readyHome.indexOf("detail.product.description"),
-  "detail description stays after MaxAudioPlayer",
+  detailView.indexOf("product.metaLine") < detailView.indexOf("{listenSlot}"),
+  "author and duration meta stay before the listen slot",
 );
-assert.ok(
-  readyHome.indexOf("detail.product.statsLabel") < readyHome.indexOf("<MaxAudioPlayer"),
-  "stats stay before MaxAudioPlayer",
-);
-assert.match(home, /!selected\.isFree/);
+assert.match(detailView, /!product\.isFree/);
+assert.match(home, /PLAY_ACTION_LABEL/);
 const catalogSearch = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
 assert.match(catalogSearch, /!product\.isFree/);
 

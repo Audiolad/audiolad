@@ -45,9 +45,13 @@ function string(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function safeIdempotencyKey(request: Request): string | null {
-  const key = request.headers.get("idempotency-key")?.trim();
+export function parseAppreciationIdempotencyKey(value: unknown): string | null {
+  const key = typeof value === "string" ? value.trim() : "";
   return key && key.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(key) ? key : null;
+}
+
+function safeIdempotencyKey(request: Request): string | null {
+  return parseAppreciationIdempotencyKey(request.headers.get("idempotency-key"));
 }
 
 export async function POST(request: Request) {
@@ -90,12 +94,6 @@ export async function POST(request: Request) {
   ) {
     return error("appreciation_unavailable", 404);
   }
-  let getCourseConfig: GetCourseConfig;
-  try {
-    getCourseConfig = getGetCourseConfig();
-  } catch {
-    return error("checkout_unavailable", 503);
-  }
 
   let userId: string | null = null;
   let email: string;
@@ -116,6 +114,51 @@ export async function POST(request: Request) {
     const guest = validateEmailFormat(string(body.guest_email) ?? "");
     if (!guest.ok) return error("guest_email_invalid", 400);
     email = guest.normalizedEmail;
+  }
+
+  return startAuthorAppreciationCheckout({
+    authorId,
+    practiceId,
+    surface,
+    amountMinor,
+    userId,
+    email,
+    idempotencyKey,
+  });
+}
+
+export async function startAuthorAppreciationCheckout(input: {
+  authorId: string;
+  practiceId: string | null;
+  surface: "author" | "product";
+  amountMinor: number;
+  userId: string | null;
+  email: string;
+  idempotencyKey: string;
+}): Promise<NextResponse> {
+  const {
+    authorId,
+    practiceId,
+    surface,
+    amountMinor,
+    userId,
+    email,
+    idempotencyKey,
+  } = input;
+  const rollout = getAuthorAppreciationRolloutConfig();
+  if (
+    !isAuthorAppreciationRolloutEnabled(rollout) ||
+    amountMinor < rollout.minAmountMinor ||
+    amountMinor > rollout.maxAmountMinor ||
+    amountMinor % 100 !== 0
+  ) {
+    return error("appreciation_unavailable", 404);
+  }
+  let getCourseConfig: GetCourseConfig;
+  try {
+    getCourseConfig = getGetCourseConfig();
+  } catch {
+    return error("checkout_unavailable", 503);
   }
 
   const service = createServiceRoleClient();

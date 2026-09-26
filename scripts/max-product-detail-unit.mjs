@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 const source = readFileSync(join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"), "utf8");
+const detailSource = readFileSync(join(process.cwd(), "src/components/max/MaxProductDetailView.tsx"), "utf8");
 const catalogSource = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
 assert.match(catalogSource, /key=\{`\$\{product\.authorSlug\}\/\$\{product\.slug\}`\}/);
 assert.match(catalogSource, /<ul[\s\S]*<li[\s\S]*<button/);
@@ -11,18 +12,27 @@ assert.match(source, /status: "error"/);
 assert.match(source, /AbortController/);
 assert.match(source, /controller\.abort/);
 assert.match(source, /formatMaxDuration/);
-assert.match(source, /detail\.product\.coverUrl/);
-assert.match(source, /aspect-square/);
-assert.match(source, /max-w-\[280px\]/);
-assert.match(source, /mx-auto/);
-assert.match(source, /object-cover/);
-assert.doesNotMatch(source, /h-48/);
-assert.doesNotMatch(source, /h-24\s+w-20/);
-assert.doesNotMatch(source, /window\.location|openLink|\/practice\/|audiolad\.ru/);
+assert.match(source, /readMaxProductDetail/);
+assert.match(detailSource, /product\.coverUrl/);
+assert.match(detailSource, /PracticeHeroGallery/);
+assert.match(detailSource, /FEATURED_CARD_CHIP_CLASS/);
+assert.match(detailSource, /FEATURED_CARD_TITLE_CLASS/);
+assert.match(detailSource, /FEATURED_CARD_SUBTITLE_CLASS/);
+assert.match(detailSource, /FEATURED_CARD_META_CLASS/);
+assert.match(detailSource, /data-practice-hero-type-chip/);
+assert.match(detailSource, /grid-cols-1/);
+assert.match(detailSource, /h-14 w-14/);
+assert.match(detailSource, /openCatalogProduct|onOpenRecommendation/);
+assert.doesNotMatch(detailSource, /grid-cols-2/);
+assert.doesNotMatch(detailSource, /max-w-\[280px\]/);
+assert.doesNotMatch(detailSource, /from "next\/link"|<Link/);
+assert.doesNotMatch(`${source}\n${detailSource}`, /h-48/);
+assert.doesNotMatch(`${source}\n${detailSource}`, /h-24\s+w-20/);
+assert.doesNotMatch(`${source}\n${detailSource}`, /window\.location|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 assert.doesNotMatch(source, /description:\s*string \| null/);
-assert.match(source, /Array\.isArray\(product\.topics\)/);
-assert.match(source, /Array\.isArray\(product\.recommendations\)/);
+assert.match(readFileSync(join(process.cwd(), "src/lib/max/product-view.ts"), "utf8"), /Array\.isArray\(value\.topics\)/);
+assert.match(readFileSync(join(process.cwd(), "src/lib/max/product-view.ts"), "utf8"), /Array\.isArray\(value\.recommendations\)/);
 
 const catalogStart = catalogSource.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">');
 assert.notEqual(catalogStart, -1, "catalog list exists");
@@ -64,68 +74,48 @@ assert.ok(
   catalogBlock.indexOf("product.authorName") < catalogBlock.indexOf("!product.isFree"),
   "catalog card shows author above paid price",
 );
-assert.match(source.slice(readyStart), /max-w-\[280px\]/);
-assert.match(source.slice(readyStart), /aspect-square/);
 const readyBlock = source.slice(readyStart);
-const headerEnd = Math.min(
-  ...["MaxAudioPlayer", 'playback.status === "loading"']
-    .map((marker) => readyBlock.indexOf(marker))
-    .filter((index) => index >= 0),
-);
-assert.ok(headerEnd > 0, "ready detail has a header before playback");
-const detailHeader = readyBlock.slice(0, headerEnd);
-assert.match(detailHeader, /detail\.product\.formatLabel/);
+assert.match(readyBlock, /PLAY_ACTION_LABEL/);
+assert.match(readyBlock, /<MaxAudioPlayer/);
 assert.match(catalogBlock, /product\.formatLabel/);
 assert.match(catalogBlock, /!product\.isFree/);
 assert.match(catalogBlock, /product\.priceLabel/);
 assert.doesNotMatch(catalogBlock, /priceLabel !== "Подарок"/);
-assert.match(readyBlock, /detail\.product\.formatLabel/);
-assert.match(readyBlock, /!detail\.product\.isFree/);
-assert.match(readyBlock, /detail\.product\.priceLabel/);
-assert.doesNotMatch(readyBlock, /priceLabel !== "Подарок"/);
+assert.match(detailSource, /product\.formatLabel/);
+assert.match(detailSource, /!product\.isFree/);
+assert.match(detailSource, /product\.priceLabel/);
+assert.doesNotMatch(`${readyBlock}\n${detailSource}`, /priceLabel !== "Подарок"/);
+assert.doesNotMatch(`${readyBlock}\n${detailSource}`, /Ещё от автора/);
+assert.match(detailSource, /product\.recommendationsTitle/);
+assert.match(detailSource, /Рекомендации автора|recommendationsTitle/);
+assert.match(detailSource, /aria-label="Темы практики"/);
+assert.match(detailSource, /Темы/);
+assert.doesNotMatch(detailSource, /product\.description|О продукте|Как слушать|Как использовать/);
 
+const coverIndex = detailSource.indexOf("product.coverUrl");
+const chipIndex = detailSource.indexOf('data-practice-hero-type-chip');
+assert.ok(coverIndex >= 0 && chipIndex > coverIndex, "cover is rendered before the type pill");
+const heroBody = detailSource.slice(chipIndex);
 const fieldOrder = [
-  "detail.product.coverUrl",
-  "detail.product.formatLabel",
-  "detail.product.title",
-  "detail.product.subtitle",
-  "detail.product.authorName",
-  "detail.product.statsLabel",
-  "detail.product.topics",
-  "detail.product.isFree",
-  "detail.product.priceLabel",
-  "MaxAudioPlayer",
-  "detail.product.contents",
-  "detail.product.recommendations",
+  "product.formatLabel",
+  "product.title",
+  "product.subtitle",
+  "product.metaLine",
+  "product.isFree",
+  "product.priceLabel",
+  "listenSlot",
+  "MaxProductRating",
+  "product.appreciation",
+  "product.topics",
+  "product.contents",
+  "product.recommendations",
 ];
 let lastIndex = -1;
 for (const field of fieldOrder) {
-  const index = readyBlock.indexOf(field);
-  assert.notEqual(index, -1, `ready UI renders ${field}`);
-  assert.ok(index > lastIndex, `ready UI order includes ${field} after previous field`);
+  const index = heroBody.indexOf(field);
+  assert.notEqual(index, -1, `detail UI renders ${field}`);
+  assert.ok(index > lastIndex, `detail UI order includes ${field} after previous field`);
   lastIndex = index;
 }
-
-assert.ok(
-  readyBlock.indexOf("detail.product.statsLabel") < readyBlock.indexOf("MaxAudioPlayer"),
-  "statsLabel is before player",
-);
-assert.ok(
-  readyBlock.indexOf("detail.product.priceLabel") < readyBlock.indexOf("MaxAudioPlayer"),
-  "paid price is before player",
-);
-assert.doesNotMatch(readyBlock, /detail\.product\.description/);
-assert.match(readyBlock, /aria-label="Темы продукта"/);
-assert.match(readyBlock, /Ещё от автора/);
-assert.match(readyBlock, /onClick=\{\(\) => openCatalogProduct\(product\)\}/);
-assert.ok(
-  readyBlock.indexOf("detail.product.topics") < readyBlock.indexOf("MaxAudioPlayer"),
-  "topics are before player",
-);
-assert.ok(
-  readyBlock.indexOf("detail.product.contents") <
-    readyBlock.indexOf("detail.product.recommendations"),
-  "recommendations are after the product content",
-);
 
 console.log("max-product-detail-unit: ok");
