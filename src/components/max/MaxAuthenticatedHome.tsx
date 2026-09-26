@@ -27,7 +27,22 @@ import { useEffect, useState } from "react";
 type MaxProductDetailState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; product: { title: string; subtitle: string | null; description: string | null; authorName: string | null; formatLabel: string; coverUrl: string | null; priceLabel: string; statsLabel: string | null; contents: Array<{ title: string; position: number; durationSeconds: number | null }> } }
+  | {
+      status: "ready";
+      product: {
+        title: string;
+        subtitle: string | null;
+        authorName: string | null;
+        formatLabel: string;
+        coverUrl: string | null;
+        priceLabel: string;
+        isFree: boolean;
+        statsLabel: string | null;
+        topics: Array<{ key: string; title: string }>;
+        contents: Array<{ title: string; position: number; durationSeconds: number | null }>;
+        recommendations: MaxCatalogProduct[];
+      };
+    }
   | { status: "not_found" }
   | { status: "error" };
 type MaxPlaybackState =
@@ -73,7 +88,12 @@ export default function MaxAuthenticatedHome() {
         if (controller.signal.aborted) return;
         if (status === 404) return setDetail({ status: "not_found" });
         const product = payload?.product;
-        if (product && Array.isArray(product.contents)) {
+        if (
+          product &&
+          Array.isArray(product.contents) &&
+          Array.isArray(product.topics) &&
+          Array.isArray(product.recommendations)
+        ) {
           setDetail({ status: "ready", product });
         } else setDetail({ status: "error" });
       })
@@ -188,7 +208,10 @@ export default function MaxAuthenticatedHome() {
                   className="mt-4 aspect-square w-full max-w-[280px] mx-auto rounded-2xl object-cover"
                 />
               ) : null}
-              <h2 className="mt-2 text-2xl font-semibold">{detail.product.title}</h2>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
+                {detail.product.formatLabel}
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold">{detail.product.title}</h2>
               {detail.product.subtitle ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.subtitle}</p>
               ) : null}
@@ -198,7 +221,19 @@ export default function MaxAuthenticatedHome() {
               {detail.product.statsLabel ? (
                 <p className="mt-2 text-sm text-[#6c5d94]">{detail.product.statsLabel}</p>
               ) : null}
-              {!selected.isFree ? (
+              {detail.product.topics.length ? (
+                <ul className="mt-3 flex flex-wrap gap-2" aria-label="Темы продукта">
+                  {detail.product.topics.map((topic) => (
+                    <li
+                      key={topic.key}
+                      className="rounded-full border border-[#ddcfef] bg-white px-3 py-1.5 text-xs font-medium text-[#7042c5]"
+                    >
+                      {topic.title}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {!detail.product.isFree ? (
                 <p className="mt-2 text-sm font-medium text-[#7042c5]">{detail.product.priceLabel}</p>
               ) : null}
               {playback.status === "loading" ? (
@@ -262,9 +297,6 @@ export default function MaxAuthenticatedHome() {
                   }}
                 />
               ) : null}
-              {detail.product.description ? (
-                <p className="mt-6 whitespace-pre-line text-sm text-[#4a3d73]">{detail.product.description}</p>
-              ) : null}
               {playback.status !== "ready" && detail.product.contents.length ? (
                 <ol className="mt-6 space-y-2 text-sm">
                   {detail.product.contents.map((track) => (
@@ -274,6 +306,53 @@ export default function MaxAuthenticatedHome() {
                     </li>
                   ))}
                 </ol>
+              ) : null}
+              {detail.product.recommendations.length ? (
+                <section className="mt-8 pb-6" aria-labelledby="max-author-recommendations-title">
+                  <h3
+                    id="max-author-recommendations-title"
+                    className="text-lg font-semibold text-[#25135c]"
+                  >
+                    Ещё от автора
+                  </h3>
+                  <ul className="mt-3 grid grid-cols-2 gap-2">
+                    {detail.product.recommendations.map((product) => (
+                      <li
+                        key={`${product.authorSlug}/${product.slug}`}
+                        className="min-w-0"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openCatalogProduct(product)}
+                          className="flex w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#eadff8] bg-white text-left shadow-[0_4px_14px_rgba(91,62,145,0.05)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        >
+                          <div className="aspect-square w-full bg-[#ede6f8]">
+                            {product.coverUrl ? (
+                              <img
+                                src={product.coverUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="px-2.5 pb-2.5 pt-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
+                              {product.formatLabel}
+                            </p>
+                            <p className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c]">
+                              {product.title}
+                            </p>
+                            {!product.isFree ? (
+                              <p className="mt-1 whitespace-nowrap text-xs font-semibold leading-4 text-[#7042c5]">
+                                {product.priceLabel}
+                              </p>
+                            ) : null}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
             </>
           ) : null}
