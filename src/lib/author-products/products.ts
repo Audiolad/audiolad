@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { catalogSectionColumnForInsert } from "@/lib/author-products/catalog-section-field";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
 import { musicAlbumSkipsDefaultAudioItem } from "@/lib/author-products/music-album-batch";
+import { normalizeLegacyMusicDraftPlaceholder } from "@/lib/author-products/server/normalize-legacy-music-draft-placeholder";
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -399,6 +400,22 @@ export async function getAuthorProductDetail(
     return null;
   }
 
+  const practiceRow = coercePracticeRow(practice as PracticeRow);
+  if (
+    practiceRow.product_kind === PRODUCT_KIND.MUSIC &&
+    practiceRow.status === "draft"
+  ) {
+    try {
+      await normalizeLegacyMusicDraftPlaceholder(practiceId);
+    } catch (error) {
+      console.error(
+        "legacy_music_draft_placeholder_normalize_failed",
+        practiceId,
+        error instanceof Error ? error.message : "unknown",
+      );
+    }
+  }
+
   const { data: audioItems, error: audioError } = await supabase
     .from("audio_items")
     .select(AUDIO_ITEM_DETAIL_SELECT)
@@ -409,7 +426,6 @@ export async function getAuthorProductDetail(
     throw new Error("audio_items_lookup_failed");
   }
 
-  const practiceRow = coercePracticeRow(practice as PracticeRow);
   const [contentLockedAfterSale, deleteLockedAfterPaidPurchase, gallerySlides, seoContent] =
     await Promise.all([
       resolveContentLockedAfterSale(practiceId),
