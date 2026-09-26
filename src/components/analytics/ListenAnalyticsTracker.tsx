@@ -34,6 +34,7 @@ import {
   isListeningCompleted,
   updateListeningProgressState,
 } from "@/lib/analytics/listening";
+import { publishAnalyticsListeningKey } from "@/lib/analytics/listening-context-store";
 import {
   rememberContinuousListenCompleted,
   rememberContinuousListenPlayStarted,
@@ -230,6 +231,12 @@ export default function ListenAnalyticsTracker({
     });
 
     context.listeningSessionKey = listeningKey;
+    publishAnalyticsListeningKey({
+      practiceId,
+      audioItemId: trackId,
+      startedAt: context.listeningStartedAt,
+      listeningKey,
+    });
     noteListenTrackerPlayingActivity(context, now);
 
     emitPlayStarted({
@@ -392,6 +399,12 @@ function flushPendingEntry(input: {
     context.playStarted = true;
     context.listeningStartedAt = entry.listeningContextId;
     context.listeningSessionKey = listeningKey;
+    publishAnalyticsListeningKey({
+      practiceId: entry.practiceId,
+      audioItemId: entry.trackId,
+      startedAt: entry.listeningContextId,
+      listeningKey,
+    });
     noteListenTrackerPlayingActivity(context, now);
   }
 

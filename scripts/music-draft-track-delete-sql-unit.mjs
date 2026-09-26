@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20261126120000_music_draft_track_teardown.sql";
+const migrationName = "20261126130000_music_draft_track_teardown.sql";
 const sql = readFileSync(join(repoRoot, "supabase/migrations", migrationName), "utf8");
 const smoke = readFileSync(
   join(repoRoot, "supabase/tests/music_draft_track_teardown_smoke.sql"),
@@ -28,7 +28,7 @@ assert(existsSync(join(repoRoot, "supabase/migrations", migrationName)), "teardo
 const names = readdirSync(join(repoRoot, "supabase/migrations")).filter((name) => name.endsWith(".sql"));
 const versions = names.map((name) => name.match(/^(\d{14})_/)?.[1]).filter(Boolean);
 assert(new Set(versions).size === versions.length, "no duplicate migration timestamps");
-assert(versions.includes("20261126120000"), "teardown version listed");
+assert(versions.includes("20261126130000"), "teardown version listed");
 
 const teardown = functionBody(sql, "teardown_music_track_delivery");
 const markers = [

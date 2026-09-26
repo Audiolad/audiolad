@@ -97,6 +97,9 @@ export default function AdminAnalyticsFunnelPanel({
           <p className="mt-1 text-sm text-[#796ba0]">
             События и интенсивность использования, а не уникальные люди.
           </p>
+          {overview.listeningTimeNotice ? (
+            <p className="mt-1 text-sm text-[#7042c5]">{overview.listeningTimeNotice}</p>
+          ) : null}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
@@ -107,6 +110,21 @@ export default function AdminAnalyticsFunnelPanel({
               label: "Запусков на слушателя",
               value: overview.startsPerListener,
               suffix: "события / человек",
+            },
+            {
+              label: "Время прослушивания",
+              value: overview.listeningTimeLabel,
+              suffix: "доверенное MEDIA-TIME",
+            },
+            {
+              label: "Среднее время на слушателя",
+              value: overview.averagePerListenerLabel,
+              suffix: "время / уникальный слушатель",
+            },
+            {
+              label: "Среднее время на запуск",
+              value: overview.averagePerStartLabel,
+              suffix: "время / audio_play_started",
             },
           ].map((metric) => (
             <article

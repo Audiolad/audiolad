@@ -118,6 +118,42 @@ export const ADMIN_METRIC_DEFINITIONS: AdminMetricDefinition[] = [
     comparableToMetrika: false,
   },
   {
+    key: "listening_time",
+    label: "Время прослушивания",
+    shortDescription: "Сумма доверенного MEDIA-TIME с момента включения учёта.",
+    kind: "event",
+    sqlSource: "playback_usage_facts.listened_ms → admin_analytics_listening_time",
+    formula: "SUM(server-accepted listened_ms)",
+    filters: "period, staff/test/bot, author/practice/utm/device (session-touch)",
+    comparableToMetrika: false,
+  },
+  {
+    key: "avg_listen_per_listener",
+    label: "Среднее время на слушателя",
+    shortDescription:
+      "Измеренное время / уникальные слушатели audio_play_started в том же измеренном окне.",
+    kind: "ratio",
+    sqlSource: "admin_analytics_listening_time.measured_listeners",
+    formula:
+      "SUM(listened_ms) / COUNT(DISTINCT visitor_key of audio_play_started) за effective_from..selected_to",
+    filters:
+      "effective_from = max(selected_from, listening_time_valid_from); All берёт valid_from. Те же includeTest, author, practice, UTM, device. Карточки слушателей периода не меняются.",
+    comparableToMetrika: false,
+  },
+  {
+    key: "avg_listen_per_start",
+    label: "Среднее время на запуск",
+    shortDescription:
+      "Измеренное время / audio_play_started в том же измеренном окне.",
+    kind: "ratio",
+    sqlSource: "admin_analytics_listening_time.measured_play_starts",
+    formula:
+      "SUM(listened_ms) / COUNT(audio_play_started) за effective_from..selected_to",
+    filters:
+      "то же измеренное окно, что у среднего на слушателя. Карточка запусков периода не меняется.",
+    comparableToMetrika: false,
+  },
+  {
     key: "saves",
     label: "Сохранили практику в Аудиотеку",
     shortDescription: "События first_manual_library_save.",

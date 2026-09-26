@@ -13,6 +13,12 @@ import {
   type AdminAnalyticsPeriod,
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
+import {
+  listeningAverageLabels,
+  formatListeningDuration,
+  formatListeningTimeNotice,
+  listenedMsToChartMinutes,
+} from "@/lib/admin/format-listening-time";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type AdminAnalyticsMetricCard = {
@@ -85,6 +91,13 @@ export type AdminAnalyticsProductOverview = {
   conversionToListening: string;
   completionByListeners: string;
   startsPerListener: string;
+  listenedMs: number | null;
+  listeningTimeLabel: string;
+  averagePerListenerLabel: string;
+  averagePerStartLabel: string;
+  listeningTimeNotice: string | null;
+  listeningTimeUnmeasured: boolean;
+  listeningTimePartial: boolean;
   newListeners: number;
   returningListeners: number;
   repeatListeners: number;
@@ -105,6 +118,8 @@ export type AdminAnalyticsTimeseriesPoint = {
   listeners: number;
   completions: number;
   saves: number;
+  listenedMs: number | null;
+  listenedMinutes: number | null;
 };
 
 export type AdminAnalyticsPracticeRow = {
@@ -125,6 +140,8 @@ export type AdminAnalyticsPracticeRow = {
   uniqueSavers: number;
   viewToPlayRate: string;
   playToCompleteRate: string;
+  listenedMs: number | null;
+  listeningTimeLabel: string;
 };
 
 export type AdminAnalyticsAuthorRow = {
@@ -211,6 +228,9 @@ export type AdminAnalyticsDashboard = {
     page: number;
     pageSize: number;
     error: string | null;
+    listeningTimeValidFrom: string | null;
+    listeningTimePartial: boolean;
+    listeningTimeUnmeasured: boolean;
   };
   authors: {
     total: number;
@@ -279,6 +299,67 @@ type SummarySnapshot = {
     savers?: number;
   } | null;
 };
+
+function asOptionalIso(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function presentListeningTime(
+  raw: {
+    listened_ms?: number | null;
+    measured_listeners?: number | null;
+    measured_play_starts?: number | null;
+    valid_from?: string | null;
+    partial?: boolean;
+    unmeasured?: boolean;
+  } | null,
+  unavailable = false,
+): Pick<
+  AdminAnalyticsProductOverview,
+  | "listenedMs"
+  | "listeningTimeLabel"
+  | "averagePerListenerLabel"
+  | "averagePerStartLabel"
+  | "listeningTimeNotice"
+  | "listeningTimeUnmeasured"
+  | "listeningTimePartial"
+> {
+  if (unavailable || !raw) {
+    return {
+      listenedMs: null,
+      listeningTimeLabel: "—",
+      averagePerListenerLabel: "—",
+      averagePerStartLabel: "—",
+      listeningTimeNotice: "Время прослушивания временно недоступно",
+      listeningTimeUnmeasured: true,
+      listeningTimePartial: false,
+    };
+  }
+
+  const unmeasured = raw.unmeasured === true || raw.listened_ms == null;
+  const partial = raw.partial === true;
+  const listenedMs = unmeasured ? null : asNonNegativeInt(raw.listened_ms);
+  const validFrom = asOptionalIso(raw.valid_from);
+  const averages = listeningAverageLabels(
+    listenedMs,
+    asNonNegativeInt(raw.measured_listeners),
+    asNonNegativeInt(raw.measured_play_starts),
+  );
+
+  return {
+    listenedMs,
+    listeningTimeLabel:
+      listenedMs == null ? "—" : formatListeningDuration(listenedMs),
+    averagePerListenerLabel: averages.perListener,
+    averagePerStartLabel: averages.perStart,
+    listeningTimeNotice:
+      validFrom && (partial || unmeasured)
+        ? formatListeningTimeNotice(validFrom)
+        : null,
+    listeningTimeUnmeasured: unmeasured,
+    listeningTimePartial: partial,
+  };
+}
 
 function asNonNegativeInt(value: unknown): number {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -551,6 +632,13 @@ function buildProductOverview(
     conversionToListening: formatAdminPercent(listeners, practiceVisitors),
     completionByListeners: formatAdminPercent(completers, listeners),
     startsPerListener: formatAdminDecimal(playStarts, listeners),
+    listenedMs: null,
+    listeningTimeLabel: "—",
+    averagePerListenerLabel: "—",
+    averagePerStartLabel: "—",
+    listeningTimeNotice: null,
+    listeningTimeUnmeasured: false,
+    listeningTimePartial: false,
     newListeners: asNonNegativeInt(raw.new_listeners),
     returningListeners: asNonNegativeInt(raw.returning_listeners),
     repeatListeners: asNonNegativeInt(raw.repeat_listeners),
@@ -579,6 +667,8 @@ function mapTimeseriesPoints(raw: unknown): AdminAnalyticsTimeseriesPoint[] {
       listeners: asNonNegativeInt(record.listeners),
       completions: asNonNegativeInt(record.completions),
       saves: asNonNegativeInt(record.saves),
+      listenedMs: null,
+      listenedMinutes: null,
     };
   }).filter((row) => row.bucket);
 }
@@ -711,9 +801,25 @@ function mapPracticeRows(
         uniqueSavers: asNonNegativeInt(row.uniqueSavers ?? row.unique_savers),
         viewToPlayRate: formatAdminPercent(playStarts, views),
         playToCompleteRate: formatAdminPercent(completions, playStarts),
+        ...presentPracticeListeningTime(row.listenedMs ?? row.listened_ms),
       };
     })
     .filter((row) => row.practiceId);
+}
+
+function presentPracticeListeningTime(value: unknown): {
+  listenedMs: number | null;
+  listeningTimeLabel: string;
+} {
+  if (value == null || value === "") {
+    return { listenedMs: null, listeningTimeLabel: "—" };
+  }
+
+  const listenedMs = asNonNegativeInt(value);
+  return {
+    listenedMs,
+    listeningTimeLabel: formatListeningDuration(listenedMs),
+  };
 }
 
 function mapAuthorRows(
@@ -835,7 +941,8 @@ export async function getAdminAnalyticsSummaryBundle(
   const generatedAt = new Date().toISOString();
   const service = createServiceRoleClient();
 
-  const [summaryRes, overviewRes, timeseriesRes, filterOptions] = await Promise.all([
+  const [summaryRes, overviewRes, timeseriesRes, listeningRes, listeningSeriesRes, filterOptions] =
+    await Promise.all([
     service.rpc("admin_analytics_p2_summary", {
       ...sharedFilters,
       p_prev_from: previous?.from ?? null,
@@ -843,6 +950,8 @@ export async function getAdminAnalyticsSummaryBundle(
     }),
     service.rpc("analytics_owner_overview", sharedFilters),
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
+    service.rpc("admin_analytics_listening_time", sharedFilters),
+    service.rpc("admin_analytics_listening_time_timeseries", sharedFilters),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
@@ -857,9 +966,51 @@ export async function getAdminAnalyticsSummaryBundle(
     granularity?: string;
     points?: unknown;
   };
-  const points = timeseriesRes.error
+  const basePoints = timeseriesRes.error
     ? []
     : mapTimeseriesPoints(timeseriesData.points);
+  const listeningSnapshot = (listeningRes.data ?? null) as {
+    listened_ms?: number | null;
+    measured_listeners?: number | null;
+    measured_play_starts?: number | null;
+    valid_from?: string | null;
+    partial?: boolean;
+    unmeasured?: boolean;
+  } | null;
+  const overviewBase = buildProductOverview(
+    (overviewRes.data ?? {}) as Record<string, unknown>,
+  );
+  const listeningTime = presentListeningTime(
+    listeningRes.error ? null : listeningSnapshot,
+    Boolean(listeningRes.error),
+  );
+  const listeningByBucket = new Map<string, number | null>();
+  const listeningSeries = (listeningSeriesRes.data ?? {}) as { points?: unknown };
+  if (!listeningSeriesRes.error && Array.isArray(listeningSeries.points)) {
+    for (const row of listeningSeries.points) {
+      const record = (row ?? {}) as Record<string, unknown>;
+      const bucket = typeof record.bucket === "string" ? record.bucket : "";
+      if (!bucket) continue;
+      const rawMs = record.listened_ms ?? record.listenedMs;
+      listeningByBucket.set(
+        bucket,
+        rawMs == null ? null : asNonNegativeInt(rawMs),
+      );
+    }
+  }
+  const points = basePoints.map((point) => {
+    const listenedMs = listeningSeriesRes.error
+      ? null
+      : listeningByBucket.has(point.bucket)
+        ? (listeningByBucket.get(point.bucket) ?? null)
+        : null;
+    return {
+      ...point,
+      listenedMs,
+      listenedMinutes:
+        listenedMs == null ? null : listenedMsToChartMinutes(listenedMs),
+    };
+  });
 
   return {
     period,
@@ -876,7 +1027,10 @@ export async function getAdminAnalyticsSummaryBundle(
     ),
     audience: buildAudience(summary),
     kpi: buildKpi(summary, points),
-    productOverview: buildProductOverview((overviewRes.data ?? {}) as Record<string, unknown>),
+    productOverview: {
+      ...overviewBase,
+      ...listeningTime,
+    },
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,
     purchasesPlaceholder:
@@ -932,6 +1086,9 @@ export async function getAdminAnalyticsBreakdownBundle(
   const practicesData = (practicesRes.data ?? {}) as {
     total?: number;
     rows?: Array<Record<string, unknown>>;
+    listeningTimeValidFrom?: string | null;
+    listeningTimePartial?: boolean;
+    listeningTimeUnmeasured?: boolean;
   };
   const authorsData = (authorsRes.data ?? {}) as {
     total?: number;
@@ -951,6 +1108,9 @@ export async function getAdminAnalyticsBreakdownBundle(
       page: practicesPage,
       pageSize: practicesLimit,
       error: practicesRes.error?.message ?? null,
+      listeningTimeValidFrom: asOptionalIso(practicesData.listeningTimeValidFrom),
+      listeningTimePartial: practicesData.listeningTimePartial === true,
+      listeningTimeUnmeasured: practicesData.listeningTimeUnmeasured === true,
     },
     authors: {
       total: asNonNegativeInt(authorsData.total),

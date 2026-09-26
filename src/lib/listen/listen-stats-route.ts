@@ -10,11 +10,75 @@ import {
 } from "@/lib/listen/listen-stats-access";
 import { getOwnPracticeListenStats } from "@/lib/listen/listen-stats";
 import { applyOwnPracticeListenStatsHeartbeat } from "@/lib/listen/listen-stats-write";
+import { applyPlaybackUsageHeartbeat } from "@/lib/listen/playback-usage-write";
+import type { PlaybackUsagePhase } from "@/lib/listen/playback-usage";
 import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 const MAX_ANONYMOUS_ID_LENGTH = 128;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseUuid(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return UUID_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+function parsePlaybackPhase(value: unknown): PlaybackUsagePhase | null {
+  if (
+    value === "advance" ||
+    value === "seek" ||
+    value === "pause" ||
+    value === "ended" ||
+    value === "track_change"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function parseListeningKey(
+  value: unknown,
+  practiceId: string,
+  audioItemId: string,
+): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const parts = trimmed.split(":");
+
+  if (
+    parts.length !== 3 ||
+    parts[0] !== practiceId ||
+    parts[1] !== audioItemId ||
+    !/^\d+$/.test(parts[2]) ||
+    trimmed.length > 200
+  ) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function parseSampleSeq(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    return null;
+  }
+
+  if (value > Number.MAX_SAFE_INTEGER) {
+    return null;
+  }
+
+  return value;
+}
 
 function parseOptionalMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
@@ -108,26 +172,17 @@ export async function handleListenStatsPut(
   }
 
   const { supabase, userId, practice, access } = loaded.context;
-
-  if (!userId) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
   const isCourse = isCoursePublication(
     practice.publication_class,
     practice.product_kind,
   );
 
-  if (
-    !canAccrueListenStats({
-      userId,
-      access,
-      isCourse,
-      productKind: practice.product_kind,
-    })
-  ) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const accrueRating = canAccrueListenStats({
+    userId,
+    access,
+    isCourse,
+    productKind: practice.product_kind,
+  });
 
   let body: unknown;
 
@@ -157,9 +212,25 @@ export async function handleListenStatsPut(
   const playbackRate = parseOptionalRate(
     "playback_rate" in body ? body.playback_rate : undefined,
   );
-  parseOptionalAnonymousId(
+  const anonymousId = parseOptionalAnonymousId(
     "audiolad_anonymous_id" in body ? body.audiolad_anonymous_id : undefined,
   );
+  const clientEventId = parseUuid(
+    "client_event_id" in body ? body.client_event_id : undefined,
+  );
+  const sessionId = parseUuid(
+    "analytics_session_id" in body ? body.analytics_session_id : undefined,
+  );
+  const phase = parsePlaybackPhase(
+    "playback_phase" in body ? body.playback_phase : undefined,
+  );
+  const sampleSeq = parseSampleSeq(
+    "sample_seq" in body ? body.sample_seq : undefined,
+  );
+  const usageRequested =
+    ("client_event_id" in body && body.client_event_id != null) ||
+    ("listening_key" in body && body.listening_key != null) ||
+    ("playback_phase" in body && body.playback_phase != null);
 
   if (!audioItemId || audioItemId.startsWith("legacy-") || positionMs === null) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
@@ -200,17 +271,67 @@ export async function handleListenStatsPut(
     clientMediaDeltaMs ??
     (priorPositionMs !== null ? Math.max(0, positionMs - priorPositionMs) : null);
 
+  if (!accrueRating && !usageRequested) {
+    return NextResponse.json(
+      { error: userId ? "forbidden" : "unauthorized" },
+      { status: userId ? 403 : 401 },
+    );
+  }
+
+  const listeningKey = usageRequested
+    ? parseListeningKey(
+        "listening_key" in body ? body.listening_key : undefined,
+        practice.id,
+        audioItemId,
+      )
+    : null;
+
+  if (usageRequested && (!clientEventId || !listeningKey || !phase || sampleSeq === null)) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
   try {
-    const ownState = await applyOwnPracticeListenStatsHeartbeat({
-      userId,
-      practiceId: practice.id,
-      audioItemId,
-      positionMs,
-      allowEligibility: canBecomeRatingEligible(access),
-      clientMediaDeltaMs: derivedClientDelta,
-      playbackRate,
+    let acceptedUsageMs: number | null = null;
+
+    if (usageRequested && clientEventId && listeningKey && phase && sampleSeq !== null) {
+      const usage = await applyPlaybackUsageHeartbeat({
+        clientEventId,
+        sampleSeq,
+        listeningKey,
+        userId,
+        anonymousId,
+        sessionId,
+        practiceId: practice.id,
+        audioItemId,
+        positionMs,
+        clientMediaDeltaMs: derivedClientDelta,
+        playbackRate,
+        phase,
+      });
+      acceptedUsageMs = usage.acceptedMs;
+    }
+
+    if (accrueRating && userId) {
+      const ownState = await applyOwnPracticeListenStatsHeartbeat({
+        userId,
+        practiceId: practice.id,
+        audioItemId,
+        positionMs,
+        allowEligibility: canBecomeRatingEligible(access),
+        clientMediaDeltaMs: derivedClientDelta,
+        playbackRate,
+      });
+      return NextResponse.json(
+        acceptedUsageMs == null ? ownState : { ...ownState, acceptedUsageMs },
+      );
+    }
+
+    return NextResponse.json({
+      realListenedMs: 0,
+      ratingEligible: false,
+      ratingEligibleAt: null,
+      acceptedUsageMs,
     });
-    return NextResponse.json(ownState);
   } catch (error) {
     console.error("listen_stats_put_error", error);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });

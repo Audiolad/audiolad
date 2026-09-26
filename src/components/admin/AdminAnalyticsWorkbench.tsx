@@ -43,6 +43,9 @@ const emptyBreakdown: AdminAnalyticsBreakdownBundle = {
     page: 1,
     pageSize: 25,
     error: null,
+    listeningTimeValidFrom: null,
+    listeningTimePartial: false,
+    listeningTimeUnmeasured: false,
   },
   authors: {
     total: 0,
@@ -354,6 +357,7 @@ export default function AdminAnalyticsWorkbench({
         points={summary.timeseries.points}
         granularity={summary.timeseries.granularity}
         error={summary.timeseries.error}
+        listeningTimeNotice={summary.productOverview.listeningTimeNotice}
       />
 
       <AdminAnalyticsBreakdownPanel
