@@ -72,9 +72,9 @@ const headerEnd = Math.min(
     .map((marker) => readyBlock.indexOf(marker))
     .filter((index) => index >= 0),
 );
-assert.ok(headerEnd > 0, "ready detail has a header before playback/description");
+assert.ok(headerEnd > 0, "ready detail has a header before playback");
 const detailHeader = readyBlock.slice(0, headerEnd);
-assert.doesNotMatch(detailHeader, /detail\.product\.formatLabel/);
+assert.match(detailHeader, /detail\.product\.formatLabel/);
 assert.match(catalogBlock, /product\.formatLabel/);
 assert.match(catalogBlock, /!product\.isFree/);
 assert.match(catalogBlock, /product\.priceLabel/);
@@ -86,9 +86,6 @@ assert.doesNotMatch(readyBlock, /priceLabel !== "Подарок"/);
 
 const fieldOrder = [
   "detail.product.coverUrl",
-  "detail.product.title",
-  "detail.product.subtitle",
-  "detail.product.authorName",
   "detail.product.formatLabel",
   "detail.product.title",
   "detail.product.subtitle",
