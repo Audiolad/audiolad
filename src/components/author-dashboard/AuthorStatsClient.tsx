@@ -30,6 +30,11 @@ import type {
   AuthorStatsSummary,
   AuthorStatsTimeseriesPoint,
 } from "@/lib/author-stats/types";
+import {
+  formatAverageListening,
+  formatListeningDuration,
+  formatListeningTimeNotice,
+} from "@/lib/admin/format-listening-time";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type AuthorStatsClientProps = {
@@ -76,7 +81,7 @@ function Section({
 function pointValue(
   point: AuthorStatsTimeseriesPoint,
   metric: AuthorStatsChartMetric,
-): number {
+): number | null {
   switch (metric) {
     case "practice_views":
       return point.practiceViews;
@@ -104,6 +109,8 @@ function pointValue(
       return point.appreciationGrossMinor;
     case "appreciation_author_accrued":
       return point.appreciationAuthorAccruedMinor;
+    case "listening_time":
+      return point.listenedMs;
     default:
       return 0;
   }
@@ -116,6 +123,50 @@ function formatRubMinor(value: number): string {
   })} ₽`;
 }
 
+function formatPointMetric(
+  metric: AuthorStatsChartMetric,
+  value: number | null,
+): string {
+  if (metric === "listening_time") {
+    return value == null ? "—" : formatListeningDuration(value);
+  }
+  if (
+    metric === "appreciation_gross" ||
+    metric === "appreciation_author_accrued"
+  ) {
+    return formatRubMinor(value ?? 0);
+  }
+  return formatAuthorStatsCount(value ?? 0);
+}
+
+function formatListeningCard(ms: number | null): string {
+  return ms == null ? "—" : formatListeningDuration(ms);
+}
+
+function formatListeningAverage(
+  listenedMs: number | null,
+  denominator: number | null,
+): string {
+  if (listenedMs == null || denominator == null) return "—";
+  return formatAverageListening(listenedMs, denominator);
+}
+
+function buildListeningGapPath(
+  coords: Array<{ x: number; y: number | null }>,
+): string {
+  let segmentStart = true;
+  let path = "";
+  for (const coord of coords) {
+    if (coord.y == null) {
+      segmentStart = true;
+      continue;
+    }
+    path += `${segmentStart ? "M" : "L"}${coord.x},${coord.y}`;
+    segmentStart = false;
+  }
+  return path;
+}
+
 function StatsSparkline({
   points,
   metric,
@@ -124,7 +175,10 @@ function StatsSparkline({
   metric: AuthorStatsChartMetric;
 }) {
   const values = points.map((point) => pointValue(point, metric));
-  const max = Math.max(...values, 0);
+  const numericValues = values.filter((value): value is number => value != null);
+  const max = Math.max(...numericValues, 0);
+  const listeningUnmeasured =
+    metric === "listening_time" && numericValues.length === 0;
   const width = 640;
   const height = 180;
   const padX = 12;
@@ -138,13 +192,17 @@ function StatsSparkline({
         ? padX + innerW / 2
         : padX + (index / (values.length - 1)) * innerW;
     const y =
-      max <= 0
-        ? padY + innerH
-        : padY + innerH - (value / max) * innerH;
+      value == null
+        ? null
+        : max <= 0
+          ? padY + innerH
+          : padY + innerH - (value / max) * innerH;
     return { x, y, value, date: points[index]?.date ?? "" };
   });
 
-  const polyline = coords.map((c) => `${c.x},${c.y}`).join(" ");
+  const listeningGaps = values.some((value) => value == null);
+  const polyline = coords.map((c) => `${c.x},${c.y ?? padY + innerH}`).join(" ");
+  const gapPath = buildListeningGapPath(coords);
   const [active, setActive] = useState<number | null>(null);
 
   if (points.length === 0) {
@@ -171,7 +229,7 @@ function StatsSparkline({
           stroke="#eadff8"
           strokeWidth="1"
         />
-        {max > 0 ? (
+        {max > 0 && !listeningGaps ? (
           <polyline
             fill="none"
             stroke="#7042c5"
@@ -181,7 +239,18 @@ function StatsSparkline({
             points={polyline}
           />
         ) : null}
-        {coords.map((c, index) => (
+        {max > 0 && listeningGaps && gapPath ? (
+          <path
+            d={gapPath}
+            fill="none"
+            stroke="#7042c5"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ) : null}
+        {coords.map((c, index) =>
+          c.y == null ? null : (
           <circle
             key={`${c.date}-${index}`}
             cx={c.x}
@@ -194,23 +263,20 @@ function StatsSparkline({
             onBlur={() => setActive(null)}
             tabIndex={0}
             role="img"
-            aria-label={`${c.date}: ${
-              metric === "appreciation_gross" ||
-              metric === "appreciation_author_accrued"
-                ? formatRubMinor(c.value)
-                : formatAuthorStatsCount(c.value)
-            }`}
+            aria-label={`${c.date}: ${formatPointMetric(metric, c.value)}`}
           />
         ))}
       </svg>
+      {listeningUnmeasured ? (
+        <p className="mt-2 text-sm text-[#7d70a2]">
+          За эти дни время прослушивания ещё не измерялось.
+        </p>
+      ) : null}
       {active !== null && coords[active] ? (
         <p className="mt-2 text-sm text-[#2b2145]">
           {coords[active].date}:{" "}
           <span className="font-semibold">
-            {metric === "appreciation_gross" ||
-            metric === "appreciation_author_accrued"
-              ? formatRubMinor(coords[active].value)
-              : formatAuthorStatsCount(coords[active].value)}
+            {formatPointMetric(metric, coords[active].value)}
           </span>
         </p>
       ) : (
@@ -234,12 +300,7 @@ function StatsSparkline({
             {coords.map((c) => (
               <tr key={c.date} className="border-b border-[#f4eefb]">
                 <td className="py-1 pr-3">{c.date}</td>
-                <td className="py-1">
-                  {metric === "appreciation_gross" ||
-                  metric === "appreciation_author_accrued"
-                    ? formatRubMinor(c.value)
-                    : formatAuthorStatsCount(c.value)}
-                </td>
+                <td className="py-1">{formatPointMetric(metric, c.value)}</td>
               </tr>
             ))}
           </tbody>
@@ -385,12 +446,13 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
 
   const hasAnyActivity =
     summary !== null &&
-    (summary.authorPageViews > 0 ||
+    (      summary.authorPageViews > 0 ||
       summary.practiceViews > 0 ||
       summary.plays > 0 ||
       summary.librarySaves > 0 ||
       summary.grossPurchases > 0 ||
-      summary.appreciationCount > 0);
+      summary.appreciationCount > 0 ||
+      (summary.listenedMs ?? 0) > 0);
 
   const anyError =
     summaryState === "error" ||
@@ -480,7 +542,37 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
           </Section>
 
           <Section title="Прослушивания, действия и продажи">
+            {summary.listeningTimeValidFrom ? (
+              <p className="text-sm text-[#7042c5]">
+                {formatListeningTimeNotice(summary.listeningTimeValidFrom)}
+              </p>
+            ) : null}
+            {summary.listeningAveragesWithheld ? (
+              <p className="text-sm text-[#7d70a2]">
+                Среднее время не считаем: в сумме есть прослушивания продукта,
+                который вам больше не принадлежит, и для них нет сопоставимого
+                числа запусков. Историческую сумму на оставшиеся запуски не делим.
+              </p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Время прослушивания"
+                value={formatListeningCard(summary.listenedMs)}
+              />
+              <MetricCard
+                label="Среднее время на слушателя"
+                value={formatListeningAverage(
+                  summary.listenedMs,
+                  summary.measuredListeners,
+                )}
+              />
+              <MetricCard
+                label="Среднее время на запуск"
+                value={formatListeningAverage(
+                  summary.listenedMs,
+                  summary.measuredPlayStarts,
+                )}
+              />
               <MetricCard
                 label="Запуски"
                 value={formatAuthorStatsCount(summary.plays)}
@@ -619,6 +711,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                     <th className="px-3 py-3 font-medium">Просмотры</th>
                     <th className="px-3 py-3 font-medium">Посетители</th>
                     <th className="px-3 py-3 font-medium">Запуски</th>
+                    <th className="px-3 py-3 font-medium">Время прослушивания</th>
                     <th className="px-3 py-3 font-medium">25%</th>
                     <th className="px-3 py-3 font-medium">Завершения</th>
                     <th className="px-3 py-3 font-medium">Сохранения</th>
@@ -651,6 +744,9 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                       </td>
                       <td className="px-3 py-3">
                         {formatAuthorStatsCount(product.plays)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatListeningCard(product.listenedMs)}
                       </td>
                       <td className="px-3 py-3">
                         {formatAuthorStatsCount(product.progress25)}
@@ -718,6 +814,12 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                       <dt className="text-[#9a8bb8]">Запуски</dt>
                       <dd className="font-semibold">
                         {formatAuthorStatsCount(product.plays)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Время прослушивания</dt>
+                      <dd className="font-semibold">
+                        {formatListeningCard(product.listenedMs)}
                       </dd>
                     </div>
                     <div>

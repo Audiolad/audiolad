@@ -165,7 +165,7 @@
     "test:retired-meditation-solutions-landing": "npx tsx scripts/retired-meditation-solutions-landing-unit.mts",
     "test:listener-welcome": "npx tsx scripts/listener-welcome-unit.mts",
     "test:help-center-support": "npx tsx scripts/help-center-support-unit.mjs",
-    "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs",
+    "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs && npx tsx scripts/author-stats-listening-unit.mts && node scripts/author-stats-listening-sql-unit.mjs",
     "test:author-multi-project": "npx tsx scripts/author-multi-project-unit.mjs && node scripts/author-multi-project-sql-unit.mjs",
     "test:author-project-cyrillic-name": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-project-cyrillic-name-unit.mjs",
     "test:author-canonical-sales": "npx tsx scripts/author-canonical-sales-unit.mjs && npx tsx scripts/author-sale-email-outbox-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-finance-sales-route-unit.mts && node scripts/author-canonical-sales-sql-unit.mjs",
