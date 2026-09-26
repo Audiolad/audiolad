@@ -5,6 +5,14 @@
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import {
+  applyListeningProducts,
+  applyListeningSummary,
+  applyListeningTimeseries,
+  readAuthorListeningProducts,
+  readAuthorListeningSummary,
+  readAuthorListeningTimeseries,
+} from "./listening";
 import type {
   AuthorStatsProductRow,
   AuthorStatsSourceBucket,
@@ -80,6 +88,14 @@ function mapSummary(raw: unknown): AuthorStatsSummary | null {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
+    measuredListeners: null,
+    measuredPlayStarts: null,
+    averageListenPerListenerMs: null,
+    averageListenPerStartMs: null,
+    listeningTimeValidFrom: null,
+    listeningTimePartial: false,
+    listeningTimeUnmeasured: true,
   };
 }
 
@@ -106,6 +122,7 @@ function mapPoint(raw: unknown): AuthorStatsTimeseriesPoint | null {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
   };
 }
 
@@ -143,6 +160,7 @@ function mapProduct(raw: unknown): AuthorStatsProductRow | null {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
   };
 }
 
@@ -171,45 +189,73 @@ export async function getAuthorStatsSummary(
   input: Bounds,
 ): Promise<AuthorStatsSummary | null> {
   const service = createServiceRoleClient();
-  const { data, error } = await service.rpc("author_stats_summary", {
+  const filters = {
     p_author_id: input.authorId,
     p_from: input.dateFrom,
     p_to: input.dateTo,
-  });
+  };
+  const [summaryResult, listeningResult] = await Promise.all([
+    service.rpc("author_stats_summary", filters),
+    service.rpc("author_stats_listening_summary", filters),
+  ]);
 
-  if (error) {
-    console.error("author_stats_summary_failed", error.message);
+  if (summaryResult.error) {
+    console.error("author_stats_summary_failed", summaryResult.error.message);
+    return null;
+  }
+  if (listeningResult.error) {
+    console.error(
+      "author_stats_listening_summary_failed",
+      listeningResult.error.message,
+    );
     return null;
   }
 
-  return mapSummary(data);
+  const summary = mapSummary(summaryResult.data);
+  const listening = readAuthorListeningSummary(listeningResult.data);
+  if (!summary || !listening) return null;
+  return applyListeningSummary(summary, listening);
 }
 
 export async function getAuthorStatsTimeseries(
   input: Bounds,
 ): Promise<AuthorStatsTimeseries | null> {
   const service = createServiceRoleClient();
-  const { data, error } = await service.rpc("author_stats_timeseries", {
+  const filters = {
     p_author_id: input.authorId,
     p_from: input.dateFrom,
     p_to: input.dateTo,
-  });
+  };
+  const [seriesResult, listeningResult] = await Promise.all([
+    service.rpc("author_stats_timeseries", filters),
+    service.rpc("author_stats_listening_timeseries", filters),
+  ]);
 
-  if (error) {
-    console.error("author_stats_timeseries_failed", error.message);
+  if (seriesResult.error) {
+    console.error("author_stats_timeseries_failed", seriesResult.error.message);
+    return null;
+  }
+  if (listeningResult.error) {
+    console.error(
+      "author_stats_listening_timeseries_failed",
+      listeningResult.error.message,
+    );
     return null;
   }
 
-  const row = asRecord(data);
+  const row = asRecord(seriesResult.data);
   const pointsRaw = Array.isArray(row.points) ? row.points : [];
   const points = pointsRaw
     .map(mapPoint)
     .filter((point): point is AuthorStatsTimeseriesPoint => point !== null);
+  const listening = readAuthorListeningTimeseries(listeningResult.data);
+  if (!listening) return null;
 
   return {
     from: asText(row.from),
     to: asText(row.to),
-    points,
+    listeningTimeValidFrom: listening.validFrom,
+    points: applyListeningTimeseries(points, listening),
   };
 }
 
@@ -217,22 +263,36 @@ export async function getAuthorStatsProducts(
   input: Bounds,
 ): Promise<AuthorStatsProductRow[] | null> {
   const service = createServiceRoleClient();
-  const { data, error } = await service.rpc("author_stats_products", {
+  const filters = {
     p_author_id: input.authorId,
     p_from: input.dateFrom,
     p_to: input.dateTo,
-  });
+  };
+  const [productsResult, listeningResult] = await Promise.all([
+    service.rpc("author_stats_products", filters),
+    service.rpc("author_stats_listening_products", filters),
+  ]);
 
-  if (error) {
-    console.error("author_stats_products_failed", error.message);
+  if (productsResult.error) {
+    console.error("author_stats_products_failed", productsResult.error.message);
+    return null;
+  }
+  if (listeningResult.error) {
+    console.error(
+      "author_stats_listening_products_failed",
+      listeningResult.error.message,
+    );
     return null;
   }
 
-  const row = asRecord(data);
+  const row = asRecord(productsResult.data);
   const rowsRaw = Array.isArray(row.rows) ? row.rows : [];
-  return rowsRaw
+  const products = rowsRaw
     .map(mapProduct)
     .filter((item): item is AuthorStatsProductRow => item !== null);
+  const listening = readAuthorListeningProducts(listeningResult.data);
+  if (!listening) return null;
+  return applyListeningProducts(products, listening);
 }
 
 export async function getAuthorStatsSources(

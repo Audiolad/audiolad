@@ -116,6 +116,20 @@ function testUi() {
   assert(!client.includes("user_id"), "no user_id in UI");
   assert(!client.includes("anonymous_id"), "no anonymous_id in UI");
   assert(!client.includes("email"), "no email in UI");
+  assert(labels.includes("Время прослушивания считается по фактическому времени"), "listening method");
+  assert(labels.includes("Учёт времени прослушивания ведётся с даты запуска"), "listening start note");
+  assert(labels.includes("listening_time"), "listening chart metric");
+  assert(client.includes("Время прослушивания"), "listening card");
+  assert(client.includes("Среднее время на слушателя"), "average per listener");
+  assert(client.includes("Среднее время на запуск"), "average per start");
+  assert(client.includes("formatListeningDuration"), "duration format");
+  const listeningSql = read(
+    "supabase/migrations/20261128120000_author_stats_listening_time.sql",
+  );
+  assert(listeningSql.includes("f.author_id_snapshot = p_author_id"), "snapshot key");
+  assert(!listeningSql.includes("coalesce(f.author_id_snapshot"), "no current-owner fallback");
+  assert(listeningSql.includes("author_members"), "self traffic excluded");
+  assert(listeningSql.includes("GRANT EXECUTE") && listeningSql.includes("service_role"), "service role only");
   assert(client.includes("Благодарности от слушателей") || labels.includes("Благодарности"), "appreciation group");
   assert(client.includes("appreciationCount") || client.includes("appreciationGrossMinor"), "separate appreciation fields");
   assert(!client.includes("донат") && !client.includes("Донат"), "no donate wording");

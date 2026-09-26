@@ -30,6 +30,17 @@ export type AuthorStatsSummary = {
   appreciationGrossMinor: number;
   /** Author share from appreciation sale_accrual. Separate from netRevenueMinor. */
   appreciationAuthorAccruedMinor: number;
+  /** Trusted playback_usage_facts listened_ms. Null when the window is unmeasured. */
+  listenedMs: number | null;
+  /** Unique listeners inside the measured window. Not the selected-period KPI. */
+  measuredListeners: number | null;
+  /** audio_play_started inside the measured window. Not the selected-period KPI. */
+  measuredPlayStarts: number | null;
+  averageListenPerListenerMs: number | null;
+  averageListenPerStartMs: number | null;
+  listeningTimeValidFrom: string | null;
+  listeningTimePartial: boolean;
+  listeningTimeUnmeasured: boolean;
 };
 
 export type AuthorStatsTimeseriesPoint = {
@@ -50,12 +61,15 @@ export type AuthorStatsTimeseriesPoint = {
   appreciationCount: number;
   appreciationGrossMinor: number;
   appreciationAuthorAccruedMinor: number;
+  /** Null on days that end before listening time metering. Not a fake zero. */
+  listenedMs: number | null;
 };
 
 export type AuthorStatsTimeseries = {
   from: string | null;
   to: string | null;
   points: AuthorStatsTimeseriesPoint[];
+  listeningTimeValidFrom: string | null;
 };
 
 export type AuthorStatsProductRow = {
@@ -84,6 +98,8 @@ export type AuthorStatsProductRow = {
   appreciationCount: number;
   appreciationGrossMinor: number;
   appreciationAuthorAccruedMinor: number;
+  /** Null when the selected window is entirely before metering. */
+  listenedMs: number | null;
 };
 
 export type AuthorStatsSourceBucket =
@@ -116,4 +132,5 @@ export type AuthorStatsChartMetric =
   | "author_page_unique_visitors"
   | "appreciation_count"
   | "appreciation_gross"
-  | "appreciation_author_accrued";
+  | "appreciation_author_accrued"
+  | "listening_time";
