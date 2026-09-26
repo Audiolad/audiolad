@@ -5,6 +5,8 @@ import {
   isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
   isMaxProductPath,
+  isMaxPromoPath,
+  isMaxPromoAnalyticsPath,
   isMaxRatingPath,
   isMaxAppreciationPath,
   isMaxHostname,
@@ -69,6 +71,8 @@ export function resolveMaxProxyAction(
       isMaxCatalogPath(pathname) ||
       isMaxCatalogTopicsPath(pathname) ||
       isMaxProductPath(pathname) ||
+      isMaxPromoPath(pathname) ||
+      isMaxPromoAnalyticsPath(pathname) ||
       isMaxRatingPath(pathname) ||
       isMaxAppreciationPath(pathname) ||
       isMaxPlaybackSessionPath(pathname) ||

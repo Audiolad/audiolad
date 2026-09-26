@@ -15,6 +15,8 @@ import {
   isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
   isMaxProductPath,
+  isMaxPromoPath,
+  isMaxPromoAnalyticsPath,
   isMaxRatingPath,
   isMaxAppreciationPath,
   isMaxHostname,
@@ -28,6 +30,8 @@ import {
   MAX_PLAYBACK_PREVIEW_PATH,
   MAX_PLAYBACK_SESSION_PATH,
   MAX_PRODUCT_PATH,
+  MAX_PROMO_PATH,
+  MAX_PROMO_ANALYTICS_PATH,
   MAX_RATING_PATH,
   MAX_APPRECIATION_PATH,
   MAX_SESSION_LINK_PATH,
@@ -103,6 +107,11 @@ assert.equal(isMaxCatalogTopicsPath(MAX_CATALOG_PATH), false);
 assert.equal(isMaxCatalogTopicsPath("/api/max/catalog/topics/extra"), false);
 assert.equal(isMaxProductPath(MAX_PRODUCT_PATH), true);
 assert.equal(isMaxProductPath(`${MAX_PRODUCT_PATH}/`), false);
+assert.equal(isMaxPromoPath(MAX_PROMO_PATH), true);
+assert.equal(isMaxPromoPath(`${MAX_PROMO_PATH}/`), false);
+assert.equal(isMaxPromoPath("/api/max/promo/extra"), false);
+assert.equal(isMaxPromoAnalyticsPath(MAX_PROMO_ANALYTICS_PATH), true);
+assert.equal(isMaxPromoAnalyticsPath(`${MAX_PROMO_ANALYTICS_PATH}/`), false);
 assert.equal(isMaxRatingPath(MAX_RATING_PATH), true);
 assert.equal(isMaxRatingPath(`${MAX_RATING_PATH}/`), false);
 assert.equal(isMaxAppreciationPath(MAX_APPRECIATION_PATH), true);
@@ -126,6 +135,8 @@ assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_TOPICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PROMO_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PROMO_ANALYTICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_RATING_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_APPRECIATION_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_SESSION_PATH, "pass_through");
@@ -137,6 +148,9 @@ assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_TOPICS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/catalog/topics/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PROMO_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/promo/extra", "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PROMO_ANALYTICS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_RATING_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_APPRECIATION_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/rating/extra", "not_found");
@@ -264,6 +278,8 @@ const maxClientSources = [
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/components/max/MaxAuthenticatedHome.tsx",
   "src/components/max/MaxProductDetailView.tsx",
+  "src/components/max/MaxPromoLanding.tsx",
+  "src/lib/max/promo-target.ts",
   "src/components/max/MaxProductRating.tsx",
   "src/components/max/MaxAuthorAppreciation.tsx",
   "src/components/max/MaxCatalogSearch.tsx",

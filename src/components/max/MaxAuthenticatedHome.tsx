@@ -15,6 +15,7 @@ import MaxCatalogSearch, {
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
+import MaxPromoLanding from "@/components/max/MaxPromoLanding";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
 import {
@@ -24,6 +25,10 @@ import {
   MAX_PRODUCT_PATH,
 } from "@/lib/max/host";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
+import {
+  readMaxPromoTargetFromLocation,
+  type MaxPromoTarget,
+} from "@/lib/max/promo-target";
 import { readMaxProductDetail, type MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
 import {
   MAX_INITIAL_PRIMARY_TAB,
@@ -59,9 +64,22 @@ export default function MaxAuthenticatedHome() {
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
   const [catalogTopicNavigation, setCatalogTopicNavigation] =
     useState<MaxCatalogTopicNavigationRequest | null>(null);
+  const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(null);
   const playRef = useRef<(() => void) | null>(null);
   const pendingPlayRef = useRef(false);
-  const bindPlay = useCallback((play: () => void) => {
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPromoTarget(readMaxPromoTargetFromLocation());
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+    const bindPlay = useCallback((play: () => void) => {
     playRef.current = play;
     if (pendingPlayRef.current) {
       pendingPlayRef.current = false;
@@ -73,6 +91,15 @@ export default function MaxAuthenticatedHome() {
     pendingPlayRef.current = false;
     setListenArmed(false);
     setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
+  }
+
+  function closePromoLanding() {
+    setPromoTarget(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("promo");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }
 
   function openCatalogProduct(product: MaxCatalogProduct) {
@@ -177,6 +204,9 @@ export default function MaxAuthenticatedHome() {
   }, [detail.status, selected]);
 
   function selectMaxTab(next: MaxPrimaryTab) {
+    if (promoTarget) {
+      closePromoLanding();
+    }
     if (next === activeTab) {
       if (next === "catalog" && selected) closeProductDetail();
       return;
@@ -214,7 +244,7 @@ export default function MaxAuthenticatedHome() {
           />
         </header>
       )}
-      <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog"}>
+      <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog" || Boolean(promoTarget)}>
         <MaxCatalogSearch
           onSelectProduct={openCatalogProduct}
           topicNavigationRequest={catalogTopicNavigation}
@@ -223,7 +253,17 @@ export default function MaxAuthenticatedHome() {
       {activeTab === "catalog" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
       )}
-      {activeTab === "catalog" && selected ? (
+      {activeTab === "catalog" && promoTarget ? (
+        <div
+          className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"
+          style={{ bottom: `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))` }}
+        >
+          <div className="mx-auto max-w-lg pb-6">
+            <MaxPromoLanding target={promoTarget} onClose={closePromoLanding} />
+          </div>
+        </div>
+      ) : null}
+      {activeTab === "catalog" && selected && !promoTarget ? (
         <div
           className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"
           style={{ bottom: `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))` }}

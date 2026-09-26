@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
@@ -22,6 +22,8 @@ export default function MaxAudioPlayer({
   session,
   fetchAudio,
   onBindPlay,
+  onPlaybackStarted,
+  onPlaybackCompleted,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -31,6 +33,11 @@ export default function MaxAudioPlayer({
     { ok: true; url: string; objectUrl?: boolean } | { ok: false; reason: string }
   >;
   onBindPlay?: (play: () => void) => void;
+  onPlaybackStarted?: (input: { trackId: string | null }) => void;
+  onPlaybackCompleted?: (input: {
+    trackId: string | null;
+    durationSeconds: number | null;
+  }) => void;
 }) {
   const {
     audioRef,
@@ -42,6 +49,7 @@ export default function MaxAudioPlayer({
     duration,
     error,
     previewEnded,
+    completed,
     play,
     pause,
     seek,
@@ -56,6 +64,9 @@ export default function MaxAudioPlayer({
     onBindPlay?.(play);
   }, [onBindPlay, play]);
 
+  const startedNotifiedRef = useRef(false);
+  const completionNotifiedRef = useRef(false);
+
   const isPreview = isMaxPreviewPlaybackMode(session.playbackMode);
   const showNavigation = shouldShowMaxTrackNavigation(session.playbackMode);
   const currentTitle = currentTrack?.title ?? session.title;
@@ -64,6 +75,30 @@ export default function MaxAudioPlayer({
       ? currentTrack.durationSeconds
       : 0;
   const sliderMax = isPreview && previewDuration > 0 ? previewDuration : duration > 0 ? duration : 0;
+
+  useEffect(() => {
+    startedNotifiedRef.current = false;
+    completionNotifiedRef.current = false;
+  }, [session.authorSlug, session.productSlug]);
+
+  useEffect(() => {
+    if (!isPlaying || startedNotifiedRef.current) return;
+    startedNotifiedRef.current = true;
+    onPlaybackStarted?.({ trackId: currentTrack?.trackId ?? null });
+  }, [currentTrack?.trackId, isPlaying, onPlaybackStarted]);
+
+  useEffect(() => {
+    if (!completed) {
+      completionNotifiedRef.current = false;
+      return;
+    }
+    if (completionNotifiedRef.current) return;
+    completionNotifiedRef.current = true;
+    onPlaybackCompleted?.({
+      trackId: currentTrack?.trackId ?? null,
+      durationSeconds: sliderMax > 0 ? sliderMax : null,
+    });
+  }, [completed, currentTrack?.trackId, onPlaybackCompleted, sliderMax]);
 
   return (
     <section className="mt-6 rounded-2xl border border-[#e8def5] bg-white p-4">

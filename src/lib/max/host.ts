@@ -19,6 +19,12 @@ export const MAX_CATALOG_PATH = "/api/max/catalog";
 export const MAX_CATALOG_TOPICS_PATH = "/api/max/catalog/topics";
 export const MAX_PRODUCT_PATH = "/api/max/product";
 
+/** HMAC-verify linked MAX identity, then return one canonical published promo page. */
+export const MAX_PROMO_PATH = "/api/max/promo";
+
+/** HMAC-verify linked MAX identity, then write canonical promo-page analytics. */
+export const MAX_PROMO_ANALYTICS_PATH = "/api/max/promo/analytics";
+
 /** HMAC-verify linked MAX identity, then read or write the canonical practice rating. */
 export const MAX_RATING_PATH = "/api/max/rating";
 
@@ -58,6 +64,14 @@ export function isMaxCatalogTopicsPath(pathname: string): boolean {
 }
 export function isMaxProductPath(pathname: string): boolean {
   return pathname === MAX_PRODUCT_PATH;
+}
+
+export function isMaxPromoPath(pathname: string): boolean {
+  return pathname === MAX_PROMO_PATH;
+}
+
+export function isMaxPromoAnalyticsPath(pathname: string): boolean {
+  return pathname === MAX_PROMO_ANALYTICS_PATH;
 }
 
 export function isMaxRatingPath(pathname: string): boolean {
