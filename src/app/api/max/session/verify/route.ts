@@ -13,12 +13,22 @@ import {
   MAX_EXTERNAL_IDENTITY_PROVIDER,
   touchExternalIdentity,
 } from "@/lib/max/touch-external-identity";
+import { resolveMaxStartTarget } from "@/lib/max/startapp-server";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
 export { setResolveMaxSessionBindingForTests } from "@/lib/max/session-binding";
 export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setTouchExternalIdentityForTests } from "@/lib/max/touch-external-identity";
+
+type ResolveMaxStartTarget = typeof resolveMaxStartTarget;
+let resolveMaxStartTargetImpl: ResolveMaxStartTarget | null = null;
+
+export function setResolveMaxStartTargetForTests(
+  impl: ResolveMaxStartTarget | null,
+) {
+  resolveMaxStartTargetImpl = impl;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +141,10 @@ export async function POST(request: Request) {
     return errorResponse(result.reason, statusForReason(result.reason));
   }
 
+  const startTarget = await (resolveMaxStartTargetImpl ?? resolveMaxStartTarget)(
+    result.data.start_param,
+  );
+
   const touch = await touchExternalIdentity(
     MAX_EXTERNAL_IDENTITY_PROVIDER,
     result.data.user.id,
@@ -145,6 +159,7 @@ export async function POST(request: Request) {
       linked: false,
       maxAuthenticated: false,
       webSessionMatches: false,
+      startTarget,
     });
   }
 
@@ -171,5 +186,6 @@ export async function POST(request: Request) {
     linked: true,
     maxAuthenticated: true,
     webSessionMatches: binding.sessionMatches,
+    startTarget,
   });
 }
