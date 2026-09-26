@@ -327,13 +327,15 @@ export default function MaxPromoLanding({
                     onBindPlay={(play) => {
                       if (pendingAutoPlayRef.current === product.practiceId) {
                         pendingAutoPlayRef.current = null;
-                        trackMaxPromoPlayStartedOnce(
-                          page.promoPageId,
-                          product.practiceId,
-                          playback.session.tracks[0]?.trackId ?? null,
-                        );
                         play();
                       }
+                    }}
+                    onPlaybackStarted={({ trackId }) => {
+                      trackMaxPromoPlayStartedOnce(
+                        page.promoPageId,
+                        product.practiceId,
+                        trackId,
+                      );
                     }}
                     onPlaybackCompleted={({ trackId, durationSeconds }) => {
                       trackMaxPromoCompletedOnce(
