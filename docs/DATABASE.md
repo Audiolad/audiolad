@@ -1513,6 +1513,68 @@ Owner всегда `auth.uid()`. Не создаёт Player, Subscription, Sonic
 
 Business App UI в A1 **не** подключается к этим таблицам (остаётся mock).
 
+## Business Player Foundation (Zone → Player → Assignment → Heartbeat → Health)
+
+Миграция: `supabase/migrations/20261202120000_business_player_foundation.sql`.
+
+Каноническая цепочка после A1:
+
+```text
+Organization
+  ↓
+Location
+  ↓
+Zone
+  ↓
+Player
+  ↓
+Assignment
+  ↓
+Heartbeat
+  ↓
+Health (derived)
+```
+
+| Domain | Таблица |
+|--------|---------|
+| Player | `business_players` |
+| Assignment | `business_player_assignments` |
+| Credential | `business_player_credentials` |
+| Runtime | `business_player_runtime` |
+
+Player принадлежит Organization. `zone_id` на Player **нет** — размещение только через Assignment.
+
+`player_code` — immutable human-readable `AL-P-#########` (sequence `business_player_code_seq`). Canonical PK — UUID.
+
+Status Player: `active` / `suspended` / `retired`. Hard DELETE API нет.
+
+Assignment: максимум один active на Player (`UNIQUE(player_id) WHERE unassigned_at IS NULL`). Несколько Players в одной Zone **разрешены**. Cross-organization assignment запрещён (RPC + trigger).
+
+Credential: SHA-256 `bytea` hash в отдельной таблице. Plaintext только один раз при create/rotate. Authenticated **не** имеет SELECT на credentials/runtime.
+
+Health derived от `business_player_runtime.last_heartbeat_at` (server time) через `business_player_derived_health`:
+
+- `never_seen` — heartbeat ещё не было
+- `online` — age ≤ 90s
+- `stale` — 90s < age ≤ 300s
+- `offline` — age > 300s
+
+**Player Health ≠ Playback Health.** Потеря heartbeat не означает, что музыка остановилась.
+
+### RPC
+
+| RPC | Кто | Назначение |
+|-----|-----|------------|
+| `create_business_player` | owner | создать Player + credential + empty runtime |
+| `assign_business_player_to_zone` | owner | назначить Zone (idempotent same zone) |
+| `rotate_business_player_credential` | owner | ротация credential |
+| `record_business_player_heartbeat` | machine (`anon`/`authenticated` EXECUTE, credential) | обновить server heartbeat |
+| `get_business_player_health` | organization member | проекция health без credential |
+
+Heartbeat не возвращает Organization/Zone/memberships. Не принимает user-controlled `player_id` как identity — только credential.
+
+`playback_usage_facts` / Music Passport / Business App UI в A2 **не** меняются.
+
 ## Резервное копирование
 
 Будет заполнено позже.

@@ -319,7 +319,7 @@ MAX user_id  ↔  профиль АудиоЛада  ↔  пользовател
 
 ## Business bounded context (Аудиолад Бизнес)
 
-Физическое пространство B2B:
+Физическое пространство и Player reliability:
 
 ```text
 Organization
@@ -327,14 +327,24 @@ Organization
 Location
   ↓
 Zone
+  ↓
+Player
+  ↓
+Assignment
+  ↓
+Heartbeat
+  ↓
+Health
 ```
 
-Domain foundation: migration `20261201120000_business_domain_core.sql`.
+- **A1** domain: `20261201120000_business_domain_core.sql`.
+- **A2** Player foundation: `20261202120000_business_player_foundation.sql`.
 
 - Public marketing `/b` на `audiolad.ru` остаётся отдельным лендингом.
 - User-facing host `business.audiolad.ru` обслуживает Business App shell (`/business-app/*`).
-- **A1:** schema + RLS + bootstrap RPC. Business App **ещё на mock-data** и к domain не подключён.
-- Следующие слои (отдельные PR): Player → Heartbeat/Health → attribution в `playback_usage_facts` → billing / rights / Sonic DNA.
+- Business App **ещё на mock-data** и к domain/Player health не подключён.
+- **Player Health ≠ Playback Health** (и ≠ mock Home `healthy/autonomous/stopped`).
+- Следующие слои (отдельные PR): B2B attribution в `playback_usage_facts` → billing / rights / Sonic DNA / offline cache.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса.
 
