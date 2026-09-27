@@ -111,6 +111,12 @@ COMMENT ON COLUMN public.playback_usage_facts.zone_id IS
 COMMENT ON COLUMN public.playback_usage_facts.player_id IS
   'audiolad:playback-usage; B2B Player snapshot at accept. No FK.';
 
+COMMENT ON COLUMN public.playback_usage_facts.occurred_at IS
+  'Canonical playback event time. Online A3: server sample-processing time. Not a forever-universal synonym of wall-clock server time; future offline-sync may set historical values only from a server-validated reconstructed Player timeline (never raw client timestamp).';
+
+COMMENT ON COLUMN public.playback_usage_facts.created_at IS
+  'Server-side time when the evidence row was written to the ledger.';
+
 COMMENT ON COLUMN public.playback_usage_facts.business_account_id IS
   'Reserved legacy/compatibility. Not canonical B2B attribution. A3 does not populate.';
 
