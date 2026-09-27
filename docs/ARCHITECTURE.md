@@ -316,6 +316,28 @@ Timeweb Cloud
 MAX user_id  ↔  профиль АудиоЛада  ↔  пользователь Supabase Auth
 ```
 
+
+## Business bounded context (Аудиолад Бизнес)
+
+Физическое пространство B2B:
+
+```text
+Organization
+  ↓
+Location
+  ↓
+Zone
+```
+
+Domain foundation: migration `20261201120000_business_domain_core.sql`.
+
+- Public marketing `/b` на `audiolad.ru` остаётся отдельным лендингом.
+- User-facing host `business.audiolad.ru` обслуживает Business App shell (`/business-app/*`).
+- **A1:** schema + RLS + bootstrap RPC. Business App **ещё на mock-data** и к domain не подключён.
+- Следующие слои (отдельные PR): Player → Heartbeat/Health → attribution в `playback_usage_facts` → billing / rights / Sonic DNA.
+
+Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса.
+
 ## Что отсутствует в архитектуре
 
 - Глобальная защита приватных маршрутов — не реализована (профиль проверяет сессию локально, но маршрут не защищён на уровне proxy).
