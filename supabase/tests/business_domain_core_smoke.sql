@@ -184,6 +184,96 @@ BEGIN
     RAISE EXCEPTION 'Case10: direct membership INSERT must fail';
   END IF;
 
+  -- Case 10b: authenticated cannot direct UPDATE/DELETE core tables
+  -- (even as owner who can SELECT — table privileges are SELECT-only)
+  PERFORM set_config('request.jwt.claim.sub', user_a::text, true);
+  EXECUTE 'SET ROLE authenticated';
+
+  raised := false;
+  BEGIN
+    UPDATE public.business_organizations SET name = 'Hacked' WHERE id = v_org;
+  EXCEPTION WHEN insufficient_privilege THEN
+    raised := true;
+  WHEN OTHERS THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct org UPDATE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    UPDATE public.business_locations SET name = 'Hacked' WHERE id = v_loc;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct location UPDATE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    UPDATE public.business_zones SET status = 'closed' WHERE id = v_zone;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct zone UPDATE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    UPDATE public.business_organization_members SET role = 'manager'
+    WHERE organization_id = v_org AND user_id = user_a;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct membership UPDATE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    DELETE FROM public.business_zones WHERE id = v_zone;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct zone DELETE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    DELETE FROM public.business_locations WHERE id = v_loc;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct location DELETE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    DELETE FROM public.business_organization_members
+    WHERE organization_id = v_org AND user_id = user_a;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct membership DELETE must fail';
+  END IF;
+
+  raised := false;
+  BEGIN
+    DELETE FROM public.business_organizations WHERE id = v_org;
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'Case10b: direct org DELETE must fail';
+  END IF;
+
   -- Case 11: duplicate membership (service_role / table owner path)
   RESET ROLE;
   raised := false;

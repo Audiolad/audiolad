@@ -486,6 +486,20 @@ BEGIN
      OR has_table_privilege('authenticated', 'public.business_organization_members', 'INSERT') THEN
     RAISE EXCEPTION 'Post-check failed: authenticated must not INSERT business tables';
   END IF;
+
+  IF has_table_privilege('authenticated', 'public.business_organizations', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.business_locations', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.business_zones', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.business_organization_members', 'UPDATE') THEN
+    RAISE EXCEPTION 'Post-check failed: authenticated must not UPDATE business tables';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.business_organizations', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.business_locations', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.business_zones', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.business_organization_members', 'DELETE') THEN
+    RAISE EXCEPTION 'Post-check failed: authenticated must not DELETE business tables';
+  END IF;
 END;
 $$;
 

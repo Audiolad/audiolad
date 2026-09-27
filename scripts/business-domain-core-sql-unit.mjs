@@ -83,6 +83,11 @@ assert(migration.includes("ENABLE ROW LEVEL SECURITY"), "RLS enabled");
 assert(migration.includes("GRANT SELECT ON TABLE public.business_organizations TO authenticated"), "auth SELECT orgs");
 assert(migration.includes("REVOKE ALL ON TABLE public.business_organizations FROM PUBLIC, anon, authenticated"), "revoke orgs");
 assert(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON TABLE public\.business_organizations TO authenticated/i.test(migration), "no auth write orgs");
+assert(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON TABLE public\.business_organization_members TO authenticated/i.test(migration), "no auth write members");
+assert(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON TABLE public\.business_locations TO authenticated/i.test(migration), "no auth write locations");
+assert(!/GRANT\s+(INSERT|UPDATE|DELETE|ALL)\s+ON TABLE public\.business_zones TO authenticated/i.test(migration), "no auth write zones");
+assert(migration.includes("authenticated must not UPDATE business tables"), "post-check no UPDATE priv");
+assert(migration.includes("authenticated must not DELETE business tables"), "post-check no DELETE priv");
 
 assert(
   migration.includes("create_business_organization_with_location"),
@@ -115,6 +120,10 @@ assert(smoke.includes("invalid_country_code"), "smoke country");
 assert(smoke.includes("invalid_timezone"), "smoke timezone");
 assert(smoke.includes("outsider"), "smoke outsider");
 assert(smoke.includes("direct org INSERT"), "smoke no direct mutation");
+assert(smoke.includes("direct org UPDATE must fail"), "smoke no direct UPDATE");
+assert(smoke.includes("direct org DELETE must fail"), "smoke no direct DELETE");
+assert(smoke.includes("direct location UPDATE must fail"), "smoke no location UPDATE");
+assert(smoke.includes("direct zone DELETE must fail"), "smoke no zone DELETE");
 assert(smoke.includes("duplicate membership"), "smoke unique membership");
 assert(smoke.includes("orphan location"), "smoke FK");
 assert(smoke.includes("Multi-org") || smoke.includes("Second Org"), "smoke multi-org");
