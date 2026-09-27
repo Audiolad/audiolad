@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-09-27 — Business Player identity, assignment and technical health
+
+**Контекст:** после A1 нужен reliability-слой Player до Proof of Play и playback attribution.
+
+**Решение:**
+
+1. Player — logical identity, owned by Organization (не device-location, без `zone_id` на Player).
+2. Assignment — отдельная сущность; один active assignment на Player; несколько Players на Zone разрешены.
+3. Technical health derived from server `last_heartbeat_at` (thresholds в одной функции `business_player_derived_health`).
+4. Heartbeat loss ≠ music stopped; Player Health ≠ Playback Health ≠ Business UX Home state.
+5. Machine credential: 64-hex opaque from `gen_random_uuid()` entropy; core `sha256` hash only in DB (no pgcrypto); plaintext once on create/rotate.
+6. Health projection uses `statement_timestamp()`; heartbeat writes use `clock_timestamp()`.
+
+**Принято:** владелец продукта + архитектор (задание Foundation PR A2).
+
+---
+
 ## 2026-09-27 — Business physical-space canonical terminology
 
 **Контекст:** нужен production-domain фундамент «Аудиолада Бизнес» до Player, Proof of Play и billing.
