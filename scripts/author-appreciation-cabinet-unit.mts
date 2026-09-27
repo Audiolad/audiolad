@@ -159,6 +159,15 @@ function emptySummary(): AuthorStatsSummary {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
+    measuredListeners: null,
+    measuredPlayStarts: null,
+    averageListenPerListenerMs: null,
+    averageListenPerStartMs: null,
+    listeningTimeValidFrom: null,
+    listeningTimePartial: false,
+    listeningTimeUnmeasured: true,
+    listeningAveragesWithheld: false,
   };
 }
 
@@ -189,6 +198,7 @@ function emptyProduct(slug: string, title: string): AuthorStatsProductRow {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
   };
 }
 
@@ -211,6 +221,7 @@ function emptyPoint(date: string): AuthorStatsTimeseriesPoint {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
   };
 }
 

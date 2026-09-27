@@ -143,6 +143,7 @@ function emptyPoint(date: string): AuthorStatsTimeseriesPoint {
     appreciationCount: 0,
     appreciationGrossMinor: 0,
     appreciationAuthorAccruedMinor: 0,
+    listenedMs: null,
   };
 }
 
