@@ -1,14 +1,7 @@
 -- Minimal schema for isolated Business Player Foundation tests.
 -- Never apply to production.
 
-CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-
-CREATE OR REPLACE FUNCTION public.gen_random_uuid()
-RETURNS uuid
-LANGUAGE sql
-VOLATILE
-AS $fn$ SELECT extensions.gen_random_uuid() $fn$;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 CREATE SCHEMA IF NOT EXISTS auth;
 

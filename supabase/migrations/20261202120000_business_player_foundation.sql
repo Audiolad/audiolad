@@ -1,5 +1,9 @@
 BEGIN;
 
+-- pgcrypto provides digest() / gen_random_bytes() in public for compile envs
+-- that do not ship an extensions schema.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Foundation A2: Business Player Identity, Assignment, Heartbeat & Health
 -- Zone → Player → Assignment → Heartbeat → derived Health.
 -- Expand-only. No playback_usage_facts wiring, Music Passport, billing, or Business App UI.
@@ -240,9 +244,9 @@ RETURNS bytea
 LANGUAGE sql
 IMMUTABLE
 STRICT
-SET search_path = public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
-  SELECT extensions.digest(convert_to(p_credential, 'UTF8'), 'sha256');
+  SELECT digest(convert_to(p_credential, 'UTF8'), 'sha256');
 $$;
 
 REVOKE ALL ON FUNCTION public.business_player_hash_credential(text) FROM PUBLIC, anon, authenticated;
@@ -252,9 +256,9 @@ CREATE OR REPLACE FUNCTION public.business_player_generate_credential()
 RETURNS text
 LANGUAGE sql
 VOLATILE
-SET search_path = public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
-  SELECT encode(extensions.gen_random_bytes(32), 'hex');
+  SELECT encode(gen_random_bytes(32), 'hex');
 $$;
 
 REVOKE ALL ON FUNCTION public.business_player_generate_credential() FROM PUBLIC, anon, authenticated;
@@ -349,7 +353,7 @@ CREATE OR REPLACE FUNCTION public.create_business_player(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_id uuid := auth.uid();
@@ -552,7 +556,7 @@ CREATE OR REPLACE FUNCTION public.rotate_business_player_credential(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_id uuid := auth.uid();
@@ -615,7 +619,7 @@ CREATE OR REPLACE FUNCTION public.record_business_player_heartbeat(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_cred text := btrim(coalesce(p_credential, ''));
