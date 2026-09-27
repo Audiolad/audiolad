@@ -1455,6 +1455,64 @@ RPC перед удалением авторов и перед завершен�
 
 Миграция `supabase/migrations/20261125120000_seo_reservation_published_occupancy.sql` заменяет `reserve_seo_query`. Повторный вызов с уже активным бронированием того же автора возвращает существующую строку и не создаёт вторую. Опубликованная практика с `primary_seo_query_id` блокирует новое бронирование даже без строки в `seo_query_reservations`. Пока отдельный backfill не заполнен, то же делает точное нормализованное равенство `practices.seo_primary_query` и `seo_queries.normalized_query` при `primary_seo_query_id IS NULL`. Это не ILIKE и не нечёткое сравнение. Лимит активных бронирований остаётся 5; статусы `used`, `released` и истёкшие слот не занимают. Миграция не обновляет существующие строки и не запускает backfill.
 
+## Business Domain Core (Organization → Location → Zone)
+
+Миграция: `supabase/migrations/20261201120000_business_domain_core.sql`.
+
+Каноническая терминология B2B физического пространства:
+
+```text
+Organization
+  ↓
+Location
+  ↓
+Zone
+```
+
+| Domain | Таблица |
+|--------|---------|
+| Organization | `business_organizations` |
+| Organization Member | `business_organization_members` |
+| Location | `business_locations` |
+| Zone | `business_zones` |
+
+Не использовать в этой модели `business_account` / `venue` как канонические имена (они остаются зарезервированными NULL-полями в `playback_usage_facts` для будущего A3 и отдельно нормализуются).
+
+### Связи
+
+- `business_organization_members.organization_id` → `business_organizations(id)` (`ON DELETE RESTRICT`)
+- `business_organization_members.user_id` → `auth.users(id)` (`ON DELETE CASCADE`)
+- `business_organizations.created_by` → `auth.users(id)` (`ON DELETE SET NULL`) — audit-origin, не ownership
+- `business_locations.organization_id` → `business_organizations(id)` (`ON DELETE RESTRICT`)
+- `business_zones.location_id` → `business_locations(id)` (`ON DELETE RESTRICT`)
+
+Ownership определяется только `business_organization_members.role = 'owner'`. Колонки `owner_user_id` нет. A1 роли: `owner`, `manager` (без `employee`).
+
+Location с v1 обязана иметь `country_code` (две латинские uppercase буквы) и IANA `timezone` (проверка через `pg_timezone_names` в bootstrap RPC).
+
+Каждая Location в approved creation flow получает ровно одну default Zone: `is_default = true`, `name = NULL` (UI локализует ярлык). Partial unique: `UNIQUE(location_id) WHERE is_default = true`.
+
+### RLS
+
+Все четыре таблицы: RLS enabled. `anon` — без доступа. `authenticated` — только `SELECT` по membership. Прямые `INSERT`/`UPDATE`/`DELETE` клиенту в A1 не выдаются. `service_role` — полный доступ.
+
+| Таблица | SELECT (authenticated) |
+|--------|------------------------|
+| `business_organizations` | member (`owner`/`manager`) своей Organization |
+| `business_organization_members` | своя строка; owner видит membership своей Organization |
+| `business_locations` | member родительской Organization |
+| `business_zones` | member Organization родительской Location |
+
+Helpers: `is_business_organization_member`, `is_business_organization_owner` — `STABLE` `SECURITY DEFINER`, `search_path = public, pg_temp`.
+
+### Bootstrap RPC
+
+`create_business_organization_with_location(p_organization_name, p_location_name, p_business_category, p_country_code, p_timezone)` → `jsonb` с `organization_id`, `location_id`, `zone_id`.
+
+Owner всегда `auth.uid()`. Не создаёт Player, Subscription, Sonic DNA, Rights, billing, Author workspace и не трогает `profiles.role`.
+
+Business App UI в A1 **не** подключается к этим таблицам (остаётся mock).
+
 ## Резервное копирование
 
 Будет заполнено позже.

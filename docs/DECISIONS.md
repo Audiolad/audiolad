@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-09-27 — Business physical-space canonical terminology
+
+**Контекст:** нужен production-domain фундамент «Аудиолада Бизнес» до Player, Proof of Play и billing.
+
+**Решение:**
+
+- Каноническая цепочка: **Organization → Location → Zone**.
+- Физические таблицы: `business_organizations`, `business_organization_members`, `business_locations`, `business_zones`.
+- Не использовать `business_account` / `venue` как канонические имена в новой модели (отдельная нормализация зарезервированных полей позже).
+- Owner только через membership `role = 'owner'`; без `owner_user_id`.
+- Employee scope — отдельный слой (не organization-wide member в A1).
+
+**Принято:** владелец продукта + архитектор (задание Foundation PR A1).
+
+---
+
+
 ## 2026-09-13 — Guest Studio: globally free catalog music
 
 **Контекст:** гостевой проект Студии уже изолирован `guest_session_id` и

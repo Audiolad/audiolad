@@ -4,6 +4,14 @@
 
 Последнее обновление: 2026-07-15
 
+
+## Аудиолад Бизнес (факт на момент A1)
+
+- Business Domain Core добавлен: `business_organizations` / `business_organization_members` / `business_locations` / `business_zones` + bootstrap RPC.
+- Business App UI по-прежнему на mock-data; к domain не подключён.
+- Player / Proof of Play / billing / Sonic DNA / Rights — не реализованы.
+- `MERGE=NO`, `DEPLOY=NO`, production DB apply не выполнялся в рамках A1.
+
 ## Сводный статус
 
 | Подсистема | Статус | Комментарий |
