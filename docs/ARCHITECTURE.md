@@ -345,9 +345,21 @@ Health
 - Business App **ещё на mock-data** и к domain/Player health не подключён.
 - **Player Health ≠ Playback Health** (и ≠ mock Home `healthy/autonomous/stopped`).
 - **A3** B2B Playback Attribution (online evidence foundation): `20261203120000_business_playback_attribution.sql` — single ledger `playback_usage_facts` + `usage_kind` + canonical Organization/Location/Zone/Player snapshots; Evidence only (not Qualified Usage / Royalty). `occurred_at` = canonical playback event time (online: server sample-processing time); `created_at` = ledger write time. Attribution reassignment re-baselines media-time. Offline/cache evidence path not in A3.
-- Следующие слои (отдельные PR): full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing / rights / Sonic DNA / Business App wiring.
+- **A4** Rights bounded context (Rights Passport foundation): `20261204120000_music_rights_foundation.sql`
 
-Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса.
+```
+Track (audio_items.id / AL-T-*)
+  ↓
+Rights Grants (recording | composition × use_type × territory)
+  ↓
+Rights Passport Basic projection (REVIEW_REQUIRED | HAS_VERIFIED_GRANTS)
+```
+
+  Rightsholder ≠ Author. Rights Grant = legal source of truth; Passport is projection (not `licensed=true`). Studio `music_usage_permission` / entitlements are a separate domain and do **not** auto-map into B2B rights. A4 does **not** decide Location eligibility.
+- **A5** (later): Country Rights Profile → Location Rights Context → Eligibility Decision.
+- Следующие слои (отдельные PR): A5 eligibility, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Analyzer, Business App / Rights UI wiring.
+
+Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).
 
 ## Что отсутствует в архитектуре
 
