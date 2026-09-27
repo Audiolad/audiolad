@@ -89,6 +89,7 @@ jobs:
           npx tsx scripts/music-track-upload-queue-unit.mts
           npx tsx scripts/music-upload-autostart-unit.mts
           node scripts/music-draft-track-delete-sql-unit.mjs
+          node scripts/music-track-identity-sql-unit.mjs
           npx tsx scripts/music-draft-track-delete-unit.mts
           npx tsx scripts/legacy-music-draft-placeholder-unit.mts
           npx tsx scripts/business-landing-unit.mts

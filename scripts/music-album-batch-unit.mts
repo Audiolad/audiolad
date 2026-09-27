@@ -8,6 +8,7 @@ import {
 import {
   deriveAlbumTrackTitle,
   resolveAlbumTrackTitle,
+  describeAlbumBatchCreateError,
   formatAlbumBatchCreateFailure,
   MAX_MUSIC_ALBUM_BATCH_FILES,
   musicAlbumSkipsDefaultAudioItem,
@@ -197,6 +198,36 @@ assert.equal(
   formatAlbumBatchCreateFailure(5, 10, "06 - Night.wav"),
   "Добавлено 5 из 10 треков. Не удалось добавить 06 - Night.wav.",
 );
+assert.equal(describeAlbumBatchCreateError("internal_error"), "Не удалось создать трек на сервере.");
+assert.equal(describeAlbumBatchCreateError("  "), null);
+assert.equal(describeAlbumBatchCreateError(null), null);
+assert.equal(describeAlbumBatchCreateError("totally_unknown_code"), null);
+assert.equal(
+  describeAlbumBatchCreateError("audio_title_too_long"),
+  "Название аудио не должно превышать 100 символов.",
+);
+assert.equal(
+  formatAlbumBatchCreateFailure(
+    0,
+    10,
+    "01 - Наша команда.wav",
+    describeAlbumBatchCreateError("internal_error"),
+  ),
+  "Добавлено 0 из 10 треков. Не удалось добавить 01 - Наша команда.wav. Не удалось создать трек на сервере.",
+);
+assert.equal(
+  formatAlbumBatchCreateFailure(
+    5,
+    10,
+    "06 - Night.wav",
+    describeAlbumBatchCreateError("audio_title_too_long"),
+  ),
+  "Добавлено 5 из 10 треков. Не удалось добавить 06 - Night.wav. Название аудио не должно превышать 100 символов.",
+);
+assert.equal(
+  formatAlbumBatchCreateFailure(2, 4, "03.wav", "   "),
+  "Добавлено 2 из 4 треков. Не удалось добавить 03.wav.",
+);
 
 const formSource = readFileSync(
   new URL("../src/components/author-dashboard/AuthorProductForm.tsx", import.meta.url),
@@ -226,6 +257,9 @@ assert.ok(albumBody.indexOf("stageMusicTrackFile") < albumBody.indexOf("startRea
 assert.match(albumBody, /if \(stagedIds\.length > 0\)/);
 assert.match(albumBody, /musicQueueBlocksTrackCreation/);
 assert.match(albumBody, /failedNames/);
+assert.match(albumBody, /failureReason/);
+assert.match(albumBody, /payload\.error/);
+assert.match(albumBody, /describeAlbumBatchCreateError/);
 assert.match(albumBody, /resolveAlbumTrackTitle/);
 assert.match(albumBody, /continue/);
 assert.match(functionBody(formSource, "addAudioItem"), /PRODUCT_KIND\.MUSIC/);
