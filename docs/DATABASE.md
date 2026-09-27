@@ -1035,7 +1035,7 @@ PRIMARY KEY / UNIQUE `(user_id, practice_id)`.
 | `anonymous_id` / `visitor_key` | существующая анонимная идентичность |
 | `practice_id` / `audio_item_id` | снимки UUID без FK: удаление продукта или трека не удаляет факт |
 | `listened_ms` | принятые миллисекунды этого тика; в таблицу попадают только значения > 0 |
-| `occurred_at` | серверное время принятия |
+| `occurred_at` | canonical playback event time (online path: sample processing time on server; see A3 time semantics) |
 | `author_id_snapshot` | автор продукта на момент принятия; для будущего закрытого ledger |
 | `business_account_id`, `venue_id`, `billing_period_start`, `royalty_eligible_ms` | NULL-задел. Биллинг и royalty в этой миграции не считаются |
 | `playback_usage_contexts` | последняя позиция и сумма по контексту, чтобы следующий тик не доверял клиентской дельте |
@@ -1578,6 +1578,77 @@ Health derived от `business_player_runtime.last_heartbeat_at` (server time) ч
 Heartbeat не возвращает Organization/Zone/memberships. Не принимает user-controlled `player_id` как identity — только credential.
 
 `playback_usage_facts` / Music Passport / Business App UI в A2 **не** меняются.
+
+## Business Playback Attribution (A3)
+
+Миграция: `supabase/migrations/20261203120000_business_playback_attribution.sql`.
+
+Канонический durable ledger остаётся **один**: `public.playback_usage_facts`. Второй ledger запрещён.
+
+### Discriminator
+
+- `usage_kind text NOT NULL DEFAULT 'consumer'` на `playback_usage_contexts` и `playback_usage_facts`
+- V1: `consumer` | `business` (CHECK)
+- Существующие строки = `consumer`
+- B2B facts = `business`
+- Не использовать presence/absence `user_id` как discriminator
+
+### Canonical B2B snapshot columns (historical, no destructive FK)
+
+На contexts и facts:
+
+- `organization_id`
+- `location_id`
+- `zone_id`
+- `player_id`
+
+Legacy `business_account_id` / `venue_id` **не** rename, **не** backfill, **не** заполняются в A3.
+
+CHECK:
+
+- consumer → все четыре B2B snapshot NULL
+- business → все четыре NOT NULL
+
+### Evidence ≠ Qualified Usage ≠ Money
+
+A3 пишет только Playback Evidence. Для business fact:
+
+- `royalty_eligible_ms = NULL`
+- `billing_period_start = NULL`
+
+Rights / Economics — отдельные bounded contexts.
+
+### Machine RPC
+
+`apply_business_playback_usage_heartbeat(credential, client_event_id, playback_session_id, sample_seq, audio_item_id, position_ms, …)`
+
+- Identity: credential → hash → `business_player_credentials` → Player (`FOR SHARE`)
+- Space: active assignment → Zone → Location → Organization
+- Track: `audio_item_id` → practice → `author_id` (только `product_kind='music'`)
+- Listening key: `business:{player_id}:{playback_session_id}` (server-formed)
+- Reuses media-time acceptance of `apply_playback_usage_heartbeat` (не копирует алгоритм)
+- Reassignment boundary: при смене attribution snapshot (org/location/zone/player) первый sample нового assignment = media-time baseline (`accepted_ms = 0`); `sample_seq` остаётся монотонным; новая playback session не требуется
+- Response: `{ok, accepted_ms, duplicate, server_time}`
+- `anon`/`authenticated` EXECUTE; no browser SELECT on ledger tables
+
+### Time semantics (A3 online)
+
+- `occurred_at` — **canonical playback event time** (не универсальный синоним «server time навсегда»).
+- В текущем **online** A3 `occurred_at` безопасно определяется серверным временем обработки sample (Player не передаёт authoritative client timestamp).
+- `created_at` — server-side время записи evidence-строки в ledger.
+- A3 поддерживает только **online evidence path**. Offline engine / raw client timestamp / фиктивный `offline=false` — вне scope.
+- Будущий offline-sync сможет записывать исторический `occurred_at` только из **server-validated reconstructed Player timeline**, не из доверенного клиентского timestamp; provenance online/offline появится вместе с offline/cache foundation.
+
+Connectivity heartbeat A2 (`record_business_player_heartbeat`) ≠ playback media-time A3.
+
+### Consumer analytics isolation
+
+`playback_usage_admin_facts` и `author_stats_listening_facts` читают только `usage_kind = 'consumer'`.
+
+### Indexes (partial, business only)
+
+- `(organization_id, occurred_at) WHERE usage_kind='business'`
+- `(player_id, occurred_at) WHERE usage_kind='business'`
 
 ## music_track_code (идентичность музыкального трека)
 
