@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { MUSIC_LAB_BUCKET, MUSIC_LAB_EXPERIMENT_CODE } from "@/lib/music-lab/constants";
-import type { ListeningPacket } from "@/lib/music-lab/packet";
+import type { BlindKeyMap, ListeningPacket } from "@/lib/music-lab/packet";
 import type {
   MusicLabBlindAssignment,
   MusicLabExperiment,
@@ -152,7 +152,6 @@ export async function importListeningPacket(
     prefix: string;
     subjectExternalKey: string;
     definition: MusicLabTask["definition"];
-    blind?: { A: string; B: string };
   }[] = [];
 
   packet.listenTracks.forEach((track) => {
@@ -186,7 +185,6 @@ export async function importListeningPacket(
       prefix: "s",
       subjectExternalKey: seedId,
       definition: { sets },
-      blind: packet.blindBySeed[seedId],
     });
   });
 
@@ -229,22 +227,52 @@ export async function importListeningPacket(
     taskOrder += 1;
     await repository.saveTask(task);
     savedTasks.push(task);
+  }
 
-    if (!desired.blind) {
-      continue;
-    }
+  const responsesAfter = await repository.listResponses(experiment.id);
+  return {
+    experimentCode: experiment.code,
+    status: experiment.status,
+    items: (await repository.listItems(experiment.id)).length,
+    tasks: savedTasks.length,
+    blindAssignments: (await repository.listBlindAssignments(experiment.id)).length,
+    responsesPreserved: responsesAfter.length,
+    created,
+  };
+}
 
-    const existingBlind = (await repository.listBlindAssignments(experiment.id)).filter(
-      (entry) => entry.taskId === task.id,
-    );
+export async function importBlindAssignments(
+  repository: MusicLabRepository,
+  blindBySeed: BlindKeyMap,
+): Promise<{ blindAssignments: number }> {
+  const experiment = await repository.getExperimentByCode(MUSIC_LAB_EXPERIMENT_CODE);
+  if (!experiment) {
+    throw new MusicLabImportError("packet_required");
+  }
+
+  const tasks = await repository.listTasks(experiment.id);
+  const similarityTasks = tasks.filter((task) => task.taskType === "similarity");
+  const seedIds = similarityTasks.map((task) => task.naturalKey.slice("similarity:".length));
+  const provided = Object.keys(blindBySeed);
+  if (
+    similarityTasks.length === 0 ||
+    seedIds.length !== provided.length ||
+    seedIds.some((seedId) => !blindBySeed[seedId])
+  ) {
+    throw new MusicLabImportError("blind_key_mismatch");
+  }
+
+  const responses = await repository.listResponses(experiment.id);
+  const existingBlind = await repository.listBlindAssignments(experiment.id);
+
+  for (const task of similarityTasks) {
+    const seedId = task.naturalKey.slice("similarity:".length);
+    const mapping = blindBySeed[seedId];
+    const taskBlind = existingBlind.filter((entry) => entry.taskId === task.id);
     for (const slot of ["A", "B"] as const) {
-      const previousBlind = existingBlind.find((entry) => entry.slotCode === slot);
-      const systemCode = desired.blind[slot];
-      if (
-        previousBlind &&
-        previousBlind.systemCode !== systemCode &&
-        responses.length > 0
-      ) {
+      const previousBlind = taskBlind.find((entry) => entry.slotCode === slot);
+      const systemCode = mapping[slot];
+      if (previousBlind && previousBlind.systemCode !== systemCode && responses.length > 0) {
         throw new MusicLabImportError("blind_key_conflict");
       }
       const assignment: MusicLabBlindAssignment = {
@@ -258,14 +286,7 @@ export async function importListeningPacket(
     }
   }
 
-  const responsesAfter = await repository.listResponses(experiment.id);
   return {
-    experimentCode: experiment.code,
-    status: experiment.status,
-    items: (await repository.listItems(experiment.id)).length,
-    tasks: savedTasks.length,
     blindAssignments: (await repository.listBlindAssignments(experiment.id)).length,
-    responsesPreserved: responsesAfter.length,
-    created,
   };
 }

@@ -3,3 +3,5 @@
 *.flac
 *.aiff
 *.m4a
+similarity_ear_key.json
+*similarity_ear_key*.json

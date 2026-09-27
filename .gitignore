@@ -45,6 +45,10 @@ yarn-error.log*
 *.mp3
 public/audiolad_brand_icons.zip
 
+# Music Analyzer Lab blind key stays on the operator machine.
+similarity_ear_key.json
+*similarity_ear_key*.json
+
 # vercel
 .vercel
 

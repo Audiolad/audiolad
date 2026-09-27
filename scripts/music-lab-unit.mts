@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,10 +8,10 @@ import { decideMusicLabAccess } from "../src/lib/music-lab/access-policy";
 import { assertMusicLabClientSafe } from "../src/lib/music-lab/client-safety";
 import { buildMusicLabClientBundle } from "../src/lib/music-lab/client-view";
 import { MUSIC_LAB_EXPERIMENT_CODE, MUSIC_LAB_FORBIDDEN_PRODUCTION_TABLES, MUSIC_LAB_TABLES } from "../src/lib/music-lab/constants";
-import { MusicLabImportError, importListeningPacket } from "../src/lib/music-lab/import-packet";
+import { MusicLabImportError, importBlindAssignments, importListeningPacket } from "../src/lib/music-lab/import-packet";
 import { createMemoryMusicLabRepository } from "../src/lib/music-lab/memory-store";
 import { isWorkspaceDashboardPathname } from "../src/lib/navigation/bottom-nav";
-import { defaultListeningPacketDir, readListeningPacketDir } from "../src/lib/music-lab/packet";
+import { defaultListeningPacketDir, parseBlindKeyJson, readListeningPacketDir } from "../src/lib/music-lab/packet";
 import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config";
 import type { ListenAnswers, MusicLabRepository, SimilarityAnswers } from "../src/lib/music-lab/types";
 import {
@@ -95,13 +95,13 @@ function withBlindCounter(repository: MusicLabRepository) {
   };
 }
 
-function walk(directory: string): string[] {
+function walk(directory: string, extension = /\.(ts|tsx)$/): string[] {
   const entries: string[] = [];
   for (const name of readdirSync(directory)) {
     const full = path.join(directory, name);
     if (statSync(full).isDirectory()) {
-      entries.push(...walk(full));
-    } else if (/\.(ts|tsx)$/.test(name)) {
+      entries.push(...walk(full, extension));
+    } else if (extension.test(name)) {
       entries.push(full);
     }
   }
@@ -113,7 +113,6 @@ assert.equal(packet.listenTracks.length, 16);
 assert.equal(packet.similaritySeedIds.length, 10);
 assert.equal(packet.bpmTracks.length, 7);
 assert.equal(packet.similarityRows.length, 100);
-assert.equal(Object.keys(packet.blindBySeed).length, 10);
 
 assert.equal(decideMusicLabAccess({ userId: null, roles: [] }), "anonymous");
 assert.equal(decideMusicLabAccess({ userId: userId, roles: [] }), "denied");
@@ -130,7 +129,7 @@ const first = await importListeningPacket(blind.repository, packet);
 assert.equal(first.created, true);
 assert.equal(first.responsesPreserved, 0);
 assert.equal(first.tasks, 33);
-assert.equal(first.blindAssignments, 20);
+assert.equal(first.blindAssignments, 0);
 
 const experiment = await blind.repository.getExperimentByCode(MUSIC_LAB_EXPERIMENT_CODE);
 assert.ok(experiment);
@@ -193,22 +192,38 @@ assert.deepEqual(await blind.repository.listResponses(experiment.id), preserved)
 const tasksAfter = await blind.repository.listTasks(experiment.id);
 assert.equal(tasksAfter.length, tasks.length);
 
+const blindMap = parseBlindKeyJson(
+  JSON.stringify({
+    panels_by_seed: Object.fromEntries(
+      packet.similaritySeedIds.map((seedId, index) => [
+        seedId,
+        index % 2 === 0
+          ? { A: "clap_native", B: "openl3" }
+          : { A: "openl3", B: "clap_native" },
+      ]),
+    ),
+  }),
+  packet.similaritySeedIds,
+);
+const loadedBlind = await importBlindAssignments(blind.repository, blindMap);
+assert.equal(loadedBlind.blindAssignments, 20);
+const blindBeforeConflict = await repository.listBlindAssignments(experiment.id);
 const swappedSeed = packet.similaritySeedIds[0];
 await assert.rejects(
   () =>
-    importListeningPacket(blind.repository, {
-      ...packet,
-      blindBySeed: {
-        ...packet.blindBySeed,
-        [swappedSeed]: {
-          A: packet.blindBySeed[swappedSeed].B,
-          B: packet.blindBySeed[swappedSeed].A,
-        },
+    importBlindAssignments(blind.repository, {
+      ...blindMap,
+      [swappedSeed]: {
+        A: blindMap[swappedSeed].B,
+        B: blindMap[swappedSeed].A,
       },
     }),
   (error: unknown) => error instanceof MusicLabImportError && error.code === "blind_key_conflict",
 );
 assert.deepEqual(await blind.repository.listResponses(experiment.id), preserved);
+assert.deepEqual(await repository.listBlindAssignments(experiment.id), blindBeforeConflict);
+await importListeningPacket(blind.repository, packet);
+assert.deepEqual(await repository.listBlindAssignments(experiment.id), blindBeforeConflict);
 
 await assert.rejects(
   () =>
@@ -334,7 +349,7 @@ await saveMusicLabResponse({
   answers: uncertainListen(),
 });
 
-const migration = read("supabase/migrations/20261203120000_music_analyzer_lab_v01.sql");
+const migration = read("supabase/migrations/20261204120000_music_analyzer_lab_v01.sql");
 const sql = migration.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--.*$/gm, "");
 for (const table of MUSIC_LAB_FORBIDDEN_PRODUCTION_TABLES) {
   assert.equal(sql.includes(table), false, table);
@@ -390,9 +405,34 @@ assert.equal(isMusicLabAnalyticsRoute("/music-analyzer/results"), true);
 assert.match(read("src/app/(platform)/music-analyzer/layout.tsx"), /PRIVATE_PAGE_ROBOTS/);
 assert.match(read("next.config.ts"), /\/music-analyzer[\s\S]*noindex, nofollow/);
 
-const committedAudio = walk(path.join(root, "data/music-lab")).filter((file) =>
-  /\.(mp3|wav|flac)$/i.test(file),
-);
+const packetFiles = walk(path.join(root, "data/music-lab"), /$/);
+assert.equal(packetFiles.some((file) => file.endsWith("similarity_ear_key.json")), false);
+for (const file of packetFiles) {
+  if (file.endsWith(".gitignore")) {
+    continue;
+  }
+  const source = readFileSync(file, "utf8");
+  assert.equal(source.includes("clap_native"), false, file);
+  assert.equal(source.includes("openl3"), false, file);
+  assert.equal(source.includes("/Users/"), false, file);
+}
+const ignoreText = `${read(".gitignore")}\n${read("data/music-lab/.gitignore")}`;
+assert.match(ignoreText, /similarity_ear_key\.json/);
+assert.equal(read("src/app/api/music-analyzer/import/route.ts").includes("clap_native"), false);
+assert.equal(read("src/lib/music-lab/workflow.ts").includes("similarity_ear_key"), false);
+assert.equal(read("src/lib/music-lab/packet.ts").includes("similarity_ear_key"), false);
+
+const bundleDir = path.join(root, ".next/static");
+if (existsSync(bundleDir)) {
+  for (const file of walk(bundleDir, /\.js$/)) {
+    const source = readFileSync(file, "utf8");
+    assert.equal(source.includes("clap_native"), false, file);
+    assert.equal(source.includes("openl3"), false, file);
+    assert.equal(source.includes("similarity_ear_key"), false, file);
+  }
+}
+
+const committedAudio = packetFiles.filter((file) => /\.(mp3|wav|flac)$/i.test(file));
 assert.deepEqual(committedAudio, []);
 
 console.log("music-lab-unit: ok");

@@ -20,13 +20,14 @@ export type SimilarityPacketRow = {
   neighbourFilename: string;
 };
 
+export type BlindKeyMap = Record<string, { A: BlindSystemCode; B: BlindSystemCode }>;
+
 export type ListeningPacket = {
   version: string;
   listenTracks: ListeningTrack[];
   similarityRows: SimilarityPacketRow[];
   similaritySeedIds: string[];
   bpmTracks: ListeningTrack[];
-  blindBySeed: Record<string, { A: BlindSystemCode; B: BlindSystemCode }>;
   filenamesByTrackId: Map<string, string>;
 };
 
@@ -48,7 +49,6 @@ export function parseListeningPacketFiles(files: {
   listenCsv: string;
   similarityCsv: string;
   bpmCsv: string;
-  blindKeyJson: string;
 }): ListeningPacket {
   const trackSet = JSON.parse(files.trackSetJson) as {
     listening_version?: string;
@@ -57,9 +57,6 @@ export function parseListeningPacketFiles(files: {
   const listenRows = csvObjects(files.listenCsv);
   const similarityRowsRaw = csvObjects(files.similarityCsv);
   const bpmRows = csvObjects(files.bpmCsv);
-  const blind = JSON.parse(files.blindKeyJson) as {
-    panels_by_seed?: Record<string, { A?: string; B?: string }>;
-  };
 
   const listenTracks = listenRows.map((row) =>
     requireFilename(row.track_id ?? "", row.filename ?? ""),
@@ -102,18 +99,6 @@ export function parseListeningPacketFiles(files: {
     ? trackSet.similarity_seed_ids.map((id) => id.trim()).filter(Boolean)
     : [];
 
-  const blindBySeed: ListeningPacket["blindBySeed"] = {};
-  const panels = blind.panels_by_seed ?? {};
-  for (const seedId of similaritySeedIds) {
-    const panel = panels[seedId];
-    const systemA = panel?.A ?? "";
-    const systemB = panel?.B ?? "";
-    if (!isBlindSystem(systemA) || !isBlindSystem(systemB) || systemA === systemB) {
-      throw new Error("music_lab_packet_invalid");
-    }
-    blindBySeed[seedId] = { A: systemA, B: systemB };
-  }
-
   if (listenTracks.length === 0 || bpmTracks.length === 0 || similaritySeedIds.length === 0) {
     throw new Error("music_lab_packet_invalid");
   }
@@ -124,9 +109,38 @@ export function parseListeningPacketFiles(files: {
     similarityRows,
     similaritySeedIds,
     bpmTracks,
-    blindBySeed,
     filenamesByTrackId,
   };
+}
+
+export function parseBlindKeyJson(
+  blindKeyJson: string,
+  similaritySeedIds: readonly string[],
+): BlindKeyMap {
+  const blind = JSON.parse(blindKeyJson) as {
+    panels_by_seed?: Record<string, { A?: string; B?: string }>;
+  };
+  const panels = blind.panels_by_seed ?? {};
+  const expected = new Set(similaritySeedIds);
+  if (expected.size !== similaritySeedIds.length) {
+    throw new Error("music_lab_packet_invalid");
+  }
+  const provided = Object.keys(panels);
+  if (provided.length !== expected.size || provided.some((seedId) => !expected.has(seedId))) {
+    throw new Error("music_lab_packet_invalid");
+  }
+
+  const blindBySeed: BlindKeyMap = {};
+  for (const seedId of similaritySeedIds) {
+    const panel = panels[seedId];
+    const systemA = panel?.A ?? "";
+    const systemB = panel?.B ?? "";
+    if (!isBlindSystem(systemA) || !isBlindSystem(systemB) || systemA === systemB) {
+      throw new Error("music_lab_packet_invalid");
+    }
+    blindBySeed[seedId] = { A: systemA, B: systemB };
+  }
+  return blindBySeed;
 }
 
 export function readListeningPacketDir(directory: string): ListeningPacket {
@@ -136,7 +150,6 @@ export function readListeningPacketDir(directory: string): ListeningPacket {
     listenCsv: read("human_listen_sheet.csv"),
     similarityCsv: read("similarity_ear_sheet.csv"),
     bpmCsv: read("bpm_key_gt_sheet.csv"),
-    blindKeyJson: read("similarity_ear_key.json"),
   });
 }
 

@@ -1,7 +1,7 @@
 {
   "listening_version": "0.5",
   "labels_included": false,
-  "config": "/Users/sergeypetrov/Desktop/music-analyzer-research/music-analyzer/config/listening_v05.yaml",
+  "config": "config/listening_v05.yaml",
   "input_dir": "test_tracks",
   "note": "Inventory heading says suggested 17. The id list under that heading has 16 tracks. This config follows the id list.",
   "track_count": 16,
