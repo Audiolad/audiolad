@@ -616,3 +616,19 @@ Builder).
 **Реализация:** интеграция пока не реализована. Конкретный набор способов регистрации не утверждён.
 
 **Принято:** владелец проекта и архитектор (предварительное направление).
+
+## ADR: Single playback ledger + usage_kind (A3)
+
+Date: 2026-09-27
+
+Context: B2B Proof of Play must attribute Track → Player → Zone → Location → Organization without corrupting consumer listening analytics.
+
+Decision:
+
+1. Keep one durable ledger: `playback_usage_facts` (no second B2B ledger).
+2. Discriminator `usage_kind` ∈ {consumer, business}; never infer from `user_id`.
+3. Canonical snapshot columns: organization_id / location_id / zone_id / player_id (no destructive FK).
+4. Legacy business_account_id / venue_id remain unused reserved NULL.
+5. A3 = Playback Evidence only; royalty_eligible_ms and billing_period_start stay NULL.
+6. Reuse `apply_playback_usage_heartbeat` media-time acceptance via B2B wrapper auth + context upsert.
+7. Existing consumer admin/author readers filter `usage_kind = 'consumer'`.

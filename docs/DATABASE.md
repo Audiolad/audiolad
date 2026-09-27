@@ -1579,6 +1579,70 @@ Heartbeat не возвращает Organization/Zone/memberships. Не прин
 
 `playback_usage_facts` / Music Passport / Business App UI в A2 **не** меняются.
 
+## Business Playback Attribution (A3)
+
+Миграция: `supabase/migrations/20261203120000_business_playback_attribution.sql`.
+
+Канонический durable ledger остаётся **один**: `public.playback_usage_facts`. Второй ledger запрещён.
+
+### Discriminator
+
+- `usage_kind text NOT NULL DEFAULT 'consumer'` на `playback_usage_contexts` и `playback_usage_facts`
+- V1: `consumer` | `business` (CHECK)
+- Существующие строки = `consumer`
+- B2B facts = `business`
+- Не использовать presence/absence `user_id` как discriminator
+
+### Canonical B2B snapshot columns (historical, no destructive FK)
+
+На contexts и facts:
+
+- `organization_id`
+- `location_id`
+- `zone_id`
+- `player_id`
+
+Legacy `business_account_id` / `venue_id` **не** rename, **не** backfill, **не** заполняются в A3.
+
+CHECK:
+
+- consumer → все четыре B2B snapshot NULL
+- business → все четыре NOT NULL
+
+### Evidence ≠ Qualified Usage ≠ Money
+
+A3 пишет только Playback Evidence. Для business fact:
+
+- `royalty_eligible_ms = NULL`
+- `billing_period_start = NULL`
+
+Rights / Economics — отдельные bounded contexts.
+
+### Machine RPC
+
+`apply_business_playback_usage_heartbeat(credential, client_event_id, playback_session_id, sample_seq, audio_item_id, position_ms, …)`
+
+- Identity: credential → hash → `business_player_credentials` → Player (`FOR SHARE`)
+- Space: active assignment → Zone → Location → Organization
+- Track: `audio_item_id` → practice → `author_id` (только `product_kind='music'`)
+- Listening key: `business:{player_id}:{playback_session_id}` (server-formed)
+- Reuses media-time acceptance of `apply_playback_usage_heartbeat` (не копирует алгоритм)
+- `occurred_at` = server time
+- Response: `{ok, accepted_ms, duplicate, server_time}`
+- `anon`/`authenticated` EXECUTE; no browser SELECT on ledger tables
+
+Connectivity heartbeat A2 (`record_business_player_heartbeat`) ≠ playback media-time A3.
+
+### Consumer analytics isolation
+
+`playback_usage_admin_facts` и `author_stats_listening_facts` читают только `usage_kind = 'consumer'`.
+
+### Indexes (partial, business only)
+
+- `(organization_id, occurred_at) WHERE usage_kind='business'`
+- `(player_id, occurred_at) WHERE usage_kind='business'`
+
+
 ## Резервное копирование
 
 Будет заполнено позже.

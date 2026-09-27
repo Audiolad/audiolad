@@ -5,12 +5,13 @@
 Последнее обновление: 2026-07-15
 
 
-## Аудиолад Бизнес (факт на момент A2)
+## Аудиолад Бизнес (факт на момент A3)
 
 - **A1** Business Domain Core: Organization → Location → Zone + membership/bootstrap.
 - **A2** Player foundation: `business_players` / assignments / credentials / runtime + create/assign/heartbeat/health/rotate RPC.
 - Technical Player Health derived from server heartbeat (`never_seen` / `online` / `stale` / `offline`).
-- Business App UI по-прежнему на mock-data; к domain/Player не подключён.
+- **A3** B2B Playback Attribution: `usage_kind` consumer|business; canonical org/location/zone/player snapshots on existing `playback_usage_facts`; machine RPC `apply_business_playback_usage_heartbeat`; consumer analytics isolated.
+- Business App UI по-прежнему на mock-data; к domain/Player/playback не подключён.
 - Actual playback engine / offline cache / Proof of Play / B2B attribution / billing / Sonic DNA / Rights — не реализованы.
 - `MERGE=NO`, `DEPLOY=NO`, production DB apply не выполнялся в рамках A2.
 

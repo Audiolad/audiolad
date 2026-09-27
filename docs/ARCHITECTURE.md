@@ -344,7 +344,8 @@ Health
 - User-facing host `business.audiolad.ru` обслуживает Business App shell (`/business-app/*`).
 - Business App **ещё на mock-data** и к domain/Player health не подключён.
 - **Player Health ≠ Playback Health** (и ≠ mock Home `healthy/autonomous/stopped`).
-- Следующие слои (отдельные PR): B2B attribution в `playback_usage_facts` → billing / rights / Sonic DNA / offline cache.
+- **A3** B2B Playback Attribution: `20261203120000_business_playback_attribution.sql` — single ledger `playback_usage_facts` + `usage_kind` + canonical Organization/Location/Zone/Player snapshots; Evidence only (not Qualified Usage / Royalty).
+- Следующие слои (отдельные PR): Qualified Usage / billing / rights / Sonic DNA / offline cache / Business App wiring.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса.
 
