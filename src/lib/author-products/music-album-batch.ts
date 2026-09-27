@@ -1,4 +1,12 @@
-import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
+import {
+  getProductFieldErrorMessage,
+  PRODUCT_CONTENT_LIMITS,
+} from "@/lib/author-products/limits";
+import {
+  getProductSaveErrorMessage,
+  PRODUCT_SAVE_ERROR_FALLBACK,
+  PRODUCT_SAVE_SERVER_MESSAGE,
+} from "@/lib/author-products/save-errors";
 import { validateMusicMasterFileClient } from "@/lib/author-products/music-master-upload-contract";
 import { validateProductAudioFileClient } from "@/lib/author-products/product-audio-upload-contract";
 import {
@@ -131,12 +139,46 @@ export function formatAlbumBatchOverflowMessage(overflow: readonly string[]): st
   return `За один раз можно добавить не больше ${MAX_MUSIC_ALBUM_BATCH_FILES} файлов. Не добавлены: ${overflow.join(", ")}.`;
 }
 
+export const ALBUM_BATCH_CREATE_SERVER_FAILURE =
+  "Не удалось создать трек на сервере.";
+
+/** Russian reason for a failed album-track POST, when the API sent `error`. */
+export function describeAlbumBatchCreateError(
+  error: string | null | undefined,
+): string | null {
+  const code = error?.trim() ?? "";
+  if (!code) {
+    return null;
+  }
+  if (code === "internal_error") {
+    return ALBUM_BATCH_CREATE_SERVER_FAILURE;
+  }
+  const fieldMessage = getProductFieldErrorMessage(code);
+  if (fieldMessage) {
+    return fieldMessage;
+  }
+  const mapped = getProductSaveErrorMessage({ error: code });
+  if (
+    mapped === PRODUCT_SAVE_ERROR_FALLBACK ||
+    mapped === PRODUCT_SAVE_SERVER_MESSAGE
+  ) {
+    return null;
+  }
+  return mapped;
+}
+
 export function formatAlbumBatchCreateFailure(
   created: number,
   planned: number,
   fileName: string,
+  reason?: string | null,
 ): string {
-  return `Добавлено ${created} из ${planned} треков. Не удалось добавить ${fileName}.`;
+  const summary = `Добавлено ${created} из ${planned} треков. Не удалось добавить ${fileName}.`;
+  const detail = reason?.trim();
+  if (!detail) {
+    return summary;
+  }
+  return `${summary} ${detail}`;
 }
 
 /** New music albums start empty. Every track comes from the album drop zone. */

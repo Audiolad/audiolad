@@ -173,6 +173,7 @@ import {
   validateStudioMusicPaidPriceInputDraft,
 } from "@/lib/author-products/price-input-draft";
 import {
+  describeAlbumBatchCreateError,
   formatAlbumBatchCreateFailure,
   formatAlbumBatchOverflowMessage,
   formatAlbumBatchSkipMessage,
@@ -2643,6 +2644,7 @@ export default function AuthorProductForm({
     let created = 0;
     const stagedIds: string[] = [];
     const failedNames: string[] = [];
+    let failureReason: string | null = null;
 
     try {
       const ensured = await ensurePracticeId();
@@ -2668,8 +2670,14 @@ export default function AuthorProductForm({
           const payload = (await response.json()) as {
             product?: AuthorProductDetail;
             audio_item?: AudioItemRow;
+            error?: string;
           };
           if (!response.ok || !payload.audio_item) {
+            if (failedNames.length === 0) {
+              failureReason = describeAlbumBatchCreateError(
+                typeof payload.error === "string" ? payload.error : null,
+              );
+            }
             failedNames.push(file.name);
             continue;
           }
@@ -2703,6 +2711,7 @@ export default function AuthorProductForm({
           created,
           plan.accepted.length,
           failedNames[0] ?? "файл",
+          failureReason,
         ),
       );
     }

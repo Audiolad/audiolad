@@ -1650,6 +1650,15 @@ Connectivity heartbeat A2 (`record_business_player_heartbeat`) ≠ playback medi
 - `(organization_id, occurred_at) WHERE usage_kind='business'`
 - `(player_id, occurred_at) WHERE usage_kind='business'`
 
+## music_track_code (идентичность музыкального трека)
+
+Миграции:
+
+- `20261129120000_music_track_identity.sql` — колонка `audio_items.music_track_code`, последовательность и триггеры. `next_music_track_code()` после неё доступна только `service_role`.
+- `20261203120100_music_track_identity_definer.sql` — `ensure_music_track_identity()` и `backfill_music_track_identity_on_kind_change()` работают как `SECURITY DEFINER` с `search_path = public, pg_temp`. Restamp с `20261203120000`: этот штамп на main занят `business_playback_attribution`.
+
+`EXECUTE` на `next_music_track_code()` роли `authenticated` не выдаётся: функция двигает общую последовательность. Авторский INSERT музыкального трека назначает код внутри триггера от имени владельца функции (на этом Supabase это `postgres`). Прямой вызов issuer автором остаётся запрещённым. Неуспешный INSERT не создаёт строку `audio_items`.
+
 ## Music Analyzer Lab (черновик, не применено к production)
 
 Миграция `supabase/migrations/20261204120000_music_analyzer_lab_v01.sql` — изолированные таблицы `music_lab_experiments`, `music_lab_items`, `music_lab_tasks`, `music_lab_responses`, `music_lab_blind_assignments` и приватный bucket `music-analyzer-lab`.
