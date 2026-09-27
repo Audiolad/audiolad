@@ -127,8 +127,10 @@ assert.equal(toAbsoluteSitemapUrl("/b", PRODUCTION_APP_ORIGIN), "https://audiola
 
 const nextConfig = read("next.config.ts");
 assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/|["'])/);
-assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 2);
+assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 4);
 assert.match(nextConfig, /source:\s*"\/auth\/:path\*"[\s\S]*X-Robots-Tag/);
+assert.match(nextConfig, /source:\s*"\/music-analyzer"[\s\S]*X-Robots-Tag/);
+assert.match(nextConfig, /source:\s*"\/music-analyzer\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/d\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(view, /alt=\{venue\.imageAlt\}/);
 assert.match(view, /alt="Женщина с ноутбуком в светлом зале с растениями\."/);
