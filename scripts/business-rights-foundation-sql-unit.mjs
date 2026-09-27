@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20261204120000_music_rights_foundation.sql";
+const migrationName = "20261205120000_music_rights_foundation.sql";
 const migrationPath = join(repoRoot, "supabase/migrations", migrationName);
 const stubPath = join(repoRoot, "scripts/lib/business-rights-foundation-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/music_rights_foundation_smoke.sql");

@@ -1674,7 +1674,7 @@ RLS включён, политик для `anon` / `authenticated` нет: до�
 
 ## Music Rights Foundation (A4)
 
-Migration: `20261204120000_music_rights_foundation.sql`
+Migration: `20261205120000_music_rights_foundation.sql`
 
 Rights domain is **global/shared**. It is not Organization-scoped in A4.
 
