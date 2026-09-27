@@ -10,10 +10,10 @@
 - **A1** Business Domain Core: Organization → Location → Zone + membership/bootstrap.
 - **A2** Player foundation: `business_players` / assignments / credentials / runtime + create/assign/heartbeat/health/rotate RPC.
 - Technical Player Health derived from server heartbeat (`never_seen` / `online` / `stale` / `offline`).
-- **A3** B2B Playback Attribution: `usage_kind` consumer|business; canonical org/location/zone/player snapshots on existing `playback_usage_facts`; machine RPC `apply_business_playback_usage_heartbeat`; consumer analytics isolated.
+- **A3** B2B Playback Attribution / **online evidence foundation** — реализовано: `usage_kind` consumer|business; canonical org/location/zone/player snapshots on existing `playback_usage_facts`; machine RPC `apply_business_playback_usage_heartbeat`; consumer analytics isolated; reassignment re-baselines media-time.
 - Business App UI по-прежнему на mock-data; к domain/Player/playback не подключён.
-- Actual playback engine / offline cache / Proof of Play / B2B attribution / billing / Sonic DNA / Rights — не реализованы.
-- `MERGE=NO`, `DEPLOY=NO`, production DB apply не выполнялся в рамках A2.
+- Ещё не реализованы: full Proof of Play (product UX), offline/cache evidence + provenance, Rights qualification / Qualified Usage, financial usage / billing, Player playback engine, Analyzer / Sonic DNA / Music Passport.
+- `MERGE=NO`, `DEPLOY=NO`, `PRODUCTION_DB_APPLY=NO` в рамках A3 Draft (production DB apply не выполнялся).
 
 ## Сводный статус
 

@@ -43,7 +43,6 @@ DECLARE
   v_zone_old uuid;
   v_zone_new uuid;
   v_fact_zone uuid;
-  v_new_session uuid := '12121212-1212-4121-8121-121212121212';
   v_before timestamptz;
   v_after timestamptz;
 BEGIN
@@ -231,7 +230,7 @@ BEGIN
     RAISE EXCEPTION 'Case16: impossible jump should be 0 got %', v_hb;
   END IF;
 
-  -- Case 17–18: reassignment A→B keeps old facts A; new facts B
+  -- Case 17–18: reassignment A→B on SAME playback_session re-baselines; old facts stay A
   RESET ROLE;
   SELECT zone_id INTO v_zone_old FROM public.playback_usage_facts WHERE client_event_id = v_event2;
   IF v_zone_old IS DISTINCT FROM v_zone THEN
@@ -244,15 +243,20 @@ BEGIN
   RESET ROLE;
   EXECUTE 'SET ROLE anon';
 
-  PERFORM public.apply_business_playback_usage_heartbeat(
-    v_cred, v_event4, v_new_session, 1, audio_id, 0
+  -- Same playback_session_id as Zone A; continue audio_id2; sample_seq stays monotonic (7, 8).
+  v_hb := public.apply_business_playback_usage_heartbeat(
+    v_cred, v_event4, v_session, 7, audio_id2, 500, NULL, NULL, 'advance'
   );
+  IF coalesce((v_hb->>'accepted_ms')::bigint, -1) <> 0 THEN
+    RAISE EXCEPTION 'Case17: first sample after reassignment must baseline +0 got %', v_hb;
+  END IF;
+
   PERFORM pg_sleep(3);
   v_hb := public.apply_business_playback_usage_heartbeat(
-    v_cred, v_event5, v_new_session, 2, audio_id, 3500
+    v_cred, v_event5, v_session, 8, audio_id2, 4000, NULL, NULL, 'advance'
   );
   IF coalesce((v_hb->>'accepted_ms')::bigint, 0) <= 0 THEN
-    RAISE EXCEPTION 'Case17: post-reassign accept failed %', v_hb;
+    RAISE EXCEPTION 'Case17: second sample after reassignment should accept under Zone B got %', v_hb;
   END IF;
 
   RESET ROLE;
@@ -263,6 +267,11 @@ BEGIN
   SELECT zone_id INTO v_zone_new FROM public.playback_usage_facts WHERE client_event_id = v_event5;
   IF v_zone_new IS DISTINCT FROM v_zone2 THEN
     RAISE EXCEPTION 'Case17: new fact expected zone B got %', v_zone_new;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.playback_usage_facts WHERE client_event_id = v_event4 AND listened_ms > 0
+  ) THEN
+    RAISE EXCEPTION 'Case17: baseline sample must not create positive fact';
   END IF;
 
   -- Case 23/24: consumer analytics exclude business

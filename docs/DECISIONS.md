@@ -621,7 +621,7 @@ Builder).
 
 Date: 2026-09-27
 
-Context: B2B Proof of Play must attribute Track → Player → Zone → Location → Organization without corrupting consumer listening analytics.
+Context: B2B online playback evidence must attribute Track → Player → Zone → Location → Organization without corrupting consumer listening analytics. Full Proof of Play / offline / Rights / Money stay later layers.
 
 Decision:
 
@@ -629,6 +629,8 @@ Decision:
 2. Discriminator `usage_kind` ∈ {consumer, business}; never infer from `user_id`.
 3. Canonical snapshot columns: organization_id / location_id / zone_id / player_id (no destructive FK).
 4. Legacy business_account_id / venue_id remain unused reserved NULL.
-5. A3 = Playback Evidence only; royalty_eligible_ms and billing_period_start stay NULL.
+5. A3 = online Playback Evidence only; royalty_eligible_ms and billing_period_start stay NULL.
 6. Reuse `apply_playback_usage_heartbeat` media-time acceptance via B2B wrapper auth + context upsert.
 7. Existing consumer admin/author readers filter `usage_kind = 'consumer'`.
+8. Time: `occurred_at` is canonical playback event time; online A3 sets it from server sample-processing time. `created_at` is ledger write time. Do not treat occurred_at as a forever-universal synonym of server wall-clock time. Do not accept raw client timestamps in A3. Future offline-sync may write historical `occurred_at` only from a server-validated reconstructed Player timeline. No fake offline=false flag in A3.
+9. Reassignment boundary: when live attribution (org/location/zone/player) changes on an existing B2B context, the first sample under the new assignment is a media-time baseline (`accepted_ms = 0`); historical facts keep the old snapshot; `sample_seq` stays monotonic; a new playback_session_id is not required.

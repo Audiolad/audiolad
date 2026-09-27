@@ -90,6 +90,50 @@ assert(migration.includes("client_event_identity_conflict"), "identity-safe idem
 assert(!/\bSET\s+royalty_eligible_ms\s*=/i.test(migration), "must not SET royalty_eligible_ms");
 assert(!/\bSET\s+billing_period_start\s*=/i.test(migration), "must not SET billing_period_start");
 assert(migration.includes("Evidence only"), "evidence-only comment");
+assert(migration.includes("last_reported_at = CASE"), "reassignment re-baseline clears last_reported_at");
+assert(migration.includes("canonical playback event time"), "occurred_at column comment");
+assert(migration.includes("ledger write time"), "created_at / ledger write time semantics");
+{
+  const docs = [
+    readFileSync(join(repoRoot, "docs/DATABASE.md"), "utf8"),
+    readFileSync(join(repoRoot, "docs/ARCHITECTURE.md"), "utf8"),
+    readFileSync(join(repoRoot, "docs/DECISIONS.md"), "utf8"),
+  ].join("\n");
+  const affirmativeServerTime = [
+    /`occurred_at`\s*=\s*server time/i,
+    /occurred_at\s*=\s*server time(?!\s+as\s+a\s+forever)/i,
+    /- `occurred_at` = server time/i,
+  ];
+  for (const re of affirmativeServerTime) {
+    const m = docs.match(re);
+    if (m) {
+      const idx = docs.search(re);
+      const window = docs.slice(Math.max(0, idx - 60), idx + 80);
+      assert(
+        /do not|не универсал|forever-universal synonym|not a universal/i.test(window),
+        "docs must not claim universal occurred_at = server time; near: " + window.replace(/\s+/g, " "),
+      );
+    }
+  }
+  assert(!/- `occurred_at` = server time\n/i.test(docs), "DATABASE bullet must not be occurred_at = server time");
+  assert(docs.includes("canonical playback event time"), "docs: canonical playback event time");
+  assert(docs.includes("online"), "docs: online A3 path");
+  assert(
+    /re-baselines media-time|reassignment re-baselines|первый sample нового assignment = media-time baseline/i.test(docs),
+    "docs: reassignment re-baseline",
+  );
+  const projectState = readFileSync(join(repoRoot, "docs/PROJECT_STATE.md"), "utf8");
+  assert(
+    /online evidence foundation/i.test(projectState),
+    "PROJECT_STATE: online evidence foundation implemented",
+  );
+  assert(
+    !/Proof of Play \/ B2B attribution \/ billing/i.test(projectState),
+    "PROJECT_STATE must not lump B2B attribution with unimplemented Proof of Play",
+  );
+  assert(/в рамках A3/i.test(projectState), "PROJECT_STATE stop flags refer to A3");
+}
+
 assert(migration.includes("audio_item_not_music"), "music-only gate");
 assert(migration.includes("v_row.usage_kind"), "fact copies usage_kind from context");
 assert(migration.includes("v_row.organization_id"), "fact copies org from context");
@@ -128,6 +172,8 @@ assert(smoke.includes("Case14"), "smoke Case14");
 assert(smoke.includes("Case15"), "smoke Case15");
 assert(smoke.includes("Case16"), "smoke Case16");
 assert(smoke.includes("Case17"), "smoke Case17");
+assert(smoke.includes("first sample after reassignment must baseline"), "smoke reassignment baseline");
+assert(smoke.includes("v_session, 7, audio_id2"), "smoke same session after reassignment");
 assert(smoke.includes("Case18"), "smoke Case18");
 assert(smoke.includes("Case23"), "smoke Case23");
 assert(smoke.includes("Case24"), "smoke Case24");

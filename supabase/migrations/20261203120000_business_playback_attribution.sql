@@ -776,6 +776,25 @@ BEGIN
     location_id = EXCLUDED.location_id,
     zone_id = EXCLUDED.zone_id,
     player_id = EXCLUDED.player_id,
+    -- Attribution boundary: interval started under Zone A must not credit Zone B.
+    -- Clear last_reported_at so the first sample after reassignment is a media-time baseline (+0).
+    -- Keep last_sample_seq (monotonic) and accepted_listened_ms (lifetime budget within session).
+    last_reported_at = CASE
+      WHEN public.playback_usage_contexts.organization_id IS DISTINCT FROM EXCLUDED.organization_id
+        OR public.playback_usage_contexts.location_id IS DISTINCT FROM EXCLUDED.location_id
+        OR public.playback_usage_contexts.zone_id IS DISTINCT FROM EXCLUDED.zone_id
+        OR public.playback_usage_contexts.player_id IS DISTINCT FROM EXCLUDED.player_id
+      THEN NULL
+      ELSE public.playback_usage_contexts.last_reported_at
+    END,
+    last_position_ms = CASE
+      WHEN public.playback_usage_contexts.organization_id IS DISTINCT FROM EXCLUDED.organization_id
+        OR public.playback_usage_contexts.location_id IS DISTINCT FROM EXCLUDED.location_id
+        OR public.playback_usage_contexts.zone_id IS DISTINCT FROM EXCLUDED.zone_id
+        OR public.playback_usage_contexts.player_id IS DISTINCT FROM EXCLUDED.player_id
+      THEN 0
+      ELSE public.playback_usage_contexts.last_position_ms
+    END,
     updated_at = v_now;
 
   SELECT a.accepted_ms, a.duplicate
@@ -808,7 +827,7 @@ $$;
 COMMENT ON FUNCTION public.apply_business_playback_usage_heartbeat(
   text, uuid, uuid, bigint, uuid, bigint, bigint, numeric, text
 ) IS
-  'audiolad:business-playback; machine media-time into playback_usage_facts. Credential identity; server-derived Player/Zone/Location/Organization and practice/author. Evidence only — royalty_eligible_ms stays NULL.';
+  'audiolad:business-playback; online Evidence only into playback_usage_facts. Credential identity; server-derived Player/Zone/Location/Organization and practice/author. occurred_at is canonical playback event time (online A3: sample processing time on server); created_at is ledger write time. Attribution change re-baselines media-time (+0). royalty_eligible_ms stays NULL. No offline path in A3.';
 
 REVOKE ALL ON FUNCTION public.apply_business_playback_usage_heartbeat(
   text, uuid, uuid, bigint, uuid, bigint, bigint, numeric, text
