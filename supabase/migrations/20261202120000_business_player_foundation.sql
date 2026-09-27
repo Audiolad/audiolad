@@ -1,10 +1,8 @@
 BEGIN;
 
--- pgcrypto provides digest() / gen_random_bytes() in public for compile envs
--- that do not ship an extensions schema.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 -- Foundation A2: Business Player Identity, Assignment, Heartbeat & Health
+-- Credential hashing uses core sha256(); credential entropy uses gen_random_uuid() only.
+-- No pgcrypto / digest() / gen_random_bytes() dependency.
 -- Zone → Player → Assignment → Heartbeat → derived Health.
 -- Expand-only. No playback_usage_facts wiring, Music Passport, billing, or Business App UI.
 -- Player Health ≠ Playback Health (heartbeat loss does not mean music stopped).
@@ -246,19 +244,21 @@ IMMUTABLE
 STRICT
 SET search_path = public, pg_temp
 AS $$
-  SELECT digest(convert_to(p_credential, 'UTF8'), 'sha256');
+  SELECT sha256(convert_to(p_credential, 'UTF8'));
 $$;
 
 REVOKE ALL ON FUNCTION public.business_player_hash_credential(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.business_player_hash_credential(text) TO service_role;
 
+-- Canonical machine credential: 64 lowercase hex chars (~244-bit UUID-v4 entropy class).
 CREATE OR REPLACE FUNCTION public.business_player_generate_credential()
 RETURNS text
 LANGUAGE sql
 VOLATILE
 SET search_path = public, pg_temp
 AS $$
-  SELECT encode(gen_random_bytes(32), 'hex');
+  SELECT replace(gen_random_uuid()::text, '-', '')
+      || replace(gen_random_uuid()::text, '-', '');
 $$;
 
 REVOKE ALL ON FUNCTION public.business_player_generate_credential() FROM PUBLIC, anon, authenticated;
@@ -271,7 +271,7 @@ GRANT EXECUTE ON FUNCTION public.business_player_generate_credential() TO servic
 
 CREATE OR REPLACE FUNCTION public.business_player_derived_health(
   p_last_heartbeat_at timestamptz,
-  p_as_of timestamptz DEFAULT clock_timestamp()
+  p_as_of timestamptz DEFAULT statement_timestamp()
 )
 RETURNS text
 LANGUAGE sql
@@ -287,7 +287,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.business_player_derived_health(timestamptz, timestamptz) IS
-  'audiolad:business-player; derived connectivity health from server last_heartbeat_at. Not playback health.';
+  'audiolad:business-player; derived connectivity health from server last_heartbeat_at using statement_timestamp as_of. Not playback health.';
 
 REVOKE ALL ON FUNCTION public.business_player_derived_health(timestamptz, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.business_player_derived_health(timestamptz, timestamptz) FROM anon;
@@ -459,10 +459,12 @@ BEGIN
     RAISE EXCEPTION 'invalid_assignment_args' USING ERRCODE = '22023';
   END IF;
 
+  -- Serialize concurrent assign/reassign on this Player (row lock).
   SELECT p.organization_id, p.status
   INTO v_player_org, v_player_status
   FROM public.business_players AS p
-  WHERE p.id = p_player_id;
+  WHERE p.id = p_player_id
+  FOR UPDATE;
 
   IF v_player_org IS NULL THEN
     RAISE EXCEPTION 'player_not_found' USING ERRCODE = 'P0002';
@@ -539,7 +541,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.assign_business_player_to_zone(uuid, uuid) IS
-  'audiolad:business-player; owner-only assign Player to Zone. Closes previous active assignment. Idempotent for same Zone.';
+  'audiolad:business-player; owner-only assign Player to Zone. Locks Player row (FOR UPDATE), closes previous active assignment. Idempotent for same Zone.';
 
 REVOKE ALL ON FUNCTION public.assign_business_player_to_zone(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.assign_business_player_to_zone(uuid, uuid) FROM anon;
@@ -629,7 +631,8 @@ DECLARE
   v_app text := NULLIF(btrim(coalesce(p_app_version, '')), '');
   v_now timestamptz := clock_timestamp();
 BEGIN
-  IF char_length(v_cred) < 32 THEN
+  -- Canonical credential is exactly 64 lowercase hex; reject before hashing.
+  IF v_cred !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid_player_credential' USING ERRCODE = '42501';
   END IF;
 
@@ -659,6 +662,10 @@ BEGIN
     last_client_time = p_client_time,
     app_version = COALESCE(v_app, app_version)
   WHERE player_id = v_player_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'player_runtime_missing' USING ERRCODE = 'P0002';
+  END IF;
 
   RETURN jsonb_build_object(
     'ok', true,
@@ -702,7 +709,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_id uuid := auth.uid();
-  v_as_of timestamptz := clock_timestamp();
+  v_as_of timestamptz := statement_timestamp();
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';

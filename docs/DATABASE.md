@@ -1550,9 +1550,13 @@ Status Player: `active` / `suspended` / `retired`. Hard DELETE API нет.
 
 Assignment: максимум один active на Player (`UNIQUE(player_id) WHERE unassigned_at IS NULL`). Несколько Players в одной Zone **разрешены**. Cross-organization assignment запрещён (RPC + trigger).
 
-Credential: SHA-256 `bytea` hash в отдельной таблице. Plaintext только один раз при create/rotate. Authenticated **не** имеет SELECT на credentials/runtime.
+Credential: canonical plaintext — 64 lowercase hex (entropy from two `gen_random_uuid()`). Hash — core `sha256(convert_to(...))` → `bytea` (no pgcrypto). Plaintext только один раз при create/rotate. Authenticated **не** имеет SELECT на credentials/runtime.
 
-Health derived от `business_player_runtime.last_heartbeat_at` (server time) через `business_player_derived_health`:
+Heartbeat принимает только `^[0-9a-f]{64}$` до hash; malformed → generic `invalid_player_credential`. Отсутствие runtime row → `player_runtime_missing` (fail-closed).
+
+`assign_business_player_to_zone` сериализует concurrent assign через `FOR UPDATE` на `business_players`.
+
+Health derived от `business_player_runtime.last_heartbeat_at` (server time) через `business_player_derived_health` с `statement_timestamp()` as_of:
 
 - `never_seen` — heartbeat ещё не было
 - `online` — age ≤ 90s
@@ -1566,7 +1570,7 @@ Health derived от `business_player_runtime.last_heartbeat_at` (server time) ч
 | RPC | Кто | Назначение |
 |-----|-----|------------|
 | `create_business_player` | owner | создать Player + credential + empty runtime |
-| `assign_business_player_to_zone` | owner | назначить Zone (idempotent same zone) |
+| `assign_business_player_to_zone` | owner | назначить Zone (Player row lock; idempotent same zone) |
 | `rotate_business_player_credential` | owner | ротация credential |
 | `record_business_player_heartbeat` | machine (`anon`/`authenticated` EXECUTE, credential) | обновить server heartbeat |
 | `get_business_player_health` | organization member | проекция health без credential |

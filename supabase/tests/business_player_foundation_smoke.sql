@@ -98,8 +98,8 @@ BEGIN
   IF v_create->>'player_code' !~ '^AL-P-[0-9]{9}$' THEN
     RAISE EXCEPTION 'Case3: bad player_code %', v_create->>'player_code';
   END IF;
-  IF v_cred IS NULL OR char_length(v_cred) < 32 THEN
-    RAISE EXCEPTION 'Case3: credential missing';
+  IF v_cred IS NULL OR v_cred !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'Case3: credential must be 64 lowercase hex, got %', v_cred;
   END IF;
   SELECT count(*) INTO cnt FROM public.business_players
   WHERE id = v_player AND status = 'active';
@@ -214,6 +214,57 @@ BEGIN
   IF NOT raised OR position('invalid_player_credential' in v_err) = 0 THEN
     RAISE EXCEPTION 'Case11: expected invalid_player_credential, got %', v_err;
   END IF;
+
+  -- Case 11b: malformed credentials (short / overlong / non-hex) → same generic error
+  raised := false;
+  BEGIN
+    PERFORM public.record_business_player_heartbeat(repeat('a', 32));
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('invalid_player_credential' in v_err) = 0 THEN
+    RAISE EXCEPTION 'Case11b: short credential must be invalid_player_credential, got %', v_err;
+  END IF;
+
+  raised := false;
+  BEGIN
+    PERFORM public.record_business_player_heartbeat(repeat('a', 65));
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('invalid_player_credential' in v_err) = 0 THEN
+    RAISE EXCEPTION 'Case11b: overlong credential must be invalid_player_credential, got %', v_err;
+  END IF;
+
+  raised := false;
+  BEGIN
+    PERFORM public.record_business_player_heartbeat(repeat('g', 64));
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('invalid_player_credential' in v_err) = 0 THEN
+    RAISE EXCEPTION 'Case11b: non-hex credential must be invalid_player_credential, got %', v_err;
+  END IF;
+
+  -- Case 11c: heartbeat fail-closed when runtime row missing
+  RESET ROLE;
+  DELETE FROM public.business_player_runtime WHERE player_id = v_player;
+  EXECUTE 'SET ROLE anon';
+  raised := false;
+  BEGIN
+    PERFORM public.record_business_player_heartbeat(v_cred);
+  EXCEPTION WHEN OTHERS THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('player_runtime_missing' in v_err) = 0 THEN
+    RAISE EXCEPTION 'Case11c: expected player_runtime_missing, got %', v_err;
+  END IF;
+  RESET ROLE;
+  INSERT INTO public.business_player_runtime (player_id) VALUES (v_player);
 
   -- Case 12: suspended/retired reject heartbeat
   RESET ROLE;

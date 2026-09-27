@@ -76,6 +76,21 @@ assert(!/UNIQUE \(zone_id\).*unassigned_at IS NULL/s.test(migration), "no unique
 assert(migration.includes("cross_organization_assignment"), "cross-org guard");
 assert(migration.includes("credential_hash bytea"), "hash bytea");
 assert(migration.includes("business_player_hash_credential"), "hash helper");
+assert(migration.includes("sha256(convert_to(p_credential, 'UTF8'))"), "core sha256 hash");
+{
+  const codeOnly = migration.replace(/--[^\n]*/g, "");
+  assert(!/CREATE\s+EXTENSION/i.test(migration), "A2 must not CREATE EXTENSION");
+  assert(!/\bpgcrypto\b/i.test(codeOnly), "A2 must not depend on pgcrypto");
+  assert(!/extensions\.digest/i.test(migration), "no extensions.digest");
+  assert(!/\bdigest\s*\(/i.test(codeOnly), "no digest()");
+  assert(!/\bgen_random_bytes\s*\(/i.test(codeOnly), "no gen_random_bytes()");
+}
+assert(migration.includes("replace(gen_random_uuid()::text, '-', '')"), "UUID-based credential entropy");
+assert(migration.includes("^[0-9a-f]{64}$"), "strict 64-hex credential validate");
+assert(migration.includes("FOR UPDATE"), "player row lock on assign");
+assert(migration.includes("player_runtime_missing"), "heartbeat fail-closed without runtime");
+assert(migration.includes("statement_timestamp()"), "STABLE health uses statement_timestamp");
+assert(!/DEFAULT clock_timestamp\(\)/.test(migration), "no clock_timestamp default on health");
 assert(migration.includes("create_business_player"), "create rpc");
 assert(migration.includes("assign_business_player_to_zone"), "assign rpc");
 assert(migration.includes("record_business_player_heartbeat"), "heartbeat rpc");
@@ -115,6 +130,11 @@ assert(smoke.includes("direct DELETE must fail"), "smoke no delete");
 assert(smoke.includes("multi player per zone"), "smoke multi zone players");
 assert(smoke.includes("rotate_business_player_credential"), "smoke rotation");
 assert(smoke.includes("player_code must not authenticate"), "smoke code != credential");
+assert(smoke.includes("short credential"), "smoke short credential reject");
+assert(smoke.includes("overlong credential"), "smoke overlong credential reject");
+assert(smoke.includes("non-hex credential"), "smoke non-hex credential reject");
+assert(smoke.includes("player_runtime_missing"), "smoke runtime missing");
+assert(!/CREATE EXTENSION IF NOT EXISTS pgcrypto/i.test(readFileSync(stubPath, "utf8")), "stub must not install pgcrypto");
 
 function runIsolatedSql() {
   if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {

@@ -1,7 +1,6 @@
 -- Minimal schema for isolated Business Player Foundation tests.
 -- Never apply to production.
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+-- A2 uses core gen_random_uuid() / sha256() only — no pgcrypto install here.
 
 CREATE SCHEMA IF NOT EXISTS auth;
 

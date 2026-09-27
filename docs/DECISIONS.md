@@ -16,7 +16,8 @@
 2. Assignment — отдельная сущность; один active assignment на Player; несколько Players на Zone разрешены.
 3. Technical health derived from server `last_heartbeat_at` (thresholds в одной функции `business_player_derived_health`).
 4. Heartbeat loss ≠ music stopped; Player Health ≠ Playback Health ≠ Business UX Home state.
-5. Machine credential: high-entropy secret, SHA-256 hash only in DB; plaintext once on create/rotate.
+5. Machine credential: 64-hex opaque from `gen_random_uuid()` entropy; core `sha256` hash only in DB (no pgcrypto); plaintext once on create/rotate.
+6. Health projection uses `statement_timestamp()`; heartbeat writes use `clock_timestamp()`.
 
 **Принято:** владелец продукта + архитектор (задание Foundation PR A2).
 
