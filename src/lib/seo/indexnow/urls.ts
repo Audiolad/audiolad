@@ -7,6 +7,7 @@ const ALLOWED_HOSTS = new Set(["audiolad.ru", "www.audiolad.ru"]);
 const EXTRA_PRIVATE_PREFIXES = [
   "/_next/",
   "/admin",
+  "/music-analyzer",
   "/api",
   "/auth",
   "/d/",

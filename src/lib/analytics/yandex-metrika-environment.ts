@@ -9,6 +9,11 @@ const NON_PRODUCTION_HOSTS = new Set([
 
 const ADMIN_ROUTE_PREFIX = "/admin";
 
+export function isMusicLabAnalyticsRoute(pathname: string | null | undefined): boolean {
+  const normalized = pathname?.trim() || "/";
+  return normalized === "/music-analyzer" || normalized.startsWith("/music-analyzer/");
+}
+
 export function isAdminAnalyticsRoute(pathname: string | null | undefined): boolean {
   const normalized = pathname?.trim() || "/";
 
@@ -81,6 +86,10 @@ export function shouldEnableYandexMetrika(input?: {
   }
 
   if (isAdminAnalyticsRoute(input?.pathname)) {
+    return false;
+  }
+
+  if (isMusicLabAnalyticsRoute(input?.pathname)) {
     return false;
   }
 

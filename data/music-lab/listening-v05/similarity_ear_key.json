@@ -1,0 +1,48 @@
+{
+  "warning": "Blind key. Do not open until similarity_ear_sheet.csv score cells are filled.",
+  "rng_seed": 20260927,
+  "complete": true,
+  "neighbour_source": "passport_embeddings",
+  "panels_by_seed": {
+    "01sj_3_Cozy_spa_smooth_jazz_background": {
+      "A": "clap_native",
+      "B": "openl3"
+    },
+    "02lounge_10_Aflat_major_Smooth": {
+      "A": "openl3",
+      "B": "clap_native"
+    },
+    "03spa_Quiet_Body_Healing": {
+      "A": "clap_native",
+      "B": "openl3"
+    },
+    "04sleep_10": {
+      "A": "openl3",
+      "B": "clap_native"
+    },
+    "05med_Meditation_bez_slov_Vnutrennee_samoistselenie": {
+      "A": "clap_native",
+      "B": "openl3"
+    },
+    "07contrast_Beethoven_Moonlight_Piano": {
+      "A": "openl3",
+      "B": "clap_native"
+    },
+    "06vocal_sung_Ya_ostalas": {
+      "A": "clap_native",
+      "B": "openl3"
+    },
+    "06vocal_spoken_Lyubov_k_sebe": {
+      "A": "openl3",
+      "B": "clap_native"
+    },
+    "07contrast_energetic_Seychas_budet_pesnya_derzkim": {
+      "A": "clap_native",
+      "B": "openl3"
+    },
+    "05med_Angelskiy_iscelayushchiy_impuls": {
+      "A": "openl3",
+      "B": "clap_native"
+    }
+  }
+}

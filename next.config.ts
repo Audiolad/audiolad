@@ -31,6 +31,22 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/music-analyzer",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
+        source: "/music-analyzer/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
         source: "/d/:path*",
         headers: [
           { key: "Cache-Control", value: "private, no-store" },

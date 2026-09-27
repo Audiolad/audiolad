@@ -14,6 +14,10 @@
 - Actual playback engine / offline cache / Proof of Play / B2B attribution / billing / Sonic DNA / Rights — не реализованы.
 - `MERGE=NO`, `DEPLOY=NO`, production DB apply не выполнялся в рамках A2.
 
+## Music Analyzer Lab
+
+Черновик `/music-analyzer` (Human Listening Validation v0.5) есть в репозитории как закрытая консоль owner/admin. Production-миграция не применялась, деплой не выполнялся, публичная навигация на лабораторию не ведёт.
+
 ## Сводный статус
 
 | Подсистема | Статус | Комментарий |

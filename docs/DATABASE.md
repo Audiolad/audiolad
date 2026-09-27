@@ -1579,6 +1579,14 @@ Heartbeat не возвращает Organization/Zone/memberships. Не прин
 
 `playback_usage_facts` / Music Passport / Business App UI в A2 **не** меняются.
 
+## Music Analyzer Lab (черновик, не применено к production)
+
+Миграция `supabase/migrations/20261203120000_music_analyzer_lab_v01.sql` — изолированные таблицы `music_lab_experiments`, `music_lab_items`, `music_lab_tasks`, `music_lab_responses`, `music_lab_blind_assignments` и приватный bucket `music-analyzer-lab`.
+
+RLS включён, политик для `anon` / `authenticated` нет: доступ только через service role после проверки роли owner/admin в приложении. Слепая карта похожести лежит в `music_lab_blind_assignments` и не отдаётся клиенту, пока статус эксперимента не `completed`. Пока статус `completed`, запись ответов блокирует триггер.
+
+Таблицы каталога, SEO, треков и «Аудиолад Бизнес» эта миграция не изменяет. На production она не применялась в рамках чернового PR.
+
 ## Резервное копирование
 
 Будет заполнено позже.
