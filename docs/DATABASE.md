@@ -1655,7 +1655,7 @@ Connectivity heartbeat A2 (`record_business_player_heartbeat`) ≠ playback medi
 Миграции:
 
 - `20261129120000_music_track_identity.sql` — колонка `audio_items.music_track_code`, последовательность и триггеры. `next_music_track_code()` после неё доступна только `service_role`.
-- `20261203120000_music_track_identity_definer.sql` — `ensure_music_track_identity()` и `backfill_music_track_identity_on_kind_change()` работают как `SECURITY DEFINER` с `search_path = public, pg_temp`.
+- `20261203120100_music_track_identity_definer.sql` — `ensure_music_track_identity()` и `backfill_music_track_identity_on_kind_change()` работают как `SECURITY DEFINER` с `search_path = public, pg_temp`. Restamp с `20261203120000`: этот штамп на main занят `business_playback_attribution`.
 
 `EXECUTE` на `next_music_track_code()` роли `authenticated` не выдаётся: функция двигает общую последовательность. Авторский INSERT музыкального трека назначает код внутри триггера от имени владельца функции (на этом Supabase это `postgres`). Прямой вызов issuer автором остаётся запрещённым. Неуспешный INSERT не создаёт строку `audio_items`.
 

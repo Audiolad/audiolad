@@ -1,6 +1,6 @@
 -- Privilege contract for music track identity.
 -- Run on a disposable database after migrations, including
--- 20261203120000_music_track_identity_definer.sql.
+-- 20261203120100_music_track_identity_definer.sql.
 -- No row writes. Author INSERT cleanup is unnecessary: a denied issuer
 -- aborts the audio_items INSERT before a row exists.
 BEGIN;

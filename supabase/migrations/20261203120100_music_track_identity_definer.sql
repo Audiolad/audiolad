@@ -1,5 +1,8 @@
 BEGIN;
 
+-- Restamped from 20261203120000: that version is business_playback_attribution
+-- on main. This file stays append-only and does not edit 20261129120000.
+
 -- Author music-track create was failing with SQLSTATE 42501:
 -- permission denied for function next_music_track_code.
 --

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const appliedName = "20261129120000_music_track_identity.sql";
-const fixName = "20261203120000_music_track_identity_definer.sql";
+const fixName = "20261203120100_music_track_identity_definer.sql";
 const applied = readFileSync(join(repoRoot, "supabase/migrations", appliedName), "utf8");
 const fix = readFileSync(join(repoRoot, "supabase/migrations", fixName), "utf8");
 const smoke = readFileSync(
@@ -32,9 +32,10 @@ const names = readdirSync(join(repoRoot, "supabase/migrations")).filter((name) =
 const versions = names.map((name) => name.match(/^(\d{14})_/)?.[1]).filter(Boolean);
 assert(new Set(versions).size === versions.length, "duplicate migration timestamps");
 assert(versions.includes("20261129120000"), "applied identity migration stays listed");
-assert(versions.includes("20261203120000"), "definer migration listed");
+assert(versions.includes("20261203120000"), "business playback attribution keeps 20261203120000");
+assert(versions.includes("20261203120100"), "definer migration listed");
 assert(
-  versions.filter((version) => version > "20261202120000").includes("20261203120000"),
+  versions.filter((version) => version > "20261203120000").includes("20261203120100"),
   "definer migration is stamped after the latest main migration",
 );
 
