@@ -118,7 +118,7 @@ COMMENT ON COLUMN public.music_rights_grants.territory_scope IS
   'worldwide | countries. Not a single global-boolean territory model. Country rows live in music_rights_grant_countries.';
 
 COMMENT ON COLUMN public.music_rights_grants.status IS
-  'Grant lifecycle draft|verified|superseded|revoked. Allowed: draft→verified; verified→superseded|revoked. Terminal: superseded, revoked. Not eligibility. Temporal expiration uses valid_until.';
+  'Grant lifecycle draft|verified|superseded|revoked. INSERT only draft|verified. Transitions: draft→verified; verified→superseded|revoked. Terminal: superseded, revoked. Not eligibility. Temporal expiration uses valid_until.';
 
 -- ---------------------------------------------------------------------------
 -- Territory countries
@@ -353,18 +353,21 @@ BEGIN
       END IF;
     END IF;
 
-    IF NEW.status IS DISTINCT FROM 'draft' THEN
-      IF NEW.status NOT IN ('verified', 'superseded', 'revoked') THEN
-        RAISE EXCEPTION 'grant_status_invalid' USING ERRCODE = '22023';
-      END IF;
-      -- Direct insert into non-draft is allowed only when territory already coherent
-      -- (countries must be attached after insert while draft — prefer draft→verify).
-      -- For insert-as-verified worldwide with zero countries: OK.
-      -- For insert-as-verified countries: fail (no rows yet at BEFORE INSERT).
+    -- INSERT may only create draft or verified. Terminal superseded/revoked
+    -- must arise via draft → verified → superseded|revoked.
+    IF NEW.status IN ('superseded', 'revoked') THEN
+      RAISE EXCEPTION 'grant_lifecycle_forbidden' USING ERRCODE = '22023';
+    END IF;
+
+    IF NEW.status = 'verified' THEN
+      -- Intentional: verified worldwide insert OK when coherent + verified_at.
+      -- countries must still go draft → rows → verified (no rows yet at BEFORE INSERT).
       IF NEW.territory_scope = 'countries' THEN
         RAISE EXCEPTION 'grant_territory_incomplete' USING ERRCODE = '22023';
       END IF;
       PERFORM public.music_rights_grant_territory_coherent(NEW.id, NEW.territory_scope);
+    ELSIF NEW.status IS DISTINCT FROM 'draft' THEN
+      RAISE EXCEPTION 'grant_status_invalid' USING ERRCODE = '22023';
     END IF;
 
     RETURN NEW;
@@ -473,25 +476,60 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_status text;
-  v_grant_id uuid;
+  v_old_status text;
+  v_new_status text;
 BEGIN
-  v_grant_id := coalesce(NEW.grant_id, OLD.grant_id);
-  SELECT status INTO v_status
-  FROM public.music_rights_grants
-  WHERE id = v_grant_id;
+  -- Close re-parenting bypass: both OLD and NEW parents must be draft on UPDATE.
+  IF TG_OP = 'DELETE' THEN
+    SELECT status INTO v_old_status
+    FROM public.music_rights_grants
+    WHERE id = OLD.grant_id;
 
-  IF v_status IS NULL THEN
-    RAISE EXCEPTION 'grant_not_found' USING ERRCODE = 'P0002';
+    -- Parent missing: allow (FK CASCADE while deleting a draft grant).
+    -- Parent present and non-draft: reject manual territory erase.
+    IF v_old_status IS NOT NULL AND v_old_status IS DISTINCT FROM 'draft' THEN
+      RAISE EXCEPTION 'grant_territory_immutable' USING ERRCODE = '55000';
+    END IF;
+    RETURN OLD;
   END IF;
 
-  IF v_status IS DISTINCT FROM 'draft' THEN
+  IF TG_OP = 'INSERT' THEN
+    SELECT status INTO v_new_status
+    FROM public.music_rights_grants
+    WHERE id = NEW.grant_id;
+
+    IF v_new_status IS NULL THEN
+      RAISE EXCEPTION 'grant_not_found' USING ERRCODE = 'P0002';
+    END IF;
+    IF v_new_status IS DISTINCT FROM 'draft' THEN
+      RAISE EXCEPTION 'grant_territory_immutable' USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- UPDATE: reject if OLD or NEW parent is non-draft (blocks move out of / into verified history).
+  SELECT status INTO v_old_status
+  FROM public.music_rights_grants
+  WHERE id = OLD.grant_id;
+
+  IF v_old_status IS NULL THEN
+    RAISE EXCEPTION 'grant_not_found' USING ERRCODE = 'P0002';
+  END IF;
+  IF v_old_status IS DISTINCT FROM 'draft' THEN
     RAISE EXCEPTION 'grant_territory_immutable' USING ERRCODE = '55000';
   END IF;
 
-  IF TG_OP = 'DELETE' THEN
-    RETURN OLD;
+  SELECT status INTO v_new_status
+  FROM public.music_rights_grants
+  WHERE id = NEW.grant_id;
+
+  IF v_new_status IS NULL THEN
+    RAISE EXCEPTION 'grant_not_found' USING ERRCODE = 'P0002';
   END IF;
+  IF v_new_status IS DISTINCT FROM 'draft' THEN
+    RAISE EXCEPTION 'grant_territory_immutable' USING ERRCODE = '55000';
+  END IF;
+
   RETURN NEW;
 END;
 $$;

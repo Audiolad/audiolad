@@ -24,6 +24,9 @@ DECLARE
   g_v2 uuid;
   g_v2b uuid;
   g_del uuid;
+  g_draft_a uuid;
+  g_draft_b uuid;
+  g_country_row uuid;
   passport jsonb;
   cnt integer;
   raised boolean;
@@ -642,6 +645,104 @@ BEGIN
   IF NOT raised OR position('audio_item_not_music' in v_err) = 0 THEN
     RAISE EXCEPTION 'Case4b: non-music must fail got %', v_err;
   END IF;
+
+  -- Direct INSERT into terminal lifecycle rejected
+  raised := false;
+  BEGIN
+    INSERT INTO public.music_rights_grants (
+      audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
+      valid_from, source_type, status, verified_at
+    ) VALUES (
+      audio_music2, rh1, 'recording', 'advertising_adjacency', 'worldwide',
+      now(), 'other', 'superseded', now()
+    );
+  EXCEPTION WHEN others THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('grant_lifecycle_forbidden' in v_err) = 0 THEN
+    RAISE EXCEPTION 'CaseInsertSuperseded: direct INSERT superseded must fail got %', v_err;
+  END IF;
+
+  raised := false;
+  BEGIN
+    INSERT INTO public.music_rights_grants (
+      audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
+      valid_from, source_type, status, verified_at
+    ) VALUES (
+      audio_music2, rh1, 'recording', 'advertising_synchronization', 'worldwide',
+      now(), 'other', 'revoked', now()
+    );
+  EXCEPTION WHEN others THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('grant_lifecycle_forbidden' in v_err) = 0 THEN
+    RAISE EXCEPTION 'CaseInsertRevoked: direct INSERT revoked must fail got %', v_err;
+  END IF;
+
+  -- Territory re-parenting bypass closed
+  INSERT INTO public.music_rights_grants (
+    audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
+    valid_from, source_type, status, verified_at
+  ) VALUES (
+    audio_music2, rh1, 'recording', 'stem_use', 'worldwide',
+    now(), 'other', 'draft', NULL
+  ) RETURNING id INTO g_draft_a;
+
+  INSERT INTO public.music_rights_grants (
+    audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
+    valid_from, source_type, status, verified_at
+  ) VALUES (
+    audio_music2, rh1, 'recording', 'remix_derivative', 'worldwide',
+    now(), 'other', 'draft', NULL
+  ) RETURNING id INTO g_draft_b;
+
+  -- Case A: verified country → draft grant_id rejected
+  raised := false;
+  BEGIN
+    UPDATE public.music_rights_grant_countries
+    SET grant_id = g_draft_a
+    WHERE grant_id = g_ww_ex AND country_code = 'US';
+  EXCEPTION WHEN others THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('grant_territory_immutable' in v_err) = 0 THEN
+    RAISE EXCEPTION 'CaseReparentA: verified→draft reparent must fail got %', v_err;
+  END IF;
+
+  -- Case B: draft country → verified grant_id rejected
+  INSERT INTO public.music_rights_grant_countries (grant_id, country_code, effect)
+  VALUES (g_draft_a, 'CA', 'exclude')
+  RETURNING id INTO g_country_row;
+
+  raised := false;
+  BEGIN
+    UPDATE public.music_rights_grant_countries
+    SET grant_id = g_ww
+    WHERE id = g_country_row;
+  EXCEPTION WHEN others THEN
+    raised := true;
+    v_err := SQLERRM;
+  END;
+  IF NOT raised OR position('grant_territory_immutable' in v_err) = 0 THEN
+    RAISE EXCEPTION 'CaseReparentB: draft→verified reparent must fail got %', v_err;
+  END IF;
+
+  -- Case C: draft → draft reassignment allowed when scope/effect compatible
+  UPDATE public.music_rights_grant_countries
+  SET grant_id = g_draft_b
+  WHERE id = g_country_row;
+
+  SELECT count(*) INTO cnt FROM public.music_rights_grant_countries
+  WHERE id = g_country_row AND grant_id = g_draft_b AND country_code = 'CA';
+  IF cnt <> 1 THEN
+    RAISE EXCEPTION 'CaseReparentC: draft→draft reparent must succeed';
+  END IF;
+
+  -- cleanup drafts used for reparent tests
+  DELETE FROM public.music_rights_grants WHERE id IN (g_draft_a, g_draft_b);
 
   -- Draft grant can still be deleted (positive control)
   DELETE FROM public.music_rights_grants WHERE id = g_draft_terr;

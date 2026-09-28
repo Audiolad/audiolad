@@ -1713,7 +1713,7 @@ Write path validates Track exists and `product_kind='music'`.
 
 **Non-draft** (`verified` / `superseded` / `revoked`): DELETE rejected; substantive legal fields immutable; territory rows INSERT/UPDATE/DELETE rejected (`grant_territory_immutable`). Parent `ON DELETE CASCADE` to countries therefore cannot erase historical territory of a non-draft grant.
 
-Lifecycle state machine: `draft → verified`; `verified → superseded|revoked`; `superseded` and `revoked` are terminal. `verified_at` is immutable after leaving draft.
+Lifecycle state machine: INSERT only `draft`|`verified` (not terminal); transitions `draft → verified`; `verified → superseded|revoked`; `superseded` and `revoked` are terminal. `verified_at` is immutable after leaving draft. Territory rows cannot be re-parented into/out of a non-draft grant (`grant_territory_immutable` on OLD and NEW parent).
 
 Territory must be coherent before verification: `countries` requires ≥1 include (and no exclude); `worldwide` allows 0..N exclude only. Preferred write flow: create draft → add territory rows → verify.
 

@@ -664,7 +664,7 @@ Decision:
 3. Recording ≠ Composition: `rights_layer` ∈ {recording, composition}; do not collapse into `all_rights`.
 4. Territory-aware: `territory_scope` worldwide|countries + `music_rights_grant_countries` include/exclude. Not RU-hardcoded; not a lone `is_global` boolean.
 5. Versioned history via `version` + `supersedes_grant_id` (unique successor; same Track/layer/use_type; version = predecessor + 1). Do not rewrite substantive legal fields of non-draft grants. Non-draft DELETE and territory mutations are rejected; draft remains editable until verify.
-6. Lifecycle: `draft → verified`; `verified → superseded|revoked`; terminal superseded/revoked. `verified_at` immutable after leaving draft. Territory must be complete/coherent before verification.
+6. Lifecycle: INSERT only draft|verified; transitions `draft → verified`; `verified → superseded|revoked`; terminal superseded/revoked. `verified_at` immutable after leaving draft. Territory must be complete/coherent before verification; territory rows cannot re-parent into/out of non-draft grants.
 7. No automatic B2B rights from existing publication / Studio permission / entitlements. Existing music Track without structured grants → Passport `REVIEW_REQUIRED` (not “Track not found”). Missing/non-music audio_item raises `audio_item_not_found` / `audio_item_not_music`.
 8. A4 stops at Rightsholder → Grant → Passport. Country/Location Eligibility is A5. No Money / Analyzer / Business UI.
 9. `audio_item_id` is historical reference without destructive FK to `audio_items` (legal history survives Track deletion). Write path validates music Track existence.
