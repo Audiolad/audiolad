@@ -824,6 +824,54 @@ REVOKE ALL ON FUNCTION public.business_location_rights_context_use_statuses_prot
 REVOKE ALL ON FUNCTION public.business_location_rights_context_use_statuses_protect() FROM authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Location: rights-relevant fields immutable while active Rights Context exists
+-- ---------------------------------------------------------------------------
+-- V1 write order: supersede active Context (server ceased_at) → UPDATE Location
+-- country_code/business_category → create+activate new Context. No auto-supersede.
+
+CREATE OR REPLACE FUNCTION public.business_locations_protect_rights_relevant()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP <> 'UPDATE' THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.country_code IS DISTINCT FROM NEW.country_code
+     OR OLD.business_category IS DISTINCT FROM NEW.business_category THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.business_location_rights_contexts c
+      WHERE c.location_id = OLD.id
+        AND c.status = 'active'
+    ) THEN
+      RAISE EXCEPTION 'active_location_rights_context_must_be_superseded'
+        USING ERRCODE = '22023';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.business_locations_protect_rights_relevant() IS
+  'audiolad:rights-eligibility; reject country_code/business_category UPDATE while an active Location Rights Context exists. Supersede first.';
+
+DROP TRIGGER IF EXISTS business_locations_protect_rights_relevant_bu
+  ON public.business_locations;
+CREATE TRIGGER business_locations_protect_rights_relevant_bu
+  BEFORE UPDATE ON public.business_locations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.business_locations_protect_rights_relevant();
+
+REVOKE ALL ON FUNCTION public.business_locations_protect_rights_relevant() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.business_locations_protect_rights_relevant() FROM anon;
+REVOKE ALL ON FUNCTION public.business_locations_protect_rights_relevant() FROM authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Helpers: historical grant / territory / eligibility resolution
 -- ---------------------------------------------------------------------------
 

@@ -765,28 +765,57 @@ BEGIN
   END IF;
   RAISE NOTICE 'CaseL ok';
 
-  -- Cases G/H/I/J Location country/category change with historical survival
-  v_t_before := clock_timestamp();
-  -- tiny wait so historical as_of is strictly before subsequent mutations' statement times
-  PERFORM pg_sleep(0.05);
-  UPDATE public.business_locations
-    SET country_code = 'YY', business_category = 'gym'
-    WHERE id = v_loc_chg;
-  -- H: stale current active context → UNKNOWN MISMATCH
-  v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
-  IF v_out->>'decision' <> 'UNKNOWN'
-     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISMATCH%' THEN
-    RAISE EXCEPTION 'CaseH stale current expected MISMATCH got %', v_out;
-  END IF;
-  RAISE NOTICE 'CaseH ok';
+  -- LocGuard A–I + adapted CaseG/H/I/J: no stale active Context interval
+  -- Workflow: supersede active Context → UPDATE Location → new Context → activate
 
-  -- G: can supersede old context after Location changed
+  -- LocGuardA: country change with active Context rejected
+  BEGIN
+    UPDATE public.business_locations
+      SET country_code = 'YY'
+      WHERE id = v_loc_chg;
+    RAISE EXCEPTION 'LocGuardA expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%active_location_rights_context_must_be_superseded%' THEN
+      RAISE EXCEPTION 'LocGuardA unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'LocGuardA ok';
+
+  -- LocGuardB: business_category change with active Context rejected
+  BEGIN
+    UPDATE public.business_locations
+      SET business_category = 'gym'
+      WHERE id = v_loc_chg;
+    RAISE EXCEPTION 'LocGuardB expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%active_location_rights_context_must_be_superseded%' THEN
+      RAISE EXCEPTION 'LocGuardB unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'LocGuardB ok';
+
+  -- LocGuardC: unrelated Location fields editable with active Context
+  UPDATE public.business_locations
+    SET name = 'Loc CHG renamed', timezone = 'Europe/Moscow'
+    WHERE id = v_loc_chg;
+  IF (SELECT name FROM public.business_locations WHERE id = v_loc_chg) <> 'Loc CHG renamed' THEN
+    RAISE EXCEPTION 'LocGuardC name update failed';
+  END IF;
+  IF (SELECT country_code FROM public.business_locations WHERE id = v_loc_chg) <> 'ZZ' THEN
+    RAISE EXCEPTION 'LocGuardC country mutated unexpectedly';
+  END IF;
+  RAISE NOTICE 'LocGuardC ok';
+
+  -- Capture as_of while old Context still active (historical survival / LocGuardI)
+  v_t_before := clock_timestamp();
+  PERFORM pg_sleep(0.05);
+
+  -- CaseG + LocGuardD: supersede first (server ceased_at), then Location may change
   UPDATE public.business_location_rights_contexts
     SET status = 'superseded', ceased_at = timestamptz '2021-01-01 00:00:00+00'
     WHERE id = v_ctx_old;
   IF (SELECT status FROM public.business_location_rights_contexts WHERE id = v_ctx_old) <> 'superseded' THEN
-    RAISE EXCEPTION 'CaseG supersede after location change failed';
+    RAISE EXCEPTION 'CaseG supersede failed';
   END IF;
   IF (SELECT country_code_snapshot FROM public.business_location_rights_contexts WHERE id = v_ctx_old) <> 'ZZ' THEN
     RAISE EXCEPTION 'CaseG snapshot rewritten';
@@ -795,9 +824,75 @@ BEGIN
        = timestamptz '2021-01-01 00:00:00+00' THEN
     RAISE EXCEPTION 'CaseG/D supplied ceased_at controlled context cessation';
   END IF;
+  SELECT ceased_at INTO v_ceased
+  FROM public.business_location_rights_contexts WHERE id = v_ctx_old;
   RAISE NOTICE 'CaseG ok';
 
-  -- New YY profile + context
+  -- LocGuardE: historical as_of immediately before ceased_at uses old Context
+  v_out_hist := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback',
+    v_ceased - interval '1 millisecond');
+  IF v_out_hist->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'LocGuardE expected ELIGIBLE got %', v_out_hist;
+  END IF;
+  IF (v_out_hist->>'location_rights_context_id')::uuid IS DISTINCT FROM v_ctx_old THEN
+    RAISE EXCEPTION 'LocGuardE context id % want %', v_out_hist, v_ctx_old;
+  END IF;
+  IF v_out_hist->>'country_code' <> 'ZZ' THEN
+    RAISE EXCEPTION 'LocGuardE country %', v_out_hist->>'country_code';
+  END IF;
+  RAISE NOTICE 'LocGuardE ok';
+
+  -- LocGuardF: as_of at/after ceased_at does not use old Context
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', v_ceased);
+  IF v_out::text LIKE '%' || v_ctx_old::text || '%'
+     AND v_out->>'location_rights_context_id' IS NOT NULL
+     AND (v_out->>'location_rights_context_id')::uuid IS NOT DISTINCT FROM v_ctx_old THEN
+    RAISE EXCEPTION 'LocGuardF still used old context at ceased_at %', v_out;
+  END IF;
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISSING%' THEN
+    RAISE EXCEPTION 'LocGuardF expected MISSING at ceased_at got %', v_out;
+  END IF;
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback',
+    v_ceased + interval '1 millisecond');
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISSING%' THEN
+    RAISE EXCEPTION 'LocGuardF expected MISSING after ceased_at got %', v_out;
+  END IF;
+  RAISE NOTICE 'LocGuardF ok';
+
+  -- LocGuardD: after supersede, country/category may change
+  UPDATE public.business_locations
+    SET country_code = 'YY', business_category = 'gym'
+    WHERE id = v_loc_chg;
+  IF (SELECT country_code || '/' || business_category FROM public.business_locations WHERE id = v_loc_chg)
+       <> 'YY/gym' THEN
+    RAISE EXCEPTION 'LocGuardD location update failed';
+  END IF;
+  RAISE NOTICE 'LocGuardD ok';
+
+  -- LocGuardG: after Location change, before new Context → MISSING (not MISMATCH)
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISSING%' THEN
+    RAISE EXCEPTION 'LocGuardG expected MISSING got %', v_out;
+  END IF;
+  RAISE NOTICE 'LocGuardG ok';
+
+  -- LocGuardI baseline: historical as_of before ceased_at stable before new Context
+  v_out_hist := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', v_t_before);
+  IF v_out_hist->>'decision' <> 'ELIGIBLE'
+     OR v_out_hist->>'country_code' <> 'ZZ'
+     OR (v_out_hist->>'location_rights_context_id')::uuid IS DISTINCT FROM v_ctx_old THEN
+    RAISE EXCEPTION 'LocGuardI pre-new-context historical drifted %', v_out_hist;
+  END IF;
+
+  -- New YY profile + context (CaseI current + LocGuardH)
   INSERT INTO public.music_country_rights_profiles (country_code, version, status)
   VALUES ('YY', 1, 'draft') RETURNING id INTO v_prof_aa;
   INSERT INTO public.music_country_rights_profile_rules
@@ -814,29 +909,54 @@ BEGIN
   v_out := public.resolve_business_track_eligibility(
     v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'ELIGIBLE' THEN
-    RAISE EXCEPTION 'CaseI current YY expected ELIGIBLE got %', v_out;
+    RAISE EXCEPTION 'CaseI/LocGuardH current YY expected ELIGIBLE got %', v_out;
   END IF;
   IF v_out->>'country_code' <> 'YY' THEN
-    RAISE EXCEPTION 'CaseI country_code %', v_out->>'country_code';
+    RAISE EXCEPTION 'CaseI/LocGuardH country_code %', v_out->>'country_code';
   END IF;
+  RAISE NOTICE 'LocGuardH ok';
 
-  -- I/J historical resolve at T_before still ZZ profile/context/territory
-  v_out_hist := public.resolve_business_track_eligibility(
+  -- CaseI/J + LocGuardI: historical resolve at T_before still ZZ; unchanged after new Context
+  v_out := public.resolve_business_track_eligibility(
     v_track, v_loc_chg, NULL, 'business_background_playback', v_t_before);
-  IF v_out_hist->>'decision' <> 'ELIGIBLE' THEN
-    RAISE EXCEPTION 'CaseI historical expected ELIGIBLE got %', v_out_hist;
+  IF v_out->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'CaseI historical expected ELIGIBLE got %', v_out;
   END IF;
-  IF v_out_hist->>'country_code' <> 'ZZ' THEN
-    RAISE EXCEPTION 'CaseI/J historical country %', v_out_hist->>'country_code';
+  IF v_out->>'country_code' <> 'ZZ' THEN
+    RAISE EXCEPTION 'CaseI/J historical country %', v_out->>'country_code';
   END IF;
-  IF v_out_hist->>'location_rights_context_id' IS DISTINCT FROM v_ctx_old::text
-     AND v_out_hist->>'location_rights_context_id' <> v_ctx_old::text THEN
-    -- compare uuid text
-    IF (v_out_hist->>'location_rights_context_id')::uuid IS DISTINCT FROM v_ctx_old THEN
-      RAISE EXCEPTION 'CaseI historical context id % want %', v_out_hist, v_ctx_old;
-    END IF;
+  IF (v_out->>'location_rights_context_id')::uuid IS DISTINCT FROM v_ctx_old THEN
+    RAISE EXCEPTION 'CaseI historical context id % want %', v_out, v_ctx_old;
+  END IF;
+  IF v_out->>'decision' IS DISTINCT FROM v_out_hist->>'decision'
+     OR v_out->>'country_code' IS DISTINCT FROM v_out_hist->>'country_code'
+     OR v_out->>'location_rights_context_id' IS DISTINCT FROM v_out_hist->>'location_rights_context_id' THEN
+    RAISE EXCEPTION 'LocGuardI as_of changed after new Context % vs %', v_out, v_out_hist;
   END IF;
   RAISE NOTICE 'CaseI/J ok';
+  RAISE NOTICE 'LocGuardI ok';
+
+  -- CaseH defense-in-depth: MISMATCH only for corrupt/legacy (trigger disabled)
+  ALTER TABLE public.business_locations
+    DISABLE TRIGGER business_locations_protect_rights_relevant_bu;
+  UPDATE public.business_locations
+    SET country_code = 'ZZ', business_category = 'cafe'
+    WHERE id = v_loc_chg;
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISMATCH%' THEN
+    ALTER TABLE public.business_locations
+      ENABLE TRIGGER business_locations_protect_rights_relevant_bu;
+    RAISE EXCEPTION 'CaseH stale current expected MISMATCH got %', v_out;
+  END IF;
+  -- restore Location to match active YY context, re-enable guard
+  UPDATE public.business_locations
+    SET country_code = 'YY', business_category = 'gym'
+    WHERE id = v_loc_chg;
+  ALTER TABLE public.business_locations
+    ENABLE TRIGGER business_locations_protect_rights_relevant_bu;
+  RAISE NOTICE 'CaseH ok';
 
   -- CaseM root version must be 1
   BEGIN

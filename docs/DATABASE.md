@@ -1774,6 +1774,7 @@ Tables: `music_country_rights_profiles`, `music_country_rights_profile_rules`.
 Tables: `business_location_rights_contexts`, `business_location_rights_context_use_statuses`.
 
 - Snapshots `country_code` + `business_category` from `business_locations`; profile country must match Location.
+- While an `active` Location Rights Context exists, `business_locations.country_code` / `business_category` cannot change (`active_location_rights_context_must_be_superseded`). V1 write order: supersede Context (server `ceased_at`) → UPDATE Location → create+activate new Context. No auto-supersede from Location.
 - Lifecycle/versioning mirrors Country Profile. One active context per Location.
 - `client_requirement_status`: not_required|confirmed|not_confirmed|unknown. Child rows immutable after parent leaves draft.
 
@@ -1781,7 +1782,7 @@ Tables: `business_location_rights_contexts`, `business_location_rights_context_u
 
 `resolve_business_track_eligibility(p_audio_item_id, p_location_id, p_zone_id default null, p_use_type default business_background_playback, p_as_of default now())` → jsonb with `decision`, ids/versions, matched grant id arrays, `reason_codes`, `engine_version=rights_eligibility_v1`.
 
-Resolver order: validate track/location/zone → historical **Location Rights Context** at `as_of` → load **referenced** Country Profile (must be effective at `as_of`) → use rule → grants by context country snapshot. Current active context whose snapshots diverge from mutable Location → `UNKNOWN` / `LOCATION_RIGHTS_CONTEXT_MISMATCH` (historical superseded contexts are not re-checked against today's Location). Country Rule `client_requirement=required` + Location `not_required` → `UNKNOWN` / `CLIENT_REQUIREMENT_STATUS_CONFLICT` (not ELIGIBLE). Profile/context `activated_at`/`ceased_at` are server `clock_timestamp()` (not `reviewed_at`, not client-supplied).
+Resolver order: validate track/location/zone → historical **Location Rights Context** at `as_of` → load **referenced** Country Profile (must be effective at `as_of`) → use rule → grants by context country snapshot. Legitimate Location country/category updates require superseding the active Context first (no stale active interval). Current active context whose snapshots diverge from mutable Location (legacy/corrupt) → `UNKNOWN` / `LOCATION_RIGHTS_CONTEXT_MISMATCH` (defense-in-depth; historical superseded contexts are not re-checked against today's Location). Country Rule `client_requirement=required` + Location `not_required` → `UNKNOWN` / `CLIENT_REQUIREMENT_STATUS_CONFLICT` (not ELIGIBLE). Profile/context `activated_at`/`ceased_at` are server `clock_timestamp()` (not `reviewed_at`, not client-supplied).
 
 Decisions: ELIGIBLE | INELIGIBLE | CONDITIONAL | UNKNOWN. UNKNOWN never defaults to ELIGIBLE. Rights First (no BPM/genre/Sonic DNA). No Aural wiring. No persistent decision ledger table.
 

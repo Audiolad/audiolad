@@ -129,6 +129,12 @@ assert(smoke.includes("CaseH"), "smoke CaseH");
 assert(smoke.includes("CaseI"), "smoke CaseI");
 assert(smoke.includes("CaseM"), "smoke CaseM");
 assert(smoke.includes("CaseP"), "smoke CaseP");
+assert(migration.includes("active_location_rights_context_must_be_superseded"), "location guard error");
+assert(migration.includes("business_locations_protect_rights_relevant"), "location rights-relevant guard");
+assert(smoke.includes("LocGuardA"), "smoke LocGuardA");
+assert(smoke.includes("LocGuardG"), "smoke LocGuardG");
+assert(smoke.includes("LocGuardI"), "smoke LocGuardI");
+assert(smoke.includes("LOCATION_RIGHTS_CONTEXT_MISSING"), "smoke missing after location change");
 assert(smoke.includes("CLIENT_REQUIREMENT_STATUS_CONFLICT"), "smoke conflict reason");
 
 assert(smoke.includes("'AA'"), "synthetic AA");
