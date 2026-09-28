@@ -12,6 +12,7 @@ export const USER_DELETION_BLOCK_CODES = {
   platform_owner: "platform_owner",
   platform_admin: "platform_admin",
   author_workspace: "author_workspace",
+  author_products: "author_products",
   orders: "orders",
   personal_materials: "personal_materials",
   promotion_campaigns: "promotion_campaigns",
@@ -23,6 +24,7 @@ export type UserDeletionBlockCode =
 export type UserDeletionDependencies = {
   role: string | null;
   isAuthorMember: boolean;
+  hasAuthorProducts: boolean;
   hasOrders: boolean;
   hasPersonalMaterials: boolean;
   hasPromotionCampaigns: boolean;
@@ -54,7 +56,9 @@ export function getUserDeletionBlockMessage(
     case USER_DELETION_BLOCK_CODES.platform_admin:
       return "Нельзя удалить администратора платформы.";
     case USER_DELETION_BLOCK_CODES.author_workspace:
-      return "Аккаунт связан с авторским пространством.";
+      return "Аккаунт связан с авторским пространством, которое нельзя удалить автоматически.";
+    case USER_DELETION_BLOCK_CODES.author_products:
+      return "У автора есть продукты. Сначала нужно сохранить или отдельно обработать авторские данные.";
     case USER_DELETION_BLOCK_CODES.orders:
       return "У пользователя есть заказы. Финансовые данные нужно сохранить.";
     case USER_DELETION_BLOCK_CODES.personal_materials:
@@ -97,8 +101,14 @@ export function evaluateUserDeletionEligibility(input: {
     };
   }
 
-  const { role, isAuthorMember, hasOrders, hasPersonalMaterials, hasPromotionCampaigns } =
-    input.dependencies;
+  const {
+    role,
+    isAuthorMember,
+    hasAuthorProducts,
+    hasOrders,
+    hasPersonalMaterials,
+    hasPromotionCampaigns,
+  } = input.dependencies;
 
   if (isPlatformOwnerRole(role)) {
     return {
@@ -120,12 +130,14 @@ export function evaluateUserDeletionEligibility(input: {
     };
   }
 
-  if (isAuthorMember) {
+  // Author status alone is not a blocker. Empty author workspaces are cleaned
+  // transactionally by the server-side deletion RPC before auth deletion.
+  if (isAuthorMember && hasAuthorProducts) {
     return {
       canDelete: false,
-      blockCode: USER_DELETION_BLOCK_CODES.author_workspace,
+      blockCode: USER_DELETION_BLOCK_CODES.author_products,
       blockReason: getUserDeletionBlockMessage(
-        USER_DELETION_BLOCK_CODES.author_workspace,
+        USER_DELETION_BLOCK_CODES.author_products,
       ),
     };
   }
