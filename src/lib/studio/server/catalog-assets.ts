@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireAuthenticatedUser } from "@/lib/author-products/auth";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { isStudioMusicPublication } from "@/lib/studio-music/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -38,6 +39,12 @@ type CatalogAudioItemRow = {
   duration_seconds: number | null;
   audio_path: string | null;
 };
+
+async function resolveStudioAuthorUserId(): Promise<string> {
+  const { user } = await requireAuthenticatedUser();
+  const execution = await peekAuthorExecutionContext();
+  return execution?.isSupportMode ? execution.actingUserId : user.id;
+}
 
 function mapAttachError(error: {
   message?: string;
@@ -146,7 +153,7 @@ export async function attachStudioCatalogAsset(input: {
 
   const userId =
     projectAccess.ownerKind === "author"
-      ? (await requireAuthenticatedUser()).user.id
+      ? await resolveStudioAuthorUserId()
       : null;
   const access =
     projectAccess.ownerKind === "author"
@@ -193,7 +200,7 @@ export async function toListedStudioAssetDtos(
   const projectAccess = await requireStudioProjectAccess(projectId);
   let userId: string | null = null;
   if (projectAccess.ownerKind === "author") {
-    userId = (await requireAuthenticatedUser()).user.id;
+    userId = await resolveStudioAuthorUserId();
   }
   const service = createServiceRoleClient();
   return Promise.all(
@@ -285,7 +292,7 @@ export async function assertCatalogAssetReadyForPlayback(
 
   const userId =
     projectAccess.ownerKind === "author"
-      ? (await requireAuthenticatedUser()).user.id
+      ? await resolveStudioAuthorUserId()
       : null;
   const access =
     projectAccess.ownerKind === "author"
