@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAuthenticatedUser } from "@/lib/author-products/auth";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { isStudioMusicPublication } from "@/lib/studio-music/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -190,6 +191,12 @@ export async function attachStudioCatalogAsset(input: {
   if (studioCatalogAssetDtoContainsForbiddenFields(dto)) {
     throw new StudioApiError("internal_error", 500);
   }
+  await recordAuthorSupportAudit({
+    action: "studio_asset_uploaded",
+    resourceType: "studio_asset",
+    resourceId: asset.id,
+    metadata: { source: "catalog" },
+  });
   return dto;
 }
 
