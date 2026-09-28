@@ -273,8 +273,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "studio_audiobooks",
-      group: "blocked",
-      disposition: "blocked",
+      group: "studio",
+      disposition: "allowed_audited",
+      action: "studio_audiobook_updated",
       routePatterns: [
         "src/app/api/studio/audiobooks/projects/route.ts",
         "src/app/api/studio/audiobooks/projects/[projectId]/route.ts",
@@ -295,16 +296,18 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "studio_catalog_asset_attach",
-      group: "blocked",
-      disposition: "blocked",
+      group: "studio",
+      disposition: "allowed_audited",
+      action: "studio_asset_uploaded",
       routePatterns: [
         "src/app/api/studio/projects/[projectId]/assets/catalog/route.ts",
       ],
     },
     {
       key: "finance_payout",
-      group: "blocked",
-      disposition: "blocked",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_payout_profile_updated",
       routePatterns: [
         "src/app/api/author/payout-profile/route.ts",
         "src/app/api/author/finance/terms/route.ts",
@@ -321,8 +324,9 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "personal_materials",
-      group: "blocked",
-      disposition: "blocked",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "personal_material_updated",
       routePatterns: [
         "src/app/api/author/personal-materials/route.ts",
         "src/app/api/author/personal-materials/settings/route.ts",
@@ -365,21 +369,39 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
     },
     {
       key: "author_seo_tools",
-      group: "blocked",
-      disposition: "blocked",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_seo_tool_used",
       routePatterns: [
         "src/app/api/author/seo/product-autofill/route.ts",
         "src/app/api/author/seo/wordstat/suggestions/route.ts",
       ],
     },
     {
-      key: "terms_commercial_projects",
+      key: "author_terms_accept",
       group: "blocked",
       disposition: "blocked",
+      routePatterns: ["src/app/api/author/terms/accept/route.ts"],
+    },
+    {
+      key: "author_project_create",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: ["src/app/api/author/projects/route.ts"],
+    },
+    {
+      key: "commercial_application",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "commercial_application_updated",
+      routePatterns: ["src/app/api/author/commercial-application/route.ts"],
+    },
+    {
+      key: "author_onboarding",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_onboarding_updated",
       routePatterns: [
-        "src/app/api/author/terms/accept/route.ts",
-        "src/app/api/author/commercial-application/route.ts",
-        "src/app/api/author/projects/route.ts",
         "src/app/api/author/onboarding/route.ts",
         "src/app/api/author/onboarding/ui/route.ts",
       ],
