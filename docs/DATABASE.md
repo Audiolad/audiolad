@@ -1659,6 +1659,14 @@ Connectivity heartbeat A2 (`record_business_player_heartbeat`) ≠ playback medi
 
 `EXECUTE` на `next_music_track_code()` роли `authenticated` не выдаётся: функция двигает общую последовательность. Авторский INSERT музыкального трека назначает код внутри триггера от имени владельца функции (на этом Supabase это `postgres`). Прямой вызов issuer автором остаётся запрещённым. Неуспешный INSERT не создаёт строку `audio_items`.
 
+## Music Analyzer Lab (черновик, не применено к production)
+
+Миграция `supabase/migrations/20261204120000_music_analyzer_lab_v01.sql` — изолированные таблицы `music_lab_experiments`, `music_lab_items`, `music_lab_tasks`, `music_lab_responses`, `music_lab_blind_assignments` и приватный bucket `music-analyzer-lab`.
+
+RLS включён, политик для `anon` / `authenticated` нет: доступ только через service role после проверки роли owner/admin в приложении. Слепая карта похожести не хранится в репозитории: оператор один раз загружает её в `music_lab_blind_assignments` из локального файла. Клиенту сырые коды не отдаются. Пока статус `completed`, запись ответов блокирует триггер.
+
+Таблицы каталога, SEO, треков и «Аудиолад Бизнес» эта миграция не изменяет. На production она не применялась в рамках чернового PR.
+
 ## Резервное копирование
 
 Будет заполнено позже.

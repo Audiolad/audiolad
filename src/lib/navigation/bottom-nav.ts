@@ -20,6 +20,7 @@ const BOTTOM_NAV_HIDDEN_PREFIXES = [
 export const WORKSPACE_DASHBOARD_PREFIXES = [
   "/author-dashboard",
   "/admin",
+  "/music-analyzer",
 ] as const;
 
 export function isWorkspaceDashboardPathname(pathname: string): boolean {

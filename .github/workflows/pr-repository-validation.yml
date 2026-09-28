@@ -93,6 +93,7 @@ jobs:
           npx tsx scripts/music-draft-track-delete-unit.mts
           npx tsx scripts/legacy-music-draft-placeholder-unit.mts
           npx tsx scripts/business-landing-unit.mts
+          npm run test:music-lab
           npm run build
           npm run typecheck
           npm run test:author-project-cyrillic-name

@@ -15,6 +15,10 @@
 - Ещё не реализованы: full Proof of Play (product UX), offline/cache evidence + provenance, Rights qualification / Qualified Usage, financial usage / billing, Player playback engine, Analyzer / Sonic DNA / Music Passport.
 - `MERGE=NO`, `DEPLOY=NO`, `PRODUCTION_DB_APPLY=NO` в рамках A3 Draft (production DB apply не выполнялся).
 
+## Music Analyzer Lab
+
+Черновик `/music-analyzer` (Human Listening Validation v0.5) есть в репозитории как закрытая консоль owner/admin. Публичный пакет проверки лежит в `data/music-lab/listening-v05/`. Слепой ключ похожести в git не хранится. Production-миграция не применялась, деплой не выполнялся, публичная навигация на лабораторию не ведёт.
+
 ## Сводный статус
 
 | Подсистема | Статус | Комментарий |
