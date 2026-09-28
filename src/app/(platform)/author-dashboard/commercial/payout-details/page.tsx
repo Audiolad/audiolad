@@ -2,6 +2,7 @@ import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorPayoutProfileForm from "@/components/author-dashboard/AuthorPayoutProfileForm";
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
 import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -26,14 +27,17 @@ export default async function AuthorCommercialPayoutDetailsPage({
   const collectionEnabled = isPayoutProfilesEnabled();
 
   let initialEmail: string | null = null;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    initialEmail = user?.email?.trim() || null;
-  } catch {
-    initialEmail = null;
+  const execution = await peekAuthorExecutionContext();
+  if (!execution?.isSupportMode) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      initialEmail = user?.email?.trim() || null;
+    } catch {
+      initialEmail = null;
+    }
   }
 
   return (
