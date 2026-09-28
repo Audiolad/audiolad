@@ -35,6 +35,10 @@ export const AUTHOR_SUPPORT_RPC_WRAPPERS = {
     "get_author_partner_invite_template_with_support_proof",
   set_author_partner_invite_template:
     "set_author_partner_invite_template_with_support_proof",
+  save_author_commercial_application_draft:
+    "save_author_commercial_application_draft_with_support_proof",
+  submit_author_commercial_application:
+    "submit_author_commercial_application_with_support_proof",
 } as const;
 
 export type AuthorSupportRpcName = keyof typeof AUTHOR_SUPPORT_RPC_WRAPPERS;
