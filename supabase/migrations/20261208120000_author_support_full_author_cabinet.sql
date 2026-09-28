@@ -435,4 +435,238 @@ REVOKE ALL ON FUNCTION public.acquire_free_studio_music_with_support_proof(text,
 GRANT EXECUTE ON FUNCTION public.acquire_free_studio_music_with_support_proof(text, uuid)
   TO authenticated;
 
+-- Project creation is a user-level author-account action. Keep the normal
+-- function semantics while allowing a support session to create the project
+-- for acting_user_id (never for the platform-owner actor).
+CREATE OR REPLACE FUNCTION public.create_author_project_for_user(
+  p_user_id uuid,
+  p_name text,
+  p_slug text DEFAULT NULL,
+  p_short_description text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_name text := btrim(coalesce(p_name, ''));
+  v_slug_input text := nullif(btrim(coalesce(p_slug, '')), '');
+  v_slug text;
+  v_description text := nullif(btrim(coalesce(p_short_description, '')), '');
+  v_limit integer;
+  v_unlimited boolean;
+  v_purchased integer;
+  v_partner_bonus integer;
+  v_used integer;
+  v_author_id uuid;
+  v_base integer;
+  v_finalize jsonb;
+BEGIN
+  IF p_user_id IS NULL OR NOT EXISTS (
+    SELECT 1 FROM auth.users AS u WHERE u.id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'unauthorized' USING ERRCODE = '42501';
+  END IF;
+
+  IF char_length(v_name) < 2 OR char_length(v_name) > 80 THEN
+    RAISE EXCEPTION 'invalid_project_name' USING ERRCODE = '22023';
+  END IF;
+  IF v_description IS NOT NULL AND char_length(v_description) > 280 THEN
+    RAISE EXCEPTION 'invalid_project_description' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));
+
+  SELECT
+    coalesce(p.author_projects_unlimited, false),
+    coalesce(p.author_project_slots_purchased, 0),
+    coalesce(p.author_project_slots_partner_bonus, 0),
+    CASE
+      WHEN p.author_project_limit_override IS NOT NULL
+           AND p.author_project_limit_override >= 1
+        THEN p.author_project_limit_override
+      WHEN coalesce(p.author_premium_enabled, false) THEN 3
+      ELSE 1
+    END
+  INTO v_unlimited, v_purchased, v_partner_bonus, v_base
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id
+  FOR UPDATE;
+
+  v_unlimited := coalesce(v_unlimited, false);
+  v_base := coalesce(v_base, 1);
+  v_purchased := greatest(coalesce(v_purchased, 0), 0);
+  v_partner_bonus := greatest(coalesce(v_partner_bonus, 0), 0);
+  v_limit := v_base + v_purchased + v_partner_bonus;
+
+  SELECT count(*)::integer
+  INTO v_used
+  FROM public.author_members AS am
+  WHERE am.user_id = p_user_id
+    AND am.role = 'owner';
+
+  IF NOT v_unlimited AND v_used >= v_limit THEN
+    RAISE EXCEPTION 'author_project_limit_reached' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_slug_input IS NOT NULL THEN
+    v_slug := public.slugify_author_display_name(v_slug_input);
+    IF v_slug IS NULL OR char_length(v_slug) < 2 THEN
+      RAISE EXCEPTION 'invalid_project_slug' USING ERRCODE = '22023';
+    END IF;
+  ELSE
+    v_slug := public.allocate_unique_author_slug(v_name);
+  END IF;
+
+  PERFORM public.acquire_author_slug_namespace_lock(v_slug);
+  IF EXISTS (SELECT 1 FROM public.authors AS a WHERE a.slug = v_slug)
+     OR EXISTS (
+       SELECT 1 FROM public.author_slug_redirects AS r WHERE r.old_slug = v_slug
+     ) THEN
+    RAISE EXCEPTION 'project_slug_taken' USING ERRCODE = '23505';
+  END IF;
+
+  INSERT INTO public.authors (
+    name, slug, author_type, access_status, short_bio, description
+  ) VALUES (
+    v_name, v_slug, 'project', 'free', v_description, v_description
+  )
+  RETURNING id INTO v_author_id;
+
+  INSERT INTO public.author_members (author_id, user_id, role)
+  VALUES (v_author_id, p_user_id, 'owner');
+
+  v_finalize := public.finalize_author_partner_referral(p_user_id, v_author_id);
+
+  SELECT
+    coalesce(p.author_projects_unlimited, false),
+    coalesce(p.author_project_slots_purchased, 0),
+    coalesce(p.author_project_slots_partner_bonus, 0),
+    CASE
+      WHEN p.author_project_limit_override IS NOT NULL
+           AND p.author_project_limit_override >= 1
+        THEN p.author_project_limit_override
+      WHEN coalesce(p.author_premium_enabled, false) THEN 3
+      ELSE 1
+    END
+  INTO v_unlimited, v_purchased, v_partner_bonus, v_base
+  FROM public.profiles AS p
+  WHERE p.id = p_user_id;
+
+  v_unlimited := coalesce(v_unlimited, false);
+  v_base := coalesce(v_base, 1);
+  v_purchased := greatest(coalesce(v_purchased, 0), 0);
+  v_partner_bonus := greatest(coalesce(v_partner_bonus, 0), 0);
+  v_limit := v_base + v_purchased + v_partner_bonus;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'author_id', v_author_id,
+    'slug', v_slug,
+    'name', v_name,
+    'used', v_used + 1,
+    'limit', CASE WHEN v_unlimited THEN NULL ELSE v_limit END,
+    'unlimited', v_unlimited,
+    'partner_finalize', v_finalize
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_author_project_for_user(uuid, text, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_author_project_for_user(uuid, text, text, text)
+  TO service_role;
+
+CREATE OR REPLACE FUNCTION public.create_author_project(
+  p_name text,
+  p_slug text DEFAULT NULL,
+  p_short_description text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'unauthorized' USING ERRCODE = '42501';
+  END IF;
+  RETURN public.create_author_project_for_user(
+    auth.uid(), p_name, p_slug, p_short_description
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_author_project(text, text, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_author_project(text, text, text)
+  TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.create_author_project_with_support_proof(
+  p_token_hash text,
+  p_name text,
+  p_slug text DEFAULT NULL,
+  p_short_description text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_session public.author_support_sessions%ROWTYPE;
+  v_result jsonb;
+  v_new_author_id uuid;
+BEGIN
+  PERFORM public.set_author_support_session_proof(p_token_hash);
+
+  SELECT s.*
+  INTO v_session
+  FROM public.author_support_sessions AS s
+  WHERE s.actor_user_id = auth.uid()
+    AND s.token_hash = public.author_support_request_token_hash()
+    AND s.revoked_at IS NULL
+    AND s.expires_at > now()
+    AND public.is_platform_owner(s.actor_user_id)
+    AND public.author_support_session_allows(s.acting_author_id)
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  v_result := public.create_author_project_for_user(
+    v_session.acting_user_id,
+    p_name,
+    p_slug,
+    p_short_description
+  );
+  v_new_author_id := nullif(v_result ->> 'author_id', '')::uuid;
+
+  UPDATE public.author_support_sessions AS s
+  SET
+    acting_author_id = v_new_author_id,
+    last_seen_at = now()
+  WHERE s.id = v_session.id;
+
+  PERFORM public.record_author_support_mutation_audit(
+    v_new_author_id,
+    'author_project_created',
+    'author',
+    v_new_author_id::text,
+    jsonb_build_object('operation', 'create_project')
+  );
+
+  RETURN v_result;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_author_project_with_support_proof(text, text, text, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_author_project_with_support_proof(text, text, text, text)
+  TO authenticated;
+
+
 COMMIT;
