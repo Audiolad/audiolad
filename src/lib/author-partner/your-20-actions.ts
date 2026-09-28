@@ -1,6 +1,6 @@
 "use server";
 
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { callAuthorUserRpc, peekAuthorExecutionContext } from "@/lib/author-support/context";
 import {
   AuthorAccessError,
   requireAuthorMembership,
@@ -32,11 +32,11 @@ export type PartnerYour20ActionResult =
     };
 
 /**
- * Authoritative gate for your-20 mutations:
- * 1) support-mode blocked
- * 2) requireAuthorMembership → role must be owner
+ * Authoritative gate for your-20 actions:
+ * 1) requireAuthorMembership scopes normal or support-mode access
+ * 2) normal mode requires owner; platform-owner support mode is allowed
  * 3) load authors.slug by authorId (server SoT)
- * 4) resolved slug must belong to that owner membership
+ * 4) resolved slug must belong to the verified workspace
  *
  * Never trusts a client-supplied slug.
  */
@@ -48,9 +48,11 @@ async function assertPartnerYour20MutationAccess(
   const execution = await peekAuthorExecutionContext();
 
   let role: string;
+  let dataClient: Awaited<ReturnType<typeof requireAuthorMembership>>["supabase"];
   try {
     const membership = await requireAuthorMembership(authorId);
     role = membership.role;
+    dataClient = membership.supabase;
   } catch (error) {
     if (error instanceof AuthorAccessError) {
       return {
@@ -62,8 +64,7 @@ async function assertPartnerYour20MutationAccess(
     throw error;
   }
 
-  const supabase = await createClient();
-  const { data: authorRow, error: authorError } = await supabase
+  const { data: authorRow, error: authorError } = await dataClient
     .from("authors")
     .select("slug")
     .eq("id", authorId)
@@ -98,9 +99,11 @@ export async function loadAuthorPartnerProfileAction(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_author_partner_profile", {
-    p_author_id: authorId,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "get_author_partner_profile",
+    { p_author_id: authorId },
+  );
 
   if (error) {
     const code = parsePartnerRpcErrorCode(error);
@@ -120,9 +123,11 @@ export async function ensureAuthorPartnerProfileAction(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("ensure_author_partner_profile", {
-    p_author_id: authorId,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "ensure_author_partner_profile",
+    { p_author_id: authorId },
+  );
 
   if (error) {
     logPartnerYour20RpcFailure({
@@ -137,9 +142,11 @@ export async function ensureAuthorPartnerProfileAction(
     return { ok: false, code, message: partnerCodeUserMessage(code) };
   }
 
-  const reload = await supabase.rpc("get_author_partner_profile", {
-    p_author_id: authorId,
-  });
+  const reload = await callAuthorUserRpc(
+    supabase,
+    "get_author_partner_profile",
+    { p_author_id: authorId },
+  );
   if (reload.error) {
     const row = (data ?? {}) as Record<string, unknown>;
     if (typeof row.primary_code === "string") {
@@ -172,10 +179,14 @@ export async function changeAuthorPartnerCodeAction(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("change_author_partner_code", {
-    p_author_id: authorId,
-    p_new_code: newCode,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "change_author_partner_code",
+    {
+      p_author_id: authorId,
+      p_new_code: newCode,
+    },
+  );
 
   if (error) {
     logPartnerYour20RpcFailure({
@@ -193,9 +204,11 @@ export async function changeAuthorPartnerCodeAction(
   const row = (data ?? {}) as Record<string, unknown>;
   const previousKept = row.previous_code_is_alias === true;
 
-  const reload = await supabase.rpc("get_author_partner_profile", {
-    p_author_id: authorId,
-  });
+  const reload = await callAuthorUserRpc(
+    supabase,
+    "get_author_partner_profile",
+    { p_author_id: authorId },
+  );
   if (reload.error) {
     if (typeof row.primary_code === "string") {
       return {
@@ -232,7 +245,8 @@ export async function loadAuthorPartnerInviteTemplateAction(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc(
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
     "get_author_partner_invite_template",
     { p_author_id: authorId },
   );
@@ -261,7 +275,8 @@ export async function saveAuthorPartnerInviteTemplateAction(
   );
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc(
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
     "set_author_partner_invite_template",
     { p_author_id: authorId, p_template: template },
   );

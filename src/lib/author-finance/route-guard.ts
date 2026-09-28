@@ -11,10 +11,9 @@
  * Both owner and editor may read: the finance cabinet is read-only, and an
  * editor who runs a workspace day to day needs to see whether money arrived.
  *
- * A platform admin deliberately gets nothing extra here. Viewing another
- * author's finance is an admin capability and lives in the admin panel, behind
- * its own RBAC. Letting a staff account borrow this endpoint would turn an
- * author-scoped API into an unaudited cross-author one.
+ * Platform-owner support mode is allowed only through requireAuthorMembership(),
+ * which scopes the request to the active actingAuthorId. The finance queries
+ * remain read-only and receive only that verified author id.
  */
 
 import {
@@ -22,7 +21,6 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import type { AuthorMemberRole } from "@/lib/author-products/types";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -40,11 +38,6 @@ export type AuthorFinanceContext = {
 export async function requireAuthorFinanceAccess(
   request: Request,
 ): Promise<AuthorFinanceContext> {
-  const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    throw new AuthorAccessError("support_sensitive_route_blocked", 403);
-  }
-
   const url = new URL(request.url);
   const claimed = url.searchParams.get("author_id")?.trim() ?? "";
 

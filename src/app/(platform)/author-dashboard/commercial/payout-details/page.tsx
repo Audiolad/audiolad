@@ -17,11 +17,6 @@ type PageProps = {
 export default async function AuthorCommercialPayoutDetailsPage({
   searchParams,
 }: PageProps) {
-  const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    redirect("/author-dashboard");
-  }
-
   const params = (await searchParams) ?? {};
   const author = await requireCommercialOnboardingAuthor({
     nextPath: "/author-dashboard/commercial/payout-details",
@@ -32,14 +27,17 @@ export default async function AuthorCommercialPayoutDetailsPage({
   const collectionEnabled = isPayoutProfilesEnabled();
 
   let initialEmail: string | null = null;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    initialEmail = user?.email?.trim() || null;
-  } catch {
-    initialEmail = null;
+  const execution = await peekAuthorExecutionContext();
+  if (!execution?.isSupportMode) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      initialEmail = user?.email?.trim() || null;
+    } catch {
+      initialEmail = null;
+    }
   }
 
   return (

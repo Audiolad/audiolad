@@ -139,7 +139,6 @@ export async function PUT(request: Request) {
     }
 
     const application = await getAuthorCommercialApplication(supabase, authorId);
-
     return NextResponse.json({
       ok: true,
       result: rpc.result,

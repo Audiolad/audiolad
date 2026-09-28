@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
-import { requireAuthorMaterialListAccess, requireAuthorMaterialListReadAccess } from "@/lib/personal-materials/server/auth";
+import { getPersonalMaterialLookupClient, requireAuthorMaterialListAccess, requireAuthorMaterialListReadAccess } from "@/lib/personal-materials/server/auth";
 import {
   handlePersonalMaterialRouteError,
   PersonalMaterialApiError,
@@ -13,7 +13,6 @@ import {
   toSafePersonalMaterialTemplateDto,
   updatePersonalMaterialTemplate,
 } from "@/lib/personal-materials/server/templates";
-import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -22,8 +21,8 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const template = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const template = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!template) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -46,14 +45,14 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const existing = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const existing = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!existing) {
       throw new PersonalMaterialApiError("not_found", 404);
     }
 
-    await requireAuthorMaterialListAccess(existing.author_id);
+    const { supabase } = await requireAuthorMaterialListAccess(existing.author_id);
     const fields = parseTemplateBody(await request.json());
     const updated = await updatePersonalMaterialTemplate(supabase, id, fields);
 
@@ -72,14 +71,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const existing = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const existing = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!existing) {
       throw new PersonalMaterialApiError("not_found", 404);
     }
 
-    await requireAuthorMaterialListAccess(existing.author_id);
+    const { supabase } = await requireAuthorMaterialListAccess(existing.author_id);
     await deletePersonalMaterialTemplate(supabase, id);
 
     return NextResponse.json({ ok: true });

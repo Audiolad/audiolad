@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
-import { requireAuthorMaterialListAccess } from "@/lib/personal-materials/server/auth";
+import { getPersonalMaterialLookupClient, requireAuthorMaterialListAccess } from "@/lib/personal-materials/server/auth";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
 import {
   handlePersonalMaterialRouteError,
@@ -12,7 +12,6 @@ import {
   getAuthorPersonalMaterialById,
 } from "@/lib/personal-materials/server/repository";
 import { getPersonalMaterialTemplateById } from "@/lib/personal-materials/server/templates";
-import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -21,14 +20,14 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const template = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const template = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!template) {
       throw new PersonalMaterialApiError("not_found", 404);
     }
 
-    await requireAuthorMaterialListAccess(template.author_id);
+    const { supabase } = await requireAuthorMaterialListAccess(template.author_id);
 
     const today = new Date();
     const materialDate = [

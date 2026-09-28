@@ -255,15 +255,15 @@ for (const pathName of [
   "/profile/edit",
   "/auth/forgot-password",
   "/auth/reset-password",
-  "/author-dashboard/finance",
-  "/author-dashboard/commercial/payout-details",
-  "/api/author/payout-profile",
-  "/api/author/finance/summary",
 ]) {
   assert.equal(isAuthorSupportSensitivePath(pathName), true, pathName);
 }
 
 assert.equal(isAuthorSupportSensitivePath("/author-dashboard"), false);
+assert.equal(isAuthorSupportSensitivePath("/author-dashboard/finance"), false);
+assert.equal(isAuthorSupportSensitivePath("/author-dashboard/commercial/payout-details"), false);
+assert.equal(isAuthorSupportSensitivePath("/api/author/payout-profile"), false);
+assert.equal(isAuthorSupportSensitivePath("/api/author/finance/summary"), false);
 assert.equal(isAuthorSupportSensitivePath("/author-dashboard/products/1"), false);
 assert.equal(isAuthorSupportSensitivePath("/studio/projects"), false);
 assert.equal(isAuthorSupportSensitivePath("/admin/users"), false);
@@ -485,10 +485,12 @@ assert.match(proxy, /AUTHOR_SUPPORT_COOKIE_NAME/);
 assert.match(proxy, /isAuthorSupportSensitivePath/);
 
 const financeGuard = read("src/lib/author-finance/route-guard.ts");
-assert.match(financeGuard, /support_sensitive_route_blocked/);
+assert.doesNotMatch(financeGuard, /support_sensitive_route_blocked/);
+assert.match(financeGuard, /requireAuthorMembership/);
 
 const payoutRoute = read("src/app/api/author/payout-profile/route.ts");
-assert.match(payoutRoute, /support_sensitive_route_blocked/);
+assert.doesNotMatch(payoutRoute, /support_sensitive_route_blocked/);
+assert.match(payoutRoute, /author_payout_profile_updated/);
 
 const productPatch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(productPatch, /product_updated/);
@@ -714,23 +716,24 @@ assert.equal(
     pathname: ownPersonalMaterialAudioPost,
     method: "POST",
   }),
-  true,
+  false,
 );
 assert.equal(
   isAuthorSupportBlockedMutation({
     pathname: "/api/studio/projects/project-id/assets/catalog",
     method: "POST",
   }),
-  true,
+  false,
 );
 assert.equal(
   AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.includes("/api/author/personal-materials"),
-  false,
+  true,
 );
 const personalMaterialsInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
   (item) => item.key === "personal_materials",
 );
-assert.equal(personalMaterialsInventory?.disposition, "blocked");
+assert.equal(personalMaterialsInventory?.disposition, "allowed_audited");
+assert.equal(personalMaterialsInventory?.action, "personal_material_updated");
 
 function proxyGuardBlocksSupportMutation(supportCookie, pathname, method) {
   return Boolean(supportCookie) && isAuthorSupportBlockedMutation({ pathname, method });
@@ -746,11 +749,11 @@ assert.equal(
   false,
 );
 
-// B. Support cookie active. Forbidden mutations stay 403 / support_mutation_blocked.
+// B. Support cookie active. Scoped author-workspace mutations stay available.
 const activeSupportCookie = "opaque-author-support-token";
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, ownPersonalMaterialAudioPost, "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(
@@ -758,7 +761,7 @@ assert.equal(
     "/api/author/personal-materials/c202e2da",
     "PATCH",
   ),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/promotion/pages", "POST"),
@@ -766,7 +769,7 @@ assert.equal(
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/onboarding", "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(
@@ -774,7 +777,7 @@ assert.equal(
     "/api/studio/projects/project-id/assets/catalog",
     "POST",
   ),
-  true,
+  false,
 );
 // Studio music licensing is a blocked support-mode mutation. The proxy must
 // return its structured 403 before the acquire route is reached, and the
@@ -828,9 +831,8 @@ assert.equal(
 for (const sensitivePath of [
   "/settings",
   "/profile/edit",
-  "/author-dashboard/finance",
-  "/api/author/payout-profile",
-  "/api/author/finance/summary",
+  "/auth/forgot-password",
+  "/auth/reset-password",
 ]) {
   assert.equal(isAuthorSupportSensitivePath(sensitivePath), true, sensitivePath);
   assert.equal(
@@ -986,7 +988,7 @@ for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);
 assert.match(proxy, /supportCookie &&/);
-assert.doesNotMatch(
+assert.match(
   read("src/lib/author-support/policy.ts"),
   /\/api\/author\/personal-materials/,
 );
@@ -1037,6 +1039,19 @@ const appreciationInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
   (item) => item.key === "author_appreciation_settings",
 );
 assert.equal(appreciationInventory?.disposition, "allowed_audited");
+
+for (const [key, action] of [
+  ["finance_payout", "author_payout_profile_updated"],
+  ["studio_audiobooks", "studio_audiobook_updated"],
+  ["studio_catalog_asset_attach", "studio_asset_uploaded"],
+  ["author_seo_tools", "author_seo_tool_used"],
+  ["commercial_application", "commercial_application_updated"],
+  ["author_onboarding", "author_onboarding_updated"],
+]) {
+  const item = AUTHOR_SUPPORT_MUTATION_INVENTORY.find((entry) => entry.key === key);
+  assert.equal(item?.disposition, "allowed_audited", key);
+  assert.equal(item?.action, action, key);
+}
 
 const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(practicePage, /peekAuthorExecutionContext/);

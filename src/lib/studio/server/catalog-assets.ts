@@ -1,6 +1,8 @@
 import "server-only";
 
 import { requireAuthenticatedUser } from "@/lib/author-products/auth";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { isStudioMusicPublication } from "@/lib/studio-music/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -38,6 +40,14 @@ type CatalogAudioItemRow = {
   duration_seconds: number | null;
   audio_path: string | null;
 };
+
+async function resolveStudioCatalogUserId(): Promise<string> {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    return execution.actingUserId;
+  }
+  return (await requireAuthenticatedUser()).user.id;
+}
 
 function mapAttachError(error: {
   message?: string;
@@ -146,7 +156,7 @@ export async function attachStudioCatalogAsset(input: {
 
   const userId =
     projectAccess.ownerKind === "author"
-      ? (await requireAuthenticatedUser()).user.id
+      ? await resolveStudioCatalogUserId()
       : null;
   const access =
     projectAccess.ownerKind === "author"
@@ -179,6 +189,12 @@ export async function attachStudioCatalogAsset(input: {
     mapAttachError(error);
   }
   const asset = data as StudioProjectAssetRow;
+  await recordAuthorSupportAudit({
+    action: "studio_asset_uploaded",
+    resourceType: "studio_project_asset",
+    resourceId: asset.id,
+    metadata: { source: "catalog", projectId: input.projectId },
+  });
   const dto = toStudioAssetDto(asset, null, { available: true });
   if (studioCatalogAssetDtoContainsForbiddenFields(dto)) {
     throw new StudioApiError("internal_error", 500);
@@ -193,7 +209,7 @@ export async function toListedStudioAssetDtos(
   const projectAccess = await requireStudioProjectAccess(projectId);
   let userId: string | null = null;
   if (projectAccess.ownerKind === "author") {
-    userId = (await requireAuthenticatedUser()).user.id;
+    userId = await resolveStudioCatalogUserId();
   }
   const service = createServiceRoleClient();
   return Promise.all(
@@ -285,7 +301,7 @@ export async function assertCatalogAssetReadyForPlayback(
 
   const userId =
     projectAccess.ownerKind === "author"
-      ? (await requireAuthenticatedUser()).user.id
+      ? await resolveStudioCatalogUserId()
       : null;
   const access =
     projectAccess.ownerKind === "author"

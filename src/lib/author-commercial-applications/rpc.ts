@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { callAuthorUserRpc } from "@/lib/author-support/context";
+import type { AuthorSupportRpcName } from "@/lib/author-support/proof";
+
 import type { AuthorCommercialApplicationFormValues } from "./types";
 import { mapCommercialApplicationRpcError } from "./validation";
 
@@ -39,13 +42,17 @@ export function parseCommercialApplicationRpcResult(
 
 export async function callCommercialApplicationRpc(
   supabase: SupabaseClient,
-  functionName: string,
+  functionName: Extract<
+    AuthorSupportRpcName,
+    | "save_author_commercial_application_draft"
+    | "submit_author_commercial_application"
+  >,
   args: Record<string, unknown>,
 ): Promise<
   | { ok: true; result: CommercialApplicationRpcResult }
   | { ok: false; error: string }
 > {
-  const { data, error } = await supabase.rpc(functionName, args);
+  const { data, error } = await callAuthorUserRpc(supabase, functionName, args);
 
   if (error) {
     console.error(`commercial_application_${functionName}_error`, error.message);

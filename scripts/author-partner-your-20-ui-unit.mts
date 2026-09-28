@@ -70,22 +70,38 @@ test("editor cannot open Ваши 20%", () => {
   );
 });
 
-test("support mode cannot open Ваши 20%", () => {
+test("platform-owner support mode can open Ваши 20%", () => {
   assert.equal(
     canAccessAuthorPartnerYour20Ui({
       authorSlug: "anna-meditation",
       role: "owner",
       isSupportMode: true,
     }),
-    false,
+    true,
+  );
+  assert.equal(
+    canAccessAuthorPartnerYour20Ui({
+      authorSlug: "anna-meditation",
+      role: "editor",
+      isSupportMode: true,
+    }),
+    true,
   );
   assert.equal(
     evaluatePartnerYour20Access({
       resolvedAuthorSlug: "anna-meditation",
-      role: "owner",
+      role: "editor",
       isSupportMode: true,
     }),
-    "support_mode_blocked",
+    "allowed",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(
+      [{ slug: "editor-only", role: "editor" }],
+      "editor-only",
+      true,
+    )?.slug,
+    "editor-only",
   );
 });
 
@@ -379,6 +395,28 @@ test("reward money formatter: exact RUB and safe fallback", () => {
 test("your-20 route keeps ?author=sergey-petrov", () => {
   const href = `/author-dashboard/your-20?author=${encodeURIComponent("anna-meditation")}`;
   assert.equal(href, "/author-dashboard/your-20?author=anna-meditation");
+});
+
+test("your-20 uses scoped support proof instead of blocking platform owner", () => {
+  const pageSrc = readFileSync(
+    new URL("../src/app/(platform)/author-dashboard/your-20/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const actionSrc = readFileSync(
+    new URL("../src/lib/author-partner/your-20-actions.ts", import.meta.url),
+    "utf8",
+  );
+  const proofSrc = readFileSync(
+    new URL("../src/lib/author-support/proof.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(pageSrc, /callAuthorUserRpc/);
+  assert.match(pageSrc, /selectOwnedAuthorWorkspace\(authors, slugParam, isSupportMode\)/);
+  assert.doesNotMatch(pageSrc, /if \(execution\?\.isSupportMode\) \{\s*redirect\("\/author-dashboard"\)/);
+  assert.match(actionSrc, /callAuthorUserRpc/);
+  assert.match(proofSrc, /get_author_partner_profile_with_support_proof/);
+  assert.match(proofSrc, /list_author_partner_invitees_with_support_proof/);
+  assert.match(proofSrc, /get_author_partner_reward_dashboard_with_support_proof/);
 });
 
 test("copy: explains 20%, 3-year window, bonus space, and live rewards", () => {
