@@ -1765,7 +1765,7 @@ Server-set via `clock_timestamp()` when `verified → superseded|revoked` (clien
 Tables: `music_country_rights_profiles`, `music_country_rights_profile_rules`.
 
 - Lifecycle: draft → active → superseded (terminal). INSERT only draft; activate requires `reviewed_at`.
-- One current `active` profile per `country_code`. Version chain via `supersedes_profile_id` (same country, version = pred+1, unique successor).
+- One current `active` profile per `country_code`. One linear version chain per country: `UNIQUE(country_code, version)` plus root version=1, predecessor required for version>1, version=pred+1, and unique successor (`supersedes_profile_id`).
 - Rules: `use_type` (A4 vocabulary), `service_status` supported|unsupported|unknown, `client_requirement` none|required|unknown, `requires_recording` / `requires_composition`.
 - Rules editable only while parent draft; immutable after activation. No production country legal seeds.
 
@@ -1775,7 +1775,7 @@ Tables: `business_location_rights_contexts`, `business_location_rights_context_u
 
 - Snapshots `country_code` + `business_category` from `business_locations`; profile country must match Location.
 - While an `active` Location Rights Context exists, `business_locations.country_code` / `business_category` cannot change (`active_location_rights_context_must_be_superseded`). V1 write order: supersede Context (server `ceased_at`) → UPDATE Location → create+activate new Context. No auto-supersede from Location.
-- Lifecycle/versioning mirrors Country Profile. One active context per Location.
+- Lifecycle/versioning mirrors Country Profile. One active context per Location. One linear context chain per Location: `UNIQUE(location_id, version)` plus the same root/predecessor/successor invariants.
 - `client_requirement_status`: not_required|confirmed|not_confirmed|unknown. Child rows immutable after parent leaves draft.
 
 ### Eligibility RPC

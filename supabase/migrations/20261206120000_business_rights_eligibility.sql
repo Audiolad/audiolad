@@ -223,6 +223,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS music_country_rights_profiles_supersedes_uidx
   ON public.music_country_rights_profiles (supersedes_profile_id)
   WHERE supersedes_profile_id IS NOT NULL;
 
+CREATE UNIQUE INDEX IF NOT EXISTS music_country_rights_profiles_country_version_uidx
+  ON public.music_country_rights_profiles (country_code, version);
+
 CREATE UNIQUE INDEX IF NOT EXISTS music_country_rights_profiles_one_active_uidx
   ON public.music_country_rights_profiles (country_code)
   WHERE status = 'active';
@@ -295,6 +298,9 @@ COMMENT ON TABLE public.business_location_rights_contexts IS
 CREATE UNIQUE INDEX IF NOT EXISTS business_location_rights_contexts_supersedes_uidx
   ON public.business_location_rights_contexts (supersedes_context_id)
   WHERE supersedes_context_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS business_location_rights_contexts_location_version_uidx
+  ON public.business_location_rights_contexts (location_id, version);
 
 CREATE UNIQUE INDEX IF NOT EXISTS business_location_rights_contexts_one_active_uidx
   ON public.business_location_rights_contexts (location_id)

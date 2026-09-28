@@ -1049,8 +1049,104 @@ BEGIN
   END;
   RAISE NOTICE 'CaseP ok';
 
-  RAISE NOTICE 'Hardening A-P ok';
+
+  -- CaseQ: second Country root (same country + version=1 + supersedes=NULL) rejected
+  BEGIN
+    INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+    VALUES ('XX', 1, 'draft');
+    RAISE EXCEPTION 'CaseQ expected fail';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  WHEN others THEN
+    IF SQLERRM LIKE '%CaseQ expected%' THEN RAISE; END IF;
+    IF SQLSTATE <> '23505' THEN
+      RAISE EXCEPTION 'CaseQ unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseQ ok';
+
+  -- CaseR: duplicate Country version number in same country rejected
+  -- XX already has version=1 (active) and draft version=2 from CaseO
+  BEGIN
+    INSERT INTO public.music_country_rights_profiles
+      (country_code, version, status, supersedes_profile_id)
+    VALUES ('XX', 2, 'draft', v_prof_aa);
+    RAISE EXCEPTION 'CaseR expected fail';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  WHEN others THEN
+    IF SQLERRM LIKE '%CaseR expected%' THEN RAISE; END IF;
+    IF SQLSTATE <> '23505' THEN
+      RAISE EXCEPTION 'CaseR unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseR ok';
+
+  -- CaseS: another country may have its own version=1
+  INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+  VALUES ('WW', 1, 'draft');
+  IF NOT EXISTS (
+    SELECT 1 FROM public.music_country_rights_profiles
+    WHERE country_code = 'WW' AND version = 1 AND supersedes_profile_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'CaseS WW root missing';
+  END IF;
+  RAISE NOTICE 'CaseS ok';
+
+  -- CaseT: second Location Context root same location + version=1 rejected
+  -- location ...013 already has context version=1 from CaseP
+  BEGIN
+    INSERT INTO public.business_location_rights_contexts
+      (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
+    VALUES ('b0000000-0000-4000-8000-000000000013', v_prof_aa, 'XX', 'cafe', 1, 'draft');
+    RAISE EXCEPTION 'CaseT expected fail';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  WHEN others THEN
+    IF SQLERRM LIKE '%CaseT expected%' THEN RAISE; END IF;
+    IF SQLSTATE <> '23505' THEN
+      RAISE EXCEPTION 'CaseT unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseT ok';
+
+  -- CaseU: duplicate Location Context version for same location rejected
+  -- ...013 already has version=1 and version=2 (draft) from CaseP
+  BEGIN
+    INSERT INTO public.business_location_rights_contexts
+      (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+       version, status, supersedes_context_id)
+    VALUES ('b0000000-0000-4000-8000-000000000013', v_prof_aa, 'XX', 'cafe', 2, 'draft', v_ctx_old);
+    RAISE EXCEPTION 'CaseU expected fail';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  WHEN others THEN
+    IF SQLERRM LIKE '%CaseU expected%' THEN RAISE; END IF;
+    IF SQLSTATE <> '23505' THEN
+      RAISE EXCEPTION 'CaseU unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseU ok';
+
+  -- CaseV: another Location may have its own version=1
+  INSERT INTO public.business_locations (id, organization_id, name, business_category, country_code, timezone)
+  VALUES ('b0000000-0000-4000-8000-000000000014', v_org, 'Loc WW', 'cafe', 'WW', 'UTC');
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
+  SELECT 'b0000000-0000-4000-8000-000000000014', id, 'WW', 'cafe', 1, 'draft'
+  FROM public.music_country_rights_profiles
+  WHERE country_code = 'WW' AND version = 1;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.business_location_rights_contexts
+    WHERE location_id = 'b0000000-0000-4000-8000-000000000014' AND version = 1
+  ) THEN
+    RAISE EXCEPTION 'CaseV other location root missing';
+  END IF;
+  RAISE NOTICE 'CaseV ok';
+
+  RAISE NOTICE 'Hardening A-P + Q-V ok';
 
   RAISE NOTICE 'A5 smoke complete';
+
 END;
 $smoke$;

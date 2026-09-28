@@ -134,6 +134,15 @@ assert(migration.includes("business_locations_protect_rights_relevant"), "locati
 assert(smoke.includes("LocGuardA"), "smoke LocGuardA");
 assert(smoke.includes("LocGuardG"), "smoke LocGuardG");
 assert(smoke.includes("LocGuardI"), "smoke LocGuardI");
+assert(migration.includes("music_country_rights_profiles_country_version_uidx"), "UNIQUE(country_code, version)");
+assert(migration.includes("business_location_rights_contexts_location_version_uidx"), "UNIQUE(location_id, version)");
+assert(smoke.includes("CaseQ"), "smoke CaseQ");
+assert(smoke.includes("CaseR"), "smoke CaseR");
+assert(smoke.includes("CaseS"), "smoke CaseS");
+assert(smoke.includes("CaseT"), "smoke CaseT");
+assert(smoke.includes("CaseU"), "smoke CaseU");
+assert(smoke.includes("CaseV"), "smoke CaseV");
+
 assert(smoke.includes("LOCATION_RIGHTS_CONTEXT_MISSING"), "smoke missing after location change");
 assert(smoke.includes("CLIENT_REQUIREMENT_STATUS_CONFLICT"), "smoke conflict reason");
 
