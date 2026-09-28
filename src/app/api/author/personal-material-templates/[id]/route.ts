@@ -45,8 +45,8 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const existing = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const existing = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!existing) {
       throw new PersonalMaterialApiError("not_found", 404);
@@ -71,8 +71,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const supabase = await createClient();
-    const existing = await getPersonalMaterialTemplateById(supabase, id);
+    const lookupClient = await getPersonalMaterialLookupClient();
+    const existing = await getPersonalMaterialTemplateById(lookupClient, id);
 
     if (!existing) {
       throw new PersonalMaterialApiError("not_found", 404);
