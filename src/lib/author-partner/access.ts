@@ -15,9 +15,7 @@ export function canAccessAuthorPartnerYour20Ui(input: {
   if (input.role !== "owner") {
     return false;
   }
-  const slug =
-    typeof input.authorSlug === "string" ? input.authorSlug.trim() : "";
-  return slug.length > 0;
+  return true;
 }
 
 export type PartnerYour20AccessDecision =
