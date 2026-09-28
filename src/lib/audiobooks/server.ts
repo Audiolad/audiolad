@@ -59,7 +59,12 @@ async function readAccess(authorId: string) {
   }
 }
 async function mutationAccess(authorId: string) {
-  try { await requireAuthorMutationMembership(authorId); }
+  try {
+    await requireAuthorMutationMembership(authorId, {
+      action: "studio_audiobook_updated",
+      resourceType: "audiobook",
+    });
+  }
   catch (error) {
     if (error instanceof AuthorAccessError && error.code === "forbidden") throw new AudiobookError("not_found", 404);
     throw error;
