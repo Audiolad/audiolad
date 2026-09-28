@@ -20,6 +20,13 @@ import {
   listenedMsToChartMinutes,
 } from "@/lib/admin/format-listening-time";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  canonicalizeAdminAuthorSort,
+  canonicalizeAdminPracticeSort,
+  canonicalizeAdminUtmSort,
+  clampStatsSearchQuery,
+  STATS_TABLE_ROW_CAP,
+} from "@/lib/stats/table-sort";
 
 export type AdminAnalyticsMetricCard = {
   key: string;
@@ -245,6 +252,8 @@ export type AdminAnalyticsDashboard = {
     attribution: "session_touch";
     total: number;
     rows: AdminAnalyticsAcquisitionRow[];
+    sort: string;
+    sortDir: "asc" | "desc";
     page: number;
     pageSize: number;
     error: string | null;
@@ -418,7 +427,7 @@ function clampPageSize(value: number): number {
   if (!Number.isFinite(value) || value < 1) {
     return 20;
   }
-  return Math.min(Math.floor(value), 100);
+  return Math.min(Math.floor(value), STATS_TABLE_ROW_CAP);
 }
 
 function card(
@@ -898,10 +907,14 @@ type DashboardInput = {
   deviceType?: string | null;
   practicesSort?: string | null;
   practicesSortDir?: string | null;
+  practicesQuery?: string | null;
   practicesPage?: string | null;
   authorsSort?: string | null;
   authorsSortDir?: string | null;
   authorsPage?: string | null;
+  utmSort?: string | null;
+  utmSortDir?: string | null;
+  utmGroup?: string | null;
   acquisitionPage?: string | null;
   practicesLimit?: number | null;
   authorsLimit?: number | null;
@@ -1049,12 +1062,19 @@ export async function getAdminAnalyticsBreakdownBundle(
   input?: DashboardInput,
 ): Promise<AdminAnalyticsBreakdownBundle> {
   const { sharedFilters } = resolveSharedQuery(input);
-  const practicesSort = input?.practicesSort?.trim() || "play_starts";
+  const practicesSort = canonicalizeAdminPracticeSort(input?.practicesSort);
   const practicesSortDir = parseSortDir(input?.practicesSortDir);
+  const practicesQuery = clampStatsSearchQuery(input?.practicesQuery);
   const practicesPage = parsePage(input?.practicesPage);
-  const authorsSort = input?.authorsSort?.trim() || "play_starts";
+  const authorsSort = canonicalizeAdminAuthorSort(input?.authorsSort);
   const authorsSortDir = parseSortDir(input?.authorsSortDir);
   const authorsPage = parsePage(input?.authorsPage);
+  const utmSort = canonicalizeAdminUtmSort(input?.utmSort);
+  const utmSortDir = parseSortDir(input?.utmSortDir);
+  const utmGroup =
+    input?.utmGroup === "campaign" || input?.utmGroup === "medium"
+      ? input.utmGroup
+      : "source";
   const acquisitionPage = parsePage(input?.acquisitionPage);
   const practicesLimit = clampPageSize(input?.practicesLimit ?? 25);
   const authorsLimit = clampPageSize(input?.authorsLimit ?? 25);
@@ -1068,6 +1088,7 @@ export async function getAdminAnalyticsBreakdownBundle(
       p_sort_dir: practicesSortDir,
       p_limit: practicesLimit,
       p_offset: (practicesPage - 1) * practicesLimit,
+      p_query: practicesQuery || null,
     }),
     service.rpc("admin_analytics_p2_authors", {
       ...sharedFilters,
@@ -1080,6 +1101,9 @@ export async function getAdminAnalyticsBreakdownBundle(
       ...sharedFilters,
       p_limit: acquisitionLimit,
       p_offset: (acquisitionPage - 1) * acquisitionLimit,
+      p_sort: utmSort,
+      p_sort_dir: utmSortDir,
+      p_group: utmGroup,
     }),
   ]);
 
@@ -1127,6 +1151,8 @@ export async function getAdminAnalyticsBreakdownBundle(
       rows: acquisitionRes.error
         ? []
         : mapAcquisitionRows(acquisitionData.rows),
+      sort: utmSort,
+      sortDir: utmSortDir,
       page: acquisitionPage,
       pageSize: acquisitionLimit,
       error: acquisitionRes.error?.message ?? null,

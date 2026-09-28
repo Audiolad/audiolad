@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 
 import { buildCsv, downloadCsv } from "@/lib/admin/analytics-csv";
 import { formatListeningTimeNotice } from "@/lib/admin/format-listening-time";
@@ -15,75 +14,56 @@ import type {
   AdminAnalyticsTopN,
   AdminAnalyticsUtmGroup,
 } from "@/lib/admin/analytics-url-state";
+import SortableColumnHeader from "@/components/stats/SortableColumnHeader";
+import type { SortOrder } from "@/lib/stats/table-sort";
 
-type GroupedUtmRow = {
-  key: string;
+function SortableHead({
+  label,
+  sortKey,
+  sort,
+  direction,
+  onSort,
+}: {
   label: string;
-  sessions: number;
-  visitors: number;
-  registrations: number;
-  playStarts: number;
-  listeners: number;
-  saves: number;
-};
-
-function filterPractices(
-  rows: AdminAnalyticsPracticeRow[],
-  query: string,
-): AdminAnalyticsPracticeRow[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return rows;
-  return rows.filter((row) => {
-    const haystack = [
-      row.title,
-      row.practiceSlug ?? "",
-      row.authorName,
-      row.authorSlug ?? "",
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(q);
-  });
+  sortKey: string;
+  sort: string;
+  direction: SortOrder;
+  onSort: (sort: string) => void;
+}) {
+  const active = sort === sortKey;
+  return (
+    <th
+      className="px-2 py-2 font-medium whitespace-nowrap"
+      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <SortableColumnHeader
+        label={label}
+        active={active}
+        direction={direction}
+        onSort={() => onSort(sortKey)}
+      />
+    </th>
+  );
 }
 
-function groupUtm(
-  rows: AdminAnalyticsAcquisitionRow[],
-  group: AdminAnalyticsUtmGroup,
-): GroupedUtmRow[] {
-  const map = new Map<string, GroupedUtmRow>();
+function PracticeHeader(props: {
+  label: string;
+  sortKey: string;
+  sort: string;
+  direction: SortOrder;
+  onSort: (sort: string) => void;
+}) {
+  return <SortableHead {...props} />;
+}
 
-  for (const row of rows) {
-    const raw =
-      group === "campaign"
-        ? row.utmCampaign
-        : group === "medium"
-          ? row.utmMedium
-          : row.utmSource;
-    const key = raw.trim() || "__none__";
-    const label =
-      key === "__none__"
-        ? "Без UTM / прямые и неопределённые переходы"
-        : raw.trim();
-    const current = map.get(key) ?? {
-      key,
-      label,
-      sessions: 0,
-      visitors: 0,
-      registrations: 0,
-      playStarts: 0,
-      listeners: 0,
-      saves: 0,
-    };
-    current.sessions += row.sessions;
-    current.visitors += row.visitors;
-    current.registrations += row.registrations;
-    current.playStarts += row.playStarts;
-    current.listeners += row.listeners;
-    current.saves += row.saves;
-    map.set(key, current);
-  }
-
-  return [...map.values()].sort((a, b) => b.sessions - a.sessions);
+function AuthorHeader(props: {
+  label: string;
+  sortKey: string;
+  sort: string;
+  direction: SortOrder;
+  onSort: (sort: string) => void;
+}) {
+  return <SortableHead {...props} />;
 }
 
 export default function AdminAnalyticsBreakdownPanel({
@@ -102,6 +82,7 @@ export default function AdminAnalyticsBreakdownPanel({
   onUtmGroupChange,
   onPracticesSort,
   onAuthorsSort,
+  onUtmSort,
 }: {
   tab: AdminAnalyticsTab;
   top: AdminAnalyticsTopN;
@@ -127,6 +108,8 @@ export default function AdminAnalyticsBreakdownPanel({
   acquisition: {
     total: number;
     rows: AdminAnalyticsAcquisitionRow[];
+    sort: string;
+    sortDir: SortOrder;
     error: string | null;
   };
   loading: boolean;
@@ -137,16 +120,8 @@ export default function AdminAnalyticsBreakdownPanel({
   onUtmGroupChange: (group: AdminAnalyticsUtmGroup) => void;
   onPracticesSort: (sort: string) => void;
   onAuthorsSort: (sort: string) => void;
+  onUtmSort: (sort: string) => void;
 }) {
-  const filteredPractices = useMemo(
-    () => filterPractices(practices.rows, query),
-    [practices.rows, query],
-  );
-  const groupedUtm = useMemo(
-    () => groupUtm(acquisition.rows, utmGroup),
-    [acquisition.rows, utmGroup],
-  );
-
   function exportCurrent() {
     if (tab === "practices") {
       downloadCsv(
@@ -163,7 +138,7 @@ export default function AdminAnalyticsBreakdownPanel({
             "saves",
             "listened_ms",
           ],
-          filteredPractices.map((row) => [
+          practices.rows.map((row) => [
             row.title,
             row.authorName,
             row.views,
@@ -210,7 +185,7 @@ export default function AdminAnalyticsBreakdownPanel({
       "audiolad-utm.csv",
       buildCsv(
         ["group", "sessions", "visitors", "registrations", "play_starts", "listeners", "saves"],
-        groupedUtm.map((row) => [
+        acquisition.rows.map((row) => [
           row.label,
           row.sessions,
           row.visitors,
@@ -330,7 +305,7 @@ export default function AdminAnalyticsBreakdownPanel({
       ) : null}
 
       {!loading && !error && tab === "practices" ? (
-        filteredPractices.length === 0 ? (
+        practices.rows.length === 0 ? (
           <p className="mt-6 text-sm text-[#9485b4]">
             {query
               ? "По запросу ничего не найдено. Измените поиск или Top N."
@@ -341,38 +316,18 @@ export default function AdminAnalyticsBreakdownPanel({
             <table className="min-w-[900px] w-full text-left text-sm">
               <thead className="text-[#796ba0]">
                 <tr className="border-b border-[#eadff8]">
-                  <th className="px-2 py-2">Практика</th>
-                  <th className="px-2 py-2">Автор</th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onPracticesSort("views")}>
-                      Просмотры{practices.sort === "views" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onPracticesSort("play_starts")}>
-                      Запуски{practices.sort === "play_starts" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onPracticesSort("listeners")}>
-                      Слушатели{practices.sort === "listeners" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onPracticesSort("completions")}>
-                      Дослуш.{practices.sort === "completions" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onPracticesSort("listened_ms")}>
-                      Время прослушивания{practices.sort === "listened_ms" ? (practices.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">Сохр.</th>
+                  <PracticeHeader label="Практика" sortKey="title" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Автор" sortKey="author" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Просмотры" sortKey="views" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Запуски" sortKey="play_starts" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Слушатели" sortKey="listeners" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Дослуш." sortKey="completions" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Время прослушивания" sortKey="listened_ms" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
+                  <PracticeHeader label="Сохр." sortKey="saves" sort={practices.sort} direction={practices.sortDir} onSort={onPracticesSort} />
                 </tr>
               </thead>
               <tbody>
-                {filteredPractices.map((row) => (
+                {practices.rows.map((row) => (
                   <tr key={row.practiceId} className="border-b border-[#f3ecfb]">
                     <td className="px-2 py-3 font-medium text-[#25135c]">
                       {row.href ? (
@@ -400,7 +355,7 @@ export default function AdminAnalyticsBreakdownPanel({
               </tbody>
             </table>
             <p className="mt-2 text-xs text-[#9485b4]">
-              Показано {filteredPractices.length} из {practices.total.toLocaleString("ru-RU")}
+              Показано {practices.rows.length} из {practices.total.toLocaleString("ru-RU")}
               {practices.sort === "listened_ms"
                 ? " · Топ практик по времени прослушивания"
                 : ""}
@@ -424,15 +379,13 @@ export default function AdminAnalyticsBreakdownPanel({
             <table className="min-w-[760px] w-full text-left text-sm">
               <thead className="text-[#796ba0]">
                 <tr className="border-b border-[#eadff8]">
-                  <th className="px-2 py-2">Автор</th>
-                  <th className="px-2 py-2">
-                    <button type="button" onClick={() => onAuthorsSort("play_starts")}>
-                      Запуски{authors.sort === "play_starts" ? (authors.sortDir === "desc" ? " ↓" : " ↑") : ""}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">Слушатели</th>
-                  <th className="px-2 py-2">Дослуш.</th>
-                  <th className="px-2 py-2">Сохр.</th>
+                  <AuthorHeader label="Автор" sortKey="name" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Практики" sortKey="published_practices" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Просмотры" sortKey="views" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Запуски" sortKey="play_starts" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Слушатели" sortKey="listeners" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Дослуш." sortKey="completions" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
+                  <AuthorHeader label="Сохр." sortKey="saves" sort={authors.sort} direction={authors.sortDir} onSort={onAuthorsSort} />
                 </tr>
               </thead>
               <tbody>
@@ -446,10 +399,9 @@ export default function AdminAnalyticsBreakdownPanel({
                       ) : (
                         row.name
                       )}
-                      <span className="ml-2 text-xs text-[#9485b4]">
-                        {row.publishedPractices} опубл. практ.
-                      </span>
                     </td>
+                    <td className="px-2 py-3">{row.publishedPractices.toLocaleString("ru-RU")}</td>
+                    <td className="px-2 py-3">{row.views.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.playStarts.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.uniqueListeners.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.completions.toLocaleString("ru-RU")}</td>
@@ -463,25 +415,25 @@ export default function AdminAnalyticsBreakdownPanel({
       ) : null}
 
       {!loading && !error && tab === "utm" ? (
-        groupedUtm.length === 0 ? (
+        acquisition.rows.length === 0 ? (
           <p className="mt-6 text-sm text-[#9485b4]">Нет данных по источникам.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-[720px] w-full text-left text-sm">
               <thead className="text-[#796ba0]">
                 <tr className="border-b border-[#eadff8]">
-                  <th className="px-2 py-2">Группа</th>
-                  <th className="px-2 py-2">Сессии</th>
-                  <th className="px-2 py-2">Посетители</th>
-                  <th className="px-2 py-2">Рег.</th>
-                  <th className="px-2 py-2">Запуски</th>
-                  <th className="px-2 py-2">Слушатели</th>
-                  <th className="px-2 py-2">Сохр.</th>
+                  <SortableHead label="Группа" sortKey="group" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Сессии" sortKey="sessions" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Посетители" sortKey="visitors" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Рег." sortKey="registrations" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Запуски" sortKey="play_starts" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Слушатели" sortKey="listeners" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
+                  <SortableHead label="Сохр." sortKey="saves" sort={acquisition.sort} direction={acquisition.sortDir} onSort={onUtmSort} />
                 </tr>
               </thead>
               <tbody>
-                {groupedUtm.map((row) => (
-                  <tr key={row.key} className="border-b border-[#f3ecfb]">
+                {acquisition.rows.map((row, index) => (
+                  <tr key={`${row.label}-${index}`} className="border-b border-[#f3ecfb]">
                     <td className="px-2 py-3 font-medium text-[#25135c]">{row.label}</td>
                     <td className="px-2 py-3">{row.sessions.toLocaleString("ru-RU")}</td>
                     <td className="px-2 py-3">{row.visitors.toLocaleString("ru-RU")}</td>

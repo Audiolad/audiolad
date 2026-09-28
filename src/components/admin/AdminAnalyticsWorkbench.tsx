@@ -33,6 +33,15 @@ import {
   type AdminAnalyticsUtmGroup,
   type AdminAnalyticsView,
 } from "@/lib/admin/analytics-url-state";
+import {
+  adminAuthorSortKind,
+  adminPracticeSortKind,
+  adminUtmSortKind,
+  canonicalizeAdminAuthorSort,
+  canonicalizeAdminPracticeSort,
+  canonicalizeAdminUtmSort,
+  defaultSortOrder,
+} from "@/lib/stats/table-sort";
 
 const emptyBreakdown: AdminAnalyticsBreakdownBundle = {
   practices: {
@@ -60,6 +69,8 @@ const emptyBreakdown: AdminAnalyticsBreakdownBundle = {
     attribution: "session_touch",
     total: 0,
     rows: [],
+    sort: "sessions",
+    sortDir: "desc",
     page: 1,
     pageSize: 100,
     error: null,
@@ -84,7 +95,13 @@ export default function AdminAnalyticsWorkbench({
     useState<AdminAnalyticsBreakdownBundle>(emptyBreakdown);
   const [loadingBreakdown, setLoadingBreakdown] = useState(true);
   const [breakdownError, setBreakdownError] = useState<string | null>(null);
+  const [debouncedQuery, setDebouncedQuery] = useState(urlState.q);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(urlState.q), 300);
+    return () => window.clearTimeout(timer);
+  }, [urlState.q]);
 
   const replaceState = useCallback(
     (patch: Partial<typeof urlState>) => {
@@ -105,10 +122,14 @@ export default function AdminAnalyticsWorkbench({
     urlState.utmSource ?? "",
     urlState.deviceType ?? "",
     urlState.top,
+    debouncedQuery,
     urlState.practicesSort,
     urlState.practicesSortDir,
     urlState.authorsSort,
     urlState.authorsSortDir,
+    urlState.utmSort,
+    urlState.utmSortDir,
+    urlState.utmGroup,
   ].join("|");
 
   useEffect(() => {
@@ -122,6 +143,11 @@ export default function AdminAnalyticsWorkbench({
 
     const params = buildAdminAnalyticsSearchParams(urlState);
     params.set("top", urlState.top);
+    if (debouncedQuery) {
+      params.set("q", debouncedQuery);
+    } else {
+      params.delete("q");
+    }
 
     void (async () => {
       // Async boundary avoids sync setState-in-effect lint cascade.
@@ -177,23 +203,45 @@ export default function AdminAnalyticsWorkbench({
   }
 
   function togglePracticesSort(sort: string) {
-    if (urlState.practicesSort === sort) {
+    const key = canonicalizeAdminPracticeSort(sort);
+    if (urlState.practicesSort === key) {
       replaceState({
         practicesSortDir: urlState.practicesSortDir === "desc" ? "asc" : "desc",
       });
       return;
     }
-    replaceState({ practicesSort: sort, practicesSortDir: "desc" });
+    replaceState({
+      practicesSort: key,
+      practicesSortDir: defaultSortOrder(adminPracticeSortKind(key)),
+    });
   }
 
   function toggleAuthorsSort(sort: string) {
-    if (urlState.authorsSort === sort) {
+    const key = canonicalizeAdminAuthorSort(sort);
+    if (urlState.authorsSort === key) {
       replaceState({
         authorsSortDir: urlState.authorsSortDir === "desc" ? "asc" : "desc",
       });
       return;
     }
-    replaceState({ authorsSort: sort, authorsSortDir: "desc" });
+    replaceState({
+      authorsSort: key,
+      authorsSortDir: defaultSortOrder(adminAuthorSortKind(key)),
+    });
+  }
+
+  function toggleUtmSort(sort: string) {
+    const key = canonicalizeAdminUtmSort(sort);
+    if (urlState.utmSort === key) {
+      replaceState({
+        utmSortDir: urlState.utmSortDir === "desc" ? "asc" : "desc",
+      });
+      return;
+    }
+    replaceState({
+      utmSort: key,
+      utmSortDir: defaultSortOrder(adminUtmSortKind(key)),
+    });
   }
 
   const view: AdminAnalyticsView = urlState.view;
@@ -378,6 +426,7 @@ export default function AdminAnalyticsWorkbench({
         }
         onPracticesSort={togglePracticesSort}
         onAuthorsSort={toggleAuthorsSort}
+        onUtmSort={toggleUtmSort}
       />
 
       <AdminAnalyticsDrilldownDrawer

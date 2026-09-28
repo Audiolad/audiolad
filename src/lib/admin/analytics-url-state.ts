@@ -14,6 +14,16 @@ import {
   type AdminAnalyticsPeriod,
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
+import {
+  adminPracticeSortParam,
+  canonicalizeAdminAuthorSort,
+  canonicalizeAdminPracticeSort,
+  canonicalizeAdminUtmSort,
+  STATS_TABLE_ROW_CAP,
+  type AdminAuthorSortKey,
+  type AdminPracticeSortKey,
+  type AdminUtmSortKey,
+} from "@/lib/stats/table-sort";
 
 export type AdminAnalyticsView =
   | "product"
@@ -82,10 +92,12 @@ export type AdminAnalyticsUrlState = {
   q: string;
   top: AdminAnalyticsTopN;
   utmGroup: AdminAnalyticsUtmGroup;
-  practicesSort: string;
+  practicesSort: AdminPracticeSortKey;
   practicesSortDir: "asc" | "desc";
-  authorsSort: string;
+  authorsSort: AdminAuthorSortKey;
   authorsSortDir: "asc" | "desc";
+  utmSort: AdminUtmSortKey;
+  utmSortDir: "asc" | "desc";
   drill: AdminAnalyticsDrillMetric;
   /** Money-layer period (independent from product analytics). */
   moneyPeriod: AdminAnalyticsPeriod;
@@ -375,10 +387,20 @@ export function parseAdminAnalyticsUrlState(
     q: (get("q") ?? "").trim(),
     top: parseTop(get("top")),
     utmGroup: parseUtmGroup(get("utmGroup")),
-    practicesSort: get("practicesSort")?.trim() || "play_starts",
-    practicesSortDir: parseDir(get("practicesSortDir")),
-    authorsSort: get("authorsSort")?.trim() || "play_starts",
+    practicesSort: get("practicesSort")?.trim()
+      ? canonicalizeAdminPracticeSort(get("practicesSort"))
+      : get("sort")?.trim()
+        ? canonicalizeAdminPracticeSort(get("sort"))
+        : "play_starts",
+    practicesSortDir: get("practicesSortDir")
+      ? parseDir(get("practicesSortDir"))
+      : get("order")
+        ? parseDir(get("order"))
+        : "desc",
+    authorsSort: canonicalizeAdminAuthorSort(get("authorsSort")),
     authorsSortDir: parseDir(get("authorsSortDir")),
+    utmSort: canonicalizeAdminUtmSort(get("utmSort")),
+    utmSortDir: parseDir(get("utmSortDir")),
     drill: parseDrill(get("drill")),
     moneyPeriod: parseAdminAnalyticsPeriod(get("moneyPeriod")),
     includeTestPayments: parseIncludeTestPayments(get("includeTestPayments")),
@@ -467,8 +489,17 @@ export function buildAdminAnalyticsSearchParams(
     ["utmGroup", state.utmGroup === "source" ? null : state.utmGroup],
     ["practicesSort", state.practicesSort === "play_starts" ? null : state.practicesSort],
     ["practicesSortDir", state.practicesSortDir === "desc" ? null : state.practicesSortDir],
+    [
+      "sort",
+      state.practicesSort === "play_starts"
+        ? null
+        : adminPracticeSortParam(state.practicesSort),
+    ],
+    ["order", state.practicesSortDir === "desc" ? null : state.practicesSortDir],
     ["authorsSort", state.authorsSort === "play_starts" ? null : state.authorsSort],
     ["authorsSortDir", state.authorsSortDir === "desc" ? null : state.authorsSortDir],
+    ["utmSort", state.utmSort === "sessions" ? null : state.utmSort],
+    ["utmSortDir", state.utmSortDir === "desc" ? null : state.utmSortDir],
     ["drill", state.drill],
     ["moneyTab", state.moneyTab === "products" ? null : state.moneyTab],
     ["moneyQ", state.moneyQ || null],
@@ -607,5 +638,5 @@ export function buildAdminAnalyticsSearchParams(
 export function topNToLimit(top: AdminAnalyticsTopN): number {
   if (top === "10") return 10;
   if (top === "25") return 25;
-  return 100;
+  return STATS_TABLE_ROW_CAP;
 }
