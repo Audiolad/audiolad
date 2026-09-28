@@ -70,22 +70,38 @@ test("editor cannot open Ваши 20%", () => {
   );
 });
 
-test("support mode cannot open Ваши 20%", () => {
+test("platform-owner support mode can open Ваши 20%", () => {
   assert.equal(
     canAccessAuthorPartnerYour20Ui({
       authorSlug: "anna-meditation",
       role: "owner",
       isSupportMode: true,
     }),
-    false,
+    true,
+  );
+  assert.equal(
+    canAccessAuthorPartnerYour20Ui({
+      authorSlug: "anna-meditation",
+      role: "editor",
+      isSupportMode: true,
+    }),
+    true,
   );
   assert.equal(
     evaluatePartnerYour20Access({
       resolvedAuthorSlug: "anna-meditation",
-      role: "owner",
+      role: "editor",
       isSupportMode: true,
     }),
-    "support_mode_blocked",
+    "allowed",
+  );
+  assert.equal(
+    selectOwnedAuthorWorkspace(
+      [{ slug: "editor-only", role: "editor" }],
+      "editor-only",
+      true,
+    )?.slug,
+    "editor-only",
   );
 });
 
