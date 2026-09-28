@@ -356,7 +356,7 @@ Rights Passport Basic projection (REVIEW_REQUIRED | HAS_VERIFIED_GRANTS)
 ```
 
   Rightsholder ≠ Author. Rights Grant = legal source of truth; Passport is projection (not `licensed=true`). Draft editable; non-draft legal history (incl. territory) immutable. `REVIEW_REQUIRED` = existing music Track without verified in-term grants (not missing Track). Studio `music_usage_permission` / entitlements are a separate domain and do **not** auto-map into B2B rights. A4 does **not** decide Location eligibility.
-- **A5** Rights Eligibility foundation: `20261206120000_business_rights_eligibility.sql`
+- **A5** Rights Eligibility foundation: `20261206120200_business_rights_eligibility.sql`
 
 ```
 Rights Grant (A4, + ceased_at)
