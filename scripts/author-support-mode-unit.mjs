@@ -988,7 +988,7 @@ for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);
 assert.match(proxy, /supportCookie &&/);
-assert.doesNotMatch(
+assert.match(
   read("src/lib/author-support/policy.ts"),
   /\/api\/author\/personal-materials/,
 );
