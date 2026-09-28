@@ -1,9 +1,10 @@
 /**
- * Owner-only access to «Ваши 20%».
+ * Owner access to «Ваши 20%», plus platform-owner support mode.
  *
- * A user may open the section only for an author workspace they already
- * belong to as owner. Support mode and editor membership stay closed.
- * Query parameters never grant a workspace that is not in that membership list.
+ * Normal users must own the workspace. In support mode the platform owner may
+ * inspect and operate the selected author workspace even though the real admin
+ * account is not an author_members row. The support session itself is already
+ * scoped to one acting author and validated server-side.
  */
 
 export function canAccessAuthorPartnerYour20Ui(input: {
@@ -11,15 +12,15 @@ export function canAccessAuthorPartnerYour20Ui(input: {
   role?: string | null;
   isSupportMode?: boolean;
 }): boolean {
-  if (input.isSupportMode) {
-    return false;
-  }
-  if (input.role !== "owner") {
-    return false;
-  }
   const slug =
     typeof input.authorSlug === "string" ? input.authorSlug.trim() : "";
-  return slug.length > 0;
+  if (!slug) {
+    return false;
+  }
+  if (input.isSupportMode) {
+    return true;
+  }
+  return input.role === "owner";
 }
 
 export type PartnerYour20AccessDecision =
@@ -37,12 +38,6 @@ export function evaluatePartnerYour20Access(input: {
   role: string | null | undefined;
   isSupportMode: boolean;
 }): PartnerYour20AccessDecision {
-  if (input.isSupportMode) {
-    return "support_mode_blocked";
-  }
-  if (input.role !== "owner") {
-    return "forbidden";
-  }
   const slug =
     typeof input.resolvedAuthorSlug === "string"
       ? input.resolvedAuthorSlug.trim()
@@ -50,24 +45,37 @@ export function evaluatePartnerYour20Access(input: {
   if (!slug) {
     return "forbidden";
   }
+  if (input.isSupportMode) {
+    return "allowed";
+  }
+  if (input.role !== "owner") {
+    return "forbidden";
+  }
   return "allowed";
 }
 
 /**
- * Pick an owner workspace from the current user's memberships.
- * Editor rows are ignored. A foreign or editor `?author=` slug falls back
- * to the first owner workspace and never authorizes a non-owner role.
+ * Pick the partner-program workspace.
+ * Normal mode is owner-only. Support mode may use the single scoped workspace
+ * even when the acting membership is editor: platform-owner support authority
+ * is constrained by the active support session, not by admin author_members.
  */
 export function selectOwnedAuthorWorkspace<
   T extends { slug: string; role?: string | null },
->(authors: readonly T[], slugParam: string | null | undefined): T | null {
-  const owners = authors.filter((author) => author.role === "owner");
-  if (owners.length === 0) {
+>(
+  authors: readonly T[],
+  slugParam: string | null | undefined,
+  isSupportMode = false,
+): T | null {
+  const candidates = isSupportMode
+    ? [...authors]
+    : authors.filter((author) => author.role === "owner");
+  if (candidates.length === 0) {
     return null;
   }
   const requested = typeof slugParam === "string" ? slugParam.trim() : "";
   const matched = requested
-    ? owners.find((author) => author.slug === requested)
+    ? candidates.find((author) => author.slug === requested)
     : undefined;
-  return matched ?? owners[0] ?? null;
+  return matched ?? candidates[0] ?? null;
 }
