@@ -59,7 +59,10 @@ export async function loadUserDeletionDependencies(
     promotionCampaignsResult,
   ] = await Promise.all([
     service.from("profiles").select("id, role, avatar_path").in("id", uniqueIds),
-    service.from("author_members").select("user_id").in("user_id", uniqueIds),
+    service
+      .from("author_members")
+      .select("user_id, author_id, role")
+      .in("user_id", uniqueIds),
     service.from("orders").select("user_id").in("user_id", uniqueIds),
     service
       .from("personal_materials")
@@ -90,6 +93,41 @@ export async function loadUserDeletionDependencies(
   const authorMemberIds = new Set(
     (authorMembersResult.data ?? []).map((row) => row.user_id),
   );
+  const authorIds = [
+    ...new Set(
+      (authorMembersResult.data ?? [])
+        .map((row) => row.author_id)
+        .filter((value): value is string => typeof value === "string"),
+    ),
+  ];
+  const authorIdsByUser = new Map<string, string[]>();
+
+  for (const row of authorMembersResult.data ?? []) {
+    if (typeof row.author_id !== "string") {
+      continue;
+    }
+    const current = authorIdsByUser.get(row.user_id) ?? [];
+    current.push(row.author_id);
+    authorIdsByUser.set(row.user_id, current);
+  }
+
+  const practiceAuthorIds = new Set<string>();
+  if (authorIds.length > 0) {
+    const { data: practiceRows, error: practiceError } = await service
+      .from("practices")
+      .select("author_id")
+      .in("author_id", authorIds);
+
+    if (practiceError) {
+      throw new Error("admin_user_deletion_practices_failed");
+    }
+
+    for (const row of practiceRows ?? []) {
+      if (typeof row.author_id === "string") {
+        practiceAuthorIds.add(row.author_id);
+      }
+    }
+  }
   const orderUserIds = new Set(
     (ordersResult.data ?? []).map((row) => row.user_id),
   );
@@ -128,6 +166,9 @@ export async function loadUserDeletionDependencies(
     result.set(userId, {
       role: typeof profile.role === "string" ? profile.role : null,
       isAuthorMember: authorMemberIds.has(userId),
+      hasAuthorProducts: (authorIdsByUser.get(userId) ?? []).some((authorId) =>
+        practiceAuthorIds.has(authorId),
+      ),
       hasOrders: orderUserIds.has(userId),
       hasPersonalMaterials: personalMaterialUserIds.has(userId),
       hasPromotionCampaigns: promotionCreatorIds.has(userId),
@@ -190,6 +231,42 @@ async function removeUserAvatarIfPresent(
   }
 
   console.error("admin_user_deletion_avatar_remove_failed", userId, removed.error);
+}
+
+async function cleanupEmptyAuthorFootprint(
+  service: ServiceClient,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await service.rpc("admin_cleanup_deletable_user", {
+    p_target_user_id: userId,
+  });
+
+  if (error) {
+    const detail = `${error.details ?? ""} ${error.message ?? ""}`.trim();
+    console.error("admin_user_deletion_db_cleanup_failed", userId, detail);
+
+    if (error.code === "P0001" || detail.includes("admin_user_delete_blocked")) {
+      return {
+        ok: false,
+        error:
+          "У пользователя есть продукты, финансовые или другие связанные данные. Автоматическое удаление заблокировано.",
+      };
+    }
+
+    return {
+      ok: false,
+      error: "Не удалось очистить связанные данные пользователя.",
+    };
+  }
+
+  if (!data || typeof data !== "object") {
+    return {
+      ok: false,
+      error: "Не удалось подтвердить очистку связанных данных пользователя.",
+    };
+  }
+
+  return { ok: true };
 }
 
 async function deleteAuthUser(
@@ -287,6 +364,15 @@ export async function deleteSingleAdminUser(
       deps.cleanupPrivateAudioStorageForUser ??
       cleanupPrivateAudioStorageForUser;
     await cleanupPrivateAudio(input.userId);
+
+    const dbCleanup = await cleanupEmptyAuthorFootprint(service, input.userId);
+    if (!dbCleanup.ok) {
+      return {
+        userId: input.userId,
+        ok: false,
+        error: dbCleanup.error,
+      };
+    }
 
     const deleted = await deleteAuthUser(service, input.userId);
 
