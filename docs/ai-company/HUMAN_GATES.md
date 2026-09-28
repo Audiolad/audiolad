@@ -20,6 +20,20 @@ Agents must stop and escalate before:
 - material production-risk changes;
 - changes to the Human Gate policy itself.
 
+## Privileged infrastructure gate
+
+Explicit approval is required before:
+- granting sudo/root-equivalent capability to an agent;
+- granting Docker socket access;
+- changing host firewall/network exposure;
+- rotating or distributing administrative SSH credentials;
+- destructive Company DB operations;
+- giving Company Core broad shell access to Audiolad production;
+- changing secret-management policy;
+- increasing infrastructure spend beyond approved bounds.
+
+These actions must use dedicated identities and produce an auditable approval/event record.
+
 ## Autonomous by default
 
 Within approved strategy and guardrails, agents may:
@@ -33,7 +47,8 @@ Within approved strategy and guardrails, agents may:
 - perform QA;
 - write documentation;
 - run analytics;
-- prepare marketing/sales research and draft assets.
+- prepare marketing/sales research and draft assets;
+- perform non-privileged Company Core L0 health/state processing.
 
 ## v1 release boundary
 
