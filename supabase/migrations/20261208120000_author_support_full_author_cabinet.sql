@@ -64,7 +64,7 @@ AS $$
           AND m.user_id = auth.uid()
           AND m.role = 'owner'
       )
-      OR public.author_support_session_is_owner(p_author_id)
+      OR public.author_support_session_allows(p_author_id)
     );
 $$;
 
