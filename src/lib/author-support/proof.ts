@@ -35,16 +35,6 @@ export const AUTHOR_SUPPORT_RPC_WRAPPERS = {
     "get_author_partner_invite_template_with_support_proof",
   set_author_partner_invite_template:
     "set_author_partner_invite_template_with_support_proof",
-  get_author_partner_profile: "get_author_partner_profile_with_support_proof",
-  ensure_author_partner_profile: "ensure_author_partner_profile_with_support_proof",
-  change_author_partner_code: "change_author_partner_code_with_support_proof",
-  list_author_partner_invitees: "list_author_partner_invitees_with_support_proof",
-  get_author_partner_reward_dashboard:
-    "get_author_partner_reward_dashboard_with_support_proof",
-  get_author_partner_invite_template:
-    "get_author_partner_invite_template_with_support_proof",
-  set_author_partner_invite_template:
-    "set_author_partner_invite_template_with_support_proof",
   acquire_free_studio_music:
     "acquire_free_studio_music_with_support_proof",
   create_author_project:
