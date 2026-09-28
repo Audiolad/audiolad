@@ -23,6 +23,12 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
   "product_editing_started",
   "product_soft_deleted",
   "author_profile_updated",
+  "author_payout_profile_updated",
+  "author_partner_profile_updated",
+  "author_partner_code_updated",
+  "author_partner_invite_template_updated",
+  "personal_material_updated",
+  "studio_audiobook_updated",
   "studio_project_created",
   "studio_project_duplicated",
   "studio_project_updated",
@@ -37,7 +43,16 @@ export const AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES = [
   "/api/author/products",
   "/api/author/promotion",
   "/api/author/appreciation-settings",
+  "/api/author/payout-profile",
+  "/api/author/personal-materials",
+  "/api/author/personal-material-templates",
+  "/api/author/seo",
+  "/api/author/terms",
+  "/api/author/commercial-application",
+  "/api/author/onboarding",
   "/api/studio/projects",
+  "/api/studio/audiobooks",
+  "/api/studio/music",
   "/api/author/profile",
 ] as const;
 
@@ -75,20 +90,13 @@ const SENSITIVE_PATH_PREFIXES = [
   "/profile/edit",
   "/auth/forgot-password",
   "/auth/reset-password",
-  "/author-dashboard/finance",
-  "/author-dashboard/commercial/payout-details",
-  "/api/author/payout-profile",
-  "/api/author/finance",
 ] as const;
 
 function isBlockedAuthorSupportStudioMutation(pathname: string): boolean {
-  return (
-    pathname.startsWith("/api/studio/music/") ||
-    pathname.startsWith("/api/studio/guest/") ||
-    pathname.startsWith("/api/studio/audiobooks/") ||
-    (pathname.startsWith("/api/studio/projects/") &&
-      pathname.includes("/assets/catalog"))
-  );
+  // Guest handoff belongs to an anonymous guest session, not to the acting
+  // author's workspace. Author-owned Studio routes are authorized downstream
+  // against actingAuthorId and remain available in support mode.
+  return pathname.startsWith("/api/studio/guest/");
 }
 
 const SENSITIVE_METADATA_KEY =
