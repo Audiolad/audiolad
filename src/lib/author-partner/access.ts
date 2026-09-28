@@ -2,7 +2,8 @@
  * Owner-only access to «Ваши 20%».
  *
  * A user may open the section only for an author workspace they already
- * belong to as owner. Support mode and editor membership stay closed.
+ * belong to as owner. Platform-owner support mode mirrors the acting owner's
+ * access, while editor membership stays closed.
  * Query parameters never grant a workspace that is not in that membership list.
  */
 
@@ -11,9 +12,6 @@ export function canAccessAuthorPartnerYour20Ui(input: {
   role?: string | null;
   isSupportMode?: boolean;
 }): boolean {
-  if (input.isSupportMode) {
-    return false;
-  }
   if (input.role !== "owner") {
     return false;
   }
@@ -24,7 +22,6 @@ export function canAccessAuthorPartnerYour20Ui(input: {
 
 export type PartnerYour20AccessDecision =
   | "allowed"
-  | "support_mode_blocked"
   | "forbidden";
 
 /**
@@ -37,9 +34,6 @@ export function evaluatePartnerYour20Access(input: {
   role: string | null | undefined;
   isSupportMode: boolean;
 }): PartnerYour20AccessDecision {
-  if (input.isSupportMode) {
-    return "support_mode_blocked";
-  }
   if (input.role !== "owner") {
     return "forbidden";
   }
