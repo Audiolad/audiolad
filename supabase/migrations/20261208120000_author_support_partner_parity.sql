@@ -214,7 +214,7 @@ RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $support$
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '28000';
@@ -235,7 +235,7 @@ BEGIN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
   END IF;
 END;
-$;
+$support$;
 
 REVOKE ALL ON FUNCTION public.assert_author_commercial_application_member(uuid, uuid)
   FROM PUBLIC, anon, authenticated;
@@ -253,7 +253,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $support$
 DECLARE
   v_result jsonb;
 BEGIN
@@ -275,7 +275,7 @@ BEGIN
   );
   RETURN v_result;
 END;
-$;
+$support$;
 
 CREATE OR REPLACE FUNCTION public.submit_author_commercial_application_with_support_proof(
   p_token_hash text,
@@ -290,7 +290,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $support$
 DECLARE
   v_result jsonb;
 BEGIN
@@ -312,7 +312,7 @@ BEGIN
   );
   RETURN v_result;
 END;
-$;
+$support$;
 
 REVOKE ALL ON FUNCTION public.save_author_commercial_application_draft_with_support_proof(
   text, uuid, text, text, text, boolean, text
