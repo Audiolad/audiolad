@@ -34,7 +34,6 @@ import {
   AUTHOR_SUPPORT_MUTATION_INVENTORY,
   listAuthorSupportInventoryRoutePatterns,
 } from "../src/lib/author-support/mutation-inventory.ts";
-import { mapStudioMusicAcquireClientError } from "../src/lib/studio-music/client-errors.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -255,12 +254,18 @@ for (const pathName of [
   "/profile/edit",
   "/auth/forgot-password",
   "/auth/reset-password",
+]) {
+  assert.equal(isAuthorSupportSensitivePath(pathName), true, pathName);
+}
+
+for (const authorCabinetPath of [
+  "/author-dashboard",
   "/author-dashboard/finance",
   "/author-dashboard/commercial/payout-details",
   "/api/author/payout-profile",
   "/api/author/finance/summary",
 ]) {
-  assert.equal(isAuthorSupportSensitivePath(pathName), true, pathName);
+  assert.equal(isAuthorSupportSensitivePath(authorCabinetPath), false, authorCabinetPath);
 }
 
 assert.equal(isAuthorSupportSensitivePath("/author-dashboard"), false);
@@ -485,10 +490,11 @@ assert.match(proxy, /AUTHOR_SUPPORT_COOKIE_NAME/);
 assert.match(proxy, /isAuthorSupportSensitivePath/);
 
 const financeGuard = read("src/lib/author-finance/route-guard.ts");
-assert.match(financeGuard, /support_sensitive_route_blocked/);
+assert.doesNotMatch(financeGuard, /support_sensitive_route_blocked/);
 
 const payoutRoute = read("src/app/api/author/payout-profile/route.ts");
-assert.match(payoutRoute, /support_sensitive_route_blocked/);
+assert.doesNotMatch(payoutRoute, /support_sensitive_route_blocked/);
+assert.match(payoutRoute, /author_payout_profile_updated/);
 
 const productPatch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(productPatch, /product_updated/);
@@ -714,23 +720,23 @@ assert.equal(
     pathname: ownPersonalMaterialAudioPost,
     method: "POST",
   }),
-  true,
+  false,
 );
 assert.equal(
   isAuthorSupportBlockedMutation({
     pathname: "/api/studio/projects/project-id/assets/catalog",
     method: "POST",
   }),
-  true,
+  false,
 );
 assert.equal(
   AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.includes("/api/author/personal-materials"),
-  false,
+  true,
 );
 const personalMaterialsInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
   (item) => item.key === "personal_materials",
 );
-assert.equal(personalMaterialsInventory?.disposition, "blocked");
+assert.equal(personalMaterialsInventory?.disposition, "allowed_audited");
 
 function proxyGuardBlocksSupportMutation(supportCookie, pathname, method) {
   return Boolean(supportCookie) && isAuthorSupportBlockedMutation({ pathname, method });
@@ -746,11 +752,11 @@ assert.equal(
   false,
 );
 
-// B. Support cookie active. Forbidden mutations stay 403 / support_mutation_blocked.
+// B. Support cookie active. Author-cabinet mutations stay available; only non-author guest/account routes remain blocked.
 const activeSupportCookie = "opaque-author-support-token";
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, ownPersonalMaterialAudioPost, "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(
@@ -758,7 +764,7 @@ assert.equal(
     "/api/author/personal-materials/c202e2da",
     "PATCH",
   ),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/promotion/pages", "POST"),
@@ -766,7 +772,7 @@ assert.equal(
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/onboarding", "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation(
@@ -774,16 +780,14 @@ assert.equal(
     "/api/studio/projects/project-id/assets/catalog",
     "POST",
   ),
-  true,
+  false,
 );
-// Studio music licensing is a blocked support-mode mutation. The proxy must
-// return its structured 403 before the acquire route is reached, and the
-// Studio client must render the support-specific message rather than generic
-// acquisition failure.
+// Studio music acquisition is routed through the support-proof wrapper and
+// applies the entitlement to acting_user_id, never to the platform owner.
 const studioMusicAcquirePath = "/api/studio/music/acquire";
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, studioMusicAcquirePath, "POST"),
-  true,
+  false,
 );
 assert.equal(
   proxyGuardBlocksSupportMutation("", studioMusicAcquirePath, "POST"),
@@ -797,11 +801,6 @@ assert.match(
   proxy,
   /NextResponse\.json\(\s*\{ error: "support_mutation_blocked" \},\s*\{ status: 403 \}/,
 );
-assert.equal(
-  mapStudioMusicAcquireClientError("support_mutation_blocked"),
-  "В режиме поддержки нельзя получать музыку для Студии.",
-);
-
 // Allowed prefixes still allowed while support cookie is present.
 assert.equal(
   proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/products/abc", "PATCH"),
@@ -828,9 +827,6 @@ assert.equal(
 for (const sensitivePath of [
   "/settings",
   "/profile/edit",
-  "/author-dashboard/finance",
-  "/api/author/payout-profile",
-  "/api/author/finance/summary",
 ]) {
   assert.equal(isAuthorSupportSensitivePath(sensitivePath), true, sensitivePath);
   assert.equal(
@@ -986,7 +982,7 @@ for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);
 assert.match(proxy, /supportCookie &&/);
-assert.doesNotMatch(
+assert.match(
   read("src/lib/author-support/policy.ts"),
   /\/api\/author\/personal-materials/,
 );
