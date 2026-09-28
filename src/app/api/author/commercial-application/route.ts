@@ -25,7 +25,6 @@ import {
 import { sendCommercialApplicationAdminAlertEmail } from "@/lib/email/send-commercial-application-admin-alert-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 
 function resolveAuthorId(request: Request, body?: Record<string, unknown>) {
   const url = new URL(request.url);
@@ -140,13 +139,6 @@ export async function PUT(request: Request) {
     }
 
     const application = await getAuthorCommercialApplication(supabase, authorId);
-    await recordAuthorSupportAudit({
-      action: "commercial_application_updated",
-      resourceType: "commercial_application",
-      resourceId: application?.id ?? authorId,
-      metadata: { operation: "save_draft" },
-    });
-
     return NextResponse.json({
       ok: true,
       result: rpc.result,
@@ -219,13 +211,6 @@ export async function POST(request: Request) {
     const application = await getAuthorCommercialApplication(supabase, authorId);
     const applicationId =
       rpc.result.application_id ?? application?.id ?? null;
-
-    await recordAuthorSupportAudit({
-      action: "commercial_application_updated",
-      resourceType: "commercial_application",
-      resourceId: applicationId ?? authorId,
-      metadata: { operation: "submit" },
-    });
 
     if (applicationId) {
       // Non-fatal: never roll back a successful submit because of email issues.
