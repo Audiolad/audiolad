@@ -28,6 +28,16 @@ DECLARE
   v_t1 timestamptz := timestamptz '2026-06-01 12:00:00+00';
   v_t2 timestamptz := timestamptz '2026-09-01 12:00:00+00';
   v_ceased timestamptz;
+  v_loc_chg uuid := 'b0000000-0000-4000-8000-000000000012';
+  v_prof_aa uuid;
+  v_prof_bb2 uuid;
+  v_ctx_old uuid;
+  v_ctx_new uuid;
+  v_t_before timestamptz;
+  v_act timestamptz;
+  v_rev timestamptz;
+  v_out_hist jsonb;
+  v_t_grant timestamptz;
 BEGIN
   INSERT INTO public.authors (id, name, slug) VALUES (v_author, 'A', 'a5-author');
   INSERT INTO public.practices (id, author_id, title, slug, product_kind)
@@ -74,9 +84,20 @@ BEGIN
   END;
   RAISE NOTICE 'Case3 ok';
 
-  -- Case4 draft→active
+  -- Case4 draft→active (server activated_at; reviewed_at stays earlier)
   UPDATE public.music_country_rights_profiles
-    SET reviewed_at = v_t0, status = 'active' WHERE id = v_prof1;
+    SET reviewed_at = v_t0, activated_at = timestamptz '2020-01-01 00:00:00+00', status = 'active'
+    WHERE id = v_prof1;
+  IF (SELECT reviewed_at FROM public.music_country_rights_profiles WHERE id = v_prof1) <> v_t0 THEN
+    RAISE EXCEPTION 'Case4/E reviewed_at not preserved';
+  END IF;
+  IF (SELECT activated_at FROM public.music_country_rights_profiles WHERE id = v_prof1) <= v_t0 THEN
+    RAISE EXCEPTION 'Case4/E activated_at should be server statement time > reviewed_at';
+  END IF;
+  IF (SELECT activated_at FROM public.music_country_rights_profiles WHERE id = v_prof1)
+       = timestamptz '2020-01-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'Case4/B supplied activated_at must not control activation';
+  END IF;
   RAISE NOTICE 'Case4 ok';
 
   -- Case5 active rules immutable
@@ -259,9 +280,14 @@ BEGIN
   END;
   RAISE NOTICE 'Case29 ok';
 
-  UPDATE public.music_rights_grants SET status = 'superseded' WHERE id = v_g_rec;
+  UPDATE public.music_rights_grants
+    SET status = 'superseded', ceased_at = timestamptz '2020-01-01 00:00:00+00'
+    WHERE id = v_g_rec;
   SELECT ceased_at INTO v_ceased FROM public.music_rights_grants WHERE id = v_g_rec;
   IF v_ceased IS NULL THEN RAISE EXCEPTION 'Case26 ceased_at not set'; END IF;
+  IF v_ceased = timestamptz '2020-01-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'Case26/A supplied past ceased_at must not control cessation';
+  END IF;
   RAISE NOTICE 'Case26 ok';
 
   INSERT INTO public.music_rights_grants (
@@ -308,7 +334,7 @@ BEGIN
   -- ===== Eligibility Case35-38 =====
   BEGIN
     PERFORM public.resolve_business_track_eligibility(
-      'ffffffff-ffff-4fff-8fff-ffffffffffff', v_loc_bb, NULL, 'business_background_playback', now());
+      'ffffffff-ffff-4fff-8fff-ffffffffffff', v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
     RAISE EXCEPTION 'Case35 expected fail';
   EXCEPTION WHEN others THEN
     IF SQLERRM NOT LIKE '%audio_item_not_found%' THEN RAISE EXCEPTION 'Case35: %', SQLERRM; END IF;
@@ -317,7 +343,7 @@ BEGIN
 
   BEGIN
     PERFORM public.resolve_business_track_eligibility(
-      v_track_nm, v_loc_bb, NULL, 'business_background_playback', now());
+      v_track_nm, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
     RAISE EXCEPTION 'Case36 expected fail';
   EXCEPTION WHEN others THEN
     IF SQLERRM NOT LIKE '%audio_item_not_music%' THEN RAISE EXCEPTION 'Case36: %', SQLERRM; END IF;
@@ -326,7 +352,7 @@ BEGIN
 
   BEGIN
     PERFORM public.resolve_business_track_eligibility(
-      v_track, 'ffffffff-ffff-4fff-8fff-ffffffffffff', NULL, 'business_background_playback', now());
+      v_track, 'ffffffff-ffff-4fff-8fff-ffffffffffff', NULL, 'business_background_playback', clock_timestamp());
     RAISE EXCEPTION 'Case37 expected fail';
   EXCEPTION WHEN others THEN
     IF SQLERRM NOT LIKE '%location_not_found%' THEN RAISE EXCEPTION 'Case37: %', SQLERRM; END IF;
@@ -335,7 +361,7 @@ BEGIN
 
   BEGIN
     PERFORM public.resolve_business_track_eligibility(
-      v_track, v_loc_bb, v_zone_aa, 'business_background_playback', now());
+      v_track, v_loc_bb, v_zone_aa, 'business_background_playback', clock_timestamp());
     RAISE EXCEPTION 'Case38 expected fail';
   EXCEPTION WHEN others THEN
     IF SQLERRM NOT LIKE '%zone_location_mismatch%' THEN RAISE EXCEPTION 'Case38: %', SQLERRM; END IF;
@@ -345,7 +371,7 @@ BEGIN
   -- Case39 no profile for AA location without active historical setup on AA for as_of far past
   -- loc_aa has AA; current AA active is v2 (unsupported) from earlier. Ensure context missing → after profile exists.
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_aa, NULL, 'business_background_playback', now());
+    v_track, v_loc_aa, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'UNKNOWN' THEN RAISE EXCEPTION 'Case39/40 decision %', v_out; END IF;
   IF NOT (v_out->'reason_codes' ?| array['LOCATION_RIGHTS_CONTEXT_MISSING','COUNTRY_RIGHTS_PROFILE_MISSING']) THEN
     -- AA has profile so expect LOCATION_RIGHTS_CONTEXT_MISSING
@@ -362,7 +388,7 @@ BEGIN
   -- But AA superseded profile v1 has supported/none — BB is our path
 
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, v_zone_bb, 'business_background_playback', now());
+    v_track, v_loc_bb, v_zone_bb, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'ELIGIBLE' THEN
     RAISE EXCEPTION 'Case51 expected ELIGIBLE got %', v_out;
   END IF;
@@ -391,7 +417,7 @@ BEGIN
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx1;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_aa, NULL, 'business_background_playback', now());
+    v_track, v_loc_aa, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'INELIGIBLE' THEN
     RAISE EXCEPTION 'Case43/55 expected INELIGIBLE got %', v_out;
   END IF;
@@ -415,7 +441,7 @@ BEGIN
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx2;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'CONDITIONAL' THEN
     RAISE EXCEPTION 'Case49 expected CONDITIONAL got %', v_out;
   END IF;
@@ -432,7 +458,7 @@ BEGIN
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx1;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'CONDITIONAL' THEN
     RAISE EXCEPTION 'Case50 expected CONDITIONAL got %', v_out;
   END IF;
@@ -450,15 +476,16 @@ BEGIN
   UPDATE public.music_country_rights_profiles
     SET reviewed_at = now(), status = 'active' WHERE id = v_prof2;
   INSERT INTO public.business_location_rights_contexts
-    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
-  VALUES (v_loc_bb, v_prof2, 'BB', 'gym', 5, 'draft') RETURNING id INTO v_ctx2;
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_bb, v_prof2, 'BB', 'gym', 5, 'draft', v_ctx1) RETURNING id INTO v_ctx2;
   INSERT INTO public.business_location_rights_context_use_statuses
     (context_id, use_type, client_requirement_status)
   VALUES (v_ctx2, 'business_background_playback', 'not_required');
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx2;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'UNKNOWN' OR v_out::text NOT LIKE '%COUNTRY_USE_STATUS_UNKNOWN%' THEN
     RAISE EXCEPTION 'Case42 got %', v_out;
   END IF;
@@ -471,7 +498,8 @@ BEGIN
   INSERT INTO public.audio_items (id, practice_id, title, music_track_code)
   VALUES ('a0000000-0000-4000-8000-000000000022', 'a0000000-0000-4000-8000-000000000012', 'T2', 'AL-T-A5TEST002');
   -- switch BB profile to supported + none for grant absence tests
-  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE location_id = v_loc_bb AND status = 'active';
+  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE location_id = v_loc_bb AND status = 'active'
+    RETURNING id INTO v_ctx2;
   INSERT INTO public.music_country_rights_profiles
     (country_code, version, status, supersedes_profile_id)
   VALUES ('BB', 3, 'draft', v_prof2) RETURNING id INTO v_prof1;
@@ -482,12 +510,13 @@ BEGIN
   UPDATE public.music_country_rights_profiles
     SET reviewed_at = now(), status = 'active' WHERE id = v_prof1;
   INSERT INTO public.business_location_rights_contexts
-    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
-  VALUES (v_loc_bb, v_prof1, 'BB', 'gym', 6, 'draft') RETURNING id INTO v_ctx1;
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_bb, v_prof1, 'BB', 'gym', 6, 'draft', v_ctx2) RETURNING id INTO v_ctx1;
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx1;
   v_out := public.resolve_business_track_eligibility(
-    'a0000000-0000-4000-8000-000000000022', v_loc_bb, NULL, 'business_background_playback', now());
+    'a0000000-0000-4000-8000-000000000022', v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'UNKNOWN' OR v_out::text NOT LIKE '%RECORDING_RIGHTS_NOT_VERIFIED%' THEN
     RAISE EXCEPTION 'Case44 got %', v_out;
   END IF;
@@ -495,19 +524,27 @@ BEGIN
 
   -- Case52 none + grants → ELIGIBLE on original track
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'ELIGIBLE' THEN
     RAISE EXCEPTION 'Case52 expected ELIGIBLE got %', v_out;
   END IF;
   RAISE NOTICE 'Case52 ok';
 
-  -- Case56 historical: supersede grant and check as_of before/after ceased_at
-  SELECT ceased_at INTO v_ceased FROM public.music_rights_grants WHERE id = v_g_rec;
-  -- v_g_rec is version 3 recording still verified; supersede it
+  -- Case56 historical: capture as_of while grant still usable, then supersede
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'Case56 pre-supersede expected ELIGIBLE got %', v_out;
+  END IF;
+  v_t_grant := (v_out->>'as_of')::timestamptz;
+  PERFORM pg_sleep(0.05);
   UPDATE public.music_rights_grants SET status = 'superseded' WHERE id = v_g_rec;
   SELECT ceased_at INTO v_ceased FROM public.music_rights_grants WHERE id = v_g_rec;
+  IF v_ceased IS NULL OR v_t_grant >= v_ceased THEN
+    RAISE EXCEPTION 'Case56 timestamp window invalid grant=% ceased=%', v_t_grant, v_ceased;
+  END IF;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', v_ceased - interval '1 second');
+    v_track, v_loc_bb, NULL, 'business_background_playback', v_t_grant);
   IF v_out->>'decision' <> 'ELIGIBLE' THEN
     RAISE EXCEPTION 'Case31/56 before ceased expected ELIGIBLE got %', v_out;
   END IF;
@@ -528,7 +565,7 @@ BEGIN
     END;
     BEGIN
       PERFORM public.resolve_business_track_eligibility(
-        v_track, v_loc_bb, NULL, 'business_background_playback', now());
+        v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
       RAISE EXCEPTION 'Case64 anon execute should fail';
     EXCEPTION WHEN insufficient_privilege THEN NULL;
     WHEN others THEN
@@ -544,7 +581,8 @@ BEGIN
   RAISE NOTICE 'Case60-64 ok';
 
   -- Case48 client_requirement unknown
-  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE location_id = v_loc_bb AND status = 'active';
+  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE location_id = v_loc_bb AND status = 'active'
+    RETURNING id INTO v_ctx2;
   -- restore a recording grant for remaining tests
   INSERT INTO public.music_rights_grants (
     audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
@@ -563,12 +601,13 @@ BEGIN
   UPDATE public.music_country_rights_profiles
     SET reviewed_at = now(), status = 'active' WHERE id = v_prof2;
   INSERT INTO public.business_location_rights_contexts
-    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
-  VALUES (v_loc_bb, v_prof2, 'BB', 'gym', 7, 'draft') RETURNING id INTO v_ctx1;
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_bb, v_prof2, 'BB', 'gym', 7, 'draft', v_ctx2) RETURNING id INTO v_ctx1;
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx1;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'UNKNOWN' OR v_out::text NOT LIKE '%CLIENT_REQUIREMENT_UNKNOWN%' THEN
     RAISE EXCEPTION 'Case48 got %', v_out;
   END IF;
@@ -584,12 +623,13 @@ BEGIN
   UPDATE public.music_country_rights_profiles
     SET reviewed_at = now(), status = 'active' WHERE id = v_prof1;
   INSERT INTO public.business_location_rights_contexts
-    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
-  VALUES (v_loc_bb, v_prof1, 'BB', 'gym', 8, 'draft') RETURNING id INTO v_ctx2;
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_bb, v_prof1, 'BB', 'gym', 8, 'draft', v_ctx1) RETURNING id INTO v_ctx2;
   UPDATE public.business_location_rights_contexts
     SET reviewed_at = now(), status = 'active' WHERE id = v_ctx2;
   v_out := public.resolve_business_track_eligibility(
-    v_track, v_loc_bb, NULL, 'business_background_playback', now());
+    v_track, v_loc_bb, NULL, 'business_background_playback', clock_timestamp());
   IF v_out->>'decision' <> 'UNKNOWN' OR v_out::text NOT LIKE '%COUNTRY_USE_RULE_MISSING%' THEN
     RAISE EXCEPTION 'Case41 got %', v_out;
   END IF;
@@ -598,6 +638,298 @@ BEGIN
   -- Case46 excluded country: countries-scope grant excluding BB — already UNKNOWN without include
   -- covered by absence → UNKNOWN not INELIGIBLE
   RAISE NOTICE 'Case46/53/54 conceptual ok';
+
+
+  -- ===== Hardening Cases A–P =====
+
+  -- CaseA: future ceased_at on grant transition ignored
+  INSERT INTO public.music_rights_grants (
+    audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
+    valid_from, source_type, status, version, verified_at
+  ) VALUES (
+    v_track, v_rh, 'recording', 'on_demand_playback', 'worldwide',
+    v_t0, 'direct_license', 'verified', 1, v_t0
+  ) RETURNING id INTO v_g_new;
+  UPDATE public.music_rights_grants
+    SET status = 'revoked', ceased_at = clock_timestamp() + interval '30 days'
+    WHERE id = v_g_new;
+  SELECT ceased_at INTO v_ceased FROM public.music_rights_grants WHERE id = v_g_new;
+  IF v_ceased > clock_timestamp() + interval '1 minute' THEN
+    RAISE EXCEPTION 'CaseA future ceased_at controlled cessation';
+  END IF;
+  RAISE NOTICE 'CaseA ok';
+
+  -- CaseC/F country profile: supplied ceased_at ignored; future reviewed_at rejected
+  INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+  VALUES ('ZZ', 1, 'draft') RETURNING id INTO v_prof_aa;
+  INSERT INTO public.music_country_rights_profile_rules
+    (profile_id, use_type, service_status, client_requirement, requires_recording, requires_composition)
+  VALUES (v_prof_aa, 'business_background_playback', 'supported', 'none', true, true);
+  BEGIN
+    UPDATE public.music_country_rights_profiles
+      SET reviewed_at = clock_timestamp() + interval '2 days', status = 'active'
+      WHERE id = v_prof_aa;
+    RAISE EXCEPTION 'CaseF expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%country_profile_reviewed_at_future%' THEN
+      RAISE EXCEPTION 'CaseF unexpected: %', SQLERRM;
+    END IF;
+  END;
+  UPDATE public.music_country_rights_profiles
+    SET reviewed_at = v_t0, status = 'active',
+        activated_at = timestamptz '2019-01-01 00:00:00+00'
+    WHERE id = v_prof_aa;
+  SELECT activated_at, reviewed_at INTO v_act, v_rev
+  FROM public.music_country_rights_profiles WHERE id = v_prof_aa;
+  IF v_act = timestamptz '2019-01-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'CaseB supplied activated_at controlled history';
+  END IF;
+  IF v_rev <> v_t0 OR v_act <= v_rev THEN
+    RAISE EXCEPTION 'CaseE reviewed_at/activated_at semantics % %', v_rev, v_act;
+  END IF;
+  UPDATE public.music_country_rights_profiles
+    SET status = 'superseded', ceased_at = timestamptz '2020-06-01 00:00:00+00'
+    WHERE id = v_prof_aa;
+  IF (SELECT ceased_at FROM public.music_country_rights_profiles WHERE id = v_prof_aa)
+       = timestamptz '2020-06-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'CaseC supplied ceased_at controlled profile history';
+  END IF;
+  RAISE NOTICE 'CaseB/C/E/F ok';
+
+  -- CaseD Location Context supplied activated_at/ceased_at ignored
+  INSERT INTO public.business_locations (id, organization_id, name, business_category, country_code, timezone)
+  VALUES (v_loc_chg, v_org, 'Loc CHG', 'cafe', 'ZZ', 'UTC');
+  -- ZZ profile already superseded; need active ZZ for context activation
+  INSERT INTO public.music_country_rights_profiles
+    (country_code, version, status, supersedes_profile_id)
+  VALUES ('ZZ', 2, 'draft', v_prof_aa) RETURNING id INTO v_prof_bb2;
+  INSERT INTO public.music_country_rights_profile_rules
+    (profile_id, use_type, service_status, client_requirement, requires_recording, requires_composition)
+  VALUES (v_prof_bb2, 'business_background_playback', 'supported', 'required', true, true);
+  UPDATE public.music_country_rights_profiles
+    SET reviewed_at = now(), status = 'active' WHERE id = v_prof_bb2;
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
+  VALUES (v_loc_chg, v_prof_bb2, 'ZZ', 'cafe', 1, 'draft') RETURNING id INTO v_ctx_old;
+  INSERT INTO public.business_location_rights_context_use_statuses
+    (context_id, use_type, client_requirement_status)
+  VALUES (v_ctx_old, 'business_background_playback', 'confirmed');
+  UPDATE public.business_location_rights_contexts
+    SET reviewed_at = v_t0,
+        activated_at = timestamptz '2018-01-01 00:00:00+00',
+        status = 'active'
+    WHERE id = v_ctx_old;
+  IF (SELECT activated_at FROM public.business_location_rights_contexts WHERE id = v_ctx_old)
+       = timestamptz '2018-01-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'CaseD supplied activated_at controlled context';
+  END IF;
+  RAISE NOTICE 'CaseD ok';
+
+  -- CaseK required + not_required → UNKNOWN conflict (not ELIGIBLE)
+  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE id = v_ctx_old;
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_chg, v_prof_bb2, 'ZZ', 'cafe', 2, 'draft', v_ctx_old) RETURNING id INTO v_ctx_new;
+  INSERT INTO public.business_location_rights_context_use_statuses
+    (context_id, use_type, client_requirement_status)
+  VALUES (v_ctx_new, 'business_background_playback', 'not_required');
+  UPDATE public.business_location_rights_contexts
+    SET reviewed_at = now(), status = 'active' WHERE id = v_ctx_new;
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' = 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'CaseK required+not_required must not be ELIGIBLE %', v_out;
+  END IF;
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%CLIENT_REQUIREMENT_STATUS_CONFLICT%' THEN
+    RAISE EXCEPTION 'CaseK expected UNKNOWN CONFLICT got %', v_out;
+  END IF;
+  RAISE NOTICE 'CaseK ok';
+
+  -- CaseL required + confirmed → ELIGIBLE
+  UPDATE public.business_location_rights_contexts SET status = 'superseded' WHERE id = v_ctx_new;
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_chg, v_prof_bb2, 'ZZ', 'cafe', 3, 'draft', v_ctx_new) RETURNING id INTO v_ctx_old;
+  INSERT INTO public.business_location_rights_context_use_statuses
+    (context_id, use_type, client_requirement_status)
+  VALUES (v_ctx_old, 'business_background_playback', 'confirmed');
+  UPDATE public.business_location_rights_contexts
+    SET reviewed_at = now(), status = 'active' WHERE id = v_ctx_old;
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'CaseL expected ELIGIBLE got %', v_out;
+  END IF;
+  RAISE NOTICE 'CaseL ok';
+
+  -- Cases G/H/I/J Location country/category change with historical survival
+  v_t_before := clock_timestamp();
+  -- tiny wait so historical as_of is strictly before subsequent mutations' statement times
+  PERFORM pg_sleep(0.05);
+  UPDATE public.business_locations
+    SET country_code = 'YY', business_category = 'gym'
+    WHERE id = v_loc_chg;
+  -- H: stale current active context → UNKNOWN MISMATCH
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'UNKNOWN'
+     OR v_out::text NOT LIKE '%LOCATION_RIGHTS_CONTEXT_MISMATCH%' THEN
+    RAISE EXCEPTION 'CaseH stale current expected MISMATCH got %', v_out;
+  END IF;
+  RAISE NOTICE 'CaseH ok';
+
+  -- G: can supersede old context after Location changed
+  UPDATE public.business_location_rights_contexts
+    SET status = 'superseded', ceased_at = timestamptz '2021-01-01 00:00:00+00'
+    WHERE id = v_ctx_old;
+  IF (SELECT status FROM public.business_location_rights_contexts WHERE id = v_ctx_old) <> 'superseded' THEN
+    RAISE EXCEPTION 'CaseG supersede after location change failed';
+  END IF;
+  IF (SELECT country_code_snapshot FROM public.business_location_rights_contexts WHERE id = v_ctx_old) <> 'ZZ' THEN
+    RAISE EXCEPTION 'CaseG snapshot rewritten';
+  END IF;
+  IF (SELECT ceased_at FROM public.business_location_rights_contexts WHERE id = v_ctx_old)
+       = timestamptz '2021-01-01 00:00:00+00' THEN
+    RAISE EXCEPTION 'CaseG/D supplied ceased_at controlled context cessation';
+  END IF;
+  RAISE NOTICE 'CaseG ok';
+
+  -- New YY profile + context
+  INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+  VALUES ('YY', 1, 'draft') RETURNING id INTO v_prof_aa;
+  INSERT INTO public.music_country_rights_profile_rules
+    (profile_id, use_type, service_status, client_requirement, requires_recording, requires_composition)
+  VALUES (v_prof_aa, 'business_background_playback', 'supported', 'none', true, true);
+  UPDATE public.music_country_rights_profiles
+    SET reviewed_at = now(), status = 'active' WHERE id = v_prof_aa;
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES (v_loc_chg, v_prof_aa, 'YY', 'gym', 4, 'draft', v_ctx_old) RETURNING id INTO v_ctx_new;
+  UPDATE public.business_location_rights_contexts
+    SET reviewed_at = now(), status = 'active' WHERE id = v_ctx_new;
+  v_out := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', clock_timestamp());
+  IF v_out->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'CaseI current YY expected ELIGIBLE got %', v_out;
+  END IF;
+  IF v_out->>'country_code' <> 'YY' THEN
+    RAISE EXCEPTION 'CaseI country_code %', v_out->>'country_code';
+  END IF;
+
+  -- I/J historical resolve at T_before still ZZ profile/context/territory
+  v_out_hist := public.resolve_business_track_eligibility(
+    v_track, v_loc_chg, NULL, 'business_background_playback', v_t_before);
+  IF v_out_hist->>'decision' <> 'ELIGIBLE' THEN
+    RAISE EXCEPTION 'CaseI historical expected ELIGIBLE got %', v_out_hist;
+  END IF;
+  IF v_out_hist->>'country_code' <> 'ZZ' THEN
+    RAISE EXCEPTION 'CaseI/J historical country %', v_out_hist->>'country_code';
+  END IF;
+  IF v_out_hist->>'location_rights_context_id' IS DISTINCT FROM v_ctx_old::text
+     AND v_out_hist->>'location_rights_context_id' <> v_ctx_old::text THEN
+    -- compare uuid text
+    IF (v_out_hist->>'location_rights_context_id')::uuid IS DISTINCT FROM v_ctx_old THEN
+      RAISE EXCEPTION 'CaseI historical context id % want %', v_out_hist, v_ctx_old;
+    END IF;
+  END IF;
+  RAISE NOTICE 'CaseI/J ok';
+
+  -- CaseM root version must be 1
+  BEGIN
+    INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+    VALUES ('XX', 2, 'draft');
+    RAISE EXCEPTION 'CaseM expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%country_profile_root_version_required%' THEN
+      RAISE EXCEPTION 'CaseM unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseM ok';
+
+  -- CaseN version >1 needs predecessor
+  BEGIN
+    INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+    VALUES ('XX', 3, 'draft');
+    RAISE EXCEPTION 'CaseN expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%country_profile_root_version_required%'
+       AND SQLERRM NOT LIKE '%country_profile_predecessor_required%' THEN
+      RAISE EXCEPTION 'CaseN unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseN ok';
+
+  -- CaseO draft predecessor cannot produce active successor
+  INSERT INTO public.music_country_rights_profiles (country_code, version, status)
+  VALUES ('XX', 1, 'draft') RETURNING id INTO v_prof_aa;
+  INSERT INTO public.music_country_rights_profiles
+    (country_code, version, status, supersedes_profile_id)
+  VALUES ('XX', 2, 'draft', v_prof_aa) RETURNING id INTO v_prof_bb2;
+  INSERT INTO public.music_country_rights_profile_rules
+    (profile_id, use_type, service_status, client_requirement, requires_recording, requires_composition)
+  VALUES (v_prof_bb2, 'business_background_playback', 'supported', 'none', true, true);
+  BEGIN
+    UPDATE public.music_country_rights_profiles
+      SET reviewed_at = now(), status = 'active' WHERE id = v_prof_bb2;
+    RAISE EXCEPTION 'CaseO expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%country_profile_predecessor_not_historical%' THEN
+      RAISE EXCEPTION 'CaseO unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseO ok';
+
+  -- CaseP Location Context root/predecessor same rules
+  BEGIN
+    INSERT INTO public.business_location_rights_contexts
+      (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
+    VALUES (v_loc_chg, v_prof_aa, 'YY', 'gym', 2, 'draft');
+    RAISE EXCEPTION 'CaseP expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%location_context_root_version_required%'
+       AND SQLERRM NOT LIKE '%location_context_predecessor_required%'
+       AND SQLERRM NOT LIKE '%mismatch%' THEN
+      -- may also fail profile mismatch if XX vs YY
+      IF SQLERRM LIKE '%CaseP expected%' THEN RAISE; END IF;
+      NULL;
+    END IF;
+  END;
+  -- draft predecessor context activation blocked
+  INSERT INTO public.business_locations (id, organization_id, name, business_category, country_code, timezone)
+  VALUES ('b0000000-0000-4000-8000-000000000013', v_org, 'Loc XX', 'cafe', 'XX', 'UTC');
+  -- activate XX v1 first path: need active profile for context — activate v_prof_aa after adding rules
+  INSERT INTO public.music_country_rights_profile_rules
+    (profile_id, use_type, service_status, client_requirement, requires_recording, requires_composition)
+  VALUES (v_prof_aa, 'business_background_playback', 'supported', 'none', true, true);
+  -- v_prof_aa is still draft; create draft context superseding chain
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot, version, status)
+  VALUES ('b0000000-0000-4000-8000-000000000013', v_prof_aa, 'XX', 'cafe', 1, 'draft')
+  RETURNING id INTO v_ctx_old;
+  INSERT INTO public.business_location_rights_contexts
+    (location_id, country_profile_id, country_code_snapshot, business_category_snapshot,
+     version, status, supersedes_context_id)
+  VALUES ('b0000000-0000-4000-8000-000000000013', v_prof_aa, 'XX', 'cafe', 2, 'draft', v_ctx_old)
+  RETURNING id INTO v_ctx_new;
+  -- activate XX profile so draft→active context check focuses on predecessor
+  UPDATE public.music_country_rights_profiles
+    SET reviewed_at = now(), status = 'active' WHERE id = v_prof_aa;
+  BEGIN
+    UPDATE public.business_location_rights_contexts
+      SET reviewed_at = now(), status = 'active' WHERE id = v_ctx_new;
+    RAISE EXCEPTION 'CaseP pred expected fail';
+  EXCEPTION WHEN others THEN
+    IF SQLERRM NOT LIKE '%location_context_predecessor_not_historical%' THEN
+      RAISE EXCEPTION 'CaseP pred unexpected: %', SQLERRM;
+    END IF;
+  END;
+  RAISE NOTICE 'CaseP ok';
+
+  RAISE NOTICE 'Hardening A-P ok';
 
   RAISE NOTICE 'A5 smoke complete';
 END;

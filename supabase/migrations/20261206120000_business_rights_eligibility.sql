@@ -128,9 +128,9 @@ BEGIN
     END IF;
   END IF;
 
-  -- Server-set ceased_at on verified → superseded|revoked; otherwise immutable
+  -- Server-set ceased_at via clock_timestamp on verified → superseded|revoked; supplied ceased_at never authoritative
   IF OLD.status = 'verified' AND NEW.status IN ('superseded', 'revoked') THEN
-    NEW.ceased_at := coalesce(NEW.ceased_at, now());
+    NEW.ceased_at := clock_timestamp();
   ELSIF OLD.ceased_at IS DISTINCT FROM NEW.ceased_at THEN
     RAISE EXCEPTION 'ceased_at_immutable' USING ERRCODE = '55000';
   END IF;
@@ -389,7 +389,14 @@ BEGIN
     IF NEW.activated_at IS NOT NULL OR NEW.ceased_at IS NOT NULL THEN
       RAISE EXCEPTION 'country_profile_activation_forbidden' USING ERRCODE = '22023';
     END IF;
-    IF NEW.supersedes_profile_id IS NOT NULL THEN
+    IF NEW.supersedes_profile_id IS NULL THEN
+      IF NEW.version IS DISTINCT FROM 1 THEN
+        RAISE EXCEPTION 'country_profile_root_version_required' USING ERRCODE = '22023';
+      END IF;
+    ELSE
+      IF NEW.version <= 1 THEN
+        RAISE EXCEPTION 'country_profile_predecessor_required' USING ERRCODE = '22023';
+      END IF;
       SELECT * INTO v_pred FROM public.music_country_rights_profiles
       WHERE id = NEW.supersedes_profile_id;
       IF NOT FOUND THEN
@@ -414,7 +421,14 @@ BEGIN
     IF NEW.supersedes_profile_id IS DISTINCT FROM OLD.supersedes_profile_id
        OR NEW.version IS DISTINCT FROM OLD.version
        OR NEW.country_code IS DISTINCT FROM OLD.country_code THEN
-      IF NEW.supersedes_profile_id IS NOT NULL THEN
+      IF NEW.supersedes_profile_id IS NULL THEN
+        IF NEW.version IS DISTINCT FROM 1 THEN
+          RAISE EXCEPTION 'country_profile_root_version_required' USING ERRCODE = '22023';
+        END IF;
+      ELSE
+        IF NEW.version <= 1 THEN
+          RAISE EXCEPTION 'country_profile_predecessor_required' USING ERRCODE = '22023';
+        END IF;
         SELECT * INTO v_pred FROM public.music_country_rights_profiles
         WHERE id = NEW.supersedes_profile_id;
         IF NOT FOUND THEN
@@ -444,10 +458,25 @@ BEGIN
     IF NEW.reviewed_at IS NULL THEN
       RAISE EXCEPTION 'country_profile_reviewed_at_required' USING ERRCODE = '22023';
     END IF;
-    NEW.activated_at := coalesce(NEW.activated_at, NEW.reviewed_at, now());
+    IF NEW.reviewed_at > clock_timestamp() THEN
+      RAISE EXCEPTION 'country_profile_reviewed_at_future' USING ERRCODE = '22023';
+    END IF;
+    -- predecessor must already be historically activated and superseded (not draft/active)
+    IF NEW.supersedes_profile_id IS NOT NULL THEN
+      SELECT * INTO v_pred FROM public.music_country_rights_profiles
+      WHERE id = NEW.supersedes_profile_id;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'supersedes_profile_not_found' USING ERRCODE = 'P0002';
+      END IF;
+      IF v_pred.activated_at IS NULL OR v_pred.status IS DISTINCT FROM 'superseded' THEN
+        RAISE EXCEPTION 'country_profile_predecessor_not_historical' USING ERRCODE = '22023';
+      END IF;
+    END IF;
+    -- reviewed_at ≠ activated_at: activation is always server clock time (not client-supplied, not reviewed_at)
+    NEW.activated_at := clock_timestamp();
     NEW.ceased_at := NULL;
   ELSIF OLD.status = 'active' AND NEW.status = 'superseded' THEN
-    NEW.ceased_at := coalesce(NEW.ceased_at, now());
+    NEW.ceased_at := clock_timestamp();
   END IF;
 
   -- After leaving draft: country/version/chain/source immutable; activation stamps mostly immutable
@@ -551,6 +580,7 @@ DECLARE
   v_loc record;
   v_prof record;
   v_allowed boolean := false;
+  v_is_supersede boolean := false;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     IF OLD.status IS DISTINCT FROM 'draft' THEN
@@ -559,32 +589,41 @@ BEGIN
     RETURN OLD;
   END IF;
 
-  SELECT id, country_code, business_category
-  INTO v_loc
-  FROM public.business_locations
-  WHERE id = NEW.location_id;
+  -- active → superseded: preserve historical snapshots; do NOT re-check mutable Location
+  v_is_supersede := (
+    TG_OP = 'UPDATE'
+    AND OLD.status = 'active'
+    AND NEW.status = 'superseded'
+  );
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'location_not_found' USING ERRCODE = 'P0002';
-  END IF;
+  IF NOT v_is_supersede THEN
+    SELECT id, country_code, business_category
+    INTO v_loc
+    FROM public.business_locations
+    WHERE id = NEW.location_id;
 
-  SELECT id, country_code, status
-  INTO v_prof
-  FROM public.music_country_rights_profiles
-  WHERE id = NEW.country_profile_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'location_not_found' USING ERRCODE = 'P0002';
+    END IF;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'country_profile_not_found' USING ERRCODE = 'P0002';
-  END IF;
+    SELECT id, country_code, status
+    INTO v_prof
+    FROM public.music_country_rights_profiles
+    WHERE id = NEW.country_profile_id;
 
-  IF NEW.country_code_snapshot IS DISTINCT FROM v_loc.country_code THEN
-    RAISE EXCEPTION 'location_rights_context_country_mismatch' USING ERRCODE = '22023';
-  END IF;
-  IF v_prof.country_code IS DISTINCT FROM v_loc.country_code THEN
-    RAISE EXCEPTION 'location_rights_context_profile_country_mismatch' USING ERRCODE = '22023';
-  END IF;
-  IF NEW.business_category_snapshot IS DISTINCT FROM v_loc.business_category THEN
-    RAISE EXCEPTION 'location_rights_context_category_mismatch' USING ERRCODE = '22023';
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'country_profile_not_found' USING ERRCODE = 'P0002';
+    END IF;
+
+    IF NEW.country_code_snapshot IS DISTINCT FROM v_loc.country_code THEN
+      RAISE EXCEPTION 'location_rights_context_country_mismatch' USING ERRCODE = '22023';
+    END IF;
+    IF v_prof.country_code IS DISTINCT FROM v_loc.country_code THEN
+      RAISE EXCEPTION 'location_rights_context_profile_country_mismatch' USING ERRCODE = '22023';
+    END IF;
+    IF NEW.business_category_snapshot IS DISTINCT FROM v_loc.business_category THEN
+      RAISE EXCEPTION 'location_rights_context_category_mismatch' USING ERRCODE = '22023';
+    END IF;
   END IF;
 
   IF TG_OP = 'INSERT' THEN
@@ -597,7 +636,14 @@ BEGIN
     IF NEW.activated_at IS NOT NULL OR NEW.ceased_at IS NOT NULL THEN
       RAISE EXCEPTION 'location_context_activation_forbidden' USING ERRCODE = '22023';
     END IF;
-    IF NEW.supersedes_context_id IS NOT NULL THEN
+    IF NEW.supersedes_context_id IS NULL THEN
+      IF NEW.version IS DISTINCT FROM 1 THEN
+        RAISE EXCEPTION 'location_context_root_version_required' USING ERRCODE = '22023';
+      END IF;
+    ELSE
+      IF NEW.version <= 1 THEN
+        RAISE EXCEPTION 'location_context_predecessor_required' USING ERRCODE = '22023';
+      END IF;
       SELECT * INTO v_pred FROM public.business_location_rights_contexts
       WHERE id = NEW.supersedes_context_id;
       IF NOT FOUND THEN
@@ -621,7 +667,14 @@ BEGIN
     IF NEW.supersedes_context_id IS DISTINCT FROM OLD.supersedes_context_id
        OR NEW.version IS DISTINCT FROM OLD.version
        OR NEW.location_id IS DISTINCT FROM OLD.location_id THEN
-      IF NEW.supersedes_context_id IS NOT NULL THEN
+      IF NEW.supersedes_context_id IS NULL THEN
+        IF NEW.version IS DISTINCT FROM 1 THEN
+          RAISE EXCEPTION 'location_context_root_version_required' USING ERRCODE = '22023';
+        END IF;
+      ELSE
+        IF NEW.version <= 1 THEN
+          RAISE EXCEPTION 'location_context_predecessor_required' USING ERRCODE = '22023';
+        END IF;
         SELECT * INTO v_pred FROM public.business_location_rights_contexts
         WHERE id = NEW.supersedes_context_id;
         IF NOT FOUND THEN
@@ -651,14 +704,37 @@ BEGIN
     IF NEW.reviewed_at IS NULL THEN
       RAISE EXCEPTION 'location_context_reviewed_at_required' USING ERRCODE = '22023';
     END IF;
-    -- Profile should be active or historically usable; require non-draft profile
-    IF v_prof.status = 'draft' THEN
+    IF NEW.reviewed_at > clock_timestamp() THEN
+      RAISE EXCEPTION 'location_context_reviewed_at_future' USING ERRCODE = '22023';
+    END IF;
+    -- Activation requires CURRENTLY active Country Profile (not merely non-draft)
+    IF v_prof.status IS DISTINCT FROM 'active' THEN
       RAISE EXCEPTION 'location_context_profile_not_ready' USING ERRCODE = '22023';
     END IF;
-    NEW.activated_at := coalesce(NEW.activated_at, NEW.reviewed_at, now());
+    IF NEW.supersedes_context_id IS NOT NULL THEN
+      SELECT * INTO v_pred FROM public.business_location_rights_contexts
+      WHERE id = NEW.supersedes_context_id;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'supersedes_context_not_found' USING ERRCODE = 'P0002';
+      END IF;
+      IF v_pred.activated_at IS NULL OR v_pred.status IS DISTINCT FROM 'superseded' THEN
+        RAISE EXCEPTION 'location_context_predecessor_not_historical' USING ERRCODE = '22023';
+      END IF;
+    END IF;
+    NEW.activated_at := clock_timestamp();
     NEW.ceased_at := NULL;
   ELSIF OLD.status = 'active' AND NEW.status = 'superseded' THEN
-    NEW.ceased_at := coalesce(NEW.ceased_at, now());
+    -- Historical snapshots stay immutable; ignore any client-supplied ceased_at
+    NEW.ceased_at := clock_timestamp();
+    -- Force snapshot/profile fields to remain OLD values even if payload tried to rewrite
+    NEW.location_id := OLD.location_id;
+    NEW.country_profile_id := OLD.country_profile_id;
+    NEW.country_code_snapshot := OLD.country_code_snapshot;
+    NEW.business_category_snapshot := OLD.business_category_snapshot;
+    NEW.version := OLD.version;
+    NEW.supersedes_context_id := OLD.supersedes_context_id;
+    NEW.reviewed_at := OLD.reviewed_at;
+    NEW.activated_at := OLD.activated_at;
   END IF;
 
   IF OLD.status IS DISTINCT FROM 'draft' THEN
@@ -835,6 +911,7 @@ DECLARE
   v_has_rec boolean := false;
   v_has_comp boolean := false;
   v_client_ok boolean := false;
+  v_country text;
 BEGIN
   IF p_audio_item_id IS NULL THEN
     RAISE EXCEPTION 'audio_item_id_required' USING ERRCODE = '22023';
@@ -880,41 +957,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Historical Country Profile: activated and not yet ceased at as_of
-  SELECT *
-  INTO v_profile
-  FROM public.music_country_rights_profiles
-  WHERE country_code = v_loc.country_code
-    AND status IN ('active', 'superseded')
-    AND activated_at IS NOT NULL
-    AND activated_at <= v_as_of
-    AND (ceased_at IS NULL OR v_as_of < ceased_at)
-  ORDER BY version DESC
-  LIMIT 1;
-
-  IF NOT FOUND THEN
-    v_decision := 'UNKNOWN';
-    v_reasons := array_append(v_reasons, 'COUNTRY_RIGHTS_PROFILE_MISSING');
-    RETURN jsonb_build_object(
-      'decision', v_decision,
-      'audio_item_id', p_audio_item_id,
-      'track_code', v_track_code,
-      'location_id', p_location_id,
-      'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
-      'use_type', p_use_type,
-      'as_of', v_as_of,
-      'engine_version', v_engine,
-      'country_profile_id', NULL,
-      'country_profile_version', NULL,
-      'location_rights_context_id', NULL,
-      'location_rights_context_version', NULL,
-      'recording_grant_ids', '[]'::jsonb,
-      'composition_grant_ids', '[]'::jsonb,
-      'reason_codes', to_jsonb(v_reasons)
-    );
-  END IF;
-
+  -- 1) Historical Location Rights Context first (not current Location.country_code)
   SELECT *
   INTO v_context
   FROM public.business_location_rights_contexts
@@ -939,8 +982,8 @@ BEGIN
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
-      'country_profile_id', v_profile.id,
-      'country_profile_version', v_profile.version,
+      'country_profile_id', NULL,
+      'country_profile_version', NULL,
       'location_rights_context_id', NULL,
       'location_rights_context_version', NULL,
       'recording_grant_ids', '[]'::jsonb,
@@ -949,9 +992,14 @@ BEGIN
     );
   END IF;
 
-  IF v_context.country_code_snapshot IS DISTINCT FROM v_loc.country_code
-     OR v_context.country_profile_id IS DISTINCT FROM v_profile.id
-     OR v_context.country_code_snapshot IS DISTINCT FROM v_profile.country_code THEN
+  v_country := v_context.country_code_snapshot;
+
+  -- Current active context must still match mutable Location; historical superseded does not
+  IF v_context.status = 'active'
+     AND (
+       v_context.country_code_snapshot IS DISTINCT FROM v_loc.country_code
+       OR v_context.business_category_snapshot IS DISTINCT FROM v_loc.business_category
+     ) THEN
     v_decision := 'UNKNOWN';
     v_reasons := array_append(v_reasons, 'LOCATION_RIGHTS_CONTEXT_MISMATCH');
     RETURN jsonb_build_object(
@@ -960,7 +1008,64 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
+      'use_type', p_use_type,
+      'as_of', v_as_of,
+      'engine_version', v_engine,
+      'country_profile_id', v_context.country_profile_id,
+      'country_profile_version', NULL,
+      'location_rights_context_id', v_context.id,
+      'location_rights_context_version', v_context.version,
+      'recording_grant_ids', '[]'::jsonb,
+      'composition_grant_ids', '[]'::jsonb,
+      'reason_codes', to_jsonb(v_reasons)
+    );
+  END IF;
+
+  -- 2) Load EXACTLY the referenced Country Profile (not lookup by current Location.country)
+  SELECT *
+  INTO v_profile
+  FROM public.music_country_rights_profiles
+  WHERE id = v_context.country_profile_id;
+
+  IF NOT FOUND THEN
+    v_decision := 'UNKNOWN';
+    v_reasons := array_append(v_reasons, 'COUNTRY_RIGHTS_PROFILE_MISSING');
+    RETURN jsonb_build_object(
+      'decision', v_decision,
+      'audio_item_id', p_audio_item_id,
+      'track_code', v_track_code,
+      'location_id', p_location_id,
+      'zone_id', p_zone_id,
+      'country_code', v_country,
+      'use_type', p_use_type,
+      'as_of', v_as_of,
+      'engine_version', v_engine,
+      'country_profile_id', v_context.country_profile_id,
+      'country_profile_version', NULL,
+      'location_rights_context_id', v_context.id,
+      'location_rights_context_version', v_context.version,
+      'recording_grant_ids', '[]'::jsonb,
+      'composition_grant_ids', '[]'::jsonb,
+      'reason_codes', to_jsonb(v_reasons)
+    );
+  END IF;
+
+  -- Profile must match snapshot country and be effective at as_of
+  IF v_profile.country_code IS DISTINCT FROM v_context.country_code_snapshot
+     OR v_profile.activated_at IS NULL
+     OR v_profile.activated_at > v_as_of
+     OR (v_profile.ceased_at IS NOT NULL AND v_as_of >= v_profile.ceased_at)
+     OR v_profile.status NOT IN ('active', 'superseded') THEN
+    v_decision := 'UNKNOWN';
+    v_reasons := array_append(v_reasons, 'LOCATION_RIGHTS_CONTEXT_MISMATCH');
+    RETURN jsonb_build_object(
+      'decision', v_decision,
+      'audio_item_id', p_audio_item_id,
+      'track_code', v_track_code,
+      'location_id', p_location_id,
+      'zone_id', p_zone_id,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -989,7 +1094,7 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -1012,7 +1117,7 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -1035,7 +1140,7 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -1049,7 +1154,7 @@ BEGIN
     );
   END IF;
 
-  -- service_status = supported → match historical grants
+  -- Territory matching uses context country snapshot (not mutable Location.country_code)
   SELECT coalesce(array_agg(rg.id ORDER BY rg.version, rg.id), ARRAY[]::uuid[])
   INTO v_rec_ids
   FROM public.music_rights_grants AS rg
@@ -1061,7 +1166,7 @@ BEGIN
     AND rg.valid_from <= v_as_of
     AND (rg.valid_until IS NULL OR v_as_of < rg.valid_until)
     AND (rg.ceased_at IS NULL OR v_as_of < rg.ceased_at)
-    AND public.music_rights_grant_covers_country(rg.id, v_loc.country_code);
+    AND public.music_rights_grant_covers_country(rg.id, v_country);
 
   SELECT coalesce(array_agg(rg.id ORDER BY rg.version, rg.id), ARRAY[]::uuid[])
   INTO v_comp_ids
@@ -1074,7 +1179,7 @@ BEGIN
     AND rg.valid_from <= v_as_of
     AND (rg.valid_until IS NULL OR v_as_of < rg.valid_until)
     AND (rg.ceased_at IS NULL OR v_as_of < rg.ceased_at)
-    AND public.music_rights_grant_covers_country(rg.id, v_loc.country_code);
+    AND public.music_rights_grant_covers_country(rg.id, v_country);
 
   v_has_rec := coalesce(cardinality(v_rec_ids), 0) > 0;
   v_has_comp := coalesce(cardinality(v_comp_ids), 0) > 0;
@@ -1096,7 +1201,7 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -1110,7 +1215,6 @@ BEGIN
     );
   END IF;
 
-  -- Client requirement
   IF v_rule.client_requirement = 'unknown' THEN
     v_decision := 'UNKNOWN';
     v_reasons := array_append(v_reasons, 'CLIENT_REQUIREMENT_UNKNOWN');
@@ -1120,7 +1224,7 @@ BEGIN
       'track_code', v_track_code,
       'location_id', p_location_id,
       'zone_id', p_zone_id,
-      'country_code', v_loc.country_code,
+      'country_code', v_country,
       'use_type', p_use_type,
       'as_of', v_as_of,
       'engine_version', v_engine,
@@ -1135,6 +1239,7 @@ BEGIN
   END IF;
 
   IF v_rule.client_requirement = 'none' THEN
+    -- Location use-status does not soften/harden Country Rule = none in A5 V1
     v_client_ok := true;
   ELSIF v_rule.client_requirement = 'required' THEN
     SELECT client_requirement_status INTO v_crs
@@ -1151,7 +1256,7 @@ BEGIN
         'track_code', v_track_code,
         'location_id', p_location_id,
         'zone_id', p_zone_id,
-        'country_code', v_loc.country_code,
+        'country_code', v_country,
         'use_type', p_use_type,
         'as_of', v_as_of,
         'engine_version', v_engine,
@@ -1172,7 +1277,7 @@ BEGIN
         'track_code', v_track_code,
         'location_id', p_location_id,
         'zone_id', p_zone_id,
-        'country_code', v_loc.country_code,
+        'country_code', v_country,
         'use_type', p_use_type,
         'as_of', v_as_of,
         'engine_version', v_engine,
@@ -1184,8 +1289,30 @@ BEGIN
         'composition_grant_ids', to_jsonb(v_comp_ids),
         'reason_codes', to_jsonb(v_reasons)
       );
-    ELSIF v_crs = 'confirmed' OR v_crs = 'not_required' THEN
+    ELSIF v_crs = 'confirmed' THEN
       v_client_ok := true;
+    ELSIF v_crs = 'not_required' THEN
+      -- Country REQUIRED vs Location not_required has no exemption model in A5 V1
+      v_decision := 'UNKNOWN';
+      v_reasons := array_append(v_reasons, 'CLIENT_REQUIREMENT_STATUS_CONFLICT');
+      RETURN jsonb_build_object(
+        'decision', v_decision,
+        'audio_item_id', p_audio_item_id,
+        'track_code', v_track_code,
+        'location_id', p_location_id,
+        'zone_id', p_zone_id,
+        'country_code', v_country,
+        'use_type', p_use_type,
+        'as_of', v_as_of,
+        'engine_version', v_engine,
+        'country_profile_id', v_profile.id,
+        'country_profile_version', v_profile.version,
+        'location_rights_context_id', v_context.id,
+        'location_rights_context_version', v_context.version,
+        'recording_grant_ids', to_jsonb(v_rec_ids),
+        'composition_grant_ids', to_jsonb(v_comp_ids),
+        'reason_codes', to_jsonb(v_reasons)
+      );
     ELSE
       v_decision := 'CONDITIONAL';
       v_reasons := array_append(v_reasons, 'CLIENT_REQUIREMENT_CONFIRMATION_REQUIRED');
@@ -1195,7 +1322,7 @@ BEGIN
         'track_code', v_track_code,
         'location_id', p_location_id,
         'zone_id', p_zone_id,
-        'country_code', v_loc.country_code,
+        'country_code', v_country,
         'use_type', p_use_type,
         'as_of', v_as_of,
         'engine_version', v_engine,
@@ -1224,7 +1351,7 @@ BEGIN
     'track_code', v_track_code,
     'location_id', p_location_id,
     'zone_id', p_zone_id,
-    'country_code', v_loc.country_code,
+    'country_code', v_country,
     'use_type', p_use_type,
     'as_of', v_as_of,
     'engine_version', v_engine,

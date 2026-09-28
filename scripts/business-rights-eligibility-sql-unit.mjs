@@ -114,6 +114,23 @@ assert(smoke.includes("Case49"), "smoke Case49");
 assert(smoke.includes("Case51"), "smoke Case51");
 assert(smoke.includes("Case56"), "smoke Case56");
 assert(smoke.includes("Case57"), "smoke Case57");
+
+assert(migration.includes("clock_timestamp()"), "server clock_timestamp for transitions");
+assert(migration.includes("CLIENT_REQUIREMENT_STATUS_CONFLICT"), "required+not_required conflict");
+assert(migration.includes("country_profile_reviewed_at_future"), "future reviewed_at rejected");
+assert(migration.includes("country_profile_root_version_required"), "root version=1");
+assert(migration.includes("country_profile_predecessor_not_historical"), "draft pred cannot activate successor");
+assert(migration.includes("location_context_predecessor_not_historical"), "context pred historical");
+assert(!/coalesce\(NEW\.ceased_at/i.test(migration), "no coalesce ceased_at");
+assert(!/coalesce\(NEW\.activated_at/i.test(migration), "no coalesce activated_at");
+assert(smoke.includes("CaseA"), "smoke CaseA");
+assert(smoke.includes("CaseK"), "smoke CaseK");
+assert(smoke.includes("CaseH"), "smoke CaseH");
+assert(smoke.includes("CaseI"), "smoke CaseI");
+assert(smoke.includes("CaseM"), "smoke CaseM");
+assert(smoke.includes("CaseP"), "smoke CaseP");
+assert(smoke.includes("CLIENT_REQUIREMENT_STATUS_CONFLICT"), "smoke conflict reason");
+
 assert(smoke.includes("'AA'"), "synthetic AA");
 assert(smoke.includes("'BB'"), "synthetic BB");
 assert(!/\b'RU'\b/.test(smoke), "smoke no RU seed");

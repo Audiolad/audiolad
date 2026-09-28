@@ -1758,7 +1758,7 @@ Migration: `20261206120000_business_rights_eligibility.sql` (expand-only; does n
 
 ### A4 additive: `music_rights_grants.ceased_at`
 
-Server-set when `verified → superseded|revoked`. Historical grant usable at `p_as_of` only if `verified_at <= p_as_of`, validity window covers `p_as_of`, `(ceased_at IS NULL OR p_as_of < ceased_at)`, and territory covers Location country. Client cannot invent/rewrite `ceased_at`. Not `updated_at`.
+Server-set via `clock_timestamp()` when `verified → superseded|revoked` (client-supplied `ceased_at` is ignored). Historical grant usable at `p_as_of` only if `verified_at <= p_as_of`, validity window covers `p_as_of`, `(ceased_at IS NULL OR p_as_of < ceased_at)`, and territory covers the **Location Rights Context `country_code_snapshot`** (not mutable `business_locations.country_code`). Not `updated_at`.
 
 ### Country Rights Profile (global, versioned)
 
@@ -1780,6 +1780,8 @@ Tables: `business_location_rights_contexts`, `business_location_rights_context_u
 ### Eligibility RPC
 
 `resolve_business_track_eligibility(p_audio_item_id, p_location_id, p_zone_id default null, p_use_type default business_background_playback, p_as_of default now())` → jsonb with `decision`, ids/versions, matched grant id arrays, `reason_codes`, `engine_version=rights_eligibility_v1`.
+
+Resolver order: validate track/location/zone → historical **Location Rights Context** at `as_of` → load **referenced** Country Profile (must be effective at `as_of`) → use rule → grants by context country snapshot. Current active context whose snapshots diverge from mutable Location → `UNKNOWN` / `LOCATION_RIGHTS_CONTEXT_MISMATCH` (historical superseded contexts are not re-checked against today's Location). Country Rule `client_requirement=required` + Location `not_required` → `UNKNOWN` / `CLIENT_REQUIREMENT_STATUS_CONFLICT` (not ELIGIBLE). Profile/context `activated_at`/`ceased_at` are server `clock_timestamp()` (not `reviewed_at`, not client-supplied).
 
 Decisions: ELIGIBLE | INELIGIBLE | CONDITIONAL | UNKNOWN. UNKNOWN never defaults to ELIGIBLE. Rights First (no BPM/genre/Sonic DNA). No Aural wiring. No persistent decision ledger table.
 
