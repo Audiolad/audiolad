@@ -355,7 +355,7 @@ function testAuthorCabinet() {
 
 function testSqlSortsBeforeLimit() {
   const sql = readFileSync(
-    join(ROOT, "supabase/migrations/20261206120000_stats_table_column_sort.sql"),
+    join(ROOT, "supabase/migrations/20261206120100_stats_table_column_sort.sql"),
     "utf8",
   );
   assert.equal(sql.includes("EXECUTE"), true);
