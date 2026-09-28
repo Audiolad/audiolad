@@ -49,6 +49,7 @@ function testPolicyGuards() {
     dependencies: {
       role: LISTENER_ROLE,
       isAuthorMember: false,
+      hasAuthorProducts: false,
       hasOrders: false,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
@@ -63,6 +64,7 @@ function testPolicyGuards() {
     dependencies: {
       role: PLATFORM_OWNER_ROLE,
       isAuthorMember: false,
+      hasAuthorProducts: false,
       hasOrders: false,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
@@ -80,6 +82,7 @@ function testPolicyGuards() {
     dependencies: {
       role: PLATFORM_ADMIN_ROLE,
       isAuthorMember: false,
+      hasAuthorProducts: false,
       hasOrders: false,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
@@ -97,15 +100,30 @@ function testPolicyGuards() {
     dependencies: {
       role: LISTENER_ROLE,
       isAuthorMember: true,
+      hasAuthorProducts: false,
       hasOrders: false,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
     },
   });
-  assert(!authorBlock.canDelete, "author workspace protected");
+  assert(authorBlock.canDelete, "empty author workspace can delete");
+
+  const authorProductBlock = evaluateUserDeletionEligibility({
+    userId: otherId,
+    actorUserId: actorId,
+    dependencies: {
+      role: LISTENER_ROLE,
+      isAuthorMember: true,
+      hasAuthorProducts: true,
+      hasOrders: false,
+      hasPersonalMaterials: false,
+      hasPromotionCampaigns: false,
+    },
+  });
+  assert(!authorProductBlock.canDelete, "author with products protected");
   assert(
-    authorBlock.blockCode === USER_DELETION_BLOCK_CODES.author_workspace,
-    "author block code",
+    authorProductBlock.blockCode === USER_DELETION_BLOCK_CODES.author_products,
+    "author products block code",
   );
 
   const ordersBlock = evaluateUserDeletionEligibility({
@@ -114,6 +132,7 @@ function testPolicyGuards() {
     dependencies: {
       role: LISTENER_ROLE,
       isAuthorMember: false,
+      hasAuthorProducts: false,
       hasOrders: true,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
@@ -127,6 +146,7 @@ function testPolicyGuards() {
     dependencies: {
       role: LISTENER_ROLE,
       isAuthorMember: false,
+      hasAuthorProducts: false,
       hasOrders: false,
       hasPersonalMaterials: false,
       hasPromotionCampaigns: false,
@@ -158,6 +178,10 @@ function testStaticWiring() {
   assert(
     deletion.includes("MAX_ADMIN_USER_DELETION_BATCH_SIZE"),
     "batch size limit enforced",
+  );
+  assert(
+    deletion.includes('service.rpc("admin_cleanup_deletable_user"'),
+    "empty author cleanup RPC runs before auth delete",
   );
   assert(!table.includes("createServiceRoleClient"), "service role not in client table");
   assert(!table.includes("SUPABASE_SERVICE_ROLE_KEY"), "service key not in client table");
@@ -369,6 +393,9 @@ function createFakeService(scenario = {}) {
       if (name === "has_platform_permission") {
         const allowed = permissionByActor.get(args.p_user_id) === true;
         return Promise.resolve({ data: allowed, error: null });
+      }
+      if (name === "admin_cleanup_deletable_user") {
+        return Promise.resolve({ data: { ok: true, counts: {} }, error: null });
       }
       return Promise.resolve({ data: null, error: { message: `unknown_rpc:${name}` } });
     },
