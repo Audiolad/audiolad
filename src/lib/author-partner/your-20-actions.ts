@@ -50,9 +50,11 @@ async function assertPartnerYour20MutationAccess(
   const execution = await peekAuthorExecutionContext();
 
   let role: string;
+  let accessClient;
   try {
     const membership = await requireAuthorMembership(authorId);
     role = membership.role;
+    accessClient = membership.supabase;
   } catch (error) {
     if (error instanceof AuthorAccessError) {
       return {
@@ -64,8 +66,7 @@ async function assertPartnerYour20MutationAccess(
     throw error;
   }
 
-  const supabase = await createClient();
-  const { data: authorRow, error: authorError } = await supabase
+  const { data: authorRow, error: authorError } = await accessClient
     .from("authors")
     .select("slug")
     .eq("id", authorId)
