@@ -33,6 +33,8 @@ export const AUTHOR_SUPPORT_RPC_WRAPPERS = {
     "set_author_partner_invite_template_with_support_proof",
   acquire_free_studio_music:
     "acquire_free_studio_music_with_support_proof",
+  create_author_project:
+    "create_author_project_with_support_proof",
 } as const;
 
 export type AuthorSupportRpcName = keyof typeof AUTHOR_SUPPORT_RPC_WRAPPERS;
