@@ -356,8 +356,22 @@ Rights Passport Basic projection (REVIEW_REQUIRED | HAS_VERIFIED_GRANTS)
 ```
 
   Rightsholder ≠ Author. Rights Grant = legal source of truth; Passport is projection (not `licensed=true`). Draft editable; non-draft legal history (incl. territory) immutable. `REVIEW_REQUIRED` = existing music Track without verified in-term grants (not missing Track). Studio `music_usage_permission` / entitlements are a separate domain and do **not** auto-map into B2B rights. A4 does **not** decide Location eligibility.
-- **A5** (later): Country Rights Profile → Location Rights Context → Eligibility Decision.
-- Следующие слои (отдельные PR): A5 eligibility, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Analyzer, Business App / Rights UI wiring.
+- **A5** Rights Eligibility foundation: `20261206120000_business_rights_eligibility.sql`
+
+```
+Rights Grant (A4, + ceased_at)
+  ↓
+Rights Passport Basic (projection)
+  ↓
+Country Rights Profile (versioned global legal context)
+  ↓
+Location Rights Context (versioned application to Location)
+  ↓
+Eligibility Decision (computed short-lived; rights_eligibility_v1)
+```
+
+  Decisions: `ELIGIBLE` | `INELIGIBLE` | `CONDITIONAL` | `UNKNOWN`. UNKNOWN never defaults to ELIGIBLE. INELIGIBLE only from explicit negative machine facts (e.g. service_status=unsupported). Absence of grants/profile/context → UNKNOWN. No country-if branches; new countries are data. Rights First: eligibility independent of BPM/genre/Sonic DNA. No Aural Candidate Pool / Music License Passport / economics wiring in A5. No persistent high-volume eligibility ledger.
+- Следующие слои (отдельные PR): Aural wiring to Eligibility Decision, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Analyzer, Business App / Rights Ops UI.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).
 

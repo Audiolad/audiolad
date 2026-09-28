@@ -131,7 +131,7 @@ assert(migration.includes("ledger write time"), "created_at / ledger write time 
     !/Proof of Play \/ B2B attribution \/ billing/i.test(projectState),
     "PROJECT_STATE must not lump B2B attribution with unimplemented Proof of Play",
   );
-  assert(/в рамках A[34]/i.test(projectState), "PROJECT_STATE stop flags refer to A3 or later Foundation draft");
+  assert(/в рамках A[3-5]/i.test(projectState), "PROJECT_STATE stop flags refer to A3+ Foundation draft");
 }
 
 assert(migration.includes("audio_item_not_music"), "music-only gate");

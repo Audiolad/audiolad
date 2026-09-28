@@ -669,3 +669,18 @@ Decision:
 8. A4 stops at Rightsholder → Grant → Passport. Country/Location Eligibility is A5. No Money / Analyzer / Business UI.
 9. `audio_item_id` is historical reference without destructive FK to `audio_items` (legal history survives Track deletion). Write path validates music Track existence.
 10. Raw rights tables: RLS on; anon/authenticated no SELECT/INSERT/UPDATE/DELETE; service_role ALL. Passport EXECUTE service_role only.
+
+## ADR: Rights Eligibility is computed, fail-closed (A5)
+
+Date: 2026-09-28
+
+Context: Aural Engine must answer whether Track X may play at Location Y / Zone Z at time T for use U without parsing contracts itself. A4 grants alone are not Location eligibility.
+
+Decision:
+
+1. Country Rights Profile (`music_country_rights_profiles` + rules) is the versioned global legal/right context SoT. Location Rights Context (`business_location_rights_contexts` + use statuses) is the versioned application of a profile version to a concrete Location (snapshots `country_code` / `business_category` from A1).
+2. Eligibility Decision is computed (`resolve_business_track_eligibility`, engine `rights_eligibility_v1`), not a hand-set `licensed` / `eligible` boolean and not a persistent high-volume ledger.
+3. Four states: ELIGIBLE | INELIGIBLE | CONDITIONAL | UNKNOWN. UNKNOWN never defaults to ELIGIBLE. INELIGIBLE only from explicit negatives (e.g. `service_status=unsupported`). Missing profile/context/rule/grants → UNKNOWN. Client requirement known but unmet → CONDITIONAL (not ELIGIBLE).
+4. Historical reproducibility via profile/context `activated_at`/`ceased_at` and A4 grant `ceased_at` (server-set on verified→superseded|revoked). `updated_at` is not a legal cessation timestamp.
+5. Reuse A4 `use_type` vocabulary. No country-if in the engine. No production legal country seeds in migration. No Studio auto-map, Analyzer, Aural, or economics scope in A5.
+6. Security: RLS on; anon/authenticated no raw access; RPC EXECUTE service_role only.
