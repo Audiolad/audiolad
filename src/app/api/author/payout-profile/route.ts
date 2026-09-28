@@ -11,11 +11,10 @@ import {
 } from "@/lib/author-payout-profiles/service";
 import { isAuthorEditablePayoutProfileStatus } from "@/lib/author-payout-profiles/status";
 import {
-  AuthorAccessError,
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -106,16 +105,8 @@ function handlePayoutProfileError(error: unknown) {
   return handleAuthorRouteError(error);
 }
 
-async function assertPayoutNotInSupportMode() {
-  const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    throw new AuthorAccessError("support_sensitive_route_blocked", 403);
-  }
-}
-
 export async function GET(request: Request) {
   try {
-    await assertPayoutNotInSupportMode();
     const authorId = resolveAuthorId(request);
 
     if (!authorId) {
@@ -151,7 +142,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    await assertPayoutNotInSupportMode();
     if (!isPayoutProfilesEnabled()) {
       return featureDisabledResponse();
     }
@@ -180,6 +170,12 @@ export async function PUT(request: Request) {
       actorUserId: user.id,
       body,
     });
+    await recordAuthorSupportAudit({
+      action: "author_payout_profile_updated",
+      resourceType: "author_payout_profile",
+      resourceId: authorId,
+      metadata: { operation: "save_draft" },
+    });
 
     return jsonWithNoStore({ ok: true, profile });
   } catch (error) {
@@ -189,7 +185,6 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await assertPayoutNotInSupportMode();
     if (!isPayoutProfilesEnabled()) {
       return featureDisabledResponse();
     }
@@ -216,6 +211,12 @@ export async function POST(request: Request) {
         actorUserId: user.id,
         confirm: body.confirm === true,
       });
+      await recordAuthorSupportAudit({
+        action: "author_payout_profile_updated",
+        resourceType: "author_payout_profile",
+        resourceId: authorId,
+        metadata: { operation: "begin_edit" },
+      });
 
       return jsonWithNoStore({ ok: true, profile });
     }
@@ -234,6 +235,12 @@ export async function POST(request: Request) {
       authorId,
       actorUserId: user.id,
       body,
+    });
+    await recordAuthorSupportAudit({
+      action: "author_payout_profile_updated",
+      resourceType: "author_payout_profile",
+      resourceId: authorId,
+      metadata: { operation: "submit" },
     });
 
     // Intentionally no author/admin email on save in the minimal payout form flow.
