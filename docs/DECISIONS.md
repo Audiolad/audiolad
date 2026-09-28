@@ -649,3 +649,23 @@ Decision:
 7. Existing consumer admin/author readers filter `usage_kind = 'consumer'`.
 8. Time: `occurred_at` is canonical playback event time; online A3 sets it from server sample-processing time. `created_at` is ledger write time. Do not treat occurred_at as a forever-universal synonym of server wall-clock time. Do not accept raw client timestamps in A3. Future offline-sync may write historical `occurred_at` only from a server-validated reconstructed Player timeline. No fake offline=false flag in A3.
 9. Reassignment boundary: when live attribution (org/location/zone/player) changes on an existing B2B context, the first sample under the new assignment is a media-time baseline (`accepted_ms = 0`); historical facts keep the old snapshot; `sample_seq` stays monotonic; a new playback_session_id is not required.
+
+
+## ADR: Rights Grant is legal source of truth (A4)
+
+Date: 2026-09-27
+
+Context: B2B needs structured music rights facts before Location eligibility. Studio licensing, author terms, and `music_usage_permission` already exist but are not a B2B Rights Passport.
+
+Decision:
+
+1. Rights Grant (`music_rights_grants`) is the legal source of truth. Rights Passport Basic is a projection/RPC over grants — never a hand-set `licensed=true` column.
+2. Creator/Author ≠ Rightsholder. `music_rightsholders` has no required `author_id`.
+3. Recording ≠ Composition: `rights_layer` ∈ {recording, composition}; do not collapse into `all_rights`.
+4. Territory-aware: `territory_scope` worldwide|countries + `music_rights_grant_countries` include/exclude. Not RU-hardcoded; not a lone `is_global` boolean.
+5. Versioned history via `version` + `supersedes_grant_id` (unique successor; same Track/layer/use_type; version = predecessor + 1). Do not rewrite substantive legal fields of non-draft grants. Non-draft DELETE and territory mutations are rejected; draft remains editable until verify.
+6. Lifecycle: INSERT only draft|verified; transitions `draft → verified`; `verified → superseded|revoked`; terminal superseded/revoked. `verified_at` immutable after leaving draft. Territory must be complete/coherent before verification; territory rows cannot re-parent into/out of non-draft grants.
+7. No automatic B2B rights from existing publication / Studio permission / entitlements. Existing music Track without structured grants → Passport `REVIEW_REQUIRED` (not “Track not found”). Missing/non-music audio_item raises `audio_item_not_found` / `audio_item_not_music`.
+8. A4 stops at Rightsholder → Grant → Passport. Country/Location Eligibility is A5. No Money / Analyzer / Business UI.
+9. `audio_item_id` is historical reference without destructive FK to `audio_items` (legal history survives Track deletion). Write path validates music Track existence.
+10. Raw rights tables: RLS on; anon/authenticated no SELECT/INSERT/UPDATE/DELETE; service_role ALL. Passport EXECUTE service_role only.

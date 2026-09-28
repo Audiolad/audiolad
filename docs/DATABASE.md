@@ -1670,3 +1670,82 @@ RLS включён, политик для `anon` / `authenticated` нет: до�
 ## Резервное копирование
 
 Будет заполнено позже.
+
+
+## Music Rights Foundation (A4)
+
+Migration: `20261205120000_music_rights_foundation.sql`
+
+Rights domain is **global/shared**. It is not Organization-scoped in A4.
+
+### Rightsholder
+
+Table `music_rightsholders`:
+
+| Column | Notes |
+|--------|-------|
+| `display_name` | trimmed nonempty, max 200 |
+| `entity_type` | `person` \| `organization` |
+| `status` | `active` \| `inactive` |
+
+No `author_id`. Creator/Author and Rightsholder are different concepts.
+
+### Rights Grant (source of truth)
+
+Table `music_rights_grants`:
+
+| Column | Notes |
+|--------|-------|
+| `audio_item_id` | current Track root UUID; **no** destructive FK to `audio_items` |
+| `rightsholder_id` | FK → `music_rightsholders` `ON DELETE RESTRICT` |
+| `rights_layer` | `recording` \| `composition` |
+| `use_type` | vocabulary incl. `business_background_playback`, `on_demand_playback`, `offline_storage_cache`, advertising/*, … — one does not imply others |
+| `territory_scope` | `worldwide` \| `countries` |
+| `valid_from` / `valid_until` | `valid_until` NULL or `> valid_from` |
+| `source_type` | `platform_agreement` \| `direct_license` \| `contract` \| `distributor` \| `cmo_pro` \| `other` |
+| `status` | `draft` \| `verified` \| `superseded` \| `revoked` (lifecycle ≠ eligibility) |
+| `version` / `supersedes_grant_id` | versioning; self-FK `ON DELETE RESTRICT` |
+| `verified_at` | required for non-draft |
+
+Write path validates Track exists and `product_kind='music'`.
+
+**Draft** grants: substantive fields and territory rows are editable; draft grant may be deleted.
+
+**Non-draft** (`verified` / `superseded` / `revoked`): DELETE rejected; substantive legal fields immutable; territory rows INSERT/UPDATE/DELETE rejected (`grant_territory_immutable`). Parent `ON DELETE CASCADE` to countries therefore cannot erase historical territory of a non-draft grant.
+
+Lifecycle state machine: INSERT only `draft`|`verified` (not terminal); transitions `draft → verified`; `verified → superseded|revoked`; `superseded` and `revoked` are terminal. `verified_at` is immutable after leaving draft. Territory rows cannot be re-parented into/out of a non-draft grant (`grant_territory_immutable` on OLD and NEW parent).
+
+Territory must be coherent before verification: `countries` requires ≥1 include (and no exclude); `worldwide` allows 0..N exclude only. Preferred write flow: create draft → add territory rows → verify.
+
+Version chain: when `supersedes_grant_id` is set, predecessor must exist with same `audio_item_id`, `rights_layer`, `use_type`, and `NEW.version = predecessor.version + 1`. Unique successor per predecessor (`music_rights_grants_supersedes_uidx`).
+
+### Territory rows
+
+`music_rights_grant_countries`: `country_code` `^[A-Z]{2}$`, `effect` `include`\|`exclude`.
+
+- `countries` + include = allowlist
+- `worldwide` + exclude = worldwide excluding X
+
+Identity only — A4 does not seed legal coverage claims for markets. Territory becomes immutable once the parent grant leaves draft.
+
+### Rights Passport Basic (projection)
+
+`get_music_rights_passport_basic(p_audio_item_id, p_as_of default now())` → jsonb:
+
+- `audio_item_id`, `track_code` (AL-T-* when present), `as_of`
+- `review_status`: `REVIEW_REQUIRED` \| `HAS_VERIFIED_GRANTS`
+- `active_grants[]` from **verified** grants in term at `as_of`
+
+Errors (not review_status): nonexistent `audio_item` → `audio_item_not_found`; non-music product → `audio_item_not_music`.
+
+`REVIEW_REQUIRED` means: an **existing music Track** currently has no verified in-term structured grants — not “Track not found”.
+
+`HAS_VERIFIED_GRANTS` ≠ eligible. No `eligible` / `licensed` boolean. No production backfill.
+
+### Security
+
+RLS enabled on all three tables. PUBLIC/anon/authenticated: no access. service_role: ALL. Passport EXECUTE: service_role (and postgres) only.
+
+### Explicit non-goals (A4)
+
+No Country/Location Eligibility (A5). No Studio/`music_usage_permission` auto-map. No playback/economics mutation. No Analyzer fields. No Business / License Passport UI.
