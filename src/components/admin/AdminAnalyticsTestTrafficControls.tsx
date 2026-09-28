@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import type { AdminAnalyticsPeriod } from "@/lib/admin/analytics-period";
+import { pushStatsQuery } from "@/lib/navigation/stats-query-navigation";
 
 type AdminAnalyticsTestTrafficControlsProps = {
   currentPeriod: AdminAnalyticsPeriod;
@@ -31,10 +31,11 @@ export default function AdminAnalyticsTestTrafficControls({
 
   return (
     <div className="flex w-full flex-col items-end gap-2 sm:w-auto">
-      <Link
-        href={toggleHref}
+      <button
+        type="button"
         className="inline-flex items-center gap-2 rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm font-medium text-[#7042c5]"
         aria-pressed={!includeTest}
+        onClick={() => pushStatsQuery(toggleHref, window.history)}
       >
         <span
           className={`inline-flex h-5 w-9 items-center rounded-full p-0.5 transition ${
@@ -49,7 +50,7 @@ export default function AdminAnalyticsTestTrafficControls({
           />
         </span>
         Не учитывать служебный и тестовый трафик
-      </Link>
+      </button>
 
       <p className="max-w-xs text-right text-xs leading-5 text-[#796ba0]">
         Исключает размеченные действия владельца, администраторов, тестовых
