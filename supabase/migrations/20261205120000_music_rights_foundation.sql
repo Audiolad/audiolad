@@ -97,6 +97,11 @@ CREATE TABLE IF NOT EXISTS public.music_rights_grants (
     CHECK (supersedes_grant_id IS NULL OR supersedes_grant_id <> id)
 );
 
+-- One predecessor may have at most one successor version (NULLs allowed multiple times).
+CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_supersedes_uidx
+  ON public.music_rights_grants (supersedes_grant_id)
+  WHERE supersedes_grant_id IS NOT NULL;
+
 COMMENT ON TABLE public.music_rights_grants IS
   'audiolad:music-rights; primary legal Rights Grant. Source of truth for Rights Passport projection. No organization_id (global catalog).';
 
@@ -113,7 +118,7 @@ COMMENT ON COLUMN public.music_rights_grants.territory_scope IS
   'worldwide | countries. Not a single global-boolean territory model. Country rows live in music_rights_grant_countries.';
 
 COMMENT ON COLUMN public.music_rights_grants.status IS
-  'Grant lifecycle draft|verified|superseded|revoked. Not eligibility. Temporal expiration uses valid_until.';
+  'Grant lifecycle draft|verified|superseded|revoked. Allowed: draft→verified; verified→superseded|revoked. Terminal: superseded, revoked. Not eligibility. Temporal expiration uses valid_until.';
 
 -- ---------------------------------------------------------------------------
 -- Territory countries
@@ -268,18 +273,157 @@ REVOKE ALL ON FUNCTION public.music_rights_grant_countries_validate() FROM anon;
 REVOKE ALL ON FUNCTION public.music_rights_grant_countries_validate() FROM authenticated;
 
 -- ---------------------------------------------------------------------------
--- Substantive immutability for non-draft grants (lifecycle fields still mutable)
+-- Legal history hardening:
+-- draft editable; non-draft immutable (incl. DELETE + territory);
+-- lifecycle state machine; territory complete before verify; version chain.
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.music_rights_grants_protect_legal_fields()
+CREATE OR REPLACE FUNCTION public.music_rights_grant_territory_coherent(
+  p_grant_id uuid,
+  p_territory_scope text
+)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_include integer;
+  v_exclude integer;
+BEGIN
+  SELECT
+    count(*) FILTER (WHERE effect = 'include'),
+    count(*) FILTER (WHERE effect = 'exclude')
+  INTO v_include, v_exclude
+  FROM public.music_rights_grant_countries
+  WHERE grant_id = p_grant_id;
+
+  IF p_territory_scope = 'countries' THEN
+    IF v_include < 1 THEN
+      RAISE EXCEPTION 'grant_territory_incomplete' USING ERRCODE = '22023';
+    END IF;
+    IF v_exclude > 0 THEN
+      RAISE EXCEPTION 'grant_territory_incoherent' USING ERRCODE = '22023';
+    END IF;
+  ELSIF p_territory_scope = 'worldwide' THEN
+    IF v_include > 0 THEN
+      RAISE EXCEPTION 'grant_territory_incoherent' USING ERRCODE = '22023';
+    END IF;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.music_rights_grants_enforce_legal_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_pred public.music_rights_grants%ROWTYPE;
+  v_allowed boolean := false;
 BEGIN
-  IF OLD.status = 'draft' AND NEW.status = 'draft' THEN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.status IS DISTINCT FROM 'draft' THEN
+      RAISE EXCEPTION 'grant_history_immutable' USING ERRCODE = '55000';
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  -- INSERT path: version chain + non-draft territory completeness
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.supersedes_grant_id IS NOT NULL THEN
+      SELECT * INTO v_pred
+      FROM public.music_rights_grants
+      WHERE id = NEW.supersedes_grant_id;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'supersedes_grant_not_found' USING ERRCODE = 'P0002';
+      END IF;
+      IF v_pred.audio_item_id IS DISTINCT FROM NEW.audio_item_id THEN
+        RAISE EXCEPTION 'supersedes_audio_item_mismatch' USING ERRCODE = '22023';
+      END IF;
+      IF v_pred.rights_layer IS DISTINCT FROM NEW.rights_layer THEN
+        RAISE EXCEPTION 'supersedes_rights_layer_mismatch' USING ERRCODE = '22023';
+      END IF;
+      IF v_pred.use_type IS DISTINCT FROM NEW.use_type THEN
+        RAISE EXCEPTION 'supersedes_use_type_mismatch' USING ERRCODE = '22023';
+      END IF;
+      IF NEW.version IS DISTINCT FROM (v_pred.version + 1) THEN
+        RAISE EXCEPTION 'supersedes_version_mismatch' USING ERRCODE = '22023';
+      END IF;
+    END IF;
+
+    IF NEW.status IS DISTINCT FROM 'draft' THEN
+      IF NEW.status NOT IN ('verified', 'superseded', 'revoked') THEN
+        RAISE EXCEPTION 'grant_status_invalid' USING ERRCODE = '22023';
+      END IF;
+      -- Direct insert into non-draft is allowed only when territory already coherent
+      -- (countries must be attached after insert while draft — prefer draft→verify).
+      -- For insert-as-verified worldwide with zero countries: OK.
+      -- For insert-as-verified countries: fail (no rows yet at BEFORE INSERT).
+      IF NEW.territory_scope = 'countries' THEN
+        RAISE EXCEPTION 'grant_territory_incomplete' USING ERRCODE = '22023';
+      END IF;
+      PERFORM public.music_rights_grant_territory_coherent(NEW.id, NEW.territory_scope);
+    END IF;
+
     RETURN NEW;
   END IF;
 
+  -- UPDATE path
+  IF OLD.status = 'draft' AND NEW.status = 'draft' THEN
+    -- draft stays editable for substantive fields; still validate version chain if set
+    IF NEW.supersedes_grant_id IS DISTINCT FROM OLD.supersedes_grant_id
+       OR NEW.version IS DISTINCT FROM OLD.version
+       OR NEW.audio_item_id IS DISTINCT FROM OLD.audio_item_id
+       OR NEW.rights_layer IS DISTINCT FROM OLD.rights_layer
+       OR NEW.use_type IS DISTINCT FROM OLD.use_type THEN
+      IF NEW.supersedes_grant_id IS NOT NULL THEN
+        SELECT * INTO v_pred
+        FROM public.music_rights_grants
+        WHERE id = NEW.supersedes_grant_id;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'supersedes_grant_not_found' USING ERRCODE = 'P0002';
+        END IF;
+        IF v_pred.audio_item_id IS DISTINCT FROM NEW.audio_item_id THEN
+          RAISE EXCEPTION 'supersedes_audio_item_mismatch' USING ERRCODE = '22023';
+        END IF;
+        IF v_pred.rights_layer IS DISTINCT FROM NEW.rights_layer THEN
+          RAISE EXCEPTION 'supersedes_rights_layer_mismatch' USING ERRCODE = '22023';
+        END IF;
+        IF v_pred.use_type IS DISTINCT FROM NEW.use_type THEN
+          RAISE EXCEPTION 'supersedes_use_type_mismatch' USING ERRCODE = '22023';
+        END IF;
+        IF NEW.version IS DISTINCT FROM (v_pred.version + 1) THEN
+          RAISE EXCEPTION 'supersedes_version_mismatch' USING ERRCODE = '22023';
+        END IF;
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Lifecycle transitions
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    v_allowed :=
+      (OLD.status = 'draft' AND NEW.status = 'verified')
+      OR (OLD.status = 'verified' AND NEW.status IN ('superseded', 'revoked'));
+    IF NOT v_allowed THEN
+      RAISE EXCEPTION 'grant_lifecycle_forbidden' USING ERRCODE = '22023';
+    END IF;
+  END IF;
+
+  -- verified_at immutable after leaving draft
+  IF OLD.status IS DISTINCT FROM 'draft' THEN
+    IF OLD.verified_at IS DISTINCT FROM NEW.verified_at THEN
+      RAISE EXCEPTION 'verified_at_immutable' USING ERRCODE = '55000';
+    END IF;
+  ELSIF OLD.status = 'draft' AND NEW.status = 'verified' THEN
+    IF NEW.verified_at IS NULL THEN
+      RAISE EXCEPTION 'verified_at_required' USING ERRCODE = '22023';
+    END IF;
+  END IF;
+
+  -- Substantive legal fields immutable once leaving draft / for non-draft
   IF OLD.audio_item_id IS DISTINCT FROM NEW.audio_item_id
     OR OLD.rightsholder_id IS DISTINCT FROM NEW.rightsholder_id
     OR OLD.rights_layer IS DISTINCT FROM NEW.rights_layer
@@ -292,9 +436,12 @@ BEGIN
     OR OLD.version IS DISTINCT FROM NEW.version
     OR OLD.supersedes_grant_id IS DISTINCT FROM NEW.supersedes_grant_id
   THEN
-    IF OLD.status IS DISTINCT FROM 'draft' OR NEW.status IS DISTINCT FROM 'draft' THEN
-      RAISE EXCEPTION 'grant_legal_fields_immutable' USING ERRCODE = '55000';
-    END IF;
+    RAISE EXCEPTION 'grant_legal_fields_immutable' USING ERRCODE = '55000';
+  END IF;
+
+  -- Territory complete on draft → verified
+  IF OLD.status = 'draft' AND NEW.status = 'verified' THEN
+    PERFORM public.music_rights_grant_territory_coherent(NEW.id, NEW.territory_scope);
   END IF;
 
   RETURN NEW;
@@ -303,14 +450,62 @@ $$;
 
 DROP TRIGGER IF EXISTS music_rights_grants_protect_legal_fields_bu
   ON public.music_rights_grants;
-CREATE TRIGGER music_rights_grants_protect_legal_fields_bu
-  BEFORE UPDATE ON public.music_rights_grants
+DROP TRIGGER IF EXISTS music_rights_grants_enforce_legal_history_biud
+  ON public.music_rights_grants;
+CREATE TRIGGER music_rights_grants_enforce_legal_history_biud
+  BEFORE INSERT OR UPDATE OR DELETE ON public.music_rights_grants
   FOR EACH ROW
-  EXECUTE FUNCTION public.music_rights_grants_protect_legal_fields();
+  EXECUTE FUNCTION public.music_rights_grants_enforce_legal_history();
 
-REVOKE ALL ON FUNCTION public.music_rights_grants_protect_legal_fields() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.music_rights_grants_protect_legal_fields() FROM anon;
-REVOKE ALL ON FUNCTION public.music_rights_grants_protect_legal_fields() FROM authenticated;
+REVOKE ALL ON FUNCTION public.music_rights_grant_territory_coherent(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.music_rights_grant_territory_coherent(uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public.music_rights_grant_territory_coherent(uuid, text) FROM authenticated;
+REVOKE ALL ON FUNCTION public.music_rights_grants_enforce_legal_history() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.music_rights_grants_enforce_legal_history() FROM anon;
+REVOKE ALL ON FUNCTION public.music_rights_grants_enforce_legal_history() FROM authenticated;
+DROP FUNCTION IF EXISTS public.music_rights_grants_protect_legal_fields();
+
+-- Territory rows: immutable when parent grant is non-draft
+CREATE OR REPLACE FUNCTION public.music_rights_grant_countries_protect()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_status text;
+  v_grant_id uuid;
+BEGIN
+  v_grant_id := coalesce(NEW.grant_id, OLD.grant_id);
+  SELECT status INTO v_status
+  FROM public.music_rights_grants
+  WHERE id = v_grant_id;
+
+  IF v_status IS NULL THEN
+    RAISE EXCEPTION 'grant_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_status IS DISTINCT FROM 'draft' THEN
+    RAISE EXCEPTION 'grant_territory_immutable' USING ERRCODE = '55000';
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS music_rights_grant_countries_protect_biud
+  ON public.music_rights_grant_countries;
+CREATE TRIGGER music_rights_grant_countries_protect_biud
+  BEFORE INSERT OR UPDATE OR DELETE ON public.music_rights_grant_countries
+  FOR EACH ROW
+  EXECUTE FUNCTION public.music_rights_grant_countries_protect();
+
+REVOKE ALL ON FUNCTION public.music_rights_grant_countries_protect() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.music_rights_grant_countries_protect() FROM anon;
+REVOKE ALL ON FUNCTION public.music_rights_grant_countries_protect() FROM authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Rights Passport Basic projection (service_role / internal only)
@@ -330,6 +525,7 @@ AS $$
 DECLARE
   v_as_of timestamptz := coalesce(p_as_of, now());
   v_track_code text;
+  v_kind text;
   v_grants jsonb;
   v_count integer;
 BEGIN
@@ -337,10 +533,18 @@ BEGIN
     RAISE EXCEPTION 'audio_item_id_required' USING ERRCODE = '22023';
   END IF;
 
-  SELECT ai.music_track_code
-  INTO v_track_code
+  SELECT ai.music_track_code, p.product_kind
+  INTO v_track_code, v_kind
   FROM public.audio_items AS ai
+  JOIN public.practices AS p ON p.id = ai.practice_id
   WHERE ai.id = p_audio_item_id;
+
+  IF NOT FOUND OR v_kind IS NULL THEN
+    RAISE EXCEPTION 'audio_item_not_found' USING ERRCODE = 'P0002';
+  END IF;
+  IF v_kind IS DISTINCT FROM 'music' THEN
+    RAISE EXCEPTION 'audio_item_not_music' USING ERRCODE = '22023';
+  END IF;
 
   SELECT coalesce(jsonb_agg(g.payload ORDER BY g.valid_from, g.id), '[]'::jsonb),
          count(*)::integer
@@ -394,7 +598,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.get_music_rights_passport_basic(uuid, timestamptz) IS
-  'audiolad:music-rights; Rights Passport Basic projection from verified in-term grants. review_status REVIEW_REQUIRED|HAS_VERIFIED_GRANTS. Never returns legal eligibility. service_role only.';
+  'audiolad:music-rights; Rights Passport Basic projection from verified in-term grants. Missing track → audio_item_not_found; non-music → audio_item_not_music; music without verified in-term grants → REVIEW_REQUIRED. Never returns legal eligibility. service_role only.';
 
 REVOKE ALL ON FUNCTION public.get_music_rights_passport_basic(uuid, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_music_rights_passport_basic(uuid, timestamptz) FROM anon;

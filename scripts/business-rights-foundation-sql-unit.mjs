@@ -104,6 +104,15 @@ assert(migration.includes("GRANT EXECUTE ON FUNCTION public.get_music_rights_pas
 assert(/REVOKE ALL ON FUNCTION public\.get_music_rights_passport_basic\([^)]+\) FROM anon/i.test(migration), "passport not anon");
 assert(migration.includes("audio_item_not_music"), "music-only gate");
 assert(migration.includes("grant_legal_fields_immutable"), "immutability");
+assert(migration.includes("grant_history_immutable"), "non-draft delete protection");
+assert(migration.includes("grant_territory_immutable"), "territory immutability");
+assert(migration.includes("grant_lifecycle_forbidden"), "lifecycle state machine");
+assert(migration.includes("verified_at_immutable"), "verified_at immutable");
+assert(migration.includes("grant_territory_incomplete"), "territory before verify");
+assert(migration.includes("supersedes_version_mismatch"), "version chain");
+assert(migration.includes("music_rights_grants_supersedes_uidx"), "unique successor");
+assert(migration.includes("audio_item_not_found"), "passport missing track");
+assert(migration.includes("audio_item_not_music"), "passport non-music");
 assert(smoke.includes("Case1"), "smoke Case1");
 assert(smoke.includes("Case21"), "smoke Case21");
 assert(smoke.includes("Case22"), "smoke Case22");
@@ -111,6 +120,16 @@ assert(smoke.includes("Case23"), "smoke Case23");
 assert(smoke.includes("Case24"), "smoke Case24");
 assert(smoke.includes("Case29"), "smoke Case29");
 assert(smoke.includes("Case30"), "smoke Case30");
+assert(smoke.includes("CaseA"), "smoke CaseA verified delete");
+assert(smoke.includes("CaseD"), "smoke CaseD territory insert");
+assert(smoke.includes("CaseH"), "smoke CaseH countries incomplete");
+assert(smoke.includes("CaseL"), "smoke CaseL lifecycle");
+assert(smoke.includes("CaseP"), "smoke CaseP verified_at");
+assert(smoke.includes("CaseQ"), "smoke CaseQ version");
+assert(smoke.includes("CaseU"), "smoke CaseU unique successor");
+assert(smoke.includes("CaseV"), "smoke CaseV missing track");
+assert(smoke.includes("CaseW"), "smoke CaseW non-music");
+assert(smoke.includes("CaseX"), "smoke CaseX REVIEW_REQUIRED");
 assert(smoke.includes("REVIEW_REQUIRED"), "smoke REVIEW_REQUIRED");
 assert(smoke.includes("HAS_VERIFIED_GRANTS"), "smoke HAS_VERIFIED_GRANTS");
 assert(stub.includes("music_usage_permission"), "stub keeps Studio field for non-map proof");
@@ -128,6 +147,8 @@ assert(!/CREATE EXTENSION IF NOT EXISTS pgcrypto/i.test(stub), "stub must not in
     assert(/Rights Grant/i.test(docs), "docs: Rights Grant");
     assert(/Rightsholder/i.test(docs), "docs: Rightsholder");
     assert(/REVIEW_REQUIRED/i.test(docs), "docs: REVIEW_REQUIRED");
+    assert(/immutable/i.test(docs), "docs: immutability");
+    assert(/audio_item_not_found/i.test(docs), "docs: passport missing track");
     const stripped = docs
       .replace(/never a hand-set `licensed=true`[^\n]*/gi, "")
       .replace(/not `licensed=true`/gi, "")

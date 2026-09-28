@@ -1707,7 +1707,17 @@ Table `music_rights_grants`:
 | `version` / `supersedes_grant_id` | versioning; self-FK `ON DELETE RESTRICT` |
 | `verified_at` | required for non-draft |
 
-Write path validates Track exists and `product_kind='music'`. Verified grants: substantive legal fields immutable (lifecycle may move verified → superseded/revoked).
+Write path validates Track exists and `product_kind='music'`.
+
+**Draft** grants: substantive fields and territory rows are editable; draft grant may be deleted.
+
+**Non-draft** (`verified` / `superseded` / `revoked`): DELETE rejected; substantive legal fields immutable; territory rows INSERT/UPDATE/DELETE rejected (`grant_territory_immutable`). Parent `ON DELETE CASCADE` to countries therefore cannot erase historical territory of a non-draft grant.
+
+Lifecycle state machine: `draft → verified`; `verified → superseded|revoked`; `superseded` and `revoked` are terminal. `verified_at` is immutable after leaving draft.
+
+Territory must be coherent before verification: `countries` requires ≥1 include (and no exclude); `worldwide` allows 0..N exclude only. Preferred write flow: create draft → add territory rows → verify.
+
+Version chain: when `supersedes_grant_id` is set, predecessor must exist with same `audio_item_id`, `rights_layer`, `use_type`, and `NEW.version = predecessor.version + 1`. Unique successor per predecessor (`music_rights_grants_supersedes_uidx`).
 
 ### Territory rows
 
@@ -1716,7 +1726,7 @@ Write path validates Track exists and `product_kind='music'`. Verified grants: s
 - `countries` + include = allowlist
 - `worldwide` + exclude = worldwide excluding X
 
-Identity only — A4 does not seed legal coverage claims for markets.
+Identity only — A4 does not seed legal coverage claims for markets. Territory becomes immutable once the parent grant leaves draft.
 
 ### Rights Passport Basic (projection)
 
@@ -1726,7 +1736,11 @@ Identity only — A4 does not seed legal coverage claims for markets.
 - `review_status`: `REVIEW_REQUIRED` \| `HAS_VERIFIED_GRANTS`
 - `active_grants[]` from **verified** grants in term at `as_of`
 
-`HAS_VERIFIED_GRANTS` ≠ eligible. No `eligible` / `licensed` boolean. Tracks with zero grants → `REVIEW_REQUIRED`. No production backfill.
+Errors (not review_status): nonexistent `audio_item` → `audio_item_not_found`; non-music product → `audio_item_not_music`.
+
+`REVIEW_REQUIRED` means: an **existing music Track** currently has no verified in-term structured grants — not “Track not found”.
+
+`HAS_VERIFIED_GRANTS` ≠ eligible. No `eligible` / `licensed` boolean. No production backfill.
 
 ### Security
 

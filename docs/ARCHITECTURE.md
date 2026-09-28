@@ -355,7 +355,7 @@ Rights Grants (recording | composition × use_type × territory)
 Rights Passport Basic projection (REVIEW_REQUIRED | HAS_VERIFIED_GRANTS)
 ```
 
-  Rightsholder ≠ Author. Rights Grant = legal source of truth; Passport is projection (not `licensed=true`). Studio `music_usage_permission` / entitlements are a separate domain and do **not** auto-map into B2B rights. A4 does **not** decide Location eligibility.
+  Rightsholder ≠ Author. Rights Grant = legal source of truth; Passport is projection (not `licensed=true`). Draft editable; non-draft legal history (incl. territory) immutable. `REVIEW_REQUIRED` = existing music Track without verified in-term grants (not missing Track). Studio `music_usage_permission` / entitlements are a separate domain and do **not** auto-map into B2B rights. A4 does **not** decide Location eligibility.
 - **A5** (later): Country Rights Profile → Location Rights Context → Eligibility Decision.
 - Следующие слои (отдельные PR): A5 eligibility, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Analyzer, Business App / Rights UI wiring.
 
