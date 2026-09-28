@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminAnalyticsBreakdownPanel from "@/components/admin/AdminAnalyticsBreakdownPanel";
 import AdminAnalyticsDefinitions from "@/components/admin/AdminAnalyticsDefinitions";
@@ -33,6 +33,12 @@ import {
   type AdminAnalyticsUtmGroup,
   type AdminAnalyticsView,
 } from "@/lib/admin/analytics-url-state";
+import {
+  adminSummaryNeedsRefresh,
+  replaceStatsQuery,
+  shouldReplaceStatsTableWithLoading,
+  statsQueryHref,
+} from "@/lib/navigation/stats-query-navigation";
 import {
   adminAuthorSortKind,
   adminPracticeSortKind,
@@ -85,7 +91,6 @@ export default function AdminAnalyticsWorkbench({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
   const urlState = useMemo(
     () => parseAdminAnalyticsUrlState(searchParams),
     [searchParams],
@@ -97,6 +102,7 @@ export default function AdminAnalyticsWorkbench({
   const [breakdownError, setBreakdownError] = useState<string | null>(null);
   const [debouncedQuery, setDebouncedQuery] = useState(urlState.q);
   const abortRef = useRef<AbortController | null>(null);
+  const breakdownShownRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(urlState.q), 300);
@@ -107,12 +113,34 @@ export default function AdminAnalyticsWorkbench({
     (patch: Partial<typeof urlState>) => {
       const next = { ...urlState, ...patch };
       const params = buildAdminAnalyticsSearchParams(next);
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-      });
+      replaceStatsQuery(statsQueryHref(pathname, params), window.history);
     },
-    [pathname, router, urlState],
+    [pathname, urlState],
   );
+
+  const summaryStale = adminSummaryNeedsRefresh(
+    {
+      period: summary.period,
+      includeTest: summary.includeTest,
+      authorId: summary.filters.authorId,
+      practiceId: summary.filters.practiceId,
+      utmSource: summary.filters.utmSource,
+      deviceType: summary.filters.deviceType,
+    },
+    {
+      period: urlState.period,
+      includeTest: urlState.includeTest,
+      authorId: urlState.authorId,
+      practiceId: urlState.practiceId,
+      utmSource: urlState.utmSource,
+      deviceType: urlState.deviceType,
+    },
+  );
+
+  useEffect(() => {
+    if (!summaryStale) return;
+    router.refresh();
+  }, [router, summaryStale]);
 
   const breakdownQueryKey = [
     urlState.period,
@@ -156,7 +184,9 @@ export default function AdminAnalyticsWorkbench({
         return;
       }
 
-      setLoadingBreakdown(true);
+      if (shouldReplaceStatsTableWithLoading(breakdownShownRef.current)) {
+        setLoadingBreakdown(true);
+      }
       setBreakdownError(null);
 
       try {
@@ -175,6 +205,7 @@ export default function AdminAnalyticsWorkbench({
         const data = (await response.json()) as AdminAnalyticsBreakdownBundle;
 
         if (!controller.signal.aborted) {
+          breakdownShownRef.current = true;
           setBreakdown(data);
           setLoadingBreakdown(false);
         }
@@ -335,19 +366,12 @@ export default function AdminAnalyticsWorkbench({
       <div className="flex flex-wrap gap-2" role="group" aria-label="Быстрый период">
         {ADMIN_ANALYTICS_PERIOD_OPTIONS.map((option) => {
           const active = option.id === urlState.period;
-          const params = buildAdminAnalyticsSearchParams({
-            ...urlState,
-            period: option.id,
-            drill: null,
-          });
           return (
             <button
               key={option.id}
               type="button"
               onClick={() =>
-                startTransition(() => {
-                  router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-                })
+                replaceState({ period: option.id, drill: null })
               }
               className={`rounded-full px-4 py-2 text-sm font-medium ${
                 active
@@ -369,12 +393,12 @@ export default function AdminAnalyticsWorkbench({
       </div>
 
       <AdminAnalyticsFilters
-        currentPeriod={summary.period}
-        includeTest={summary.includeTest}
-        authorId={summary.filters.authorId}
-        practiceId={summary.filters.practiceId}
-        utmSource={summary.filters.utmSource}
-        deviceType={summary.filters.deviceType}
+        currentPeriod={urlState.period}
+        includeTest={urlState.includeTest}
+        authorId={urlState.authorId}
+        practiceId={urlState.practiceId}
+        utmSource={urlState.utmSource}
+        deviceType={urlState.deviceType}
         authors={summary.filterOptions.authors}
         practices={summary.filterOptions.practices}
         filterNotes={summary.filterNotes}
@@ -413,9 +437,21 @@ export default function AdminAnalyticsWorkbench({
         top={urlState.top}
         query={urlState.q}
         utmGroup={urlState.utmGroup}
-        practices={breakdown.practices}
-        authors={breakdown.authors}
-        acquisition={breakdown.acquisition}
+        practices={{
+          ...breakdown.practices,
+          sort: urlState.practicesSort,
+          sortDir: urlState.practicesSortDir,
+        }}
+        authors={{
+          ...breakdown.authors,
+          sort: urlState.authorsSort,
+          sortDir: urlState.authorsSortDir,
+        }}
+        acquisition={{
+          ...breakdown.acquisition,
+          sort: urlState.utmSort,
+          sortDir: urlState.utmSortDir,
+        }}
         loading={loadingBreakdown}
         error={breakdownError}
         onTabChange={(tab: AdminAnalyticsTab) => replaceState({ tab })}

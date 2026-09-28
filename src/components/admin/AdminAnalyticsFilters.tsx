@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import type { AdminAnalyticsFilterOption } from "@/lib/admin/analytics-queries";
 import type { AdminAnalyticsPeriod } from "@/lib/admin/analytics-period";
+import {
+  isPlainPrimaryClick,
+  pushStatsQuery,
+} from "@/lib/navigation/stats-query-navigation";
 
 export default function AdminAnalyticsFilters({
   currentPeriod,
@@ -29,9 +31,7 @@ export default function AdminAnalyticsFilters({
   filterNotes: string[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
 
   function buildHref(mutate: (params: URLSearchParams) => void): string {
     const params = new URLSearchParams(searchParams.toString());
@@ -45,20 +45,19 @@ export default function AdminAnalyticsFilters({
     key: "authorId" | "practiceId" | "utmSource" | "deviceType",
     value: string,
   ) {
-    startTransition(() => {
-      router.push(
-        buildHref((params) => {
-          if (!value) {
-            params.delete(key);
-          } else {
-            params.set(key, value);
-          }
-          params.delete("practicesPage");
-          params.delete("authorsPage");
-          params.delete("acquisitionPage");
-        }),
-      );
-    });
+    pushStatsQuery(
+      buildHref((params) => {
+        if (!value) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+        params.delete("practicesPage");
+        params.delete("authorsPage");
+        params.delete("acquisitionPage");
+      }),
+      window.history,
+    );
   }
 
   const resetHref = buildHref((params) => {
@@ -76,9 +75,17 @@ export default function AdminAnalyticsFilters({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-[#25135c]">Фильтры отчёта</p>
         {(authorId || practiceId || utmSource || deviceType) && (
-          <Link href={resetHref} className="text-xs font-medium text-[#7042c5]">
+          <a
+            href={resetHref}
+            className="text-xs font-medium text-[#7042c5]"
+            onClick={(event) => {
+              if (!isPlainPrimaryClick(event)) return;
+              event.preventDefault();
+              pushStatsQuery(resetHref, window.history);
+            }}
+          >
             Сбросить фильтры
-          </Link>
+          </a>
         )}
       </div>
 
@@ -88,7 +95,6 @@ export default function AdminAnalyticsFilters({
           <select
             className="mt-1 w-full rounded-xl border border-[#eadff8] bg-[#fcfaff] px-3 py-2 text-sm text-[#25135c]"
             value={authorId ?? ""}
-            disabled={pending}
             onChange={(event) => onSelectChange("authorId", event.target.value)}
           >
             <option value="">Все авторы</option>
@@ -105,7 +111,6 @@ export default function AdminAnalyticsFilters({
           <select
             className="mt-1 w-full rounded-xl border border-[#eadff8] bg-[#fcfaff] px-3 py-2 text-sm text-[#25135c]"
             value={practiceId ?? ""}
-            disabled={pending}
             onChange={(event) => onSelectChange("practiceId", event.target.value)}
           >
             <option value="">Все практики</option>
@@ -122,7 +127,6 @@ export default function AdminAnalyticsFilters({
           <select
             className="mt-1 w-full rounded-xl border border-[#eadff8] bg-[#fcfaff] px-3 py-2 text-sm text-[#25135c]"
             value={utmSource ?? ""}
-            disabled={pending}
             onChange={(event) => onSelectChange("utmSource", event.target.value)}
           >
             <option value="">Все источники</option>
@@ -140,7 +144,6 @@ export default function AdminAnalyticsFilters({
           <select
             className="mt-1 w-full rounded-xl border border-[#eadff8] bg-[#fcfaff] px-3 py-2 text-sm text-[#25135c]"
             value={deviceType ?? ""}
-            disabled={pending}
             onChange={(event) => onSelectChange("deviceType", event.target.value)}
           >
             <option value="">Все устройства</option>

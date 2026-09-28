@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import SortableColumnHeader from "@/components/stats/SortableColumnHeader";
@@ -13,6 +13,12 @@ import {
   parseAuthorProductSortState,
   type AuthorStatsProductSortKey,
 } from "@/lib/author-stats/product-sort";
+import {
+  applyAuthorStatsSearchPatch,
+  replaceStatsQuery,
+  shouldReplaceStatsTableWithLoading,
+  statsQueryHref,
+} from "@/lib/navigation/stats-query-navigation";
 import { nextColumnSort } from "@/lib/stats/table-sort";
 import {
   getAuthorStatsPeriodLabel,
@@ -320,8 +326,9 @@ function StatsSparkline({
 }
 
 export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
-  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const productsShownRef = useRef(false);
   const period = parseAuthorStatsPeriod(searchParams.get("period"));
   const authorSlug = searchParams.get("author");
   const productSort = parseAuthorProductSortState(
@@ -354,18 +361,8 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
     sort?: string | null;
     order?: "asc" | "desc" | null;
   }) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next.author) params.set("author", next.author);
-    if (next.period) params.set("period", next.period);
-    if (next.sort !== undefined) {
-      if (!next.sort || next.sort === "views") params.delete("sort");
-      else params.set("sort", next.sort);
-    }
-    if (next.order !== undefined) {
-      if (!next.order || next.order === "desc") params.delete("order");
-      else params.set("order", next.order);
-    }
-    router.replace(`/author-dashboard/stats?${params.toString()}`);
+    const params = applyAuthorStatsSearchPatch(searchParams, next);
+    replaceStatsQuery(statsQueryHref(pathname, params), window.history);
   }
 
   function onProductSort(key: AuthorStatsProductSortKey) {
@@ -451,6 +448,12 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
   }, [period, reloadToken, selectedAuthor]);
 
   useEffect(() => {
+    // Period and author changes may replace the whole table. Sort must not:
+    // that flag stays true so the mobile select and rows stay mounted.
+    productsShownRef.current = false;
+  }, [period, selectedAuthor]);
+
+  useEffect(() => {
     if (!selectedAuthor) return;
 
     let cancelled = false;
@@ -464,7 +467,9 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
     async function loadProducts() {
       await Promise.resolve();
       if (cancelled) return;
-      setProductsState("loading");
+      if (shouldReplaceStatsTableWithLoading(productsShownRef.current)) {
+        setProductsState("loading");
+      }
 
       try {
         const response = await fetch(
@@ -478,6 +483,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
           products?: AuthorStatsProductRow[];
         };
         if (cancelled) return;
+        productsShownRef.current = true;
         setProducts(payload.products ?? []);
         setProductsState("ready");
       } catch {
