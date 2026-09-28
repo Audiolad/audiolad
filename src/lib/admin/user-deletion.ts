@@ -116,8 +116,7 @@ export async function loadUserDeletionDependencies(
     const { data: practiceRows, error: practiceError } = await service
       .from("practices")
       .select("author_id")
-      .in("author_id", authorIds)
-      .is("deleted_at", null);
+      .in("author_id", authorIds);
 
     if (practiceError) {
       throw new Error("admin_user_deletion_practices_failed");
