@@ -23,6 +23,7 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { sendCommercialApplicationAdminAlertEmail } from "@/lib/email/send-commercial-application-admin-alert-email";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -139,6 +140,12 @@ export async function PUT(request: Request) {
     }
 
     const application = await getAuthorCommercialApplication(supabase, authorId);
+    await recordAuthorSupportAudit({
+      action: "commercial_application_updated",
+      resourceType: "commercial_application",
+      resourceId: application?.id ?? authorId,
+      metadata: { operation: "save_draft" },
+    });
 
     return NextResponse.json({
       ok: true,
@@ -222,6 +229,13 @@ export async function POST(request: Request) {
         idempotent: rpc.result.idempotent,
       });
     }
+
+    await recordAuthorSupportAudit({
+      action: "commercial_application_updated",
+      resourceType: "commercial_application",
+      resourceId: applicationId ?? authorId,
+      metadata: { operation: "submit" },
+    });
 
     return NextResponse.json({
       ok: true,
