@@ -1793,3 +1793,14 @@ RLS on all new tables. PUBLIC/anon/authenticated: no raw access. service_role AL
 ### Explicit non-goals (A5)
 
 No production legal country seeds. No licensed/is_licensed boolean SoT. No Studio auto-map. No Aural Candidate Pool / playlist / Business UI. No Music License Passport / QR. No Analyzer. No economics / playback_usage_facts mutation. No country-if branches.
+
+
+## Author support parity – partner/commercial proof (2026-12-08)
+
+Migration: `20261208120000_author_support_partner_parity.sql`.
+
+- Platform-owner support mode may use owner-scoped partner-program RPCs only for the active `acting_author_id`; authorization remains bound to the request support proof.
+- Partner reads and mutations use dedicated `*_with_support_proof` wrappers. Partner mutations are written to `author_support_audit_events`.
+- Author commercial-application draft/submit membership checks accept the same scoped support proof; their support wrappers journal the mutation in the same transaction.
+- Normal author behavior is unchanged: outside support mode, partner access remains owner-only and commercial applications remain owner/editor membership-scoped.
+- This does not turn support mode into account impersonation: password/auth settings and other user-identity/legal actions remain outside author-workspace scope.
