@@ -7,6 +7,7 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/author-products/auth";
 import { hasPermission } from "@/lib/auth/platform-access";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import {
   WORDSTAT_ERROR_MESSAGES,
@@ -68,6 +69,12 @@ export async function POST(request: Request) {
         { status: wordstatHttpStatus(result.error.code) },
       );
     }
+
+    await recordAuthorSupportAudit({
+      action: "author_seo_tool_used",
+      resourceType: "author_seo_tool",
+      metadata: { tool: "wordstat" },
+    });
 
     return NextResponse.json(result.data);
   } catch (error) {
