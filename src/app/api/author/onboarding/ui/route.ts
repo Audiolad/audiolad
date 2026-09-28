@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadAuthorOnboardingChecklistState } from "@/lib/author-dashboard/load-onboarding-state";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { hideAuthorOnboardingChecklist } from "@/lib/author-dashboard/onboarding-ui-store";
 import {
   parseOnboardingUiHideBody,
@@ -61,6 +62,12 @@ export async function PATCH(request: Request) {
       checklist: checklistKind,
       freeComplete: checklist.complete,
       commercialComplete: checklist.commercial.complete,
+    });
+    await recordAuthorSupportAudit({
+      action: "author_onboarding_updated",
+      resourceType: "author_onboarding",
+      resourceId: author.id,
+      metadata: { checklist: checklistKind, operation: "hide" },
     });
 
     return NextResponse.json({ ok: true, ui, checklist });
