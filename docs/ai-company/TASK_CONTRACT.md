@@ -1,6 +1,6 @@
 # Task Contract v1
 
-A task may enter Ready only when it has a useful result, a consumer and a strategic connection.
+A task may enter Ready only when it has a useful result, a consumer, a strategic connection and known governing knowledge.
 
 ## Required Task Packet
 
@@ -15,6 +15,16 @@ In plain human language: if this works perfectly, what happens in the real user'
 
 ### Contribution
 How does this task move the Strategic Goal?
+
+### Governing Knowledge
+Which canonical Company/Product documents govern this task?
+
+Record:
+- Knowledge Scope
+- Canonical Product Bible
+- Bible Version
+- Relevant Sections / Anchors
+- Source Decision IDs where applicable
 
 ### Market / Reference Check
 Who already solves this well? Buy / Integrate / Benchmark & Build / Build?
@@ -49,6 +59,18 @@ None / Sergey / Oriy.
 ### Next Action
 What should happen after acceptance?
 
+## Before execution
+
+The agent must answer:
+
+> Which canonical documents govern this task?
+
+> Which sections are directly relevant?
+
+> Does the requested work conflict with any approved principle?
+
+If there is a material conflict with a canonical Bible, trigger AI Andon.
+
 ## Best Result Check
 
 Before work:
@@ -63,12 +85,15 @@ Every meaningful handoff records:
 - Task
 - Strategic Goal
 - Ideal Outcome Scene
+- Governing Bible/version
+- Relevant knowledge refs
 - Expected Output
 - Actual Result
 - Deliverables
 - Result Consumer
 - Consumer Need
 - Acceptance Criteria status
+- Bible Compliance: PASS / ANDON
 - Best Result Check
 - Risks
 - Open Questions
