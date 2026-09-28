@@ -1754,7 +1754,7 @@ A4 itself does not decide Location eligibility (see A5). No Studio/`music_usage_
 
 ## A5 — Country Rights Profile + Location Rights Context + Eligibility
 
-Migration: `20261206120000_business_rights_eligibility.sql` (expand-only; does not rewrite A4 migration file).
+Migration: `20261206120200_business_rights_eligibility.sql` (expand-only; does not rewrite A4 migration file).
 
 ### A4 additive: `music_rights_grants.ceased_at`
 
