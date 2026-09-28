@@ -2,7 +2,6 @@ import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorPayoutProfileForm from "@/components/author-dashboard/AuthorPayoutProfileForm";
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
 import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -17,11 +16,6 @@ type PageProps = {
 export default async function AuthorCommercialPayoutDetailsPage({
   searchParams,
 }: PageProps) {
-  const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    redirect("/author-dashboard");
-  }
-
   const params = (await searchParams) ?? {};
   const author = await requireCommercialOnboardingAuthor({
     nextPath: "/author-dashboard/commercial/payout-details",
