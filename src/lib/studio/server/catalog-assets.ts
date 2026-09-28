@@ -46,7 +46,7 @@ async function resolveStudioCatalogUserId(): Promise<string> {
   if (execution?.isSupportMode) {
     return execution.actingUserId;
   }
-  return await resolveStudioCatalogUserId();
+  return (await requireAuthenticatedUser()).user.id;
 }
 
 function mapAttachError(error: {
