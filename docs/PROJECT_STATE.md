@@ -5,16 +5,17 @@
 Последнее обновление: 2026-07-15
 
 
-## Аудиолад Бизнес (факт на момент A4)
+## Аудиолад Бизнес (факт на момент A5)
 
 - **A1** Business Domain Core: Organization → Location → Zone + membership/bootstrap.
 - **A2** Player foundation: `business_players` / assignments / credentials / runtime + create/assign/heartbeat/health/rotate RPC.
 - Technical Player Health derived from server heartbeat (`never_seen` / `online` / `stale` / `offline`).
 - **A3** B2B Playback Attribution / **online evidence foundation** — реализовано: `usage_kind` consumer|business; canonical org/location/zone/player snapshots on existing `playback_usage_facts`; machine RPC `apply_business_playback_usage_heartbeat`; consumer analytics isolated; reassignment re-baselines media-time.
-- **A4** Rights Passport v1 / Rights Grants Core — реализовано: `music_rightsholders`, `music_rights_grants`, `music_rights_grant_countries`; Rights Grant = legal source of truth; draft editable / non-draft legal history immutable (incl. territory); Rights Passport Basic = projection (`get_music_rights_passport_basic`); existing music Track without grants → `REVIEW_REQUIRED` (missing/non-music raise errors); no auto-map from Studio/`music_usage_permission`.
-- Business App UI по-прежнему на mock-data; к domain/Player/playback/rights не подключён.
-- Ещё не реализованы: A5 Country/Location Rights Eligibility, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / financial usage / billing, Player playback engine, Analyzer / Sonic DNA / Music Passport UI, Rights UI / Music License Passport.
-- `MERGE=NO`, `DEPLOY=NO`, `PRODUCTION_DB_APPLY=NO` в рамках A4 Draft (production DB apply не выполнялся).
+- **A4** Rights Passport v1 / Rights Grants Core — merged: `music_rightsholders`, `music_rights_grants`, `music_rights_grant_countries`; Rights Grant = legal source of truth; Passport Basic projection; A5 adds grant `ceased_at` for historical usability.
+- **A5** Country Rights Profile + Location Rights Context + Rights Eligibility — реализовано (Draft): `music_country_rights_profiles` / rules; `business_location_rights_contexts` / use statuses; `resolve_business_track_eligibility` → ELIGIBLE|INELIGIBLE|CONDITIONAL|UNKNOWN (`rights_eligibility_v1`). UNKNOWN never defaults to ELIGIBLE. No production country legal seeds. No licensed boolean. No Aural/Analyzer/economics/UI.
+- Business App UI по-прежнему на mock-data; к domain/Player/playback/rights/eligibility не подключён.
+- Ещё не реализованы: Aural Candidate Pool wiring, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / financial usage / billing, Player playback engine, Analyzer / Sonic DNA / Music Passport UI, Rights Ops / Music License Passport UI.
+- `MERGE=NO`, `DEPLOY=NO`, `PRODUCTION_DB_APPLY=NO` в рамках A5 Draft (production DB apply не выполнялся).
 
 ## Music Analyzer Lab
 

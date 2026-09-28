@@ -1750,4 +1750,46 @@ RLS enabled on all three tables. PUBLIC/anon/authenticated: no access. service_r
 
 ### Explicit non-goals (A4)
 
-No Country/Location Eligibility (A5). No Studio/`music_usage_permission` auto-map. No playback/economics mutation. No Analyzer fields. No Business / License Passport UI.
+A4 itself does not decide Location eligibility (see A5). No Studio/`music_usage_permission` auto-map. No playback/economics mutation. No Analyzer fields. No Business / License Passport UI.
+
+## A5 — Country Rights Profile + Location Rights Context + Eligibility
+
+Migration: `20261206120000_business_rights_eligibility.sql` (expand-only; does not rewrite A4 migration file).
+
+### A4 additive: `music_rights_grants.ceased_at`
+
+Server-set via `clock_timestamp()` when `verified → superseded|revoked` (client-supplied `ceased_at` is ignored). Historical grant usable at `p_as_of` only if `verified_at <= p_as_of`, validity window covers `p_as_of`, `(ceased_at IS NULL OR p_as_of < ceased_at)`, and territory covers the **Location Rights Context `country_code_snapshot`** (not mutable `business_locations.country_code`). Not `updated_at`.
+
+### Country Rights Profile (global, versioned)
+
+Tables: `music_country_rights_profiles`, `music_country_rights_profile_rules`.
+
+- Lifecycle: draft → active → superseded (terminal). INSERT only draft; activate requires `reviewed_at`.
+- One current `active` profile per `country_code`. One linear version chain per country: `UNIQUE(country_code, version)` plus root version=1, predecessor required for version>1, version=pred+1, and unique successor (`supersedes_profile_id`).
+- Rules: `use_type` (A4 vocabulary), `service_status` supported|unsupported|unknown, `client_requirement` none|required|unknown, `requires_recording` / `requires_composition`.
+- Rules editable only while parent draft; immutable after activation. No production country legal seeds.
+
+### Location Rights Context (per Location, versioned)
+
+Tables: `business_location_rights_contexts`, `business_location_rights_context_use_statuses`.
+
+- Snapshots `country_code` + `business_category` from `business_locations`; profile country must match Location.
+- While an `active` Location Rights Context exists, `business_locations.country_code` / `business_category` cannot change (`active_location_rights_context_must_be_superseded`). V1 write order: supersede Context (server `ceased_at`) → UPDATE Location → create+activate new Context. No auto-supersede from Location.
+- Lifecycle/versioning mirrors Country Profile. One active context per Location. One linear context chain per Location: `UNIQUE(location_id, version)` plus the same root/predecessor/successor invariants.
+- `client_requirement_status`: not_required|confirmed|not_confirmed|unknown. Child rows immutable after parent leaves draft.
+
+### Eligibility RPC
+
+`resolve_business_track_eligibility(p_audio_item_id, p_location_id, p_zone_id default null, p_use_type default business_background_playback, p_as_of default now())` → jsonb with `decision`, ids/versions, matched grant id arrays, `reason_codes`, `engine_version=rights_eligibility_v1`.
+
+Resolver order: validate track/location/zone → historical **Location Rights Context** at `as_of` → load **referenced** Country Profile (must be effective at `as_of`) → use rule → grants by context country snapshot. Legitimate Location country/category updates require superseding the active Context first (no stale active interval). Current active context whose snapshots diverge from mutable Location (legacy/corrupt) → `UNKNOWN` / `LOCATION_RIGHTS_CONTEXT_MISMATCH` (defense-in-depth; historical superseded contexts are not re-checked against today's Location). Country Rule `client_requirement=required` + Location `not_required` → `UNKNOWN` / `CLIENT_REQUIREMENT_STATUS_CONFLICT` (not ELIGIBLE). Profile/context `activated_at`/`ceased_at` are server `clock_timestamp()` (not `reviewed_at`, not client-supplied).
+
+Decisions: ELIGIBLE | INELIGIBLE | CONDITIONAL | UNKNOWN. UNKNOWN never defaults to ELIGIBLE. Rights First (no BPM/genre/Sonic DNA). No Aural wiring. No persistent decision ledger table.
+
+### Security (A5)
+
+RLS on all new tables. PUBLIC/anon/authenticated: no raw access. service_role ALL. Eligibility RPC EXECUTE: service_role (and postgres) only.
+
+### Explicit non-goals (A5)
+
+No production legal country seeds. No licensed/is_licensed boolean SoT. No Studio auto-map. No Aural Candidate Pool / playlist / Business UI. No Music License Passport / QR. No Analyzer. No economics / playback_usage_facts mutation. No country-if branches.
