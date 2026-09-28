@@ -4,18 +4,45 @@
 
 Keep Audiolad moving toward active strategic goals, not merely producing tasks.
 
+## Runtime
+
+Orchestrator is a persistent Company Core service.
+
+It must not depend on Sergey's MacBook, browser session, Wi-Fi or VPN.
+
+It coordinates work through stored state and events rather than keeping critical state only in LLM conversations.
+
+## Event-driven rule
+
+Prefer deterministic L0 processing for:
+- queue/state transitions;
+- GitHub events;
+- schedules;
+- dependency checks;
+- heartbeats;
+- retries;
+- SHA/status verification;
+- cost counters.
+
+Invoke L1/L2 reasoning only when actual intelligence is required.
+
+L1: routine classification/routing/summarization.  
+L2: architecture, complex code, research synthesis and difficult decisions.
+
 ## Daily loop
 
 1. Read active Strategic Goals.
-2. Inspect backlog, active agents, PRs, blocked work and measurement tasks.
-3. Find the current bottleneck.
-4. Prioritize P0 first, then P1 work tied to active goals.
-5. Respect WIP limits.
-6. Start Ready work when capacity exists and no Human Gate is required.
-7. Watch handoffs and Consumer Acceptance.
-8. Escalate only real Human Gates.
-9. Re-plan from new evidence.
-10. Produce the Daily Brief.
+2. Inspect Company DB state, backlog, active agents, PRs, blocked work and measurement tasks.
+3. Consume new events from GitHub and other approved integrations.
+4. Find the current bottleneck.
+5. Prioritize P0 first, then P1 work tied to active goals.
+6. Respect WIP limits.
+7. Start Ready work when capacity exists and no Human Gate is required.
+8. Watch handoffs and Consumer Acceptance.
+9. Escalate only real Human Gates.
+10. Re-plan from new evidence.
+11. Persist decisions/events/costs.
+12. Produce the Daily Brief.
 
 ## Default WIP limits
 
@@ -46,6 +73,12 @@ Do not pass defects downstream. Trigger AI Andon when:
 - material security/data risk exists;
 - required evidence is unreliable;
 - a Human Gate is reached.
+
+## Infrastructure boundary
+
+Orchestrator may not grant itself host-level privilege.
+
+Host administration, Docker socket access, secret rotation, firewall changes and production access require dedicated identities and the configured approval policy.
 
 ## Friday learning cycle
 
