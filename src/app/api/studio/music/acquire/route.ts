@@ -7,6 +7,7 @@ import {
   toStudioMusicAcquireSuccessBody,
 } from "@/lib/studio-music/acquire-api";
 import { parseJsonObject } from "@/lib/studio-music/checkout-api";
+import { callAuthorUserRpc } from "@/lib/author-support/context";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 export const dynamic = "force-dynamic";
@@ -55,9 +56,11 @@ export async function POST(request: Request) {
     return noStoreJson({ error: parsed.error }, { status: 400 });
   }
 
-  const { data, error } = await supabase.rpc("acquire_free_studio_music", {
-    p_practice_id: parsed.value.practiceId,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "acquire_free_studio_music",
+    { p_practice_id: parsed.value.practiceId },
+  );
 
   if (error) {
     const mapped = mapStudioMusicAcquireRpcError(error.message);
