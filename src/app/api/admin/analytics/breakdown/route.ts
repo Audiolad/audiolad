@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getAdminAnalyticsBreakdownBundle } from "@/lib/admin/analytics-queries";
-import { topNToLimit } from "@/lib/admin/analytics-url-state";
+import {
+  parseAdminAnalyticsUrlState,
+  topNToLimit,
+} from "@/lib/admin/analytics-url-state";
+import { STATS_TABLE_ROW_CAP } from "@/lib/stats/table-sort";
 import { getPlatformAccess, snapshotHasPermission } from "@/lib/auth/platform-access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,24 +31,28 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const top = url.searchParams.get("top") ?? "25";
-  const limit = topNToLimit(top === "10" || top === "25" || top === "all" ? top : "25");
+  const state = parseAdminAnalyticsUrlState(url.searchParams);
+  const limit = topNToLimit(state.top);
 
   try {
     const breakdown = await getAdminAnalyticsBreakdownBundle({
-      period: url.searchParams.get("period"),
-      includeTest: url.searchParams.get("includeTest"),
-      authorId: url.searchParams.get("authorId"),
-      practiceId: url.searchParams.get("practiceId"),
-      utmSource: url.searchParams.get("utmSource"),
-      deviceType: url.searchParams.get("deviceType"),
-      practicesSort: url.searchParams.get("practicesSort"),
-      practicesSortDir: url.searchParams.get("practicesSortDir"),
-      authorsSort: url.searchParams.get("authorsSort"),
-      authorsSortDir: url.searchParams.get("authorsSortDir"),
+      period: state.period,
+      includeTest: state.includeTest ? "1" : "0",
+      authorId: state.authorId,
+      practiceId: state.practiceId,
+      utmSource: state.utmSource,
+      deviceType: state.deviceType,
+      practicesSort: state.practicesSort,
+      practicesSortDir: state.practicesSortDir,
+      practicesQuery: state.q,
+      authorsSort: state.authorsSort,
+      authorsSortDir: state.authorsSortDir,
+      utmSort: state.utmSort,
+      utmSortDir: state.utmSortDir,
+      utmGroup: state.utmGroup,
       practicesLimit: limit,
       authorsLimit: limit,
-      acquisitionLimit: 100,
+      acquisitionLimit: STATS_TABLE_ROW_CAP,
       practicesPage: "1",
       authorsPage: "1",
       acquisitionPage: "1",

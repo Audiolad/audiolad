@@ -120,7 +120,10 @@ function main() {
   assert(breakdown.includes("Export CSV"), "csv export ui");
   assert(breakdown.includes("Top"), "top n");
   assert(breakdown.includes('["source", "Source"]') || breakdown.includes("utmGroup"), "utm group");
-  assert(breakdown.includes("опубл. практ."), "published practices");
+  assert(
+    breakdown.includes("publishedPractices") && breakdown.includes("Практики"),
+    "published practices",
+  );
   assert(
     breakdown.includes("Нет продуктовой активности") ||
       breakdown.includes("ничего не найдено") ||

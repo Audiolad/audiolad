@@ -5,6 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import SortableColumnHeader from "@/components/stats/SortableColumnHeader";
+import {
+  AUTHOR_STATS_PRODUCT_SORT_KEYS,
+  AUTHOR_STATS_PRODUCT_SORT_LABELS,
+  authorProductSortKind,
+  parseAuthorProductSortState,
+  type AuthorStatsProductSortKey,
+} from "@/lib/author-stats/product-sort";
+import { nextColumnSort } from "@/lib/stats/table-sort";
 import {
   getAuthorStatsPeriodLabel,
   parseAuthorStatsPeriod,
@@ -315,6 +324,10 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
   const searchParams = useSearchParams();
   const period = parseAuthorStatsPeriod(searchParams.get("period"));
   const authorSlug = searchParams.get("author");
+  const productSort = parseAuthorProductSortState(
+    searchParams.get("sort"),
+    searchParams.get("order"),
+  );
 
   const selectedAuthor = useMemo(() => {
     if (authorSlug) {
@@ -338,11 +351,29 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
   function updateQuery(next: {
     author?: string;
     period?: AuthorStatsPeriodKey;
+    sort?: string | null;
+    order?: "asc" | "desc" | null;
   }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next.author) params.set("author", next.author);
     if (next.period) params.set("period", next.period);
+    if (next.sort !== undefined) {
+      if (!next.sort || next.sort === "views") params.delete("sort");
+      else params.set("sort", next.sort);
+    }
+    if (next.order !== undefined) {
+      if (!next.order || next.order === "desc") params.delete("order");
+      else params.set("order", next.order);
+    }
     router.replace(`/author-dashboard/stats?${params.toString()}`);
+  }
+
+  function onProductSort(key: AuthorStatsProductSortKey) {
+    const next = nextColumnSort(productSort, key, authorProductSortKind(key));
+    updateQuery({
+      sort: next.sort === "views" ? null : next.sort,
+      order: next.order === "desc" ? null : next.order,
+    });
   }
 
   useEffect(() => {
@@ -365,7 +396,6 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
 
       setSummaryState("loading");
       setSeriesState("loading");
-      setProductsState("loading");
       setSourcesState("loading");
 
       const summaryPromise = loadJson<{ summary: AuthorStatsSummary }>(
@@ -396,20 +426,6 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
           setSeriesState("error");
         });
 
-      const productsPromise = loadJson<{ products: AuthorStatsProductRow[] }>(
-        `/api/author/stats/products?${query}`,
-      )
-        .then((payload) => {
-          if (cancelled) return;
-          setProducts(payload.products ?? []);
-          setProductsState("ready");
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setProducts([]);
-          setProductsState("error");
-        });
-
       const sourcesPromise = loadJson<{ sources: AuthorStatsSourceRow[] }>(
         `/api/author/stats/sources?${query}`,
       )
@@ -424,12 +440,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
           setSourcesState("error");
         });
 
-      await Promise.all([
-        summaryPromise,
-        seriesPromise,
-        productsPromise,
-        sourcesPromise,
-      ]);
+      await Promise.all([summaryPromise, seriesPromise, sourcesPromise]);
     }
 
     void loadAll();
@@ -438,6 +449,56 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
       cancelled = true;
     };
   }, [period, reloadToken, selectedAuthor]);
+
+  useEffect(() => {
+    if (!selectedAuthor) return;
+
+    let cancelled = false;
+    const params = new URLSearchParams({
+      author_id: selectedAuthor.id,
+      period,
+      sort: productSort.sort,
+      order: productSort.order,
+    });
+
+    async function loadProducts() {
+      await Promise.resolve();
+      if (cancelled) return;
+      setProductsState("loading");
+
+      try {
+        const response = await fetch(
+          `/api/author/stats/products?${params.toString()}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          throw new Error(`status_${response.status}`);
+        }
+        const payload = (await response.json()) as {
+          products?: AuthorStatsProductRow[];
+        };
+        if (cancelled) return;
+        setProducts(payload.products ?? []);
+        setProductsState("ready");
+      } catch {
+        if (cancelled) return;
+        setProducts([]);
+        setProductsState("error");
+      }
+    }
+
+    void loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    period,
+    productSort.order,
+    productSort.sort,
+    reloadToken,
+    selectedAuthor,
+  ]);
 
   const sourceTotalVisitors = sources.reduce(
     (total, row) => total + row.visitors,
@@ -702,26 +763,58 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
           </div>
         ) : (
           <>
+            <label className="block text-sm text-[#5c5080] md:hidden">
+              Сортировка
+              <select
+                className="mt-1 block w-full rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm font-semibold text-[#2b2145]"
+                aria-label="Сортировка продуктов"
+                value={`${productSort.sort}:${productSort.order}`}
+                onChange={(event) => {
+                  const [sortKey, order] = event.target.value.split(":");
+                  const key = sortKey as AuthorStatsProductSortKey;
+                  updateQuery({
+                    sort: key === "views" ? null : key,
+                    order: order === "desc" ? null : "asc",
+                  });
+                }}
+              >
+                {AUTHOR_STATS_PRODUCT_SORT_KEYS.flatMap((key) => [
+                  <option key={`${key}:desc`} value={`${key}:desc`}>
+                    {AUTHOR_STATS_PRODUCT_SORT_LABELS[key]} ↓
+                  </option>,
+                  <option key={`${key}:asc`} value={`${key}:asc`}>
+                    {AUTHOR_STATS_PRODUCT_SORT_LABELS[key]} ↑
+                  </option>,
+                ])}
+              </select>
+            </label>
             <div className="hidden overflow-x-auto rounded-[20px] border border-[#eadff8] bg-white md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[#faf7ff] text-[#5c5080]">
                   <tr>
-                    <th className="px-3 py-3 font-medium">Продукт</th>
-                    <th className="px-3 py-3 font-medium">Статус</th>
-                    <th className="px-3 py-3 font-medium">Просмотры</th>
-                    <th className="px-3 py-3 font-medium">Посетители</th>
-                    <th className="px-3 py-3 font-medium">Запуски</th>
-                    <th className="px-3 py-3 font-medium">Время прослушивания</th>
-                    <th className="px-3 py-3 font-medium">25%</th>
-                    <th className="px-3 py-3 font-medium">Завершения</th>
-                    <th className="px-3 py-3 font-medium">Сохранения</th>
-                    <th className="px-3 py-3 font-medium">Покупки</th>
-                    <th className="px-3 py-3 font-medium">Возвраты</th>
-                    <th className="px-3 py-3 font-medium">Чистые продажи</th>
-                    <th className="px-3 py-3 font-medium">Благодарности</th>
-                    <th className="px-3 py-3 font-medium">Сумма благодарностей</th>
-                    <th className="px-3 py-3 font-medium">Начислено вам</th>
-                    <th className="px-3 py-3 font-medium">Просмотр → запуск</th>
+                    {AUTHOR_STATS_PRODUCT_SORT_KEYS.map((key) => {
+                      const active = productSort.sort === key;
+                      return (
+                        <th
+                          key={key}
+                          className="px-3 py-3 font-medium whitespace-nowrap"
+                          aria-sort={
+                            active
+                              ? productSort.order === "asc"
+                                ? "ascending"
+                                : "descending"
+                              : "none"
+                          }
+                        >
+                          <SortableColumnHeader
+                            label={AUTHOR_STATS_PRODUCT_SORT_LABELS[key]}
+                            active={active}
+                            direction={productSort.order}
+                            onSort={() => onProductSort(key)}
+                          />
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
