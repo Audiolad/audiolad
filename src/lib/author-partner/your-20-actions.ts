@@ -32,11 +32,11 @@ export type PartnerYour20ActionResult =
     };
 
 /**
- * Authoritative gate for your-20 mutations:
- * 1) support-mode blocked
- * 2) requireAuthorMembership → role must be owner
+ * Authoritative gate for your-20 actions:
+ * 1) requireAuthorMembership scopes normal or support-mode access
+ * 2) normal mode requires owner; platform-owner support mode is allowed
  * 3) load authors.slug by authorId (server SoT)
- * 4) resolved slug must belong to that owner membership
+ * 4) resolved slug must belong to the verified workspace
  *
  * Never trusts a client-supplied slug.
  */
