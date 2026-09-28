@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
+import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
@@ -172,6 +173,7 @@ export default function AuthorDashboardNav({
   authorRole,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
+  const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
@@ -226,6 +228,7 @@ export default function AuthorDashboardNav({
     ...(canAccessAuthorPartnerYour20Ui({
       authorSlug,
       role: authorRole,
+      isSupportMode: supportMode,
     })
       ? [
           {
