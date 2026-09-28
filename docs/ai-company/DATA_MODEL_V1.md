@@ -78,6 +78,7 @@ Examples:
 - pr_created
 - checks_passed
 - deployment_observed
+- knowledge_version_changed
 - heartbeat
 - failure
 
@@ -106,6 +107,8 @@ Durable references to produced work:
 - research output
 - daily brief
 - weekly review
+- canonical source document
+- normalized knowledge document
 
 Store references/metadata, not arbitrary secrets.
 
@@ -151,6 +154,54 @@ Track:
 - current task
 - health metadata
 
+### knowledge_documents
+
+Canonical Company/Product documents.
+
+Minimum fields:
+- id
+- document_key
+- title
+- scope
+- product
+- version
+- status
+- checksum
+- source_artifact_id
+- normalized_artifact_id
+- approved_by
+- approved_at
+- effective_from
+- supersedes_id
+- created_at
+- updated_at
+
+### knowledge_sections
+
+Retrievable sections of canonical knowledge.
+
+Minimum fields:
+- id
+- document_id
+- section_key
+- heading_path
+- content
+- ordinal
+- content_hash
+- retrieval/index metadata
+- created_at
+
+### task_knowledge_refs
+
+Explicit evidence of which canonical knowledge governed a task.
+
+Minimum fields:
+- task_id
+- document_id
+- section_id
+- reason
+- created_at
+
 ## Design principles
 
 - UUID primary keys.
@@ -159,8 +210,9 @@ Track:
 - explicit task state transitions.
 - approvals auditable.
 - external IDs stored separately from internal IDs.
+- canonical knowledge is versioned; old versions are never silently overwritten.
 - no private keys, passphrases or raw long-lived credentials in DB records intended for application-level access.
-- secrets belong in the deployment secret store/environment, not task artifacts.
+- secrets belong in the deployment secret store/environment, not task artifacts or knowledge documents.
 
 ## Source-of-truth split
 
@@ -174,6 +226,9 @@ Company DB owns:
 - event history;
 - cost accounting;
 - heartbeats;
-- dashboard read model.
+- dashboard read model;
+- knowledge index and task-to-knowledge references.
+
+Private canonical source artifacts remain authoritative for Company/Product Bibles. The DB is their retrieval/index layer.
 
 GitHub references are synchronized into Company Core rather than replacing Company DB.
