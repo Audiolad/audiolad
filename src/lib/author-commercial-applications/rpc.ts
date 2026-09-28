@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { callAuthorUserRpc, type AuthorSupportRpcName } from "@/lib/author-support/context";
+import { callAuthorUserRpc } from "@/lib/author-support/context";
+import type { AuthorSupportRpcName } from "@/lib/author-support/proof";
 
 import type { AuthorCommercialApplicationFormValues } from "./types";
 import { mapCommercialApplicationRpcError } from "./validation";
