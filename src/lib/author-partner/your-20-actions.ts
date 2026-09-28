@@ -48,7 +48,7 @@ async function assertPartnerYour20MutationAccess(
   const execution = await peekAuthorExecutionContext();
 
   let role: string;
-  let dataClient;
+  let dataClient: Awaited<ReturnType<typeof requireAuthorMembership>>["supabase"];
   try {
     const membership = await requireAuthorMembership(authorId);
     role = membership.role;
