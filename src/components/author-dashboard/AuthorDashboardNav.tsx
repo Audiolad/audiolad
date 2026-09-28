@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
-import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
@@ -173,7 +172,6 @@ export default function AuthorDashboardNav({
   authorRole,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
-  const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
@@ -219,28 +217,23 @@ export default function AuthorDashboardNav({
       icon: StatsIcon,
       active: pathname.startsWith("/author-dashboard/stats"),
     },
-    ...(!supportMode
+    {
+      href: `/author-dashboard/finance${authorQuery}`,
+      label: "Продажи и финансы",
+      icon: FinanceIcon,
+      active: pathname.startsWith("/author-dashboard/finance"),
+    },
+    ...(canAccessAuthorPartnerYour20Ui({
+      authorSlug,
+      role: authorRole,
+    })
       ? [
           {
-            href: `/author-dashboard/finance${authorQuery}`,
-            label: "Продажи и финансы",
-            icon: FinanceIcon,
-            active: pathname.startsWith("/author-dashboard/finance"),
+            href: `/author-dashboard/your-20${authorQuery}`,
+            label: "Ваши 20%",
+            icon: PercentIcon,
+            active: pathname.startsWith("/author-dashboard/your-20"),
           },
-          ...(canAccessAuthorPartnerYour20Ui({
-            authorSlug,
-            role: authorRole,
-            isSupportMode: supportMode,
-          })
-            ? [
-                {
-                  href: `/author-dashboard/your-20${authorQuery}`,
-                  label: "Ваши 20%",
-                  icon: PercentIcon,
-                  active: pathname.startsWith("/author-dashboard/your-20"),
-                },
-              ]
-            : []),
         ]
       : []),
     {
