@@ -18,7 +18,7 @@ import {
   PARTNER_REWARD_LOAD_ERROR,
 } from "@/lib/author-partner/rewards";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { callAuthorUserRpc, peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -50,9 +50,7 @@ export default async function AuthorYour20Page({
   searchParams: SearchParams;
 }) {
   const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    redirect("/author-dashboard");
-  }
+  const isSupportMode = execution?.isSupportMode === true;
 
   const supabase = await createClient();
   const {
@@ -72,7 +70,7 @@ export default async function AuthorYour20Page({
   const slugParam = Array.isArray(params.author)
     ? params.author[0]
     : params.author;
-  const selected = selectOwnedAuthorWorkspace(authors, slugParam);
+  const selected = selectOwnedAuthorWorkspace(authors, slugParam, isSupportMode);
   if (!selected) {
     return <NoAuthorAccess />;
   }
@@ -81,7 +79,7 @@ export default async function AuthorYour20Page({
     !canAccessAuthorPartnerYour20Ui({
       authorSlug: selected.slug,
       role: selected.role,
-      isSupportMode: false,
+      isSupportMode,
     })
   ) {
     const q = selected.slug
@@ -90,9 +88,11 @@ export default async function AuthorYour20Page({
     redirect(`/author-dashboard${q}`);
   }
 
-  const { data, error } = await supabase.rpc("get_author_partner_profile", {
-    p_author_id: selected.id,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "get_author_partner_profile",
+    { p_author_id: selected.id },
+  );
 
   // Do not mask RPC/network/permission failures as exists=false.
   const initialLoadError = error
@@ -102,7 +102,8 @@ export default async function AuthorYour20Page({
     ? null
     : parseAuthorPartnerProfilePayload(data, selected.id);
 
-  const { data: inviteesData, error: inviteesError } = await supabase.rpc(
+  const { data: inviteesData, error: inviteesError } = await callAuthorUserRpc(
+    supabase,
     "list_author_partner_invitees",
     { p_author_id: selected.id },
   );
@@ -111,7 +112,8 @@ export default async function AuthorYour20Page({
     : parseAuthorPartnerInviteesPayload(inviteesData);
   const initialInviteesError = inviteesError ? PARTNER_INVITEES_LOAD_ERROR : null;
 
-  const { data: rewardsData, error: rewardsError } = await supabase.rpc(
+  const { data: rewardsData, error: rewardsError } = await callAuthorUserRpc(
+    supabase,
     "get_author_partner_reward_dashboard",
     { p_author_id: selected.id },
   );
@@ -121,7 +123,8 @@ export default async function AuthorYour20Page({
   const initialRewardsError =
     rewardsError || !initialRewards ? PARTNER_REWARD_LOAD_ERROR : null;
 
-  const { data: templateData, error: templateError } = await supabase.rpc(
+  const { data: templateData, error: templateError } = await callAuthorUserRpc(
+    supabase,
     "get_author_partner_invite_template",
     { p_author_id: selected.id },
   );
