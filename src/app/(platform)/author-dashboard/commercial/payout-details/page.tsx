@@ -3,6 +3,7 @@ import AuthorPayoutProfileForm from "@/components/author-dashboard/AuthorPayoutP
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
 import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -18,9 +19,6 @@ export default async function AuthorCommercialPayoutDetailsPage({
   searchParams,
 }: PageProps) {
   const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    redirect("/author-dashboard");
-  }
 
   const params = (await searchParams) ?? {};
   const author = await requireCommercialOnboardingAuthor({
@@ -33,11 +31,17 @@ export default async function AuthorCommercialPayoutDetailsPage({
 
   let initialEmail: string | null = null;
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    initialEmail = user?.email?.trim() || null;
+    if (execution?.isSupportMode) {
+      const service = createServiceRoleClient();
+      const { data } = await service.auth.admin.getUserById(execution.actingUserId);
+      initialEmail = data.user?.email?.trim() || null;
+    } else {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      initialEmail = user?.email?.trim() || null;
+    }
   } catch {
     initialEmail = null;
   }
