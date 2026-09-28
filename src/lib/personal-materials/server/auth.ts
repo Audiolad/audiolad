@@ -7,6 +7,8 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 
+import { getAuthorDataClient, peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import type { PersonalMaterialRow } from "@/lib/personal-materials/types";
 
 import { PersonalMaterialApiError } from "./errors";
@@ -18,8 +20,12 @@ const MATERIAL_SELECT =
 
 export async function requirePersonalMaterialReadAccess(materialId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
+  const execution = await peekAuthorExecutionContext();
+  const dataClient = execution?.isSupportMode
+    ? await getAuthorDataClient(execution, supabase)
+    : supabase;
 
-  const { data: material, error } = await supabase
+  const { data: material, error } = await dataClient
     .from("personal_materials")
     .select(MATERIAL_SELECT)
     .eq("id", materialId)
@@ -34,27 +40,10 @@ export async function requirePersonalMaterialReadAccess(materialId: string) {
     throw new AuthorAccessError("not_found", 404);
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from("author_members")
-    .select("role")
-    .eq("author_id", material.author_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (membershipError) {
-    console.error("personal_material_membership_error", membershipError.message);
-    throw new AuthorAccessError("internal_error", 500);
-  }
-
-  if (
-    !membership ||
-    (membership.role !== "owner" && membership.role !== "editor")
-  ) {
-    throw new AuthorAccessError("forbidden", 403);
-  }
+  const membership = await requireAuthorMembership(material.author_id);
 
   return {
-    supabase,
+    supabase: membership.supabase,
     user,
     material: material as PersonalMaterialRow,
     role: membership.role,
@@ -68,6 +57,11 @@ export async function requirePersonalMaterialAccess(materialId: string) {
     context.material.author_id,
   );
   assertAuthorContentMutationsAllowed(accessStatus);
+  await recordAuthorSupportAudit({
+    action: "personal_material_updated",
+    resourceType: "personal_material",
+    resourceId: materialId,
+  });
 
   return {
     ...context,
@@ -93,7 +87,10 @@ export function assertAuthorEditable(material: PersonalMaterialRow) {
 }
 
 export async function requireAuthorMaterialListAccess(authorId: string) {
-  return requireAuthorMutationMembership(authorId);
+  return requireAuthorMutationMembership(authorId, {
+    action: "personal_material_updated",
+    resourceType: "personal_material",
+  });
 }
 
 export async function requireAuthorMaterialListReadAccess(authorId: string) {
