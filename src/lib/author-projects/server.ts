@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  callAuthorUserRpc,
+  peekAuthorExecutionContext,
+} from "@/lib/author-support/context";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
 import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
 import {
   AuthorAccessError,
@@ -144,12 +150,28 @@ export async function getAuthorProjectsSummary(
   userId: string,
   supabase: SupabaseClient,
 ): Promise<AuthorProjectsSummary> {
-  const [projects, limitFields] = await Promise.all([
+  const execution = await peekAuthorExecutionContext();
+  const supportForThisUser =
+    execution?.isSupportMode === true && execution.realUserId === userId;
+  const limitUserId = supportForThisUser ? execution.actingUserId : userId;
+  const limitClient = supportForThisUser ? createServiceRoleClient() : supabase;
+
+  const [projects, limitFields, supportOwnedCount] = await Promise.all([
     listAuthorWorkspacesForUser(userId, supabase),
-    loadAuthorProjectLimitFields(supabase, userId),
+    loadAuthorProjectLimitFields(limitClient, limitUserId),
+    supportForThisUser
+      ? limitClient
+          .from("author_members")
+          .select("author_id", { count: "exact", head: true })
+          .eq("user_id", limitUserId)
+          .eq("role", "owner")
+      : Promise.resolve(null),
   ]);
 
-  const ownedCount = projects.filter((project) => project.role === "owner").length;
+  const ownedCount =
+    supportForThisUser && supportOwnedCount
+      ? supportOwnedCount.count ?? 0
+      : projects.filter((project) => project.role === "owner").length;
   const resolution = resolveEffectiveAuthorProjectLimit(limitFields);
   const canCreate = canCreateOwnedAuthorProject(
     ownedCount,
@@ -206,11 +228,15 @@ export async function createAuthorProjectViaRpc(
   supabase: SupabaseClient,
   input: CreateAuthorProjectInput,
 ): Promise<CreateAuthorProjectResult> {
-  const { data, error } = await supabase.rpc("create_author_project", {
-    p_name: input.name,
-    p_slug: input.slug?.trim() || null,
-    p_short_description: input.shortDescription?.trim() || null,
-  });
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "create_author_project",
+    {
+      p_name: input.name,
+      p_slug: input.slug?.trim() || null,
+      p_short_description: input.shortDescription?.trim() || null,
+    },
+  );
 
   if (error) {
     const message = error.message ?? "";
