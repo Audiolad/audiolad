@@ -1,0 +1,128 @@
+name: "AI Company — Task Packet"
+description: "Структурированная задача для Orchestrator и агентов Аудиолада"
+title: "[AI] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Заполняйте задачу как Result Contract. Задача без понятной цели, результата и внутреннего клиента не готова к работе.
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options: [Idea, Research, Ready, In Progress, Review, Human Gate, Ready to Release, Production, Measuring, Done]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [P0, P1, P2, P3]
+    validations:
+      required: true
+
+  - type: input
+    id: strategic-goal
+    attributes:
+      label: Strategic Goal
+      placeholder: "Какой общей цели служит эта задача?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: "Почему задача появилась и почему важна сейчас?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: ideal-outcome
+    attributes:
+      label: Ideal Outcome Scene
+      description: "Простым человеческим языком: что произойдёт в реальной жизни, если всё сделаем правильно?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-output
+    attributes:
+      label: Expected Output
+      description: "Конкретный конечный результат этой работы."
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverable-format
+    attributes:
+      label: Deliverable Format
+      description: "В каком виде результат должен быть передан?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: producer
+    attributes:
+      label: Producer
+      options: [Orchestrator, Research, Product, UX, Engineering, QA, "Marketing & Sales", Analytics]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result-consumer
+    attributes:
+      label: Result Consumer
+      options: [Orchestrator, Research, Product, UX, Engineering, QA, "Marketing & Sales", Analytics, Сергей, Орий]
+    validations:
+      required: true
+
+  - type: textarea
+    id: consumer-need
+    attributes:
+      label: Consumer Need
+      description: "Что следующий Consumer должен суметь сделать благодаря этому результату?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: "Проверяемые признаки готовности."
+    validations:
+      required: true
+
+  - type: textarea
+    id: market-reference
+    attributes:
+      label: Market / Reference Check
+      description: "Кто уже решал задачу? BUY / INTEGRATE / BENCHMARK & BUILD / BUILD."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: human-gate
+    attributes:
+      label: Human Gate
+      options: [None, Sergey, Oriy]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: blocked
+    attributes:
+      label: Blocked
+      options: ["No", "Yes"]
+    validations:
+      required: true
+
+  - type: textarea
+    id: next-action
+    attributes:
+      label: Next Action
+      description: "Конкретный следующий шаг после получения результата."
+    validations:
+      required: true
