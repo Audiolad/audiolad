@@ -70,14 +70,14 @@ test("editor cannot open Ваши 20%", () => {
   );
 });
 
-test("support mode cannot open Ваши 20%", () => {
+test("platform-owner support mode mirrors owner access to Ваши 20%", () => {
   assert.equal(
     canAccessAuthorPartnerYour20Ui({
       authorSlug: "anna-meditation",
       role: "owner",
       isSupportMode: true,
     }),
-    false,
+    true,
   );
   assert.equal(
     evaluatePartnerYour20Access({
@@ -85,7 +85,7 @@ test("support mode cannot open Ваши 20%", () => {
       role: "owner",
       isSupportMode: true,
     }),
-    "support_mode_blocked",
+    "allowed",
   );
 });
 

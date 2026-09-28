@@ -7,6 +7,7 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/author-products/auth";
 import { hasPermission } from "@/lib/auth/platform-access";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import {
   PRODUCT_SEO_AI_ERROR_MESSAGE,
   productSeoAiError,
@@ -75,6 +76,12 @@ export async function POST(request: Request) {
         { status: productSeoAiHttpStatus(result.error.code) },
       );
     }
+
+    await recordAuthorSupportAudit({
+      action: "author_seo_tool_used",
+      resourceType: "author_seo",
+      metadata: { tool: "product_autofill" },
+    });
 
     return NextResponse.json({
       seoSecondaryQueries: result.data.seoSecondaryQueries,
