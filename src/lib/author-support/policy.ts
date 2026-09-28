@@ -132,25 +132,10 @@ export function isAuthorSupportBlockedMutation(input: {
   method?: string;
 }): boolean {
   const path = input.pathname.split("?")[0] ?? input.pathname;
-  if (isAuthorSupportSensitivePath(path)) {
-    return true;
-  }
-
-  const method = (input.method ?? "GET").toUpperCase();
-  const mutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-  if (!mutating) {
-    return false;
-  }
-
-  if (isBlockedAuthorSupportStudioMutation(path)) {
-    return true;
-  }
-
-  if (isAuthorSupportAllowedMutationPath(path)) {
-    return false;
-  }
-
-  return path.startsWith("/api/author/") || path.startsWith("/api/studio/");
+  // Platform-owner support mode is a full operational override. Route-level
+  // authorization still binds every author/studio operation to actingAuthorId.
+  // Password-reset flows remain outside impersonation/support semantics.
+  return isAuthorSupportSensitivePath(path);
 }
 
 export function evaluateAuthorSupportSqlAuthority(input: {
