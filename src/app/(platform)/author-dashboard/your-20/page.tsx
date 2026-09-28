@@ -18,7 +18,10 @@ import {
   PARTNER_REWARD_LOAD_ERROR,
 } from "@/lib/author-partner/rewards";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
-import { callAuthorUserRpc } from "@/lib/author-support/context";
+import {
+  callAuthorUserRpc,
+  peekAuthorExecutionContext,
+} from "@/lib/author-support/context";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -58,6 +61,8 @@ export default async function AuthorYour20Page({
     redirect("/auth/sign-in?next=/author-dashboard/your-20");
   }
 
+  const execution = await peekAuthorExecutionContext();
+  const supportMode = execution?.isSupportMode === true;
   const authors = await listAuthorWorkspacesForUser(user.id);
   if (authors.length === 0) {
     return <NoAuthorAccess />;
@@ -67,7 +72,9 @@ export default async function AuthorYour20Page({
   const slugParam = Array.isArray(params.author)
     ? params.author[0]
     : params.author;
-  const selected = selectOwnedAuthorWorkspace(authors, slugParam);
+  const selected = supportMode
+    ? authors.find((author) => author.slug === slugParam) ?? authors[0] ?? null
+    : selectOwnedAuthorWorkspace(authors, slugParam);
   if (!selected) {
     return <NoAuthorAccess />;
   }
@@ -76,7 +83,7 @@ export default async function AuthorYour20Page({
     !canAccessAuthorPartnerYour20Ui({
       authorSlug: selected.slug,
       role: selected.role,
-      isSupportMode: false,
+      isSupportMode: supportMode,
     })
   ) {
     const q = selected.slug
