@@ -136,11 +136,18 @@ export async function getAuthorRpcClient(
   return createClient();
 }
 
+export type AuthorUserRpcError = {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
+
 export async function callAuthorUserRpc<T = unknown>(
   fallback: SupabaseClient,
   fn: AuthorSupportRpcName,
   args: Record<string, unknown>,
-): Promise<{ data: T | null; error: { message: string } | null }> {
+): Promise<{ data: T | null; error: AuthorUserRpcError | null }> {
   const execution = await peekAuthorExecutionContext();
   if (!execution?.isSupportMode) {
     return fallback.rpc(fn, args);
