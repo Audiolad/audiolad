@@ -10,24 +10,19 @@ import type {
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { serializeCatalogTopicParam } from "@/lib/catalog/topic-filter";
 import { readMaxInitData } from "@/lib/max/bridge";
+import {
+  readMaxCatalogProducts,
+  type MaxCatalogProduct,
+} from "@/lib/max/catalog-product";
 import { MAX_CATALOG_PATH } from "@/lib/max/host";
+import MaxCatalogProductCard from "@/components/max/MaxCatalogProductCard";
 import MaxCatalogSections from "@/components/max/MaxCatalogSections";
 import MaxCatalogTopicsSheet from "@/components/max/MaxCatalogTopicsSheet";
 
 /** Matches ordinary catalog URL debounce without importing catalog routing. */
 const MAX_CATALOG_SEARCH_DEBOUNCE_MS = 300;
 
-export type MaxCatalogProduct = {
-  authorSlug: string;
-  slug: string;
-  title: string;
-  subtitle: string | null;
-  coverUrl: string | null;
-  authorName: string | null;
-  formatLabel: string;
-  priceLabel: string;
-  isFree: boolean;
-};
+export type { MaxCatalogProduct };
 
 type DefaultCatalogState =
   | { status: "loading" }
@@ -68,8 +63,12 @@ type FilterListingState =
 type SearchStatus = "idle" | "searching" | "ready" | "error";
 
 export type MaxCatalogTopicNavigationRequest = {
-  key: string;
   requestId: number;
+  /** Topic key from an in-app recommendation. Omit to leave topics unchanged until other fields apply. */
+  key?: string;
+  section?: PublicCatalogSection | null;
+  access?: CatalogAccessFilter;
+  publicationClass?: CatalogClassFilter;
 };
 
 type MaxCatalogSearchProps = {
@@ -109,50 +108,6 @@ function ClearIcon() {
       <path d="M6 6l12 12M18 6 6 18" />
     </svg>
   );
-}
-
-function readCatalogPayload(payload: unknown): MaxCatalogProduct[] | null {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return null;
-  }
-
-  const items = (payload as { items?: unknown }).items;
-  if (!Array.isArray(items)) {
-    return null;
-  }
-
-  return items.flatMap((item) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) {
-      return [];
-    }
-
-    const product = item as Partial<MaxCatalogProduct>;
-    if (
-      typeof product.slug !== "string" ||
-      typeof product.authorSlug !== "string" ||
-      typeof product.title !== "string" ||
-      typeof product.formatLabel !== "string" ||
-      typeof product.priceLabel !== "string" ||
-      typeof product.isFree !== "boolean"
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        authorSlug: product.authorSlug,
-        slug: product.slug,
-        title: product.title,
-        subtitle: typeof product.subtitle === "string" ? product.subtitle : null,
-        coverUrl: typeof product.coverUrl === "string" ? product.coverUrl : null,
-        authorName:
-          typeof product.authorName === "string" ? product.authorName : null,
-        formatLabel: product.formatLabel,
-        priceLabel: product.priceLabel,
-        isFree: product.isFree,
-      },
-    ];
-  });
 }
 
 function hasActiveCatalogFilters(
@@ -290,7 +245,7 @@ export default function MaxCatalogSearch({
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        const items = response.ok ? readCatalogPayload(payload) : null;
+        const items = response.ok ? readMaxCatalogProducts(payload) : null;
         if (!items) {
           setSearchStatus("error");
           return;
@@ -522,7 +477,7 @@ export default function MaxCatalogSearch({
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        const items = response.ok ? readCatalogPayload(payload) : null;
+        const items = response.ok ? readMaxCatalogProducts(payload) : null;
         setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -574,7 +529,7 @@ export default function MaxCatalogSearch({
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        const items = response.ok ? readCatalogPayload(payload) : null;
+        const items = response.ok ? readMaxCatalogProducts(payload) : null;
         if (!items) {
           setSectionListing({ status: "error", section });
           return;
@@ -654,7 +609,7 @@ export default function MaxCatalogSearch({
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        const items = response.ok ? readCatalogPayload(payload) : null;
+        const items = response.ok ? readMaxCatalogProducts(payload) : null;
         if (!items) {
           setFilterListing({
             status: "error",
@@ -740,17 +695,33 @@ export default function MaxCatalogSearch({
   }
 
   useEffect(() => {
-    const topicKey = topicNavigationRequest?.key.trim();
-    if (!topicKey) return;
+    if (!topicNavigationRequest) return;
+    const request = topicNavigationRequest;
+    const topicKey = request.key?.trim() ?? "";
+    const extendsFilters =
+      request.section !== undefined ||
+      request.access !== undefined ||
+      request.publicationClass !== undefined;
+    if (!topicKey && !extendsFilters) return;
 
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
       setSearchInput("");
       searchInputRef.current = "";
-      setActiveSection(null);
-      activeSectionRef.current = null;
-      applyFilters([topicKey], "all", "all");
+      if (!extendsFilters) {
+        setActiveSection(null);
+        activeSectionRef.current = null;
+        applyFilters([topicKey], "all", "all");
+        return;
+      }
+
+      const section = request.section ?? null;
+      const access = request.access ?? "all";
+      const publicationClass = request.publicationClass ?? "all";
+      activeSectionRef.current = section;
+      setActiveSection(section);
+      applyFilters(topicKey ? [topicKey] : [], access, publicationClass);
     });
 
     return () => {
@@ -798,7 +769,7 @@ export default function MaxCatalogSearch({
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
           return;
         }
-        const items = response.ok ? readCatalogPayload(payload) : null;
+        const items = response.ok ? readMaxCatalogProducts(payload) : null;
         setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
       } catch {
         if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -1063,37 +1034,7 @@ function CatalogGrid({
     <ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">
       {items.map((product) => (
         <li key={`${product.authorSlug}/${product.slug}`} className="min-w-0">
-          <button
-            type="button"
-            onClick={() => onSelectProduct(product)}
-            className="flex w-full min-w-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-white text-left shadow-[0_6px_16px_rgba(91,62,145,0.06)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            <div className="aspect-square w-full bg-[#ede6f8]">
-              {product.coverUrl ? (
-                <img
-                  src={product.coverUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : null}
-            </div>
-            <div className="px-2.5 pb-2.5 pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-                {product.formatLabel}
-              </p>
-              <p className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c]">
-                {product.title}
-              </p>
-              <p className="mt-1 line-clamp-1 min-h-5 text-sm text-[#7d70a2]">
-                {product.authorName || "\u00a0"}
-              </p>
-              {!product.isFree ? (
-                <p className="mt-1 whitespace-nowrap text-xs font-semibold leading-4 text-[#7042c5]">
-                  {product.priceLabel}
-                </p>
-              ) : null}
-            </div>
-          </button>
+          <MaxCatalogProductCard product={product} onSelectProduct={onSelectProduct} />
         </li>
       ))}
     </ul>

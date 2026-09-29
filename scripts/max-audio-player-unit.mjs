@@ -274,6 +274,11 @@ assert.ok(
 assert.match(detailView, /!product\.isFree/);
 assert.match(home, /PLAY_ACTION_LABEL/);
 const catalogSearch = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
-assert.match(catalogSearch, /!product\.isFree/);
+const catalogCard = readFileSync(
+  join(process.cwd(), "src/components/max/MaxCatalogProductCard.tsx"),
+  "utf8",
+);
+assert.match(catalogSearch, /MaxCatalogProductCard/);
+assert.match(catalogCard, /!product\.isFree/);
 
 console.log("max-audio-player-unit: ok");

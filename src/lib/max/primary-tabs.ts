@@ -13,7 +13,7 @@ export type MaxPrimaryTabItem = {
   label: string;
 };
 
-/** Top-level tabs in display order. Catalog is the initial screen. */
+/** Top-level tabs in display order. Home is the initial screen. */
 export const MAX_PRIMARY_TABS: readonly MaxPrimaryTabItem[] = [
   { id: "home", label: "Главная" },
   { id: "catalog", label: "Каталог" },
@@ -22,7 +22,24 @@ export const MAX_PRIMARY_TABS: readonly MaxPrimaryTabItem[] = [
   { id: "profile", label: "Профиль" },
 ];
 
-export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "catalog";
+export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "home";
+
+/**
+ * Ordinary open starts on Home. Product and promo deeplinks, including a
+ * location promo target, still open in the catalog context.
+ */
+export function resolveInitialMaxPrimaryTab(
+  startTarget: { kind?: string | null } | null | undefined,
+  hasLocationPromo: boolean,
+): MaxPrimaryTab {
+  if (startTarget?.kind === "product" || startTarget?.kind === "promo") {
+    return "catalog";
+  }
+  if (hasLocationPromo) {
+    return "catalog";
+  }
+  return MAX_INITIAL_PRIMARY_TAB;
+}
 
 /** Icon row height. Same 68px as the ordinary mobile tab bar, without its routes. */
 export const MAX_TAB_BAR_HEIGHT_PX = 68;

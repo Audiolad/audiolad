@@ -33,8 +33,10 @@ assert.deepEqual(
   tabItems.map((item) => item[2]),
   ["Главная", "Каталог", "Аудиотека", "Плейлисты", "Профиль"],
 );
-assert.match(tabs, /export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "catalog"/);
-assert.match(home, /useState<MaxPrimaryTab>\(MAX_INITIAL_PRIMARY_TAB\)/);
+assert.match(tabs, /export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "home"/);
+assert.match(tabs, /return MAX_INITIAL_PRIMARY_TAB/);
+assert.match(home, /resolveInitialMaxPrimaryTab\(/);
+assert.match(home, /useState<MaxPrimaryTab>\(\(\) =>/);
 assert.match(nav, /MAX_PRIMARY_TABS\.map/);
 assert.match(nav, /aria-current=\{active \? "page" : undefined\}/);
 assert.match(nav, /type="button"/);

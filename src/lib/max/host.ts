@@ -21,6 +21,12 @@ export const MAX_SESSION_UNLINK_PATH = "/api/max/session/unlink";
 /** HMAC-verify linked MAX identity, then return the read-only MAX catalog. */
 export const MAX_CATALOG_PATH = "/api/max/catalog";
 
+/**
+ * HMAC-verify raw initData, then return guest-visible Home shelves.
+ * A linked AudioLad account is not required.
+ */
+export const MAX_HOME_PATH = "/api/max/home";
+
 /** HMAC-verify linked MAX identity, then return catalog topics with products. */
 export const MAX_CATALOG_TOPICS_PATH = "/api/max/catalog/topics";
 export const MAX_PRODUCT_PATH = "/api/max/product";
@@ -67,6 +73,10 @@ export function isMaxSessionUnlinkPath(pathname: string): boolean {
 
 export function isMaxCatalogPath(pathname: string): boolean {
   return pathname === MAX_CATALOG_PATH;
+}
+
+export function isMaxHomePath(pathname: string): boolean {
+  return pathname === MAX_HOME_PATH;
 }
 
 export function isMaxCatalogTopicsPath(pathname: string): boolean {
