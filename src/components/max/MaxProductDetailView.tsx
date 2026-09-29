@@ -31,6 +31,7 @@ type MaxProductDetailViewProps = {
   listenSlot: ReactNode;
   onOpenRecommendation: (product: MaxCatalogProduct) => void;
   onOpenTopic: (topicKey: string) => void;
+  interactiveActionsEnabled?: boolean;
 };
 
 function toHeroCover(slug: string, title: string, coverUrl: string | null): PracticePageCoverData {
@@ -56,6 +57,7 @@ export default function MaxProductDetailView({
   listenSlot,
   onOpenRecommendation,
   onOpenTopic,
+  interactiveActionsEnabled = true,
 }: MaxProductDetailViewProps) {
   const slides: CatalogSlide[] = product.gallery.map((slide, index) => ({
     id: slide.id,
@@ -103,20 +105,24 @@ export default function MaxProductDetailView({
         </FeaturedProductCard>
       </section>
 
-      <MaxProductRating
-        key={`${authorSlug}/${productSlug}`}
-        authorSlug={authorSlug}
-        productSlug={productSlug}
-        enabled={product.rating.enabled}
-        initialAggregate={product.rating.aggregate}
-      />
+      {interactiveActionsEnabled ? (
+        <>
+          <MaxProductRating
+            key={`${authorSlug}/${productSlug}`}
+            authorSlug={authorSlug}
+            productSlug={productSlug}
+            enabled={product.rating.enabled}
+            initialAggregate={product.rating.aggregate}
+          />
 
-      {product.appreciation ? (
-        <MaxAuthorAppreciation
-          authorName={product.appreciation.authorName}
-          authorSlug={authorSlug}
-          productSlug={productSlug}
-        />
+          {product.appreciation ? (
+            <MaxAuthorAppreciation
+              authorName={product.appreciation.authorName}
+              authorSlug={authorSlug}
+              productSlug={productSlug}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {product.topics.length ? (

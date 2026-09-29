@@ -204,6 +204,10 @@ export default function MaxBridgeScript() {
   }, [applyEvent]);
 
   const view = viewMaxShell(shell);
+  const showGuestStartProduct =
+    view.phase === "guest_unlinked" && startTarget?.kind === "product";
+  const showProductShell =
+    view.phase === "linked_authenticated" || showGuestStartProduct;
 
   return (
     <>
@@ -219,8 +223,12 @@ export default function MaxBridgeScript() {
         data-max-platform={snapshot.platform ?? ""}
         data-max-version={snapshot.version ?? ""}
       />
-      {view.phase === "linked_authenticated" ? (
-        <MaxAuthenticatedHome initialStartTarget={startTarget} />
+      {showProductShell ? (
+        <MaxAuthenticatedHome
+          initialStartTarget={startTarget}
+          guestMode={showGuestStartProduct}
+          onRequestLogin={handleOpenLogin}
+        />
       ) : (
         <section className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
           <AudioladHorizontalLogo
