@@ -81,6 +81,10 @@ const home = readFileSync(
   join(process.cwd(), "src/components/max/MaxAuthenticatedHome.tsx"),
   "utf8",
 );
+const authorProductForm = readFileSync(
+  join(process.cwd(), "src/components/author-dashboard/AuthorProductForm.tsx"),
+  "utf8",
+);
 
 assert.ok(
   verifyRoute.indexOf("verifyMaxInitData(initData, botToken)") <
@@ -98,6 +102,15 @@ assert.match(bridge, /initialStartTarget=\{startTarget\}/);
 assert.match(home, /initialStartTarget\?\.kind === "promo"/);
 assert.match(home, /initialStartTarget\?\.kind === "product"/);
 assert.match(home, /productSlug: initialStartTarget\.productSlug/);
+assert.match(authorProductForm, /Адрес продукта в MAX/);
+assert.match(authorProductForm, /buildMaxProductDeepLink\(practiceId\)/);
+assert.match(authorProductForm, /handleCopyMaxProductLink/);
+assert.match(authorProductForm, /copyTextToClipboard\(maxProductDeepLink\)/);
+assert.match(
+  authorProductForm,
+  /Открывает этот продукт внутри мини-приложения АудиоЛад в MAX/,
+);
+
 assert.doesNotMatch(
   `${verifyRoute}\n${resolver}`,
   /initDataUnsafe/,

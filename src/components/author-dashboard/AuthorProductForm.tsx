@@ -209,6 +209,8 @@ import {
   type MusicQueueSnapshot,
 } from "@/lib/author-products/music-track-upload-queue";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
+import { buildMaxProductDeepLink } from "@/lib/max/startapp";
+import { copyTextToClipboard } from "@/lib/playlists/public-url";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import {
   AUTHOR_PRODUCT_FREE_PRICE_LABEL,
@@ -923,6 +925,7 @@ export default function AuthorProductForm({
     useState(initialProduct?.deleteLockedAfterPaidPurchase === true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [maxLinkCopied, setMaxLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [courseContentSnapshot, setCourseContentSnapshot] =
     useState<CoursePublishContentSnapshot>({ lessonCount: 0, blockCount: 0 });
@@ -1328,6 +1331,17 @@ export default function AuthorProductForm({
     form.slug && selectedAuthor?.slug
       ? buildPracticePublishPreviewPath(selectedAuthor.slug, form.slug)
       : "";
+  const maxProductDeepLink = practiceId
+    ? buildMaxProductDeepLink(practiceId) ?? ""
+    : "";
+
+  async function handleCopyMaxProductLink() {
+    if (!maxProductDeepLink) return;
+    const copied = await copyTextToClipboard(maxProductDeepLink);
+    if (!copied) return;
+    setMaxLinkCopied(true);
+    window.setTimeout(() => setMaxLinkCopied(false), 1800);
+  }
   async function getPracticeIdForCoverUpload(): Promise<string | null> {
     const existingPracticeId = practiceIdRef.current || practiceId;
 
@@ -4378,6 +4392,29 @@ export default function AuthorProductForm({
           )}
           {publicPath ? (
             <p className="mt-2 text-xs text-[#7d70a2]">Публичный адрес: {publicPath}</p>
+          ) : null}
+          {maxProductDeepLink ? (
+            <div className="mt-3">
+              <span className="mb-1 block text-xs text-[#7d70a2]">
+                Адрес продукта в MAX
+              </span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <p className="min-w-0 flex-1 break-all rounded-[14px] border border-[#e4d7f4] bg-[#fbf8ff] px-3 py-2 text-xs text-[#5f5484]">
+                  {maxProductDeepLink}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyMaxProductLink()}
+                  className="shrink-0 rounded-full border border-[#c6afe6] px-4 py-2 text-xs font-semibold text-[#7042c5]"
+                >
+                  {maxLinkCopied ? "Скопировано" : "Скопировать"}
+                </button>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-[#7d70a2]">
+                Открывает этот продукт внутри мини-приложения АудиоЛад в MAX.
+                {!isPublished ? " Для слушателя ссылка заработает после публикации продукта." : ""}
+              </p>
+            </div>
           ) : null}
         </div>
 
