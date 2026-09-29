@@ -7,7 +7,17 @@ export type PlatformOwnerSession = {
   email: string | null;
 };
 
-export async function requirePlatformOwnerAccess(): Promise<PlatformOwnerSession> {
+function getSafeAdminReturnPath(nextPath: string): string {
+  if (!nextPath.startsWith("/admin") || nextPath.startsWith("//")) {
+    return "/admin";
+  }
+
+  return nextPath;
+}
+
+export async function requirePlatformOwnerAccess(
+  nextPath = "/admin/users",
+): Promise<PlatformOwnerSession> {
   const supabase = await createClient();
 
   const {
@@ -15,7 +25,8 @@ export async function requirePlatformOwnerAccess(): Promise<PlatformOwnerSession
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/auth/sign-in?next=/admin/users");
+    const safeNextPath = getSafeAdminReturnPath(nextPath);
+    redirect(`/auth/sign-in?next=${encodeURIComponent(safeNextPath)}`);
   }
 
   const owner = await isPlatformOwner(supabase, user.id);
