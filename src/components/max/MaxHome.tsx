@@ -3,10 +3,15 @@
 import { useEffect, useState } from "react";
 
 import MaxCatalogProductCard from "@/components/max/MaxCatalogProductCard";
+import MaxGuestHomeSlider from "@/components/max/MaxGuestHomeSlider";
 import {
   PUBLIC_CATALOG_SECTION_CARDS,
   type PublicCatalogSection,
 } from "@/lib/catalog/catalog-sections";
+import {
+  GUEST_HOME_INTRO,
+  GUEST_HOME_LISTEN_FREE_CTA,
+} from "@/lib/home/guest-slider";
 import { readMaxInitData } from "@/lib/max/bridge";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import {
@@ -26,10 +31,12 @@ import { MAX_HOME_PATH } from "@/lib/max/host";
 type MaxHomeStatus = "loading" | "ready" | "error";
 
 type MaxHomeScreenProps = {
+  guestMode: boolean;
   status: MaxHomeStatus;
   shelves: MaxHomeShelves | null;
   onOpenCatalog: () => void;
   onListenFree: () => void;
+  onSlideAction: (slideId: string) => void;
   onOpenSection: (section: PublicCatalogSection) => void;
   onOpenShelf: (shelfId: MaxHomeShelfId) => void;
   onSelectProduct: (product: MaxCatalogProduct) => void;
@@ -42,10 +49,12 @@ const EMPTY_SHELVES: MaxHomeShelves = {
 };
 
 export function MaxHomeScreen({
+  guestMode,
   status,
   shelves,
   onOpenCatalog,
   onListenFree,
+  onSlideAction,
   onOpenSection,
   onOpenShelf,
   onSelectProduct,
@@ -53,27 +62,53 @@ export function MaxHomeScreen({
   const readyShelves = shelves ?? EMPTY_SHELVES;
 
   return (
-    <div data-max-home>
-      <h1 className="mt-5 text-[26px] font-semibold leading-tight text-[#25135c]">
-        {MAX_HOME_TITLE}
-      </h1>
-      <p className="mt-2 text-[17px] leading-6 text-[#4a3d73]">{MAX_HOME_SUBTITLE}</p>
-      <div className="mt-5 flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={onOpenCatalog}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          {MAX_HOME_OPEN_CATALOG_LABEL}
-        </button>
-        <button
-          type="button"
-          onClick={onListenFree}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          {MAX_HOME_LISTEN_FREE_LABEL}
-        </button>
-      </div>
+    <div data-max-home data-max-home-guest={guestMode ? "true" : "false"}>
+      {guestMode ? (
+        <section className="mt-3">
+          <h1
+            data-max-guest-home-intro
+            className="text-[15px] font-medium leading-snug text-[#25135c] sm:text-base"
+          >
+            {GUEST_HOME_INTRO}
+          </h1>
+          <div className="mt-3">
+            <MaxGuestHomeSlider onSlideAction={onSlideAction} />
+          </div>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              data-max-guest-home-cta
+              onClick={onListenFree}
+              className="home-primary-cta home-primary-cta--compact"
+            >
+              {GUEST_HOME_LISTEN_FREE_CTA.label}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <>
+          <h1 className="mt-5 text-[26px] font-semibold leading-tight text-[#25135c]">
+            {MAX_HOME_TITLE}
+          </h1>
+          <p className="mt-2 text-[17px] leading-6 text-[#4a3d73]">{MAX_HOME_SUBTITLE}</p>
+          <div className="mt-5 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={onOpenCatalog}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              {MAX_HOME_OPEN_CATALOG_LABEL}
+            </button>
+            <button
+              type="button"
+              onClick={onListenFree}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              {MAX_HOME_LISTEN_FREE_LABEL}
+            </button>
+          </div>
+        </>
+      )}
 
       <nav aria-label="Разделы каталога" data-max-home-sections className="mt-6">
         <div className="grid grid-cols-4 gap-1">
@@ -142,8 +177,10 @@ export function MaxHomeScreen({
 }
 
 export default function MaxHome({
+  guestMode,
   onOpenCatalog,
   onListenFree,
+  onSlideAction,
   onOpenSection,
   onOpenShelf,
   onSelectProduct,
@@ -193,10 +230,12 @@ export default function MaxHome({
 
   return (
     <MaxHomeScreen
+      guestMode={guestMode}
       status={status}
       shelves={shelves}
       onOpenCatalog={onOpenCatalog}
       onListenFree={onListenFree}
+      onSlideAction={onSlideAction}
       onOpenSection={onOpenSection}
       onOpenShelf={onOpenShelf}
       onSelectProduct={onSelectProduct}

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
-import type { CatalogAccessFilter } from "@/lib/catalog/listing-contract";
+import type {
+  CatalogAccessFilter,
+  CatalogClassFilter,
+} from "@/lib/catalog/listing-contract";
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import {
   FEATURED_CARD_ACTIONS_CLASS,
@@ -34,6 +37,10 @@ import {
   type MaxPromoTarget,
 } from "@/lib/max/promo-target";
 import { readMaxProductDetail, type MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
+import {
+  openMaxGuestHomeExternalSlide,
+  resolveMaxGuestHomeSlideAction,
+} from "@/lib/max/guest-home-slider";
 import { MAX_HOME_SHELVES, type MaxHomeShelfId } from "@/lib/max/home";
 import {
   MAX_PRIMARY_TABS,
@@ -224,6 +231,7 @@ export default function MaxAuthenticatedHome({
   function openCatalogFromHome(target: {
     section: PublicCatalogSection | null;
     access: CatalogAccessFilter;
+    publicationClass?: CatalogClassFilter;
   }) {
     closeProductDetail();
     if (promoTarget) {
@@ -234,7 +242,7 @@ export default function MaxAuthenticatedHome({
       requestId: (current?.requestId ?? 0) + 1,
       section: target.section,
       access: target.access,
-      publicationClass: "all",
+      publicationClass: target.publicationClass ?? "all",
     }));
   }
 
@@ -328,6 +336,28 @@ export default function MaxAuthenticatedHome({
     return () => controller.abort();
   }, [detail.status, selected]);
 
+  function applyGuestHomeSlide(slideId: string) {
+    const action = resolveMaxGuestHomeSlideAction(slideId);
+    if (!action) return;
+    if (action.type === "external") {
+      openMaxGuestHomeExternalSlide(action.url);
+      return;
+    }
+    if (action.type === "signup") {
+      onRequestSignup?.();
+      return;
+    }
+    if (action.type === "playlists") {
+      selectMaxTab("playlists");
+      return;
+    }
+    openCatalogFromHome({
+      section: action.section,
+      access: action.access,
+      publicationClass: action.publicationClass,
+    });
+  }
+
   function selectMaxTab(next: MaxPrimaryTab) {
     if (promoTarget) {
       closePromoLanding();
@@ -378,8 +408,10 @@ export default function MaxAuthenticatedHome({
       {activeTab === "home" ? (
         <div className="mx-auto max-w-lg">
           <MaxHome
+            guestMode={guestMode}
             onOpenCatalog={() => openCatalogFromHome({ section: null, access: "all" })}
             onListenFree={() => openCatalogFromHome({ section: null, access: "free" })}
+            onSlideAction={applyGuestHomeSlide}
             onOpenSection={(section) => openCatalogFromHome({ section, access: "all" })}
             onOpenShelf={(shelfId) => openCatalogFromHome(homeShelfTarget(shelfId))}
             onSelectProduct={openHomeProduct}

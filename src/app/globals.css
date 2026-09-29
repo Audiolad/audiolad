@@ -562,6 +562,25 @@ html.catalog-sheet-lock body {
   }
 }
 
+/* Fill the MAX column (max-w-lg) so the square banner has no side gap. */
+.guest-home-slider.guest-home-slider--max {
+  max-width: none;
+}
+
+button.guest-home-slider__link {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .guest-home-slider__track {
   display: flex;
   margin: 0;
