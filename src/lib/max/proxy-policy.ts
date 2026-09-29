@@ -11,6 +11,7 @@ import {
   isMaxAppreciationPath,
   isMaxHostname,
   isMaxSessionLinkPath,
+  isMaxSessionUnlinkPath,
   isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_SITE_PATH,
@@ -68,6 +69,7 @@ export function resolveMaxProxyAction(
     isMaxHostname(hostname) &&
     (isMaxSessionVerifyPath(pathname) ||
       isMaxSessionLinkPath(pathname) ||
+      isMaxSessionUnlinkPath(pathname) ||
       isMaxCatalogPath(pathname) ||
       isMaxCatalogTopicsPath(pathname) ||
       isMaxProductPath(pathname) ||

@@ -21,6 +21,7 @@ import {
   isMaxAppreciationPath,
   isMaxHostname,
   isMaxSessionLinkPath,
+  isMaxSessionUnlinkPath,
   isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_HOSTNAME,
@@ -35,6 +36,7 @@ import {
   MAX_RATING_PATH,
   MAX_APPRECIATION_PATH,
   MAX_SESSION_LINK_PATH,
+  MAX_SESSION_UNLINK_PATH,
   MAX_SESSION_VERIFY_PATH,
   MAX_SITE_PATH,
 } from "../src/lib/max/host.ts";
@@ -96,6 +98,10 @@ assert.equal(isMaxSessionVerifyPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath(MAX_SESSION_LINK_PATH), true);
 assert.equal(isMaxSessionLinkPath(`${MAX_SESSION_LINK_PATH}/`), false);
 assert.equal(isMaxSessionLinkPath("/api/max"), false);
+assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_UNLINK_PATH), true);
+assert.equal(isMaxSessionUnlinkPath(`${MAX_SESSION_UNLINK_PATH}/`), false);
+assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_LINK_PATH), false);
+assert.equal(isMaxSessionUnlinkPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath("/api/foo"), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
 assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
@@ -132,6 +138,7 @@ assertMaxAction(MAX_HOSTNAME, "/sw.js", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_SESSION_UNLINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_TOPICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
@@ -144,6 +151,7 @@ assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_AUDIO_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_PREVIEW_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_UNLINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_TOPICS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/catalog/topics/extra", "not_found");
@@ -201,6 +209,7 @@ assertMaxAction("www.audiolad.ru", "/", "pass_through");
 assertMaxAction(SCHOOL_HOSTNAME, "/", "pass_through");
 assertMaxAction("audiolad.ru", MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction("audiolad.ru", MAX_SESSION_LINK_PATH, "pass_through");
+assertMaxAction("audiolad.ru", MAX_SESSION_UNLINK_PATH, "pass_through");
 assertMaxAction("audiolad.ru", MAX_CATALOG_PATH, "pass_through");
 
 // School policy still owns school host isolation.
@@ -285,6 +294,7 @@ const maxClientSources = [
   "src/components/max/MaxCatalogSearch.tsx",
   "src/components/max/MaxBottomNav.tsx",
   "src/components/max/MaxTabPlaceholder.tsx",
+  "src/components/max/MaxProfile.tsx",
   "src/lib/max/primary-tabs.ts",
   "src/components/max/MaxAudioPlayer.tsx",
   "src/components/max/useMaxAudioPlayback.ts",
@@ -391,6 +401,7 @@ assert.match(
 );
 assert.match(policySource, /isMaxSessionVerifyPath/);
 assert.match(policySource, /isMaxSessionLinkPath/);
+assert.match(policySource, /isMaxSessionUnlinkPath/);
 assert.doesNotMatch(
   policySource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /pathname\.startsWith\(|\/api\/max\/\*/,

@@ -17,6 +17,7 @@ import {
   loginAndLinkMaxSession,
   signOutMaxSession,
   signUpAndLinkMaxSession,
+  unlinkMaxSession,
   verifyMaxSession,
 } from "@/lib/max/session-shell-client";
 import {
@@ -203,6 +204,26 @@ export default function MaxBridgeScript() {
     })();
   }, [applyEvent]);
 
+  const handleUnlink = useCallback(async () => {
+    const generation = ++actionGeneration.current;
+    applyEvent({ type: "UNLINK_START" });
+    const event = await unlinkMaxSession();
+    if (generation !== actionGeneration.current) {
+      return false;
+    }
+    if (event.type === "UNLINK_SUCCESS") {
+      setStartTarget(null);
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPassword("");
+      setLegalConsent(false);
+      setMarketingConsent(false);
+    }
+    applyEvent(event);
+    return event.type === "UNLINK_SUCCESS";
+  }, [applyEvent]);
+
   const view = viewMaxShell(shell);
   const showGuestStartProduct =
     view.phase === "guest_unlinked" && startTarget?.kind === "product";
@@ -228,6 +249,8 @@ export default function MaxBridgeScript() {
           initialStartTarget={startTarget}
           guestMode={showGuestStartProduct}
           onRequestLogin={handleOpenLogin}
+          onUnlinkAccount={handleUnlink}
+          unlinking={shell.submitting && shell.phase === "linked_authenticated"}
         />
       ) : (
         <section className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">

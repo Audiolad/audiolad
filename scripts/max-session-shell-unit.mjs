@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { SIGN_IN_GENERIC_ERROR } from "../src/lib/auth/sign-in-messages.ts";
 import {
   MAX_SESSION_LINK_PATH,
+  MAX_SESSION_UNLINK_PATH,
   MAX_SESSION_VERIFY_PATH,
 } from "../src/lib/max/host.ts";
 import {
@@ -40,6 +41,7 @@ import {
   loginAndLinkMaxSession,
   mapLinkResponseToEvent,
   signUpAndLinkMaxSession,
+  unlinkMaxSession,
   verifyMaxSession,
 } from "../src/lib/max/session-shell-client.ts";
 import {
@@ -219,6 +221,35 @@ function testStateMachineCopy() {
   );
   assert.equal(afterLoginLink.phase, "linked_authenticated");
   assert.equal(viewMaxShell(afterLoginLink).showLoginForm, false);
+
+  const webSignOutKeepsMaxLink = reduceMaxShell(linkedAuth, { type: "SIGN_OUT" });
+  assert.equal(webSignOutKeepsMaxLink.phase, "linked_authenticated");
+
+  const unlinkStarting = reduceMaxShell(linkedAuth, { type: "UNLINK_START" });
+  assert.equal(unlinkStarting.phase, "linked_authenticated");
+  assert.equal(unlinkStarting.submitting, true);
+  const unlinked = reduceMaxShell(unlinkStarting, { type: "UNLINK_SUCCESS" });
+  assert.equal(unlinked.phase, "guest_unlinked");
+  assert.equal(unlinked.submitting, false);
+  assert.equal(unlinked.formMode, null);
+  const unlinkedView = viewMaxShell(unlinked);
+  assert.equal(unlinkedView.showLoginCta, true);
+  assert.equal(unlinkedView.showSignupCta, true);
+  assert.equal(unlinkedView.showLoginForm, false);
+  assert.equal(unlinkedView.showSignupForm, false);
+  assert.equal(unlinkedView.showSignOut, false);
+
+  const unlinkFailed = reduceMaxShell(unlinkStarting, { type: "UNLINK_FAILURE" });
+  assert.equal(unlinkFailed.phase, "linked_authenticated");
+  assert.equal(unlinkFailed.submitting, false);
+  assert.equal(
+    reduceMaxShell(guestUnlinked, { type: "UNLINK_SUCCESS" }).phase,
+    "guest_unlinked",
+  );
+  assert.equal(
+    reduceMaxShell(INITIAL_MAX_SHELL_STATE, { type: "UNLINK_START" }).phase,
+    "guest",
+  );
 
   const expired = reduceMaxShell(loggingIn, { type: "LINK_EXPIRED" });
   assert.equal(viewMaxShell(expired).expiredMessage, MAX_SHELL_EXPIRED);
@@ -1087,8 +1118,76 @@ await testSignupExistingEmailSwitchesToLogin();
 await testSignupPasswordTooShortDoesNotSucceed();
 await testSignupCaseBPendingThenLoginLinks();
 await testSignupExpiredAfterConfirm();
+async function testUnlinkPostsInitDataThenSignsOut() {
+  const initData = "user=%7B%22id%22%3A101%7D";
+  const { deps, calls } = createDeps({
+    initData,
+    fetchImpl: async () => jsonResponse(200, { ok: true, linked: false }),
+  });
+  assert.deepEqual(await unlinkMaxSession(deps), { type: "UNLINK_SUCCESS" });
+  assert.equal(calls[0].type, "fetch");
+  assert.equal(calls[0].url, MAX_SESSION_UNLINK_PATH);
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(calls[0].body, { initData });
+  assert.equal("user_id" in calls[0].body, false);
+  assert.equal("max_user_id" in calls[0].body, false);
+  assert.equal("providerUserId" in calls[0].body, false);
+  assert.equal(calls[1].type, "signOut");
+  assert.equal(
+    calls.some((call) => call.url === MAX_SESSION_LINK_PATH),
+    false,
+  );
+}
+
+async function testUnlinkFailureDoesNotSignOut() {
+  const { deps, calls } = createDeps({
+    fetchImpl: async () =>
+      jsonResponse(401, { ok: false, reason: "invalid_hash" }),
+  });
+  assert.deepEqual(await unlinkMaxSession(deps), { type: "UNLINK_FAILURE" });
+  assert.equal(
+    calls.some((call) => call.type === "signOut"),
+    false,
+  );
+  assert.equal(calls[0].url, MAX_SESSION_UNLINK_PATH);
+}
+
+async function testUnlinkSignOutErrorStillLeavesGuest() {
+  const deps = {
+    readInitData: () => "signed-init",
+    getAuthClient: () => ({
+      auth: {
+        signInWithPassword: async () => {
+          throw new Error("unused");
+        },
+        getUser: async () => ({ data: { user: null } }),
+        signOut: async () => {
+          throw new Error("local session already gone");
+        },
+      },
+    }),
+    fetch: async () => jsonResponse(200, { ok: true, linked: false }),
+  };
+  assert.deepEqual(await unlinkMaxSession(deps), { type: "UNLINK_SUCCESS" });
+}
+
+async function testUnlinkWithoutInitDataDoesNotFetch() {
+  const { deps, calls } = createDeps({
+    initData: "   ",
+    fetchImpl: async () => {
+      throw new Error("fetch must not run");
+    },
+  });
+  assert.deepEqual(await unlinkMaxSession(deps), { type: "UNLINK_FAILURE" });
+  assert.equal(calls.length, 0);
+}
+
 testLoginFormMarkup();
 testSignupFormMarkup();
 testSourceGuards();
+await testUnlinkPostsInitDataThenSignsOut();
+await testUnlinkFailureDoesNotSignOut();
+await testUnlinkSignOutErrorStillLeavesGuest();
+await testUnlinkWithoutInitDataDoesNotFetch();
 
 console.log("max-session-shell-unit: ok");

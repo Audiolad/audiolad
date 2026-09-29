@@ -91,7 +91,10 @@ export type MaxShellEvent =
   | { type: "LINK_IDENTITY_CONFLICT" }
   | { type: "LINK_USER_CONFLICT" }
   | { type: "LINK_SERVER_ERROR" }
-  | { type: "SIGN_OUT" };
+  | { type: "SIGN_OUT" }
+  | { type: "UNLINK_START" }
+  | { type: "UNLINK_SUCCESS" }
+  | { type: "UNLINK_FAILURE" };
 
 export type MaxShellView = {
   phase: MaxShellPhase;
@@ -285,7 +288,8 @@ export function reduceMaxShell(
       );
     case "SIGN_OUT":
       if (state.phase === "linked_authenticated") {
-        // MAX-native authentication remains valid after a web-session sign-out.
+        // A Supabase web-session sign-out does not remove external_identities.
+        // MAX logout is UNLINK_SUCCESS after the server deletes that identity.
         return state;
       }
       if (state.phase === "identity_already_linked") {
@@ -295,6 +299,35 @@ export function reduceMaxShell(
         return withForm("logging_in", "first_link");
       }
       return state;
+    case "UNLINK_START":
+      if (state.phase !== "linked_authenticated") {
+        return state;
+      }
+      return {
+        ...state,
+        submitting: true,
+        loginError: null,
+        signupError: null,
+      };
+    case "UNLINK_SUCCESS":
+      if (state.phase !== "linked_authenticated") {
+        return state;
+      }
+      return {
+        phase: "guest_unlinked",
+        submitting: false,
+        loginError: null,
+        signupError: null,
+        formMode: null,
+      };
+    case "UNLINK_FAILURE":
+      if (state.phase !== "linked_authenticated") {
+        return state;
+      }
+      return {
+        ...state,
+        submitting: false,
+      };
     default: {
       const _exhaustive: never = event;
       return _exhaustive;
