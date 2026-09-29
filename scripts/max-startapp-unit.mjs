@@ -15,7 +15,7 @@ import {
 const productId = "11111111-1111-4111-8111-111111111111";
 const promoId = "22222222-2222-4222-8222-222222222222";
 
-assert.equal(MAX_MINI_APP_BOT_NAME, "id507305817690_bot");
+assert.equal(MAX_MINI_APP_BOT_NAME, "id507305817690_1_bot");
 assert.equal(
   buildMaxProductStartPayload(productId),
   "p_11111111111141118111111111111111",
@@ -38,11 +38,11 @@ assert.equal(parseMaxStartPayload("a".repeat(513)), null);
 assert.equal(buildMaxProductDeepLink("bad"), null);
 assert.equal(
   buildMaxProductDeepLink(productId),
-  "https://max.ru/id507305817690_bot?startapp=p_11111111111141118111111111111111",
+  "https://max.ru/id507305817690_1_bot?startapp=p_11111111111141118111111111111111",
 );
 assert.equal(
   buildMaxPromoDeepLink(promoId),
-  "https://max.ru/id507305817690_bot?startapp=g_22222222222242228222222222222222",
+  "https://max.ru/id507305817690_1_bot?startapp=g_22222222222242228222222222222222",
 );
 
 assert.deepEqual(
