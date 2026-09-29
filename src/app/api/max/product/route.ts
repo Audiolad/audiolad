@@ -3,13 +3,10 @@ import "server-only";
 import { isMaxHostname } from "@/lib/max/host";
 import { getMaxPublishedProduct } from "@/lib/max/product";
 import { isAllowedMaxSessionOrigin, MAX_SESSION_BODY_MAX_BYTES } from "@/lib/max/session-http";
-import { resolveMaxNativeUser } from "@/lib/max/session-binding";
-import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "@/lib/max/touch-external-identity";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
 export const dynamic = "force-dynamic";
-export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setGetMaxPublishedProductForTests } from "@/lib/max/product";
 
 function fail(reason: string, status: number) {
@@ -48,9 +45,6 @@ export async function POST(request: Request) {
     const status = ["invalid_hash", "expired", "future"].includes(verified.reason) ? 401 : 400;
     return fail(verified.reason, status);
   }
-  const native = await resolveMaxNativeUser(MAX_EXTERNAL_IDENTITY_PROVIDER, verified.data.user.id);
-  if (!native.ok) return fail("storage_unavailable", 503);
-  if (!native.userId) return fail("unlinked", 403);
   const result = await getMaxPublishedProduct(body.authorSlug, body.productSlug);
   if (!result.ok) return fail("storage_unavailable", 503);
   if (!result.product) return fail("not_found", 404);
