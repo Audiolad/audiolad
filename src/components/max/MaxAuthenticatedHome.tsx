@@ -15,6 +15,7 @@ import MaxCatalogSearch, {
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
+import MaxProfile from "@/components/max/MaxProfile";
 import MaxPromoLanding from "@/components/max/MaxPromoLanding";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
@@ -64,10 +65,14 @@ export default function MaxAuthenticatedHome({
   initialStartTarget = null,
   guestMode = false,
   onRequestLogin,
+  onUnlinkAccount,
+  unlinking = false,
 }: {
   initialStartTarget?: MaxResolvedStartTarget | null;
   guestMode?: boolean;
   onRequestLogin?: () => void;
+  onUnlinkAccount?: () => Promise<boolean>;
+  unlinking?: boolean;
 }) {
   const [selected, setSelected] = useState<MaxSelectedProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
@@ -291,9 +296,12 @@ export default function MaxAuthenticatedHome({
           />
         </div>
       ) : null}
-      {activeTab === "catalog" ? null : (
+      {activeTab === "catalog" || activeTab === "profile" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
       )}
+      {activeTab === "profile" && !guestMode && onUnlinkAccount ? (
+        <MaxProfile submitting={unlinking} onLogout={onUnlinkAccount} />
+      ) : null}
       {activeTab === "catalog" && promoTarget ? (
         <div
           className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"

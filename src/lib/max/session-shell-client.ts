@@ -3,6 +3,7 @@ import { readMaxInitData } from "@/lib/max/bridge";
 import { readMaxResolvedStartTarget } from "@/lib/max/startapp";
 import {
   MAX_SESSION_LINK_PATH,
+  MAX_SESSION_UNLINK_PATH,
   MAX_SESSION_VERIFY_PATH,
 } from "@/lib/max/host";
 import { createMaxSupabaseClient } from "@/lib/max/supabase-client";
@@ -267,4 +268,56 @@ export async function signOutMaxSession(
     // Session-only sign-out: still leave the local shell signed out.
   }
   return { type: "SIGN_OUT" };
+}
+
+function unlinkResponseSucceeded(status: number, body: unknown): boolean {
+  return (
+    status >= 200 &&
+    status < 300 &&
+    Boolean(
+      body &&
+        typeof body === "object" &&
+        !Array.isArray(body) &&
+        (body as { ok?: unknown }).ok === true &&
+        (body as { linked?: unknown }).linked === false,
+    )
+  );
+}
+
+/**
+ * Deletes the verified MAX external identity, then clears a local Supabase
+ * session. Sign-out alone is not a MAX logout: the next verify would still
+ * see the linked identity.
+ */
+export async function unlinkMaxSession(
+  deps: MaxShellClientDeps = defaultDeps(),
+): Promise<MaxShellEvent> {
+  const initData = deps.readInitData();
+  if (typeof initData !== "string" || initData.trim().length === 0) {
+    return { type: "UNLINK_FAILURE" };
+  }
+
+  try {
+    const response = await deps.fetch(MAX_SESSION_UNLINK_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData }),
+      cache: "no-store",
+    });
+    const payload = await readJsonBody(response);
+    if (!unlinkResponseSucceeded(response.status, payload)) {
+      return { type: "UNLINK_FAILURE" };
+    }
+  } catch {
+    return { type: "UNLINK_FAILURE" };
+  }
+
+  try {
+    await deps.getAuthClient().auth.signOut();
+  } catch {
+    // The MAX identity is already gone. Local sign-out is best-effort.
+  }
+
+  return { type: "UNLINK_SUCCESS" };
 }

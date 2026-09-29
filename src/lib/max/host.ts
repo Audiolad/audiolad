@@ -12,6 +12,12 @@ export const MAX_SESSION_VERIFY_PATH = "/api/max/session/verify";
 /** HMAC-verify initData, then link the verified MAX id to the session user. MAX host only. */
 export const MAX_SESSION_LINK_PATH = "/api/max/session/link";
 
+/**
+ * HMAC-verify initData, then delete only that MAX external identity.
+ * Does not delete the AudioLad user. MAX host only.
+ */
+export const MAX_SESSION_UNLINK_PATH = "/api/max/session/unlink";
+
 /** HMAC-verify linked MAX identity, then return the read-only MAX catalog. */
 export const MAX_CATALOG_PATH = "/api/max/catalog";
 
@@ -53,6 +59,10 @@ export function isMaxSessionVerifyPath(pathname: string): boolean {
 
 export function isMaxSessionLinkPath(pathname: string): boolean {
   return pathname === MAX_SESSION_LINK_PATH;
+}
+
+export function isMaxSessionUnlinkPath(pathname: string): boolean {
+  return pathname === MAX_SESSION_UNLINK_PATH;
 }
 
 export function isMaxCatalogPath(pathname: string): boolean {
