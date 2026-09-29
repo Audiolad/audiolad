@@ -53,6 +53,7 @@ type MaxPlaybackState =
   | { status: "loading" }
   | { status: "ready"; session: MaxPlaybackSession; playbackTicket: string }
   | { status: "access_required" }
+  | { status: "login_required" }
   | { status: "preview_unavailable" }
   | { status: "no_audio" }
   | { status: "error" };
@@ -61,8 +62,12 @@ export { formatMaxDuration } from "@/lib/max/format-duration";
 
 export default function MaxAuthenticatedHome({
   initialStartTarget = null,
+  guestMode = false,
+  onRequestLogin,
 }: {
   initialStartTarget?: MaxResolvedStartTarget | null;
+  guestMode?: boolean;
+  onRequestLogin?: () => void;
 }) {
   const [selected, setSelected] = useState<MaxSelectedProduct | null>(null);
   const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
@@ -205,6 +210,9 @@ export default function MaxAuthenticatedHome({
       }))
       .then(({ status, payload }) => {
         if (controller.signal.aborted) return;
+        if (status === 403 && payload?.reason === "unlinked") {
+          return setPlayback({ status: "login_required" });
+        }
         if (status === 403 && payload?.reason === "preview_unavailable") {
           return setPlayback({ status: "preview_unavailable" });
         }
@@ -274,12 +282,14 @@ export default function MaxAuthenticatedHome({
           />
         </header>
       )}
-      <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog" || Boolean(promoTarget)}>
-        <MaxCatalogSearch
-          onSelectProduct={openCatalogProduct}
-          topicNavigationRequest={catalogTopicNavigation}
-        />
-      </div>
+      {!guestMode ? (
+        <div className="mx-auto max-w-lg" hidden={activeTab !== "catalog" || Boolean(promoTarget)}>
+          <MaxCatalogSearch
+            onSelectProduct={openCatalogProduct}
+            topicNavigationRequest={catalogTopicNavigation}
+          />
+        </div>
+      ) : null}
       {activeTab === "catalog" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
       )}
@@ -296,12 +306,18 @@ export default function MaxAuthenticatedHome({
       {activeTab === "catalog" && selected && !promoTarget ? (
         <div
           className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"
-          style={{ bottom: `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))` }}
+          style={{
+            bottom: guestMode
+              ? "0px"
+              : `calc(${MAX_TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`,
+          }}
         >
           <div className="mx-auto max-w-lg pb-6">
-          <button type="button" onClick={closeProductDetail} className="min-h-11 text-sm font-medium text-[#7042c5]">
-            ← Назад в каталог
-          </button>
+          {!guestMode ? (
+            <button type="button" onClick={closeProductDetail} className="min-h-11 text-sm font-medium text-[#7042c5]">
+              ← Назад в каталог
+            </button>
+          ) : null}
           {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
           {detail.status === "not_found" ? <p className="mt-6 text-sm text-[#6c5d94]">Продукт недоступен.</p> : null}
           {detail.status === "error" ? <p className="mt-6 text-sm text-[#6c5d94]">Не удалось загрузить продукт.</p> : null}
@@ -312,10 +328,25 @@ export default function MaxAuthenticatedHome({
               product={detail.product}
               onOpenRecommendation={openCatalogProduct}
               onOpenTopic={openCatalogTopic}
+              interactiveActionsEnabled={!guestMode}
               listenSlot={
                 <>
                   {playback.status === "loading" ? (
                     <p className="mt-4 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
+                  ) : null}
+                  {playback.status === "login_required" ? (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={onRequestLogin}
+                        className={FEATURED_CARD_PRIMARY_CTA_CLASS}
+                      >
+                        Войти или зарегистрироваться
+                      </button>
+                      <p className="mt-2 text-sm text-[#6c5d94]">
+                        Карточка продукта доступна без регистрации. Для прослушивания войдите в АудиоЛад.
+                      </p>
+                    </div>
                   ) : null}
                   {playback.status === "access_required" ? (
                     <p className="mt-4 text-sm text-[#6c5d94]">Для прослушивания нужен доступ к продукту.</p>
@@ -383,6 +414,7 @@ export default function MaxAuthenticatedHome({
                   ) : null}
                   {!listenArmed &&
                   playback.status !== "access_required" &&
+                  playback.status !== "login_required" &&
                   playback.status !== "preview_unavailable" &&
                   playback.status !== "no_audio" &&
                   playback.status !== "error" ? (
@@ -409,7 +441,9 @@ export default function MaxAuthenticatedHome({
           </div>
         </div>
       ) : null}
-      <MaxBottomNav activeTab={activeTab} onSelectTab={selectMaxTab} />
+      {!guestMode ? (
+        <MaxBottomNav activeTab={activeTab} onSelectTab={selectMaxTab} />
+      ) : null}
     </section>
   );
 }
