@@ -9,7 +9,20 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { CATALOG_CLASS_FILTERS } from "../src/lib/catalog/listing-contract.ts";
+import { GUEST_HOME_INTRO, GUEST_HOME_LISTEN_FREE_CTA, GUEST_HOME_SLIDES } from "../src/lib/home/guest-slider.ts";
 import { MaxHomeScreen } from "../src/components/max/MaxHome.tsx";
+import {
+  beginMaxGuestSlideGesture,
+  endMaxGuestSlidePointer,
+  isMaxGuestHomeAuthorSlideUrl,
+  maxGuestSlideClickActivates,
+  moveMaxGuestSlideGesture,
+  nearestMaxGuestSlideIndex,
+  openMaxGuestHomeExternalSlide,
+  resolveMaxGuestHomeAuthorUrl,
+  resolveMaxGuestHomeSlideAction,
+} from "../src/lib/max/guest-home-slider.ts";
 import { readMaxHomeShelves, MAX_HOME_SHELVES } from "../src/lib/max/home.ts";
 import {
   MAX_INITIAL_PRIMARY_TAB,
@@ -24,6 +37,8 @@ function read(relative) {
 
 const shell = read("src/components/max/MaxAuthenticatedHome.tsx");
 const home = read("src/components/max/MaxHome.tsx");
+const slider = read("src/components/max/MaxGuestHomeSlider.tsx");
+const slideActions = read("src/lib/max/guest-home-slider.ts");
 const card = read("src/components/max/MaxCatalogProductCard.tsx");
 const search = read("src/components/max/MaxCatalogSearch.tsx");
 const bridge = read("src/components/max/MaxBridgeScript.tsx");
@@ -54,7 +69,9 @@ const homePane = shell.slice(
   shell.indexOf("<MaxTabPlaceholder"),
 );
 assert.match(homePane, /<MaxHome/);
-assert.doesNotMatch(homePane, /guestMode/);
+assert.match(homePane, /guestMode=\{guestMode\}/);
+assert.match(homePane, /onSlideAction=\{applyGuestHomeSlide\}/);
+assert.doesNotMatch(shell, /MaxGuestHomeSlider/);
 assert.match(shell, /activeTab === "catalog" \|\| activeTab === "profile" \|\| activeTab === "home"/);
 assert.match(shell, /<MaxTabPlaceholder title=\{activeTabLabel\} \/>/);
 
@@ -72,7 +89,13 @@ assert.match(home, /PUBLIC_CATALOG_SECTION_CARDS/);
 assert.match(home, /data-max-home-section=\{section\.value\}/);
 assert.match(home, /MaxCatalogProductCard/);
 assert.doesNotMatch(home, /MaxProductDetailView/);
-assert.doesNotMatch(home, /guestMode|localStorage|sessionStorage|useRouter|next\/link|next\/navigation/);
+assert.match(home, /guestMode/);
+assert.match(home, /\{guestMode \?/);
+assert.match(home, /<MaxGuestHomeSlider/);
+assert.match(home, /data-max-guest-home-cta/);
+assert.match(home, /GUEST_HOME_INTRO/);
+assert.match(home, /GUEST_HOME_LISTEN_FREE_CTA\.label/);
+assert.doesNotMatch(home, /localStorage|sessionStorage|useRouter|next\/link|next\/navigation/);
 assert.doesNotMatch(home, /user_id|max_user_id|initDataUnsafe|for-you|listen history/i);
 
 assert.match(shell, /function openHomeProduct\(product: MaxCatalogProduct\)/);
@@ -90,7 +113,13 @@ assert.match(
 assert.match(shell, /onOpenShelf=\{\(shelfId\) => openCatalogFromHome\(homeShelfTarget\(shelfId\)\)\}/);
 assert.match(shell, /section: target\.section/);
 assert.match(shell, /access: target\.access/);
-assert.match(shell, /publicationClass: "all"/);
+assert.match(shell, /publicationClass: target\.publicationClass \?\? "all"/);
+assert.match(shell, /function applyGuestHomeSlide\(slideId: string\)/);
+assert.match(shell, /resolveMaxGuestHomeSlideAction\(slideId\)/);
+assert.match(shell, /openMaxGuestHomeExternalSlide\(action\.url\)/);
+assert.match(shell, /onRequestSignup\?\.\(\)/);
+assert.match(shell, /selectMaxTab\("playlists"\)/);
+assert.match(shell, /publicationClass: action\.publicationClass/);
 assert.match(search, /section\?: PublicCatalogSection \| null/);
 assert.match(search, /access\?: CatalogAccessFilter/);
 assert.match(search, /applyFilters\(\[topicKey\], "all", "all"\)/);
@@ -167,15 +196,21 @@ assert.equal(JSON.stringify(parsed).includes("browser-user"), false);
 assert.equal(JSON.stringify(parsed).includes("aaaaaaaa-aaaa-4aaa-8aaa"), false);
 assert.equal(readMaxHomeShelves({ shelves: { free: [], music: [] } }), null);
 
+const linkedProps = {
+  guestMode: false,
+  onOpenCatalog: () => {},
+  onListenFree: () => {},
+  onSlideAction: () => {},
+  onOpenSection: () => {},
+  onOpenShelf: () => {},
+  onSelectProduct: () => {},
+};
+
 const markup = renderToStaticMarkup(
   createElement(MaxHomeScreen, {
+    ...linkedProps,
     status: "ready",
     shelves: parsed,
-    onOpenCatalog: () => {},
-    onListenFree: () => {},
-    onOpenSection: () => {},
-    onOpenShelf: () => {},
-    onSelectProduct: () => {},
   }),
 );
 assert.match(markup, /АудиоЛад/);
@@ -199,21 +234,154 @@ assert.match(markup, /Тишина/);
 assert.doesNotMatch(markup, /data-max-home-shelf="music"/);
 assert.equal(markup.split("Смотреть все").length - 1, 2);
 assert.match(markup, /rounded-\[20px\]/);
+assert.match(markup, /data-max-home-guest="false"/);
 assert.doesNotMatch(markup, /<a[\s>]|\/catalog\?|\/practice\//);
+assert.doesNotMatch(markup, /data-max-guest-home-slider|data-max-guest-home-intro|Начать слушать бесплатно/);
+assert.doesNotMatch(markup, /\/images\/home\/guest-slider\//);
 
 const loading = renderToStaticMarkup(
   createElement(MaxHomeScreen, {
+    ...linkedProps,
     status: "loading",
     shelves: null,
-    onOpenCatalog: () => {},
-    onListenFree: () => {},
-    onOpenSection: () => {},
-    onOpenShelf: () => {},
-    onSelectProduct: () => {},
   }),
 );
 assert.match(loading, /Открыть каталог/);
 assert.match(loading, /Собираем подборки/);
 assert.doesNotMatch(loading, /data-max-home-shelf=/);
+assert.doesNotMatch(loading, /data-max-guest-home-slider/);
+
+const guestActions = [];
+const guestMarkup = renderToStaticMarkup(
+  createElement(MaxHomeScreen, {
+    ...linkedProps,
+    guestMode: true,
+    status: "ready",
+    shelves: parsed,
+    onListenFree: () => guestActions.push("cta"),
+    onSlideAction: (slideId) => guestActions.push(slideId),
+  }),
+);
+assert.match(guestMarkup, /data-max-home-guest="true"/);
+assert.match(guestMarkup, /data-max-guest-home-intro/);
+assert.ok(guestMarkup.includes(GUEST_HOME_INTRO));
+assert.match(guestMarkup, /data-max-guest-home-cta/);
+assert.ok(guestMarkup.includes(GUEST_HOME_LISTEN_FREE_CTA.label));
+assert.equal(GUEST_HOME_SLIDES.length, 7);
+assert.equal((guestMarkup.match(/data-max-guest-home-slide=/g) ?? []).length, 7);
+assert.equal((guestMarkup.match(/data-max-guest-home-dot=/g) ?? []).length, 7);
+assert.match(
+  guestMarkup,
+  /data-max-guest-home-dot="01"[^>]*aria-current="true"/,
+);
+for (const slide of GUEST_HOME_SLIDES) {
+  assert.match(guestMarkup, new RegExp(`data-max-guest-home-slide="${slide.id}"`));
+  assert.match(guestMarkup, new RegExp(`data-max-guest-home-dot="${slide.id}"`));
+  assert.ok(guestMarkup.includes(slide.src), slide.src);
+  assert.match(slide.src, /^\/images\/home\/guest-slider\/0[1-7]-audio-practices\.webp$/);
+}
+assert.match(guestMarkup, /data-max-home-section="music"/);
+assert.match(guestMarkup, /data-max-home-section="meditations"/);
+assert.match(guestMarkup, /data-max-home-section="education"/);
+assert.match(guestMarkup, /data-max-home-section="stories"/);
+assert.match(guestMarkup, /data-max-home-shelf="free"/);
+assert.match(guestMarkup, /data-max-home-shelf="meditations"/);
+assert.match(guestMarkup, /Бесплатная практика/);
+assert.doesNotMatch(guestMarkup, /Открыть каталог/);
+assert.doesNotMatch(guestMarkup, /Музыка, медитации, аудиопрактики и аудиокурсы/);
+const guestBody = guestMarkup.replace(/<link\b[^>]*>/g, "");
+assert.doesNotMatch(guestBody, /<a[\s>]|\/catalog\?|\/practice\/|\/auth\/|\/playlists\//);
+assert.doesNotMatch(guestBody, /href=/);
+for (const href of guestMarkup.matchAll(/<link\b[^>]*href="([^"]+)"/g)) {
+  assert.match(href[1], /^\/images\/|^https:\/\/cdn\.example\.test\//, href[1]);
+}
+
+const maxSlideSources = `${slider}\n${slideActions}\n${home}`;
+assert.match(slider, /GUEST_HOME_SLIDES\.map/);
+assert.match(slider, /nearestMaxGuestSlideIndex/);
+assert.match(slider, /maxGuestSlideClickActivates\(gestureRef\.current\)/);
+assert.match(slider, /onSlideAction\(slideId\)/);
+assert.match(slider, /guest-home-slider guest-home-slider--max/);
+assert.match(slider, /guest-home-slider__dot--active/);
+assert.match(slider, /aspect-ratio|guest-home-slider__media/);
+assert.doesNotMatch(slider, /01-audio-practices\.webp/);
+assert.doesNotMatch(slider, /setInterval|autoplay|guest-home-slider__arrow|Следующий слайд|Предыдущий слайд/);
+assert.doesNotMatch(
+  maxSlideSources,
+  /next\/link|next\/navigation|useRouter|useSearchParams|router\.push|<a[\s>]|href=["']\/|\/catalog["']|\/auth\/|\/playlists\/|\/my-practices/,
+);
+assert.match(slideActions, /openMaxExternalLink\(url\)/);
+assert.match(slideActions, /isMaxGuestHomeAuthorSlideUrl\(url\)/);
+assert.ok(CATALOG_CLASS_FILTERS.includes("release"));
+
+assert.deepEqual(resolveMaxGuestHomeSlideAction("01"), {
+  type: "catalog",
+  section: null,
+  access: "all",
+  publicationClass: "all",
+});
+assert.deepEqual(resolveMaxGuestHomeSlideAction("02"), {
+  type: "catalog",
+  section: null,
+  access: "free",
+  publicationClass: "all",
+});
+assert.deepEqual(resolveMaxGuestHomeSlideAction("03"), {
+  type: "catalog",
+  section: null,
+  access: "all",
+  publicationClass: "release",
+});
+assert.deepEqual(resolveMaxGuestHomeSlideAction("04"), { type: "playlists" });
+assert.deepEqual(resolveMaxGuestHomeSlideAction("05"), {
+  type: "catalog",
+  section: null,
+  access: "paid",
+  publicationClass: "all",
+});
+assert.deepEqual(resolveMaxGuestHomeSlideAction("06"), { type: "signup" });
+assert.equal(
+  resolveMaxGuestHomeAuthorUrl(),
+  "https://audiolad.ru/dlya-avtorov-meditatsiy",
+);
+assert.deepEqual(resolveMaxGuestHomeSlideAction("07"), {
+  type: "external",
+  url: "https://audiolad.ru/dlya-avtorov-meditatsiy",
+});
+assert.equal(resolveMaxGuestHomeSlideAction("08"), null);
+for (const slide of GUEST_HOME_SLIDES) {
+  assert.ok(resolveMaxGuestHomeSlideAction(slide.id), slide.id);
+}
+
+assert.equal(isMaxGuestHomeAuthorSlideUrl("https://audiolad.ru/dlya-avtorov-meditatsiy"), true);
+for (const blocked of [
+  "https://audiolad.ru/catalog",
+  "https://audiolad.ru/catalog?access=free",
+  "https://audiolad.ru/auth/sign-up",
+  "https://audiolad.ru/playlists/catalog",
+  "https://audiolad.ru/dlya-avtorov-meditatsiy?next=/",
+  "https://evil.example/dlya-avtorov-meditatsiy",
+  "http://audiolad.ru/dlya-avtorov-meditatsiy",
+  "javascript:alert(1)",
+]) {
+  assert.equal(isMaxGuestHomeAuthorSlideUrl(blocked), false, blocked);
+  assert.equal(openMaxGuestHomeExternalSlide(blocked), false, blocked);
+}
+
+const tap = beginMaxGuestSlideGesture({ x: 10, y: 20 });
+assert.equal(maxGuestSlideClickActivates(tap), true);
+const held = moveMaxGuestSlideGesture(tap, { x: 18, y: 20 });
+assert.equal(held.moved, false);
+assert.equal(maxGuestSlideClickActivates(endMaxGuestSlidePointer(held)), true);
+const swiped = moveMaxGuestSlideGesture(tap, { x: 19, y: 20 });
+assert.equal(swiped.moved, true);
+assert.equal(maxGuestSlideClickActivates(endMaxGuestSlidePointer(swiped)), false);
+const diagonal = moveMaxGuestSlideGesture(tap, { x: 16, y: 26 });
+assert.equal(diagonal.moved, true);
+assert.equal(nearestMaxGuestSlideIndex([], 40), 0);
+assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 0), 0);
+assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 40), 0);
+assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 90), 1);
+assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 200), 2);
 
 console.log("max-home-unit: ok");

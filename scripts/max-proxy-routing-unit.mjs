@@ -304,6 +304,8 @@ const maxClientSources = [
   "src/components/max/MaxCatalogSearch.tsx",
   "src/components/max/MaxCatalogProductCard.tsx",
   "src/components/max/MaxHome.tsx",
+  "src/components/max/MaxGuestHomeSlider.tsx",
+  "src/lib/max/guest-home-slider.ts",
   "src/lib/max/home.ts",
   "src/lib/max/catalog-product.ts",
   "src/components/max/MaxBottomNav.tsx",
