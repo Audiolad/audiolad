@@ -146,6 +146,7 @@ export default function MaxAuthenticatedHome({
   }
 
   function openCatalogTopic(topicKey: string) {
+    if (guestMode) return;
     const key = topicKey.trim();
     if (!key) return;
     closeProductDetail();
