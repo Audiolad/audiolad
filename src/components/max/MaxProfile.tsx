@@ -3,6 +3,10 @@
 import { useRef, useState } from "react";
 
 import { MAX_TAB_BAR_HEIGHT_PX } from "@/lib/max/primary-tabs";
+import {
+  MAX_SHELL_LOGIN_CTA,
+  MAX_SHELL_SIGNUP_CTA,
+} from "@/lib/max/session-shell";
 
 export const MAX_PROFILE_TITLE = "Профиль";
 export const MAX_PROFILE_LINKED_STATUS = "Аккаунт АудиоЛада подключён к MAX";
@@ -16,6 +20,44 @@ export const MAX_PROFILE_CANCEL_LABEL = "Отмена";
 export const MAX_PROFILE_CONFIRM_LABEL = "Выйти";
 export const MAX_PROFILE_LOGOUT_ERROR =
   "Не удалось выйти. Попробуйте ещё раз.";
+export const MAX_PROFILE_GUEST_STATUS = "Вы используете АудиоЛад без входа";
+export const MAX_PROFILE_LOGIN_LABEL = MAX_SHELL_LOGIN_CTA;
+export const MAX_PROFILE_SIGNUP_LABEL = MAX_SHELL_SIGNUP_CTA;
+
+export function MaxGuestProfile({
+  onLogin,
+  onSignup,
+}: {
+  onLogin?: () => void;
+  onSignup?: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-lg">
+      <h1 className="mt-5 text-[26px] font-semibold leading-tight text-[#25135c]">
+        {MAX_PROFILE_TITLE}
+      </h1>
+      <section className="mt-5 rounded-[20px] border border-[#eadff8] bg-white px-4 py-4">
+        <p className="text-sm leading-5 text-[#4a3d73]">{MAX_PROFILE_GUEST_STATUS}</p>
+      </section>
+      <div className="mt-6 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={onLogin}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          {MAX_PROFILE_LOGIN_LABEL}
+        </button>
+        <button
+          type="button"
+          onClick={onSignup}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          {MAX_PROFILE_SIGNUP_LABEL}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 type MaxProfileProps = {
   /**

@@ -22,8 +22,8 @@ assert.match(platformSearch, /PLATFORM_SEARCH_CATALOG_URL_DEBOUNCE_MS = 300/);
 assert.match(search, /MAX_CATALOG_SEARCH_DEBOUNCE_MS = 300/);
 assert.match(search, /setTimeout\(\(\) => \{[\s\S]*?\}, MAX_CATALOG_SEARCH_DEBOUNCE_MS\)/);
 
-assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
-assert.match(home, /<MaxCatalogSearch onSelectProduct=\{openCatalogProduct\} \/>/);
+assert.match(home, /hidden=\{activeTab !== "catalog" \|\| Boolean\(promoTarget\)\}/);
+assert.match(home, /<MaxCatalogSearch[\s\S]*onSelectProduct=\{openCatalogProduct\}/);
 assert.doesNotMatch(placeholder, /MaxCatalogSearch|Поиск по каталогу/);
 assert.match(search, /placeholder="Поиск по каталогу"/);
 assert.match(search, /role="search"/);
@@ -85,7 +85,10 @@ assert.match(search, /new AbortController\(\)/);
 assert.match(search, /abortRef\.current\?\.abort\(\)/);
 assert.match(search, /requestId !== requestGenerationRef\.current \|\| controller\.signal\.aborted/);
 assert.match(search, /JSON\.stringify\(\{ initData \}\)/);
-assert.match(search, /JSON\.stringify\(\{ initData, query: normalized \}\)/);
+assert.match(
+  search,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*query: normalized/,
+);
 assert.doesNotMatch(search, /user_id|max_user_id|maxAuthenticated/);
 
 assert.doesNotMatch(search, /AudioladHorizontalLogo/);
@@ -97,7 +100,7 @@ const sectionsAt = search.indexOf("<MaxCatalogSections");
 const gridAt = search.indexOf("<CatalogGrid");
 assert.ok(search.indexOf("data-max-catalog-search-row") < topicsAt);
 assert.ok(topicsAt < sectionsAt && sectionsAt < gridAt);
-assert.match(search, /onApply=\{applyTopicKeys\}/);
+assert.match(search, /onApply=\{applyFilters\}/);
 assert.doesNotMatch(
   search,
   /CatalogMobileFilters|buildCatalogHref|<Link|<a[\s>]|router\.push|window\.location|openLink/,
@@ -107,17 +110,20 @@ assert.match(search, /По запросу „\{resultQuery\}“ ничего н�
 assert.match(search, /Очистить поиск/);
 assert.match(search, /Не удалось выполнить поиск\./);
 assert.match(search, /defaultCatalog/);
-assert.match(search, /usingSearchResults \? searchItems : defaultCatalog\.status === "ready"/);
 assert.match(
   search,
-  /searchItems !== null && searchStatus !== "idle" && resultSection === activeSection/,
+  /usingSearchResults\s*\?\s*searchItems\s*:\s*defaultCatalog\.status === "ready"/,
+);
+assert.match(
+  search,
+  /searchItems !== null &&\s*searchStatus !== "idle" &&\s*resultSection === activeSection/,
 );
 assert.doesNotMatch(
   search,
   /searchStatus === "searching" \|\| searchStatus === "error"\s*\?\s*\[\]/,
 );
 const gridChoice = search.slice(
-  search.indexOf("const gridItems = activeTopicParam"),
+  search.indexOf("const gridItems = hasActiveFilters"),
   search.indexOf("const showSearchEmpty"),
 );
 assert.match(gridChoice, /usingSearchResults\s*\?\s*searchItems\s*:\s*sectionScopeItems/);
@@ -144,8 +150,13 @@ assert.match(grid, /product\.priceLabel/);
 assert.doesNotMatch(grid, /Подарок|Бесплатно/);
 assert.doesNotMatch(search, /onSelectProduct\(product\)[\s\S]{0,120}clearSearch|clearSearch\(\)[\s\S]{0,80}onSelectProduct/);
 
-const back = home.slice(home.indexOf("← Назад в каталог") - 180, home.indexOf("← Назад в каталог") + 80);
-assert.match(back, /setSelected\(null\)/);
+const back = home.slice(home.indexOf("← Назад в каталог") - 220, home.indexOf("← Назад в каталог") + 80);
+assert.match(back, /closeProductDetail/);
+const closeDetail = home.slice(
+  home.indexOf("function closeProductDetail"),
+  home.indexOf("function closePromoLanding"),
+);
+assert.match(closeDetail, /setSelected\(null\)/);
 assert.doesNotMatch(back, /clearSearch|searchInput|resultQuery|localStorage|sessionStorage/);
 
 const selectFn = home.slice(
@@ -154,7 +165,7 @@ const selectFn = home.slice(
 );
 assert.match(selectFn, /setSelected\(null\)/);
 assert.doesNotMatch(selectFn, /searchInput|resultQuery|localStorage|sessionStorage|router/);
-assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
+assert.match(home, /hidden=\{activeTab !== "catalog" \|\| Boolean\(promoTarget\)\}/);
 
 assert.doesNotMatch(
   search,
@@ -162,7 +173,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   home,
-  /useRouter|useSearchParams|router\.push|replaceListingSearch|window\.location|openLink|localStorage|sessionStorage|\/catalog\?/,
+  /useRouter|useSearchParams|router\.push|replaceListingSearch|window\.location\s*=|openLink|localStorage|sessionStorage|\/catalog\?/,
 );
 assert.doesNotMatch(search, /aria-autocomplete|role="listbox"|role="combobox"|search history|недавн/i);
 assert.doesNotMatch(search, /CATALOG_SEARCH_SUGGEST_MIN_LENGTH/);

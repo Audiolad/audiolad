@@ -156,7 +156,7 @@ assert.match(loadFiltered, /\+\+requestGenerationRef\.current/);
 assert.match(loadFiltered, /abortRef\.current\?\.abort\(\)/);
 assert.match(loadFiltered, /buildMaxCatalogRequestBody/);
 
-assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
+assert.match(home, /hidden=\{activeTab !== "catalog" \|\| Boolean\(promoTarget\)\}/);
 const back = home.slice(
   home.indexOf("← Назад в каталог") - 240,
   home.indexOf("← Назад в каталог") + 40,

@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 
+import { CATALOG_LISTING_SEARCH_LIMIT } from "../src/lib/catalog/listing.ts";
 import {
   CATALOG_SEARCH_MAX_LENGTH,
   searchPublishedCatalogProducts,
@@ -77,8 +78,8 @@ assert.equal(searchCalls.length, 1);
 assert.equal(listCalls.length, 0);
 assert.equal(searchCalls[0].query, "деньги и спокойствие");
 assert.deepEqual(searchCalls[0].viewer, GUEST_ORDINARY_CATALOG_VIEWER);
-assert.equal(searchCalls[0].limit, undefined);
-assert.deepEqual(Object.keys(searchCalls[0]).sort(), ["query", "viewer"]);
+assert.equal(searchCalls[0].limit, CATALOG_LISTING_SEARCH_LIMIT);
+assert.deepEqual(Object.keys(searchCalls[0]).sort(), ["limit", "query", "viewer"]);
 assert.equal(forwarded.items.length, 1);
 assert.equal(forwarded.items[0].slug, "product-1");
 assert.equal(forwarded.items[0].formatLabel, "Аудиопрактика");

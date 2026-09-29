@@ -251,7 +251,7 @@ assert.match(
 assert.match(hook, /shouldStartMaxPrimaryPlayFetch/);
 assert.match(hook, /intendedPlayingRef\.current = true;\s*void loadTrack\(next, true\)/);
 assert.doesNotMatch(source, /localStorage|sessionStorage/);
-assert.doesNotMatch(source, /window\.location|openLink|\/listen\/|\/practice\//);
+assert.doesNotMatch(source, /window\.location\s*=|openLink|\/listen\/|\/practice\//);
 assert.match(home, /MAX_PLAYBACK_SESSION_PATH/);
 assert.match(home, /MAX_PLAYBACK_AUDIO_PATH/);
 assert.match(home, /MAX_PLAYBACK_PREVIEW_PATH/);

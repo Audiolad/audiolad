@@ -15,16 +15,9 @@ import {
   isAllowedMaxSessionOrigin,
   MAX_SESSION_BODY_MAX_BYTES,
 } from "@/lib/max/session-http";
-import {
-  MAX_EXTERNAL_IDENTITY_PROVIDER,
-} from "@/lib/max/touch-external-identity";
-import {
-  resolveMaxNativeUser,
-} from "@/lib/max/session-binding";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
-export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setListMaxPublishedCatalogForTests } from "@/lib/max/catalog";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +43,6 @@ type CatalogErrorReason =
   | "invalid_hash"
   | "expired"
   | "future"
-  | "unlinked"
   | "storage_unavailable";
 
 const PARSE_REASONS = new Set<CatalogErrorReason>([
@@ -94,7 +86,6 @@ function statusForReason(reason: CatalogErrorReason): number {
   if (reason === "storage_unavailable" || reason === "service_unavailable") {
     return 503;
   }
-  if (reason === "unlinked") return 403;
   if (reason === "invalid_hash" || reason === "expired" || reason === "future") {
     return 401;
   }
@@ -188,17 +179,6 @@ export async function POST(request: Request) {
   const publicationClass = parseMaxCatalogClassParam(body.class);
   if (!publicationClass.ok) {
     return errorResponse("invalid_request", 400);
-  }
-
-  const nativeUser = await resolveMaxNativeUser(
-    MAX_EXTERNAL_IDENTITY_PROVIDER,
-    verified.data.user.id,
-  );
-  if (!nativeUser.ok) {
-    return errorResponse("storage_unavailable", 503);
-  }
-  if (!nativeUser.userId) {
-    return errorResponse("unlinked", 403);
   }
 
   const catalogInput: {

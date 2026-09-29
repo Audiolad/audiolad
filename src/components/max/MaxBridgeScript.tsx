@@ -22,6 +22,7 @@ import {
 } from "@/lib/max/session-shell-client";
 import {
   INITIAL_MAX_SHELL_STATE,
+  MAX_SHELL_CONTINUE_WITHOUT_ACCOUNT,
   MAX_SHELL_LOGIN_CTA,
   MAX_SHELL_SIGN_OUT_LABEL,
   MAX_SHELL_SIGNUP_CTA,
@@ -225,10 +226,8 @@ export default function MaxBridgeScript() {
   }, [applyEvent]);
 
   const view = viewMaxShell(shell);
-  const showGuestStartProduct =
-    view.phase === "guest_unlinked" && startTarget?.kind === "product";
-  const showProductShell =
-    view.phase === "linked_authenticated" || showGuestStartProduct;
+  const showAppShell =
+    view.phase === "linked_authenticated" || view.phase === "guest_unlinked";
 
   return (
     <>
@@ -244,11 +243,12 @@ export default function MaxBridgeScript() {
         data-max-platform={snapshot.platform ?? ""}
         data-max-version={snapshot.version ?? ""}
       />
-      {showProductShell ? (
+      {showAppShell ? (
         <MaxAuthenticatedHome
           initialStartTarget={startTarget}
-          guestMode={showGuestStartProduct}
+          guestMode={view.phase === "guest_unlinked"}
           onRequestLogin={handleOpenLogin}
+          onRequestSignup={handleOpenSignup}
           onUnlinkAccount={handleUnlink}
           unlinking={shell.submitting && shell.phase === "linked_authenticated"}
         />
@@ -373,6 +373,15 @@ export default function MaxBridgeScript() {
           className="mt-6 text-sm font-medium text-[#7042c5]"
         >
           {MAX_SHELL_SIGN_OUT_LABEL}
+        </button>
+      ) : null}
+      {view.showContinueWithoutAccount ? (
+        <button
+          type="button"
+          onClick={() => applyEvent({ type: "RETURN_TO_APP" })}
+          className="mt-6 text-sm font-medium text-[#7042c5]"
+        >
+          {MAX_SHELL_CONTINUE_WITHOUT_ACCOUNT}
         </button>
       ) : null}
         </section>

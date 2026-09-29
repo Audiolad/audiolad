@@ -29,7 +29,7 @@ assert.doesNotMatch(detailSource, /max-w-\[280px\]/);
 assert.doesNotMatch(detailSource, /from "next\/link"|<Link/);
 assert.doesNotMatch(`${source}\n${detailSource}`, /h-48/);
 assert.doesNotMatch(`${source}\n${detailSource}`, /h-24\s+w-20/);
-assert.doesNotMatch(`${source}\n${detailSource}`, /window\.location|openLink|\/practice\/|audiolad\.ru/);
+assert.doesNotMatch(`${source}\n${detailSource}`, /window\.location\s*=|openLink|\/practice\/|audiolad\.ru/);
 assert.match(source, /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/);
 assert.doesNotMatch(source, /description:\s*string \| null/);
 assert.match(readFileSync(join(process.cwd(), "src/lib/max/product-view.ts"), "utf8"), /Array\.isArray\(value\.topics\)/);

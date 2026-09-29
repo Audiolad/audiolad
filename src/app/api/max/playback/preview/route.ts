@@ -3,11 +3,8 @@ import "server-only";
 import { readMaxJsonPost } from "@/lib/max/authenticated-post";
 import { buildMaxPlaybackPreviewClip } from "@/lib/max/playback";
 import { verifyMaxPlaybackTicket } from "@/lib/max/playback-ticket";
-import { resolveMaxNativeUser } from "@/lib/max/session-binding";
-import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "@/lib/max/touch-external-identity";
 
 export const dynamic = "force-dynamic";
-export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setMaxPlaybackDepsForTests } from "@/lib/max/playback";
 export { setMaxPlaybackTicketNowForTests } from "@/lib/max/playback-ticket";
 
@@ -37,17 +34,6 @@ export async function POST(request: Request) {
       if (ticket.reason === "malformed") return fail("invalid_request", 400);
       if (ticket.reason === "expired") return fail("playback_expired", 401);
       return fail("invalid_ticket", 401);
-    }
-
-    const native = await resolveMaxNativeUser(
-      MAX_EXTERNAL_IDENTITY_PROVIDER,
-      ticket.claims.providerUserId,
-    );
-    if (!native.ok) {
-      return fail("storage_unavailable", 503);
-    }
-    if (!native.userId) {
-      return fail("unlinked", 403);
     }
 
     const clip = await buildMaxPlaybackPreviewClip(

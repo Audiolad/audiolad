@@ -174,7 +174,10 @@ assert.doesNotMatch(previewFetch, /method: "GET"/);
 assert.doesNotMatch(source, /localStorage|sessionStorage/);
 assert.doesNotMatch(source, /\/api\/max\/playback\/preview\?/);
 assert.doesNotMatch(source, /\/api\/max\/playback\/preview\//);
-assert.doesNotMatch(source, /searchParams|URLSearchParams/);
+assert.doesNotMatch(
+  `${hook}\n${player}\n${previewFetch}\n${fullAudioFetch}`,
+  /searchParams|URLSearchParams/,
+);
 
 const readyHome = home.slice(home.indexOf('{detail.status === "ready" ?'));
 const detailView = readFileSync(

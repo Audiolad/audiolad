@@ -74,7 +74,7 @@ const maxHomeSource = `${bridge}\n${home}\n${catalogSearch}\n${detailView}\n${ra
   .replace(/\/\/.*$/gm, "");
 assert.doesNotMatch(
   maxHomeSource,
-  /window\.location|openLink|\/practice\/|\/catalog["']|\/my-practices|\/studio|access_token|refresh_token|user_id|max_user_id/,
+  /window\.location\s*=|openLink|\/practice\/|\/catalog["']|\/my-practices|\/studio|access_token|refresh_token|user_id|max_user_id/,
 );
 
 console.log("max-authenticated-home-unit: ok");

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 
 import { signEntitledListenAudio } from "../src/lib/listen/sign-entitled-audio.ts";
 import {
+  canAccessCourseContent,
+  resolveProductAccess,
+} from "../src/lib/products/access.ts";
+import {
   getMaxPlaybackSession,
   setMaxPlaybackDepsForTests,
   signMaxPlaybackAudio,
@@ -324,6 +328,108 @@ try {
   });
   const signThrow = await signMaxPlaybackAudio(userId, "author", "product", "track-1");
   assert.deepEqual(signThrow, { ok: false, reason: "storage_unavailable" });
+
+  const accessPractice = {
+    id: "practice-1",
+    author_id: "author-1",
+    status: "published",
+    is_catalog_listed: true,
+    catalog_visibility: "listed",
+    product_kind: "practice",
+    publication_class: "audio_product",
+  };
+  const guestFreeAccess = await resolveProductAccess(
+    {},
+    { ...accessPractice, is_free: true, guest_access_enabled: false },
+    null,
+  );
+  assert.equal(guestFreeAccess.canListen, true);
+  assert.equal(guestFreeAccess.reason, "free");
+  const guestPromoAccess = await resolveProductAccess(
+    {},
+    { ...accessPractice, is_free: false, guest_access_enabled: true },
+    null,
+  );
+  assert.equal(guestPromoAccess.canListen, true);
+  assert.equal(guestPromoAccess.reason, "guest_promo");
+  const guestPaidAccess = await resolveProductAccess(
+    {},
+    { ...accessPractice, is_free: false, guest_access_enabled: false },
+    null,
+  );
+  assert.equal(guestPaidAccess.canListen, false);
+  assert.equal(guestPaidAccess.reason, "not_authenticated");
+  const guestSelectedAccess = await resolveProductAccess(
+    {},
+    {
+      ...accessPractice,
+      is_free: true,
+      guest_access_enabled: true,
+      catalog_visibility: "selected_users",
+      is_catalog_listed: false,
+    },
+    null,
+  );
+  assert.equal(guestSelectedAccess.canListen, false);
+  assert.equal(
+    await canAccessCourseContent(
+      {},
+      {
+        ...accessPractice,
+        is_free: true,
+        product_kind: "course",
+        publication_class: "course",
+      },
+      null,
+    ),
+    false,
+  );
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => catalog(),
+    getPractice: async () => ({ practice: listedPractice, error: false }),
+    loadSession: async (_supabase, _author, _slug, linkedUserId) => {
+      assert.equal(linkedUserId, null);
+      return sessionPayload;
+    },
+  });
+  const guestFull = await getMaxPlaybackSession(null, "author", "product");
+  assert.equal(guestFull.ok, true);
+  assert.equal(guestFull.playbackMode, "full");
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "course" }],
+    getPractice: async () => ({
+      practice: {
+        ...listedPractice,
+        is_free: true,
+        product_kind: "course",
+        publication_class: "course",
+      },
+      error: false,
+    }),
+    loadSession: async (_supabase, _author, _slug, linkedUserId) => {
+      assert.equal(linkedUserId, null);
+      return { ok: false, reason: "unavailable" };
+    },
+    resolvePreview: async () => ({ ok: false, reason: "preview_unavailable" }),
+  });
+  const guestCourse = await getMaxPlaybackSession(null, "author", "course");
+  assert.deepEqual(guestCourse, { ok: false, reason: "preview_unavailable" });
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => catalog(),
+    getPractice: async () => ({ practice: listedPractice, error: false }),
+    signAudio: async (input) => {
+      assert.equal(input.userId, null);
+      return { ok: false, reason: "access_required" };
+    },
+  });
+  const guestDeniedSign = await signMaxPlaybackAudio(null, "author", "product", "track-1");
+  assert.deepEqual(guestDeniedSign, { ok: false, reason: "access_required" });
 } finally {
   setMaxPlaybackDepsForTests(null);
 }

@@ -94,7 +94,8 @@ assert.match(scriptSource, /window\.location\.replace\(fallback\)/);
 assert.match(scriptSource, /inMax: nextSnapshot\.inMax/);
 assert.match(shellCopySource, /АудиоЛад открыт внутри MAX/);
 assert.match(shellCopySource, /Подключение к MAX…/);
-assert.match(shellCopySource, /Подключение к MAX подтверждено/);
+assert.match(shellCopySource, /АудиоЛад открыт в MAX/);
+assert.doesNotMatch(shellCopySource, /Подключение к MAX подтверждено/);
 assert.doesNotMatch(
   scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /initDataUnsafe/,

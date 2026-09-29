@@ -99,18 +99,26 @@ assert.match(resolver, /\.eq\("catalog_visibility", "listed"\)/);
 assert.match(resolver, /\.from\("promo_pages"\)/);
 assert.match(shellClient, /readMaxResolvedStartTarget/);
 assert.match(bridge, /initialStartTarget=\{startTarget\}/);
-assert.match(bridge, /showGuestStartProduct/);
-assert.match(bridge, /view\.phase === "guest_unlinked"/);
-assert.match(bridge, /guestMode=\{showGuestStartProduct\}/);
+assert.match(
+  bridge,
+  /view\.phase === "linked_authenticated" \|\| view\.phase === "guest_unlinked"/,
+);
+assert.match(bridge, /guestMode=\{view\.phase === "guest_unlinked"\}/);
+assert.doesNotMatch(bridge, /guest_unlinked" && startTarget\?\.kind === "product"/);
 assert.match(bridge, /onRequestLogin=\{handleOpenLogin\}/);
+assert.match(bridge, /onRequestSignup=\{handleOpenSignup\}/);
 assert.match(home, /initialStartTarget\?\.kind === "promo"/);
 assert.match(home, /initialStartTarget\?\.kind === "product"/);
 assert.match(home, /guestMode = false/);
-assert.match(home, /status: "login_required"/);
-assert.match(home, /payload\?\.reason === "unlinked"/);
-assert.match(home, /Войти или зарегистрироваться/);
+assert.doesNotMatch(home, /status: "login_required"/);
+assert.doesNotMatch(home, /payload\?\.reason === "unlinked"/);
+assert.doesNotMatch(home, /Войти или зарегистрироваться/);
+assert.match(home, /PLAY_ACTION_LABEL/);
+assert.match(home, /PREVIEW_ACTION_LABEL/);
+assert.match(home, /<MaxBottomNav/);
+assert.doesNotMatch(home, /!guestMode \? \(\s*<MaxBottomNav/);
 assert.match(home, /interactiveActionsEnabled=\{!guestMode\}/);
-assert.match(home, /productSlug: initialStartTarget\.productSlug/);
+assert.match(home, /slug: initialStartTarget\.productSlug/);
 assert.match(authorProductForm, /Адрес продукта в MAX/);
 assert.match(authorProductForm, /buildMaxProductDeepLink\(practiceId\)/);
 assert.match(authorProductForm, /handleCopyMaxProductLink/);
